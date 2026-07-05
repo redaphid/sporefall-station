@@ -1,0 +1,8 @@
+node_modules/
+dist/
+outputs/
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+*.log

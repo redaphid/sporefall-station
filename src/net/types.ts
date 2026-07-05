@@ -1,0 +1,50 @@
+export type PeerId = string
+
+export const PROTOCOL_VERSION = 1
+
+/** GATT service/characteristic UUIDs (BLE transport). */
+export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'
+export const BLE_DATA_H2C_UUID = '5f47a3c1-9b1e-4a52-8f6d-2c3e4b5a6d70'
+export const BLE_DATA_C2H_UUID = '5f47a3c2-9b1e-4a52-8f6d-2c3e4b5a6d70'
+export const BLE_LOBBY_INFO_UUID = '5f47a3c3-9b1e-4a52-8f6d-2c3e4b5a6d70'
+
+export const SNAPSHOT_INTERVAL_TICKS = 3 // 10Hz at 30Hz sim
+export const INPUT_SEND_HZ = 20
+
+/** First byte of every message. */
+export const MsgType = {
+  // Binary hot path
+  Snapshot: 1,
+  Input: 2,
+  // JSON cold path (lobby/control/events)
+  Hello: 10,
+  Welcome: 11,
+  Reject: 12,
+  LobbyState: 13,
+  GameStart: 14,
+  Ready: 15,
+  Go: 16,
+  Events: 17,
+  State: 18,
+} as const
+export type MsgTypeId = (typeof MsgType)[keyof typeof MsgType]
+
+export type TransportEvent =
+  | { type: 'peerConnected'; peer: PeerId }
+  | { type: 'peerDisconnected'; peer: PeerId; reason: 'remote' | 'local' | 'error' }
+  | { type: 'data'; peer: PeerId; bytes: Uint8Array }
+
+export interface Transport {
+  readonly role: 'host' | 'client'
+  /** Max bytes per sendPacket call (BLE: MTU-3 clamped to 244; dev: 4096). */
+  readonly maxPacket: number
+  start(): Promise<void>
+  stop(): Promise<void>
+  /**
+   * Ordered, reliable-while-connected delivery of one packet.
+   * Resolves when the underlying stack accepts it — this paces the send queue.
+   */
+  sendPacket(peer: PeerId, bytes: Uint8Array): Promise<void>
+  on(handler: (e: TransportEvent) => void): () => void
+  peers(): PeerId[]
+}

@@ -9,6 +9,7 @@ export const SnapFlags = {
   Stunned: 1 << 2,
   DoorOpen: 1 << 3,
   HitFlash: 1 << 4,
+  Cloaked: 1 << 5,
 } as const
 
 export interface EntitySnap {

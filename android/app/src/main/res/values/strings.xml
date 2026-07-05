@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Streets of Rogue-ish</string>
+    <string name="title_activity_main">Streets of Rogue-ish</string>
+    <string name="package_name">com.hypnodroid.streetsofrogueish</string>
+    <string name="custom_url_scheme">com.hypnodroid.streetsofrogueish</string>
+</resources>

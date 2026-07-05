@@ -1,6 +1,6 @@
 import { Application, Container } from 'pixi.js'
 import type { Level } from '../game/levelgen/level'
-import type { Entity } from '../game/entity'
+import type { RenderView } from '../app/session'
 import { createArt, type ArtRegistry } from './art'
 import { Camera } from './camera'
 import { EntityViews } from './sprites'
@@ -10,7 +10,7 @@ export interface GameRenderer {
   app: Application
   camera: Camera
   setLevel(level: Level): void
-  draw(entities: readonly Entity[], alpha: number, dt: number): void
+  draw(view: RenderView, alpha: number, dt: number): void
 }
 
 export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> => {
@@ -36,6 +36,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   const viewRect = { x: 0, y: 0, w: 0, h: 0 }
   let levelW = 0
   let levelH = 0
+  let lastEventTick = -1
 
   return {
     app,
@@ -46,9 +47,19 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       levelH = level.h
       camera.snapTo(level.spawn.x, level.spawn.y)
     },
-    draw(ents: readonly Entity[], alpha: number, dt: number): void {
+    draw(view: RenderView, alpha: number, dt: number): void {
+      // Event-driven juice: shake hard when our player is hit, lightly on deaths.
+      // Events live for one sim tick but draw runs every frame — process once per tick.
+      if (view.tick !== lastEventTick) {
+        lastEventTick = view.tick
+        for (const ev of view.events) {
+          if (ev.type === 'hit' && view.self && ev.targetId === view.self.id) camera.shake(0.12)
+          else if (ev.type === 'death') camera.shake(0.05)
+          else if (ev.type === 'explosion') camera.shake(0.2)
+        }
+      }
       camera.update(dt)
-      entities.update(ents, alpha)
+      entities.update(view.entities, alpha, view.tick)
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
       tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)

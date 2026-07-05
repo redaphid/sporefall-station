@@ -10,6 +10,8 @@ export const TILE_PX = 32
 export interface ArtRegistry {
   tile(tileId: number): Texture
   entity(archetype: string): Texture
+  /** White silhouette of the entity texture, swapped in during hit flash. */
+  entityFlash(archetype: string): Texture
 }
 
 const TILE_COLORS: Record<number, number> = {
@@ -52,25 +54,57 @@ export const createArt = (renderer: Renderer): ArtRegistry => {
     return tex
   }
 
+  const drawEntity = (archetype: string, colorOverride?: number): Texture => {
+    if (archetype === 'projectile') {
+      const g = new Graphics().circle(4, 4, 4).fill(colorOverride ?? 0xffe066)
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
+    if (archetype.startsWith('pickup.')) {
+      const s = TILE_PX * 0.45
+      const g = new Graphics()
+        .roundRect(0, 0, s, s, 3)
+        .fill(colorOverride ?? 0xd4af37)
+        .roundRect(0, 0, s, s, 3)
+        .stroke({ width: 2, color: 0x000000, alpha: 0.4 })
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
+    const color = colorOverride ?? ENTITY_COLORS[archetype] ?? ENTITY_COLORS.default
+    const r = TILE_PX * 0.35
+    const g = new Graphics()
+      .circle(r, r, r)
+      .fill(color)
+      .circle(r, r, r)
+      .stroke({ width: 2, color: 0x000000, alpha: 0.35 })
+      // Facing notch pointing +x; sprite rotation orients it.
+      .poly([r * 1.6, r * 0.7, r * 2.0, r, r * 1.6, r * 1.3])
+      .fill(colorOverride ?? 0xffffff)
+    const tex = renderer.generateTexture(g)
+    g.destroy()
+    return tex
+  }
+
   const entity = (archetype: string): Texture => {
     let tex = entityCache.get(archetype)
     if (!tex) {
-      const color = ENTITY_COLORS[archetype] ?? ENTITY_COLORS.default
-      const r = TILE_PX * 0.35
-      const g = new Graphics()
-        .circle(r, r, r)
-        .fill(color)
-        .circle(r, r, r)
-        .stroke({ width: 2, color: 0x000000, alpha: 0.35 })
-        // Facing notch pointing +x; sprite rotation orients it.
-        .poly([r * 1.6, r * 0.7, r * 2.0, r, r * 1.6, r * 1.3])
-        .fill(0xffffff)
-      tex = renderer.generateTexture(g)
-      g.destroy()
+      tex = drawEntity(archetype)
       entityCache.set(archetype, tex)
     }
     return tex
   }
 
-  return { tile, entity }
+  const flashCache = new Map<string, Texture>()
+  const entityFlash = (archetype: string): Texture => {
+    let tex = flashCache.get(archetype)
+    if (!tex) {
+      tex = drawEntity(archetype, 0xffffff)
+      flashCache.set(archetype, tex)
+    }
+    return tex
+  }
+
+  return { tile, entity, entityFlash }
 }

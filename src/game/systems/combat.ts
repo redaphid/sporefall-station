@@ -1,0 +1,112 @@
+import { WEAPONS } from '../data/items'
+import { NPCS } from '../data/npcs'
+import { makeEntity, type Entity } from '../entity'
+import type { InputCmd } from '../types'
+import { addEntity, type World } from '../world'
+
+const IFRAME_TICKS = 5
+const FLASH_TICKS = 3
+
+export const applyDamage = (
+  w: World,
+  target: Entity,
+  amount: number,
+  fromX: number,
+  fromY: number,
+  knockback: number,
+  attackerId: number,
+): void => {
+  if (!target.health || target.dead || target.health.iframes > 0) return
+  target.health.hp -= amount
+  target.health.iframes = IFRAME_TICKS
+  if (target.status) {
+    target.status.hitFlashUntil = w.tick + FLASH_TICKS
+    target.status.sleep = 0 // damage wakes sleepers
+  }
+  const dx = target.pos.x - fromX
+  const dy = target.pos.y - fromY
+  const len = Math.hypot(dx, dy) || 1
+  target.vel.x += (dx / len) * knockback
+  target.vel.y += (dy / len) * knockback
+  w.events.push({ type: 'hit', x: target.pos.x, y: target.pos.y, targetId: target.id, amount })
+
+  // Civilians panic when hurt
+  if (target.ai && NPCS[target.archetype]?.fleesOnDamage) {
+    target.ai.mode = 'flee'
+    target.ai.targetId = attackerId
+    target.ai.thinkAt = w.tick // re-think immediately
+  }
+
+  if (target.health.hp <= 0) kill(w, target)
+}
+
+const kill = (w: World, target: Entity): void => {
+  w.events.push({ type: 'death', x: target.pos.x, y: target.pos.y, entityId: target.id })
+  if (target.playerCtl) {
+    // Placeholder until M3 downed/revive: respawn at level start with full hp.
+    target.health!.hp = target.health!.max
+    target.pos.x = w.level.spawn.x
+    target.pos.y = w.level.spawn.y
+    target.vel.x = 0
+    target.vel.y = 0
+    return
+  }
+  target.dead = true
+}
+
+/** Swing at the nearest live target inside range and a 90° arc around facing. */
+export const meleeAttack = (w: World, attacker: Entity, damage: number, range: number, knockback: number): boolean => {
+  const fx = Math.cos(attacker.facing)
+  const fy = Math.sin(attacker.facing)
+  let best: Entity | null = null
+  let bestDist = Infinity
+  for (const e of w.entities) {
+    if (e === attacker || e.dead || !e.health) continue
+    const dx = e.pos.x - attacker.pos.x
+    const dy = e.pos.y - attacker.pos.y
+    const dist = Math.hypot(dx, dy)
+    // Weapon range is edge-to-edge: include both bodies' radii.
+    if (dist > range + attacker.radius + e.radius) continue
+    // Within 90° of facing (or point-blank)
+    if (dist > 0.3 && (dx * fx + dy * fy) / dist < 0.5) continue
+    if (dist < bestDist) {
+      best = e
+      bestDist = dist
+    }
+  }
+  if (!best) return false
+  applyDamage(w, best, damage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
+  return true
+}
+
+export const spawnProjectile = (
+  w: World,
+  owner: Entity,
+  damage: number,
+  speed: number,
+  rangeTiles: number,
+): void => {
+  const e = makeEntity('projectile', 'projectile', owner.pos.x, owner.pos.y, 0.15)
+  e.facing = owner.facing
+  e.vel.x = Math.cos(owner.facing) * speed
+  e.vel.y = Math.sin(owner.facing) * speed
+  e.projectile = { ownerId: owner.id, damage, ttl: Math.ceil((rangeTiles / speed) * 30) }
+  addEntity(w, e)
+}
+
+/** Player attack inputs. NPC attacks happen in the AI system. */
+export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
+  for (const e of w.entities) {
+    if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
+    if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
+    const cmd = inputs.get(e.playerCtl.playerId)
+    if (!cmd?.attack || e.combat.cooldown > 0) continue
+    const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
+    e.combat.cooldown = weapon.cooldownTicks
+    if (weapon.kind === 'melee') {
+      meleeAttack(w, e, weapon.damage, weapon.range, weapon.knockback)
+    } else {
+      spawnProjectile(w, e, weapon.damage, weapon.projectileSpeed ?? 12, weapon.range)
+    }
+  }
+}

@@ -2,7 +2,12 @@ import type { Entity } from './entity'
 import { generateLevel } from './levelgen/generate'
 import { isSolidTile, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
+import { aiSystem } from './systems/ai'
+import { combatSystem } from './systems/combat'
+import { interactionSystem } from './systems/interaction'
 import { movementSystem } from './systems/movement'
+import { projectileSystem } from './systems/projectiles'
+import { statusSystem } from './systems/status'
 import type { EntityId, InputCmd, SimEvent } from './types'
 
 export interface MissionState {
@@ -57,10 +62,9 @@ export const addEntity = (w: World, e: Entity): Entity => {
   return e
 }
 
-/** Is this world tile blocked, considering walls and closed doors? */
-export const isBlocked = (w: World, tx: number, ty: number): boolean => {
-  if (isSolidTile(w.level, tx, ty)) return true
-  // Closed doors block. Few doors per level — linear scan is fine until profiling says otherwise.
+/** Is a closed door standing on this tile? */
+export const doorClosedAt = (w: World, tx: number, ty: number): boolean => {
+  // Few doors per level — linear scan is fine until profiling says otherwise.
   for (const e of w.entities) {
     if (e.door && !e.door.open && !e.dead && Math.floor(e.pos.x) === tx && Math.floor(e.pos.y) === ty) {
       return true
@@ -69,13 +73,22 @@ export const isBlocked = (w: World, tx: number, ty: number): boolean => {
   return false
 }
 
+/** Is this world tile blocked, considering walls and closed doors? */
+export const isBlocked = (w: World, tx: number, ty: number): boolean =>
+  isSolidTile(w.level, tx, ty) || doorClosedAt(w, tx, ty)
+
 export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   w.events.length = 0
   for (const e of w.entities) {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
+  aiSystem(w)
   movementSystem(w, inputs)
+  combatSystem(w, inputs)
+  projectileSystem(w)
+  interactionSystem(w)
+  statusSystem(w)
   sweepDead(w)
   w.tick++
 }

@@ -30,7 +30,12 @@ export interface Entity {
   pos: Vec2
   /** Position at the previous tick — used for render interpolation. */
   prevPos: Vec2
+  /** Knockback/impulse velocity (tiles/sec), decays with friction. */
   vel: Vec2
+  /** Desired movement direction (unit vector), set by input or AI. */
+  intent: Vec2
+  /** Walk speed in tiles/sec. */
+  speed: number
   radius: number
   facing: number // radians
 
@@ -68,6 +73,8 @@ export const makeEntity = (
   pos: { x, y },
   prevPos: { x, y },
   vel: { x: 0, y: 0 },
+  intent: { x: 0, y: 0 },
+  speed: 0,
   radius,
   facing: 0,
 })

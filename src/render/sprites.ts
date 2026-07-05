@@ -6,6 +6,7 @@ interface View {
   sprite: Sprite
   archetype: string
   seen: boolean
+  flashing: boolean
 }
 
 /** Pool of entity sprites keyed by entity id, diffed against the sim each frame. */
@@ -17,7 +18,7 @@ export class EntityViews {
     this.root.sortableChildren = true
   }
 
-  update(entities: readonly Entity[], alpha: number): void {
+  update(entities: readonly Entity[], alpha: number, tick: number): void {
     for (const view of this.views.values()) view.seen = false
 
     for (const e of entities) {
@@ -31,14 +32,20 @@ export class EntityViews {
         const sprite = new Sprite(this.art.entity(e.archetype))
         sprite.anchor.set(0.5)
         this.root.addChild(sprite)
-        view = { sprite, archetype: e.archetype, seen: true }
+        view = { sprite, archetype: e.archetype, seen: true, flashing: false }
         this.views.set(e.id, view)
       }
       view.seen = true
+      const flashing = e.status !== undefined && e.status.hitFlashUntil > tick
+      if (flashing !== view.flashing) {
+        view.flashing = flashing
+        view.sprite.texture = flashing ? this.art.entityFlash(e.archetype) : this.art.entity(e.archetype)
+      }
+      // Pickups don't rotate; actors face their heading.
       const x = e.prevPos.x + (e.pos.x - e.prevPos.x) * alpha
       const y = e.prevPos.y + (e.pos.y - e.prevPos.y) * alpha
       view.sprite.position.set(x * TILE_PX, y * TILE_PX)
-      view.sprite.rotation = e.facing
+      view.sprite.rotation = e.kind === 'pickup' || e.kind === 'door' ? 0 : e.facing
       view.sprite.zIndex = y
     }
 

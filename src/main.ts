@@ -1,33 +1,20 @@
-import { makeEntity } from './game/entity'
+import { HostSession } from './app/hostSession'
 import { SIM_DT } from './game/types'
-import { addEntity, createWorld, tickWorld, type World } from './game/world'
 import { createKeyboard } from './input/keyboard'
 import { createRenderer } from './render/renderer'
-import type { InputCmd } from './game/types'
+import { createHud } from './ui/hud'
 
 const boot = async (): Promise<void> => {
   const mount = document.getElementById('app')!
+  const uiMount = document.getElementById('ui')!
   const renderer = await createRenderer(mount)
+  const hud = createHud(uiMount)
 
   const params = new URLSearchParams(location.search)
-  const seed = Number(params.get('seed')) || 1
+  const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
 
-  const world: World = createWorld(seed, 1)
-  const player = addEntity(world, makeEntity('player', 'player', world.level.spawn.x, world.level.spawn.y))
-  player.playerCtl = {
-    playerId: 0,
-    classId: 'soldier',
-    abilityCooldown: 0,
-    inventory: [],
-    cash: 0,
-    crimeUntilTick: 0,
-  }
-  player.health = { hp: 100, max: 100, iframes: 0 }
-
-  renderer.setLevel(world.level)
-
-  const keyboard = createKeyboard()
-  const inputs = new Map<number, InputCmd>()
+  const session = new HostSession(seed, createKeyboard())
+  renderer.setLevel(session.world.level)
 
   let acc = 0
   let last = performance.now()
@@ -36,18 +23,18 @@ const boot = async (): Promise<void> => {
     acc += dt
     last = now
     while (acc >= SIM_DT) {
-      inputs.set(0, keyboard.sample())
-      tickWorld(world, inputs)
+      session.tick()
       acc -= SIM_DT
     }
     const alpha = acc / SIM_DT
-    const p = world.byId.get(player.id)
-    if (p) {
-      const px = p.prevPos.x + (p.pos.x - p.prevPos.x) * alpha
-      const py = p.prevPos.y + (p.pos.y - p.prevPos.y) * alpha
+    const view = session.renderView()
+    if (view.self) {
+      const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
+      const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
       renderer.camera.follow(px, py, dt)
     }
-    renderer.draw(world.entities, alpha, dt)
+    renderer.draw(view, alpha, dt)
+    hud.update(view)
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

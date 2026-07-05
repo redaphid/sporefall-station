@@ -83,27 +83,29 @@ const circleFits = (
 export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   const blocked = (tx: number, ty: number): boolean => isBlocked(w, tx, ty)
   for (const e of w.entities) {
-    if (e.dead) continue
-    if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
+    if (e.dead || e.projectile) continue
+    const stunned = e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)
 
-    let ix = 0
-    let iy = 0
-    if (e.playerCtl && !e.playerCtl.downed) {
+    // Players write intent from their input; NPCs got theirs from the AI system.
+    if (e.playerCtl && !e.playerCtl.downed && !stunned) {
+      e.intent.x = 0
+      e.intent.y = 0
       const cmd = inputs.get(e.playerCtl.playerId)
       if (cmd) {
         const len = Math.hypot(cmd.moveX, cmd.moveY)
         if (len > 0.01) {
           const norm = len > 1 ? 1 / len : 1
-          ix = cmd.moveX * norm
-          iy = cmd.moveY * norm
-          e.facing = Math.atan2(iy, ix)
+          e.intent.x = cmd.moveX * norm
+          e.intent.y = cmd.moveY * norm
+          e.facing = Math.atan2(e.intent.y, e.intent.x)
         }
       }
     }
 
-    const speed = e.playerCtl ? PLAYER_SPEED : 0
-    const dx = (ix * speed + e.vel.x) * SIM_DT
-    const dy = (iy * speed + e.vel.y) * SIM_DT
+    const ix = stunned ? 0 : e.intent.x
+    const iy = stunned ? 0 : e.intent.y
+    const dx = (ix * e.speed + e.vel.x) * SIM_DT
+    const dy = (iy * e.speed + e.vel.y) * SIM_DT
     if (dx !== 0 || dy !== 0) moveAndCollide(e, dx, dy, blocked)
 
     // Knockback decay
@@ -112,5 +114,31 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
     e.vel.y *= decay
     if (Math.abs(e.vel.x) < 0.01) e.vel.x = 0
     if (Math.abs(e.vel.y) < 0.01) e.vel.y = 0
+  }
+
+  pushApart(w, blocked)
+}
+
+/** Soft separation between live actors so they don't stack. */
+const pushApart = (w: World, blocked: (tx: number, ty: number) => boolean): void => {
+  const actors = w.entities
+  for (let i = 0; i < actors.length; i++) {
+    const a = actors[i]
+    if (a.dead || !a.health || a.projectile) continue
+    for (let j = i + 1; j < actors.length; j++) {
+      const b = actors[j]
+      if (b.dead || !b.health || b.projectile) continue
+      const dx = b.pos.x - a.pos.x
+      const dy = b.pos.y - a.pos.y
+      const rr = a.radius + b.radius
+      const d2 = dx * dx + dy * dy
+      if (d2 >= rr * rr || d2 === 0) continue
+      const d = Math.sqrt(d2)
+      const push = ((rr - d) / 2) * 0.5 // soft: resolve half the overlap per tick
+      const nx = dx / d
+      const ny = dy / d
+      moveAndCollide(a, -nx * push, -ny * push, blocked)
+      moveAndCollide(b, nx * push, ny * push, blocked)
+    }
   }
 }

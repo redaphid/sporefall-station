@@ -49,7 +49,9 @@ export interface Entity {
     inventory: ItemStack[]
     cash: number
     crimeUntilTick: number
-    downed?: { bleedTicks: number }
+    downed?: { bleedTicks: number; reviveProgress: number }
+    /** Timed action in progress (lockpicking). Moving cancels it. */
+    channel?: { kind: 'lockpick'; targetId: EntityId; ticksLeft: number }
   }
   projectile?: { ownerId: EntityId; damage: number; ttl: number }
   pickup?: { itemId: string; qty: number }

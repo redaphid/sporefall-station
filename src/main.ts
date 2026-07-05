@@ -3,18 +3,21 @@ import { SIM_DT } from './game/types'
 import { createKeyboard } from './input/keyboard'
 import { createRenderer } from './render/renderer'
 import { createHud } from './ui/hud'
+import { createScreens } from './ui/screens'
 
 const boot = async (): Promise<void> => {
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
   const renderer = await createRenderer(mount)
   const hud = createHud(uiMount)
+  const screens = createScreens(uiMount)
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
 
   const session = new HostSession(seed, createKeyboard())
   renderer.setLevel(session.world.level)
+  let currentLevel = session.world.level
 
   let acc = 0
   let last = performance.now()
@@ -28,6 +31,11 @@ const boot = async (): Promise<void> => {
     }
     const alpha = acc / SIM_DT
     const view = session.renderView()
+    // Floor changed: rebuild the tile layer and snap the camera to the new spawn
+    if (view.level !== currentLevel) {
+      currentLevel = view.level
+      renderer.setLevel(view.level)
+    }
     if (view.self) {
       const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
       const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
@@ -35,6 +43,7 @@ const boot = async (): Promise<void> => {
     }
     renderer.draw(view, alpha, dt)
     hud.update(view)
+    screens.update(view)
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

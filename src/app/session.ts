@@ -8,6 +8,10 @@ export interface RenderView {
   events: readonly SimEvent[]
   tick: number
   level: Level
+  floor: number
+  missionText: string
+  missionComplete: boolean
+  gameOver: boolean
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
 }

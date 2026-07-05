@@ -23,24 +23,28 @@ export class EntityViews {
 
     for (const e of entities) {
       if (e.dead) continue
+      // Doors render differently open vs closed; treat state as part of identity.
+      const artKey = e.door ? (e.door.open ? 'door.open' : 'door') : e.archetype
       let view = this.views.get(e.id)
-      if (!view || view.archetype !== e.archetype) {
+      if (!view || view.archetype !== artKey) {
         if (view) {
           this.root.removeChild(view.sprite)
           view.sprite.destroy()
         }
-        const sprite = new Sprite(this.art.entity(e.archetype))
+        const sprite = new Sprite(this.art.entity(artKey))
         sprite.anchor.set(0.5)
         this.root.addChild(sprite)
-        view = { sprite, archetype: e.archetype, seen: true, flashing: false }
+        view = { sprite, archetype: artKey, seen: true, flashing: false }
         this.views.set(e.id, view)
       }
       view.seen = true
       const flashing = e.status !== undefined && e.status.hitFlashUntil > tick
       if (flashing !== view.flashing) {
         view.flashing = flashing
-        view.sprite.texture = flashing ? this.art.entityFlash(e.archetype) : this.art.entity(e.archetype)
+        view.sprite.texture = flashing ? this.art.entityFlash(artKey) : this.art.entity(artKey)
       }
+      // Downed players lie flat and faded
+      view.sprite.alpha = e.playerCtl?.downed ? 0.45 : 1
       // Pickups don't rotate; actors face their heading.
       const x = e.prevPos.x + (e.pos.x - e.prevPos.x) * alpha
       const y = e.prevPos.y + (e.pos.y - e.prevPos.y) * alpha

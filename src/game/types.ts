@@ -40,3 +40,5 @@ export type SimEvent =
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'missionComplete'; description: string }
   | { type: 'floorChange'; floor: number }
+  | { type: 'noise'; x: number; y: number }
+  | { type: 'runOver'; floor: number }

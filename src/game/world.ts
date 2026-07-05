@@ -5,6 +5,7 @@ import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { combatSystem } from './systems/combat'
 import { interactionSystem } from './systems/interaction'
+import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
 import { projectileSystem } from './systems/projectiles'
 import { statusSystem } from './systems/status'
@@ -30,30 +31,38 @@ export interface World {
   mission: MissionState
   /** Host-only sim randomness (AI dice, loot). Clients never draw from it. */
   rng: Rng
+  /** Root PRNG for the run; per-floor sim streams fork from it. */
+  baseRng: Rng
   /** Per-tick FX/net events; consumed after each tick. */
   events: SimEvent[]
   /** City heat 0..3 — cop aggro threshold. */
   alarm: number
+  gameOver: boolean
 }
 
-export const createWorld = (seed: number, floor: number): World => ({
-  tick: 0,
-  seed,
-  floor,
-  level: generateLevel(seed, floor),
-  entities: [],
-  byId: new Map(),
-  nextId: 1,
-  mission: {
-    template: 'reach',
-    complete: true,
-    exitUnlocked: true,
-    description: 'Reach the exit',
-  },
-  rng: mulberry32(seed).fork(`sim:${floor}`),
-  events: [],
-  alarm: 0,
-})
+export const createWorld = (seed: number, floor: number): World => {
+  const baseRng = mulberry32(seed)
+  return {
+    tick: 0,
+    seed,
+    floor,
+    level: generateLevel(seed, floor),
+    entities: [],
+    byId: new Map(),
+    nextId: 1,
+    mission: {
+      template: 'reach',
+      complete: true,
+      exitUnlocked: true,
+      description: 'Reach the exit',
+    },
+    rng: baseRng.fork(`sim:${floor}`),
+    baseRng,
+    events: [],
+    alarm: 0,
+    gameOver: false,
+  }
+}
 
 export const addEntity = (w: World, e: Entity): Entity => {
   e.id = w.nextId++
@@ -87,8 +96,9 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   movementSystem(w, inputs)
   combatSystem(w, inputs)
   projectileSystem(w)
-  interactionSystem(w)
+  interactionSystem(w, inputs)
   statusSystem(w)
+  missionSystem(w)
   sweepDead(w)
   w.tick++
 }

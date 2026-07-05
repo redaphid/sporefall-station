@@ -1,6 +1,7 @@
 import type { Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
 import { populateWorld } from '../game/populate'
+import { setupFloor } from '../game/systems/missions'
 import { createWorld, tickWorld, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -23,6 +24,7 @@ export class HostSession implements Session {
   ) {
     this.world = createWorld(seed, 1)
     populateWorld(this.world)
+    setupFloor(this.world)
     this.self = spawnPlayer(this.world, 0, 'soldier', this.world.level.spawn.x, this.world.level.spawn.y)
   }
 
@@ -39,6 +41,10 @@ export class HostSession implements Session {
       events: this.world.events,
       tick: this.world.tick,
       level: this.world.level,
+      floor: this.world.floor,
+      missionText: this.world.mission.description,
+      missionComplete: this.world.mission.complete,
+      gameOver: this.world.gameOver,
       self: this.self,
     }
   }

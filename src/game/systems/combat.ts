@@ -17,6 +17,7 @@ export const applyDamage = (
   attackerId: number,
 ): void => {
   if (!target.health || target.dead || target.health.iframes > 0) return
+  if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
   if (target.status) {
@@ -37,16 +38,40 @@ export const applyDamage = (
     target.ai.thinkAt = w.tick // re-think immediately
   }
 
+  markCrime(w, target, attackerId)
+
   if (target.health.hp <= 0) kill(w, target)
+}
+
+const CRIME_TICKS = 15 * 30 // stay "wanted" for 15s
+
+/** Attacking civilians or cops is a crime: flags the player, panics witnesses, raises the alarm. */
+const markCrime = (w: World, target: Entity, attackerId: number): void => {
+  const attacker = w.byId.get(attackerId)
+  if (!attacker?.playerCtl || !target.ai) return
+  if (target.ai.faction !== 'civ' && target.ai.faction !== 'cop') return
+  attacker.playerCtl.crimeUntilTick = w.tick + CRIME_TICKS
+  for (const witness of w.entities) {
+    if (!witness.ai || witness.dead || witness === target) continue
+    const dist = Math.hypot(witness.pos.x - target.pos.x, witness.pos.y - target.pos.y)
+    if (dist > witness.ai.sightRange) continue
+    if (witness.ai.faction === 'civ' && NPCS[witness.archetype]?.fleesOnDamage) {
+      witness.ai.mode = 'flee'
+      witness.ai.targetId = attackerId
+      witness.ai.thinkAt = w.tick
+    } else if (witness.ai.faction === 'cop') {
+      if (w.alarm < 3) w.alarm++
+      witness.ai.thinkAt = w.tick // cop reacts immediately
+    }
+  }
 }
 
 const kill = (w: World, target: Entity): void => {
   w.events.push({ type: 'death', x: target.pos.x, y: target.pos.y, entityId: target.id })
   if (target.playerCtl) {
-    // Placeholder until M3 downed/revive: respawn at level start with full hp.
-    target.health!.hp = target.health!.max
-    target.pos.x = w.level.spawn.x
-    target.pos.y = w.level.spawn.y
+    // Downed: crawl-immobile, bleeding out; teammates can revive (interaction system).
+    target.health!.hp = 0
+    target.playerCtl.downed = { bleedTicks: 30 * 30, reviveProgress: 0 }
     target.vel.x = 0
     target.vel.y = 0
     return

@@ -26,6 +26,7 @@ const TILE_COLORS: Record<number, number> = {
 const ENTITY_COLORS: Record<string, number> = {
   player: 0x7fd17f,
   thug: 0xd17f7f,
+  boss: 0xe0483f,
   cop: 0x7f9fd1,
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
@@ -55,6 +56,25 @@ export const createArt = (renderer: Renderer): ArtRegistry => {
   }
 
   const drawEntity = (archetype: string, colorOverride?: number): Texture => {
+    if (archetype === 'door') {
+      const g = new Graphics()
+        .rect(0, 0, TILE_PX, TILE_PX)
+        .fill(colorOverride ?? 0x8a6a3f)
+        .rect(2, 2, TILE_PX - 4, TILE_PX - 4)
+        .stroke({ width: 2, color: 0x000000, alpha: 0.45 })
+        .circle(TILE_PX * 0.78, TILE_PX * 0.5, 2)
+        .fill(0x222222)
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
+    if (archetype === 'door.open') {
+      // Open door: slim panel against the jamb
+      const g = new Graphics().rect(0, 0, 6, TILE_PX).fill(colorOverride ?? 0x8a6a3f)
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
     if (archetype === 'projectile') {
       const g = new Graphics().circle(4, 4, 4).fill(colorOverride ?? 0xffe066)
       const tex = renderer.generateTexture(g)

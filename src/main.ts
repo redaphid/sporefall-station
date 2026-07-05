@@ -6,11 +6,13 @@ import { SIM_DT } from './game/types'
 import { createKeyboard } from './input/keyboard'
 import { createTouch, mergeInputs } from './input/touch'
 import type { InputSource } from './input/input'
+import { Capacitor } from '@capacitor/core'
+import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import { pickClass } from './ui/classSelect'
 import { createHud } from './ui/hud'
-import { createLobbyUi, pickMode, type GameMode } from './ui/menu'
+import { createLobbyUi, pickHost, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 
 const boot = async (): Promise<void> => {
@@ -51,8 +53,12 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
     return session
   }
 
+  const native = Capacitor.isNativePlatform()
+
   if (mode === 'host') {
-    const transport = new BroadcastChannelTransport('host', deps.room)
+    const transport = native
+      ? new BleHostTransport(`SoR ${deps.name}`)
+      : new BroadcastChannelTransport('host', deps.room)
     const session = new NetHostSession(deps.seed, deps.classId, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
@@ -67,8 +73,20 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   }
 
   // join
-  const transport = new BroadcastChannelTransport('client', deps.room)
+  const transport = native ? new BleClientTransport() : new BroadcastChannelTransport('client', deps.room)
   const session = new NetClientSession(deps.name, deps.classId, deps.input, transport)
+
+  if (transport instanceof BleClientTransport) {
+    // BLE needs an explicit pick-a-host step before the lobby.
+    await transport.start()
+    const scanCtl: { stop: (() => Promise<void>) | null } = { stop: null }
+    const deviceId = await pickHost(deps.uiMount, (onFound) => {
+      void transport.scan(onFound).then((stop) => (scanCtl.stop = stop))
+    })
+    await scanCtl.stop?.()
+    await transport.connect(deviceId)
+  }
+
   const lobby = createLobbyUi(deps.uiMount, false)
   lobby.setStatus('Looking for a host…')
   session.onLobbyChange = (msg) => lobby.setPlayers(msg.players)

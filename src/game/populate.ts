@@ -74,7 +74,7 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number): Ent
   e.speed = def.speed
   e.health = { hp: def.hp, max: def.hp, iframes: 0 }
   e.combat = { weapon: def.weapon, cooldown: 0 }
-  e.status = { stun: 0, sleep: 0, hitFlashUntil: 0 }
+  e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
   e.ai = {
     mode: 'idle',
     faction: def.faction,

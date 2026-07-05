@@ -43,8 +43,9 @@ export class EntityViews {
         view.flashing = flashing
         view.sprite.texture = flashing ? this.art.entityFlash(artKey) : this.art.entity(artKey)
       }
-      // Downed players lie flat and faded
-      view.sprite.alpha = e.playerCtl?.downed ? 0.45 : 1
+      // Downed players faded hard; cloaked thieves shimmer translucent
+      const cloaked = e.status !== undefined && e.status.cloakUntil > tick
+      view.sprite.alpha = e.playerCtl?.downed ? 0.45 : cloaked ? 0.55 : 1
       // Pickups don't rotate; actors face their heading.
       const x = e.prevPos.x + (e.pos.x - e.prevPos.x) * alpha
       const y = e.prevPos.y + (e.pos.y - e.prevPos.y) * alpha

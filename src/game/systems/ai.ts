@@ -87,8 +87,10 @@ const findHostileTarget = (w: World, e: Entity): Entity | null => {
   for (const p of w.entities) {
     if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
     if (def.hostility === 'lawful' && w.alarm < 2 && p.playerCtl.crimeUntilTick <= w.tick) continue
+    // Cloaked players are much harder to spot
+    const sight = p.status && p.status.cloakUntil > w.tick ? ai.sightRange * 0.5 : ai.sightRange
     const dist = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y)
-    if (dist > ai.sightRange || dist >= bestDist) continue
+    if (dist > sight || dist >= bestDist) continue
     if (!canSee(w, e, p)) continue
     best = p
     bestDist = dist

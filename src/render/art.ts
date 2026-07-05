@@ -75,8 +75,10 @@ export const createArt = (renderer: Renderer): ArtRegistry => {
       g.destroy()
       return tex
     }
-    if (archetype === 'projectile') {
-      const g = new Graphics().circle(4, 4, 4).fill(colorOverride ?? 0xffe066)
+    if (archetype === 'projectile' || archetype === 'grenade') {
+      const color = archetype === 'grenade' ? 0x3a4a3a : 0xffe066
+      const size = archetype === 'grenade' ? 6 : 4
+      const g = new Graphics().circle(size, size, size).fill(colorOverride ?? color)
       const tex = renderer.generateTexture(g)
       g.destroy()
       return tex

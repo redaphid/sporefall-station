@@ -1,3 +1,4 @@
+import { CLASSES } from '../data/classes'
 import { WEAPONS } from '../data/items'
 import { NPCS } from '../data/npcs'
 import { makeEntity, type Entity } from '../entity'
@@ -100,7 +101,18 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     }
   }
   if (!best) return false
-  applyDamage(w, best, damage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
+  let finalDamage = damage
+  // Cloaked backstab: attacker unseen and behind the target's facing → triple damage.
+  if (attacker.status && attacker.status.cloakUntil > w.tick) {
+    const tx = Math.cos(best.facing)
+    const ty = Math.sin(best.facing)
+    const adx = attacker.pos.x - best.pos.x
+    const ady = attacker.pos.y - best.pos.y
+    const alen = Math.hypot(adx, ady) || 1
+    if ((adx / alen) * tx + (ady / alen) * ty < -0.2) finalDamage *= 3
+    attacker.status.cloakUntil = w.tick // attacking breaks cloak
+  }
+  applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
   return true
 }
 
@@ -119,17 +131,25 @@ export const spawnProjectile = (
   addEntity(w, e)
 }
 
-/** Player attack inputs. NPC attacks happen in the AI system. */
+/** Player attack + ability inputs. NPC attacks happen in the AI system. */
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
     if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
     const cmd = inputs.get(e.playerCtl.playerId)
-    if (!cmd?.attack || e.combat.cooldown > 0) continue
+    if (!cmd) continue
+    const cls = CLASSES[e.playerCtl.classId]
+
+    if (cmd.special && cls && e.playerCtl.abilityCooldown <= 0) {
+      if (cls.ability(w, e)) e.playerCtl.abilityCooldown = cls.abilityCooldownTicks
+    }
+
+    if (!cmd.attack || e.combat.cooldown > 0) continue
     const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
     e.combat.cooldown = weapon.cooldownTicks
     if (weapon.kind === 'melee') {
-      meleeAttack(w, e, weapon.damage, weapon.range, weapon.knockback)
+      const damage = Math.round(weapon.damage * (cls?.meleeDamageMult ?? 1))
+      meleeAttack(w, e, damage, weapon.range, weapon.knockback)
     } else {
       spawnProjectile(w, e, weapon.damage, weapon.projectileSpeed ?? 12, weapon.range)
     }

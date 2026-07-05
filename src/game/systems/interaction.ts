@@ -1,3 +1,4 @@
+import { CLASSES } from '../data/classes'
 import { CONSUMABLES, WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
@@ -44,6 +45,11 @@ const handleInteract = (w: World, p: Entity): void => {
     if (!door.locked) {
       door.open = !door.open
       w.events.push({ type: 'doorToggle', entityId: target.id, open: door.open })
+    } else if ((CLASSES[p.playerCtl!.classId]?.autoPickLockLevel ?? 0) >= door.lockLevel) {
+      // Thief passive: easy locks pop instantly
+      door.locked = false
+      door.open = true
+      w.events.push({ type: 'doorToggle', entityId: target.id, open: true })
     } else if (!p.playerCtl!.channel) {
       p.playerCtl!.channel = { kind: 'lockpick', targetId: target.id, ticksLeft: LOCKPICK_TICKS }
     }
@@ -93,7 +99,8 @@ const bleedAndRevive = (w: World, p: Entity): void => {
       Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
   )
   if (helper) {
-    if (++downed.reviveProgress >= REVIVE_TICKS) {
+    downed.reviveProgress += CLASSES[helper.playerCtl!.classId]?.reviveSpeedMult ?? 1
+    if (downed.reviveProgress >= REVIVE_TICKS) {
       p.playerCtl!.downed = undefined
       p.health!.hp = Math.floor(p.health!.max * 0.3)
     }
@@ -134,8 +141,8 @@ const collect = (player: Entity, item: Entity): boolean => {
     return true
   }
   if (CONSUMABLES[itemId]) {
-    // Auto-heal if hurt, else stash (max 4 stacks).
-    const heal = CONSUMABLES[itemId].heal ?? 0
+    // Auto-heal if hurt, else stash (max 4 stacks). Doctors heal double.
+    const heal = (CONSUMABLES[itemId].heal ?? 0) * (CLASSES[ctl.classId]?.healMult ?? 1)
     if (player.health && player.health.hp < player.health.max) {
       player.health.hp = Math.min(player.health.max, player.health.hp + heal)
       return true

@@ -20,12 +20,13 @@ export class HostSession implements Session {
 
   constructor(
     seed: number,
+    classId: string,
     private localInput: InputSource,
   ) {
     this.world = createWorld(seed, 1)
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, 'soldier', this.world.level.spawn.x, this.world.level.spawn.y)
+    this.self = spawnPlayer(this.world, 0, classId, this.world.level.spawn.x, this.world.level.spawn.y)
   }
 
   tick(): void {

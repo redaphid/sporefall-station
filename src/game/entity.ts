@@ -53,11 +53,17 @@ export interface Entity {
     /** Timed action in progress (lockpicking). Moving cancels it. */
     channel?: { kind: 'lockpick'; targetId: EntityId; ticksLeft: number }
   }
-  projectile?: { ownerId: EntityId; damage: number; ttl: number }
+  projectile?: {
+    ownerId: EntityId
+    damage: number
+    ttl: number
+    /** Grenades: AoE on fuse-end or impact instead of point damage. */
+    explode?: { radius: number; damage: number }
+  }
   pickup?: { itemId: string; qty: number }
   door?: { open: boolean; locked: boolean; lockLevel: number }
   interact?: { verb: 'open' | 'pickup' | 'talk' | 'use'; range: number }
-  status?: { stun: number; sleep: number; hitFlashUntil: number }
+  status?: { stun: number; sleep: number; hitFlashUntil: number; cloakUntil: number }
   dead?: boolean
 }
 

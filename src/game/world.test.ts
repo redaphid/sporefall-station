@@ -14,6 +14,7 @@ describe('sim integration', () => {
   it('player melee attack damages and kills an adjacent thug', () => {
     const w = createWorld(5, 1)
     const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    player.combat!.weapon = 'fists' // pin melee — soldier starts with a pistol
     const thug = spawnNpc(w, 'thug', 11.5, 1.5)
     player.facing = 0 // facing +x, toward the thug
 
@@ -44,6 +45,7 @@ describe('sim integration', () => {
   it('civilian flees when damaged', () => {
     const w = createWorld(7, 1)
     const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    player.combat!.weapon = 'fists'
     const civ = spawnNpc(w, 'civilian', 11.5, 1.5)
     player.facing = 0
     const attack = new Map([[0, { ...emptyInput(), attack: true }]])

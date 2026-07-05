@@ -1,3 +1,4 @@
+import { CLASSES } from '../game/data/classes'
 import { WEAPONS } from '../game/data/items'
 import type { RenderView } from '../app/session'
 
@@ -33,8 +34,12 @@ export const createHud = (mount: HTMLElement): Hud => {
       }
       const weapon = WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? '—'
       const cash = self.playerCtl?.cash ?? 0
-      const bandages = self.playerCtl?.inventory.reduce((n, s) => n + s.qty, 0) ?? 0
-      const text = `${weapon} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}`
+      const bandages = self.playerCtl?.inventory.filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0) ?? 0
+      const cls = CLASSES[self.playerCtl?.classId ?? '']
+      const cd = self.playerCtl?.abilityCooldown ?? 0
+      const ability = cls ? ` · ${cls.abilityName}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
+      const briefcase = self.playerCtl?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 💼' : ''
+      const text = `${weapon} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${briefcase}`
       if (text !== lastInfo) {
         lastInfo = text
         info.textContent = text

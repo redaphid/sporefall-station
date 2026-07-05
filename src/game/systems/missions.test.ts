@@ -77,6 +77,7 @@ describe('roguelite loop', () => {
   it('attacking a civilian in front of a cop raises the alarm and the cop aggros', () => {
     const w = createWorld(13, 1)
     const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    player.combat!.weapon = 'fists'
     const civ = spawnNpc(w, 'civilian', 11.5, 1.5)
     const cop = spawnNpc(w, 'cop', 13.5, 1.5) // sees the crime
     player.facing = 0

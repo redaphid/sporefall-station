@@ -1,6 +1,8 @@
 import { HostSession } from './app/hostSession'
 import { SIM_DT } from './game/types'
 import { createKeyboard } from './input/keyboard'
+import { createTouch, mergeInputs } from './input/touch'
+import { pickClass } from './ui/classSelect'
 import { createRenderer } from './render/renderer'
 import { createHud } from './ui/hud'
 import { createScreens } from './ui/screens'
@@ -15,7 +17,13 @@ const boot = async (): Promise<void> => {
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
 
-  const session = new HostSession(seed, createKeyboard())
+  // ?class=thief skips the picker (handy for dev + headless screenshots)
+  const classId = params.get('class') ?? (await pickClass(uiMount))
+
+  let input = createKeyboard()
+  if (navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
+
+  const session = new HostSession(seed, classId, input)
   renderer.setLevel(session.world.level)
   let currentLevel = session.world.level
 

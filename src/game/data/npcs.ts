@@ -23,6 +23,16 @@ export const NPCS: Record<string, NpcDef> = {
     hostility: 'always',
     fleesOnDamage: false,
   },
+  boss: {
+    archetype: 'boss',
+    faction: 'gang',
+    hp: 80,
+    speed: 3.6,
+    weapon: 'bat',
+    sightRange: 8,
+    hostility: 'always',
+    fleesOnDamage: false,
+  },
   cop: {
     archetype: 'cop',
     faction: 'cop',

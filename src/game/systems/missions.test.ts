@@ -90,6 +90,17 @@ describe('roguelite loop', () => {
     expect(cop.ai!.mode).toBe('aggro')
   })
 
+  it('fully set-up worlds (mission + doors + boss) survive 300 ticks across seeds', () => {
+    // Regression: the assassinate boss archetype must exist in NPCS — a
+    // missing def crashed the AI system only in fully-set-up worlds.
+    for (let seed = 1; seed <= 12; seed++) {
+      const { w } = makeRun(seed)
+      const inputs = idle()
+      for (let i = 0; i < 300; i++) tickWorld(w, inputs)
+      expect(w.tick).toBe(300)
+    }
+  })
+
   it('downed solo player triggers run over', () => {
     const w = createWorld(14, 1)
     const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)

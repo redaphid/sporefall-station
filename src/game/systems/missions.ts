@@ -49,9 +49,7 @@ const generateMission = (w: World): void => {
     }
   } else {
     const spot = roomCenter(building)
-    const boss = spawnNpc(w, 'thug', spot.x, spot.y)
-    boss.archetype = 'boss'
-    boss.health!.hp = boss.health!.max = 80
+    const boss = spawnNpc(w, 'boss', spot.x, spot.y)
     w.mission = {
       template: 'assassinate',
       targetEntityId: boss.id,

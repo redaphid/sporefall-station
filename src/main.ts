@@ -1,31 +1,103 @@
 import { HostSession } from './app/hostSession'
+import { NetClientSession } from './app/netClient'
+import { NetHostSession } from './app/netHost'
+import type { Session } from './app/session'
 import { SIM_DT } from './game/types'
 import { createKeyboard } from './input/keyboard'
 import { createTouch, mergeInputs } from './input/touch'
+import type { InputSource } from './input/input'
+import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
+import { createRenderer, type GameRenderer } from './render/renderer'
 import { pickClass } from './ui/classSelect'
-import { createRenderer } from './render/renderer'
 import { createHud } from './ui/hud'
+import { createLobbyUi, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 
 const boot = async (): Promise<void> => {
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
   const renderer = await createRenderer(mount)
-  const hud = createHud(uiMount)
-  const screens = createScreens(uiMount)
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
+  const room = params.get('room') ?? 'car'
+  const name = params.get('name') ?? `Player-${(Math.random() * 90 + 10) | 0}`
 
-  // ?class=thief skips the picker (handy for dev + headless screenshots)
   const classId = params.get('class') ?? (await pickClass(uiMount))
+  const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount))
 
-  let input = createKeyboard()
+  let input: InputSource = createKeyboard()
   if (navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
 
-  const session = new HostSession(seed, classId, input)
-  renderer.setLevel(session.world.level)
-  let currentLevel = session.world.level
+  const session = await createSession(mode, { seed, room, name, classId, input, uiMount, renderer })
+  if (!session) return
+  runLoop(session, renderer, uiMount)
+}
+
+interface SessionDeps {
+  seed: number
+  room: string
+  name: string
+  classId: string
+  input: InputSource
+  uiMount: HTMLElement
+  renderer: GameRenderer
+}
+
+const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
+  if (mode === 'solo') {
+    const session = new HostSession(deps.seed, deps.classId, deps.input)
+    deps.renderer.setLevel(session.world.level)
+    return session
+  }
+
+  if (mode === 'host') {
+    const transport = new BroadcastChannelTransport('host', deps.room)
+    const session = new NetHostSession(deps.seed, deps.classId, deps.name, deps.input, transport)
+    const lobby = createLobbyUi(deps.uiMount, true)
+    lobby.setStatus('Waiting for players…')
+    lobby.setPlayers(session.lobbyPlayers())
+    session.onLobbyChange = (players) => lobby.setPlayers(players)
+    await session.start()
+    await lobby.waitForStart()
+    session.beginGame()
+    lobby.close()
+    deps.renderer.setLevel(session.world.level)
+    return session
+  }
+
+  // join
+  const transport = new BroadcastChannelTransport('client', deps.room)
+  const session = new NetClientSession(deps.name, deps.classId, deps.input, transport)
+  const lobby = createLobbyUi(deps.uiMount, false)
+  lobby.setStatus('Looking for a host…')
+  session.onLobbyChange = (msg) => lobby.setPlayers(msg.players)
+  session.onLevelChange = (level) => deps.renderer.setLevel(level)
+  const ready = new Promise<boolean>((resolve) => {
+    session.onPhaseChange = (phase) => {
+      if (phase === 'lobby') lobby.setStatus('Connected — waiting for host to start')
+      else if (phase === 'starting') lobby.setStatus('Generating city…')
+      else if (phase === 'playing') resolve(true)
+      else if (phase === 'rejected') {
+        lobby.setStatus(`Rejected: ${session.rejectReason}`)
+        resolve(false)
+      } else if (phase === 'ended') {
+        lobby.setStatus('Host disconnected')
+        resolve(false)
+      }
+    }
+  })
+  await session.start()
+  const ok = await ready
+  if (!ok) return null
+  lobby.close()
+  return session
+}
+
+const runLoop = (session: Session, renderer: GameRenderer, uiMount: HTMLElement): void => {
+  const hud = createHud(uiMount)
+  const screens = createScreens(uiMount)
+  let currentLevel = session.renderView().level
 
   let acc = 0
   let last = performance.now()
@@ -39,7 +111,6 @@ const boot = async (): Promise<void> => {
     }
     const alpha = acc / SIM_DT
     const view = session.renderView()
-    // Floor changed: rebuild the tile layer and snap the camera to the new spawn
     if (view.level !== currentLevel) {
       currentLevel = view.level
       renderer.setLevel(view.level)

@@ -1,5 +1,9 @@
 import type { PeerId, Transport, TransportEvent } from '../types'
 
+/** Dev diagnostics, readable from the console / smoke tests. */
+export const debugNet = { packetsSent: 0, packetsReceived: 0, bytesSent: 0, dropped: 0, fatal: '' }
+;(globalThis as Record<string, unknown>).__net = debugNet
+
 interface WireMsg {
   kind: 'join' | 'accept' | 'data' | 'leave'
   from: string
@@ -60,7 +64,11 @@ export class BroadcastChannelTransport implements Transport {
         break
       case 'data': {
         const peer = this.role === 'client' ? 'host' : msg.from
-        if (!this.connected.has(peer)) return
+        if (!this.connected.has(peer)) {
+          debugNet.dropped++
+          return
+        }
+        debugNet.packetsReceived++
         this.emit({ type: 'data', peer, bytes: new Uint8Array(msg.bytes!) })
         break
       }
@@ -81,6 +89,8 @@ export class BroadcastChannelTransport implements Transport {
     const to = this.role === 'client' ? (this.hostWireId ?? undefined) : peer
     await new Promise((r) => setTimeout(r, delay))
     this.post({ kind: 'data', from: this.id, to, bytes: [...bytes] })
+    debugNet.packetsSent++
+    debugNet.bytesSent += bytes.length
   }
 
   on(handler: (e: TransportEvent) => void): () => void {

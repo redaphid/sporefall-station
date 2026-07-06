@@ -66,10 +66,18 @@ npx tsx scripts/test/mp-smoke.ts      # 2-tab co-op end-to-end (needs `npm run d
 npx tsx scripts/test/dump-level.ts 7  # eyeball a generated city as ASCII
 ```
 
+## Reconnect after a drop
+
+A mid-game link drop (BLE radios in cars do this) is survivable: the host parks
+the avatar as a stunned "ghost" for 90 s and remembers a rejoin token; the client
+auto-reconnects (`transport.reconnect()` on all three client transports) and
+re-Hellos with `{slot, token}` to reclaim the same avatar mid-run. Proven
+end-to-end by `scripts/test/reconnect-smoke.ts` (simulated drop over the dev
+transport). Real-radio behavior still needs on-phone testing.
+
 ## Known gaps / next up
 
-- BLE transports are code-complete but not yet verified on physical phones
-  (emulators have no Bluetooth). Reconnect-with-replay is designed but not built —
-  a mid-game BLE drop currently stuns the avatar and the client must rejoin as new.
-- M6 content: shop/bribe economy, more NPC archetypes, second mission per floor,
-  difficulty ramp, sound, app icon.
+- BLE transports + reconnect are code-complete but not yet verified on physical
+  phones (emulators have no Bluetooth).
+- Remaining content ideas: shop/bribe economy, second mission per floor,
+  real tileset via `art.ts` swap.

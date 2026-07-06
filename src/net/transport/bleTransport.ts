@@ -132,17 +132,24 @@ export class BleClientTransport implements Transport {
     }
   }
 
+  private lastDeviceId: string | null = null
+  private listenersAdded = false
+
   async connect(deviceId: string): Promise<void> {
-    await BluetoothLowEnergy.addListener('deviceDisconnected', (ev) => {
-      if (ev.deviceId === this.hostDeviceId) {
-        this.hostDeviceId = null
-        this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
-      }
-    })
-    await BluetoothLowEnergy.addListener('characteristicChanged', (ev) => {
-      if (ev.characteristic.toLowerCase() !== BLE_DATA_H2C_UUID.toLowerCase()) return
-      this.emit({ type: 'data', peer: 'host', bytes: new Uint8Array(ev.value) })
-    })
+    this.lastDeviceId = deviceId
+    if (!this.listenersAdded) {
+      this.listenersAdded = true
+      await BluetoothLowEnergy.addListener('deviceDisconnected', (ev) => {
+        if (ev.deviceId === this.hostDeviceId) {
+          this.hostDeviceId = null
+          this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
+        }
+      })
+      await BluetoothLowEnergy.addListener('characteristicChanged', (ev) => {
+        if (ev.characteristic.toLowerCase() !== BLE_DATA_H2C_UUID.toLowerCase()) return
+        this.emit({ type: 'data', peer: 'host', bytes: new Uint8Array(ev.value) })
+      })
+    }
     await BluetoothLowEnergy.connect({ deviceId })
     try {
       const { mtu } = await BluetoothLowEnergy.requestMtu({ deviceId, mtu: 512 })
@@ -158,6 +165,12 @@ export class BleClientTransport implements Transport {
     })
     this.hostDeviceId = deviceId
     this.emit({ type: 'peerConnected', peer: 'host' })
+  }
+
+  /** Reconnect to the last host after a drop (BLE radios do this a lot in cars). */
+  async reconnect(): Promise<void> {
+    if (!this.lastDeviceId) throw new Error('never connected')
+    await this.connect(this.lastDeviceId)
   }
 
   async stop(): Promise<void> {

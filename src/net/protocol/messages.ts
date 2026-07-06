@@ -189,9 +189,13 @@ export interface HelloMsg {
   v: number
   name: string
   classId: string
+  /** Present when rejoining after a mid-game drop. */
+  rejoin?: { slot: number; token: string }
 }
 export interface WelcomeMsg {
   slot: number
+  /** Keep this to rejoin the same avatar if the link drops. */
+  token: string
 }
 export interface LobbyPlayer {
   slot: number

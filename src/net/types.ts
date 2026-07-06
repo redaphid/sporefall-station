@@ -47,4 +47,6 @@ export interface Transport {
   sendPacket(peer: PeerId, bytes: Uint8Array): Promise<void>
   on(handler: (e: TransportEvent) => void): () => void
   peers(): PeerId[]
+  /** Client transports: re-establish the link to the same host after a drop. */
+  reconnect?(): Promise<void>
 }

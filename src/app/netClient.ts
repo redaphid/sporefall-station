@@ -25,7 +25,10 @@ import type { RenderView, Session } from './session'
 const SMOOTH = 0.45 // remote entities chase their snapshot target per tick
 const SNAP_DIST = 2.5
 
-export type ClientPhase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'ended' | 'rejected'
+export type ClientPhase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'reconnecting' | 'ended' | 'rejected'
+
+const RECONNECT_ATTEMPTS = 30
+const RECONNECT_SPACING_MS = 2000
 
 /**
  * Client: predicts its own avatar with the shared movement code,
@@ -63,6 +66,8 @@ export class NetClientSession implements Session {
     huds: {},
   }
 
+  private rejoinToken = ''
+
   constructor(
     private name: string,
     private classId: string,
@@ -71,9 +76,38 @@ export class NetClientSession implements Session {
   ) {
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onConnected()
-      else if (ev.type === 'peerDisconnected') this.setPhase('ended')
+      else if (ev.type === 'peerDisconnected') this.onDisconnected()
       else if (ev.type === 'data') this.reader.push(ev.bytes, (m) => this.onMessage(m))
     })
+  }
+
+  private onDisconnected(): void {
+    this.reader.reset() // a fresh link starts a fresh byte stream
+    // Mid-game drop with a rejoin token and a reconnect-capable transport:
+    // keep trying quietly; the host holds our avatar for 90s.
+    if (this.phase === 'playing' && this.rejoinToken && this.transport.reconnect) {
+      this.setPhase('reconnecting')
+      void this.reconnectLoop()
+      return
+    }
+    if (this.phase !== 'reconnecting') this.setPhase('ended')
+  }
+
+  private async reconnectLoop(): Promise<void> {
+    for (let attempt = 0; attempt < RECONNECT_ATTEMPTS && this.phase === 'reconnecting'; attempt++) {
+      await new Promise((r) => setTimeout(r, RECONNECT_SPACING_MS))
+      if (this.phase !== 'reconnecting') return
+      try {
+        await this.transport.reconnect!()
+        // Some transports resolve before the link is confirmed — give the
+        // peerConnected event a moment, then check.
+        await new Promise((r) => setTimeout(r, 1000))
+        if (this.transport.peers().length > 0) return // peerConnected handler sent the rejoin Hello
+      } catch {
+        // radio still gone — try again
+      }
+    }
+    if (this.phase === 'reconnecting') this.setPhase('ended')
   }
 
   async start(): Promise<void> {
@@ -86,8 +120,16 @@ export class NetClientSession implements Session {
   }
 
   private onConnected(): void {
-    this.queue = new SendQueue(this.transport, 'host', () => this.setPhase('ended'))
-    this.queue.queueReliable(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: this.name, classId: this.classId }))
+    this.queue = new SendQueue(this.transport, 'host', () => this.onDisconnected())
+    const rejoining = this.phase === 'reconnecting' && this.rejoinToken && this.slot >= 0
+    this.queue.queueReliable(
+      encodeJson(MsgType.Hello, {
+        v: PROTOCOL_VERSION,
+        name: this.name,
+        classId: this.classId,
+        ...(rejoining ? { rejoin: { slot: this.slot, token: this.rejoinToken } } : {}),
+      }),
+    )
   }
 
   private onMessage(msg: Uint8Array): void {
@@ -95,10 +137,14 @@ export class NetClientSession implements Session {
       case MsgType.Snapshot:
         this.applySnapshot(decodeSnapshot(msg))
         break
-      case MsgType.Welcome:
-        this.slot = decodeJson<WelcomeMsg>(msg).slot
-        this.setPhase('lobby')
+      case MsgType.Welcome: {
+        const welcome = decodeJson<WelcomeMsg>(msg)
+        this.slot = welcome.slot
+        this.rejoinToken = welcome.token
+        // During a rejoin the host follows up with GameStart+Go; stay out of lobby.
+        if (this.phase !== 'reconnecting') this.setPhase('lobby')
         break
+      }
       case MsgType.Reject:
         this.rejectReason = decodeJson<{ reason: string }>(msg).reason
         this.setPhase('rejected')
@@ -109,6 +155,7 @@ export class NetClientSession implements Session {
       case MsgType.GameStart: {
         const start = decodeJson<{ seed: number }>(msg)
         this.seed = start.seed
+        if (this.phase === 'reconnecting') break // level already live; snapshots resync the floor
         this.floor = 1
         this.level = generateLevel(this.seed, 1)
         this.onLevelChange?.(this.level)
@@ -273,13 +320,19 @@ export class NetClientSession implements Session {
         ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
       ]
     }
+    const missionText =
+      this.phase === 'reconnecting'
+        ? 'Bluetooth dropped — reconnecting…'
+        : this.phase === 'ended' && this.selfId >= 0
+          ? 'Connection lost'
+          : this.state.missionText
     return {
       entities: [...this.entities.values()],
       events,
       tick: this.tickCount,
       level: this.level ?? emptyLevel(),
       floor: this.state.floor,
-      missionText: this.state.missionText,
+      missionText,
       missionComplete: this.state.missionComplete,
       gameOver: this.state.gameOver,
       self: this.self,

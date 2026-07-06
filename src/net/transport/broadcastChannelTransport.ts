@@ -35,6 +35,19 @@ export class BroadcastChannelTransport implements Transport {
   async start(): Promise<void> {
     this.channel.onmessage = (ev: MessageEvent<WireMsg>) => this.onWire(ev.data)
     if (this.role === 'client') this.post({ kind: 'join', from: this.id })
+    if (this.role === 'client') (globalThis as Record<string, unknown>).__transport = this
+  }
+
+  /** Dev/testing: fake a BLE-style mid-game drop (visible to both sides). */
+  simulateDrop(): void {
+    if (this.role !== 'client') return
+    this.post({ kind: 'leave', from: this.id })
+    if (this.connected.delete('host')) this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'error' })
+  }
+
+  async reconnect(): Promise<void> {
+    if (this.role !== 'client') throw new Error('host transports do not reconnect')
+    this.post({ kind: 'join', from: this.id })
   }
 
   async stop(): Promise<void> {

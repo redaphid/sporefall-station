@@ -29,6 +29,7 @@ interface PeerState {
   slot: number
   name: string
   classId: string
+  token: string
   queue: SendQueue
   reader: StreamReader
   lastInputSeq: number
@@ -36,6 +37,18 @@ interface PeerState {
   pendingEdges: number
   entityId?: number
 }
+
+/** A dropped mid-game player who may still rejoin. */
+interface Ghost {
+  slot: number
+  name: string
+  classId: string
+  token: string
+  entityId: number
+  expiresAtTick: number
+}
+
+const REJOIN_GRACE_TICKS = 90 * 30
 
 /**
  * Authoritative host: runs the sim, accepts joins pre-start,
@@ -46,6 +59,7 @@ export class NetHostSession implements Session {
   self!: Entity
   readonly peersBySlot = new Map<number, PeerState>()
   private peers = new Map<PeerId, PeerState>()
+  private ghosts = new Map<number, Ghost>()
   private inputs = new Map<number, InputCmd>()
   started = false
   onLobbyChange?: (players: LobbyPlayer[]) => void
@@ -109,6 +123,7 @@ export class NetHostSession implements Session {
       this.inputs.set(p.slot, cmd)
     }
     tickWorld(this.world, this.inputs)
+    this.expireGhosts()
 
     if (this.world.events.length > 0) {
       this.broadcastJson(MsgType.Events, { tick: this.world.tick, events: this.world.events })
@@ -188,6 +203,7 @@ export class NetHostSession implements Session {
       slot: -1,
       name: '',
       classId: 'soldier',
+      token: '',
       queue: new SendQueue(this.transport, peer, () => this.onPeerLost(peer)),
       reader: new StreamReader(),
       lastInputSeq: 0,
@@ -203,13 +219,32 @@ export class NetHostSession implements Session {
     p.queue.stop()
     this.peers.delete(peer)
     if (p.slot >= 0) this.peersBySlot.delete(p.slot)
-    // Their avatar stands stunned; a rejoin flow can reclaim it later.
-    if (p.entityId !== undefined) {
+    // Mid-game drop: park the avatar (stunned, invulnerable-ish via stun) and
+    // remember the slot so the same player can rejoin within the grace window.
+    if (this.started && p.slot >= 0 && p.entityId !== undefined) {
+      this.ghosts.set(p.slot, {
+        slot: p.slot,
+        name: p.name,
+        classId: p.classId,
+        token: p.token,
+        entityId: p.entityId,
+        expiresAtTick: this.world.tick + REJOIN_GRACE_TICKS,
+      })
       const avatar = this.world.byId.get(p.entityId)
-      if (avatar?.status) avatar.status.stun = 90 * 30
+      if (avatar?.status) avatar.status.stun = REJOIN_GRACE_TICKS
     }
     this.onLobbyChange?.(this.lobbyPlayers())
     this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
+  }
+
+  /** Bleed out ghosts whose grace window expired. */
+  private expireGhosts(): void {
+    for (const [slot, ghost] of this.ghosts) {
+      if (this.world.tick < ghost.expiresAtTick) continue
+      this.ghosts.delete(slot)
+      const avatar = this.world.byId.get(ghost.entityId)
+      if (avatar) avatar.dead = true
+    }
   }
 
   private onData(peer: PeerId, bytes: Uint8Array): void {
@@ -235,6 +270,33 @@ export class NetHostSession implements Session {
         p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'version mismatch — update the game' }))
         return
       }
+
+      // Mid-game rejoin: reclaim the ghost slot if the token matches.
+      if (this.started && hello.rejoin) {
+        const ghost = this.ghosts.get(hello.rejoin.slot)
+        if (!ghost || ghost.token !== hello.rejoin.token) {
+          p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'rejoin window expired' }))
+          return
+        }
+        this.ghosts.delete(ghost.slot)
+        p.slot = ghost.slot
+        p.name = ghost.name
+        p.classId = ghost.classId
+        p.token = ghost.token
+        p.entityId = ghost.entityId
+        this.peersBySlot.set(p.slot, p)
+        const avatar = this.world.byId.get(ghost.entityId)
+        if (avatar?.status) avatar.status.stun = 0
+        p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers() }))
+        p.queue.queueReliable(
+          encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: ghost.entityId } }),
+        )
+        this.onLobbyChange?.(this.lobbyPlayers())
+        this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
+        return
+      }
+
       if (this.started || this.peers.size > 3) {
         p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: this.started ? 'game already running' : 'lobby full' }))
         return
@@ -245,8 +307,9 @@ export class NetHostSession implements Session {
       p.slot = slot
       p.name = hello.name
       p.classId = hello.classId
+      p.token = Math.random().toString(36).slice(2, 12)
       this.peersBySlot.set(slot, p)
-      p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot }))
+      p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
       this.onLobbyChange?.(this.lobbyPlayers())
       this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
     }

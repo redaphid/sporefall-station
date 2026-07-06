@@ -60,6 +60,7 @@ export class WebBluetoothClientTransport implements Transport {
   private c2h: BluetoothRemoteGATTCharacteristic | null = null
   private connected = false
   private writeChain: Promise<void> = Promise.resolve()
+  private disconnectHooked = false
 
   /** MUST run inside a user-gesture handler: opens Chrome's device chooser. */
   async requestDevice(): Promise<void> {
@@ -74,11 +75,14 @@ export class WebBluetoothClientTransport implements Transport {
   async connect(): Promise<void> {
     const device = this.device
     if (!device?.gatt) throw new Error('no device picked — call requestDevice() from a click first')
-    device.addEventListener('gattserverdisconnected', () => {
-      if (!this.connected) return
-      this.connected = false
-      this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
-    })
+    if (!this.disconnectHooked) {
+      this.disconnectHooked = true
+      device.addEventListener('gattserverdisconnected', () => {
+        if (!this.connected) return
+        this.connected = false
+        this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
+      })
+    }
     this.gatt = await device.gatt.connect()
     const service = await this.gatt.getPrimaryService(BLE_SERVICE_UUID)
     const h2c = await service.getCharacteristic(BLE_DATA_H2C_UUID)
@@ -97,6 +101,12 @@ export class WebBluetoothClientTransport implements Transport {
   async start(): Promise<void> {
     // Connection is driven by requestDevice()/connect(); session.start()
     // re-enters here afterwards, so this stays a no-op.
+  }
+
+  /** Re-attach to the already-picked device after a drop — no gesture needed. */
+  async reconnect(): Promise<void> {
+    if (!this.device) throw new Error('never connected')
+    await this.connect()
   }
 
   async stop(): Promise<void> {

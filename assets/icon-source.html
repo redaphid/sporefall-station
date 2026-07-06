@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head><style>
+  body { margin: 0; width: 1024px; height: 1024px; }
+  svg { display: block; }
+</style></head>
+<body>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- night city backdrop -->
+  <rect width="1024" height="1024" fill="#0b0b12"/>
+  <!-- street grid -->
+  <rect x="0" y="416" width="1024" height="96" fill="#33333c"/>
+  <rect x="416" y="0" width="96" height="1024" fill="#33333c"/>
+  <rect x="0" y="448" width="1024" height="8" fill="#ffd76a" opacity="0.35"/>
+  <rect x="448" y="0" width="8" height="1024" fill="#ffd76a" opacity="0.35"/>
+  <!-- city blocks -->
+  <g fill="#1b1b24" stroke="#4c4c56" stroke-width="10">
+    <rect x="64" y="64" width="288" height="288" rx="18"/>
+    <rect x="576" y="64" width="384" height="288" rx="18"/>
+    <rect x="64" y="576" width="288" height="384" rx="18"/>
+  </g>
+  <!-- park block -->
+  <rect x="576" y="576" width="384" height="384" rx="18" fill="#2e5d3a" stroke="#4c4c56" stroke-width="10"/>
+  <!-- windows -->
+  <g fill="#ffd76a" opacity="0.8">
+    <rect x="120" y="120" width="40" height="40"/><rect x="200" y="120" width="40" height="40"/>
+    <rect x="120" y="200" width="40" height="40"/><rect x="280" y="200" width="40" height="40"/>
+    <rect x="640" y="140" width="40" height="40"/><rect x="740" y="220" width="40" height="40"/>
+    <rect x="860" y="140" width="40" height="40"/><rect x="140" y="660" width="40" height="40"/>
+    <rect x="220" y="800" width="40" height="40"/>
+  </g>
+  <!-- the rogue: big green troublemaker mid-street -->
+  <circle cx="512" cy="512" r="150" fill="#7fd17f" stroke="#0b0b12" stroke-width="14"/>
+  <circle cx="512" cy="512" r="108" fill="none" stroke="#ffffff" stroke-width="8" opacity="0.25"/>
+  <circle cx="580" cy="470" r="22" fill="#101018"/>
+  <circle cx="580" cy="554" r="22" fill="#101018"/>
+  <!-- held bat -->
+  <rect x="620" y="580" width="150" height="34" rx="17" fill="#8a6a3f" transform="rotate(32 620 580)"/>
+</svg>
+</body>
+</html>

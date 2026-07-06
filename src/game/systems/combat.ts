@@ -32,11 +32,20 @@ export const applyDamage = (
   target.vel.y += (dy / len) * knockback
   w.events.push({ type: 'hit', x: target.pos.x, y: target.pos.y, targetId: target.id, amount })
 
-  // Civilians panic when hurt
-  if (target.ai && NPCS[target.archetype]?.fleesOnDamage) {
-    target.ai.mode = 'flee'
-    target.ai.targetId = attackerId
-    target.ai.thinkAt = w.tick // re-think immediately
+  // Civilians panic when hurt; bouncers take it personally
+  if (target.ai) {
+    const def = NPCS[target.archetype]
+    if (def?.fleesOnDamage) {
+      target.ai.mode = 'flee'
+      target.ai.targetId = attackerId
+      target.ai.thinkAt = w.tick // re-think immediately
+    } else if (def?.retaliates) {
+      target.ai.mode = 'aggro'
+      target.ai.targetId = attackerId
+      const attacker = w.byId.get(attackerId)
+      if (attacker) target.ai.lastKnownTargetPos = { x: attacker.pos.x, y: attacker.pos.y }
+      target.ai.thinkAt = w.tick
+    }
   }
 
   markCrime(w, target, attackerId)

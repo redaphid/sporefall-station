@@ -29,7 +29,12 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
 }
 
 const populateBuilding = (w: World, rng: Rng, building: Building): void => {
-  for (const spec of ROLE_SPAWNS[building.role]) {
+  const specs = [...ROLE_SPAWNS[building.role]]
+  // Difficulty ramp: deeper floors gang up
+  if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'gangster', count: [1, 2] })
+  if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'gangster', count: [0, 1] })
+  if (w.floor >= 2 && building.role === 'shop') specs.push({ archetype: 'bouncer', count: [1, 1] })
+  for (const spec of specs) {
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
       const spot = randomFloorInBuilding(w, rng, building)
@@ -72,7 +77,9 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number): Ent
   const def = NPCS[archetype]
   const e = makeEntity('npc', archetype, x, y)
   e.speed = def.speed
-  e.health = { hp: def.hp, max: def.hp, iframes: 0 }
+  // Difficulty ramp: +15% hp per floor past the first
+  const hp = Math.round(def.hp * (1 + 0.15 * (w.floor - 1)))
+  e.health = { hp, max: hp, iframes: 0 }
   e.combat = { weapon: def.weapon, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
   e.ai = {

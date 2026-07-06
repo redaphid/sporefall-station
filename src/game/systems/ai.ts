@@ -3,7 +3,7 @@ import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import { doorClosedAt, type World } from '../world'
-import { applyDamage } from './combat'
+import { applyDamage, spawnProjectile } from './combat'
 
 const THINK_INTERVAL = 5 // ~6Hz per NPC at 30Hz sim, phase-spread by id
 const WANDER_RADIUS = 4
@@ -114,7 +114,22 @@ const steer = (w: World, e: Entity): void => {
     const dy = goal.y - e.pos.y
     const dist = Math.hypot(dx, dy)
     const weapon = WEAPONS[e.combat?.weapon ?? 'fists']
-    if (target && !target.dead && dist <= weapon.range + target.radius && canSee(w, e, target)) {
+
+    if (weapon.kind === 'ranged') {
+      if (target && !target.dead && dist <= weapon.range * 0.8 && canSee(w, e, target)) {
+        e.facing = Math.atan2(dy, dx) + (w.rng.next() - 0.5) * 0.15 // imperfect aim
+        if (e.combat && e.combat.cooldown <= 0) {
+          e.combat.cooldown = weapon.cooldownTicks + w.rng.int(0, 10) // stagger volleys
+          spawnProjectile(w, e, weapon.damage, weapon.projectileSpeed ?? 12, weapon.range)
+        }
+        // Hold a standoff distance instead of closing to melee
+        if (dist < weapon.range * 0.4) {
+          e.intent.x = -dx / dist
+          e.intent.y = -dy / dist
+        }
+        return
+      }
+    } else if (target && !target.dead && dist <= weapon.range + target.radius && canSee(w, e, target)) {
       e.facing = Math.atan2(dy, dx)
       if (e.combat && e.combat.cooldown <= 0) {
         e.combat.cooldown = weapon.cooldownTicks

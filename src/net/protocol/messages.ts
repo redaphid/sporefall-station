@@ -24,6 +24,8 @@ export const ARCHETYPES = [
   'pickup.medkit',
   'pickup.cash',
   'pickup.briefcase',
+  'gangster',
+  'bouncer',
 ] as const
 
 const archetypeIndex = new Map<string, number>(ARCHETYPES.map((a, i) => [a, i]))

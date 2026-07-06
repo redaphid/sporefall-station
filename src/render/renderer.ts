@@ -3,6 +3,7 @@ import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
 import { createArt, type ArtRegistry } from './art'
 import { Camera } from './camera'
+import { Sound } from './sound'
 import { EntityViews } from './sprites'
 import { TilemapView } from './tilemap'
 
@@ -33,6 +34,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   app.stage.addChild(world)
 
   const camera = new Camera()
+  const sound = new Sound()
   const viewRect = { x: 0, y: 0, w: 0, h: 0 }
   let levelW = 0
   let levelH = 0
@@ -57,6 +59,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
           else if (ev.type === 'death') camera.shake(0.05)
           else if (ev.type === 'explosion') camera.shake(0.2)
         }
+        sound.handle(view.events)
       }
       camera.update(dt)
       entities.update(view.entities, alpha, view.tick)

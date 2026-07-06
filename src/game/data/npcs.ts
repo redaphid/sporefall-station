@@ -10,6 +10,8 @@ export interface NpcDef {
   /** Aggro anyone on sight (thugs) vs only criminals (cops) vs never (civs). */
   hostility: 'always' | 'lawful' | 'never'
   fleesOnDamage: boolean
+  /** Peaceful until hit, then fights back (bouncers). */
+  retaliates?: boolean
 }
 
 export const NPCS: Record<string, NpcDef> = {
@@ -42,6 +44,27 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 8,
     hostility: 'lawful',
     fleesOnDamage: false,
+  },
+  gangster: {
+    archetype: 'gangster',
+    faction: 'gang',
+    hp: 35,
+    speed: 3.6,
+    weapon: 'pistol',
+    sightRange: 8,
+    hostility: 'always',
+    fleesOnDamage: false,
+  },
+  bouncer: {
+    archetype: 'bouncer',
+    faction: 'neutral',
+    hp: 90,
+    speed: 3.0,
+    weapon: 'fists',
+    sightRange: 5,
+    hostility: 'never',
+    fleesOnDamage: false,
+    retaliates: true,
   },
   civilian: {
     archetype: 'civilian',

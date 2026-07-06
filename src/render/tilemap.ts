@@ -31,7 +31,9 @@ export class TilemapView {
         container.position.set(cx * CHUNK * TILE_PX, cy * CHUNK * TILE_PX)
         for (let ty = cy * CHUNK; ty < Math.min((cy + 1) * CHUNK, level.h); ty++) {
           for (let tx = cx * CHUNK; tx < Math.min((cx + 1) * CHUNK, level.w); tx++) {
-            const sprite = new Sprite(art.tile(level.tiles[ty * level.w + tx]))
+            // Deterministic per-position variant for texture variety
+            const variant = (tx * 7 + ty * 13) % 3
+            const sprite = new Sprite(art.tile(level.tiles[ty * level.w + tx], variant))
             sprite.position.set((tx - cx * CHUNK) * TILE_PX, (ty - cy * CHUNK) * TILE_PX)
             container.addChild(sprite)
           }

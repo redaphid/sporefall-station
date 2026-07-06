@@ -27,6 +27,57 @@ export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
     mount.appendChild(overlay)
   })
 
+export type JoinTransportChoice = 'ble' | 'tabs'
+
+/**
+ * Desktop-browser join: Bluetooth (phone host) vs same-computer tabs (dev).
+ * The Bluetooth button invokes `requestBleDevice` directly inside its click
+ * handler because Chrome's requestDevice needs a user gesture; a cancelled
+ * chooser keeps the picker open so the player can retry or fall back to tabs.
+ */
+export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Promise<void>): Promise<JoinTransportChoice> =>
+  new Promise((resolve) => {
+    const overlay = document.createElement('div')
+    overlay.style.cssText =
+      'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
+      'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
+    overlay.innerHTML = `<div style="font:800 22px system-ui">JOIN VIA</div>
+      <div id="status" style="opacity:.7;min-height:1.2em"></div>`
+    const statusEl = overlay.querySelector<HTMLElement>('#status')!
+    const buttons: HTMLButtonElement[] = []
+    const addButton = (label: string, blurb: string, onClick: () => void): void => {
+      const b = document.createElement('button')
+      b.style.cssText =
+        'font:600 17px system-ui;padding:14px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
+        'background:#ffffff10;color:#eee;cursor:pointer;width:min(320px,80vw);text-align:left'
+      b.innerHTML = `${label} <span style="opacity:.6;font-weight:400;font-size:13px"><br>${blurb}</span>`
+      b.addEventListener('click', onClick)
+      buttons.push(b)
+      overlay.appendChild(b)
+    }
+    addButton('Bluetooth (phone host)', 'Pick a nearby phone hosting a game', () => {
+      statusEl.textContent = 'Opening Bluetooth chooser…'
+      for (const b of buttons) b.disabled = true
+      // Called directly in the click handler: Chrome requires a user gesture.
+      requestBleDevice().then(
+        () => {
+          overlay.remove()
+          resolve('ble')
+        },
+        (err: unknown) => {
+          for (const b of buttons) b.disabled = false
+          const cancelled = err instanceof Error && err.name === 'NotFoundError'
+          statusEl.textContent = cancelled ? 'No device picked — try again' : `Bluetooth error: ${String(err)}`
+        },
+      )
+    })
+    addButton('Same-computer tabs (dev)', 'Join a host tab in this browser', () => {
+      overlay.remove()
+      resolve('tabs')
+    })
+    mount.appendChild(overlay)
+  })
+
 /** BLE join: list hosts as they're discovered; resolves with the chosen deviceId. */
 export const pickHost = (
   mount: HTMLElement,

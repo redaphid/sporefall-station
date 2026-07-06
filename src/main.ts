@@ -9,10 +9,12 @@ import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
+import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
+import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import { pickClass } from './ui/classSelect'
 import { createHud } from './ui/hud'
-import { createLobbyUi, pickHost, pickMode, type GameMode } from './ui/menu'
+import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 
 const boot = async (): Promise<void> => {
@@ -46,6 +48,22 @@ interface SessionDeps {
   renderer: GameRenderer
 }
 
+/**
+ * Browser join transport: Web Bluetooth (laptop joining a phone host) when
+ * available, else BroadcastChannel tabs. `?transport=tabs` skips the picker so
+ * the dev flow and mp-smoke stay click-free; picking Bluetooth runs Chrome's
+ * requestDevice chooser inside the button's click handler (gesture required).
+ */
+const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> => {
+  const pref = new URLSearchParams(location.search).get('transport')
+  if (pref !== 'tabs' && isWebBluetoothAvailable()) {
+    const webBle = new WebBluetoothClientTransport()
+    const choice = await pickJoinTransport(deps.uiMount, () => webBle.requestDevice())
+    if (choice === 'ble') return webBle
+  }
+  return new BroadcastChannelTransport('client', deps.room)
+}
+
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
     const session = new HostSession(deps.seed, deps.classId, deps.input)
@@ -73,7 +91,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   }
 
   // join
-  const transport = native ? new BleClientTransport() : new BroadcastChannelTransport('client', deps.room)
+  const transport = native ? new BleClientTransport() : await pickBrowserJoinTransport(deps)
   const session = new NetClientSession(deps.name, deps.classId, deps.input, transport)
 
   if (transport instanceof BleClientTransport) {
@@ -88,6 +106,18 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   }
 
   const lobby = createLobbyUi(deps.uiMount, false)
+  if (transport instanceof WebBluetoothClientTransport) {
+    // Device was already picked in the gesture handler; now do the GATT
+    // connect with the session's handlers registered so peerConnected lands.
+    lobby.setStatus('Connecting over Bluetooth…')
+    try {
+      await transport.connect()
+    } catch (err) {
+      console.error(err)
+      lobby.setStatus('Bluetooth connection failed — reload to retry')
+      return null
+    }
+  }
   lobby.setStatus('Looking for a host…')
   session.onLobbyChange = (msg) => lobby.setPlayers(msg.players)
   session.onLevelChange = (level) => deps.renderer.setLevel(level)

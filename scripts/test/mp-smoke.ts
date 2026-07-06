@@ -1,10 +1,11 @@
 // Two-tab multiplayer smoke test over BroadcastChannelTransport.
 // Host tab + client tab in one browser context, host starts, both play,
 // screenshots + console errors captured.
-// Usage: npx tsx scripts/test/mp-smoke.ts [outDir]
+// Usage: npx tsx scripts/test/mp-smoke.ts [outDir] [baseUrl]
+//   baseUrl also settable via MP_SMOKE_BASE (default http://localhost:5173)
 import { chromium } from 'playwright-core'
 
-const BASE = 'http://localhost:5173'
+const BASE = process.argv[3] ?? process.env.MP_SMOKE_BASE ?? 'http://localhost:5173'
 const outDir = process.argv[2] ?? 'outputs/screenshots'
 
 const main = async (): Promise<void> => {
@@ -24,7 +25,8 @@ const main = async (): Promise<void> => {
   const client = await context.newPage()
   client.on('console', track('client'))
   client.on('pageerror', (err) => errors.push(`[client pageerror] ${err.stack ?? err.message}`))
-  await client.goto(`${BASE}/?mode=join&class=thief&room=smoke&name=Sneaky`)
+  // transport=tabs skips the Bluetooth-vs-tabs picker shown when Web Bluetooth exists
+  await client.goto(`${BASE}/?mode=join&class=thief&room=smoke&name=Sneaky&transport=tabs`)
   await client.waitForSelector('text=Connected', { timeout: 10000 })
 
   // Host should now list both players

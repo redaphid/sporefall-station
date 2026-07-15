@@ -5,7 +5,7 @@ import { addEntity, type World } from './world'
 
 /** Rounds the class starter pistol/gun spawns loaded with — generous so the
  * early game isn't ammo-starved, but FINITE so ammo pickups still matter. */
-export const STARTER_AMMO = 40
+export const STARTER_AMMO = 200
 
 /** Build the class starter as a real slotted ItemStack so it behaves like any
  * picked-up weapon: it carries ammo/durability in `qty` and can hold weapon-mods

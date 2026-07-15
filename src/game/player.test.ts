@@ -13,7 +13,7 @@ import { weaponStack, spendAmmo } from './systems/inventory'
 import { resolveWeapon } from './systems/resolveWeapon'
 import { WEAPONS } from './data/items'
 
-const STARTER_AMMO = 40
+const STARTER_AMMO = 200
 
 const step = (w: World): void => tickWorld(w, new Map([[0, emptyInput()]]))
 
@@ -73,8 +73,8 @@ describe('spawnPlayer — the starter gun holds mods (the #1 fix)', () => {
   })
 })
 
-describe('spawnPlayer — the starter pistol has finite (40-round) ammo', () => {
-  it('spendAmmo decrements and empties after exactly 40 shots', () => {
+describe('spawnPlayer — the starter pistol has finite (200-round) ammo', () => {
+  it('spendAmmo decrements and empties after exactly 200 shots', () => {
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 'soldier', 20, 20)
     for (let i = 0; i < STARTER_AMMO; i++) expect(spendAmmo(p)).toBe(true)

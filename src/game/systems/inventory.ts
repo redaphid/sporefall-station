@@ -60,33 +60,51 @@ export const activeStack = (e: Entity): ItemStack | undefined => {
   return ctl.inventory[ctl.activeSlot]
 }
 
-/** Drop a slot and, if it was equipped, fall back to bare fists. Keeps
- * activeSlot pointing at the same logical slot as the array shrinks. */
+/** The slot holding the currently-swung weapon (`combat.weapon`). This is NOT
+ * always `activeSlot`: a "held" throwable/consumable takes the active slot while
+ * a real weapon stays in hand, so durability/ammo must follow the weapon's slot,
+ * not whatever is held. Fast-path the common case where they coincide. Returns
+ * -1 when the weapon isn't slotted (bare fists, or a class-starter gun). */
+const weaponSlotIndex = (e: Entity): number => {
+  const ctl = e.playerCtl
+  if (!ctl || !e.combat) return -1
+  const wid = e.combat.weapon
+  if (ctl.activeSlot >= 0 && ctl.inventory[ctl.activeSlot]?.itemId === wid) return ctl.activeSlot
+  return ctl.inventory.findIndex((s) => {
+    const c = itemClass(s.itemId)
+    return s.itemId === wid && (c === 'melee' || c === 'ranged')
+  })
+}
+
+/** Drop a slot; if it held the swung weapon, fall back to bare fists. Keeps
+ * activeSlot pointing at the same logical slot as the array shrinks. The
+ * weapon-reset keys off the removed item, NOT activeSlot — throwing a held
+ * throwable (active slot) must not disarm the weapon in the player's hand. */
 const removeSlot = (e: Entity, index: number): void => {
   const ctl = e.playerCtl!
+  const wasWeapon = e.combat !== undefined && ctl.inventory[index]?.itemId === e.combat.weapon
   ctl.inventory.splice(index, 1)
-  if (ctl.activeSlot === index) {
-    ctl.activeSlot = -1
-    if (e.combat) e.combat.weapon = 'fists'
-  } else if (ctl.activeSlot > index) {
-    ctl.activeSlot -= 1
-  }
+  if (ctl.activeSlot === index) ctl.activeSlot = -1
+  else if (ctl.activeSlot > index) ctl.activeSlot -= 1
+  if (wasWeapon && e.combat) e.combat.weapon = 'fists'
 }
 
-/** A melee swing wears the active weapon down; at zero durability it breaks and
- * the entity drops to fists. Innate fists (no active slot) never wear. */
+/** A melee swing wears the swung weapon down; at zero durability it breaks and
+ * the entity drops to fists. Innate fists (weapon not slotted) never wear. */
 export const wearMelee = (e: Entity): void => {
-  const stack = activeStack(e)
-  if (!stack) return
+  const index = weaponSlotIndex(e)
+  if (index < 0) return
+  const stack = e.playerCtl!.inventory[index]
   stack.qty -= 1
-  if (stack.qty <= 0) removeSlot(e, e.playerCtl!.activeSlot)
+  if (stack.qty <= 0) removeSlot(e, index)
 }
 
-/** Try to spend one round from the equipped gun. Returns false when empty — the
+/** Try to spend one round from the swung gun. Returns false when empty — the
  * gun stays in the slot (empty, can't fire) rather than vanishing. */
 export const spendAmmo = (e: Entity): boolean => {
-  const stack = activeStack(e)
-  if (!stack) return true // gun not slotted (e.g. class starter): treat as unlimited
+  const index = weaponSlotIndex(e)
+  if (index < 0) return true // gun not slotted (e.g. class starter): treat as unlimited
+  const stack = e.playerCtl!.inventory[index]
   if (stack.qty <= 0) return false
   stack.qty -= 1
   return true

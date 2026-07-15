@@ -39,6 +39,9 @@ export interface AiState {
   rel?: Record<EntityId, RelEntry>
   /** Holds position instead of idle-wandering until it spots a target. */
   guard?: boolean
+  /** The goal chosen by the last arbitration (battle/flee/pursue/investigate/
+   * wander) — drives `mode`, exposed for debugging and the e2e. */
+  goal?: string
 }
 
 export interface ItemStack {

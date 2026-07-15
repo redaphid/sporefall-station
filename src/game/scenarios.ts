@@ -315,6 +315,22 @@ const stageMission = (w: World): void => {
   }
 }
 
+/** Two hostile gangsters — one at full health that charges, one badly wounded
+ * that flees — plus a calm cop downrange that will investigate a noise. */
+const setupAiGoals = (w: World): void => {
+  const { x, y } = findStage(w, 14)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0
+  }
+  spawnNpc(w, 'gangster', x + 3 + 0.5, y + 0.5) // full health -> charges
+  const wounded = spawnNpc(w, 'gangster', x + 4 + 0.5, y + 0.5)
+  wounded.health!.hp = 5 // < a third of max -> should flee, not fight
+  spawnNpc(w, 'cop', x + 10 + 0.5, y + 0.5) // neutral bystander for the noise test
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)
@@ -327,4 +343,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'doors') stageDoors(w)
   if (name === 'shooting') stageShooting(w)
   if (name === 'mission') stageMission(w)
+  if (name === 'ai-goals') setupAiGoals(w)
 }

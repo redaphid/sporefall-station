@@ -3,12 +3,11 @@ import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import { doorClosedAt, type World } from '../world'
 import { applyDamage, spawnProjectile } from './combat'
-import { dispositionToward } from './relationships'
+import { arbitrateGoal, BATTLE, FLEE, INVESTIGATE, PURSUE, type Goal } from './goals'
 import { isImmobilized } from './statusFx'
 
 const THINK_INTERVAL = 5 // ~6Hz per NPC at 30Hz sim, phase-spread by id
 const WANDER_RADIUS = 4
-const LEASH = 1.5 // × sightRange before giving up a chase
 
 export const aiSystem = (w: World): void => {
   for (const e of w.entities) {
@@ -27,75 +26,46 @@ export const aiSystem = (w: World): void => {
 }
 
 const think = (w: World, e: Entity): void => {
+  applyGoal(w, e, arbitrateGoal(w, e))
+}
+
+/** Translate the arbitrated goal into the FSM mode/target/waypoint that steer()
+ * executes. Battle and Pursue both drive `aggro` — steer engages if in weapon
+ * range, else closes on the target (or its last-known spot). */
+const applyGoal = (w: World, e: Entity, goal: Goal): void => {
   const ai = e.ai!
-
-  // Sighting checks: aggro any player this NPC is disposed hostile toward.
-  const target = findHostileTarget(w, e)
-  if (target) {
+  ai.goal = goal.code
+  if (goal.code === BATTLE || goal.code === PURSUE) {
     ai.mode = 'aggro'
-    ai.targetId = target.id
-    ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
+    ai.targetId = goal.target
+    const target = goal.target !== undefined ? w.byId.get(goal.target) : undefined
+    if (target && canSee(w, e, target)) ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
     return
   }
-
-  if (ai.mode === 'aggro') {
-    const target = ai.targetId !== undefined ? w.byId.get(ai.targetId) : undefined
-    if (!target || target.dead) {
-      dropAggro(ai)
-    } else {
-      const dist = Math.hypot(target.pos.x - e.pos.x, target.pos.y - e.pos.y)
-      if (canSee(w, e, target)) {
-        ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
-      } else if (dist > ai.sightRange * LEASH) {
-        dropAggro(ai)
-      }
-    }
+  if (goal.code === FLEE) {
+    ai.mode = 'flee'
+    ai.targetId = goal.target
     return
   }
-
-  if (ai.mode === 'flee') {
-    const threat = ai.targetId !== undefined ? w.byId.get(ai.targetId) : undefined
-    if (!threat || threat.dead || Math.hypot(threat.pos.x - e.pos.x, threat.pos.y - e.pos.y) > ai.sightRange * 2) {
-      ai.mode = 'idle'
-      ai.targetId = undefined
-    }
+  if (goal.code === INVESTIGATE) {
+    ai.mode = 'wander'
+    ai.targetId = undefined
+    ai.waypoint = goal.at
     return
   }
-
-  // idle/wander: occasionally pick a new waypoint near home (guards hold post)
+  // WANDER: shed any old chase and amble around home (guards hold their post).
+  if (ai.mode === 'aggro' || ai.mode === 'flee') {
+    ai.targetId = undefined
+    ai.lastKnownTargetPos = undefined
+  }
   if (!ai.guard && !ai.waypoint && w.rng.chance(0.3)) {
     const tx = ai.home.x + w.rng.int(-WANDER_RADIUS, WANDER_RADIUS)
     const ty = ai.home.y + w.rng.int(-WANDER_RADIUS, WANDER_RADIUS)
     ai.waypoint = { x: tx, y: ty }
     ai.mode = 'wander'
+  } else if (!ai.waypoint) {
+    ai.mode = 'idle'
   }
-}
-
-const dropAggro = (ai: NonNullable<Entity['ai']>): void => {
-  ai.mode = 'wander'
-  ai.targetId = undefined
-  ai.waypoint = { ...ai.home }
-}
-
-const findHostileTarget = (w: World, e: Entity): Entity | null => {
-  const ai = e.ai!
-  let best: Entity | null = null
-  let bestDist = Infinity
-  for (const p of w.entities) {
-    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    // Aggro only players this NPC is disposed hostile toward; a raised alarm
-    // makes every cop treat the player as hostile (city-wide heat).
-    const hostile = dispositionToward(e, p.id) === 'Hostile' || (ai.faction === 'cop' && w.alarm >= 2)
-    if (!hostile) continue
-    // Cloaked players are much harder to spot
-    const sight = p.status && p.status.cloakUntil > w.tick ? ai.sightRange * 0.5 : ai.sightRange
-    const dist = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y)
-    if (dist > sight || dist >= bestDist) continue
-    if (!canSee(w, e, p)) continue
-    best = p
-    bestDist = dist
-  }
-  return best
 }
 
 const canSee = (w: World, e: Entity, target: Entity): boolean =>

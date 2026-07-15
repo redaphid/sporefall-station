@@ -18,13 +18,17 @@ describe('sim integration', () => {
     const thug = spawnNpc(w, 'thug', 11.5, 1.5)
     player.facing = 0 // facing +x, toward the thug
 
-    const attack = { ...emptyInput(), attack: true }
-    const inputs = new Map([[0, attack]])
-    tickWorld(w, inputs)
+    tickWorld(w, new Map([[0, { ...emptyInput(), attack: true }]]))
     expect(thug.health!.hp).toBeLessThan(thug.health!.max)
 
-    // Keep swinging until it dies (cooldowns apply); generous budget.
-    tickN(w, inputs, 300)
+    // A wounded thug now flees (goal arbitration) — chase it down while swinging.
+    for (let i = 0; i < 300 && w.byId.get(thug.id); i++) {
+      const cur = w.byId.get(thug.id)!
+      const dx = cur.pos.x - player.pos.x
+      const dy = cur.pos.y - player.pos.y
+      const chase = { ...emptyInput(), attack: true, moveX: Math.sign(dx), moveY: Math.sign(dy) }
+      tickWorld(w, new Map([[0, chase]]))
+    }
     expect(w.byId.get(thug.id)).toBeUndefined() // dead and swept
   })
 

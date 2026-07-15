@@ -22,6 +22,17 @@ export interface MissionState {
   description: string
 }
 
+/** A heard disturbance NPCs can investigate — a point that decays after a while. */
+export interface Noise {
+  x: number
+  y: number
+  /** Absolute tick at which it is forgotten. */
+  expires: number
+}
+
+/** Ticks a noise lingers for NPCs to hear and investigate (~3s at 30tps). */
+export const NOISE_TTL = 90
+
 export interface World {
   tick: number
   seed: number
@@ -39,6 +50,8 @@ export interface World {
   events: SimEvent[]
   /** City heat 0..3 — cop aggro threshold. */
   alarm: number
+  /** Active heard disturbances; NPCs investigate the nearest. */
+  noises: Noise[]
   gameOver: boolean
 }
 
@@ -62,8 +75,14 @@ export const createWorld = (seed: number, floor: number): World => {
     baseRng,
     events: [],
     alarm: 0,
+    noises: [],
     gameOver: false,
   }
+}
+
+/** Register a heard disturbance at a point; NPCs nearby will investigate it. */
+export const emitNoise = (w: World, x: number, y: number, ttl = NOISE_TTL): void => {
+  w.noises.push({ x, y, expires: w.tick + ttl })
 }
 
 export const addEntity = (w: World, e: Entity): Entity => {
@@ -90,6 +109,7 @@ export const isBlocked = (w: World, tx: number, ty: number): boolean =>
 
 export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   w.events.length = 0
+  if (w.noises.length > 0) w.noises = w.noises.filter((n) => n.expires > w.tick)
   for (const e of w.entities) {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y

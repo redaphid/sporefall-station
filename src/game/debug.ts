@@ -5,16 +5,18 @@
 
 import { applyDamage } from './systems/combat'
 import { freeze, shock, wet } from './systems/interactions'
-import type { World } from './world'
+import { emitNoise, type World } from './world'
 
 export interface DebugApi {
   freeze: (id: number) => void
   wet: (id: number) => void
   shock: (id: number) => void
   hit: (id: number, dmg?: number) => { id: number; hp: number | null; dead: boolean; shattered: boolean } | null
+  noise: (x: number, y: number) => void
 }
 
 export const createDebugApi = (w: World): DebugApi => ({
+  noise: (x, y) => emitNoise(w, x, y),
   freeze: (id) => {
     const e = w.byId.get(id)
     if (e) freeze(w, e)

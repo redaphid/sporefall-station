@@ -2,7 +2,7 @@ import { CLASSES } from '../data/classes'
 import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
-import { type World } from '../world'
+import { emitNoise, type World } from '../world'
 import { addItem, equipSlot } from './inventory'
 
 const INTERACT_RANGE = 1.3
@@ -80,6 +80,7 @@ const runChannel = (w: World, p: Entity): void => {
   } else {
     // Botched pick: noise draws attention, counts as a witnessed-able crime
     w.events.push({ type: 'noise', x: door.pos.x, y: door.pos.y })
+    emitNoise(w, door.pos.x, door.pos.y) // NPCs will investigate the racket
     ctl.crimeUntilTick = w.tick + CRIME_TICKS
     for (const npc of w.entities) {
       if (!npc.ai || npc.dead) continue

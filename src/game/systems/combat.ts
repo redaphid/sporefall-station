@@ -256,6 +256,40 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
   }
 }
 
+/** Fire the entity's equipped weapon along its current `facing`. THE single fire
+ * site: players (combatSystem) and NPCs (ai.ts) both route through here, so mods,
+ * elements (onHit), pellets, projectile behavior and melee arcs work identically
+ * for either. Sets `combat.cooldown` and returns whether a shot/swing happened
+ * (false = an empty gun clicked). Ammo/durability are spent only for INVENTORY
+ * weapons (a `weaponStack`); NPCs carry no inventory, so their loadout is innate
+ * and never runs dry. Callers gate on `combat.cooldown <= 0` before calling. */
+export const fireWeapon = (w: World, e: Entity): boolean => {
+  if (!e.combat) return false
+  const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
+  const stack = weaponStack(e)
+  const rw = resolveWeapon(weapon, stack?.mods)
+  if (weapon.kind === 'melee') {
+    const cls = e.playerCtl ? CLASSES[e.playerCtl.classId] : undefined
+    e.combat.cooldown = rw.cooldownTicks
+    const damage = Math.round(rw.damage * (cls?.meleeDamageMult ?? 1))
+    const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
+    if (weapon.durability !== undefined && stack) wearMelee(e)
+    if (hit) {
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
+    }
+    return true
+  }
+  if (stack && !spendAmmo(e)) return false // empty gun clicks — no shot, no cooldown
+  e.combat.cooldown = rw.cooldownTicks
+  const spec = projectileSpec(rw)
+  for (let i = 0; i < rw.pellets; i++) {
+    const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
+    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec)
+  }
+  return true
+}
+
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
@@ -276,26 +310,6 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     if (cmd.throwItem && e.combat.cooldown <= 0 && useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
-    const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
-    // The SINGLE fire-site fold: mods hang off the swung weapon's ItemStack.
-    const rw = resolveWeapon(weapon, weaponStack(e)?.mods)
-    if (weapon.kind === 'melee') {
-      e.combat.cooldown = rw.cooldownTicks
-      const damage = Math.round(rw.damage * (cls?.meleeDamageMult ?? 1))
-      const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
-      if (weapon.durability !== undefined) wearMelee(e)
-      if (hit) {
-        if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
-        runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
-      }
-    } else {
-      if (!spendAmmo(e)) continue // empty gun clicks — no shot, no cooldown
-      e.combat.cooldown = rw.cooldownTicks
-      const spec = projectileSpec(rw)
-      for (let i = 0; i < rw.pellets; i++) {
-        const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
-        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec)
-      }
-    }
+    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
   }
 }

@@ -34,6 +34,9 @@ export interface WorldJson {
   baseRng: number
   /** FNV-1a of the regenerated level — a mismatch means seed/floor drift. */
   levelChecksum: number
+  /** Combat "all NPCs are enemies" tunable. Omitted when true (the default) so
+   * pre-feature snapshots round-trip byte-for-byte and load as hostile. */
+  hostile?: boolean
   entities: Record<string, unknown>[]
   /** Inert on-screen annotations (types.ts). Absent in pre-annotation snapshots →
    * restored as `[]`. Entity SELECTION needs no field here: `Entity.selected`
@@ -59,6 +62,9 @@ export const serializeWorld = (w: World): WorldJson => ({
   baseRng: w.baseRng.state(),
   levelChecksum: levelChecksum(w.level),
   entities: w.entities.map(serializeEntity),
+  // Omit when at the hostile default so pre-existing snapshots stay byte-for-byte
+  // unchanged; only a peaceful (false) world writes the field.
+  ...(w.hostile ? {} : { hostile: false }),
   // Omit when empty so pre-existing snapshots stay byte-for-byte unchanged (a
   // fresh world with no annotations serializes exactly as before this feature).
   ...(w.annotations.length ? { annotations: clone(w.annotations) } : {}),
@@ -74,6 +80,7 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.tick = j.tick
   w.nextId = j.nextId
   w.alarm = j.alarm
+  w.hostile = j.hostile ?? true // pre-feature snapshots load as hostile (the default)
   w.gameOver = j.gameOver
   w.mission = { ...j.mission }
   w.noises = j.noises.map((n) => ({ ...n }))

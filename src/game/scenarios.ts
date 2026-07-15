@@ -244,6 +244,10 @@ const setupShowcase = (w: World): void => {
 const LANE_Y = 11 // open plaza lane below spawn — the camera frames it without clamping
 
 const clearStage = (w: World): void => {
+  // Scripted stages are hand-choreographed around faction stances (ambient
+  // civilians amble, only the gang thugs charge), so opt out of the global
+  // "everyone's an enemy" default — hostility here comes from disposition alone.
+  w.hostile = false
   // Mod-pickups (populate.ts) are the LAST entities stocked before the player is
   // spawned, so they shift the player id + `nextId` up by their count. A scripted
   // plaza wipes all populate entities anyway, but the AI think-stagger keys off
@@ -363,7 +367,58 @@ const setupObjects = (w: World): void => {
   bystander.speed = 0
 }
 
+/** A ring of ARMED, HOSTILE NPCs closing on the player, each with a visibly
+ * different weapon (bat / knife / pistol / shotgun / machinegun / sledgehammer /
+ * freeze ray / flamethrower). Leaves the world's `hostile` default ON so every
+ * ring member engages regardless of faction — the "make them all enemies" demo.
+ * The player is made tanky so the swarm converges and fires without ending the
+ * clip early. A blank clearing is carved so LOS/movement are unobstructed. */
+const setupNpcCombat = (w: World): void => {
+  const cx = Math.floor(w.level.w / 2)
+  const cy = Math.floor(w.level.h / 2)
+  const R = 8 // half-size of the carved clearing
+  for (let y = cy - R; y <= cy + R; y++) {
+    for (let x = cx - R; x <= cx + R; x++) {
+      if (x > 0 && y > 0 && x < w.level.w - 1 && y < w.level.h - 1) w.level.tiles[y * w.level.w + x] = Tile.Floor
+    }
+  }
+  // Blank the randomly-populated crowd/loot so only the staged fight is on screen.
+  const players = w.entities.filter((e) => !!e.playerCtl)
+  w.entities = players
+  w.byId.clear()
+  for (const e of players) w.byId.set(e.id, e)
+
+  const player = players[0]
+  if (player) {
+    player.pos = { x: cx + 0.5, y: cy + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    if (player.health) player.health = { hp: 100000, max: 100000, iframes: 0 } // survive the swarm for the whole clip
+  }
+
+  const ring: [string, string][] = [
+    ['thug', 'bat'],
+    ['thug', 'knife'],
+    ['gangster', 'pistol'],
+    ['gangster', 'shotgun'],
+    ['gangster', 'machinegun'],
+    ['thug', 'sledgehammer'],
+    ['gangster', 'tranquilizer'],
+    ['gangster', 'flamethrower'],
+  ]
+  const radius = 6
+  for (let i = 0; i < ring.length; i++) {
+    const [arch, weapon] = ring[i]
+    const a = (i / ring.length) * Math.PI * 2
+    const nx = cx + 0.5 + Math.cos(a) * radius
+    const ny = cy + 0.5 + Math.sin(a) * radius
+    const npc = spawnNpc(w, arch, nx, ny)
+    npc.combat!.weapon = weapon
+    npc.ai!.sightRange = 14 // see across the clearing so they all commit at once
+  }
+}
+
 export const applyScenario = (w: World, name: string): void => {
+  if (name === 'npc-combat') setupNpcCombat(w)
   if (name === 'objects') setupObjects(w)
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)

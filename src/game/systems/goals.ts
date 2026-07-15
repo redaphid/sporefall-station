@@ -19,6 +19,7 @@
 // resolve by candidate order (Wander first, then targets by id, strictly-greater
 // replaces).
 
+import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
@@ -41,6 +42,9 @@ export const INVESTIGATE_SCORE = 3
 export const DIST_K = 2.5
 /** How far an NPC can hear a noise to investigate it. */
 export const HEAR_RANGE = 12
+/** Baseline hate a `w.hostile` world imputes toward players for an NPC with no
+ * stored opinion — the `CRIME_HATE` threshold, so battleScore clears WANDER. */
+export const WORLD_HOSTILE_HATE = 5
 /** Multiple of sightRange an NPC keeps chasing a remembered target before giving up. */
 const LEASH = 1.5
 
@@ -58,8 +62,14 @@ const fleeScore = (hate: number, hp: number, max: number, dist: number): number 
 const canSee = (w: World, a: Entity, b: Entity): boolean =>
   hasLineOfSight(w.level, a.pos.x, a.pos.y, b.pos.x, b.pos.y, (tx, ty) => doorClosedAt(w, tx, ty))
 
-const hateToward = (e: Entity, targetId: EntityId): number =>
-  e.ai?.rel?.[targetId]?.hate ?? initialPlayerHate(e.ai?.faction ?? 'neutral')
+const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
+  const stored = e.ai?.rel?.[targetId]?.hate
+  if (stored !== undefined) return stored
+  const base = initialPlayerHate(e.ai?.faction ?? 'neutral')
+  // A hostile world floors an un-opinionated NPC's grudge to the hostile band so
+  // it engages regardless of faction; a stored opinion (e.g. befriended) still wins.
+  return w.hostile ? Math.max(base, WORLD_HOSTILE_HATE) : base
+}
 
 const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {
   let best: Vec2 | undefined
@@ -85,17 +95,28 @@ export const arbitrateGoal = (w: World, e: Entity): Goal => {
   const ai = e.ai!
   const hp = e.health?.hp ?? 1
   const max = e.health?.max ?? 1
+
+  // Panic overrides aggression: a skittish NPC (civilian/scientist) that has been
+  // scared into fleeing keeps running from its scarer until it's well clear — a
+  // hostile world makes it an enemy only until it's hurt, then it just flees.
+  if (NPCS[e.archetype]?.fleesOnDamage && ai.mode === 'flee' && ai.targetId !== undefined) {
+    const threat = w.byId.get(ai.targetId)
+    if (threat && !threat.dead && Math.hypot(threat.pos.x - e.pos.x, threat.pos.y - e.pos.y) <= ai.sightRange * 2) {
+      return { code: FLEE, target: ai.targetId }
+    }
+  }
+
   let best: Best = { code: WANDER, score: WANDER_SCORE }
 
   for (const p of w.entities) {
     if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    const hostile = dispositionToward(e, p.id) === 'Hostile' || (ai.faction === 'cop' && w.alarm >= 2)
+    const hostile = w.hostile || dispositionToward(e, p.id) === 'Hostile' || (ai.faction === 'cop' && w.alarm >= 2)
     if (!hostile) continue
     const dist = Math.max(1, Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y))
     // Cloaked players are much harder to spot.
     const sight = p.status && p.status.cloakUntil > w.tick ? ai.sightRange * 0.5 : ai.sightRange
     if (dist > sight || !canSee(w, e, p)) continue // must actually perceive it
-    const hate = hateToward(e, p.id)
+    const hate = hateToward(w, e, p.id)
     const aggress = battleScore(hate, hp, dist)
     if (aggress > best.score) best = { code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: aggress, target: p.id }
     const flee = fleeScore(hate, hp, max, dist)

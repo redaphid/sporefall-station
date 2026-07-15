@@ -71,6 +71,11 @@ export interface World {
   mode: RunMode
   /** Party-shared comebacks left this run; only consumed/gated in `normal`. */
   revivesLeft: number
+  /** Combat tunable: when true every NPC treats players as an enemy on sight and
+   * engages regardless of faction disposition (the "make them all enemies" knob).
+   * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
+   * cloaked-guard exemptions still apply — this only sets the baseline stance. */
+  hostile: boolean
   /** Inert on-screen annotations (labels/pins/arrows/circles/text) the render
    * overlay draws OVER the world. NO sim system reads or mutates this, so it never
    * touches determinism — it just serializes/replays with the world (see types.ts
@@ -78,7 +83,7 @@ export interface World {
   annotations: Annotation[]
 }
 
-export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal'): World => {
+export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
   const baseRng = mulberry32(seed)
   return {
     tick: 0,
@@ -102,6 +107,7 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     gameOver: false,
     mode,
     revivesLeft: REVIVES_PER_RUN,
+    hostile,
     annotations: [],
   }
 }

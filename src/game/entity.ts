@@ -109,6 +109,12 @@ export interface Entity {
   /** A usable object (ATM/vending) that has already dispensed once. */
   used?: boolean
   dead?: boolean
+  /** General UI selection state — the player tapped/clicked this entity to point
+   * it out. Multi-select: any number of entities may be `selected` at once. Inert
+   * to the sim (no system reads it), so it never affects determinism; it rides
+   * along in the entity's serialized JSON like any other component. An agent finds
+   * selected entities with a normal `entities`/`get` query (filter on this flag). */
+  selected?: boolean
 }
 
 /** Bare entity with no id — World.addEntity assigns ids so worlds stay self-contained. */

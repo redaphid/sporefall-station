@@ -1,6 +1,6 @@
 import type { Entity } from '../game/entity'
 import type { Level } from '../game/levelgen/level'
-import type { SimEvent } from '../game/types'
+import type { Annotation, SimEvent } from '../game/types'
 import type { RunMode } from '../game/world'
 
 /** What the render layer consumes each frame. */
@@ -19,6 +19,9 @@ export interface RenderView {
   revivesLeft?: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
+  /** Inert on-screen annotations to draw over the scene (see game/types.ts).
+   * Empty/omitted on sessions that don't surface them (clients mirror host state). */
+  annotations?: readonly Annotation[]
 }
 
 /**

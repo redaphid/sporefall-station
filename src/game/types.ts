@@ -38,6 +38,41 @@ export const emptyInput = (): InputCmd => ({
   throwItem: false,
 })
 
+/** The visual kinds an annotation can take. `label`/`pin` mark a point or entity;
+ * `arrow`/`circle` are free shapes; `text` is a screen-space banner. */
+export type AnnotationKind = 'text' | 'label' | 'pin' | 'arrow' | 'circle'
+
+/**
+ * Inert presentation data drawn OVER the world by the render overlay — never read
+ * or mutated by any sim system, so determinism is untouched. It rides along in
+ * world state (serializes/replays) so an agent (or a tutorial, or a game event)
+ * can point things out to the player.
+ *
+ * The headline, most ergonomic form is ENTITY-ANCHORED: give a `targetId` and let
+ * the engine position the mark over that entity's LIVE sprite each frame (no x/y).
+ * Free-floating `x`/`y` marks exist for points with no entity. `ttlTick` (an
+ * ABSOLUTE tick) auto-expires the mark once `w.tick` passes it.
+ */
+export interface Annotation {
+  id: number | string
+  kind: AnnotationKind
+  text?: string
+  /** Free-floating world (label/pin/arrow/circle) or screen (text banner) x. */
+  x?: number
+  y?: number
+  /** Entity to anchor to — the engine reads its live pos and places the mark. */
+  targetId?: EntityId
+  /** For `arrow`: the world point it points FROM (defaults near the target/point). */
+  x2?: number
+  y2?: number
+  /** For `circle`: world radius in tiles (default 1). */
+  radius?: number
+  /** CSS colour string; the overlay picks a default when absent. */
+  color?: string
+  /** Absolute tick at/after which the overlay stops drawing it. */
+  ttlTick?: number
+}
+
 export type SimEvent =
   | { type: 'hit'; x: number; y: number; targetId: EntityId; amount: number }
   | { type: 'death'; x: number; y: number; entityId: EntityId }

@@ -1,0 +1,72 @@
+// Pure builder for the tap-inspect readout — a friendly subset of an entity's
+// components (name/kind, hp, faction/disposition, door lock, interact verb, item
+// effect). Kept DOM-free so the overlay just renders the rows and tests assert on
+// them. Reads live entity fields plus the data tables for human-facing names.
+
+import type { Entity } from '../game/entity'
+import { NPCS } from '../game/data/npcs'
+import { CONSUMABLES, THROWABLES, WEAPONS } from '../game/data/items'
+
+export interface InspectRow {
+  label: string
+  value: string
+}
+
+export interface InspectCard {
+  title: string
+  rows: InspectRow[]
+}
+
+/** Title-case an archetype key like `door.wood` → `Door Wood`. */
+const pretty = (s: string): string =>
+  s
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(' ')
+
+/** Human name for whichever weapon/throwable/consumable id we can resolve. */
+const itemName = (id: string): string => WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id)
+
+/**
+ * Build the friendly inspect card for an entity. Only rows that apply are
+ * emitted, so a plain prop shows a short card and a rich NPC a fuller one. Never
+ * throws on missing fields — every lookup is defensive.
+ */
+export const inspectCard = (e: Entity): InspectCard => {
+  const rows: InspectRow[] = []
+  const title = `${pretty(e.archetype)} · ${e.kind}`
+
+  if (e.health) rows.push({ label: 'HP', value: `${Math.max(0, Math.round(e.health.hp))}/${e.health.max}` })
+
+  if (e.ai) {
+    const def = NPCS[e.archetype]
+    rows.push({ label: 'Faction', value: pretty(e.ai.faction ?? def?.faction ?? 'neutral') })
+    // Disposition: the AI's current goal/mode is the closest friendly read.
+    if (e.ai.goal) rows.push({ label: 'Disposition', value: pretty(e.ai.goal) })
+    else if (e.ai.mode) rows.push({ label: 'Disposition', value: pretty(e.ai.mode) })
+  }
+
+  if (e.playerCtl) {
+    rows.push({ label: 'Player', value: `P${e.playerCtl.playerId + 1} · ${pretty(e.playerCtl.classId)}` })
+    if (e.playerCtl.downed) rows.push({ label: 'State', value: 'Downed' })
+  }
+
+  if (e.door) {
+    rows.push({ label: 'Door', value: e.door.open ? 'Open' : e.door.locked ? `Locked (L${e.door.lockLevel})` : 'Closed' })
+  }
+
+  if (e.combat?.weapon) rows.push({ label: 'Weapon', value: itemName(e.combat.weapon) })
+
+  if (e.pickup) {
+    rows.push({ label: 'Item', value: `${itemName(e.pickup.itemId)}${e.pickup.qty > 1 ? ` ×${e.pickup.qty}` : ''}` })
+    const wpn = WEAPONS[e.pickup.itemId]
+    const heal = CONSUMABLES[e.pickup.itemId]?.heal
+    if (wpn) rows.push({ label: 'Damage', value: String(wpn.damage) })
+    else if (heal) rows.push({ label: 'Heal', value: String(heal) })
+  }
+
+  if (e.interact) rows.push({ label: 'Interact', value: pretty(e.interact.verb) })
+
+  return { title, rows }
+}

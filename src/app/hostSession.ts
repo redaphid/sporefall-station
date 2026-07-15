@@ -117,6 +117,7 @@ export class HostSession implements Session {
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       self: this.self,
+      annotations: this.world.annotations,
     }
   }
 }

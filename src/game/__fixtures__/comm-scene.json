@@ -1,0 +1,298 @@
+{
+  "v": 1,
+  "seed": 20260715,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 7,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the exit"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 3425059380,
+  "baseRng": 20260715,
+  "levelChecksum": 3150501330,
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 20,
+        "y": 11
+      },
+      "prevPos": {
+        "x": 20,
+        "y": 11
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "classId": "soldier",
+        "abilityCooldown": 0,
+        "inventory": [],
+        "activeSlot": -1,
+        "cash": 0,
+        "crimeUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "cop",
+      "pos": {
+        "x": 22,
+        "y": 9
+      },
+      "prevPos": {
+        "x": 22,
+        "y": 9
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 60,
+        "max": 60,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 100000,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "cop",
+        "home": {
+          "x": 22,
+          "y": 9
+        },
+        "thinkAt": 0,
+        "sightRange": 8
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 18,
+        "y": 9
+      },
+      "prevPos": {
+        "x": 18,
+        "y": 9
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 100000,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 18,
+          "y": 9
+        },
+        "thinkAt": 0,
+        "sightRange": 7
+      }
+    },
+    {
+      "id": 4,
+      "kind": "npc",
+      "archetype": "gangster",
+      "pos": {
+        "x": 23,
+        "y": 12
+      },
+      "prevPos": {
+        "x": 23,
+        "y": 12
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.6,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 35,
+        "max": 35,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 100000,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 23,
+          "y": 12
+        },
+        "thinkAt": 0,
+        "sightRange": 8
+      }
+    },
+    {
+      "id": 5,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 20,
+        "y": 8
+      },
+      "prevPos": {
+        "x": 20,
+        "y": 8
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 100000,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 20,
+          "y": 8
+        },
+        "thinkAt": 0,
+        "sightRange": 7
+      }
+    },
+    {
+      "id": 6,
+      "kind": "pickup",
+      "archetype": "medkit",
+      "pos": {
+        "x": 17,
+        "y": 13
+      },
+      "prevPos": {
+        "x": 17,
+        "y": 13
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "pickup": {
+        "itemId": "medkit",
+        "qty": 1
+      },
+      "interact": {
+        "verb": "pickup",
+        "range": 0.8
+      }
+    }
+  ]
+}

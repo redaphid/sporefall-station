@@ -11,7 +11,7 @@ import { movementSystem } from './systems/movement'
 import { projectileSystem } from './systems/projectiles'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
-import type { EntityId, InputCmd, SimEvent } from './types'
+import type { Annotation, EntityId, InputCmd, SimEvent } from './types'
 
 export interface MissionState {
   template: 'steal' | 'assassinate' | 'reach'
@@ -70,6 +70,11 @@ export interface World {
   mode: RunMode
   /** Party-shared comebacks left this run; only consumed/gated in `normal`. */
   revivesLeft: number
+  /** Inert on-screen annotations (labels/pins/arrows/circles/text) the render
+   * overlay draws OVER the world. NO sim system reads or mutates this, so it never
+   * touches determinism — it just serializes/replays with the world (see types.ts
+   * `Annotation`). Default `[]`. */
+  annotations: Annotation[]
 }
 
 export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal'): World => {
@@ -96,6 +101,7 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     gameOver: false,
     mode,
     revivesLeft: REVIVES_PER_RUN,
+    annotations: [],
   }
 }
 

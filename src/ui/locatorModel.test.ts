@@ -5,6 +5,7 @@ import {
   playerColor,
   playerLabel,
   projectToScreen,
+  screenToWorld,
   type CameraState,
   type Teammate,
 } from './locatorModel'
@@ -161,5 +162,31 @@ describe('locatorMarkers', () => {
     const [m] = locatorMarkers(self, mates, cam({ screenW: 0, screenH: 0 }))
     expect(Number.isFinite(m.sx)).toBe(true)
     expect(Number.isFinite(m.sy)).toBe(true)
+  })
+})
+
+describe('screenToWorld — inverse of projectToScreen (tap → world point)', () => {
+  it('round-trips a world point through project → screen → world', () => {
+    const c = cam()
+    const p = projectToScreen(52, 48, c)
+    const back = screenToWorld(p.x, p.y, c)
+    expect(back.x).toBeCloseTo(52, 6)
+    expect(back.y).toBeCloseTo(48, 6)
+  })
+
+  it('maps screen centre to the (clamped) camera centre', () => {
+    const c = cam()
+    const w = screenToWorld(c.screenW / 2, c.screenH / 2, c)
+    expect(w.x).toBeCloseTo(50, 6)
+    expect(w.y).toBeCloseTo(50, 6)
+  })
+
+  it('respects the edge clamp exactly (matches projectToScreen at a corner)', () => {
+    // Camera pushed hard against the level edge so the clamp fires.
+    const c = cam({ x: 0, y: 0 })
+    const p = projectToScreen(3, 4, c)
+    const back = screenToWorld(p.x, p.y, c)
+    expect(back.x).toBeCloseTo(3, 6)
+    expect(back.y).toBeCloseTo(4, 6)
   })
 })

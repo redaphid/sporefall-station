@@ -174,6 +174,7 @@ export class BleClientTransport implements Transport {
       this.listenersAdded = true
       await BluetoothLowEnergy.addListener('deviceDisconnected', (ev) => {
         if (ev.deviceId === this.hostDeviceId) {
+          this.log(`join: host disconnected ${ev.deviceId}`)
           this.hostDeviceId = null
           this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
         }
@@ -183,20 +184,26 @@ export class BleClientTransport implements Transport {
         this.emit({ type: 'data', peer: 'host', bytes: new Uint8Array(ev.value) })
       })
     }
+    this.log(`join: connect ${deviceId}`)
     await BluetoothLowEnergy.connect({ deviceId })
     try {
       const { mtu } = await BluetoothLowEnergy.requestMtu({ deviceId, mtu: 512 })
       this.maxPacket = Math.max(20, Math.min(mtu - 3, 244))
+      this.log(`join: MTU ${mtu} → maxPacket ${this.maxPacket}`)
     } catch {
       this.maxPacket = MAX_PACKET // stack refused; the 182-byte floor still works
+      this.log(`join: MTU refused → maxPacket ${this.maxPacket}`)
     }
+    this.log('join: discoverServices')
     await BluetoothLowEnergy.discoverServices({ deviceId })
+    this.log('join: subscribe H2C notifications')
     await BluetoothLowEnergy.startCharacteristicNotifications({
       deviceId,
       service: BLE_SERVICE_UUID,
       characteristic: BLE_DATA_H2C_UUID,
     })
     this.hostDeviceId = deviceId
+    this.log('join: connected — sending Hello')
     this.emit({ type: 'peerConnected', peer: 'host' })
   }
 

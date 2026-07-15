@@ -19,6 +19,7 @@ import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import { pickClass } from './ui/classSelect'
 import { createHud } from './ui/hud'
+import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 
@@ -96,16 +97,23 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   }
 
   const native = Capacitor.isNativePlatform()
+  // On-screen co-op diagnostics (host/join). Invaluable on a real phone where the
+  // BLE handshake can't be watched over a single adb cable.
+  const dbg = createDebugLog(deps.uiMount)
 
   if (mode === 'host') {
     const transport = native
-      ? new BleHostTransport(`SoR ${deps.name}`)
+      ? new BleHostTransport(`SoR ${deps.name}`, dbg.log)
       : new BroadcastChannelTransport('host', deps.room)
+    dbg.log(`host: mode start, native=${native}, name="SoR ${deps.name}"`)
     const session = new NetHostSession(deps.seed, deps.classId, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
-    session.onLobbyChange = (players) => lobby.setPlayers(players)
+    session.onLobbyChange = (players) => {
+      dbg.log(`host: lobby now ${players.length} player(s)`)
+      lobby.setPlayers(players)
+    }
     await session.start()
     await lobby.waitForStart()
     session.beginGame()
@@ -115,7 +123,8 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   }
 
   // join
-  const transport = native ? new BleClientTransport() : await pickBrowserJoinTransport(deps)
+  dbg.log(`join: mode start, native=${native}`)
+  const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
   const session = new NetClientSession(deps.name, deps.classId, deps.input, transport)
 
   if (transport instanceof BleClientTransport) {
@@ -147,6 +156,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   session.onLevelChange = (level) => deps.renderer.setLevel(level)
   const ready = new Promise<boolean>((resolve) => {
     session.onPhaseChange = (phase) => {
+      dbg.log(`join: phase → ${phase}`)
       if (phase === 'lobby') lobby.setStatus('Connected — waiting for host to start')
       else if (phase === 'starting') lobby.setStatus('Generating city…')
       else if (phase === 'playing') resolve(true)

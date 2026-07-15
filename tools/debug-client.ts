@@ -3,11 +3,19 @@
 // pushed events out to subscribers. Uses Node's built-in global WebSocket
 // (Node 22+) so it needs no dependency of its own.
 
-import { DEFAULT_HUB_PORT, hubUrl, type DebugMsg } from '../src/debug/protocol'
+import { DEFAULT_HUB_PORT, hubUrl, type DebugMsg, type GameInfo } from '../src/debug/protocol'
+
+export interface RawOpts {
+  timeoutMs?: number
+  /** Route this verb to the game with this id/name (else the hub's default). */
+  target?: string
+}
 
 export interface DebugClient {
   /** Send one verb line; resolve with the game's text reply (reject on error). */
-  raw(verb: string, timeoutMs?: number): Promise<string>
+  raw(verb: string, opts?: RawOpts): Promise<string>
+  /** List the games connected to the hub (a hub control verb). */
+  games(): Promise<GameInfo[]>
   onEvent(cb: (event: unknown) => void): void
   close(): void
 }
@@ -45,15 +53,16 @@ export const connectDebugger = (url = defaultHubUrl()): Promise<DebugClient> =>
     })
 
     const client: DebugClient = {
-      raw: (verb, timeoutMs = 5000) =>
+      raw: (verb, { timeoutMs = 5000, target } = {}) =>
         new Promise((res, rej) => {
           const id = seq++
           waiters.set(id, { resolve: res, reject: rej })
-          ws.send(JSON.stringify({ t: 'req', id, verb } satisfies DebugMsg))
+          ws.send(JSON.stringify({ t: 'req', id, verb, ...(target ? { target } : {}) } satisfies DebugMsg))
           setTimeout(() => {
             if (waiters.delete(id)) rej(new Error(`verb timed out (${timeoutMs}ms): ${verb}`))
           }, timeoutMs)
         }),
+      games: async () => JSON.parse(await client.raw('games')) as GameInfo[],
       onEvent: (cb) => eventCbs.push(cb),
       close: () => ws.close(),
     }

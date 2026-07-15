@@ -27,6 +27,12 @@ const id = z.union([z.number(), z.string()])
 export function buildMcpServer(raw: Raw): McpServer {
   const server = new McpServer({ name: 'sor-ecs-debug', version: '0.1.0' })
 
+  // ---- game selection (multi-game hubs) ---------------------------------
+  // A hub may host several games; these pick which one the other tools drive.
+  // With exactly one live game, selection is unnecessary.
+  server.registerTool('games', { description: 'List games connected to the hub: id, name, live?, ticking? (frozen = backgrounded/orphaned), gameOver, last-seen.' }, () => run(() => raw('games')))
+  server.registerTool('select_game', { description: 'Route subsequent verbs to a specific game by id/name (sticky for this session). Use when the hub reports multiple games.', inputSchema: { game: z.string().describe('a game id (e.g. "g2") or name from `games`') } }, ({ game }) => run(() => raw(`use ${game}`)))
+
   // ---- inspect ----------------------------------------------------------
   server.registerTool('list_entities', { description: 'Every ECS entity: id, kind, archetype, and verbatim component JSON (unknown/future components included).' }, () => run(() => raw('entities')))
   server.registerTool('inspect', { description: "One entity's verbatim component JSON.", inputSchema: { entity: id } }, ({ entity }) => run(() => raw(`get ${entity}`)))

@@ -9,8 +9,10 @@ export interface Hud {
 
 export const createHud = (mount: HTMLElement): Hud => {
   const root = document.createElement('div')
+  // Offset by the notch/status-bar inset so the health bar clears the OS clock on
+  // notched/foldable phones (Razr Ultra). env() needs viewport-fit=cover, set in index.html.
   root.style.cssText =
-    'position:absolute;left:12px;top:10px;color:#eee;font:14px system-ui;text-shadow:0 1px 2px #000;pointer-events:none;'
+    'position:absolute;left:12px;top:calc(env(safe-area-inset-top, 0px) + 10px);color:#eee;font:14px system-ui;text-shadow:0 1px 2px #000;pointer-events:none;'
   root.innerHTML = `
     <div style="width:160px;height:14px;background:#3338;border:1px solid #000;border-radius:3px;overflow:hidden">
       <div id="hp" style="width:100%;height:100%;background:linear-gradient(#7fd17f,#4a9a4a);transition:width .15s"></div>

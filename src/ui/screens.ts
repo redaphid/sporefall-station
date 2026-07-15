@@ -1,14 +1,26 @@
 import type { RenderView } from '../app/session'
+import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 
 export interface Screens {
   update(view: RenderView): void
 }
 
-/** Mission banner, floor-change flash, and the run-over overlay. All DOM. */
-export const createScreens = (mount: HTMLElement, onRestart?: () => void): Screens => {
+/**
+ * Read-only camera/screen state for the teammate locator's world→screen
+ * projection. main.ts supplies it from the renderer without the locator ever
+ * touching pixi. Omitted (undefined) in solo/tests → the on-screen markers just
+ * don't render and only the (projection-free) edge arrows would show.
+ */
+export type CameraSource = () => Omit<CameraState, 'levelW' | 'levelH'>
+
+/** Mission banner, floor-change flash, the run-over overlay, and the co-op locator. All DOM. */
+export const createScreens = (mount: HTMLElement, onRestart?: () => void, cameraSource?: CameraSource): Screens => {
   const mission = document.createElement('div')
+  // Offset by the notch/status-bar inset (env() → viewport-fit=cover in index.html), and
+  // drop below the health-bar band so the centered mission text never overlaps the HUD's
+  // top-left health bar on narrow/foldable screens.
   mission.style.cssText =
-    'position:absolute;top:10px;left:50%;transform:translateX(-50%);color:#eee;font:600 14px system-ui;' +
+    'position:absolute;top:calc(env(safe-area-inset-top, 0px) + 34px);left:50%;transform:translateX(-50%);color:#eee;font:600 14px system-ui;' +
     'text-shadow:0 1px 3px #000;pointer-events:none;text-align:center;max-width:70vw'
   mount.appendChild(mission)
 
@@ -44,6 +56,15 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void): Scree
   const exitArrow = exitPtr.querySelector<HTMLElement>('#exitArrow')!
   const exitLabel = exitPtr.querySelector<HTMLElement>('#exitLabel')!
 
+  // Co-op teammate locator (issue #34): a DOM overlay of per-teammate markers.
+  // Off-screen teammates get an edge-pinned rotating ➤ with a distance readout;
+  // on-screen ones get a coloured name caret so players stay distinguishable.
+  // Elements are pooled by playerId so we position, not rebuild, each frame.
+  const locator = document.createElement('div')
+  locator.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:65'
+  mount.appendChild(locator)
+  const locatorEls = new Map<number, LocatorEl>()
+
   const restartBtn = overlay.querySelector<HTMLButtonElement>('#restart')!
   if (onRestart) {
     // Host/solo own "play again": rebuild the run in place — NO page reload, so a
@@ -67,6 +88,36 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void): Scree
     banner.style.opacity = '1'
     clearTimeout(bannerTimer)
     bannerTimer = setTimeout(() => (banner.style.opacity = '0'), 2200)
+  }
+
+  let lastLocator = ''
+  const updateLocator = (view: RenderView): void => {
+    const cam = cameraSource?.()
+    // Gather every OTHER player (self is the camera target, never located).
+    const teammates: Teammate[] = []
+    if (view.self) {
+      for (const e of view.entities) {
+        if (!e.playerCtl || e === view.self || e.dead) continue
+        teammates.push({ playerId: e.playerCtl.playerId, x: e.pos.x, y: e.pos.y, downed: !!e.playerCtl.downed })
+      }
+    }
+    // Solo (no teammates) or no camera to project with → clear and bail cheaply.
+    if (!view.self || !cam || teammates.length === 0) {
+      if (lastLocator !== '') {
+        lastLocator = ''
+        for (const el of locatorEls.values()) el.root.remove()
+        locatorEls.clear()
+      }
+      return
+    }
+    const markers = locatorMarkers(view.self.pos, teammates, { ...cam, levelW: view.level.w, levelH: view.level.h })
+    // Cheap change-detection (like the HUD): skip DOM writes when nothing moved.
+    const key = markers
+      .map((m) => `${m.playerId}:${m.onScreen ? 'o' : 'e'}${Math.round(m.sx)},${Math.round(m.sy)}:${m.angle.toFixed(2)}:${m.dist}:${m.color}`)
+      .join('|')
+    if (key === lastLocator) return
+    lastLocator = key
+    positionMarkers(locator, locatorEls, markers)
   }
 
   let lastMission = ''
@@ -103,6 +154,8 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void): Scree
         exitPtr.style.display = 'none'
       }
 
+      updateLocator(view)
+
       if (view.gameOver && !shownGameOver) {
         shownGameOver = true
         stats.textContent = `Made it to floor ${view.floor} · $${view.self?.playerCtl?.cash ?? 0} collected`
@@ -114,5 +167,67 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void): Scree
         overlay.style.display = 'none'
       }
     },
+  }
+}
+
+/** Pooled DOM for one teammate marker: a rotating arrow glyph + a name/distance tag. */
+interface LocatorEl {
+  root: HTMLElement
+  arrow: HTMLElement
+  tag: HTMLElement
+}
+
+/** Build a fresh (detached) marker element; screens.ts pools these by playerId. */
+const makeLocatorEl = (): LocatorEl => {
+  const root = document.createElement('div')
+  root.style.cssText =
+    'position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:0;' +
+    'transform-origin:center;will-change:transform;font:800 12px system-ui;text-shadow:0 1px 3px #000'
+  const arrow = document.createElement('div')
+  arrow.textContent = '➤'
+  arrow.style.cssText = 'font-size:26px;line-height:1;transition:transform .1s'
+  const tag = document.createElement('div')
+  tag.style.cssText = 'line-height:1;margin-top:1px;white-space:nowrap'
+  root.append(arrow, tag)
+  return { root, arrow, tag }
+}
+
+/**
+ * Reconcile the pooled marker elements against the computed markers: create for
+ * new teammates, drop for departed ones, and (re)position/paint the rest. On-
+ * screen teammates show just a coloured name caret; off-screen ones show the
+ * rotating ➤ and a distance readout, edge-pinned by screens.ts's projection.
+ */
+const positionMarkers = (container: HTMLElement, pool: Map<number, LocatorEl>, markers: readonly LocatorMarker[]): void => {
+  const live = new Set<number>()
+  for (const m of markers) {
+    live.add(m.playerId)
+    let el = pool.get(m.playerId)
+    if (!el) {
+      el = makeLocatorEl()
+      container.appendChild(el.root)
+      pool.set(m.playerId, el)
+    }
+    el.root.style.color = m.color
+    el.root.style.zIndex = m.downed ? '2' : '1'
+    // Centre the marker on its anchor point (translate off its own half-size).
+    el.root.style.transform = `translate(${m.sx}px, ${m.sy}px) translate(-50%, -50%)`
+    if (m.onScreen) {
+      // Visible: a downward caret + name so co-op players stay distinguishable.
+      el.arrow.textContent = m.downed ? '✖' : '▼'
+      el.arrow.style.transform = 'none'
+      el.tag.textContent = m.downed ? `${m.label} DOWN` : m.label
+    } else {
+      // Off-screen: rotate the ➤ toward them with a live world-distance readout.
+      el.arrow.textContent = '➤'
+      el.arrow.style.transform = `rotate(${m.angle}rad)`
+      el.tag.textContent = `${m.label}${m.downed ? ' DOWN' : ''} · ${m.dist}m`
+    }
+  }
+  for (const [id, el] of pool) {
+    if (!live.has(id)) {
+      el.root.remove()
+      pool.delete(id)
+    }
   }
 }

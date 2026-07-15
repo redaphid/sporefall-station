@@ -1,0 +1,124 @@
+import { TILE_PX } from '../render/art'
+
+/**
+ * Co-op teammate locator (issue #34). Pure geometry so it's fully unit-tested:
+ * screens.ts feeds it the camera/screen state each frame and renders the DOM
+ * overlays it returns. Mirrors the EXIT compass math (atan2 on the world delta,
+ * rounded distance) — no pixi involvement, DOM markers only.
+ */
+
+/** Stable per-slot caret colours; teammates keep the same hue all game. */
+const SLOT_COLORS = ['#5aa9ff', '#7fd17f', '#ffd76a', '#d17fd1', '#ff9a5a', '#6ad1c8'] as const
+/** Downed teammates override their slot colour with a loud red — rush to revive. */
+export const DOWNED_COLOR = '#ff4d4d'
+
+/** Stable caret colour for a player slot (playerId). Wraps past the palette. */
+export const playerColor = (playerId: number): string =>
+  SLOT_COLORS[((playerId % SLOT_COLORS.length) + SLOT_COLORS.length) % SLOT_COLORS.length]
+
+/** Short stable label for a player slot: P1, P2, … (1-based, human-facing). */
+export const playerLabel = (playerId: number): string => `P${playerId + 1}`
+
+/** A teammate as the locator sees them — a player entity that is not `self`. */
+export interface Teammate {
+  playerId: number
+  x: number
+  y: number
+  downed: boolean
+}
+
+/** Everything screens.ts must know to project world → screen, mirroring Camera.apply. */
+export interface CameraState {
+  /** Camera centre in world tiles (unclamped, as the follow target left it). */
+  x: number
+  y: number
+  zoom: number
+  screenW: number
+  screenH: number
+  levelW: number
+  levelH: number
+}
+
+/** One teammate's on-screen marker (visible) or off-screen edge arrow (radar). */
+export interface LocatorMarker {
+  playerId: number
+  color: string
+  label: string
+  downed: boolean
+  /** Visible on-screen → name caret at (sx,sy); off-screen → edge arrow at (sx,sy). */
+  onScreen: boolean
+  /** Screen px: the caret anchor when on-screen, the edge-pinned arrow when off. */
+  sx: number
+  sy: number
+  /** Off-screen only: glyph rotation (rad) and rounded world distance for the label. */
+  angle: number
+  dist: number
+}
+
+/** Pixels the marker anchor is inset from the raw screen edge so carets/arrows don't clip. */
+const EDGE_MARGIN = 28
+
+/**
+ * Project a world tile coord to a screen pixel, replicating Camera.apply's edge
+ * clamp exactly (read-only — the renderer is untouched). Shake is intentionally
+ * ignored: it's sub-pixel jitter that would only make markers twitch.
+ */
+export const projectToScreen = (wx: number, wy: number, cam: CameraState): { x: number; y: number } => {
+  const T = TILE_PX * cam.zoom
+  const halfW = cam.screenW / 2 / T
+  const halfH = cam.screenH / 2 / T
+  const cx = cam.levelW * T > cam.screenW ? clamp(cam.x, halfW, cam.levelW - halfW) : cam.levelW / 2
+  const cy = cam.levelH * T > cam.screenH ? clamp(cam.y, halfH, cam.levelH - halfH) : cam.levelH / 2
+  return { x: cam.screenW / 2 + (wx - cx) * T, y: cam.screenH / 2 + (wy - cy) * T }
+}
+
+const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+
+/**
+ * Build the render list for the co-op locator. Off-screen teammates become an
+ * edge-pinned arrow (rotated toward them, world distance readout); visible ones
+ * become an on-screen caret at their projected position. Downed teammates sort
+ * last so their red marker paints on top. Skips any teammate with a non-finite
+ * position (never emit a NaN-transformed DOM node).
+ */
+export const locatorMarkers = (self: { x: number; y: number }, teammates: readonly Teammate[], cam: CameraState): LocatorMarker[] => {
+  if (!Number.isFinite(self.x) || !Number.isFinite(self.y)) return []
+  const markers: LocatorMarker[] = []
+  for (const t of teammates) {
+    if (!Number.isFinite(t.x) || !Number.isFinite(t.y)) continue
+    const dx = t.x - self.x
+    const dy = t.y - self.y
+    // ➤ points east at 0°, matching world +x; +y is screen-down — same as the EXIT compass.
+    const angle = Math.atan2(dy, dx)
+    const dist = Math.round(Math.hypot(dx, dy))
+    const color = t.downed ? DOWNED_COLOR : playerColor(t.playerId)
+    const label = playerLabel(t.playerId)
+    const p = projectToScreen(t.x, t.y, cam)
+    const onScreen =
+      p.x >= EDGE_MARGIN && p.x <= cam.screenW - EDGE_MARGIN && p.y >= EDGE_MARGIN && p.y <= cam.screenH - EDGE_MARGIN
+    if (onScreen) {
+      markers.push({ playerId: t.playerId, color, label, downed: t.downed, onScreen: true, sx: p.x, sy: p.y, angle, dist })
+    } else {
+      const edge = edgePoint(angle, cam.screenW, cam.screenH)
+      markers.push({ playerId: t.playerId, color, label, downed: t.downed, onScreen: false, sx: edge.x, sy: edge.y, angle, dist })
+    }
+  }
+  // Alive first, downed last → downed carets/arrows render on top (higher priority).
+  markers.sort((a, b) => Number(a.downed) - Number(b.downed))
+  return markers
+}
+
+/** Where a ray from screen-centre at `angle` meets the inset screen rect. */
+const edgePoint = (angle: number, screenW: number, screenH: number): { x: number; y: number } => {
+  const cx = screenW / 2
+  const cy = screenH / 2
+  const halfW = Math.max(0, cx - EDGE_MARGIN)
+  const halfH = Math.max(0, cy - EDGE_MARGIN)
+  const dx = Math.cos(angle)
+  const dy = Math.sin(angle)
+  const tx = dx !== 0 ? halfW / Math.abs(dx) : Infinity
+  const ty = dy !== 0 ? halfH / Math.abs(dy) : Infinity
+  const t = Math.min(tx, ty)
+  // t is finite whenever the screen has area; guard the pathological zero-size case.
+  return Number.isFinite(t) ? { x: cx + dx * t, y: cy + dy * t } : { x: cx, y: cy }
+}

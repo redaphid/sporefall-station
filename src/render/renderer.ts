@@ -1,12 +1,30 @@
-import { Application, Assets, Container, Sprite, Texture, type Renderer } from 'pixi.js'
+import { Application, Assets, ColorMatrixFilter, Container, Sprite, Texture, type Renderer } from 'pixi.js'
+import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
 import { createArt, TILE_PX, type ArtRegistry, type DirSet, type Facing, type SpriteTextures } from './art'
 import { Camera } from './camera'
 import { EffectsLayer } from './effects'
+import { createHaptics } from './haptics'
+import { nativeHapticDriver } from './hapticsDriver'
+import {
+  addHitstop,
+  decayTint,
+  decayVignette,
+  hitstopForEvent,
+  lowHealthPulse,
+  shakeForEvent,
+  tickHitstop,
+  tintForEvent,
+  VIGNETTE_MAX,
+} from './juice'
+import { createSettingsPanel } from './settingsPanel'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
 import { TilemapView } from './tilemap'
+
+/** Cold blue used to recolour frost (shatter/shock) sparks. */
+const FROST_TINT = 0x8fd0ff
 
 export interface GameRenderer {
   app: Application
@@ -138,10 +156,41 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
 
   const camera = new Camera()
   const sound = new Sound()
+
+  // --- Screen-space post overlays (drawn on the stage, above the shaken world).
+  // Cheap full-screen tints: red damage/low-health vignette + warm/cold element
+  // wash. A single ColorMatrixFilter adds a bloom-ish grade only on 'high'.
+  const overlay = (blend: 'normal' | 'add', tint: number): Sprite => {
+    const s = new Sprite(Texture.WHITE)
+    s.tint = tint
+    s.alpha = 0
+    s.blendMode = blend
+    s.eventMode = 'none'
+    app.stage.addChild(s)
+    return s
+  }
+  const damageOverlay = overlay('normal', 0xd11a1a)
+  const warmOverlay = overlay('add', 0xff7a1a)
+  const coldOverlay = overlay('add', 0x3aa0ff)
+  const grade = new ColorMatrixFilter()
+
+  const native = Capacitor.isNativePlatform()
+  // The panel reports live changes through the callback; hold the latest here so
+  // haptics + the effects-quality gate pick them up without a reload.
+  let settings = createSettingsPanel(mount, native, (s) => (settings = s)).settings()
+  const haptics = createHaptics(nativeHapticDriver(), () => settings)
+
   const viewRect = { x: 0, y: 0, w: 0, h: 0 }
   let levelW = 0
   let levelH = 0
   let lastEventTick = -1
+  // Juice state carried across frames.
+  let hitstop = 0
+  let vignette = 0
+  let warm = 0
+  let cold = 0
+  let elapsed = 0
+  let graded = false
 
   return {
     app,
@@ -153,34 +202,95 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       camera.snapTo(level.spawn.x, level.spawn.y)
     },
     draw(view: RenderView, alpha: number, dt: number): void {
-      // Event-driven juice: shake hard when our player is hit, lightly on deaths.
-      // Events live for one sim tick but draw runs every frame — process once per tick.
+      elapsed += dt
+      const fx = settings.effectsQuality
+      const juicing = fx !== 'off'
+      // Event-driven juice: sparks/gibs, camera shake, hitstop, element tint, and
+      // haptics. Events live for one sim tick but draw runs every frame — process
+      // once per tick.
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
         for (const ev of view.events) {
+          const isSelf =
+            view.self != null &&
+            (('targetId' in ev && ev.targetId === view.self.id) ||
+              ('entityId' in ev && ev.entityId === view.self.id))
+          // A red vignette flash only when it's the local player getting hurt.
+          const selfHurt = isSelf && (ev.type === 'hit' || ev.type === 'death')
+          // Spark/gib layer + element-flavoured recolour.
           if (ev.type === 'hit') {
             effects.spawn('hit', ev.x, ev.y, view.tick)
-            if (view.self && ev.targetId === view.self.id) camera.shake(0.12)
           } else if (ev.type === 'death') {
             effects.spawn('blood', ev.x, ev.y, view.tick)
-            camera.shake(0.05)
-          }
-          else if (ev.type === 'explosion') {
+          } else if (ev.type === 'explosion') {
             effects.spawn('explosion', ev.x, ev.y, view.tick)
-            camera.shake(0.2)
+          } else if (ev.type === 'shatter') {
+            effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
+          } else if (ev.type === 'shock') {
+            effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
           } else if (ev.type === 'pickup') {
             const by = view.entities.find((e) => e.id === ev.byId)
             if (by) effects.spawn('pickup', by.pos.x, by.pos.y, view.tick)
           }
+          if (juicing) {
+            camera.shake(shakeForEvent(ev, isSelf))
+            hitstop = addHitstop(hitstop, hitstopForEvent(ev, isSelf))
+            const t = tintForEvent(ev)
+            warm = Math.min(1, warm + t.warm)
+            cold = Math.min(1, cold + t.cold)
+            if (selfHurt) vignette = Math.min(VIGNETTE_MAX, vignette + 0.35)
+          }
         }
         sound.handle(view.events)
+        haptics.handle(view.events, view.self)
       }
-      camera.update(dt)
-      entities.update(view.entities, alpha, view.tick)
-      effects.update(view.tick, alpha)
+
+      // Hitstop: hold the actors still for a few frames on a weighty impact for a
+      // sense of weight; the shake keeps jittering (dt=0 freezes its decay).
+      const frozen = hitstop > 0
+      if (frozen) hitstop = tickHitstop(hitstop)
+      camera.update(frozen ? 0 : dt)
+      if (!frozen) {
+        entities.update(view.entities, alpha, view.tick)
+        effects.update(view.tick, alpha)
+      }
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
       tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)
+
+      // --- Screen post: damage/low-health vignette + element wash + grade.
+      vignette = decayVignette(vignette, dt)
+      warm = juicing ? decayTint(warm, dt) : 0
+      cold = juicing ? decayTint(cold, dt) : 0
+      const hpFrac =
+        view.self?.health && view.self.health.max > 0
+          ? Math.max(0, view.self.health.hp) / view.self.health.max
+          : 1
+      const red = juicing ? Math.max(vignette, lowHealthPulse(hpFrac, elapsed)) : 0
+      const sw = app.screen.width
+      const sh = app.screen.height
+      for (const [ov, a] of [
+        [damageOverlay, red],
+        [warmOverlay, warm * 0.35],
+        [coldOverlay, cold * 0.3],
+      ] as const) {
+        ov.alpha = a
+        if (a > 0) ov.setSize(sw, sh)
+      }
+      // Warm bloom / cold desaturation grade only on 'high' (a real GPU filter).
+      const wantGrade = fx === 'high' && (warm > 0 || cold > 0)
+      if (wantGrade) {
+        grade.reset()
+        if (warm > 0) {
+          grade.brightness(1 + warm * 0.2, true)
+          grade.saturate(warm * 0.4, true)
+        }
+        if (cold > 0) grade.saturate(-cold * 0.5, true)
+      }
+      if (wantGrade !== graded) {
+        graded = wantGrade
+        world.filters = wantGrade ? [grade] : []
+      }
     },
   }
 }

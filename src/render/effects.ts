@@ -24,12 +24,14 @@ export class EffectsLayer {
     this.root.sortableChildren = true
   }
 
-  /** Start an effect at a world position (tiles). No-op if its art is missing. */
-  spawn(key: EffectKey, x: number, y: number, tick: number): void {
+  /** Start an effect at a world position (tiles). No-op if its art is missing.
+   * `tint` recolours the spark for element flavour (e.g. blue frost shatter). */
+  spawn(key: EffectKey, x: number, y: number, tick: number, tint?: number): void {
     const frames = this.art.effectFrames(key)
     if (frames.length === 0) return
     const sprite = new Sprite(frames[0])
     sprite.anchor.set(0.5)
+    if (tint !== undefined) sprite.tint = tint
     // Glows pop with additive blend; blood is opaque and sits under the actors.
     sprite.blendMode = key === 'blood' ? 'normal' : 'add'
     sprite.position.set(x * TILE_PX, y * TILE_PX)

@@ -22,11 +22,14 @@ Now there's a game icon on your phone. Tap it to play.
 
 ## Install the Android app (for 2-phone co-op)
 
-1. On your Android phone, open the **latest release**:
-   **https://github.com/redaphid/mobile-streets-of-rogue/releases/latest**
-2. Download the file that ends in **`.apk`** (`backseat.apk`).
-3. Tap the downloaded file to install it. The first time, Android asks to
-   **allow installing apps from this source** — say yes, then tap **Install**.
+1. On your Android phone, open this link — it downloads the app straight from the
+   game site (always the newest version):
+   **https://backseat-sd8.pages.dev/download**
+2. Tap the downloaded **`backseat.apk`** to install it. The first time, Android asks
+   to **allow installing apps from this source** — say yes, then tap **Install**.
+
+   (Prefer the source page? The same file is on the releases page:
+   https://github.com/redaphid/mobile-streets-of-rogue/releases/latest)
 
 Open **Backseat** from your app drawer and play.
 

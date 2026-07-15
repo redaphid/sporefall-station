@@ -31,7 +31,7 @@ for (let i = 0; i < argv.length; i++) {
 const watch = argv[0] === '--watch'
 const verb = (watch ? argv.slice(1) : argv).join(' ').trim()
 
-const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport', 'load', 'step', 'tick'])
+const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport', 'load', 'step', 'tick', 'annotate', 'clearAnnotations'])
 
 /** Print a one-line-per-game table so a human can see which game to target. */
 const printGames = (games: GameInfo[]): void => {

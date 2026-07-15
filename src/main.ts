@@ -25,6 +25,12 @@ import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
+import { createOverlay } from './ui/overlay'
+// verbs.ts is already in the core bundle (serialize.ts imports serializeEntity from
+// it), so this static import adds nothing to the release size; the runVerb hooks it
+// backs are still only wired under ?e2e below.
+import { runVerb } from './debug/verbs'
+import { projectToScreen } from './ui/locatorModel'
 
 const boot = async (): Promise<void> => {
   // Confirm this bundle booted so the native OTA layer keeps it (and applies any
@@ -91,8 +97,29 @@ const boot = async (): Promise<void> => {
   if (zoom >= 1 && zoom <= 4) renderer.camera.zoom = zoom
   if (params.has('e2e')) {
     ;(window as unknown as { __sor: Session }).__sor = session
-    if (session instanceof HostSession)
-      (window as unknown as { __debug: unknown }).__debug = createDebugApi(session.world)
+    if (session instanceof HostSession) {
+      const hostWorld = session.world
+      ;(window as unknown as { __debug: unknown }).__debug = createDebugApi(hostWorld)
+      ;(window as unknown as { __world: unknown }).__world = hostWorld
+      // Headless hook for the screenshot e2es: drive the real `annotate` /
+      // `clearAnnotations` verb path (same guards as the live debug channel) so a
+      // browser test can draw over the scene without a hub.
+      ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
+        runVerb(hostWorld, `annotate ${line}`)
+      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) => runVerb(hostWorld, line)
+      // Project a world tile to a screen pixel via the LIVE camera, so an e2e can
+      // click exactly on an entity (mirrors the overlay's own projection).
+      ;(window as unknown as { __project: (wx: number, wy: number) => { x: number; y: number } }).__project = (wx, wy) =>
+        projectToScreen(wx, wy, {
+          x: renderer.camera.x,
+          y: renderer.camera.y,
+          zoom: renderer.camera.zoom,
+          screenW: renderer.app.screen.width,
+          screenH: renderer.app.screen.height,
+          levelW: hostWorld.level.w,
+          levelH: hostWorld.level.h,
+        })
+    }
   }
   if (script && session instanceof HostSession) {
     ;(window as unknown as { __world: unknown }).__world = session.world
@@ -255,13 +282,20 @@ const runLoop = (
   // restart() and instead waits for the host's fresh GameStart over the link.
   // Feed the teammate locator read-only camera/screen state so it can project
   // world→screen for on-screen markers — no renderer draw code is touched.
-  const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined, () => ({
+  const cameraSource = (): { x: number; y: number; zoom: number; screenW: number; screenH: number } => ({
     x: renderer.camera.x,
     y: renderer.camera.y,
     zoom: renderer.camera.zoom,
     screenW: renderer.app.screen.width,
     screenH: renderer.app.screen.height,
-  }))
+  })
+  const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined, cameraSource)
+  // Annotation + selection overlay. Mounted on the canvas container (#app, which
+  // receives pointer events — #ui is pointer-events:none) so a tap reaches it to
+  // pick an entity; the touch sticks live on #ui and still capture their own
+  // drags on phones. Reads the same read-only camera as the locator.
+  const appMount = (renderer.app.canvas.parentElement as HTMLElement | null) ?? uiMount
+  const commOverlay = createOverlay(appMount, cameraSource)
   const overlay = createControllersOverlay(uiMount)
   const showPause = createPauseBanner(uiMount)
   let currentLevel = session.renderView().level
@@ -292,6 +326,7 @@ const runLoop = (
     hud.update(view)
     touch?.update(view)
     screens.update(view)
+    commOverlay.update(view)
     overlay.update(coop.debug())
     showPause(session.isPaused ?? false)
     requestAnimationFrame(frame)

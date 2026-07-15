@@ -10,7 +10,7 @@ import { serializeEntity } from '../debug/verbs'
 import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
 import { hashLabel, mulberry32 } from './rng'
-import type { SimEvent } from './types'
+import type { Annotation, SimEvent } from './types'
 import { createWorld, type MissionState, type Noise, type World } from './world'
 
 /** The versioned on-disk shape of a whole world. Stable and JSON-safe: every
@@ -35,6 +35,10 @@ export interface WorldJson {
   /** FNV-1a of the regenerated level — a mismatch means seed/floor drift. */
   levelChecksum: number
   entities: Record<string, unknown>[]
+  /** Inert on-screen annotations (types.ts). Absent in pre-annotation snapshots →
+   * restored as `[]`. Entity SELECTION needs no field here: `Entity.selected`
+   * rides along in each entity's verbatim JSON above. */
+  annotations?: Annotation[]
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -55,6 +59,9 @@ export const serializeWorld = (w: World): WorldJson => ({
   baseRng: w.baseRng.state(),
   levelChecksum: levelChecksum(w.level),
   entities: w.entities.map(serializeEntity),
+  // Omit when empty so pre-existing snapshots stay byte-for-byte unchanged (a
+  // fresh world with no annotations serializes exactly as before this feature).
+  ...(w.annotations.length ? { annotations: clone(w.annotations) } : {}),
 })
 
 /** Rebuild a fresh, standalone world from a snapshot — byte-identical on every
@@ -79,5 +86,7 @@ export const deserializeWorld = (j: WorldJson): World => {
   // JSON stays pristine, and two worlds from the same snapshot never alias.
   w.entities = j.entities.map((e) => clone(e) as unknown as Entity)
   w.byId = new Map(w.entities.map((e) => [e.id, e]))
+  // Annotations are inert presentation data; default to none for older snapshots.
+  w.annotations = j.annotations ? clone(j.annotations) : []
   return w
 }

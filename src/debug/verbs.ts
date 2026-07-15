@@ -11,6 +11,8 @@ import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import { kill as killEntity } from '../game/systems/combat'
+import { addAnnotations, clearAnnotations } from '../game/annotations'
+import { selectedEntities } from '../game/select'
 import type { SimEvent } from '../game/types'
 import { addEntity, tickWorld, type World } from '../game/world'
 import { decodeArg } from './protocol'
@@ -18,7 +20,17 @@ import { decodeArg } from './protocol'
 /** Verbs that mutate the world — the channel defers these onto the sim step so
  * they never land mid-render; reads answer immediately. `load`/`step`/`tick`
  * change or advance the whole world, so they are deferred too. */
-export const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport', 'load', 'step', 'tick'])
+export const WRITE_VERBS = new Set([
+  'set',
+  'spawn',
+  'kill',
+  'teleport',
+  'load',
+  'step',
+  'tick',
+  'annotate',
+  'clearAnnotations',
+])
 
 export interface VerbCtx {
   /** Channel-maintained ring of recent events (they are cleared from
@@ -178,6 +190,11 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
 
   switch (verb) {
     case 'entities':
+      // `entities` → all; `entities selected` → just the ones the player picked
+      // (a plain, general filter — selection is normal ECS state, not a special
+      // channel). Any other arg is rejected so typos fail loud.
+      if (rest === 'selected') return JSON.stringify(selectedEntities(w.entities).map(serializeEntity))
+      if (rest) throw new Error(`usage: entities [selected]`)
       return JSON.stringify(w.entities.map(serializeEntity))
 
     case 'get':
@@ -231,6 +248,10 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
         mission: w.mission,
         counts: countByKind(w),
         total: w.entities.length,
+        // General world UI state (not a special channel): which entities the player
+        // has selected, and how many annotations are being drawn.
+        selectedIds: selectedEntities(w.entities).map((e) => e.id),
+        annotations: w.annotations.length,
       })
 
     case 'events':
@@ -267,6 +288,24 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       // Reflection: the live component/archetype shape of the world, derived from
       // its entities so unfamiliar/new components show up without a hardcoded list.
       return JSON.stringify(buildSchema(w))
+
+    case 'annotate': {
+      // Draw one or many inert on-screen annotations (game/types.ts `Annotation`).
+      // Untrusted input: guard prototype keys before touching it (belt-and-suspenders
+      // — sanitizeAnnotation also only reads whitelisted fields), then validate.
+      if (!rest) throw new Error('usage: annotate <Annotation | Annotation[] JSON>')
+      const parsed = JSON.parse(decodeArg(rest)) as unknown
+      assertNoForbiddenKeys(parsed)
+      const added = addAnnotations(w, parsed)
+      return JSON.stringify({ added: added.length, ids: added.map((a) => a.id) })
+    }
+
+    case 'clearAnnotations': {
+      // No arg → clear all; `clearAnnotations <id>` → clear one (numeric or string id).
+      const id = rest === '' ? undefined : /^-?\d+(\.\d+)?$/.test(rest) ? Number(rest) : rest
+      const removed = clearAnnotations(w, id)
+      return JSON.stringify({ removed, remaining: w.annotations.length })
+    }
 
     case 'command':
       // Escape hatch: the rest of the line is itself a verb — run it verbatim.

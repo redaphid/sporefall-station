@@ -75,6 +75,21 @@ export const projectToScreen = (wx: number, wy: number, cam: CameraState): { x: 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 
 /**
+ * Inverse of {@link projectToScreen}: a screen pixel back to a world tile coord,
+ * replicating Camera.apply's edge clamp exactly (read-only — the renderer is
+ * untouched). Used to turn a tap/click into the world point under it so the
+ * nearest entity can be picked. `projectToScreen(screenToWorld(p)) === p`.
+ */
+export const screenToWorld = (sx: number, sy: number, cam: CameraState): { x: number; y: number } => {
+  const T = TILE_PX * cam.zoom
+  const halfW = cam.screenW / 2 / T
+  const halfH = cam.screenH / 2 / T
+  const cx = cam.levelW * T > cam.screenW ? clamp(cam.x, halfW, cam.levelW - halfW) : cam.levelW / 2
+  const cy = cam.levelH * T > cam.screenH ? clamp(cam.y, halfH, cam.levelH - halfH) : cam.levelH / 2
+  return { x: cx + (sx - cam.screenW / 2) / T, y: cy + (sy - cam.screenH / 2) / T }
+}
+
+/**
  * Build the render list for the co-op locator. Off-screen teammates become an
  * edge-pinned arrow (rotated toward them, world distance readout); visible ones
  * become an on-screen caret at their projected position. Downed teammates sort

@@ -62,6 +62,27 @@ export function buildMcpServer(raw: Raw): McpServer {
     ({ kind, archetype, x, y }) => run(() => raw(`spawn ${kind} ${archetype} ${x} ${y}`)),
   )
   server.registerTool('kill', { description: 'Kill an entity (players are downed, not removed).', inputSchema: { entity: id } }, ({ entity }) => run(() => raw(`kill ${entity}`)))
+
+  // ---- communicate: draw on screen + read the player's selection -------------
+  server.registerTool(
+    'annotate',
+    {
+      description:
+        'Draw inert on-screen annotation(s) OVER the live scene (does not affect the sim). The recommended, engine-positioned form anchors to an entity: {"kind":"label","targetId":47,"text":"boss — hits hard"} — the overlay places the text over that entity\'s live sprite and follows it. Free-floating marks use a world point (or screen point for kind "text"): kinds are label/pin/arrow/circle/text; every kind also takes an optional "text" caption; optional "color" (CSS), "ttlTick" (absolute tick to expire), "radius" (circle), "x2"/"y2" (arrow tail). Pass one object or a JSON array of them.',
+      inputSchema: { annotations: z.string().describe('a JSON Annotation object or an array of them') },
+    },
+    ({ annotations }) => run(() => raw(`annotate ${encodeArg(annotations)}`)),
+  )
+  server.registerTool(
+    'clear_annotations',
+    { description: 'Remove all on-screen annotations, or just one by id.', inputSchema: { id: id.optional().describe('annotation id; omit to clear all') } },
+    ({ id: aid }) => run(() => raw(`clearAnnotations${aid === undefined ? '' : ` ${aid}`}`)),
+  )
+  server.registerTool(
+    'list_selected',
+    { description: 'The entities the player has SELECTED (tapped to point out), with full component JSON. Selection is a normal per-entity flag, so this is just `entities` filtered to selected — use it to resolve "this one" from the player.' },
+    () => run(() => raw('entities selected')),
+  )
   server.registerTool('teleport', { description: 'Teleport an entity to (x,y).', inputSchema: { entity: id, x: z.number(), y: z.number() } }, ({ entity, x, y }) => run(() => raw(`teleport ${entity} ${x} ${y}`)))
   server.registerTool(
     'restore_world',

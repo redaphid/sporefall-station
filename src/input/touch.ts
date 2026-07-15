@@ -1,13 +1,20 @@
+import type { RenderView } from '../app/session'
 import { emptyInput, type InputCmd } from '../game/types'
 import type { InputSource } from './input'
+import { computeTouchLabels } from './touchLabels'
 
 const STICK_RADIUS = 60 // px of thumb travel for full speed
+
+/** An InputSource that also refreshes its button labels from live game state. */
+export interface TouchInput extends InputSource {
+  update(view: RenderView): void
+}
 
 /**
  * Left-half virtual joystick + right-side action buttons.
  * DOM-based, pointer events, edge-accumulated taps so none are lost between ticks.
  */
-export const createTouch = (mount: HTMLElement): InputSource => {
+export const createTouch = (mount: HTMLElement): TouchInput => {
   let moveX = 0
   let moveY = 0
   let attackHeld = false
@@ -79,7 +86,7 @@ export const createTouch = (mount: HTMLElement): InputSource => {
     size: number,
     onDown: () => void,
     onUp?: () => void,
-  ): void => {
+  ): HTMLElement => {
     const b = document.createElement('div')
     b.textContent = label
     b.style.cssText =
@@ -99,16 +106,53 @@ export const createTouch = (mount: HTMLElement): InputSource => {
     b.addEventListener('pointerup', up)
     b.addEventListener('pointercancel', up)
     mount.appendChild(b)
+    return b
   }
 
-  makeButton('ATK', 24, 96, 84, () => {
+  const atkBtn = makeButton('ATK', 24, 96, 84, () => {
     attackHeld = true
     attackEdge = true
   }, () => (attackHeld = false))
-  makeButton('USE', 118, 40, 64, () => (interactEdge = true))
-  makeButton('SPC', 24, 210, 64, () => (specialEdge = true))
+  const useBtn = makeButton('USE', 118, 40, 64, () => (interactEdge = true))
+  const spcBtn = makeButton('SPC', 24, 210, 64, () => (specialEdge = true))
+
+  // Rewrite a label/dim only when it changes — same lastX guard the HUD uses.
+  let lastAtk = ''
+  let lastUse = ''
+  let lastUseEnabled = true
+  let lastSpc = ''
+  let lastSpcEnabled = true
+  const setLabel = (b: HTMLElement, text: string): void => {
+    b.textContent = text
+  }
+  const setEnabled = (b: HTMLElement, on: boolean): void => {
+    b.style.opacity = on ? '1' : '0.4'
+  }
 
   return {
+    update(view: RenderView): void {
+      const { atk, use, useEnabled, spc, spcEnabled } = computeTouchLabels(view)
+      if (atk !== lastAtk) {
+        lastAtk = atk
+        setLabel(atkBtn, atk)
+      }
+      if (use !== lastUse) {
+        lastUse = use
+        setLabel(useBtn, use)
+      }
+      if (useEnabled !== lastUseEnabled) {
+        lastUseEnabled = useEnabled
+        setEnabled(useBtn, useEnabled)
+      }
+      if (spc !== lastSpc) {
+        lastSpc = spc
+        setLabel(spcBtn, spc)
+      }
+      if (spcEnabled !== lastSpcEnabled) {
+        lastSpcEnabled = spcEnabled
+        setEnabled(spcBtn, spcEnabled)
+      }
+    },
     sample(): InputCmd {
       const cmd = emptyInput()
       cmd.seq = seq++

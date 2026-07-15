@@ -1,0 +1,222 @@
+{
+  "v": 1,
+  "seed": 7,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 72,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "steal",
+    "targetEntityId": 34,
+    "targetBuilding": 6,
+    "complete": false,
+    "exitUnlocked": false,
+    "description": "Steal the briefcase from the clinic"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 605634632,
+  "baseRng": 7,
+  "levelChecksum": 2949895550,
+  "entities": [
+    {
+      "id": 68,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 1.5,
+        "y": 1.5
+      },
+      "prevPos": {
+        "x": 1.5,
+        "y": 1.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "classId": "soldier",
+        "abilityCooldown": 0,
+        "inventory": [],
+        "activeSlot": -1,
+        "cash": 0,
+        "crimeUntilTick": 0
+      }
+    },
+    {
+      "id": 69,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 12,
+        "y": 11
+      },
+      "prevPos": {
+        "x": 12,
+        "y": 11
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 12,
+          "y": 11
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "guard": true
+      }
+    },
+    {
+      "id": 70,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 15,
+        "y": 11
+      },
+      "prevPos": {
+        "x": 15,
+        "y": 11
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 15,
+          "y": 11
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "guard": true
+      }
+    },
+    {
+      "id": 71,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 18,
+        "y": 11
+      },
+      "prevPos": {
+        "x": 18,
+        "y": 11
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 18,
+          "y": 11
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "guard": true
+      }
+    }
+  ]
+}

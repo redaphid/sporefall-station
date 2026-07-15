@@ -105,6 +105,12 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 60 },
   ],
 
+  // Stand and watch: no input at all. Backs the #50 fire feature video, where the
+  // real fire system does all the work — the lit crate row spreads down into a
+  // flammable bystander and burns it to death (~tick 100) while the player looks
+  // on from the north. 180 ticks (~6s) leaves a clear beat on the aftermath.
+  burn: [{ ticks: 180 }],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

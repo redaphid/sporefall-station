@@ -3,7 +3,9 @@ import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
 import type { Session } from './app/session'
 import { createDebugApi } from './game/debug'
+import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
+import { deserializeWorld, type WorldJson } from './game/serialize'
 import { SIM_DT } from './game/types'
 import { createGamepadCoop } from './input/gamepadCoop'
 import { createControllersOverlay } from './input/controllersOverlay'
@@ -52,6 +54,34 @@ const boot = async (): Promise<void> => {
   if (!session) return
   const scenario = params.get('scenario')
   if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
+  // #50 exact-world-state injection: `?world=<fixture>` replaces the freshly
+  // built world with a deserialized snapshot BEFORE the loop starts, so a feature
+  // test can set world state EXACTLY and still run the real systems (composes with
+  // `?script=` — the scripted input then plays from tick 0 of the injected world).
+  // `?world=@inline` (needs `?e2e`) instead waits for the harness to push a
+  // WorldJson via `window.__loadWorld(json)` — same effect, no rebuild for ad-hoc
+  // snapshots. Placed before the `?e2e`/`?script=` exposure below so `window.__world`
+  // points at the injected world. Absent `?world=`, behavior is unchanged.
+  const worldParam = params.get('world')
+  if (worldParam && session instanceof HostSession) {
+    const host = session
+    const inject = (json: WorldJson): void => {
+      const restored = deserializeWorld(json)
+      host.world = restored
+      host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
+      renderer.setLevel(restored.level)
+    }
+    if (worldParam === '@inline') {
+      await new Promise<void>((resolve) => {
+        ;(window as unknown as { __loadWorld: (j: WorldJson) => void }).__loadWorld = (j) => {
+          inject(j)
+          resolve()
+        }
+      })
+    } else {
+      inject(loadFixtureJson(worldParam))
+    }
+  }
   const zoom = Number(params.get('zoom'))
   if (zoom >= 1 && zoom <= 4) renderer.camera.zoom = zoom
   if (params.has('e2e')) {

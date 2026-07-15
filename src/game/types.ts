@@ -38,6 +38,8 @@ export type SimEvent =
   | { type: 'doorToggle'; entityId: EntityId; open: boolean }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   | { type: 'explosion'; x: number; y: number; radius: number }
+  | { type: 'shatter'; x: number; y: number; entityId: EntityId }
+  | { type: 'shock'; x: number; y: number; targetId: EntityId }
   | { type: 'missionComplete'; description: string }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }

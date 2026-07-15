@@ -4,6 +4,7 @@ import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import { doorClosedAt, type World } from '../world'
 import { applyDamage, spawnProjectile } from './combat'
+import { isImmobilized } from './statusFx'
 
 const THINK_INTERVAL = 5 // ~6Hz per NPC at 30Hz sim, phase-spread by id
 const WANDER_RADIUS = 4
@@ -12,7 +13,7 @@ const LEASH = 1.5 // × sightRange before giving up a chase
 export const aiSystem = (w: World): void => {
   for (const e of w.entities) {
     if (!e.ai || e.dead) continue
-    if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) {
+    if ((e.status && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)) {
       e.intent.x = 0
       e.intent.y = 0
       continue

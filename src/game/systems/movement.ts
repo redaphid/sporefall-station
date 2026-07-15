@@ -1,6 +1,7 @@
 import type { Entity } from '../entity'
 import { SIM_DT, type InputCmd } from '../types'
 import { isBlocked, type World } from '../world'
+import { isImmobilized } from './statusFx'
 
 export const PLAYER_SPEED = 4.5 // tiles/sec
 const FRICTION = 12 // knockback velocity decay per second
@@ -84,7 +85,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
   const blocked = (tx: number, ty: number): boolean => isBlocked(w, tx, ty)
   for (const e of w.entities) {
     if (e.dead || e.projectile) continue
-    const stunned = e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)
+    const stunned = (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)
 
     // Players write intent from their input; NPCs got theirs from the AI system.
     if (e.playerCtl && !e.playerCtl.downed && !stunned) {

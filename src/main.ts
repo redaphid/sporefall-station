@@ -2,6 +2,7 @@ import { HostSession } from './app/hostSession'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
 import type { Session } from './app/session'
+import { createDebugApi } from './game/debug'
 import { applyScenario } from './game/scenarios'
 import { SIM_DT } from './game/types'
 import { createGamepadCoop } from './input/gamepadCoop'
@@ -43,7 +44,11 @@ const boot = async (): Promise<void> => {
   if (!session) return
   const scenario = params.get('scenario')
   if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
-  if (params.has('e2e')) (window as unknown as { __sor: Session }).__sor = session
+  if (params.has('e2e')) {
+    ;(window as unknown as { __sor: Session }).__sor = session
+    if (session instanceof HostSession)
+      (window as unknown as { __debug: unknown }).__debug = createDebugApi(session.world)
+  }
   runLoop(session, renderer, uiMount, coop)
 }
 

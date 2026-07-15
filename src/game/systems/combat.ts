@@ -4,9 +4,23 @@ import { NPCS } from '../data/npcs'
 import { makeEntity, type Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { addEntity, type World } from '../world'
+import { isFrozen, isImmobilized, removeStatus } from './statusFx'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
+
+/** Interaction-matrix rule: a solid IMPACT on a frozen body shatters it — an
+ * instant kill regardless of the blow's damage, clearing the frost. Only impact
+ * (this path) shatters; damage-over-time never routes through here, so a frozen
+ * agent burned to death by fire dies normally and does not shatter. Grounded in
+ * StatusEffects.cs (frozen death → IceGib) + the frozen one-hit backstab. */
+const shatter = (w: World, target: Entity): void => {
+  removeStatus(target, 'frozen')
+  target.health!.hp = 0
+  target.shattered = true
+  w.events.push({ type: 'shatter', x: target.pos.x, y: target.pos.y, entityId: target.id })
+  kill(w, target)
+}
 
 export const applyDamage = (
   w: World,
@@ -19,6 +33,7 @@ export const applyDamage = (
 ): void => {
   if (!target.health || target.dead || target.health.iframes > 0) return
   if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
+  if (isFrozen(target)) return shatter(w, target)
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
   if (target.status) {
@@ -145,6 +160,7 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
     if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
+    if (isImmobilized(e)) continue // frozen/electrified can't act
     const cmd = inputs.get(e.playerCtl.playerId)
     if (!cmd) continue
     const cls = CLASSES[e.playerCtl.classId]

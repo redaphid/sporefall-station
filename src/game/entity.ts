@@ -80,6 +80,8 @@ export interface Entity {
   flammable?: boolean
   /** A fire hazard occupying this cell — kind 'fire'. `fuel` burns down 1/tick. */
   fire?: { fuel: number }
+  /** Destroyed by shattering a frozen body — an ice gib, not a corpse. */
+  shattered?: boolean
   dead?: boolean
 }
 

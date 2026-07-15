@@ -1,6 +1,15 @@
 import { Container, Sprite } from 'pixi.js'
-import type { Entity } from '../game/entity'
+import type { Entity, Fx } from '../game/entity'
 import { TILE_PX, type ArtRegistry } from './art'
+
+const elementTint = (fx: Fx | undefined): number => {
+  if (!fx) return 0xffffff
+  if (fx.frozen) return 0x8fd4ff
+  if (fx.electrified) return 0xfff27a
+  if (fx.burning) return 0xff7a2a
+  if (fx.wet) return 0x7aa8ff
+  return 0xffffff
+}
 
 interface View {
   sprite: Sprite
@@ -46,9 +55,9 @@ export class EntityViews {
       // Downed players faded hard; cloaked thieves shimmer translucent
       const cloaked = e.status !== undefined && e.status.cloakUntil > tick
       view.sprite.alpha = e.playerCtl?.downed ? 0.45 : cloaked ? 0.55 : 1
-      // Things on fire glow ember-orange; fire hazards keep their own colors.
-      const burning = e.fx !== undefined && e.fx.burning !== undefined
-      view.sprite.tint = burning && !flashing ? 0xff7a2a : 0xffffff
+      // Element tints read the status at a glance: frozen ice-blue, electrified
+      // shock-yellow, burning ember-orange, wet a cool slick. Hit-flash wins.
+      view.sprite.tint = flashing ? 0xffffff : elementTint(e.fx)
       // Pickups don't rotate; actors face their heading.
       const x = e.prevPos.x + (e.pos.x - e.prevPos.x) * alpha
       const y = e.prevPos.y + (e.pos.y - e.prevPos.y) * alpha

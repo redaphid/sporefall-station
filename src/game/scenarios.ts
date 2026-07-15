@@ -5,6 +5,7 @@ import { makeEntity, type Entity } from './entity'
 import { isSolidTile } from './levelgen/level'
 import { spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
+import { freeze, wet } from './systems/interactions'
 import { addEntity, type World } from './world'
 
 const crate = (w: World, cx: number, cy: number): Entity => {
@@ -60,6 +61,43 @@ const setupFire = (w: World): void => {
   igniteCell(w, x + 1, y)
 }
 
+/** A still bystander at a cell centre — AI stripped so it stays put on stage. */
+const bystander = (w: World, cx: number, cy: number): Entity => {
+  const e = spawnNpc(w, 'civilian', cx + 0.5, cy + 0.5)
+  e.ai = undefined
+  e.intent = { x: 0, y: 0 }
+  return e
+}
+
+/** Drop the player just north of the stage row so the camera frames it. */
+const placePlayer = (w: World, x: number, y: number): void => {
+  const player = w.entities.find((e) => e.playerCtl)
+  if (!player) return
+  const py = isSolidTile(w.level, x, y - 1) ? y : y - 1
+  player.pos = { x: x + 0.5, y: py + 0.5 }
+  player.prevPos = { x: player.pos.x, y: player.pos.y }
+}
+
+/** Two bystanders: one pre-frozen (ice-blue), one untouched twin. Hitting the
+ * frozen one shatters it; the twin shrugs off the same blow. */
+const setupFrost = (w: World): void => {
+  const { x, y } = findStage(w, 5)
+  const frozen = bystander(w, x + 1, y)
+  freeze(w, frozen)
+  bystander(w, x + 3, y)
+  placePlayer(w, x + 2, y)
+}
+
+/** A puddle of wet bystanders in a row; zapping the near one arcs down the
+ * whole connected cluster. */
+const setupWetElectric = (w: World): void => {
+  const { x, y } = findStage(w, 6)
+  for (let i = 1; i <= 4; i++) wet(w, bystander(w, x + i, y))
+  placePlayer(w, x + 2, y)
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'fire') setupFire(w)
+  if (name === 'frost') setupFrost(w)
+  if (name === 'wet-electric') setupWetElectric(w)
 }

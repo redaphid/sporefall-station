@@ -23,6 +23,15 @@ export const removeStatus = (e: Entity, kind: string): void => {
 
 export const hasStatus = (e: Entity, kind: string): boolean => e.fx !== undefined && e.fx[kind] !== undefined
 
+export const isFrozen = (e: Entity): boolean => hasStatus(e, 'frozen')
+
+export const isWet = (e: Entity): boolean => hasStatus(e, 'wet')
+
+/** Frozen or electrified: the game's `CantDoAnything` states — a body that can
+ * neither move nor act until the status runs out. Movement, combat and AI all
+ * gate on this. */
+export const isImmobilized = (e: Entity): boolean => hasStatus(e, 'frozen') || hasStatus(e, 'electrified')
+
 /** Expire every effect whose tick has arrived. Pure function of world.tick, so
  * it behaves identically whether the world ran unbroken or was restored. */
 export const statusFxSystem = (w: World): void => {

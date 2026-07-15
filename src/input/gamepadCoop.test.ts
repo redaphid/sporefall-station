@@ -72,6 +72,18 @@ describe('createGamepadCoop', () => {
       const r = coop.sample()
       expect(r.inputs.get(0)!.attack).toBe(true)
     })
+    it('aims from the right stick (axes 2/3) independently of movement', () => {
+      pads = [pad(0, { axes: [0, 0, 0, -0.9] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.aimX).toBeCloseTo(0)
+      expect(cmd.aimY).toBeCloseTo(-0.9)
+    })
+    it('falls back to aim-where-you-move when the right stick is centred', () => {
+      pads = [pad(0, { axes: [0.9, 0] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.aimX).toBeCloseTo(0.9)
+      expect(cmd.aimY).toBeCloseTo(0)
+    })
   })
 
   describe('interact is edge-triggered so a held button acts once', () => {

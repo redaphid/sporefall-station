@@ -64,6 +64,19 @@ describe('readPad', () => {
     })
   })
 
+  describe('aim from the right stick', () => {
+    it('reads the right stick (axes 2/3) into aimX/aimY past the deadzone', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0.8, -0.9] }), std)
+      expect(s.aimX).toBeCloseTo(0.8)
+      expect(s.aimY).toBeCloseTo(-0.9)
+    })
+    it('ignores right-stick drift inside the deadzone', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0.1, -0.1] }), std)
+      expect(s.aimX).toBe(0)
+      expect(s.aimY).toBe(0)
+    })
+  })
+
   describe('action buttons', () => {
     it('reports attack when the bottom face button is down', () => {
       const buttons: boolean[] = []

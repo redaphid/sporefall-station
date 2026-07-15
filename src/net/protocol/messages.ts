@@ -99,7 +99,11 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
 
 export const encodeInput = (cmd: InputCmd, edges: { attack: boolean; interact: boolean; special: boolean }): Uint8Array => {
   const w = new ByteWriter(9)
-  const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0)
+  // Bit 8 carries whether aim is active: the angle byte can't encode a centred
+  // stick (atan2(0,0)=0 looks like "aim right"), so this bit lets the far side
+  // restore a (0,0) aim and hold the last facing instead of snapping.
+  const aimActive = Math.hypot(cmd.aimX, cmd.aimY) > 0.01
+  const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0) | (aimActive ? 8 : 0)
   const edge = (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0)
   w.u8(MsgType.Input)
     .u16(cmd.seq & 0xffff)
@@ -124,8 +128,9 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
-  cmd.aimX = Math.cos(aim)
-  cmd.aimY = Math.sin(aim)
+  const aimActive = (held & 8) !== 0
+  cmd.aimX = aimActive ? Math.cos(aim) : 0
+  cmd.aimY = aimActive ? Math.sin(aim) : 0
   return { cmd, edges }
 }
 

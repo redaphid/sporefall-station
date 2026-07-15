@@ -1,13 +1,11 @@
 import { CLASSES } from '../game/data/classes'
-import { CONSUMABLES, THROWABLES, WEAPONS } from '../game/data/items'
+import { CONSUMABLES, WEAPONS } from '../game/data/items'
 import type { RenderView } from '../app/session'
+import { hotbarSlots } from './hotbarModel'
 
 export interface Hud {
   update(view: RenderView): void
 }
-
-const itemLabel = (itemId: string): string =>
-  WEAPONS[itemId]?.name ?? THROWABLES[itemId]?.name ?? CONSUMABLES[itemId]?.name ?? (itemId === 'ammo' ? 'Ammo' : itemId)
 
 export const createHud = (mount: HTMLElement): Hud => {
   const root = document.createElement('div')
@@ -53,20 +51,15 @@ export const createHud = (mount: HTMLElement): Hud => {
 
       const inv = self.playerCtl?.inventory ?? []
       const active = self.playerCtl?.activeSlot ?? -1
-      const slots = inv
-        .filter((s) => s.itemId !== 'briefcase')
-        .map((s) => `${itemLabel(s.itemId)}·${s.qty}`)
-      const key = `${active}|${slots.join(',')}`
+      const slots = hotbarSlots(inv, active)
+      const key = slots.map((s) => `${s.index}:${s.itemId}·${s.qty}${s.active ? '*' : ''}`).join(',')
       if (key !== lastHotbar) {
         lastHotbar = key
-        const activeItemId = inv[active]?.itemId
-        hotbar.innerHTML = inv
-          .filter((s) => s.itemId !== 'briefcase')
+        hotbar.innerHTML = slots
           .map((s) => {
-            const on = s.itemId === activeItemId
-            const bg = on ? '#d4af37cc' : '#222a'
-            const col = on ? '#111' : '#eee'
-            return `<div style="padding:2px 7px;background:${bg};color:${col};border:1px solid #000;border-radius:4px;font-size:12px">${itemLabel(s.itemId)} <b>${s.qty}</b></div>`
+            const bg = s.active ? '#d4af37cc' : '#222a'
+            const col = s.active ? '#111' : '#eee'
+            return `<div style="padding:2px 7px;background:${bg};color:${col};border:1px solid #000;border-radius:4px;font-size:12px">${s.label} <b>${s.qty}</b></div>`
           })
           .join('')
       }

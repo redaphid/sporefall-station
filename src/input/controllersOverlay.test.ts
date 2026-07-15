@@ -6,6 +6,8 @@ import type { PadState } from './readPad'
 const state = (over: Partial<PadState> = {}): PadState => ({
   moveX: 0,
   moveY: 0,
+  aimX: 0,
+  aimY: 0,
   attack: false,
   interact: false,
   special: false,

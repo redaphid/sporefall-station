@@ -76,10 +76,12 @@ build dir.
 
 ## B. Android APK release
 
-**Approach:** on a `v*` tag, `release-apk.yml` sets up JDK 21 + Android SDK,
-runs `scripts/build-apk.sh` (via `pnpm run build:apk`), and attaches the APK to a
-GitHub Release with `softprops/action-gh-release@v2`. Uses the built-in
-`GITHUB_TOKEN` — **no extra secret needed** for the debug flow.
+**Approach:** on a `v*` tag, `release-apk.yml` sets up JDK 21 + Android SDK and
+runs `scripts/build-apk.sh`. If the four signing secrets (below) are set it
+decodes the keystore and builds a **signed** `assembleRelease` APK
+(`pnpm run build:apk:release`); if they're absent it falls back to the debug
+build so the release never breaks. Either way the APK is attached to a GitHub
+Release with `softprops/action-gh-release@v2`.
 
 ### Cut a release
 
@@ -88,45 +90,109 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release appears at `.../releases/latest` with `backseat.apk`.
+The release appears at `.../releases/latest` with `backseat.apk`. The title says
+`(signed APK)` or `(debug APK)` depending on whether the secrets were present.
 
-### Signed release APK (TODO — #30 slice 1)
+### Signed release APK — one-time setup (#30)
 
-Currently the workflow ships the **debug** APK. A debug build installs and
-plays but is signed with the throwaway debug key, so it can't upgrade in place
-over a release build and isn't OTA-ready. To switch to a signed release:
+The gradle wiring is already in place (`android/app/build.gradle`): the release
+build reads its signing config from a gitignored `android/keystore.properties`
+**or** from `ANDROID_KEYSTORE_*` env vars, and falls back to debug signing (with
+a loud warning) if neither is present. You only need to **generate a key and set
+the secrets** — the repo never contains the keystore or any password.
 
-1. Generate a keystore (keep it **out of git**):
-   ```bash
-   keytool -genkey -v -keystore release.keystore -alias rogueish \
-     -keyalg RSA -keysize 2048 -validity 10000
-   ```
-2. Wire `android/app/build.gradle` `release { signingConfig ... }` to read from
-   env vars / a gitignored `keystore.properties`.
-3. Add a release build (`assembleRelease`) producing a signed `app-release.apk`.
-4. Base64-encode the keystore and add these GitHub repo secrets:
-   - `ANDROID_KEYSTORE_BASE64` — `base64 -w0 release.keystore`
-   - `ANDROID_KEYSTORE_PASSWORD`
-   - `ANDROID_KEY_ALIAS`
-   - `ANDROID_KEY_PASSWORD`
-5. In `release-apk.yml`, decode the keystore before building:
-   ```yaml
-   - name: Decode keystore
-     run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-   ```
-   then build the release variant and attach `app-release.apk`.
+> **⚠️ The signing key must stay STABLE forever.** Android identifies an app by
+> its signing certificate. If a future release is signed with a *different* key,
+> every installed phone rejects the update ("App not installed" / signature
+> mismatch) and users must uninstall + reinstall, losing local data. Generate
+> the keystore **once**, back it up somewhere safe (a password manager /
+> encrypted vault), and reuse it for every release. Losing it = the same forced
+> uninstall for all users. `validity 10000` days (~27 yrs) keeps it usable long
+> term.
 
-Remove the `TODO(#30)` markers in `release-apk.yml` once this is done.
+**1. Generate a release keystore** (replace the placeholders; you'll be prompted
+for the store + key passwords — they can be the same):
+
+```bash
+keytool -genkeypair -v \
+  -keystore backseat-release.keystore \
+  -alias backseat \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=Backseat, O=hypnodroid, C=US"
+# You'll be asked for a keystore password (and can reuse it for the key).
+```
+
+This makes `backseat-release.keystore` in your current dir. **Do not commit it.**
+(`*.keystore`, `*.jks`, and `keystore.properties` are gitignored.)
+
+**2a. Build locally (optional)** — create a gitignored `android/keystore.properties`:
+
+```properties
+storeFile=/absolute/path/to/backseat-release.keystore
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=backseat
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+Then `pnpm run build:apk:release` → signed APK at
+`android/app/build/outputs/apk/release/app-release.apk`. (Env vars
+`ANDROID_KEYSTORE_FILE` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` /
+`ANDROID_KEY_PASSWORD` work instead of the file, and are what CI uses.)
+
+**2b. Set the CI secrets** — base64-encode the keystore and set all four secrets
+with the `gh` CLI (run from the repo root; `-w0` = no line wraps on Linux; on
+macOS use `base64 -i backseat-release.keystore`):
+
+```bash
+gh secret set ANDROID_KEYSTORE_BASE64   < <(base64 -w0 backseat-release.keystore)
+gh secret set ANDROID_KEYSTORE_PASSWORD --body 'YOUR_STORE_PASSWORD'
+gh secret set ANDROID_KEY_ALIAS         --body 'backseat'
+gh secret set ANDROID_KEY_PASSWORD      --body 'YOUR_KEY_PASSWORD'
+```
+
+Verify they exist (values are never shown): `gh secret list`.
+
+**3. Release.** Push a `v*` tag. The workflow decodes `ANDROID_KEYSTORE_BASE64`
+to a temp file, exports the passwords/alias as env vars, builds
+`assembleRelease`, and runs `apksigner verify` to confirm the APK is NOT
+debug-signed before publishing. If any secret is missing it quietly ships the
+debug APK instead.
+
+### Migration: debug → release signing (one-time uninstall)
+
+Everyone who already sideloaded a **debug** build must **uninstall it once**,
+then install the first signed release. This is unavoidable: the signing
+certificate changes from the shared Android debug key to your release key, and
+Android refuses to update across a changed signature. After that first
+reinstall, **all future signed releases install in place** (no uninstall) as
+long as the key stays the same.
+
+**Honest scope of what signing fixes:**
+
+- ✅ In-place upgrades over previous **signed** releases (no uninstall).
+- ✅ No "debug build" / Play Protect friction that debug-signed APKs trigger.
+- ❌ It does **not** remove the first-time "allow installs from this source"
+  prompt. That permission is inherent to *sideloading* any APK outside the Play
+  Store and only the Play Store removes it. The user grants it once per source
+  (browser / file manager), then it's remembered.
+- Note: `versionCode` is currently a fixed `1`. `adb install -r` reinstalls the
+  same version fine, but for Android to treat a new APK as an *upgrade* you must
+  bump `versionCode` (and ideally `versionName`) in `android/app/build.gradle`
+  before tagging. Keep it monotonically increasing.
 
 ### Secrets summary (APK)
 
 | Secret | Needed for |
 | --- | --- |
-| `GITHUB_TOKEN` (built-in) | debug release (current) — nothing to add |
-| `ANDROID_KEYSTORE_BASE64` | signed release (TODO) |
-| `ANDROID_KEYSTORE_PASSWORD` | signed release (TODO) |
-| `ANDROID_KEY_ALIAS` | signed release (TODO) |
-| `ANDROID_KEY_PASSWORD` | signed release (TODO) |
+| `GITHUB_TOKEN` (built-in) | publishing the Release — nothing to add |
+| `ANDROID_KEYSTORE_BASE64` | signed release — `base64 -w0` of the keystore |
+| `ANDROID_KEYSTORE_PASSWORD` | signed release — keystore password |
+| `ANDROID_KEY_ALIAS` | signed release — key alias (e.g. `backseat`) |
+| `ANDROID_KEY_PASSWORD` | signed release — key password |
+
+If the four `ANDROID_*` secrets are absent, the workflow still succeeds and
+ships a debug APK. Nothing secret is ever committed — the keystore lives only in
+the `ANDROID_KEYSTORE_BASE64` secret and your own backup.
 
 ---
 

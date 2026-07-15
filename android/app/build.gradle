@@ -1,4 +1,50 @@
+import java.util.Properties
+
 apply plugin: 'com.android.application'
+
+// --- Release signing --------------------------------------------------------
+// Signing material is read, in order of preference, from:
+//   1. a gitignored `android/keystore.properties` file, then
+//   2. environment variables (populated from CI secrets):
+//        ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD,
+//        ANDROID_KEY_ALIAS,     ANDROID_KEY_PASSWORD
+//
+// If NEITHER source yields a complete, usable config, the release build falls
+// back to the debug signing config so contributors without the key (and CI runs
+// without secrets) can still produce a runnable APK — with a loud warning that
+// it is debug-signed and therefore NOT upgrade-compatible with real releases.
+//
+// NB: the signing KEY must stay identical across every release, or in-place
+// updates on already-installed phones break (Android rejects a changed
+// signature). See docs/deploy.md.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def signingValue = { String propKey, String envKey ->
+    def v = keystoreProperties.getProperty(propKey)
+    if (v == null || v.trim().isEmpty()) {
+        v = System.getenv(envKey)
+    }
+    return (v == null || v.trim().isEmpty()) ? null : v.trim()
+}
+
+def storeFilePath      = signingValue("storeFile",     "ANDROID_KEYSTORE_FILE")
+def storePasswordValue = signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+def keyAliasValue      = signingValue("keyAlias",      "ANDROID_KEY_ALIAS")
+def keyPasswordValue   = signingValue("keyPassword",   "ANDROID_KEY_PASSWORD")
+
+// Resolve the keystore path: absolute as-is, else relative to the android/ dir.
+def keystoreFile = null
+if (storeFilePath != null) {
+    def f = new File(storeFilePath)
+    keystoreFile = f.isAbsolute() ? f : rootProject.file(storeFilePath)
+}
+
+def hasReleaseSigning = keystoreFile != null && keystoreFile.exists() &&
+    storePasswordValue != null && keyAliasValue != null && keyPasswordValue != null
 
 android {
     namespace = "com.hypnodroid.backseat"
@@ -16,10 +62,34 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile keystoreFile
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+                // V2/V3 give in-place upgrades on API 24+; keep V1 for older.
+                enableV1Signing true
+                enableV2Signing true
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+                logger.lifecycle("release-signing: using RELEASE keystore ${keystoreFile}")
+            } else {
+                // Graceful fallback so the build never hard-fails without a key.
+                signingConfig signingConfigs.debug
+                logger.warn("release-signing: WARNING — no release keystore configured " +
+                    "(set android/keystore.properties or ANDROID_KEYSTORE_* env vars). " +
+                    "The release APK will be DEBUG-signed and CANNOT upgrade a real signed " +
+                    "install in place. See docs/deploy.md.")
+            }
         }
     }
 }

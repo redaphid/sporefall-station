@@ -9,3 +9,11 @@ android/local.properties
 *.log
 pnpm-lock.yaml
 .claude/worktrees/
+
+# Android release signing — NEVER commit keystores or their passwords.
+android/keystore.properties
+keystore.properties
+*.keystore
+*.jks
+*.p12
+*.pkcs12

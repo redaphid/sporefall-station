@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "lint": "eslint src",
     "build:apk": "bash scripts/build-apk.sh",
+    "build:apk:release": "bash scripts/build-apk.sh --release",
     "dev:live": "bash scripts/dev-live.sh",
     "install:apk": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "e2e": "./e2e/run.sh",

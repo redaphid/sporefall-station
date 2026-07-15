@@ -81,6 +81,9 @@ export type SimEvent =
   | { type: 'death'; x: number; y: number; entityId: EntityId }
   | { type: 'doorToggle'; entityId: EntityId; open: boolean }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
+  /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
+   * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */
+  | { type: 'modPickup'; entityId: EntityId; byId: EntityId; modId: string; weapon: string; maxed: boolean }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }

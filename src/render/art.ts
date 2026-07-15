@@ -1,5 +1,6 @@
 import { Graphics, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
+import { MODS } from '../game/data/mods'
 
 export const TILE_PX = 32
 
@@ -278,6 +279,23 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
         .fill(colorOverride ?? 0xd4af37)
         .roundRect(0, 0, s, s, 3)
         .stroke({ width: 2, color: 0x000000, alpha: 0.4 })
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
+    // A weapon-mod pickup: a rarity-coloured diamond gem (common grey · rare blue ·
+    // legendary gold) so a kid can spot "a mod, and how special" from across a room.
+    if (archetype.startsWith('mod.')) {
+      const rarity = MODS[archetype.slice('mod.'.length)]?.rarity
+      const gem = rarity === 'legendary' ? 0xffb020 : rarity === 'rare' ? 0x4aa3ff : 0xff5bd0
+      const r = TILE_PX * 0.28
+      const g = new Graphics()
+        .poly([r, 0, r * 2, r, r, r * 2, 0, r])
+        .fill(colorOverride ?? gem)
+        .poly([r, 0, r * 2, r, r, r * 2, 0, r])
+        .stroke({ width: 2, color: 0x101018, alpha: 0.6 })
+        .poly([r, r * 0.35, r * 1.55, r, r, r * 1.65, r * 0.45, r])
+        .stroke({ width: 1.5, color: 0xffffff, alpha: 0.35 })
       const tex = renderer.generateTexture(g)
       g.destroy()
       return tex

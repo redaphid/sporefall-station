@@ -1,8 +1,14 @@
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity } from './entity'
 import { Tile, type Building } from './levelgen/level'
+import type { Rect } from './levelgen/rooms'
 import type { Rng } from './rng'
+import { weightedModId } from './systems/draft'
 import { addEntity, type World } from './world'
+
+/** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
+ * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
+export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
 
 /** Host-only: fill a freshly generated level with NPCs and loot. */
 export const populateWorld = (w: World): void => {
@@ -12,6 +18,7 @@ export const populateWorld = (w: World): void => {
   }
   spawnStreetLife(w, rng)
   sprinkleLoot(w, rng)
+  scatterModPickups(w)
 }
 
 const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number, number] }[]> = {
@@ -111,6 +118,62 @@ const sprinkleLoot = (w: World, rng: Rng): void => {
     const itemId = rng.pick(table)
     dropPickup(w, itemId, spot.x, spot.y, itemId === 'cash' ? rng.int(10, 40) : 1)
   }
+}
+
+/** A world weapon-mod pickup: a `pickup` entity whose `itemId` is a mod id (not
+ * an item id). Auto-pickup applies it to the grabber's gun (interaction.ts); the
+ * `mod.<id>` archetype gives it a distinct rarity-coloured gem sprite + inspect
+ * card. The specific mod is fixed at populate time so a seed is reproducible and
+ * the pickup is inspectable before you touch it. */
+const dropModPickup = (w: World, modId: string, x: number, y: number): void => {
+  const e = makeEntity('pickup', `mod.${modId}`, x, y, 0.3)
+  e.pickup = { itemId: modId, qty: 1 }
+  addEntity(w, e)
+}
+
+/** Deterministically sprinkle weapon-mod pickups: ~`MOD_PICKUP_ROOM_CHANCE` of
+ * interior rooms get exactly one, the specific mod chosen weighted by rarity. Uses
+ * a DEDICATED `mod-pickups` fork so it neither perturbs the loot/AI stream nor is
+ * perturbed by it — same seed → same rooms get the same mods, on every peer. */
+const scatterModPickups = (w: World): void => {
+  const rng = w.rng.fork('mod-pickups')
+  const spawnTx = Math.floor(w.level.spawn.x)
+  const spawnTy = Math.floor(w.level.spawn.y)
+  for (const building of w.level.buildings) {
+    for (const room of building.rooms) {
+      // Skip the spawn room so a fresh run doesn't hand you a mod for free.
+      if (rectContains(room, spawnTx, spawnTy)) continue
+      if (!rng.chance(MOD_PICKUP_ROOM_CHANCE)) continue
+      const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
+      if (!spot) continue
+      dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+    }
+  }
+}
+
+const rectContains = (r: Rect, tx: number, ty: number): boolean =>
+  tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h
+
+/** A random floor tile strictly inside a room — never a wall, the exit, or the
+ * spawn tile — as a tile-centre world coord, or null if none found. */
+const randomFloorInRoom = (
+  w: World,
+  rng: Rng,
+  room: Rect,
+  spawnTx: number,
+  spawnTy: number,
+): { x: number; y: number } | null => {
+  const exitTx = Math.floor(w.level.exit.x)
+  const exitTy = Math.floor(w.level.exit.y)
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const tx = rng.int(room.x, room.x + room.w - 1)
+    const ty = rng.int(room.y, room.y + room.h - 1)
+    if (w.level.tiles[ty * w.level.w + tx] !== Tile.Floor) continue
+    if (tx === spawnTx && ty === spawnTy) continue
+    if (tx === exitTx && ty === exitTy) continue
+    return { x: tx + 0.5, y: ty + 0.5 }
+  }
+  return null
 }
 
 export const spawnNpc = (w: World, archetype: string, x: number, y: number): Entity => {

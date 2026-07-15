@@ -73,6 +73,16 @@ describe('inspectCard — friendly readout subset', () => {
     expect(medRows.Heal).toBe('100')
   })
 
+  it('reads a weapon-mod pickup as a named, blurbed, rarity-tagged mod (not a plain item)', () => {
+    const modPick = makeEntity('pickup', 'mod.frost', 1, 1)
+    modPick.pickup = { itemId: 'frost', qty: 1 }
+    const rows = rowMap(inspectCard(modPick).rows)
+    expect(rows.Mod).toMatch(/Cryo Rounds/)
+    expect(rows.Effect).toMatch(/[Ff]reezes/)
+    expect(rows.Rarity).toBe('Rare')
+    expect(rows.Item).toBeUndefined() // reads as a mod, never a bogus "Item: Frost"
+  })
+
   it('never throws on a bare entity with no components', () => {
     const bare = makeEntity('interactable', 'mystery.thing', 0, 0)
     const card = inspectCard(bare)

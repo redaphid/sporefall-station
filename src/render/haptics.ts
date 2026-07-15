@@ -53,6 +53,10 @@ export const hapticForEvent = (ev: SimEvent, self?: HapticSelf): HapticCmd | nul
     case 'pickup':
       // Only my own pickups buzz.
       return self != null && ev.byId === self.id ? { key: 'pickup', style: 'light' } : null
+    case 'modPickup':
+      // Grabbing a weapon mod is a bigger moment than a plain pickup — a firmer
+      // buzz, but only for the player who grabbed it.
+      return self != null && ev.byId === self.id ? { key: 'modPickup', style: 'medium', vibrateMs: 45 } : null
     case 'missionComplete':
       return { key: 'mission', style: 'medium', vibrateMs: 90 }
     case 'floorChange':

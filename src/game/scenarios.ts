@@ -244,9 +244,21 @@ const setupShowcase = (w: World): void => {
 const LANE_Y = 11 // open plaza lane below spawn — the camera frames it without clamping
 
 const clearStage = (w: World): void => {
-  w.entities = w.entities.filter((e) => !!e.playerCtl)
+  // Mod-pickups (populate.ts) are the LAST entities stocked before the player is
+  // spawned, so they shift the player id + `nextId` up by their count. A scripted
+  // plaza wipes all populate entities anyway, but the AI think-stagger keys off
+  // `id % 5`, so that leftover shift would desync the tuned demo choreography.
+  // Roll the id space back by the mod-pickups we're removing → the scenario's ids
+  // are exactly what they'd be without the feature (a no-op when none spawned).
+  const modShift = w.entities.filter((e) => e.archetype.startsWith('mod.')).length
+  const players = w.entities.filter((e) => !!e.playerCtl)
+  w.entities = players
   w.byId.clear()
-  for (const e of w.entities) w.byId.set(e.id, e)
+  w.nextId -= modShift
+  for (const e of players) {
+    e.id -= modShift
+    w.byId.set(e.id, e)
+  }
 }
 
 const stageThug = (w: World, x: number, y: number): Entity => {

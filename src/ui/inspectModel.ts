@@ -72,11 +72,19 @@ export const inspectCard = (e: Entity): InspectCard => {
   }
 
   if (e.pickup) {
-    rows.push({ label: 'Item', value: `${itemName(e.pickup.itemId)}${e.pickup.qty > 1 ? ` ×${e.pickup.qty}` : ''}` })
-    const wpn = WEAPONS[e.pickup.itemId]
-    const heal = CONSUMABLES[e.pickup.itemId]?.heal
-    if (wpn) rows.push({ label: 'Damage', value: String(wpn.damage) })
-    else if (heal) rows.push({ label: 'Heal', value: String(heal) })
+    const mod = MODS[e.pickup.itemId]
+    if (mod) {
+      // A world weapon-mod pickup reads like "❄️ Cryo Rounds — freezes… (mod)".
+      rows.push({ label: 'Mod', value: `${mod.icon} ${mod.name}` })
+      rows.push({ label: 'Effect', value: mod.blurb })
+      rows.push({ label: 'Rarity', value: pretty(mod.rarity) })
+    } else {
+      rows.push({ label: 'Item', value: `${itemName(e.pickup.itemId)}${e.pickup.qty > 1 ? ` ×${e.pickup.qty}` : ''}` })
+      const wpn = WEAPONS[e.pickup.itemId]
+      const heal = CONSUMABLES[e.pickup.itemId]?.heal
+      if (wpn) rows.push({ label: 'Damage', value: String(wpn.damage) })
+      else if (heal) rows.push({ label: 'Heal', value: String(heal) })
+    }
   }
 
   if (e.interact) rows.push({ label: 'Interact', value: pretty(e.interact.verb) })

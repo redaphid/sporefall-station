@@ -23,6 +23,21 @@ export const removeStatus = (e: Entity, kind: string): void => {
 
 export const hasStatus = (e: Entity, kind: string): boolean => e.fx !== undefined && e.fx[kind] !== undefined
 
+/** Apply one status to one entity — the single place item/element effects land.
+ * `sleep` and `slip`/`stun` route to the proven legacy per-tick timers (which
+ * already immobilize and wake-on-damage); everything else is an fx effect. */
+export const applyStatus = (w: World, e: Entity, status: string, ticks: number): void => {
+  if (status === 'sleep') {
+    if (e.status) e.status.sleep = ticks
+    return
+  }
+  if (status === 'slip' || status === 'stun') {
+    if (e.status) e.status.stun = ticks
+    return
+  }
+  addStatus(w, e, status, ticks)
+}
+
 export const isFrozen = (e: Entity): boolean => hasStatus(e, 'frozen')
 
 export const isWet = (e: Entity): boolean => hasStatus(e, 'wet')

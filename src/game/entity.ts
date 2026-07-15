@@ -72,8 +72,10 @@ export interface Entity {
     ttl: number
     /** Grenades: AoE on fuse-end or impact instead of point damage. */
     explode?: { radius: number; damage: number }
-    /** Thrown items: element applied where it lands (molotov → fire). */
-    onImpact?: 'fire'
+    /** Thrown items: the area effect applied where it lands (molotov → fire). */
+    onLand?: import('./data/items').AreaEffect
+    /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
+    onHit?: import('./data/items').StatusApply
   }
   pickup?: { itemId: string; qty: number }
   door?: { open: boolean; locked: boolean; lockLevel: number }

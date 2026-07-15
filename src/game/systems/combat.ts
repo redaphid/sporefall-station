@@ -1,11 +1,11 @@
 import { CLASSES } from '../data/classes'
-import { WEAPONS } from '../data/items'
+import { WEAPONS, type StatusApply } from '../data/items'
 import { NPCS } from '../data/npcs'
 import { makeEntity, type Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { addEntity, type World } from '../world'
-import { isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { equipSlot, spendAmmo, throwActive, wearMelee } from './inventory'
+import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
+import { equipSlot, spendAmmo, useHeld, wearMelee } from './inventory'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -107,7 +107,7 @@ export const kill = (w: World, target: Entity): void => {
 }
 
 /** Swing at the nearest live target inside range and a 90° arc around facing. */
-export const meleeAttack = (w: World, attacker: Entity, damage: number, range: number, knockback: number): boolean => {
+export const meleeAttack = (w: World, attacker: Entity, damage: number, range: number, knockback: number): Entity | null => {
   const fx = Math.cos(attacker.facing)
   const fy = Math.sin(attacker.facing)
   let best: Entity | null = null
@@ -126,7 +126,7 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
       bestDist = dist
     }
   }
-  if (!best) return false
+  if (!best) return null
   let finalDamage = damage
   // Cloaked backstab: attacker unseen and behind the target's facing → triple damage.
   if (attacker.status && attacker.status.cloakUntil > w.tick) {
@@ -139,7 +139,7 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     attacker.status.cloakUntil = w.tick // attacking breaks cloak
   }
   applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
-  return true
+  return best
 }
 
 export const spawnProjectile = (
@@ -148,12 +148,15 @@ export const spawnProjectile = (
   damage: number,
   speed: number,
   rangeTiles: number,
+  angleOffset = 0,
+  onHit?: StatusApply,
 ): void => {
+  const angle = owner.facing + angleOffset
   const e = makeEntity('projectile', 'projectile', owner.pos.x, owner.pos.y, 0.15)
-  e.facing = owner.facing
-  e.vel.x = Math.cos(owner.facing) * speed
-  e.vel.y = Math.sin(owner.facing) * speed
-  e.projectile = { ownerId: owner.id, damage, ttl: Math.ceil((rangeTiles / speed) * 30) }
+  e.facing = angle
+  e.vel.x = Math.cos(angle) * speed
+  e.vel.y = Math.sin(angle) * speed
+  e.projectile = { ownerId: owner.id, damage, ttl: Math.ceil((rangeTiles / speed) * 30), onHit }
   addEntity(w, e)
 }
 
@@ -171,21 +174,27 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
       if (cls.ability(w, e)) e.playerCtl.abilityCooldown = cls.abilityCooldownTicks
     }
 
-    // Hotbar: equip a slot; Throw: lob the active/nearest throwable.
+    // Hotbar: equip a slot; Use/Throw: use the held item (throw or consume).
     if (cmd.hotbar >= 0) equipSlot(e, cmd.hotbar)
-    if (cmd.throwItem && e.combat.cooldown <= 0 && throwActive(w, e)) e.combat.cooldown = THROW_COOLDOWN
+    if (cmd.throwItem && e.combat.cooldown <= 0 && useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
     const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
     if (weapon.kind === 'melee') {
       e.combat.cooldown = weapon.cooldownTicks
       const damage = Math.round(weapon.damage * (cls?.meleeDamageMult ?? 1))
-      meleeAttack(w, e, damage, weapon.range, weapon.knockback)
+      const hit = meleeAttack(w, e, damage, weapon.range, weapon.knockback)
       if (weapon.durability !== undefined) wearMelee(e)
+      if (hit && weapon.onHit) applyStatus(w, hit, weapon.onHit.status, weapon.onHit.ticks)
     } else {
       if (!spendAmmo(e)) continue // empty gun clicks — no shot, no cooldown
       e.combat.cooldown = weapon.cooldownTicks
-      spawnProjectile(w, e, weapon.damage, weapon.projectileSpeed ?? 12, weapon.range)
+      const pellets = weapon.pellets ?? 1
+      const speed = weapon.projectileSpeed ?? 12
+      for (let i = 0; i < pellets; i++) {
+        const offset = pellets > 1 ? (i / (pellets - 1) - 0.5) * (weapon.spread ?? 0) : 0
+        spawnProjectile(w, e, weapon.damage, speed, weapon.range, offset, weapon.onHit)
+      }
     }
   }
 }

@@ -7,9 +7,10 @@
 // at zero; a throwable is lobbed and one is spent. Re-expressed from observed
 // Streets of Rogue behavior, not ported.
 
-import { itemClass, THROWABLES } from '../data/items'
+import { CONSUMABLES, itemClass, THROWABLES } from '../data/items'
 import { makeEntity, type Entity, type ItemStack } from '../entity'
 import { addEntity, type World } from '../world'
+import { applyStatus } from './statusFx'
 
 export const MAX_SLOTS = 6
 
@@ -36,15 +37,20 @@ export const addItem = (slots: ItemStack[], itemId: string, qty: number): boolea
 
 /** Equip the weapon in slot `index` — sets it as the active hotbar slot and the
  * entity's swung weapon. Only melee/ranged slots can be equipped. */
+const USABLE = new Set(['melee', 'ranged', 'throwable', 'consumable'])
+
+/** Select slot `index` as the active/hotbar slot. Equipping a weapon also makes
+ * it the swung weapon; a throwable/consumable just becomes the held item (the
+ * one the Use/Throw key acts on) and leaves the current weapon in hand. */
 export const equipSlot = (e: Entity, index: number): boolean => {
   const ctl = e.playerCtl
   if (!ctl) return false
   const slot = ctl.inventory[index]
   if (!slot) return false
   const c = itemClass(slot.itemId)
-  if (c !== 'melee' && c !== 'ranged') return false
+  if (!USABLE.has(c)) return false
   ctl.activeSlot = index
-  if (e.combat) e.combat.weapon = slot.itemId
+  if (e.combat && (c === 'melee' || c === 'ranged')) e.combat.weapon = slot.itemId
   return true
 }
 
@@ -110,7 +116,7 @@ export const throwActive = (w: World, e: Entity): boolean => {
     ownerId: e.id,
     damage: def.damage,
     ttl: Math.ceil((def.range / def.speed) * 30),
-    onImpact: def.impact,
+    onLand: def.onLand,
   }
   addEntity(w, proj)
 
@@ -118,3 +124,21 @@ export const throwActive = (w: World, e: Entity): boolean => {
   if (stack.qty <= 0) removeSlot(e, index)
   return true
 }
+
+/** Consume the active consumable: heal and/or apply its self buff, then spend
+ * one. Returns false if the active slot isn't a consumable. */
+const consumeActive = (w: World, e: Entity): boolean => {
+  const ctl = e.playerCtl
+  if (!ctl || ctl.activeSlot < 0) return false
+  const stack = ctl.inventory[ctl.activeSlot]
+  const def = stack && CONSUMABLES[stack.itemId]
+  if (!def) return false
+  if (def.heal && e.health) e.health.hp = Math.min(e.health.max, e.health.hp + def.heal)
+  if (def.onUse) applyStatus(w, e, def.onUse.status, def.onUse.ticks)
+  stack.qty -= 1
+  if (stack.qty <= 0) removeSlot(e, ctl.activeSlot)
+  return true
+}
+
+/** The Use/Throw action: consume the held consumable, else lob a throwable. */
+export const useHeld = (w: World, e: Entity): boolean => consumeActive(w, e) || throwActive(w, e)

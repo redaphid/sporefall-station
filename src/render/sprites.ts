@@ -56,8 +56,10 @@ export class EntityViews {
       const cloaked = e.status !== undefined && e.status.cloakUntil > tick
       view.sprite.alpha = e.playerCtl?.downed ? 0.45 : cloaked ? 0.55 : 1
       // Element tints read the status at a glance: frozen ice-blue, electrified
-      // shock-yellow, burning ember-orange, wet a cool slick. Hit-flash wins.
-      view.sprite.tint = flashing ? 0xffffff : elementTint(e.fx)
+      // shock-yellow, burning ember-orange, wet a cool slick, asleep/stunned a
+      // dim lavender. Hit-flash wins.
+      const drowsy = e.status !== undefined && (e.status.sleep > 0 || e.status.stun > 0)
+      view.sprite.tint = flashing ? 0xffffff : drowsy && !e.fx ? 0xb9a8e0 : elementTint(e.fx)
       // Pickups don't rotate; actors face their heading.
       const x = e.prevPos.x + (e.pos.x - e.prevPos.x) * alpha
       const y = e.prevPos.y + (e.pos.y - e.prevPos.y) * alpha

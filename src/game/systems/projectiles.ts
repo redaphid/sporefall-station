@@ -1,7 +1,8 @@
 import { SIM_DT } from '../types'
 import { isBlocked, type World } from '../world'
 import { applyDamage } from './combat'
-import { igniteCell } from './fire'
+import { applyAreaEffect } from './itemEffects'
+import { applyStatus } from './statusFx'
 
 export const projectileSystem = (w: World): void => {
   for (const e of w.entities) {
@@ -26,6 +27,7 @@ export const projectileSystem = (w: World): void => {
           explode(w, e)
         } else {
           applyDamage(w, other, e.projectile.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, e.projectile.ownerId)
+          if (e.projectile.onHit) applyStatus(w, other, e.projectile.onHit.status, e.projectile.onHit.ticks)
         }
         land(w, e)
         e.dead = true
@@ -35,9 +37,10 @@ export const projectileSystem = (w: World): void => {
   }
 }
 
-/** A thrown item applies its element where it lands (molotov → fire). */
-const land = (w: World, e: { pos: { x: number; y: number }; projectile?: { onImpact?: 'fire' } }): void => {
-  if (e.projectile?.onImpact === 'fire') igniteCell(w, Math.floor(e.pos.x), Math.floor(e.pos.y))
+/** A thrown item applies its area effect where it lands (molotov → fire, freeze
+ * grenade → frozen burst, grenade → blast). */
+const land = (w: World, e: { pos: { x: number; y: number }; projectile?: { ownerId: number; onLand?: import('../data/items').AreaEffect } }): void => {
+  if (e.projectile?.onLand) applyAreaEffect(w, e.pos.x, e.pos.y, e.projectile.onLand, e.projectile.ownerId)
 }
 
 const explode = (w: World, e: { pos: { x: number; y: number }; projectile?: { ownerId: number; explode?: { radius: number; damage: number } } }): void => {

@@ -118,9 +118,35 @@ const setupInventory = (w: World): void => {
   crate(w, x + 5, y)
 }
 
+/** A broad loadout of the new item breadth (shotgun / freeze grenade /
+ * chloroform / molotov / sledgehammer / adrenaline) with a bystander and crate
+ * downrange to use them on. */
+const setupItems = (w: World): void => {
+  const { x, y } = findStage(w, 10)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // aim east, down the row into view
+    player.playerCtl.inventory = [
+      { itemId: 'shotgun', qty: 6 },
+      { itemId: 'freezeGrenade', qty: 2 },
+      { itemId: 'chloroform', qty: 2 },
+      { itemId: 'molotov', qty: 2 },
+      { itemId: 'sledgehammer', qty: WEAPONS.sledgehammer.durability! },
+      { itemId: 'adrenaline', qty: 1 },
+    ]
+    player.playerCtl.activeSlot = 0
+    if (player.combat) player.combat.weapon = 'shotgun'
+  }
+  bystander(w, x + 4, y)
+  crate(w, x + 7, y)
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)
   if (name === 'wet-electric') setupWetElectric(w)
   if (name === 'inventory') setupInventory(w)
+  if (name === 'items') setupItems(w)
 }

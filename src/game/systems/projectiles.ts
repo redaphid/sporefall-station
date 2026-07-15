@@ -25,7 +25,12 @@ export const projectileSystem = (w: World): void => {
       if (dx * dx + dy * dy < rr * rr) {
         if (e.projectile.explode) {
           explode(w, e)
-        } else {
+        } else if (!e.projectile.onLand) {
+          // A thrown item's whole effect is its onLand (fire/blast/status burst);
+          // the point-damage hit here is a no-op (throwables deal 0) that would
+          // only grant the brushed entity iframes and blunt its own blast, so
+          // skip it and let land() resolve the area effect. Bullets have no
+          // onLand and still take the normal damage + onHit path.
           applyDamage(w, other, e.projectile.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, e.projectile.ownerId)
           if (e.projectile.onHit) applyStatus(w, other, e.projectile.onHit.status, e.projectile.onHit.ticks)
         }

@@ -56,7 +56,17 @@ export class BleHostTransport implements Transport {
       if (ev.characteristic.toLowerCase() !== BLE_DATA_C2H_UUID.toLowerCase()) return
       this.emit({ type: 'data', peer: ev.deviceId, bytes: new Uint8Array(ev.value) })
     })
-    await BluetoothLowEnergy.startAdvertising({ name: this.advertiseName, services: [BLE_SERVICE_UUID] })
+    // The name is deliberately kept OUT of the advertisement: a 128-bit service
+    // UUID (18B) + flags (3B) already uses ~21 of the 31-byte legacy PDU, so any
+    // name longer than ~8 chars ("SoR Player-42" is 13) makes Android's advertiser
+    // fail with ADVERTISE_FAILED_DATA_TOO_LARGE — silently, because the plugin
+    // resolves before its async onStartFailure fires. Centrals discover us by the
+    // service UUID and show "Unknown host"; the real name arrives after connect.
+    await BluetoothLowEnergy.startAdvertising({
+      name: this.advertiseName,
+      services: [BLE_SERVICE_UUID],
+      includeName: false,
+    })
   }
 
   async stop(): Promise<void> {

@@ -49,7 +49,8 @@ export const shock = (w: World, origin: Entity): void => {
     seen.add(e)
     addStatus(w, e, 'electrified', ELEMENTS.electrified.durationTicks)
     if (!isWet(e)) continue // dry: immobilized only, no water damage, no arc
-    if (e.health) {
+    if (e.health && !e.playerCtl?.downed) {
+      // A downed body is out of the fight — shock damage can't re-kill it (#52).
       e.health.hp -= ELEC_DAMAGE
       w.events.push({ type: 'shock', x: e.pos.x, y: e.pos.y, targetId: e.id })
       if (e.health.hp <= 0) kill(w, e)

@@ -12,7 +12,7 @@ import {
   decayTint,
   decayVignette,
   hitstopForEvent,
-  lowHealthPulse,
+  lowHealthVignette,
   shakeForEvent,
   tickHitstop,
   tintForEvent,
@@ -262,11 +262,20 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       vignette = decayVignette(vignette, dt)
       warm = juicing ? decayTint(warm, dt) : 0
       cold = juicing ? decayTint(cold, dt) : 0
-      const hpFrac =
-        view.self?.health && view.self.health.max > 0
-          ? Math.max(0, view.self.health.hp) / view.self.health.max
-          : 1
-      const red = juicing ? Math.max(vignette, lowHealthPulse(hpFrac, elapsed)) : 0
+      // Sustained low-health pulse — gated OFF while the local player is downed/
+      // dead or the run is over, so a 0-hp body never sticks the screen red under
+      // the (missing) restart overlay. The one-shot damage flash (`vignette`)
+      // still lands on the killing blow, then decays. See juice.lowHealthVignette.
+      const self = view.self
+      const vitals =
+        self?.health && self.health.max > 0
+          ? {
+              hpFrac: Math.max(0, self.health.hp) / self.health.max,
+              downed: self.playerCtl?.downed != null,
+              dead: !!self.dead,
+            }
+          : null
+      const red = juicing ? Math.max(vignette, lowHealthVignette(vitals, view.gameOver, elapsed)) : 0
       const sw = app.screen.width
       const sh = app.screen.height
       for (const [ov, a] of [

@@ -163,13 +163,16 @@ describe('kill — players go downed, everything else dies', () => {
     expect(p.dead).toBeFalsy()
   })
 
-  it('ADVERSARIAL: calling kill() again on a downed player keeps them downed but RESETS the bleed timer (documents current semantics)', () => {
+  it('ADVERSARIAL: calling kill() again on a downed player is INERT — the bleed timer keeps its progress (#52)', () => {
     const p = spawnPlayer(w, 0, 'soldier', 20, 20)
     kill(w, p)
     p.playerCtl!.downed!.bleedTicks = 5 // almost bled out
     kill(w, p)
     expect(p.dead).toBeFalsy()
-    expect(p.playerCtl!.downed!.bleedTicks).toBe(30 * 30) // reset to full
+    // Must NOT re-arm to a fresh 900: a DOT tick re-killing the downed body every
+    // interval used to reset this forever, trapping a downed solo player at hp 0
+    // (the red-flash-forever dead-end). The existing bleed-out is preserved.
+    expect(p.playerCtl!.downed!.bleedTicks).toBe(5)
   })
 })
 

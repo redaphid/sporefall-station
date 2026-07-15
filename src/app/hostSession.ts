@@ -46,6 +46,9 @@ export class HostSession implements Session {
 
   private joined = new Set<number>()
   isPaused = false
+  /** Debug harness hook: sees the composed slot→command map right before it is
+   * fed to `tickWorld` — the ground-truth input for record/replay. */
+  onTickInputs?: (inputs: Map<number, InputCmd>) => void
 
   constructor(
     seed: number,
@@ -81,6 +84,7 @@ export class HostSession implements Session {
     }
     if (this.isPaused) return
     for (const [playerId, cmd] of this.remoteInputs) this.inputs.set(playerId, cmd)
+    this.onTickInputs?.(this.inputs)
     tickWorld(this.world, this.inputs)
   }
 

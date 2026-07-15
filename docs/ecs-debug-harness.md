@@ -113,12 +113,73 @@ verb line safe (`encodeArg`/`decodeArg`); the CLI and WebSocket accept raw JSON
 too. Writes are **deferred onto the sim step** (drained between tick and render)
 so they never tear a frame; reads answer immediately.
 
+## Session / lobby + record & replay (issue #44)
+
+On top of the world verbs, a headless **GameHarness** (`src/debug/harness.ts`)
+drives a whole co-op session — no phone, no render loop. It wraps a
+`HostSession` (the authoritative sim) with a lobby lifecycle and a recorder, and
+bot players are extra slots whose per-tick command is deposited into
+`HostSession.remoteInputs` — exactly where the real net layer puts remote
+players, so the sim path is identical. `runHarnessVerb` exposes it over the same
+verb grammar (unknown verbs fall through to the world surface above):
+
+| Verb | Does |
+|---|---|
+| `create <classId> <seed> [name]` | create/host a game in the lobby |
+| `join_bot <name> <classId> [script]` | add a bot player (programmatic/scripted input); returns its slot |
+| `remove_bot <slot>` | remove a bot + kill its avatar |
+| `start_run` | spawn every lobby player, begin ticking |
+| `lobby` / `phase` | query players / phase+tick+floor |
+| `input <slot> <jsonCmd>` | set a slot's next `InputCmd` (slot 0 = host), latest-write-wins |
+| `tick [n]` | advance the sim n ticks |
+| `record_start` / `record_stop` | record the genesis snapshot + per-tick inputs + events → `Recording` JSON |
+| `replay <recording>` | re-run a `Recording` and assert final state + events match |
+| `save` / `load <fixture>` | dump / restore the full world (scenario fixtures) |
+
+Run a whole session headless via the same hub the phone uses — start the relay,
+attach the harness backend, then drive it from the CLI/MCP:
+
+```sh
+npx tsx tools/debug-hub/hub.ts &            # the relay
+npx tsx tools/debug-harness/host.ts         # the headless "game" backend (a GameHarness)
+npx tsx tools/debug-cli/cli.ts create soldier 42
+npx tsx tools/debug-cli/cli.ts join_bot Bravo thief
+npx tsx tools/debug-cli/cli.ts start_run
+npx tsx tools/debug-cli/cli.ts record_start
+npx tsx tools/debug-cli/cli.ts tick 300
+npx tsx tools/debug-cli/cli.ts record_stop > run.json
+```
+
+The MCP server re-exposes these as `session_create` / `session_join_bot` /
+`session_start` / `bot_input` / `advance` / `record_start` / `record_stop` /
+`replay` / `save_world` / `load_world`.
+
+**Determinism.** The world is a pure function of `(seed → forked RNG)` + the
+per-tick `InputCmd` map (the sim forbids `Date.now()`/`Math.random()`,
+eslint-guarded). The recorder captures the exact input map fed to `tickWorld`
+each tick (via a `HostSession.onTickInputs` hook) plus that tick's `w.events`.
+`replay` rebuilds the world from the seed + genesis player seeds and re-feeds the
+recorded inputs — inputs are the only entropy, so it reproduces the same
+entities and events bit-for-bit. (`save`/`load` fixtures re-fork the RNG from
+seed+floor, so they are scenario *starting points*, not bit-exact continuations;
+replay never uses that path.)
+
+## In-app channel auto-reconnect
+
+`startDebugChannel` now re-dials the hub with exponential backoff (base 500ms →
+cap 8s) when the socket drops on HMR reloads / idle timeouts, so long
+e2e/record sessions survive. `stop()` cancels any pending retry; pass
+`{ reconnect: false }` to opt out (and `WebSocketImpl` to inject a socket in
+tests).
+
 ## Verify (no phone needed)
 
 ```sh
 npx tsx scripts/test/debug-harness-smoke.ts     # hub + real World + real channel + debugger round-trip
 npx tsx scripts/test/mcp-debug-smoke.ts         # + MCP server & a real MCP client
-npx vitest run src/debug/verbs.test.ts          # verb-handler unit tests
+npx tsx scripts/test/harness-e2e.ts             # full co-op flow + record/replay determinism + loopback net joiners
+npx tsx scripts/test/harness-channel-smoke.ts   # CLI/MCP → hub → harness over a real WebSocket
+npx vitest run src/debug/                        # verb / harness / record / channel unit tests
 ```
 
 ## Deferred / out of scope
@@ -128,5 +189,3 @@ npx vitest run src/debug/verbs.test.ts          # verb-handler unit tests
 - **Reflection "God-view"** (the C# harness's `get_field`/`call_method` over
   arbitrary engine objects) — unneeded here: our entities are plain data, so the
   verbatim mirror already exposes everything.
-- **Time-travel / snapshot diffing** — the `state` summary + event stream are
-  the primitives; the recorder isn't built.

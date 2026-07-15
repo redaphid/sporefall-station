@@ -97,23 +97,64 @@ describe('teammate revive', () => {
   })
 })
 
-describe('bleed-out → death', () => {
+describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
   let w: World
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = createWorld(1, 1) // default 'normal'
   })
 
-  it('a lone downed player counts down bleedTicks and dies when it hits zero', () => {
+  it('a LONE downed player counts down bleedTicks and SELF-REVIVES (no one could rescue them) at a penalty', () => {
     const p = spawnPlayer(w, 0, 'soldier', 20, 20)
     p.health!.hp = 0
+    p.playerCtl!.cash = 50
+    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 3, reviveProgress: 0 }
     settle(p)
     const ids = idleFor(0)
     interactionSystem(w, ids)
     interactionSystem(w, ids)
     expect(p.dead).toBeFalsy()
-    interactionSystem(w, ids) // 3 → 0
+    expect(p.playerCtl!.downed).toBeDefined()
+    interactionSystem(w, ids) // 3 → 0: back up, not dead
+    expect(p.dead).toBeFalsy()
+    expect(p.playerCtl!.downed).toBeUndefined()
+    expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
+    expect(p.playerCtl!.cash).toBe(0) // penalty: cash dropped
+    expect(p.playerCtl!.inventory).toHaveLength(0) // penalty: non-key items dropped
+    expect(w.revivesLeft).toBe(1) // penalty: one comeback spent
+  })
+
+  it('a downed player with a DOWNED teammate (nobody standing to rescue) bleeds out to DEATH', () => {
+    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const mate = spawnPlayer(w, 1, 'soldier', 30, 30) // far away, also down
+    p.health!.hp = 0
+    p.playerCtl!.downed = { bleedTicks: 3, reviveProgress: 0 }
+    mate.health!.hp = 0
+    mate.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
+    settle(p)
+    const ids = idleFor(0, 1)
+    interactionSystem(w, ids)
+    interactionSystem(w, ids)
+    interactionSystem(w, ids) // 3 → 0: no possible rescuer → real death
     expect(p.dead).toBe(true)
+    expect(p.playerCtl!.downed).toBeDefined() // downed record left as the death cause
+  })
+
+  it('casual mode: a lone downed player self-revives with NO penalty and unlimited comebacks', () => {
+    const cw = createWorld(1, 1, 'casual')
+    const p = spawnPlayer(cw, 0, 'soldier', 20, 20)
+    p.health!.hp = 0
+    p.playerCtl!.cash = 50
+    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 10 }]
+    p.playerCtl!.downed = { bleedTicks: 2, reviveProgress: 0 }
+    settle(p)
+    const ids = idleFor(0)
+    interactionSystem(cw, ids)
+    interactionSystem(cw, ids) // 2 → 0
+    expect(p.playerCtl!.downed).toBeUndefined()
+    expect(p.playerCtl!.cash).toBe(50) // no penalty
+    expect(p.playerCtl!.inventory).toHaveLength(1)
+    expect(cw.revivesLeft).toBe(2) // untouched — casual doesn't spend the pool
   })
 })
 

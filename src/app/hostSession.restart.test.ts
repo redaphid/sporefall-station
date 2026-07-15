@@ -12,19 +12,21 @@ const scripted = (samples: CoopSample[]) => {
   return { sample: () => q.shift() ?? { inputs: new Map<number, InputCmd>(), joins: [], leaves: [], pauses: [] } }
 }
 
-/** Down the lone self and tick once so missionSystem flips the run over. */
+/** Exhaust the run's comeback economy and kill the lone self, then tick once so
+ * missionSystem flips the run over (out of lives → a solo death is a real loss). */
 const forceGameOver = (s: HostSession): void => {
+  s.world.revivesLeft = 0
   s.self.health!.hp = 0
-  s.self.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
+  s.self.dead = true
   s.tick()
 }
 
 describe('HostSession.restart — solo play-again is a connection-preserving rebuild', () => {
-  it('a solo party wipe really ends the run (gameOver), no auto-revive', () => {
+  it('a solo run out of lives really ends the run (gameOver), no auto-revive', () => {
     const s = new HostSession(1, 'soldier', stubInput)
     forceGameOver(s)
     expect(s.world.gameOver).toBe(true)
-    expect(s.self.playerCtl!.downed).toBeDefined() // still down, not auto-revived
+    expect(s.self.dead).toBe(true) // dead for real, not revived
   })
 
   it('restart() clears gameOver and respawns a single, upright player on floor 1', () => {

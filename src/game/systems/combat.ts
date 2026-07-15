@@ -21,6 +21,13 @@ const THROW_COOLDOWN = 20
 const shatter = (w: World, target: Entity): void => {
   removeStatus(target, 'frozen')
   target.health!.hp = 0
+  // A frozen PLAYER shattering must DOWN them (via kill's player path), NOT
+  // gib-vanish: skip the `shattered` flag and the ice-gib event so they stay a
+  // visible, revivable downed body instead of disappearing from the snapshot.
+  if (target.playerCtl) {
+    kill(w, target)
+    return
+  }
   target.shattered = true
   w.events.push({ type: 'shatter', x: target.pos.x, y: target.pos.y, entityId: target.id })
   kill(w, target)
@@ -38,6 +45,9 @@ export const applyDamage = (
   if (!target.health || target.dead || target.health.iframes > 0) return
   if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
   if (isFrozen(target)) return shatter(w, target)
+  // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
+  // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.
+  if (amount < 0) amount = 0
   if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
@@ -81,12 +91,20 @@ export const applyDamage = (
 export const kill = (w: World, target: Entity): void => {
   w.events.push({ type: 'death', x: target.pos.x, y: target.pos.y, entityId: target.id })
   if (target.playerCtl) {
-    // Downed: crawl-immobile, bleeding out; teammates can revive (interaction system).
-    // Solo has no reviver, so this becomes a run-over (missions.ts) — death is real.
     target.health!.hp = 0
-    target.playerCtl.downed = { bleedTicks: 30 * 30, reviveProgress: 0 }
     target.vel.x = 0
     target.vel.y = 0
+    // `normal` with an empty revive pool: the comeback economy is spent, so this
+    // down is PERMANENT death (feeds the run-over check in missions.ts). Otherwise
+    // — and always in `casual` — go downed: crawl-immobile and bleeding out. A
+    // teammate can revive (interaction system); solo bleeds out to a self-revive
+    // at a penalty, or, out of lives, to a real run-over.
+    if (w.mode === 'normal' && w.revivesLeft <= 0) {
+      target.playerCtl.downed = undefined
+      target.dead = true
+      return
+    }
+    target.playerCtl.downed = { bleedTicks: 30 * 30, reviveProgress: 0 }
     return
   }
   target.dead = true

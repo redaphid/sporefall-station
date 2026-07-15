@@ -101,15 +101,27 @@ describe('roguelite loop', () => {
     }
   })
 
-  it('downed solo player triggers run over', () => {
+  it('solo out-of-lives player going down triggers run over (a real death, not a grace-down)', () => {
+    const w = createWorld(14, 1)
+    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    player.health!.hp = 1
+    w.revivesLeft = 0 // comeback economy already spent this run
+    const thug = spawnNpc(w, 'thug', 11.2, 1.5)
+    thug.combat!.cooldown = 0
+    for (let i = 0; i < 120 && !w.gameOver; i++) tickWorld(w, idle())
+    expect(w.gameOver).toBe(true)
+    expect(player.dead).toBe(true)
+  })
+
+  it('solo player WITH lives left goes down but the run continues (self-revive, no game-over)', () => {
     const w = createWorld(14, 1)
     const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
     player.health!.hp = 1
     const thug = spawnNpc(w, 'thug', 11.2, 1.5)
     thug.combat!.cooldown = 0
-    for (let i = 0; i < 120 && !w.gameOver; i++) tickWorld(w, idle())
-    expect(w.gameOver).toBe(true)
+    for (let i = 0; i < 120 && !player.playerCtl!.downed; i++) tickWorld(w, idle())
     expect(player.playerCtl!.downed).toBeDefined()
+    expect(w.gameOver).toBe(false) // lone downed player is recovering, not lost
   })
 
   it('teammate proximity revives a downed player', () => {

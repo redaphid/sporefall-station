@@ -1,6 +1,7 @@
 import type { Entity } from '../game/entity'
 import type { Level } from '../game/levelgen/level'
 import type { SimEvent } from '../game/types'
+import type { RunMode } from '../game/world'
 
 /** What the render layer consumes each frame. */
 export interface RenderView {
@@ -12,6 +13,10 @@ export interface RenderView {
   missionText: string
   missionComplete: boolean
   gameOver: boolean
+  /** Difficulty rules in force (host truth; clients mirror it from the host). */
+  mode?: RunMode
+  /** Party-shared comebacks left this run (only meaningful in `normal`). */
+  revivesLeft?: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
 }

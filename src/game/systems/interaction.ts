@@ -11,6 +11,8 @@ const INTERACT_RANGE = 1.3
 const LOCKPICK_TICKS = 45 // 1.5s channel
 const REVIVE_TICKS = 90 // 3s of teammate proximity
 const CRIME_TICKS = 15 * 30
+/** Fraction of max HP a revived player comes back with — a low, exposed start. */
+const REVIVE_HP_FRACTION = 0.3
 
 export const interactionSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const p of w.entities) {
@@ -107,15 +109,42 @@ const bleedAndRevive = (w: World, p: Entity): void => {
       Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
   )
   if (helper) {
+    // Teammate revive: a standing ally hauls them up — the co-op window is kept.
     downed.reviveProgress += CLASSES[helper.playerCtl!.classId]?.reviveSpeedMult ?? 1
-    if (downed.reviveProgress >= REVIVE_TICKS) {
-      p.playerCtl!.downed = undefined
-      p.health!.hp = Math.floor(p.health!.max * 0.3)
-    }
+    if (downed.reviveProgress >= REVIVE_TICKS) recover(w, p)
   } else {
     downed.reviveProgress = 0
-    if (--downed.bleedTicks <= 0) p.dead = true
+    // Bleed-out: the downed timer is a real recovery delay, not instant death.
+    if (--downed.bleedTicks <= 0) {
+      // Self-revive only if nobody else could have rescued you (solo, or the last
+      // one still in trouble while teammates stand). If another player is also
+      // down/dead the party is failing — you bleed out for real, so a co-op wipe
+      // can end the run instead of everyone popping back up forever.
+      if (canSelfRecover(w, p)) recover(w, p)
+      else p.dead = true
+    }
   }
+}
+
+/** Can this downed player pull themselves up? Yes only when every OTHER player
+ * is upright (or there are none at all — solo). */
+const canSelfRecover = (w: World, p: Entity): boolean =>
+  w.entities.every((e) => e === p || !e.playerCtl || (!e.playerCtl.downed && !e.dead))
+
+/** Bring a downed player back up. In `normal` this costs a shared revive and a
+ * comeback penalty (drop cash + non-key items, ability put on full cooldown);
+ * `casual` just stands them up. Both paths (teammate + self) route through here
+ * so the penalty lands exactly once per recovery. */
+const recover = (w: World, p: Entity): void => {
+  const ctl = p.playerCtl!
+  ctl.downed = undefined
+  p.health!.hp = Math.max(1, Math.floor(p.health!.max * REVIVE_HP_FRACTION))
+  if (w.mode !== 'normal') return
+  w.revivesLeft = Math.max(0, w.revivesLeft - 1)
+  ctl.cash = 0
+  ctl.inventory = ctl.inventory.filter((s) => itemClass(s.itemId) === 'key')
+  ctl.activeSlot = -1 // dropped the weapon we were holding
+  ctl.abilityCooldown = CLASSES[ctl.classId]?.abilityCooldownTicks ?? 0
 }
 
 export const nearestInteractable = (entities: readonly Entity[], p: Entity): Entity | null => {

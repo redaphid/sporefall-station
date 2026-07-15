@@ -2,7 +2,7 @@ import type { Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
-import { createWorld, tickWorld, type World } from '../game/world'
+import { createWorld, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import type { CoopSample } from '../input/gamepadCoop'
@@ -55,6 +55,8 @@ export class HostSession implements Session {
     private classId: string,
     private localInput: InputSource,
     private coop?: CoopSource,
+    /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
+    private mode: RunMode = 'normal',
   ) {
     this.buildRun()
   }
@@ -62,7 +64,7 @@ export class HostSession implements Session {
   /** Generate floor 1 from the seed and spawn the local player. Used at start
    * and by restart() — a fresh run from default state. */
   private buildRun(): void {
-    this.world = createWorld(this.seed, 1)
+    this.world = createWorld(this.seed, 1, this.mode)
     populateWorld(this.world)
     setupFloor(this.world)
     this.self = spawnPlayer(this.world, 0, this.classId, this.world.level.spawn.x, this.world.level.spawn.y)
@@ -112,6 +114,8 @@ export class HostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       gameOver: this.world.gameOver,
+      mode: this.world.mode,
+      revivesLeft: this.world.revivesLeft,
       self: this.self,
     }
   }

@@ -153,8 +153,9 @@ export class NetClientSession implements Session {
         this.onLobbyChange?.(decodeJson<LobbyStateMsg>(msg))
         break
       case MsgType.GameStart: {
-        const start = decodeJson<{ seed: number }>(msg)
+        const start = decodeJson<{ seed: number; mode?: 'casual' | 'normal' }>(msg)
         this.seed = start.seed
+        if (start.mode) this.state.mode = start.mode
         if (this.phase === 'reconnecting') break // level already live; snapshots resync the floor
         this.floor = 1
         this.level = generateLevel(this.seed, 1)
@@ -340,6 +341,8 @@ export class NetClientSession implements Session {
       missionText,
       missionComplete: this.state.missionComplete,
       gameOver: this.state.gameOver,
+      mode: this.state.mode,
+      revivesLeft: this.state.revivesLeft,
       self: this.self,
     }
   }

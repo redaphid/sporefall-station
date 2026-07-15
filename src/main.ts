@@ -36,6 +36,7 @@ const boot = async (): Promise<void> => {
 
   const session = await createSession(mode, { seed, room, name, classId, input, uiMount, renderer })
   if (!session) return
+  if (params.has('e2e')) (window as unknown as { __sor: Session }).__sor = session
   runLoop(session, renderer, uiMount)
 }
 

@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "e2e": "./e2e/run.sh",
+    "e2e:play": "node e2e/play-session.mjs",
+    "e2e:showcase": "node e2e/record-showcase.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
@@ -21,6 +24,7 @@
     "@capacitor/cli": "^8.4.1",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.6.0",
+    "playwright": "^1.61.1",
     "playwright-core": "^1.61.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.1",

@@ -59,7 +59,18 @@ const boot = async (): Promise<void> => {
     ;(window as unknown as { __world: unknown }).__world = session.world
     ;(window as unknown as { __scriptTicks: number }).__scriptTicks = scriptTicks(script)
   }
-  runLoop(session, renderer, uiMount, coop)
+  // Live ECS debug harness (issue #29): only under `?debug`, only for sessions
+  // that own an authoritative world (solo/host). Dynamic import keeps it out of
+  // normal builds. The hub URL derives from whoever served the app, so it "just
+  // works" under Vite live-reload from the laptop.
+  let debug: { afterTick(): void } | undefined
+  if (params.has('debug') && 'world' in session) {
+    const { startDebugChannel } = await import('./debug/channel')
+    const { hubUrl, DEFAULT_HUB_PORT } = await import('./debug/protocol')
+    const port = Number(params.get('debugPort')) || DEFAULT_HUB_PORT
+    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port))
+  }
+  runLoop(session, renderer, uiMount, coop, debug)
 }
 
 interface SessionDeps {
@@ -191,6 +202,7 @@ const runLoop = (
   renderer: GameRenderer,
   uiMount: HTMLElement,
   coop: ReturnType<typeof createGamepadCoop>,
+  debug?: { afterTick(): void },
 ): void => {
   const hud = createHud(uiMount)
   const screens = createScreens(uiMount)
@@ -206,6 +218,7 @@ const runLoop = (
     last = now
     while (acc >= SIM_DT) {
       session.tick()
+      debug?.afterTick() // stream this tick's events + drain queued debug mutations
       acc -= SIM_DT
     }
     const alpha = acc / SIM_DT

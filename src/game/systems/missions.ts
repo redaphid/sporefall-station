@@ -109,11 +109,27 @@ export const missionSystem = (w: World): void => {
     }
   }
 
-  // Run over: no live (non-downed) players remain
+  // Party wipe: every player is downed/dead at once, so no one is left to revive
+  // anyone. Ending the run here forced both players to kill and relaunch the app
+  // (a page reload drops the BLE link). Instead, pick the whole party back up at
+  // the level spawn — away from whatever killed them — so co-op just keeps going.
   const players = w.entities.filter((e) => e.playerCtl)
   if (players.length > 0 && players.every((e) => e.playerCtl!.downed || e.dead)) {
-    w.gameOver = true
-    w.events.push({ type: 'runOver', floor: w.floor })
+    for (const p of players) {
+      p.pos.x = w.level.spawn.x
+      p.pos.y = w.level.spawn.y
+      p.prevPos.x = p.pos.x
+      p.prevPos.y = p.pos.y
+      p.vel.x = 0
+      p.vel.y = 0
+      if (p.health) {
+        p.health.hp = Math.max(1, Math.floor(p.health.max / 2))
+        p.health.iframes = 90
+      }
+      if (p.playerCtl) p.playerCtl.downed = undefined
+      p.dead = false
+    }
+    w.events.push({ type: 'partyWipe', floor: w.floor })
   }
 }
 

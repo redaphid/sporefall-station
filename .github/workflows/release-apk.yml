@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: write
+  actions: write # to trigger the deploy-web workflow so the site's APK refreshes
 
 jobs:
   release-apk:
@@ -74,3 +75,11 @@ jobs:
           name: "Backseat ${{ github.ref_name }} (debug APK)"
           generate_release_notes: true
           files: backseat.apk
+
+      # Close the loop: now that this release is the newest, kick the web deploy
+      # so it re-bundles this APK into the public site at /download/backseat.apk.
+      # Without this a new release would only reach the site on the next main push.
+      - name: Refresh the self-hosted APK on the site
+        run: gh workflow run deploy-web.yml --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}

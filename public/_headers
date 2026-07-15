@@ -18,6 +18,11 @@
 /ota/*.zip
   Cache-Control: public, max-age=31536000, immutable
 
+# The self-hosted APK is re-bundled from the newest release on each deploy, so it
+# must not be cached long or phones would get a stale app after a new release.
+/download/backseat.apk
+  Cache-Control: no-cache
+
 # Baseline security headers for the whole site.
 /*
   X-Content-Type-Options: nosniff

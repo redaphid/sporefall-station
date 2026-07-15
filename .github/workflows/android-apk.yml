@@ -1,9 +1,14 @@
 name: android-apk
 
+# Continuous APK CI: builds a debug APK on every push to main / PR (artifact),
+# and refreshes a rolling "latest" prerelease from main. Official tagged
+# releases (v1.2.3) are handled by release-apk.yml, so this workflow no longer
+# triggers on tags — that avoids two workflows racing to create the same
+# Release for one tag.
+
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
   release:
     types: [published]
@@ -67,16 +72,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" ecs-game.apk --clobber
 
-      # A version tag (v1.2.3) was pushed -> create that release with the APK.
-      - name: Publish tagged release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" ecs-game.apk \
-            --title "Streets of Rogue-ish $GITHUB_REF_NAME (debug APK)" \
-            --generate-notes \
-          || gh release upload "$GITHUB_REF_NAME" ecs-game.apk --clobber
+      # Tagged releases (v1.2.3) are handled by release-apk.yml.
 
       # Every push to main -> refresh a rolling "latest" prerelease so there is
       # always a downloadable APK for the current main, no tagging required.

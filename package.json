@@ -28,6 +28,7 @@
     "@capacitor/android": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capgo/capacitor-bluetooth-low-energy": "^8.2.0",
+    "@capgo/capacitor-updater": "^8.51.0",
     "pixi.js": "^8.19.0"
   },
   "devDependencies": {

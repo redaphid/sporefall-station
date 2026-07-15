@@ -12,6 +12,7 @@ import { createScriptedInput, scriptTicks, SCRIPTS } from './input/scripted'
 import { createTouch, mergeInputs, type TouchInput } from './input/touch'
 import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
+import { notifyOtaReady } from './app/ota'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
@@ -24,6 +25,10 @@ import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } f
 import { createScreens } from './ui/screens'
 
 const boot = async (): Promise<void> => {
+  // Confirm this bundle booted so the native OTA layer keeps it (and applies any
+  // newer bundle it fetched). Non-blocking; no-op on web / dev live-reload.
+  void notifyOtaReady()
+
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
   const renderer = await createRenderer(mount)

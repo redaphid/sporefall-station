@@ -1,0 +1,86 @@
+name: deploy-web
+
+# Deploy the Vite web build to Cloudflare Pages on every push to main.
+# This is the "always current" browser on-ramp for the nephews: open a URL,
+# get the latest game. Independent of the native APK / OTA path.
+#
+# One-time setup (see docs/deploy.md):
+#   1. Create a Cloudflare Pages project (Direct Upload) named
+#      `streets-of-rogue-ish` (or edit the name below + wrangler.toml).
+#   2. Add repo secrets CLOUDFLARE_API_TOKEN (Pages:Edit) and
+#      CLOUDFLARE_ACCOUNT_ID.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+# Never run more than one deploy at a time; cancel superseded runs.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy web build to Cloudflare Pages
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build web bundle
+        run: npm run build
+        env:
+          # MUST stay unset for a static deploy so the built app serves its own
+          # bundled assets instead of pointing the webview at a laptop dev
+          # server (see capacitor.config.ts). Set here explicitly for clarity.
+          CAP_SERVER_URL: ""
+
+      # Package the built app as an OTA bundle and publish a version manifest
+      # alongside the site. Installed APKs POST to /ota/check (a Pages Function),
+      # which compares against dist/ota/version.json and hands back this zip when
+      # it's newer. So one push to main both deploys the web page AND ships an
+      # OTA update to phones. Version derives from git (tag if present, else SHA).
+      - name: Stage OTA bundle + manifest
+        run: |
+          set -euo pipefail
+          VER="$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)"
+          # Public origin of the Pages project. Override with the SITE_URL repo
+          # variable if the project name / custom domain differs.
+          SITE="${SITE_URL:-https://streets-of-rogue-ish.pages.dev}"
+          SITE="${SITE%/}"
+          mkdir -p dist/ota
+          # Zip the built app (index.html at the zip root); exclude the ota/ dir
+          # so the bundle never contains itself or the manifest.
+          ( cd dist && zip -q -r -X "../bundle.zip" . -x "ota/*" )
+          mv bundle.zip "dist/ota/${VER}.zip"
+          printf '{"version":"%s","url":"%s/ota/%s.zip"}\n' "$VER" "$SITE" "$VER" > dist/ota/version.json
+          echo "OTA bundle: dist/ota/${VER}.zip"
+          cat dist/ota/version.json
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Uses pages_build_output_dir ("dist") from wrangler.toml.
+          command: pages deploy --project-name=streets-of-rogue-ish
+
+      - name: Print deployment URL
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: echo "Deployed to $DEPLOYMENT_URL"

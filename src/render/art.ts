@@ -122,8 +122,6 @@ export interface SpriteTextures {
   prop?: Texture
 }
 
-const COP_ARCHETYPES = new Set(['cop', 'thug', 'gangster', 'bouncer'])
-
 const TILE_COLORS: Record<number, number> = {
   [Tile.Street]: 0x33333c,
   [Tile.Sidewalk]: 0x4c4c56,

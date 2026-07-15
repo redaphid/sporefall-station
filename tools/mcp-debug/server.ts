@@ -38,6 +38,8 @@ export function buildMcpServer(raw: Raw): McpServer {
   server.registerTool('inspect', { description: "One entity's verbatim component JSON.", inputSchema: { entity: id } }, ({ entity }) => run(() => raw(`get ${entity}`)))
   server.registerTool('game_state', { description: 'World summary: tick, seed, floor, alarm, gameOver, mission, per-kind entity counts.' }, () => run(() => raw('state')))
   server.registerTool('events', { description: 'Recent sim events (deaths, hits, pickups, explosions, ...) from the live event ring.' }, () => run(() => raw('events')))
+  server.registerTool('dump_world', { description: 'Lossless snapshot of the WHOLE live world as WorldJson (serialize.ts): entities + RNG stream position + mission/alarm/tick. Feed the exact string back to restore_world for a byte-identical restore.' }, () => run(() => raw('dump')))
+  server.registerTool('schema', { description: 'Reflection: the live component/archetype shape of the world (kinds, archetypes, and every top-level entity field with its types + nested keys), derived from the actual entities so unfamiliar/new components are enumerated dynamically. Use it to reason about entities you have not seen before.' }, () => run(() => raw('schema')))
 
   // ---- mutate -----------------------------------------------------------
   server.registerTool(
@@ -61,6 +63,16 @@ export function buildMcpServer(raw: Raw): McpServer {
   )
   server.registerTool('kill', { description: 'Kill an entity (players are downed, not removed).', inputSchema: { entity: id } }, ({ entity }) => run(() => raw(`kill ${entity}`)))
   server.registerTool('teleport', { description: 'Teleport an entity to (x,y).', inputSchema: { entity: id, x: z.number(), y: z.number() } }, ({ entity, x, y }) => run(() => raw(`teleport ${entity} ${x} ${y}`)))
+  server.registerTool(
+    'restore_world',
+    { description: 'Replace the live world EXACTLY from a WorldJson snapshot (from dump_world), in place. Prototype-pollution-guarded. Use this to set world state precisely before inspecting/stepping.', inputSchema: { world: z.string().describe('a WorldJson string from dump_world') } },
+    ({ world }) => run(() => raw(`load ${encodeArg(world)}`)),
+  )
+  server.registerTool(
+    'step',
+    { description: 'Advance the LIVE world N deterministic ticks with neutral input (no player commands); 30 ticks = 1s. The RNG stream is the only entropy, so a stepped world stays reproducible. Default 1.', inputSchema: { ticks: z.number().int().nonnegative().optional() } },
+    ({ ticks }) => run(() => raw(`step ${ticks ?? 1}`)),
+  )
 
   // ---- session / lobby (headless harness backend) -----------------------
   // These verbs only resolve when the connected `game` is a GameHarness (see

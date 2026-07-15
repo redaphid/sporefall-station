@@ -1,4 +1,4 @@
-import type { Entity } from '../../game/entity'
+import type { Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
@@ -100,16 +100,17 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
 
 export const encodeInput = (
   cmd: InputCmd,
-  edges: { attack: boolean; interact: boolean; special: boolean; roll?: boolean },
+  edges: { attack: boolean; interact: boolean; special: boolean; roll?: boolean; throwItem?: boolean },
 ): Uint8Array => {
-  const w = new ByteWriter(9)
+  const w = new ByteWriter(10)
   // Bit 8 carries whether aim is active: the angle byte can't encode a centred
   // stick (atan2(0,0)=0 looks like "aim right"), so this bit lets the far side
   // restore a (0,0) aim and hold the last facing instead of snapping.
   const aimActive = Math.hypot(cmd.aimX, cmd.aimY) > 0.01
   const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0) | (aimActive ? 8 : 0)
-  // Roll is a pure edge (a tap) — bit 8 of the edge byte, decoded by the host.
-  const edge = (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0) | (edges.roll ? 8 : 0)
+  // Roll (bit 8) and Use/Throw (bit 16) are pure edges (taps), decoded by the host.
+  const edge =
+    (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0) | (edges.roll ? 8 : 0) | (edges.throwItem ? 16 : 0)
   w.u8(MsgType.Input)
     .u16(cmd.seq & 0xffff)
     .u8(Math.round((cmd.moveX + 1) * 127))
@@ -117,6 +118,8 @@ export const encodeInput = (
     .u8(held)
     .u8(edge)
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
+    // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
+    .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
   return w.finish()
 }
 
@@ -130,9 +133,12 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const held = r.u8()
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
+  const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
+  cmd.throwItem = (edges & 16) !== 0
+  cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
@@ -251,4 +257,23 @@ export interface StateMsg {
   revivesLeft?: number
   /** Per-slot HUD extras for each player's own display. */
   huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
+}
+
+/**
+ * Host → one client: that client's OWN authoritative inventory. Unlike the
+ * per-player HUD summary in `StateMsg.huds` (which stays a lightweight summary
+ * for teammates), the local player needs the FULL slot list so weapon switching,
+ * item use, mod badges and ammo counts all work as a joiner. Sent on the reliable
+ * channel and only when the inventory/activeSlot/weapon actually changes, so it
+ * stays BLE-bandwidth-sane rather than riding every snapshot.
+ */
+export interface InventoryMsg {
+  /** The receiving client's own player slot. */
+  slot: number
+  /** Full slot list — each stack carries its ammo/durability in `qty` and any `mods`. */
+  inventory: ItemStack[]
+  /** Equipped/hotbar slot index into `inventory`; -1 = bare fists. */
+  activeSlot: number
+  /** The currently-swung weapon id (may differ from activeSlot when a throwable/consumable is held). */
+  weapon: string
 }

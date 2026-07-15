@@ -26,6 +26,9 @@ export const MsgType = {
   Go: 16,
   Events: 17,
   State: 18,
+  /** Host → one client: that client's OWN full authoritative inventory
+   * (slots/activeSlot/mods/ammo). Reliable, sent only on change. */
+  Inventory: 19,
 } as const
 export type MsgTypeId = (typeof MsgType)[keyof typeof MsgType]
 

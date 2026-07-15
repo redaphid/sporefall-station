@@ -14,6 +14,7 @@ import {
   encodeInput,
   type EventsMsg,
   type GoMsg,
+  type InventoryMsg,
   type LobbyStateMsg,
   type StateMsg,
   type WelcomeMsg,
@@ -54,8 +55,13 @@ export class NetClientSession implements Session {
   private tickCount = 0
   private inputSeq = 0
   private pendingInputs: { seq: number; cmd: InputCmd }[] = []
-  private pendingEdges = { attack: false, interact: false, special: false, roll: false }
+  private pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
+  /** Hotbar slot tapped since the last input packet went out (-1 = none). Latched
+   * so a tap between send-ticks isn't dropped — the host applies it as an edge. */
+  private pendingHotbar = -1
   private lastAckedSeq = 0
+  /** Our OWN player's authoritative inventory, streamed by the host on change. */
+  private localInv?: InventoryMsg
   private eventsOut: SimEvent[] = []
   private state: StateMsg = {
     floor: 1,
@@ -164,6 +170,7 @@ export class NetClientSession implements Session {
         this.entities.clear()
         this.targets.clear()
         this.self = undefined
+        this.localInv = undefined // fresh run: wait for the host's authoritative inventory
         this.onLevelChange?.(this.level)
         this.setPhase('starting')
         break
@@ -185,6 +192,12 @@ export class NetClientSession implements Session {
       case MsgType.State: {
         this.state = decodeJson<StateMsg>(msg)
         if (this.state.floor !== this.floor) this.changeFloor(this.state.floor)
+        break
+      }
+      case MsgType.Inventory: {
+        const inv = decodeJson<InventoryMsg>(msg)
+        // The host only ships us our own, but guard the slot defensively.
+        if (inv.slot === this.slot) this.localInv = inv
         break
       }
     }
@@ -277,11 +290,16 @@ export class NetClientSession implements Session {
     this.pendingEdges.interact ||= cmd.interact
     this.pendingEdges.special ||= cmd.special
     this.pendingEdges.roll ||= cmd.roll
+    this.pendingEdges.throwItem ||= cmd.throwItem
+    // Hotbar/Use are taps that can land on a non-send tick — latch them so the
+    // next packet still carries the equip/throw instead of dropping it.
+    if (cmd.hotbar >= 0) this.pendingHotbar = cmd.hotbar
 
     // Send at ~15Hz (every 2nd tick), latest-wins on the wire
     if (this.tickCount % 2 === 0 && this.queue) {
-      this.queue.queueSnapshot(encodeInput(cmd, this.pendingEdges))
-      this.pendingEdges = { attack: false, interact: false, special: false, roll: false }
+      this.queue.queueSnapshot(encodeInput({ ...cmd, hotbar: this.pendingHotbar }, this.pendingEdges))
+      this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
+      this.pendingHotbar = -1
     }
 
     // Predict own movement immediately
@@ -322,10 +340,23 @@ export class NetClientSession implements Session {
       this.self.playerCtl!.classId = this.classId
       if (this.self.combat) this.self.combat.weapon = hud.weapon
       else this.self.combat = { weapon: hud.weapon, cooldown: 0 }
-      this.self.playerCtl!.inventory = [
-        ...Array.from({ length: hud.bandages }, () => ({ itemId: 'bandage', qty: 1 })),
-        ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
-      ]
+    }
+    // Our OWN player carries the FULL authoritative inventory the host streams us
+    // (slots / activeSlot / per-weapon mods / ammo) so weapon switching, item use
+    // and mod badges all work as a joiner. Until that first inventory arrives, fall
+    // back to the HUD bandage/briefcase summary so nothing phantom-floods the hotbar.
+    if (this.self?.playerCtl) {
+      if (this.localInv) {
+        this.self.playerCtl.inventory = this.localInv.inventory
+        this.self.playerCtl.activeSlot = this.localInv.activeSlot
+        if (this.self.combat) this.self.combat.weapon = this.localInv.weapon
+        else this.self.combat = { weapon: this.localInv.weapon, cooldown: 0 }
+      } else if (hud) {
+        this.self.playerCtl.inventory = [
+          ...(hud.bandages > 0 ? [{ itemId: 'bandage', qty: hud.bandages }] : []),
+          ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
+        ]
+      }
     }
     const missionText =
       this.phase === 'reconnecting'

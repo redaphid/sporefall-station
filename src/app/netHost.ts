@@ -15,6 +15,7 @@ import {
   type GameStartMsg,
   type GoMsg,
   type HelloMsg,
+  type InventoryMsg,
   type LobbyPlayer,
   type StateMsg,
   type WireEntity,
@@ -46,6 +47,12 @@ interface PeerState {
   lastInputSeq: number
   latestCmd: InputCmd
   pendingEdges: number
+  /** Hotbar slot the client tapped since the last tick consumed one (-1 = none).
+   * Edge-triggered like the button edges: applied once, then reset, so a single
+   * tap equips exactly once instead of re-equipping every tick. */
+  pendingHotbar: number
+  /** Signature of the last inventory we shipped this peer — send only on change. */
+  lastInvSig: string
   entityId?: number
 }
 
@@ -74,6 +81,8 @@ export class NetHostSession implements Session {
   private inputs = new Map<number, InputCmd>()
   started = false
   onLobbyChange?: (players: LobbyPlayer[]) => void
+  /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
+  debugInventorySends = 0
 
   constructor(
     readonly seed: number,
@@ -137,6 +146,9 @@ export class NetHostSession implements Session {
   restart(): void {
     this.world = createWorld(this.seed, 1, this.mode)
     this.ghosts.clear()
+    // Force a fresh inventory push after respawn: the new loadout must reach every
+    // client even if it happens to hash-match the pre-restart one.
+    for (const p of this.peers.values()) p.lastInvSig = ''
     this.started = false
     this.beginGame()
   }
@@ -152,6 +164,11 @@ export class NetHostSession implements Session {
       cmd.interact ||= (p.pendingEdges & 2) !== 0
       cmd.special ||= (p.pendingEdges & 4) !== 0
       cmd.roll = (p.pendingEdges & 8) !== 0 // edge only — never a sticky held bit
+      cmd.throwItem = (p.pendingEdges & 16) !== 0 // Use/Throw is a tap, not a sticky held bit
+      // Hotbar equip is edge-triggered too: apply the tapped slot once, then clear
+      // it, so a single tap doesn't re-equip every tick until the next packet.
+      cmd.hotbar = p.pendingHotbar
+      p.pendingHotbar = -1
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
@@ -163,6 +180,36 @@ export class NetHostSession implements Session {
     }
     if (this.world.tick % SNAPSHOT_INTERVAL_TICKS === 0) this.sendSnapshots()
     if (this.world.tick % STATE_INTERVAL_TICKS === 0) this.sendState()
+    this.sendInventories()
+  }
+
+  /**
+   * Ship each client its OWN player's full inventory over the RELIABLE channel,
+   * but ONLY when it changed since we last sent it. Teammates stay summarized in
+   * `StateMsg.huds`; this is exclusively the local player's authoritative slots,
+   * so a joiner can switch weapons, use items, see mods and read ammo counts.
+   * Change-gating (a cheap signature compare) keeps this off the every-tick path
+   * and off the snapshot path — a firefight sends one small reliable packet per
+   * ammo/slot/mod change, not one per tick.
+   */
+  private sendInventories(): void {
+    for (const p of this.peers.values()) {
+      if (p.slot < 0 || p.entityId === undefined) continue
+      const avatar = this.world.byId.get(p.entityId)
+      const ctl = avatar?.playerCtl
+      if (!ctl) continue
+      const msg: InventoryMsg = {
+        slot: p.slot,
+        inventory: ctl.inventory,
+        activeSlot: ctl.activeSlot,
+        weapon: avatar.combat?.weapon ?? 'fists',
+      }
+      const sig = JSON.stringify([msg.inventory, msg.activeSlot, msg.weapon])
+      if (sig === p.lastInvSig) continue
+      p.lastInvSig = sig
+      p.queue.queueReliable(encodeJson(MsgType.Inventory, msg))
+      this.debugInventorySends++
+    }
   }
 
   private sendSnapshots(): void {
@@ -246,6 +293,8 @@ export class NetHostSession implements Session {
       lastInputSeq: 0,
       latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false, roll: false },
       pendingEdges: 0,
+      pendingHotbar: -1,
+      lastInvSig: '',
     }
     this.peers.set(peer, state)
   }
@@ -308,6 +357,9 @@ export class NetHostSession implements Session {
         p.latestCmd = cmd
       }
       p.pendingEdges |= edges
+      // A hotbar tap is an edge: latch the requested slot so the next tick equips
+      // it once even if the packet arrived between ticks (OR-ed like the edges).
+      if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
       return
     }
     if (type === MsgType.Hello) {

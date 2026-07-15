@@ -133,6 +133,24 @@ describe('input codec — boundary values', () => {
     expect(still.edges & 8).toBe(0)
   })
 
+  it('round-trips the hotbar equip slot as a +1 biased byte (-1 = none)', () => {
+    // No equip requested this tick.
+    expect(decodeInput(encodeInput({ ...emptyInput(), hotbar: -1 }, noEdges)).cmd.hotbar).toBe(-1)
+    // Each real slot survives the wire so a client weapon-switch reaches the host.
+    for (const slot of [0, 1, 2, 3, 4, 5]) {
+      expect(decodeInput(encodeInput({ ...emptyInput(), hotbar: slot }, noEdges)).cmd.hotbar).toBe(slot)
+    }
+  })
+
+  it('carries the Use/Throw tap as an edge bit (bit 16) and decodes throwItem', () => {
+    const thrown = decodeInput(encodeInput(emptyInput(), { attack: false, interact: false, special: false, throwItem: true }))
+    expect(thrown.edges & 16).toBe(16)
+    expect(thrown.cmd.throwItem).toBe(true)
+    const still = decodeInput(encodeInput(emptyInput(), noEdges))
+    expect(still.edges & 16).toBe(0)
+    expect(still.cmd.throwItem).toBe(false)
+  })
+
   it('masks seq into a u16 so it wraps rather than overflowing', () => {
     expect(decodeInput(encodeInput({ ...emptyInput(), seq: 65535 }, noEdges)).cmd.seq).toBe(65535)
     // 65536 wraps to 0 — this wrap is exactly what host-side seq detection relies on.

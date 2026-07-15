@@ -54,6 +54,14 @@ jobs:
             e2e/output/web-game-proof.gif
             e2e/output/assets-showcase.mp4
             e2e/output/assets-showcase.gif
+            e2e/output/gameplay-demo.mp4
+            e2e/output/gameplay-demo-*.png
+            e2e/output/e2e-doors.mp4
+            e2e/output/e2e-doors-*.png
+            e2e/output/e2e-shooting.mp4
+            e2e/output/e2e-shooting-*.png
+            e2e/output/e2e-mission.mp4
+            e2e/output/e2e-mission-*.png
 
       - name: Attach proof to release
         if: github.event_name == 'release'

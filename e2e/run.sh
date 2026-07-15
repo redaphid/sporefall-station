@@ -32,6 +32,12 @@ BASE_URL="$BASE_URL" node e2e/play-session.mjs
 echo "[run] recording asset showcase…"
 BASE_URL="$BASE_URL" node e2e/record-showcase.mjs
 
+echo "[run] recording deterministic gameplay videos…"
+for demo in gameplay-demo doors shooting mission; do
+  echo "[run] → $demo"
+  BASE_URL="$BASE_URL" E2E_OUT="$OUT" node "e2e/$demo.mjs"
+done
+
 echo "[run] converting to mp4 + gif…"
 if command -v ffmpeg >/dev/null; then
   for name in web-game-proof assets-showcase; do

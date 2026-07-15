@@ -3,7 +3,7 @@
 
 import { WEAPONS } from './data/items'
 import { makeEntity, type Entity } from './entity'
-import { isSolidTile } from './levelgen/level'
+import { isSolidTile, Tile } from './levelgen/level'
 import { spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { freeze, wet } from './systems/interactions'
@@ -235,6 +235,86 @@ const setupShowcase = (w: World): void => {
   }
 }
 
+// ── Scripted-run stages ────────────────────────────────────────────────────
+// These back the deterministic e2e videos (see e2e/ + src/input/scripted.ts).
+// applyScenario runs after populateWorld, so each first clears the random crowd
+// to a blank plaza, then hand-places exactly the beats its script drives.
+
+const LANE_Y = 11 // open plaza lane below spawn — the camera frames it without clamping
+
+const clearStage = (w: World): void => {
+  w.entities = w.entities.filter((e) => !!e.playerCtl)
+  w.byId.clear()
+  for (const e of w.entities) w.byId.set(e.id, e)
+}
+
+const stageThug = (w: World, x: number, y: number): Entity => {
+  const t = spawnNpc(w, 'thug', x, y)
+  t.health = { hp: 24, max: 24, iframes: 0 }
+  t.ai!.guard = true
+  return t
+}
+
+const stageWanderer = (w: World, x: number, y: number): void => {
+  const npc = spawnNpc(w, 'civilian', x, y)
+  npc.ai!.mode = 'wander'
+  npc.ai!.waypoint = { x: x + 1.5, y: y + 1 }
+}
+
+const stageDoor = (w: World, x: number, y: number, locked: boolean): void => {
+  const e = makeEntity('door', 'door', x, y, 0.5)
+  e.door = { open: false, locked, lockLevel: locked ? 1 : 0 }
+  e.interact = { verb: locked ? 'use' : 'open', range: 1.3 }
+  addEntity(w, e)
+}
+
+// move -> meet NPCs + grab a pickup -> open a door -> win a grenade+pistol battle
+const stageDemo = (w: World): void => {
+  clearStage(w)
+  const medkit = makeEntity('pickup', 'pickup.medkit', 5.5, LANE_Y, 0.3)
+  medkit.pickup = { itemId: 'medkit', qty: 1 }
+  addEntity(w, medkit)
+  stageWanderer(w, 8, LANE_Y - 0.6)
+  stageWanderer(w, 9, LANE_Y + 1)
+  const door = makeEntity('door', 'door', 12, LANE_Y, 0.5)
+  door.door = { open: false, locked: false, lockLevel: 0 }
+  door.interact = { verb: 'open', range: 1.3 }
+  addEntity(w, door)
+  stageThug(w, 19, LANE_Y)
+  stageThug(w, 20, LANE_Y)
+}
+
+// an unlocked door to swing open, then a locked one to pick and walk through
+const stageDoors = (w: World): void => {
+  clearStage(w)
+  stageDoor(w, 6, LANE_Y, false)
+  stageDoor(w, 11, LANE_Y, true)
+}
+
+// a firing lane: three frozen targets for a clean pistol gallery
+const stageShooting = (w: World): void => {
+  clearStage(w)
+  for (const x of [12, 15, 18]) stageThug(w, x, LANE_Y).speed = 0
+}
+
+// a real steal mission: grab the briefcase (objective done) then reach the exit
+const stageMission = (w: World): void => {
+  clearStage(w)
+  const brief = makeEntity('pickup', 'pickup.briefcase', 10, LANE_Y, 0.3)
+  brief.pickup = { itemId: 'briefcase', qty: 1 }
+  addEntity(w, brief)
+  w.level.exit = { x: 15, y: LANE_Y }
+  w.level.tiles[LANE_Y * w.level.w + 15] = Tile.Exit
+  w.mission = {
+    template: 'steal',
+    targetEntityId: brief.id,
+    targetBuilding: -1,
+    complete: false,
+    exitUnlocked: false,
+    description: 'Steal the briefcase, then reach the exit',
+  }
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)
@@ -243,4 +323,8 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'items') setupItems(w)
   if (name === 'relationships') setupRelationships(w)
   if (name === 'showcase') setupShowcase(w)
+  if (name === 'demo') stageDemo(w)
+  if (name === 'doors') stageDoors(w)
+  if (name === 'shooting') stageShooting(w)
+  if (name === 'mission') stageMission(w)
 }

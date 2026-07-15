@@ -352,14 +352,18 @@ export class NetHostSession implements Session {
     const type = msg[0]
     if (type === MsgType.Input) {
       const { cmd, edges } = decodeInput(msg)
+      // Only fold in a packet that actually advances the input sequence (u16 wrap
+      // allowed). A stale/reordered/duplicated packet must NOT re-arm its edges —
+      // OR-ing them in again would dodge-roll / throw / equip a SECOND time the
+      // player never asked for (edges must fire once, not re-fire on a re-delivery).
       if (cmd.seq > p.lastInputSeq || p.lastInputSeq - cmd.seq > 30000) {
         p.lastInputSeq = cmd.seq
         p.latestCmd = cmd
+        p.pendingEdges |= edges
+        // A hotbar tap is an edge: latch the requested slot so the next tick equips
+        // it once even if the packet arrived between ticks (OR-ed like the edges).
+        if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
       }
-      p.pendingEdges |= edges
-      // A hotbar tap is an edge: latch the requested slot so the next tick equips
-      // it once even if the packet arrived between ticks (OR-ed like the edges).
-      if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
       return
     }
     if (type === MsgType.Hello) {

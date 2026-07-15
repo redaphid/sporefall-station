@@ -73,6 +73,28 @@ describe('#52 solo death always resolves — the infinite-downed dead-end', () =
     expect(ticks).toBeLessThanOrEqual(30 * 30 + 5) // resolves by the bleed deadline
   })
 
+  it('a solo player downed WHILE MOVING does not keep drifting ("moving automatically")', () => {
+    const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    const id = p.playerCtl!.playerId
+    // Move right for a couple ticks so intent holds a non-zero heading.
+    const moving = new Map([[id, { ...emptyInput(), moveX: 1, moveY: 0 }]])
+    tickWorld(w, moving)
+    tickWorld(w, moving)
+    expect(Math.hypot(p.intent.x, p.intent.y)).toBeGreaterThan(0.5) // genuinely moving
+
+    // Go down mid-move, then tick with NO input for a full second.
+    down(w, p)
+    expect(p.playerCtl!.downed).toBeDefined()
+    const at = { x: p.pos.x, y: p.pos.y }
+    for (let i = 0; i < 30; i++) tickWorld(w, idle(id))
+
+    // A downed body must stay put — intent zeroed, no drift on stale input.
+    expect(p.playerCtl!.downed).toBeDefined() // still bleeding out (not the point being tested)
+    expect(p.intent.x).toBe(0)
+    expect(p.intent.y).toBe(0)
+    expect(Math.hypot(p.pos.x - at.x, p.pos.y - at.y)).toBeLessThan(0.05)
+  })
+
   it('DOT on a downed player never re-arms the bleed timer (kill() is inert while already downed)', () => {
     const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
     down(w, p)

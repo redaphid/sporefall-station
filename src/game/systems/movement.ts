@@ -114,6 +114,15 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
       // selectAim). A centred aim leaves facing untouched so you keep pointing
       // where you last aimed instead of snapping to a default direction.
       if (cmd && Math.hypot(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
+    } else if (e.playerCtl?.downed) {
+      // A downed body has no self-driven movement. Intent is only rewritten for
+      // upright players (the branch above), so without this a player downed
+      // mid-move — or mid-roll — keeps drifting forever on their stale last
+      // intent ("moving automatically" while bleeding out). Zero it and drop any
+      // active roll so the burst can't carry a downed body across the map.
+      e.intent.x = 0
+      e.intent.y = 0
+      if (e.playerCtl.roll) e.playerCtl.roll = undefined
     }
 
     // Rolling ignores stun-freeze on movement (it's committed) and uses the burst

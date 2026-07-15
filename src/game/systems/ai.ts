@@ -1,9 +1,9 @@
 import { WEAPONS } from '../data/items'
-import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import { doorClosedAt, type World } from '../world'
 import { applyDamage, spawnProjectile } from './combat'
+import { dispositionToward } from './relationships'
 import { isImmobilized } from './statusFx'
 
 const THINK_INTERVAL = 5 // ~6Hz per NPC at 30Hz sim, phase-spread by id
@@ -28,17 +28,14 @@ export const aiSystem = (w: World): void => {
 
 const think = (w: World, e: Entity): void => {
   const ai = e.ai!
-  const def = NPCS[e.archetype]
 
-  // Sighting checks
-  if (def.hostility !== 'never') {
-    const target = findHostileTarget(w, e)
-    if (target) {
-      ai.mode = 'aggro'
-      ai.targetId = target.id
-      ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
-      return
-    }
+  // Sighting checks: aggro any player this NPC is disposed hostile toward.
+  const target = findHostileTarget(w, e)
+  if (target) {
+    ai.mode = 'aggro'
+    ai.targetId = target.id
+    ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
+    return
   }
 
   if (ai.mode === 'aggro') {
@@ -82,12 +79,14 @@ const dropAggro = (ai: NonNullable<Entity['ai']>): void => {
 
 const findHostileTarget = (w: World, e: Entity): Entity | null => {
   const ai = e.ai!
-  const def = NPCS[e.archetype]
   let best: Entity | null = null
   let bestDist = Infinity
   for (const p of w.entities) {
     if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    if (def.hostility === 'lawful' && w.alarm < 2 && p.playerCtl.crimeUntilTick <= w.tick) continue
+    // Aggro only players this NPC is disposed hostile toward; a raised alarm
+    // makes every cop treat the player as hostile (city-wide heat).
+    const hostile = dispositionToward(e, p.id) === 'Hostile' || (ai.faction === 'cop' && w.alarm >= 2)
+    if (!hostile) continue
     // Cloaked players are much harder to spot
     const sight = p.status && p.status.cloakUntil > w.tick ? ai.sightRange * 0.5 : ai.sightRange
     const dist = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y)

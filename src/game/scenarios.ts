@@ -143,10 +143,29 @@ const setupItems = (w: World): void => {
   crate(w, x + 7, y)
 }
 
+/** A civilian in front of two cops and a bouncer: shoot the civilian and the
+ * cops (law) turn hostile and charge, while the unrelated bouncer stays calm. */
+const setupRelationships = (w: World): void => {
+  const { x, y } = findStage(w, 10)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // aim east down the row
+  }
+  const victim = spawnNpc(w, 'civilian', x + 2 + 0.5, y + 0.5)
+  victim.speed = 0 // stays put so the shot lands cleanly
+  spawnNpc(w, 'cop', x + 4 + 0.5, y + 0.5)
+  spawnNpc(w, 'cop', x + 5 + 0.5, y + 0.5)
+  const bouncer = spawnNpc(w, 'bouncer', x + 7 + 0.5, y + 0.5)
+  bouncer.speed = 0 // an unrelated bystander that should stay calm
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)
   if (name === 'wet-electric') setupWetElectric(w)
   if (name === 'inventory') setupInventory(w)
   if (name === 'items') setupItems(w)
+  if (name === 'relationships') setupRelationships(w)
 }

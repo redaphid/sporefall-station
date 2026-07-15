@@ -16,7 +16,8 @@
     "test:e2e:fire": "bash e2e/run-fire.sh",
     "test:e2e:weapons": "bash e2e/run-weapons.sh",
     "test:e2e:frost": "bash e2e/run-frost.sh",
-    "test:e2e:items": "bash e2e/run-items.sh"
+    "test:e2e:items": "bash e2e/run-items.sh",
+    "test:e2e:rel": "bash e2e/run-rel.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

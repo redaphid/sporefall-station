@@ -6,6 +6,7 @@ import type { InputCmd } from '../types'
 import { addEntity, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { equipSlot, spendAmmo, useHeld, wearMelee } from './inventory'
+import { commitCrime } from './relationships'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -65,32 +66,11 @@ export const applyDamage = (
     }
   }
 
-  markCrime(w, target, attackerId)
+  // Disposition: a player attack on a civ/cop is a crime — witnesses re-derive
+  // their stance toward the attacker (cops/allies turn hostile, civilians flee).
+  commitCrime(w, target, w.byId.get(attackerId))
 
   if (target.health.hp <= 0) kill(w, target)
-}
-
-const CRIME_TICKS = 15 * 30 // stay "wanted" for 15s
-
-/** Attacking civilians or cops is a crime: flags the player, panics witnesses, raises the alarm. */
-const markCrime = (w: World, target: Entity, attackerId: number): void => {
-  const attacker = w.byId.get(attackerId)
-  if (!attacker?.playerCtl || !target.ai) return
-  if (target.ai.faction !== 'civ' && target.ai.faction !== 'cop') return
-  attacker.playerCtl.crimeUntilTick = w.tick + CRIME_TICKS
-  for (const witness of w.entities) {
-    if (!witness.ai || witness.dead || witness === target) continue
-    const dist = Math.hypot(witness.pos.x - target.pos.x, witness.pos.y - target.pos.y)
-    if (dist > witness.ai.sightRange) continue
-    if (witness.ai.faction === 'civ' && NPCS[witness.archetype]?.fleesOnDamage) {
-      witness.ai.mode = 'flee'
-      witness.ai.targetId = attackerId
-      witness.ai.thinkAt = w.tick
-    } else if (witness.ai.faction === 'cop') {
-      if (w.alarm < 3) w.alarm++
-      witness.ai.thinkAt = w.tick // cop reacts immediately
-    }
-  }
 }
 
 export const kill = (w: World, target: Entity): void => {

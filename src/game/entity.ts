@@ -15,6 +15,15 @@ export type Fx = Record<string, StatusEntry>
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'sleep'
 export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
 
+/** A disposition band, derived from numeric hate by `determineRel`. */
+export type RelStatus = 'Friendly' | 'Neutral' | 'Annoyed' | 'Hostile'
+
+/** One agent's view of another: raw hate and the band it derives. */
+export interface RelEntry {
+  hate: number
+  code: RelStatus
+}
+
 export interface AiState {
   mode: AiMode
   faction: Faction
@@ -25,6 +34,9 @@ export interface AiState {
   thinkAt: number
   sightRange: number
   lastKnownTargetPos?: Vec2
+  /** Per-other-entity disposition, keyed by that entity's id. Absent until this
+   * NPC has an opinion; the initial stance is derived from faction on the fly. */
+  rel?: Record<EntityId, RelEntry>
 }
 
 export interface ItemStack {

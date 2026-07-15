@@ -88,8 +88,10 @@ npx tsx tools/mcp-debug/server.ts               # http://localhost:7811/mcp
 ```
 
 Tools (each a one-liner onto the `raw(verb)` bridge): `list_entities`,
-`inspect`, `game_state`, `events`, `set_entity`, `set_field`, `spawn`, `kill`,
-`teleport`, `command`.
+`inspect`, `game_state`, `events`, `schema`, `dump_world`, `set_entity`,
+`set_field`, `spawn`, `kill`, `teleport`, `restore_world`, `step`, `command`.
+See `docs/ecs-debugging.md` for the `dump`/`load`/`step`/`schema` contract and
+`--inspect` attach.
 
 ## The verb surface
 
@@ -106,6 +108,10 @@ Every client speaks the same one-line verb grammar (`runVerb` in
 | `teleport <id> <x> <y>` | move + clear interpolation |
 | `state` | tick, seed, floor, alarm, gameOver, mission, per-kind counts |
 | `events` | recent sim events (bounded ring) |
+| `schema` | reflection: live component/archetype shape, derived from entities (see `docs/ecs-debugging.md`) |
+| `dump` | lossless `WorldJson` snapshot of the whole world (`serializeWorld`, #47) |
+| `load <WorldJson>` | restore an EXACT world from a `dump` snapshot, in place (`deserializeWorld`) |
+| `step [n]` / `tick [n]` | advance the sim n ticks with neutral input (default 1) |
 | `command <verb …>` | escape hatch: run a raw verb line verbatim |
 
 Payloads with spaces/newlines are wrapped `b64:<base64>` on the wire to keep the

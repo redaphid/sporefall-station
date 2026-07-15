@@ -6,6 +6,10 @@
 //   npx tsx tools/debug-cli/cli.ts --game g2 state       (target a specific game)
 //   npx tsx tools/debug-cli/cli.ts spawn npc cop 20 20
 //   npx tsx tools/debug-cli/cli.ts set 5 '{"health":{"hp":1}}'
+//   npx tsx tools/debug-cli/cli.ts dump > world.json     (snapshot the whole world)
+//   npx tsx tools/debug-cli/cli.ts load "$(cat world.json)"   (restore it exactly)
+//   npx tsx tools/debug-cli/cli.ts step 30               (advance 1s of sim, neutral input)
+//   npx tsx tools/debug-cli/cli.ts schema                (live component/archetype shape)
 //   npx tsx tools/debug-cli/cli.ts --watch
 //
 // With exactly one live game connected, no --game is needed. Hub target:
@@ -27,7 +31,7 @@ for (let i = 0; i < argv.length; i++) {
 const watch = argv[0] === '--watch'
 const verb = (watch ? argv.slice(1) : argv).join(' ').trim()
 
-const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport'])
+const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport', 'load', 'step', 'tick'])
 
 /** Print a one-line-per-game table so a human can see which game to target. */
 const printGames = (games: GameInfo[]): void => {

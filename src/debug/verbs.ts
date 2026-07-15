@@ -9,14 +9,16 @@ import { makeEntity, type Entity } from '../game/entity'
 import { NPCS } from '../game/data/npcs'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
+import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import { kill as killEntity } from '../game/systems/combat'
 import type { SimEvent } from '../game/types'
-import { addEntity, type World } from '../game/world'
+import { addEntity, tickWorld, type World } from '../game/world'
 import { decodeArg } from './protocol'
 
 /** Verbs that mutate the world — the channel defers these onto the sim step so
- * they never land mid-render; reads answer immediately. */
-export const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport'])
+ * they never land mid-render; reads answer immediately. `load`/`step`/`tick`
+ * change or advance the whole world, so they are deferred too. */
+export const WRITE_VERBS = new Set(['set', 'spawn', 'kill', 'teleport', 'load', 'step', 'tick'])
 
 export interface VerbCtx {
   /** Channel-maintained ring of recent events (they are cleared from
@@ -96,6 +98,76 @@ const countByKind = (w: World): Record<string, number> => {
   return counts
 }
 
+/** Reject a forbidden key ANYWHERE in an untrusted `load` payload. `deserialize`
+ * already deep-clones through JSON so a prototype can't be reached, but a whole
+ * world is a bigger blast radius than a `set` patch, so we fail loud and early
+ * rather than trust the clone — the same non-negotiable guard `set` applies. */
+const assertNoForbiddenKeys = (v: unknown): void => {
+  if (Array.isArray(v)) {
+    for (const x of v) assertNoForbiddenKeys(x)
+  } else if (isPlainObject(v)) {
+    for (const k of Object.keys(v)) {
+      // JSON.parse surfaces `__proto__` as a real OWN enumerable key, so this
+      // catches it (a plain `obj.__proto__` access never would).
+      if (FORBIDDEN_KEYS.has(k)) throw new Error(`forbidden key "${k}" in load payload`)
+      assertNoForbiddenKeys(v[k])
+    }
+  }
+}
+
+/** Replace a live world's contents in place so every closed-over reference (the
+ * channel holds one) keeps pointing at the same object. World is a flat record,
+ * so copying its own fields from a freshly-deserialized world is a full swap. */
+const loadWorldInto = (target: World, fresh: World): void => {
+  Object.assign(target, fresh)
+}
+
+const jsonType = (v: unknown): string => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v)
+
+interface FieldSchema {
+  /** How many entities carry this top-level field. */
+  count: number
+  /** The distinct JSON types seen for it (number/string/boolean/object/array/null). */
+  types: string[]
+  /** For object-valued components, the union of nested sub-field names seen. */
+  keys?: string[]
+}
+
+/** Derive the component/archetype shape of the world from its LIVE entities — no
+ * hardcoded field list to rot as systems come and go. For every entity we walk
+ * its verbatim JSON (so unknown/future components are counted for free) and
+ * tally which top-level fields exist, their types, and one level of sub-keys. */
+const buildSchema = (w: World): {
+  entityCount: number
+  kinds: Record<string, number>
+  archetypes: Record<string, { kind: string; count: number }>
+  fields: Record<string, FieldSchema>
+} => {
+  const kinds: Record<string, number> = {}
+  const archetypes: Record<string, { kind: string; count: number }> = {}
+  const acc: Record<string, { count: number; types: Set<string>; keys: Set<string> }> = {}
+  for (const e of w.entities) {
+    kinds[e.kind] = (kinds[e.kind] ?? 0) + 1
+    const a = (archetypes[e.archetype] ??= { kind: e.kind, count: 0 })
+    a.count++
+    for (const [k, v] of Object.entries(serializeEntity(e))) {
+      const f = (acc[k] ??= { count: 0, types: new Set(), keys: new Set() })
+      f.count++
+      f.types.add(jsonType(v))
+      if (isPlainObject(v)) for (const sub of Object.keys(v)) f.keys.add(sub)
+    }
+  }
+  const fields: Record<string, FieldSchema> = {}
+  for (const [k, f] of Object.entries(acc)) {
+    fields[k] = {
+      count: f.count,
+      types: [...f.types].sort(),
+      ...(f.keys.size ? { keys: [...f.keys].sort() } : {}),
+    }
+  }
+  return { entityCount: w.entities.length, kinds, archetypes, fields }
+}
+
 /** Run one verb line against the world and return a text reply. Throws on a bad
  * verb/argument; the transport turns that into an `ok:false` reply. */
 export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
@@ -163,6 +235,38 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
 
     case 'events':
       return JSON.stringify(ctx.events ?? w.events)
+
+    case 'dump':
+      // Lossless snapshot of the WHOLE world (serialize.ts, #47) — the exact JSON
+      // `load` consumes for a byte-identical restore.
+      return JSON.stringify(serializeWorld(w))
+
+    case 'load': {
+      // Restore an EXACT world from a `dump` snapshot, in place. Untrusted input,
+      // so guard prototype keys before the deserializer ever touches it.
+      if (!rest) throw new Error('usage: load <WorldJson>')
+      const json = JSON.parse(decodeArg(rest)) as unknown
+      if (!isPlainObject(json)) throw new Error('load payload must be a WorldJson object')
+      assertNoForbiddenKeys(json)
+      loadWorldInto(w, deserializeWorld(json as unknown as WorldJson))
+      return JSON.stringify({ ok: true, tick: w.tick, seed: w.seed, floor: w.floor, total: w.entities.length })
+    }
+
+    case 'step':
+    case 'tick': {
+      // Advance the deterministic sim N ticks with NEUTRAL input (no player
+      // commands) — the pure `(seed→RNG)+input` step, so the RNG stream is the
+      // only entropy. Default 1.
+      const n = rest ? num(rest, 'tick count') : 1
+      if (!Number.isInteger(n) || n < 0) throw new Error(`step count must be a non-negative integer, got "${rest}"`)
+      for (let i = 0; i < n; i++) tickWorld(w, new Map())
+      return JSON.stringify({ tick: w.tick, advanced: n })
+    }
+
+    case 'schema':
+      // Reflection: the live component/archetype shape of the world, derived from
+      // its entities so unfamiliar/new components show up without a hardcoded list.
+      return JSON.stringify(buildSchema(w))
 
     case 'command':
       // Escape hatch: the rest of the line is itself a verb — run it verbatim.

@@ -37,6 +37,7 @@ describe('computeTouchLabels', () => {
       useEnabled: false,
       spc: 'SPC',
       spcEnabled: false,
+      throwEnabled: false,
     })
   })
 
@@ -70,6 +71,13 @@ describe('computeTouchLabels', () => {
     const far = door(false)
     far.pos = { x: 5, y: 0 }
     expect(computeTouchLabels(view(player(), [far])).useEnabled).toBe(false)
+  })
+
+  it('THROW only enables when a throwable is carried', () => {
+    expect(computeTouchLabels(view(player())).throwEnabled).toBe(false)
+    const armed = player()
+    armed.playerCtl!.inventory = [{ itemId: 'grenade', qty: 2 }]
+    expect(computeTouchLabels(view(armed)).throwEnabled).toBe(true)
   })
 
   it('SPC shows the class ability and cooldown state', () => {

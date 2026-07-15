@@ -1,4 +1,5 @@
 import { emptyInput, type InputCmd } from '../game/types'
+import { selectAim } from './aim'
 import type { InputSource } from './input'
 
 /**
@@ -30,10 +31,9 @@ const stepCmd = (s: ScriptStep, i: number, seq: number): InputCmd => {
   cmd.attack = !!s.attack
   cmd.interact = !!s.interact && i === 0
   cmd.special = !!s.special && i === 0
-  if (cmd.moveX !== 0 || cmd.moveY !== 0) {
-    cmd.aimX = cmd.moveX
-    cmd.aimY = cmd.moveY
-  }
+  const aim = selectAim(cmd.moveX, cmd.moveY)
+  cmd.aimX = aim.x
+  cmd.aimY = aim.y
   return cmd
 }
 

@@ -1,4 +1,5 @@
 import { emptyInput, type InputCmd } from '../game/types'
+import { selectAim } from './aim'
 import type { InputSource } from './input'
 
 /**
@@ -90,10 +91,14 @@ export const createGamepad = (): InputSource => {
       edges.interact = false
       edges.special = false
 
-      if (mx !== 0 || my !== 0) {
-        cmd.aimX = mx
-        cmd.aimY = my
-      }
+      // Right stick (standard axes 2/3) aims; falls back to aim-where-you-move.
+      let ax = pad.axes[2] ?? 0
+      let ay = pad.axes[3] ?? 0
+      if (Math.abs(ax) < DEADZONE) ax = 0
+      if (Math.abs(ay) < DEADZONE) ay = 0
+      const aim = selectAim(mx, my, ax, ay)
+      cmd.aimX = aim.x
+      cmd.aimY = aim.y
       return cmd
     },
   }

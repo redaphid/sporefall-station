@@ -27,6 +27,8 @@ export interface PadProfile {
   join: number[]
   dpad: [number, number, number, number]
   moveAxes: [number, number]
+  /** Right stick → aim (twin-stick). W3C standard puts it on axes 2/3. */
+  aimAxes: [number, number]
   hatAxis: number | null
 }
 
@@ -39,6 +41,7 @@ const STANDARD: PadProfile = {
   join: [0, 1, 2, 3, 9],
   dpad: [12, 13, 14, 15],
   moveAxes: [0, 1],
+  aimAxes: [2, 3],
   hatAxis: null,
 }
 
@@ -51,6 +54,7 @@ const permissive = (kind: PadKind): PadProfile => ({
   join: [0, 1, 2, 3, 4, 5],
   dpad: [12, 13, 14, 15],
   moveAxes: [0, 1],
+  aimAxes: [2, 3],
   hatAxis: 9,
 })
 

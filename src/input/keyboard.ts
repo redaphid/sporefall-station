@@ -1,4 +1,5 @@
 import { emptyInput, type InputCmd } from '../game/types'
+import { selectAim } from './aim'
 import type { InputSource } from './input'
 
 /** WASD/arrows move, J/space attack, K/E interact, L/shift special, 1-6 equip
@@ -44,10 +45,9 @@ export const createKeyboard = (): InputSource => {
       specialEdge = false
       throwEdge = false
       hotbarEdge = -1
-      if (cmd.moveX !== 0 || cmd.moveY !== 0) {
-        cmd.aimX = cmd.moveX
-        cmd.aimY = cmd.moveY
-      }
+      const aim = selectAim(cmd.moveX, cmd.moveY)
+      cmd.aimX = aim.x
+      cmd.aimY = aim.y
       return cmd
     },
   }

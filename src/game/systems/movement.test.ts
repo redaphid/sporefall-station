@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { makeEntity } from '../entity'
-import { moveAndCollide } from './movement'
+import { makeEntity, type Entity } from '../entity'
+import { addEntity, createWorld, type World } from '../world'
+import { emptyInput, type InputCmd } from '../types'
+import { moveAndCollide, movementSystem } from './movement'
+
+const makePlayer = (w: World): Entity => {
+  const e = addEntity(w, makeEntity('player', 'player', 20, 20))
+  e.health = { hp: 100, max: 100, iframes: 0 }
+  e.speed = 4.5
+  e.playerCtl = { playerId: 0, classId: 'thief', abilityCooldown: 0, inventory: [], activeSlot: -1, cash: 0, crimeUntilTick: 0 }
+  return e
+}
+
+const run = (w: World, cmd: InputCmd): void => movementSystem(w, new Map([[0, cmd]]))
 
 // 5x5 map: walls on the border, open 3x3 in the middle.
 const blocked = (tx: number, ty: number): boolean => tx < 1 || ty < 1 || tx > 3 || ty > 3
@@ -40,5 +52,32 @@ describe('moveAndCollide', () => {
     expect(e.pos.x).toBeLessThanOrEqual(4)
     expect(e.pos.y).toBeGreaterThanOrEqual(1)
     expect(e.pos.y).toBeLessThanOrEqual(4)
+  })
+})
+
+describe('movementSystem facing (twin-stick aim)', () => {
+  it('faces the aim vector independently of the movement direction', () => {
+    const w = createWorld(1, 1)
+    const e = makePlayer(w)
+    // Walk right, aim up: facing must follow aim (up), not movement (right).
+    run(w, { ...emptyInput(), moveX: 1, moveY: 0, aimX: 0, aimY: -1 })
+    expect(e.facing).toBeCloseTo(-Math.PI / 2)
+  })
+
+  it('falls back to movement direction when aim mirrors movement', () => {
+    const w = createWorld(1, 1)
+    const e = makePlayer(w)
+    run(w, { ...emptyInput(), moveX: -1, moveY: 0, aimX: -1, aimY: 0 })
+    expect(e.facing).toBeCloseTo(Math.PI)
+  })
+
+  it('holds the last facing when aim is centred (0,0)', () => {
+    const w = createWorld(1, 1)
+    const e = makePlayer(w)
+    run(w, { ...emptyInput(), moveX: 0, moveY: 1, aimX: 0, aimY: 1 })
+    const faced = e.facing
+    // Now move with a centred aim: facing must not snap away.
+    run(w, { ...emptyInput(), moveX: 1, moveY: 0, aimX: 0, aimY: 0 })
+    expect(e.facing).toBeCloseTo(faced)
   })
 })

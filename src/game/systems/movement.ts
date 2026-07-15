@@ -98,8 +98,11 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
           const norm = len > 1 ? 1 / len : 1
           e.intent.x = cmd.moveX * norm
           e.intent.y = cmd.moveY * norm
-          e.facing = Math.atan2(e.intent.y, e.intent.x)
         }
+        // Facing follows the aim vector (aim stick, or aim-where-you-move; see
+        // selectAim). A centred aim leaves facing untouched so you keep pointing
+        // where you last aimed instead of snapping to a default direction.
+        if (Math.hypot(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
       }
     }
 

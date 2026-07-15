@@ -1,4 +1,5 @@
 import { emptyInput, type InputCmd } from '../game/types'
+import { selectAim } from './aim'
 import { assignPads } from './padAssign'
 import { padProfile } from './padProfile'
 import { readPad, type PadState } from './readPad'
@@ -29,6 +30,8 @@ type GetPads = () => (Gamepad | null)[]
 const idle: PadState = {
   moveX: 0,
   moveY: 0,
+  aimX: 0,
+  aimY: 0,
   attack: false,
   interact: false,
   special: false,
@@ -54,10 +57,10 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     cmd.attack = s.attack
     cmd.interact = rose(padIndex, s, 'interact')
     cmd.special = s.special
-    if (s.moveX !== 0 || s.moveY !== 0) {
-      cmd.aimX = s.moveX
-      cmd.aimY = s.moveY
-    }
+    // Right stick aims (twin-stick); falls back to aim-where-you-move.
+    const aim = selectAim(s.moveX, s.moveY, s.aimX, s.aimY)
+    cmd.aimX = aim.x
+    cmd.aimY = aim.y
     return cmd
   }
 

@@ -74,4 +74,11 @@ describe('input codec', () => {
     expect(edges & 2).toBe(2)
     expect(Math.atan2(decoded.aimY, decoded.aimX)).toBeCloseTo(Math.PI / 2, 1)
   })
+
+  it('preserves a centred aim as (0,0) so facing holds instead of snapping right', () => {
+    const cmd = { ...emptyInput(), aimX: 0, aimY: 0 }
+    const { cmd: decoded } = decodeInput(encodeInput(cmd, { attack: false, interact: false, special: false }))
+    expect(decoded.aimX).toBe(0)
+    expect(decoded.aimY).toBe(0)
+  })
 })

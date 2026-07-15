@@ -4,6 +4,8 @@ import type { PadProfile } from './padProfile'
 export interface PadState {
   moveX: number
   moveY: number
+  aimX: number
+  aimY: number
   attack: boolean
   interact: boolean
   special: boolean
@@ -67,6 +69,8 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
   return {
     moveX,
     moveY,
+    aimX: dead(axis(pad, profile.aimAxes[0])),
+    aimY: dead(axis(pad, profile.aimAxes[1])),
     attack: anyPressed(pad, profile.attack),
     interact: anyPressed(pad, profile.interact),
     special: anyPressed(pad, profile.special),

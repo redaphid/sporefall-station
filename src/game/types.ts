@@ -23,6 +23,8 @@ export interface InputCmd {
   hotbar: number
   /** Throw the active/nearest throwable this tick. */
   throwItem: boolean
+  /** Dodge-roll this tick (edge-triggered): a burst + i-frames in the move dir. */
+  roll: boolean
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -36,6 +38,7 @@ export const emptyInput = (): InputCmd => ({
   aimY: 0,
   hotbar: -1,
   throwItem: false,
+  roll: false,
 })
 
 /** The visual kinds an annotation can take. `label`/`pin` mark a point or entity;
@@ -86,3 +89,4 @@ export type SimEvent =
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }
   | { type: 'runOver'; floor: number }
+  | { type: 'roll'; x: number; y: number; entityId: EntityId }

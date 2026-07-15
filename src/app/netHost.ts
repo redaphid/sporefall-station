@@ -151,6 +151,7 @@ export class NetHostSession implements Session {
       cmd.attack ||= (p.pendingEdges & 1) !== 0
       cmd.interact ||= (p.pendingEdges & 2) !== 0
       cmd.special ||= (p.pendingEdges & 4) !== 0
+      cmd.roll = (p.pendingEdges & 8) !== 0 // edge only — never a sticky held bit
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
@@ -243,7 +244,7 @@ export class NetHostSession implements Session {
       queue: new SendQueue(this.transport, peer, () => this.onPeerLost(peer)),
       reader: new StreamReader(),
       lastInputSeq: 0,
-      latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false },
+      latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false, roll: false },
       pendingEdges: 0,
     }
     this.peers.set(peer, state)

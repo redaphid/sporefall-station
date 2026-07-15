@@ -1,5 +1,6 @@
 import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
+import { ROLL_TICKS } from '../game/systems/roll'
 import { burnPulse, cycleFrame, facingDir, isMoving, walkBob } from './anim'
 import { TILE_PX, type ArtRegistry } from './art'
 
@@ -133,8 +134,19 @@ export class EntityViews {
       // pick front/side/back); top-down blobs rotate to their heading;
       // pickups/doors/fire stay upright.
       if (character) {
-        view.sprite.rotation = 0
-        view.sprite.scale.set(flip ? -scale : scale, scale)
+        // Dodge-roll: spin the billboard a full tumble over the roll window and
+        // squash it a touch — the whole-body "roll THROUGH it" read.
+        const roll = e.playerCtl?.roll
+        if (roll !== undefined && tick < roll.untilTick) {
+          const p = Math.min(1, Math.max(0, (t - (roll.untilTick - ROLL_TICKS)) / ROLL_TICKS))
+          const dir = roll.dirX < 0 || flip ? -1 : 1
+          view.sprite.rotation = dir * p * Math.PI * 2
+          const squash = 1 - Math.sin(p * Math.PI) * 0.25
+          view.sprite.scale.set((flip ? -scale : scale) * squash, scale * squash)
+        } else {
+          view.sprite.rotation = 0
+          view.sprite.scale.set(flip ? -scale : scale, scale)
+        }
       } else {
         view.sprite.rotation = e.kind === 'pickup' || e.kind === 'door' || e.kind === 'fire' ? 0 : e.facing
         view.sprite.scale.set(scale)

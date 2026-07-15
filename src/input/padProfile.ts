@@ -23,6 +23,8 @@ export interface PadProfile {
   attack: number[]
   interact: number[]
   special: number[]
+  /** Dodge-roll button(s) — the left shoulder/trigger, clear of attack/aim. */
+  roll: number[]
   pause: number[]
   join: number[]
   dpad: [number, number, number, number]
@@ -37,6 +39,7 @@ const STANDARD: PadProfile = {
   attack: [0, 5, 7],
   interact: [1],
   special: [2, 3],
+  roll: [4, 6], // LB / LT
   pause: [9],
   join: [0, 1, 2, 3, 9],
   dpad: [12, 13, 14, 15],
@@ -50,6 +53,7 @@ const permissive = (kind: PadKind): PadProfile => ({
   attack: [0, 1],
   interact: [2, 3],
   special: [4, 5],
+  roll: [6, 7],
   pause: [8, 9, 10, 11],
   join: [0, 1, 2, 3, 4, 5],
   dpad: [12, 13, 14, 15],

@@ -35,6 +35,7 @@ const idle: PadState = {
   attack: false,
   interact: false,
   special: false,
+  roll: false,
   pause: false,
 }
 
@@ -57,6 +58,7 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     cmd.attack = s.attack
     cmd.interact = rose(padIndex, s, 'interact')
     cmd.special = s.special
+    cmd.roll = rose(padIndex, s, 'roll') // edge: one roll per press, no auto-repeat
     // Right stick aims (twin-stick); falls back to aim-where-you-move.
     const aim = selectAim(s.moveX, s.moveY, s.aimX, s.aimY)
     cmd.aimX = aim.x

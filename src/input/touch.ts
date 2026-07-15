@@ -31,6 +31,7 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
   let interactEdge = false
   let specialEdge = false
   let throwEdge = false
+  let rollEdge = false
   let hotbarEdge = -1
   let seq = 0
 
@@ -136,6 +137,8 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
   const useBtn = makeButton('USE', 118, 40, 64, () => (interactEdge = true))
   const throwBtn = makeButton('THRW', 118, 118, 64, () => (throwEdge = true))
   const spcBtn = makeButton('SPC', 24, 210, 64, () => (specialEdge = true))
+  // Dodge-roll: left of ATK so a right thumb can roll then aim/fire.
+  makeButton('ROLL', 118, 196, 64, () => (rollEdge = true))
 
   // --- tappable hotbar strip (bottom centre, between the two sticks) ---
   const hotbar = document.createElement('div')
@@ -229,11 +232,13 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
       cmd.interact = interactEdge
       cmd.special = specialEdge
       cmd.throwItem = throwEdge
+      cmd.roll = rollEdge
       cmd.hotbar = hotbarEdge
       attackEdge = false
       interactEdge = false
       specialEdge = false
       throwEdge = false
+      rollEdge = false
       hotbarEdge = -1
       const aim = selectAim(moveX, moveY, aimX, aimY)
       cmd.aimX = aim.x
@@ -264,6 +269,7 @@ export const mergeInputs = (...sources: InputSource[]): InputSource => ({
       out.interact ||= c.interact
       out.special ||= c.special
       out.throwItem ||= c.throwItem
+      out.roll ||= c.roll
       if (c.hotbar >= 0) out.hotbar = c.hotbar
     }
     return out

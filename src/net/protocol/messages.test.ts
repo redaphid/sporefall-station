@@ -3,14 +3,18 @@ import { emptyInput } from '../../game/types'
 import { SnapFlags } from '../../game/snapshot'
 import { frameMessage, StreamReader } from '../framing/chunkedStream'
 import {
+  applyWireEntity,
   ARCHETYPES,
   decodeInput,
   decodeSnapshot,
   encodeInput,
   encodeSnapshot,
+  toWireEntity,
   type WireEntity,
   type WireSnapshot,
 } from './messages'
+import { spawnPlayer } from '../../game/player'
+import { createWorld } from '../../game/world'
 
 describe('snapshot codec', () => {
   const snap: WireSnapshot = {
@@ -122,6 +126,13 @@ describe('input codec — boundary values', () => {
     expect(edges & 4).toBe(4)
   })
 
+  it('carries the dodge-roll edge on its own bit (bit 8)', () => {
+    const rolled = decodeInput(encodeInput(emptyInput(), { attack: false, interact: false, special: false, roll: true }))
+    expect(rolled.edges & 8).toBe(8)
+    const still = decodeInput(encodeInput(emptyInput(), noEdges))
+    expect(still.edges & 8).toBe(0)
+  })
+
   it('masks seq into a u16 so it wraps rather than overflowing', () => {
     expect(decodeInput(encodeInput({ ...emptyInput(), seq: 65535 }, noEdges)).cmd.seq).toBe(65535)
     // 65536 wraps to 0 — this wrap is exactly what host-side seq detection relies on.
@@ -163,6 +174,23 @@ describe('snapshot codec — boundary values', () => {
   it('passes combined status flags through untouched', () => {
     const flags = SnapFlags.Downed | SnapFlags.Cloaked | SnapFlags.Stunned
     expect(oneEntity({ flags }).flags).toBe(flags)
+  })
+
+  it('ships the Rolling flag host→client so a client renders/agrees on i-frames', () => {
+    const w = createWorld(1, 1)
+    const p = spawnPlayer(w, 0, 'soldier', 10, 10)
+    p.playerCtl!.roll = { untilTick: w.tick + 12, cooldownUntilTick: w.tick + 40, dirX: 1, dirY: 0 }
+    // Host packs the flag while rolling…
+    const rollingWire = toWireEntity(p, w.tick)
+    expect(rollingWire.flags & SnapFlags.Rolling).toBe(SnapFlags.Rolling)
+    // …and the client materializes a live roll marker from it.
+    const client = applyWireEntity(undefined, rollingWire, w.tick)
+    expect(client.playerCtl!.roll).toBeDefined()
+    // Once the roll ends the flag drops and the client clears its marker.
+    w.tick = p.playerCtl!.roll.untilTick
+    const doneWire = toWireEntity(p, w.tick)
+    expect(doneWire.flags & SnapFlags.Rolling).toBe(0)
+    expect(applyWireEntity(client, doneWire, w.tick).playerCtl!.roll).toBeUndefined()
   })
 
   it('round-trips the largest u16 entity id', () => {

@@ -10,6 +10,7 @@ import { equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './invento
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
+import { isRolling } from './roll'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -46,6 +47,7 @@ export const applyDamage = (
 ): void => {
   if (!target.health || target.dead || target.health.iframes > 0) return
   if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
+  if (isRolling(target, w.tick)) return // dodge-roll i-frames: roll THROUGH bullets/melee
   if (isFrozen(target)) return shatter(w, target)
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
   // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.
@@ -258,6 +260,7 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
     if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
+    if (isRolling(e, w.tick)) continue // mid-roll: hands full — no attack/ability/throw
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
     if (isImmobilized(e)) continue // frozen/electrified can't act
     const cmd = inputs.get(e.playerCtl.playerId)

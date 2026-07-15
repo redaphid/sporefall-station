@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createGamepadCoop } from './gamepadCoop'
+import { anyPadActive, createGamepadCoop, type CoopDebugPad } from './gamepadCoop'
 
 const btn = (pressed: boolean) => ({ pressed, touched: pressed, value: pressed ? 1 : 0 })
 
@@ -166,6 +166,29 @@ describe('createGamepadCoop', () => {
       pads = [pad(0)]
       coop.sample()
       expect(coop.debug()[0].slot).toBe(null)
+    })
+  })
+
+  // #4: touch controls hide when a controller is actually driving.
+  describe('anyPadActive — the show/hide-touch decision', () => {
+    const dp = (slot: number | null): CoopDebugPad =>
+      ({ padIndex: 0, id: 'x', slot, state: {} as CoopDebugPad['state'] })
+    it('is false with no pads', () => {
+      expect(anyPadActive([])).toBe(false)
+    })
+    it('is false for a connected-but-unjoined pad (null slot)', () => {
+      expect(anyPadActive([dp(null)])).toBe(false)
+    })
+    it('is true once any pad has joined a slot', () => {
+      expect(anyPadActive([dp(null), dp(0)])).toBe(true)
+    })
+    it('reflects a real join: unassigned → hidden-off, pressing join → hidden-on', () => {
+      pads = [pad(0)]
+      coop.sample()
+      expect(anyPadActive(coop.debug())).toBe(false)
+      pads = [pad(0, { buttons: press(0) })]
+      coop.sample()
+      expect(anyPadActive(coop.debug())).toBe(true)
     })
   })
 })

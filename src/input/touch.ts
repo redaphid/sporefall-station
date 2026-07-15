@@ -7,13 +7,21 @@ import { computeTouchLabels } from './touchLabels'
 
 const STICK_RADIUS = 60 // px of thumb travel for full speed
 // Firing model: this is a twin-stick shooter — deflecting the aim stick past
-// this fraction both aims AND fires. The ATK button stays as a second way to
-// attack (melee facing your movement), so both OR into cmd.attack.
+// this fraction both aims AND fires. There is no separate ATK button; aiming IS
+// firing, so this is the SOLE attack input path.
 const AIM_FIRE = 0.5
 
-/** An InputSource that also refreshes its button labels from live game state. */
+/** Twin-stick fire rule: the aim stick past the fire threshold shoots. Pure +
+ * exported so the sole attack path is unit-testable without the DOM. */
+export const aimFires = (aimX: number, aimY: number): boolean => Math.hypot(aimX, aimY) > AIM_FIRE
+
+/** An InputSource that also refreshes its button labels from live game state and
+ * can hide itself when a gamepad takes over. */
 export interface TouchInput extends InputSource {
   update(view: RenderView): void
+  /** Hide the on-screen sticks/buttons while a controller is driving (and show
+   * them again when it leaves). */
+  setControllerActive(active: boolean): void
 }
 
 /**
@@ -22,12 +30,18 @@ export interface TouchInput extends InputSource {
  * edge-accumulated taps so none are lost between sim ticks.
  */
 export const createTouch = (mount: HTMLElement): TouchInput => {
+  // One wrapper owns every touch control, so a controller takeover hides them all
+  // with a single display toggle (setControllerActive). pointer-events:none lets
+  // taps fall through to the canvas except where a child (stick zone / button /
+  // hotbar slot) opts back in.
+  const controls = document.createElement('div')
+  controls.style.cssText = 'position:absolute;inset:0;pointer-events:none;touch-action:none'
+  mount.appendChild(controls)
+
   let moveX = 0
   let moveY = 0
   let aimX = 0
   let aimY = 0
-  let attackHeld = false
-  let attackEdge = false
   let interactEdge = false
   let specialEdge = false
   let throwEdge = false
@@ -49,7 +63,7 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
     // so those interactive controls sit on top and capture their own taps.
     const zone = document.createElement('div')
     zone.style.cssText = `position:absolute;${side}:0;top:0;bottom:0;width:50%;pointer-events:auto;touch-action:none`
-    mount.append(base, nub, zone)
+    controls.append(base, nub, zone)
 
     let pointer: number | null = null
     let ox = 0
@@ -99,21 +113,26 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
     aimY = y
   })
 
-  // --- action buttons (right side) ---
+  // --- action buttons: a compact 2×2 cluster tucked into the bottom-right,
+  // thumb-reachable and small (BTN px), with the most-used verb (USE) lowest.
+  // Grid pitch (PITCH) leaves a clear gap so none overlap each other, the hotbar
+  // (bottom-centre), or the aim zone drag. ATK is gone — aiming fires. ---
+  const BTN = 52
+  const PITCH = 64
   const makeButton = (
     label: string,
-    right: number,
-    bottom: number,
-    size: number,
+    col: 0 | 1,
+    row: 0 | 1,
     onDown: () => void,
-    onUp?: () => void,
   ): HTMLElement => {
+    const right = 20 + col * PITCH
+    const bottom = 92 + row * PITCH
     const b = document.createElement('div')
     b.textContent = label
     b.style.cssText =
-      `position:absolute;right:${right}px;bottom:${bottom}px;width:${size}px;height:${size}px;border-radius:50%;` +
+      `position:absolute;right:${right}px;bottom:${bottom}px;width:${BTN}px;height:${BTN}px;border-radius:50%;` +
       'background:#ffffff1c;border:2px solid #ffffff38;color:#fff;display:flex;align-items:center;' +
-      `justify-content:center;font:700 ${size / 4}px system-ui;pointer-events:auto;touch-action:none;` +
+      `justify-content:center;font:700 12px system-ui;pointer-events:auto;touch-action:none;` +
       'user-select:none;-webkit-user-select:none'
     b.addEventListener('pointerdown', (ev) => {
       ev.preventDefault()
@@ -122,33 +141,28 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
     })
     const up = (): void => {
       b.style.background = '#ffffff1c'
-      onUp?.()
     }
     b.addEventListener('pointerup', up)
     b.addEventListener('pointercancel', up)
-    mount.appendChild(b)
+    controls.appendChild(b)
     return b
   }
 
-  const atkBtn = makeButton('ATK', 24, 96, 84, () => {
-    attackHeld = true
-    attackEdge = true
-  }, () => (attackHeld = false))
-  const useBtn = makeButton('USE', 118, 40, 64, () => (interactEdge = true))
-  const throwBtn = makeButton('THRW', 118, 118, 64, () => (throwEdge = true))
-  const spcBtn = makeButton('SPC', 24, 210, 64, () => (specialEdge = true))
-  // Dodge-roll: left of ATK so a right thumb can roll then aim/fire.
-  makeButton('ROLL', 118, 196, 64, () => (rollEdge = true))
+  // Lower row (row 0) sits closest to the thumb: USE (inner) + ROLL (outer).
+  // Upper row (row 1): THRW (inner) + SPC (outer).
+  const useBtn = makeButton('USE', 0, 0, () => (interactEdge = true))
+  makeButton('ROLL', 1, 0, () => (rollEdge = true))
+  const throwBtn = makeButton('THRW', 0, 1, () => (throwEdge = true))
+  const spcBtn = makeButton('SPC', 1, 1, () => (specialEdge = true))
 
   // --- tappable hotbar strip (bottom centre, between the two sticks) ---
   const hotbar = document.createElement('div')
   hotbar.style.cssText =
     'position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;' +
     'pointer-events:none;touch-action:none' // container passes taps through; slots opt back in
-  mount.appendChild(hotbar)
+  controls.appendChild(hotbar)
 
   // Rewrite a label/dim only when it changes — same lastX guard the HUD uses.
-  let lastAtk = ''
   let lastUse = ''
   let lastUseEnabled = true
   let lastSpc = ''
@@ -186,12 +200,14 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
   }
 
   return {
+    setControllerActive(active: boolean): void {
+      // A gamepad has taken over → hide every on-screen control (and reveal them
+      // again when it leaves). One toggle on the wrapper covers sticks + buttons +
+      // hotbar; hidden controls receive no pointer events, so sampling idles out.
+      controls.style.display = active ? 'none' : 'block'
+    },
     update(view: RenderView): void {
-      const { atk, use, useEnabled, spc, spcEnabled, throwEnabled } = computeTouchLabels(view)
-      if (atk !== lastAtk) {
-        lastAtk = atk
-        setLabel(atkBtn, atk)
-      }
+      const { use, useEnabled, spc, spcEnabled, throwEnabled } = computeTouchLabels(view)
       if (use !== lastUse) {
         lastUse = use
         setLabel(useBtn, use)
@@ -227,14 +243,12 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
       cmd.seq = seq++
       cmd.moveX = moveX
       cmd.moveY = moveY
-      const firing = Math.hypot(aimX, aimY) > AIM_FIRE
-      cmd.attack = attackHeld || attackEdge || firing
+      cmd.attack = aimFires(aimX, aimY)
       cmd.interact = interactEdge
       cmd.special = specialEdge
       cmd.throwItem = throwEdge
       cmd.roll = rollEdge
       cmd.hotbar = hotbarEdge
-      attackEdge = false
       interactEdge = false
       specialEdge = false
       throwEdge = false

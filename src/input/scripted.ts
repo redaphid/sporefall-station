@@ -141,6 +141,20 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 74 }, // final beat on the twice-modded gun
   ],
 
+  // Playtest fix #1 proof: the DEFAULT starter pistol (now a real slotted, 40-round
+  // ItemStack) grabs a Cryo Rounds gem off the lane, then fires the frozen rounds
+  // into the thug line — freezing then shattering them. Paired with the
+  // `starter-mod-fire` inline world (frost gem at x≈5.5, thugs at x=12/15/18).
+  modFrostFire: [
+    { ticks: 36 }, // settle on spawn
+    { ticks: 64, y: 1 }, // drop down onto the lane (y≈11)
+    { ticks: 27, x: 1 }, // walk right onto the frost gem (~x5.5) → pistol gains Cryo Rounds
+    { ticks: 34 }, // pause: the badge appears on the equipped pistol
+    { ticks: 2, x: 1 }, // face east toward the thug line
+    { ticks: 150, attack: true }, // stand and empty frozen rounds into them — freeze then shatter
+    { ticks: 40 }, // aftermath on the frosted/shattered line
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

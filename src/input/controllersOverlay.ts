@@ -24,8 +24,8 @@ const actions = (s: PadState): string => {
   return out.join('')
 }
 
-// Keyboard is player 1, so pad slot 0 shows as P2.
-const label = (slot: number | null): string => (slot === null ? 'press to join' : `P${slot + 2}`)
+// Slot maps straight to player id; humans count from 1, so slot 0 is P1.
+const label = (slot: number | null): string => (slot === null ? 'press to join' : `P${slot + 1}`)
 
 export const formatPadRow = (pad: CoopDebugPad): string => {
   const live = [dirs(pad.state), actions(pad.state)].filter((s) => s.length > 0).join(' ')

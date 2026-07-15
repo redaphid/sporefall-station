@@ -23,8 +23,9 @@ const dpad = (over: Partial<CoopDebugPad> = {}): CoopDebugPad => ({
 
 describe('formatPadRow', () => {
   it('labels an assigned pad with its human player number', () => {
-    // slot 0 is the first pad; player 1 is the keyboard, so this is P2
-    expect(formatPadRow(dpad({ slot: 0 }))).toContain('P2')
+    // slot 0 is the first pad and shares player 0 (the camera target) = P1
+    expect(formatPadRow(dpad({ slot: 0 }))).toContain('P1')
+    expect(formatPadRow(dpad({ slot: 1 }))).toContain('P2')
   })
   it('prompts an unassigned pad to press to join', () => {
     expect(formatPadRow(dpad({ slot: null }))).toMatch(/join/i)

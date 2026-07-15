@@ -1,3 +1,5 @@
+import { APP_VERSION, otaBundleVersion } from '../app/version'
+
 export type GameMode = 'solo' | 'host' | 'join'
 
 /** Solo / Host / Join picker shown after class select. */
@@ -141,6 +143,19 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
     startBtn.addEventListener('click', () => startResolve?.())
     overlay.appendChild(startBtn)
   }
+
+  // Build/OTA version readout, so you can tell at a glance which build a phone is
+  // running (esp. after an over-the-air update). Shows the baked-in code version
+  // immediately, then appends the live OTA bundle id once the plugin answers.
+  const ver = document.createElement('div')
+  ver.style.cssText =
+    'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);opacity:.5;font:600 12px system-ui;pointer-events:none'
+  ver.textContent = `build ${APP_VERSION}`
+  overlay.appendChild(ver)
+  void otaBundleVersion().then((b) => {
+    if (b) ver.textContent = `build ${APP_VERSION} · ota ${b}`
+  })
+
   mount.appendChild(overlay)
 
   return {

@@ -7,6 +7,7 @@ import { isSolidTile, Tile } from './levelgen/level'
 import { spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { freeze, wet } from './systems/interactions'
+import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 
 const crate = (w: World, cx: number, cy: number): Entity => {
@@ -331,7 +332,27 @@ const setupAiGoals = (w: World): void => {
   spawnNpc(w, 'cop', x + 10 + 0.5, y + 0.5) // neutral bystander for the noise test
 }
 
+/** A vending machine to use, a crate to break for loot, and a row of explosive
+ * barrels with a bystander to chain-detonate by gunfire. */
+const setupObjects = (w: World): void => {
+  const { x, y } = findStage(w, 14)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // aim east down the row
+  }
+  spawnObject(w, 'vending', x, y) // adjacent west — E-interact to dispense
+  spawnObject(w, 'crate', x + 3, y) // shoot to break for loot
+  spawnObject(w, 'barrel', x + 6, y)
+  spawnObject(w, 'barrel', x + 7, y)
+  spawnObject(w, 'barrel', x + 8, y)
+  const bystander = spawnNpc(w, 'civilian', x + 9 + 0.5, y + 0.5)
+  bystander.speed = 0
+}
+
 export const applyScenario = (w: World, name: string): void => {
+  if (name === 'objects') setupObjects(w)
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)
   if (name === 'wet-electric') setupWetElectric(w)

@@ -1,9 +1,11 @@
 import { CLASSES } from '../data/classes'
 import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
+import { OBJECTS } from '../data/objects'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { emitNoise, type World } from '../world'
 import { addItem, equipSlot } from './inventory'
+import { useObject } from './objects'
 
 const INTERACT_RANGE = 1.3
 const LOCKPICK_TICKS = 45 // 1.5s channel
@@ -41,6 +43,10 @@ const autoPickup = (w: World, p: Entity): void => {
 const handleInteract = (w: World, p: Entity): void => {
   const target = nearestInteractable(w, p)
   if (!target) return
+  if (OBJECTS[target.archetype]?.use) {
+    useObject(w, p, target)
+    return
+  }
   if (target.door) {
     const door = target.door
     if (!door.locked) {

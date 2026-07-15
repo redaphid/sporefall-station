@@ -46,6 +46,7 @@ export type SimEvent =
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
+  | { type: 'use'; entityId: EntityId; byId: EntityId }
   | { type: 'missionComplete'; description: string }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }

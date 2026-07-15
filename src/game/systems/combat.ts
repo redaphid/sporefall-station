@@ -7,6 +7,7 @@ import { addEntity, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { equipSlot, spendAmmo, useHeld, wearMelee } from './inventory'
 import { commitCrime } from './relationships'
+import { destroyObject, isObject, resistsDamage } from './objects'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -37,6 +38,7 @@ export const applyDamage = (
   if (!target.health || target.dead || target.health.iframes > 0) return
   if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
   if (isFrozen(target)) return shatter(w, target)
+  if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
   if (target.status) {
@@ -70,7 +72,10 @@ export const applyDamage = (
   // their stance toward the attacker (cops/allies turn hostile, civilians flee).
   commitCrime(w, target, w.byId.get(attackerId))
 
-  if (target.health.hp <= 0) kill(w, target)
+  if (target.health.hp <= 0) {
+    if (isObject(target)) destroyObject(w, target, attackerId)
+    else kill(w, target)
+  }
 }
 
 export const kill = (w: World, target: Entity): void => {

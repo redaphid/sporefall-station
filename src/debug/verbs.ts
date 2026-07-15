@@ -58,10 +58,18 @@ const coerce = (cur: unknown, next: unknown): unknown => {
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
+/** Keys that must never be written through a patch: assigning them (even by
+ * recursing into the inherited object they resolve to) escapes the target and
+ * poisons Object.prototype for the whole process. A debug surface takes
+ * untrusted input, so this guard is non-negotiable. */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 /** Deep-merge a JSON patch into a target, coercing scalars to the target's
- * existing type. Nested objects merge; arrays and scalars replace. */
+ * existing type. Nested objects merge; arrays and scalars replace. Dangerous
+ * keys are skipped so a patch can never reach a prototype. */
 const mergeInto = (target: Record<string, unknown>, patch: Record<string, unknown>): void => {
   for (const k of Object.keys(patch)) {
+    if (FORBIDDEN_KEYS.has(k)) continue
     const pv = patch[k]
     const tv = target[k]
     if (isPlainObject(pv) && isPlainObject(tv)) mergeInto(tv, pv)
@@ -107,7 +115,11 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       const idSp = rest.indexOf(' ')
       if (idSp < 0) throw new Error('usage: set <id> <jsonPatch>')
       const e = entity(w, rest.slice(0, idSp))
-      const patch = JSON.parse(decodeArg(rest.slice(idSp + 1).trim())) as Record<string, unknown>
+      const patch = JSON.parse(decodeArg(rest.slice(idSp + 1).trim())) as unknown
+      // A patch is a merge of fields, so only an object makes sense. Reject
+      // arrays/scalars/null up front — an array would splatter numeric-index
+      // keys onto the entity, and `null` would blow up in Object.keys.
+      if (!isPlainObject(patch)) throw new Error('set patch must be a JSON object')
       mergeInto(e as unknown as Record<string, unknown>, patch)
       return JSON.stringify(serializeEntity(e))
     }

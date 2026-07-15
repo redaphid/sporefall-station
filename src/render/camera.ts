@@ -1,5 +1,6 @@
 import type { Container } from 'pixi.js'
 import { TILE_PX } from './art'
+import { decayShake, stackShake } from './juice'
 
 /** Camera in world (tile) coordinates, applied as a container translation. */
 export class Camera {
@@ -28,15 +29,17 @@ export class Camera {
   }
 
   shake(mag: number): void {
-    this.shakeMag = Math.max(this.shakeMag, mag)
+    // Additive stacking with a hard clamp (see juice.ts) so a burst of hits
+    // adds up but can never fling the camera off-screen.
+    this.shakeMag = stackShake(this.shakeMag, mag)
   }
 
   update(dt: number): void {
-    if (this.shakeMag > 0.001) {
+    if (this.shakeMag > 0) {
       // Render-side randomness is fine — this is not the sim.
       this.shakeX = (Math.random() * 2 - 1) * this.shakeMag
       this.shakeY = (Math.random() * 2 - 1) * this.shakeMag
-      this.shakeMag *= Math.exp(-6 * dt)
+      this.shakeMag = decayShake(this.shakeMag, dt)
     } else {
       this.shakeX = 0
       this.shakeY = 0

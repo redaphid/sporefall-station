@@ -7,6 +7,8 @@
 
 import { makeEntity, type Entity } from '../game/entity'
 import { NPCS } from '../game/data/npcs'
+import { MODS, isModId, modMaxStacks } from '../game/data/mods'
+import { weaponStack } from '../game/systems/inventory'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
@@ -30,6 +32,7 @@ export const WRITE_VERBS = new Set([
   'tick',
   'annotate',
   'clearAnnotations',
+  'addMod',
 ])
 
 export interface VerbCtx {
@@ -305,6 +308,25 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       const id = rest === '' ? undefined : /^-?\d+(\.\d+)?$/.test(rest) ? Number(rest) : rest
       const removed = clearAnnotations(w, id)
       return JSON.stringify({ removed, remaining: w.annotations.length })
+    }
+
+    case 'addMod': {
+      // Append (or stack) a weapon mod onto an entity's SLOTTED weapon — the
+      // AI-native payoff: a registry-checked, stack-capped mutation of a modded
+      // loadout over the channel. `addMod <id> <modId> [stacks]`.
+      const [ids, modId, stacksStr] = rest.split(/\s+/)
+      const e = entity(w, ids)
+      if (!modId || !isModId(modId)) throw new Error(`unknown mod "${modId}" — known: ${Object.keys(MODS).sort().join(', ')}`)
+      const stacks = stacksStr === undefined ? 1 : num(stacksStr, 'stacks')
+      if (!Number.isInteger(stacks) || stacks < 1) throw new Error(`stacks must be a positive integer, got "${stacksStr}"`)
+      const stack = weaponStack(e)
+      if (!stack) throw new Error(`entity ${e.id} has no slotted weapon to mod (equip a ranged/melee weapon from inventory first)`)
+      const cap = modMaxStacks(modId)
+      const mods = (stack.mods ??= [])
+      const existing = mods.find((m) => m.id === modId)
+      if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
+      else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
+      return JSON.stringify({ id: e.id, weapon: e.combat?.weapon, mods: stack.mods })
     }
 
     case 'command':

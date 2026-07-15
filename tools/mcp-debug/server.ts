@@ -62,6 +62,15 @@ export function buildMcpServer(raw: Raw): McpServer {
     ({ kind, archetype, x, y }) => run(() => raw(`spawn ${kind} ${archetype} ${x} ${y}`)),
   )
   server.registerTool('kill', { description: 'Kill an entity (players are downed, not removed).', inputSchema: { entity: id } }, ({ entity }) => run(() => raw(`kill ${entity}`)))
+  server.registerTool(
+    'add_mod',
+    {
+      description:
+        "Stack a ROUNDS-style weapon MOD onto an entity's slotted gun (data/mods.ts): registry-checked + stack-capped. Composes at the single fire site via resolveWeapon — inspect the result with `inspect`. e.g. modId \"frost\" (freeze), \"bounce\" (ricochet), \"explosive\", \"lifesteal\", \"homing\", \"overload\" (+damage). Known ids: bounce, bulk, choke, detonator, explosive, frost, glassCannon, heavy, homing, incendiary, lifesteal, overload, pierce, rapid, shock, split, velocity.",
+      inputSchema: { entity: id, modId: z.string(), stacks: z.number().int().positive().optional() },
+    },
+    ({ entity, modId, stacks }) => run(() => raw(`addMod ${entity} ${modId}${stacks ? ` ${stacks}` : ''}`)),
+  )
 
   // ---- communicate: draw on screen + read the player's selection -------------
   server.registerTool(

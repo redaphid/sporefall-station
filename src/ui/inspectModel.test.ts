@@ -28,6 +28,28 @@ describe('inspectCard — friendly readout subset', () => {
     expect(rows.Player).toMatch(/P1/)
   })
 
+  it("surfaces the equipped gun's mods so a kid can SEE the build", () => {
+    const w = createWorld(1, 1)
+    const p = spawnPlayer(w, 0, 'soldier', 2, 2)
+    p.combat!.weapon = 'shotgun'
+    p.playerCtl!.inventory.push({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
+    p.playerCtl!.activeSlot = 0
+    const rows = rowMap(inspectCard(p).rows)
+    expect(rows.Weapon).toBe('Shotgun')
+    expect(rows['❄️ Cryo Rounds']).toBe('×1')
+    expect(rows['🪃 Bouncy']).toBe('×2')
+  })
+
+  it('a vanilla gun shows no mod rows', () => {
+    const w = createWorld(1, 1)
+    const p = spawnPlayer(w, 0, 'soldier', 2, 2)
+    p.combat!.weapon = 'pistol'
+    p.playerCtl!.inventory.push({ itemId: 'pistol', qty: 6 })
+    p.playerCtl!.activeSlot = 0
+    const rows = inspectCard(p).rows
+    expect(rows.some((r) => r.value.startsWith('×'))).toBe(false)
+  })
+
   it('reads a door lock state', () => {
     const door = makeEntity('door', 'door.wood', 3, 3)
     door.door = { open: false, locked: true, lockLevel: 2 }

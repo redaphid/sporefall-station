@@ -31,6 +31,9 @@ import { createOverlay } from './ui/overlay'
 // backs are still only wired under ?e2e below.
 import { runVerb } from './debug/verbs'
 import { projectToScreen } from './ui/locatorModel'
+import { createDraftScreen } from './ui/draftScreen'
+import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
+import { weaponStack } from './game/systems/inventory'
 
 const boot = async (): Promise<void> => {
   // Confirm this bundle booted so the native OTA layer keeps it (and applies any
@@ -107,6 +110,28 @@ const boot = async (): Promise<void> => {
       ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
         runVerb(hostWorld, `annotate ${line}`)
       ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) => runVerb(hostWorld, line)
+      // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
+      // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
+      // the local player's equipped gun. Exposed here so a screenshot e2e can show
+      // the card screen and drive a pick headlessly (no pixel math). The automatic
+      // floor-clear trigger lands with floor progression (deferred, see P4 note).
+      const draftScreen = createDraftScreen(uiMount)
+      const applyPick = (id: string): void => {
+        const self = hostWorld.entities.find((e) => e.playerCtl)
+        const stack = self && weaponStack(self)
+        if (stack) applyDraftPick(stack, id)
+      }
+      ;(window as unknown as { __draftOffer: (f?: number) => string }).__draftOffer = (f) =>
+        JSON.stringify(floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor))
+      ;(window as unknown as { __draftShow: (f?: number) => string }).__draftShow = (f) => {
+        const offer = floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor)
+        draftScreen.show(offer, applyPick)
+        return JSON.stringify(offer)
+      }
+      ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
+        applyPick(id)
+        draftScreen.hide()
+      }
       // Project a world tile to a screen pixel via the LIVE camera, so an e2e can
       // click exactly on an entity (mirrors the overlay's own projection).
       ;(window as unknown as { __project: (wx: number, wy: number) => { x: number; y: number } }).__project = (wx, wy) =>

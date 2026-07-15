@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasThrowable, hotbarSlots } from './hotbarModel'
+import { hasThrowable, hotbarSlots, modBadge } from './hotbarModel'
 
 describe('hotbarSlots', () => {
   it('keeps each item pointing at its real inventory index across the briefcase filter', () => {
@@ -15,6 +15,25 @@ describe('hotbarSlots', () => {
   it('marks no slot active when activeSlot is -1', () => {
     const slots = hotbarSlots([{ itemId: 'pistol', qty: 6 }], -1)
     expect(slots.every((s) => !s.active)).toBe(true)
+  })
+})
+
+describe('modBadge / hotbar mod display', () => {
+  it('is empty for a vanilla weapon', () => {
+    expect(modBadge({ itemId: 'pistol', qty: 6 })).toBe('')
+    expect(hotbarSlots([{ itemId: 'pistol', qty: 6 }], 0)[0].mods).toBe('')
+  })
+  it('shows an icon per mod, with ×N for a stack', () => {
+    const badge = modBadge({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
+    expect(badge).toContain('❄️')
+    expect(badge).toContain('🪃×2')
+  })
+  it('surfaces the badge through hotbarSlots', () => {
+    const slots = hotbarSlots([{ itemId: 'pistol', qty: 6, mods: [{ id: 'overload', stacks: 3 }] }], 0)
+    expect(slots[0].mods).toContain('💥×3')
+  })
+  it('ignores unknown / zero-stack mods', () => {
+    expect(modBadge({ itemId: 'pistol', qty: 6, mods: [{ id: 'nope', stacks: 2 }, { id: 'frost', stacks: 0 }] })).toBe('')
   })
 })
 

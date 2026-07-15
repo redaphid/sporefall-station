@@ -19,6 +19,10 @@ export interface InputCmd {
   special: boolean
   aimX: number
   aimY: number
+  /** Hotbar slot to equip this tick, or -1 for none. */
+  hotbar: number
+  /** Throw the active/nearest throwable this tick. */
+  throwItem: boolean
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -30,6 +34,8 @@ export const emptyInput = (): InputCmd => ({
   special: false,
   aimX: 1,
   aimY: 0,
+  hotbar: -1,
+  throwItem: false,
 })
 
 export type SimEvent =

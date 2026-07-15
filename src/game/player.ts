@@ -14,6 +14,7 @@ export const spawnPlayer = (w: World, playerId: number, classId: string, x: numb
     classId: cls.id,
     abilityCooldown: 0,
     inventory: [],
+    activeSlot: -1,
     cash: 0,
     crimeUntilTick: 0,
   }

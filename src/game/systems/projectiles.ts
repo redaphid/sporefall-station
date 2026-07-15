@@ -1,6 +1,7 @@
 import { SIM_DT } from '../types'
 import { isBlocked, type World } from '../world'
 import { applyDamage } from './combat'
+import { igniteCell } from './fire'
 
 export const projectileSystem = (w: World): void => {
   for (const e of w.entities) {
@@ -11,6 +12,7 @@ export const projectileSystem = (w: World): void => {
 
     if (e.projectile.ttl <= 0 || isBlocked(w, Math.floor(e.pos.x), Math.floor(e.pos.y))) {
       if (e.projectile.explode) explode(w, e)
+      land(w, e)
       e.dead = true
       continue
     }
@@ -25,11 +27,17 @@ export const projectileSystem = (w: World): void => {
         } else {
           applyDamage(w, other, e.projectile.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, e.projectile.ownerId)
         }
+        land(w, e)
         e.dead = true
         break
       }
     }
   }
+}
+
+/** A thrown item applies its element where it lands (molotov → fire). */
+const land = (w: World, e: { pos: { x: number; y: number }; projectile?: { onImpact?: 'fire' } }): void => {
+  if (e.projectile?.onImpact === 'fire') igniteCell(w, Math.floor(e.pos.x), Math.floor(e.pos.y))
 }
 
 const explode = (w: World, e: { pos: { x: number; y: number }; projectile?: { ownerId: number; explode?: { radius: number; damage: number } } }): void => {

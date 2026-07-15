@@ -173,6 +173,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       classId: 'soldier',
       abilityCooldown: 0,
       inventory: [],
+      activeSlot: -1,
       cash: 0,
       crimeUntilTick: 0,
     }

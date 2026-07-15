@@ -1,6 +1,7 @@
 // Deterministic demo setups, selected by `?scenario=`. Kept out of the sim
 // proper: a scenario just seeds entities into a fresh world before play starts.
 
+import { WEAPONS } from './data/items'
 import { makeEntity, type Entity } from './entity'
 import { isSolidTile } from './levelgen/level'
 import { spawnNpc } from './populate'
@@ -96,8 +97,30 @@ const setupWetElectric = (w: World): void => {
   placePlayer(w, x + 2, y)
 }
 
+/** A loaded loadout (bat / pistol / molotovs) and flammable targets downrange:
+ * equip the gun and fire it dry, then throw a molotov to set the crates ablaze. */
+const setupInventory = (w: World): void => {
+  const { x, y } = findStage(w, 8)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // aim east, down the row into view
+    player.playerCtl.inventory = [
+      { itemId: 'bat', qty: WEAPONS.bat.durability! },
+      { itemId: 'pistol', qty: 3 },
+      { itemId: 'molotov', qty: 2 },
+    ]
+    player.playerCtl.activeSlot = 0
+    if (player.combat) player.combat.weapon = 'bat'
+  }
+  crate(w, x + 4, y)
+  crate(w, x + 5, y)
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'fire') setupFire(w)
   if (name === 'frost') setupFrost(w)
   if (name === 'wet-electric') setupWetElectric(w)
+  if (name === 'inventory') setupInventory(w)
 }

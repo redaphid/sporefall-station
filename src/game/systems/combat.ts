@@ -5,9 +5,11 @@ import { makeEntity, type Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { addEntity, type World } from '../world'
 import { isFrozen, isImmobilized, removeStatus } from './statusFx'
+import { equipSlot, spendAmmo, throwActive, wearMelee } from './inventory'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
+const THROW_COOLDOWN = 20
 
 /** Interaction-matrix rule: a solid IMPACT on a frozen body shatters it — an
  * instant kill regardless of the blow's damage, clearing the frost. Only impact
@@ -169,13 +171,20 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
       if (cls.ability(w, e)) e.playerCtl.abilityCooldown = cls.abilityCooldownTicks
     }
 
+    // Hotbar: equip a slot; Throw: lob the active/nearest throwable.
+    if (cmd.hotbar >= 0) equipSlot(e, cmd.hotbar)
+    if (cmd.throwItem && e.combat.cooldown <= 0 && throwActive(w, e)) e.combat.cooldown = THROW_COOLDOWN
+
     if (!cmd.attack || e.combat.cooldown > 0) continue
     const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
-    e.combat.cooldown = weapon.cooldownTicks
     if (weapon.kind === 'melee') {
+      e.combat.cooldown = weapon.cooldownTicks
       const damage = Math.round(weapon.damage * (cls?.meleeDamageMult ?? 1))
       meleeAttack(w, e, damage, weapon.range, weapon.knockback)
+      if (weapon.durability !== undefined) wearMelee(e)
     } else {
+      if (!spendAmmo(e)) continue // empty gun clicks — no shot, no cooldown
+      e.combat.cooldown = weapon.cooldownTicks
       spawnProjectile(w, e, weapon.damage, weapon.projectileSpeed ?? 12, weapon.range)
     }
   }

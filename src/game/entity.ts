@@ -56,7 +56,10 @@ export interface Entity {
     playerId: number
     classId: string
     abilityCooldown: number
+    /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
     inventory: ItemStack[]
+    /** Equipped/hotbar slot index into `inventory`; -1 = bare fists. */
+    activeSlot: number
     cash: number
     crimeUntilTick: number
     downed?: { bleedTicks: number; reviveProgress: number }
@@ -69,6 +72,8 @@ export interface Entity {
     ttl: number
     /** Grenades: AoE on fuse-end or impact instead of point damage. */
     explode?: { radius: number; damage: number }
+    /** Thrown items: element applied where it lands (molotov → fire). */
+    onImpact?: 'fire'
   }
   pickup?: { itemId: string; qty: number }
   door?: { open: boolean; locked: boolean; lockLevel: number }

@@ -28,6 +28,8 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
     attack: a.attack || b.attack,
     interact: a.interact || b.interact,
     special: a.special || b.special,
+    hotbar: b.hotbar >= 0 ? b.hotbar : a.hotbar,
+    throwItem: a.throwItem || b.throwItem,
   }
 }
 

@@ -207,7 +207,7 @@ export class NetHostSession implements Session {
       queue: new SendQueue(this.transport, peer, () => this.onPeerLost(peer)),
       reader: new StreamReader(),
       lastInputSeq: 0,
-      latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0 },
+      latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false },
       pendingEdges: 0,
     }
     this.peers.set(peer, state)

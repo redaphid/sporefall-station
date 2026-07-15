@@ -1,8 +1,9 @@
 import { CLASSES } from '../data/classes'
-import { CONSUMABLES, WEAPONS } from '../data/items'
+import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
+import { addItem, equipSlot } from './inventory'
 
 const INTERACT_RANGE = 1.3
 const LOCKPICK_TICKS = 45 // 1.5s channel
@@ -124,39 +125,47 @@ const nearestInteractable = (w: World, p: Entity): Entity | null => {
   return best
 }
 
+/** A picked-up weapon arrives loaded: its slot count starts at a full magazine
+ * (ranged) or full durability (melee); anything else keeps its pickup qty. */
+const startingCount = (itemId: string, qty: number): number => {
+  const def = WEAPONS[itemId]
+  if (def?.magSize) return def.magSize
+  if (def?.durability) return def.durability
+  return qty
+}
+
 const collect = (player: Entity, item: Entity): boolean => {
   const { itemId, qty } = item.pickup!
   const ctl = player.playerCtl!
-  if (itemId === 'cash') {
+  const c = itemClass(itemId)
+  if (c === 'cash') {
     ctl.cash += qty
     return true
   }
-  if (itemId === 'briefcase') {
-    ctl.inventory.push({ itemId, qty: 1 }) // key item, ignores slot limit
+  if (c === 'key') {
+    ctl.inventory.push({ itemId, qty: 1 }) // mission item, ignores slot limit
     return true
   }
-  if (WEAPONS[itemId]) {
-    // Swap held weapon; drop nothing for now (old weapon vanishes — M6 can drop it).
-    if (player.combat) player.combat.weapon = itemId
-    return true
-  }
-  if (CONSUMABLES[itemId]) {
-    // Auto-heal if hurt, else stash (max 4 stacks). Doctors heal double.
+  if (c === 'consumable') {
+    // Auto-heal if hurt, else stash. Doctors heal double.
     const heal = (CONSUMABLES[itemId].heal ?? 0) * (CLASSES[ctl.classId]?.healMult ?? 1)
     if (player.health && player.health.hp < player.health.max) {
       player.health.hp = Math.min(player.health.max, player.health.hp + heal)
       return true
     }
-    const stack = ctl.inventory.find((s) => s.itemId === itemId)
-    if (stack) {
-      stack.qty += qty
-      return true
-    }
-    if (ctl.inventory.length < 4) {
-      ctl.inventory.push({ itemId, qty })
-      return true
-    }
-    return false // inventory full and not hurt — leave it on the ground
+    return addItem(ctl.inventory, itemId, qty)
   }
-  return false
+  if (c === 'ammo') {
+    // Rounds top up an existing gun; otherwise stash for the gun you'll find.
+    const gun = ctl.inventory.find((s) => itemClass(s.itemId) === 'ranged')
+    if (gun) {
+      gun.qty += qty
+      return true
+    }
+    return addItem(ctl.inventory, itemId, qty)
+  }
+  // Weapons and throwables take a slot; auto-equip the first weapon you grab.
+  const added = addItem(ctl.inventory, itemId, startingCount(itemId, qty))
+  if (added && (c === 'melee' || c === 'ranged') && ctl.activeSlot < 0) equipSlot(player, ctl.inventory.length - 1)
+  return added
 }

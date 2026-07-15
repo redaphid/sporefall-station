@@ -1,0 +1,72 @@
+name: web-e2e
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Pick an ephemeral port
+        id: port
+        run: echo "port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')" >> "$GITHUB_OUTPUT"
+
+      - name: Build, serve, and drive the e2e proof
+        run: bash e2e/run.sh
+        env:
+          PORT: ${{ steps.port.outputs.port }}
+          E2E_SEED: "424242"
+
+      - name: Upload proof artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-proof
+          if-no-files-found: error
+          path: |
+            e2e/output/web-e2e-*.png
+            e2e/output/assets-showcase-grid.png
+            e2e/output/web-game-proof.mp4
+            e2e/output/web-game-proof.gif
+            e2e/output/assets-showcase.mp4
+            e2e/output/assets-showcase.gif
+
+      - name: Attach proof to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            e2e/output/web-e2e-01-spawn.png \
+            e2e/output/web-e2e-02-move.png \
+            e2e/output/web-e2e-03-combat.png \
+            e2e/output/web-e2e-04-interact-door.png \
+            e2e/output/web-e2e-05-mission.png \
+            e2e/output/assets-showcase-grid.png \
+            e2e/output/web-game-proof.mp4 \
+            e2e/output/assets-showcase.mp4 \
+            --clobber

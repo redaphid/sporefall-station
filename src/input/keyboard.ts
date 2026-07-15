@@ -3,7 +3,7 @@ import { selectAim } from './aim'
 import type { InputSource } from './input'
 
 /** WASD/arrows move, J/space attack, K/E interact, L/shift special, 1-6 equip
- * hotbar slot, Q/G throw. */
+ * hotbar slot, Q/G throw, F/left-ctrl dodge-roll. */
 export const createKeyboard = (): InputSource => {
   const down = new Set<string>()
   // Taps between samples must not be lost — accumulate edges.
@@ -11,6 +11,7 @@ export const createKeyboard = (): InputSource => {
   let interactEdge = false
   let specialEdge = false
   let throwEdge = false
+  let rollEdge = false
   let hotbarEdge = -1
   let seq = 0
 
@@ -21,6 +22,7 @@ export const createKeyboard = (): InputSource => {
     if (ev.code === 'KeyK' || ev.code === 'KeyE') interactEdge = true
     if (ev.code === 'KeyL' || ev.code === 'ShiftLeft') specialEdge = true
     if (ev.code === 'KeyQ' || ev.code === 'KeyG') throwEdge = true
+    if (ev.code === 'KeyF' || ev.code === 'ControlLeft') rollEdge = true
     if (ev.code.startsWith('Digit')) {
       const n = Number(ev.code.slice(5))
       if (n >= 1 && n <= 6) hotbarEdge = n - 1
@@ -39,11 +41,13 @@ export const createKeyboard = (): InputSource => {
       cmd.interact = interactEdge
       cmd.special = specialEdge || down.has('KeyL') || down.has('ShiftLeft')
       cmd.throwItem = throwEdge
+      cmd.roll = rollEdge
       cmd.hotbar = hotbarEdge
       attackEdge = false
       interactEdge = false
       specialEdge = false
       throwEdge = false
+      rollEdge = false
       hotbarEdge = -1
       const aim = selectAim(cmd.moveX, cmd.moveY)
       cmd.aimX = aim.x

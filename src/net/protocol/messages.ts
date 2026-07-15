@@ -1,6 +1,7 @@
 import type { Entity } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { SnapFlags } from '../../game/snapshot'
+import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
 import type { InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
 import { ByteReader, ByteWriter } from '../framing/codec'
@@ -97,14 +98,18 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
   return { tick, floor, alarm, lastInputSeq, entities }
 }
 
-export const encodeInput = (cmd: InputCmd, edges: { attack: boolean; interact: boolean; special: boolean }): Uint8Array => {
+export const encodeInput = (
+  cmd: InputCmd,
+  edges: { attack: boolean; interact: boolean; special: boolean; roll?: boolean },
+): Uint8Array => {
   const w = new ByteWriter(9)
   // Bit 8 carries whether aim is active: the angle byte can't encode a centred
   // stick (atan2(0,0)=0 looks like "aim right"), so this bit lets the far side
   // restore a (0,0) aim and hold the last facing instead of snapping.
   const aimActive = Math.hypot(cmd.aimX, cmd.aimY) > 0.01
   const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0) | (aimActive ? 8 : 0)
-  const edge = (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0)
+  // Roll is a pure edge (a tap) — bit 8 of the edge byte, decoded by the host.
+  const edge = (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0) | (edges.roll ? 8 : 0)
   w.u8(MsgType.Input)
     .u16(cmd.seq & 0xffff)
     .u8(Math.round((cmd.moveX + 1) * 127))
@@ -144,6 +149,7 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
     if (e.status.hitFlashUntil > tick) flags |= SnapFlags.HitFlash
     if (e.status.cloakUntil > tick) flags |= SnapFlags.Cloaked
   }
+  if (isRolling(e, tick)) flags |= SnapFlags.Rolling
   if (e.door?.open) flags |= SnapFlags.DoorOpen
   return {
     id: e.id,
@@ -183,6 +189,12 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       crimeUntilTick: 0,
     }
     e.playerCtl.downed = (we.flags & SnapFlags.Downed) !== 0 ? (e.playerCtl.downed ?? { bleedTicks: 900, reviveProgress: 0 }) : undefined
+    // Mirror the host's roll window so the client renders the tumble + agrees on
+    // i-frames. A short forward-dated `untilTick` keeps the flag "live" between
+    // snapshots; a clear snapshot with the bit off ends it.
+    e.playerCtl.roll = (we.flags & SnapFlags.Rolling) !== 0
+      ? { untilTick: tick + ROLL_TICKS, cooldownUntilTick: tick + ROLL_TICKS, dirX: Math.cos(e.facing), dirY: Math.sin(e.facing) }
+      : undefined
     e.health ??= { hp: 100, max: 100, iframes: 0 }
     e.health.hp = Math.round(we.hpPct * e.health.max)
   }

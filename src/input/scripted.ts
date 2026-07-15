@@ -19,6 +19,8 @@ export interface ScriptStep {
   /** Edge actions: fire once, on the first tick of the segment. */
   interact?: boolean
   special?: boolean
+  /** Dodge-roll edge: fire once, on the first tick of the segment. */
+  roll?: boolean
 }
 
 export const scriptTicks = (steps: ScriptStep[]): number => steps.reduce((n, s) => n + s.ticks, 0)
@@ -31,6 +33,7 @@ const stepCmd = (s: ScriptStep, i: number, seq: number): InputCmd => {
   cmd.attack = !!s.attack
   cmd.interact = !!s.interact && i === 0
   cmd.special = !!s.special && i === 0
+  cmd.roll = !!s.roll && i === 0
   const aim = selectAim(cmd.moveX, cmd.moveY)
   cmd.aimX = aim.x
   cmd.aimY = aim.y
@@ -110,6 +113,19 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // flammable bystander and burns it to death (~tick 100) while the player looks
   // on from the north. 180 ticks (~6s) leaves a clear beat on the aftermath.
   burn: [{ ticks: 180 }],
+
+  // Dodge-roll headline (#54): stand on the lane, then roll INTO an incoming
+  // bullet so the i-frame window carries the player through it unharmed. Paired
+  // with `dodgeControl` (same world, no roll → the bullet lands) to prove it's
+  // the roll, not luck, doing the work.
+  dodgeRoll: [
+    { ticks: 15 }, // the bullet closes in
+    { ticks: 1, roll: true, x: 1 }, // dodge-roll rightward, straight through it
+    { ticks: 44 }, // finish the tumble and stand, untouched
+  ],
+
+  // Control for the dodge-roll video: never roll — the same bullet connects.
+  dodgeControl: [{ ticks: 60 }],
 
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [

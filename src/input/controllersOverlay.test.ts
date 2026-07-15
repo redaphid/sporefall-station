@@ -9,6 +9,7 @@ const state = (over: Partial<PadState> = {}): PadState => ({
   aimX: 0,
   aimY: 0,
   attack: false,
+  roll: false,
   interact: false,
   special: false,
   pause: false,

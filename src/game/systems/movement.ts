@@ -1,6 +1,7 @@
 import type { Entity } from '../entity'
 import { SIM_DT, type InputCmd } from '../types'
 import { isBlocked, type World } from '../world'
+import { isRolling, ROLL_SPEED } from './roll'
 import { isImmobilized } from './statusFx'
 
 export const PLAYER_SPEED = 4.5 // tiles/sec
@@ -86,30 +87,42 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
   for (const e of w.entities) {
     if (e.dead || e.projectile) continue
     const stunned = (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)
+    // A dodge-roll overrides input: the frozen roll heading drives movement for
+    // the whole roll window (rollSystem started it before us this tick).
+    const rolling = isRolling(e, w.tick)
 
     // Players write intent from their input; NPCs got theirs from the AI system.
     if (e.playerCtl && !e.playerCtl.downed && !stunned) {
-      e.intent.x = 0
-      e.intent.y = 0
       const cmd = inputs.get(e.playerCtl.playerId)
-      if (cmd) {
-        const len = Math.hypot(cmd.moveX, cmd.moveY)
-        if (len > 0.01) {
-          const norm = len > 1 ? 1 / len : 1
-          e.intent.x = cmd.moveX * norm
-          e.intent.y = cmd.moveY * norm
+      if (rolling) {
+        // Roll steers itself; the stick only sets facing (aim where you'll exit).
+        e.intent.x = e.playerCtl.roll!.dirX
+        e.intent.y = e.playerCtl.roll!.dirY
+      } else {
+        e.intent.x = 0
+        e.intent.y = 0
+        if (cmd) {
+          const len = Math.hypot(cmd.moveX, cmd.moveY)
+          if (len > 0.01) {
+            const norm = len > 1 ? 1 / len : 1
+            e.intent.x = cmd.moveX * norm
+            e.intent.y = cmd.moveY * norm
+          }
         }
-        // Facing follows the aim vector (aim stick, or aim-where-you-move; see
-        // selectAim). A centred aim leaves facing untouched so you keep pointing
-        // where you last aimed instead of snapping to a default direction.
-        if (Math.hypot(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
       }
+      // Facing follows the aim vector (aim stick, or aim-where-you-move; see
+      // selectAim). A centred aim leaves facing untouched so you keep pointing
+      // where you last aimed instead of snapping to a default direction.
+      if (cmd && Math.hypot(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
     }
 
-    const ix = stunned ? 0 : e.intent.x
-    const iy = stunned ? 0 : e.intent.y
-    const dx = (ix * e.speed + e.vel.x) * SIM_DT
-    const dy = (iy * e.speed + e.vel.y) * SIM_DT
+    // Rolling ignores stun-freeze on movement (it's committed) and uses the burst
+    // speed; everyone else uses their walk speed and halts while stunned.
+    const speed = rolling ? ROLL_SPEED : e.speed
+    const ix = stunned && !rolling ? 0 : e.intent.x
+    const iy = stunned && !rolling ? 0 : e.intent.y
+    const dx = (ix * speed + e.vel.x) * SIM_DT
+    const dy = (iy * speed + e.vel.y) * SIM_DT
     if (dx !== 0 || dy !== 0) moveAndCollide(e, dx, dy, blocked)
 
     // Knockback decay

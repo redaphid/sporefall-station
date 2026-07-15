@@ -95,6 +95,12 @@ export interface Entity {
     downed?: { bleedTicks: number; reviveProgress: number }
     /** Timed action in progress (lockpicking). Moving cancels it. */
     channel?: { kind: 'lockpick'; targetId: EntityId; ticksLeft: number }
+    /** Active dodge-roll (Enter-the-Gungeon style). Absent = not rolling and off
+     * cooldown; all fields are ABSOLUTE ticks / a unit direction, so it serializes
+     * and replays byte-for-byte like `hitFlashUntil`. `untilTick` bounds the i-frame
+     * + speed-burst window; `cooldownUntilTick` gates the next roll (no chaining);
+     * `dirX/dirY` is the frozen roll heading (move dir, or facing when stationary). */
+    roll?: { untilTick: number; cooldownUntilTick: number; dirX: number; dirY: number }
   }
   projectile?: {
     ownerId: EntityId

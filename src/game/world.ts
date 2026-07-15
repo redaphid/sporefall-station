@@ -8,6 +8,7 @@ import { elementSystem, fireSystem } from './systems/fire'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
+import { rollSystem } from './systems/roll'
 import { projectileSystem } from './systems/projectiles'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
@@ -140,6 +141,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
     e.prevPos.y = e.pos.y
   }
   aiSystem(w)
+  rollSystem(w, inputs)
   movementSystem(w, inputs)
   combatSystem(w, inputs)
   projectileSystem(w)

@@ -54,7 +54,7 @@ export class NetClientSession implements Session {
   private tickCount = 0
   private inputSeq = 0
   private pendingInputs: { seq: number; cmd: InputCmd }[] = []
-  private pendingEdges = { attack: false, interact: false, special: false }
+  private pendingEdges = { attack: false, interact: false, special: false, roll: false }
   private lastAckedSeq = 0
   private eventsOut: SimEvent[] = []
   private state: StateMsg = {
@@ -276,11 +276,12 @@ export class NetClientSession implements Session {
     this.pendingEdges.attack ||= cmd.attack
     this.pendingEdges.interact ||= cmd.interact
     this.pendingEdges.special ||= cmd.special
+    this.pendingEdges.roll ||= cmd.roll
 
     // Send at ~15Hz (every 2nd tick), latest-wins on the wire
     if (this.tickCount % 2 === 0 && this.queue) {
       this.queue.queueSnapshot(encodeInput(cmd, this.pendingEdges))
-      this.pendingEdges = { attack: false, interact: false, special: false }
+      this.pendingEdges = { attack: false, interact: false, special: false, roll: false }
     }
 
     // Predict own movement immediately

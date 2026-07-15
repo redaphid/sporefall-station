@@ -9,6 +9,7 @@ export interface PadState {
   attack: boolean
   interact: boolean
   special: boolean
+  roll: boolean
   pause: boolean
 }
 
@@ -74,6 +75,7 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
     attack: anyPressed(pad, profile.attack),
     interact: anyPressed(pad, profile.interact),
     special: anyPressed(pad, profile.special),
+    roll: anyPressed(pad, profile.roll),
     pause: anyPressed(pad, profile.pause),
   }
 }

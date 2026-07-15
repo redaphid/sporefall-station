@@ -1,4 +1,5 @@
 import type { Entity } from './entity'
+import { isRolling } from './systems/roll'
 import type { SimEvent } from './types'
 import type { World } from './world'
 
@@ -10,6 +11,7 @@ export const SnapFlags = {
   DoorOpen: 1 << 3,
   HitFlash: 1 << 4,
   Cloaked: 1 << 5,
+  Rolling: 1 << 6,
 } as const
 
 export interface EntitySnap {
@@ -43,6 +45,7 @@ export const snapEntity = (w: World, e: Entity): EntitySnap => {
     if (e.status.stun > 0) flags |= SnapFlags.Stunned
     if (e.status.hitFlashUntil > w.tick) flags |= SnapFlags.HitFlash
   }
+  if (isRolling(e, w.tick)) flags |= SnapFlags.Rolling
   if (e.door?.open) flags |= SnapFlags.DoorOpen
   return {
     id: e.id,

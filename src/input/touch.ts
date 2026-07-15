@@ -1,19 +1,15 @@
 import type { RenderView } from '../app/session'
 import { emptyInput, type InputCmd } from '../game/types'
 import { hotbarSlots, type HotbarSlot } from '../ui/hotbarModel'
-import { selectAim } from './aim'
+import { aimFires, selectAim } from './aim'
 import type { InputSource } from './input'
 import { computeTouchLabels } from './touchLabels'
 
-const STICK_RADIUS = 60 // px of thumb travel for full speed
-// Firing model: this is a twin-stick shooter — deflecting the aim stick past
-// this fraction both aims AND fires. There is no separate ATK button; aiming IS
-// firing, so this is the SOLE attack input path.
-const AIM_FIRE = 0.5
+// Re-exported from the shared, DOM-free aim module so existing importers
+// (`./touch`) keep working while readPad/gamepad reuse the same threshold.
+export { aimFires } from './aim'
 
-/** Twin-stick fire rule: the aim stick past the fire threshold shoots. Pure +
- * exported so the sole attack path is unit-testable without the DOM. */
-export const aimFires = (aimX: number, aimY: number): boolean => Math.hypot(aimX, aimY) > AIM_FIRE
+const STICK_RADIUS = 60 // px of thumb travel for full speed
 
 /** An InputSource that also refreshes its button labels from live game state and
  * can hide itself when a gamepad takes over. */

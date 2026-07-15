@@ -1,4 +1,7 @@
+import type { RenderView } from '../app/session'
+import type { ItemStack } from '../game/entity'
 import { emptyInput, type InputCmd } from '../game/types'
+import { hotbarSlots } from '../ui/hotbarModel'
 import { selectAim } from './aim'
 import { assignPads } from './padAssign'
 import { padProfile } from './padProfile'
@@ -37,6 +40,25 @@ const idle: PadState = {
   special: false,
   roll: false,
   pause: false,
+  throwItem: false,
+  hotbarPrev: false,
+  hotbarNext: false,
+}
+
+/**
+ * Resolve a prev/next weapon-cycle intent into an ABSOLUTE inventory slot index
+ * (the value InputCmd.hotbar carries and the host equips), or -1 when there's
+ * nothing to switch to. Pure so it's unit-testable. Cycles over the same
+ * briefcase-filtered display slots the touch hotbar shows, wrapping at the ends;
+ * from bare fists (activeSlot not in the list) it starts at the first/last slot.
+ */
+export const cycleHotbar = (inv: ItemStack[], activeSlot: number, dir: 1 | -1): number => {
+  const slots = hotbarSlots(inv, activeSlot)
+  if (slots.length === 0) return -1
+  const cur = slots.findIndex((s) => s.index === activeSlot)
+  if (cur === -1) return dir > 0 ? slots[0].index : slots[slots.length - 1].index
+  const next = (cur + dir + slots.length) % slots.length
+  return slots[next].index
 }
 
 /** Is a controller actually driving the game? True once at least one pad has
@@ -48,6 +70,10 @@ export const anyPadActive = (pads: readonly CoopDebugPad[]): boolean => pads.som
 export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads?.() ?? []) => {
   let assignments = new Map<number, number>()
   const last = new Map<number, PadState>()
+  // Per player-slot inventory snapshot, refreshed each frame by update(view).
+  // The weapon-cycle resolver reads it to turn a prev/next press into a concrete
+  // slot; empty until the first update, so an early press is a harmless no-op.
+  const hotbarBySlot = new Map<number, { inv: ItemStack[]; activeSlot: number }>()
   let debugPads: CoopDebugPad[] = []
   let seq = 0
 
@@ -56,7 +82,7 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     return Boolean(now[field]) && !was[field]
   }
 
-  const toCmd = (padIndex: number, s: PadState): InputCmd => {
+  const toCmd = (padIndex: number, slot: number, s: PadState): InputCmd => {
     const cmd = emptyInput()
     cmd.seq = seq++
     cmd.moveX = s.moveX
@@ -65,6 +91,14 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     cmd.interact = rose(padIndex, s, 'interact')
     cmd.special = s.special
     cmd.roll = rose(padIndex, s, 'roll') // edge: one roll per press, no auto-repeat
+    cmd.throwItem = rose(padIndex, s, 'throwItem') // edge: one throw per press
+    // Weapon switch: a prev/next EDGE resolves to an absolute slot via the cached
+    // inventory, so it round-trips the wire exactly like the touch hotbar edge.
+    const hb = hotbarBySlot.get(slot)
+    if (hb) {
+      if (rose(padIndex, s, 'hotbarNext')) cmd.hotbar = cycleHotbar(hb.inv, hb.activeSlot, 1)
+      else if (rose(padIndex, s, 'hotbarPrev')) cmd.hotbar = cycleHotbar(hb.inv, hb.activeSlot, -1)
+    }
     // Right stick aims (twin-stick); falls back to aim-where-you-move.
     const aim = selectAim(s.moveX, s.moveY, s.aimX, s.aimY)
     cmd.aimX = aim.x
@@ -91,7 +125,7 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     const pauses: number[] = []
     for (const [padIndex, slot] of assignments) {
       const s = states.get(padIndex) ?? idle
-      inputs.set(slot, toCmd(padIndex, s))
+      inputs.set(slot, toCmd(padIndex, slot, s))
       if (rose(padIndex, s, 'pause')) pauses.push(slot)
     }
 
@@ -112,5 +146,17 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
 
   const debug = (): CoopDebugPad[] => debugPads
 
-  return { sample, debug }
+  /** Cache each player's inventory/activeSlot from the render view so the next
+   * sample() can resolve a weapon-cycle press into a concrete slot. Called once
+   * per frame (like touch.update); one-frame staleness is harmless. */
+  const update = (view: RenderView): void => {
+    hotbarBySlot.clear()
+    for (const e of view.entities) {
+      const ctl = e.playerCtl
+      if (!ctl) continue
+      hotbarBySlot.set(ctl.playerId, { inv: ctl.inventory, activeSlot: ctl.activeSlot })
+    }
+  }
+
+  return { sample, debug, update }
 }

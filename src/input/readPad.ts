@@ -1,3 +1,4 @@
+import { aimFires } from './aim'
 import type { PadProfile } from './padProfile'
 
 /** Raw held state for one pad on one sample — no edge history, no seq. */
@@ -11,6 +12,12 @@ export interface PadState {
   special: boolean
   roll: boolean
   pause: boolean
+  /** Held throw button — gamepadCoop edge-triggers it into InputCmd.throwItem. */
+  throwItem: boolean
+  /** Held weapon-cycle buttons — gamepadCoop edge-triggers them and resolves the
+   * press into an absolute hotbar slot index. */
+  hotbarPrev: boolean
+  hotbarNext: boolean
 }
 
 const DEADZONE = 0.28
@@ -67,15 +74,23 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
     }
   }
 
+  const aimX = dead(axis(pad, profile.aimAxes[0]))
+  const aimY = dead(axis(pad, profile.aimAxes[1]))
+
   return {
     moveX,
     moveY,
-    aimX: dead(axis(pad, profile.aimAxes[0])),
-    aimY: dead(axis(pad, profile.aimAxes[1])),
-    attack: anyPressed(pad, profile.attack),
+    aimX,
+    aimY,
+    // Twin-stick parity with touch: the attack BUTTON fires, and so does
+    // deflecting the aim stick past the shared fire threshold.
+    attack: anyPressed(pad, profile.attack) || aimFires(aimX, aimY),
     interact: anyPressed(pad, profile.interact),
     special: anyPressed(pad, profile.special),
     roll: anyPressed(pad, profile.roll),
     pause: anyPressed(pad, profile.pause),
+    throwItem: anyPressed(pad, profile.throw),
+    hotbarPrev: anyPressed(pad, profile.hotbarPrev),
+    hotbarNext: anyPressed(pad, profile.hotbarNext),
   }
 }

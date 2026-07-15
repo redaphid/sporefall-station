@@ -29,6 +29,15 @@ describe('padProfile', () => {
     it('lets any face button or start trigger press-to-join', () => {
       expect(p.join).toEqual(expect.arrayContaining([0, 1, 2, 3, 9]))
     })
+    it('maps throw and weapon-cycle to free buttons that do not collide with move/attack/roll', () => {
+      expect(p.throw.length).toBeGreaterThan(0)
+      expect(p.hotbarPrev.length).toBeGreaterThan(0)
+      expect(p.hotbarNext.length).toBeGreaterThan(0)
+      const taken = new Set([...p.attack, ...p.interact, ...p.special, ...p.roll, ...p.dpad])
+      for (const b of [...p.throw, ...p.hotbarPrev, ...p.hotbarNext]) expect(taken.has(b)).toBe(false)
+      // prev and next must be distinct buttons
+      expect(p.hotbarPrev).not.toEqual(p.hotbarNext)
+    })
   })
 
   describe('an 8bitdo Zero 2 in a non-standard mode', () => {
@@ -45,6 +54,12 @@ describe('padProfile', () => {
     })
     it('still offers a pause button', () => {
       expect(p.pause.length).toBeGreaterThan(0)
+    })
+    it('also maps throw and weapon-cycle (best-guess, needs a real-device check)', () => {
+      expect(p.throw.length).toBeGreaterThan(0)
+      expect(p.hotbarPrev.length).toBeGreaterThan(0)
+      expect(p.hotbarNext.length).toBeGreaterThan(0)
+      expect(p.hotbarPrev).not.toEqual(p.hotbarNext)
     })
   })
 

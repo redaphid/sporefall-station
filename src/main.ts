@@ -9,7 +9,7 @@ import { createGamepadCoop } from './input/gamepadCoop'
 import { createControllersOverlay } from './input/controllersOverlay'
 import { createKeyboard } from './input/keyboard'
 import { createScriptedInput, scriptTicks, SCRIPTS } from './input/scripted'
-import { createTouch, mergeInputs } from './input/touch'
+import { createTouch, mergeInputs, type TouchInput } from './input/touch'
 import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
@@ -40,8 +40,12 @@ const boot = async (): Promise<void> => {
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
   // A `?script=` deterministic input timeline replaces live input for e2e videos.
   const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
+  let touch: TouchInput | undefined
   let input: InputSource = script ? createScriptedInput(script) : createKeyboard()
-  if (!script && navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
+  if (!script && navigator.maxTouchPoints > 0) {
+    touch = createTouch(uiMount)
+    input = mergeInputs(input, touch)
+  }
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, classId, input, coop, uiMount, renderer })
@@ -59,7 +63,7 @@ const boot = async (): Promise<void> => {
     ;(window as unknown as { __world: unknown }).__world = session.world
     ;(window as unknown as { __scriptTicks: number }).__scriptTicks = scriptTicks(script)
   }
-  runLoop(session, renderer, uiMount, coop)
+  runLoop(session, renderer, uiMount, coop, touch)
 }
 
 interface SessionDeps {
@@ -191,6 +195,7 @@ const runLoop = (
   renderer: GameRenderer,
   uiMount: HTMLElement,
   coop: ReturnType<typeof createGamepadCoop>,
+  touch?: TouchInput,
 ): void => {
   const hud = createHud(uiMount)
   const screens = createScreens(uiMount)
@@ -221,6 +226,7 @@ const runLoop = (
     }
     renderer.draw(view, alpha, dt)
     hud.update(view)
+    touch?.update(view)
     screens.update(view)
     overlay.update(coop.debug())
     showPause(session.isPaused ?? false)

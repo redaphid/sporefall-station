@@ -41,7 +41,7 @@ const autoPickup = (w: World, p: Entity): void => {
 }
 
 const handleInteract = (w: World, p: Entity): void => {
-  const target = nearestInteractable(w, p)
+  const target = nearestInteractable(w.entities, p)
   if (!target) return
   if (OBJECTS[target.archetype]?.use) {
     useObject(w, p, target)
@@ -118,10 +118,10 @@ const bleedAndRevive = (w: World, p: Entity): void => {
   }
 }
 
-const nearestInteractable = (w: World, p: Entity): Entity | null => {
+export const nearestInteractable = (entities: readonly Entity[], p: Entity): Entity | null => {
   let best: Entity | null = null
   let bestDist = Infinity
-  for (const e of w.entities) {
+  for (const e of entities) {
     if (!e.interact || e.dead) continue
     const dist = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y)
     if (dist <= (e.interact.range ?? INTERACT_RANGE) && dist < bestDist) {

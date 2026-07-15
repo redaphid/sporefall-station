@@ -5,6 +5,6 @@
 # This is a static single-page game: SPA fallback + cache headers are handled
 # by public/_redirects and public/_headers (copied into dist/ by Vite), not by
 # this file.
-name = "streets-of-rogue-ish"
+name = "backseat"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"

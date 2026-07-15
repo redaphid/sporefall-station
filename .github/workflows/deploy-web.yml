@@ -6,7 +6,7 @@ name: deploy-web
 #
 # One-time setup (see docs/deploy.md):
 #   1. Create a Cloudflare Pages project (Direct Upload) named
-#      `streets-of-rogue-ish` (or edit the name below + wrangler.toml).
+#      `backseat` (or edit the name below + wrangler.toml).
 #   2. Add repo secrets CLOUDFLARE_API_TOKEN (Pages:Edit) and
 #      CLOUDFLARE_ACCOUNT_ID.
 
@@ -58,7 +58,7 @@ jobs:
           VER="$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)"
           # Public origin of the Pages project. Override with the SITE_URL repo
           # variable if the project name / custom domain differs.
-          SITE="${SITE_URL:-https://streets-of-rogue-ish.pages.dev}"
+          SITE="${SITE_URL:-https://backseat-sd8.pages.dev}"
           SITE="${SITE%/}"
           mkdir -p dist/ota
           # Zip the built app (index.html at the zip root); exclude the ota/ dir
@@ -78,7 +78,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           # Uses pages_build_output_dir ("dist") from wrangler.toml.
-          command: pages deploy --project-name=streets-of-rogue-ish
+          command: pages deploy --project-name=backseat
 
       - name: Print deployment URL
         env:

@@ -1,6 +1,6 @@
 # Offline co-op over Bluetooth (no internet, no server)
 
-Play Streets of Rogue-ish together on two (or more) Android phones with **no
+Play Backseat together on two (or more) Android phones with **no
 Wi-Fi, no cell signal, and no server** — perfect for a car, a plane, a
 basement, or anywhere off the grid. The phones talk **directly to each other
 over Bluetooth**.

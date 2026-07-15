@@ -35,14 +35,14 @@ comes from `wrangler.toml` (`pages_build_output_dir = "dist"`).
 
 1. **Create the Pages project** (Direct Upload). Either:
    - Dashboard: Cloudflare dashboard → **Workers & Pages** → **Create** →
-     **Pages** → **Upload assets**. Name it **`streets-of-rogue-ish`** (must match
+     **Pages** → **Upload assets**. Name it **`backseat`** (must match
      `--project-name` in `deploy-web.yml` and `name` in `wrangler.toml`).
    - Or CLI, which also does the first deploy:
      ```bash
      npm ci
      npm run build            # produces dist/  (leave CAP_SERVER_URL unset!)
      npx wrangler login       # opens a browser to authorize your account
-     npx wrangler pages deploy --project-name=streets-of-rogue-ish
+     npx wrangler pages deploy --project-name=backseat
      ```
 2. **Create an API token** for CI: Cloudflare dashboard → **My Profile** →
    **API Tokens** → **Create Token** → template **"Edit Cloudflare Workers"**,
@@ -53,7 +53,7 @@ comes from `wrangler.toml` (`pages_build_output_dir = "dist"`).
    - `CLOUDFLARE_API_TOKEN` — the token from step 2 (Pages:Edit scope).
    - `CLOUDFLARE_ACCOUNT_ID` — from step 3.
 5. Push to `main`. The deploy runs; the workflow log prints the deployment URL.
-   Your stable URL is `https://streets-of-rogue-ish.pages.dev`.
+   Your stable URL is `https://backseat-sd8.pages.dev`.
 6. **Update the play URL** in `docs/play.md` and `README.md` if the project name
    differs.
 
@@ -88,7 +88,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release appears at `.../releases/latest` with `streets-of-rogue-ish.apk`.
+The release appears at `.../releases/latest` with `backseat.apk`.
 
 ### Signed release APK (TODO — #30 slice 1)
 
@@ -161,7 +161,7 @@ same Cloudflare Pages project as the web deploy.
 - No extra secrets. OTA reuses the same Cloudflare Pages project and the
   `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` from section A. Cloudflare
   Pages Functions are included free.
-- The manifest URL defaults to `https://streets-of-rogue-ish.pages.dev/ota/check`.
+- The manifest URL defaults to `https://backseat-sd8.pages.dev/ota/check`.
   If your Pages project name or domain differs, set **both**:
   - Build-time env `OTA_UPDATE_URL` (baked into the APK by `capacitor.config.ts`)
     → point it at `https://<your-domain>/ota/check`.

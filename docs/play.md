@@ -1,4 +1,4 @@
-# How to Play Streets of Rogue-ish
+# How to Play Backseat
 
 Two ways to play. The browser one is easiest.
 
@@ -6,7 +6,7 @@ Two ways to play. The browser one is easiest.
 
 Open this link on any phone, tablet, or computer:
 
-**https://streets-of-rogue-ish.pages.dev**  <!-- TODO: replace with the real Cloudflare Pages URL after the first deploy -->
+**https://backseat-sd8.pages.dev**
 
 That's it — no installing. It's always the latest version.
 
@@ -24,11 +24,11 @@ Now there's a game icon on your phone. Tap it to play.
 
 1. On your Android phone, open the **latest release**:
    **https://github.com/redaphid/mobile-streets-of-rogue/releases/latest**
-2. Download the file that ends in **`.apk`** (`streets-of-rogue-ish.apk`).
+2. Download the file that ends in **`.apk`** (`backseat.apk`).
 3. Tap the downloaded file to install it. The first time, Android asks to
    **allow installing apps from this source** — say yes, then tap **Install**.
 
-Open **Streets of Rogue-ish** from your app drawer and play.
+Open **Backseat** from your app drawer and play.
 
 **You only install once — it updates itself.** When you're online, the app
 quietly grabs the newest version in the background and uses it next time you

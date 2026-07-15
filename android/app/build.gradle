@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.hypnodroid.streetsofrogueish"
+    namespace = "com.hypnodroid.backseat"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.hypnodroid.streetsofrogueish"
+        applicationId "com.hypnodroid.backseat"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

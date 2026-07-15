@@ -1,4 +1,4 @@
-package com.hypnodroid.streetsofrogueish;
+package com.hypnodroid.backseat;
 
 import com.getcapacitor.BridgeActivity;
 

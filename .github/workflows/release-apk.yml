@@ -63,13 +63,13 @@ jobs:
         run: |
           APK=$(find android/app/build/outputs/apk/debug -name '*.apk' | head -n1)
           if [ -z "$APK" ]; then echo "No APK produced" >&2; exit 1; fi
-          cp "$APK" streets-of-rogue-ish.apk
-          ls -la streets-of-rogue-ish.apk
+          cp "$APK" backseat.apk
+          ls -la backseat.apk
 
       - name: Publish GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
           # DEBUG build for now — see TODO(#30) above.
-          name: "Streets of Rogue-ish ${{ github.ref_name }} (debug APK)"
+          name: "Backseat ${{ github.ref_name }} (debug APK)"
           generate_release_notes: true
-          files: streets-of-rogue-ish.apk
+          files: backseat.apk

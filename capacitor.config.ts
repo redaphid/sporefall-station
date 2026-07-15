@@ -14,11 +14,11 @@ const serverUrl = process.env.CAP_SERVER_URL
 // OTA_UPDATE_URL at build time if the Pages project name differs.
 // statsUrl is empty to disable Capgo's stats reporting (fully self-hosted).
 const otaUpdateUrl =
-  process.env.OTA_UPDATE_URL ?? 'https://streets-of-rogue-ish.pages.dev/ota/check'
+  process.env.OTA_UPDATE_URL ?? 'https://backseat-sd8.pages.dev/ota/check'
 
 const config: CapacitorConfig = {
-  appId: 'com.hypnodroid.streetsofrogueish',
-  appName: 'Streets of Rogue-ish',
+  appId: 'com.hypnodroid.backseat',
+  appName: 'Backseat',
   webDir: 'dist',
   android: {
     // Game renders its own splash-free boot; keep the webview edge-to-edge.

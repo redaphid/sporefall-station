@@ -1,6 +1,6 @@
 # CLAUDE.md — working in this repo
 
-Streets of Rogue-ish: a top-down co-op roguelite (Capacitor/Android, TypeScript,
+Backseat: a top-down co-op roguelite (Capacitor/Android, TypeScript,
 pixi.js) played over Bluetooth LE with no cell service. This file orients an AI
 agent working on the codebase. Human-facing setup lives in `README.md`.
 

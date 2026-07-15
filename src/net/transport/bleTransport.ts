@@ -7,6 +7,7 @@ import {
   type Transport,
   type TransportEvent,
 } from '../types'
+import { toAdvertiseName, toHostLabel } from './hostName'
 
 const MAX_PACKET = 180 // conservative: fits the 185-byte floor after MTU negotiation
 
@@ -33,10 +34,16 @@ export class BleHostTransport implements Transport {
 
   private sawWrite = new Set<PeerId>()
 
+  private advertiseName: string
+
   constructor(
-    private advertiseName: string,
+    displayName: string,
     private log: (s: string) => void = () => {},
-  ) {}
+  ) {
+    // Truncate to the advertisement budget up front so what we log matches what
+    // goes on the air (see toAdvertiseName for the 31-byte PDU math).
+    this.advertiseName = toAdvertiseName(displayName)
+  }
 
   async start(): Promise<void> {
     this.log('host: requesting BLE permissions')
@@ -70,17 +77,19 @@ export class BleHostTransport implements Transport {
       }
       this.emit({ type: 'data', peer: ev.deviceId, bytes: new Uint8Array(ev.value) })
     })
-    // The name is deliberately kept OUT of the advertisement: a 128-bit service
-    // UUID (18B) + flags (3B) already uses ~21 of the 31-byte legacy PDU, so any
-    // name longer than ~8 chars ("SoR Player-42" is 13) makes Android's advertiser
-    // fail with ADVERTISE_FAILED_DATA_TOO_LARGE — silently, because the plugin
-    // resolves before its async onStartFailure fires. Centrals discover us by the
-    // service UUID and show "Unknown host"; the real name arrives after connect.
-    this.log(`host: startAdvertising svc=${BLE_SERVICE_UUID.slice(0, 8)}… (name off adv)`)
+    // We put the name back IN the advertisement so the join list can label each
+    // host (issue #35). The catch: a 128-bit service UUID (18B) + flags (3B) leaves
+    // only ~8 bytes for the local name in the 31-byte legacy PDU. A longer name
+    // fails Android's advertiser with ADVERTISE_FAILED_DATA_TOO_LARGE — silently,
+    // because the plugin resolves before its async onStartFailure fires. So the
+    // name is already truncated to that budget in the constructor (toAdvertiseName),
+    // and includeName:true fits. Centrals read it via getScanRecord().getDeviceName().
+    // The full player name still arrives after connect, in the lobby.
+    this.log(`host: startAdvertising svc=${BLE_SERVICE_UUID.slice(0, 8)}… name="${this.advertiseName}"`)
     await BluetoothLowEnergy.startAdvertising({
       name: this.advertiseName,
       services: [BLE_SERVICE_UUID],
-      includeName: false,
+      includeName: true,
     })
     this.log('host: advertising — waiting for a central to join')
   }
@@ -153,7 +162,7 @@ export class BleClientTransport implements Transport {
   /** Scan for hosts advertising the game service. */
   async scan(onFound: (host: FoundHost) => void): Promise<() => Promise<void>> {
     const listener = await BluetoothLowEnergy.addListener('deviceScanned', (ev) => {
-      const name = ev.device.name ?? 'Unknown host'
+      const name = toHostLabel(ev.device.name, ev.device.deviceId)
       this.log(`join: found ${name} (${ev.device.deviceId})`)
       onFound({ deviceId: ev.device.deviceId, name })
     })

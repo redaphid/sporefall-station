@@ -20,6 +20,43 @@ describe('generateLevel', () => {
     expect(levelChecksum(a)).not.toBe(levelChecksum(c))
   })
 
+  it('cycles themes so consecutive floors look different', () => {
+    const themes = Array.from({ length: 5 }, (_, i) => generateLevel(7, i + 1).theme)
+    // Every adjacent floor pair uses a different district theme.
+    for (let i = 1; i < themes.length; i++) {
+      expect(themes[i]).not.toBe(themes[i - 1])
+    }
+    expect(new Set(themes).size).toBeGreaterThanOrEqual(4)
+  })
+
+  it('varies spawn and exit placement across floors (not always TL->BR)', () => {
+    const spawns = new Set<string>()
+    const exits = new Set<string>()
+    for (let floor = 1; floor <= 12; floor++) {
+      const level = generateLevel(9, floor)
+      spawns.add(`${level.spawn.x},${level.spawn.y}`)
+      exits.add(`${level.exit.x},${level.exit.y}`)
+      // Spawn/exit always sit on opposite sides of the map.
+      const far = Math.hypot(level.spawn.x - level.exit.x, level.spawn.y - level.exit.y)
+      expect(far).toBeGreaterThan(level.w / 2)
+    }
+    expect(spawns.size).toBeGreaterThan(1)
+    expect(exits.size).toBeGreaterThan(1)
+  })
+
+  it('produces set-piece variety: courtyards and vaults appear across floors', () => {
+    const pois = new Set<string>()
+    for (let seed = 1; seed <= 30; seed++) {
+      for (let floor = 1; floor <= 4; floor++) {
+        for (const b of generateLevel(seed, floor).buildings) {
+          if (b.poi) pois.add(b.poi)
+        }
+      }
+    }
+    expect(pois.has('courtyard')).toBe(true)
+    expect(pois.has('vault')).toBe(true)
+  })
+
   it('generates a playable map: buildings exist, spawn and exit are walkable', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const level = generateLevel(seed, 1)
@@ -30,32 +67,36 @@ describe('generateLevel', () => {
     }
   })
 
-  it('every building interior and the exit are reachable from spawn', () => {
+  it('every building interior and the exit are reachable from spawn (all themes)', () => {
     for (let seed = 1; seed <= 50; seed++) {
-      const level = generateLevel(seed, 1)
-      const grid = new TileGrid(level.w, level.h, level.tiles)
-      const reachable = bfs(level.w, level.h, grid, Math.floor(level.spawn.x), Math.floor(level.spawn.y))
-      for (const b of level.buildings) {
-        expect(reachable[(b.rect.y + 1) * level.w + b.rect.x + 1], `building at ${b.rect.x},${b.rect.y} seed ${seed}`).toBe(1)
+      for (let floor = 1; floor <= 4; floor++) {
+        const level = generateLevel(seed, floor)
+        const grid = new TileGrid(level.w, level.h, level.tiles)
+        const reachable = bfs(level.w, level.h, grid, Math.floor(level.spawn.x), Math.floor(level.spawn.y))
+        for (const b of level.buildings) {
+          expect(reachable[(b.rect.y + 1) * level.w + b.rect.x + 1], `building at ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).toBe(1)
+        }
+        expect(reachable[level.exit.y * level.w + level.exit.x], `exit seed ${seed} floor ${floor}`).toBe(1)
       }
-      expect(reachable[level.exit.y * level.w + level.exit.x], `exit seed ${seed}`).toBe(1)
     }
   })
 
-  it('every room of every building is reachable (interior doors work)', () => {
+  it('every room of every building is reachable (interior doors work, all themes)', () => {
     for (let seed = 1; seed <= 50; seed++) {
-      const level = generateLevel(seed, 1)
-      const grid = new TileGrid(level.w, level.h, level.tiles)
-      const reachable = bfs(level.w, level.h, grid, Math.floor(level.spawn.x), Math.floor(level.spawn.y))
-      for (const b of level.buildings) {
-        for (const room of b.rooms) {
-          let anyReachable = false
-          for (let y = room.y; y < room.y + room.h && !anyReachable; y++) {
-            for (let x = room.x; x < room.x + room.w && !anyReachable; x++) {
-              if (grid.get(x, y) === Tile.Floor && reachable[y * level.w + x]) anyReachable = true
+      for (let floor = 1; floor <= 4; floor++) {
+        const level = generateLevel(seed, floor)
+        const grid = new TileGrid(level.w, level.h, level.tiles)
+        const reachable = bfs(level.w, level.h, grid, Math.floor(level.spawn.x), Math.floor(level.spawn.y))
+        for (const b of level.buildings) {
+          for (const room of b.rooms) {
+            let anyReachable = false
+            for (let y = room.y; y < room.y + room.h && !anyReachable; y++) {
+              for (let x = room.x; x < room.x + room.w && !anyReachable; x++) {
+                if (grid.get(x, y) === Tile.Floor && reachable[y * level.w + x]) anyReachable = true
+              }
             }
+            expect(anyReachable, `room ${room.x},${room.y} in building ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).toBe(true)
           }
-          expect(anyReachable, `room ${room.x},${room.y} in building ${b.rect.x},${b.rect.y} seed ${seed}`).toBe(true)
         }
       }
     }

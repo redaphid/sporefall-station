@@ -1,0 +1,75 @@
+name: release-apk
+
+# Build the Android APK and publish it as a GitHub Release when a version tag
+# (v1.2.3) is pushed. Players download the APK from the Releases page and
+# sideload it (see docs/play.md). Independent of the web / OTA path.
+#
+# ---------------------------------------------------------------------------
+# TODO(#30 slice 1): switch from DEBUG to a SIGNED RELEASE build.
+# Right now this attaches the *debug* APK (scripts/build-apk.sh -> assembleDebug)
+# because release signing is not set up yet. A debug APK installs and plays, but
+# is signed with the throwaway debug key, so it CANNOT upgrade in place over a
+# release build and is not suitable for OTA. To finish:
+#   1. Generate a release keystore (keep it OUT of git).
+#   2. Wire android/app/build.gradle release signingConfig from env /
+#      keystore.properties (gitignored).
+#   3. Add release build (assembleRelease) producing a signed app-release.apk.
+#   4. Store the keystore + passwords as repo secrets (base64 keystore,
+#      ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD) and
+#      decode/build them here. See docs/deploy.md "Signed release APK (TODO)".
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # TODO(#30): replace with a signed release build once the keystore is wired.
+      - name: Build debug APK
+        run: npm run build:apk
+        env:
+          CAP_SERVER_URL: ""
+
+      - name: Stage release asset
+        run: |
+          APK=$(find android/app/build/outputs/apk/debug -name '*.apk' | head -n1)
+          if [ -z "$APK" ]; then echo "No APK produced" >&2; exit 1; fi
+          cp "$APK" streets-of-rogue-ish.apk
+          ls -la streets-of-rogue-ish.apk
+
+      - name: Publish GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          # DEBUG build for now — see TODO(#30) above.
+          name: "Streets of Rogue-ish ${{ github.ref_name }} (debug APK)"
+          generate_release_notes: true
+          files: streets-of-rogue-ish.apk

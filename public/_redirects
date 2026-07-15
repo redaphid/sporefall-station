@@ -1,0 +1,3 @@
+# SPA fallback: serve index.html for any route so deep links / refreshes work.
+# Copied into dist/ by Vite at build time.
+/*  /index.html  200

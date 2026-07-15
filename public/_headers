@@ -1,0 +1,24 @@
+# Cloudflare Pages headers (copied into dist/ by Vite at build time).
+
+# Hashed build assets are immutable — cache them hard.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Never cache the HTML shell, so a new deploy is picked up immediately.
+/index.html
+  Cache-Control: no-cache
+
+/
+  Cache-Control: no-cache
+
+# OTA: the manifest must never be cached (so a new bundle is seen immediately);
+# the versioned bundle zips are immutable.
+/ota/version.json
+  Cache-Control: no-store
+/ota/*.zip
+  Cache-Control: public, max-age=31536000, immutable
+
+# Baseline security headers for the whole site.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

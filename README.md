@@ -4,6 +4,10 @@ A top-down co-op roguelite for car rides with **zero cell service**: up to 4 pla
 over **Bluetooth LE**, one phone hosting the authoritative sim, everything bundled
 offline in a Capacitor Android app.
 
+> **Just want to play?** See **[docs/play.md](docs/play.md)** — play in a browser
+> (always current) or install the Android app (install once, auto-updates).
+> Shipping/CI setup lives in **[docs/deploy.md](docs/deploy.md)**.
+
 Procedurally generated city floors · 4 classes (Soldier / Thief / Doctor / Hacker) ·
 missions (steal the briefcase, take out the boss) · cops, crime and alarm ·
 lockpicking, chloroform, grenades, downed-teammate revives.

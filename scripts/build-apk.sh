@@ -81,15 +81,15 @@ printf 'sdk.dir=%s\n' "$ANDROID_HOME" > "$ROOT/android/local.properties"
 
 # --- Build -------------------------------------------------------------------
 cd "$ROOT"
-npm run build
-npx cap sync android
+pnpm run build
+pnpm exec cap sync android
 ( cd android && ./gradlew assembleDebug "$@" )
 
 APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
 if [ -f "$APK" ]; then
   echo ""
   echo "APK built: $APK ($(du -h "$APK" | cut -f1))"
-  echo "Install with: adb install -r \"$APK\"   (or: npm run install:apk)"
+  echo "Install with: adb install -r \"$APK\"   (or: pnpm run install:apk)"
 else
   echo "ERROR: build finished but no APK at $APK" >&2
   exit 1

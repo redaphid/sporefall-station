@@ -8,3 +8,4 @@ android/build/
 android/local.properties
 *.log
 pnpm-lock.yaml
+.claude/worktrees/

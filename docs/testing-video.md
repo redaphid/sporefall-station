@@ -49,7 +49,7 @@ applyScenario(w, 'fire')      // or hand-place exactly the entities you need
 writeFileSync(`${dir}<name>.json`, JSON.stringify(serializeWorld(w), null, 2) + '\n')
 ```
 
-Regenerate all fixtures with `npm run gen:fixtures`. A `fixtures.test.ts` unit
+Regenerate all fixtures with `pnpm run gen:fixtures`. A `fixtures.test.ts` unit
 test asserts each committed feature fixture deserializes + round-trips, so a
 stale golden fails `vitest` (no browser needed).
 
@@ -89,14 +89,14 @@ systems-only beats like fire).
 ### 3. Run it
 
 ```
-npm run e2e:features            # all e2e/feature-*.mjs
-npm run e2e:feature:fire        # just the fire one
+pnpm run e2e:features            # all e2e/feature-*.mjs
+pnpm run e2e:feature:fire        # just the fire one
 ```
 
 The script (`e2e/run-features.sh`) builds, serves the bundle on its own port,
 runs the tests, and writes `e2e/output/feature-<name>.mp4` (+ labeled stills).
 **Requires the preview server + ffmpeg** — it is NOT part of the vitest unit path
-(`npx vitest run` stays green without a browser). Wire it into CI as a separate
+(`pnpm exec vitest run` stays green without a browser). Wire it into CI as a separate
 job that has Chromium + ffmpeg available.
 
 ## The two backfilled features

@@ -15,8 +15,8 @@ lockpicking, chloroform, grenades, downed-teammate revives.
 ## Play in a browser (dev)
 
 ```bash
-npm install
-npm run dev            # http://localhost:5173
+pnpm install
+pnpm run dev            # http://localhost:5173
 ```
 
 - **Move** WASD/arrows · **Attack** J/Space · **Interact** K/E · **Ability** L/Shift
@@ -45,9 +45,9 @@ Requires a **JDK 21+** (Capacitor 8 / AGP 8.13 compile at Java 21 — an older J
 with `invalid source release: 21`) and the **Android SDK**.
 
 ```bash
-npm install
-npm run build:apk      # builds web -> cap sync -> gradle assembleDebug
-npm run install:apk    # adb install -r ... to an attached phone
+pnpm install
+pnpm run build:apk      # builds web -> cap sync -> gradle assembleDebug
+pnpm run install:apk    # adb install -r ... to an attached phone
 ```
 
 `build:apk` auto-locates a JDK 21+ and the Android SDK, so it works even when your
@@ -112,10 +112,10 @@ bit-for-bit, which makes the world legible to an AI agent and to rigorous tests.
 ## Tests
 
 ```bash
-npm test                              # 550+ unit/sim tests (determinism, netcode, combat, serialize)
-npx tsx scripts/test/mp-smoke.ts      # 2-tab co-op end-to-end (needs `npm run dev` running)
-npx tsx scripts/test/dump-level.ts 7  # eyeball a generated city as ASCII
-npm run e2e                           # deterministic recorded video + state-assert scenarios
+pnpm test                              # 550+ unit/sim tests (determinism, netcode, combat, serialize)
+pnpm exec tsx scripts/test/mp-smoke.ts      # 2-tab co-op end-to-end (needs `pnpm run dev` running)
+pnpm exec tsx scripts/test/dump-level.ts 7  # eyeball a generated city as ASCII
+pnpm run e2e                           # deterministic recorded video + state-assert scenarios
 ```
 
 Fixtures + exact-state replay live in `src/game/__fixtures__/` and `src/game/testkit.ts`.

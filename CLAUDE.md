@@ -55,7 +55,7 @@ What "AI-native" means here, concretely:
 
 Features are built on `feat/*` branches (often by background subagents in git
 worktrees) and **merged into `main`** — `main` is the release; phones pull/run it.
-Gate every merge on `npm run build` (typecheck) + `npx vitest run` + `npm run lint`
+Gate every merge on `pnpm run build` (typecheck) + `pnpm exec vitest run` + `pnpm run lint`
 all green, resolve conflicts (watch for *semantic* conflicts, not just textual),
 re-run the full suite after each merge, then `git push origin main`.
 

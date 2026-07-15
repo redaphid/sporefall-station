@@ -26,18 +26,18 @@ everyone meets at a small relay ("the hub") you run on your laptop:
 | CLI | `tools/debug-cli/cli.ts` | laptop |
 | MCP server | `tools/mcp-debug/server.ts` | laptop |
 
-Everything runs via `npx tsx` (no build step). Ports: hub `7810`, MCP `7811`.
+Everything runs via `pnpm exec tsx` (no build step). Ports: hub `7810`, MCP `7811`.
 
 ## 1. Start the hub (laptop)
 
 ```sh
-npx tsx tools/debug-hub/hub.ts          # ws://0.0.0.0:7810
-# override: npx tsx tools/debug-hub/hub.ts 7900   or   DEBUG_HUB_PORT=7900 ...
+pnpm exec tsx tools/debug-hub/hub.ts          # ws://0.0.0.0:7810
+# override: pnpm exec tsx tools/debug-hub/hub.ts 7900   or   DEBUG_HUB_PORT=7900 ...
 ```
 
 ## 2. Launch the app with `?debug`
 
-Serve the app from the laptop (`npm run dev`) and open it with `?debug`. The
+Serve the app from the laptop (`pnpm run dev`) and open it with `?debug`. The
 channel derives the hub URL from whoever served the page, so under live-reload it
 "just works":
 
@@ -53,14 +53,14 @@ flag is set) and only attaches to sessions that own an authoritative world
 ## 3. Drive it from the CLI
 
 ```sh
-npx tsx tools/debug-cli/cli.ts state
-npx tsx tools/debug-cli/cli.ts entities
-npx tsx tools/debug-cli/cli.ts get 5
-npx tsx tools/debug-cli/cli.ts spawn npc cop 20 20
-npx tsx tools/debug-cli/cli.ts set 5 '{"health":{"hp":1}}'
-npx tsx tools/debug-cli/cli.ts teleport 5 30 30
-npx tsx tools/debug-cli/cli.ts kill 5
-npx tsx tools/debug-cli/cli.ts --watch          # tail the live event stream
+pnpm exec tsx tools/debug-cli/cli.ts state
+pnpm exec tsx tools/debug-cli/cli.ts entities
+pnpm exec tsx tools/debug-cli/cli.ts get 5
+pnpm exec tsx tools/debug-cli/cli.ts spawn npc cop 20 20
+pnpm exec tsx tools/debug-cli/cli.ts set 5 '{"health":{"hp":1}}'
+pnpm exec tsx tools/debug-cli/cli.ts teleport 5 30 30
+pnpm exec tsx tools/debug-cli/cli.ts kill 5
+pnpm exec tsx tools/debug-cli/cli.ts --watch          # tail the live event stream
 ```
 
 Target a non-default hub with `DEBUG_HUB_PORT=7900` or `DEBUG_HUB_URL=ws://host:port`.
@@ -70,7 +70,7 @@ Target a non-default hub with `DEBUG_HUB_PORT=7900` or `DEBUG_HUB_URL=ws://host:
 Start it (it opens its own debugger connection to the hub):
 
 ```sh
-npx tsx tools/mcp-debug/server.ts               # http://localhost:7811/mcp
+pnpm exec tsx tools/mcp-debug/server.ts               # http://localhost:7811/mcp
 # PORT=7811, hub via DEBUG_HUB_URL / DEBUG_HUB_PORT
 ```
 
@@ -146,14 +146,14 @@ Run a whole session headless via the same hub the phone uses — start the relay
 attach the harness backend, then drive it from the CLI/MCP:
 
 ```sh
-npx tsx tools/debug-hub/hub.ts &            # the relay
-npx tsx tools/debug-harness/host.ts         # the headless "game" backend (a GameHarness)
-npx tsx tools/debug-cli/cli.ts create soldier 42
-npx tsx tools/debug-cli/cli.ts join_bot Bravo thief
-npx tsx tools/debug-cli/cli.ts start_run
-npx tsx tools/debug-cli/cli.ts record_start
-npx tsx tools/debug-cli/cli.ts tick 300
-npx tsx tools/debug-cli/cli.ts record_stop > run.json
+pnpm exec tsx tools/debug-hub/hub.ts &            # the relay
+pnpm exec tsx tools/debug-harness/host.ts         # the headless "game" backend (a GameHarness)
+pnpm exec tsx tools/debug-cli/cli.ts create soldier 42
+pnpm exec tsx tools/debug-cli/cli.ts join_bot Bravo thief
+pnpm exec tsx tools/debug-cli/cli.ts start_run
+pnpm exec tsx tools/debug-cli/cli.ts record_start
+pnpm exec tsx tools/debug-cli/cli.ts tick 300
+pnpm exec tsx tools/debug-cli/cli.ts record_stop > run.json
 ```
 
 The MCP server re-exposes these as `session_create` / `session_join_bot` /
@@ -181,11 +181,11 @@ tests).
 ## Verify (no phone needed)
 
 ```sh
-npx tsx scripts/test/debug-harness-smoke.ts     # hub + real World + real channel + debugger round-trip
-npx tsx scripts/test/mcp-debug-smoke.ts         # + MCP server & a real MCP client
-npx tsx scripts/test/harness-e2e.ts             # full co-op flow + record/replay determinism + loopback net joiners
-npx tsx scripts/test/harness-channel-smoke.ts   # CLI/MCP → hub → harness over a real WebSocket
-npx vitest run src/debug/                        # verb / harness / record / channel unit tests
+pnpm exec tsx scripts/test/debug-harness-smoke.ts     # hub + real World + real channel + debugger round-trip
+pnpm exec tsx scripts/test/mcp-debug-smoke.ts         # + MCP server & a real MCP client
+pnpm exec tsx scripts/test/harness-e2e.ts             # full co-op flow + record/replay determinism + loopback net joiners
+pnpm exec tsx scripts/test/harness-channel-smoke.ts   # CLI/MCP → hub → harness over a real WebSocket
+pnpm exec vitest run src/debug/                        # verb / harness / record / channel unit tests
 ```
 
 ## Deferred / out of scope

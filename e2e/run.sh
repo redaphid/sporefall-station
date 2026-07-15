@@ -14,10 +14,10 @@ OUT="$ROOT/e2e/output"
 BASE_URL="http://localhost:${PORT}"
 
 echo "[run] building…"
-npx vite build >/dev/null
+pnpm exec vite build >/dev/null
 
 echo "[run] serving on :${PORT}…"
-npx vite preview --port "$PORT" --strictPort >/tmp/e2e-preview.log 2>&1 &
+pnpm exec vite preview --port "$PORT" --strictPort >/tmp/e2e-preview.log 2>&1 &
 SERVER_PID=$!
 trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 

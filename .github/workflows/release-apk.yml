@@ -33,10 +33,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 25
+          cache: pnpm
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -51,14 +52,11 @@ jobs:
         run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Install dependencies
-        # npm install (not ci) to match the other workflows — CI's node-22 npm
-        # rejects a lockfile written by a newer local npm on optional platform
-        # deps (@emnapi). See deploy-web.yml for the same fix.
-        run: npm install --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
 
       # TODO(#30): replace with a signed release build once the keystore is wired.
       - name: Build debug APK
-        run: npm run build:apk
+        run: pnpm run build:apk
         env:
           CAP_SERVER_URL: ""
 

@@ -194,7 +194,7 @@ inputs flowing host-ward and snapshots flowing back, plus the three rejection
 paths (version mismatch, join-after-start, lobby full). Run with:
 
 ```bash
-npm test
+pnpm test
 ```
 
 ### Manual two-device test (needs two real phones)
@@ -202,7 +202,7 @@ npm test
 A real BLE link can't be exercised headlessly, so verify the transport itself on
 hardware:
 
-1. `npm run build:apk` then `npm run install:apk` (with a phone on `adb`).
+1. `pnpm run build:apk` then `pnpm run install:apk` (with a phone on `adb`).
    Install the resulting `android/app/build/outputs/apk/debug/app-debug.apk` on
    a **second** phone too (e.g. `adb install -r`, or copy the APK over).
 2. Turn Bluetooth on for both. Disconnect from Wi-Fi/data on both to prove it's

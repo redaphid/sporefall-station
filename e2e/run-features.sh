@@ -13,10 +13,10 @@ export BASE_URL="http://localhost:${PORT}"
 export E2E_OUT="${E2E_OUT:-e2e/output}"
 
 echo "[features] building…"
-npx vite build >/dev/null
+pnpm exec vite build >/dev/null
 
 echo "[features] serving on :${PORT}…"
-npx vite preview --port "$PORT" --strictPort >/tmp/e2e-features-preview.log 2>&1 &
+pnpm exec vite preview --port "$PORT" --strictPort >/tmp/e2e-features-preview.log 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true' EXIT
 

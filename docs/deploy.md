@@ -39,16 +39,16 @@ comes from `wrangler.toml` (`pages_build_output_dir = "dist"`).
      `--project-name` in `deploy-web.yml` and `name` in `wrangler.toml`).
    - Or CLI, which also does the first deploy:
      ```bash
-     npm ci
-     npm run build            # produces dist/  (leave CAP_SERVER_URL unset!)
-     npx wrangler login       # opens a browser to authorize your account
-     npx wrangler pages deploy --project-name=backseat
+     pnpm install --frozen-lockfile
+     pnpm run build            # produces dist/  (leave CAP_SERVER_URL unset!)
+     pnpm exec wrangler login       # opens a browser to authorize your account
+     pnpm exec wrangler pages deploy --project-name=backseat
      ```
 2. **Create an API token** for CI: Cloudflare dashboard → **My Profile** →
    **API Tokens** → **Create Token** → template **"Edit Cloudflare Workers"**,
    or a custom token with **Account → Cloudflare Pages → Edit** permission.
 3. **Find your Account ID:** dashboard → **Workers & Pages** (right sidebar), or
-   `npx wrangler whoami`.
+   `pnpm exec wrangler whoami`.
 4. **Add GitHub repo secrets** (Settings → Secrets and variables → Actions):
    - `CLOUDFLARE_API_TOKEN` — the token from step 2 (Pages:Edit scope).
    - `CLOUDFLARE_ACCOUNT_ID` — from step 3.
@@ -77,7 +77,7 @@ build dir.
 ## B. Android APK release
 
 **Approach:** on a `v*` tag, `release-apk.yml` sets up JDK 21 + Android SDK,
-runs `scripts/build-apk.sh` (via `npm run build:apk`), and attaches the APK to a
+runs `scripts/build-apk.sh` (via `pnpm run build:apk`), and attaches the APK to a
 GitHub Release with `softprops/action-gh-release@v2`. Uses the built-in
 `GITHUB_TOKEN` — **no extra secret needed** for the debug flow.
 

@@ -10,7 +10,7 @@ and the **laptop browser joins** as a client over
 - Some Linux Chrome builds ship Web Bluetooth behind a flag: open
   `chrome://flags/#enable-web-bluetooth`, set it to **Enabled**, relaunch.
 - Web Bluetooth only runs in a secure context: **localhost or HTTPS**.
-  - Playing on the laptop itself: `npm run dev` and open
+  - Playing on the laptop itself: `pnpm run dev` and open
     `http://localhost:5173` — localhost counts as secure, nothing else needed.
   - `vite preview --host` served to *another* machine over plain HTTP will
     **not** work — Chrome disables Web Bluetooth there. For the car use-case

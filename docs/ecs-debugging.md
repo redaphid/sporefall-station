@@ -132,8 +132,8 @@ place to set breakpoints in `src/game/**`.
 Run it:
 
 ```sh
-npx tsx scripts/test/inspect-world.ts src/game/__fixtures__/mid-run.json 30
-npx tsx scripts/test/inspect-world.ts --new 20260715 1 30      # fresh seed/floor, 30 ticks
+pnpm exec tsx scripts/test/inspect-world.ts src/game/__fixtures__/mid-run.json 30
+pnpm exec tsx scripts/test/inspect-world.ts --new 20260715 1 30      # fresh seed/floor, 30 ticks
 ```
 
 Debug it under Chrome DevTools / VS Code (breakpoints, step, inspect `world`):
@@ -146,12 +146,12 @@ Then open `chrome://inspect` and click **inspect**. Execution pauses at the
 `debugger` line with `world` already loaded; set breakpoints in `src/game/**`
 (a system, the RNG, serialize) and resume — each `tickWorld` runs the whole sim
 step under the debugger. Capture a live world to a file first with
-`npx tsx tools/debug-cli/cli.ts dump > world.json`, then feed `world.json` in.
+`pnpm exec tsx tools/debug-cli/cli.ts dump > world.json`, then feed `world.json` in.
 
 ## Verify
 
 ```sh
-npx vitest run src/debug/                # verb / harness / record / channel unit tests
-npx vitest run src/debug/verbs.serialize.test.ts   # the #49 dump/load/step/schema tests
-npx tsx scripts/test/inspect-world.ts src/game/__fixtures__/mid-run.json 30
+pnpm exec vitest run src/debug/                # verb / harness / record / channel unit tests
+pnpm exec vitest run src/debug/verbs.serialize.test.ts   # the #49 dump/load/step/schema tests
+pnpm exec tsx scripts/test/inspect-world.ts src/game/__fixtures__/mid-run.json 30
 ```

@@ -32,7 +32,7 @@ export CAP_SERVER_URL="http://$IP:$PORT"
 echo "Live-reload server: $CAP_SERVER_URL"
 
 # --- Build the live-reload APK (cap sync picks up CAP_SERVER_URL) -------------
-npm run build:apk
+pnpm run build:apk
 
 APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
 
@@ -61,4 +61,4 @@ if ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
   exit 0
 fi
 echo "Starting Vite on :$PORT ..."
-exec npm run dev -- --host --port "$PORT"
+exec pnpm run dev -- --host --port "$PORT"

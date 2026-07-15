@@ -44,6 +44,8 @@ const boot = async (): Promise<void> => {
   if (!session) return
   const scenario = params.get('scenario')
   if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
+  const zoom = Number(params.get('zoom'))
+  if (zoom >= 1 && zoom <= 4) renderer.camera.zoom = zoom
   if (params.has('e2e')) {
     ;(window as unknown as { __sor: Session }).__sor = session
     if (session instanceof HostSession)

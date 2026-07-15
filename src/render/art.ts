@@ -15,7 +15,30 @@ export interface ArtRegistry {
   entity(archetype: string): Texture
   /** White silhouette of the entity texture, swapped in during hit flash. */
   entityFlash(archetype: string): Texture
+  /** True when this archetype draws as a billboarded character sprite (which
+   * should flip left/right, not rotate like the top-down procedural blobs). */
+  isCharacterSprite(archetype: string): boolean
+  /** Directional sprite set (front/side/back × idle/step) for an archetype, if
+   * one is loaded — lets the renderer swap by heading instead of rotating. */
+  characterSet(archetype: string): DirSet | undefined
+  /** The walking (step) pose for an archetype, if a step frame exists. */
+  walkStep(archetype: string): Texture | undefined
+  /** Fire flicker frames (empty → caller falls back to the procedural flame). */
+  flameFrames(): readonly Texture[]
+  /** A one-shot effect clip's frames, by effect key. Empty if not loaded. */
+  effectFrames(key: EffectKey): readonly Texture[]
 }
+
+export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
+
+/** A billboarded character's facings. Left is the side sprite flipped in the
+ * renderer, so only three sprites (front/side/back) are generated per pose. */
+export type Facing = 'front' | 'side' | 'back'
+export interface DirPose {
+  idle?: Texture
+  step?: Texture
+}
+export type DirSet = Record<Facing, DirPose>
 
 export interface SpriteTextures {
   floor?: Texture
@@ -24,9 +47,71 @@ export interface SpriteTextures {
   cop?: Texture
   item?: Texture
   prop?: Texture
+  /** New character idle textures, keyed by archetype. */
+  thug?: Texture
+  scientist?: Texture
+  robot?: Texture
+  /** Walk (step) frames, keyed by archetype. */
+  thugStep?: Texture
+  scientistStep?: Texture
+  robotStep?: Texture
+  /** Directional character sets, keyed by archetype. */
+  chars?: Record<string, DirSet>
+  /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
+  items?: Record<string, Texture>
+  /** World prop sprites, keyed by archetype (barrel/atm/…). */
+  props?: Record<string, Texture>
+  /** Fire flicker frames, cycled by the animator. */
+  flames?: Texture[]
+  /** One-shot effect clips. */
+  hit?: Texture[]
+  explosion?: Texture[]
+  pickup?: Texture[]
+  blood?: Texture[]
 }
 
-const COP_ARCHETYPES = new Set(['cop', 'thug', 'gangster', 'bouncer'])
+// Archetypes that borrow another archetype's directional set (bouncers use the
+// cop body; the boss uses the thug; shopkeepers use the civilian).
+const CHARSET_ALIAS: Record<string, string> = {
+  player: 'player',
+  cop: 'cop',
+  gangster: 'gangster',
+  bouncer: 'cop',
+  thug: 'thug',
+  boss: 'thug',
+  civilian: 'civilian',
+  scientist: 'scientist',
+  robot: 'robot',
+  shopkeeper: 'civilian',
+}
+
+// World props with a bespoke sprite (beyond the wooden crate).
+const PROP_SPRITE: Record<string, string> = {
+  barrel: 'barrel',
+  atm: 'atm',
+  vending: 'vending-machine',
+  tv: 'tv',
+  toilet: 'toilet',
+}
+
+// Consumables/weapons that reuse another item's sprite.
+const ITEM_ALIAS: Record<string, string> = { bandage: 'medkit' }
+
+// Archetypes with a dedicated character sprite; the rest reuse the cop body.
+const SPRITE_ARCHETYPES: Record<string, keyof SpriteTextures> = {
+  player: 'player',
+  thug: 'thug',
+  scientist: 'scientist',
+  robot: 'robot',
+  cop: 'cop',
+  gangster: 'cop',
+  bouncer: 'cop',
+}
+const STEP_ARCHETYPES: Record<string, keyof SpriteTextures> = {
+  thug: 'thugStep',
+  scientist: 'scientistStep',
+  robot: 'robotStep',
+}
 
 const TILE_COLORS: Record<number, number> = {
   [Tile.Street]: 0x33333c,
@@ -213,12 +298,35 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   }
 
   const spriteForArchetype = (archetype: string): Texture | undefined => {
-    if (archetype === 'player') return sprites.player
-    if (COP_ARCHETYPES.has(archetype)) return sprites.cop
-    if (archetype.startsWith('pickup.')) return sprites.item
+    const key = SPRITE_ARCHETYPES[archetype]
+    if (key) return sprites[key] as Texture | undefined
+    if (archetype.startsWith('pickup.')) {
+      const id = archetype.slice('pickup.'.length)
+      return sprites.items?.[id] ?? sprites.items?.[ITEM_ALIAS[id]] ?? sprites.item
+    }
+    const propKey = PROP_SPRITE[archetype]
+    if (propKey) return sprites.props?.[propKey]
     if (archetype === 'crate' || archetype.startsWith('prop')) return sprites.prop
     return undefined
   }
+
+  const characterSet = (archetype: string): DirSet | undefined => {
+    const alias = CHARSET_ALIAS[archetype]
+    return alias ? sprites.chars?.[alias] : undefined
+  }
+
+  const isCharacterSprite = (archetype: string): boolean =>
+    characterSet(archetype) !== undefined ||
+    (spriteForArchetype(archetype) !== undefined && archetype in SPRITE_ARCHETYPES)
+
+  const walkStep = (archetype: string): Texture | undefined => {
+    const key = STEP_ARCHETYPES[archetype]
+    return key ? (sprites[key] as Texture | undefined) : undefined
+  }
+
+  const flameFrames = (): readonly Texture[] => sprites.flames ?? []
+
+  const effectFrames = (key: EffectKey): readonly Texture[] => sprites[key] ?? []
 
   const entity = (archetype: string): Texture => {
     const real = spriteForArchetype(archetype)
@@ -241,5 +349,14 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     return tex
   }
 
-  return { tile, entity, entityFlash }
+  return {
+    tile,
+    entity,
+    entityFlash,
+    isCharacterSprite,
+    characterSet,
+    walkStep,
+    flameFrames,
+    effectFrames,
+  }
 }

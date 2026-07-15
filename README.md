@@ -22,13 +22,33 @@ npm run dev            # http://localhost:5173
 
 ## Android build
 
-One-time setup lives in `~/android/` (JDK 21 at `~/android/jdk-21`, SDK at `~/android`).
+### Just want the APK? Download it (no build needed)
+
+Every push to `main` and every PR builds `app-debug.apk` in CI (the **android-apk**
+workflow). Grab it without a toolchain:
+
+- **From a workflow run:** GitHub → **Actions** → **android-apk** → newest green run →
+  **Artifacts** → `ecs-game-debug-apk`. Unzip → `app-debug.apk`.
+- **From a Release:** publishing a GitHub Release attaches the APK as `ecs-game.apk`.
+  (Releases only get an APK once one is *published* — draft/absent releases show none.)
+
+Then sideload: enable "install unknown apps", copy the `.apk` to the phone, tap it —
+or `adb install -r app-debug.apk`.
+
+### Build it yourself
+
+Requires a **JDK 21+** (Capacitor 8 / AGP 8.13 compile at Java 21 — an older JDK fails
+with `invalid source release: 21`) and the **Android SDK**.
 
 ```bash
-npm run build && npx cap sync android
-cd android && JAVA_HOME=$HOME/android/jdk-21 ANDROID_HOME=$HOME/android ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+npm install
+npm run build:apk      # builds web -> cap sync -> gradle assembleDebug
+npm run install:apk    # adb install -r ... to an attached phone
 ```
+
+`build:apk` auto-locates a JDK 21+ and the Android SDK, so it works even when your
+default `java` is older. Override either by exporting `JAVA_HOME` / `ANDROID_HOME`
+first. The APK lands at `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ### 2-phone BLE test (the point of all this)
 

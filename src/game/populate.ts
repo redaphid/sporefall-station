@@ -10,13 +10,45 @@ import { addEntity, type World } from './world'
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
 export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
 
+/** A weighted arsenal every populated NPC draws from, so a floor fields a fun
+ * SPREAD of weapons rather than one archetype-locked stick. Common melee/pistol
+ * dominate; heavy and elemental guns are the rarer spice (so freeze/fire/shock
+ * turn up but don't blanket the floor). Drawn from a DEDICATED `npc-weapons` fork
+ * (see populateWorld) so weapon rolls never perturb the loot/position stream —
+ * same seed → same layout, whatever the arsenal does. */
+const NPC_ARSENAL: [string, number][] = [
+  ['knife', 5],
+  ['bat', 5],
+  ['pistol', 5],
+  ['shotgun', 2],
+  ['machinegun', 2],
+  ['sledgehammer', 1],
+  ['freezeRay', 1],
+  ['flamethrower', 1],
+  ['stunGun', 1],
+]
+const ARSENAL_TOTAL = NPC_ARSENAL.reduce((s, [, wt]) => s + wt, 0)
+
+/** Weighted pick from the arsenal — a fully deterministic function of `rng`. */
+const rollWeapon = (rng: Rng): string => {
+  let roll = rng.int(1, ARSENAL_TOTAL)
+  for (const [id, wt] of NPC_ARSENAL) {
+    roll -= wt
+    if (roll <= 0) return id
+  }
+  return NPC_ARSENAL[0][0]
+}
+
 /** Host-only: fill a freshly generated level with NPCs and loot. */
 export const populateWorld = (w: World): void => {
   const rng = w.rng.fork('populate')
+  // Weapon assignment rides its OWN stream so it can vary the arsenal without
+  // shifting the loot/position dice — layout stays bit-identical per seed.
+  const wrng = w.rng.fork('npc-weapons')
   for (let i = 0; i < w.level.buildings.length; i++) {
-    populateBuilding(w, rng, w.level.buildings[i])
+    populateBuilding(w, rng, wrng, w.level.buildings[i])
   }
-  spawnStreetLife(w, rng)
+  spawnStreetLife(w, rng, wrng)
   sprinkleLoot(w, rng)
   scatterModPickups(w)
 }
@@ -35,7 +67,7 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   clinic: [{ archetype: 'civilian', count: [1, 2] }],
 }
 
-const populateBuilding = (w: World, rng: Rng, building: Building): void => {
+const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): void => {
   const specs = [...ROLE_SPAWNS[building.role]]
   // Difficulty ramp: deeper floors gang up
   if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'gangster', count: [1, 2] })
@@ -45,7 +77,7 @@ const populateBuilding = (w: World, rng: Rng, building: Building): void => {
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
       const spot = randomFloorInBuilding(w, rng, building)
-      if (spot) spawnNpc(w, spec.archetype, spot.x, spot.y)
+      if (spot) spawnNpc(w, spec.archetype, spot.x, spot.y, wrng)
     }
   }
   if (building.role === 'shop') stockShop(w, rng, building)
@@ -92,18 +124,18 @@ const stockShop = (w: World, rng: Rng, building: Building): void => {
   }
 }
 
-const spawnStreetLife = (w: World, rng: Rng): void => {
+const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
   const wanderers = rng.int(4, 7)
   for (let i = 0; i < wanderers; i++) {
     const spot = randomTileOfType(w, rng, Tile.Sidewalk) ?? randomTileOfType(w, rng, Tile.Street)
-    if (spot) spawnNpc(w, 'civilian', spot.x, spot.y)
+    if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
   const copPairs = 1 + Math.floor(w.floor / 3)
   for (let i = 0; i < copPairs; i++) {
     const spot = randomTileOfType(w, rng, Tile.Street)
     if (spot) {
-      spawnNpc(w, 'cop', spot.x, spot.y)
-      spawnNpc(w, 'cop', spot.x + 0.8, spot.y)
+      spawnNpc(w, 'cop', spot.x, spot.y, wrng)
+      spawnNpc(w, 'cop', spot.x + 0.8, spot.y, wrng)
     }
   }
 }
@@ -176,14 +208,16 @@ const randomFloorInRoom = (
   return null
 }
 
-export const spawnNpc = (w: World, archetype: string, x: number, y: number): Entity => {
+export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng?: Rng): Entity => {
   const def = NPCS[archetype]
   const e = makeEntity('npc', archetype, x, y)
   e.speed = def.speed
   // Difficulty ramp: +15% hp per floor past the first
   const hp = Math.round(def.hp * (1 + 0.15 * (w.floor - 1)))
   e.health = { hp, max: hp, iframes: 0 }
-  e.combat = { weapon: def.weapon, cooldown: 0 }
+  // Varied loadout when populated with a weapon stream; direct callers (tests,
+  // scenarios) with no `wrng` keep the archetype's signature weapon for stability.
+  e.combat = { weapon: wrng ? rollWeapon(wrng) : def.weapon, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
   e.ai = {
     mode: 'idle',

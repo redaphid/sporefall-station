@@ -17,6 +17,7 @@
   "rng": -1565684783,
   "baseRng": 20260715,
   "levelChecksum": 3150501330,
+  "hostile": false,
   "entities": [
     {
       "id": 1,

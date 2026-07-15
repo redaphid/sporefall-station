@@ -2,7 +2,7 @@ import { WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import { doorClosedAt, type World } from '../world'
-import { applyDamage, spawnProjectile } from './combat'
+import { fireWeapon } from './combat'
 import { arbitrateGoal, BATTLE, FLEE, INVESTIGATE, PURSUE, type Goal } from './goals'
 import { isImmobilized } from './statusFx'
 
@@ -89,22 +89,25 @@ const steer = (w: World, e: Entity): void => {
       if (target && !target.dead && dist <= weapon.range * 0.8 && canSee(w, e, target)) {
         e.facing = Math.atan2(dy, dx) + (w.rng.next() - 0.5) * 0.15 // imperfect aim
         if (e.combat && e.combat.cooldown <= 0) {
-          e.combat.cooldown = weapon.cooldownTicks + w.rng.int(0, 10) // stagger volleys
-          spawnProjectile(w, e, weapon.damage, weapon.projectileSpeed ?? 12, weapon.range)
+          // THE shared fire path — mods/elements/pellets apply to NPCs too.
+          fireWeapon(w, e)
+          e.combat.cooldown += w.rng.int(0, 10) // stagger volleys so they don't fire in lockstep
         }
-        // Hold a standoff distance instead of closing to melee
+        // Keep spacing: back off if crowded to melee range, else strafe a little
+        // (perpendicular, side chosen by id) so a firing line doesn't clump.
         if (dist < weapon.range * 0.4) {
           e.intent.x = -dx / dist
           e.intent.y = -dy / dist
+        } else {
+          const side = e.id % 2 === 0 ? 1 : -1
+          e.intent.x = (-dy / dist) * side * 0.35
+          e.intent.y = (dx / dist) * side * 0.35
         }
         return
       }
     } else if (target && !target.dead && dist <= weapon.range + target.radius && canSee(w, e, target)) {
       e.facing = Math.atan2(dy, dx)
-      if (e.combat && e.combat.cooldown <= 0) {
-        e.combat.cooldown = weapon.cooldownTicks
-        applyDamage(w, target, weapon.damage, e.pos.x, e.pos.y, weapon.knockback, e.id)
-      }
+      if (e.combat && e.combat.cooldown <= 0) fireWeapon(w, e) // shared melee swing
       return
     }
     if (dist > 0.2) {

@@ -6,13 +6,12 @@
 // bit-for-bit. Nothing here reads `Date.now()`/`Math.random()`: the sim forbids
 // both (eslint-guarded), and this module only clones data and re-runs the sim.
 
-import type { Entity } from '../game/entity'
-import { generateLevel } from '../game/levelgen/generate'
 import { spawnPlayer } from '../game/player'
 import { populateWorld } from '../game/populate'
+import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import { setupFloor } from '../game/systems/missions'
 import type { InputCmd, SimEvent } from '../game/types'
-import { createWorld, tickWorld, type MissionState, type Noise, type World } from '../game/world'
+import { createWorld, tickWorld, type World } from '../game/world'
 import { serializeEntity } from './verbs'
 
 /** A player's genesis state — enough to respawn it identically on replay. */
@@ -114,48 +113,33 @@ export const replay = (rec: Recording): ReplayResult => {
 }
 
 // ---- save / load full-world fixtures ------------------------------------
-// A whole-world dump used as a scenario STARTING POINT (not for bit-exact
-// continuation: the seeded RNG stream is re-forked from seed+floor on load, so
-// post-load AI/loot dice differ from an uninterrupted run). Replay above never
-// uses this path — it reconstructs from genesis so determinism is exact.
+// Thin wrappers over the canonical `serializeWorld`/`deserializeWorld`
+// (`game/serialize.ts`). Unlike the old dump, this path is LOSSLESS: it carries
+// the RNG stream position, so a loaded world is byte-identical on subsequent
+// ticks. `applyFixture` restores in place so readonly holders of `w` keep their
+// reference. Replay above still reconstructs from genesis for its exactness.
 
-export interface WorldFixture {
-  seed: number
-  floor: number
-  tick: number
-  nextId: number
-  alarm: number
-  gameOver: boolean
-  mission: MissionState
-  noises: Noise[]
-  entities: Record<string, unknown>[]
-}
+/** @deprecated Alias of the canonical world snapshot — use `WorldJson`. */
+export type WorldFixture = WorldJson
 
-export const saveWorld = (w: World): WorldFixture => ({
-  seed: w.seed,
-  floor: w.floor,
-  tick: w.tick,
-  nextId: w.nextId,
-  alarm: w.alarm,
-  gameOver: w.gameOver,
-  mission: { ...w.mission },
-  noises: w.noises.map((n) => ({ ...n })),
-  entities: w.entities.map(serializeEntity),
-})
+export const saveWorld = (w: World): WorldFixture => serializeWorld(w)
 
 /** Restore a fixture into an existing world in place (its `level`/`rng` are
- * regenerated from seed+floor, so the reference stays valid for readonly holders). */
+ * regenerated/resumed from the snapshot, so the reference stays valid). */
 export const applyFixture = (w: World, fx: WorldFixture): void => {
-  w.floor = fx.floor
-  w.level = generateLevel(fx.seed, fx.floor)
-  w.tick = fx.tick
-  w.nextId = fx.nextId
-  w.alarm = fx.alarm
-  w.gameOver = fx.gameOver
-  w.mission = { ...fx.mission }
-  w.noises = fx.noises.map((n) => ({ ...n }))
-  w.entities.length = 0
-  for (const e of fx.entities) w.entities.push(e as unknown as Entity)
-  w.byId.clear()
-  for (const e of w.entities) w.byId.set(e.id, e)
+  const restored = deserializeWorld(fx)
+  w.seed = restored.seed
+  w.floor = restored.floor
+  w.level = restored.level
+  w.tick = restored.tick
+  w.nextId = restored.nextId
+  w.alarm = restored.alarm
+  w.gameOver = restored.gameOver
+  w.mission = restored.mission
+  w.noises = restored.noises
+  w.events = restored.events
+  w.rng = restored.rng
+  w.baseRng = restored.baseRng
+  w.entities = restored.entities
+  w.byId = restored.byId
 }

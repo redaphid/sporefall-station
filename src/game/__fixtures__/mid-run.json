@@ -1,0 +1,203 @@
+{
+  "v": 1,
+  "seed": 20260715,
+  "floor": 1,
+  "tick": 30,
+  "nextId": 6,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the exit"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 897716700,
+  "baseRng": 20260715,
+  "levelChecksum": 3150501330,
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 0.35009999999999997,
+        "y": 1.5
+      },
+      "prevPos": {
+        "x": 0.35009999999999997,
+        "y": 1.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": -1,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 6
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "classId": "soldier",
+        "abilityCooldown": 0,
+        "inventory": [],
+        "activeSlot": -1,
+        "cash": 0,
+        "crimeUntilTick": 455
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "cop",
+      "pos": {
+        "x": 4.639229440716685,
+        "y": 3.336614277482295
+      },
+      "prevPos": {
+        "x": 4.6443673871576285,
+        "y": 3.2567794385561095
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": -0.038534598307081676,
+        "y": 0.5987612919463915
+      },
+      "speed": 4,
+      "radius": 0.35,
+      "facing": 1.635064891168217,
+      "health": {
+        "hp": 46,
+        "max": 60,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 8,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "wander",
+        "faction": "cop",
+        "home": {
+          "x": 4.5,
+          "y": 1.5
+        },
+        "thinkAt": 35,
+        "sightRange": 8,
+        "goal": "wander",
+        "waypoint": {
+          "x": 4.5,
+          "y": 5.5
+        }
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": -1.5,
+        "y": 1.5
+      },
+      "prevPos": {
+        "x": -1.5,
+        "y": 1.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": -1.5,
+          "y": 1.5
+        },
+        "thinkAt": 32,
+        "sightRange": 7,
+        "goal": "wander"
+      }
+    },
+    {
+      "id": 5,
+      "kind": "projectile",
+      "archetype": "projectile",
+      "pos": {
+        "x": 5.950100000000001,
+        "y": 1.5
+      },
+      "prevPos": {
+        "x": 5.483433333333334,
+        "y": 1.5
+      },
+      "vel": {
+        "x": 14,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.15,
+      "facing": 0,
+      "projectile": {
+        "ownerId": 1,
+        "damage": 14,
+        "ttl": 10
+      }
+    }
+  ]
+}

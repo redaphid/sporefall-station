@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mulberry32 } from './rng'
+import { hashLabel, mulberry32 } from './rng'
 
 describe('mulberry32', () => {
   it('is deterministic for the same seed', () => {
@@ -42,5 +42,31 @@ describe('mulberry32', () => {
   it('forks with different labels diverge', () => {
     const rng = mulberry32(42)
     expect(rng.fork('levelgen').next()).not.toBe(rng.fork('sim').next())
+  })
+
+  it('state() captures a position that reconstructs the identical sequence', () => {
+    const a = mulberry32(777)
+    for (let i = 0; i < 137; i++) a.next() // advance to an arbitrary mid-stream point
+
+    // Rebuild from the seed + captured counter — the resume must be exact.
+    const b = mulberry32(777, a.state())
+    for (let i = 0; i < 500; i++) expect(b.next()).toBe(a.next())
+  })
+
+  it('state() of a fresh rng round-trips (zero draws)', () => {
+    const a = mulberry32(999)
+    const b = mulberry32(999, a.state())
+    for (let i = 0; i < 100; i++) expect(b.next()).toBe(a.next())
+  })
+
+  it('a reconstructed FORK resumes exactly (the serialize path)', () => {
+    // Mirrors how a world resumes its sim stream: fork a labelled child, advance
+    // it, then rebuild that child from hashLabel(seed, label) + its state().
+    const seed = 314159
+    const child = mulberry32(seed).fork('sim:1')
+    for (let i = 0; i < 40; i++) child.next()
+
+    const rebuilt = mulberry32(hashLabel(seed >>> 0, 'sim:1'), child.state())
+    for (let i = 0; i < 200; i++) expect(rebuilt.next()).toBe(child.next())
   })
 })

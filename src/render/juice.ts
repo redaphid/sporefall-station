@@ -58,6 +58,33 @@ export const lowHealthPulse = (hpFrac: number, tSec: number): number => {
   return severity * wave * VIGNETTE_MAX
 }
 
+/** The just-enough view of the local player the low-health pulse cares about. */
+export interface SelfVitals {
+  hpFrac: number
+  /** Bleeding out (hp 0, revive timer running) — resolving, not "low health". */
+  downed: boolean
+  /** Dead body not yet swept from the snapshot. */
+  dead: boolean
+}
+
+/**
+ * Gated low-health red pulse for the LOCAL player. The raw `lowHealthPulse`
+ * screams red at any hp ≤ 0 — which is exactly the state a downed/dead body sits
+ * in for the whole 30s bleed-out and again at game-over, so it would stick the
+ * screen full-red until a page reload (#52). Gate it: the pulse is a warning for
+ * a LIVE, upright, low-health player only. When `self` is downed or dead, or the
+ * run is over (the restart overlay owns the screen), it is OFF — the death/revive
+ * flow is resolving and must not be buried under a frozen red wash.
+ */
+export const lowHealthVignette = (
+  self: SelfVitals | null | undefined,
+  gameOver: boolean,
+  tSec: number,
+): number => {
+  if (!self || gameOver || self.downed || self.dead) return 0
+  return lowHealthPulse(self.hpFrac, tSec)
+}
+
 // --- Element post-tint (fire warm / frost cold), intensity 0..1 --------------
 
 const TINT_FADE = 1.2 // intensity/sec

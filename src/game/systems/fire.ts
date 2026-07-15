@@ -86,6 +86,7 @@ export const fireSystem = (w: World): void => {
 export const elementSystem = (w: World): void => {
   for (const e of w.entities) {
     if (e.dead || !e.fx || !e.health) continue
+    if (e.playerCtl?.downed) continue // a downed body is out of the fight — DOT can't re-kill it (#52)
     for (const kind of Object.keys(e.fx)) {
       const def = ELEMENTS[kind]
       if (!def || def.dot <= 0) continue

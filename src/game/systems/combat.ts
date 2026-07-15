@@ -89,6 +89,15 @@ export const applyDamage = (
 }
 
 export const kill = (w: World, target: Entity): void => {
+  // Already bleeding out? A second lethal blow (a DOT tick landing on the downed
+  // body, a stray hit) must NOT re-arm the bleed timer or emit a fresh death —
+  // that would reset the 30s clock every DOT interval and trap a downed solo
+  // player at hp 0 forever (the red-flash dead-end, #52). They are out of the
+  // fight: pin hp at 0 and let the existing bleed-out run to its resolution.
+  if (target.playerCtl?.downed) {
+    target.health!.hp = 0
+    return
+  }
   w.events.push({ type: 'death', x: target.pos.x, y: target.pos.y, entityId: target.id })
   if (target.playerCtl) {
     target.health!.hp = 0

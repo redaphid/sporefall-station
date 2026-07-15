@@ -9,6 +9,8 @@ import {
   hitstopForEvent,
   LOW_HP,
   lowHealthPulse,
+  lowHealthVignette,
+  type SelfVitals,
   SHAKE_MAX,
   shakeForEvent,
   stackShake,
@@ -90,6 +92,45 @@ describe('vignette + low-health pulse', () => {
     // Near death, peak of the wave approaches the max.
     const peaks = Array.from({ length: 200 }, (_, i) => lowHealthPulse(0.001, i * 0.01))
     expect(Math.max(...peaks)).toBeGreaterThan(VIGNETTE_MAX * 0.9)
+  })
+})
+
+// #52 — the red-flash-forever gate. The raw pulse screams at any hp ≤ 0, exactly
+// the state a downed/dead body holds through the whole bleed-out and at
+// game-over. lowHealthVignette suppresses it unless the local player is LIVE.
+describe('low-health vignette gate (#52 red-flash-forever)', () => {
+  const live = (hpFrac: number): SelfVitals => ({ hpFrac, downed: false, dead: false })
+
+  // A phase where the raw pulse is strongly positive, so any leak is caught.
+  const HOT = 1 / (2 * 3) / 2 // quarter-period of the 3Hz pulse → sine near peak
+
+  it('is OFF (0) when there is no local player', () => {
+    expect(lowHealthVignette(null, false, HOT)).toBe(0)
+    expect(lowHealthVignette(undefined, false, HOT)).toBe(0)
+  })
+
+  it('is OFF while DOWNED, even though a downed body sits at hp 0', () => {
+    expect(lowHealthVignette({ hpFrac: 0, downed: true, dead: false }, false, HOT)).toBe(0)
+  })
+
+  it('is OFF while DEAD (body not yet swept)', () => {
+    expect(lowHealthVignette({ hpFrac: 0, downed: false, dead: true }, false, HOT)).toBe(0)
+  })
+
+  it('is OFF once the run is over (restart overlay owns the screen)', () => {
+    expect(lowHealthVignette(live(0.05), true, HOT)).toBe(0)
+    // gameOver wins even for a nominally-live low-hp self.
+    expect(lowHealthVignette(live(0.001), true, HOT)).toBe(0)
+  })
+
+  it('is ON only for a LIVE, upright, low-health player — and matches the raw pulse', () => {
+    const on = lowHealthVignette(live(0.05), false, HOT)
+    expect(on).toBeGreaterThan(0)
+    expect(on).toBe(lowHealthPulse(0.05, HOT))
+  })
+
+  it('a healthy live player still gets no pulse (above LOW_HP)', () => {
+    expect(lowHealthVignette(live(0.8), false, HOT)).toBe(0)
   })
 })
 

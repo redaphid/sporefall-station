@@ -46,6 +46,10 @@ export class Sound {
         case 'pickup':
           this.blip('pickup', 660, 990, 0.09, 'sine', 0.6)
           break
+        case 'modPickup':
+          // A brighter two-step chirp than a plain pickup — "you upgraded your gun".
+          this.blip('modPickup', 880, 1320, 0.14, 'triangle', 0.7)
+          break
         case 'doorToggle':
           this.blip('door', 120, 80, 0.08, 'triangle', 0.7)
           break

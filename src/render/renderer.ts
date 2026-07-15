@@ -228,7 +228,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
             effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
           } else if (ev.type === 'shock') {
             effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
-          } else if (ev.type === 'pickup') {
+          } else if (ev.type === 'pickup' || ev.type === 'modPickup') {
             const by = view.entities.find((e) => e.id === ev.byId)
             if (by) effects.spawn('pickup', by.pos.x, by.pos.y, view.tick)
           }

@@ -20,10 +20,16 @@ interface Pickup {
   qty: number
 }
 
+/** A random-loot / shop pickup — i.e. NOT a weapon-mod pickup (`mod.*`), which
+ * this suite covers separately (populate.modpickup.test.ts). The loot-table
+ * assertions below only concern item ids, so mod pickups are filtered out here. */
+const isLootPickup = (e: { pickup?: unknown; archetype: string }): boolean =>
+  !!e.pickup && !e.archetype.startsWith('mod.')
+
 const loot = (seed: number, floor: number): Pickup[] => {
   const w = createWorld(seed, floor)
   populateWorld(w)
-  return w.entities.filter((e) => e.pickup).map((e) => ({ itemId: e.pickup!.itemId, x: e.pos.x, y: e.pos.y, qty: e.pickup!.qty }))
+  return w.entities.filter(isLootPickup).map((e) => ({ itemId: e.pickup!.itemId, x: e.pos.x, y: e.pos.y, qty: e.pickup!.qty }))
 }
 
 const inRect = (x: number, y: number, b: Building): boolean =>
@@ -89,7 +95,7 @@ describe('depth gating', () => {
       const w = createWorld(s, 1)
       w.level.buildings = w.level.buildings.filter((b) => b.role !== 'shop')
       populateWorld(w)
-      const ids = w.entities.filter((e) => e.pickup).map((e) => e.pickup!.itemId)
+      const ids = w.entities.filter(isLootPickup).map((e) => e.pickup!.itemId)
       expect(ids.every((id) => BASIC.has(id))).toBe(true)
     }
   })
@@ -100,7 +106,7 @@ describe('depth gating', () => {
       const w = createWorld(seed, floor)
       w.level.buildings = w.level.buildings.filter((b) => b.role !== 'shop')
       populateWorld(w)
-      return w.entities.filter((e) => e.pickup).map((e) => e.pickup!.itemId)
+      return w.entities.filter(isLootPickup).map((e) => e.pickup!.itemId)
     }
     const floor2 = seeds.flatMap((s) => randomLoot(s, 2))
     // Floor 2 admits throwables and freezeRay/sledgehammer, but NOT flamethrower/stunGun/tranquilizer.
@@ -119,7 +125,7 @@ describe('depth gating', () => {
       populateWorld(w)
       const shops = w.level.buildings.filter((b) => b.role === 'shop')
       for (const e of w.entities) {
-        if (e.pickup && shops.some((b) => inRect(e.pos.x, e.pos.y, b))) shopStock.push(e.pickup.itemId)
+        if (isLootPickup(e) && shops.some((b) => inRect(e.pos.x, e.pos.y, b))) shopStock.push(e.pickup!.itemId)
       }
     }
     expect(shopStock.some((id) => ELEMENT_WEAPONS.has(id))).toBe(true)

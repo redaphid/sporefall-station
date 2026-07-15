@@ -8,8 +8,10 @@
 // Streets of Rogue behavior, not ported.
 
 import { CONSUMABLES, itemClass, THROWABLES } from '../data/items'
+import { MODS, modMaxStacks } from '../data/mods'
 import { makeEntity, type Entity, type ItemStack } from '../entity'
 import { addEntity, type World } from '../world'
+import { applyDraftPick } from './draft'
 import { applyStatus } from './statusFx'
 
 export const MAX_SLOTS = 6
@@ -83,6 +85,31 @@ const weaponSlotIndex = (e: Entity): number => {
 export const weaponStack = (e: Entity): ItemStack | undefined => {
   const index = weaponSlotIndex(e)
   return index < 0 ? undefined : e.playerCtl!.inventory[index]
+}
+
+/** The outcome of grabbing a world weapon-mod pickup: which mod landed on which
+ * weapon, and whether it was already maxed (grab confirmed the cap, added nothing). */
+export interface ModPickupResult {
+  modId: string
+  weapon: string
+  maxed: boolean
+}
+
+/** Apply a scattered weapon-mod pickup to the grabber's currently-swung weapon,
+ * reusing the draft's append/stack-cap logic (`applyDraftPick`) so world pickups
+ * and the floor draft share ONE write path. Returns the result, or `null` when
+ * there's no moddable weapon to receive it — bare fists or a class-starter gun
+ * that isn't slotted. The kid-friendly caller leaves such a pickup on the ground
+ * so it can be grabbed later once a real gun is in hand (nothing is wasted). */
+export const applyModPickup = (e: Entity, modId: string): ModPickupResult | null => {
+  if (!MODS[modId]) return null
+  const stack = weaponStack(e)
+  if (!stack) return null
+  const cap = modMaxStacks(modId)
+  const before = stack.mods?.find((m) => m.id === modId)?.stacks ?? 0
+  const maxed = before >= cap
+  applyDraftPick(stack, modId, 1) // caps internally; a no-op when already maxed
+  return { modId, weapon: stack.itemId, maxed }
 }
 
 /** Drop a slot; if it held the swung weapon, fall back to bare fists. Keeps

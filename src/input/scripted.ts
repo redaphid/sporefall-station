@@ -127,6 +127,20 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Control for the dodge-roll video: never roll — the same bullet connects.
   dodgeControl: [{ ticks: 60 }],
 
+  // Weapon-mod PICKUP headline (feat/mod-pickups): drop onto the lane, then stroll
+  // east collecting two scattered mod-gems — the equipped pistol gains a badge per
+  // grab (hotbar + inspect update). Paired with the `mod-pickup` inline world whose
+  // gems sit on the lane at x≈5.5 and x≈8.5.
+  modGrab: [
+    { ticks: 40 }, // settle on spawn
+    { ticks: 64, y: 1 }, // drop down into the lane (y≈11)
+    { ticks: 26 }, // steady on the lane
+    { ticks: 30, x: 1 }, // walk right onto the first gem (~x6) → gun gains the mod
+    { ticks: 52 }, // pause over it: sparkle + badge appears
+    { ticks: 22, x: 1 }, // continue onto the second gem (~x9) → a second badge
+    { ticks: 74 }, // final beat on the twice-modded gun
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

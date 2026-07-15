@@ -1,10 +1,11 @@
 import { CLASSES } from '../data/classes'
 import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
+import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { emitNoise, type World } from '../world'
-import { addItem, equipSlot } from './inventory'
+import { addItem, applyModPickup, equipSlot } from './inventory'
 import { useObject } from './objects'
 
 const INTERACT_RANGE = 1.3
@@ -35,6 +36,17 @@ const autoPickup = (w: World, p: Entity): void => {
     const dy = e.pos.y - p.pos.y
     const rr = e.radius + p.radius
     if (dx * dx + dy * dy >= rr * rr) continue
+    // A weapon-mod pickup mods the grabber's own equipped gun (per-player, so co-op
+    // stays consistent with every other pickup). No moddable weapon in hand → leave
+    // it on the ground to grab after finding a gun, rather than wasting the mod.
+    if (isModId(e.pickup.itemId)) {
+      const res = applyModPickup(p, e.pickup.itemId)
+      if (res) {
+        e.dead = true
+        w.events.push({ type: 'modPickup', entityId: e.id, byId: p.id, modId: res.modId, weapon: res.weapon, maxed: res.maxed })
+      }
+      continue
+    }
     if (collect(p, e)) {
       e.dead = true
       w.events.push({ type: 'pickup', entityId: e.id, byId: p.id, itemId: e.pickup.itemId })

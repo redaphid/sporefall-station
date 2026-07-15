@@ -38,6 +38,21 @@ export const draftOffer = (rng: Rng, count = 3): string[] => {
   return chosen
 }
 
+/** Draw ONE mod id, weighted by rarity, from the supplied RNG stream — the
+ * single-card analogue of `draftOffer`, shared by the world mod-pickup placement
+ * (populate.ts) so scattered pickups follow the same common/rare/legendary odds
+ * as the draft. Pure in the RNG: same stream position → same id. */
+export const weightedModId = (rng: Rng): string => {
+  const all = Object.values(MODS)
+  const total = all.reduce((s, m) => s + RARITY_WEIGHT[m.rarity], 0)
+  let r = rng.next() * total
+  for (let i = 0; i < all.length - 1; i++) {
+    r -= RARITY_WEIGHT[all[i].rarity]
+    if (r <= 0) return all[i].id
+  }
+  return all[all.length - 1].id
+}
+
 /** The deterministic hand offered on clearing `floor` for a run `seed`. Uses a
  * dedicated `draft:<floor>` fork so it is reproducible and independent of the
  * sim RNG — identical on host and every client. */

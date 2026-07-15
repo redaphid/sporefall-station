@@ -214,6 +214,9 @@ export interface LobbyStateMsg {
 export interface GameStartMsg {
   seed: number
   players: LobbyPlayer[]
+  /** Difficulty rules the host is running; clients adopt it so co-op agrees.
+   * Optional on the wire for back-compat — absent means the default (`normal`). */
+  mode?: 'casual' | 'normal'
 }
 export interface GoMsg {
   startTick: number
@@ -230,6 +233,10 @@ export interface StateMsg {
   missionComplete: boolean
   gameOver: boolean
   alarm: number
+  /** Difficulty rules in force (host authoritative). */
+  mode?: 'casual' | 'normal'
+  /** Party-shared comebacks left this run (HUD; `normal` only). */
+  revivesLeft?: number
   /** Per-slot HUD extras for each player's own display. */
   huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
 }

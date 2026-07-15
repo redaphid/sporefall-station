@@ -33,6 +33,19 @@ export interface Noise {
 /** Ticks a noise lingers for NPCs to hear and investigate (~3s at 30tps). */
 export const NOISE_TTL = 90
 
+/**
+ * Run difficulty. `casual` is the forgiving mode (endless self-revives, no
+ * revive penalty) — meant for playing with a young kid. `normal` restores
+ * stakes: a finite per-run revive economy and a comeback penalty (see
+ * combat.kill / interaction.recover). The mode is a pure sim input threaded
+ * from the host session and shipped to clients so co-op agrees on the rules.
+ */
+export type RunMode = 'casual' | 'normal'
+
+/** Downs a `normal`-mode run can recover from before a down becomes fatal.
+ * Shared across the party — a co-op run has one pool, not one per player. */
+export const REVIVES_PER_RUN = 2
+
 export interface World {
   tick: number
   seed: number
@@ -53,9 +66,13 @@ export interface World {
   /** Active heard disturbances; NPCs investigate the nearest. */
   noises: Noise[]
   gameOver: boolean
+  /** Difficulty rules for this run (see RunMode). */
+  mode: RunMode
+  /** Party-shared comebacks left this run; only consumed/gated in `normal`. */
+  revivesLeft: number
 }
 
-export const createWorld = (seed: number, floor: number): World => {
+export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal'): World => {
   const baseRng = mulberry32(seed)
   return {
     tick: 0,
@@ -77,6 +94,8 @@ export const createWorld = (seed: number, floor: number): World => {
     alarm: 0,
     noises: [],
     gameOver: false,
+    mode,
+    revivesLeft: REVIVES_PER_RUN,
   }
 }
 

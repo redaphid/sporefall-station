@@ -171,6 +171,38 @@ describe('offline co-op (loopback transport)', () => {
     expect(view.entities.length).toBeGreaterThan(0)
   })
 
+  it('threads the run difficulty (mode) to a joined client so co-op agrees on the rules', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(4242, 'soldier', 'Alice', stubInput(), hub.hostTransport, 'casual')
+    const bob = hub.addClient('Bob', 'thief', stubInput())
+
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+
+    expect(host.world.mode).toBe('casual')
+    // GameStart carried mode → client surfaces it in its render view.
+    expect(bob.session.renderView().mode).toBe('casual')
+
+    // The periodic State message keeps the shared revive count visible to clients.
+    for (let i = 0; i < 20; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+    expect(bob.session.renderView().revivesLeft).toBe(host.world.revivesLeft)
+  })
+
+  it('defaults an unspecified host mode to normal (stakes on)', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(4243, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    expect(host.world.mode).toBe('normal')
+  })
+
   it('rejects a client whose protocol version does not match', async () => {
     const hub = new MockHub()
     new NetHostSession(1, 'soldier', 'Alice', stubInput(), hub.hostTransport)

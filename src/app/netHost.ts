@@ -1,7 +1,7 @@
 import { spawnPlayer } from '../game/player'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
-import { createWorld, tickWorld, type World } from '../game/world'
+import { createWorld, tickWorld, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -70,8 +70,10 @@ export class NetHostSession implements Session {
     private hostName: string,
     private localInput: InputSource,
     private transport: Transport,
+    /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
+    private mode: RunMode = 'normal',
   ) {
-    this.world = createWorld(seed, 1)
+    this.world = createWorld(seed, 1, mode)
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onPeerConnected(ev.peer)
       else if (ev.type === 'peerDisconnected') this.onPeerLost(ev.peer)
@@ -108,7 +110,7 @@ export class NetHostSession implements Session {
       p.entityId = e.id
       entityIds[p.slot] = e.id
     }
-    const start: GameStartMsg = { seed: this.seed, players: this.lobbyPlayers() }
+    const start: GameStartMsg = { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }
     const go: GoMsg = { startTick: this.world.tick, entityIds }
     this.broadcastJson(MsgType.GameStart, start)
     this.broadcastJson(MsgType.Go, go)
@@ -122,7 +124,7 @@ export class NetHostSession implements Session {
    * kept separate: this resets the former and leaves the latter untouched.
    */
   restart(): void {
-    this.world = createWorld(this.seed, 1)
+    this.world = createWorld(this.seed, 1, this.mode)
     this.ghosts.clear()
     this.started = false
     this.beginGame()
@@ -197,6 +199,8 @@ export class NetHostSession implements Session {
       missionComplete: this.world.mission.complete,
       gameOver: this.world.gameOver,
       alarm: this.world.alarm,
+      mode: this.world.mode,
+      revivesLeft: this.world.revivesLeft,
       huds,
     }
     this.broadcastJson(MsgType.State, state)
@@ -212,6 +216,8 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       gameOver: this.world.gameOver,
+      mode: this.world.mode,
+      revivesLeft: this.world.revivesLeft,
       self: this.self,
     }
   }
@@ -321,7 +327,7 @@ export class NetHostSession implements Session {
         const avatar = this.world.byId.get(ghost.entityId)
         if (avatar?.status) avatar.status.stun = 0
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
-        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers() }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
         p.queue.queueReliable(
           encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: ghost.entityId } }),
         )
@@ -349,7 +355,7 @@ export class NetHostSession implements Session {
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
-        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers() }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
         p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [slot]: avatar.id } }))
         this.onLobbyChange?.(this.lobbyPlayers())
         this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })

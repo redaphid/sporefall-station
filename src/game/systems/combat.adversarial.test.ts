@@ -6,6 +6,7 @@ import { spawnPlayer } from '../player'
 import { spawnObject } from './objects'
 import { applyDamage, kill, meleeAttack } from './combat'
 import { missionSystem } from './missions'
+import { buildSnapshot } from '../snapshot'
 import type { SimEvent } from '../types'
 
 /** A plain damageable NPC at (x,y). Civilians have ai + status so damage
@@ -74,11 +75,20 @@ describe('applyDamage — core arithmetic and iframes', () => {
     expect(events(w, 'death')).toHaveLength(0)
   })
 
-  it('ADVERSARIAL: negative damage HEALS the target and never kills (documents current semantics)', () => {
+  it('ADVERSARIAL: negative damage NEVER heals — it is clamped to a harmless 0-damage blow', () => {
     const e = npc(w, 20, 20, 30)
-    applyDamage(w, e, -100, 19, 20, 0, 99)
-    expect(e.health!.hp).toBe(130) // −(−100) added; no max clamp on this path
+    applyDamage(w, e, -100, 19, 20, 5, 99)
+    expect(e.health!.hp).toBe(30) // no heal — hp unchanged
     expect(e.dead).toBeFalsy()
+    expect(e.health!.iframes).toBe(5) // still lands as a blow
+    expect(e.vel.x).toBeGreaterThan(0) // knockback still applies
+    expect(events(w, 'hit')).toHaveLength(1)
+  })
+
+  it('ADVERSARIAL: a negative-damage "hit" on a full-hp target cannot push hp over max', () => {
+    const e = npc(w, 20, 20, 40)
+    applyDamage(w, e, -9999, 19, 20, 0, 99)
+    expect(e.health!.hp).toBe(40)
   })
 
   it('huge overkill damage drops hp well below zero and kills', () => {
@@ -188,13 +198,25 @@ describe('shatter — frozen bodies gib on impact', () => {
     expect(e.shattered).toBeFalsy()
   })
 
-  it('LOUD NOTE / flagged design edge: shattering a FROZEN PLAYER routes through kill(), so they end up DOWNED (not gibbed-dead) yet marked shattered — asserting current behavior, not endorsing it', () => {
+  it('a FROZEN PLAYER shattering DOWNS them without gib-vanishing: no shattered flag, no ice-gib event, still in the snapshot', () => {
     const p = spawnPlayer(w, 0, 'soldier', 20, 20)
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)
-    expect(p.shattered).toBe(true)
+    expect(p.shattered).toBeFalsy() // NOT gibbed — stays a visible body
+    expect(events(w, 'shatter')).toHaveLength(0) // no ice-gib fx for a player
     expect(p.dead).toBeFalsy() // player rules win: downed, not dead
     expect(p.playerCtl!.downed).toBeDefined()
+    expect(buildSnapshot(w).entities.some((s) => s.id === p.id)).toBe(true) // not vanished
+  })
+
+  it('a frozen player who is OUT OF LIVES shatters straight to a real death (still no gib flag)', () => {
+    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    w.revivesLeft = 0
+    addStatus(w, p, 'frozen', 120)
+    applyDamage(w, p, 1, 19, 20, 0, 99)
+    expect(p.shattered).toBeFalsy()
+    expect(p.dead).toBe(true)
+    expect(p.playerCtl!.downed).toBeUndefined()
   })
 })
 
@@ -242,10 +264,22 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
     w = createWorld(1, 1)
   })
 
-  it('SOLO: the lone player going down flips gameOver and emits runOver exactly once', () => {
+  it('SOLO with lives left: the lone player going down does NOT end the run (they self-revive)', () => {
     const p = spawnPlayer(w, 0, 'soldier', 20, 20)
-    kill(w, p)
+    kill(w, p) // revivesLeft still 2 → downed, not dead
+    expect(p.dead).toBeFalsy()
+    expect(p.playerCtl!.downed).toBeDefined()
+    missionSystem(w)
     expect(w.gameOver).toBe(false)
+    expect(w.events.filter((e) => e.type === 'runOver')).toHaveLength(0)
+  })
+
+  it('SOLO out of lives: a down is a real DEATH → run over, emitting runOver exactly once', () => {
+    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    w.revivesLeft = 0 // comeback economy spent
+    kill(w, p)
+    expect(p.dead).toBe(true) // no downed grace — permanent death
+    expect(p.playerCtl!.downed).toBeUndefined()
     missionSystem(w)
     expect(w.gameOver).toBe(true)
     expect(w.events.filter((e) => e.type === 'runOver')).toHaveLength(1)
@@ -253,12 +287,24 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
 
   it('runOver fires only once — a second missionSystem pass is a no-op under the gameOver guard', () => {
     const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    w.revivesLeft = 0
     kill(w, p)
     missionSystem(w)
     const eventsBefore = w.events.length
     missionSystem(w)
     expect(w.events.length).toBe(eventsBefore) // guard returns early
     expect(w.events.filter((e) => e.type === 'runOver')).toHaveLength(1)
+  })
+
+  it('CASUAL: a lone player going down never ends the run, even repeatedly (kid mode)', () => {
+    const cw = createWorld(1, 1, 'casual')
+    const p = spawnPlayer(cw, 0, 'soldier', 20, 20)
+    cw.revivesLeft = 0 // irrelevant in casual
+    kill(cw, p)
+    expect(p.dead).toBeFalsy()
+    expect(p.playerCtl!.downed).toBeDefined()
+    missionSystem(cw)
+    expect(cw.gameOver).toBe(false)
   })
 
   it('CO-OP: one down + one standing does NOT end the run', () => {

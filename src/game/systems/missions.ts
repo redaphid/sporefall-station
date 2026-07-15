@@ -109,15 +109,21 @@ export const missionSystem = (w: World): void => {
     }
   }
 
-  // Run over: no live (non-downed) players remain. This is a real game-over —
-  // the session stays connected (the transport is untouched), and a host-driven
-  // `restart()` rebuilds the run in place, so "play again" needs no reconnect or
-  // app restart. See NetHostSession.restart / the game-over overlay.
+  // Run over: nobody is left standing AND nobody can still be saved. This is a
+  // real game-over — the session stays connected (the transport is untouched),
+  // and a host-driven `restart()` rebuilds the run in place, so "play again"
+  // needs no reconnect or app restart. See NetHostSession.restart / the overlay.
+  //
+  // The lone downed player is the one exception: with no teammate to revive them
+  // they bleed out to a SELF-revive (interaction.ts), so a solo down is not yet a
+  // loss — only a solo *death* (the revive pool ran dry, marked dead by kill) is.
+  // A co-op wipe (2+ players, all down/dead) has no possible rescuer → run over.
   const players = w.entities.filter((e) => e.playerCtl)
-  if (players.length > 0 && players.every((e) => e.playerCtl!.downed || e.dead)) {
-    w.gameOver = true
-    w.events.push({ type: 'runOver', floor: w.floor })
-  }
+  if (players.length === 0) return
+  if (!players.every((e) => e.playerCtl!.downed || e.dead)) return
+  if (players.length === 1 && !players[0].dead) return
+  w.gameOver = true
+  w.events.push({ type: 'runOver', floor: w.floor })
 }
 
 const completeMission = (w: World): void => {

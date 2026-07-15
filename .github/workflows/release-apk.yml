@@ -51,7 +51,10 @@ jobs:
         run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        # npm install (not ci) to match the other workflows — CI's node-22 npm
+        # rejects a lockfile written by a newer local npm on optional platform
+        # deps (@emnapi). See deploy-web.yml for the same fix.
+        run: npm install --no-audit --no-fund
 
       # TODO(#30): replace with a signed release build once the keystore is wired.
       - name: Build debug APK

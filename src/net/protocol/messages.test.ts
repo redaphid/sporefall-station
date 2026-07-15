@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { emptyInput } from '../../game/types'
+import { SnapFlags } from '../../game/snapshot'
 import { frameMessage, StreamReader } from '../framing/chunkedStream'
-import { decodeInput, decodeSnapshot, encodeInput, encodeSnapshot, type WireSnapshot } from './messages'
+import {
+  ARCHETYPES,
+  decodeInput,
+  decodeSnapshot,
+  encodeInput,
+  encodeSnapshot,
+  type WireEntity,
+  type WireSnapshot,
+} from './messages'
 
 describe('snapshot codec', () => {
   const snap: WireSnapshot = {
@@ -73,5 +82,102 @@ describe('input codec', () => {
     expect(decoded.attack).toBe(true)
     expect(edges & 2).toBe(2)
     expect(Math.atan2(decoded.aimY, decoded.aimX)).toBeCloseTo(Math.PI / 2, 1)
+  })
+})
+
+// --- Adversarial / boundary coverage ---
+
+const noEdges = { attack: false, interact: false, special: false }
+
+describe('input codec — boundary values', () => {
+  it('round-trips full stick deflection at the axis extremes', () => {
+    const { cmd } = decodeInput(encodeInput({ ...emptyInput(), moveX: 1, moveY: -1 }, noEdges))
+    expect(cmd.moveX).toBeCloseTo(1, 1)
+    expect(cmd.moveY).toBeCloseTo(-1, 1)
+  })
+
+  it('packs every held-button combination independently', () => {
+    for (const [a, i, s] of [
+      [true, false, false],
+      [false, true, false],
+      [false, false, true],
+      [true, true, true],
+    ] as const) {
+      const { cmd } = decodeInput(encodeInput({ ...emptyInput(), attack: a, interact: i, special: s }, noEdges))
+      expect([cmd.attack, cmd.interact, cmd.special]).toEqual([a, i, s])
+    }
+  })
+
+  it('carries edge bits separately from held bits', () => {
+    const { edges } = decodeInput(encodeInput(emptyInput(), { attack: true, interact: false, special: true }))
+    expect(edges & 1).toBe(1)
+    expect(edges & 2).toBe(0)
+    expect(edges & 4).toBe(4)
+  })
+
+  it('masks seq into a u16 so it wraps rather than overflowing', () => {
+    expect(decodeInput(encodeInput({ ...emptyInput(), seq: 65535 }, noEdges)).cmd.seq).toBe(65535)
+    // 65536 wraps to 0 — this wrap is exactly what host-side seq detection relies on.
+    expect(decodeInput(encodeInput({ ...emptyInput(), seq: 65536 }, noEdges)).cmd.seq).toBe(0)
+    expect(decodeInput(encodeInput({ ...emptyInput(), seq: 70000 }, noEdges)).cmd.seq).toBe(70000 & 0xffff)
+  })
+})
+
+const wire = (over: Partial<WireEntity> = {}): WireEntity => ({
+  id: 1,
+  archetype: 'player',
+  x: 10,
+  y: 20,
+  facing: 0,
+  hpPct: 1,
+  flags: 0,
+  ...over,
+})
+
+const oneEntity = (over: Partial<WireEntity>): WireEntity =>
+  decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(over)] })).entities[0]
+
+describe('snapshot codec — boundary values', () => {
+  it('round-trips an empty entity list', () => {
+    const out = decodeSnapshot(encodeSnapshot({ tick: 5, floor: 2, alarm: 1, lastInputSeq: 99, entities: [] }))
+    expect(out.entities).toHaveLength(0)
+    expect(out.lastInputSeq).toBe(99)
+  })
+
+  it('normalizes a negative facing into 0..2π', () => {
+    expect(oneEntity({ facing: -Math.PI / 2 }).facing).toBeCloseTo((3 * Math.PI) / 2, 1)
+  })
+
+  it('clamps hpPct at both extremes', () => {
+    expect(oneEntity({ hpPct: 0 }).hpPct).toBe(0)
+    expect(oneEntity({ hpPct: 1 }).hpPct).toBeCloseTo(1, 2)
+  })
+
+  it('passes combined status flags through untouched', () => {
+    const flags = SnapFlags.Downed | SnapFlags.Cloaked | SnapFlags.Stunned
+    expect(oneEntity({ flags }).flags).toBe(flags)
+  })
+
+  it('round-trips the largest u16 entity id', () => {
+    expect(oneEntity({ id: 65535 }).id).toBe(65535)
+  })
+
+  it('round-trips every known archetype by index', () => {
+    for (const archetype of ARCHETYPES) expect(oneEntity({ archetype }).archetype).toBe(archetype)
+  })
+
+  it('maps an unknown archetype to index 0 (player) instead of corrupting the stream', () => {
+    expect(oneEntity({ archetype: 'not-a-real-archetype' }).archetype).toBe('player')
+  })
+
+  it('round-trips a full 32-bit tick counter past 2^31', () => {
+    const big = 4_000_000_000
+    expect(decodeSnapshot(encodeSnapshot({ tick: big, floor: 1, alarm: 0, lastInputSeq: 0, entities: [] })).tick).toBe(big)
+  })
+
+  it('keeps position within 1/32-tile quantization error', () => {
+    const e = oneEntity({ x: 12.531, y: 47.999 })
+    expect(Math.abs(e.x - 12.531)).toBeLessThanOrEqual(1 / 32)
+    expect(Math.abs(e.y - 47.999)).toBeLessThanOrEqual(1 / 32)
   })
 })

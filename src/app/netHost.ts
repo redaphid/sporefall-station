@@ -85,7 +85,12 @@ export class NetHostSession implements Session {
 
   lobbyPlayers(): LobbyPlayer[] {
     const players: LobbyPlayer[] = [{ slot: 0, name: this.hostName, classId: this.hostClassId }]
-    for (const p of this.peers.values()) players.push({ slot: p.slot, name: p.name, classId: p.classId })
+    // Only admitted peers belong in the lobby; a peer that has connected but not
+    // yet completed a valid Hello still carries slot -1 and must not be listed
+    // (nor shipped in GameStart's player list).
+    for (const p of this.peers.values()) {
+      if (p.slot >= 0) players.push({ slot: p.slot, name: p.name, classId: p.classId })
+    }
     players.sort((a, b) => a.slot - b.slot)
     return players
   }
@@ -268,6 +273,15 @@ export class NetHostSession implements Session {
   }
 
   private onMessage(_peer: PeerId, p: PeerState, msg: Uint8Array): void {
+    try {
+      this.handleMessage(p, msg)
+    } catch {
+      // A malformed or hostile packet (bad JSON, truncated binary, garbage type)
+      // must never take the host down: drop it and keep serving other peers.
+    }
+  }
+
+  private handleMessage(p: PeerState, msg: Uint8Array): void {
     const type = msg[0]
     if (type === MsgType.Input) {
       const { cmd, edges } = decodeInput(msg)
@@ -284,6 +298,11 @@ export class NetHostSession implements Session {
         p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'version mismatch — update the game' }))
         return
       }
+
+      // Duplicate Hello from a peer we've already admitted (not a rejoin): ignore
+      // it. Reprocessing would reassign the slot, leak a stale peersBySlot entry,
+      // and — mid-game — spawn a second avatar for the same connection.
+      if (p.slot >= 0 && !hello.rejoin) return
 
       // Mid-game rejoin: reclaim the ghost slot if the token matches.
       if (this.started && hello.rejoin) {

@@ -21,7 +21,11 @@ export const ADVERTISE_NAME_MAX = 8
  */
 export const toAdvertiseName = (raw: string | null | undefined): string => {
   const clean = (raw ?? '').replace(/\s+/g, ' ').trim()
-  const short = clean.slice(0, ADVERTISE_NAME_MAX).trim()
+  let short = clean.slice(0, ADVERTISE_NAME_MAX)
+  // Truncation must not sever a surrogate pair: a dangling high surrogate is an
+  // invalid code unit that encodes to a broken UTF-8 byte on the air.
+  if (/[\uD800-\uDBFF]$/.test(short)) short = short.slice(0, -1)
+  short = short.trim()
   return short || 'SoR'
 }
 

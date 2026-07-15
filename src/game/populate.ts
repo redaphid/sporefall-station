@@ -41,6 +41,48 @@ const populateBuilding = (w: World, rng: Rng, building: Building): void => {
       if (spot) spawnNpc(w, spec.archetype, spot.x, spot.y)
     }
   }
+  if (building.role === 'shop') stockShop(w, rng, building)
+}
+
+// Loot is tiered by depth: floor 1 stays basic (bat/knife/bandages), then the
+// element arsenal folds in so the frost/fire/shock/sleep/poison systems come
+// online as you descend. Shops always stock element gear (see stockShop), so
+// the interaction combos stay reachable regardless of how the dice fall.
+const BASIC_LOOT = ['bat', 'knife', 'bandage', 'bandage', 'medkit', 'cash']
+const ELEMENT_THROWABLES = ['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade']
+const ELEMENT_WEAPONS = ['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun']
+const GUNS = ['shotgun', 'machinegun']
+
+/** The floor's random-loot table: basics everywhere, element throwables and a
+ * couple of element weapons from floor 2, the full arsenal from floor 3 on. */
+const lootTable = (floor: number): string[] => {
+  const table = [...BASIC_LOOT]
+  if (floor >= 2) table.push(...ELEMENT_THROWABLES, 'freezeRay', 'sledgehammer')
+  if (floor >= 3) table.push(...ELEMENT_WEAPONS, ...GUNS, ...ELEMENT_THROWABLES)
+  return table
+}
+
+/** Element gear a shop can carry — the reliable place to gear up on any floor,
+ * so freeze-shatter / fire-spread combos are always within reach. */
+const SHOP_STOCK = [
+  'freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun', 'shotgun',
+  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit',
+]
+
+const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number): void => {
+  const e = makeEntity('pickup', `pickup.${itemId}`, x, y, 0.3)
+  e.pickup = { itemId, qty }
+  addEntity(w, e)
+}
+
+/** Lay out a shop's wares: a handful of element weapons/throwables on the floor
+ * for the taking, so every run has somewhere to buy into the element systems. */
+const stockShop = (w: World, rng: Rng, building: Building): void => {
+  const n = rng.int(2, 4)
+  for (let i = 0; i < n; i++) {
+    const spot = randomFloorInBuilding(w, rng, building)
+    if (spot) dropPickup(w, rng.pick(SHOP_STOCK), spot.x, spot.y, 1)
+  }
 }
 
 const spawnStreetLife = (w: World, rng: Rng): void => {
@@ -60,16 +102,14 @@ const spawnStreetLife = (w: World, rng: Rng): void => {
 }
 
 const sprinkleLoot = (w: World, rng: Rng): void => {
-  const LOOT = ['bat', 'knife', 'bandage', 'bandage', 'medkit', 'cash']
+  const table = lootTable(w.floor)
   const n = rng.int(6, 10)
   for (let i = 0; i < n; i++) {
     const building = rng.pick(w.level.buildings)
     const spot = building ? randomFloorInBuilding(w, rng, building) : null
     if (!spot) continue
-    const itemId = rng.pick(LOOT)
-    const e = makeEntity('pickup', `pickup.${itemId}`, spot.x, spot.y, 0.3)
-    e.pickup = { itemId, qty: itemId === 'cash' ? rng.int(10, 40) : 1 }
-    addEntity(w, e)
+    const itemId = rng.pick(table)
+    dropPickup(w, itemId, spot.x, spot.y, itemId === 'cash' ? rng.int(10, 40) : 1)
   }
 }
 

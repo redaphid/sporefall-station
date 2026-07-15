@@ -115,6 +115,30 @@ export const WEAPONS: Record<string, WeaponDef> = {
     magSize: 5,
     onHit: { status: 'sleep', ticks: 150 },
   },
+  flamethrower: {
+    id: 'flamethrower',
+    name: 'Flamethrower',
+    kind: 'ranged',
+    damage: 3,
+    range: 5,
+    cooldownTicks: 6,
+    knockback: 0,
+    projectileSpeed: 11,
+    magSize: 40,
+    onHit: { status: 'burning', ticks: 240 },
+  },
+  stunGun: {
+    id: 'stunGun',
+    name: 'Stun Gun',
+    kind: 'ranged',
+    damage: 2,
+    range: 5,
+    cooldownTicks: 24,
+    knockback: 1,
+    projectileSpeed: 14,
+    magSize: 4,
+    onHit: { status: 'electrified', ticks: 45 },
+  },
 }
 
 /** Throwables: lobbed as a projectile that applies its `onLand` effect. */

@@ -139,6 +139,17 @@ export class NetClientSession implements Session {
   }
 
   private onMessage(msg: Uint8Array): void {
+    try {
+      this.handleMessage(msg)
+    } catch {
+      // A truncated/garbage/hostile packet (bad JSON, a snapshot whose declared
+      // entity count runs past the buffer) must never take the client down: drop
+      // it and keep rendering. Without this, the throw also wedges the StreamReader
+      // (its buffer never advances past the bad frame), stalling every later message.
+    }
+  }
+
+  private handleMessage(msg: Uint8Array): void {
     switch (msg[0]) {
       case MsgType.Snapshot:
         this.applySnapshot(decodeSnapshot(msg))
@@ -295,9 +306,20 @@ export class NetClientSession implements Session {
     // next packet still carries the equip/throw instead of dropping it.
     if (cmd.hotbar >= 0) this.pendingHotbar = cmd.hotbar
 
-    // Send at ~15Hz (every 2nd tick), latest-wins on the wire
+    // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
+    // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
+    // hotbar are PURE edges with no held-state fallback: if their packet were
+    // dropped by a newer one overwriting the slot during a BLE stall, the tap would
+    // be silently lost (the #57 class of bug). Ship those on the reliable lane so
+    // they can never be overwritten; the host still gates them by seq so a delayed
+    // reliable input can't re-fire. attack/interact/special keep the snapshot lane —
+    // their held bit re-conveys intent on the next packet, and sustained fire would
+    // otherwise flood the reliable FIFO every tick.
     if (this.tickCount % 2 === 0 && this.queue) {
-      this.queue.queueSnapshot(encodeInput({ ...cmd, hotbar: this.pendingHotbar }, this.pendingEdges))
+      const packet = encodeInput({ ...cmd, hotbar: this.pendingHotbar }, this.pendingEdges)
+      const hasPureEdge = this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0
+      if (hasPureEdge) this.queue.queueReliable(packet)
+      else this.queue.queueSnapshot(packet)
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
     }

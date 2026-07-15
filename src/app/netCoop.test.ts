@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { makeEntity } from '../game/entity'
 import { emptyInput, type InputCmd } from '../game/types'
+import { addEntity } from '../game/world'
 import type { InputSource } from '../input/input'
 import { encodeJson, decodeJson } from '../net/framing/codec'
 import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
@@ -766,5 +768,248 @@ describe('offline co-op — restart (play again) adversarial', () => {
     expect(late.session.slot).toBe(1)
     expect(late.session.phase).toBe('playing')
     expect(host.world.entities.filter((e) => e.playerCtl)).toHaveLength(2)
+  })
+})
+
+/**
+ * A client transport whose incoming-data handler we can invoke synchronously,
+ * so a decode that throws surfaces in the test rather than as an async unhandled
+ * rejection. Mirrors what BLE hands the client: raw framed packets, some of which
+ * may be truncated/garbage after a lossy link or a hostile/older peer.
+ */
+const makeCapturingClientTransport = (): {
+  transport: Transport
+  inject: (bytes: Uint8Array) => void
+  connect: () => void
+} => {
+  let handler: ((e: TransportEvent) => void) | null = null
+  const transport: Transport = {
+    role: 'client',
+    maxPacket: 180,
+    start: async () => {},
+    stop: async () => {},
+    sendPacket: async () => {},
+    on: (h) => {
+      handler = h
+      return () => {}
+    },
+    peers: () => ['host'],
+  }
+  return {
+    transport,
+    inject: (bytes) => handler?.({ type: 'data', peer: 'host', bytes }),
+    connect: () => handler?.({ type: 'peerConnected', peer: 'host' }),
+  }
+}
+
+describe('offline co-op — adversarial CLIENT (malformed host packets)', () => {
+  it('survives a truncated Snapshot from the host without crashing', async () => {
+    const cap = makeCapturingClientTransport()
+    const client = new NetClientSession('Bob', 'thief', stubInput(), cap.transport)
+    await client.start()
+    cap.connect()
+
+    // A Snapshot header with no body — decodeSnapshot reads a u32 tick past the end.
+    const truncated = new Uint8Array([MsgType.Snapshot, 0xff])
+    for (const pkt of frameMessage(truncated, 180)) {
+      expect(() => cap.inject(pkt)).not.toThrow()
+    }
+  })
+
+  it('survives a garbage-JSON control message from the host', async () => {
+    const cap = makeCapturingClientTransport()
+    const client = new NetClientSession('Bob', 'thief', stubInput(), cap.transport)
+    await client.start()
+    cap.connect()
+
+    // Type byte says State (JSON), body is not valid JSON — JSON.parse throws.
+    const badJson = new Uint8Array([MsgType.State, 0x7b, 0xff, 0xfe])
+    for (const pkt of frameMessage(badJson, 180)) {
+      expect(() => cap.inject(pkt)).not.toThrow()
+    }
+  })
+
+  it('keeps processing valid messages after a garbage one (stream stays aligned)', () => {
+    const cap = makeCapturingClientTransport()
+    const client = new NetClientSession('Bob', 'thief', stubInput(), cap.transport)
+    cap.connect()
+
+    // Garbage snapshot first…
+    for (const pkt of frameMessage(new Uint8Array([MsgType.Snapshot, 0x00]), 180)) cap.inject(pkt)
+    // …then a perfectly valid Welcome. If the bad message wedged the stream reader
+    // (buffer never advanced) or crashed the handler, this would never land.
+    for (const pkt of frameMessage(encodeJson(MsgType.Welcome, { slot: 4, token: 'tok' }), 180)) cap.inject(pkt)
+
+    expect(client.slot).toBe(4)
+  })
+})
+
+describe('offline co-op — input edge integrity (stale/duplicate packets)', () => {
+  const rollEdges = { attack: false, interact: false, special: false, roll: true }
+
+  it('does not re-fire a roll edge from a stale/duplicate input packet', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(30, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    const raw = hub.addRawCentral()
+    raw.connect()
+    await flush()
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'thief' }))
+    await flush()
+    host.beginGame()
+    await flush()
+
+    const p = host.peersBySlot.get(1)!
+    const rollPkt = encodeInput({ ...emptyInput(), seq: 5 }, rollEdges)
+
+    // First delivery: the roll edge latches, then the tick consumes it exactly once.
+    raw.send(rollPkt)
+    await flush()
+    expect(p.pendingEdges & 8).toBe(8)
+    host.tick()
+    expect(p.pendingEdges).toBe(0)
+
+    // A duplicate/reordered copy of the SAME packet (seq 5 is now stale) must NOT
+    // re-arm the roll — otherwise the player dodge-rolls a second time they never asked for.
+    raw.send(rollPkt)
+    await flush()
+    expect(p.pendingEdges & 8).toBe(0)
+  })
+
+  it('does not drop a pure-edge tap (roll) when the input lane stalls under congestion', async () => {
+    // A host + one client, but the client→host link can be STALLED so its send
+    // queue backs up — exactly what a BLE hiccup does. Pure edges (roll / throw /
+    // hotbar) have no held-state fallback, so if the edge-carrying input packet is
+    // dropped while a newer one overwrites it on the capacity-1 snapshot lane, the
+    // dodge-roll is silently lost. This models the #57 class of bug on the wire.
+    // Holder object (not `let`) so TS doesn't narrow the handlers to null in this
+    // scope after the closure assignments below.
+    const h: { host: ((e: TransportEvent) => void) | null; client: ((e: TransportEvent) => void) | null } = {
+      host: null,
+      client: null,
+    }
+    const gate: { stall: boolean; release: (() => void) | null } = { stall: false, release: null }
+    const deliver = (fn?: () => void): Promise<void> => Promise.resolve().then(() => fn?.())
+
+    const hostTransport: Transport = {
+      role: 'host',
+      maxPacket: 180,
+      start: async () => {},
+      stop: async () => {},
+      sendPacket: (_peer, bytes) => deliver(() => h.client?.({ type: 'data', peer: 'host', bytes })),
+      on: (fn) => {
+        h.host = fn
+        return () => {}
+      },
+      peers: () => ['central-1'],
+    }
+    const clientTransport: Transport = {
+      role: 'client',
+      maxPacket: 180,
+      start: async () => {},
+      stop: async () => {},
+      sendPacket: async (_peer, bytes) => {
+        if (gate.stall) await new Promise<void>((r) => (gate.release = r)) // hold this packet in flight
+        await deliver(() => h.host?.({ type: 'data', peer: 'central-1', bytes }))
+      },
+      on: (fn) => {
+        h.client = fn
+        return () => {}
+      },
+      peers: () => ['host'],
+    }
+
+    const host = new NetHostSession(32, 'soldier', 'Alice', stubInput(), hostTransport)
+    const input = { cur: emptyInput(), sample() { return { ...this.cur } } }
+    const client = new NetClientSession('Bob', 'thief', input, clientTransport)
+    await host.start()
+    await client.start()
+    h.host?.({ type: 'peerConnected', peer: 'central-1' })
+    h.client?.({ type: 'peerConnected', peer: 'host' })
+    await flush()
+    host.beginGame()
+    await flush()
+    expect(client.phase).toBe('playing')
+
+    const p = host.peersBySlot.get(1)!
+    // Stall the uplink, then produce: a plain send (becomes the in-flight packet),
+    // a ROLL tap (its packet lands in the snapshot slot), then another plain send
+    // (overwrites the roll packet before it can leave).
+    gate.stall = true
+    input.cur = emptyInput()
+    client.tick() // tickCount 1 (odd, no send)
+    client.tick() // tickCount 2 (send) → packet #1 in-flight, held by the stall
+    await flush()
+    input.cur = { ...emptyInput(), roll: true }
+    client.tick() // tickCount 3 → latches roll edge
+    input.cur = emptyInput()
+    client.tick() // tickCount 4 (send) → roll packet into the snapshot slot
+    await flush()
+    client.tick() // tickCount 5
+    client.tick() // tickCount 6 (send) → overwrites the roll packet in the slot
+    await flush()
+
+    // Release the stall; the queue drains whatever survived.
+    gate.stall = false
+    gate.release?.()
+    await flush()
+
+    // The host must have received the roll edge — a dropped dodge is a real defect.
+    expect(p.pendingEdges & 8).toBe(8)
+  })
+
+  it("keeps a client's OWN avatar in its snapshot even when 60 NPCs crowd the interest radius", async () => {
+    // INVARIANT GUARD (not a reproduced bug): snapshots cap at 48 entities. This
+    // holds today only because players sit at a LOW index in world.entities (added
+    // at beginGame, right after populateWorld) while combat-spawned NPCs append
+    // AFTER them — so the cap slices trailing NPCs, never a player. If that ordering
+    // ever changes (e.g. players re-added mid-run, or the cap logic is rewritten),
+    // the receiving peer could stop seeing its own avatar (self → undefined,
+    // prediction/reconcile die). This locks the invariant in.
+    const hub = new MockHub()
+    const host = new NetHostSession(40, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', 'thief', stubInput())
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+
+    const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
+    for (let i = 0; i < 60; i++) {
+      addEntity(host.world, makeEntity('npc', 'thug', avatar.pos.x, avatar.pos.y))
+    }
+
+    for (let i = 0; i < 6; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+
+    // The client must still see (and reconcile) its own avatar.
+    expect(bob.session.renderView().self).toBeDefined()
+  })
+
+  it('still latches an edge carried by a genuinely newer packet', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(31, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    const raw = hub.addRawCentral()
+    raw.connect()
+    await flush()
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'thief' }))
+    await flush()
+    host.beginGame()
+    await flush()
+
+    const p = host.peersBySlot.get(1)!
+    raw.send(encodeInput({ ...emptyInput(), seq: 1 }, noEdges))
+    await flush()
+    host.tick()
+    // A newer packet (seq 2) carrying the roll edge must arm it.
+    raw.send(encodeInput({ ...emptyInput(), seq: 2 }, rollEdges))
+    await flush()
+    expect(p.pendingEdges & 8).toBe(8)
   })
 })

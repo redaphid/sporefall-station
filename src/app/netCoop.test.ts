@@ -240,13 +240,13 @@ describe('offline co-op (loopback transport)', () => {
     expect(host.lobbyPlayers().map((p) => p.name)).toContain('Late')
   })
 
-  it('still enforces the 4-player cap for late joiners in a running game', async () => {
+  it('still enforces the 8-player cap for late joiners in a running game', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(9, 'soldier', 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
-    // Three clients fill slots 1..3 in the lobby (host is slot 0), then start.
-    for (const nm of ['Bob', 'Cara', 'Dan']) {
+    // Seven clients fill slots 1..7 in the lobby (host is slot 0), then start.
+    for (const nm of ['Bob', 'Cara', 'Dan', 'Eve', 'Finn', 'Gwen', 'Hank']) {
       const c = hub.addClient(nm, 'thief', stubInput())
       await c.session.start()
       c.connect()
@@ -254,13 +254,13 @@ describe('offline co-op (loopback transport)', () => {
     }
     host.beginGame()
     await flush()
-    expect(host.lobbyPlayers()).toHaveLength(4)
+    expect(host.lobbyPlayers()).toHaveLength(8)
 
-    // The fifth participant is turned away even mid-run.
+    // The ninth participant is turned away even mid-run.
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Eve', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Ivan', classId: 'soldier' }))
     await flush()
 
     const reject = findMsg<{ reason: string }>(raw.received(), MsgType.Reject)
@@ -315,25 +315,28 @@ describe('offline co-op (loopback transport)', () => {
     expect(bob.session.renderView().self).toBeDefined()
   })
 
-  it('fills all four co-op slots then rejects the fifth player', async () => {
+  it('fills all eight co-op slots then rejects the ninth player', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(42, 'soldier', 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
-    // Three real clients fill slots 1..3 (host is slot 0).
-    for (const nm of ['Bob', 'Cara', 'Dan']) {
+    // Seven real clients fill slots 1..7 (host is slot 0).
+    const names = ['Bob', 'Cara', 'Dan', 'Eve', 'Finn', 'Gwen', 'Hank']
+    for (const nm of names) {
       const c = hub.addClient(nm, 'thief', stubInput())
       await c.session.start()
       c.connect()
       await flush()
     }
-    expect(host.lobbyPlayers()).toHaveLength(4)
+    expect(host.lobbyPlayers()).toHaveLength(8)
+    // Every joined slot is distinct and contiguous 0..7 — no collision/overflow.
+    expect(host.lobbyPlayers().map((p) => p.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 
-    // The fifth participant overflows the lobby.
+    // The ninth participant overflows the lobby.
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Eve', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Ivan', classId: 'soldier' }))
     await flush()
 
     const reject = findMsg<{ reason: string }>(raw.received(), MsgType.Reject)

@@ -7,8 +7,9 @@ import { TILE_PX } from '../render/art'
  * rounded distance) — no pixi involvement, DOM markers only.
  */
 
-/** Stable per-slot caret colours; teammates keep the same hue all game. */
-const SLOT_COLORS = ['#5aa9ff', '#7fd17f', '#ffd76a', '#d17fd1', '#ff9a5a', '#6ad1c8'] as const
+/** Stable per-slot caret colours; teammates keep the same hue all game.
+ * Eight distinct hues so an 8-player run (slots 0..7) has no colour collisions. */
+const SLOT_COLORS = ['#5aa9ff', '#7fd17f', '#ffd76a', '#d17fd1', '#ff9a5a', '#6ad1c8', '#c98cff', '#ff7fa8'] as const
 /** Downed teammates override their slot colour with a loud red — rush to revive. */
 export const DOWNED_COLOR = '#ff4d4d'
 

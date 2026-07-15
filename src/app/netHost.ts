@@ -25,6 +25,17 @@ import type { RenderView, Session } from './session'
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
 const STATE_INTERVAL_TICKS = 15 // 2Hz
 
+/**
+ * Max simultaneous players in one run (host + clients). Slots run 0..MAX_PLAYERS-1;
+ * the host always owns slot 0, so up to MAX_PLAYERS-1 remote clients may join.
+ * Raised from 4→8 for large local groups (stress/8-players). NOTE: over BLE the
+ * host peripheral's radio caps concurrent centrals well below this (commonly ~7,
+ * device-specific) — this constant is the protocol/sim ceiling, not a promise the
+ * transport can carry it. The BroadcastChannel/web path has no such radio limit.
+ */
+export const MAX_PLAYERS = 8
+const MAX_SLOT = MAX_PLAYERS - 1
+
 interface PeerState {
   slot: number
   name: string
@@ -343,7 +354,7 @@ export class NetHostSession implements Session {
         const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot), ...this.ghosts.keys()])
         let slot = 1
         while (used.has(slot)) slot++
-        if (slot > 3) {
+        if (slot > MAX_SLOT) {
           p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
           return
         }
@@ -362,7 +373,7 @@ export class NetHostSession implements Session {
         return
       }
 
-      if (this.peers.size > 3) {
+      if (this.peers.size > MAX_SLOT) {
         p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
         return
       }

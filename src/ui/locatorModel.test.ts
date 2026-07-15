@@ -27,12 +27,15 @@ describe('playerColor / playerLabel', () => {
   it('is stable and distinct per slot, and wraps past the palette', () => {
     expect(playerColor(0)).toBe(playerColor(0))
     expect(playerColor(0)).not.toBe(playerColor(1))
-    // 6-colour palette → slot 6 wraps back to slot 0's colour.
-    expect(playerColor(6)).toBe(playerColor(0))
+    // All 8 co-op slots (0..7) get distinct hues — no collisions in a full run.
+    const colors = new Set([0, 1, 2, 3, 4, 5, 6, 7].map(playerColor))
+    expect(colors.size).toBe(8)
+    // 8-colour palette → slot 8 wraps back to slot 0's colour.
+    expect(playerColor(8)).toBe(playerColor(0))
   })
   it('handles negative slots without indexing off the palette', () => {
-    expect(playerColor(-1)).toBe(playerColor(5))
-    expect(typeof playerColor(-7)).toBe('string')
+    expect(playerColor(-1)).toBe(playerColor(7))
+    expect(typeof playerColor(-9)).toBe('string')
   })
   it('labels are 1-based and human-facing', () => {
     expect(playerLabel(0)).toBe('P1')

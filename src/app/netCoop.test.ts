@@ -163,29 +163,55 @@ describe('offline co-op (loopback transport)', () => {
     expect(reject!.reason).toMatch(/version/i)
   })
 
-  it('rejects new joiners once the game has started', async () => {
+  it('drops a fresh late joiner straight into a running game', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(9, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'thief', stubInput())
-
     await host.start()
-    await bob.session.start()
-    bob.connect()
-    await flush()
     host.beginGame()
     await flush()
     expect(host.started).toBe(true)
+    const playersBefore = host.world.entities.filter((e) => e.playerCtl).length
 
-    // A late central asking to join a running game is turned away.
+    // A brand-new central (never in the lobby) asks to join mid-run.
+    const late = hub.addClient('Late', 'thief', stubInput())
+    await late.session.start()
+    late.connect()
+    await flush()
+
+    // Host welcomed it, spawned a new avatar, and handed it GameStart + Go.
+    expect(late.session.slot).toBe(1)
+    expect(late.session.phase).toBe('playing')
+    expect(host.peersBySlot.get(1)?.entityId).toBeDefined()
+    expect(host.world.entities.filter((e) => e.playerCtl).length).toBe(playersBefore + 1)
+    expect(host.lobbyPlayers().map((p) => p.name)).toContain('Late')
+  })
+
+  it('still enforces the 4-player cap for late joiners in a running game', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(9, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+
+    // Three clients fill slots 1..3 in the lobby (host is slot 0), then start.
+    for (const nm of ['Bob', 'Cara', 'Dan']) {
+      const c = hub.addClient(nm, 'thief', stubInput())
+      await c.session.start()
+      c.connect()
+      await flush()
+    }
+    host.beginGame()
+    await flush()
+    expect(host.lobbyPlayers()).toHaveLength(4)
+
+    // The fifth participant is turned away even mid-run.
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Late', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Eve', classId: 'soldier' }))
     await flush()
 
     const reject = findMsg<{ reason: string }>(raw.received(), MsgType.Reject)
     expect(reject).toBeDefined()
-    expect(reject!.reason).toMatch(/already running/i)
+    expect(reject!.reason).toMatch(/full/i)
   })
 
   it('fills all four co-op slots then rejects the fifth player', async () => {

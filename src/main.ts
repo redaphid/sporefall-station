@@ -117,10 +117,13 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   const dbg = createDebugLog(deps.uiMount)
 
   if (mode === 'host') {
+    // Advertise the host's display name so the join list can label this phone
+    // (issue #35). No "SoR " tag: the scan already filters by service UUID, and
+    // the ~8-char advertisement budget is too tight to waste on a prefix.
     const transport = native
-      ? new BleHostTransport(`SoR ${deps.name}`, dbg.log)
+      ? new BleHostTransport(deps.name, dbg.log)
       : new BroadcastChannelTransport('host', deps.room)
-    dbg.log(`host: mode start, native=${native}, name="SoR ${deps.name}"`)
+    dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     const session = new NetHostSession(deps.seed, deps.classId, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')

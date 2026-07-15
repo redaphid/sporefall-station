@@ -8,6 +8,7 @@ import { SIM_DT } from './game/types'
 import { createGamepadCoop } from './input/gamepadCoop'
 import { createControllersOverlay } from './input/controllersOverlay'
 import { createKeyboard } from './input/keyboard'
+import { createScriptedInput, scriptTicks, SCRIPTS } from './input/scripted'
 import { createTouch, mergeInputs } from './input/touch'
 import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
@@ -36,8 +37,10 @@ const boot = async (): Promise<void> => {
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
-  let input: InputSource = createKeyboard()
-  if (navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
+  // A `?script=` deterministic input timeline replaces live input for e2e videos.
+  const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
+  let input: InputSource = script ? createScriptedInput(script) : createKeyboard()
+  if (!script && navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, classId, input, coop, uiMount, renderer })
@@ -50,6 +53,10 @@ const boot = async (): Promise<void> => {
     ;(window as unknown as { __sor: Session }).__sor = session
     if (session instanceof HostSession)
       (window as unknown as { __debug: unknown }).__debug = createDebugApi(session.world)
+  }
+  if (script && session instanceof HostSession) {
+    ;(window as unknown as { __world: unknown }).__world = session.world
+    ;(window as unknown as { __scriptTicks: number }).__scriptTicks = scriptTicks(script)
   }
   runLoop(session, renderer, uiMount, coop)
 }

@@ -62,8 +62,8 @@ const think = (w: World, e: Entity): void => {
     return
   }
 
-  // idle/wander: occasionally pick a new waypoint near home
-  if (!ai.waypoint && w.rng.chance(0.3)) {
+  // idle/wander: occasionally pick a new waypoint near home (guards hold post)
+  if (!ai.guard && !ai.waypoint && w.rng.chance(0.3)) {
     const tx = ai.home.x + w.rng.int(-WANDER_RADIUS, WANDER_RADIUS)
     const ty = ai.home.y + w.rng.int(-WANDER_RADIUS, WANDER_RADIUS)
     ai.waypoint = { x: tx, y: ty }

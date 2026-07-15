@@ -37,6 +37,8 @@ export interface AiState {
   /** Per-other-entity disposition, keyed by that entity's id. Absent until this
    * NPC has an opinion; the initial stance is derived from faction on the fly. */
   rel?: Record<EntityId, RelEntry>
+  /** Holds position instead of idle-wandering until it spots a target. */
+  guard?: boolean
 }
 
 export interface ItemStack {

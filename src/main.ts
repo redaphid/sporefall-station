@@ -223,7 +223,15 @@ const runLoop = (
   const hud = createHud(uiMount)
   // Host/solo can restart in place (transport preserved); a client has no
   // restart() and instead waits for the host's fresh GameStart over the link.
-  const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined)
+  // Feed the teammate locator read-only camera/screen state so it can project
+  // world→screen for on-screen markers — no renderer draw code is touched.
+  const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined, () => ({
+    x: renderer.camera.x,
+    y: renderer.camera.y,
+    zoom: renderer.camera.zoom,
+    screenW: renderer.app.screen.width,
+    screenH: renderer.app.screen.height,
+  }))
   const overlay = createControllersOverlay(uiMount)
   const showPause = createPauseBanner(uiMount)
   let currentLevel = session.renderView().level

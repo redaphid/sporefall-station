@@ -3,9 +3,11 @@
 // effect). Kept DOM-free so the overlay just renders the rows and tests assert on
 // them. Reads live entity fields plus the data tables for human-facing names.
 
-import type { Entity } from '../game/entity'
+import type { Entity, ItemStack } from '../game/entity'
 import { NPCS } from '../game/data/npcs'
 import { CONSUMABLES, THROWABLES, WEAPONS } from '../game/data/items'
+import { MODS } from '../game/data/mods'
+import { weaponStack } from '../game/systems/inventory'
 
 export interface InspectRow {
   label: string
@@ -27,6 +29,13 @@ const pretty = (s: string): string =>
 
 /** Human name for whichever weapon/throwable/consumable id we can resolve. */
 const itemName = (id: string): string => WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id)
+
+/** One inspect row per weapon mod on a stack: "❄️ Cryo Rounds" → "×N". Empty for
+ * a vanilla / absent stack, so an unmodded gun shows just the Weapon row. */
+const modRows = (stack: ItemStack | undefined): InspectRow[] =>
+  (stack?.mods ?? [])
+    .filter((m) => MODS[m.id] && m.stacks > 0)
+    .map((m) => ({ label: `${MODS[m.id].icon} ${MODS[m.id].name}`, value: `×${m.stacks}` }))
 
 /**
  * Build the friendly inspect card for an entity. Only rows that apply are
@@ -56,7 +65,11 @@ export const inspectCard = (e: Entity): InspectCard => {
     rows.push({ label: 'Door', value: e.door.open ? 'Open' : e.door.locked ? `Locked (L${e.door.lockLevel})` : 'Closed' })
   }
 
-  if (e.combat?.weapon) rows.push({ label: 'Weapon', value: itemName(e.combat.weapon) })
+  if (e.combat?.weapon) {
+    rows.push({ label: 'Weapon', value: itemName(e.combat.weapon) })
+    // Surface the equipped gun's mods so a kid can SEE their build (#41/#51).
+    if (e.playerCtl) for (const r of modRows(weaponStack(e))) rows.push(r)
+  }
 
   if (e.pickup) {
     rows.push({ label: 'Item', value: `${itemName(e.pickup.itemId)}${e.pickup.qty > 1 ? ` ×${e.pickup.qty}` : ''}` })

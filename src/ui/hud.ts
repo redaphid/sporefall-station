@@ -54,14 +54,15 @@ export const createHud = (mount: HTMLElement): Hud => {
       const inv = self.playerCtl?.inventory ?? []
       const active = self.playerCtl?.activeSlot ?? -1
       const slots = hotbarSlots(inv, active)
-      const key = slots.map((s) => `${s.index}:${s.itemId}·${s.qty}${s.active ? '*' : ''}`).join(',')
+      const key = slots.map((s) => `${s.index}:${s.itemId}·${s.qty}${s.active ? '*' : ''}·${s.mods}`).join(',')
       if (key !== lastHotbar) {
         lastHotbar = key
         hotbar.innerHTML = slots
           .map((s) => {
             const bg = s.active ? '#d4af37cc' : '#222a'
             const col = s.active ? '#111' : '#eee'
-            return `<div style="padding:2px 7px;background:${bg};color:${col};border:1px solid #000;border-radius:4px;font-size:12px">${s.label} <b>${s.qty}</b></div>`
+            const badge = s.mods ? `<div style="font-size:11px;line-height:1.1;margin-top:1px">${s.mods}</div>` : ''
+            return `<div style="padding:2px 7px;background:${bg};color:${col};border:1px solid #000;border-radius:4px;font-size:12px">${s.label} <b>${s.qty}</b>${badge}</div>`
           })
           .join('')
       }

@@ -1,13 +1,15 @@
 import { CLASSES } from '../data/classes'
 import { WEAPONS, type StatusApply } from '../data/items'
+import type { ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, type Entity } from '../entity'
-import type { InputCmd } from '../types'
+import type { EntityId, InputCmd } from '../types'
 import { addEntity, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { equipSlot, spendAmmo, useHeld, wearMelee } from './inventory'
+import { equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
+import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -155,6 +157,19 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
   return best
 }
 
+/** Resolved bullet-behavior spec carried onto a spawned projectile (weapon mods). */
+export interface ProjectileSpec {
+  onHit?: StatusApply
+  pierce?: number
+  bounce?: number
+  homing?: number
+  explodeRadius?: number
+  explodeDamage?: number
+  split?: number
+  lifestealFrac?: number
+  triggers?: ResolvedTrigger[]
+}
+
 export const spawnProjectile = (
   w: World,
   owner: Entity,
@@ -163,14 +178,80 @@ export const spawnProjectile = (
   rangeTiles: number,
   angleOffset = 0,
   onHit?: StatusApply,
+  spec?: ProjectileSpec,
 ): void => {
   const angle = owner.facing + angleOffset
   const e = makeEntity('projectile', 'projectile', owner.pos.x, owner.pos.y, 0.15)
   e.facing = angle
   e.vel.x = Math.cos(angle) * speed
   e.vel.y = Math.sin(angle) * speed
-  e.projectile = { ownerId: owner.id, damage, ttl: Math.ceil((rangeTiles / speed) * 30), onHit }
+  const ttl = Math.ceil((rangeTiles / speed) * 30)
+  e.projectile = { ownerId: owner.id, damage, ttl, onHit: spec?.onHit ?? onHit }
+  // Attach only the mod fields that are actually present → snapshot-stable: a
+  // vanilla shot serializes exactly as before this feature.
+  if (spec) {
+    const p = e.projectile
+    if (spec.pierce) p.pierceLeft = spec.pierce
+    if (spec.bounce) p.bounceLeft = spec.bounce
+    if (spec.homing) p.homing = spec.homing
+    if (spec.explodeRadius && spec.explodeDamage) p.explode = { radius: spec.explodeRadius, damage: spec.explodeDamage }
+    if (spec.split && spec.split > 0) p.split = { count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }
+    if (spec.lifestealFrac) p.lifestealFrac = spec.lifestealFrac
+    if (spec.triggers && spec.triggers.length) p.triggers = spec.triggers
+  }
   addEntity(w, e)
+}
+
+/** A blast at (x,y): every live body in radius takes `damage` from the owner.
+ * The one AoE primitive — reused by grenades/explosive bullets (projectiles.ts)
+ * and by on-kill detonator triggers. Kept here (not projectiles.ts) so the
+ * projectile system can import it without a cycle back through applyDamage. */
+export const detonate = (w: World, x: number, y: number, radius: number, damage: number, ownerId: EntityId): void => {
+  w.events.push({ type: 'explosion', x, y, radius })
+  for (const other of w.entities) {
+    if (other.dead || !other.health) continue
+    const dist = Math.hypot(other.pos.x - x, other.pos.y - y)
+    if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
+  }
+}
+
+/** Fire a bullet/melee hit's resolved triggers on a struck victim. `killed` is
+ * whether this blow put the victim down. on-reload triggers are inert here (no
+ * reload action yet — P4). Bounded: a detonator blast does NOT re-chain, so a
+ * huge detonator stack can't recurse without limit. */
+export const runHitTriggers = (
+  w: World,
+  victim: Entity,
+  triggers: readonly ResolvedTrigger[] | undefined,
+  ownerId: EntityId,
+  killed: boolean,
+): void => {
+  if (!triggers) return
+  for (const t of triggers) {
+    if (!t.explode) continue
+    if (t.event === 'hit' || (t.event === 'kill' && killed)) {
+      detonate(w, victim.pos.x, victim.pos.y, t.explode.radius, t.explode.damage, ownerId)
+    }
+  }
+}
+
+/** Distil a resolved weapon into a projectile spec, or undefined when the shot
+ * is fully vanilla (no behavior/trigger mods) — so an unmodded bullet spawns
+ * byte-for-byte as before. */
+const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
+  const b = rw.behavior
+  const has = b.pierce || b.bounce || b.homing || b.explodeRadius || b.split || b.lifestealFrac || rw.triggers.length
+  if (!has) return undefined
+  return {
+    pierce: b.pierce || undefined,
+    bounce: b.bounce || undefined,
+    homing: b.homing || undefined,
+    explodeRadius: b.explodeRadius || undefined,
+    explodeDamage: b.explodeDamage || undefined,
+    split: b.split || undefined,
+    lifestealFrac: b.lifestealFrac || undefined,
+    triggers: rw.triggers.length ? rw.triggers : undefined,
+  }
 }
 
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
@@ -193,20 +274,24 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
     const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
+    // The SINGLE fire-site fold: mods hang off the swung weapon's ItemStack.
+    const rw = resolveWeapon(weapon, weaponStack(e)?.mods)
     if (weapon.kind === 'melee') {
-      e.combat.cooldown = weapon.cooldownTicks
-      const damage = Math.round(weapon.damage * (cls?.meleeDamageMult ?? 1))
-      const hit = meleeAttack(w, e, damage, weapon.range, weapon.knockback)
+      e.combat.cooldown = rw.cooldownTicks
+      const damage = Math.round(rw.damage * (cls?.meleeDamageMult ?? 1))
+      const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
       if (weapon.durability !== undefined) wearMelee(e)
-      if (hit && weapon.onHit) applyStatus(w, hit, weapon.onHit.status, weapon.onHit.ticks)
+      if (hit) {
+        if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+        runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
+      }
     } else {
       if (!spendAmmo(e)) continue // empty gun clicks — no shot, no cooldown
-      e.combat.cooldown = weapon.cooldownTicks
-      const pellets = weapon.pellets ?? 1
-      const speed = weapon.projectileSpeed ?? 12
-      for (let i = 0; i < pellets; i++) {
-        const offset = pellets > 1 ? (i / (pellets - 1) - 0.5) * (weapon.spread ?? 0) : 0
-        spawnProjectile(w, e, weapon.damage, speed, weapon.range, offset, weapon.onHit)
+      e.combat.cooldown = rw.cooldownTicks
+      const spec = projectileSpec(rw)
+      for (let i = 0; i < rw.pellets; i++) {
+        const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
+        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec)
       }
     }
   }

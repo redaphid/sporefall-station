@@ -44,9 +44,22 @@ export interface AiState {
   goal?: string
 }
 
+/** One applied weapon modifier: a registry id (`data/mods.ts`) plus a
+ * deterministic stack count. Pure JSON — no functions/closures — so a modded
+ * loadout serializes and round-trips byte-for-byte like any other component.
+ * ROUNDS-style: the same card can be picked (stacked) multiple times. */
+export interface WeaponMod {
+  id: string
+  stacks: number
+}
+
 export interface ItemStack {
   itemId: string
   qty: number
+  /** Present only on a modded weapon; absent = vanilla, so every pre-existing
+   * fixture/snapshot serializes byte-for-byte unchanged (same optional-field
+   * discipline as `annotations`). Resolved by `resolveWeapon` at the fire site. */
+  mods?: WeaponMod[]
 }
 
 export interface Entity {
@@ -93,6 +106,21 @@ export interface Entity {
     onLand?: import('./data/items').AreaEffect
     /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
     onHit?: import('./data/items').StatusApply
+    // ---- weapon-mod behavior fields (all optional → snapshot-stable). ----
+    /** Extra victims to pass through before dying (pierce). Decrements per body. */
+    pierceLeft?: number
+    /** Wall bounces left — reflect off a blocked tile instead of dying (bounce). */
+    bounceLeft?: number
+    /** Per-tick turn rate (radians) steering toward the nearest hostile (homing). */
+    homing?: number
+    /** Spawn N damaging children on the first body it strikes (split/multishot). */
+    split?: { count: number; damage: number; speed: number; ttl: number }
+    /** Heal the owner by frac·damage dealt on each hit (lifesteal). */
+    lifestealFrac?: number
+    /** Bodies already struck (pierce), so one victim isn't re-hit every tick. */
+    hitIds?: EntityId[]
+    /** Resolved trigger effects fired on hit/kill (on-reload handled elsewhere). */
+    triggers?: import('./data/mods').ResolvedTrigger[]
   }
   pickup?: { itemId: string; qty: number }
   door?: { open: boolean; locked: boolean; lockLevel: number }

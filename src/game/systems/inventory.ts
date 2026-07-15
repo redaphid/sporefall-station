@@ -76,6 +76,15 @@ const weaponSlotIndex = (e: Entity): number => {
   })
 }
 
+/** The ItemStack backing the currently-swung weapon — where its `mods` live.
+ * Returns undefined when the weapon isn't slotted (bare fists / class-starter
+ * gun), so those resolve as vanilla. This is the single lookup the fire site and
+ * the `addMod` verb use to reach a gun's mod list. */
+export const weaponStack = (e: Entity): ItemStack | undefined => {
+  const index = weaponSlotIndex(e)
+  return index < 0 ? undefined : e.playerCtl!.inventory[index]
+}
+
 /** Drop a slot; if it held the swung weapon, fall back to bare fists. Keeps
  * activeSlot pointing at the same logical slot as the array shrinks. The
  * weapon-reset keys off the removed item, NOT activeSlot — throwing a held

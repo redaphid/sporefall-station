@@ -32,6 +32,10 @@ What "AI-native" means here, concretely:
   and `docs/` (a real JS debugger can attach to a headless run via `node --inspect`).
 - **Communicate back to the player.** Drawing/labelling on screen and tap-to-inspect
   annotations run on the same substrate, so the agent can show what it reasons about.
+- **Experiment with gameplay.** Compose deterministic scenarios (heists, set-pieces,
+  emergent-mechanic tests), narrate them with annotations, and record annotated
+  video/stills — see the **`.claude/skills/gameplay-experiments`** skill and
+  `docs/gameplay-experiments.md`.
 - **Reflect on entity types.** Components are ad-hoc optional fields on `Entity`; a
   reflection/schema verb enumerates what's present so an agent can reason about
   unfamiliar entities rather than relying on a hardcoded list.

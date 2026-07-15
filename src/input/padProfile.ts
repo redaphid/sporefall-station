@@ -26,6 +26,12 @@ export interface PadProfile {
   /** Dodge-roll button(s) — the left shoulder/trigger, clear of attack/aim. */
   roll: number[]
   pause: number[]
+  /** Throw the held item / grenade (edge). A free button clear of attack/roll. */
+  throw: number[]
+  /** Cycle to the previous / next hotbar weapon (edge). Two distinct free buttons;
+   * gamepadCoop turns the press into an absolute slot index. */
+  hotbarPrev: number[]
+  hotbarNext: number[]
   join: number[]
   dpad: [number, number, number, number]
   moveAxes: [number, number]
@@ -41,6 +47,15 @@ const STANDARD: PadProfile = {
   special: [2, 3],
   roll: [4, 6], // LB / LT
   pause: [9],
+  // Face buttons (0-3) and all four shoulders (4-7) are already bound above, so
+  // the newly-mapped verbs take the remaining free buttons on a W3C standard pad:
+  //   throw   → Back/Select (8)
+  //   cycle   → left-stick click L3 (10, prev) / right-stick click R3 (11, next)
+  // Stick-clicks aren't glamorous but they're the only conflict-free pair here;
+  // real-device tuning may prefer LB/RB, but those collide with roll/attack.
+  throw: [8],
+  hotbarPrev: [10],
+  hotbarNext: [11],
   join: [0, 1, 2, 3, 9],
   dpad: [12, 13, 14, 15],
   moveAxes: [0, 1],
@@ -54,7 +69,14 @@ const permissive = (kind: PadKind): PadProfile => ({
   interact: [2, 3],
   special: [4, 5],
   roll: [6, 7],
-  pause: [8, 9, 10, 11],
+  // Pause narrowed from the old greedy [8,9,10,11] guess to Start (9) — matching
+  // the standard profile — so 8/10/11 are free for the new verbs, laid out like
+  // standard: throw on 8, cycle on 10 (prev) / 11 (next). All BEST GUESS: the
+  // controllers overlay shows live indices for a real-device check.
+  pause: [9],
+  throw: [8],
+  hotbarPrev: [10],
+  hotbarNext: [11],
   join: [0, 1, 2, 3, 4, 5],
   dpad: [12, 13, 14, 15],
   moveAxes: [0, 1],

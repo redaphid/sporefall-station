@@ -353,6 +353,7 @@ const runLoop = (
     // A live controller takes over → hide the on-screen touch sticks/buttons.
     touch?.setControllerActive(anyPadActive(pads))
     touch?.update(view)
+    coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
     screens.update(view)
     commOverlay.update(view)
     overlay.update(pads)

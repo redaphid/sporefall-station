@@ -21,6 +21,9 @@ const actions = (s: PadState): string => {
   if (s.interact) out.push('I')
   if (s.special) out.push('S')
   if (s.pause) out.push('P')
+  if (s.throwItem) out.push('T')
+  if (s.hotbarPrev) out.push('<')
+  if (s.hotbarNext) out.push('>')
   return out.join('')
 }
 

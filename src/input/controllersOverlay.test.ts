@@ -13,6 +13,9 @@ const state = (over: Partial<PadState> = {}): PadState => ({
   interact: false,
   special: false,
   pause: false,
+  throwItem: false,
+  hotbarPrev: false,
+  hotbarNext: false,
   ...over,
 })
 

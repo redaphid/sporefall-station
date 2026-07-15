@@ -104,4 +104,56 @@ describe('readPad', () => {
       expect(s.pause).toBe(false)
     })
   })
+
+  describe('throw / weapon-switch buttons', () => {
+    const gen = padProfile({ id: 'Some Generic USB Joystick', mapping: '' })
+
+    it('reports throwItem when the standard throw button is down', () => {
+      const buttons: boolean[] = []
+      buttons[std.throw[0]] = true
+      expect(readPad(fakePad({ buttons }), std).throwItem).toBe(true)
+    })
+    it('reports hotbarNext when the standard next button is down', () => {
+      const buttons: boolean[] = []
+      buttons[std.hotbarNext[0]] = true
+      const s = readPad(fakePad({ buttons }), std)
+      expect(s.hotbarNext).toBe(true)
+      expect(s.hotbarPrev).toBe(false)
+    })
+    it('reports hotbarPrev when the standard prev button is down', () => {
+      const buttons: boolean[] = []
+      buttons[std.hotbarPrev[0]] = true
+      expect(readPad(fakePad({ buttons }), std).hotbarPrev).toBe(true)
+    })
+    it('maps the same verbs on the generic profile too', () => {
+      const buttons: boolean[] = []
+      buttons[gen.throw[0]] = true
+      expect(readPad(fakePad({ buttons }), gen).throwItem).toBe(true)
+      const b2: boolean[] = []
+      b2[gen.hotbarNext[0]] = true
+      expect(readPad(fakePad({ buttons: b2 }), gen).hotbarNext).toBe(true)
+    })
+    it('is all false when idle', () => {
+      const s = readPad(fakePad(), std)
+      expect(s.throwItem).toBe(false)
+      expect(s.hotbarPrev).toBe(false)
+      expect(s.hotbarNext).toBe(false)
+    })
+  })
+
+  describe('aim-to-fire parity with touch', () => {
+    it('fires attack when the right stick deflects past the fire threshold, no button', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0.9, 0] }), std)
+      expect(s.attack).toBe(true)
+    })
+    it('does not fire from a small right-stick nudge below the threshold', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0.3, 0] }), std)
+      expect(s.attack).toBe(false)
+    })
+    it('still fires from the attack button with the aim stick centred', () => {
+      const buttons: boolean[] = []
+      buttons[0] = true
+      expect(readPad(fakePad({ buttons }), std).attack).toBe(true)
+    })
+  })
 })

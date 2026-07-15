@@ -10,6 +10,20 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# --- Parse flags -------------------------------------------------------------
+# `--release` builds a signed assembleRelease APK (signing config comes from
+# android/keystore.properties or ANDROID_KEYSTORE_* env vars; see
+# android/app/build.gradle + docs/deploy.md). Default is the debug build.
+BUILD_VARIANT="debug"
+GRADLE_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --release) BUILD_VARIANT="release" ;;
+    --debug)   BUILD_VARIANT="debug" ;;
+    *)         GRADLE_ARGS+=("$arg") ;;
+  esac
+done
+
 # Print the major Java version for a JDK home (handles the legacy 1.x scheme),
 # or nothing if it can't be determined.
 java_major() {
@@ -83,14 +97,27 @@ printf 'sdk.dir=%s\n' "$ANDROID_HOME" > "$ROOT/android/local.properties"
 cd "$ROOT"
 pnpm run build
 pnpm exec cap sync android
-( cd android && ./gradlew assembleDebug "$@" )
 
-APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
-if [ -f "$APK" ]; then
+if [ "$BUILD_VARIANT" = "release" ]; then
+  echo "Building SIGNED release APK (assembleRelease)..."
+  echo "  (falls back to debug signing with a warning if no keystore is configured)"
+  ( cd android && ./gradlew assembleRelease "${GRADLE_ARGS[@]}" )
+  # AGP names the signed output app-release.apk; an unsigned build would be
+  # app-release-unsigned.apk. Prefer the signed name, fall back to any release APK.
+  APK="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
+  if [ ! -f "$APK" ]; then
+    APK="$(find "$ROOT/android/app/build/outputs/apk/release" -name '*.apk' 2>/dev/null | head -n1)"
+  fi
+else
+  ( cd android && ./gradlew assembleDebug "${GRADLE_ARGS[@]}" )
+  APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
+fi
+
+if [ -n "${APK:-}" ] && [ -f "$APK" ]; then
   echo ""
   echo "APK built: $APK ($(du -h "$APK" | cut -f1))"
   echo "Install with: adb install -r \"$APK\"   (or: pnpm run install:apk)"
 else
-  echo "ERROR: build finished but no APK at $APK" >&2
+  echo "ERROR: build finished but no $BUILD_VARIANT APK was produced" >&2
   exit 1
 fi

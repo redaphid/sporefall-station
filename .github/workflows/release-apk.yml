@@ -4,20 +4,13 @@ name: release-apk
 # (v1.2.3) is pushed. Players download the APK from the Releases page and
 # sideload it (see docs/play.md). Independent of the web / OTA path.
 #
-# ---------------------------------------------------------------------------
-# TODO(#30 slice 1): switch from DEBUG to a SIGNED RELEASE build.
-# Right now this attaches the *debug* APK (scripts/build-apk.sh -> assembleDebug)
-# because release signing is not set up yet. A debug APK installs and plays, but
-# is signed with the throwaway debug key, so it CANNOT upgrade in place over a
-# release build and is not suitable for OTA. To finish:
-#   1. Generate a release keystore (keep it OUT of git).
-#   2. Wire android/app/build.gradle release signingConfig from env /
-#      keystore.properties (gitignored).
-#   3. Add release build (assembleRelease) producing a signed app-release.apk.
-#   4. Store the keystore + passwords as repo secrets (base64 keystore,
-#      ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD) and
-#      decode/build them here. See docs/deploy.md "Signed release APK (TODO)".
-# ---------------------------------------------------------------------------
+# Signing (#30): if the release-signing secrets are present the workflow decodes
+# the keystore and builds a SIGNED assembleRelease APK, so sideloaded installs
+# upgrade in place and aren't flagged as debug builds. If the secrets are absent
+# (e.g. a fork) it falls back to the debug build so the release never breaks.
+# Required repo secrets (see docs/deploy.md "Signed release APK"):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS,       ANDROID_KEY_PASSWORD
 
 on:
   push:
@@ -55,24 +48,80 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # TODO(#30): replace with a signed release build once the keystore is wired.
-      - name: Build debug APK
-        run: pnpm run build:apk
+      # Decide whether we have a full signing config. We only set the flag; the
+      # secret values themselves are never echoed.
+      - name: Detect signing secrets
+        id: signing
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_PW" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PW" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets present -> building a SIGNED release APK."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Signing secrets absent -> falling back to the debug APK."
+          fi
+
+      # Decode the base64 keystore secret to a file. Only runs when signing.
+      - name: Decode keystore
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          # sanity: non-empty file, but never print its contents
+          test -s "$RUNNER_TEMP/release.keystore"
+          echo "keystore decoded ($(wc -c < "$RUNNER_TEMP/release.keystore") bytes)"
+
+      - name: Build SIGNED release APK
+        if: steps.signing.outputs.signed == 'true'
         env:
           CAP_SERVER_URL: ""
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: pnpm run build:apk:release
+
+      - name: Build debug APK (fallback, no secrets)
+        if: steps.signing.outputs.signed != 'true'
+        env:
+          CAP_SERVER_URL: ""
+        run: pnpm run build:apk
 
       - name: Stage release asset
         run: |
-          APK=$(find android/app/build/outputs/apk/debug -name '*.apk' | head -n1)
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -n1)
+          else
+            APK=$(find android/app/build/outputs/apk/debug -name '*.apk' | head -n1)
+          fi
           if [ -z "$APK" ]; then echo "No APK produced" >&2; exit 1; fi
           cp "$APK" backseat.apk
           ls -la backseat.apk
 
+      # Verify the published APK is signed with a real (non-debug) certificate
+      # when we intended a signed build. Fails the release if signing silently
+      # fell back to debug.
+      - name: Verify signature
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME" -name apksigner | sort -r | head -n1)
+          "$APKSIGNER" verify --print-certs --verbose backseat.apk | tee sigcheck.txt
+          if grep -qi "CN=Android Debug" sigcheck.txt; then
+            echo "ERROR: APK is debug-signed but a signed release was expected." >&2
+            exit 1
+          fi
+
       - name: Publish GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          # DEBUG build for now — see TODO(#30) above.
-          name: "Backseat ${{ github.ref_name }} (debug APK)"
+          name: >-
+            Backseat ${{ github.ref_name }}${{ steps.signing.outputs.signed == 'true' && ' (signed APK)' || ' (debug APK)' }}
           generate_release_notes: true
           files: backseat.apk
 

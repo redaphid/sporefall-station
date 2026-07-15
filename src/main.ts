@@ -2,6 +2,7 @@ import { HostSession } from './app/hostSession'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
 import type { Session } from './app/session'
+import { applyScenario } from './game/scenarios'
 import { SIM_DT } from './game/types'
 import { createGamepad } from './input/gamepad'
 import { createKeyboard } from './input/keyboard'
@@ -36,6 +37,8 @@ const boot = async (): Promise<void> => {
 
   const session = await createSession(mode, { seed, room, name, classId, input, uiMount, renderer })
   if (!session) return
+  const scenario = params.get('scenario')
+  if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
   if (params.has('e2e')) (window as unknown as { __sor: Session }).__sor = session
   runLoop(session, renderer, uiMount)
 }

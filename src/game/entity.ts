@@ -1,6 +1,16 @@
 import type { EntityId, Vec2 } from './types'
 
-export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | 'interactable'
+export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | 'interactable' | 'fire'
+
+/** One active status/element effect: the absolute tick at (or before) which it
+ * expires, plus who applied it. Keyed by effect kind on `Entity.fx`. Mirrors
+ * brain's `fx` convention — absolute-tick expiry keeps it snapshot-safe. */
+export interface StatusEntry {
+  until: number
+  source?: EntityId
+}
+
+export type Fx = Record<string, StatusEntry>
 
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'sleep'
 export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
@@ -64,6 +74,12 @@ export interface Entity {
   door?: { open: boolean; locked: boolean; lockLevel: number }
   interact?: { verb: 'open' | 'pickup' | 'talk' | 'use'; range: number }
   status?: { stun: number; sleep: number; hitFlashUntil: number; cloakUntil: number }
+  /** Active status/element effects, keyed by kind ('burning', ...). */
+  fx?: Fx
+  /** Tiles/objects/actors that fire can catch and spread through. */
+  flammable?: boolean
+  /** A fire hazard occupying this cell — kind 'fire'. `fuel` burns down 1/tick. */
+  fire?: { fuel: number }
   dead?: boolean
 }
 

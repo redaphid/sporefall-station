@@ -1,9 +1,10 @@
 node_modules/
 dist/
 outputs/
-e2e/output/
+e2e/output*/
 android/app/build/
 android/.gradle/
 android/build/
 android/local.properties
 *.log
+pnpm-lock.yaml

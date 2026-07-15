@@ -46,6 +46,7 @@ const ENTITY_COLORS: Record<string, number> = {
   cop: 0x7f9fd1,
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
+  crate: 0x9c6b3f,
   default: 0xcccccc,
 }
 
@@ -150,6 +151,20 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     if (archetype === 'door.open') {
       // Open door: slim panel against the jamb
       const g = new Graphics().rect(0, 0, 6, TILE_PX).fill(colorOverride ?? 0x8a6a3f)
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
+    if (archetype === 'fire') {
+      // A stacked flame: deep orange body, yellow core, white-hot heart.
+      const c = TILE_PX / 2
+      const g = new Graphics()
+        .circle(c, c + 3, TILE_PX * 0.44)
+        .fill(colorOverride ?? 0xff4a12)
+        .circle(c, c + 4, TILE_PX * 0.3)
+        .fill(colorOverride ?? 0xff9a1e)
+        .circle(c, c + 5, TILE_PX * 0.16)
+        .fill(colorOverride ?? 0xffe45a)
       const tex = renderer.generateTexture(g)
       g.destroy()
       return tex

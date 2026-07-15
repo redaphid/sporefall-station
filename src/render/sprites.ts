@@ -46,12 +46,16 @@ export class EntityViews {
       // Downed players faded hard; cloaked thieves shimmer translucent
       const cloaked = e.status !== undefined && e.status.cloakUntil > tick
       view.sprite.alpha = e.playerCtl?.downed ? 0.45 : cloaked ? 0.55 : 1
+      // Things on fire glow ember-orange; fire hazards keep their own colors.
+      const burning = e.fx !== undefined && e.fx.burning !== undefined
+      view.sprite.tint = burning && !flashing ? 0xff7a2a : 0xffffff
       // Pickups don't rotate; actors face their heading.
       const x = e.prevPos.x + (e.pos.x - e.prevPos.x) * alpha
       const y = e.prevPos.y + (e.pos.y - e.prevPos.y) * alpha
       view.sprite.position.set(x * TILE_PX, y * TILE_PX)
-      view.sprite.rotation = e.kind === 'pickup' || e.kind === 'door' ? 0 : e.facing
-      view.sprite.zIndex = y
+      view.sprite.rotation = e.kind === 'pickup' || e.kind === 'door' || e.kind === 'fire' ? 0 : e.facing
+      // Flames draw above whatever they're consuming.
+      view.sprite.zIndex = e.kind === 'fire' ? y + 1000 : y
     }
 
     for (const [id, view] of this.views) {

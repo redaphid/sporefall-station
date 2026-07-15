@@ -76,7 +76,7 @@ const markCrime = (w: World, target: Entity, attackerId: number): void => {
   }
 }
 
-const kill = (w: World, target: Entity): void => {
+export const kill = (w: World, target: Entity): void => {
   w.events.push({ type: 'death', x: target.pos.x, y: target.pos.y, entityId: target.id })
   if (target.playerCtl) {
     // Downed: crawl-immobile, bleeding out; teammates can revive (interaction system).

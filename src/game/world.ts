@@ -4,11 +4,13 @@ import { isSolidTile, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { combatSystem } from './systems/combat'
+import { elementSystem, fireSystem } from './systems/fire'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
 import { projectileSystem } from './systems/projectiles'
 import { statusSystem } from './systems/status'
+import { statusFxSystem } from './systems/statusFx'
 import type { EntityId, InputCmd, SimEvent } from './types'
 
 export interface MissionState {
@@ -97,7 +99,10 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   combatSystem(w, inputs)
   projectileSystem(w)
   interactionSystem(w, inputs)
+  fireSystem(w)
+  elementSystem(w)
   statusSystem(w)
+  statusFxSystem(w)
   missionSystem(w)
   sweepDead(w)
   w.tick++

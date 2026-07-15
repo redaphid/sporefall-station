@@ -5,6 +5,9 @@ import { TILE_PX } from './art'
 export class Camera {
   x = 0
   y = 0
+  /** View-only magnification (1 = native). Scales the world container; the sim
+   * is untouched. Set once from `?zoom=`. */
+  zoom = 1
   private shakeMag = 0
   private shakeX = 0
   private shakeY = 0
@@ -42,24 +45,28 @@ export class Camera {
 
   /** Position the world container so the camera point sits at screen center. */
   apply(world: Container, screenW: number, screenH: number, levelW: number, levelH: number): void {
-    const halfW = screenW / 2 / TILE_PX
-    const halfH = screenH / 2 / TILE_PX
+    const T = TILE_PX * this.zoom
+    if (world.scale.x !== this.zoom) world.scale.set(this.zoom)
+    const halfW = screenW / 2 / T
+    const halfH = screenH / 2 / T
     // Clamp so we don't show past level edges (unless level smaller than view)
-    const cx = levelW * TILE_PX > screenW ? Math.min(Math.max(this.x, halfW), levelW - halfW) : levelW / 2
-    const cy = levelH * TILE_PX > screenH ? Math.min(Math.max(this.y, halfH), levelH - halfH) : levelH / 2
+    const cx = levelW * T > screenW ? Math.min(Math.max(this.x, halfW), levelW - halfW) : levelW / 2
+    const cy = levelH * T > screenH ? Math.min(Math.max(this.y, halfH), levelH - halfH) : levelH / 2
     this.appliedX = cx
     this.appliedY = cy
     world.position.set(
-      Math.round(screenW / 2 - (cx + this.shakeX) * TILE_PX),
-      Math.round(screenH / 2 - (cy + this.shakeY) * TILE_PX),
+      Math.round(screenW / 2 - (cx + this.shakeX) * T),
+      Math.round(screenH / 2 - (cy + this.shakeY) * T),
     )
   }
 
-  /** Visible world-pixel rect for culling. */
+  /** Visible world-pixel rect (in unscaled world units) for culling. */
   viewRect(screenW: number, screenH: number, out: { x: number; y: number; w: number; h: number }): void {
-    out.x = this.appliedX * TILE_PX - screenW / 2 - TILE_PX
-    out.y = this.appliedY * TILE_PX - screenH / 2 - TILE_PX
-    out.w = screenW + TILE_PX * 2
-    out.h = screenH + TILE_PX * 2
+    const hw = screenW / 2 / this.zoom
+    const hh = screenH / 2 / this.zoom
+    out.x = this.appliedX * TILE_PX - hw - TILE_PX
+    out.y = this.appliedY * TILE_PX - hh - TILE_PX
+    out.w = hw * 2 + TILE_PX * 2
+    out.h = hh * 2 + TILE_PX * 2
   }
 }

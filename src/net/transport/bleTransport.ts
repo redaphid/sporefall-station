@@ -31,11 +31,19 @@ export class BleHostTransport implements Transport {
   private handlers = new Set<(e: TransportEvent) => void>()
   private connected = new Set<PeerId>()
 
-  constructor(private advertiseName: string) {}
+  private sawWrite = new Set<PeerId>()
+
+  constructor(
+    private advertiseName: string,
+    private log: (s: string) => void = () => {},
+  ) {}
 
   async start(): Promise<void> {
+    this.log('host: requesting BLE permissions')
     await BluetoothLowEnergy.requestPermissions()
+    this.log('host: initialize(peripheral)')
     await BluetoothLowEnergy.initialize({ mode: 'peripheral' })
+    this.log('host: addGattService')
     await BluetoothLowEnergy.addGattService({
       service: BLE_SERVICE_UUID,
       characteristics: [
@@ -44,16 +52,22 @@ export class BleHostTransport implements Transport {
       ],
     })
     await BluetoothLowEnergy.addListener('centralConnected', (ev) => {
+      this.log(`host: central connected ${ev.deviceId}`)
       this.connected.add(ev.deviceId)
       this.emit({ type: 'peerConnected', peer: ev.deviceId })
     })
     await BluetoothLowEnergy.addListener('centralDisconnected', (ev) => {
+      this.log(`host: central disconnected ${ev.deviceId}`)
       if (this.connected.delete(ev.deviceId)) {
         this.emit({ type: 'peerDisconnected', peer: ev.deviceId, reason: 'remote' })
       }
     })
     await BluetoothLowEnergy.addListener('gattCharacteristicWriteRequest', (ev) => {
       if (ev.characteristic.toLowerCase() !== BLE_DATA_C2H_UUID.toLowerCase()) return
+      if (!this.sawWrite.has(ev.deviceId)) {
+        this.sawWrite.add(ev.deviceId)
+        this.log(`host: first write from ${ev.deviceId} (${ev.value.length}B) — Hello received`)
+      }
       this.emit({ type: 'data', peer: ev.deviceId, bytes: new Uint8Array(ev.value) })
     })
     // The name is deliberately kept OUT of the advertisement: a 128-bit service
@@ -62,11 +76,13 @@ export class BleHostTransport implements Transport {
     // fail with ADVERTISE_FAILED_DATA_TOO_LARGE — silently, because the plugin
     // resolves before its async onStartFailure fires. Centrals discover us by the
     // service UUID and show "Unknown host"; the real name arrives after connect.
+    this.log(`host: startAdvertising svc=${BLE_SERVICE_UUID.slice(0, 8)}… (name off adv)`)
     await BluetoothLowEnergy.startAdvertising({
       name: this.advertiseName,
       services: [BLE_SERVICE_UUID],
       includeName: false,
     })
+    this.log('host: advertising — waiting for a central to join')
   }
 
   async stop(): Promise<void> {
@@ -123,18 +139,25 @@ export class BleClientTransport implements Transport {
 
   private startedOnce = false
 
+  constructor(private log: (s: string) => void = () => {}) {}
+
   async start(): Promise<void> {
     if (this.startedOnce) return // session.start() re-enters after the scan/connect flow
     this.startedOnce = true
+    this.log('join: requesting BLE permissions')
     await BluetoothLowEnergy.requestPermissions()
+    this.log('join: initialize(central)')
     await BluetoothLowEnergy.initialize({ mode: 'central' })
   }
 
   /** Scan for hosts advertising the game service. */
   async scan(onFound: (host: FoundHost) => void): Promise<() => Promise<void>> {
     const listener = await BluetoothLowEnergy.addListener('deviceScanned', (ev) => {
-      onFound({ deviceId: ev.device.deviceId, name: ev.device.name ?? 'Unknown host' })
+      const name = ev.device.name ?? 'Unknown host'
+      this.log(`join: found ${name} (${ev.device.deviceId})`)
+      onFound({ deviceId: ev.device.deviceId, name })
     })
+    this.log(`join: scanning for svc=${BLE_SERVICE_UUID.slice(0, 8)}…`)
     await BluetoothLowEnergy.startScan({ services: [BLE_SERVICE_UUID] })
     return async () => {
       await listener.remove()

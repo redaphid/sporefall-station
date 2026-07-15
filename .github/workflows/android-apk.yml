@@ -36,7 +36,7 @@ jobs:
           sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Build debug APK
         run: npm run build:apk

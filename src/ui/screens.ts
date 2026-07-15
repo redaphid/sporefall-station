@@ -1,4 +1,5 @@
 import type { RenderView } from '../app/session'
+import { MODS } from '../game/data/mods'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 
 export interface Screens {
@@ -119,6 +120,21 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
     bannerTimer = setTimeout(() => (banner.style.opacity = '0'), 2200)
   }
 
+  // Transient pickup toast (bottom-centre) — e.g. "❄️ Cryo Rounds!" when you grab
+  // a weapon-mod gem. Separate from the big centre banner so both can show at once.
+  const toast = document.createElement('div')
+  toast.style.cssText =
+    'position:absolute;bottom:150px;left:50%;transform:translateX(-50%);color:#ffe08a;font:800 18px system-ui;' +
+    'text-shadow:0 2px 6px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;white-space:nowrap'
+  mount.appendChild(toast)
+  let toastTimer: ReturnType<typeof setTimeout> | undefined
+  const showToast = (text: string): void => {
+    toast.textContent = text
+    toast.style.opacity = '1'
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => (toast.style.opacity = '0'), 1800)
+  }
+
   let lastLocator = ''
   const updateLocator = (view: RenderView): void => {
     const cam = cameraSource?.()
@@ -164,6 +180,11 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
         for (const ev of view.events) {
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
+          else if (ev.type === 'modPickup' && ev.byId === view.self?.id) {
+            const m = MODS[ev.modId]
+            const label = `${m?.icon ?? '🔧'} ${m?.name ?? ev.modId}`
+            showToast(ev.maxed ? `${label} — MAXED` : `Got ${label}!`)
+          }
         }
       }
       // Point at the exit whenever it's open (mission done / reach missions).

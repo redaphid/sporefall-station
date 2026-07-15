@@ -56,7 +56,9 @@ jobs:
       - name: Stage OTA bundle + manifest
         run: |
           set -euo pipefail
-          VER="$(git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD)"
+          # Incrementing integer (commit count) to match the in-app build number
+          # baked by vite.config.ts, so the lobby version and OTA version line up.
+          VER="$(git rev-list --count HEAD)"
           # Public origin of the Pages project. Override with the SITE_URL repo
           # variable if the project name / custom domain differs.
           SITE="${SITE_URL:-https://backseat-sd8.pages.dev}"

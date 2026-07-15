@@ -26,6 +26,15 @@ export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
       })
       overlay.appendChild(b)
     }
+    // Big version readout under the mode picker so you can tell at a glance which
+    // build a phone is on (esp. after an OTA update) before starting a game.
+    const ver = document.createElement('div')
+    ver.style.cssText = 'margin-top:26px;font:800 22px system-ui;letter-spacing:1px;color:#7fd17f'
+    ver.textContent = APP_VERSION
+    overlay.appendChild(ver)
+    void otaBundleVersion().then((b) => {
+      if (b && b !== APP_VERSION) ver.textContent = `${APP_VERSION} · ota ${b}`
+    })
     mount.appendChild(overlay)
   })
 

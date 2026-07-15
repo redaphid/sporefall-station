@@ -13,12 +13,28 @@ export type Role = 'game' | 'debugger'
 export interface HelloMsg {
   t: 'hello'
   role: Role
+  /** Optional stable label for a `game` (e.g. `?debug=<name>`, a session id, or a
+   * player name). Older game clients omit it; the hub falls back to connection
+   * order (`g1`, `g2`, …) so they still register and route. */
+  name?: string
 }
-/** Debugger → game: run one verb line. `id` correlates the reply. */
+/** Debugger → game: run one verb line. `id` correlates the reply. `target` picks
+ * which connected game to route to (id or name); omitted → the debugger's sticky
+ * selection, else the single live game. */
 export interface ReqMsg {
   t: 'req'
   id: number
   verb: string
+  target?: string
+}
+/** Game → hub: periodic liveness heartbeat. `tick` (in-app world only) lets the
+ * hub flag a *frozen* sim whose tick has stopped advancing — a backgrounded/
+ * throttled webview — independent of socket health. The headless harness omits
+ * `tick` (it advances only when driven), so it stays live purely on freshness. */
+export interface PingMsg {
+  t: 'ping'
+  tick?: number
+  gameOver?: boolean
 }
 /** Game → debugger: the reply to a `req`. `body` is text (usually JSON). */
 export interface RepMsg {
@@ -33,7 +49,24 @@ export interface EventMsg {
   body: string
 }
 
-export type DebugMsg = HelloMsg | ReqMsg | RepMsg | EventMsg
+export type DebugMsg = HelloMsg | ReqMsg | RepMsg | EventMsg | PingMsg
+
+/** One row of the hub's `games` listing: what a debugger sees when it asks which
+ * games are connected and which are safe to drive. */
+export interface GameInfo {
+  id: string
+  name: string
+  /** Alive (fresh heartbeat, and — for a real-time game — tick still advancing). */
+  live: boolean
+  /** Tick advancing? `null` for the headless harness, which reports no tick. */
+  ticking: boolean | null
+  tick: number | null
+  gameOver: boolean
+  /** ms since the last message from this game. */
+  lastSeenMs: number
+  /** ms since it connected. */
+  ageMs: number
+}
 
 export const hubUrl = (host: string, port = DEFAULT_HUB_PORT): string => `ws://${host}:${port}`
 

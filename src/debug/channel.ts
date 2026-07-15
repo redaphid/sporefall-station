@@ -16,7 +16,7 @@ import type { SimEvent } from '../game/types'
 import type { World } from '../game/world'
 import type { GameHarness } from './harness'
 import { runHarnessVerb } from './harness'
-import type { DebugMsg } from './protocol'
+import type { DebugMsg, HelloMsg } from './protocol'
 import { runVerb, verbName, WRITE_VERBS } from './verbs'
 
 export interface DebugChannel {
@@ -35,18 +35,55 @@ export interface ChannelOpts {
   maxDelayMs?: number
   /** Injectable WebSocket ctor for tests; defaults to the global. */
   WebSocketImpl?: typeof WebSocket
+  /** Stable label sent in `hello` so the hub can identify/route this game. */
+  name?: string
+  /** Liveness heartbeat interval in ms (default 1000; 0 disables). */
+  heartbeatMs?: number
+  /** Injectable page-lifecycle source for tests; defaults to the real DOM
+   * (window `pagehide`/`beforeunload` + document `visibilitychange`). */
+  lifecycle?: LifecycleTarget
+}
+
+/** The subset of page-lifecycle the channel needs to self-remove when the webview
+ * is backgrounded or unloaded. Real builds derive it from window/document; tests
+ * inject a fake and fire events by hand. */
+export interface LifecycleTarget {
+  addEventListener(type: string, cb: () => void): void
+  removeEventListener(type: string, cb: () => void): void
+  /** Is the page currently hidden (backgrounded)? */
+  hidden(): boolean
 }
 
 const MAX_EVENTS = 256
 
 interface Conn {
   send(msg: DebugMsg): void
+  /** Intentionally close + stop re-dialing, but stay resumable (page hidden). */
+  pause(): void
+  /** Re-open after a `pause` (page visible again). No-op once stopped. */
+  resume(): void
+  /** Permanent teardown — never re-dials. */
   stop(): void
 }
 
+/** Real-DOM lifecycle source, or `undefined` when not in a browser (Node harness
+ * host has no window, so it simply skips lifecycle self-removal). `visibilitychange`
+ * lives on `document`; `pagehide`/`beforeunload` on `window`. */
+const domLifecycle = (): LifecycleTarget | undefined => {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return undefined
+  const target = (type: string): EventTarget => (type === 'visibilitychange' ? document : window)
+  return {
+    addEventListener: (type, cb) => target(type).addEventListener(type, cb),
+    removeEventListener: (type, cb) => target(type).removeEventListener(type, cb),
+    hidden: () => document.visibilityState === 'hidden',
+  }
+}
+
 /** Maintain a `game`-role socket to the hub, re-dialing with exponential backoff
- * on close. `onMessage` is rebound to each fresh socket and handed a `send` so
- * handlers need no reference to the (not-yet-constructed) Conn. */
+ * on an *unintentional* close. `pause`/`resume`/`stop` distinguish a page that
+ * backgrounds itself (must NOT keep re-dialing a ghost) from a transient drop.
+ * `onMessage` is rebound to each fresh socket and handed a `send` so handlers
+ * need no reference to the (not-yet-constructed) Conn. */
 const connectWithBackoff = (
   url: string,
   onMessage: (msg: DebugMsg, send: (m: DebugMsg) => void) => void,
@@ -57,14 +94,15 @@ const connectWithBackoff = (
   const base = opts.baseDelayMs ?? 500
   const cap = opts.maxDelayMs ?? 8000
   const reconnect = opts.reconnect !== false
-  let ws: WebSocket
+  let ws: WebSocket | undefined
   let ready = false
   let stopped = false
+  let paused = false
   let attempt = 0
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const send = (msg: DebugMsg): void => {
-    if (ready) ws.send(JSON.stringify(msg))
+    if (ready && ws) ws.send(JSON.stringify(msg))
   }
 
   const open = (): void => {
@@ -72,17 +110,20 @@ const connectWithBackoff = (
     ws.onopen = () => {
       ready = true
       attempt = 0
-      ws.send(JSON.stringify({ t: 'hello', role: 'game' } satisfies DebugMsg))
+      const hello: HelloMsg = { t: 'hello', role: 'game', ...(opts.name ? { name: opts.name } : {}) }
+      ws!.send(JSON.stringify(hello))
       log(`[debug] connected to ${url}`)
     }
     ws.onerror = () => log(`[debug] socket error (${url}) — is the hub running?`)
     ws.onclose = () => {
       ready = false
-      if (stopped || !reconnect) return
+      // No re-dial after an intentional close (stop/pause) or when disabled — the
+      // reconnect loop must never resurrect a page that removed itself.
+      if (stopped || paused || !reconnect) return
       const delay = Math.min(cap, base * 2 ** attempt++)
       log(`[debug] disconnected — retrying in ${delay}ms`)
       timer = setTimeout(() => {
-        if (!stopped) open()
+        if (!stopped && !paused) open()
       }, delay)
     }
     ws.onmessage = (ev) => {
@@ -99,12 +140,38 @@ const connectWithBackoff = (
   open()
   return {
     send,
+    pause: () => {
+      if (paused) return
+      paused = true
+      if (timer) clearTimeout(timer)
+      ws?.close()
+    },
+    resume: () => {
+      if (stopped || !paused) return
+      paused = false
+      attempt = 0
+      open()
+    },
     stop: () => {
       stopped = true
       if (timer) clearTimeout(timer)
-      ws.close()
+      ws?.close()
     },
   }
+}
+
+/** Fire `sample` (tick/gameOver snapshot) at a fixed interval so the hub can see
+ * this game is alive AND advancing. `unref` (Node-only) keeps the heartbeat from
+ * pinning the event loop open in tests/scripts. Returns a stop fn. */
+const startHeartbeat = (
+  conn: Conn,
+  heartbeatMs: number,
+  sample: () => { tick?: number; gameOver?: boolean },
+): (() => void) => {
+  if (heartbeatMs <= 0) return () => {}
+  const timer = setInterval(() => conn.send({ t: 'ping', ...sample() }), heartbeatMs)
+  ;(timer as { unref?: () => void }).unref?.()
+  return () => clearInterval(timer)
 }
 
 /** Bridge the live world over the hub. Reads answer immediately; writes defer to
@@ -135,6 +202,25 @@ export const startDebugChannel = (
 
   const conn = connectWithBackoff(url, onMessage, log, opts)
 
+  // Heartbeat carries the world tick so the hub can tell a live, advancing game
+  // from a frozen/backgrounded one whose tick has stopped.
+  const stopHeartbeat = startHeartbeat(conn, opts.heartbeatMs ?? 1000, () => ({
+    tick: world.tick,
+    gameOver: world.gameOver,
+  }))
+
+  // Self-remove when the webview is backgrounded or unloaded: close the socket
+  // AND cancel the reconnect loop so a reloading/suspended page stops re-attaching
+  // as a ghost the harness could latch onto. Re-arm when the page is foregrounded.
+  const lifecycle = opts.lifecycle ?? domLifecycle()
+  const onHide = (): void => conn.pause()
+  const onVisibility = (): void => (lifecycle!.hidden() ? conn.pause() : conn.resume())
+  if (lifecycle) {
+    lifecycle.addEventListener('pagehide', onHide)
+    lifecycle.addEventListener('beforeunload', onHide)
+    lifecycle.addEventListener('visibilitychange', onVisibility)
+  }
+
   const afterTick = (): void => {
     // Drain queued mutations FIRST: they run between ticks (sim-safe) and may
     // push their own events (a `kill` emits `death`) into world.events, which
@@ -147,7 +233,17 @@ export const startDebugChannel = (
     while (recentEvents.length > MAX_EVENTS) recentEvents.shift()
   }
 
-  return { afterTick, stop: () => conn.stop() }
+  const stop = (): void => {
+    stopHeartbeat()
+    if (lifecycle) {
+      lifecycle.removeEventListener('pagehide', onHide)
+      lifecycle.removeEventListener('beforeunload', onHide)
+      lifecycle.removeEventListener('visibilitychange', onVisibility)
+    }
+    conn.stop()
+  }
+
+  return { afterTick, stop }
 }
 
 /** Bridge a headless GameHarness over the hub — same wire protocol, but verbs go
@@ -182,5 +278,14 @@ export const startHarnessChannel = (
   }
 
   const conn = connectWithBackoff(url, onMessage, log, opts)
-  return { afterTick: () => flushEvents(conn.send), stop: () => conn.stop() }
+  // Heartbeat WITHOUT a tick: the headless harness advances only when driven, so
+  // reporting no tick keeps the hub from ever flagging it "frozen" between verbs.
+  const stopHeartbeat = startHeartbeat(conn, opts.heartbeatMs ?? 1000, () => ({}))
+  return {
+    afterTick: () => flushEvents(conn.send),
+    stop: () => {
+      stopHeartbeat()
+      conn.stop()
+    },
+  }
 }

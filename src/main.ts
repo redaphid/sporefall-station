@@ -72,7 +72,10 @@ const boot = async (): Promise<void> => {
     const { startDebugChannel } = await import('./debug/channel')
     const { hubUrl, DEFAULT_HUB_PORT } = await import('./debug/protocol')
     const port = Number(params.get('debugPort')) || DEFAULT_HUB_PORT
-    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port))
+    // `?debug=<name>` labels this game in the hub's registry so multiple games on
+    // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
+    const name = params.get('debug') || undefined
+    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, { name })
   }
   runLoop(session, renderer, uiMount, coop, touch, debug)
 }

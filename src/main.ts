@@ -7,7 +7,7 @@ import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import { SIM_DT } from './game/types'
-import { createGamepadCoop } from './input/gamepadCoop'
+import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import { createControllersOverlay } from './input/controllersOverlay'
 import { createKeyboard } from './input/keyboard'
 import { createScriptedInput, scriptTicks, SCRIPTS } from './input/scripted'
@@ -349,10 +349,13 @@ const runLoop = (
     }
     renderer.draw(view, alpha, dt)
     hud.update(view)
+    const pads = coop.debug()
+    // A live controller takes over → hide the on-screen touch sticks/buttons.
+    touch?.setControllerActive(anyPadActive(pads))
     touch?.update(view)
     screens.update(view)
     commOverlay.update(view)
-    overlay.update(coop.debug())
+    overlay.update(pads)
     showPause(session.isPaused ?? false)
     requestAnimationFrame(frame)
   }

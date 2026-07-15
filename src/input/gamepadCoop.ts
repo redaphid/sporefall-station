@@ -39,6 +39,12 @@ const idle: PadState = {
   pause: false,
 }
 
+/** Is a controller actually driving the game? True once at least one pad has
+ * press-to-joined a player slot (a merely-connected-but-unjoined pad doesn't
+ * count). Drives hiding the on-screen touch controls. Pure + exported so the
+ * show/hide decision is unit-testable apart from the DOM. */
+export const anyPadActive = (pads: readonly CoopDebugPad[]): boolean => pads.some((p) => p.slot !== null)
+
 export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads?.() ?? []) => {
   let assignments = new Map<number, number>()
   const last = new Map<number, PadState>()

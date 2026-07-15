@@ -5,6 +5,34 @@ export interface Screens {
   update(view: RenderView): void
 }
 
+/** Why the restart overlay is up (drives its heading), or null when it's down. */
+export type RestartReason = 'gameOver' | 'downed' | 'dead'
+
+export interface RestartAffordance {
+  visible: boolean
+  reason: RestartReason | null
+}
+
+/** When the restart overlay should be reachable. Beyond full game-over, it also
+ * comes up the instant the LOCAL player is downed or dead — so a host/solo player
+ * can restart the level immediately instead of waiting out the 30s bleed-out (#5).
+ * Pure + exported so the visibility rule is unit-tested apart from the DOM. */
+export const restartAffordance = (view: RenderView): RestartAffordance => {
+  if (view.gameOver) return { visible: true, reason: 'gameOver' }
+  const self = view.self
+  if (self?.dead) return { visible: true, reason: 'dead' }
+  if (self?.playerCtl?.downed) return { visible: true, reason: 'downed' }
+  return { visible: false, reason: null }
+}
+
+/** Overlay heading per reason: game-over is terminal ("YOU GOT ROLLED"); a downed/
+ * dead player gets a lighter prompt that a restart is available right now. */
+const RESTART_HEADLINE: Record<RestartReason, string> = {
+  gameOver: 'YOU GOT ROLLED',
+  downed: "YOU'RE DOWN",
+  dead: 'YOU DIED',
+}
+
 /**
  * Read-only camera/screen state for the teammate locator's world→screen
  * projection. main.ts supplies it from the renderer without the locator ever
@@ -35,12 +63,13 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
     'position:absolute;inset:0;background:#000a;display:none;flex-direction:column;align-items:center;' +
     'justify-content:center;color:#eee;font:16px system-ui;pointer-events:auto;text-align:center;gap:12px'
   overlay.innerHTML = `
-    <div style="font:800 34px system-ui;color:#e0483f">YOU GOT ROLLED</div>
+    <div id="headline" style="font:800 34px system-ui;color:#e0483f">YOU GOT ROLLED</div>
     <div id="stats"></div>
     <button id="restart" style="font:600 16px system-ui;padding:10px 26px;border-radius:8px;border:0;
       background:#7fd17f;color:#0b0b12;cursor:pointer">Run it back</button>
   `
   mount.appendChild(overlay)
+  const headline = overlay.querySelector<HTMLElement>('#headline')!
 
   // Exit compass: once the exit is open, a rotating arrow at the bottom points
   // the way to the exit tile with a live distance readout, so it's obvious where
@@ -121,7 +150,7 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
   }
 
   let lastMission = ''
-  let shownGameOver = false
+  let shownReason: RestartReason | null = null
   let lastEventTick = -1
   return {
     update(view: RenderView): void {
@@ -156,15 +185,24 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
 
       updateLocator(view)
 
-      if (view.gameOver && !shownGameOver) {
-        shownGameOver = true
-        stats.textContent = `Made it to floor ${view.floor} · $${view.self?.playerCtl?.cash ?? 0} collected`
-        overlay.style.display = 'flex'
-      } else if (!view.gameOver && shownGameOver) {
-        // A fresh run began (host restart / play again) — clear the overlay so
-        // the reconnected clients and host drop straight back into play.
-        shownGameOver = false
-        overlay.style.display = 'none'
+      // Restart affordance: up at game-over AND the moment the local player is
+      // downed/dead, so they can bail the level without waiting out the bleed-out.
+      const affordance = restartAffordance(view)
+      if (affordance.reason !== shownReason) {
+        shownReason = affordance.reason
+        if (affordance.reason) {
+          headline.textContent = RESTART_HEADLINE[affordance.reason]
+          stats.textContent =
+            affordance.reason === 'gameOver'
+              ? `Made it to floor ${view.floor} · $${view.self?.playerCtl?.cash ?? 0} collected`
+              : onRestart
+                ? 'Restart the run now, or wait for a revive.'
+                : 'Waiting on your team…'
+          overlay.style.display = 'flex'
+        } else {
+          // Revived / fresh run began — drop back into play.
+          overlay.style.display = 'none'
+        }
       }
     },
   }

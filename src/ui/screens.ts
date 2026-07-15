@@ -29,6 +29,21 @@ export const createScreens = (mount: HTMLElement): Screens => {
       background:#7fd17f;color:#0b0b12;cursor:pointer">Run it back</button>
   `
   mount.appendChild(overlay)
+
+  // Exit compass: once the exit is open, a rotating arrow at the bottom points
+  // the way to the exit tile with a live distance readout, so it's obvious where
+  // to go to finish the floor.
+  const exitPtr = document.createElement('div')
+  exitPtr.style.cssText =
+    'position:absolute;bottom:76px;left:50%;transform:translateX(-50%);display:none;flex-direction:column;' +
+    'align-items:center;gap:1px;color:#ffd76a;font:800 13px system-ui;text-shadow:0 1px 3px #000;pointer-events:none;z-index:70'
+  exitPtr.innerHTML =
+    '<div id="exitArrow" style="font-size:30px;line-height:1;transition:transform .1s">➤</div>' +
+    '<div id="exitLabel">EXIT</div>'
+  mount.appendChild(exitPtr)
+  const exitArrow = exitPtr.querySelector<HTMLElement>('#exitArrow')!
+  const exitLabel = exitPtr.querySelector<HTMLElement>('#exitLabel')!
+
   overlay.querySelector<HTMLButtonElement>('#restart')!.addEventListener('click', () => {
     const url = new URL(location.href)
     url.searchParams.set('seed', String((Math.random() * 0xffffffff) >>> 0))
@@ -59,8 +74,26 @@ export const createScreens = (mount: HTMLElement): Screens => {
         for (const ev of view.events) {
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
+          else if (ev.type === 'partyWipe') showBanner('WIPED — BACK IN THE FIGHT')
         }
       }
+      // Point at the exit whenever it's open (mission done / reach missions).
+      if (view.missionComplete && !view.gameOver && view.self) {
+        const dx = view.level.exit.x - view.self.pos.x
+        const dy = view.level.exit.y - view.self.pos.y
+        const dist = Math.hypot(dx, dy)
+        if (dist < 1.4) {
+          exitPtr.style.display = 'none'
+        } else {
+          exitPtr.style.display = 'flex'
+          // ➤ glyph points east at 0°, matching world +x; +y is screen-down.
+          exitArrow.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
+          exitLabel.textContent = `EXIT · ${Math.round(dist)}m`
+        }
+      } else {
+        exitPtr.style.display = 'none'
+      }
+
       if (view.gameOver && !shownGameOver) {
         shownGameOver = true
         stats.textContent = `Made it to floor ${view.floor} · $${view.self?.playerCtl?.cash ?? 0} collected`

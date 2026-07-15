@@ -3,6 +3,7 @@ import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
 import type { Session } from './app/session'
 import { SIM_DT } from './game/types'
+import { createGamepad } from './input/gamepad'
 import { createKeyboard } from './input/keyboard'
 import { createTouch, mergeInputs } from './input/touch'
 import type { InputSource } from './input/input'
@@ -30,11 +31,12 @@ const boot = async (): Promise<void> => {
   const classId = params.get('class') ?? (await pickClass(uiMount))
   const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount))
 
-  let input: InputSource = createKeyboard()
+  let input: InputSource = mergeInputs(createKeyboard(), createGamepad())
   if (navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
 
   const session = await createSession(mode, { seed, room, name, classId, input, uiMount, renderer })
   if (!session) return
+  if (params.has('e2e')) (window as unknown as { __sor: Session }).__sor = session
   runLoop(session, renderer, uiMount)
 }
 

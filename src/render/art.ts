@@ -17,6 +17,17 @@ export interface ArtRegistry {
   entityFlash(archetype: string): Texture
 }
 
+export interface SpriteTextures {
+  floor?: Texture
+  wall?: Texture
+  player?: Texture
+  cop?: Texture
+  item?: Texture
+  prop?: Texture
+}
+
+const COP_ARCHETYPES = new Set(['cop', 'thug', 'gangster', 'bouncer'])
+
 const TILE_COLORS: Record<number, number> = {
   [Tile.Street]: 0x33333c,
   [Tile.Sidewalk]: 0x4c4c56,
@@ -38,7 +49,7 @@ const ENTITY_COLORS: Record<string, number> = {
   default: 0xcccccc,
 }
 
-export const createArt = (renderer: Renderer): ArtRegistry => {
+export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): ArtRegistry => {
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
 
@@ -112,6 +123,8 @@ export const createArt = (renderer: Renderer): ArtRegistry => {
   }
 
   const tile = (tileId: number, variant = 0): Texture => {
+    if (tileId === Tile.Floor && sprites.floor) return sprites.floor
+    if (tileId === Tile.Wall && sprites.wall) return sprites.wall
     const key = tileId * TILE_VARIANTS + (variant % TILE_VARIANTS)
     let tex = tileCache.get(key)
     if (!tex) {
@@ -184,7 +197,17 @@ export const createArt = (renderer: Renderer): ArtRegistry => {
     return tex
   }
 
+  const spriteForArchetype = (archetype: string): Texture | undefined => {
+    if (archetype === 'player') return sprites.player
+    if (COP_ARCHETYPES.has(archetype)) return sprites.cop
+    if (archetype.startsWith('pickup.')) return sprites.item
+    if (archetype === 'crate' || archetype.startsWith('prop')) return sprites.prop
+    return undefined
+  }
+
   const entity = (archetype: string): Texture => {
+    const real = spriteForArchetype(archetype)
+    if (real) return real
     let tex = entityCache.get(archetype)
     if (!tex) {
       tex = drawEntity(archetype)

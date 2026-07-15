@@ -1,7 +1,7 @@
-import { Application, Container } from 'pixi.js'
+import { Application, Assets, Container, Sprite, Texture, type Renderer } from 'pixi.js'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
-import { createArt, type ArtRegistry } from './art'
+import { createArt, TILE_PX, type ArtRegistry, type SpriteTextures } from './art'
 import { Camera } from './camera'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
@@ -12,6 +12,37 @@ export interface GameRenderer {
   camera: Camera
   setLevel(level: Level): void
   draw(view: RenderView, alpha: number, dt: number): void
+}
+
+const CHAR_PX = Math.round(TILE_PX * 0.95)
+const ITEM_PX = Math.round(TILE_PX * 0.6)
+
+const loadSprites = async (renderer: Renderer): Promise<SpriteTextures> => {
+  const base = import.meta.env.BASE_URL
+  const specs: { key: keyof SpriteTextures; url: string; size: number }[] = [
+    { key: 'floor', url: `${base}sprites/concrete-floor.png`, size: TILE_PX },
+    { key: 'wall', url: `${base}sprites/brick-wall.png`, size: TILE_PX },
+    { key: 'player', url: `${base}sprites/player.png`, size: CHAR_PX },
+    { key: 'cop', url: `${base}sprites/cop.png`, size: CHAR_PX },
+    { key: 'item', url: `${base}sprites/pistol.png`, size: ITEM_PX },
+    { key: 'prop', url: `${base}sprites/wooden-crate.png`, size: TILE_PX },
+  ]
+  const out: SpriteTextures = {}
+  for (const { key, url, size } of specs) {
+    try {
+      const src: Texture = await Assets.load(url)
+      const sprite = new Sprite(src)
+      sprite.width = size
+      sprite.height = size
+      const holder = new Container()
+      holder.addChild(sprite)
+      out[key] = renderer.generateTexture(holder)
+      holder.destroy({ children: true })
+    } catch (err) {
+      console.warn(`[sprites] failed to load ${url}, using procedural fallback`, err)
+    }
+  }
+  return out
 }
 
 export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> => {
@@ -26,7 +57,8 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   })
   mount.appendChild(app.canvas)
 
-  const art: ArtRegistry = createArt(app.renderer)
+  const spriteTextures = await loadSprites(app.renderer)
+  const art: ArtRegistry = createArt(app.renderer, spriteTextures)
   const world = new Container()
   const tilemap = new TilemapView()
   const entities = new EntityViews(art)

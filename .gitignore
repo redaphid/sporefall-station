@@ -1,6 +1,7 @@
 node_modules/
 dist/
 outputs/
+e2e/output/
 android/app/build/
 android/.gradle/
 android/build/

@@ -1,9 +1,11 @@
-# Download the Android APK straight from the game site. Points at GitHub's
-# "latest release" asset, so it always serves the newest published APK without
-# editing this file per release. Must come BEFORE the SPA catch-all below.
-/download      https://github.com/redaphid/mobile-streets-of-rogue/releases/latest/download/backseat.apk  302
-/download/     https://github.com/redaphid/mobile-streets-of-rogue/releases/latest/download/backseat.apk  302
-/backseat.apk  https://github.com/redaphid/mobile-streets-of-rogue/releases/latest/download/backseat.apk  302
+# Short link to the self-hosted APK. The real file is served statically from
+# dist/download/backseat.apk (bundled by the deploy workflow) — a real file wins
+# over the SPA catch-all below, so these just give it friendly URLs. We serve the
+# APK from OUR site (not GitHub) because the repo is private and its release
+# assets are auth-walled.
+/download      /download/backseat.apk  302
+/download/     /download/backseat.apk  302
+/get           /download/backseat.apk  302
 
 # SPA fallback: serve index.html for any route so deep links / refreshes work.
 # Copied into dist/ by Vite at build time.

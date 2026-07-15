@@ -213,7 +213,9 @@ const runLoop = (
   debug?: { afterTick(): void },
 ): void => {
   const hud = createHud(uiMount)
-  const screens = createScreens(uiMount)
+  // Host/solo can restart in place (transport preserved); a client has no
+  // restart() and instead waits for the host's fresh GameStart over the link.
+  const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined)
   const overlay = createControllersOverlay(uiMount)
   const showPause = createPauseBanner(uiMount)
   let currentLevel = session.renderView().level

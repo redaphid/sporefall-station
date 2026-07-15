@@ -26,4 +26,12 @@ export interface Session {
   renderView(): RenderView
   /** Local co-op pause (host-only); other sessions leave it undefined. */
   isPaused?: boolean
+  /**
+   * Reset to a fresh run in place, WITHOUT touching the transport — the BLE
+   * connection and joined peers survive, so co-op can play again after a
+   * game-over with no reconnect or app restart. Authoritative sessions
+   * (solo/host) implement it; a client leaves it undefined and waits for the
+   * host's restart to arrive over the existing link.
+   */
+  restart?(): void
 }

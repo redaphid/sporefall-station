@@ -81,19 +81,8 @@ export const applyDamage = (
 export const kill = (w: World, target: Entity): void => {
   w.events.push({ type: 'death', x: target.pos.x, y: target.pos.y, entityId: target.id })
   if (target.playerCtl) {
-    const soloPlayer = w.entities.filter((e) => e.playerCtl).length === 1
-    if (soloPlayer) {
-      // Solo: there's no teammate to revive you, so a downed state is just a
-      // frozen dead-end that can only be escaped by killing the app. Instead,
-      // pop back up in place at half health with a few seconds of grace so the
-      // run keeps going and you stay in control.
-      target.health!.hp = Math.max(1, Math.floor(target.health!.max / 2))
-      target.health!.iframes = 90
-      target.playerCtl.downed = undefined
-      target.dead = false
-      return
-    }
-    // Co-op: downed — crawl-immobile, bleeding out; teammates can revive (interaction system).
+    // Downed: crawl-immobile, bleeding out; teammates can revive (interaction system).
+    // Solo has no reviver, so this becomes a run-over (missions.ts) — death is real.
     target.health!.hp = 0
     target.playerCtl.downed = { bleedTicks: 30 * 30, reviveProgress: 0 }
     target.vel.x = 0

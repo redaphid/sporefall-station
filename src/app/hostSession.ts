@@ -38,8 +38,8 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
  * M5 plugs remote InputCmds into `remoteInputs` and broadcasts snapshots.
  */
 export class HostSession implements Session {
-  readonly world: World
-  readonly self: Entity
+  world!: World
+  self!: Entity
   private inputs = new Map<number, InputCmd>()
   /** M5: net layer deposits latest per-player commands here. */
   readonly remoteInputs = new Map<number, InputCmd>()
@@ -48,15 +48,29 @@ export class HostSession implements Session {
   isPaused = false
 
   constructor(
-    seed: number,
+    private seed: number,
     private classId: string,
     private localInput: InputSource,
     private coop?: CoopSource,
   ) {
-    this.world = createWorld(seed, 1)
+    this.buildRun()
+  }
+
+  /** Generate floor 1 from the seed and spawn the local player. Used at start
+   * and by restart() — a fresh run from default state. */
+  private buildRun(): void {
+    this.world = createWorld(this.seed, 1)
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, classId, this.world.level.spawn.x, this.world.level.spawn.y)
+    this.self = spawnPlayer(this.world, 0, this.classId, this.world.level.spawn.x, this.world.level.spawn.y)
+  }
+
+  /** Play again from a game-over: rebuild the run in place. (Solo has no
+   * transport; joined co-op pads re-press to rejoin.) */
+  restart(): void {
+    this.joined.clear()
+    this.buildRun()
+    this.isPaused = false
   }
 
   private spawnJoined(slot: number): void {

@@ -5,7 +5,7 @@ export interface Screens {
 }
 
 /** Mission banner, floor-change flash, and the run-over overlay. All DOM. */
-export const createScreens = (mount: HTMLElement): Screens => {
+export const createScreens = (mount: HTMLElement, onRestart?: () => void): Screens => {
   const mission = document.createElement('div')
   mission.style.cssText =
     'position:absolute;top:10px;left:50%;transform:translateX(-50%);color:#eee;font:600 14px system-ui;' +
@@ -44,11 +44,21 @@ export const createScreens = (mount: HTMLElement): Screens => {
   const exitArrow = exitPtr.querySelector<HTMLElement>('#exitArrow')!
   const exitLabel = exitPtr.querySelector<HTMLElement>('#exitLabel')!
 
-  overlay.querySelector<HTMLButtonElement>('#restart')!.addEventListener('click', () => {
-    const url = new URL(location.href)
-    url.searchParams.set('seed', String((Math.random() * 0xffffffff) >>> 0))
-    location.href = url.toString()
-  })
+  const restartBtn = overlay.querySelector<HTMLButtonElement>('#restart')!
+  if (onRestart) {
+    // Host/solo own "play again": rebuild the run in place — NO page reload, so a
+    // co-op BLE connection survives and clients resume over the same link.
+    restartBtn.addEventListener('click', () => {
+      overlay.style.display = 'none'
+      onRestart()
+    })
+  } else {
+    // Client: the host drives the restart; a fresh GameStart arrives over the link.
+    restartBtn.textContent = 'Waiting for the host…'
+    restartBtn.disabled = true
+    restartBtn.style.cursor = 'default'
+    restartBtn.style.background = '#3a3a44'
+  }
   const stats = overlay.querySelector<HTMLElement>('#stats')!
 
   let bannerTimer: ReturnType<typeof setTimeout> | undefined
@@ -74,7 +84,6 @@ export const createScreens = (mount: HTMLElement): Screens => {
         for (const ev of view.events) {
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
-          else if (ev.type === 'partyWipe') showBanner('WIPED — BACK IN THE FIGHT')
         }
       }
       // Point at the exit whenever it's open (mission done / reach missions).
@@ -98,6 +107,11 @@ export const createScreens = (mount: HTMLElement): Screens => {
         shownGameOver = true
         stats.textContent = `Made it to floor ${view.floor} · $${view.self?.playerCtl?.cash ?? 0} collected`
         overlay.style.display = 'flex'
+      } else if (!view.gameOver && shownGameOver) {
+        // A fresh run began (host restart / play again) — clear the overlay so
+        // the reconnected clients and host drop straight back into play.
+        shownGameOver = false
+        overlay.style.display = 'none'
       }
     },
   }

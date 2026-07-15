@@ -158,6 +158,11 @@ export class NetClientSession implements Session {
         if (this.phase === 'reconnecting') break // level already live; snapshots resync the floor
         this.floor = 1
         this.level = generateLevel(this.seed, 1)
+        // Fresh run (initial start OR a host "play again" after game-over): drop
+        // the previous run's entities so nothing stale lingers before snapshots.
+        this.entities.clear()
+        this.targets.clear()
+        this.self = undefined
         this.onLevelChange?.(this.level)
         this.setPhase('starting')
         break

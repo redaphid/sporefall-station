@@ -214,6 +214,53 @@ describe('offline co-op (loopback transport)', () => {
     expect(reject!.reason).toMatch(/full/i)
   })
 
+  it('restarts in place after a game-over, keeping the connection (play again, no reconnect)', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(555, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', 'thief', stubInput())
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+    expect(bob.session.phase).toBe('playing')
+
+    // Down every player → run over (real game-over).
+    for (const e of host.world.entities.filter((p) => p.playerCtl)) {
+      e.health!.hp = 0
+      e.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
+    }
+    host.tick()
+    await flush()
+    expect(host.world.gameOver).toBe(true)
+
+    // Play again: rebuild the run in place. Transport + peer are untouched.
+    const worldBefore = host.world
+    host.restart()
+    await flush()
+
+    expect(host.world).not.toBe(worldBefore) // fresh world
+    expect(host.world.gameOver).toBe(false)
+    expect(host.started).toBe(true)
+    const players = host.world.entities.filter((e) => e.playerCtl)
+    expect(players).toHaveLength(2) // host + Bob both respawned
+    expect(players.every((e) => !e.playerCtl!.downed)).toBe(true)
+
+    // Bob resumed over the SAME connection — never disconnected, no rejoin.
+    expect(bob.session.phase).toBe('playing')
+    expect(host.peersBySlot.get(1)).toBeDefined()
+
+    // Snapshots resync Bob's fresh world; the game-over clears on his side too.
+    for (let i = 0; i < 6; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+    expect(bob.session.renderView().gameOver).toBe(false)
+    expect(bob.session.renderView().self).toBeDefined()
+  })
+
   it('fills all four co-op slots then rejects the fifth player', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(42, 'soldier', 'Alice', stubInput(), hub.hostTransport)

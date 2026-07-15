@@ -50,4 +50,4 @@ export type SimEvent =
   | { type: 'missionComplete'; description: string }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }
-  | { type: 'partyWipe'; floor: number }
+  | { type: 'runOver'; floor: number }

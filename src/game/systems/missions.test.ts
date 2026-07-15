@@ -101,18 +101,15 @@ describe('roguelite loop', () => {
     }
   })
 
-  it('solo player pops back up instead of ending the run', () => {
+  it('downed solo player triggers run over', () => {
     const w = createWorld(14, 1)
     const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
     player.health!.hp = 1
     const thug = spawnNpc(w, 'thug', 11.2, 1.5)
     thug.combat!.cooldown = 0
-    for (let i = 0; i < 120; i++) tickWorld(w, idle())
-    // Solo has no teammate to revive, so lethal damage respawns in place rather
-    // than freezing the only player and ending the run.
-    expect(w.gameOver).toBe(false)
-    expect(player.playerCtl!.downed).toBeUndefined()
-    expect(player.health!.hp).toBeGreaterThan(0)
+    for (let i = 0; i < 120 && !w.gameOver; i++) tickWorld(w, idle())
+    expect(w.gameOver).toBe(true)
+    expect(player.playerCtl!.downed).toBeDefined()
   })
 
   it('teammate proximity revives a downed player', () => {

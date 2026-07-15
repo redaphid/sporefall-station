@@ -109,6 +109,20 @@ export class NetHostSession implements Session {
     this.broadcastJson(MsgType.Go, go)
   }
 
+  /**
+   * Play again after a game-over WITHOUT dropping the transport. Rebuild the
+   * world from the seed and re-run beginGame, so every still-connected peer just
+   * receives a fresh GameStart/Go over the existing BLE link and resumes — no
+   * reconnect, no re-pairing, no app restart. Game state and connection state are
+   * kept separate: this resets the former and leaves the latter untouched.
+   */
+  restart(): void {
+    this.world = createWorld(this.seed, 1)
+    this.ghosts.clear()
+    this.started = false
+    this.beginGame()
+  }
+
   tick(): void {
     if (!this.started) return
     this.inputs.clear()

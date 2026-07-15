@@ -97,6 +97,9 @@ const main = async () => {
   let maxFires = first.fires
   const walkerLast = {}
   for (let i = 0; i < 10; i++) {
+    // Soldier grenade toss → a guaranteed explosion (player is tanky here so a
+    // close blast can't end the demo).
+    if (i === 1 || i === 4) await page.keyboard.press('KeyL')
     await sleep(500)
     const p = await probe(page)
     maxFires = Math.max(maxFires, p.fires)

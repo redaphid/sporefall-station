@@ -12,11 +12,11 @@ export interface Seg {
 
 /**
  * Partition one axis of the map interior into lot segments separated by streets.
- * Deterministic: fixed lot count per axis, jittered sizes.
+ * Deterministic: lot count per axis drawn from [minLots, maxLots], jittered sizes.
  */
-export const cutLots = (rng: Rng, total: number): Seg[] => {
+export const cutLots = (rng: Rng, total: number, minLots = 3, maxLots = 4): Seg[] => {
   const interior = total - BORDER * 2
-  const nLots = rng.int(3, 4)
+  const nLots = rng.int(minLots, maxLots)
   const space = interior - (nLots - 1) * STREET_W
   const base = Math.floor(space / nLots)
   const sizes = Array.from({ length: nLots }, (_, i) => base + (i < space - base * nLots ? 1 : 0))

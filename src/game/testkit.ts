@@ -4,27 +4,13 @@
 // another fixture. This module is imported only by tests — never by the app.
 
 import { expect } from 'vitest'
-import { deserializeWorld, serializeWorld, type WorldJson } from './serialize'
+import { serializeWorld } from './serialize'
 import { emptyInput, type InputCmd } from './types'
 import { tickWorld, type World } from './world'
 
-// Vite bundles the fixtures at build time, so no filesystem access is needed and
-// the loader stays isomorphic (works the same under Node and the browser test env).
-const fixtures = import.meta.glob('./__fixtures__/*.json', { eager: true, import: 'default' }) as Record<
-  string,
-  WorldJson
->
-
-/** Read a committed fixture as its raw JSON snapshot (a fresh, mutation-safe copy). */
-export const loadFixtureJson = (name: string): WorldJson => {
-  const j = fixtures[`./__fixtures__/${name}.json`]
-  if (!j) throw new Error(`no such fixture: ${name}`)
-  // Clone — the imported module object is shared, and callers (and the sim) mutate.
-  return JSON.parse(JSON.stringify(j)) as WorldJson
-}
-
-/** Read a committed fixture and rehydrate it into a live, standalone world. */
-export const loadFixture = (name: string): World => deserializeWorld(loadFixtureJson(name))
+// The fixture loaders live in the vitest-free `./fixtures.ts` (the app's
+// `?world=` boot hook imports them too); re-export so tests keep one import site.
+export { loadFixture, loadFixtureJson } from './fixtures'
 
 /** Tick a world `n` times, feeding a fresh, defaulted clone of `inputs` each tick
  * (partial commands are filled from `emptyInput`). Returns the world for chaining. */

@@ -16,8 +16,13 @@ const SIZE = { width: 1280, height: 720 }
  * timeline (?script=…), snaps labelled stills at fixed SIM TICKS (not wall-clock),
  * asserts on the final world state, then muxes webm→mp4 and verifies it is real.
  *
+ * An optional `beforeTicks(page)` hook runs once after navigation but before any
+ * ticks are awaited — used by the exact-world recipe to push an inline WorldJson
+ * into `window.__loadWorld` (boot blocks on it, so injection precedes tick 0).
+ *
  * @param {{name:string, params:object, stills:{tick:number,label:string}[],
- *          readState:() => any, expect:(s:any)=>string[]}} spec
+ *          readState:() => any, expect:(s:any)=>string[],
+ *          beforeTicks?:(page:import('playwright').Page)=>Promise<void>}} spec
  */
 export const record = async (spec) => {
   mkdirSync(OUT, { recursive: true })
@@ -35,6 +40,7 @@ export const record = async (spec) => {
 
   const tick = () => page.evaluate(() => window.__world?.tick ?? 0)
   await page.goto(url, { waitUntil: 'networkidle' })
+  await spec.beforeTicks?.(page)
 
   for (const s of spec.stills) {
     while ((await tick()) < s.tick) await page.waitForTimeout(40)

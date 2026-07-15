@@ -297,8 +297,34 @@ export class NetHostSession implements Session {
         return
       }
 
-      if (this.started || this.peers.size > 3) {
-        p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: this.started ? 'game already running' : 'lobby full' }))
+      // Fresh late-join: the run is already going but a slot is open. Spawn a
+      // brand-new avatar into the live world (not a ghost reclaim) and hand the
+      // client Welcome+GameStart+Go so it drops straight into the running floor.
+      if (this.started) {
+        const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot), ...this.ghosts.keys()])
+        let slot = 1
+        while (used.has(slot)) slot++
+        if (slot > 3) {
+          p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
+          return
+        }
+        p.slot = slot
+        p.name = hello.name
+        p.classId = hello.classId
+        p.token = Math.random().toString(36).slice(2, 12)
+        const avatar = spawnPlayer(this.world, slot, p.classId, this.world.level.spawn.x + slot * 0.6, this.world.level.spawn.y)
+        p.entityId = avatar.id
+        this.peersBySlot.set(slot, p)
+        p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers() }))
+        p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [slot]: avatar.id } }))
+        this.onLobbyChange?.(this.lobbyPlayers())
+        this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
+        return
+      }
+
+      if (this.peers.size > 3) {
+        p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
         return
       }
       const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot)])

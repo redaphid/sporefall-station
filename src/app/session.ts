@@ -24,4 +24,6 @@ export interface Session {
   /** Advance one fixed sim step. */
   tick(): void
   renderView(): RenderView
+  /** Local co-op pause (host-only); other sessions leave it undefined. */
+  isPaused?: boolean
 }

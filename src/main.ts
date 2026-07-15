@@ -4,7 +4,8 @@ import { NetHostSession } from './app/netHost'
 import type { Session } from './app/session'
 import { applyScenario } from './game/scenarios'
 import { SIM_DT } from './game/types'
-import { createGamepad } from './input/gamepad'
+import { createGamepadCoop } from './input/gamepadCoop'
+import { createControllersOverlay } from './input/controllersOverlay'
 import { createKeyboard } from './input/keyboard'
 import { createTouch, mergeInputs } from './input/touch'
 import type { InputSource } from './input/input'
@@ -32,15 +33,18 @@ const boot = async (): Promise<void> => {
   const classId = params.get('class') ?? (await pickClass(uiMount))
   const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount))
 
-  let input: InputSource = mergeInputs(createKeyboard(), createGamepad())
+  // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
+  // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
+  let input: InputSource = createKeyboard()
   if (navigator.maxTouchPoints > 0) input = mergeInputs(input, createTouch(uiMount))
+  const coop = createGamepadCoop()
 
-  const session = await createSession(mode, { seed, room, name, classId, input, uiMount, renderer })
+  const session = await createSession(mode, { seed, room, name, classId, input, coop, uiMount, renderer })
   if (!session) return
   const scenario = params.get('scenario')
   if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
   if (params.has('e2e')) (window as unknown as { __sor: Session }).__sor = session
-  runLoop(session, renderer, uiMount)
+  runLoop(session, renderer, uiMount, coop)
 }
 
 interface SessionDeps {
@@ -49,6 +53,7 @@ interface SessionDeps {
   name: string
   classId: string
   input: InputSource
+  coop: ReturnType<typeof createGamepadCoop>
   uiMount: HTMLElement
   renderer: GameRenderer
 }
@@ -71,7 +76,7 @@ const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> =
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.classId, deps.input)
+    const session = new HostSession(deps.seed, deps.classId, deps.input, deps.coop)
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -147,9 +152,26 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   return session
 }
 
-const runLoop = (session: Session, renderer: GameRenderer, uiMount: HTMLElement): void => {
+const createPauseBanner = (mount: HTMLElement): ((paused: boolean) => void) => {
+  const el = document.createElement('div')
+  el.textContent = 'PAUSED'
+  el.style.cssText =
+    'position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:60;' +
+    'font:800 48px system-ui;color:#fff;letter-spacing:4px;background:#0007;pointer-events:none'
+  mount.appendChild(el)
+  return (paused) => (el.style.display = paused ? 'flex' : 'none')
+}
+
+const runLoop = (
+  session: Session,
+  renderer: GameRenderer,
+  uiMount: HTMLElement,
+  coop: ReturnType<typeof createGamepadCoop>,
+): void => {
   const hud = createHud(uiMount)
   const screens = createScreens(uiMount)
+  const overlay = createControllersOverlay(uiMount)
+  const showPause = createPauseBanner(uiMount)
   let currentLevel = session.renderView().level
 
   let acc = 0
@@ -176,6 +198,8 @@ const runLoop = (session: Session, renderer: GameRenderer, uiMount: HTMLElement)
     renderer.draw(view, alpha, dt)
     hud.update(view)
     screens.update(view)
+    overlay.update(coop.debug())
+    showPause(session.isPaused ?? false)
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

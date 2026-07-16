@@ -19,7 +19,7 @@
     "build:apk": "bash scripts/build-apk.sh",
     "build:apk:release": "bash scripts/build-apk.sh --release",
     "dev:live": "bash scripts/dev-live.sh",
-    "install:apk": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "install:apk": "bash scripts/install-apk.sh",
     "e2e": "./e2e/run.sh",
     "e2e:play": "node e2e/play-session.mjs",
     "e2e:showcase": "node e2e/record-showcase.mjs",

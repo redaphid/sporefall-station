@@ -3,7 +3,7 @@ import { anyPadActive, createGamepadCoop, cycleHotbar, type CoopDebugPad } from 
 import { padProfile } from './padProfile'
 import type { RenderView } from '../app/session'
 
-const STD = padProfile({ id: 'x', mapping: 'standard' })
+const STD = padProfile({ id: 'x', mapping: 'standard', axes: [] })
 
 // A minimal render view carrying just the player entities' inventory/activeSlot,
 // which is all the coop hotbar-cycle resolver reads.
@@ -247,7 +247,11 @@ describe('createGamepadCoop', () => {
     })
   })
 
-  describe('an 8bitdo Zero 2 in non-standard mode', () => {
+  // A raw pad (mapping '' with a non-canonical axis count -- the `pad` helper's
+  // default 10 axes), i.e. the desktop-Linux/evdev shape where a one-axis hat is
+  // real. Formerly the 8bitdo special case; the Zero 2 is nothing special here,
+  // it is just a pad that reaches this shape on desktop.
+  describe('a raw pad with a one-axis hat (desktop Linux shape)', () => {
     const zero2 = { id: '8BitDo Zero 2 gamepad', mapping: '' }
     it('joins on a face button even without standard mapping', () => {
       pads = [pad(0, { ...zero2, buttons: press(0) })]
@@ -330,6 +334,114 @@ describe('createGamepadCoop', () => {
       pads = [androidPad()]
       const cmd = coop.sample().inputs.get(0)!
       expect(cmd.aimY).not.toBe(1)
+    })
+  })
+
+  /**
+   * Bug 2, end-to-end over the same live path — because bug 1 shipped despite
+   * readPad-level tests, and toCmd's selectAim(moveX, moveY, aimX, aimY) couples
+   * move and aim, so only the whole path proves the InputCmd is clean.
+   *
+   * A raw pad (mapping '', a non-canonical axis count) whose axes 2/3 are analog
+   * triggers resting at -1: hypot(-1,-1) = 1.41 > the 0.5 aim-fire threshold, so
+   * an untouched pad used to attack forever and aim pinned up-left.
+   */
+  describe('a raw pad with triggers on axes 2/3 does not shoot on its own', () => {
+    // 8 axes => not the canonical 4 => the raw profile, aimAxes null.
+    const rawPad = (over: { buttons?: boolean[]; axes?: number[] } = {}) =>
+      pad(0, { id: 'Some Generic USB Joystick', mapping: '', axisCount: 8, ...over })
+
+    beforeEach(() => {
+      pads = [rawPad({ buttons: press(0) })]
+      coop.sample()
+    })
+
+    it('feeds no attack while the pad sits idle with its triggers resting at -1', () => {
+      pads = [rawPad({ axes: [0, 0, -1, -1] })]
+      expect(coop.sample().inputs.get(0)!.attack).toBe(false)
+    })
+
+    it('feeds no aim at all from the resting triggers', () => {
+      pads = [rawPad({ axes: [0, 0, -1, -1] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.aimX).toBe(0)
+      expect(cmd.aimY).toBe(0)
+    })
+
+    // The full idle contract: an untouched pad must produce a completely inert
+    // InputCmd. This is the assertion that would have caught both shipped bugs.
+    it('feeds a completely inert InputCmd while idle — no move, no aim, no attack', () => {
+      pads = [rawPad({ axes: [0, 0, -1, -1] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.moveX).toBe(0)
+      expect(cmd.moveY).toBe(0)
+      expect(cmd.aimX).toBe(0)
+      expect(cmd.aimY).toBe(0)
+      expect(cmd.attack).toBe(false)
+    })
+
+    // Triggers report 0 until first touched, then rest at -1 -- so connect-time
+    // resting-value sampling would have sampled a lie. Both states must be inert.
+    it.each([
+      ['untouched, still reporting 0', 0],
+      ['touched once, now resting at -1', -1],
+    ])('stays inert with triggers %s', (_label, rest) => {
+      pads = [rawPad({ axes: [0, 0, rest, rest] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.attack).toBe(false)
+      expect(cmd.aimX).toBe(0)
+      expect(cmd.aimY).toBe(0)
+    })
+
+    it('still aims where the player moves, so the pad is not disarmed', () => {
+      pads = [rawPad({ axes: [0, -0.9, -1, -1] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.moveY).toBeCloseTo(-0.9)
+      expect(cmd.aimY).toBeCloseTo(-0.9) // selectAim falls back to the move vector
+      expect(cmd.attack).toBe(false)
+    })
+
+    it('still attacks from the attack button with the triggers resting at -1', () => {
+      pads = [rawPad({ buttons: press(0), axes: [0, 0, -1, -1] })]
+      expect(coop.sample().inputs.get(0)!.attack).toBe(true)
+    })
+  })
+
+  /**
+   * The other half of trusting the canonical shape, end-to-end: a real Android
+   * pad must KEEP twin-stick aim. Chromium puts triggers on buttons 6/7 there, so
+   * axes 2/3 are the right stick (or zero-filled) and are safe to read.
+   */
+  describe('a canonical pad (mapping "", 4 axes) keeps twin-stick aim end-to-end', () => {
+    const canonPad = (over: { buttons?: boolean[]; axes?: number[] } = {}) =>
+      pad(0, { id: 'Xbox Wireless Controller', mapping: '', axisCount: 4, ...over })
+
+    beforeEach(() => {
+      pads = [canonPad({ buttons: press(0) })]
+      coop.sample()
+    })
+
+    it('feeds right-stick aim and the twin-stick attack through to the InputCmd', () => {
+      pads = [canonPad({ axes: [0, 0, 0.9, -0.8] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.aimX).toBeCloseTo(0.9)
+      expect(cmd.aimY).toBeCloseTo(-0.8)
+      expect(cmd.attack).toBe(true)
+    })
+
+    it('feeds d-pad movement from canonical buttons 12-15, where Chromium puts the hat', () => {
+      pads = [canonPad({ buttons: press(12) })]
+      expect(coop.sample().inputs.get(0)!.moveY).toBe(-1)
+    })
+
+    it('feeds a completely inert InputCmd while idle', () => {
+      pads = [canonPad()]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.moveX).toBe(0)
+      expect(cmd.moveY).toBe(0)
+      expect(cmd.aimX).toBe(0)
+      expect(cmd.aimY).toBe(0)
+      expect(cmd.attack).toBe(false)
     })
   })
 })

@@ -121,4 +121,23 @@
   // routing, serialize round-trips), and member-level analysis is the noisiest
   // part of Knip. File- and export-level reachability is where the value is.
   "includeEntryExports": false
+
+  // --- Suppressing a single symbol: use @protocolReservation, not a list here -
+  // The `deadcode` script runs `knip --tags=-protocolReservation`, so tagging an
+  // export with that JSDoc tag hides it. There is deliberately NO list of
+  // exempted symbol names in this file: a name here is divorced from the code
+  // and goes stale invisibly, while the tag sits on the declaration itself,
+  // where the next person to touch it actually reads the reason.
+  //
+  // It covers ONE narrow class: a constant whose VALUE occupies an externally
+  // shared namespace, where "nothing references it" is not evidence of death —
+  // currently only the reserved BLE UUID in src/net/types.ts. Deleting one of
+  // those hands back a value the project considers claimed, and invites a later
+  // allocation to collide with a meaning already shipped to a peer in the field.
+  //
+  // It is NOT a general-purpose mute button. A merely-unused constant is a REAL
+  // finding — report it and let a human rule on it. If you are reaching for this
+  // tag and the symbol is compile-time-only (a type, erased at build, colliding
+  // with nothing) or just a tuning number nobody ever wired up, it does not
+  // qualify. Those two cases are why INPUT_SEND_HZ and MsgTypeId stay reported.
 }

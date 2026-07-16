@@ -14,7 +14,13 @@ const btn = (pressed: boolean) => ({ pressed, touched: pressed, value: pressed ?
 
 const pad = (
   index: number,
-  over: { id?: string; mapping?: string; buttons?: boolean[]; axes?: number[] } = {},
+  over: {
+    id?: string
+    mapping?: string
+    buttons?: boolean[]
+    axes?: number[]
+    axisCount?: number
+  } = {},
 ) =>
   ({
     index,
@@ -22,7 +28,7 @@ const pad = (
     mapping: over.mapping ?? 'standard',
     connected: true,
     buttons: Array.from({ length: 17 }, (_, i) => btn(over.buttons?.[i] ?? false)),
-    axes: Array.from({ length: 10 }, (_, i) => over.axes?.[i] ?? 0),
+    axes: Array.from({ length: over.axisCount ?? 10 }, (_, i) => over.axes?.[i] ?? 0),
   }) as unknown as Gamepad
 
 const press = (i: number) => {
@@ -291,6 +297,39 @@ describe('createGamepadCoop', () => {
       pads = [pad(0, { buttons: press(0) })]
       coop.sample()
       expect(anyPadActive(coop.debug())).toBe(true)
+    })
+  })
+
+  // End-to-end over the real live path that shipped the bug:
+  // sample() → readPad(p, padProfile(p)) → toCmd() → InputCmd. Chromium on
+  // Android reports mapping '' for many pads, which resolves to the permissive
+  // profile and its speculative hatAxis: 9 — an axis a 4-axis pad does not
+  // have. That used to decode as a permanent "down".
+  describe('an Android-style pad (mapping "", 4 axes) does not walk south on its own', () => {
+    const androidPad = (over: { buttons?: boolean[]; axes?: number[] } = {}) =>
+      pad(0, { id: 'Xbox Wireless Controller', mapping: '', axisCount: 4, ...over })
+
+    beforeEach(() => {
+      pads = [androidPad({ buttons: press(0) })]
+      coop.sample()
+    })
+
+    it('feeds no movement at all while the pad sits idle', () => {
+      pads = [androidPad()]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.moveX).toBe(0)
+      expect(cmd.moveY).toBe(0)
+    })
+
+    it('feeds stick Y through instead of a phantom +Y', () => {
+      pads = [androidPad({ axes: [0, -0.9] })]
+      expect(coop.sample().inputs.get(0)!.moveY).toBeCloseTo(-0.9)
+    })
+
+    it('does not pin aim southward when idle (aim-where-you-move reads moveY)', () => {
+      pads = [androidPad()]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.aimY).not.toBe(1)
     })
   })
 })

@@ -131,8 +131,13 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
     }
   }
 
-  const aimX = stick(pad, profile.aimAxes[0])
-  const aimY = stick(pad, profile.aimAxes[1])
+  // A profile with no aimAxes has no aim stick we are willing to name, so aim
+  // reads centred and the twin-stick fire path below can never trip. This is not
+  // "no aim": selectAim falls back to the movement vector, and the attack button
+  // is untouched. See PadProfile.aimAxes for why guessing here is unacceptable in
+  // a way that guessing a d-pad index is not -- aim past the threshold FIRES.
+  const aimX = profile.aimAxes === null ? 0 : stick(pad, profile.aimAxes[0])
+  const aimY = profile.aimAxes === null ? 0 : stick(pad, profile.aimAxes[1])
 
   return {
     moveX,

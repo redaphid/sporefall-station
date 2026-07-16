@@ -1,0 +1,143 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+
+  // Knip finds code that NOTHING reaches: unused files, exports, and deps.
+  // It exists because src/input/gamepad.ts sat in the tree with ZERO callers
+  // while looking completely live — someone burned a debugging session editing
+  // a file that never runs. tsc's noUnusedLocals/noUnusedParameters (already on
+  // in tsconfig.json) are per-file and cannot see that; only whole-program
+  // reachability can. Run: `pnpm run deadcode`.
+  //
+  // THE ENTRY LIST IS THE WHOLE BALLGAME. This repo is deliberately
+  // instrumented for AI/test access, so a LOT of real code is reached by a
+  // shell script, a file-based route, or a hand-typed `npx tsx` — never by an
+  // import. Knip only reads the module graph; it cannot read run.sh. Anything
+  // launched from outside the graph MUST be listed here or it false-positives.
+  // A dead-code tool that cries wolf gets ignored, which is worse than nothing.
+
+  "entry": [
+    // --- The actual app -----------------------------------------------------
+    // index.html has <script type="module" src="/src/main.ts">, and that is
+    // Vite's only input (no build.rollupOptions.input override). main.ts is the
+    // single root of everything the player actually runs.
+    //
+    // Only index.html is listed. src/main.ts, vite.config.ts,
+    // capacitor.config.ts and eslint.config.js are all reached automatically —
+    // src/main.ts via Knip's default entry pattern, and the configs via Knip's
+    // vite/capacitor/eslint plugins (it reports them as redundant if listed).
+    // Left implicit on purpose: a hand-listed entry that Knip already covers is
+    // exactly the kind of config that rots without anyone noticing.
+    "index.html",
+
+    // --- Unit tests ---------------------------------------------------------
+    // vite.config.ts sets test.include: ['src/**/*.test.ts']. These are entries
+    // because vitest invokes them; listing them is also what keeps test-only
+    // APIs honest — src/game/testkit.ts (loadFixture/runTicks/expectWorldEqual)
+    // and src/game/__fixtures__/ are imported ONLY by tests, so without this
+    // the whole testkit surface would false-positive. Naming is always
+    // *.test.ts (incl. *.adversarial.test.ts, *.behavior.test.ts) — no *.spec.ts.
+    "src/**/*.test.ts",
+
+    // --- Cloudflare Pages Functions -----------------------------------------
+    // functions/ota/check.ts is FILE-ROUTED: Pages maps the path to the route
+    // POST /ota/check and calls the exported onRequestPost/onRequestGet by
+    // convention. Nothing imports it — the only link is a runtime URL string in
+    // capacitor.config.ts (otaUpdateUrl). Invisible to static analysis.
+    "functions/**/*.ts",
+
+    // --- Debug tooling entry points (tools/) --------------------------------
+    // Standalone programs run as `npx tsx <path>` (see docs/ and the
+    // .claude/skills/ecs-debug skill). NOT in package.json scripts, so there is
+    // no script for Knip's plugins to infer them from. hub.ts (WS hub, :7810)
+    // and server.ts (MCP, :7811) are dual-mode — importable AND self-starting
+    // when run directly.
+    "tools/debug-hub/hub.ts",
+    "tools/debug-cli/cli.ts",
+    "tools/mcp-debug/server.ts",
+    "tools/debug-harness/host.ts",
+    // NB: tools/debug-client.ts is deliberately NOT listed. It's a library
+    // (connectDebugger), imported by scripts/test/*.ts — Knip traces it from
+    // those entries. If it ever stops being imported, it SHOULD get flagged.
+
+    // --- Exploratory harness scripts (scripts/test/) ------------------------
+    // Per CLAUDE.md these are hand-run debug/exploratory programs, NOT unit
+    // tests (vitest's src/**/*.test.ts include never picks them up). Each is
+    // its own entry point, typically launched as `npx tsx scripts/test/<x>.ts`
+    // from docs or a file-header comment; only gen-*-fixtures.mts are wired to
+    // an npm script (gen:fixtures). Treat the whole directory as entries —
+    // that's the directory's stated purpose. Careful: this dir is NAMED "test"
+    // but holds non-test programs, so it must not be swallowed by a test glob.
+    "scripts/test/**/*.{ts,mts,mjs}",
+
+    // --- Playwright/ffmpeg e2e scenarios (e2e/) -----------------------------
+    // Every e2e/*.mjs is a standalone Playwright scenario launched by node from
+    // a shell script, which Knip cannot parse. Several are reached only by a
+    // SHELL GLOB — run-features.sh does `files=(e2e/feature-*.mjs)` and run.sh
+    // does `node "e2e/$demo.mjs"` over an interpolated list — so enumerating
+    // individual files here would rot the moment someone adds a scenario.
+    // Directory-wide entry matches the convention: an e2e/*.mjs IS a runnable
+    // scenario. lib.mjs (record()) and record-feature.mjs are libraries and get
+    // traced from their importers regardless.
+    "e2e/*.mjs"
+  ],
+
+  // Files Knip is allowed to consider at all. The default project scope follows
+  // tsconfig, and tsconfig.json here has "include": ["src"] — so tools/,
+  // scripts/, e2e/ and functions/ sit OUTSIDE the TS project entirely. Without
+  // widening this, Knip cannot see those importers and would wrongly report the
+  // code they consume (src/debug/loopback.ts, most of src/debug/protocol.ts,
+  // the GameHarness surface) as unused.
+  "project": [
+    "src/**/*.ts",
+    "tools/**/*.ts",
+    "scripts/test/**/*.{ts,mts,mjs}",
+    "e2e/**/*.mjs",
+    "functions/**/*.ts",
+    "*.{ts,js}"
+  ],
+
+  // NOTE: there is deliberately no "ignore" list. android/ (generated Capacitor
+  // native shell), public/, assets/ and dist/ are already outside the "project"
+  // globs above, so ignoring them would be a no-op that only looks meaningful.
+  // Same for ignoreDependencies: every declared dep resolves from a real
+  // importer once the entry points above are in place. If you find yourself
+  // adding an ignore here, first check whether the real fix is a missing entry.
+
+  // ffmpeg is a SYSTEM binary, not an npm package — the e2e recorder and a
+  // couple of harness scripts shell out to it to mux frames into mp4/gif. CI
+  // installs it with apt (see .github/workflows/web-e2e.yml); it will never
+  // appear in package.json, so Knip must be told not to expect it there.
+  "ignoreBinaries": ["ffmpeg"],
+
+  // Report an export only when NOTHING anywhere imports it. Without this, a
+  // `export const ENGAGE_RANGE` that its own module uses gets reported purely
+  // because the `export` keyword is redundant — a style nit, not dead code, and
+  // this sim is full of deliberately-exported tuning constants that tests and
+  // the debug CLI reach for. Suppressing that noise is what keeps the real
+  // signal (an export literally no one calls) worth reading.
+  "ignoreExportsUsedInFile": true,
+
+  // Enum/class members are reached by string-keyed lookup in places here (verb
+  // routing, serialize round-trips), and member-level analysis is the noisiest
+  // part of Knip. File- and export-level reachability is where the value is.
+  "includeEntryExports": false
+
+  // --- Suppressing a single symbol: use @protocolReservation, not a list here -
+  // The `deadcode` script runs `knip --tags=-protocolReservation`, so tagging an
+  // export with that JSDoc tag hides it. There is deliberately NO list of
+  // exempted symbol names in this file: a name here is divorced from the code
+  // and goes stale invisibly, while the tag sits on the declaration itself,
+  // where the next person to touch it actually reads the reason.
+  //
+  // It covers ONE narrow class: a constant whose VALUE occupies an externally
+  // shared namespace, where "nothing references it" is not evidence of death —
+  // currently only the reserved BLE UUID in src/net/types.ts. Deleting one of
+  // those hands back a value the project considers claimed, and invites a later
+  // allocation to collide with a meaning already shipped to a peer in the field.
+  //
+  // It is NOT a general-purpose mute button. A merely-unused constant is a REAL
+  // finding — report it and let a human rule on it. If you are reaching for this
+  // tag and the symbol is compile-time-only (a type, erased at build, colliding
+  // with nothing) or just a tuning number nobody ever wired up, it does not
+  // qualify. Those two cases are why INPUT_SEND_HZ and MsgTypeId stay reported.
+}

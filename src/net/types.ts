@@ -6,6 +6,18 @@ export const PROTOCOL_VERSION = 1
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'
 export const BLE_DATA_H2C_UUID = '5f47a3c1-9b1e-4a52-8f6d-2c3e4b5a6d70'
 export const BLE_DATA_C2H_UUID = '5f47a3c2-9b1e-4a52-8f6d-2c3e4b5a6d70'
+/**
+ * Reserved: ...a3c3 is the fourth UUID in this allocated block; the other three
+ * are live. It is CLAIMED, not unused — it records that this value is spoken for
+ * in the same address space as the three above it. Deleting it because nothing
+ * calls it would silently hand the value back to the pool, and a later feature
+ * could then allocate ...a3c3 for something else and collide with a meaning
+ * already shipped to peers in the field. A dead-code tool can't see any of this:
+ * for a UUID the VALUE is the whole point and the call sites are irrelevant, so
+ * "no references" carries none of its usual meaning.
+ *
+ * @protocolReservation
+ */
 export const BLE_LOBBY_INFO_UUID = '5f47a3c3-9b1e-4a52-8f6d-2c3e4b5a6d70'
 
 export const SNAPSHOT_INTERVAL_TICKS = 3 // 10Hz at 30Hz sim

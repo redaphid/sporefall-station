@@ -30,16 +30,24 @@ const pressed = (pad: Gamepad, i: number): boolean => {
 
 const anyPressed = (pad: Gamepad, idxs: number[]): boolean => idxs.some((i) => pressed(pad, i))
 
-const axis = (pad: Gamepad, i: number): number => {
+/** One axis reading, or undefined if the pad simply does not have that axis (or
+ * reports garbage for it). Keeping "absent" distinct from "reads 0" matters:
+ * a hat that isn't there and a hat pushed to some value are different facts,
+ * and collapsing both to 0 is what pinned the player to a wall (see hatDir). */
+const axisAt = (pad: Gamepad, i: number): number | undefined => {
   const v = pad.axes[i]
-  if (v === undefined) return 0
+  if (typeof v !== 'number' || !Number.isFinite(v)) return undefined
   return v
 }
 
-const dead = (v: number): number => (Math.abs(v) < DEADZONE ? 0 : v)
+/** An analog stick axis, deadzoned. A missing/garbage axis is centred. */
+const stick = (pad: Gamepad, i: number): number => {
+  const v = axisAt(pad, i)
+  if (v === undefined) return 0
+  return Math.abs(v) < DEADZONE ? 0 : v
+}
 
-// 8-way hat encoded on one axis: -1..1 spans 8 directions clockwise from up.
-// Rest sits outside that band (e.g. ~3.29), so anything past 1.1 means centred.
+// The eight hat directions, clockwise from up.
 const HAT_DIRS: [number, number][] = [
   [0, -1],
   [1, -1],
@@ -51,14 +59,55 @@ const HAT_DIRS: [number, number][] = [
   [-1, -1],
 ]
 
-const hatDir = (v: number): [number, number] | null => {
-  if (Math.abs(v) > 1.1) return null
-  return HAT_DIRS[Math.round(((v + 1) / 2) * 7)]
+/**
+ * An 8-way hat squeezed onto a single axis, as evdev/Linux hats surface through
+ * the browser on non-standard pads. The driver reports a 4-bit hat state and it
+ * arrives normalised onto the axis as:
+ *
+ *     value = state * (2 / 7) - 1
+ *
+ * States 0-7 are the directions clockwise from up; state 15 means "no
+ * direction" and lands way outside the stick band, at 3.2857 (= 15*2/7 - 1):
+ *
+ *   state | 0     1      2      3      4     5     6     7   | 15
+ *   value | -1  -.714  -.429  -.143  .143  .429  .714   1    | 3.2857
+ *
+ * Two things fall out of that table which the previous decode got wrong:
+ *
+ *  1. **0 is not a valid hat value.** It sits at state 3.5 -- exactly halfway
+ *     between down-right and down. The old code rounded any |v| <= 1.1 to the
+ *     nearest state, so 0 became state 4 = DOWN. A pad with no axis 9 (or an
+ *     axis 9 that rests at 0) therefore reported "down" on every single sample,
+ *     forever. We reject non-integer states rather than special-casing 0, so
+ *     this stays correct for every other between-states value too.
+ *  2. Rest is not the only reading we must refuse. An axis that isn't a hat at
+ *     all (a spare trigger, say) sweeps continuously through the -1..1 band and
+ *     would otherwise decode as a stream of bogus directions.
+ *
+ * So: accept a value only when it lands within HAT_TOL of an exact state in
+ * 0..7. Everything else -- rest, absent, NaN, a non-hat axis mid-sweep -- is
+ * neutral. The strictness is deliberate and the cost is asymmetric: refusing a
+ * real hat direction on an unknown pad loses the d-pad but the stick still
+ * drives, while inventing one pins the player against a wall with no recourse.
+ */
+const HAT_STEP = 2 / 7
+/** Tolerance in *state* units. A full step is 1.0 and the midpoint between two
+ * states is 0.5, so 0.15 accepts real readings (which are exact to float
+ * precision) while rejecting anything genuinely between two states. */
+const HAT_TOL = 0.15
+
+const hatDir = (v: number | undefined): [number, number] | null => {
+  if (v === undefined) return null
+  const state = (v + 1) / HAT_STEP
+  const nearest = Math.round(state)
+  if (nearest < 0 || nearest > 7) return null // rest (15), and anything off-scale
+  if (Math.abs(state - nearest) > HAT_TOL) return null // not an exact hat state
+  return HAT_DIRS[nearest]
 }
 
 export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
-  let moveX = dead(axis(pad, profile.moveAxes[0]))
-  let moveY = dead(axis(pad, profile.moveAxes[1]))
+  let moveX = stick(pad, profile.moveAxes[0])
+  let moveY = stick(pad, profile.moveAxes[1])
 
   const [up, down, left, right] = profile.dpad
   if (pressed(pad, left)) moveX = -1
@@ -66,16 +115,24 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
   if (pressed(pad, up)) moveY = -1
   if (pressed(pad, down)) moveY = 1
 
+  // The hat FILLS IN: it claims an axis nothing else has already moved, rather
+  // than overwriting one. Precedence is by confidence, not by source -- a stick
+  // reading and a button press are unambiguous facts about this pad, whereas
+  // the hat only exists on profiles we could not map properly and its axis
+  // index is a documented guess. So where they disagree, the thing we actually
+  // know wins, and a bad guess can never take the controls away from a player
+  // who is pushing a real input. Per-axis, so a diagonal hat still contributes
+  // its Y while the stick holds X.
   if (profile.hatAxis !== null) {
-    const dir = hatDir(axis(pad, profile.hatAxis))
+    const dir = hatDir(axisAt(pad, profile.hatAxis))
     if (dir) {
-      moveX = dir[0]
-      moveY = dir[1]
+      if (moveX === 0) moveX = dir[0]
+      if (moveY === 0) moveY = dir[1]
     }
   }
 
-  const aimX = dead(axis(pad, profile.aimAxes[0]))
-  const aimY = dead(axis(pad, profile.aimAxes[1]))
+  const aimX = stick(pad, profile.aimAxes[0])
+  const aimY = stick(pad, profile.aimAxes[1])
 
   return {
     moveX,

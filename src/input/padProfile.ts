@@ -15,6 +15,15 @@
  * check (see the controllers overlay, which shows live indices). Movement is
  * read from stick + d-pad buttons + hat simultaneously (see readPad), so a pad
  * moves regardless of which of those its mode actually populates.
+ *
+ * `hatAxis: 9` on the permissive profiles is speculative — plenty of pads that
+ * land here have no axis 9 at all. That is fine, and it is readPad's job to
+ * keep it fine: it treats a missing axis, a resting hat, and any value that is
+ * not an exact hat state as NO direction, and lets the hat fill in only axes
+ * the stick and d-pad leave centred. So the guess costs nothing when it is
+ * wrong and wins a working d-pad when it is right. It is only safe under those
+ * rules — before them, this line made every 4-axis Android pad walk south
+ * forever.
  */
 export type PadKind = 'standard' | 'zero2' | 'generic'
 

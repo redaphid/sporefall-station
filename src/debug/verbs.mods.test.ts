@@ -65,7 +65,11 @@ describe('addMod verb', () => {
   })
 
   it('errors clearly when the entity has no slotted weapon', () => {
-    const p = spawnPlayer(w, 0, 'doctor', 20, 20) // fists starter → innate, not slotted
+    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    // Strip the starter loadout: bare hands, nothing slotted.
+    p.playerCtl!.inventory = []
+    p.playerCtl!.activeSlot = -1
+    p.combat!.weapon = 'fists'
     expect(() => runVerb(w, `addMod ${p.id} frost`)).toThrow(/no slotted weapon/)
   })
 

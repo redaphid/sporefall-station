@@ -9,7 +9,7 @@ import { serializeEntity } from './verbs'
 const recordSession = (): Recording => {
   const h = new GameHarness()
   h.create({ seed: 20260715, classId: 'soldier', name: 'Host' })
-  h.addBot({ name: 'Bravo', classId: 'thief' })
+  h.addBot({ name: 'Bravo', classId: 'soldier' })
   h.addBot({ name: 'Charlie', classId: 'soldier' })
   h.start()
   h.startRecording()

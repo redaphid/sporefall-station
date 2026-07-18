@@ -104,3 +104,24 @@ describe('HostSession local co-op', () => {
     })
   })
 })
+
+describe('soldier is the only class — sessions start as soldier with no selection step', () => {
+  it('a fresh session spawns the local player as a soldier immediately', () => {
+    const session = new HostSession(7, 'soldier', stubInput)
+    // The avatar exists BEFORE any tick — nothing waits on a class-select screen.
+    expect(session.self.playerCtl!.classId).toBe('soldier')
+    expect(session.self.combat!.weapon).toBe('pistol')
+    for (let i = 0; i < 10; i++) session.tick() // and the real systems run on it
+    expect(session.world.tick).toBe(10)
+    expect(players(session)[0].playerCtl!.classId).toBe('soldier')
+  })
+
+  it('a legacy classId from an old caller degrades to soldier (self AND pad joiners)', () => {
+    const coop = scripted([{ inputs: new Map(), joins: [1], leaves: [], pauses: [] }])
+    const session = new HostSession(7, 'thief', stubInput, coop)
+    session.tick()
+    const all = players(session)
+    expect(all).toHaveLength(2)
+    for (const p of all) expect(p.playerCtl!.classId).toBe('soldier')
+  })
+})

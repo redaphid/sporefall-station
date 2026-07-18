@@ -2,7 +2,7 @@ import { APP_VERSION, otaBundleVersion } from '../app/version'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
-/** Solo / Host / Join picker shown after class select. */
+/** Solo / Host / Join picker shown at boot (soldier is the only class — no class select). */
 export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')

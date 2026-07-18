@@ -19,7 +19,7 @@ export interface ObjectDef {
   loot?: string[]
   /** E-interact: dispense cash or an item id once. */
   use?: { gives: 'cash' | string; amount?: number }
-  /** Can be shorted out by a hacker. */
+  /** Electronics: interactable even without a `use` payout (e.g. generator). */
   hackable?: boolean
 }
 

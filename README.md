@@ -57,8 +57,8 @@ first. The APK lands at `android/app/build/outputs/apk/debug/app-debug.apk`.
 ### 2-phone BLE test (the point of all this)
 
 1. Install the APK on both phones, turn on airplane mode, **leave Bluetooth on**.
-2. Phone A: pick class → **Host co-op** → wait in lobby.
-3. Phone B: pick class → **Join co-op** → grant Bluetooth permissions → tap the host in
+2. Phone A: **Host co-op** → wait in lobby.
+3. Phone B: **Join co-op** → grant Bluetooth permissions → tap the host in
    the scan list → wait in lobby.
 4. Phone A: **Start game**. Complete a mission, hit the exit, next floor.
 

@@ -33,9 +33,9 @@ const harnessFlow = (): void => {
   console.log('\n== A) co-op flow through GameHarness ==')
   const h = new GameHarness()
   h.create({ seed: 20260715, classId: 'soldier', name: 'Hosty' })
-  const s1 = h.addBot({ name: 'Bravo', classId: 'thief' })
+  const s1 = h.addBot({ name: 'Bravo', classId: 'soldier' })
   const s2 = h.addBot({ name: 'Charlie', classId: 'soldier' })
-  const s3 = h.addBot({ name: 'Delta', classId: 'thief' })
+  const s3 = h.addBot({ name: 'Delta', classId: 'soldier' })
   check('lobby holds host + 3 bots', h.lobby().length === 4, h.lobby().map((p) => p.name).join(','))
   check('bot slots are 1..3', s1 === 1 && s2 === 2 && s3 === 3)
 
@@ -66,9 +66,9 @@ const harnessFlow = (): void => {
   const rec2 = (() => {
     const g = new GameHarness()
     g.create({ seed: 20260715, classId: 'soldier', name: 'Hosty' })
-    g.addBot({ name: 'Bravo', classId: 'thief' })
+    g.addBot({ name: 'Bravo', classId: 'soldier' })
     g.addBot({ name: 'Charlie', classId: 'soldier' })
-    g.addBot({ name: 'Delta', classId: 'thief' })
+    g.addBot({ name: 'Delta', classId: 'soldier' })
     g.start()
     g.startRecording()
     g.setInput(0, { moveX: -1, attack: true })
@@ -98,7 +98,7 @@ const loopbackNetFlow = async (): Promise<void> => {
 
   const bots: NetClientSession[] = []
   for (const [name, cls, dir] of [
-    ['Bravo', 'thief', 1],
+    ['Bravo', 'soldier', 1],
     ['Charlie', 'soldier', -1],
   ] as const) {
     const client = hub.addCentral()

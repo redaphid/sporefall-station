@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
 import { createArt, TILE_PX, type ArtRegistry, type DirSet, type Facing, type SpriteTextures } from './art'
+import { BulletLayer } from './bullets'
 import { Camera } from './camera'
 import { EffectsLayer } from './effects'
 import { createHaptics } from './haptics'
@@ -150,8 +151,9 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   const world = new Container()
   const tilemap = new TilemapView()
   const entities = new EntityViews(art)
+  const bullets = new BulletLayer(art)
   const effects = new EffectsLayer(art)
-  world.addChild(tilemap.root, entities.root, effects.root)
+  world.addChild(tilemap.root, entities.root, bullets.root, effects.root)
   app.stage.addChild(world)
 
   const camera = new Camera()
@@ -252,6 +254,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
         entities.update(view.entities, alpha, view.tick)
+        bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)
       }
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)

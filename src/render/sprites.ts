@@ -80,6 +80,10 @@ export class EntityViews {
 
     for (const e of entities) {
       if (e.dead) continue
+      // Bullets ('projectile' archetype) draw in the procedural BulletLayer,
+      // composed from their weapon-mod provenance. Grenades/thrown items keep
+      // their entity sprite here.
+      if (e.kind === 'projectile' && e.archetype === 'projectile') continue
       // Doors render differently open vs closed; treat state as part of identity.
       const artKey = e.door ? (e.door.open ? 'door.open' : 'door') : e.archetype
       let view = this.views.get(e.id)

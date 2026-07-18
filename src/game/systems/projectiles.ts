@@ -73,6 +73,8 @@ const spawnSplit = (w: World, e: Entity): void => {
     child.vel.x = Math.cos(a) * s.speed
     child.vel.y = Math.sin(a) * s.speed
     child.projectile = { ownerId: p.ownerId, damage: s.damage, ttl: s.ttl }
+    // Shards inherit the parent's mod provenance so they read as the same build.
+    if (p.mods) child.projectile.mods = p.mods.map((m) => ({ ...m }))
     addEntity(w, child)
   }
 }

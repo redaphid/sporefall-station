@@ -28,6 +28,11 @@ export interface ArtRegistry {
   flameFrames(): readonly Texture[]
   /** A one-shot effect clip's frames, by effect key. Empty if not loaded. */
   effectFrames(key: EffectKey): readonly Texture[]
+  /** White bullet core disc (radius 8px) — tinted/scaled per composed style. */
+  bulletCore(): Texture
+  /** Soft white radial halo — the sprite FALLBACK glow when the energy shader
+   * is unavailable (additive, tinted per style). */
+  bulletGlow(): Texture
 }
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
@@ -353,6 +358,33 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
 
   const flameFrames = (): readonly Texture[] => sprites.flames ?? []
 
+  // Shared bullet textures — generated ONCE, then tinted/scaled per bullet so
+  // every projectile batches on the same two textures (no per-frame generation).
+  let bulletCoreTex: Texture | undefined
+  const bulletCore = (): Texture => {
+    if (!bulletCoreTex) {
+      const g = new Graphics().circle(8, 8, 8).fill(0xffffff)
+      bulletCoreTex = renderer.generateTexture(g)
+      g.destroy()
+    }
+    return bulletCoreTex
+  }
+  let bulletGlowTex: Texture | undefined
+  const bulletGlow = (): Texture => {
+    if (!bulletGlowTex) {
+      // Concentric falloff rings approximate a radial gradient (no shaders here —
+      // this texture IS the fallback for GPUs where the energy shader won't build).
+      const g = new Graphics()
+      const R = 24
+      for (let i = 6; i >= 1; i--) {
+        g.circle(R, R, (R * i) / 6).fill({ color: 0xffffff, alpha: 0.05 + (6 - i) * 0.03 })
+      }
+      bulletGlowTex = renderer.generateTexture(g)
+      g.destroy()
+    }
+    return bulletGlowTex
+  }
+
   const effectFrames = (key: EffectKey): readonly Texture[] => sprites[key] ?? []
 
   const entity = (archetype: string): Texture => {
@@ -385,5 +417,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     walkStep,
     flameFrames,
     effectFrames,
+    bulletCore,
+    bulletGlow,
   }
 }

@@ -1,8 +1,8 @@
 import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
 import { WEAPONS, type StatusApply } from '../data/items'
-import type { ResolvedTrigger } from '../data/mods'
+import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
-import { makeEntity, type Entity } from '../entity'
+import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
@@ -181,6 +181,7 @@ export const spawnProjectile = (
   angleOffset = 0,
   onHit?: StatusApply,
   spec?: ProjectileSpec,
+  mods?: readonly WeaponMod[],
 ): void => {
   const angle = owner.facing + angleOffset
   const e = makeEntity('projectile', 'projectile', owner.pos.x, owner.pos.y, 0.15)
@@ -189,6 +190,9 @@ export const spawnProjectile = (
   e.vel.y = Math.sin(angle) * speed
   const ttl = Math.ceil((rangeTiles / speed) * 30)
   e.projectile = { ownerId: owner.id, damage, ttl, onHit: spec?.onHit ?? onHit }
+  // Build provenance for the renderer/wire: normalized, absent when vanilla.
+  const normalized = normalizeMods(mods)
+  if (normalized) e.projectile.mods = normalized
   // Attach only the mod fields that are actually present → snapshot-stable: a
   // vanilla shot serializes exactly as before this feature.
   if (spec) {
@@ -284,7 +288,7 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {
     const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
-    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec)
+    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, stack?.mods)
   }
   return true
 }

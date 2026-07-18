@@ -155,6 +155,13 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 40 }, // aftermath on the frosted/shattered line
   ],
 
+  // Mission-UI showcase: the player stands STILL for the whole clip so the
+  // Playwright driver can expand the mission panel and tap an objective link —
+  // any movement would cancel the camera focus (focusModel.ts), which is exactly
+  // what we're recording. 660 ticks (~22s) covers chip → panel → link tap →
+  // animated pan out/back → edge indicator beats.
+  missionui: [{ ticks: 660 }],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

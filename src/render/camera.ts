@@ -1,14 +1,25 @@
 import type { Container } from 'pixi.js'
 import { TILE_PX } from './art'
 import { decayShake, stackShake } from './juice'
+import { anchoredCenter, clampZoom, smoothZoom, ZOOM_DEFAULT } from './zoomModel'
+
+/** How long (s) a zoom gesture pauses player-follow so the anchored world point
+ * really stays under the finger/cursor instead of being lerped away mid-gesture. */
+const FOLLOW_HOLD_S = 0.3
 
 /** Camera in world (tile) coordinates, applied as a container translation. */
 export class Camera {
   x = 0
   y = 0
   /** View-only magnification (1 = native). Scales the world container; the sim
-   * is untouched. Set once from `?zoom=`. */
+   * is untouched. Interpolates toward `target` each frame (see zoomModel). */
   zoom = 1
+  private target = 1
+  /** Screen-px anchor the current zoom change pivots around (null = screen centre). */
+  private anchorX: number | null = null
+  private anchorY = 0
+  private followHold = 0
+  private zoomDt = 0
   private shakeMag = 0
   private shakeX = 0
   private shakeY = 0
@@ -21,7 +32,37 @@ export class Camera {
     this.y = y
   }
 
+  /** Current zoom TARGET — what wheel/pinch compound on top of. */
+  get zoomTarget(): number {
+    return this.target
+  }
+
+  /** Smoothly zoom toward `z`, keeping the world point under screen (ax,ay)
+   * fixed; omit the anchor to pivot on the screen centre. View-only. */
+  setZoom(z: number, ax?: number, ay?: number): void {
+    this.target = clampZoom(z)
+    if (ax !== undefined && ay !== undefined) {
+      this.anchorX = ax
+      this.anchorY = ay
+      this.followHold = FOLLOW_HOLD_S
+    } else {
+      this.anchorX = null
+    }
+  }
+
+  /** Jump straight to a zoom level (boot-time `?zoom=`, test hooks). */
+  snapZoom(z: number): void {
+    this.zoom = this.target = clampZoom(z)
+    this.anchorX = null
+  }
+
+  resetZoom(): void {
+    this.setZoom(ZOOM_DEFAULT)
+  }
+
   follow(tx: number, ty: number, dt: number): void {
+    // An in-flight anchored zoom owns the camera; player-follow resumes after.
+    if (this.followHold > 0) return
     // Framerate-independent exponential lerp
     const k = 1 - Math.exp(-8 * dt)
     this.x += (tx - this.x) * k
@@ -35,6 +76,8 @@ export class Camera {
   }
 
   update(dt: number): void {
+    this.zoomDt = dt
+    this.followHold = Math.max(0, this.followHold - dt)
     if (this.shakeMag > 0) {
       // Render-side randomness is fine — this is not the sim.
       this.shakeX = (Math.random() * 2 - 1) * this.shakeMag
@@ -48,6 +91,16 @@ export class Camera {
 
   /** Position the world container so the camera point sits at screen center. */
   apply(world: Container, screenW: number, screenH: number, levelW: number, levelH: number): void {
+    // Step the zoom interpolation here (screen dims are needed for anchoring).
+    if (this.zoom !== this.target) {
+      const z1 = smoothZoom(this.zoom, this.target, this.zoomDt)
+      if (this.anchorX !== null) {
+        const c = anchoredCenter(this.x, this.y, this.zoom, z1, this.anchorX, this.anchorY, screenW, screenH)
+        this.x = c.x
+        this.y = c.y
+      }
+      this.zoom = z1
+    }
     const T = TILE_PX * this.zoom
     if (world.scale.x !== this.zoom) world.scale.set(this.zoom)
     const halfW = screenW / 2 / T

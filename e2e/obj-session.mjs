@@ -80,7 +80,7 @@ const main = async () => {
     if (m.type() === 'error') log('console.error:', m.text())
   })
 
-  await page.goto(`${BASE}/?mode=solo&class=soldier&scenario=objects&e2e=1&seed=${SEED}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/?mode=solo&scenario=objects&e2e=1&seed=${SEED}`, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => {
     const c = document.querySelector('#app canvas')
     return !!c && c.clientWidth > 100 && c.clientHeight > 100

@@ -64,7 +64,7 @@ const main = async () => {
     if (m.type() === 'error') log('console.error:', m.text())
   })
 
-  const url = `${BASE}/?mode=solo&class=soldier&scenario=fire&e2e=1&seed=${SEED}`
+  const url = `${BASE}/?mode=solo&scenario=fire&e2e=1&seed=${SEED}`
   log('navigate', url)
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 

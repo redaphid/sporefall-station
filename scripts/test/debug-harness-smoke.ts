@@ -37,7 +37,7 @@ const main = async (): Promise<void> => {
 
   // --- the "game": a real world + real channel + a real tick loop ---
   const world = createWorld(4242, 1)
-  spawnPlayer(world, 0, 'soldier', world.level.spawn.x, world.level.spawn.y)
+  spawnPlayer(world, 0, world.level.spawn.x, world.level.spawn.y)
   const civ = spawnNpc(world, 'civilian', 8, 8)
   spawnNpc(world, 'thug', 12, 12)
   const channel = startDebugChannel(world, URL, () => {})

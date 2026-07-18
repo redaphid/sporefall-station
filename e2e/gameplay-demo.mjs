@@ -3,7 +3,7 @@ import { record } from './lib.mjs'
 // The showcase run: move → meet NPCs + grab a pickup → open a door → win a battle.
 await record({
   name: 'gameplay-demo',
-  params: { mode: 'solo', class: 'soldier', seed: 7, scenario: 'demo', script: 'demo' },
+  params: { mode: 'solo', seed: 7, scenario: 'demo', script: 'demo' },
   stills: [
     { tick: 20, label: '01-spawn' },
     { tick: 300, label: '02-npc' },

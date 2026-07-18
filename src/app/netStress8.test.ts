@@ -44,7 +44,6 @@ class MockHub {
 
   addClient(
     name: string,
-    classId: string,
     input: InputSource,
   ): { session: NetClientSession; connect: () => void; drop: () => void; peer: PeerId; snapshotEntityCounts: () => number[] } {
     const peer: PeerId = `central-${this.centrals.size + 1}`
@@ -70,7 +69,7 @@ class MockHub {
       },
       peers: () => ['host'],
     }
-    const session = new NetClientSession(name, classId, input, clientTransport)
+    const session = new NetClientSession(name, input, clientTransport)
     const connect = (): void => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => clientHandler?.({ type: 'peerConnected', peer: 'host' }))
@@ -132,12 +131,12 @@ describe('8-player stress — full lobby over the loopback transport', () => {
 
   it('admits 7 clients into distinct contiguous slots 1..7 (host is 0)', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(100, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(100, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     const clients = []
     for (const nm of NAMES) {
-      const c = hub.addClient(nm, 'soldier', stubInput())
+      const c = hub.addClient(nm, stubInput())
       await c.session.start()
       c.connect()
       await flush()
@@ -157,9 +156,9 @@ describe('8-player stress — full lobby over the loopback transport', () => {
     const hub = new MockHub()
     // Each client walks a different direction so its input stream is non-trivial.
     const dirs = [1, -1, 1, -1, 1, -1, 1]
-    const host = new NetHostSession(200, 'soldier', 'Alice', stubInput({ moveX: 1 }), hub.hostTransport)
+    const host = new NetHostSession(200, 'Alice', stubInput({ moveX: 1 }), hub.hostTransport)
     await host.start()
-    const clients = NAMES.map((nm, i) => hub.addClient(nm, 'soldier', stubInput({ moveX: dirs[i] })))
+    const clients = NAMES.map((nm, i) => hub.addClient(nm, stubInput({ moveX: dirs[i] })))
     for (const c of clients) {
       await c.session.start()
       c.connect()
@@ -205,11 +204,11 @@ describe('8-player stress — full lobby over the loopback transport', () => {
 
   it('late-joins players #5–#8 into a running game (started with 4)', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(300, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(300, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     // Start with host + 3 (a legacy 4-player run).
-    const first = NAMES.slice(0, 3).map((nm) => hub.addClient(nm, 'soldier', stubInput()))
+    const first = NAMES.slice(0, 3).map((nm) => hub.addClient(nm, stubInput()))
     for (const c of first) {
       await c.session.start()
       c.connect()
@@ -220,7 +219,7 @@ describe('8-player stress — full lobby over the loopback transport', () => {
     expect(host.world.entities.filter((e) => e.playerCtl)).toHaveLength(4)
 
     // Players #5, #6, #7, #8 drop in mid-run and each gets the next free slot.
-    const late = NAMES.slice(3, 7).map((nm) => hub.addClient(nm, 'soldier', stubInput()))
+    const late = NAMES.slice(3, 7).map((nm) => hub.addClient(nm, stubInput()))
     for (const c of late) {
       await c.session.start()
       c.connect()
@@ -235,13 +234,13 @@ describe('8-player stress — full lobby over the loopback transport', () => {
 
   it('rejoins a dropped player among 8 without stealing another slot', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(400, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(400, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     // Fill slots 1..3 and 5..7 with sessions; slot 4 is a raw central so we can
     // capture its rejoin token and hand-craft the reconnect Hello.
     for (const nm of NAMES.slice(0, 3)) {
-      const c = hub.addClient(nm, 'soldier', stubInput())
+      const c = hub.addClient(nm, stubInput())
       await c.session.start()
       c.connect()
       await flush()
@@ -249,12 +248,12 @@ describe('8-player stress — full lobby over the loopback transport', () => {
     const four = hub.addRawCentral()
     four.connect()
     await flush()
-    four.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Dave', classId: 'soldier' }))
+    four.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Dave' }))
     await flush()
     const welcome = findMsg<WelcomeMsg>(four.received(), MsgType.Welcome)!
     expect(welcome.slot).toBe(4)
     for (const nm of NAMES.slice(4, 7)) {
-      const c = hub.addClient(nm, 'soldier', stubInput())
+      const c = hub.addClient(nm, stubInput())
       await c.session.start()
       c.connect()
       await flush()
@@ -280,8 +279,7 @@ describe('8-player stress — full lobby over the loopback transport', () => {
       encodeJson(MsgType.Hello, {
         v: PROTOCOL_VERSION,
         name: 'Dave',
-        classId: 'soldier',
-        rejoin: { slot: welcome.slot, token: welcome.token },
+                rejoin: { slot: welcome.slot, token: welcome.token },
       }),
     )
     await flush()
@@ -295,9 +293,9 @@ describe('8-player stress — full lobby over the loopback transport', () => {
     const dirs = [1, -1, 1, -1, 1, -1, 1]
     const runOnce = async (): Promise<string> => {
       const hub = new MockHub()
-      const host = new NetHostSession(999, 'soldier', 'Alice', stubInput({ moveX: 1, moveY: 1 }), hub.hostTransport)
+      const host = new NetHostSession(999, 'Alice', stubInput({ moveX: 1, moveY: 1 }), hub.hostTransport)
       await host.start()
-      const clients = NAMES.map((nm, i) => hub.addClient(nm, 'soldier', stubInput({ moveX: dirs[i], moveY: -dirs[i] })))
+      const clients = NAMES.map((nm, i) => hub.addClient(nm, stubInput({ moveX: dirs[i], moveY: -dirs[i] })))
       for (const c of clients) {
         await c.session.start()
         c.connect()

@@ -8,9 +8,9 @@ import { equipSlot } from '../game/systems/inventory'
 import { runVerb, WRITE_VERBS } from './verbs'
 
 const armedPlayer = (w: World): number => {
-  // The soldier starter is already a slotted, equipped pistol (a real ItemStack
+  // The player starter is already a slotted, equipped pistol (a real ItemStack
   // that can carry mods) — no extra arming needed.
-  const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+  const p = spawnPlayer(w, 0, 20, 20)
   equipSlot(p, 0)
   return p.id
 }
@@ -65,7 +65,7 @@ describe('addMod verb', () => {
   })
 
   it('errors clearly when the entity has no slotted weapon', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     // Strip the starter loadout: bare hands, nothing slotted.
     p.playerCtl!.inventory = []
     p.playerCtl!.activeSlot = -1

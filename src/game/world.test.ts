@@ -13,8 +13,8 @@ const tickN = (w: ReturnType<typeof createWorld>, inputs: Map<number, InputCmd>,
 describe('sim integration', () => {
   it('player melee attack damages and kills an adjacent thug', () => {
     const w = createWorld(5, 1)
-    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
-    player.combat!.weapon = 'fists' // pin melee — soldier starts with a pistol
+    const player = spawnPlayer(w, 0, 10.5, 1.5)
+    player.combat!.weapon = 'fists' // pin melee — the player starts with a pistol
     const thug = spawnNpc(w, 'thug', 11.5, 1.5)
     player.facing = 0 // facing +x, toward the thug
 
@@ -34,7 +34,7 @@ describe('sim integration', () => {
 
   it('thug aggros a visible player and closes distance', () => {
     const w = createWorld(6, 1)
-    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    const player = spawnPlayer(w, 0, 10.5, 1.5)
     const thug = spawnNpc(w, 'thug', 15.5, 1.5) // 5 tiles away on open road, within sight 7
     const idle = new Map([[0, emptyInput()]])
     const d0 = Math.hypot(thug.pos.x - player.pos.x, thug.pos.y - player.pos.y)
@@ -48,7 +48,7 @@ describe('sim integration', () => {
 
   it('civilian flees when damaged', () => {
     const w = createWorld(7, 1)
-    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.combat!.weapon = 'fists'
     const civ = spawnNpc(w, 'civilian', 11.5, 1.5)
     player.facing = 0
@@ -63,7 +63,7 @@ describe('sim integration', () => {
 
   it('hurt player heals by walking over a bandage', () => {
     const w = createWorld(8, 1)
-    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.health!.hp = 40
     const drop = makeEntity('pickup', 'pickup.bandage', 11.5, 1.5, 0.3)
     drop.pickup = { itemId: 'bandage', qty: 1 }
@@ -78,7 +78,7 @@ describe('sim integration', () => {
   it('populated world simulates 300 ticks without errors and stays deterministic-ish in count', () => {
     const w = createWorld(42, 1)
     populateWorld(w)
-    spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     const before = w.entities.length
     expect(before).toBeGreaterThan(10)
     const idle = new Map([[0, emptyInput()]])

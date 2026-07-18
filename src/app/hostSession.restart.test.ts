@@ -23,14 +23,14 @@ const forceGameOver = (s: HostSession): void => {
 
 describe('HostSession.restart — solo play-again is a connection-preserving rebuild', () => {
   it('a solo run out of lives really ends the run (gameOver), no auto-revive', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     forceGameOver(s)
     expect(s.world.gameOver).toBe(true)
     expect(s.self.dead).toBe(true) // dead for real, not revived
   })
 
   it('restart() clears gameOver and respawns a single, upright player on floor 1', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     forceGameOver(s)
     const oldWorld = s.world
     s.restart()
@@ -45,7 +45,7 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
   })
 
   it('restart() re-points self at the new avatar (not the stale downed one)', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     const stale = s.self
     forceGameOver(s)
     s.restart()
@@ -55,7 +55,7 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
   })
 
   it('restart() regenerates floor 1 even from deep in a run (mid-run restart)', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     nextFloor(s.world)
     nextFloor(s.world)
     expect(s.world.floor).toBe(3)
@@ -65,7 +65,7 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
   })
 
   it('restart() is deterministic from the seed — the same floor 1 is rebuilt', () => {
-    const s = new HostSession(7, 'soldier', stubInput)
+    const s = new HostSession(7, stubInput)
     const spawnBefore = { ...s.world.level.spawn }
     forceGameOver(s)
     s.restart()
@@ -77,7 +77,7 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
       { inputs: new Map(), joins: [1], leaves: [], pauses: [] }, // pad 1 joins
       { inputs: new Map(), joins: [1], leaves: [], pauses: [] }, // re-join after restart
     ])
-    const s = new HostSession(1, 'soldier', stubInput, coop)
+    const s = new HostSession(1, stubInput, coop)
     s.tick()
     expect(players(s)).toHaveLength(2) // self + pad 1
     s.restart()
@@ -87,14 +87,14 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
   })
 
   it('restart() unpauses a paused run', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     s.isPaused = true
     s.restart()
     expect(s.isPaused).toBe(false)
   })
 
   it('the session ticks cleanly and stays playable after a restart', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     forceGameOver(s)
     s.restart()
     expect(() => {
@@ -105,7 +105,7 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
   })
 
   it('restart() twice in a row leaves a single consistent player (idempotent-ish)', () => {
-    const s = new HostSession(1, 'soldier', stubInput)
+    const s = new HostSession(1, stubInput)
     forceGameOver(s)
     s.restart()
     s.restart()
@@ -118,7 +118,7 @@ describe('HostSession.restart — solo play-again is a connection-preserving reb
 describe('HostSession — run-over semantics (no respawn, real game-over)', () => {
   it('co-op wipe (both down) is a real run-over — no auto-revive on the next tick', () => {
     const coop = scripted([{ inputs: new Map(), joins: [1], leaves: [], pauses: [] }])
-    const s = new HostSession(1, 'soldier', stubInput, coop)
+    const s = new HostSession(1, stubInput, coop)
     s.tick()
     for (const p of players(s)) {
       p.health!.hp = 0
@@ -133,7 +133,7 @@ describe('HostSession — run-over semantics (no respawn, real game-over)', () =
 
   it('a co-op run with one player still standing is NOT over', () => {
     const coop = scripted([{ inputs: new Map(), joins: [1], leaves: [], pauses: [] }])
-    const s = new HostSession(1, 'soldier', stubInput, coop)
+    const s = new HostSession(1, stubInput, coop)
     s.tick()
     const [a] = players(s)
     a.health!.hp = 0

@@ -8,9 +8,9 @@ import { serializeEntity } from './verbs'
 // distinct scripted movement + attacks, run for a while, and seal it.
 const recordSession = (): Recording => {
   const h = new GameHarness()
-  h.create({ seed: 20260715, classId: 'soldier', name: 'Host' })
-  h.addBot({ name: 'Bravo', classId: 'soldier' })
-  h.addBot({ name: 'Charlie', classId: 'soldier' })
+  h.create({ seed: 20260715, name: 'Host' })
+  h.addBot({ name: 'Bravo' })
+  h.addBot({ name: 'Charlie' })
   h.start()
   h.startRecording()
   // Scripted programmatic inputs: everyone pushes into the populated city and
@@ -73,7 +73,7 @@ describe('record + replay', () => {
 describe('save / load fixtures', () => {
   it('round-trips full world state through a fixture', () => {
     const h = new GameHarness()
-    h.create({ seed: 4242, classId: 'soldier' })
+    h.create({ seed: 4242 })
     h.start()
     spawnNpc(h.world, 'cop', 12, 12)
     h.stepTicks(30)

@@ -62,7 +62,7 @@ const world = (page) =>
   })
 
 const ready = async (page, scenario) => {
-  await page.goto(`${BASE}/?mode=solo&class=soldier&scenario=${scenario}&e2e=1&seed=${SEED}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/?mode=solo&scenario=${scenario}&e2e=1&seed=${SEED}`, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => {
     const c = document.querySelector('#app canvas')
     return !!c && c.clientWidth > 100 && c.clientHeight > 100

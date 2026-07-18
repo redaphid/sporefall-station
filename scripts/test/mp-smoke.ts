@@ -19,14 +19,14 @@ const main = async (): Promise<void> => {
   const host = await context.newPage()
   host.on('console', track('host'))
   host.on('pageerror', (err) => errors.push(`[host pageerror] ${err.stack ?? err.message}`))
-  await host.goto(`${BASE}/?mode=host&class=soldier&seed=777&room=smoke&name=Hosty`)
+  await host.goto(`${BASE}/?mode=host&seed=777&room=smoke&name=Hosty`)
   await host.waitForSelector('text=HOSTING', { timeout: 10000 })
 
   const client = await context.newPage()
   client.on('console', track('client'))
   client.on('pageerror', (err) => errors.push(`[client pageerror] ${err.stack ?? err.message}`))
   // transport=tabs skips the Bluetooth-vs-tabs picker shown when Web Bluetooth exists
-  await client.goto(`${BASE}/?mode=join&class=soldier&room=smoke&name=Sneaky&transport=tabs`)
+  await client.goto(`${BASE}/?mode=join&room=smoke&name=Sneaky&transport=tabs`)
   await client.waitForSelector('text=Connected', { timeout: 10000 })
 
   // Host should now list both players
@@ -38,7 +38,7 @@ const main = async (): Promise<void> => {
   await client.waitForSelector('text=Floor 1', { timeout: 10000 })
   console.log('✓ both entered floor 1')
 
-  // Client walks right for 2 seconds; host should see the soldier move.
+  // Client walks right for 2 seconds; host should see the player move.
   await client.bringToFront()
   await client.keyboard.down('d')
   await client.waitForTimeout(2000)

@@ -4,7 +4,7 @@ import { record } from './lib.mjs'
 // locked one and walk through.
 await record({
   name: 'e2e-doors',
-  params: { mode: 'solo', class: 'soldier', seed: 7, scenario: 'doors', script: 'doors' },
+  params: { mode: 'solo', seed: 7, scenario: 'doors', script: 'doors' },
   stills: [
     { tick: 20, label: '01-spawn' },
     { tick: 150, label: '02-approach' },

@@ -15,9 +15,9 @@ import { projectileSystem } from './projectiles'
 import { equipSlot } from './inventory'
 import { isFrozen } from './statusFx'
 
-/** A soldier holding `weaponId` (slotted, so mods attach) with `mods`. */
+/** A player holding `weaponId` (slotted, so mods attach) with `mods`. */
 const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMod[]): Entity => {
-  const p = spawnPlayer(w, 0, 'soldier', x, y)
+  const p = spawnPlayer(w, 0, x, y)
   // Replace the slotted starter with the weapon under test (starter is now a real
   // slotted ItemStack, so pushing would leave it in slot 0 and mis-equip).
   p.playerCtl!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]

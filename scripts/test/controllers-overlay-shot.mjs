@@ -34,7 +34,7 @@ const main = async () => {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 
   await page.addInitScript(injectFakePad)
-  await page.goto(`${BASE}/?mode=solo&class=soldier&seed=42&pads=1`)
+  await page.goto(`${BASE}/?mode=solo&seed=42&pads=1`)
   await page.waitForSelector('text=Floor 1', { timeout: 15000 })
 
   // Press-to-join: face button 0 down for a few frames, then release.

@@ -22,12 +22,12 @@ import { createWorld, tickWorld, type World } from '../../src/game/world'
 const dir = fileURLToPath(new URL('../../src/game/__fixtures__/', import.meta.url))
 mkdirSync(dir, { recursive: true })
 
-/** Mirror HostSession.buildRun: fresh floor-1 world with the local soldier. */
+/** Mirror HostSession.buildRun: fresh floor-1 world with the local player. */
 const buildRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   populateWorld(w)
   setupFloor(w)
-  spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+  spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
   return w
 }
 
@@ -49,7 +49,7 @@ const ticksUntil = (json: WorldJson, pred: (w: World) => boolean, cap = 1200): n
 }
 
 // ── combat-stage: three frozen-in-place thugs down the pistol lane. The proven
-// `shooting` script walks into range and empties the soldier's pistol into them.
+// `shooting` script walks into range and empties the player's pistol into them.
 const combat = buildRun(7)
 applyScenario(combat, 'shooting')
 const combatJson = write('combat-stage', combat)

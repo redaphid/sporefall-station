@@ -74,8 +74,8 @@ describe('runVerb', () => {
     expect(JSON.parse(runVerb(w, `kill ${npc.id}`)).dead).toBe(true)
     // Two players = co-op: a killed player is downed (a teammate can revive).
     // A solo player would instead respawn in place, so spawn a second one.
-    const p = spawnPlayer(w, 0, 'soldier', 1, 1)
-    spawnPlayer(w, 1, 'soldier', 2, 2)
+    const p = spawnPlayer(w, 0, 1, 1)
+    spawnPlayer(w, 1, 2, 2)
     const rep = JSON.parse(runVerb(w, `kill ${p.id}`))
     expect(rep.dead).toBe(false)
     expect(rep.downed).toBe(true)
@@ -93,7 +93,7 @@ describe('runVerb', () => {
     const w = world()
     spawnNpc(w, 'cop', 0, 0)
     spawnNpc(w, 'thug', 1, 1)
-    spawnPlayer(w, 0, 'soldier', 2, 2)
+    spawnPlayer(w, 0, 2, 2)
     const s = JSON.parse(runVerb(w, 'state'))
     expect(s.tick).toBe(0)
     expect(s.seed).toBe(1234)

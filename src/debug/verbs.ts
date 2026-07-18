@@ -102,7 +102,7 @@ const nextPlayerSlot = (w: World): number => {
 
 const spawn = (w: World, kind: string, archetype: string, x: number, y: number): Entity => {
   if (kind === 'npc' && NPCS[archetype]) return spawnNpc(w, archetype, x, y)
-  if (kind === 'player') return spawnPlayer(w, nextPlayerSlot(w), archetype, x, y)
+  if (kind === 'player') return spawnPlayer(w, nextPlayerSlot(w), x, y)
   // Generic fallback: bare entity so any kind can be materialized for a repro.
   return addEntity(w, makeEntity(kind as Entity['kind'], archetype, x, y))
 }

@@ -6,10 +6,10 @@ import type { Recording } from './record'
 describe('GameHarness', () => {
   it('creates a lobby, admits bots, then starts the run', () => {
     const h = new GameHarness()
-    h.create({ seed: 1, classId: 'soldier', name: 'Host' })
+    h.create({ seed: 1, name: 'Host' })
     expect(h.phase).toBe('lobby')
-    const s1 = h.addBot({ name: 'Bob', classId: 'soldier' })
-    const s2 = h.addBot({ name: 'Cara', classId: 'soldier' })
+    const s1 = h.addBot({ name: 'Bob' })
+    const s2 = h.addBot({ name: 'Cara' })
     expect([s1, s2]).toEqual([1, 2])
     expect(h.lobby().map((p) => p.name)).toEqual(['Host', 'Bob', 'Cara'])
 
@@ -22,14 +22,14 @@ describe('GameHarness', () => {
 
   it('refuses to tick before the run starts', () => {
     const h = new GameHarness()
-    h.create({ seed: 1, classId: 'soldier' })
+    h.create({ seed: 1 })
     expect(() => h.stepTick()).toThrow(/start the run/)
   })
 
   it('drives bots via programmatic input deposited into remoteInputs', () => {
     const h = new GameHarness()
-    h.create({ seed: 7, classId: 'soldier' })
-    const slot = h.addBot({ name: 'Runner', classId: 'soldier' })
+    h.create({ seed: 7 })
+    const slot = h.addBot({ name: 'Runner' })
     h.start()
     const bot = h.world.entities.find((e) => e.playerCtl?.playerId === slot)!
     const x0 = bot.pos.x
@@ -40,19 +40,19 @@ describe('GameHarness', () => {
 
   it('late-joins a bot straight into a running world', () => {
     const h = new GameHarness()
-    h.create({ seed: 9, classId: 'soldier' })
+    h.create({ seed: 9 })
     h.start()
     h.stepTicks(5)
     const before = h.world.entities.filter((e) => e.playerCtl).length
-    const slot = h.addBot({ name: 'Late', classId: 'soldier' })
+    const slot = h.addBot({ name: 'Late' })
     expect(h.world.entities.filter((e) => e.playerCtl).length).toBe(before + 1)
     expect(h.world.entities.some((e) => e.playerCtl?.playerId === slot)).toBe(true)
   })
 
   it('removeBot kills the avatar and frees the slot', () => {
     const h = new GameHarness()
-    h.create({ seed: 9, classId: 'soldier' })
-    const slot = h.addBot({ name: 'Temp', classId: 'soldier' })
+    h.create({ seed: 9 })
+    const slot = h.addBot({ name: 'Temp' })
     h.start()
     const id = h.world.entities.find((e) => e.playerCtl?.playerId === slot)!.id
     h.removeBot(slot)
@@ -66,8 +66,8 @@ describe('runHarnessVerb', () => {
 
   it('runs a whole session through the verb grammar', () => {
     const h = new GameHarness()
-    drive(h, 'create soldier 12345 Hosty')
-    const joined = drive(h, 'join_bot Bob soldier') as { slot: number }
+    drive(h, 'create 12345 Hosty')
+    const joined = drive(h, 'join_bot Bob') as { slot: number }
     expect(joined.slot).toBe(1)
     expect(drive(h, 'lobby')).toHaveLength(2)
     drive(h, 'start_run')
@@ -81,8 +81,8 @@ describe('runHarnessVerb', () => {
 
   it('records via verbs and replays deterministically', () => {
     const h = new GameHarness()
-    drive(h, 'create soldier 999')
-    drive(h, 'join_bot Bob soldier')
+    drive(h, 'create 999')
+    drive(h, 'join_bot Bob')
     drive(h, 'start_run')
     drive(h, 'record_start')
     runHarnessVerb(h, `input 1 ${encodeArg('{"moveX":1}')}`)
@@ -95,7 +95,7 @@ describe('runHarnessVerb', () => {
 
   it('save/load round-trip through verbs restores world state', () => {
     const h = new GameHarness()
-    drive(h, 'create soldier 321')
+    drive(h, 'create 321')
     drive(h, 'start_run')
     drive(h, 'tick 15')
     const fixture = runHarnessVerb(h, 'save')
@@ -107,7 +107,7 @@ describe('runHarnessVerb', () => {
 
   it('falls through to world verbs for the ECS surface', () => {
     const h = new GameHarness()
-    drive(h, 'create soldier 5')
+    drive(h, 'create 5')
     drive(h, 'start_run')
     const before = (drive(h, 'state') as { counts: Record<string, number> }).counts.npc ?? 0
     const spawned = drive(h, 'spawn npc cop 10 10') as { id: number; archetype: string }

@@ -44,31 +44,29 @@ over Bluetooth**.
 ### On the phone that HOSTS
 
 1. Open the game.
-2. Choose your character/class.
-3. On the **Solo / Host / Join** screen, tap **Host co-op**
+2. On the **Solo / Host / Join** screen, tap **Host co-op**
    ("Others join your game").
-4. The **first time**, Android asks for permission to use **Nearby devices /
+3. The **first time**, Android asks for permission to use **Nearby devices /
    Bluetooth**. Tap **Allow**. (The game can't be found by friends without
    it — it only uses Bluetooth to find the other phones, never your location.)
-5. You'll see a **HOSTING** screen that says *"Waiting for players…"* Leave this
+4. You'll see a **HOSTING** screen that says *"Waiting for players…"* Leave this
    screen up and keep the phone **awake** (screen on). Your phone is now
    broadcasting a game called **`SoR <your name>`**.
-6. As friends join, their names appear in the list.
-7. When everyone's in, tap the green **Start game** button.
+5. As friends join, their names appear in the list.
+6. When everyone's in, tap the green **Start game** button.
 
 ### On each phone that JOINS
 
 1. Open the game.
-2. Choose your character/class.
-3. On the **Solo / Host / Join** screen, tap **Join co-op**
+2. On the **Solo / Host / Join** screen, tap **Join co-op**
    ("Find a nearby host").
-4. The **first time**, Android asks for **Nearby devices / Bluetooth**
+3. The **first time**, Android asks for **Nearby devices / Bluetooth**
    permission. Tap **Allow**.
-5. A **NEARBY GAMES** screen appears and scans over Bluetooth. Within a few
+4. A **NEARBY GAMES** screen appears and scans over Bluetooth. Within a few
    seconds the host's game (**`SoR <name>`**) shows up as a button.
-6. **Tap the host's button.** If Android asks to pair or connect, say **Allow /
+5. **Tap the host's button.** If Android asks to pair or connect, say **Allow /
    Pair**.
-7. You'll see **LOBBY → "Connected — waiting for host to start."** Now just wait
+6. You'll see **LOBBY → "Connected — waiting for host to start."** Now just wait
    for the host to press Start. When they do, you drop straight into the game.
 
 ---

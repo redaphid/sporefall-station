@@ -51,7 +51,7 @@ const run = (nPlayers: number, ticks: number, combat: boolean): void => {
 
   const avatars = []
   for (let slot = 0; slot < nPlayers; slot++) {
-    avatars.push(spawnPlayer(world, slot, 'soldier', world.level.spawn.x + slot * 0.6, world.level.spawn.y))
+    avatars.push(spawnPlayer(world, slot, world.level.spawn.x + slot * 0.6, world.level.spawn.y))
   }
 
   const npcCount = world.entities.filter((e) => e.playerCtl === undefined).length

@@ -73,7 +73,7 @@ const main = async () => {
   page.on('pageerror', (e) => { pageErrors.push(String(e)); log('PAGE ERROR:', String(e)) })
   page.on('console', (m) => m.type() === 'error' && log('console.error:', m.text()))
 
-  await page.goto(`${BASE}/?mode=solo&class=soldier&scenario=npc-combat&e2e=1&seed=${SEED}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/?mode=solo&scenario=npc-combat&e2e=1&seed=${SEED}`, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => {
     const c = document.querySelector('#app canvas')
     return !!c && c.clientWidth > 100 && c.clientHeight > 100

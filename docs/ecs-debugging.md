@@ -110,7 +110,7 @@ rot). It returns:
     "pos":       { "count": 4, "types": ["object"], "keys": ["x","y"] },
     "health":    { "count": 4, "types": ["object"], "keys": ["hp","iframes","max"] },
     "ai":        { "count": 3, "types": ["object"], "keys": ["faction","goal","home","mode","sightRange","thinkAt","waypoint"] },
-    "playerCtl": { "count": 1, "types": ["object"], "keys": ["abilityCooldown","activeSlot","cash","classId",...] },
+    "playerCtl": { "count": 1, "types": ["object"], "keys": ["abilityCooldown","activeSlot","cash","crimeUntilTick",...] },
     "futureThing": { "count": 1, "types": ["object"], "keys": ["tags","z"] }   // a component no tool knew about — enumerated anyway
   }
 }

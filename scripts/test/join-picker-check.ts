@@ -13,7 +13,7 @@ const main = async (): Promise<void> => {
   const plain = await (await browser.newContext()).newPage()
   const hasBt = await plain.evaluate(() => 'bluetooth' in navigator)
   console.log('navigator.bluetooth present:', hasBt)
-  await plain.goto(`${BASE}/?mode=join&class=soldier&room=picker-check&name=Picky`)
+  await plain.goto(`${BASE}/?mode=join&room=picker-check&name=Picky`)
   if (hasBt) {
     await plain.waitForSelector('text=JOIN VIA', { timeout: 5000 })
     console.log('✓ picker shown when Web Bluetooth exists')
@@ -33,7 +33,7 @@ const main = async (): Promise<void> => {
      } })`,
   )
   const page = await ctx.newPage()
-  await page.goto(`${BASE}/?mode=join&class=soldier&room=picker-check2&name=Picky`)
+  await page.goto(`${BASE}/?mode=join&room=picker-check2&name=Picky`)
   await page.waitForSelector('text=JOIN VIA', { timeout: 5000 })
   console.log('✓ picker shown with (stubbed) Web Bluetooth')
   await page.click('text=Bluetooth (phone host)')
@@ -45,7 +45,7 @@ const main = async (): Promise<void> => {
 
   // Path 3: ?transport=tabs must skip the picker even with Web Bluetooth
   const page3 = await ctx.newPage()
-  await page3.goto(`${BASE}/?mode=join&class=soldier&room=picker-check3&name=Picky&transport=tabs`)
+  await page3.goto(`${BASE}/?mode=join&room=picker-check3&name=Picky&transport=tabs`)
   await page3.waitForSelector('text=Looking for a host', { timeout: 5000 })
   console.log('✓ ?transport=tabs skips the picker')
 

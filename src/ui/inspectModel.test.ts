@@ -23,14 +23,14 @@ describe('inspectCard — friendly readout subset', () => {
 
   it('reads a player card (slot, class)', () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 2, 2)
+    const p = spawnPlayer(w, 0, 2, 2)
     const rows = rowMap(inspectCard(p).rows)
     expect(rows.Player).toMatch(/P1/)
   })
 
   it("surfaces the equipped gun's mods so a kid can SEE the build", () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 2, 2)
+    const p = spawnPlayer(w, 0, 2, 2)
     p.combat!.weapon = 'shotgun'
     p.playerCtl!.inventory.push({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
     p.playerCtl!.activeSlot = 0
@@ -42,7 +42,7 @@ describe('inspectCard — friendly readout subset', () => {
 
   it('a vanilla gun shows no mod rows', () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 2, 2)
+    const p = spawnPlayer(w, 0, 2, 2)
     p.combat!.weapon = 'pistol'
     p.playerCtl!.inventory.push({ itemId: 'pistol', qty: 6 })
     p.playerCtl!.activeSlot = 0

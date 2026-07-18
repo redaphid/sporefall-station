@@ -75,7 +75,7 @@ const check = (cond, msg) => {
 }
 
 const runFrost = async (page) => {
-  await ready(page, `${BASE}/?mode=solo&class=soldier&scenario=frost&e2e=1&seed=${SEED}`)
+  await ready(page, `${BASE}/?mode=solo&scenario=frost&e2e=1&seed=${SEED}`)
   const before = await npcs(page)
   const frozen = before.find((n) => n.frozen)
   if (!frozen) throw new Error('frost scenario: no frozen NPC found')
@@ -97,7 +97,7 @@ const runFrost = async (page) => {
 }
 
 const runWetElectric = async (page) => {
-  await ready(page, `${BASE}/?mode=solo&class=soldier&scenario=wet-electric&e2e=1&seed=${SEED}`)
+  await ready(page, `${BASE}/?mode=solo&scenario=wet-electric&e2e=1&seed=${SEED}`)
   const before = (await npcs(page)).filter((n) => n.wet).sort((a, b) => a.x - b.x)
   if (before.length < 2) throw new Error('wet-electric scenario: need >=2 wet NPCs')
   const near = before[0]

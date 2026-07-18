@@ -31,8 +31,8 @@ describe('teammate revive', () => {
     w = createWorld(1, 1)
   })
 
-  const downPlayer = (classId = 'soldier'): Entity => {
-    const p = spawnPlayer(w, 0, classId, 20, 20)
+  const downPlayer = (): Entity => {
+    const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
     settle(p)
@@ -41,7 +41,7 @@ describe('teammate revive', () => {
 
   it('an adjacent standing teammate revives the downed player after REVIVE_TICKS, restoring 30% hp', () => {
     const downed = downPlayer()
-    const helper = spawnPlayer(w, 1, 'soldier', 20.9, 20) // within 1.3
+    const helper = spawnPlayer(w, 1, 20.9, 20) // within 1.3
     settle(helper)
     const ids = idleFor(0, 1)
     for (let i = 0; i < 90 && downed.playerCtl!.downed; i++) interactionSystem(w, ids)
@@ -52,7 +52,7 @@ describe('teammate revive', () => {
   it('a teammate out of range makes no progress and lets the bleed timer tick down', () => {
     const downed = downPlayer()
     downed.playerCtl!.downed!.bleedTicks = 10
-    spawnPlayer(w, 1, 'soldier', 25, 20) // far away
+    spawnPlayer(w, 1, 25, 20) // far away
     const ids = idleFor(0, 1)
     interactionSystem(w, ids)
     expect(downed.playerCtl!.downed!.reviveProgress).toBe(0)
@@ -61,7 +61,7 @@ describe('teammate revive', () => {
 
   it('ADVERSARIAL: a helper leaving mid-revive RESETS progress (partial revive is lost)', () => {
     const downed = downPlayer()
-    const helper = spawnPlayer(w, 1, 'soldier', 20.9, 20)
+    const helper = spawnPlayer(w, 1, 20.9, 20)
     const ids = idleFor(0, 1)
     for (let i = 0; i < 30; i++) interactionSystem(w, ids)
     expect(downed.playerCtl!.downed!.reviveProgress).toBeGreaterThan(0)
@@ -73,7 +73,7 @@ describe('teammate revive', () => {
 
   it('ADVERSARIAL: a downed teammate is not a valid reviver — two downed players both bleed out', () => {
     const a = downPlayer()
-    const b = spawnPlayer(w, 1, 'soldier', 20.5, 20)
+    const b = spawnPlayer(w, 1, 20.5, 20)
     b.health!.hp = 0
     b.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
     settle(b)
@@ -91,7 +91,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
   })
 
   it('a LONE downed player counts down bleedTicks and SELF-REVIVES (no one could rescue them) at a penalty', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.cash = 50
     p.playerCtl!.inventory = [{ itemId: 'bat', qty: 10 }]
@@ -112,8 +112,8 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
   })
 
   it('a downed player with a DOWNED teammate (nobody standing to rescue) bleeds out to DEATH', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const mate = spawnPlayer(w, 1, 'soldier', 30, 30) // far away, also down
+    const p = spawnPlayer(w, 0, 20, 20)
+    const mate = spawnPlayer(w, 1, 30, 30) // far away, also down
     p.health!.hp = 0
     p.playerCtl!.downed = { bleedTicks: 3, reviveProgress: 0 }
     mate.health!.hp = 0
@@ -129,7 +129,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
 
   it('casual mode: a lone downed player self-revives with NO penalty and unlimited comebacks', () => {
     const cw = createWorld(1, 1, 'casual')
-    const p = spawnPlayer(cw, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(cw, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.cash = 50
     p.playerCtl!.inventory = [{ itemId: 'bat', qty: 10 }]
@@ -154,7 +154,7 @@ describe('lockpick channel', () => {
   it('any locked door starts a lockpick channel — no class pops locks instantly anymore', () => {
     for (const lockLevel of [1, 2]) {
       const world = createWorld(1, 1)
-      const p = spawnPlayer(world, 0, 'soldier', 20, 20)
+      const p = spawnPlayer(world, 0, 20, 20)
       const door = lockedDoor(world, 20.8, 20, lockLevel)
       settle(p)
       interactionSystem(world, inputs([0, interactCmd()]))
@@ -164,7 +164,7 @@ describe('lockpick channel', () => {
   })
 
   it('moving cancels an in-progress channel', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     lockedDoor(w, 20.8, 20)
     settle(p)
     interactionSystem(w, inputs([0, interactCmd()]))
@@ -175,7 +175,7 @@ describe('lockpick channel', () => {
   })
 
   it('a channel aborts if the target door is unlocked by other means mid-pick', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     const door = lockedDoor(w, 20.8, 20)
     settle(p)
     interactionSystem(w, inputs([0, interactCmd()]))
@@ -189,7 +189,7 @@ describe('lockpick channel', () => {
     let opened = false
     for (let seed = 1; seed < 40 && !opened; seed++) {
       const world = createWorld(seed, 1)
-      const p = spawnPlayer(world, 0, 'soldier', 20, 20)
+      const p = spawnPlayer(world, 0, 20, 20)
       const door = lockedDoor(world, 20.8, 20)
       settle(p)
       interactionSystem(world, inputs([0, interactCmd()]))
@@ -222,7 +222,7 @@ describe('auto-pickup', () => {
   }
 
   it('walking over cash banks it and consumes the pickup', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     const cash = pickup('cash', 20, 20, 25)
     settle(p)
     interactionSystem(w, idleFor(0))
@@ -231,7 +231,7 @@ describe('auto-pickup', () => {
   })
 
   it('a weapon pickup is grabbed and auto-equipped (first weapon)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     pickup('bat', 20, 20)
     settle(p)
     interactionSystem(w, idleFor(0))
@@ -240,7 +240,7 @@ describe('auto-pickup', () => {
   })
 
   it('a consumable auto-heals a hurt player instead of taking a slot', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 10
     pickup('bandage', 20, 20) // heals 30
     settle(p)
@@ -250,7 +250,7 @@ describe('auto-pickup', () => {
   })
 
   it('an out-of-reach pickup is left alone', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     const cash = pickup('cash', 23, 20, 25)
     settle(p)
     interactionSystem(w, idleFor(0))
@@ -259,7 +259,7 @@ describe('auto-pickup', () => {
   })
 
   it('a downed player does not auto-pickup (they only bleed/revive)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
     pickup('cash', 20, 20, 25)
     settle(p)
@@ -275,12 +275,12 @@ describe('nearestInteractable', () => {
   })
 
   it('returns null when nothing carries an interact component in range', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     expect(nearestInteractable(w.entities, p)).toBeNull()
   })
 
   it('picks the closest of several in-range interactables', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     const far = lockedDoor(w, 21, 20)
     const near = lockedDoor(w, 20.3, 20)
     expect(nearestInteractable(w.entities, p)).toBe(near)
@@ -288,7 +288,7 @@ describe('nearestInteractable', () => {
   })
 
   it('respects each entity\'s own interact.range and ignores dead ones', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     const inRange = spawnObject(w, 'atm', 20, 20) // range 1.3, at ~20.5,20.5
     inRange.interact = { verb: 'use', range: 1.3 }
     const wideButDead = lockedDoor(w, 20.1, 20)
@@ -297,7 +297,7 @@ describe('nearestInteractable', () => {
   })
 
   it('excludes an interactable just past its range', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     const door = lockedDoor(w, 20, 20)
     door.pos = { x: 21.4, y: 20 } // > 1.3 away
     door.interact!.range = 1.3

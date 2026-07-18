@@ -142,7 +142,7 @@ describe('kill — players go downed, everything else dies', () => {
   })
 
   it('kill on a player DOWNS them (bleeding, immobile) — NOT dead, real death is deferred to run-over', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.vel = { x: 3, y: -2 }
     kill(w, p)
     expect(p.dead).toBeFalsy()
@@ -154,7 +154,7 @@ describe('kill — players go downed, everything else dies', () => {
   })
 
   it('applyDamage cannot re-hit a downed player (they are out of the fight, not a piñata)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     kill(w, p)
     const downedRef = p.playerCtl!.downed
     applyDamage(w, p, 50, 19, 20, 5, 99)
@@ -164,7 +164,7 @@ describe('kill — players go downed, everything else dies', () => {
   })
 
   it('ADVERSARIAL: calling kill() again on a downed player is INERT — the bleed timer keeps its progress (#52)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     kill(w, p)
     p.playerCtl!.downed!.bleedTicks = 5 // almost bled out
     kill(w, p)
@@ -202,7 +202,7 @@ describe('shatter — frozen bodies gib on impact', () => {
   })
 
   it('a FROZEN PLAYER shattering DOWNS them without gib-vanishing: no shattered flag, no ice-gib event, still in the snapshot', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)
     expect(p.shattered).toBeFalsy() // NOT gibbed — stays a visible body
@@ -213,7 +213,7 @@ describe('shatter — frozen bodies gib on impact', () => {
   })
 
   it('a frozen player who is OUT OF LIVES shatters straight to a real death (still no gib flag)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)
@@ -230,7 +230,7 @@ describe('meleeAttack — arc, targeting, backstab', () => {
   })
 
   it('hits the nearest live target within range and the facing arc', () => {
-    const attacker = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const attacker = spawnPlayer(w, 0, 20, 20)
     attacker.facing = 0 // +x
     const near = npc(w, 20.8, 20)
     const far = npc(w, 21.4, 20)
@@ -241,7 +241,7 @@ describe('meleeAttack — arc, targeting, backstab', () => {
   })
 
   it('misses a target behind the attacker (outside the 90° arc)', () => {
-    const attacker = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const attacker = spawnPlayer(w, 0, 20, 20)
     attacker.facing = 0 // facing +x
     const behind = npc(w, 19, 20) // directly behind
     const hit = meleeAttack(w, attacker, 10, 1.5, 0)
@@ -250,7 +250,7 @@ describe('meleeAttack — arc, targeting, backstab', () => {
   })
 
   it('a cloaked backstab triples damage and breaks the cloak', () => {
-    const attacker = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const attacker = spawnPlayer(w, 0, 20, 20)
     attacker.facing = 0
     attacker.status!.cloakUntil = w.tick + 100
     const victim = npc(w, 20.8, 20)
@@ -268,7 +268,7 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
   })
 
   it('SOLO with lives left: the lone player going down does NOT end the run (they self-revive)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     kill(w, p) // revivesLeft still 2 → downed, not dead
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toBeDefined()
@@ -278,7 +278,7 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
   })
 
   it('SOLO out of lives: a down is a real DEATH → run over, emitting runOver exactly once', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0 // comeback economy spent
     kill(w, p)
     expect(p.dead).toBe(true) // no downed grace — permanent death
@@ -289,7 +289,7 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
   })
 
   it('runOver fires only once — a second missionSystem pass is a no-op under the gameOver guard', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0
     kill(w, p)
     missionSystem(w)
@@ -301,7 +301,7 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
 
   it('CASUAL: a lone player going down never ends the run, even repeatedly (kid mode)', () => {
     const cw = createWorld(1, 1, 'casual')
-    const p = spawnPlayer(cw, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(cw, 0, 20, 20)
     cw.revivesLeft = 0 // irrelevant in casual
     kill(cw, p)
     expect(p.dead).toBeFalsy()
@@ -311,8 +311,8 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
   })
 
   it('CO-OP: one down + one standing does NOT end the run', () => {
-    const p0 = spawnPlayer(w, 0, 'soldier', 20, 20)
-    spawnPlayer(w, 1, 'soldier', 21, 20)
+    const p0 = spawnPlayer(w, 0, 20, 20)
+    spawnPlayer(w, 1, 21, 20)
     kill(w, p0)
     missionSystem(w)
     expect(w.gameOver).toBe(false)
@@ -320,8 +320,8 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
   })
 
   it('CO-OP: the party fully wiped (all downed) is a run-over', () => {
-    const p0 = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const p1 = spawnPlayer(w, 1, 'soldier', 21, 20)
+    const p0 = spawnPlayer(w, 0, 20, 20)
+    const p1 = spawnPlayer(w, 1, 21, 20)
     kill(w, p0)
     kill(w, p1)
     missionSystem(w)
@@ -330,8 +330,8 @@ describe('run-over — the real game-over, driven by missionSystem', () => {
   })
 
   it('CO-OP: a mix of downed and dead players (both out of action) is a run-over', () => {
-    const p0 = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const p1 = spawnPlayer(w, 1, 'soldier', 21, 20)
+    const p0 = spawnPlayer(w, 0, 20, 20)
+    const p1 = spawnPlayer(w, 1, 21, 20)
     kill(w, p0) // downed
     p1.dead = true // bled out earlier this tick, not yet swept
     missionSystem(w)

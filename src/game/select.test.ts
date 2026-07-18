@@ -89,7 +89,7 @@ describe('selection flag (general, multi-select)', () => {
 describe('selection round-trips in world serialization (no dedicated field needed)', () => {
   it('a selected flag survives a full serialize → deserialize', () => {
     const w = world()
-    const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     const e = spawnNpc(w, 'cop', 6, 6)
     setSelected(e, true)
     const restored = deserializeWorld(serializeWorld(w))

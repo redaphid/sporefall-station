@@ -27,7 +27,7 @@ const page = await ctx.newPage()
 const errs = []
 page.on('pageerror', (e) => errs.push(String(e)))
 
-await page.goto(`${BASE}/?e2e=1&mode=solo&class=soldier&world=@inline&seed=7&zoom=2`, { waitUntil: 'networkidle' })
+await page.goto(`${BASE}/?e2e=1&mode=solo&world=@inline&seed=7&zoom=2`, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => typeof window.__loadWorld === 'function', { timeout: 20000 })
 await page.evaluate((j) => window.__loadWorld(j), w)
 // boot only defines the e2e hooks AFTER the @inline world injection unblocks it.

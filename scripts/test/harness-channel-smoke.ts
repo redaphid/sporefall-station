@@ -31,9 +31,9 @@ const main = async (): Promise<void> => {
   const events: Array<{ type?: string }> = []
   dbg.onEvent((e) => events.push(e as { type?: string }))
 
-  check('create returns lobby', JSON.parse(await dbg.raw('create soldier 20260715 Hosty')).phase === 'lobby')
-  check('join_bot assigns slot 1', JSON.parse(await dbg.raw('join_bot Bravo soldier')).slot === 1)
-  check('join_bot assigns slot 2', JSON.parse(await dbg.raw('join_bot Charlie soldier')).slot === 2)
+  check('create returns lobby', JSON.parse(await dbg.raw('create 20260715 Hosty')).phase === 'lobby')
+  check('join_bot assigns slot 1', JSON.parse(await dbg.raw('join_bot Bravo')).slot === 1)
+  check('join_bot assigns slot 2', JSON.parse(await dbg.raw('join_bot Charlie')).slot === 2)
   check('lobby lists 3 players', (JSON.parse(await dbg.raw('lobby')) as unknown[]).length === 3)
   check('start_run flips to playing', JSON.parse(await dbg.raw('start_run')).phase === 'playing')
 

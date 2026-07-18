@@ -49,8 +49,8 @@ const main = async () => {
 
   const hostIn = makeInput()
   const clientIn = makeInput()
-  const host = new NetHostSession(4242, 'soldier', 'Alice', hostIn.source, hostTransport)
-  const client = new NetClientSession('Bob', 'soldier', clientIn.source, clientTransport)
+  const host = new NetHostSession(4242, 'Alice', hostIn.source, hostTransport)
+  const client = new NetClientSession('Bob', clientIn.source, clientTransport)
 
   await host.start()
   await client.start() // client posts 'join'; host accepts → both see peerConnected

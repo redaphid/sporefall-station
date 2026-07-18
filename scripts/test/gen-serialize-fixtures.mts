@@ -26,7 +26,7 @@ const DRIVE = new Map<number, InputCmd>([[0, { ...emptyInput(), moveX: -1, attac
 const buildMidRun = (): World => {
   const w = createWorld(SEED, 1)
   const sp = w.level.spawn
-  spawnPlayer(w, 0, 'soldier', sp.x, sp.y)
+  spawnPlayer(w, 0, sp.x, sp.y)
   spawnNpc(w, 'cop', sp.x + 3, sp.y)
   spawnNpc(w, 'thug', sp.x - 3, sp.y)
   runTicks(w, DRIVE, 30) // drive some AI/combat so the sim RNG has really advanced

@@ -65,7 +65,7 @@ export interface ItemStack {
 export interface Entity {
   id: EntityId
   kind: EntityKind
-  /** Key into data/ definitions: 'thug', 'cop', 'soldier', 'medkit', 'door.wood', ... */
+  /** Key into data/ definitions: 'thug', 'cop', 'player', 'medkit', 'door.wood', ... */
   archetype: string
   pos: Vec2
   /** Position at the previous tick — used for render interpolation. */
@@ -84,7 +84,6 @@ export interface Entity {
   ai?: AiState
   playerCtl?: {
     playerId: number
-    classId: string
     abilityCooldown: number
     /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
     inventory: ItemStack[]

@@ -76,7 +76,6 @@ export class NetClientSession implements Session {
 
   constructor(
     private name: string,
-    private classId: string,
     private localInput: InputSource,
     private transport: Transport,
   ) {
@@ -132,7 +131,6 @@ export class NetClientSession implements Session {
       encodeJson(MsgType.Hello, {
         v: PROTOCOL_VERSION,
         name: this.name,
-        classId: this.classId,
         ...(rejoining ? { rejoin: { slot: this.slot, token: this.rejoinToken } } : {}),
       }),
     )
@@ -359,7 +357,6 @@ export class NetClientSession implements Session {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
       this.self.playerCtl!.cash = hud.cash
       this.self.playerCtl!.abilityCooldown = hud.abilityCd
-      this.self.playerCtl!.classId = this.classId
       if (this.self.combat) this.self.combat.weapon = hud.weapon
       else this.self.combat = { weapon: hud.weapon, cooldown: 0 }
     }

@@ -8,7 +8,7 @@ const makeRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   populateWorld(w)
   setupFloor(w)
-  spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+  spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
   return w
 }
 
@@ -95,7 +95,7 @@ describe('exit gating', () => {
 
   it('with two players, either one on the exit is enough to descend', () => {
     const w = makeRun(12)
-    spawnPlayer(w, 1, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    spawnPlayer(w, 1, w.level.spawn.x, w.level.spawn.y)
     w.mission.exitUnlocked = true
     onExit(w, 1) // the second player reaches it
     missionSystem(w)

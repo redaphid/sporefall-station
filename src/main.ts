@@ -48,10 +48,6 @@ const boot = async (): Promise<void> => {
   const room = params.get('room') ?? 'car'
   const name = params.get('name') ?? `Player-${(Math.random() * 90 + 10) | 0}`
 
-  // Soldier is the only playable class — boot goes straight to the mode picker
-  // with no class-selection screen. A stale `?class=` param is ignored;
-  // spawnPlayer falls back to soldier for unknown ids anyway.
-  const classId = 'soldier'
   const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount))
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
@@ -66,7 +62,7 @@ const boot = async (): Promise<void> => {
   }
   const coop = createGamepadCoop()
 
-  const session = await createSession(mode, { seed, room, name, classId, input, coop, uiMount, renderer })
+  const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
   if (!session) return
   const scenario = params.get('scenario')
   if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
@@ -173,7 +169,6 @@ interface SessionDeps {
   seed: number
   room: string
   name: string
-  classId: string
   input: InputSource
   coop: ReturnType<typeof createGamepadCoop>
   uiMount: HTMLElement
@@ -198,7 +193,7 @@ const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> =
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.classId, deps.input, deps.coop)
+    const session = new HostSession(deps.seed, deps.input, deps.coop)
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -216,7 +211,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       ? new BleHostTransport(deps.name, dbg.log)
       : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
-    const session = new NetHostSession(deps.seed, deps.classId, deps.name, deps.input, transport)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
@@ -235,7 +230,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   // join
   dbg.log(`join: mode start, native=${native}`)
   const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
-  const session = new NetClientSession(deps.name, deps.classId, deps.input, transport)
+  const session = new NetClientSession(deps.name, deps.input, transport)
 
   if (transport instanceof BleClientTransport) {
     // BLE needs an explicit pick-a-host step before the lobby.

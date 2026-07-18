@@ -70,7 +70,7 @@ const readState = () =>
     }
   })
 
-await page.goto(`${BASE}/?e2e&mode=solo&class=soldier&seed=7`, { waitUntil: 'networkidle' })
+await page.goto(`${BASE}/?e2e&mode=solo&seed=7`, { waitUntil: 'networkidle' })
 // Wait for the host world + a player entity to exist.
 await page.waitForFunction(() => window.__sor?.world?.entities?.some((e) => e.playerCtl), null, { timeout: 15000 })
 await waitTicks(5)

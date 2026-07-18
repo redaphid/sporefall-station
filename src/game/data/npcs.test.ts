@@ -12,7 +12,7 @@ const tickN = (w: World, inputs: Map<number, InputCmd>, n: number): void => {
 describe('new NPC archetypes', () => {
   it('gangster shoots at a visible player from range', () => {
     const w = createWorld(30, 1)
-    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    const player = spawnPlayer(w, 0, 10.5, 1.5)
     spawnNpc(w, 'gangster', 16.5, 1.5) // within 0.8 * pistol range 10
     tickN(w, idle(), 90)
     // Projectiles were fired and some connected
@@ -21,7 +21,7 @@ describe('new NPC archetypes', () => {
 
   it('bouncer ignores bystanders but retaliates when hit', () => {
     const w = createWorld(31, 1)
-    const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+    const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.combat!.weapon = 'fists'
     const bouncer = spawnNpc(w, 'bouncer', 11.5, 1.5)
     bouncer.ai!.thinkAt = 100000 // stand still so the punch below actually lands

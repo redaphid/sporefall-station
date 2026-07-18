@@ -1,4 +1,4 @@
-import { CLASSES } from '../data/classes'
+import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
 import { WEAPONS, type StatusApply } from '../data/items'
 import type { ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
@@ -269,9 +269,8 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   const stack = weaponStack(e)
   const rw = resolveWeapon(weapon, stack?.mods)
   if (weapon.kind === 'melee') {
-    const cls = e.playerCtl ? CLASSES[e.playerCtl.classId] : undefined
     e.combat.cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (cls?.meleeDamageMult ?? 1))
+    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
@@ -299,10 +298,9 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     if (isImmobilized(e)) continue // frozen/electrified can't act
     const cmd = inputs.get(e.playerCtl.playerId)
     if (!cmd) continue
-    const cls = CLASSES[e.playerCtl.classId]
 
-    if (cmd.special && cls && e.playerCtl.abilityCooldown <= 0) {
-      if (cls.ability(w, e)) e.playerCtl.abilityCooldown = cls.abilityCooldownTicks
+    if (cmd.special && e.playerCtl.abilityCooldown <= 0) {
+      if (throwGrenade(w, e)) e.playerCtl.abilityCooldown = SPECIAL_COOLDOWN_TICKS
     }
 
     // Hotbar: equip a slot; Use/Throw: use the held item (throw or consume).

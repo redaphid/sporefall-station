@@ -1,5 +1,5 @@
 import type { RenderView } from '../app/session'
-import { CLASSES } from '../game/data/classes'
+import { SPECIAL_NAME } from '../game/player'
 import { WEAPONS } from '../game/data/items'
 import { OBJECTS } from '../game/data/objects'
 import type { Entity } from '../game/entity'
@@ -40,13 +40,12 @@ export const computeTouchLabels = (view: RenderView): TouchLabels => {
   const self = view.self
   if (!self) return { atk: 'ATK', use: 'USE', useEnabled: false, spc: 'SPC', spcEnabled: false, throwEnabled: false }
   const target = nearestInteractable(view.entities, self)
-  const cls = CLASSES[self.playerCtl?.classId ?? '']
   const cd = self.playerCtl?.abilityCooldown ?? 0
   return {
     atk: WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? 'Fists',
     use: target ? useLabel(target) : 'USE',
     useEnabled: !!target,
-    spc: cls ? (cd > 0 ? `${cls.abilityName} ${Math.ceil(cd / 30)}s` : cls.abilityName) : 'SPC',
+    spc: cd > 0 ? `${SPECIAL_NAME} ${Math.ceil(cd / 30)}s` : SPECIAL_NAME,
     spcEnabled: cd <= 0,
     throwEnabled: hasThrowable(self.playerCtl?.inventory ?? []),
   }

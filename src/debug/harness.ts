@@ -28,7 +28,6 @@ export type HarnessPhase = 'idle' | 'lobby' | 'playing'
 export interface HarnessPlayer {
   slot: number
   name: string
-  classId: string
   bot: boolean
 }
 
@@ -51,7 +50,6 @@ const programmable = (script?: InputSource): Programmable => {
 interface Bot {
   slot: number
   name: string
-  classId: string
   input: Programmable
   entityId?: number
 }
@@ -60,7 +58,6 @@ interface Game {
   host: HostSession
   localInput: Programmable
   hostName: string
-  hostClassId: string
 }
 
 export class GameHarness {
@@ -79,14 +76,14 @@ export class GameHarness {
   }
 
   /** Build a fresh session in the lobby phase (nothing ticks until start). */
-  create(opts: { seed: number; classId: string; name?: string }): void {
+  create(opts: { seed: number; name?: string }): void {
     const localInput = programmable()
-    const host = new HostSession(opts.seed, opts.classId, localInput)
+    const host = new HostSession(opts.seed, localInput)
     host.onTickInputs = (inputs) => {
       this.lastInputs = new Map([...inputs].map(([slot, cmd]) => [slot, { ...cmd }]))
       this.lastTick = host.world.tick
     }
-    this.game = { host, localInput, hostName: opts.name ?? 'Host', hostClassId: opts.classId }
+    this.game = { host, localInput, hostName: opts.name ?? 'Host' }
     this.bots.clear()
     this.recorder = undefined
     this.stream = []
@@ -101,7 +98,7 @@ export class GameHarness {
 
   /** Add a bot player. Pre-start it just reserves a lobby slot; mid-run it spawns
    * straight into the live world (late-join). */
-  addBot(opts: { name: string; classId: string; script?: string }): number {
+  addBot(opts: { name: string; script?: string }): number {
     if (!this.game) throw new Error('no game — call create first')
     const script = opts.script ? SCRIPTS[opts.script] : undefined
     if (opts.script && !script) throw new Error(`unknown script: ${opts.script}`)
@@ -109,7 +106,6 @@ export class GameHarness {
     const bot: Bot = {
       slot,
       name: opts.name,
-      classId: opts.classId,
       input: programmable(script ? createScriptedInput(script) : undefined),
     }
     this.bots.set(slot, bot)
@@ -130,7 +126,7 @@ export class GameHarness {
 
   private spawnBot(bot: Bot): void {
     const spawn = this.world.level.spawn
-    const e = spawnPlayer(this.world, bot.slot, bot.classId, spawn.x + bot.slot * 0.6, spawn.y)
+    const e = spawnPlayer(this.world, bot.slot, spawn.x + bot.slot * 0.6, spawn.y)
     bot.entityId = e.id
   }
 
@@ -144,8 +140,8 @@ export class GameHarness {
 
   lobby(): HarnessPlayer[] {
     if (!this.game) return []
-    const players: HarnessPlayer[] = [{ slot: 0, name: this.game.hostName, classId: this.game.hostClassId, bot: false }]
-    for (const b of this.bots.values()) players.push({ slot: b.slot, name: b.name, classId: b.classId, bot: true })
+    const players: HarnessPlayer[] = [{ slot: 0, name: this.game.hostName, bot: false }]
+    for (const b of this.bots.values()) players.push({ slot: b.slot, name: b.name, bot: true })
     return players.sort((a, b) => a.slot - b.slot)
   }
 
@@ -252,16 +248,16 @@ export const runHarnessVerb = (h: GameHarness, line: string, ctx: VerbCtx = {}):
 
   switch (verb) {
     case 'create': {
-      const [classId, seedStr, ...nameParts] = rest.split(/\s+/)
-      if (!classId || !seedStr) throw new Error('usage: create <classId> <seed> [name]')
-      h.create({ classId, seed: num(seedStr, 'seed'), name: nameParts.join(' ') || undefined })
+      const [seedStr, ...nameParts] = rest.split(/\s+/)
+      if (!seedStr) throw new Error('usage: create <seed> [name]')
+      h.create({ seed: num(seedStr, 'seed'), name: nameParts.join(' ') || undefined })
       return JSON.stringify({ ok: true, phase: h.phase, players: h.lobby() })
     }
 
     case 'join_bot': {
-      const [name, classId, script] = rest.split(/\s+/)
-      if (!name || !classId) throw new Error('usage: join_bot <name> <classId> [scriptName]')
-      const slot = h.addBot({ name, classId, script })
+      const [name, script] = rest.split(/\s+/)
+      if (!name) throw new Error('usage: join_bot <name> [scriptName]')
+      const slot = h.addBot({ name, script })
       return JSON.stringify({ slot, players: h.lobby() })
     }
 

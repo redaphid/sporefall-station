@@ -2,7 +2,7 @@ import { APP_VERSION, otaBundleVersion } from '../app/version'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
-/** Solo / Host / Join picker shown at boot (soldier is the only class — no class select). */
+/** Solo / Host / Join picker shown at boot. */
 export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
@@ -122,7 +122,7 @@ export const pickHost = (
   })
 
 export interface LobbyUi {
-  setPlayers(players: { slot: number; name: string; classId: string }[]): void
+  setPlayers(players: { slot: number; name: string }[]): void
   setStatus(text: string): void
   /** Resolves when the host presses Start (host mode only). */
   waitForStart(): Promise<void>
@@ -173,7 +173,7 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
         .map(
           (p) =>
             `<div style="background:#ffffff12;border-radius:8px;padding:8px 12px">` +
-            `P${p.slot + 1} · ${p.name} <span style="opacity:.6">(${p.classId})</span></div>`,
+            `P${p.slot + 1} · ${p.name}</div>`,
         )
         .join('')
     },

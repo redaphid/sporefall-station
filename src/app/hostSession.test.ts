@@ -22,7 +22,7 @@ describe('HostSession local co-op', () => {
         { inputs: new Map([[0, moving()]]), joins: [0], leaves: [], pauses: [] },
         { inputs: new Map([[0, moving()]]), joins: [], leaves: [], pauses: [] },
       ])
-      session = new HostSession(1, 'soldier', stubInput, coop)
+      session = new HostSession(1, stubInput, coop)
     })
     it('does not spawn a second avatar for the first pad', () => {
       session.tick()
@@ -40,7 +40,7 @@ describe('HostSession local co-op', () => {
     let session: HostSession
     beforeEach(() => {
       const coop = scripted([{ inputs: new Map(), joins: [1], leaves: [], pauses: [] }])
-      session = new HostSession(1, 'soldier', stubInput, coop)
+      session = new HostSession(1, stubInput, coop)
       session.tick()
     })
     it('spawns a second player entity', () => {
@@ -58,7 +58,7 @@ describe('HostSession local co-op', () => {
         { inputs: new Map([[1, moving()]]), joins: [1], leaves: [], pauses: [] },
         { inputs: new Map([[1, moving()]]), joins: [], leaves: [], pauses: [] },
       ])
-      const session = new HostSession(1, 'soldier', stubInput, coop)
+      const session = new HostSession(1, stubInput, coop)
       session.tick()
       const p1 = players(session).find((e) => e.playerCtl!.playerId === 1)!
       const startX = p1.pos.x
@@ -73,7 +73,7 @@ describe('HostSession local co-op', () => {
         { inputs: new Map([[0, moving()]]), joins: [0], leaves: [], pauses: [0] },
         { inputs: new Map([[0, moving()]]), joins: [], leaves: [], pauses: [] },
       ])
-      const session = new HostSession(1, 'soldier', stubInput, coop)
+      const session = new HostSession(1, stubInput, coop)
       session.tick()
       const x = session.self.pos.x
       session.tick()
@@ -86,7 +86,7 @@ describe('HostSession local co-op', () => {
         { inputs: new Map([[0, moving()]]), joins: [], leaves: [], pauses: [0] },
         { inputs: new Map([[0, moving()]]), joins: [], leaves: [], pauses: [] },
       ])
-      const session = new HostSession(1, 'soldier', stubInput, coop)
+      const session = new HostSession(1, stubInput, coop)
       session.tick()
       session.tick()
       const x = session.self.pos.x
@@ -98,30 +98,31 @@ describe('HostSession local co-op', () => {
 
   describe('backward compatibility', () => {
     it('still runs solo with no coop provider', () => {
-      const session = new HostSession(1, 'soldier', stubInput)
+      const session = new HostSession(1, stubInput)
       expect(() => session.tick()).not.toThrow()
       expect(players(session)).toHaveLength(1)
     })
   })
 })
 
-describe('soldier is the only class — sessions start as soldier with no selection step', () => {
-  it('a fresh session spawns the local player as a soldier immediately', () => {
-    const session = new HostSession(7, 'soldier', stubInput)
-    // The avatar exists BEFORE any tick — nothing waits on a class-select screen.
-    expect(session.self.playerCtl!.classId).toBe('soldier')
+describe('sessions spawn a ready-to-play avatar with no selection step', () => {
+  it('a fresh session spawns the local player with the standard loadout immediately', () => {
+    const session = new HostSession(7, stubInput)
+    // The avatar exists BEFORE any tick — nothing waits on a selection screen.
     expect(session.self.combat!.weapon).toBe('pistol')
+    expect(session.self.playerCtl!.activeSlot).toBe(0)
+    expect(session.self.playerCtl!.abilityCooldown).toBe(0) // grenade special ready
     for (let i = 0; i < 10; i++) session.tick() // and the real systems run on it
     expect(session.world.tick).toBe(10)
-    expect(players(session)[0].playerCtl!.classId).toBe('soldier')
+    expect(players(session)[0].combat!.weapon).toBe('pistol')
   })
 
-  it('a legacy classId from an old caller degrades to soldier (self AND pad joiners)', () => {
+  it('pad joiners get the same standard loadout as the host', () => {
     const coop = scripted([{ inputs: new Map(), joins: [1], leaves: [], pauses: [] }])
-    const session = new HostSession(7, 'thief', stubInput, coop)
+    const session = new HostSession(7, stubInput, coop)
     session.tick()
     const all = players(session)
     expect(all).toHaveLength(2)
-    for (const p of all) expect(p.playerCtl!.classId).toBe('soldier')
+    for (const p of all) expect(p.combat!.weapon).toBe('pistol')
   })
 })

@@ -2,15 +2,14 @@ import { HostSession } from '../../src/app/hostSession.ts'
 import { applyScenario } from '../../src/game/scenarios.ts'
 import { createScriptedInput, SCRIPTS, scriptTicks } from '../../src/input/scripted.ts'
 
-// usage: tsx tune-demo.mjs <scenario=demo> <script=demo> <class=soldier> [from] [to]
+// usage: tsx tune-demo.mjs <scenario=demo> <script=demo> [from] [to]
 const scenario = process.argv[2] ?? 'demo'
 const scriptName = process.argv[3] ?? scenario
-const cls = process.argv[4] ?? 'soldier'
-const from = Number(process.argv[5] ?? 0)
-const to = Number(process.argv[6] ?? 0)
+const from = Number(process.argv[4] ?? 0)
+const to = Number(process.argv[5] ?? 0)
 
 const steps = SCRIPTS[scriptName]
-const s = (() => { const s = new HostSession(7, cls, createScriptedInput(steps)); applyScenario(s.world, scenario); return s })()
+const s = (() => { const s = new HostSession(7, createScriptedInput(steps)); applyScenario(s.world, scenario); return s })()
 const total = scriptTicks(steps)
 
 const state = () => {

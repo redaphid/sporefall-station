@@ -10,7 +10,7 @@ import { restartAffordance } from './screens'
 const self = (over: Partial<Entity['playerCtl']> & { dead?: boolean } = {}): Entity =>
   ({
     dead: over.dead,
-    playerCtl: { downed: over.downed, playerId: 0, classId: 'soldier' },
+    playerCtl: { downed: over.downed, playerId: 0 },
   }) as unknown as Entity
 
 const view = (over: Partial<RenderView>): RenderView =>

@@ -17,7 +17,6 @@ import { serializeEntity } from './verbs'
 /** A player's genesis state — enough to respawn it identically on replay. */
 export interface RecordedPlayer {
   slot: number
-  classId: string
   x: number
   y: number
 }
@@ -65,7 +64,7 @@ const eq = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.strin
 export const playerSeeds = (w: World): RecordedPlayer[] =>
   w.entities
     .filter((e) => e.playerCtl)
-    .map((e) => ({ slot: e.playerCtl!.playerId, classId: e.playerCtl!.classId, x: e.pos.x, y: e.pos.y }))
+    .map((e) => ({ slot: e.playerCtl!.playerId, x: e.pos.x, y: e.pos.y }))
 
 /**
  * Captures the per-tick input map + event stream of a run. Feed it every tick
@@ -90,7 +89,7 @@ export const worldFromHeader = (header: RecordingHeader): World => {
   const w = createWorld(header.seed, header.floor)
   populateWorld(w)
   setupFloor(w)
-  for (const p of header.players) spawnPlayer(w, p.slot, p.classId, p.x, p.y)
+  for (const p of header.players) spawnPlayer(w, p.slot, p.x, p.y)
   return w
 }
 

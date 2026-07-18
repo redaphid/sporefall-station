@@ -36,7 +36,7 @@ class MockHub {
       peers: () => [...this.centrals.keys()],
     }
   }
-  addClient(name: string, classId: string, input: InputSource) {
+  addClient(name: string, input: InputSource) {
     const peer: PeerId = `central-${this.centrals.size + 1}`
     let ch: ((e: TransportEvent) => void) | null = null
     this.centrals.set(peer, (b) => void Promise.resolve().then(() => ch?.({ type: 'data', peer: 'host', bytes: b })))
@@ -49,7 +49,7 @@ class MockHub {
       on: (h) => ((ch = h), () => {}),
       peers: () => ['host'],
     }
-    const session = new NetClientSession(name, classId, input, t)
+    const session = new NetClientSession(name, input, t)
     const connect = () => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => ch?.({ type: 'peerConnected', peer: 'host' }))
@@ -82,7 +82,7 @@ const main = async () => {
   log('=== Co-op client inventory proof (issue #57) ===\n')
   const hub = new MockHub()
   const clientInput = makeInput()
-  const host = new NetHostSession(4242, 'soldier', 'Alice', makeInput().source, hub.hostTransport)
+  const host = new NetHostSession(4242, 'Alice', makeInput().source, hub.hostTransport)
   const bob = hub.addClient('Bob', 'thief', clientInput.source)
   await host.start()
   await bob.session.start()

@@ -34,7 +34,7 @@ const main = async (): Promise<void> => {
 
   // game side
   const world = createWorld(777, 1)
-  spawnPlayer(world, 0, 'soldier', world.level.spawn.x, world.level.spawn.y)
+  spawnPlayer(world, 0, world.level.spawn.x, world.level.spawn.y)
   spawnNpc(world, 'cop', 6, 6)
   const channel = startDebugChannel(world, HUB_WS, () => {})
   const loop = setInterval(() => {

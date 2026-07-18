@@ -131,8 +131,8 @@ verb grammar (unknown verbs fall through to the world surface above):
 
 | Verb | Does |
 |---|---|
-| `create <classId> <seed> [name]` | create/host a game in the lobby |
-| `join_bot <name> <classId> [script]` | add a bot player (programmatic/scripted input); returns its slot |
+| `create <seed> [name]` | create/host a game in the lobby |
+| `join_bot <name> [script]` | add a bot player (programmatic/scripted input); returns its slot |
 | `remove_bot <slot>` | remove a bot + kill its avatar |
 | `start_run` | spawn every lobby player, begin ticking |
 | `lobby` / `phase` | query players / phase+tick+floor |
@@ -148,8 +148,8 @@ attach the harness backend, then drive it from the CLI/MCP:
 ```sh
 pnpm exec tsx tools/debug-hub/hub.ts &            # the relay
 pnpm exec tsx tools/debug-harness/host.ts         # the headless "game" backend (a GameHarness)
-pnpm exec tsx tools/debug-cli/cli.ts create soldier 42
-pnpm exec tsx tools/debug-cli/cli.ts join_bot Bravo thief
+pnpm exec tsx tools/debug-cli/cli.ts create 42
+pnpm exec tsx tools/debug-cli/cli.ts join_bot Bravo
 pnpm exec tsx tools/debug-cli/cli.ts start_run
 pnpm exec tsx tools/debug-cli/cli.ts record_start
 pnpm exec tsx tools/debug-cli/cli.ts tick 300

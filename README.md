@@ -8,7 +8,7 @@ offline in a Capacitor Android app.
 > (always current) or install the Android app (install once, auto-updates).
 > Shipping/CI setup lives in **[docs/deploy.md](docs/deploy.md)**.
 
-Procedurally generated city floors · 4 classes (Soldier / Thief / Doctor / Hacker) ·
+Procedurally generated city floors ·
 missions (steal the briefcase, take out the boss) · cops, crime and alarm ·
 lockpicking, chloroform, grenades, downed-teammate revives.
 
@@ -20,9 +20,9 @@ pnpm run dev            # http://localhost:5173
 ```
 
 - **Move** WASD/arrows · **Attack** J/Space · **Interact** K/E · **Ability** L/Shift
-- URL params skip menus: `?class=thief&mode=solo&seed=7`
-- **Local co-op test**: open two tabs — `?mode=host&class=soldier&room=x` and
-  `?mode=join&class=thief&room=x` (BroadcastChannel transport with fake latency).
+- URL params skip menus: `?mode=solo&seed=7`
+- **Local co-op test**: open two tabs — `?mode=host&room=x` and
+  `?mode=join&room=x` (BroadcastChannel transport with fake latency).
 
 ## Android build
 

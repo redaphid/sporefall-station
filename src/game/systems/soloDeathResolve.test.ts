@@ -43,7 +43,7 @@ describe('#52 solo death always resolves — the infinite-downed dead-end', () =
   })
 
   it('a solo player downed while BURNING self-revives WITHIN the bleed window (DOT never re-arms the timer)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     // Light the tile the player is standing on and put them ON fire, then down
     // them — exactly the "died to a molotov" case.
     ignite(w, p)
@@ -65,7 +65,7 @@ describe('#52 solo death always resolves — the infinite-downed dead-end', () =
   })
 
   it('the plain solo down (no DOT) self-revives within the bleed-out window', () => {
-    const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     down(w, p)
     const ticks = tickUntilResolved(w, p, 1200)
     expect(p.playerCtl!.downed).toBeUndefined()
@@ -74,7 +74,7 @@ describe('#52 solo death always resolves — the infinite-downed dead-end', () =
   })
 
   it('a solo player downed WHILE MOVING does not keep drifting ("moving automatically")', () => {
-    const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     const id = p.playerCtl!.playerId
     // Move right for a couple ticks so intent holds a non-zero heading.
     const moving = new Map([[id, { ...emptyInput(), moveX: 1, moveY: 0 }]])
@@ -96,7 +96,7 @@ describe('#52 solo death always resolves — the infinite-downed dead-end', () =
   })
 
   it('DOT on a downed player never re-arms the bleed timer (kill() is inert while already downed)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+    const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     down(w, p)
     // Simulate 100 ticks of bleed-out progress already elapsed.
     p.playerCtl!.downed!.bleedTicks -= 100

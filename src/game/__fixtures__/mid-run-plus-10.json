@@ -14,10 +14,9 @@
   },
   "noises": [],
   "events": [],
-  "rng": -1565684783,
+  "rng": -302013443,
   "baseRng": 20260715,
   "levelChecksum": 3150501330,
-  "hostile": false,
   "entities": [
     {
       "id": 1,
@@ -32,7 +31,7 @@
         "y": 1.5
       },
       "vel": {
-        "x": 0,
+        "x": -0.9072,
         "y": 0
       },
       "intent": {
@@ -43,9 +42,9 @@
       "radius": 0.35,
       "facing": 0,
       "health": {
-        "hp": 120,
+        "hp": 88,
         "max": 120,
-        "iframes": 0
+        "iframes": 1
       },
       "combat": {
         "weapon": "pistol",
@@ -54,17 +53,21 @@
       "status": {
         "stun": 0,
         "sleep": 0,
-        "hitFlashUntil": 0,
+        "hitFlashUntil": 39,
         "cloakUntil": 0
       },
       "playerCtl": {
         "playerId": 0,
-        "classId": "soldier",
         "abilityCooldown": 0,
-        "inventory": [],
-        "activeSlot": -1,
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 197
+          }
+        ],
+        "activeSlot": 0,
         "cash": 0,
-        "crimeUntilTick": 455
+        "crimeUntilTick": 488
       }
     },
     {
@@ -72,41 +75,41 @@
       "kind": "npc",
       "archetype": "cop",
       "pos": {
-        "x": 4.5878499763072424,
-        "y": 4.134962666744149
+        "x": 2.0322449421653332,
+        "y": 1.5
       },
       "prevPos": {
-        "x": 4.592987922748186,
-        "y": 4.055127827817963
+        "x": 1.9322449421653334,
+        "y": 1.5
       },
       "vel": {
-        "x": 0,
+        "x": 1.7999999999999998,
         "y": 0
       },
       "intent": {
-        "x": -0.038534598307081606,
-        "y": 0.5987612919463915
+        "x": 0,
+        "y": 0
       },
       "speed": 4,
       "radius": 0.35,
-      "facing": 1.635064891168217,
+      "facing": 3.141592653589793,
       "health": {
-        "hp": 46,
+        "hp": 18,
         "max": 60,
-        "iframes": 0
+        "iframes": 3
       },
       "combat": {
         "weapon": "bat",
-        "cooldown": 0
+        "cooldown": 11
       },
       "status": {
         "stun": 0,
         "sleep": 0,
-        "hitFlashUntil": 8,
+        "hitFlashUntil": 41,
         "cloakUntil": 0
       },
       "ai": {
-        "mode": "wander",
+        "mode": "aggro",
         "faction": "cop",
         "home": {
           "x": 4.5,
@@ -114,10 +117,11 @@
         },
         "thinkAt": 42,
         "sightRange": 8,
-        "goal": "wander",
-        "waypoint": {
-          "x": 4.5,
-          "y": 5.5
+        "goal": "battle",
+        "targetId": 1,
+        "lastKnownTargetPos": {
+          "x": 0.35009999999999997,
+          "y": 1.5
         }
       }
     },
@@ -139,11 +143,11 @@
       },
       "intent": {
         "x": 0,
-        "y": 0
+        "y": 0.6
       },
       "speed": 3.4,
       "radius": 0.35,
-      "facing": 0,
+      "facing": 1.5707963267948966,
       "health": {
         "hp": 40,
         "max": 40,
@@ -160,7 +164,7 @@
         "cloakUntil": 0
       },
       "ai": {
-        "mode": "idle",
+        "mode": "wander",
         "faction": "gang",
         "home": {
           "x": -1.5,
@@ -168,36 +172,11 @@
         },
         "thinkAt": 40,
         "sightRange": 7,
-        "goal": "wander"
-      }
-    },
-    {
-      "id": 6,
-      "kind": "projectile",
-      "archetype": "projectile",
-      "pos": {
-        "x": 2.216766666666667,
-        "y": 1.5
-      },
-      "prevPos": {
-        "x": 1.7501000000000002,
-        "y": 1.5
-      },
-      "vel": {
-        "x": 14,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 0,
-      "radius": 0.15,
-      "facing": 0,
-      "projectile": {
-        "ownerId": 1,
-        "damage": 14,
-        "ttl": 18
+        "goal": "wander",
+        "waypoint": {
+          "x": -1.5,
+          "y": 5.5
+        }
       }
     }
   ]

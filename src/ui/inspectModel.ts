@@ -57,7 +57,7 @@ export const inspectCard = (e: Entity): InspectCard => {
   }
 
   if (e.playerCtl) {
-    rows.push({ label: 'Player', value: `P${e.playerCtl.playerId + 1} · ${pretty(e.playerCtl.classId)}` })
+    rows.push({ label: 'Player', value: `P${e.playerCtl.playerId + 1}` })
     if (e.playerCtl.downed) rows.push({ label: 'State', value: 'Downed' })
   }
 

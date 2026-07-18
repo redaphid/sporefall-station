@@ -102,7 +102,7 @@ describe('auto-reconnect', () => {
 describe('world channel over the wire', () => {
   it('answers a read verb immediately and defers writes to afterTick', () => {
     const world = createWorld(4242, 1)
-    spawnPlayer(world, 0, 'soldier', 5, 5)
+    spawnPlayer(world, 0, 5, 5)
     const ch = startDebugChannel(world, 'ws://x', () => {}, OPTS)
     const sock = FakeWS.instances[0]
     sock.fireOpen()
@@ -133,8 +133,8 @@ describe('harness channel over the wire', () => {
       return JSON.parse(sock.sent[before])
     }
 
-    expect(call(1, 'create soldier 777').ok).not.toBe(false)
-    expect(call(2, 'join_bot Bob soldier').ok).not.toBe(false)
+    expect(call(1, 'create 777').ok).not.toBe(false)
+    expect(call(2, 'join_bot Bob').ok).not.toBe(false)
     expect(call(3, 'start_run').ok).not.toBe(false)
     const tickRep = call(4, 'tick 10')
     expect(JSON.parse(tickRep.body!).tick).toBe(10)

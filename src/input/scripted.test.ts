@@ -7,7 +7,7 @@ import { createScriptedInput, SCRIPTS, scriptTicks } from './scripted'
 // (no browser) is the fast, deterministic regression guard for every beat.
 const play = (scenario: string, script: string) => {
   const steps = SCRIPTS[script]
-  const s = new HostSession(7, 'soldier', createScriptedInput(steps))
+  const s = new HostSession(7, createScriptedInput(steps))
   applyScenario(s.world, scenario)
   let missionComplete = false
   for (let t = 0; t <= scriptTicks(steps) + 5; t++) {

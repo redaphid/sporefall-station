@@ -187,7 +187,6 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   if (we.archetype === 'player') {
     e.playerCtl ??= {
       playerId: -1,
-      classId: 'soldier',
       abilityCooldown: 0,
       inventory: [],
       activeSlot: -1,
@@ -212,7 +211,6 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
 export interface HelloMsg {
   v: number
   name: string
-  classId: string
   /** Present when rejoining after a mid-game drop. */
   rejoin?: { slot: number; token: string }
 }
@@ -224,7 +222,6 @@ export interface WelcomeMsg {
 export interface LobbyPlayer {
   slot: number
   name: string
-  classId: string
 }
 export interface LobbyStateMsg {
   players: LobbyPlayer[]

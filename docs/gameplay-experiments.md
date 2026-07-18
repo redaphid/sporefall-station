@@ -64,7 +64,7 @@ enough to **coach a plan on screen** (annotation-driven tutorials) or to run an
 import { record } from './lib.mjs'
 await record({
   name: 'heist',
-  params: { world: 'heist-stage', script: 'heist', e2e: '1', mode: 'solo', class: 'thief' },
+  params: { world: 'heist-stage', script: 'heist', e2e: '1', mode: 'solo' },
   beforeTicks: async (page) => {
     await page.evaluate(() => {
       window.__annotate('text "HEIST 1/6 — Case the joint"')

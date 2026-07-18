@@ -53,7 +53,6 @@ export class HostSession implements Session {
 
   constructor(
     private seed: number,
-    private classId: string,
     private localInput: InputSource,
     private coop?: CoopSource,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
@@ -68,7 +67,7 @@ export class HostSession implements Session {
     this.world = createWorld(this.seed, 1, this.mode)
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, this.classId, this.world.level.spawn.x, this.world.level.spawn.y)
+    this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
   }
 
   /** Play again from a game-over: rebuild the run in place. (Solo has no
@@ -84,7 +83,7 @@ export class HostSession implements Session {
     if (this.joined.has(slot)) return
     this.joined.add(slot)
     const spawn = this.world.level.spawn
-    spawnPlayer(this.world, slot, this.classId, spawn.x + spawnOffset(slot), spawn.y)
+    spawnPlayer(this.world, slot, spawn.x + spawnOffset(slot), spawn.y)
   }
 
   tick(): void {

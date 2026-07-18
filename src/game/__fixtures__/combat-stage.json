@@ -8,7 +8,7 @@
   "gameOver": false,
   "mission": {
     "template": "steal",
-    "targetEntityId": 34,
+    "targetEntityId": 42,
     "targetBuilding": 6,
     "complete": false,
     "exitUnlocked": false,
@@ -60,10 +60,14 @@
       },
       "playerCtl": {
         "playerId": 0,
-        "classId": "soldier",
         "abilityCooldown": 0,
-        "inventory": [],
-        "activeSlot": -1,
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 200
+          }
+        ],
+        "activeSlot": 0,
         "cash": 0,
         "crimeUntilTick": 0
       }
@@ -218,5 +222,6 @@
         "guard": true
       }
     }
-  ]
+  ],
+  "hostile": false
 }

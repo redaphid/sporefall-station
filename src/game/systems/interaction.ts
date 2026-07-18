@@ -1,4 +1,4 @@
-import { CLASSES } from '../data/classes'
+import { SPECIAL_COOLDOWN_TICKS } from '../player'
 import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
 import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
@@ -151,7 +151,7 @@ const recover = (w: World, p: Entity): void => {
   ctl.cash = 0
   ctl.inventory = ctl.inventory.filter((s) => itemClass(s.itemId) === 'key')
   ctl.activeSlot = -1 // dropped the weapon we were holding
-  ctl.abilityCooldown = CLASSES[ctl.classId]?.abilityCooldownTicks ?? 0
+  ctl.abilityCooldown = SPECIAL_COOLDOWN_TICKS
 }
 
 export const nearestInteractable = (entities: readonly Entity[], p: Entity): Entity | null => {

@@ -43,7 +43,7 @@ tick 0, then `serializeWorld` it into `src/game/__fixtures__/<name>.json`:
 ```ts
 const w = createWorld(SEED, 1)
 populateWorld(w); setupFloor(w)
-spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
 applyScenario(w, 'fire')      // or hand-place exactly the entities you need
 // ...tweak to taste (e.g. lower a victim's hp so the beat lands on-screen)...
 writeFileSync(`${dir}<name>.json`, JSON.stringify(serializeWorld(w), null, 2) + '\n')

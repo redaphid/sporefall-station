@@ -78,7 +78,7 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 90 }, // final beat
   ],
 
-  // Open an unlocked door, then pick a locked one (soldier channels the lockpick).
+  // Open an unlocked door, then pick a locked one (the player channels the lockpick).
   doors: [
     { ticks: 40 },
     { ticks: 64, y: 1 }, // down onto the lane

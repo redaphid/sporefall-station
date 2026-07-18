@@ -58,10 +58,14 @@
       },
       "playerCtl": {
         "playerId": 0,
-        "classId": "soldier",
         "abilityCooldown": 0,
-        "inventory": [],
-        "activeSlot": -1,
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 200
+          }
+        ],
+        "activeSlot": 0,
         "cash": 0,
         "crimeUntilTick": 0
       }

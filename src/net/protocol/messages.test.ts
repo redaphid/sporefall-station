@@ -196,7 +196,7 @@ describe('snapshot codec — boundary values', () => {
 
   it('ships the Rolling flag host→client so a client renders/agrees on i-frames', () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 10, 10)
+    const p = spawnPlayer(w, 0, 10, 10)
     p.playerCtl!.roll = { untilTick: w.tick + 12, cooldownUntilTick: w.tick + 40, dirX: 1, dirY: 0 }
     // Host packs the flag while rolling…
     const rollingWire = toWireEntity(p, w.tick)

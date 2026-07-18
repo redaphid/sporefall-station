@@ -17,7 +17,7 @@ import { runVerb } from './verbs'
 const buildMidRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   const sp = w.level.spawn
-  spawnPlayer(w, 0, 'soldier', sp.x, sp.y)
+  spawnPlayer(w, 0, sp.x, sp.y)
   spawnNpc(w, 'cop', sp.x + 3, sp.y)
   spawnNpc(w, 'thug', sp.x - 3, sp.y)
   return runTicks(w, new Map([[0, { moveX: -1, attack: true }]]), 50)
@@ -146,16 +146,15 @@ describe('schema (reflection)', () => {
     spawnNpc(w, 'cop', 5, 5)
     spawnNpc(w, 'cop', 6, 6)
     spawnNpc(w, 'thug', 7, 7)
-    spawnPlayer(w, 0, 'soldier', 8, 8)
+    spawnPlayer(w, 0, 8, 8)
     const s = JSON.parse(runVerb(w, 'schema'))
 
     expect(s.entityCount).toBe(4)
     expect(s.kinds).toEqual({ npc: 3, player: 1 })
     expect(s.archetypes.cop).toEqual({ kind: 'npc', count: 2 })
     expect(s.archetypes.thug).toEqual({ kind: 'npc', count: 1 })
-    // The player's archetype is 'player'; its classId lives in playerCtl.
     expect(s.archetypes.player).toEqual({ kind: 'player', count: 1 })
-    expect(s.fields.playerCtl.keys).toContain('classId')
+    expect(s.fields.playerCtl.keys).toContain('abilityCooldown')
 
     // Core fields present on every entity.
     expect(s.fields.id.count).toBe(4)

@@ -20,7 +20,7 @@ const noInput = (): Map<number, InputCmd> => new Map([[0, emptyInput()]])
 /** A player spawned on the guaranteed-open level spawn tile. */
 const player = (w: World): Entity => {
   const s = w.level.spawn
-  return spawnPlayer(w, 0, 'soldier', s.x, s.y)
+  return spawnPlayer(w, 0, s.x, s.y)
 }
 
 describe('rollSystem — start conditions & direction', () => {
@@ -323,7 +323,7 @@ describe('dodge-roll — headline: roll THROUGH a bullet (mirrors the e2e world)
   // recorder injects (e2e/feature-dodge-roll.mjs).
   const duel = (): { w: World; p: Entity } => {
     const w = createWorld(7, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 6, 11)
+    const p = spawnPlayer(w, 0, 6, 11)
     p.health = { hp: 120, max: 120, iframes: 0 }
     p.facing = 0
     addEntity(w, {

@@ -5,7 +5,7 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
 const errs = []
 page.on('pageerror', (e) => errs.push(e.message))
-await page.goto('http://localhost:5173/?mode=solo&class=soldier', { waitUntil: 'networkidle' })
+await page.goto('http://localhost:5173/?mode=solo', { waitUntil: 'networkidle' })
 await page.waitForTimeout(1200)
 await page.mouse.click(450, 350)
 

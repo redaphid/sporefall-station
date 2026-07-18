@@ -14,7 +14,6 @@ import { record } from './lib.mjs'
  *   name: string,                                  // artifact + still basename
  *   world: string | object,                        // committed fixture NAME, or an inline WorldJson
  *   script?: string,                               // SCRIPTS[...] input timeline (drives the real systems)
- *   klass?: string,                                // player class (default 'soldier')
  *   params?: Record<string,string|number>,         // extra URL params (seed/zoom/…)
  *   stills: {tick:number,label:string}[],          // screenshots at fixed SIM ticks
  *   readState?: () => any,                          // runs in-page; defaults to a generic world summary
@@ -25,7 +24,6 @@ export const recordFeature = (spec) => {
   const isInline = typeof spec.world === 'object' && spec.world !== null
   const params = {
     mode: 'solo',
-    class: spec.klass ?? 'soldier',
     e2e: '1',
     // Fixture name → `?world=<name>` (loaded from the bundle at boot). Inline
     // WorldJson → `?world=@inline`, pushed in via window.__loadWorld before ticking.

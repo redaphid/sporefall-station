@@ -46,7 +46,7 @@ const run = async () => {
   page.on('pageerror', (e) => errs.push(String(e)))
   page.on('console', (m) => m.type() === 'error' && errs.push(`console: ${m.text()}`))
 
-  const url = `${BASE}/?${new URLSearchParams({ mode: 'solo', class: 'soldier', e2e: '1', world: 'comm-scene' })}`
+  const url = `${BASE}/?${new URLSearchParams({ mode: 'solo', e2e: '1', world: 'comm-scene' })}`
   await page.goto(url, { waitUntil: 'networkidle' })
   await page.waitForFunction(() => window.__world && window.__project && window.__annotate)
 

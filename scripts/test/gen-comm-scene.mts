@@ -22,7 +22,7 @@ const w = createWorld(SEED, 1)
 // edge clamp (halfW≈20, halfH≈11.25 tiles at 1280×720/zoom-1), independent of the
 // level's actual corner spawn — so every clustered entity is reliably on-screen.
 const A = { x: 20, y: 11 }
-spawnPlayer(w, 0, 'soldier', A.x, A.y)
+spawnPlayer(w, 0, A.x, A.y)
 
 // Clustered close so their engine-positioned labels crowd and exercise de-overlap.
 const npcs: Entity[] = [

@@ -82,11 +82,11 @@ describe('spawn', () => {
     const out = JSON.parse(runVerb(w, 'spawn npc cop 1e6 -1e6'))
     expect(out.pos).toEqual({ x: 1e6, y: -1e6 })
   })
-  it('substitutes soldier for an unknown player class', () => {
+  it('spawns a standard player regardless of the archetype token', () => {
     const w = world()
-    const out = JSON.parse(runVerb(w, 'spawn player no_such_class 1 1'))
+    const out = JSON.parse(runVerb(w, 'spawn player anything 1 1'))
     expect(out.kind).toBe('player')
-    expect(out.playerCtl.classId).toBe('soldier')
+    expect(out.combat.weapon).toBe('pistol')
   })
 })
 

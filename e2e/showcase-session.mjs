@@ -52,7 +52,7 @@ const main = async () => {
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(String(e)))
 
-  const url = `${BASE}/?mode=solo&class=soldier&scenario=showcase&e2e=1&zoom=2.2&seed=${SEED}`
+  const url = `${BASE}/?mode=solo&scenario=showcase&e2e=1&zoom=2.2&seed=${SEED}`
   log('goto', url)
   await page.goto(url, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => window.__sor && window.__sor.renderView().entities.length > 0, {
@@ -97,7 +97,7 @@ const main = async () => {
   let maxFires = first.fires
   const walkerLast = {}
   for (let i = 0; i < 10; i++) {
-    // Soldier grenade toss → a guaranteed explosion (player is tanky here so a
+    // Player grenade toss → a guaranteed explosion (player is tanky here so a
     // close blast can't end the demo).
     if (i === 1 || i === 4) await page.keyboard.press('KeyL')
     await sleep(500)

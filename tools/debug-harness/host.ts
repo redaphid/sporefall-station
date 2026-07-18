@@ -5,8 +5,8 @@
 //
 //   npx tsx tools/debug-hub/hub.ts &                 (the relay)
 //   npx tsx tools/debug-harness/host.ts              (this backend)
-//   npx tsx tools/debug-cli/cli.ts create soldier 42
-//   npx tsx tools/debug-cli/cli.ts join_bot Bob soldier
+//   npx tsx tools/debug-cli/cli.ts create 42
+//   npx tsx tools/debug-cli/cli.ts join_bot Bob
 //   npx tsx tools/debug-cli/cli.ts start_run
 //   npx tsx tools/debug-cli/cli.ts tick 300
 //   npx tsx tools/debug-cli/cli.ts state

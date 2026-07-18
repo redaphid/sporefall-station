@@ -4,7 +4,7 @@ import { record } from './lib.mjs'
 // MISSION COMPLETE banner, exit unlocks), then reach the exit to clear the floor.
 await record({
   name: 'e2e-mission',
-  params: { mode: 'solo', class: 'soldier', seed: 7, scenario: 'mission', script: 'mission' },
+  params: { mode: 'solo', seed: 7, scenario: 'mission', script: 'mission' },
   stills: [
     { tick: 20, label: '01-spawn' },
     { tick: 170, label: '02-approach-briefcase' },

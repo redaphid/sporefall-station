@@ -47,7 +47,7 @@ const viewSrc = (over = {}) => ({
     id: 1, pos: { x: 5, y: 5 }, dead: false,
     combat: { weapon: 'pistol', cooldown: 0 },
     playerCtl: {
-      playerId: 0, classId: 'soldier', abilityCooldown: 0, cash: 0, crimeUntilTick: 0, activeSlot: 0,
+      playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0, activeSlot: 0,
       inventory: [{ itemId: 'pistol', qty: 40 }, { itemId: 'molotov', qty: 2 }],
     },
   },
@@ -141,7 +141,7 @@ await record('ui-restart-when-downed', 'Restart available the moment you are DOW
   await page.waitForTimeout(200)
   await page.evaluate((v) => window.__screens.update(v), viewSrc({
     self: { id: 1, pos: { x: 5, y: 5 }, dead: false,
-      playerCtl: { playerId: 0, classId: 'soldier', activeSlot: 0, cash: 120, inventory: [],
+      playerCtl: { playerId: 0, activeSlot: 0, cash: 120, inventory: [],
         downed: { bleedTicks: 780, reviveProgress: 0 } } },
   }))
   await page.waitForTimeout(400)

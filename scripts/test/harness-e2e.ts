@@ -32,10 +32,10 @@ const stubInput = (cmd: Partial<InputCmd> = {}): InputSource => ({ sample: () =>
 const harnessFlow = (): void => {
   console.log('\n== A) co-op flow through GameHarness ==')
   const h = new GameHarness()
-  h.create({ seed: 20260715, classId: 'soldier', name: 'Hosty' })
-  const s1 = h.addBot({ name: 'Bravo', classId: 'soldier' })
-  const s2 = h.addBot({ name: 'Charlie', classId: 'soldier' })
-  const s3 = h.addBot({ name: 'Delta', classId: 'soldier' })
+  h.create({ seed: 20260715, name: 'Hosty' })
+  const s1 = h.addBot({ name: 'Bravo' })
+  const s2 = h.addBot({ name: 'Charlie' })
+  const s3 = h.addBot({ name: 'Delta' })
   check('lobby holds host + 3 bots', h.lobby().length === 4, h.lobby().map((p) => p.name).join(','))
   check('bot slots are 1..3', s1 === 1 && s2 === 2 && s3 === 3)
 
@@ -65,10 +65,10 @@ const harnessFlow = (): void => {
   // Two independent recordings of the same script are byte-identical.
   const rec2 = (() => {
     const g = new GameHarness()
-    g.create({ seed: 20260715, classId: 'soldier', name: 'Hosty' })
-    g.addBot({ name: 'Bravo', classId: 'soldier' })
-    g.addBot({ name: 'Charlie', classId: 'soldier' })
-    g.addBot({ name: 'Delta', classId: 'soldier' })
+    g.create({ seed: 20260715, name: 'Hosty' })
+    g.addBot({ name: 'Bravo' })
+    g.addBot({ name: 'Charlie' })
+    g.addBot({ name: 'Delta' })
     g.start()
     g.startRecording()
     g.setInput(0, { moveX: -1, attack: true })
@@ -93,16 +93,16 @@ const harnessFlow = (): void => {
 const loopbackNetFlow = async (): Promise<void> => {
   console.log('\n== B) net joiners over the loopback transport ==')
   const hub = new LoopbackHub()
-  const host = new NetHostSession(4242, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+  const host = new NetHostSession(4242, 'Alice', stubInput(), hub.hostTransport)
   await host.start()
 
   const bots: NetClientSession[] = []
-  for (const [name, cls, dir] of [
-    ['Bravo', 'soldier', 1],
-    ['Charlie', 'soldier', -1],
+  for (const [name, dir] of [
+    ['Bravo', 1],
+    ['Charlie', -1],
   ] as const) {
     const client = hub.addCentral()
-    const session = new NetClientSession(name, cls, stubInput({ moveX: dir }), client.transport)
+    const session = new NetClientSession(name, stubInput({ moveX: dir }), client.transport)
     await session.start()
     client.connect()
     bots.push(session)

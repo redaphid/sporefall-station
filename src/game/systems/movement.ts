@@ -4,7 +4,6 @@ import { isBlocked, type World } from '../world'
 import { isRolling, ROLL_SPEED } from './roll'
 import { isImmobilized } from './statusFx'
 
-export const PLAYER_SPEED = 4.5 // tiles/sec
 const FRICTION = 12 // knockback velocity decay per second
 
 /**

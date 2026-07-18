@@ -40,7 +40,6 @@ const MAX_SLOT = MAX_PLAYERS - 1
 interface PeerState {
   slot: number
   name: string
-  classId: string
   token: string
   queue: SendQueue
   reader: StreamReader
@@ -60,7 +59,6 @@ interface PeerState {
 interface Ghost {
   slot: number
   name: string
-  classId: string
   token: string
   entityId: number
   expiresAtTick: number
@@ -86,7 +84,6 @@ export class NetHostSession implements Session {
 
   constructor(
     readonly seed: number,
-    private hostClassId: string,
     private hostName: string,
     private localInput: InputSource,
     private transport: Transport,
@@ -106,12 +103,12 @@ export class NetHostSession implements Session {
   }
 
   lobbyPlayers(): LobbyPlayer[] {
-    const players: LobbyPlayer[] = [{ slot: 0, name: this.hostName, classId: this.hostClassId }]
+    const players: LobbyPlayer[] = [{ slot: 0, name: this.hostName }]
     // Only admitted peers belong in the lobby; a peer that has connected but not
     // yet completed a valid Hello still carries slot -1 and must not be listed
     // (nor shipped in GameStart's player list).
     for (const p of this.peers.values()) {
-      if (p.slot >= 0) players.push({ slot: p.slot, name: p.name, classId: p.classId })
+      if (p.slot >= 0) players.push({ slot: p.slot, name: p.name })
     }
     players.sort((a, b) => a.slot - b.slot)
     return players
@@ -123,10 +120,10 @@ export class NetHostSession implements Session {
     this.started = true
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, this.hostClassId, this.world.level.spawn.x, this.world.level.spawn.y)
+    this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
     const entityIds: Record<number, number> = { 0: this.self.id }
     for (const p of this.peers.values()) {
-      const e = spawnPlayer(this.world, p.slot, p.classId, this.world.level.spawn.x + p.slot * 0.6, this.world.level.spawn.y)
+      const e = spawnPlayer(this.world, p.slot, this.world.level.spawn.x + p.slot * 0.6, this.world.level.spawn.y)
       p.entityId = e.id
       entityIds[p.slot] = e.id
     }
@@ -286,7 +283,6 @@ export class NetHostSession implements Session {
     const state: PeerState = {
       slot: -1,
       name: '',
-      classId: 'soldier',
       token: '',
       queue: new SendQueue(this.transport, peer, () => this.onPeerLost(peer)),
       reader: new StreamReader(),
@@ -311,7 +307,6 @@ export class NetHostSession implements Session {
       this.ghosts.set(p.slot, {
         slot: p.slot,
         name: p.name,
-        classId: p.classId,
         token: p.token,
         entityId: p.entityId,
         expiresAtTick: this.world.tick + REJOIN_GRACE_TICKS,
@@ -388,7 +383,6 @@ export class NetHostSession implements Session {
         this.ghosts.delete(ghost.slot)
         p.slot = ghost.slot
         p.name = ghost.name
-        p.classId = ghost.classId
         p.token = ghost.token
         p.entityId = ghost.entityId
         this.peersBySlot.set(p.slot, p)
@@ -417,9 +411,8 @@ export class NetHostSession implements Session {
         }
         p.slot = slot
         p.name = hello.name
-        p.classId = hello.classId
         p.token = Math.random().toString(36).slice(2, 12)
-        const avatar = spawnPlayer(this.world, slot, p.classId, this.world.level.spawn.x + slot * 0.6, this.world.level.spawn.y)
+        const avatar = spawnPlayer(this.world, slot, this.world.level.spawn.x + slot * 0.6, this.world.level.spawn.y)
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
@@ -439,7 +432,6 @@ export class NetHostSession implements Session {
       while (used.has(slot)) slot++
       p.slot = slot
       p.name = hello.name
-      p.classId = hello.classId
       p.token = Math.random().toString(36).slice(2, 12)
       this.peersBySlot.set(slot, p)
       p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))

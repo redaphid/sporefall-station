@@ -41,7 +41,6 @@ class MockHub {
 
   addClient(
     name: string,
-    classId: string,
     input: InputSource,
   ): { session: NetClientSession; connect: () => void; drop: () => void; peer: PeerId } {
     const peer: PeerId = `central-${this.centrals.size + 1}`
@@ -59,7 +58,7 @@ class MockHub {
       },
       peers: () => ['host'],
     }
-    const session = new NetClientSession(name, classId, input, clientTransport)
+    const session = new NetClientSession(name, input, clientTransport)
     const connect = (): void => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => clientHandler?.({ type: 'peerConnected', peer: 'host' }))
@@ -114,8 +113,8 @@ const startPair = async (
   clientInput: InputSource = makeInput().source,
 ): Promise<{ hub: MockHub; host: NetHostSession; bob: ReturnType<MockHub['addClient']> }> => {
   const hub = new MockHub()
-  const host = new NetHostSession(seed, 'soldier', 'Alice', makeInput().source, hub.hostTransport)
-  const bob = hub.addClient('Bob', 'soldier', clientInput)
+  const host = new NetHostSession(seed, 'Alice', makeInput().source, hub.hostTransport)
+  const bob = hub.addClient('Bob', clientInput)
   await host.start()
   await bob.session.start()
   bob.connect()
@@ -213,12 +212,12 @@ describe('co-op client inventory (issue #57)', () => {
 
   it('late-joiner receives its full inventory', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(204, 'soldier', 'Alice', makeInput().source, hub.hostTransport)
+    const host = new NetHostSession(204, 'Alice', makeInput().source, hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
 
-    const late = hub.addClient('Late', 'soldier', makeInput().source)
+    const late = hub.addClient('Late', makeInput().source)
     await late.session.start()
     late.connect()
     await flush()
@@ -237,9 +236,9 @@ describe('co-op client inventory (issue #57)', () => {
 
   it('gives multiple clients each THEIR own inventory, not each other\'s', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(205, 'soldier', 'Alice', makeInput().source, hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', makeInput().source)
-    const cara = hub.addClient('Cara', 'soldier', makeInput().source)
+    const host = new NetHostSession(205, 'Alice', makeInput().source, hub.hostTransport)
+    const bob = hub.addClient('Bob', makeInput().source)
+    const cara = hub.addClient('Cara', makeInput().source)
     await host.start()
     for (const c of [bob, cara]) {
       await c.session.start()
@@ -323,14 +322,14 @@ describe('co-op client inventory (issue #57)', () => {
 
   it('re-sends the full inventory to a rejoining client (ghost reclaim)', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(209, 'soldier', 'Alice', makeInput().source, hub.hostTransport)
+    const host = new NetHostSession(209, 'Alice', makeInput().source, hub.hostTransport)
     await host.start()
 
     // Join a raw central, start, give it a rich loadout, then drop it to a ghost.
     const a = hub.addRawCentral()
     a.connect()
     await flush()
-    a.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier' }))
+    a.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob' }))
     await flush()
     const welcome = decodeJson<{ slot: number; token: string }>(a.received().find((m) => m[0] === MsgType.Welcome)!)
     host.beginGame()
@@ -346,7 +345,7 @@ describe('co-op client inventory (issue #57)', () => {
     const b = hub.addRawCentral()
     b.connect()
     await flush()
-    b.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier', rejoin: { slot: welcome.slot, token: welcome.token } }))
+    b.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot: welcome.slot, token: welcome.token } }))
     await flush()
     host.tick()
     await flush()
@@ -376,12 +375,12 @@ describe('co-op client inventory (issue #57)', () => {
   it('is deterministic: two identical host runs stream byte-identical inventory to the client', async () => {
     const capture = async (): Promise<InventoryMsg> => {
       const hub = new MockHub()
-      const host = new NetHostSession(210, 'soldier', 'Alice', makeInput().source, hub.hostTransport)
+      const host = new NetHostSession(210, 'Alice', makeInput().source, hub.hostTransport)
       await host.start()
       const raw = hub.addRawCentral()
       raw.connect()
       await flush()
-      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier' }))
+      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob' }))
       await flush()
       host.beginGame()
       await flush()

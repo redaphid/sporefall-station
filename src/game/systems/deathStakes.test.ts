@@ -49,7 +49,7 @@ describe('kill() life-gate — normal mode', () => {
   })
 
   it('while the pool has comebacks, a down is a survivable DOWNED state', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     down(w, p)
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toEqual({ bleedTicks: 30 * 30, reviveProgress: 0 })
@@ -57,7 +57,7 @@ describe('kill() life-gate — normal mode', () => {
   })
 
   it('with an empty pool, a down is a real permanent DEATH (no downed grace)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0
     down(w, p)
     expect(p.dead).toBe(true)
@@ -72,7 +72,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   })
 
   it('a lone downed player bleeds the timer down and self-revives at low hp, dropping cash + items', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.cash = 120
     p.playerCtl!.inventory = [{ itemId: 'bat', qty: 8 }]
     p.playerCtl!.activeSlot = 0
@@ -90,7 +90,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   })
 
   it('a KEY item survives the comeback penalty (only non-key items drop)', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.inventory = [
       { itemId: 'briefcase', qty: 1 }, // key
       { itemId: 'pistol', qty: 6 }, // non-key
@@ -103,7 +103,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   })
 
   it('the penalty lands EXACTLY ONCE — a further interaction tick after recovery does not re-charge', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.cash = 50
     down(w, p)
     p.playerCtl!.downed!.bleedTicks = 1
@@ -119,7 +119,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   })
 
   it('the run is LOSABLE: each down spends a comeback, and the down after the pool empties ends the run', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     // Burn through every comeback.
     for (let i = 0; i < REVIVES_PER_RUN; i++) {
       down(w, p)
@@ -138,7 +138,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   })
 
   it('missionSystem never lets a lone DOWNED player (still recovering) count as a run-over', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     down(w, p)
     missionSystem(w)
     expect(w.gameOver).toBe(false)
@@ -152,8 +152,8 @@ describe('co-op: partial down keeps teammate-revive; full wipe ends the run', ()
   })
 
   it('one down + one standing does NOT end the run; the standing ally can still revive', () => {
-    const a = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const b = spawnPlayer(w, 1, 'soldier', 20.8, 20) // adjacent rescuer
+    const a = spawnPlayer(w, 0, 20, 20)
+    const b = spawnPlayer(w, 1, 20.8, 20) // adjacent rescuer
     down(w, a)
     settle(a)
     settle(b)
@@ -167,8 +167,8 @@ describe('co-op: partial down keeps teammate-revive; full wipe ends the run', ()
   })
 
   it('a full party wipe (all down) is a run-over — checked before anyone bleeds out', () => {
-    const a = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const b = spawnPlayer(w, 1, 'soldier', 40, 40)
+    const a = spawnPlayer(w, 0, 20, 20)
+    const b = spawnPlayer(w, 1, 40, 40)
     down(w, a)
     down(w, b)
     missionSystem(w)
@@ -177,8 +177,8 @@ describe('co-op: partial down keeps teammate-revive; full wipe ends the run', ()
   })
 
   it('a downed player with NO possible rescuer (teammate also down, out of range) bleeds out to death', () => {
-    const a = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const b = spawnPlayer(w, 1, 'soldier', 40, 40)
+    const a = spawnPlayer(w, 0, 20, 20)
+    const b = spawnPlayer(w, 1, 40, 40)
     down(w, a)
     down(w, b)
     a.playerCtl!.downed!.bleedTicks = 2
@@ -191,8 +191,8 @@ describe('co-op: partial down keeps teammate-revive; full wipe ends the run', ()
   })
 
   it('the comeback pool is SHARED across the party (two revives drain the same pool)', () => {
-    const a = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const b = spawnPlayer(w, 1, 'soldier', 21, 20)
+    const a = spawnPlayer(w, 0, 20, 20)
+    const b = spawnPlayer(w, 1, 21, 20)
     // a goes down and self-revives while b stands (canSelfRecover true).
     down(w, a)
     a.playerCtl!.downed!.bleedTicks = 1
@@ -217,7 +217,7 @@ describe('casual mode — forgiving (kid mode)', () => {
   })
 
   it('a down is always survivable (the pool is never consulted) and self-revive costs nothing', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0 // even with an empty pool, casual downs (never a real death)
     p.playerCtl!.cash = 77
     p.playerCtl!.inventory = [{ itemId: 'bat', qty: 3 }]
@@ -234,7 +234,7 @@ describe('casual mode — forgiving (kid mode)', () => {
   })
 
   it('a lone casual player can go down forever and never lose the run', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     for (let i = 0; i < 5; i++) {
       down(w, p)
       p.playerCtl!.downed!.bleedTicks = 1
@@ -247,8 +247,8 @@ describe('casual mode — forgiving (kid mode)', () => {
   })
 
   it('casual co-op STILL loses on a full simultaneous wipe (the game can end)', () => {
-    const a = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const b = spawnPlayer(w, 1, 'soldier', 40, 40)
+    const a = spawnPlayer(w, 0, 20, 20)
+    const b = spawnPlayer(w, 1, 40, 40)
     down(w, a)
     down(w, b)
     missionSystem(w)
@@ -259,7 +259,7 @@ describe('casual mode — forgiving (kid mode)', () => {
 describe('edge cases & guards', () => {
   it('revivesLeft never goes negative even if recovery is forced past an empty pool', () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0
     // Force a downed record directly (bypassing the kill gate) then resolve it.
     p.health!.hp = 0
@@ -272,7 +272,7 @@ describe('edge cases & guards', () => {
 
   it('recovery hp is at least 1 even for a 1-hp-max glass cannon (never revives to 0)', () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.health!.max = 1
     p.health!.hp = 0
     p.playerCtl!.downed = { bleedTicks: 1, reviveProgress: 0 }
@@ -291,7 +291,7 @@ describe('edge cases & guards', () => {
 describe('determinism — same seed + inputs + scripted downs ⇒ identical outcome', () => {
   const runScenario = (mode: RunMode): { revivesLeft: number; hp: number; cash: number; dead: boolean; gameOver: boolean } => {
     const w = createWorld(99, 1, mode)
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
+    const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.cash = 200
     // Scripted: down, shorten bleed, resolve — twice.
     for (let i = 0; i < 2; i++) {
@@ -326,7 +326,7 @@ describe('determinism — same seed + inputs + scripted downs ⇒ identical outc
   it('end-to-end via tickWorld: a scripted solo down self-resolves and stays deterministic', () => {
     const build = (): World => {
       const w = createWorld(21, 1)
-      const p = spawnPlayer(w, 0, 'soldier', w.level.spawn.x, w.level.spawn.y)
+      const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
       down(w, p)
       p.playerCtl!.downed!.bleedTicks = 5
       return w

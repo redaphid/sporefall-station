@@ -46,7 +46,6 @@ class MockHub {
   /** A full NetClientSession joining over its own client Transport. */
   addClient(
     name: string,
-    classId: string,
     input: InputSource,
   ): { session: NetClientSession; connect: () => void; drop: () => void; peer: PeerId } {
     const peer: PeerId = `central-${this.centrals.size + 1}`
@@ -66,7 +65,7 @@ class MockHub {
       },
       peers: () => ['host'],
     }
-    const session = new NetClientSession(name, classId, input, clientTransport)
+    const session = new NetClientSession(name, input, clientTransport)
     const connect = (): void => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => clientHandler?.({ type: 'peerConnected', peer: 'host' }))
@@ -124,8 +123,8 @@ const findMsg = <T>(msgs: Uint8Array[], type: number): T | undefined => {
 describe('offline co-op (loopback transport)', () => {
   it('completes the join handshake and assigns the client a slot', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(1234, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(1234, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
 
     await host.start()
     await bob.session.start()
@@ -141,9 +140,9 @@ describe('offline co-op (loopback transport)', () => {
 
   it('drops both players into the same game and syncs input → snapshot', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(777, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(777, 'Alice', stubInput(), hub.hostTransport)
     // Client walks right so its input packets carry a changing sequence.
-    const bob = hub.addClient('Bob', 'soldier', stubInput({ moveX: 1 }))
+    const bob = hub.addClient('Bob', stubInput({ moveX: 1 }))
 
     await host.start()
     await bob.session.start()
@@ -175,8 +174,8 @@ describe('offline co-op (loopback transport)', () => {
 
   it('threads the run difficulty (mode) to a joined client so co-op agrees on the rules', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(4242, 'soldier', 'Alice', stubInput(), hub.hostTransport, 'casual')
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(4242, 'Alice', stubInput(), hub.hostTransport, 'casual')
+    const bob = hub.addClient('Bob', stubInput())
 
     await host.start()
     await bob.session.start()
@@ -200,18 +199,18 @@ describe('offline co-op (loopback transport)', () => {
 
   it('defaults an unspecified host mode to normal (stakes on)', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(4243, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(4243, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     expect(host.world.mode).toBe('normal')
   })
 
   it('rejects a client whose protocol version does not match', async () => {
     const hub = new MockHub()
-    new NetHostSession(1, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    new NetHostSession(1, 'Alice', stubInput(), hub.hostTransport)
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION + 99, name: 'Old', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION + 99, name: 'Old' }))
     await flush()
 
     const reject = findMsg<{ reason: string }>(raw.received(), MsgType.Reject)
@@ -221,7 +220,7 @@ describe('offline co-op (loopback transport)', () => {
 
   it('drops a fresh late joiner straight into a running game', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(9, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(9, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
@@ -229,7 +228,7 @@ describe('offline co-op (loopback transport)', () => {
     const playersBefore = host.world.entities.filter((e) => e.playerCtl).length
 
     // A brand-new central (never in the lobby) asks to join mid-run.
-    const late = hub.addClient('Late', 'soldier', stubInput())
+    const late = hub.addClient('Late', stubInput())
     await late.session.start()
     late.connect()
     await flush()
@@ -244,12 +243,12 @@ describe('offline co-op (loopback transport)', () => {
 
   it('still enforces the 8-player cap for late joiners in a running game', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(9, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(9, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     // Seven clients fill slots 1..7 in the lobby (host is slot 0), then start.
     for (const nm of ['Bob', 'Cara', 'Dan', 'Eve', 'Finn', 'Gwen', 'Hank']) {
-      const c = hub.addClient(nm, 'soldier', stubInput())
+      const c = hub.addClient(nm, stubInput())
       await c.session.start()
       c.connect()
       await flush()
@@ -262,7 +261,7 @@ describe('offline co-op (loopback transport)', () => {
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Ivan', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Ivan' }))
     await flush()
 
     const reject = findMsg<{ reason: string }>(raw.received(), MsgType.Reject)
@@ -272,8 +271,8 @@ describe('offline co-op (loopback transport)', () => {
 
   it('restarts in place after a game-over, keeping the connection (play again, no reconnect)', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(555, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(555, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
     await host.start()
     await bob.session.start()
     bob.connect()
@@ -319,13 +318,13 @@ describe('offline co-op (loopback transport)', () => {
 
   it('fills all eight co-op slots then rejects the ninth player', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(42, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(42, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     // Seven real clients fill slots 1..7 (host is slot 0).
     const names = ['Bob', 'Cara', 'Dan', 'Eve', 'Finn', 'Gwen', 'Hank']
     for (const nm of names) {
-      const c = hub.addClient(nm, 'soldier', stubInput())
+      const c = hub.addClient(nm, stubInput())
       await c.session.start()
       c.connect()
       await flush()
@@ -338,7 +337,7 @@ describe('offline co-op (loopback transport)', () => {
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Ivan', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Ivan' }))
     await flush()
 
     const reject = findMsg<{ reason: string }>(raw.received(), MsgType.Reject)
@@ -353,7 +352,7 @@ const REJOIN_GRACE_TICKS = 90 * 30
 describe('offline co-op — adversarial host (malformed / hostile input)', () => {
   it('survives a hostile non-JSON Hello and keeps serving other peers', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(1, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(1, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     const evil = hub.addRawCentral()
@@ -368,7 +367,7 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
     expect(findMsg<WelcomeMsg>(evil.received(), MsgType.Welcome)).toBeUndefined()
 
     // A well-formed client still joins afterward — the host is alive.
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const bob = hub.addClient('Bob', stubInput())
     await bob.session.start()
     bob.connect()
     await flush()
@@ -377,8 +376,8 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
 
   it('survives a truncated Input packet and keeps ticking', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(2, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(2, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
     await host.start()
     await bob.session.start()
     bob.connect()
@@ -396,15 +395,15 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
     expect(bob.session.phase).toBe('playing')
   })
 
-  it('admits a Hello missing name/classId and spawns a default avatar', async () => {
+  it('admits a Hello missing a name and spawns a default avatar', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(3, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(3, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION })) // no name, no classId
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION })) // no name
     await flush()
 
     expect(findMsg<WelcomeMsg>(raw.received(), MsgType.Welcome)?.slot).toBe(1)
@@ -415,25 +414,25 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
 
   it('rejects a Hello with a missing/zero protocol version', async () => {
     const hub = new MockHub()
-    new NetHostSession(4, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    new NetHostSession(4, 'Alice', stubInput(), hub.hostTransport)
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { name: 'NoVer', classId: 'soldier' })) // v undefined
+    raw.send(encodeJson(MsgType.Hello, { name: 'NoVer' })) // v undefined
     await flush()
     expect(findMsg<{ reason: string }>(raw.received(), MsgType.Reject)?.reason).toMatch(/version/i)
   })
 
   it('ignores duplicate pre-start Hellos (join spam) instead of reassigning the slot', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(5, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(5, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
 
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
     for (let i = 0; i < 5; i++) {
-      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Spammer', classId: 'soldier' }))
+      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Spammer' }))
       await flush()
     }
 
@@ -445,7 +444,7 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
 
   it('ignores a duplicate late-join Hello instead of spawning a second avatar', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(6, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(6, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
@@ -454,9 +453,9 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Late', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Late' }))
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Late', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Late' }))
     await flush()
 
     expect(host.world.entities.filter((e) => e.playerCtl).length).toBe(before + 1) // only one new avatar
@@ -466,12 +465,12 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
 
   it('accepts a wrapped input seq and rejects stale reordered packets', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(7, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(7, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Seq', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Seq' }))
     await flush()
 
     const p = host.peersBySlot.get(1)!
@@ -498,7 +497,7 @@ const seedGhost = async (
   const a = hub.addRawCentral()
   a.connect()
   await flush()
-  a.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier' }))
+  a.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob' }))
   await flush()
   const welcome = findMsg<WelcomeMsg>(a.received(), MsgType.Welcome)!
   host.beginGame()
@@ -512,7 +511,7 @@ const seedGhost = async (
 describe('offline co-op — ghost slots & rejoin', () => {
   it('reclaims the same avatar on rejoin with the correct token', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(10, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(10, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
     expect(host.peersBySlot.get(slot)).toBeUndefined()
@@ -521,7 +520,7 @@ describe('offline co-op — ghost slots & rejoin', () => {
     const b = hub.addRawCentral()
     b.connect()
     await flush()
-    b.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier', rejoin: { slot, token } }))
+    b.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot, token } }))
     await flush()
 
     expect(findMsg<WelcomeMsg>(b.received(), MsgType.Welcome)?.slot).toBe(slot)
@@ -532,14 +531,14 @@ describe('offline co-op — ghost slots & rejoin', () => {
 
   it('rejects a rejoin with the wrong token but keeps the ghost reclaimable', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(11, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(11, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
 
     const bad = hub.addRawCentral()
     bad.connect()
     await flush()
-    bad.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Imposter', classId: 'soldier', rejoin: { slot, token: 'not-the-token' } }))
+    bad.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Imposter', rejoin: { slot, token: 'not-the-token' } }))
     await flush()
     expect(findMsg<{ reason: string }>(bad.received(), MsgType.Reject)?.reason).toMatch(/rejoin|expired|window/i)
 
@@ -547,7 +546,7 @@ describe('offline co-op — ghost slots & rejoin', () => {
     const good = hub.addRawCentral()
     good.connect()
     await flush()
-    good.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier', rejoin: { slot, token } }))
+    good.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot, token } }))
     await flush()
     expect(findMsg<WelcomeMsg>(good.received(), MsgType.Welcome)?.slot).toBe(slot)
     expect(host.peersBySlot.get(slot)?.entityId).toBe(entityId)
@@ -555,7 +554,7 @@ describe('offline co-op — ghost slots & rejoin', () => {
 
   it('bleeds out the avatar and rejects a rejoin after the grace window expires', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(12, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(12, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
 
@@ -568,19 +567,19 @@ describe('offline co-op — ghost slots & rejoin', () => {
     const late = hub.addRawCentral()
     late.connect()
     await flush()
-    late.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier', rejoin: { slot, token } }))
+    late.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot, token } }))
     await flush()
     expect(findMsg<{ reason: string }>(late.received(), MsgType.Reject)?.reason).toMatch(/rejoin|expired|window/i)
   })
 
   it('does not let a fresh late-joiner steal a ghost slot', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(13, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(13, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { slot, token } = await seedGhost(hub, host) // ghost holds slot 1
 
     // A brand-new player joining mid-run must NOT take the reserved ghost slot.
-    const newbie = hub.addClient('Newbie', 'soldier', stubInput())
+    const newbie = hub.addClient('Newbie', stubInput())
     await newbie.session.start()
     newbie.connect()
     await flush()
@@ -590,7 +589,7 @@ describe('offline co-op — ghost slots & rejoin', () => {
     const b = hub.addRawCentral()
     b.connect()
     await flush()
-    b.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier', rejoin: { slot, token } }))
+    b.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot, token } }))
     await flush()
     expect(findMsg<WelcomeMsg>(b.received(), MsgType.Welcome)?.slot).toBe(1)
   })
@@ -599,8 +598,8 @@ describe('offline co-op — ghost slots & rejoin', () => {
 describe('offline co-op — restart (play again) adversarial', () => {
   it('restarts mid-game (before any game-over) without touching the transport', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(20, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(20, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
     await host.start()
     await bob.session.start()
     bob.connect()
@@ -636,7 +635,7 @@ describe('offline co-op — restart (play again) adversarial', () => {
 
   it('restarts solo (no peers) and can restart again', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(21, 'soldier', 'Solo', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(21, 'Solo', stubInput(), hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
@@ -653,11 +652,11 @@ describe('offline co-op — restart (play again) adversarial', () => {
 
   it('restarts with three connected peers — all resume, slots preserved', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(22, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(22, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const clients = []
     for (const nm of ['Bob', 'Cara', 'Dan']) {
-      const c = hub.addClient(nm, 'soldier', stubInput())
+      const c = hub.addClient(nm, stubInput())
       await c.session.start()
       c.connect()
       await flush()
@@ -695,8 +694,8 @@ describe('offline co-op — restart (play again) adversarial', () => {
 
   it('restarts twice in a row without duplicating avatars', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(23, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(23, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
     await host.start()
     await bob.session.start()
     bob.connect()
@@ -716,9 +715,9 @@ describe('offline co-op — restart (play again) adversarial', () => {
 
   it('does not respawn a peer that dropped during the ended run', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(24, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
-    const cara = hub.addClient('Cara', 'soldier', stubInput())
+    const host = new NetHostSession(24, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
+    const cara = hub.addClient('Cara', stubInput())
     await host.start()
     for (const c of [bob, cara]) {
       await c.session.start()
@@ -753,14 +752,14 @@ describe('offline co-op — restart (play again) adversarial', () => {
 
   it('accepts a fresh late-joiner after a restart', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(25, 'soldier', 'Solo', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(25, 'Solo', stubInput(), hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
     host.restart()
     await flush()
 
-    const late = hub.addClient('Late', 'soldier', stubInput())
+    const late = hub.addClient('Late', stubInput())
     await late.session.start()
     late.connect()
     await flush()
@@ -805,7 +804,7 @@ const makeCapturingClientTransport = (): {
 describe('offline co-op — adversarial CLIENT (malformed host packets)', () => {
   it('survives a truncated Snapshot from the host without crashing', async () => {
     const cap = makeCapturingClientTransport()
-    const client = new NetClientSession('Bob', 'soldier', stubInput(), cap.transport)
+    const client = new NetClientSession('Bob', stubInput(), cap.transport)
     await client.start()
     cap.connect()
 
@@ -818,7 +817,7 @@ describe('offline co-op — adversarial CLIENT (malformed host packets)', () => 
 
   it('survives a garbage-JSON control message from the host', async () => {
     const cap = makeCapturingClientTransport()
-    const client = new NetClientSession('Bob', 'soldier', stubInput(), cap.transport)
+    const client = new NetClientSession('Bob', stubInput(), cap.transport)
     await client.start()
     cap.connect()
 
@@ -831,7 +830,7 @@ describe('offline co-op — adversarial CLIENT (malformed host packets)', () => 
 
   it('keeps processing valid messages after a garbage one (stream stays aligned)', () => {
     const cap = makeCapturingClientTransport()
-    const client = new NetClientSession('Bob', 'soldier', stubInput(), cap.transport)
+    const client = new NetClientSession('Bob', stubInput(), cap.transport)
     cap.connect()
 
     // Garbage snapshot first…
@@ -849,12 +848,12 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
 
   it('does not re-fire a roll edge from a stale/duplicate input packet', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(30, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(30, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob' }))
     await flush()
     host.beginGame()
     await flush()
@@ -919,9 +918,9 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
       peers: () => ['host'],
     }
 
-    const host = new NetHostSession(32, 'soldier', 'Alice', stubInput(), hostTransport)
+    const host = new NetHostSession(32, 'Alice', stubInput(), hostTransport)
     const input = { cur: emptyInput(), sample() { return { ...this.cur } } }
-    const client = new NetClientSession('Bob', 'soldier', input, clientTransport)
+    const client = new NetClientSession('Bob', input, clientTransport)
     await host.start()
     await client.start()
     h.host?.({ type: 'peerConnected', peer: 'central-1' })
@@ -967,8 +966,8 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     // the receiving peer could stop seeing its own avatar (self → undefined,
     // prediction/reconcile die). This locks the invariant in.
     const hub = new MockHub()
-    const host = new NetHostSession(40, 'soldier', 'Alice', stubInput(), hub.hostTransport)
-    const bob = hub.addClient('Bob', 'soldier', stubInput())
+    const host = new NetHostSession(40, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
     await host.start()
     await bob.session.start()
     bob.connect()
@@ -993,12 +992,12 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
 
   it('still latches an edge carried by a genuinely newer packet', async () => {
     const hub = new MockHub()
-    const host = new NetHostSession(31, 'soldier', 'Alice', stubInput(), hub.hostTransport)
+    const host = new NetHostSession(31, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const raw = hub.addRawCentral()
     raw.connect()
     await flush()
-    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', classId: 'soldier' }))
+    raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob' }))
     await flush()
     host.beginGame()
     await flush()

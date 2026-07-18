@@ -5,7 +5,7 @@ import { emptyInput } from '../../src/game/types'
 import { createWorld, tickWorld } from '../../src/game/world'
 
 const w = createWorld(5, 1)
-const player = spawnPlayer(w, 0, 'soldier', 10.5, 1.5)
+const player = spawnPlayer(w, 0, 10.5, 1.5)
 const thug = spawnNpc(w, 'thug', 11.5, 1.5)
 player.facing = 0
 

@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core'
 
 const OUT = process.env.OUT || '/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue/7cd1f2be-c0fd-478e-8279-45f7638dd053/scratchpad'
-const URL = 'http://localhost:5173/?mode=solo&class=soldier'
+const URL = 'http://localhost:5173/?mode=solo'
 
 const browser = await chromium.launch({
   executablePath: '/usr/bin/google-chrome',

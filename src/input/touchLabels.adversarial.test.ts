@@ -3,12 +3,11 @@ import type { RenderView } from '../app/session'
 import { makeEntity, type Entity } from '../game/entity'
 import { computeTouchLabels } from './touchLabels'
 
-const player = (opts: { classId?: string; weapon?: string; cd?: number } = {}): Entity => {
+const player = (opts: { weapon?: string; cd?: number } = {}): Entity => {
   const p = makeEntity('player', 'player', 0, 0)
   p.combat = { weapon: opts.weapon ?? 'pistol', cooldown: 0 }
   p.playerCtl = {
     playerId: 0,
-    classId: opts.classId ?? 'soldier',
     abilityCooldown: opts.cd ?? 0,
     inventory: [],
     activeSlot: -1,
@@ -43,25 +42,19 @@ describe('computeTouchLabels — ATK weapon fallbacks', () => {
 })
 
 describe('computeTouchLabels — SPC ability + cooldown edges', () => {
-  it('an unknown class yields the bare SPC label, still enabled when off cooldown', () => {
-    const labels = computeTouchLabels(view(player({ classId: 'ghost-class', cd: 0 })))
-    expect(labels.spc).toBe('SPC')
-    expect(labels.spcEnabled).toBe(true)
-  })
-
   it('rounds the cooldown UP to whole seconds (1 tick still reads 1s and is disabled)', () => {
-    const labels = computeTouchLabels(view(player({ classId: 'soldier', cd: 1 })))
+    const labels = computeTouchLabels(view(player({ cd: 1 })))
     expect(labels.spc).toBe('Grenade 1s')
     expect(labels.spcEnabled).toBe(false)
   })
 
   it('shows the exact whole-second cooldown at a tick boundary', () => {
-    expect(computeTouchLabels(view(player({ classId: 'soldier', cd: 60 }))).spc).toBe('Grenade 2s')
-    expect(computeTouchLabels(view(player({ classId: 'soldier', cd: 61 }))).spc).toBe('Grenade 3s')
+    expect(computeTouchLabels(view(player({ cd: 60 }))).spc).toBe('Grenade 2s')
+    expect(computeTouchLabels(view(player({ cd: 61 }))).spc).toBe('Grenade 3s')
   })
 
   it('a ready ability (cd 0) shows just the name and is enabled', () => {
-    const labels = computeTouchLabels(view(player({ classId: 'soldier', cd: 0 })))
+    const labels = computeTouchLabels(view(player({ cd: 0 })))
     expect(labels.spc).toBe('Grenade')
     expect(labels.spcEnabled).toBe(true)
   })
@@ -102,12 +95,12 @@ describe('computeTouchLabels — USE verb selection', () => {
 })
 
 describe('computeTouchLabels — degenerate self', () => {
-  it('a self with no playerCtl still produces safe labels (weapon + bare SPC)', () => {
+  it('a self with no playerCtl still produces safe labels (weapon + ready special)', () => {
     const p = makeEntity('player', 'player', 0, 0)
     p.combat = { weapon: 'pistol', cooldown: 0 }
     const labels = computeTouchLabels(view(p))
     expect(labels.atk).toBe('Pistol')
-    expect(labels.spc).toBe('SPC')
+    expect(labels.spc).toBe('Grenade')
     expect(labels.spcEnabled).toBe(true) // cd defaults to 0
   })
 })

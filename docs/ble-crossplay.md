@@ -19,9 +19,9 @@ and the **laptop browser joins** as a client over
 
 ## Join steps
 
-1. **Phone** (the Capacitor app): pick a class → **Host co-op**. It advertises
+1. **Phone** (the Capacitor app): **Host co-op**. It advertises
    as `SoR <name>`.
-2. **Laptop**: open `http://localhost:5173`, pick a class → **Join co-op** →
+2. **Laptop**: open `http://localhost:5173`, **Join co-op** →
    **Bluetooth (phone host)**.
 3. Chrome opens its own device chooser — pick the `SoR <name>` entry and hit
    Pair/Connect. (The chooser is Chrome UI; the in-game scan list is only used

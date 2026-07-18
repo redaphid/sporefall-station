@@ -8,7 +8,7 @@ const makePlayer = (w: World): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', 20, 20))
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.speed = 4.5
-  e.playerCtl = { playerId: 0, classId: 'thief', abilityCooldown: 0, inventory: [], activeSlot: -1, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, classId: 'soldier', abilityCooldown: 0, inventory: [], activeSlot: -1, cash: 0, crimeUntilTick: 0 }
   return e
 }
 

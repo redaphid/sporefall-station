@@ -8,7 +8,7 @@ describe('GameHarness', () => {
     const h = new GameHarness()
     h.create({ seed: 1, classId: 'soldier', name: 'Host' })
     expect(h.phase).toBe('lobby')
-    const s1 = h.addBot({ name: 'Bob', classId: 'thief' })
+    const s1 = h.addBot({ name: 'Bob', classId: 'soldier' })
     const s2 = h.addBot({ name: 'Cara', classId: 'soldier' })
     expect([s1, s2]).toEqual([1, 2])
     expect(h.lobby().map((p) => p.name)).toEqual(['Host', 'Bob', 'Cara'])
@@ -29,7 +29,7 @@ describe('GameHarness', () => {
   it('drives bots via programmatic input deposited into remoteInputs', () => {
     const h = new GameHarness()
     h.create({ seed: 7, classId: 'soldier' })
-    const slot = h.addBot({ name: 'Runner', classId: 'thief' })
+    const slot = h.addBot({ name: 'Runner', classId: 'soldier' })
     h.start()
     const bot = h.world.entities.find((e) => e.playerCtl?.playerId === slot)!
     const x0 = bot.pos.x
@@ -44,7 +44,7 @@ describe('GameHarness', () => {
     h.start()
     h.stepTicks(5)
     const before = h.world.entities.filter((e) => e.playerCtl).length
-    const slot = h.addBot({ name: 'Late', classId: 'thief' })
+    const slot = h.addBot({ name: 'Late', classId: 'soldier' })
     expect(h.world.entities.filter((e) => e.playerCtl).length).toBe(before + 1)
     expect(h.world.entities.some((e) => e.playerCtl?.playerId === slot)).toBe(true)
   })
@@ -52,7 +52,7 @@ describe('GameHarness', () => {
   it('removeBot kills the avatar and frees the slot', () => {
     const h = new GameHarness()
     h.create({ seed: 9, classId: 'soldier' })
-    const slot = h.addBot({ name: 'Temp', classId: 'thief' })
+    const slot = h.addBot({ name: 'Temp', classId: 'soldier' })
     h.start()
     const id = h.world.entities.find((e) => e.playerCtl?.playerId === slot)!.id
     h.removeBot(slot)
@@ -67,7 +67,7 @@ describe('runHarnessVerb', () => {
   it('runs a whole session through the verb grammar', () => {
     const h = new GameHarness()
     drive(h, 'create soldier 12345 Hosty')
-    const joined = drive(h, 'join_bot Bob thief') as { slot: number }
+    const joined = drive(h, 'join_bot Bob soldier') as { slot: number }
     expect(joined.slot).toBe(1)
     expect(drive(h, 'lobby')).toHaveLength(2)
     drive(h, 'start_run')
@@ -82,7 +82,7 @@ describe('runHarnessVerb', () => {
   it('records via verbs and replays deterministically', () => {
     const h = new GameHarness()
     drive(h, 'create soldier 999')
-    drive(h, 'join_bot Bob thief')
+    drive(h, 'join_bot Bob soldier')
     drive(h, 'start_run')
     drive(h, 'record_start')
     runHarnessVerb(h, `input 1 ${encodeArg('{"moveX":1}')}`)

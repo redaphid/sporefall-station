@@ -4,7 +4,7 @@ import { makeEntity, type Entity } from '../game/entity'
 
 import { computeTouchLabels } from './touchLabels'
 
-const player = (classId = 'thief', abilityCooldown = 0): Entity => {
+const player = (classId = 'soldier', abilityCooldown = 0): Entity => {
   const p = makeEntity('player', 'player', 0, 0)
   p.combat = { weapon: 'pistol', cooldown: 0 }
   p.playerCtl = {
@@ -81,12 +81,12 @@ describe('computeTouchLabels', () => {
   })
 
   it('SPC shows the class ability and cooldown state', () => {
-    const ready = computeTouchLabels(view(player('thief', 0)))
-    expect(ready.spc).toBe('Cloak')
+    const ready = computeTouchLabels(view(player('soldier', 0)))
+    expect(ready.spc).toBe('Grenade')
     expect(ready.spcEnabled).toBe(true)
 
-    const cooling = computeTouchLabels(view(player('thief', 90)))
-    expect(cooling.spc).toBe('Cloak 3s')
+    const cooling = computeTouchLabels(view(player('soldier', 90)))
+    expect(cooling.spc).toBe('Grenade 3s')
     expect(cooling.spcEnabled).toBe(false)
   })
 })

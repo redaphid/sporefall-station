@@ -49,19 +49,6 @@ describe('teammate revive', () => {
     expect(downed.health!.hp).toBe(Math.floor(downed.health!.max * 0.3))
   })
 
-  it('a Doctor revives twice as fast (reviveSpeedMult 2)', () => {
-    const downed = downPlayer()
-    spawnPlayer(w, 1, 'doctor', 20.9, 20)
-    const ids = idleFor(0, 1)
-    let ticks = 0
-    while (downed.playerCtl!.downed && ticks < 90) {
-      interactionSystem(w, ids)
-      ticks++
-    }
-    expect(downed.playerCtl!.downed).toBeUndefined()
-    expect(ticks).toBeLessThanOrEqual(45) // 90 / 2
-  })
-
   it('a teammate out of range makes no progress and lets the bleed timer tick down', () => {
     const downed = downPlayer()
     downed.playerCtl!.downed!.bleedTicks = 10
@@ -164,31 +151,16 @@ describe('lockpick channel', () => {
     w = createWorld(1, 1)
   })
 
-  it('a Thief pops an easy lock (level ≤ autoPickLockLevel) instantly, no channel', () => {
-    const p = spawnPlayer(w, 0, 'thief', 20, 20) // autoPickLockLevel 1
-    const door = lockedDoor(w, 20.8, 20, 1)
-    settle(p)
-    interactionSystem(w, inputs([0, interactCmd()]))
-    expect(door.door!.locked).toBe(false)
-    expect(door.door!.open).toBe(true)
-    expect(p.playerCtl!.channel).toBeUndefined()
-  })
-
-  it('a Thief facing a hard lock (level above their skill) starts a channel instead', () => {
-    const p = spawnPlayer(w, 0, 'thief', 20, 20)
-    const door = lockedDoor(w, 20.8, 20, 2)
-    settle(p)
-    interactionSystem(w, inputs([0, interactCmd()]))
-    expect(door.door!.locked).toBe(true)
-    expect(p.playerCtl!.channel).toEqual({ kind: 'lockpick', targetId: door.id, ticksLeft: 45 })
-  })
-
-  it('a non-Thief starts a lockpick channel on any locked door', () => {
-    const p = spawnPlayer(w, 0, 'soldier', 20, 20)
-    const door = lockedDoor(w, 20.8, 20, 1)
-    settle(p)
-    interactionSystem(w, inputs([0, interactCmd()]))
-    expect(p.playerCtl!.channel?.targetId).toBe(door.id)
+  it('any locked door starts a lockpick channel — no class pops locks instantly anymore', () => {
+    for (const lockLevel of [1, 2]) {
+      const world = createWorld(1, 1)
+      const p = spawnPlayer(world, 0, 'soldier', 20, 20)
+      const door = lockedDoor(world, 20.8, 20, lockLevel)
+      settle(p)
+      interactionSystem(world, inputs([0, interactCmd()]))
+      expect(door.door!.locked).toBe(true) // still locked: the pick is a channel, not instant
+      expect(p.playerCtl!.channel).toEqual({ kind: 'lockpick', targetId: door.id, ticksLeft: 45 })
+    }
   })
 
   it('moving cancels an in-progress channel', () => {
@@ -207,7 +179,7 @@ describe('lockpick channel', () => {
     const door = lockedDoor(w, 20.8, 20)
     settle(p)
     interactionSystem(w, inputs([0, interactCmd()]))
-    door.door!.locked = false // hacker opened it, say
+    door.door!.locked = false // unlocked by other means, say
     interactionSystem(w, idleFor(0))
     expect(p.playerCtl!.channel).toBeUndefined()
   })

@@ -34,22 +34,14 @@ describe('spawnPlayer — the starter weapon is a proper slotted ItemStack', () 
     expect(weaponStack(p)?.itemId).toBe('pistol')
   })
 
-  it('a melee starter (thief → knife) is slotted with its normal durability', () => {
+  it('an unknown/removed classId falls back to the soldier starter (pistol, slotted, loaded)', () => {
     const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'thief', 20, 20)
-    expect(p.combat!.weapon).toBe('knife')
+    const p = spawnPlayer(w, 0, 'thief', 20, 20) // removed class → soldier
+    expect(p.playerCtl!.classId).toBe('soldier')
+    expect(p.combat!.weapon).toBe('pistol')
     expect(p.playerCtl!.activeSlot).toBe(0)
-    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'knife', qty: WEAPONS.knife.durability }])
-    expect(weaponStack(p)?.itemId).toBe('knife')
-  })
-
-  it('a fists starter (doctor) stays innate — no slot, bare hands', () => {
-    const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 'doctor', 20, 20)
-    expect(p.combat!.weapon).toBe('fists')
-    expect(p.playerCtl!.activeSlot).toBe(-1)
-    expect(p.playerCtl!.inventory).toEqual([])
-    expect(weaponStack(p)).toBeUndefined()
+    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(weaponStack(p)?.itemId).toBe('pistol')
   })
 })
 

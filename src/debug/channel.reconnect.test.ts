@@ -134,7 +134,7 @@ describe('harness channel over the wire', () => {
     }
 
     expect(call(1, 'create soldier 777').ok).not.toBe(false)
-    expect(call(2, 'join_bot Bob thief').ok).not.toBe(false)
+    expect(call(2, 'join_bot Bob soldier').ok).not.toBe(false)
     expect(call(3, 'start_run').ok).not.toBe(false)
     const tickRep = call(4, 'tick 10')
     expect(JSON.parse(tickRep.body!).tick).toBe(10)

@@ -104,7 +104,7 @@ export class EntityViews {
         view.frame = frame
       }
 
-      // Downed players faded hard; cloaked thieves shimmer translucent
+      // Downed players faded hard; cloaked players shimmer translucent
       const cloaked = e.status !== undefined && e.status.cloakUntil > tick
       view.sprite.alpha = e.playerCtl?.downed ? 0.45 : cloaked ? 0.55 : 1
       // Element tints read status at a glance: frozen ice-blue, electrified

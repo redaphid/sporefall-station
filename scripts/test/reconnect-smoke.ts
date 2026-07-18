@@ -24,7 +24,7 @@ const main = async (): Promise<void> => {
 
   const client = await context.newPage()
   hookErrors('client', client)
-  await client.goto(`${BASE}/?mode=join&class=thief&room=rejoin&name=Sneaky&transport=tabs`)
+  await client.goto(`${BASE}/?mode=join&class=soldier&room=rejoin&name=Sneaky&transport=tabs`)
   await client.waitForSelector('text=Connected', { timeout: 10000 })
   await host.click('text=Start game')
   await client.waitForSelector('text=Floor 1', { timeout: 10000 })

@@ -66,11 +66,6 @@ const handleInteract = (w: World, p: Entity): void => {
     if (!door.locked) {
       door.open = !door.open
       w.events.push({ type: 'doorToggle', entityId: target.id, open: door.open })
-    } else if ((CLASSES[p.playerCtl!.classId]?.autoPickLockLevel ?? 0) >= door.lockLevel) {
-      // Thief passive: easy locks pop instantly
-      door.locked = false
-      door.open = true
-      w.events.push({ type: 'doorToggle', entityId: target.id, open: true })
     } else if (!p.playerCtl!.channel) {
       p.playerCtl!.channel = { kind: 'lockpick', targetId: target.id, ticksLeft: LOCKPICK_TICKS }
     }
@@ -122,7 +117,7 @@ const bleedAndRevive = (w: World, p: Entity): void => {
   )
   if (helper) {
     // Teammate revive: a standing ally hauls them up — the co-op window is kept.
-    downed.reviveProgress += CLASSES[helper.playerCtl!.classId]?.reviveSpeedMult ?? 1
+    downed.reviveProgress += 1
     if (downed.reviveProgress >= REVIVE_TICKS) recover(w, p)
   } else {
     downed.reviveProgress = 0
@@ -195,8 +190,8 @@ const collect = (player: Entity, item: Entity): boolean => {
     return true
   }
   if (c === 'consumable') {
-    // Auto-heal if hurt, else stash. Doctors heal double.
-    const heal = (CONSUMABLES[itemId].heal ?? 0) * (CLASSES[ctl.classId]?.healMult ?? 1)
+    // Auto-heal if hurt, else stash.
+    const heal = CONSUMABLES[itemId].heal ?? 0
     if (player.health && player.health.hp < player.health.max) {
       player.health.hp = Math.min(player.health.max, player.health.hp + heal)
       return true

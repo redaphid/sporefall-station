@@ -250,7 +250,7 @@ describe('meleeAttack — arc, targeting, backstab', () => {
   })
 
   it('a cloaked backstab triples damage and breaks the cloak', () => {
-    const attacker = spawnPlayer(w, 0, 'thief', 20, 20)
+    const attacker = spawnPlayer(w, 0, 'soldier', 20, 20)
     attacker.facing = 0
     attacker.status!.cloakUntil = w.tick + 100
     const victim = npc(w, 20.8, 20)

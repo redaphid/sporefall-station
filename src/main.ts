@@ -20,7 +20,6 @@ import { BroadcastChannelTransport } from './net/transport/broadcastChannelTrans
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
-import { pickClass } from './ui/classSelect'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
@@ -49,7 +48,10 @@ const boot = async (): Promise<void> => {
   const room = params.get('room') ?? 'car'
   const name = params.get('name') ?? `Player-${(Math.random() * 90 + 10) | 0}`
 
-  const classId = params.get('class') ?? (await pickClass(uiMount))
+  // Soldier is the only playable class — boot goes straight to the mode picker
+  // with no class-selection screen. A stale `?class=` param is ignored;
+  // spawnPlayer falls back to soldier for unknown ids anyway.
+  const classId = 'soldier'
   const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount))
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,

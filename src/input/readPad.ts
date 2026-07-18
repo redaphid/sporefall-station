@@ -1,4 +1,3 @@
-import { aimFires } from './aim'
 import type { PadProfile } from './padProfile'
 
 /** Raw held state for one pad on one sample — no edge history, no seq. */
@@ -22,10 +21,17 @@ export interface PadState {
 
 const DEADZONE = 0.28
 
+/** Analog trigger threshold: past half-travel counts as pressed. Matters for
+ * L2/R2 fire — some pads report a trigger's travel only in `.value` and are
+ * stingy with `.pressed`. The (0.5, 1] band is deliberate: the spec range is
+ * 0..1, so a garbage reading (negative, NaN, or wildly out of range) can never
+ * fake a press. */
+const TRIGGER_PRESS = 0.5
+
 const pressed = (pad: Gamepad, i: number): boolean => {
   const b = pad.buttons[i]
   if (!b) return false
-  return b.pressed
+  return b.pressed || (b.value > TRIGGER_PRESS && b.value <= 1)
 }
 
 const anyPressed = (pad: Gamepad, idxs: number[]): boolean => idxs.some((i) => pressed(pad, i))
@@ -132,10 +138,9 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
   }
 
   // A profile with no aimAxes has no aim stick we are willing to name, so aim
-  // reads centred and the twin-stick fire path below can never trip. This is not
-  // "no aim": selectAim falls back to the movement vector, and the attack button
-  // is untouched. See PadProfile.aimAxes for why guessing here is unacceptable in
-  // a way that guessing a d-pad index is not -- aim past the threshold FIRES.
+  // reads centred. This is not "no aim": selectAim falls back to the movement
+  // vector, and the fire buttons are untouched. See PadProfile.aimAxes for why
+  // guessing here is unacceptable in a way that guessing a d-pad index is not.
   const aimX = profile.aimAxes === null ? 0 : stick(pad, profile.aimAxes[0])
   const aimY = profile.aimAxes === null ? 0 : stick(pad, profile.aimAxes[1])
 
@@ -144,9 +149,9 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
     moveY,
     aimX,
     aimY,
-    // Twin-stick parity with touch: the attack BUTTON fires, and so does
-    // deflecting the aim stick past the shared fire threshold.
-    attack: anyPressed(pad, profile.attack) || aimFires(aimX, aimY),
+    // Firing is buttons only (A / RB / L2 / R2 on the shared map). The aim stick
+    // aims and never fires — so no axis reading, proven or guessed, can shoot.
+    attack: anyPressed(pad, profile.attack),
     interact: anyPressed(pad, profile.interact),
     special: anyPressed(pad, profile.special),
     roll: anyPressed(pad, profile.roll),

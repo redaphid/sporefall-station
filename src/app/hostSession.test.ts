@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { HostSession } from './hostSession'
+import { serializeWorld } from '../game/serialize'
 import { emptyInput, type InputCmd } from '../game/types'
 import type { CoopSample } from '../input/gamepadCoop'
 
@@ -93,6 +94,36 @@ describe('HostSession local co-op', () => {
       session.tick()
       expect(session.isPaused).toBe(false)
       expect(session.self.pos.x).toBeGreaterThan(x)
+    })
+
+    // Determinism: pause must not touch the world at all. A paused tick is a
+    // session-level skip — no systems run, no RNG draws, no tick advance — so
+    // the serialized world is byte-identical however long the pause lasts.
+    it('leaves the world byte-identical across any number of paused ticks', () => {
+      const coop = scripted([{ inputs: new Map(), joins: [0], leaves: [], pauses: [0] }])
+      const session = new HostSession(1, stubInput, coop)
+      session.tick() // pause lands
+      const frozen = JSON.stringify(serializeWorld(session.world))
+      for (let i = 0; i < 25; i++) session.tick()
+      expect(JSON.stringify(serializeWorld(session.world))).toBe(frozen)
+      expect(session.isPaused).toBe(true)
+    })
+
+    // And a paused-then-resumed run replays to the same world as an unbroken
+    // run: same seed + same per-tick inputs => byte-identical, pause or not.
+    it('a run interrupted by a pause converges with an uninterrupted run', () => {
+      const plain = new HostSession(9, stubInput)
+      for (let i = 0; i < 10; i++) plain.tick()
+
+      const coop = scripted([
+        ...Array.from({ length: 5 }, () => ({ inputs: new Map<number, InputCmd>(), joins: [] as number[], leaves: [] as number[], pauses: [] as number[] })),
+        { inputs: new Map<number, InputCmd>(), joins: [], leaves: [], pauses: [0] }, // pause after 5 sim ticks
+        ...Array.from({ length: 3 }, () => ({ inputs: new Map<number, InputCmd>(), joins: [] as number[], leaves: [] as number[], pauses: [] as number[] })),
+        { inputs: new Map<number, InputCmd>(), joins: [], leaves: [], pauses: [0] }, // resume
+      ])
+      const paused = new HostSession(9, stubInput, coop)
+      while (paused.world.tick < 10) paused.tick()
+      expect(JSON.stringify(serializeWorld(paused.world))).toBe(JSON.stringify(serializeWorld(plain.world)))
     })
   })
 

@@ -343,13 +343,16 @@ describe('readPad', () => {
     })
   })
 
-  describe('aim-to-fire parity with touch', () => {
-    it('fires attack when the right stick deflects past the fire threshold, no button', () => {
+  // Firing is buttons only: the aim stick aims and NEVER fires. (Touch keeps
+  // its own aim-to-fire rule — a phone has no trigger; a pad has four.)
+  describe('the aim stick aims but never fires', () => {
+    it('does not fire from a fully deflected right stick', () => {
       const s = readPad(fakePad({ axes: [0, 0, 0.9, 0] }), std)
-      expect(s.attack).toBe(true)
+      expect(s.attack).toBe(false)
+      expect(s.aimX).toBeCloseTo(0.9)
     })
-    it('does not fire from a small right-stick nudge below the threshold', () => {
-      const s = readPad(fakePad({ axes: [0, 0, 0.3, 0] }), std)
+    it('does not fire from a hard diagonal deflection either', () => {
+      const s = readPad(fakePad({ axes: [0, 0, -1, -1] }), std)
       expect(s.attack).toBe(false)
     })
     it('still fires from the attack button with the aim stick centred', () => {
@@ -359,11 +362,71 @@ describe('readPad', () => {
     })
   })
 
+  describe('L2 fires (the explicit trigger), with analog .value tolerance', () => {
+    const withBtn = (i: number, b: { pressed: boolean; value: number }) => {
+      const pad = fakePad()
+      ;(pad.buttons as unknown as { pressed: boolean; touched: boolean; value: number }[])[i] = {
+        ...b,
+        touched: b.pressed,
+      }
+      return pad
+    }
+
+    it('fires while L2 (button 6) is pressed', () => {
+      const buttons: boolean[] = []
+      buttons[6] = true
+      expect(readPad(fakePad({ buttons }), std).attack).toBe(true)
+    })
+    it('fires while R2 (button 7) is pressed', () => {
+      const buttons: boolean[] = []
+      buttons[7] = true
+      expect(readPad(fakePad({ buttons }), std).attack).toBe(true)
+    })
+    it('does not roll when L2 fires — roll lives on LB alone now', () => {
+      const buttons: boolean[] = []
+      buttons[6] = true
+      const s = readPad(fakePad({ buttons }), std)
+      expect(s.roll).toBe(false)
+      expect(readPad(fakePad({ buttons: (() => { const b: boolean[] = []; b[4] = true; return b })() }), std).roll).toBe(true)
+    })
+    it('fires from analog travel past half even when .pressed lags (value 0.8, pressed false)', () => {
+      expect(readPad(withBtn(6, { pressed: false, value: 0.8 }), std).attack).toBe(true)
+    })
+    it('does not fire from a light squeeze (value 0.3)', () => {
+      expect(readPad(withBtn(6, { pressed: false, value: 0.3 }), std).attack).toBe(false)
+    })
+    it('does not fire at exactly the threshold (value 0.5)', () => {
+      expect(readPad(withBtn(6, { pressed: false, value: 0.5 }), std).attack).toBe(false)
+    })
+    // Adversarial: .value is specced 0..1, so out-of-range garbage — a raw-pad
+    // trigger resting at -1, NaN, or a wild 100 — must never fake a press.
+    it.each([-1, -0.75, NaN, 100, 2, Infinity])('never fires from garbage value %p', (v) => {
+      expect(readPad(withBtn(6, { pressed: false, value: v }), std).attack).toBe(false)
+    })
+    it('fires on the raw profile too — L2 is the same guess there', () => {
+      const raw = padProfile(fakePad({ id: 'Some Generic USB Joystick', mapping: '', axisCount: 8 }))
+      const buttons: boolean[] = []
+      buttons[6] = true
+      expect(readPad(fakePad({ buttons, mapping: '', axisCount: 8 }), raw).attack).toBe(true)
+    })
+    // A raw pad fresh from the driver: even if every button object reports a
+    // resting value of 0 and pressed false, nothing fires.
+    it('an untouched raw pad with idle trigger buttons stays silent', () => {
+      const raw = padProfile(fakePad({ id: 'Some Generic USB Joystick', mapping: '', axisCount: 8 }))
+      const s = readPad(fakePad({ mapping: '', axisCount: 8 }), raw)
+      expect(s.attack).toBe(false)
+      expect(s.roll).toBe(false)
+      expect(s.pause).toBe(false)
+    })
+  })
+
   /**
    * The bug-2 repro. On a RAW pad, axes 2/3 are as likely to be analog triggers
-   * as a right stick. Analog triggers rest at -1, so hypot(-1,-1) = 1.41 sails
-   * past the 0.5 aim-fire threshold: an untouched pad fired forever and aimed
-   * pinned up-left. The fix is that a raw profile names no aim axes at all.
+   * as a right stick. Analog triggers rest at -1 once touched, and when aim
+   * could still fire that meant an untouched pad fired forever and aimed pinned
+   * up-left. Two independent defences now stand: a raw profile names no aim
+   * axes at all, AND firing is buttons-only so no axis can shoot on any pad.
+   * This suite pins both.
    */
   describe('a raw pad cannot fire itself from axes it never proved were a stick', () => {
     const raw = padProfile(fakePad({ id: 'Some Generic USB Joystick', mapping: '', axisCount: 8 }))
@@ -459,11 +522,17 @@ describe('readPad', () => {
       expect(s.moveY).toBe(0)
     })
 
-    it('aims and fires from a genuinely deflected right stick', () => {
+    it('aims from a genuinely deflected right stick without firing (buttons fire)', () => {
       const s = readPad(canonPad({ axes: [0, 0, 0.9, -0.8] }), canon)
       expect(s.aimX).toBeCloseTo(0.9)
       expect(s.aimY).toBeCloseTo(-0.8)
-      expect(s.attack).toBe(true)
+      expect(s.attack).toBe(false)
+    })
+
+    it('fires from L2 (canonical button 6, where Chromium puts the left trigger)', () => {
+      const buttons: boolean[] = []
+      buttons[6] = true
+      expect(readPad(canonPad({ buttons }), canon).attack).toBe(true)
     })
 
     // Chromium hands the hat over as buttons 12-15 here; there is no axis 9.

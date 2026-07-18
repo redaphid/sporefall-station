@@ -33,7 +33,10 @@ const config: CapacitorConfig = {
         plugins: {
           CapacitorUpdater: {
             autoUpdate: true,
-            autoUpdateUrl: otaUpdateUrl,
+            // capgo v4+ renamed `autoUpdateUrl` → `updateUrl`; with the old key
+            // the plugin silently fell back to Capgo's SaaS endpoint (which
+            // rejects self-hosted apps with HTTP 429) and updates never arrived.
+            updateUrl: otaUpdateUrl,
             statsUrl: '',
           },
         },

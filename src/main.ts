@@ -183,6 +183,12 @@ const boot = async (): Promise<void> => {
           levelW: hostWorld.level.w,
           levelH: hostWorld.level.h,
         })
+      // GROUND TRUTH projection: where the world container ACTUALLY drew a
+      // world point this frame (post edge-clamp + shake). e2es assert the DOM
+      // overlays (mission 🎯, locator) against THIS, so any drift between the
+      // overlay math and the render transform fails loudly.
+      ;(window as unknown as { __renderedProject: (wx: number, wy: number) => { x: number; y: number } }).__renderedProject =
+        (wx, wy) => renderer.worldToScreen(wx, wy)
     }
   }
   if (script && session instanceof HostSession) {

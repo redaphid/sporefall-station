@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { OVERSCAN_FRAC } from '../render/cameraModel'
 import {
   DOWNED_COLOR,
   locatorMarkers,
@@ -55,11 +56,14 @@ describe('projectToScreen', () => {
     // zoom scales the tile size.
     expect(projectToScreen(51, 50, cam({ zoom: 2 }))).toEqual({ x: 464, y: 300 })
   })
-  it('clamps the camera at the level edge, exactly like Camera.apply', () => {
-    // Camera pushed hard into the top-left corner: halfW = 400/32 = 12.5, so cx clamps to 12.5.
+  it('clamps the camera at the level edge with the SOFT (overscan) clamp, exactly like Camera.apply', () => {
+    // Camera pushed hard into the top-left corner: halfW = 400/32 = 12.5, and
+    // the soft clamp allows OVERSCAN_FRAC of the half-view past the edge, so
+    // cx clamps to 12.5 - 0.4*12.5 = 7.5 (not the old hard 12.5 — that stale
+    // duplicate clamp is exactly what put mission markers on empty ground).
     const p = projectToScreen(0, 0, cam({ x: 0, y: 0 }))
-    expect(p.x).toBeCloseTo(400 + (0 - 12.5) * 32) // = 0
-    expect(p.y).toBeCloseTo(300 + (0 - 9.375) * 32) // halfH = 300/32 = 9.375
+    expect(p.x).toBeCloseTo(400 + (0 - 12.5 * (1 - OVERSCAN_FRAC)) * 32) // = 160
+    expect(p.y).toBeCloseTo(300 + (0 - 9.375 * (1 - OVERSCAN_FRAC)) * 32) // halfH = 300/32 = 9.375
   })
   it('centres a level smaller than the viewport instead of clamping', () => {
     // 5x5 level, 800px view → level*T (160) < screenW, so cx = levelW/2 = 2.5.

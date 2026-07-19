@@ -78,11 +78,12 @@ const farthestBuilding = (w: World): Building | null => {
   return best
 }
 
-/** The LAST room is by convention the deepest one — generators that carve an
- * innermost chamber (bunker core, vault) push it last, so a mission objective
- * in such a building lands behind every lock and wall it has. */
+/** Centre of the building's EXPLICIT objective room — the room its generator
+ * designated for mission targets (bunker core, vault, loop core, …). No array-
+ * order inference: if a generator forgot to designate one, fall back to the
+ * whole interior so the target still lands inside the building. */
 const roomCenter = (b: Building): { x: number; y: number } => {
-  const room = b.rooms.length > 0 ? b.rooms[b.rooms.length - 1] : { x: b.rect.x + 1, y: b.rect.y + 1, w: b.rect.w - 2, h: b.rect.h - 2 }
+  const room = b.objectiveRoom ?? { x: b.rect.x + 1, y: b.rect.y + 1, w: b.rect.w - 2, h: b.rect.h - 2 }
   return { x: room.x + room.w / 2, y: room.y + room.h / 2 }
 }
 

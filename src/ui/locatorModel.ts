@@ -1,4 +1,5 @@
 import { TILE_PX } from '../render/art'
+import { appliedCenter } from '../render/cameraModel'
 
 /**
  * Co-op teammate locator (issue #34). Pure geometry so it's fully unit-tested:
@@ -66,14 +67,12 @@ const EDGE_MARGIN = 28
  */
 export const projectToScreen = (wx: number, wy: number, cam: CameraState): { x: number; y: number } => {
   const T = TILE_PX * cam.zoom
-  const halfW = cam.screenW / 2 / T
-  const halfH = cam.screenH / 2 / T
-  const cx = cam.levelW * T > cam.screenW ? clamp(cam.x, halfW, cam.levelW - halfW) : cam.levelW / 2
-  const cy = cam.levelH * T > cam.screenH ? clamp(cam.y, halfH, cam.levelH - halfH) : cam.levelH / 2
-  return { x: cam.screenW / 2 + (wx - cx) * T, y: cam.screenH / 2 + (wy - cy) * T }
+  // The APPLIED camera centre — the shared soft-edge clamp (cameraModel.ts),
+  // identical to what Camera.apply renders with. Never re-derive it here: a
+  // divergent clamp misplaces every marker precisely in map corners.
+  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH)
+  return { x: cam.screenW / 2 + (wx - c.x) * T, y: cam.screenH / 2 + (wy - c.y) * T }
 }
-
-const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 
 /**
  * Inverse of {@link projectToScreen}: a screen pixel back to a world tile coord,
@@ -83,11 +82,8 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
  */
 export const screenToWorld = (sx: number, sy: number, cam: CameraState): { x: number; y: number } => {
   const T = TILE_PX * cam.zoom
-  const halfW = cam.screenW / 2 / T
-  const halfH = cam.screenH / 2 / T
-  const cx = cam.levelW * T > cam.screenW ? clamp(cam.x, halfW, cam.levelW - halfW) : cam.levelW / 2
-  const cy = cam.levelH * T > cam.screenH ? clamp(cam.y, halfH, cam.levelH - halfH) : cam.levelH / 2
-  return { x: cx + (sx - cam.screenW / 2) / T, y: cy + (sy - cam.screenH / 2) / T }
+  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH)
+  return { x: c.x + (sx - cam.screenW / 2) / T, y: c.y + (sy - cam.screenH / 2) / T }
 }
 
 /**

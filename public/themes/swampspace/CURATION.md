@@ -6,52 +6,74 @@ water, overgrown tech. Art direction: dominant-color study of *Flashback*
 (Amiga 1992) Titan jungle — teal mist, olive overgrowth, tan/gray tech, hot
 accents (inspiration only; no Flashback art used as input or reproduced).
 
+Pipeline guide (setup, scripts, techniques): `docs/sprite-generation.md`.
+
+## Numbers
+
+- 47 shipped sprites: 20 character frames (6 cast members), 2 seamless tiles,
+  6 props, 8 items, 11 FX/projectiles.
+- 36 are curated diffusion picks from ~384 staged sweep candidates
+  (~9% acceptance); 11 FX are deterministic procedural PIL drawings.
+- Three whole sweep rounds were rejected outright and re-prompted: NPC s-idles
+  (cast-anchor weight 0.8 turned everyone into player clones), items
+  (environment IPAdapter refs turned weapons into mushrooms), and diffusion FX
+  (gray scene remnants on "pure black background" prompts).
+
 ## How each asset was chosen
 
 Every diffusion asset came from a **seed sweep** (4–16 candidates), reviewed
-at final sprite size, gated by a VLM verifier (`scripts/assets/verify.py`,
-qwen3-vl majority vote: props must not read as figures, floors must read
-top-down, back-facing character poses must not show a face), and the winner's
-exact lineage recorded in `scripts/assets/curation.json`
-(`{seed, batch, index, raw}` — regenerate any pick with
-`python3 scripts/assets/generate.py final <job>`).
+at final sprite size on contact sheets, gated by the VLM verifier
+(`scripts/assets/verify.py`, qwen3-vl: anthropomorphism/perspective/facing per
+asset, `--pairs` idle-vs-step pose consistency, `--style` pack-wide style
+match against anchor sprites), and the winner's exact lineage recorded in
+`scripts/assets/curation.json` (`{seed, batch, index, raw, size, ckpt}` —
+regenerate any pick with `python3 scripts/assets/generate.py final <job>`).
 
-- Generator: SDXL `AnythingXL_xl` + skormino pixel-art LoRA (SDXL/Illustrious),
-  CFG 3.5 euler 28 steps @1024, IPAdapter style anchoring
-  (`scripts/assets/anchors/`), k-centroid downscale, locked 34-color palette
-  (`scripts/assets/palette.py`), no dither, hard alpha.
-- Tiles are generated with a half-offset + img2img-heal pass (seamless by
-  construction); tiling proofs live in `docs/assets/swampspace/tiling-*.png`.
-- Sparse particle FX (hit spark, pickup sparkle, ichor splat, spore bolt,
-  spore pod) are deterministic PIL drawings (`scripts/assets/procedural.py`) —
-  diffusion reliably hallucinates figures into sparse particle prompts.
-- Raw sweeps are NOT committed (staging under `$SWAMPSPACE_STAGE`).
+Two generator configurations (recorded per pick in `curation.json`):
+
+- **SDXL** `AnythingXL_xl` + skormino pixel LoRA @1024 — tiles, props, the
+  ranger's 10 poses, spore-drone idle.
+- **SD1.5** `dreamshaper_8` @512 (no LoRA — it's SDXL-only) — NPC cast,
+  items, wall tile, all step frames. Adopted when resident VLM models on the
+  shared GPU pushed SDXL into 30-min lowvram batches. The k-centroid +
+  locked-palette post-pass keeps both sets in one visual register.
+
+All curated sprites are quantized to the locked 34-color Flashback-derived
+palette (`scripts/assets/palette.py`), no dither, hard alpha.
 
 ## Cast
 
 | archetype | kind | notes |
 |---|---|---|
-| player | vine-ranger | teal EVA suit, amber visor, vine-wrapped arm |
-| cop | spore-drone | hovering pod drone, green sensor eye (bouncer shares) |
-| thug | bog-mutant | hulking moss-crusted brute (boss/gangster share) |
-| scientist | mycologist | pale hazmat, green faceplate, mushroom vials |
-| robot | derelict-bot | rusted tracked maintenance unit |
-| civilian | frog-settler | squat frog alien in poncho (shopkeeper shares) |
+| player | vine-ranger | teal EVA suit, amber cap-visor, vine arm — full 5-dir × idle/step set |
+| cop | spore-drone | hovering jellyfish-drone, green sensor mass (bouncer shares) |
+| thug | bog-mutant | hulking moss-crusted olive brute (boss/gangster share) |
+| scientist | mycologist | pale hazmat, green shoulder pods, sample tube |
+| robot | derelict-bot | dark boxy machine, orange eye lenses |
+| civilian | frog-settler | squat frog in rope-belted poncho (shopkeeper shares) |
 
-Each character: 5 drawn directions (s se e ne n; west mirrored by engine) ×
-idle/step, 48×48, feet bottom-center. The character's curated `s-idle` is the
-IPAdapter anchor for its other nine poses (weight 0.7–0.8 for front poses,
-0.5–0.55 for away poses so the anchor doesn't fight the facing prompt — at 0.8
-a "cast anchor" turned every NPC into a player clone; NPC identity is enforced
-with per-kind negative prompts against the ranger's signature).
+Characters: 48×48, feet bottom-center. The player has all 5 drawn directions;
+NPCs ship s-idle/s-step and borrow the rest via manifest fallback chains
+(`manifest.py` mentions every one of the 70 char keys so nothing falls back to
+the city theme's human sprites mid-walk).
+
+**Step frames are img2img from that direction's curated idle** (denoise 0.38,
+prompt delta only "mid-stride, one leg forward") — txt2img steps flickered
+like costume changes against their idles in the walk cycle.
 
 ## Known compromises
 
-- `tile.root-bulkhead` reads more "overgrown stone courses" than "roots over
-  hull metal"; best of 20 candidates, seam energy 10.8 (deck-moss: 3.9).
-- The ranger's amber "visor" drifted to an amber cap in most poses; kept — it
-  is consistent across the set and reads at gameplay zoom.
-- Props share a gray-teal body palette; silhouettes carry the differences.
+- `item.root-club` is the weakest sprite in the pack (dark, low silhouette
+  readability at 19 px display size); two re-prompt rounds didn't beat it.
+- The ranger's amber "visor" reads as an amber cap in most poses; kept — it is
+  consistent across all 10 poses and reads at gameplay zoom.
+- `tile.root-bulkhead` seam energy 8.6 (deck-moss 3.9) — visible texture
+  variance when tiled in long runs, acceptable at gameplay zoom (see
+  `docs/assets/swampspace/tiling-root-bulkhead.png`).
+- NPC non-south directions are manifest borrows of the south sprites (engine
+  mirrors/billboards); real per-direction NPC art is the natural next
+  increment, one `sweep` per pose with the anchors already in
+  `scripts/assets/anchors/`.
 
-Contact sheets: `docs/assets/swampspace/{pack,tiles,chars,props,items,fx}.png`.
-Regeneration guide: `docs/swampspace-theme.md`.
+Contact sheets: `docs/assets/swampspace/{pack,tiles,chars,props,items,fx}.png`;
+in-game capture: `docs/assets/swampspace/ingame-swampspace.png`.

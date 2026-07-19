@@ -183,9 +183,65 @@ def pairs_mode():
     sys.exit(min(fails, 120))
 
 
+STYLE_PROMPT = (
+    "Image 1 is a candidate sprite; images 2 and 3 are style anchors from the same "
+    "pixel-art game. Judge whether the candidate belongs to the same game: same "
+    "pixel-art style and pixel density, same overall color palette (dark teal/olive "
+    "with green/amber accents), same flat lighting. Answer ONLY with JSON: "
+    '{"same_style": <bool>, "same_palette": <bool>, "reason": "<short>"}'
+)
+
+# pack-wide style anchors: the player front sprite, the hero prop, the floor
+STYLE_ANCHORS = ("chars/vine-ranger-s-idle.png", "props/spore-barrel.png")
+
+
+def style_mode():
+    """Compare every curated sprite against the pack's style anchors."""
+    anchors = [os.path.join(G.THEME, a) for a in STYLE_ANCHORS]
+    anchors = [a for a in anchors if os.path.exists(a)]
+    fails = 0
+    checked = 0
+    J = G.jobs()
+    for name, spec in J.items():
+        p = os.path.join(G.THEME, spec["path"])
+        if not os.path.exists(p) or spec["path"] in STYLE_ANCHORS:
+            continue
+        body = {"model": MODEL, "prompt": STYLE_PROMPT,
+                "images": [_b64(p)] + [_b64(a) for a in anchors],
+                "stream": False, "think": False, "options": {"temperature": 0}}
+        raw = ""
+        for attempt in range(4):
+            try:
+                req = urllib.request.Request(OLLAMA + "/api/generate",
+                                             json.dumps(body).encode(),
+                                             {"Content-Type": "application/json"})
+                raw = json.load(urllib.request.urlopen(req, timeout=300)).get("response", "").strip()
+                break
+            except Exception:
+                import time
+                time.sleep(3 * (attempt + 1))
+        a, b = raw.find("{"), raw.rfind("}")
+        v = {}
+        if a != -1 and b > a:
+            try:
+                v = json.loads(raw[a:b + 1])
+            except Exception:
+                pass
+        probs = [k for k in ("same_style", "same_palette") if v.get(k) is False]
+        checked += 1
+        fails += 1 if probs else 0
+        mark = "ok  " if not probs else "FAIL"
+        print(f"{mark} {spec['path']:44s} {probs} {v.get('reason','')[:60]}", flush=True)
+    print(f"\n{fails} FAIL / {checked} style-checked")
+    sys.exit(min(fails, 120))
+
+
 def main():
     if "--pairs" in sys.argv:
         pairs_mode()
+        return
+    if "--style" in sys.argv:
+        style_mode()
         return
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     J = G.jobs()

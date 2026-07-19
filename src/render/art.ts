@@ -163,6 +163,17 @@ const TILE_COLORS: Record<number, number> = {
   [Tile.Exit]: 0xd4af37,
 }
 
+/** For each bevelled wall corner variant, the polygon of the KEPT wall area
+ * (unit coords) — the missing triangle is the outside corner it exposes. The
+ * tilemap draws the outside ground tile underneath, so the cut shows pavement. */
+const CUT = 0.5
+const WALL_CUT_POLY: Record<number, number[]> = {
+  [Tile.WallCutNW]: [CUT, 0, 1, 0, 1, 1, 0, 1, 0, CUT],
+  [Tile.WallCutNE]: [0, 0, 1 - CUT, 0, 1, CUT, 1, 1, 0, 1],
+  [Tile.WallCutSE]: [0, 0, 1, 0, 1, 1 - CUT, 1 - CUT, 1, 0, 1],
+  [Tile.WallCutSW]: [0, 0, 1, 0, 1, 1, CUT, 1, 0, 1 - CUT],
+}
+
 const ENTITY_COLORS: Record<string, number> = {
   player: 0x7fd17f,
   thug: 0xd17f7f,
@@ -204,9 +215,26 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}, pale
   }
 
   const drawTile = (tileId: number, variant: number): Texture => {
+    const T = TILE_PX
+    // Bevelled wall corner: transparent canvas, wall-coloured polygon with the
+    // outside triangle cut away (the tilemap layers ground art underneath).
+    const cutPoly = WALL_CUT_POLY[tileId]
+    if (cutPoly) {
+      const wall = tileColors[Tile.Wall] ?? 0x1b1b24
+      const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+      const pts = cutPoly.map((v) => v * T)
+      g.poly(pts).fill(wall)
+      g.poly(pts).stroke({ width: 2, color: 0x000000, alpha: 0.3 })
+      // Same top highlight the square wall carries, clipped to the kept width.
+      const topY = 0
+      const xs = cutPoly.filter((_, i) => i % 2 === 0 && cutPoly[i + 1] === 0).map((v) => v * T)
+      if (xs.length >= 2) g.rect(Math.min(...xs), topY, Math.max(...xs) - Math.min(...xs), 3).fill(0x2a2a36)
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
     const color = tileColors[tileId] ?? 0xff00ff
     const g = new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill(color)
-    const T = TILE_PX
     switch (tileId) {
       case Tile.Wall: {
         // Brick courses

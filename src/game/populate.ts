@@ -65,6 +65,11 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   ],
   warehouse: [{ archetype: 'thug', count: [2, 3] }],
   clinic: [{ archetype: 'civilian', count: [1, 2] }],
+  // Bunkers (themed floors >= 2 only) are garrisons: always guarded.
+  bunker: [
+    { archetype: 'thug', count: [1, 2] },
+    { archetype: 'gangster', count: [1, 2] },
+  ],
 }
 
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): void => {

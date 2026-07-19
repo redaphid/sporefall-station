@@ -1,5 +1,5 @@
 import { Container, Sprite } from 'pixi.js'
-import type { Level } from '../game/levelgen/level'
+import { isWallTile, Tile, WALL_CUT_OUTSIDE, type Level } from '../game/levelgen/level'
 import { TILE_PX, type ArtRegistry } from './art'
 
 const CHUNK = 8 // tiles per chunk side
@@ -33,8 +33,25 @@ export class TilemapView {
           for (let tx = cx * CHUNK; tx < Math.min((cx + 1) * CHUNK, level.w); tx++) {
             // Deterministic per-position variant for texture variety
             const variant = (tx * 7 + ty * 13) % 3
-            const sprite = new Sprite(art.tile(level.tiles[ty * level.w + tx], variant))
-            sprite.position.set((tx - cx * CHUNK) * TILE_PX, (ty - cy * CHUNK) * TILE_PX)
+            const tileId = level.tiles[ty * level.w + tx]
+            const px = (tx - cx * CHUNK) * TILE_PX
+            const py = (ty - cy * CHUNK) * TILE_PX
+            // Bevelled wall corner: its texture has a transparent cut triangle,
+            // so first lay down the ground tile the bevel exposes (the diagonal
+            // outside neighbour's art — falls back to sidewalk).
+            const cut = WALL_CUT_OUTSIDE[tileId]
+            if (cut) {
+              const bx = tx + cut.dx
+              const by = ty + cut.dy
+              const inBounds = bx >= 0 && by >= 0 && bx < level.w && by < level.h
+              const neighbor = inBounds ? level.tiles[by * level.w + bx] : Tile.Sidewalk
+              const ground = isWallTile(neighbor) ? Tile.Sidewalk : neighbor
+              const back = new Sprite(art.tile(ground, variant))
+              back.position.set(px, py)
+              container.addChild(back)
+            }
+            const sprite = new Sprite(art.tile(tileId, variant))
+            sprite.position.set(px, py)
             container.addChild(sprite)
           }
         }

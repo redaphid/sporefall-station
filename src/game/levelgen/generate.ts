@@ -1,8 +1,15 @@
 import { mulberry32, type Rng } from '../rng'
 import { LEVEL_H, LEVEL_W } from '../types'
-import { Tile, TileGrid, themeForFloor, type Building, type BuildingRole, type Level, type Theme } from './level'
-import { BORDER, cutLots } from './lots'
+import { carveBunker } from './bunker'
+import { carveCompound } from './compound'
+import { applyCornerCuts } from './corners'
+import { carveHallways } from './corridors'
+import { isWallTile, Tile, TileGrid, themeForFloor, type Building, type BuildingRole, type Level, type Theme } from './level'
+import { BORDER, cutLots, cutLotsVaried } from './lots'
 import { splitRooms, type Rect } from './rooms'
+
+/** Chance an empty themed lot becomes a paved plaza with a green heart. */
+const PLAZA_CHANCE = 0.3
 
 const CLASSIC_ROLES: readonly BuildingRole[] = ['shop', 'apartment', 'office', 'warehouse', 'clinic']
 
@@ -17,7 +24,8 @@ export const generateLevel = (seed: number, floor: number): Level => {
   // Floor 1 is the familiar surface city, kept byte-for-byte with the original
   // generator so the scripted-demo regression guards (which replay fixed inputs
   // on a specific seed/floor-1 map) stay valid. Deeper floors mutate by theme.
-  const buildings = floor === 1 ? buildClassicCity(rng, grid, w, h) : buildThemedCity(rng, grid, w, h, theme, floor)
+  const plazas: Rect[] = []
+  const buildings = floor === 1 ? buildClassicCity(rng, grid, w, h) : buildThemedCity(rng, grid, w, h, theme, floor, plazas)
 
   const { spawn, exit } =
     floor === 1
@@ -25,10 +33,13 @@ export const generateLevel = (seed: number, floor: number): Level => {
       : varyEndpoints(rng.fork('spawnExit'), w, h)
   grid.set(exit.x, exit.y, Tile.Exit)
 
-  const level: Level = { w, h, tiles, solid: buildSolid(tiles), buildings, spawn, exit, theme: theme.name }
+  const level: Level = { w, h, tiles, solid: buildSolid(tiles), buildings, spawn, exit, theme: theme.name, plazas }
 
   // Connectivity safety net: every building interior must be reachable on foot.
   repairConnectivity(rng.fork('repair'), grid, level)
+  // Bevel street-facing building corners LAST — pure retexture of wall tiles
+  // (still fully solid), after every pass that reasons about Tile.Wall.
+  if (floor !== 1) applyCornerCuts(grid)
   level.solid = buildSolid(tiles)
   return level
 }
@@ -69,11 +80,22 @@ const buildClassicCity = (rng: Rng, grid: TileGrid, w: number, h: number): Build
  * floors read differently. Each lot forks its own RNG stream (by position) so
  * generation is order-independent and stays deterministic.
  */
-const buildThemedCity = (rng: Rng, grid: TileGrid, w: number, h: number, theme: Theme, floor: number): Building[] => {
+const buildThemedCity = (
+  rng: Rng,
+  grid: TileGrid,
+  w: number,
+  h: number,
+  theme: Theme,
+  floor: number,
+  plazas: Rect[],
+): Building[] => {
   // Deeper floors pack in a little tighter (capped) — a gentle difficulty ramp.
   const buildChance = Math.min(0.95, theme.buildingChance + 0.02 * (floor - 1))
-  const colSegs = cutLots(rng.fork('cols'), w, theme.minLots, theme.maxLots)
-  const rowSegs = cutLots(rng.fork('rows'), h, theme.minLots, theme.maxLots)
+  // Bunkers thicken with depth — the fortress floors are the deep ones.
+  const bunkerChance = Math.min(0.5, theme.bunkerChance + 0.03 * (floor - 1))
+  // Street variety: boulevards / standard streets / alleys, per gap.
+  const colSegs = cutLotsVaried(rng.fork('cols'), w, theme.minLots, theme.maxLots)
+  const rowSegs = cutLotsVaried(rng.fork('rows'), h, theme.minLots, theme.maxLots)
   const lots: Rect[] = []
   for (const rs of rowSegs) {
     for (const cs of colSegs) {
@@ -89,6 +111,19 @@ const buildThemedCity = (rng: Rng, grid: TileGrid, w: number, h: number, theme: 
     const inset: Rect = { x: lot.x + 1, y: lot.y + 1, w: lot.w - 2, h: lot.h - 2 }
     if (inset.w < 7 || inset.h < 7 || !lrng.chance(buildChance)) {
       grid.fillRect(inset.x, inset.y, inset.w, inset.h, theme.yard)
+      // Some empty lots become plazas: paved square, green heart.
+      if (inset.w >= 7 && inset.h >= 7 && lrng.chance(PLAZA_CHANCE)) {
+        grid.fillRect(inset.x, inset.y, inset.w, inset.h, Tile.Sidewalk)
+        grid.fillRect(inset.x + 2, inset.y + 2, inset.w - 4, inset.h - 4, Tile.Grass)
+        plazas.push(inset)
+      }
+      continue
+    }
+
+    // Bunker: fills its whole lot inset — a fortress never has a front yard.
+    if (inset.w >= 13 && inset.h >= 13 && lrng.chance(bunkerChance)) {
+      const plan = carveBunker(lrng, grid, inset)
+      buildings.push({ rect: inset, rooms: plan.rooms, doors: plan.doors, role: 'bunker', poi: 'bunker' })
       continue
     }
 
@@ -110,9 +145,10 @@ const buildThemedCity = (rng: Rng, grid: TileGrid, w: number, h: number, theme: 
     let poi: Building['poi']
     const large = interior.w >= 11 && interior.h >= 11
     if (large && lrng.chance(theme.courtyardChance)) {
-      // Ring building: an open courtyard leaves a connected loop of floor.
-      carveCourtyard(grid, interior)
-      rooms.push(interior)
+      // Courtyard compound: a ring of rooms around an open pit, with a street gate.
+      const plan = carveCompound(lrng, grid, rect, interior, Tile.Grass)
+      rooms.push(...plan.rooms)
+      doors.push(...plan.doors)
       poi = 'courtyard'
     } else if (interior.w >= 12 && interior.h >= 12 && lrng.chance(theme.vaultChance)) {
       // Open hall with a single sealed reward chamber — no split walls to break.
@@ -123,13 +159,35 @@ const buildThemedCity = (rng: Rng, grid: TileGrid, w: number, h: number, theme: 
         doors.push(vault.door)
         poi = 'vault'
       }
+    } else if (Math.min(interior.w, interior.h) >= 9 && lrng.chance(theme.hallwayChance)) {
+      // Hallway-first: corridor spine carved first, rooms hang off it.
+      const plan = carveHallways(lrng, grid, rect, interior)
+      if (plan) {
+        rooms.push(...plan.rooms)
+        doors.push(...plan.doors)
+        poi = 'hallway'
+      } else {
+        doors.push(...splitRooms(lrng, grid, interior, rooms))
+      }
     } else {
       doors.push(...splitRooms(lrng, grid, interior, rooms))
     }
     doors.push(...punchExteriorDoors(lrng, grid, rect))
-    buildings.push({ rect, rooms, doors, role: lrng.pick(theme.roles), poi })
+    buildings.push({ rect, rooms, doors: dedupeDoors(doors), role: lrng.pick(theme.roles), poi })
   }
   return buildings
+}
+
+/** Drop coincident door positions (a spine-end door the generic exterior punch
+ * re-picked, say) so spawnDoors never stacks two door entities on one tile. */
+const dedupeDoors = (doors: { x: number; y: number }[]): { x: number; y: number }[] => {
+  const seen = new Set<number>()
+  return doors.filter((d) => {
+    const key = d.y * LEVEL_W + d.x
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 /** Spawn + exit on opposite border edges (varied, not the fixed TL->BR diagonal). */
@@ -142,11 +200,6 @@ const varyEndpoints = (
   const s = edgeTile(se, edge, w, h)
   const e = edgeTile(se, (edge + 2) % 4, w, h)
   return { spawn: { x: s.x + 0.5, y: s.y + 0.5 }, exit: { x: e.x, y: e.y } }
-}
-
-/** Carve a central open courtyard, leaving a 2-wide connected floor ring around it. */
-const carveCourtyard = (grid: TileGrid, interior: Rect): void => {
-  grid.fillRect(interior.x + 2, interior.y + 2, interior.w - 4, interior.h - 4, Tile.Grass)
 }
 
 /** A sealed reward room tucked in an interior corner, with one door onto the floor. */
@@ -188,7 +241,8 @@ const edgeTile = (rng: Rng, edge: number, w: number, h: number): { x: number; y:
 
 const buildSolid = (tiles: Uint8Array): Uint8Array => {
   const solid = new Uint8Array(tiles.length)
-  for (let i = 0; i < tiles.length; i++) solid[i] = tiles[i] === Tile.Wall ? 1 : 0
+  // Cut-corner walls are FULLY solid — the bevel is visual only (level.ts).
+  for (let i = 0; i < tiles.length; i++) solid[i] = isWallTile(tiles[i]) ? 1 : 0
   return solid
 }
 
@@ -233,14 +287,27 @@ const doorOnSide = (
   return door
 }
 
+/** A floor tile inside the building to probe reachability at. The classic
+ * top-left interior tile when it is open (always, for classic-city buildings —
+ * keeps floor 1 byte-identical); otherwise (bunkers: 2-thick walls) the first
+ * floor tile scanning the footprint row-major. Draws no rng either way. */
+const probeTile = (grid: TileGrid, b: Building): { x: number; y: number } => {
+  if (grid.get(b.rect.x + 1, b.rect.y + 1) === Tile.Floor) return { x: b.rect.x + 1, y: b.rect.y + 1 }
+  for (let y = b.rect.y; y < b.rect.y + b.rect.h; y++) {
+    for (let x = b.rect.x; x < b.rect.x + b.rect.w; x++) {
+      if (grid.get(x, y) === Tile.Floor) return { x, y }
+    }
+  }
+  return { x: b.rect.x + 1, y: b.rect.y + 1 }
+}
+
 /** BFS from spawn over walkable tiles; punch extra exterior doors for any unreachable building. */
 const repairConnectivity = (rng: Rng, grid: TileGrid, level: Level): void => {
   for (let attempt = 0; attempt < 4; attempt++) {
     const reachable = bfsReachable(level, grid)
     const unreachable = level.buildings.filter((b) => {
-      const cx = b.rect.x + 1
-      const cy = b.rect.y + 1
-      return !reachable[cy * level.w + cx]
+      const probe = probeTile(grid, b)
+      return !reachable[probe.y * level.w + probe.x]
     })
     if (unreachable.length === 0) return
     for (const b of unreachable) {
@@ -272,7 +339,7 @@ const bfsReachable = (level: Level, grid: TileGrid): Uint8Array => {
       const ny = y + dy
       if (!grid.inBounds(nx, ny)) continue
       const nidx = ny * w + nx
-      if (reachable[nidx] || grid.get(nx, ny) === Tile.Wall) continue
+      if (reachable[nidx] || isWallTile(grid.get(nx, ny))) continue
       reachable[nidx] = 1
       queue.push(nidx)
     }

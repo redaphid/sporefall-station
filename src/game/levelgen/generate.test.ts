@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateLevel } from './generate'
-import { levelChecksum, Tile, TileGrid } from './level'
+import { isWallTile, levelChecksum, Tile, TileGrid } from './level'
 
 describe('generateLevel', () => {
   it('is bit-exact deterministic for the same seed and floor', () => {
@@ -74,7 +74,11 @@ describe('generateLevel', () => {
         const grid = new TileGrid(level.w, level.h, level.tiles)
         const reachable = bfs(level.w, level.h, grid, Math.floor(level.spawn.x), Math.floor(level.spawn.y))
         for (const b of level.buildings) {
-          expect(reachable[(b.rect.y + 1) * level.w + b.rect.x + 1], `building at ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).toBe(1)
+          // Probe the first interior floor tile (bunkers have 2-thick walls, so
+          // rect.x+1/y+1 may itself be wall).
+          const probe = firstFloorTile(grid, b.rect)
+          expect(probe, `no floor in building at ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).not.toBeNull()
+          expect(reachable[probe!.y * level.w + probe!.x], `building at ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).toBe(1)
         }
         expect(reachable[level.exit.y * level.w + level.exit.x], `exit seed ${seed} floor ${floor}`).toBe(1)
       }
@@ -116,10 +120,19 @@ const bfs = (w: number, h: number, grid: TileGrid, sx: number, sy: number): Uint
       const ny = y + dy
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
       const nidx = ny * w + nx
-      if (reachable[nidx] || grid.get(nx, ny) === Tile.Wall) continue
+      if (reachable[nidx] || isWallTile(grid.get(nx, ny))) continue
       reachable[nidx] = 1
       queue.push(nidx)
     }
   }
   return reachable
+}
+
+const firstFloorTile = (grid: TileGrid, rect: { x: number; y: number; w: number; h: number }): { x: number; y: number } | null => {
+  for (let y = rect.y; y < rect.y + rect.h; y++) {
+    for (let x = rect.x; x < rect.x + rect.w; x++) {
+      if (grid.get(x, y) === Tile.Floor) return { x, y }
+    }
+  }
+  return null
 }

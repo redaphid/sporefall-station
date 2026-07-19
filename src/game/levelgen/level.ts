@@ -7,13 +7,35 @@ export const Tile = {
   Wall: 3,
   Grass: 4,
   Exit: 5,
+  // 45°-cut wall corners (the name is the OUTSIDE corner that is bevelled).
+  // Appended AFTER Exit so existing tile ids never renumber — serialized
+  // levelChecksums for old floors stay valid. Collision-wise these are full
+  // solid squares (see buildSolid); the cut is visual only, which keeps the
+  // physics/netcode byte-identical and can never snag movement (the collision
+  // volume strictly contains the drawn shape).
+  WallCutNW: 6,
+  WallCutNE: 7,
+  WallCutSE: 8,
+  WallCutSW: 9,
 } as const
 export type TileId = (typeof Tile)[keyof typeof Tile]
 
-export type BuildingRole = 'shop' | 'apartment' | 'office' | 'warehouse' | 'clinic'
+/** Every wall-family tile (plain wall + the 4 bevelled corner variants). */
+export const isWallTile = (t: number): boolean => t === Tile.Wall || (t >= Tile.WallCutNW && t <= Tile.WallCutSW)
+
+/** For each cut-corner variant, the diagonal offset toward the OUTSIDE ground
+ * tile the bevel exposes — the renderer draws that neighbour underneath. */
+export const WALL_CUT_OUTSIDE: Record<number, { dx: number; dy: number }> = {
+  [Tile.WallCutNW]: { dx: -1, dy: -1 },
+  [Tile.WallCutNE]: { dx: 1, dy: -1 },
+  [Tile.WallCutSE]: { dx: 1, dy: 1 },
+  [Tile.WallCutSW]: { dx: -1, dy: 1 },
+}
+
+export type BuildingRole = 'shop' | 'apartment' | 'office' | 'warehouse' | 'clinic' | 'bunker'
 
 /** Layout set-piece a building can carry (beyond a plain box of rooms). */
-export type BuildingPoi = 'courtyard' | 'vault'
+export type BuildingPoi = 'courtyard' | 'vault' | 'hallway' | 'bunker'
 
 export interface Building {
   rect: Rect
@@ -43,6 +65,12 @@ export interface Theme {
   setbackChance: number
   /** Chance a large building hides a sealed vault room. */
   vaultChance: number
+  /** Chance a medium/large building organises around a corridor spine
+   * (straight/L/T/loop hallway with rooms hanging off it). */
+  hallwayChance: number
+  /** Chance a big lot grows a bunker: 2-thick windowless walls, an airlock
+   * vestibule entry and a deep innermost chamber. Ramps gently with depth. */
+  bunkerChance: number
   /** Role palette (repeats bias the weighting). */
   roles: readonly BuildingRole[]
 }
@@ -61,6 +89,8 @@ export const THEMES: readonly Theme[] = [
     courtyardChance: 0.35,
     setbackChance: 0.15,
     vaultChance: 0.2,
+    hallwayChance: 0.6,
+    bunkerChance: 0.06,
     roles: ['office', 'office', 'shop', 'apartment'],
   },
   {
@@ -72,6 +102,8 @@ export const THEMES: readonly Theme[] = [
     courtyardChance: 0.05,
     setbackChance: 0.4,
     vaultChance: 0.05,
+    hallwayChance: 0.35,
+    bunkerChance: 0.12,
     roles: ['apartment', 'apartment', 'shop', 'warehouse'],
   },
   {
@@ -83,6 +115,8 @@ export const THEMES: readonly Theme[] = [
     courtyardChance: 0.45,
     setbackChance: 0.25,
     vaultChance: 0.15,
+    hallwayChance: 0.55,
+    bunkerChance: 0.35,
     roles: ['warehouse', 'warehouse', 'office', 'shop'],
   },
   {
@@ -94,6 +128,8 @@ export const THEMES: readonly Theme[] = [
     courtyardChance: 0.3,
     setbackChance: 0.45,
     vaultChance: 0.05,
+    hallwayChance: 0.3,
+    bunkerChance: 0.05,
     roles: ['clinic', 'apartment', 'shop', 'clinic'],
   },
 ]
@@ -115,6 +151,9 @@ export interface Level {
   exit: { x: number; y: number }
   /** District theme this floor was generated with. */
   theme?: ThemeName
+  /** Open plaza lots (themed floors): paved squares with a green heart. Not
+   * serialized — the level regenerates from seed+floor like everything else. */
+  plazas?: Rect[]
 }
 
 /** Mutable view over a tile buffer during generation. */

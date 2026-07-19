@@ -108,7 +108,85 @@ def check(path, spec):
     return votes[-1], probs
 
 
+PAIR_PROMPT = (
+    "These two images are the IDLE and STEP frames of one game character's walk "
+    "cycle. They must show the SAME character with the SAME posture, proportions, "
+    "outfit and gear — differing ONLY in leg/arm phase (mid-stride). Answer ONLY "
+    'with JSON: {"same_character": <bool>, "same_posture": <bool — false if one '
+    'slouches/leans/sits while the other stands upright>, "same_gear": <bool>, '
+    '"only_limbs_differ": <bool>}'
+)
+
+
+def _b64(path):
+    im = Image.open(path)
+    if im.mode in ("RGBA", "LA", "P"):
+        im = im.convert("RGBA")
+        bg = Image.new("RGBA", im.size, (128, 128, 128, 255))
+        bg.alpha_composite(im)
+        im = bg.convert("RGB")
+    if max(im.size) < 256:
+        f = 256 // max(im.size) + 1
+        im = im.resize((im.width * f, im.height * f), Image.NEAREST)
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def check_pair(idle_path, step_path):
+    """VLM gate for idle/step pose consistency. Returns (verdict, problems)."""
+    body = {"model": MODEL, "prompt": PAIR_PROMPT,
+            "images": [_b64(idle_path), _b64(step_path)],
+            "stream": False, "think": False, "options": {"temperature": 0}}
+    raw = ""
+    for attempt in range(4):
+        try:
+            req = urllib.request.Request(OLLAMA + "/api/generate", json.dumps(body).encode(),
+                                         {"Content-Type": "application/json"})
+            raw = json.load(urllib.request.urlopen(req, timeout=300)).get("response", "").strip()
+            break
+        except Exception:
+            import time
+            time.sleep(3 * (attempt + 1))
+    a, b = raw.find("{"), raw.rfind("}")
+    v = {}
+    if a != -1 and b > a:
+        try:
+            v = json.loads(raw[a:b + 1])
+        except Exception:
+            pass
+    probs = [k for k in ("same_character", "same_posture", "same_gear", "only_limbs_differ")
+             if v.get(k) is False]
+    return v, probs
+
+
+def pairs_mode():
+    """Verify every curated idle/step pair in the theme dir."""
+    J = G.jobs()
+    fails = 0
+    checked = 0
+    for name, spec in J.items():
+        if spec["cat"] != "char" or spec["frame"] != "step":
+            continue
+        step = os.path.join(G.THEME, spec["path"])
+        idle = os.path.join(G.THEME, spec["path"].replace("-step", "-idle"))
+        if not (os.path.exists(step) and os.path.exists(idle)):
+            continue
+        if os.path.realpath(step) == os.path.realpath(idle):
+            continue
+        v, probs = check_pair(idle, step)
+        checked += 1
+        mark = "ok  " if not probs else "FAIL"
+        fails += 0 if not probs else 1
+        print(f"{mark} {os.path.basename(step):34s} {v} {probs}")
+    print(f"\n{fails} FAIL / {checked} pairs")
+    sys.exit(min(fails, 120))
+
+
 def main():
+    if "--pairs" in sys.argv:
+        pairs_mode()
+        return
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     J = G.jobs()
     targets = []  # (path, spec)

@@ -213,19 +213,29 @@ def jobs():
         for d, dprompt in DIRS.items():
             for frame in ("idle", "step"):
                 jname = f"char.{kind}.{d}-{frame}"
-                pose = dprompt if frame == "idle" else f"{dprompt}, {STEP}"
                 is_anchor_pose = d == "s" and frame == "idle"
                 neg_parts = [p for p in (DIR_NEG.get(d, ""), kneg) if p]
-                out[jname] = dict(
+                spec = dict(
                     cat="char", arch=arch, kind=kind, dir=d, frame=frame,
                     path=f"chars/{kind}-{d}-{frame}.png", px=CHAR_PX,
-                    pos=f"{TRIGGER}, full body game character sprite, {desc}, {pose}, "
+                    pos=f"{TRIGGER}, full body game character sprite, {desc}, {dprompt}, "
                         f"{BG_CHAR}, {LOOK}",
                     neg=", ".join(neg_parts + [
                         f"two characters, crowd, cropped, close-up, portrait, {NEG_BASE}"]),
                     refs="char-cast" if is_anchor_pose else "char-anchor",
                     ipw=0.3 if is_anchor_pose else DIR_IPW[d],
                 )
+                if frame == "step":
+                    # STEP frames are img2img FROM the direction's curated idle
+                    # at low denoise with a minimal prompt delta — posture,
+                    # proportions and gear stay identical, only limbs move.
+                    # (txt2img steps flickered like a costume change against
+                    # their idles when the walk cycle alternated frames.)
+                    spec["pos"] = spec["pos"].replace(dprompt, f"{dprompt}, {STEP}")
+                    spec["init_from_idle"] = jname.replace("-step", "-idle")
+                    spec["denoise"] = 0.38
+                    spec["refs"] = None
+                out[jname] = spec
     for name, (pattern, frames, subj) in FX.items():
         px = FLAME_PX if "flame" in name else FX_PX
         for i in range(1, frames + 1):
@@ -257,11 +267,18 @@ def load_curation():
 def sweep(names, seeds=6, base_seed=414500):
     import comfy
     CHUNK = 4  # >4-image batches with the two-pass tile graph can OOM the server
+    cur = load_curation()
     for name in names:
         spec = jobs()[name]
         refs = resolve_refs(spec)
         dest = os.path.join(STAGE, name)
         init = spec.get("init")
+        if spec.get("init_from_idle"):
+            idle = cur.get(spec["init_from_idle"], {})
+            init = idle.get("raw")
+            if not (init and os.path.exists(init)):
+                print(f"SKIP {name}: curate {spec['init_from_idle']} first")
+                continue
         done = 0
         while done < seeds:
             n = min(CHUNK, seeds - done)
@@ -293,12 +310,15 @@ def final(names):
             continue
         raw = pick.get("raw")  # curated raw file kept from the sweep
         if not (raw and os.path.exists(raw)):
+            init = spec.get("init")
+            if spec.get("init_from_idle"):
+                init = cur.get(spec["init_from_idle"], {}).get("raw")
             g = comfy.build_graph(
                 pos=spec["pos"], neg=spec["neg"], seed=pick["seed"],
                 batch=pick.get("batch", 1),
                 seamless=spec.get("seamless", False),
                 refs=resolve_refs(spec) or None, ip_weight=spec.get("ipw", 0.8),
-                init=spec.get("init"), denoise=spec.get("denoise", 1.0),
+                init=init, denoise=spec.get("denoise", 1.0),
                 alpha=spec.get("alpha", True), prefix="final-" + name.replace(".", "-"),
             )
             paths = comfy.run(g, os.path.join(STAGE, "final", name))

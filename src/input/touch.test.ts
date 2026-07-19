@@ -117,3 +117,52 @@ describe('touch controls — #4 hide under an active controller', () => {
     expect(wrapper.style.display).toBe('block')
   })
 })
+
+describe('touch controls — UI chrome is press-EXEMPT (the settings-gear bug class)', () => {
+  let root: HTMLElement
+  const PE = (window as unknown as { PointerEvent: typeof PointerEvent }).PointerEvent
+  const zoneOf = (side: 'left' | 'right'): HTMLElement =>
+    root.querySelector<HTMLElement>(`[data-stick-zone="${side}"]`)!
+
+  beforeEach(() => {
+    root = mount()
+  })
+
+  it('a tap on a data-ui-chrome element nested in the touch layer NEVER classifies as inspect', () => {
+    const touch = createTouch(root)
+    const fired: string[] = []
+    touch.setInspectHandler((mode) => fired.push(mode))
+    // Adversarial: some future overlay mounts its chrome INSIDE a stick zone.
+    const gearish = document.createElement('button')
+    gearish.dataset.uiChrome = ''
+    zoneOf('right').appendChild(gearish)
+    gearish.dispatchEvent(new PE('pointerdown', { pointerId: 7, clientX: 30, clientY: 30, bubbles: true }))
+    gearish.dispatchEvent(new PE('pointerup', { pointerId: 7, clientX: 30, clientY: 30, bubbles: true }))
+    expect(fired).toEqual([]) // chrome owns its tap outright
+  })
+
+  it('control case: the same tap on the bare zone DOES classify as an inspect tap', () => {
+    const touch = createTouch(root)
+    const fired: string[] = []
+    touch.setInspectHandler((mode) => fired.push(mode))
+    const zone = zoneOf('right')
+    zone.setPointerCapture = () => {}
+    zone.dispatchEvent(new PE('pointerdown', { pointerId: 8, clientX: 30, clientY: 30, bubbles: true }))
+    zone.dispatchEvent(new PE('pointerup', { pointerId: 8, clientX: 30, clientY: 30, bubbles: true }))
+    expect(fired).toEqual(['tap'])
+  })
+
+  it('a press that starts on a zone but is RELEASED over chrome never inspects (sub-slop drift onto the gear)', () => {
+    const touch = createTouch(root)
+    const fired: string[] = []
+    touch.setInspectHandler((mode) => fired.push(mode))
+    const zone = zoneOf('right')
+    zone.setPointerCapture = () => {}
+    const gearish = document.createElement('button')
+    gearish.dataset.uiChrome = ''
+    zone.appendChild(gearish)
+    zone.dispatchEvent(new PE('pointerdown', { pointerId: 9, clientX: 40, clientY: 40, bubbles: true }))
+    gearish.dispatchEvent(new PE('pointerup', { pointerId: 9, clientX: 44, clientY: 42, bubbles: true }))
+    expect(fired).toEqual([])
+  })
+})

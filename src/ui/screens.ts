@@ -1,6 +1,7 @@
 import type { RenderView } from '../app/session'
 import { MODS } from '../game/data/mods'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
+import { markUiChrome } from './chrome'
 
 export interface Screens {
   update(view: RenderView): void
@@ -52,6 +53,7 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
   mount.appendChild(banner)
 
   const overlay = document.createElement('div')
+  markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
   overlay.style.cssText =
     'position:absolute;inset:0;background:#000a;display:none;flex-direction:column;align-items:center;' +
     'justify-content:center;color:#eee;font:16px system-ui;pointer-events:auto;text-align:center;gap:12px'

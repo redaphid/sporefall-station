@@ -43,6 +43,7 @@ import {
 import { projectToScreen, screenToWorld, type CameraState } from './locatorModel'
 import { buildInfoCard, type InfoCard } from './inspectModel'
 import { createPressTracker, LONG_PRESS_MS } from './pressModel'
+import { isUiChrome, markUiChrome } from './chrome'
 import { themeDisplayName } from '../render/themeState'
 import type { CameraSource } from './screens'
 
@@ -129,6 +130,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
   // The popup root: never blocks gameplay — only its affordances opt back in.
   const card = document.createElement('div')
   card.className = 'inspect-card'
+  markUiChrome(card) // its chip/✕/locate taps are chrome, never game presses
   card.style.cssText =
     'position:absolute;left:0;top:0;display:none;z-index:69;pointer-events:none;' +
     'box-sizing:border-box;max-width:250px;background:rgba(12,14,22,.93);' +
@@ -206,6 +208,9 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
   const press = createPressTracker()
   let pressTimer: ReturnType<typeof setTimeout> | undefined
   mount.addEventListener('pointerdown', (ev) => {
+    // Presses on interactive UI chrome (settings gear/panel, …) belong to the
+    // chrome, never to inspect (chrome.ts) — structural, not per-widget.
+    if (isUiChrome(ev.target)) return
     press.down(ev.pointerId, ev.clientX, ev.clientY, performance.now())
     clearTimeout(pressTimer)
     if (ev.pointerType !== 'mouse') {
@@ -218,6 +223,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
   mount.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
   mount.addEventListener('pointerup', (ev) => {
     clearTimeout(pressTimer)
+    if (isUiChrome(ev.target)) press.cancel(ev.pointerId) // released over chrome → never inspect
     const outcome = press.up(ev.pointerId, performance.now())
     if (outcome === null) return
     // Desktop click = the full card straight away; a touch tap opens the chip,

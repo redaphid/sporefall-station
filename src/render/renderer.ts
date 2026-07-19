@@ -49,7 +49,15 @@ export interface GameRenderer {
 /** Canvas clear color when no theme palette provides one. */
 const DEFAULT_BACKGROUND = 0x0b0b12
 
-export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> => {
+/**
+ * @param mount The canvas host (#app) — pixi renders here.
+ * @param chromeMount Where interactive UI chrome (the settings gear/panel)
+ *   mounts. On the real app this must be the UI layer (#ui): #app sits UNDER
+ *   #ui in the browser's hit test, so chrome mounted on #app is unreachable by
+ *   touch on phones — the touch layer's full-screen stick zones (also on #ui)
+ *   swallow every tap first. Defaults to `mount` for canvas-only harnesses.
+ */
+export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElement = mount): Promise<GameRenderer> => {
   const app = new Application()
   await app.init({
     resizeTo: mount,
@@ -165,7 +173,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   // change from the panel hot-swaps the renderer's assets.
   const themeList = await listThemes()
   let settings = createSettingsPanel(
-    mount,
+    chromeMount,
     native,
     (s) => {
       const prevTheme = settings.theme

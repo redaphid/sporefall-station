@@ -53,7 +53,10 @@ const boot = async (): Promise<void> => {
 
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
-  const renderer = await createRenderer(mount)
+  // UI chrome (settings gear/panel) mounts on #ui: it must hit-test ABOVE the
+  // touch layer's stick zones (also on #ui) — chrome on #app is unreachable by
+  // touch (see src/ui/chrome.ts).
+  const renderer = await createRenderer(mount, uiMount)
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)

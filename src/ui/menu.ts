@@ -1,4 +1,5 @@
 import { APP_VERSION, otaBundleVersion } from '../app/version'
+import { markUiChrome } from './chrome'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
@@ -6,6 +7,7 @@ export type GameMode = 'solo' | 'host' | 'join'
 export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
+    markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
     overlay.style.cssText =
       'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
       'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
@@ -49,6 +51,7 @@ export type JoinTransportChoice = 'ble' | 'tabs'
 export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Promise<void>): Promise<JoinTransportChoice> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
+    markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
     overlay.style.cssText =
       'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
       'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
@@ -96,6 +99,7 @@ export const pickHost = (
 ): Promise<string> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
+    markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
     overlay.style.cssText =
       'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
       'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
@@ -131,6 +135,7 @@ export interface LobbyUi {
 
 export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
   const overlay = document.createElement('div')
+  markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
   overlay.style.cssText =
     'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
     'justify-content:center;gap:12px;pointer-events:auto;color:#eee;font:16px system-ui'

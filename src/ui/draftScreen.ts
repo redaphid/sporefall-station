@@ -5,6 +5,7 @@
 // applied pick) lives in `game/systems/draft.ts`.
 
 import { draftCards, type DraftCard } from '../game/systems/draft'
+import { markUiChrome } from './chrome'
 
 const RARITY_COLOR: Record<DraftCard['rarity'], string> = {
   common: '#9aa4b2',
@@ -22,6 +23,7 @@ export interface DraftScreen {
 export const createDraftScreen = (mount: HTMLElement): DraftScreen => {
   const root = document.createElement('div')
   root.className = 'draft-screen'
+  markUiChrome(root) // press-exempt UI chrome (chrome.ts)
   root.style.cssText =
     'position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
     'background:rgba(6,8,14,.82);z-index:60;backdrop-filter:blur(2px)'

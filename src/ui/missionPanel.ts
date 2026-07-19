@@ -18,6 +18,7 @@
 import type { RenderView } from '../app/session'
 import { missionObjectives, missionChipText, resolveLink, type Objective, type ObjectiveLink } from './missionModel'
 import { pointMarker, type CameraState } from './locatorModel'
+import { markUiChrome } from './chrome'
 import type { CameraSource } from './screens'
 
 export interface MissionPanel {
@@ -63,6 +64,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
 
   const chip = document.createElement('button')
   chip.dataset.missionChip = ''
+  markUiChrome(chip) // press-exempt UI chrome (chrome.ts) — never a game press
   chip.style.cssText =
     'pointer-events:auto;appearance:none;border:1px solid rgba(255,255,255,.18);border-radius:999px;' +
     'background:rgba(12,14,22,.72);color:#eee;font:600 13px system-ui;padding:4px 12px;cursor:pointer;' +
@@ -71,6 +73,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
 
   const panel = document.createElement('div')
   panel.dataset.missionPanel = ''
+  markUiChrome(panel)
   panel.style.cssText =
     'pointer-events:auto;display:none;flex-direction:column;gap:4px;min-width:220px;max-width:100%;' +
     'background:rgba(12,14,22,.88);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:8px;' +

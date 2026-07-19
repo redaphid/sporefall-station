@@ -6,6 +6,7 @@
  */
 
 import { loadSettings, saveSettings, type EffectsQuality, type GameSettings } from '../app/settings'
+import { markUiChrome } from '../ui/chrome'
 
 export interface SettingsPanel {
   settings(): GameSettings
@@ -24,18 +25,26 @@ export const createSettingsPanel = (
 ): SettingsPanel => {
   let current = loadSettings()
 
+  // The gear + panel are UI CHROME (chrome.ts): they must mount on the UI
+  // layer ABOVE the touch controls' full-screen stick zones (renderer.ts passes
+  // #ui) and are marked data-ui-chrome so a tap on them never enters the
+  // stick/inspect press classification. Mounted on the canvas host instead,
+  // touches would be swallowed by the zones and the gear would be mouse-only.
   const gear = document.createElement('button')
   gear.textContent = '⚙'
   gear.setAttribute('aria-label', 'Settings')
+  markUiChrome(gear)
   gear.style.cssText =
     'position:absolute;right:10px;top:10px;z-index:70;width:34px;height:34px;border-radius:8px;' +
-    'border:1px solid #0008;background:#222c;color:#eee;font-size:18px;cursor:pointer;pointer-events:auto'
+    'border:1px solid #0008;background:#222c;color:#eee;font-size:18px;cursor:pointer;pointer-events:auto;' +
+    'touch-action:manipulation'
 
   const panel = document.createElement('div')
+  markUiChrome(panel)
   panel.style.cssText =
     'position:absolute;right:10px;top:52px;z-index:70;display:none;min-width:200px;padding:12px 14px;' +
     'background:#1a1a22ee;color:#eee;font:13px system-ui;border:1px solid #0008;border-radius:10px;' +
-    'box-shadow:0 6px 24px #0008;pointer-events:auto'
+    'box-shadow:0 6px 24px #0008;pointer-events:auto;touch-action:manipulation'
 
   const qualityRow = `
     <label style="display:block;margin-bottom:10px">Effects

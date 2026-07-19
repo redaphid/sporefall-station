@@ -6,6 +6,7 @@ import { aimFires, selectAim } from './aim'
 import type { InputSource } from './input'
 import { createPinchTracker } from './pinch'
 import { createPressTracker, LONG_PRESS_MS } from '../ui/pressModel'
+import { isUiChrome } from '../ui/chrome'
 import { computeTouchLabels } from './touchLabels'
 
 // Re-exported from the shared, DOM-free aim module so existing importers
@@ -94,6 +95,10 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
   let inspectCb: ((mode: 'tap' | 'longpress', clientX: number, clientY: number) => void) | undefined
   let pressTimer: ReturnType<typeof setTimeout> | undefined
   controls.addEventListener('pointerdown', (ev) => {
+    // Interactive UI chrome (data-ui-chrome — settings gear, panels, …) owns
+    // its tap outright: it never enters the press classification, even if a
+    // future overlay ends up nested inside this wrapper (chrome.ts).
+    if (isUiChrome(ev.target)) return
     if (!(ev.target instanceof HTMLElement) || ev.target.dataset.stickZone === undefined) return
     // Register EVERY zone press (even one the pinch just consumed): the
     // tracker's join rule is what disqualifies the other finger of a pinch.
@@ -106,6 +111,9 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
   })
   controls.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
   controls.addEventListener('pointerup', (ev) => {
+    // A press RELEASED over chrome (finger drifted onto the gear/panel) is the
+    // chrome's business too — drop it instead of classifying (chrome.ts).
+    if (isUiChrome(ev.target)) press.cancel(ev.pointerId)
     const out = press.up(ev.pointerId, performance.now())
     if (out !== null) inspectCb?.(out, ev.clientX, ev.clientY)
   })

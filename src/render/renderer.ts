@@ -91,7 +91,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // a stable reference across runtime theme changes.
   let inner: ArtRegistry = await buildArt(chain)
   const art: ArtRegistry = {
-    tile: (id, v) => inner.tile(id, v),
+    tile: (id, v, tx, ty) => inner.tile(id, v, tx, ty),
+    tileOverlayPool: (id) => inner.tileOverlayPool(id),
+    tileMacro: (id) => inner.tileMacro(id),
     wallShadow: (s) => inner.wallShadow(s),
     groundSeam: (s) => inner.groundSeam(s),
     entity: (a) => inner.entity(a),

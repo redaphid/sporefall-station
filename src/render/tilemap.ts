@@ -1,6 +1,7 @@
 import { Container, Sprite } from 'pixi.js'
 import { isWallTile, Tile, WALL_CUT_OUTSIDE, type Level } from '../game/levelgen/level'
 import { TILE_PX, type ArtRegistry, type OverlaySide } from './art'
+import { coordHash, planTileOverlays, type OverlayPlacement } from './tileSelect'
 
 const CHUNK = 8 // tiles per chunk side
 
@@ -10,15 +11,6 @@ interface Chunk {
   x: number
   y: number
   size: number
-}
-
-/** Deterministic 32-bit coordinate hash — variant/accent selection must be a
- * pure function of (tx,ty) so every device (and every replay) bakes the exact
- * same ground. NOT the sim rng: this is render-only. */
-const coordHash = (tx: number, ty: number): number => {
-  let h = Math.imul(tx ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(ty ^ 0xc2b2ae35, 0x27d4eb2f)
-  h = Math.imul(h ^ (h >>> 15), 0x2545f491)
-  return h >>> 0
 }
 
 /** Ground "height" rank for seam shading: water-street lowest, then moss/
@@ -53,6 +45,22 @@ export class TilemapView {
     this.chunks = []
     const tileAt = (tx: number, ty: number): number =>
       tx >= 0 && ty >= 0 && tx < level.w && ty < level.h ? level.tiles[ty * level.w + tx] : Tile.Sidewalk
+    // Context-keyed overlay decals ("moss as placement, not texture"): for
+    // every surface the theme ships a `tile.<name>.overlay` pool for, plan
+    // decal placements from the tile grid (wall bases, door thresholds, plate
+    // seams…) — deterministic, so the same moss grows on every device. The
+    // plan is grouped per tile for O(1) lookup while baking chunks.
+    const overlayAt = new Map<number, OverlayPlacement[]>()
+    for (const t of [Tile.Floor, Tile.Sidewalk, Tile.Street, Tile.Grass, Tile.Exit]) {
+      const pool = art.tileOverlayPool(t)
+      if (pool.length === 0) continue
+      for (const p of planTileOverlays(level, t, pool.length, art.tileMacro(t))) {
+        const key = p.ty * level.w + p.tx
+        const list = overlayAt.get(key)
+        if (list) list.push(p)
+        else overlayAt.set(key, [p])
+      }
+    }
     const chunksX = Math.ceil(level.w / CHUNK)
     const chunksY = Math.ceil(level.h / CHUNK)
     for (let cy = 0; cy < chunksY; cy++) {
@@ -73,13 +81,29 @@ export class TilemapView {
             if (cut) {
               const neighbor = tileAt(tx + cut.dx, ty + cut.dy)
               const ground = isWallTile(neighbor) ? Tile.Sidewalk : neighbor
-              const back = new Sprite(art.tile(ground, hash))
+              const back = new Sprite(art.tile(ground, hash, tx, ty))
               back.position.set(px, py)
               container.addChild(back)
             }
-            const sprite = new Sprite(art.tile(tileId, hash))
+            const sprite = new Sprite(art.tile(tileId, hash, tx, ty))
             sprite.position.set(px, py)
             container.addChild(sprite)
+
+            // Context-keyed overgrowth decals sit on the base tile, under the
+            // grounding shadows (so AO still darkens moss at wall bases).
+            const placements = overlayAt.get(ty * level.w + tx)
+            if (placements) {
+              const pool = art.tileOverlayPool(tileId)
+              for (const p of placements) {
+                const tex = pool[p.idx]
+                if (!tex) continue
+                const decal = new Sprite(tex)
+                decal.anchor.set(0.5)
+                decal.position.set(px + TILE_PX / 2, py + TILE_PX / 2)
+                decal.rotation = (p.rot * Math.PI) / 2
+                container.addChild(decal)
+              }
+            }
 
             // ---- Grounding pass: wall-contact shadows + surface seams ------
             // Cheap baked ambient occlusion: walls cast onto adjacent ground,

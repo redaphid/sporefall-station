@@ -62,7 +62,11 @@ export const TILE_NAMES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit
  * VARIANTS the tilemap alternates deterministically by tile coordinate, so big
  * surfaces read as texture instead of one repeated stamp. `tile.<name>.accent`
  * is an optional rare-detail pool (root clusters, grates, spore patches…)
- * sprinkled at low frequency on the same hash. */
+ * sprinkled at low frequency on the same hash. `tile.<name>.overlay` is an
+ * optional pool of RGBA decals the tilemap places by CONTEXT (wall bases,
+ * door thresholds, plate seams — see tileSelect.planTileOverlays); decals are
+ * authored with their mass biased toward the tile's TOP edge and rotated
+ * toward whichever edge earned them. */
 const isTileKey = (k: string): boolean => k.startsWith('tile.')
 
 const buildSpriteKeys = (): Set<string> => {
@@ -70,6 +74,7 @@ const buildSpriteKeys = (): Set<string> => {
   for (const t of TILE_NAMES) {
     keys.add(`tile.${t}`)
     keys.add(`tile.${t}.accent`)
+    keys.add(`tile.${t}.overlay`)
   }
   for (const c of CHAR_NAMES) for (const d of DIRS5) for (const f of ['idle', 'step']) keys.add(`char.${c}.${d}-${f}`)
   // Animation-state frames (docs/themes.md "Animation states"):
@@ -111,6 +116,11 @@ export interface ThemeManifest {
   /** Per-animation-state cadence override, in sim ticks per frame (1..30).
    * States a theme omits use the engine default (animState.DEFAULT_TPF). */
   anim: Partial<Record<AnimStateName, number>>
+  /** Tile surfaces whose variant pool is sliced from N×N-tile macro images
+   * (tile name → N, 2..4). The tilemap then picks variants by position within
+   * the macro cell so adjacent slices land adjacently (plate seams and large
+   * features span tiles); pools without an entry keep the pure-hash pick. */
+  macroTiles: Record<string, number>
 }
 
 /** A manifest bound to the folder it loaded from (dir is app-root-relative,
@@ -132,6 +142,7 @@ export const emptyManifest = (): ThemeManifest => ({
   names: {},
   sprites: {},
   anim: {},
+  macroTiles: {},
 })
 
 // ---------------------------------------------------------------------------
@@ -252,6 +263,27 @@ const validateSprites = (raw: unknown, warn: (w: string) => void): ThemeManifest
   return out
 }
 
+const validateMacroTiles = (raw: unknown, warn: (w: string) => void): ThemeManifest['macroTiles'] => {
+  const out: ThemeManifest['macroTiles'] = {}
+  if (raw === undefined) return out
+  if (!isRecord(raw)) {
+    warn('macroTiles: expected an object of tile name → macro side (2..4)')
+    return out
+  }
+  for (const [k, v] of Object.entries(raw)) {
+    if (!(TILE_NAMES as readonly string[]).includes(k)) {
+      warn(`macroTiles: unknown tile "${k}" dropped (known: ${TILE_NAMES.join(' ')})`)
+      continue
+    }
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 2 || v > 4) {
+      warn(`macroTiles.${k}: expected an integer macro side in 2..4, got ${JSON.stringify(v)}`)
+      continue
+    }
+    out[k] = v
+  }
+  return out
+}
+
 const validateAnim = (raw: unknown, warn: (w: string) => void): ThemeManifest['anim'] => {
   const out: ThemeManifest['anim'] = {}
   if (raw === undefined) return out
@@ -295,7 +327,8 @@ export const validateManifest = (raw: unknown): ValidatedManifest => {
   manifest.names = validateNames(raw.names, warn)
   manifest.sprites = validateSprites(raw.sprites, warn)
   manifest.anim = validateAnim(raw.anim, warn)
-  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim'])
+  manifest.macroTiles = validateMacroTiles(raw.macroTiles, warn)
+  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'macroTiles'])
   for (const k of Object.keys(raw)) if (!known.has(k)) warn(`manifest: unknown key "${k}" dropped`)
   return { manifest, warnings }
 }
@@ -349,6 +382,16 @@ export const resolveAnimTpf = (state: AnimStateName, chain: ThemeChain): number 
 export const resolveAnimTpfs = (chain: ThemeChain): Record<AnimStateName, number> => {
   const out = { ...DEFAULT_TPF }
   for (const s of ANIM_STATES) out[s] = resolveAnimTpf(s, chain)
+  return out
+}
+
+/** Macro-slicing declarations for tile pools: per tile name, the first theme
+ * in the chain that declares it wins. In practice the declaring theme is the
+ * one whose `tile.<name>` pool is sliced from macro images — the two travel
+ * together in one manifest. */
+export const resolveMacroTiles = (chain: ThemeChain): Record<string, number> => {
+  const out: Record<string, number> = {}
+  for (const theme of [...chain].reverse()) Object.assign(out, theme.manifest.macroTiles)
   return out
 }
 

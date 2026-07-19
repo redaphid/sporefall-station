@@ -9,6 +9,7 @@ import {
   isValidThemeId,
   parseColor,
   prettyArchetype,
+  resolveMacroTiles,
   resolvePalette,
   resolveSpritePaths,
   resolveThemeId,
@@ -83,6 +84,32 @@ describe('validateManifest', () => {
     expect(manifest.sprites['tile.floor']).toEqual(['a.png', 'b.png'])
     expect(manifest.sprites['tile.grass.accent']).toEqual(['roots.png', 'spores.png'])
     expect(manifest.sprites['tile.street']).toEqual(['s.png'])
+  })
+
+  it('accepts overlay decal pools on tile.* keys', () => {
+    const { manifest, warnings } = validateManifest({
+      sprites: { 'tile.floor.overlay': ['moss-0.png', 'moss-1.png'], 'tile.grass.overlay': 'clump.png' },
+    })
+    expect(warnings).toEqual([])
+    expect(manifest.sprites['tile.floor.overlay']).toEqual(['moss-0.png', 'moss-1.png'])
+    expect(manifest.sprites['tile.grass.overlay']).toEqual(['clump.png'])
+  })
+
+  it('accepts a macroTiles section and drops bad entries with warnings', () => {
+    const { manifest, warnings } = validateManifest({
+      macroTiles: { floor: 2, street: 4, lava: 2, wall: 5, grass: 2.5, exit: '2' },
+    })
+    expect(manifest.macroTiles).toEqual({ floor: 2, street: 4 })
+    expect(warnings.join('\n')).toContain('lava')
+    expect(warnings.join('\n')).toContain('macroTiles.wall')
+    expect(warnings.join('\n')).toContain('macroTiles.grass')
+    expect(warnings.join('\n')).toContain('macroTiles.exit')
+  })
+
+  it('macroTiles tolerates garbage without dying and defaults empty', () => {
+    expect(validateManifest({ macroTiles: [] }).manifest.macroTiles).toEqual({})
+    expect(validateManifest({ macroTiles: 'x' }).manifest.macroTiles).toEqual({})
+    expect(validateManifest({}).manifest.macroTiles).toEqual({})
   })
 
   it('keeps null as an explicit procedural opt-out', () => {
@@ -236,6 +263,17 @@ describe('resolvePalette', () => {
 })
 
 // ---------------------------------------------------------------------------
+describe('resolveMacroTiles', () => {
+  it('active theme wins per tile name; undeclared names fall through', () => {
+    const chain: ThemeChain = [
+      theme('swamp', { macroTiles: { floor: 2 } }),
+      theme('city', { macroTiles: { floor: 3, street: 2 } }),
+    ]
+    expect(resolveMacroTiles(chain)).toEqual({ floor: 2, street: 2 })
+  })
+  it('empty chain declares nothing', () => expect(resolveMacroTiles([])).toEqual({}))
+})
+
 describe('theme id selection', () => {
   it('URL param beats setting', () => expect(resolveThemeId('swamp', 'city')).toBe('swamp'))
   it('invalid param falls to setting', () => expect(resolveThemeId('../x', 'swamp')).toBe('swamp'))

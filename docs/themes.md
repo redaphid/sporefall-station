@@ -88,7 +88,11 @@ still loadable by id without an index entry).
   "anim": {                      // OPTIONAL per-state animation cadence, in sim
     "walk": 6,                   //   TICKS PER FRAME (30 ticks = 1s). Integers
     "attack": 2                  //   1..30. States you omit use the engine
-  }                              //   defaults (see "Animation states" below).
+  },                             //   defaults (see "Animation states" below).
+
+  "macroTiles": {                // OPTIONAL: tile surfaces whose variant pool
+    "floor": 2                   //   is sliced from N×N-tile macro images
+  }                              //   (N ∈ 2..4; see "Macro-tiles" below).
 }
 ```
 
@@ -107,6 +111,7 @@ the console and in `validateManifest` unit tests.
 |---|---|
 | `tile.<name>` | ground/wall tile art, `<name>` ∈ `street sidewalk floor wall grass exit`. A single path OR an **array of variant paths** — the tilemap alternates variants by a deterministic per-coordinate hash, so big surfaces read as texture instead of one repeated stamp (same seed → same ground on every device). Should tile seamlessly. The wall's first variant is also clipped onto the bevelled corner-cut tiles. |
 | `tile.<name>.accent` | OPTIONAL rare-detail pool for that surface (root cluster, vent grate, glowing spore patch…). One accent replaces the base variant on ~1/17 tiles, picked on the same coordinate hash. Array or single path. |
+| `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player cop thug civilian scientist gangster robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
 | `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
 | `unit.player`, `unit.cop` | single-sprite billboard fallback (no directions) |
@@ -122,6 +127,23 @@ the console and in `validateManifest` unit tests.
 | `fx.explosion` | **array** — explosion clip (3 frames in city) |
 | `fx.pickup` | **array** — pickup sparkle clip |
 | `fx.blood` | **array** — death splat (drawn under actors, not additive) |
+
+### Macro-tiles (`macroTiles`, slice-coherent variant pools)
+
+A 32px tile can't hold a feature bigger than itself, and a pool of independent
+32px variants still repeats visibly on large surfaces. `macroTiles` fixes both:
+author a surface as one or more **N×N-tile macro images** (N ∈ 2..4 — e.g.
+64×64px for N=2), slice each macro into its N² tiles **row-major**, and list
+the slices in the `tile.<name>` pool (macro 0's slices first, then macro 1's…).
+Declare `"macroTiles": { "<name>": N }` and the tilemap picks each tile's
+variant by **position** — quadrant `(tx mod N, ty mod N)` — so adjacent slices
+always land adjacently: plate seams, ripple rings and other large features span
+tiles seamlessly. Which macro fills a given N×N cell is hashed **per cell**, so
+multiple macros alternate deterministically and the visible repeat period
+becomes N tiles. Pools without a `macroTiles` entry keep the per-tile hash pick.
+A pool whose length is not a multiple of N² ignores the trailing partial macro;
+a pool shorter than N² falls back to the hash pick. Accents still replace
+slices at the usual rarity — author them as self-contained feature tiles.
 
 Archetypes that share a body keep sharing it (bouncer→cop, boss→thug,
 shopkeeper→civilian): theming `char.cop.*` also reskins bouncers. Doors, fires,

@@ -36,6 +36,7 @@
     "test:e2e:obj": "bash e2e/run-obj.sh",
     "e2e:features": "bash e2e/run-features.sh",
     "e2e:comm-ui": "bash e2e/run-comm-ui.sh",
+    "e2e:ai-inspect": "bash e2e/run-ai-inspection.sh",
     "e2e:feature:combat": "bash e2e/run-features.sh combat",
     "e2e:feature:fire": "bash e2e/run-features.sh fire",
     "gen:fixtures": "tsx scripts/test/gen-serialize-fixtures.mts && tsx scripts/test/gen-feature-fixtures.mts"

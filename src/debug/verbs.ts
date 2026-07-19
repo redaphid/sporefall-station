@@ -173,8 +173,10 @@ interface FieldSchema {
 /** Derive the component/archetype shape of the world from its LIVE entities — no
  * hardcoded field list to rot as systems come and go. For every entity we walk
  * its verbatim JSON (so unknown/future components are counted for free) and
- * tally which top-level fields exist, their types, and one level of sub-keys. */
-const buildSchema = (w: World): {
+ * tally which top-level fields exist, their types, and one level of sub-keys.
+ * Takes just `{entities}` so view-only sessions (the window.backseat surface on
+ * a net client) can reflect over their predicted entities too. */
+export const buildSchema = (w: { entities: readonly Entity[] }): {
   entityCount: number
   kinds: Record<string, number>
   archetypes: Record<string, { kind: string; count: number }>

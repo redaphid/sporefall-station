@@ -4,14 +4,35 @@ import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
-import { emitNoise, type World } from '../world'
+import { type World } from '../world'
 import { addItem, applyModPickup, equipSlot } from './inventory'
 import { useObject } from './objects'
 
 const INTERACT_RANGE = 1.3
-const LOCKPICK_TICKS = 45 // 1.5s channel
+/** How far a channeling picker may drift from the door before the pick drops. */
+const PICK_BREAK_RANGE = 1.6
+/** Deliberate stick input past this magnitude cancels a pick channel. */
+const PICK_MOVE_DEADZONE = 0.25
+/** Per-tick displacement past this cancels a pick — real knockback/teleport,
+ * NOT the sub-0.05 nudges pushApart deals when an NPC brushes past. */
+const PICK_DRIFT_CANCEL = 0.15
+
+/**
+ * Pick-channel length per lock level, in ticks (30 = 1s). EVERY lock is
+ * pickable by the default player — there are no class perks anymore, so the
+ * lock level buys TIME EXPOSED, never a dead end. Tuned so a bunker's three
+ * serial doors (floor 3+, L2) cost ~10.5s of channeling total.
+ *   L1 (floor 1-2 mission doors)  2.0s
+ *   L2 (floor 3+ mission doors)   3.5s
+ *   L3 (reserved for set-pieces)  5.0s
+ * Out-of-range levels clamp into the table: a mis-set lockLevel can never
+ * produce an unpickable door.
+ */
+export const PICK_TICKS_BY_LEVEL: readonly number[] = [60, 60, 105, 150]
+export const pickTicks = (lockLevel: number): number =>
+  PICK_TICKS_BY_LEVEL[Math.max(1, Math.min(PICK_TICKS_BY_LEVEL.length - 1, Math.floor(lockLevel)))]
+
 const REVIVE_TICKS = 90 // 3s of teammate proximity
-const CRIME_TICKS = 15 * 30
 /** Fraction of max HP a revived player comes back with — a low, exposed start. */
 const REVIVE_HP_FRACTION = 0.3
 
@@ -23,8 +44,8 @@ export const interactionSystem = (w: World, inputs: Map<number, InputCmd>): void
       continue
     }
     autoPickup(w, p)
-    runChannel(w, p)
     const cmd = inputs.get(p.playerCtl.playerId)
+    runChannel(w, p, cmd)
     if (cmd?.interact) handleInteract(w, p)
   }
 }
@@ -67,42 +88,41 @@ const handleInteract = (w: World, p: Entity): void => {
       door.open = !door.open
       w.events.push({ type: 'doorToggle', entityId: target.id, open: door.open })
     } else if (!p.playerCtl!.channel) {
-      p.playerCtl!.channel = { kind: 'lockpick', targetId: target.id, ticksLeft: LOCKPICK_TICKS }
+      const total = pickTicks(door.lockLevel)
+      p.playerCtl!.channel = { kind: 'lockpick', targetId: target.id, ticksLeft: total, total }
+      w.events.push({ type: 'pickStart', entityId: target.id, byId: p.id, ticks: total })
     }
   }
 }
 
-const runChannel = (w: World, p: Entity): void => {
+/**
+ * Advance a lockpick channel. Picking is DETERMINISTIC: hold your ground for
+ * the full channel and the lock opens, every time — no botch roll. The cost is
+ * exposure (you stand still, in the open, for the lock level's worth of
+ * seconds). The channel drops only for legible reasons, each one evented so
+ * the UI can say WHY: deliberate movement / real knockback (`moved`), taking a
+ * hit (`hurt`, via applyDamage), or the door no longer being locked (`gone`).
+ * A brushing NPC's pushApart nudge does NOT cancel — see PICK_DRIFT_CANCEL.
+ */
+const runChannel = (w: World, p: Entity, cmd: InputCmd | undefined): void => {
   const ctl = p.playerCtl!
   const channel = ctl.channel
   if (!channel) return
-  // Moving (or drifting from knockback) cancels the channel
-  if (Math.hypot(p.pos.x - p.prevPos.x, p.pos.y - p.prevPos.y) > 0.02) {
+  const cancel = (reason: 'moved' | 'hurt' | 'gone'): void => {
     ctl.channel = undefined
-    return
+    w.events.push({ type: 'pickCancel', entityId: channel.targetId, byId: p.id, reason })
   }
   const door = w.byId.get(channel.targetId)
-  if (!door?.door || !door.door.locked) {
-    ctl.channel = undefined
-    return
-  }
+  if (!door?.door || !door.door.locked) return cancel('gone')
+  // Walking off (stick input), being blasted away, or ending up out of reach.
+  if (cmd && Math.hypot(cmd.moveX, cmd.moveY) > PICK_MOVE_DEADZONE) return cancel('moved')
+  if (Math.hypot(p.pos.x - p.prevPos.x, p.pos.y - p.prevPos.y) > PICK_DRIFT_CANCEL) return cancel('moved')
+  if (Math.hypot(p.pos.x - door.pos.x, p.pos.y - door.pos.y) > PICK_BREAK_RANGE) return cancel('moved')
   if (--channel.ticksLeft > 0) return
   ctl.channel = undefined
-  if (w.rng.chance(0.7)) {
-    door.door.locked = false
-    door.door.open = true
-    w.events.push({ type: 'doorToggle', entityId: door.id, open: true })
-  } else {
-    // Botched pick: noise draws attention, counts as a witnessed-able crime
-    w.events.push({ type: 'noise', x: door.pos.x, y: door.pos.y })
-    emitNoise(w, door.pos.x, door.pos.y) // NPCs will investigate the racket
-    ctl.crimeUntilTick = w.tick + CRIME_TICKS
-    for (const npc of w.entities) {
-      if (!npc.ai || npc.dead) continue
-      const dist = Math.hypot(npc.pos.x - door.pos.x, npc.pos.y - door.pos.y)
-      if (dist <= npc.ai.sightRange + 2) npc.ai.thinkAt = w.tick
-    }
-  }
+  door.door.locked = false
+  door.door.open = true
+  w.events.push({ type: 'doorToggle', entityId: door.id, open: true })
 }
 
 const bleedAndRevive = (w: World, p: Entity): void => {

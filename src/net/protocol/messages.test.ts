@@ -13,6 +13,7 @@ import {
   type WireEntity,
   type WireSnapshot,
 } from './messages'
+import { makeEntity } from '../../game/entity'
 import { spawnPlayer } from '../../game/player'
 import { createWorld } from '../../game/world'
 
@@ -232,5 +233,48 @@ describe('snapshot codec — boundary values', () => {
     const e = oneEntity({ x: 12.531, y: 47.999 })
     expect(Math.abs(e.x - 12.531)).toBeLessThanOrEqual(1 / 32)
     expect(Math.abs(e.y - 47.999)).toBeLessThanOrEqual(1 / 32)
+  })
+})
+
+describe('door lock state over the wire', () => {
+  const doorEntity = (locked: boolean, lockLevel: number, open = false) => {
+    const e = makeEntity('door', 'door', 21.5, 9.5, 0.5)
+    e.id = 33
+    e.door = { open, locked, lockLevel }
+    return e
+  }
+
+  it('a locked door ships the DoorLocked flag and its lock level (hp byte), and the client rebuilds both', () => {
+    const wire = toWireEntity(doorEntity(true, 2), 100)
+    expect(wire.flags & SnapFlags.DoorLocked).not.toBe(0)
+    const [rt] = decodeSnapshot(encodeSnapshot({ tick: 1, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire] })).entities
+    const client = applyWireEntity(undefined, rt, 1)
+    expect(client.door).toEqual({ open: false, locked: true, lockLevel: 2 })
+  })
+
+  it('unlocking on the host clears the flag and the SAME client entity flips to unlocked on refresh', () => {
+    const client = applyWireEntity(undefined, toWireEntity(doorEntity(true, 1), 1), 1)
+    expect(client.door!.locked).toBe(true)
+    const after = applyWireEntity(client, toWireEntity(doorEntity(false, 1, true), 2), 2)
+    expect(after).toBe(client) // refreshed in place, not replaced
+    expect(after.door).toEqual({ open: true, locked: false, lockLevel: 1 })
+  })
+
+  it('ADVERSARIAL: a plain unlocked door stays plain, and non-door hpPct is untouched by the lock bit', () => {
+    const plain = applyWireEntity(undefined, toWireEntity(doorEntity(false, 0), 1), 1)
+    expect(plain.door).toEqual({ open: false, locked: false, lockLevel: 0 })
+    const w = createWorld(1, 1)
+    const p = spawnPlayer(w, 0, 5, 5)
+    p.health!.hp = 60 // /120 max
+    const pw = toWireEntity(p, 0)
+    expect(pw.flags & SnapFlags.DoorLocked).toBe(0)
+    expect(pw.hpPct).toBeCloseTo(0.5, 2)
+  })
+
+  it('ADVERSARIAL: lock levels survive the full byte range clamp (L3 and an absurd 255)', () => {
+    const l3 = applyWireEntity(undefined, toWireEntity(doorEntity(true, 3), 1), 1)
+    expect(l3.door!.lockLevel).toBe(3)
+    const wild = applyWireEntity(undefined, toWireEntity(doorEntity(true, 255), 1), 1)
+    expect(wild.door!.lockLevel).toBe(255) // pickTicks clamps at use — the wire stays honest
   })
 })

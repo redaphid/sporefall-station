@@ -151,11 +151,19 @@ describe('buildInfoCard — doors', () => {
     return d
   }
 
-  it('locked: state, lock level, and the pick time in seconds', () => {
-    const rows = rowMap(buildInfoCard(door({ locked: true, lockLevel: 2 })).rows)
-    expect(rows.Door).toBe('Locked (L2)')
-    expect(rows['Pick time']).toBe('1.5s') // LOCKPICK_TICKS / SIM_RATE
-    expect(rows.Interact).toBe('Open')
+  it('locked: state, lock level, and the LEVEL-DEPENDENT pick time in seconds', () => {
+    const l2 = rowMap(buildInfoCard(door({ locked: true, lockLevel: 2 })).rows)
+    expect(l2.Door).toBe('Locked (L2)')
+    expect(l2['Pick time']).toBe('3.5s') // pickTicks(2)=105 / SIM_RATE
+    expect(l2.Interact).toBe('Open')
+    const l1 = rowMap(buildInfoCard(door({ locked: true, lockLevel: 1 })).rows)
+    expect(l1['Pick time']).toBe('2.0s') // pickTicks(1)=60 / SIM_RATE
+    const l3 = rowMap(buildInfoCard(door({ locked: true, lockLevel: 3 })).rows)
+    expect(l3['Pick time']).toBe('5.0s') // pickTicks(3)=150 / SIM_RATE
+  })
+
+  it('a locked door thumbnails as the padlocked art key', () => {
+    expect(buildInfoCard(door({ locked: true, lockLevel: 1 })).artKey).toBe('door.locked')
   })
 
   it('closed-unlocked and open doors show no pick time', () => {

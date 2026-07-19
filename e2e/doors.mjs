@@ -9,9 +9,9 @@ await record({
     { tick: 20, label: '01-spawn' },
     { tick: 150, label: '02-approach' },
     { tick: 210, label: '03-unlocked-open' },
-    { tick: 300, label: '04-picking' },
-    { tick: 430, label: '05-lock-popped' },
-    { tick: 490, label: '06-through' },
+    { tick: 320, label: '04-picking' },
+    { tick: 380, label: '05-lock-popped' },
+    { tick: 440, label: '06-through' },
   ],
   readState: () => {
     const w = window.__world

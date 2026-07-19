@@ -136,8 +136,10 @@ export interface Entity {
     cash: number
     crimeUntilTick: number
     downed?: { bleedTicks: number; reviveProgress: number }
-    /** Timed action in progress (lockpicking). Moving cancels it. */
-    channel?: { kind: 'lockpick'; targetId: EntityId; ticksLeft: number }
+    /** Timed action in progress (lockpicking). Deliberate movement, damage, or
+     * drifting out of range cancels it. `total` is the full channel length so
+     * UIs can draw progress without re-deriving lock tables. */
+    channel?: { kind: 'lockpick'; targetId: EntityId; ticksLeft: number; total: number }
     /** Active dodge-roll (Enter-the-Gungeon style). Absent = not rolling and off
      * cooldown; all fields are ABSOLUTE ticks / a unit direction, so it serializes
      * and replays byte-for-byte like `hitFlashUntil`. `untilTick` bounds the i-frame

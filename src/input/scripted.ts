@@ -101,10 +101,8 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 55 },
     { ticks: 31, x: 1 }, // through it, up to the locked door at x=11
     { ticks: 24 },
-    { ticks: 1, interact: true }, // start the lockpick channel
-    { ticks: 60 }, // hold still while it picks (moving cancels) — first try botches
-    { ticks: 1, interact: true }, // retry — this one pops the lock
-    { ticks: 80 }, // watch the lock give and the door swing open
+    { ticks: 1, interact: true }, // start the lockpick channel (L1 = 60 ticks)
+    { ticks: 75 }, // hold still while it picks — deterministic: the lock WILL give
     { ticks: 40, x: 1 }, // step through the opened door
     { ticks: 70 },
   ],
@@ -256,6 +254,36 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 70 },
     { ticks: 14, x: 1, y: -1 }, // NE
     { ticks: 70 }, // final beat, resting on the ne facing
+  ],
+
+  // The bunker heist (fixture `bunker-heist`: seed 7 floor 3, player staged
+  // east of the bunker airlock). The previously-blocked mission path, end to
+  // end: PICK the two L2 airlock doors (deterministic 3.5s channels, progress
+  // ring on screen), circuit the guard band, BREACH the core door with the
+  // grenade special (loud — the boom pulls investigators), grab the briefcase
+  // → MISSION COMPLETE. Geometry from levelgen seed 7 floor 3: outer door
+  // (40.5,53.5), inner (38.5,53.5), core door (26.5,55.5), briefcase (31.5,53).
+  'bunker-heist': [
+    { ticks: 30 }, // settle on the approach
+    { ticks: 14, x: -1 }, // west up to the OUTER airlock door
+    { ticks: 90 }, // stand — the "Lock II · Use to pick (3.5s)" prompt shows
+    { ticks: 1, interact: true }, // pick #1 starts (L2 = 105 ticks)
+    { ticks: 112 }, // hold still, ring fills, door pops
+    { ticks: 15, x: -1 }, // through the vestibule to the INNER door
+    { ticks: 15 },
+    { ticks: 1, interact: true }, // pick #2
+    { ticks: 112 },
+    { ticks: 12, x: -1 }, // into the guard band
+    { ticks: 27, y: 1 }, // south along the east strip
+    { ticks: 84, x: -1 }, // west along the south strip
+    { ticks: 14, y: -1 }, // north, up beside the CORE door
+    { ticks: 3, x: 1 }, // face the door (sets aim east)
+    { ticks: 1, special: true }, // GRENADE — breach the core door
+    { ticks: 45 }, // fuse, boom, door blown open (we eat some blast — loud is costly)
+    { ticks: 22, x: 1 }, // step through the breach
+    { ticks: 26, x: 1, y: -1 }, // angle up toward the briefcase
+    { ticks: 10, x: 1 },
+    { ticks: 80 }, // briefcase auto-grabs → MISSION COMPLETE banner
   ],
 
   // A full mission: grab the briefcase (objective complete), then reach the exit.

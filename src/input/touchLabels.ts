@@ -41,10 +41,11 @@ export const computeTouchLabels = (view: RenderView): TouchLabels => {
   if (!self) return { atk: 'ATK', use: 'USE', useEnabled: false, spc: 'SPC', spcEnabled: false, throwEnabled: false }
   const target = nearestInteractable(view.entities, self)
   const cd = self.playerCtl?.abilityCooldown ?? 0
+  const picking = self.playerCtl?.channel?.kind === 'lockpick'
   return {
     atk: WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? 'Fists',
-    use: target ? useLabel(target) : 'USE',
-    useEnabled: !!target,
+    use: picking ? 'Picking…' : target ? useLabel(target) : 'USE',
+    useEnabled: picking || !!target,
     spc: cd > 0 ? `${SPECIAL_NAME} ${Math.ceil(cd / 30)}s` : SPECIAL_NAME,
     spcEnabled: cd <= 0,
     throwEnabled: hasThrowable(self.playerCtl?.inventory ?? []),

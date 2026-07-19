@@ -60,6 +60,14 @@ PALETTE_SECTION = {
     },
 }
 
+# Animation states emitted as frame clips when their files exist
+# (walk cycles come from the rotoscope pipeline; more states as art lands).
+ANIM_STATES = ("walk", "attack", "hurt", "roll", "death")
+# Cadence: 8-frame rotoscoped walk at 4 ticks/frame = 32 ticks (~1.07 s) per
+# stride — the engine default of 6 was tuned for the 2-frame legacy cycle and
+# reads sluggish over 8 frames.
+ANIM_SECTION = {"walk": 4}
+
 CHAR_FILES = {arch: kind for arch, (kind, *_rest) in G.CHARS.items()}
 CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
                    if t in CHAR_FILES and arch in ("gangster",)})
@@ -109,6 +117,17 @@ def build():
                     sprites[f"char.{arch}.{d}-{frame}"] = rel
                 else:
                     print(f"  (no art at all: char.{arch}.{d}-{frame})", file=sys.stderr)
+            # Animation-state clips (char.<arch>.<dir>-<state>-<n>, n contiguous
+            # from 0 — docs/themes.md "Animation states"). Emitted per actually-
+            # present file; the rotoscope pipeline (scripts/assets/rotoscope/)
+            # produces 8-frame walk cycles. Legacy idle/step keys above remain
+            # as the fallback for directions/states without clips.
+            for state in ANIM_STATES:
+                for n in range(8):
+                    rel = f"chars/{kind}-{d}-{state}-{n}.png"
+                    if not exists(rel):
+                        break  # frames must be contiguous from 0
+                    sprites[f"char.{arch}.{d}-{state}-{n}"] = rel
     put("prop.default", "props/cargo-pod.png")
     for eng, ours in PROP_KEYS.items():
         put(f"prop.{eng}", f"props/{ours}.png")
@@ -135,6 +154,7 @@ def build():
         "palette": PALETTE_SECTION,
         "names": NAMES,
         "sprites": sprites,
+        "anim": ANIM_SECTION,
     }
     out = os.path.join(THEME, "manifest.json")
     json.dump(manifest, open(out, "w"), indent=2)

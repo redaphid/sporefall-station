@@ -197,7 +197,85 @@ JSON contract in `PROMPT` (or `PAIR_PROMPT`) and add the corresponding
 majority-vote rule in `check()` — keep answers machine-parseable JSON and
 never trust a single VLM read.
 
-## 6. Worked example: add a new NPC to an existing theme
+## 6. Rotoscoped animation (`scripts/assets/rotoscope/`)
+
+Flashback (1992) got its fluid animation by rotoscoping filmed actors. The
+modern equivalent here renders a rigged 3D walk cycle and lets the diffusion
+pipeline "trace" every frame into pack style — 3D supplies the frame-to-frame
+coherence AI can't, AI supplies the look 3D can't. Three stages, one command:
+
+```bash
+cd scripts/assets/rotoscope
+export SWAMPSPACE_STAGE=/tmp/swampspace-stage
+CHAR=vine-ranger bash run.sh     # render -> trace -> gate -> manifest
+```
+
+### Stage 1 — motion source (`rig_walk.py` via `render.sh`)
+
+A fully **procedural** color-blocked humanoid proxy — every mesh is a bpy
+primitive created by the script, so the motion source has **no external
+rig/asset and no license baggage**. The walk is the classic 4-keypose stride
+(contact/down/passing/up, Williams) written out as 8 explicit poses; hip
+height is solved per frame by leg FK so the stance foot always touches the
+ground (bob emerges from geometry, feet never float). The proxy is
+color-blocked as the character (teal suit, orange cap, visor, boots) because
+at low denoise the tracer keeps color regions — that's what keeps every frame
+the same character.
+
+It renders on the `soul` box: a **Windows** Blender 5.x driven headless from
+WSL over ssh. The exact invocation (`render.sh` does all of this):
+
+```bash
+ssh soul   # alias in ~/.ssh/config (cloudflared); NOT soul.local. The
+           # "Could not request local forwarding" noise is benign tunnel chatter.
+# inside: binary /mnt/d/tools/blender/blender.exe, and paths handed to Blender
+# must be D:/-style (the exe is a Windows binary; /mnt/d = D:). Remote shell is
+# zsh — unmatched globs abort, clean up with find. Workdir: /mnt/d/tmp/backseat-roto.
+/mnt/d/tools/blender/blender.exe -b -P 'D:/tmp/backseat-roto/rig_walk.py' -- \
+  --out 'D:/tmp/backseat-roto/frames' --res 1024
+```
+
+Output: `walk-<dir>-<n>.png`, 5 dirs × 8 frames, RGBA-transparent, one fixed
+orthographic camera (slight-high game angle, elevation 14°) so framing/scale
+are identical across every frame and direction. e/ne face RIGHT per the pack
+facing convention (west is engine-mirrored, never drawn).
+
+### Stage 2 — AI tracer (`trace.py`)
+
+Each frame goes through ComfyUI **img2img at denoise 0.35** (SDXL + pixel-art
+LoRA) with the character's curated s-idle as IPAdapter anchor (per-direction
+weights from §4.5), same seed for all 40 frames. The 3D render pins pose and
+composition; diffusion only re-develops the surface into pack pixel art.
+Then, instead of per-frame rembg (alpha flicker) the traced RGB is masked by
+the **Blender frame's own alpha**, and every frame is downscaled through
+**one fixed crop window** (union bbox of all 40 Blender frames) —
+k-centroid + locked palette — so scale and feet anchoring never pump between
+frames. Results land as `public/themes/swampspace/chars/<char>-<dir>-walk-<n>.png`.
+
+Shared-GPU manners: the tracer is fire-and-forget and resumable — it submits
+in waves of ≤8, polls history, harvests finished frames even if a previous
+client was killed, and skips frames already traced. `--no-trace` skips the AI
+entirely and ships palette-quantized 3D frames (the coherence-safe fallback);
+`--post-only` redoes the downscale from cached traces. `DENOISE=`/`SEED=` to
+re-tune.
+
+### Stage 3 — gate (`gate.py`) and manifest
+
+`gate.py` (exit code = failures): deterministic checks (48×48, hard alpha,
+every pixel in the locked palette, feet on the bottom rows, no content-height
+pumping across the cycle), a coherence metric (fraction of changed pixels
+between adjacent frames — a spike over 3× the direction's median is tracing
+flicker), and the qwen3-vl gates (facing per frame, same-character contract
+between the two contact poses). `manifest.py` then emits the
+`char.<arch>.<dir>-walk-0..7` clips plus `anim.walk` cadence (4 ticks/frame:
+8-frame stride ≈ 1.07 s; the engine-default 6 was tuned for the 2-frame flip).
+Legacy `idle`/`step` keys stay as the fallback for states/directions without
+clips (docs/themes.md "Animation states").
+
+In-game proof: `bash e2e/run-roto-walk.sh` (port 4993) records the ranger
+walking the full 8-direction compass circle on the new cycles.
+
+## 7. Worked example: add a new NPC to an existing theme
 
 Goal: a "marsh-witch" NPC for swampspace, mapped to the `civilian` archetype.
 

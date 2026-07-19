@@ -28,8 +28,11 @@ export const DEADZONE = 0.28
  * fake a press. */
 const TRIGGER_PRESS = 0.5
 
-/** Exported for padJoin: a button press is a fact about the pad regardless of
- * which action its index maps to, so ANY press is valid join intent. */
+/** Is button `i` down on this pad? Exported for padJoin (a press is a fact
+ * about the pad regardless of which action its index maps to, so ANY press is
+ * valid join intent) and for the remap capture (padCapture.ts), which must use
+ * the EXACT same press definition as gameplay — a reading that can't fire an
+ * action can't bind one either. */
 export const buttonPressed = (pad: Gamepad, i: number): boolean => {
   const b = pad.buttons[i]
   if (!b) return false

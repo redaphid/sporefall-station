@@ -44,6 +44,11 @@ export interface GameRenderer {
    * live art registry (so it matches the active theme exactly), cached per key,
    * cache dropped on theme swap. Undefined when extraction isn't possible. */
   entityThumb(artKey: string): string | undefined
+  /** Where a world tile coord is ACTUALLY drawn, in screen px — read straight
+   * off the world container's live transform (post edge-clamp, post shake).
+   * The e2e ground truth that DOM overlays (mission marker, locator) must
+   * agree with; never derived from duplicated camera math. */
+  worldToScreen(wx: number, wy: number): { x: number; y: number }
   /** Twin-stick aim reticles to draw this frame, in world TILE coordinates
    * (computed by input/aim.padAimReticles). Pass [] to clear. Presentation
    * only — the sim never sees them. */
@@ -231,6 +236,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     camera,
     setTheme,
     entityThumb,
+    worldToScreen(wx: number, wy: number): { x: number; y: number } {
+      // The live container transform — the rendered truth, no re-derived math.
+      const p = world.toGlobal({ x: wx * TILE_PX, y: wy * TILE_PX })
+      return { x: p.x, y: p.y }
+    },
     setReticles(reticles): void {
       reticleList = reticles
     },

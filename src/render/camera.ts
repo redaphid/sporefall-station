@@ -1,5 +1,6 @@
 import type { Container } from 'pixi.js'
 import { TILE_PX } from './art'
+import { appliedCenter, OVERSCAN_FRAC } from './cameraModel'
 import { decayShake, stackShake } from './juice'
 import { anchoredCenter, clampZoom, smoothZoom, ZOOM_DEFAULT } from './zoomModel'
 
@@ -9,8 +10,8 @@ const FOLLOW_HOLD_S = 0.3
 
 /** Camera in world (tile) coordinates, applied as a container translation. */
 export class Camera {
-  /** Fraction of the half-view allowed past a level edge (see apply()). */
-  static readonly OVERSCAN_FRAC = 0.4
+  /** Fraction of the half-view allowed past a level edge (see cameraModel.ts). */
+  static readonly OVERSCAN_FRAC = OVERSCAN_FRAC
 
   x = 0
   y = 0
@@ -109,17 +110,9 @@ export class Camera {
     }
     const T = TILE_PX * this.zoom
     if (world.scale.x !== this.zoom) world.scale.set(this.zoom)
-    const halfW = screenW / 2 / T
-    const halfH = screenH / 2 / T
-    // Soft edge clamp: allow the view to run OVERSCAN_FRAC of its half-extent
-    // past the level edge, so a player standing in a map corner is framed well
-    // inside the screen (clear of the HUD stack) instead of pinned to the
-    // corner pixel. The strip beyond the edge renders as the theme background —
-    // "past the map" void. View-only; the sim never sees the camera.
-    const mX = halfW * Camera.OVERSCAN_FRAC
-    const mY = halfH * Camera.OVERSCAN_FRAC
-    const cx = levelW * T > screenW ? Math.min(Math.max(this.x, halfW - mX), levelW - halfW + mX) : levelW / 2
-    const cy = levelH * T > screenH ? Math.min(Math.max(this.y, halfH - mY), levelH - halfH + mY) : levelH / 2
+    // Soft edge clamp — the SHARED definition (cameraModel.appliedCenter), also
+    // used by every DOM-overlay projection, so markers always match the render.
+    const { x: cx, y: cy } = appliedCenter(this.x, this.y, T, screenW, screenH, levelW, levelH)
     this.appliedX = cx
     this.appliedY = cy
     world.position.set(

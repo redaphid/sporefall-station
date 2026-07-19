@@ -7,6 +7,7 @@ import { assignPads } from './padAssign'
 import { initialJoinIntent, stepJoinIntent, type JoinIntentState } from './padJoin'
 import { padProfile } from './padProfile'
 import { readPad, type PadState } from './readPad'
+import { isPadCaptureActive, remapProfile } from './remap'
 
 /**
  * Local co-op over the Gamepad API. One instance owns every connected pad,
@@ -152,18 +153,29 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     const pads = getPads()
     const live = pads.filter((p): p is Gamepad => p !== null)
     const states = new Map<number, PadState>()
-    for (const p of live) states.set(p.index, readPad(p, padProfile(p)))
+    // remapProfile overlays the user's button map (settings → Controller) on
+    // the resolved profile, so a rebind applies on this very sample.
+    for (const p of live) states.set(p.index, readPad(p, remapProfile(padProfile(p))))
+
+    // While the remap UI is CAPTURING a button, every pad is presented idle
+    // and nothing joins: the captured press is spent on binding (same rule as
+    // the join press). Real states still land in `last` below, so releasing
+    // the captured button after capture ends never edge-fires an action.
+    const capturing = isPadCaptureActive()
 
     const connected = live.map((p) => p.index)
     // Join intent (padJoin.ts): ANY button, or a firm sustained push on a
     // trusted, proven-neutral stick pair. Trackers only exist for unjoined
-    // pads — they accumulate the neutral proof across samples.
+    // pads — they accumulate the neutral proof across samples. While the remap
+    // UI is capturing, nothing joins at all: the captured press is spent on
+    // binding (trackers freeze rather than step, so no intent accrues either).
     const joining: number[] = []
     for (const p of live) {
       if (assignments.has(p.index)) {
         joinTrackers.delete(p.index)
         continue
       }
+      if (capturing) continue
       const intent = stepJoinIntent(joinTrackers.get(p.index) ?? initialJoinIntent(), p, padProfile(p))
       joinTrackers.set(p.index, intent.state)
       if (intent.join) joining.push(p.index)
@@ -191,7 +203,8 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     const inputs = new Map<number, InputCmd>()
     const pauses: number[] = []
     for (const [padIndex, slot] of assignments) {
-      const s = joinedNow.has(padIndex) ? idle : maskSuppressed(padIndex, states.get(padIndex) ?? idle)
+      const s =
+        capturing || joinedNow.has(padIndex) ? idle : maskSuppressed(padIndex, states.get(padIndex) ?? idle)
       inputs.set(slot, toCmd(padIndex, slot, s))
       if (rose(padIndex, s, 'pause')) pauses.push(slot)
     }

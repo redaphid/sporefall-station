@@ -14,7 +14,7 @@
  * Binding a button another action owns SWAPS the two (stated in the UI copy).
  */
 
-import { loadSettings, saveSettings, type EffectsQuality, type GameSettings } from '../app/settings'
+import { loadSettings, saveSettings, type EffectsQuality, type GameSettings, type ShaderFxMode } from '../app/settings'
 import { createButtonCapture, type ButtonCapture } from '../input/padCapture'
 import { buttonPressed } from '../input/readPad'
 import {
@@ -77,6 +77,13 @@ export const createSettingsPanel = (
       <select id="q" style="width:100%;margin-top:3px;background:#111;color:#eee;border:1px solid #0006;border-radius:5px;padding:4px">
         <option value="high">High</option>
         <option value="low">Low</option>
+        <option value="off">Off</option>
+      </select>
+    </label>
+    <label style="display:block;margin-bottom:10px">Shader FX
+      <select id="fx" style="width:100%;margin-top:3px;background:#111;color:#eee;border:1px solid #0006;border-radius:5px;padding:4px">
+        <option value="full">Full</option>
+        <option value="reduced">Reduced</option>
         <option value="off">Off</option>
       </select>
     </label>`
@@ -251,6 +258,8 @@ export const createSettingsPanel = (
 
   const q = panel.querySelector<HTMLSelectElement>('#q')!
   q.value = current.effectsQuality
+  const fx = panel.querySelector<HTMLSelectElement>('#fx')!
+  fx.value = current.shaderFx
   const th = panel.querySelector<HTMLSelectElement>('#th')
   if (th && themes.some((t) => t.id === current.theme)) th.value = current.theme
   const hen = panel.querySelector<HTMLInputElement>('#hen')
@@ -269,6 +278,7 @@ export const createSettingsPanel = (
     if (panel.style.display === 'none') stopCapture() // closing the panel always ends capture
   })
   q.addEventListener('change', () => apply({ effectsQuality: q.value as EffectsQuality }))
+  fx.addEventListener('change', () => apply({ shaderFx: fx.value as ShaderFxMode }))
   th?.addEventListener('change', () => apply({ theme: th.value }))
   hen?.addEventListener('change', () => apply({ hapticsEnabled: hen.checked }))
   hin?.addEventListener('input', () => apply({ hapticsIntensity: Number(hin.value) }))

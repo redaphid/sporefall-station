@@ -30,8 +30,26 @@ describe('clampSettings', () => {
     expect(clampSettings({ hapticsEnabled: 'yes' }).hapticsEnabled).toBe(true) // non-bool → default true
   })
 
+  it('rejects an unknown shaderFx but keeps a valid one', () => {
+    expect(clampSettings({ shaderFx: 'ludicrous' }).shaderFx).toBe(defaultSettings().shaderFx)
+    expect(clampSettings({ shaderFx: 42 }).shaderFx).toBe(defaultSettings().shaderFx)
+    expect(clampSettings({ shaderFx: 'off' }).shaderFx).toBe('off')
+    expect(clampSettings({ shaderFx: 'reduced' }).shaderFx).toBe('reduced')
+    expect(clampSettings({ shaderFx: 'full' }).shaderFx).toBe('full')
+  })
+
+  it('defaults shaderFx to full for legacy persisted blobs that predate it', () => {
+    expect(clampSettings({ hapticsEnabled: false, effectsQuality: 'low' }).shaderFx).toBe('full')
+  })
+
   it('round-trips a fully-valid object', () => {
-    const s = { hapticsEnabled: false, hapticsIntensity: 0.5, effectsQuality: 'low' as const, theme: 'swamp' }
+    const s = {
+      hapticsEnabled: false,
+      hapticsIntensity: 0.5,
+      effectsQuality: 'low' as const,
+      shaderFx: 'reduced' as const,
+      theme: 'swamp',
+    }
     expect(clampSettings(s)).toEqual(s)
   })
 

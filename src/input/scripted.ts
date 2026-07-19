@@ -120,6 +120,11 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 60 },
   ],
 
+  // Stand and watch, longer: input-free 260 ticks. Backs the shader-FX videos —
+  // the showcase scenario's staggered grenades boom at ~70/140/210 (shockwave +
+  // kaleidoscopic bloom), and the exit-portal idle clip just breathes.
+  fxIdle: [{ ticks: 260 }],
+
   // Stand and watch: no input at all. Backs the #50 fire feature video, where the
   // real fire system does all the work — the lit crate row spreads down into a
   // flammable bystander and burns it to death (~tick 100) while the player looks

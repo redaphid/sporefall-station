@@ -73,6 +73,27 @@ describe('settings gear — press-exempt chrome', () => {
     createSettingsPanel(root, false, () => {}, [{ id: 'city', name: 'City' }])
     expect(panelOf(root).querySelector('#th')).toBeNull()
   })
+
+  it('the Shader FX select is present with full/reduced/off and reports a change', () => {
+    const onChange = vi.fn()
+    createSettingsPanel(root, false, onChange, THEMES)
+    const fx = panelOf(root).querySelector<HTMLSelectElement>('#fx')!
+    expect(fx).toBeTruthy()
+    expect([...fx.options].map((o) => o.value)).toEqual(['full', 'reduced', 'off'])
+    fx.value = 'reduced'
+    fx.dispatchEvent(new Event('change'))
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ shaderFx: 'reduced' }))
+  })
+
+  it('the Shader FX choice persists: a fresh panel starts on the saved mode', () => {
+    createSettingsPanel(root, false, () => {}, THEMES)
+    const fx = panelOf(root).querySelector<HTMLSelectElement>('#fx')!
+    fx.value = 'off'
+    fx.dispatchEvent(new Event('change'))
+    const root2 = mount()
+    createSettingsPanel(root2, false, () => {}, THEMES)
+    expect(panelOf(root2).querySelector<HTMLSelectElement>('#fx')!.value).toBe('off')
+  })
 })
 
 // ---------------------------------------------------------------------------

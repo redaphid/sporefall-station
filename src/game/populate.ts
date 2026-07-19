@@ -65,6 +65,11 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   ],
   warehouse: [{ archetype: 'thug', count: [2, 3] }],
   clinic: [{ archetype: 'civilian', count: [1, 2] }],
+  // Bunkers (themed floors >= 2 only) are garrisons: always guarded.
+  bunker: [
+    { archetype: 'thug', count: [1, 2] },
+    { archetype: 'gangster', count: [1, 2] },
+  ],
 }
 
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): void => {
@@ -78,20 +83,53 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): vo
     for (let i = 0; i < n; i++) {
       const spot = randomFloorInBuilding(w, rng, building)
       if (!spot) continue
-      const npc = spawnNpc(w, spec.archetype, spot.x, spot.y, wrng)
+      // The new-archetype patrol beats (bunker band, courtyard pit) are FIXED
+      // rectangles of provably-open tiles — patrol steering is straight-line
+      // (no pathfinder), so the patroller spawns ON its first waypoint and
+      // every leg runs along an unobstructed row/col. No rng drawn for either
+      // (the position dice above are still rolled), so streams stay put.
+      const beat = patrolBeat(building, spec === specs[0] && i === 0)
+      const pos = beat ? beat[0] : spot
+      const npc = spawnNpc(w, spec.archetype, pos.x, pos.y, wrng)
+      if (beat) assignPatrol(npc, beat)
       // One thug per warehouse walks rounds through the stock instead of
       // loitering — an interior patrol the players can time and slip past.
-      if (building.role === 'warehouse' && spec.archetype === 'thug' && i === 0) {
-        const beat = [{ x: spot.x, y: spot.y }]
+      // (Unless a set-piece beat already claimed this NPC: a warehouse-role
+      // COMPOUND's first thug walks the pit, not the stock.)
+      if (!beat && building.role === 'warehouse' && spec.archetype === 'thug' && i === 0) {
+        const wbeat = [{ x: spot.x, y: spot.y }]
         for (let j = 0; j < 2; j++) {
           const p = randomFloorInBuilding(w, rng, building)
-          if (p) beat.push(p)
+          if (p) wbeat.push(p)
         }
-        assignPatrol(npc, beat)
+        assignPatrol(npc, wbeat)
       }
     }
   }
   if (building.role === 'shop') stockShop(w, rng, building)
+}
+
+/** A rectangular circuit of tile-centre waypoints along `r`'s inner ring. */
+const ringBeat = (r: Rect): { x: number; y: number }[] => [
+  { x: r.x + 0.5, y: r.y + 0.5 },
+  { x: r.x + r.w - 0.5, y: r.y + 0.5 },
+  { x: r.x + r.w - 0.5, y: r.y + r.h - 0.5 },
+  { x: r.x + 0.5, y: r.y + r.h - 0.5 },
+]
+
+/** The set-piece patrol circuit for this building's FIRST spawned NPC, if any.
+ * Bunker: the guard band's inner ring (one tile in from the band edge — clear
+ * of the airlock's flanking walls and the chamber ring, so every straight leg
+ * is open). Courtyard compound: the pit's edge. Both are levelgen-guaranteed
+ * open rectangles, safe for the pathless straight-line patrol steering. */
+const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: number }[] | null => {
+  if (!isFirst) return null
+  if (building.role === 'bunker') {
+    const band = building.rooms[0]
+    return ringBeat({ x: band.x + 1, y: band.y + 1, w: band.w - 2, h: band.h - 2 })
+  }
+  if (building.courtyard) return ringBeat(building.courtyard)
+  return null
 }
 
 // Loot is tiered by depth: floor 1 stays basic (bat/knife/bandages), then the

@@ -20,6 +20,7 @@ import {
   type ThemeChain,
 } from './theme'
 import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type SpriteTextures } from './art'
+import { ANIM_STATES, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
 const BASE = import.meta.env.BASE_URL
 
@@ -115,18 +116,43 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     return (await Promise.all(u.map((f) => bake(renderer, f, size)))).filter((t): t is Texture => t !== undefined)
   }
 
-  // Directional character set: 5 drawn dirs × idle/step (west half mirrored at
-  // draw time). Kept only when at least one idle pose actually loaded.
+  // Animation-state clip: frames n = 0,1,2,… must be CONTIGUOUS from 0 in the
+  // manifest — the first unmapped index ends the clip (a bake failure on a
+  // mapped frame also truncates there, degrading to a shorter clip).
+  const clip = async (name: string, d: string, state: AnimStateName): Promise<Texture[]> => {
+    const frames: Texture[] = []
+    for (let n = 0; n < MAX_ANIM_FRAMES; n++) {
+      const tex = await one(`char.${name}.${d}-${state}-${n}`, CHAR_CANVAS_PX)
+      if (!tex) break
+      frames.push(tex)
+    }
+    return frames
+  }
+
+  // Directional character set: 5 drawn dirs × (legacy idle/step + named-state
+  // clips), west half mirrored at draw time. Kept only when at least one
+  // direction has an idle pose (legacy frame or idle clip).
   const charSet = async (name: string): Promise<CharSet | undefined> => {
     const poses = await Promise.all(
-      DIRS5.map(async (d): Promise<[typeof d, DirPose]> => [
-        d,
-        { idle: await one(`char.${name}.${d}-idle`, CHAR_CANVAS_PX), step: await one(`char.${name}.${d}-step`, CHAR_CANVAS_PX) },
-      ]),
+      DIRS5.map(async (d): Promise<[typeof d, DirPose]> => {
+        const [idle, step] = await Promise.all([
+          one(`char.${name}.${d}-idle`, CHAR_CANVAS_PX),
+          one(`char.${name}.${d}-step`, CHAR_CANVAS_PX),
+        ])
+        const stateClips = await Promise.all(ANIM_STATES.map((s) => clip(name, d, s)))
+        const clips: DirPose['clips'] = {}
+        ANIM_STATES.forEach((s, i) => {
+          const frames = stateClips[i]
+          if (frames.length > 0) clips[s] = frames
+        })
+        const pose: DirPose = { idle, step }
+        if (Object.keys(clips).length > 0) pose.clips = clips
+        return [d, pose]
+      }),
     )
     const set: CharSet = {}
-    for (const [d, pose] of poses) if (pose.idle || pose.step) set[d] = pose
-    return Object.values(set).some((p) => p.idle) ? set : undefined
+    for (const [d, pose] of poses) if (pose.idle || pose.step || pose.clips) set[d] = pose
+    return Object.values(set).some((p) => p.idle || p.clips?.idle?.length) ? set : undefined
   }
 
   const record = async (keys: readonly string[], size: number, prefix: string): Promise<Record<string, Texture>> => {

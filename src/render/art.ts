@@ -1,6 +1,7 @@
 import { Graphics, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
 import { MODS } from '../game/data/mods'
+import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 
 export const TILE_PX = 32
@@ -46,6 +47,9 @@ export interface ArtRegistry {
    * if any — mod visual traits compose ON TOP of it (tint/stretch/energy).
    * Undefined → the procedural tintable white disc carries the whole look. */
   themedBullet(): Texture | undefined
+  /** Cadence (sim ticks per frame) for an animation state — theme override or
+   * the engine default. */
+  animTpf(state: AnimStateName): number
 }
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
@@ -53,6 +57,10 @@ export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
 export interface DirPose {
   idle?: Texture
   step?: Texture
+  /** Named-state frame clips (docs/themes.md "Animation states"). Legacy
+   * idle/step above stay authoritative when a state ships no clip — the
+   * animator synthesizes walk = [idle, step] (animState.effectiveClips). */
+  clips?: Partial<Record<AnimStateName, Texture[]>>
 }
 /** A billboarded character's 5 DRAWN directions (docs/themes.md): s, se, e,
  * ne, n. The west half (w/sw/nw) is the east art mirrored at draw time, so
@@ -195,7 +203,12 @@ const shade = (color: number, f: number): number => {
   return (ch((color >> 16) & 0xff) << 16) | (ch((color >> 8) & 0xff) << 8) | ch(color & 0xff)
 }
 
-export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}, palette: ArtPalette = {}): ArtRegistry => {
+export const createArt = (
+  renderer: Renderer,
+  sprites: SpriteTextures = {},
+  palette: ArtPalette = {},
+  animTpfs: Partial<Record<AnimStateName, number>> = {},
+): ArtRegistry => {
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
 
@@ -604,5 +617,6 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}, pale
     bulletCore,
     bulletGlow,
     themedBullet: () => sprites.projectile,
+    animTpf: (state) => animTpfs[state] ?? DEFAULT_TPF[state],
   }
 }

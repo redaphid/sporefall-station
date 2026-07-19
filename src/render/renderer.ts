@@ -5,7 +5,7 @@ import type { RenderView } from '../app/session'
 import { loadSettings } from '../app/settings'
 import { createArt, type ArtRegistry } from './art'
 import { BulletLayer } from './bullets'
-import { resolvePalette, resolveThemeId, type ThemeChain } from './theme'
+import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from './theme'
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
 import { setActiveThemeChain } from './themeState'
 import { Camera } from './camera'
@@ -63,7 +63,12 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   setActiveThemeChain(chain)
   const buildArt = async (c: ThemeChain): Promise<ArtRegistry> => {
     const p = resolvePalette(c)
-    return createArt(app.renderer, await loadSpriteTextures(app.renderer, c), { tiles: p.tiles, entities: p.entities })
+    return createArt(
+      app.renderer,
+      await loadSpriteTextures(app.renderer, c),
+      { tiles: p.tiles, entities: p.entities },
+      resolveAnimTpfs(c),
+    )
   }
   // Facade over the swappable registry so the tilemap/entity/effect layers keep
   // a stable reference across runtime theme changes.
@@ -80,6 +85,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
     bulletCore: () => inner.bulletCore(),
     bulletGlow: () => inner.bulletGlow(),
     themedBullet: () => inner.themedBullet(),
+    animTpf: (s) => inner.animTpf(s),
   }
   const world = new Container()
   const tilemap = new TilemapView()
@@ -181,6 +187,9 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       // once per tick.
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
+        // Character deaths hand their sprite to the entity layer as a death
+        // ghost (the corpse is swept from the snapshot this same tick).
+        entities.noteEvents(view.events, view.tick)
         for (const ev of view.events) {
           const isSelf =
             view.self != null &&

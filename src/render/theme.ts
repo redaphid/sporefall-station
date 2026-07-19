@@ -8,6 +8,8 @@
  * asset-generation pipeline targets — keep them in sync).
  */
 
+import { ANIM_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
+
 export const DEFAULT_THEME_ID = 'city'
 
 /** Theme ids are folder names under public/themes/ — keep them URL/path safe. */
@@ -54,6 +56,12 @@ export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.e
 const buildSpriteKeys = (): Set<string> => {
   const keys = new Set<string>(['tile.floor', 'tile.wall', 'item.default', 'prop.default', 'projectile', 'grenade'])
   for (const c of CHAR_NAMES) for (const d of DIRS5) for (const f of ['idle', 'step']) keys.add(`char.${c}.${d}-${f}`)
+  // Animation-state frames (docs/themes.md "Animation states"):
+  // char.<kind>.<dir>-<state>-<n>, n contiguous from 0.
+  for (const c of CHAR_NAMES)
+    for (const d of DIRS5)
+      for (const s of ANIM_STATES)
+        for (let n = 0; n < MAX_ANIM_FRAMES; n++) keys.add(`char.${c}.${d}-${s}-${n}`)
   for (const u of UNIT_SINGLES) keys.add(`unit.${u}`)
   for (const u of UNIT_WALKERS) for (const f of ['idle', 'step']) keys.add(`unit.${u}.${f}`)
   for (const i of ITEM_IDS) keys.add(`item.${i}`)
@@ -88,6 +96,9 @@ export interface ThemeManifest {
   /** key → frame paths (single sprites normalized to a 1-element array), or
    * null = "force procedural art, do not fall back to the default theme". */
   sprites: Record<string, readonly string[] | null>
+  /** Per-animation-state cadence override, in sim ticks per frame (1..30).
+   * States a theme omits use the engine default (animState.DEFAULT_TPF). */
+  anim: Partial<Record<AnimStateName, number>>
 }
 
 /** A manifest bound to the folder it loaded from (dir is app-root-relative,
@@ -108,6 +119,7 @@ export const emptyManifest = (): ThemeManifest => ({
   palette: { tiles: {}, entities: {} },
   names: {},
   sprites: {},
+  anim: {},
 })
 
 // ---------------------------------------------------------------------------
@@ -228,6 +240,27 @@ const validateSprites = (raw: unknown, warn: (w: string) => void): ThemeManifest
   return out
 }
 
+const validateAnim = (raw: unknown, warn: (w: string) => void): ThemeManifest['anim'] => {
+  const out: ThemeManifest['anim'] = {}
+  if (raw === undefined) return out
+  if (!isRecord(raw)) {
+    warn('anim: expected an object of state → ticks-per-frame')
+    return out
+  }
+  for (const [k, v] of Object.entries(raw)) {
+    if (!(ANIM_STATES as readonly string[]).includes(k)) {
+      warn(`anim: unknown state "${k}" dropped (known: ${ANIM_STATES.join(' ')})`)
+      continue
+    }
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > 30) {
+      warn(`anim.${k}: expected an integer ticks-per-frame in 1..30, got ${JSON.stringify(v)}`)
+      continue
+    }
+    out[k as AnimStateName] = v
+  }
+  return out
+}
+
 /** Coerce arbitrary JSON into a safe, normalized manifest. Collects a warning
  * per dropped/defaulted field; never throws. */
 export const validateManifest = (raw: unknown): ValidatedManifest => {
@@ -249,7 +282,8 @@ export const validateManifest = (raw: unknown): ValidatedManifest => {
   manifest.palette = validatePalette(raw.palette, warn)
   manifest.names = validateNames(raw.names, warn)
   manifest.sprites = validateSprites(raw.sprites, warn)
-  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites'])
+  manifest.anim = validateAnim(raw.anim, warn)
+  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim'])
   for (const k of Object.keys(raw)) if (!known.has(k)) warn(`manifest: unknown key "${k}" dropped`)
   return { manifest, warnings }
 }
@@ -287,6 +321,23 @@ export const themedName = (archetype: string, chain: ThemeChain): string => {
     if (n !== undefined) return n
   }
   return prettyArchetype(archetype)
+}
+
+/** Ticks-per-frame for an animation state: first theme in the chain that sets
+ * it wins; otherwise the engine default (animState.DEFAULT_TPF). */
+export const resolveAnimTpf = (state: AnimStateName, chain: ThemeChain): number => {
+  for (const theme of chain) {
+    const v = theme.manifest.anim[state]
+    if (v !== undefined) return v
+  }
+  return DEFAULT_TPF[state]
+}
+
+/** The full per-state cadence table for a chain (fed to the ArtRegistry). */
+export const resolveAnimTpfs = (chain: ThemeChain): Record<AnimStateName, number> => {
+  const out = { ...DEFAULT_TPF }
+  for (const s of ANIM_STATES) out[s] = resolveAnimTpf(s, chain)
+  return out
 }
 
 /** Merge the chain's palettes: per field/key, the first theme that sets it wins. */

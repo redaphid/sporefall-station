@@ -311,6 +311,9 @@ export interface StateMsg {
   floor: number
   missionText: string
   missionComplete: boolean
+  /** Mission target entity id (steal item / assassinate boss) so client UIs can
+   * hyperlink the objective. Optional on the wire for back-compat. */
+  missionTargetId?: number
   gameOver: boolean
   alarm: number
   /** Difficulty rules in force (host authoritative). */

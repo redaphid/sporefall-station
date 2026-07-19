@@ -20,7 +20,13 @@ const SIZE = { width: 1280, height: 720 }
  * ticks are awaited — used by the exact-world recipe to push an inline WorldJson
  * into `window.__loadWorld` (boot blocks on it, so injection precedes tick 0).
  *
- * @param {{name:string, params:object, stills:{tick:number,label:string}[],
+ * A still may also carry an `act(page)` hook — run when its tick is reached,
+ * BEFORE the screenshot (with a short settle so the DOM it changed renders).
+ * This is how UI e2es tap real DOM (mission panel, buttons) at deterministic
+ * sim times without any pixel math.
+ *
+ * @param {{name:string, params:object,
+ *          stills:{tick:number,label:string,act?:(page:import('playwright').Page)=>Promise<void>}[],
  *          readState:() => any, expect:(s:any)=>string[],
  *          beforeTicks?:(page:import('playwright').Page)=>Promise<void>}} spec
  */
@@ -44,6 +50,10 @@ export const record = async (spec) => {
 
   for (const s of spec.stills) {
     while ((await tick()) < s.tick) await page.waitForTimeout(40)
+    if (s.act) {
+      await s.act(page)
+      await page.waitForTimeout(250) // let the acted-on DOM/camera settle before the shot
+    }
     await page.screenshot({ path: join(OUT, `${spec.name}-${s.label}.png`) })
   }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cardAnchor,
   clampToViewport,
   deOverlap,
   entityLabelAnchor,
@@ -110,5 +111,47 @@ describe('overlaps / deOverlap — de-crowding stacked labels', () => {
     const out = deOverlap(cluster)
     for (let i = 0; i < out.length; i++)
       for (let j = i + 1; j < out.length; j++) expect(overlaps(out[i], out[j])).toBe(false)
+  })
+})
+
+describe('cardAnchor — inspect card beside its entity, always fully on-screen', () => {
+  const VW = 1280
+  const VH = 720
+
+  it('prefers the right side, vertically centred on the sprite', () => {
+    const a = cardAnchor(400, 300, 240, 160, VW, VH)
+    expect(a.x).toBe(400 + 18)
+    expect(a.y).toBe(300 - 80)
+  })
+
+  it('flips to the left when the right edge would clip', () => {
+    const a = cardAnchor(VW - 100, 300, 240, 160, VW, VH)
+    expect(a.x).toBe(VW - 100 - 18 - 240)
+    expect(rectInViewport({ ...a, w: 240, h: 160 }, VW, VH)).toBe(true)
+  })
+
+  it('clamps fully on-screen for an entity at every screen corner', () => {
+    for (const [sx, sy] of [
+      [0, 0],
+      [VW, 0],
+      [0, VH],
+      [VW, VH],
+    ]) {
+      const a = cardAnchor(sx, sy, 240, 160, VW, VH)
+      expect(rectInViewport({ ...a, w: 240, h: 160 }, VW, VH, 5.9)).toBe(true)
+    }
+  })
+
+  it('stays on-screen across zoomed projections (anchor far off-screen)', () => {
+    const a = cardAnchor(-500, 4000, 240, 160, VW, VH)
+    expect(rectInViewport({ ...a, w: 240, h: 160 }, VW, VH)).toBe(true)
+  })
+
+  it('a card wider than the viewport degrades to the pinned inset, never NaN', () => {
+    const a = cardAnchor(100, 100, VW * 2, VH * 2, VW, VH)
+    expect(Number.isFinite(a.x)).toBe(true)
+    expect(Number.isFinite(a.y)).toBe(true)
+    expect(a.x).toBe(6)
+    expect(a.y).toBe(6)
   })
 })

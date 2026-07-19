@@ -349,20 +349,29 @@ const runLoop = (
   // VIEW-ONLY camera focus (focusModel.ts) — an animated glide to the target and
   // back. Nothing here writes sim state; determinism is untouched.
   let focus: FocusState | undefined
+  const beginFocus = (link: { targetId?: number; x?: number; y?: number }): void => {
+    const self = session.renderView().self
+    if (self) focus = startFocus(link, self.pos)
+  }
   const missionPanel = createMissionPanel(uiMount, {
     cameraSource,
-    onFocus: (link) => {
-      const self = session.renderView().self
-      if (self) focus = startFocus(link, self.pos)
-    },
+    onFocus: beginFocus,
     focusSource: () => focus?.target,
   })
-  // Annotation + selection overlay. Mounted on the canvas container (#app, which
-  // receives pointer events — #ui is pointer-events:none) so a tap reaches it to
-  // pick an entity; the touch sticks live on #ui and still capture their own
-  // drags on phones. Reads the same read-only camera as the locator.
+  // Annotation + inspect overlay. Pointer listeners live on the canvas container
+  // (#app — receives desktop clicks and, when a controller hides the touch
+  // controls, raw touches); on phones the touch layer forwards NEUTRAL taps /
+  // long-presses via setInspectHandler after its stick/pinch claiming rules run.
+  // The popup itself mounts on #ui so its chip/✕/locate affordances paint (and
+  // hit-test) ABOVE the stick zones. The card's mission-locate action reuses the
+  // mission panel's beginFocus — one camera-focus machinery, no duplication.
   const appMount = (renderer.app.canvas.parentElement as HTMLElement | null) ?? uiMount
-  const commOverlay = createOverlay(appMount, cameraSource)
+  const commOverlay = createOverlay(appMount, cameraSource, {
+    cardMount: uiMount,
+    onFocus: beginFocus,
+    thumbnail: (artKey) => renderer.entityThumb(artKey),
+  })
+  touch?.setInspectHandler((mode, x, y) => commOverlay.inspectAt(mode === 'tap' ? 'chip' : 'card', x, y))
   const overlay = createControllersOverlay(uiMount)
   const showPause = createPauseBanner(uiMount)
   let currentLevel = session.renderView().level

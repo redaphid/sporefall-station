@@ -100,6 +100,28 @@ export const entityLabelAnchor = (
   return { x: sx - w / 2, y }
 }
 
+/**
+ * Top-left for the INSPECT CARD anchored to an entity at screen (sx,sy).
+ * Placed beside the sprite (right of it, vertically centred, `gap` px away) so
+ * the card reads like a callout; flips to the LEFT side when the right edge
+ * would clip. Finally clamped fully on-screen — a card on an entity at the
+ * screen corner slides inward rather than clipping. Same measured-then-clamped
+ * discipline as the annotation labels.
+ */
+export const cardAnchor = (
+  sx: number,
+  sy: number,
+  w: number,
+  h: number,
+  vw: number,
+  vh: number,
+  gap = 18,
+  margin = 6,
+): { x: number; y: number } => {
+  const x = sx + gap + w > vw - margin ? sx - gap - w : sx + gap
+  return clampToViewport({ x, y: sy - h / 2, w, h }, vw, vh, margin)
+}
+
 /** Overlap in both axes exceeds `thr` px (i.e. the boxes visibly cover). */
 export const overlaps = (a: Rect, b: Rect, thr = 2): boolean => {
   const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)

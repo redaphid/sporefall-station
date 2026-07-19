@@ -14,6 +14,7 @@ import { MODS } from '../game/data/mods'
 import { BEHAVIORS, DEFAULT_BEHAVIOR } from '../game/systems/behaviors'
 import { dispositionToward, initialPlayerHate, determineRel } from '../game/systems/relationships'
 import { weaponStack } from '../game/systems/inventory'
+import { pickTicks } from '../game/systems/interaction'
 import { SIM_RATE } from '../game/types'
 
 export interface InfoRow {
@@ -149,8 +150,6 @@ const reflectionRows = (e: Entity): InfoRow[] => {
   return rows
 }
 
-const LOCKPICK_TICKS = 45 // mirrors systems/interaction.ts (1.5s channel)
-
 /** How a throwable's landing effect reads to a player. */
 const areaPhrase = (t: (typeof THROWABLES)[string]): string => {
   const a = t.onLand
@@ -176,7 +175,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
     title: nameFor(e.archetype),
     kind: e.kind,
     archetype: e.archetype,
-    artKey: e.door ? (e.door.open ? 'door.open' : 'door') : e.archetype,
+    artKey: e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype,
     glyph: GLYPHS[e.kind] ?? '❓',
     rows,
   }
@@ -216,8 +215,8 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
   if (e.door) {
     rows.push({ label: 'Door', value: e.door.open ? 'Open' : e.door.locked ? `Locked (L${e.door.lockLevel})` : 'Closed' })
     if (!e.door.open && e.door.locked)
-      rows.push({ label: 'Pick time', value: `${(LOCKPICK_TICKS / SIM_RATE).toFixed(1)}s` })
-    card.tagline ??= e.door.open ? 'Walk on through' : e.door.locked ? 'Locked — pick it or find another way' : 'Closed — opens on use'
+      rows.push({ label: 'Pick time', value: `${(pickTicks(e.door.lockLevel) / SIM_RATE).toFixed(1)}s` })
+    card.tagline ??= e.door.open ? 'Walk on through' : e.door.locked ? 'Locked — Use starts the pick (stand still), or blast it open' : 'Closed — opens on use'
   }
 
   if (e.combat?.weapon) {

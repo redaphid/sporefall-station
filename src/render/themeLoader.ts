@@ -14,6 +14,7 @@ import {
   ITEM_IDS,
   isValidThemeId,
   PROP_NAMES,
+  resolveMacroTiles,
   resolveSpritePaths,
   TILE_NAMES,
   validateManifest,
@@ -179,13 +180,13 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   }
 
   const [
-    tiles, tileAccents, player, cop, item, prop,
+    tiles, tileAccents, tileOverlays, player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood,
     charSets, items, props,
   ] = await Promise.all([
-    tilePools(''), tilePools('.accent'),
+    tilePools(''), tilePools('.accent'), tilePools('.overlay'),
     one('unit.player', CHAR_CANVAS_PX), one('unit.cop', CHAR_CANVAS_PX),
     one('item.default', ITEM_PX), one('prop.default', TILE_PX),
     one('unit.thug.idle', CHAR_CANVAS_PX), one('unit.scientist.idle', CHAR_CANVAS_PX), one('unit.robot.idle', CHAR_CANVAS_PX),
@@ -208,7 +209,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   })
 
   return {
-    tiles, tileAccents, player, cop, item, prop,
+    tiles, tileAccents, tileOverlays, tileMacro: resolveMacroTiles(chain), player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood, chars, items, props,

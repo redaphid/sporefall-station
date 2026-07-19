@@ -53,6 +53,18 @@ export class Sound {
         case 'doorToggle':
           this.blip('door', 120, 80, 0.08, 'triangle', 0.7)
           break
+        case 'pickStart':
+          // Soft tumbler click — "the pick is in, hold still".
+          this.blip('pick', 880, 440, 0.05, 'square', 0.35)
+          break
+        case 'pickCancel':
+          // Low dud thunk — the channel broke, distinct from any success sound.
+          this.blip('pickfail', 140, 60, 0.12, 'sawtooth', 0.5)
+          break
+        case 'doorBreach':
+          // Splintering crack on top of the blast's boom.
+          this.blip('breach', 500, 90, 0.18, 'sawtooth', 0.8)
+          break
         case 'explosion':
           this.noise('boom', 0.35, 0.9)
           break

@@ -1,4 +1,4 @@
-import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Texture, type TextStyleOptions } from 'pixi.js'
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
@@ -25,10 +25,20 @@ import {
   tintForEvent,
   VIGNETTE_MAX,
 } from './juice'
+import { createPickTracker } from './pickModel'
 import { createSettingsPanel } from './settingsPanel'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
 import { TilemapView } from './tilemap'
+
+/** World-space label style for the lockpick prompt/toast (small, outlined). */
+const pickTextStyle = (fill: number): TextStyleOptions => ({
+  fontFamily: 'monospace',
+  fontSize: 12,
+  fontWeight: 'bold',
+  fill,
+  stroke: { color: 0x000000, width: 3 },
+})
 
 /** Cold blue used to recolour frost (shatter/shock) sparks. */
 const FROST_TINT = 0x8fd0ff
@@ -100,7 +110,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // a stable reference across runtime theme changes.
   let inner: ArtRegistry = await buildArt(chain)
   const art: ArtRegistry = {
-    tile: (id, v) => inner.tile(id, v),
+    tile: (id, v, tx, ty) => inner.tile(id, v, tx, ty),
+    tileOverlayPool: (id) => inner.tileOverlayPool(id),
+    tileMacro: (id) => inner.tileMacro(id),
     wallShadow: (s) => inner.wallShadow(s),
     groundSeam: (s) => inner.groundSeam(s),
     entity: (a) => inner.entity(a),
@@ -124,7 +136,46 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
   const reticleLayer = new Container()
-  world.addChild(tilemap.root, entities.root, bullets.root, effects.root, reticleLayer)
+  // Lockpick affordance: progress ring on the door being picked, a lock-level
+  // prompt over a nearby locked door, and a "pick broken" toast on cancel.
+  // Model in pickModel.ts (pure, tested); this layer only draws its output.
+  const pickLayer = new Container()
+  pickLayer.eventMode = 'none'
+  const pickRingG = new Graphics()
+  const pickText = new Text({ text: '', style: pickTextStyle(0xffe28a) })
+  pickText.anchor.set(0.5, 1)
+  const pickToastText = new Text({ text: '', style: pickTextStyle(0xff8a7a) })
+  pickToastText.anchor.set(0.5, 1)
+  pickLayer.addChild(pickRingG, pickText, pickToastText)
+  const pickTracker = createPickTracker()
+  const drawPickUi = (view: RenderView): void => {
+    const ui = pickTracker.update(view)
+    pickRingG.clear()
+    if (ui.ring) {
+      const cx = ui.ring.x * TILE_PX
+      const cy = ui.ring.y * TILE_PX
+      const r = TILE_PX * 0.62
+      pickRingG.circle(cx, cy, r).stroke({ color: 0x000000, width: 5, alpha: 0.45 })
+      pickRingG
+        .arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + ui.ring.progress * Math.PI * 2)
+        .stroke({ color: 0xffe28a, width: 3, alpha: 0.95 })
+    }
+    const label = ui.ring ? { x: ui.ring.x, y: ui.ring.y, text: 'Picking… stand still' } : ui.prompt
+    pickText.visible = !!label
+    if (label) {
+      pickText.text = label.text
+      pickText.position.set(label.x * TILE_PX, (label.y - 0.85) * TILE_PX)
+    }
+    pickToastText.visible = !!ui.toast
+    if (ui.toast) {
+      pickToastText.text = ui.toast.text
+      pickToastText.alpha = Math.min(1, ui.toast.life * 2)
+      pickToastText.position.set(ui.toast.x * TILE_PX, (ui.toast.y - 0.85) * TILE_PX)
+    }
+  }
+  // The pick layer lives INSIDE `world`: it is world-space affordance art, so
+  // it rides the camera transform and (deliberately) the distortion field too.
+  world.addChild(tilemap.root, entities.root, bullets.root, effects.root, reticleLayer, pickLayer)
 
   // --- Backbuffer weapon-FX pipeline (backbuffer.ts). The world lives inside
   // `sceneRoot`; the pipeline either composites it through the distortion
@@ -368,6 +419,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         effects.update(view.tick, alpha)
       }
       drawReticles()
+      drawPickUi(view)
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
       tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)

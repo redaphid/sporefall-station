@@ -4,8 +4,9 @@ import { appliedCenter } from '../render/cameraModel'
 /**
  * Co-op teammate locator (issue #34). Pure geometry so it's fully unit-tested:
  * screens.ts feeds it the camera/screen state each frame and renders the DOM
- * overlays it returns. Mirrors the EXIT compass math (atan2 on the world delta,
- * rounded distance) — no pixi involvement, DOM markers only.
+ * overlays it returns (atan2 on the world delta, rounded distance) — no pixi
+ * involvement, DOM markers only. ALL objective/teammate indicators route
+ * through here; there is deliberately no other projection or compass path.
  */
 
 /** Stable per-slot caret colours; teammates keep the same hue all game.
@@ -114,7 +115,7 @@ export const pointMarker = (
   if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return undefined
   const dx = target.x - from.x
   const dy = target.y - from.y
-  // ➤ points east at 0°, matching world +x; +y is screen-down — same as the EXIT compass.
+  // ➤ points east at 0°, matching world +x; +y is screen-down.
   const angle = Math.atan2(dy, dx)
   const dist = Math.round(Math.hypot(dx, dy))
   const p = projectToScreen(target.x, target.y, cam)

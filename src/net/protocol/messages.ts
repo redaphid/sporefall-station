@@ -212,13 +212,16 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   }
   if (isRolling(e, tick)) flags |= SnapFlags.Rolling
   if (e.door?.open) flags |= SnapFlags.DoorOpen
+  if (e.door?.locked) flags |= SnapFlags.DoorLocked
   const we: WireEntity = {
     id: e.id,
     archetype: e.archetype,
     x: e.pos.x,
     y: e.pos.y,
     facing: e.facing,
-    hpPct: e.health ? Math.max(0, e.health.hp) / e.health.max : 1,
+    // Doors have no health, so their hp byte carries the LOCK LEVEL instead —
+    // the client needs it for the inspect card's pick-time row.
+    hpPct: e.door ? (e.door.lockLevel & 0xff) / 255 : e.health ? Math.max(0, e.health.hp) / e.health.max : 1,
     flags,
   }
   // Modded bullets carry their build so clients compose the same look.
@@ -232,7 +235,11 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   e.id = we.id
   e.facing = we.facing
   if (we.archetype === 'door') {
-    e.door = { open: (we.flags & SnapFlags.DoorOpen) !== 0, locked: false, lockLevel: 0 }
+    e.door = {
+      open: (we.flags & SnapFlags.DoorOpen) !== 0,
+      locked: (we.flags & SnapFlags.DoorLocked) !== 0,
+      lockLevel: Math.round(we.hpPct * 255), // doors ride lockLevel in the hp byte
+    }
   }
   if (we.archetype === 'projectile' && we.mods && we.mods.length > 0) {
     // Render-mirror provenance only: the client never sims this projectile, so

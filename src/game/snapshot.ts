@@ -12,6 +12,10 @@ export const SnapFlags = {
   HitFlash: 1 << 4,
   Cloaked: 1 << 5,
   Rolling: 1 << 6,
+  /** Door archetype: the door is locked (drives the client's Unlock label,
+   * lock art and pick-time inspect row — without it a joiner sees every
+   * mission door as a plain openable door and the pick channel is invisible). */
+  DoorLocked: 1 << 7,
 } as const
 
 export interface EntitySnap {
@@ -47,6 +51,7 @@ export const snapEntity = (w: World, e: Entity): EntitySnap => {
   }
   if (isRolling(e, w.tick)) flags |= SnapFlags.Rolling
   if (e.door?.open) flags |= SnapFlags.DoorOpen
+  if (e.door?.locked) flags |= SnapFlags.DoorLocked
   return {
     id: e.id,
     kind: e.kind,

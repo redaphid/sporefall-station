@@ -176,6 +176,33 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 90 }, // floor 2 beat
   ],
 
+  // Sprite-facing showcase: walk a full compass circle — E, SE, S, SW, W, NW,
+  // N, NE — with a LONG hold after each leg. Facing persists while idle (aim
+  // (0,0) holds the last heading), so each hold is a stable window for the e2e
+  // to screenshot that facing even though screenshots under video recording
+  // lag the sim by ~60 ticks. Legs cancel pairwise, so the walker ends where
+  // it started. Backs the feature-walk8 e2e video (8 facings from 5 drawn
+  // directions + 3 mirrors).
+  walk8: [
+    { ticks: 20 }, // settle (idle, facing s)
+    { ticks: 14, x: 1 }, // E
+    { ticks: 70 },
+    { ticks: 14, x: 1, y: 1 }, // SE
+    { ticks: 70 },
+    { ticks: 14, y: 1 }, // S
+    { ticks: 70 },
+    { ticks: 14, x: -1, y: 1 }, // SW (mirrored se art)
+    { ticks: 70 },
+    { ticks: 14, x: -1 }, // W (mirrored e art)
+    { ticks: 70 },
+    { ticks: 14, x: -1, y: -1 }, // NW (mirrored ne art)
+    { ticks: 70 },
+    { ticks: 14, y: -1 }, // N
+    { ticks: 70 },
+    { ticks: 14, x: 1, y: -1 }, // NE
+    { ticks: 70 }, // final beat, resting on the ne facing
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

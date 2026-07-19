@@ -18,7 +18,7 @@ import type { RenderView } from '../app/session'
 import type { Entity } from '../game/entity'
 import type { Annotation } from '../game/types'
 import { visibleAnnotations } from '../game/annotations'
-import { pickNearestEntity, clearSelection, setSelected, selectedEntities } from '../game/select'
+import { pickNearestEntity, clearSelection, setSelected, selectedEntities, PICK_RADIUS } from '../game/select'
 import { TILE_PX } from '../render/art'
 import {
   clampToViewport,
@@ -42,8 +42,6 @@ const DEFAULT_COLOR = '#ffd76a'
 const SELECT_COLOR = '#5aa9ff'
 /** Tap vs drag: a pointer that travels more than this (px) is a joystick drag, not a tap. */
 const TAP_SLOP = 10
-/** World-tile radius a tap snaps to the nearest entity within. */
-const PICK_RADIUS = 1.2
 
 /** Common legibility styling every annotation TEXT element shares: a backing
  * plate, a text-shadow, a min-legible font, and word-boundary wrapping. The

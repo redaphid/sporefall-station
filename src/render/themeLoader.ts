@@ -19,14 +19,14 @@ import {
   type LoadedTheme,
   type ThemeChain,
 } from './theme'
-import { TILE_PX, type CharSet, type DirPose, type SpriteTextures } from './art'
+import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type SpriteTextures } from './art'
 
 const BASE = import.meta.env.BASE_URL
 
 // Bake sizes per slot. Characters follow the 48×48 authoring canvas
-// (docs/themes.md "Character art convention") — deliberately larger than the
-// 32px tile so bodies overhang their tile.
-export const CHAR_CANVAS_PX = 48
+// (docs/themes.md "Character art convention" — CHAR_PX in art.ts) —
+// deliberately larger than the 32px tile so bodies overhang their tile.
+export const CHAR_CANVAS_PX = CHAR_PX
 const ITEM_PX = Math.round(TILE_PX * 0.6)
 const FLAME_PX = Math.round(TILE_PX * 1.4)
 const FX_PX = Math.round(TILE_PX * 1.7)

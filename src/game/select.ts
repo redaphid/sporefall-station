@@ -9,6 +9,12 @@ import type { Entity } from './entity'
 import type { EntityId } from './types'
 import type { World } from './world'
 
+/** Default tap-pick radius in world tiles. Characters draw on a feet-anchored
+ * 48px canvas over 32px tiles, so the farthest visible pixel from the entity
+ * centre is the top corner: √(0.75² + 1²) = 1.25 tiles. 1.4 keeps a finger-
+ * friendly margin while staying tight enough that taps feel precise. */
+export const PICK_RADIUS = 1.4
+
 /**
  * Nearest non-dead entity whose centre is within `maxRadius` world tiles of
  * (wx,wy), or undefined if none. Ties break by smaller distance, then smaller id,

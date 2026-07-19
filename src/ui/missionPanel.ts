@@ -65,10 +65,11 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
   const chip = document.createElement('button')
   chip.dataset.missionChip = ''
   markUiChrome(chip) // press-exempt UI chrome (chrome.ts) — never a game press
+  // Quiet chrome: smaller, dimmer — a reference card, not a headline over the world.
   chip.style.cssText =
-    'pointer-events:auto;appearance:none;border:1px solid rgba(255,255,255,.18);border-radius:999px;' +
-    'background:rgba(12,14,22,.72);color:#eee;font:600 13px system-ui;padding:4px 12px;cursor:pointer;' +
-    'text-shadow:0 1px 3px #000;box-shadow:0 2px 8px #0006;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+    'pointer-events:auto;appearance:none;border:1px solid rgba(255,255,255,.12);border-radius:999px;' +
+    'background:rgba(12,14,22,.55);color:#cfcfcf;font:600 12px system-ui;padding:3px 11px;cursor:pointer;' +
+    'text-shadow:0 1px 3px #000;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
   root.appendChild(chip)
 
   const panel = document.createElement('div')

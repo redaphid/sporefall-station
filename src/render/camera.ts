@@ -9,6 +9,9 @@ const FOLLOW_HOLD_S = 0.3
 
 /** Camera in world (tile) coordinates, applied as a container translation. */
 export class Camera {
+  /** Fraction of the half-view allowed past a level edge (see apply()). */
+  static readonly OVERSCAN_FRAC = 0.4
+
   x = 0
   y = 0
   /** View-only magnification (1 = native). Scales the world container; the sim
@@ -108,9 +111,15 @@ export class Camera {
     if (world.scale.x !== this.zoom) world.scale.set(this.zoom)
     const halfW = screenW / 2 / T
     const halfH = screenH / 2 / T
-    // Clamp so we don't show past level edges (unless level smaller than view)
-    const cx = levelW * T > screenW ? Math.min(Math.max(this.x, halfW), levelW - halfW) : levelW / 2
-    const cy = levelH * T > screenH ? Math.min(Math.max(this.y, halfH), levelH - halfH) : levelH / 2
+    // Soft edge clamp: allow the view to run OVERSCAN_FRAC of its half-extent
+    // past the level edge, so a player standing in a map corner is framed well
+    // inside the screen (clear of the HUD stack) instead of pinned to the
+    // corner pixel. The strip beyond the edge renders as the theme background —
+    // "past the map" void. View-only; the sim never sees the camera.
+    const mX = halfW * Camera.OVERSCAN_FRAC
+    const mY = halfH * Camera.OVERSCAN_FRAC
+    const cx = levelW * T > screenW ? Math.min(Math.max(this.x, halfW - mX), levelW - halfW + mX) : levelW / 2
+    const cy = levelH * T > screenH ? Math.min(Math.max(this.y, halfH - mY), levelH - halfH + mY) : levelH / 2
     this.appliedX = cx
     this.appliedY = cy
     world.position.set(

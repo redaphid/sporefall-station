@@ -58,10 +58,13 @@ export const createHud = (mount: HTMLElement): Hud => {
         lastHotbar = key
         hotbar.innerHTML = slots
           .map((s) => {
-            const bg = s.active ? '#d4af37cc' : '#222a'
-            const col = s.active ? '#111' : '#eee'
-            const badge = s.mods ? `<div style="font-size:11px;line-height:1.1;margin-top:1px">${s.mods}</div>` : ''
-            return `<div style="padding:2px 7px;background:${bg};color:${col};border:1px solid #000;border-radius:4px;font-size:12px">${s.label} <b>${s.qty}</b>${badge}</div>`
+            // Same quiet-chrome treatment as the touch hotbar: dark pill,
+            // gold accent for the active slot — never a solid gold slab.
+            const bg = s.active ? '#151009c0' : '#00000073'
+            const col = s.active ? '#e8c96a' : '#c9c9c9'
+            const border = s.active ? '#d4af3799' : '#ffffff1f'
+            const badge = s.mods ? `<div style="font-size:10px;line-height:1.1;margin-top:1px">${s.mods}</div>` : ''
+            return `<div style="padding:2px 7px;background:${bg};color:${col};border:1px solid ${border};border-radius:4px;font-size:11px">${s.label} <b>${s.qty}</b>${badge}</div>`
           })
           .join('')
       }

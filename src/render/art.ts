@@ -1,4 +1,4 @@
-import { Graphics, Texture, type Renderer } from 'pixi.js'
+import { Container, Graphics, Sprite, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
 import { MODS } from '../game/data/mods'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
@@ -17,9 +17,27 @@ export const CHAR_PX = 48
  */
 export const TILE_VARIANTS = 3
 
+/** Sides a ground tile can receive a wall-contact shadow or ground-seam
+ * overlay on (tilemap.ts lays these over the base tiles — the cheap ambient
+ * occlusion that grounds walls and makes surface boundaries deliberate). */
+export type OverlaySide = 'n' | 's' | 'e' | 'w'
+
+/** ~1 in this many tiles of a themed surface swaps its variant for a rare
+ * accent tile (root cluster, grate, spore patch…) when the theme ships any. */
+export const TILE_ACCENT_EVERY = 17
+
 export interface ArtRegistry {
-  /** variant in [0, TILE_VARIANTS) — picked per position for texture variety. */
-  tile(tileId: number, variant?: number): Texture
+  /** `hash` is any deterministic per-coordinate value (tilemap hashes tx,ty).
+   * It picks among themed variants/accents or the procedural TILE_VARIANTS —
+   * same hash, same texture, on every device. */
+  tile(tileId: number, hash?: number): Texture
+  /** Wall-contact shadow strip for a ground tile's `side` facing the wall:
+   * strongest below a wall (side 'n' — the wall stands to the tile's north),
+   * subtle on the flanks. Overlay-blended by the tilemap. */
+  wallShadow(side: OverlaySide): Texture
+  /** Soft seam strip for a boundary where a LOWER surface (street water) meets
+   * a higher one (deck/grass) — drawn on the lower tile's edge. */
+  groundSeam(side: OverlaySide): Texture
   entity(archetype: string): Texture
   /** White silhouette of the entity texture, swapped in during hit flash. For
    * a character pass its current drawn facing so the flash keeps the pose. */
@@ -69,8 +87,12 @@ export interface DirPose {
 export type CharSet = Partial<Record<Dir5, DirPose>>
 
 export interface SpriteTextures {
-  floor?: Texture
-  wall?: Texture
+  /** Themed tile art, keyed by tile NAME (street/sidewalk/floor/wall/grass/
+   * exit): each entry is a non-empty variant pool the tilemap alternates by
+   * coordinate hash. Absent name → procedural art for that tile. */
+  tiles?: Record<string, Texture[]>
+  /** Rare accent pools per tile name (see TILE_ACCENT_EVERY). */
+  tileAccents?: Record<string, Texture[]>
   player?: Texture
   cop?: Texture
   item?: Texture
@@ -306,17 +328,87 @@ export const createArt = (
     return tex
   }
 
-  const tile = (tileId: number, variant = 0): Texture => {
-    if (tileId === Tile.Floor && sprites.floor) return sprites.floor
-    if (tileId === Tile.Wall && sprites.wall) return sprites.wall
-    const key = tileId * TILE_VARIANTS + (variant % TILE_VARIANTS)
+  /** Themed wall art clipped to a bevel-cut polygon, cached per cut tile id —
+   * so corner cuts wear the same dressed wall the straight runs do. */
+  const themedCutCache = new Map<number, Texture>()
+  const themedCut = (tileId: number, wallTex: Texture): Texture => {
+    let tex = themedCutCache.get(tileId)
+    if (!tex) {
+      const holder = new Container()
+      // Transparent backer pins bounds to the full tile.
+      holder.addChild(new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill({ color: 0, alpha: 0 }))
+      const spr = new Sprite(wallTex)
+      spr.width = TILE_PX
+      spr.height = TILE_PX
+      const mask = new Graphics().poly(WALL_CUT_POLY[tileId].map((v) => v * TILE_PX)).fill(0xffffff)
+      spr.mask = mask
+      holder.addChild(spr, mask)
+      tex = renderer.generateTexture(holder)
+      holder.destroy({ children: true })
+      themedCutCache.set(tileId, tex)
+    }
+    return tex
+  }
+
+  const TILE_NAME_BY_ID: Record<number, string> = Object.fromEntries(
+    Object.entries(TILE_ID_BY_NAME).map(([name, id]) => [id, name]),
+  )
+
+  const tile = (tileId: number, hash = 0): Texture => {
+    const name = TILE_NAME_BY_ID[tileId]
+    const variants = name ? sprites.tiles?.[name] : undefined
+    if (variants && variants.length > 0) {
+      // Rare accents ride the same hash (different bits pick which one).
+      const accents = sprites.tileAccents?.[name]
+      if (accents && accents.length > 0 && hash % TILE_ACCENT_EVERY === 0) {
+        return accents[(hash >>> 5) % accents.length]
+      }
+      return variants[(hash >>> 2) % variants.length]
+    }
+    // Bevelled corners wear the themed wall art (clipped) when the theme ships one.
+    const themedWall = sprites.tiles?.wall
+    if (WALL_CUT_POLY[tileId] && themedWall && themedWall.length > 0) {
+      return themedCut(tileId, themedWall[0])
+    }
+    const key = tileId * TILE_VARIANTS + (hash % TILE_VARIANTS)
     let tex = tileCache.get(key)
     if (!tex) {
-      tex = drawTile(tileId, variant % TILE_VARIANTS)
+      tex = drawTile(tileId, hash % TILE_VARIANTS)
       tileCache.set(key, tex)
     }
     return tex
   }
+
+  // ---- Ground overlay strips (wall-contact shadows + surface seams) --------
+  // Banded alpha rects approximate a gradient without shaders; generated once
+  // per side and overlay-blended by the tilemap. Deterministic, theme-agnostic.
+  const overlayCache = new Map<string, Texture>()
+  const overlayStrip = (kind: string, side: OverlaySide, depth: number, alpha: number): Texture => {
+    const key = `${kind}:${side}`
+    let tex = overlayCache.get(key)
+    if (tex) return tex
+    const T = TILE_PX
+    const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+    const bands = 4
+    for (let i = 0; i < bands; i++) {
+      const a = alpha * (1 - i / bands)
+      const d0 = (depth * i) / bands
+      const d1 = (depth * (i + 1)) / bands
+      if (side === 'n') g.rect(0, d0, T, d1 - d0).fill({ color: 0x000000, alpha: a })
+      else if (side === 's') g.rect(0, T - d1, T, d1 - d0).fill({ color: 0x000000, alpha: a })
+      else if (side === 'w') g.rect(d0, 0, d1 - d0, T).fill({ color: 0x000000, alpha: a })
+      else g.rect(T - d1, 0, d1 - d0, T).fill({ color: 0x000000, alpha: a })
+    }
+    tex = renderer.generateTexture(g)
+    g.destroy()
+    overlayCache.set(key, tex)
+    return tex
+  }
+  // A wall to the tile's north drops the strongest shade (light reads as
+  // coming from the top of the screen); flanks are subtle, south is faint.
+  const wallShadow = (side: OverlaySide): Texture =>
+    side === 'n' ? overlayStrip('ws-n', 'n', 11, 0.34) : side === 's' ? overlayStrip('ws-s', 's', 5, 0.14) : overlayStrip(`ws-${side}`, side, 7, 0.2)
+  const groundSeam = (side: OverlaySide): Texture => overlayStrip(`gs-${side}`, side, 4, 0.24)
 
   const drawEntity = (archetype: string, colorOverride?: number): Texture => {
     if (archetype === 'door') {
@@ -607,6 +699,8 @@ export const createArt = (
 
   return {
     tile,
+    wallShadow,
+    groundSeam,
     entity,
     entityFlash,
     isCharacterSprite,

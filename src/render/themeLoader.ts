@@ -15,6 +15,7 @@ import {
   isValidThemeId,
   PROP_NAMES,
   resolveSpritePaths,
+  TILE_NAMES,
   validateManifest,
   type LoadedTheme,
   type ThemeChain,
@@ -165,14 +166,26 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     return out
   }
 
+  // Tile variant/accent pools, keyed by tile name. A name with zero loaded
+  // frames is dropped so `tiles.grass` is either a non-empty pool or absent
+  // (→ procedural art), never a blank tile.
+  const tilePools = async (suffix: string): Promise<Record<string, Texture[]>> => {
+    const pools = await Promise.all(TILE_NAMES.map((n) => many(`tile.${n}${suffix}`, TILE_PX)))
+    const out: Record<string, Texture[]> = {}
+    TILE_NAMES.forEach((n, i) => {
+      if (pools[i].length > 0) out[n] = pools[i]
+    })
+    return out
+  }
+
   const [
-    floor, wall, player, cop, item, prop,
+    tiles, tileAccents, player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood,
     charSets, items, props,
   ] = await Promise.all([
-    one('tile.floor', TILE_PX), one('tile.wall', TILE_PX),
+    tilePools(''), tilePools('.accent'),
     one('unit.player', CHAR_CANVAS_PX), one('unit.cop', CHAR_CANVAS_PX),
     one('item.default', ITEM_PX), one('prop.default', TILE_PX),
     one('unit.thug.idle', CHAR_CANVAS_PX), one('unit.scientist.idle', CHAR_CANVAS_PX), one('unit.robot.idle', CHAR_CANVAS_PX),
@@ -195,7 +208,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   })
 
   return {
-    floor, wall, player, cop, item, prop,
+    tiles, tileAccents, player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood, chars, items, props,

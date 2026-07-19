@@ -43,8 +43,17 @@
     "exit": "Launch Bay"
   },
   "sprites": {
-    "tile.floor": "tiles/deck-moss.png",
-    "tile.wall": "tiles/root-bulkhead.png",
+    "tile.floor": [
+      "tiles/floor-0.png",
+      "tiles/floor-1.png",
+      "tiles/floor-2.png",
+      "tiles/floor-3.png"
+    ],
+    "tile.wall": [
+      "tiles/wall-0.png",
+      "tiles/wall-1.png",
+      "tiles/wall-2.png"
+    ],
     "char.player.s-idle": "chars/vine-ranger-s-idle.png",
     "char.player.s-step": "chars/vine-ranger-s-step.png",
     "char.player.se-idle": "chars/vine-ranger-se-idle.png",
@@ -150,6 +159,47 @@
     ],
     "fx.blood": [
       "fx/ichor-splat.png"
+    ],
+    "tile.floor.accent": [
+      "tiles/floor-accent-0.png",
+      "tiles/floor-accent-1.png"
+    ],
+    "tile.grass": [
+      "tiles/grass-0.png",
+      "tiles/grass-1.png",
+      "tiles/grass-2.png",
+      "tiles/grass-3.png",
+      "tiles/grass-4.png",
+      "tiles/grass-5.png",
+      "tiles/grass-6.png",
+      "tiles/grass-7.png"
+    ],
+    "tile.grass.accent": [
+      "tiles/grass-accent-0.png",
+      "tiles/grass-accent-1.png",
+      "tiles/grass-accent-2.png"
+    ],
+    "tile.street": [
+      "tiles/street-0.png",
+      "tiles/street-1.png",
+      "tiles/street-2.png",
+      "tiles/street-3.png",
+      "tiles/street-4.png",
+      "tiles/street-5.png",
+      "tiles/street-6.png"
+    ],
+    "tile.street.accent": [
+      "tiles/street-accent-0.png",
+      "tiles/street-accent-1.png"
+    ],
+    "tile.sidewalk": [
+      "tiles/sidewalk-0.png",
+      "tiles/sidewalk-1.png",
+      "tiles/sidewalk-2.png",
+      "tiles/sidewalk-3.png"
+    ],
+    "tile.exit": [
+      "tiles/exit-0.png"
     ]
   }
 }

@@ -193,10 +193,14 @@ def jobs():
                                    pos=f"{TRIGGER}, {subj}, {BG_OBJ}, upright, slight high "
                                        f"three-quarter game angle, {LOOK}",
                                    neg=f"{NEG_FIGURE}, {NEG_BASE}", refs="env")
+    # Items get NO IPAdapter refs: the environment anchors (mossy barrel + deck
+    # tile) turned every weapon into a mushroom. Inventory-icon wording instead;
+    # palette lock keeps them cohesive with the pack.
     for name, (path, subj) in ITEMS.items():
         out[f"item.{name}"] = dict(cat="item", path=path, px=ITEM_PX,
-                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, {LOOK}",
-                                   neg=f"{NEG_FIGURE}, {NEG_BASE}", refs="env")
+                                   pos=f"{TRIGGER}, flat 2D game inventory item icon, {subj}, "
+                                       f"{BG_OBJ}, {LOOK}",
+                                   neg=f"mushroom, tree, plant, moss ball, {NEG_FIGURE}, {NEG_BASE}")
     # IPAdapter anchoring fights pose words: at 0.8 the anchor's front pose
     # bleeds into back/profile views, so away-facing directions drop the weight.
     DIR_IPW = {"s": 0.8, "se": 0.7, "e": 0.55, "ne": 0.5, "n": 0.5}

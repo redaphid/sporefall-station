@@ -91,10 +91,24 @@ def build():
 
     put("tile.floor", "tiles/deck-moss.png")
     put("tile.wall", "tiles/root-bulkhead.png")
+    # Character keys resolve *per key* against the theme chain, so any key we
+    # omit falls back to CITY's art — a spore-drone cop facing south would turn
+    # into a human cop when walking east. Mention every direction key
+    # explicitly, borrowing within the theme (se→s, e→s, ne→e→s, n→s; step→idle)
+    # until real art for that pose lands.
+    BORROW = {"s": ["s"], "se": ["se", "s"], "e": ["e", "s"],
+              "ne": ["ne", "e", "s"], "n": ["n", "s"]}
     for arch, kind in CHAR_FILES.items():
         for d in G.DIRS:
             for frame in ("idle", "step"):
-                put(f"char.{arch}.{d}-{frame}", f"chars/{kind}-{d}-{frame}.png")
+                candidates = [f"chars/{kind}-{b}-{f}.png"
+                              for b in BORROW[d]
+                              for f in ((frame, "idle") if frame == "step" else (frame,))]
+                rel = next((c for c in candidates if exists(c)), None)
+                if rel:
+                    sprites[f"char.{arch}.{d}-{frame}"] = rel
+                else:
+                    print(f"  (no art at all: char.{arch}.{d}-{frame})", file=sys.stderr)
     put("prop.default", "props/cargo-pod.png")
     for eng, ours in PROP_KEYS.items():
         put(f"prop.{eng}", f"props/{ours}.png")

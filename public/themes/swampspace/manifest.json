@@ -1,0 +1,76 @@
+{
+  "name": "Sporefall Station",
+  "version": 1,
+  "palette": {
+    "background": "#0c1416",
+    "uiAccent": "#46e078",
+    "tiles": {
+      "street": "#16282c",
+      "sidewalk": "#23323a",
+      "floor": "#2a3626",
+      "wall": "#141a16",
+      "grass": "#35511a",
+      "exit": "#46e078"
+    },
+    "entities": {
+      "boss": "#a05ae0",
+      "gangster": "#7b8791",
+      "bouncer": "#59636d",
+      "shopkeeper": "#b08d50",
+      "crate": "#6b4d26"
+    }
+  },
+  "names": {
+    "player": "Ranger",
+    "cop": "Spore Warden",
+    "bouncer": "Airlock Warden",
+    "thug": "Bog Mutant",
+    "boss": "Mireclaw Alpha",
+    "gangster": "Rootcult Enforcer",
+    "civilian": "Settler",
+    "shopkeeper": "Barter Frog",
+    "scientist": "Mycologist",
+    "robot": "Derelict Unit",
+    "crate": "Cargo Pod",
+    "barrel": "Spore Barrel",
+    "atm": "Cryo Terminal",
+    "vending": "Nutrient Dispenser",
+    "tv": "Console",
+    "toilet": "Hydro Recycler",
+    "door": "Bulkhead Hatch",
+    "door.open": "Open Hatch",
+    "fire": "Phosphor Fire",
+    "exit": "Launch Bay"
+  },
+  "sprites": {
+    "tile.floor": "tiles/deck-moss.png",
+    "tile.wall": "tiles/root-bulkhead.png",
+    "char.player.s-idle": "chars/vine-ranger-s-idle.png",
+    "char.player.s-step": "chars/vine-ranger-s-step.png",
+    "char.player.se-idle": "chars/vine-ranger-se-idle.png",
+    "char.player.se-step": "chars/vine-ranger-se-step.png",
+    "char.player.e-idle": "chars/vine-ranger-e-idle.png",
+    "char.player.e-step": "chars/vine-ranger-e-step.png",
+    "char.player.ne-idle": "chars/vine-ranger-ne-idle.png",
+    "char.player.ne-step": "chars/vine-ranger-ne-step.png",
+    "char.player.n-idle": "chars/vine-ranger-n-idle.png",
+    "char.player.n-step": "chars/vine-ranger-n-step.png",
+    "prop.default": "props/cargo-pod.png",
+    "prop.barrel": "props/spore-barrel.png",
+    "prop.atm": "props/cryo-terminal.png",
+    "prop.vending-machine": "props/nutrient-dispenser.png",
+    "prop.tv": "props/console-monitor.png",
+    "prop.toilet": "props/hydro-recycler.png",
+    "projectile": "fx/spore-bolt.png",
+    "grenade": "fx/spore-pod.png",
+    "fx.hit": [
+      "fx/hit-spark.png"
+    ],
+    "fx.pickup": [
+      "fx/pickup-sparkle.png"
+    ],
+    "fx.blood": [
+      "fx/ichor-splat.png"
+    ]
+  }
+}

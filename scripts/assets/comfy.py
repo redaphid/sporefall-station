@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""Thin ComfyUI HTTP driver for the swampspace pack (no UI, no saved workflows).
+
+Builds SDXL graphs: checkpoint + pixel-art LoRA (skormino, Illustrious/SDXL —
+NB the prior pack paired this LoRA with an SD1.5 checkpoint, which silently
+no-ops; it must ride an SDXL-family base) + optional IPAdapter style anchor +
+optional seamless-tiling model patch + optional img2img init.
+
+Raw outputs stay in ComfyUI's own output dir (~/sync/comfy-output); callers
+download copies into a staging dir for post-processing/curation.
+"""
+import json
+import os
+import time
+import urllib.parse
+import urllib.request
+import uuid
+
+HOST = os.environ.get("COMFY", "http://localhost:8188")
+
+CKPT = os.environ.get("CKPT", "AnythingXL_xl.safetensors")
+LORA = os.environ.get("LORA", "pixel_art_style_by_skormino_v7.05_test_72img.safetensors")
+LORA_W = float(os.environ.get("LORA_W", "1.0"))
+SIZE = int(os.environ.get("SIZE", "1024"))
+# skormino v7.05 documented recipe: CFG 3-4, 28+ steps, euler
+STEPS, CFG, SAMPLER, SCHED = 28, 3.5, "euler", "normal"
+
+
+def post(path, payload):
+    req = urllib.request.Request(
+        HOST + path, json.dumps(payload).encode(), {"Content-Type": "application/json"}
+    )
+    return json.load(urllib.request.urlopen(req))
+
+
+def upload(path):
+    name = os.path.basename(path)
+    boundary = uuid.uuid4().hex
+    body = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="image"; '
+        f'filename="{name}"\r\nContent-Type: image/png\r\n\r\n'
+    ).encode() + open(path, "rb").read() + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(
+        HOST + "/upload/image", body,
+        {"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    return json.load(urllib.request.urlopen(req))["name"]
+
+
+def build_graph(
+    *,
+    pos: str,
+    neg: str,
+    seed: int,
+    batch: int = 1,
+    seamless: bool = False,
+    refs: list[str] | None = None,
+    ip_weight: float = 0.8,
+    ip_type: str = "style transfer",
+    init: str | None = None,
+    denoise: float = 1.0,
+    alpha: bool = True,
+    prefix: str = "swampspace",
+    size: int | None = None,
+):
+    size = size or SIZE
+    g = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CKPT}}}
+    model, clip = ["1", 0], ["1", 1]
+    if LORA:
+        g["2"] = {
+            "class_type": "LoraLoader",
+            "inputs": {"model": model, "clip": clip, "lora_name": LORA,
+                       "strength_model": LORA_W, "strength_clip": LORA_W},
+        }
+        model, clip = ["2", 0], ["2", 1]
+    g["3"] = {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": pos}}
+    g["4"] = {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": neg}}
+    if init:
+        g["30"] = {"class_type": "LoadImage", "inputs": {"image": upload(init)}}
+        g["31"] = {"class_type": "ImageScale",
+                   "inputs": {"image": ["30", 0], "upscale_method": "lanczos",
+                              "width": size, "height": size, "crop": "disabled"}}
+        g["32"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["31", 0], "vae": ["1", 2]}}
+        if batch > 1:
+            g["33"] = {"class_type": "RepeatLatentBatch",
+                       "inputs": {"samples": ["32", 0], "amount": batch}}
+            latent = ["33", 0]
+        else:
+            latent = ["32", 0]
+    else:
+        g["5"] = {"class_type": "EmptyLatentImage",
+                  "inputs": {"width": size, "height": size, "batch_size": batch}}
+        latent = ["5", 0]
+    if refs:
+        g["8"] = {"class_type": "IPAdapterUnifiedLoader",
+                  "inputs": {"model": ["1", 0], "preset": "PLUS (high strength)"}}
+        img = None
+        for i, ref in enumerate(refs):
+            g[str(20 + i)] = {"class_type": "LoadImage", "inputs": {"image": upload(ref)}}
+            if img is None:
+                img = [str(20 + i), 0]
+            else:
+                bid = str(40 + i)
+                g[bid] = {"class_type": "ImageBatch",
+                          "inputs": {"image1": img, "image2": [str(20 + i), 0]}}
+                img = [bid, 0]
+        g["9"] = {"class_type": "IPAdapterAdvanced",
+                  "inputs": {"model": model, "ipadapter": ["8", 1], "image": img,
+                             "weight": ip_weight, "weight_type": ip_type,
+                             "combine_embeds": "average", "start_at": 0.0, "end_at": 0.9,
+                             "embeds_scaling": "V only"}}
+        model = ["9", 0]
+    g["6"] = {"class_type": "KSampler",
+              "inputs": {"model": model, "positive": ["3", 0], "negative": ["4", 0],
+                         "latent_image": latent, "seed": seed, "steps": STEPS, "cfg": CFG,
+                         "sampler_name": SAMPLER, "scheduler": SCHED, "denoise": denoise}}
+    g["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
+    out = ["7", 0]
+    if seamless:
+        # True-tiling recipe: half-offset the image (wrap edges become adjacent
+        # interior columns -> continuous by construction), then a low-denoise
+        # img2img pass heals the old seams now sitting at the center cross.
+        # (Model Patch Seamless (mtb) deepcopy-crashes on ComfyUI 0.28.)
+        g["13"] = {"class_type": "Image Tile Offset (mtb)",
+                   "inputs": {"image": out, "tilesX": 2, "tilesY": 2}}
+        g["14"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["13", 0], "vae": ["1", 2]}}
+        g["15"] = {"class_type": "KSampler",
+                   "inputs": {"model": model, "positive": ["3", 0], "negative": ["4", 0],
+                              "latent_image": ["14", 0], "seed": seed + 1, "steps": STEPS,
+                              "cfg": CFG, "sampler_name": SAMPLER, "scheduler": SCHED,
+                              "denoise": 0.35}}
+        g["16"] = {"class_type": "VAEDecode", "inputs": {"samples": ["15", 0], "vae": ["1", 2]}}
+        out = ["16", 0]
+    if alpha:
+        g["11"] = {"class_type": "Image Rembg (Remove Background)",
+                   "inputs": {"images": out, "model": "isnet-general-use",
+                              "transparency": True, "alpha_matting": False,
+                              "alpha_matting_foreground_threshold": 240,
+                              "alpha_matting_background_threshold": 20,
+                              "alpha_matting_erode_size": 4, "post_processing": True,
+                              "only_mask": False, "background_color": "none"}}
+        out = ["11", 0]
+    g["12"] = {"class_type": "SaveImage", "inputs": {"images": out, "filename_prefix": prefix}}
+    return g
+
+
+def run(graph, dest_dir, timeout=900):
+    """Queue a graph, wait, download every produced image to dest_dir. Returns paths."""
+    pid = post("/prompt", {"prompt": graph})["prompt_id"]
+    os.makedirs(dest_dir, exist_ok=True)
+    for _ in range(timeout):
+        time.sleep(1)
+        try:
+            h = json.load(urllib.request.urlopen(f"{HOST}/history/{pid}", timeout=30))
+        except Exception:
+            continue  # server busy mid-batch; keep polling
+        if pid not in h:
+            continue
+        entry = h[pid]
+        if entry.get("status", {}).get("status_str") == "error":
+            raise RuntimeError(json.dumps(entry["status"], indent=1)[:3000])
+        outs = [o for o in entry["outputs"].values() if "images" in o]
+        if not outs:
+            continue
+        paths = []
+        for im in outs[-1]["images"]:
+            q = urllib.parse.urlencode({"filename": im["filename"],
+                                        "subfolder": im.get("subfolder", ""),
+                                        "type": im["type"]})
+            dest = os.path.join(dest_dir, im["filename"])
+            with urllib.request.urlopen(f"{HOST}/view?{q}") as r, open(dest, "wb") as f:
+                f.write(r.read())
+            paths.append(dest)
+        return paths
+    raise TimeoutError(pid)

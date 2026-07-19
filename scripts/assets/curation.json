@@ -1,0 +1,112 @@
+{
+ "tile.deck-moss": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/tile.deck-moss/tile-deck-moss-s414500_00002_.png"
+ },
+ "prop.spore-barrel": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.spore-barrel/prop-spore-barrel-s414504_00004_.png"
+ },
+ "char.vine-ranger.s-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.s-idle/char-vine-ranger-s-idle-s414500_00005_.png",
+  "note": "vivid-prompt resweep"
+ },
+ "prop.cargo-pod": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.cargo-pod/prop-cargo-pod-s414500_00003_.png"
+ },
+ "prop.cryo-terminal": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.cryo-terminal/prop-cryo-terminal-s414504_00001_.png"
+ },
+ "prop.nutrient-dispenser": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.nutrient-dispenser/prop-nutrient-dispenser-s414500_00001_.png"
+ },
+ "prop.console-monitor": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.console-monitor/prop-console-monitor-s414500_00001_.png"
+ },
+ "prop.hydro-recycler": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.hydro-recycler/prop-hydro-recycler-s414500_00001_.png"
+ },
+ "char.vine-ranger.se-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 4,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-idle/char-vine-ranger-se-idle-s414500_00005_.png"
+ },
+ "char.vine-ranger.e-idle": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-idle/char-vine-ranger-e-idle-s414504_00004_.png"
+ },
+ "char.vine-ranger.ne-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-idle/char-vine-ranger-ne-idle-s414500_00003_.png"
+ },
+ "char.vine-ranger.n-idle": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-idle/char-vine-ranger-n-idle-s414504_00002_.png"
+ },
+ "char.vine-ranger.s-step": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.s-step/char-vine-ranger-s-step-s414504_00002_.png"
+ },
+ "char.vine-ranger.se-step": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-step/char-vine-ranger-se-step-s414504_00002_.png"
+ },
+ "char.vine-ranger.e-step": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-step/char-vine-ranger-e-step-s414504_00001_.png"
+ },
+ "char.vine-ranger.ne-step": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-step/char-vine-ranger-ne-step-s414500_00004_.png"
+ },
+ "char.vine-ranger.n-step": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-step/char-vine-ranger-n-step-s414504_00002_.png"
+ },
+ "tile.root-bulkhead": {
+  "seed": null,
+  "batch": 4,
+  "index": null,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/tile.root-bulkhead/tile-root-bulkhead-s414504_00001_.png",
+  "note": "provisional; resweep pending"
+ }
+}

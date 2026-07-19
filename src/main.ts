@@ -20,11 +20,16 @@ import { BroadcastChannelTransport } from './net/transport/broadcastChannelTrans
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
+import type { ZoomSink } from './render/zoomModel'
+import { wireWheelZoom } from './input/wheelZoom'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 import { createOverlay } from './ui/overlay'
+import { createMissionPanel } from './ui/missionPanel'
+import { resolveLink } from './ui/missionModel'
+import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 // verbs.ts is already in the core bundle (serialize.ts imports serializeEntity from
 // it), so this static import adds nothing to the release size; the runVerb hooks it
 // backs are still only wired under ?e2e below.
@@ -54,10 +59,18 @@ const boot = async (): Promise<void> => {
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
   // A `?script=` deterministic input timeline replaces live input for e2e videos.
   const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
+  // View-only zoom control: pinch (touch) + scrollwheel (desktop), both routed
+  // through the camera's smooth, anchored zoom target. Zero effect on the sim.
+  const zoomSink: ZoomSink = {
+    get: () => renderer.camera.zoomTarget,
+    set: (z, ax, ay) => renderer.camera.setZoom(z, ax, ay),
+    reset: () => renderer.camera.resetZoom(),
+  }
+  wireWheelZoom(renderer.app.canvas, zoomSink)
   let touch: TouchInput | undefined
   let input: InputSource = script ? createScriptedInput(script) : createKeyboard()
   if (!script && navigator.maxTouchPoints > 0) {
-    touch = createTouch(uiMount)
+    touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
   const coop = createGamepadCoop()
@@ -100,7 +113,7 @@ const boot = async (): Promise<void> => {
     }
   }
   const zoom = Number(params.get('zoom'))
-  if (zoom >= 1 && zoom <= 4) renderer.camera.zoom = zoom
+  if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
   if (params.has('e2e')) {
     ;(window as unknown as { __sor: Session }).__sor = session
     if (session instanceof HostSession) {
@@ -112,7 +125,12 @@ const boot = async (): Promise<void> => {
       // browser test can draw over the scene without a hub.
       ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
         runVerb(hostWorld, `annotate ${line}`)
-      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) => runVerb(hostWorld, line)
+      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) =>
+        runVerb(hostWorld, line, { setTheme: (id) => void renderer.setTheme(id) })
+      // Awaitable theme swap for e2e screenshot tests (the `theme` verb is
+      // fire-and-forget; this resolves when the new assets are actually baked).
+      ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
+        renderer.setTheme(id)
       // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
       // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
       // the local player's equipped gun. Exposed here so a screenshot e2e can show
@@ -134,6 +152,13 @@ const boot = async (): Promise<void> => {
       ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
         applyPick(id)
         draftScreen.hide()
+      }
+      // Drive the view zoom headlessly: smooth (real interpolation path) or
+      // snapped (deterministic stills at exact zoom levels).
+      ;(window as unknown as { __zoom: (z: number, snap?: boolean) => number }).__zoom = (z, snap) => {
+        if (snap) renderer.camera.snapZoom(z)
+        else renderer.camera.setZoom(z)
+        return renderer.camera.zoomTarget
       }
       // Project a world tile to a screen pixel via the LIVE camera, so an e2e can
       // click exactly on an entity (mirrors the overlay's own projection).
@@ -165,7 +190,10 @@ const boot = async (): Promise<void> => {
     // `?debug=<name>` labels this game in the hub's registry so multiple games on
     // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
     const name = params.get('debug') || undefined
-    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, { name })
+    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
+      name,
+      setTheme: (id) => void renderer.setTheme(id),
+    })
   }
   runLoop(session, renderer, uiMount, coop, touch, debug)
 }
@@ -317,6 +345,18 @@ const runLoop = (
     screenH: renderer.app.screen.height,
   })
   const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined, cameraSource)
+  // Mission panel + objective hyperlinks: tapping a linked objective row starts a
+  // VIEW-ONLY camera focus (focusModel.ts) — an animated glide to the target and
+  // back. Nothing here writes sim state; determinism is untouched.
+  let focus: FocusState | undefined
+  const missionPanel = createMissionPanel(uiMount, {
+    cameraSource,
+    onFocus: (link) => {
+      const self = session.renderView().self
+      if (self) focus = startFocus(link, self.pos)
+    },
+    focusSource: () => focus?.target,
+  })
   // Annotation + selection overlay. Mounted on the canvas container (#app, which
   // receives pointer events — #ui is pointer-events:none) so a tap reaches it to
   // pick an entity; the touch sticks live on #ui and still capture their own
@@ -347,7 +387,18 @@ const runLoop = (
     if (view.self) {
       const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
       const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
-      renderer.camera.follow(px, py, dt)
+      // Objective focus: while live, the camera glides to the link target and
+      // back (focusPanRate < normal → an animated pan, never a cut). The focus
+      // dies on its own timer, when the player moves, or if the target despawns.
+      const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
+      focus = tickFocus(focus, dt, view.self.pos, focusPos)
+      const rate = focusPanRate(focus)
+      if (focus) {
+        const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
+        renderer.camera.follow(t.x, t.y, dt, rate)
+      } else {
+        renderer.camera.follow(px, py, dt, rate)
+      }
     }
     renderer.draw(view, alpha, dt)
     hud.update(view)
@@ -357,6 +408,7 @@ const runLoop = (
     touch?.update(view)
     coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
     screens.update(view)
+    missionPanel.update(view)
     commOverlay.update(view)
     overlay.update(pads)
     showPause(session.isPaused ?? false)

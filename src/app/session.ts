@@ -12,6 +12,10 @@ export interface RenderView {
   floor: number
   missionText: string
   missionComplete: boolean
+  /** The mission's target entity id (steal item / assassinate boss) so the UI
+   * can hyperlink the objective to it. Absent for `reach` missions and on
+   * clients running an older host. */
+  missionTargetId?: number
   gameOver: boolean
   /** Difficulty rules in force (host truth; clients mirror it from the host). */
   mode?: RunMode

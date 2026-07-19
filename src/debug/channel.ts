@@ -37,6 +37,9 @@ export interface ChannelOpts {
   WebSocketImpl?: typeof WebSocket
   /** Stable label sent in `hello` so the hub can identify/route this game. */
   name?: string
+  /** Renderer hook for the `theme` verb (presentation-only hot-swap); absent in
+   * headless contexts, where the verb reports itself unavailable. */
+  setTheme?: (id: string) => void
   /** Liveness heartbeat interval in ms (default 1000; 0 disables). */
   heartbeatMs?: number
   /** Injectable page-lifecycle source for tests; defaults to the real DOM
@@ -191,7 +194,7 @@ export const startDebugChannel = (
     const reply = (ok: boolean, body: string): void => send({ t: 'rep', id, ok, body })
     const run = (): void => {
       try {
-        reply(true, runVerb(world, verb, { events: recentEvents }))
+        reply(true, runVerb(world, verb, { events: recentEvents, setTheme: opts.setTheme }))
       } catch (e) {
         reply(false, e instanceof Error ? e.message : String(e))
       }

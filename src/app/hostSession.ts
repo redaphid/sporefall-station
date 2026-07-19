@@ -113,6 +113,7 @@ export class HostSession implements Session {
       floor: this.world.floor,
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
+      missionTargetId: this.world.mission.targetEntityId,
       gameOver: this.world.gameOver,
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,

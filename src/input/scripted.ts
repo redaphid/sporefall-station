@@ -167,6 +167,54 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 40 }, // aftermath on the frosted/shattered line
   ],
 
+  // Mission-UI showcase: the player stands STILL for the whole clip so the
+  // Playwright driver can expand the mission panel and tap an objective link —
+  // any movement would cancel the camera focus (focusModel.ts), which is exactly
+  // what we're recording. 660 ticks (~22s) covers chip → panel → link tap →
+  // animated pan out/back → edge indicator beats.
+  missionui: [{ ticks: 660 }],
+
+  // Mission-UI progress states: the `mission` walk to the briefcase, then a LONG
+  // stand-still beat (600 ticks) so the e2e can open the panel and tap the exit
+  // link with generous wall-clock slack (screenshots are slow under video
+  // recording), then finish the floor.
+  missionProgress: [
+    { ticks: 40 },
+    { ticks: 64, y: 1 }, // down onto the lane
+    { ticks: 30 },
+    { ticks: 57, x: 1 }, // onto the briefcase (~tick 190: objective completes)
+    { ticks: 600 }, // hold: panel/link interactions land in this window
+    { ticks: 34, x: 1 }, // head for the open exit
+    { ticks: 90 }, // floor 2 beat
+  ],
+
+  // Sprite-facing showcase: walk a full compass circle — E, SE, S, SW, W, NW,
+  // N, NE — with a LONG hold after each leg. Facing persists while idle (aim
+  // (0,0) holds the last heading), so each hold is a stable window for the e2e
+  // to screenshot that facing even though screenshots under video recording
+  // lag the sim by ~60 ticks. Legs cancel pairwise, so the walker ends where
+  // it started. Backs the feature-walk8 e2e video (8 facings from 5 drawn
+  // directions + 3 mirrors).
+  walk8: [
+    { ticks: 20 }, // settle (idle, facing s)
+    { ticks: 14, x: 1 }, // E
+    { ticks: 70 },
+    { ticks: 14, x: 1, y: 1 }, // SE
+    { ticks: 70 },
+    { ticks: 14, y: 1 }, // S
+    { ticks: 70 },
+    { ticks: 14, x: -1, y: 1 }, // SW (mirrored se art)
+    { ticks: 70 },
+    { ticks: 14, x: -1 }, // W (mirrored e art)
+    { ticks: 70 },
+    { ticks: 14, x: -1, y: -1 }, // NW (mirrored ne art)
+    { ticks: 70 },
+    { ticks: 14, y: -1 }, // N
+    { ticks: 70 },
+    { ticks: 14, x: 1, y: -1 }, // NE
+    { ticks: 70 }, // final beat, resting on the ne facing
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

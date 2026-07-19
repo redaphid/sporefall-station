@@ -11,10 +11,16 @@ export interface SettingsPanel {
   settings(): GameSettings
 }
 
+export interface ThemeOption {
+  id: string
+  name: string
+}
+
 export const createSettingsPanel = (
   mount: HTMLElement,
   native: boolean,
   onChange: (s: GameSettings) => void,
+  themes: ThemeOption[] = [],
 ): SettingsPanel => {
   let current = loadSettings()
 
@@ -39,6 +45,18 @@ export const createSettingsPanel = (
         <option value="off">Off</option>
       </select>
     </label>`
+  // Theme picker only when more than one theme is installed. Selection is
+  // presentation-only (persisted locally; never crosses the wire).
+  const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+  const themeRow =
+    themes.length > 1
+      ? `
+    <label style="display:block;margin-bottom:10px">Theme
+      <select id="th" style="width:100%;margin-top:3px;background:#111;color:#eee;border:1px solid #0006;border-radius:5px;padding:4px">
+        ${themes.map((t) => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}
+      </select>
+    </label>`
+      : ''
   const hapticRows = native
     ? `
     <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -49,12 +67,14 @@ export const createSettingsPanel = (
     </label>`
     : `<div style="opacity:.6">Vibration: phone only</div>`
 
-  panel.innerHTML = qualityRow + hapticRows
+  panel.innerHTML = qualityRow + themeRow + hapticRows
   mount.appendChild(gear)
   mount.appendChild(panel)
 
   const q = panel.querySelector<HTMLSelectElement>('#q')!
   q.value = current.effectsQuality
+  const th = panel.querySelector<HTMLSelectElement>('#th')
+  if (th && themes.some((t) => t.id === current.theme)) th.value = current.theme
   const hen = panel.querySelector<HTMLInputElement>('#hen')
   const hin = panel.querySelector<HTMLInputElement>('#hin')
   if (hen) hen.checked = current.hapticsEnabled
@@ -70,6 +90,7 @@ export const createSettingsPanel = (
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none'
   })
   q.addEventListener('change', () => apply({ effectsQuality: q.value as EffectsQuality }))
+  th?.addEventListener('change', () => apply({ theme: th.value }))
   hen?.addEventListener('change', () => apply({ hapticsEnabled: hen.checked }))
   hin?.addEventListener('input', () => apply({ hapticsIntensity: Number(hin.value) }))
 

@@ -31,6 +31,34 @@ export const ARCHETYPES = [
 
 const archetypeIndex = new Map<string, number>(ARCHETYPES.map((a, i) => [a, i]))
 
+/** Fixed weapon-mod registry order — 5-bit index over the wire. Append only.
+ * (Sorted-at-birth is NOT enough: future registry additions must not renumber
+ * existing entries, so this list is frozen history, like ARCHETYPES.) */
+export const WIRE_MODS = [
+  'overload',
+  'bulk',
+  'rapid',
+  'heavy',
+  'choke',
+  'velocity',
+  'glassCannon',
+  'frost',
+  'incendiary',
+  'shock',
+  'bounce',
+  'pierce',
+  'homing',
+  'explosive',
+  'split',
+  'lifesteal',
+  'detonator',
+] as const
+
+const wireModIndex = new Map<string, number>(WIRE_MODS.map((m, i) => [m, i]))
+
+/** Most mods a single bullet advertises on the wire (bounds the record size). */
+const WIRE_MOD_CAP = 12
+
 const POS_SCALE = 32 // 1/32-tile precision in u16
 const FACING_SCALE = 256 / (Math.PI * 2)
 
@@ -42,6 +70,9 @@ export interface WireEntity {
   facing: number
   hpPct: number
   flags: number
+  /** Bullet mod provenance ('projectile' archetype only) — drives the client's
+   * procedural bullet look. Absent/empty = vanilla shot. */
+  mods?: { id: string; stacks: number }[]
 }
 
 export interface WireSnapshot {
@@ -61,7 +92,7 @@ export const kindOf = (archetype: string): Entity['kind'] => {
 }
 
 export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
-  const w = new ByteWriter(16 + s.entities.length * 10)
+  const w = new ByteWriter(16 + s.entities.length * 12)
   w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(s.entities.length)
   for (const e of s.entities) {
     w.u16(e.id)
@@ -71,6 +102,17 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
     w.u16(Math.round(e.y * POS_SCALE))
     w.u8(Math.round(((e.facing % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     w.u8(Math.round(e.hpPct * 255))
+    // Variable tail, 'projectile' records only: u8 mod count, then one byte per
+    // mod — 5-bit WIRE_MODS index | 3-bit (stacks-1, capped at 8). A vanilla
+    // bullet costs 1 extra byte; other archetypes are unchanged.
+    if (e.archetype === 'projectile') {
+      const mods = (e.mods ?? []).filter((m) => wireModIndex.has(m.id) && m.stacks > 0).slice(0, WIRE_MOD_CAP)
+      w.u8(mods.length)
+      for (const m of mods) {
+        const stacks = Math.min(8, Math.max(1, Math.floor(m.stacks)))
+        w.u8(((wireModIndex.get(m.id)! & 0x1f) << 3) | ((stacks - 1) & 0x07))
+      }
+    }
   }
   return w.finish()
 }
@@ -85,7 +127,7 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
   const count = r.u8()
   const entities: WireEntity[] = []
   for (let i = 0; i < count; i++) {
-    entities.push({
+    const we: WireEntity = {
       id: r.u16(),
       archetype: ARCHETYPES[r.u8()] ?? 'player',
       flags: r.u8(),
@@ -93,7 +135,20 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
       y: r.u16() / POS_SCALE,
       facing: r.u8() / FACING_SCALE,
       hpPct: r.u8() / 255,
-    })
+    }
+    if (we.archetype === 'projectile') {
+      const n = r.u8()
+      if (n > 0) {
+        const mods: { id: string; stacks: number }[] = []
+        for (let j = 0; j < n; j++) {
+          const packed = r.u8()
+          const id = WIRE_MODS[(packed >> 3) & 0x1f]
+          if (id) mods.push({ id, stacks: (packed & 0x07) + 1 })
+        }
+        if (mods.length) we.mods = mods
+      }
+    }
+    entities.push(we)
   }
   return { tick, floor, alarm, lastInputSeq, entities }
 }
@@ -157,7 +212,7 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   }
   if (isRolling(e, tick)) flags |= SnapFlags.Rolling
   if (e.door?.open) flags |= SnapFlags.DoorOpen
-  return {
+  const we: WireEntity = {
     id: e.id,
     archetype: e.archetype,
     x: e.pos.x,
@@ -166,6 +221,9 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
     hpPct: e.health ? Math.max(0, e.health.hp) / e.health.max : 1,
     flags,
   }
+  // Modded bullets carry their build so clients compose the same look.
+  if (e.projectile?.mods && e.projectile.mods.length > 0) we.mods = e.projectile.mods.map((m) => ({ ...m }))
+  return we
 }
 
 /** Materialize/refresh a render-side entity from the wire (client side). */
@@ -175,6 +233,13 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   e.facing = we.facing
   if (we.archetype === 'door') {
     e.door = { open: (we.flags & SnapFlags.DoorOpen) !== 0, locked: false, lockLevel: 0 }
+  }
+  if (we.archetype === 'projectile' && we.mods && we.mods.length > 0) {
+    // Render-mirror provenance only: the client never sims this projectile, so
+    // ownerId/damage/ttl are inert placeholders — `mods` is what the bullet
+    // renderer reads to compose the modded look.
+    e.projectile ??= { ownerId: 0, damage: 0, ttl: 1 }
+    e.projectile.mods = we.mods.map((m) => ({ ...m }))
   }
   if ((we.flags & SnapFlags.HitFlash) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
@@ -246,6 +311,9 @@ export interface StateMsg {
   floor: number
   missionText: string
   missionComplete: boolean
+  /** Mission target entity id (steal item / assassinate boss) so client UIs can
+   * hyperlink the objective. Optional on the wire for back-compat. */
+  missionTargetId?: number
   gameOver: boolean
   alarm: number
   /** Difficulty rules in force (host authoritative). */

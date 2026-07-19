@@ -168,6 +168,12 @@ export interface Entity {
     hitIds?: EntityId[]
     /** Resolved trigger effects fired on hit/kill (on-reload handled elsewhere). */
     triggers?: import('./data/mods').ResolvedTrigger[]
+    /** Build provenance: the (normalized) mod list of the gun that fired this
+     * shot. Pure inert data — no system reads it — carried so the renderer (and
+     * net peers, via the snapshot codec) can COMPOSE the bullet's procedural
+     * look from its mods, Nova-Drift style. Absent = vanilla shot, so every
+     * pre-feature world/fixture serializes byte-for-byte unchanged. */
+    mods?: WeaponMod[]
   }
   pickup?: { itemId: string; qty: number }
   door?: { open: boolean; locked: boolean; lockLevel: number }

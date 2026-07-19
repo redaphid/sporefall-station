@@ -41,6 +41,10 @@ export interface VerbCtx {
   /** Channel-maintained ring of recent events (they are cleared from
    * `world.events` every tick). Falls back to the current tick's events. */
   events?: readonly SimEvent[]
+  /** Presentation hook: hot-swap the active visual theme. Injected by whoever
+   * owns a renderer (main.ts / the debug channel); themes are render-side only,
+   * so the verb never touches the world and is a no-op in headless contexts. */
+  setTheme?: (id: string) => void
 }
 
 /** The effective verb name, unwrapping the `command` escape hatch. */
@@ -401,6 +405,17 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       e.ai.patrolIndex = 0
       e.ai.thinkAt = w.tick
       return runVerb(w, `ai ${e.id}`, ctx)
+    }
+
+    case 'theme': {
+      // Presentation-only: swaps the renderer's theme (sprites/palette/names).
+      // Deliberately NOT a write verb — it never touches world state, so
+      // determinism, serialization and replay are unaffected.
+      if (!rest || rest.includes(' ')) throw new Error('usage: theme <themeId>')
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(rest)) throw new Error(`invalid theme id "${rest}" (lowercase [a-z0-9-])`)
+      if (!ctx.setTheme) throw new Error('theme switching unavailable here (no renderer attached)')
+      ctx.setTheme(rest)
+      return JSON.stringify({ theme: rest, status: 'switching' })
     }
 
     case 'command':

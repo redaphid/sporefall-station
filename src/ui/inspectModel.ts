@@ -41,10 +41,15 @@ const modRows = (stack: ItemStack | undefined): InspectRow[] =>
  * Build the friendly inspect card for an entity. Only rows that apply are
  * emitted, so a plain prop shows a short card and a rich NPC a fuller one. Never
  * throws on missing fields — every lookup is defensive.
+ *
+ * `nameFor` maps an archetype to its display name — the overlay passes the
+ * theme-aware resolver (a `cop` can read "Bog Warden" in a swamp theme; same
+ * sim entity, themed presentation). Defaults to plain title-casing so the
+ * builder stays pure and theme-free for tests.
  */
-export const inspectCard = (e: Entity): InspectCard => {
+export const inspectCard = (e: Entity, nameFor: (archetype: string) => string = pretty): InspectCard => {
   const rows: InspectRow[] = []
-  const title = `${pretty(e.archetype)} · ${e.kind}`
+  const title = `${nameFor(e.archetype)} · ${e.kind}`
 
   if (e.health) rows.push({ label: 'HP', value: `${Math.max(0, Math.round(e.health.hp))}/${e.health.max}` })
 

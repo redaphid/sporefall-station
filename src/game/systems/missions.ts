@@ -1,4 +1,4 @@
-import { makeEntity } from '../entity'
+import { makeEntity, SPAWN_GRACE_TICKS } from '../entity'
 import { generateLevel } from '../levelgen/generate'
 import type { Building } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
@@ -150,7 +150,11 @@ export const nextFloor = (w: World): void => {
     p.prevPos.y = p.pos.y
     p.vel.x = 0
     p.vel.y = 0
-    if (p.health) p.health.hp = Math.max(p.health.hp, Math.floor(p.health.max / 2))
+    if (p.health) {
+      p.health.hp = Math.max(p.health.hp, Math.floor(p.health.max / 2))
+      // Fresh-floor landing gets the same spawn grace as a fresh run.
+      p.health.iframes = SPAWN_GRACE_TICKS
+    }
     if (p.playerCtl) {
       p.playerCtl.downed = undefined
       p.playerCtl.channel = undefined

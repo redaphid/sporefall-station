@@ -14,10 +14,12 @@ const recordSession = (): Recording => {
   h.start()
   h.startRecording()
   // Scripted programmatic inputs: everyone pushes into the populated city and
-  // fires — deterministically triggering AI/combat (hits + deaths).
-  h.setInput(0, { moveX: -1, attack: true })
-  h.setInput(1, { moveX: -1, attack: true })
-  h.setInput(2, { moveX: -1, moveY: 1 })
+  // fires — deterministically triggering AI/combat (hits + deaths). Spawn is
+  // the map's NW corner and street life now keeps a spawn-safe radius, so the
+  // party must march INTO the city (east/south) to reach anyone to shoot.
+  h.setInput(0, { moveX: 1, attack: true })
+  h.setInput(1, { moveX: 1, attack: true })
+  h.setInput(2, { moveX: 1, moveY: 1 })
   h.stepTicks(200)
   return h.stopRecording()
 }

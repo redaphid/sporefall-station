@@ -13,6 +13,7 @@ describe('new NPC archetypes', () => {
   it('gangster shoots at a visible player from range', () => {
     const w = createWorld(30, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
+    player.health!.iframes = 0 // shed spawn grace: this tests the gangster's gun, not spawn protection
     spawnNpc(w, 'gangster', 16.5, 1.5) // within 0.8 * pistol range 10
     tickN(w, idle(), 90)
     // Projectiles were fired and some connected

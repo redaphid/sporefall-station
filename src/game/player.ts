@@ -1,5 +1,5 @@
 import { WEAPONS } from './data/items'
-import { makeEntity, type Entity, type ItemStack } from './entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type ItemStack } from './entity'
 import { addEntity, type World } from './world'
 
 // ---- Player defaults ------------------------------------------------------
@@ -55,7 +55,10 @@ const starterLoadout = (startWeapon: string): { inventory: ItemStack[]; activeSl
 export const spawnPlayer = (w: World, playerId: number, x: number, y: number): Entity => {
   const e = makeEntity('player', 'player', x, y)
   e.speed = PLAYER_SPEED
-  e.health = { hp: PLAYER_HP, max: PLAYER_HP, iframes: 0 }
+  // Spawn grace: brief invulnerability so landing next to a hostile (or a
+  // wandering patrol crossing the spawn) can never delete a player before
+  // their first input registers. See SPAWN_GRACE_TICKS.
+  e.health = { hp: PLAYER_HP, max: PLAYER_HP, iframes: SPAWN_GRACE_TICKS }
   e.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
   const { inventory, activeSlot } = starterLoadout(PLAYER_START_WEAPON)

@@ -41,6 +41,7 @@ describe('combat AI — acquire, chase, attack', () => {
   it('a hostile-world NPC acquires a passive player, closes in, and deals damage', () => {
     const { w } = arena()
     const player = spawnPlayer(w, 0, 12.5, 20.5)
+    player.health!.iframes = 0 // shed spawn grace: this tests acquire/chase/attack, not spawn protection
     const civ = spawnNpc(w, 'civilian', 17.5, 20.5) // fists, sightRange 6: engages only because w.hostile
     const startDist = dist(civ.pos.x, civ.pos.y, player.pos.x, player.pos.y)
 

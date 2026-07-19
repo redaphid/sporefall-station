@@ -10,6 +10,15 @@ import { addEntity, type World } from './world'
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
 export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
 
+/** No street-life NPC (or street patrol waypoint) may be placed closer than this
+ * to the player spawn. Sized past the LONGEST NPC sight range (8) so that with
+ * `world.hostile` (every NPC engages players on sight) nobody can already see —
+ * and beeline for — the spawn tile on tick 0. Before this guard, ~8% of seeds
+ * beat an idle just-spawned player to death within 10 seconds (seed 7 among
+ * them: a bat civilian 2.2 tiles from spawn). Building interiors are exempt —
+ * walls block sight, and the door is the player's choice to open. */
+export const SPAWN_SAFE_RADIUS = 9
+
 /** A weighted arsenal every populated NPC draws from, so a floor fields a fun
  * SPREAD of weapons rather than one archetype-locked stick. Common melee/pistol
  * dominate; heavy and elemental guns are the rarer spice (so freeze/fire/shock
@@ -176,26 +185,28 @@ const stockShop = (w: World, rng: Rng, building: Building): void => {
 const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
   const wanderers = rng.int(4, 7)
   for (let i = 0; i < wanderers; i++) {
-    const spot = randomTileOfType(w, rng, Tile.Sidewalk) ?? randomTileOfType(w, rng, Tile.Street)
+    const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
   // Scavengers: a couple of civ-faction gleaners drawn to loose loot, so the
   // street competes with the players for unclaimed pickups.
   const scavengers = rng.int(1, 2)
   for (let i = 0; i < scavengers; i++) {
-    const spot = randomTileOfType(w, rng, Tile.Sidewalk) ?? randomTileOfType(w, rng, Tile.Street)
+    const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng).ai!.behavior = 'scavenger'
   }
   const copPairs = 1 + Math.floor(w.floor / 3)
   for (let i = 0; i < copPairs; i++) {
-    const spot = randomTileOfType(w, rng, Tile.Street)
+    const spot = randomStreetSpot(w, rng, Tile.Street)
     if (spot) {
       const a = spawnNpc(w, 'cop', spot.x, spot.y, wrng)
       const b = spawnNpc(w, 'cop', spot.x + 0.8, spot.y, wrng)
       // The pair walks a shared street beat instead of loitering at one corner.
+      // Waypoints respect the spawn-safe radius too, so a beat never marches
+      // the pair straight through the player's landing zone.
       const beat = [{ x: spot.x, y: spot.y }]
       for (let j = 0; j < 2; j++) {
-        const p = randomTileOfType(w, rng, Tile.Street)
+        const p = randomStreetSpot(w, rng, Tile.Street)
         if (p) beat.push(p)
       }
       assignPatrol(a, beat)
@@ -318,11 +329,18 @@ const randomFloorInBuilding = (
   return null
 }
 
-const randomTileOfType = (w: World, rng: Rng, tile: number): { x: number; y: number } | null => {
+/** A random tile of `tile` type outside the spawn-safe radius, as a tile-centre
+ * world coord, or null. Every attempt draws the same two ints whether or not it
+ * is rejected — determinism is per-seed, not per-layout. */
+const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 20; attempt++) {
     const tx = rng.int(1, w.level.w - 2)
     const ty = rng.int(1, w.level.h - 2)
-    if (w.level.tiles[ty * w.level.w + tx] === tile) return { x: tx + 0.5, y: ty + 0.5 }
+    if (w.level.tiles[ty * w.level.w + tx] !== tile) continue
+    const x = tx + 0.5
+    const y = ty + 0.5
+    if (Math.hypot(x - w.level.spawn.x, y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    return { x, y }
   }
   return null
 }

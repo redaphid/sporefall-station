@@ -45,6 +45,8 @@ export interface Building {
   role: BuildingRole
   /** Optional set-piece tag for populate/missions and variety tests. */
   poi?: BuildingPoi
+  /** Compound pit (open ground) — populate routes patrol beats around it. */
+  courtyard?: Rect
 }
 
 /** A floor's district flavour — drives density, footprints and role palette. */

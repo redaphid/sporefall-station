@@ -143,12 +143,14 @@ const buildThemedCity = (
     const rooms: Rect[] = []
     const doors: { x: number; y: number }[] = []
     let poi: Building['poi']
+    let courtyard: Rect | undefined
     const large = interior.w >= 11 && interior.h >= 11
     if (large && lrng.chance(theme.courtyardChance)) {
       // Courtyard compound: a ring of rooms around an open pit, with a street gate.
       const plan = carveCompound(lrng, grid, rect, interior, Tile.Grass)
       rooms.push(...plan.rooms)
       doors.push(...plan.doors)
+      courtyard = plan.courtyard
       poi = 'courtyard'
     } else if (interior.w >= 12 && interior.h >= 12 && lrng.chance(theme.vaultChance)) {
       // Open hall with a single sealed reward chamber — no split walls to break.
@@ -173,7 +175,7 @@ const buildThemedCity = (
       doors.push(...splitRooms(lrng, grid, interior, rooms))
     }
     doors.push(...punchExteriorDoors(lrng, grid, rect))
-    buildings.push({ rect, rooms, doors: dedupeDoors(doors), role: lrng.pick(theme.roles), poi })
+    buildings.push({ rect, rooms, doors: dedupeDoors(doors), role: lrng.pick(theme.roles), poi, courtyard })
   }
   return buildings
 }

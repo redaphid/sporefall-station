@@ -84,7 +84,9 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 | `generate.py` | **The job table** — every asset's subject prompt, negatives, category, target px — plus the `sweep` / `final` CLI. |
 | `post.py` | Post-processing: content bbox crop → k-centroid downscale → palette quantize (no dither) → hard alpha → canvas placement; `tile()`, `sprite()`, `luma_sprite()`, `derive_step()`, `seam_energy()`, `contact_sheet()`. |
 | `palette.py` | The locked theme palette (34 colors for swampspace). Run it to emit a swatch sheet. |
-| `verify.py` | VLM gate (§5). |
+| `verify.py` | VLM gate (§5): per-asset checks, `--pairs`, `--same`, `--style`. |
+| `consistency.py` | Silhouette-metric consistency harness + per-character spec gate (§5b). |
+| `consistency-spec.json` | Committed per-character proportion envelopes (ref frame + tolerances). |
 | `procedural.py` | Deterministic PIL sprites for sparse particles/FX. |
 | `manifest.py` | Emits `manifest.json` against the schema in `docs/themes.md`, with within-theme direction borrowing, and registers the theme in `public/themes/index.json`. |
 | `sheets.py` | Contact sheets + 4×4 tiling proofs into `docs/assets/swampspace/`. |
@@ -116,7 +118,18 @@ sprites land in `public/themes/swampspace/`. Only the latter is committed.
 
 - **Characters: 48×48 px canvas**, feet on bottom-center (the engine anchors
   there). **5 drawn directions** `s se e ne n` × **2 frames** `idle step`;
-  west (`sw w nw`) is mirrored by the engine — never draw it. Manifest keys
+  west (`sw w nw`) is mirrored by the engine — never draw it.
+  **Drawn side art MUST face RIGHT** (`e` = profile facing right, `se`/`ne` =
+  turned to the character's right): the engine (`src/render/anim.ts`) flips
+  the drawn frames for the west half, so a left-facing `e` frame makes every
+  horizontal move read inverted in-game — the player walks left while the
+  sprite looks right. This shipped once (the first vine-ranger `e`/`ne` set
+  was drawn facing left) and is user-visible in every session; diffusion
+  models happily ignore "facing right" in the prompt, so NEVER trust the
+  prompt alone — gate facing with `consistency.py --check` (accent-pixel
+  heuristic, §5b) and `verify.py` before curating, and if a good candidate
+  faces left, mirror the RAW (record it in `curation.json`) so
+  `generate.py final` stays reproducible. Manifest keys
   `char.<archetype>.<dir>-<frame>` (archetypes: `player cop thug civilian
   scientist gangster robot`); file naming here is `chars/<kind>-<dir>-<frame>.png`
   with thematic kind names — the manifest maps keys to files.
@@ -173,6 +186,21 @@ sprites land in `public/themes/swampspace/`. Only the latter is committed.
 10. **Seed sweeps + human curation.** 4–8 seeds per asset, contact-sheet at
     FINAL sprite size (judging at 512 px lies), pick, record lineage in
     `curation.json`, regenerate any time with `generate.py final`.
+11. **Cross-direction anchoring: derive, don't re-imagine.** txt2img per
+    direction drifts identity — the first vine-ranger set shipped an `e` with
+    a different cap, a bulky grey `ne` and slim `n` frames (width 21→31 px,
+    mass ±21% within ONE character). The fix is the step-frame discipline
+    extended to directions: img2img each new direction FROM an already-curated
+    neighbouring direction's raw, at moderate denoise, keeping the s-idle
+    IPAdapter anchor at the §4.5 per-direction weight and adding "the exact
+    same character, identical outfit colors gear and proportions" to the
+    prompt. Chain outward from the identity anchor:
+    `s-idle → e-idle (denoise ~0.6) → ne-idle (~0.5–0.55) → n-idle (~0.5)`,
+    `s-idle → se-idle (~0.5)`; every step frame then img2img's from ITS
+    direction's new idle at 0.38 as before. Each hop inherits proportions and
+    palette from an already-locked frame, so drift cannot compound. Gate every
+    candidate with the consistency harness (§5b) BEFORE the VLM, and curate
+    from the survivors.
 
 ## 5. The VLM verification gate (`verify.py`)
 
@@ -196,6 +224,51 @@ Exit code = number of failures (CI-gate style). To add a check: extend the
 JSON contract in `PROMPT` (or `PAIR_PROMPT`) and add the corresponding
 majority-vote rule in `check()` — keep answers machine-parseable JSON and
 never trust a single VLM read.
+
+Two more modes cover character identity:
+
+```bash
+python3 verify.py --pairs               # idle/step: same character, only limbs differ
+python3 verify.py --same                # cross-DIRECTION identity: every curated
+                                        # frame vs its character's s-idle
+python3 verify.py --same a.png b.png    # ad-hoc: gate one candidate vs the anchor
+```
+
+## 5b. The consistency harness (`consistency.py`) — metrics, not vibes
+
+The VLM judges identity; the harness judges **proportions**, deterministically.
+For every shipped frame it measures the silhouette from the alpha channel —
+standing height, max width, head-block height (rows from the top until row
+occupancy drops below 55% of the head peak), pixel mass, centroid-x, foot row —
+and gates each frame against a committed per-character envelope in
+`consistency-spec.json` (reference = the curated s-idle's metrics; tolerances
+default to height ±2 px, width ±3 px, head ±2 px, mass ±22%, cx ±2.5 px,
+foot_y ±1 px, hand-tunable per character in the spec file).
+
+A spec may also carry an `accent` block — the FACING gate (see §3: drawn side
+art faces right). For characters whose face has a hot-accent marker (the
+ranger's amber visor, palette colors `#ffd83e #ff9032 #e04a2a`): on `e`/`se`
+frames the accent centroid must sit ≥ `min_dx` px to the RIGHT of the body
+centroid; on `ne`/`n` (back views) the accent may cover at most
+`back_max_frac` of the head zone (a visor visible "from behind" means the
+frame isn't a back view at all — exactly how the original left-facing set
+would have been caught).
+
+```bash
+python3 consistency.py                  # report: per-frame metrics + max deviation
+python3 consistency.py vine-ranger      # one character
+python3 consistency.py --check          # gate against consistency-spec.json (CI-style)
+python3 consistency.py --files spr.png  # ad-hoc metrics for sweep candidates
+python3 consistency.py --write-spec vine-ranger=s-idle   # (re)derive a spec
+```
+
+This is a **standing check**: `src/render/charConsistency.test.ts` re-implements
+the same metrics (self-contained PNG decode, mirrored constants) and fails the
+vitest suite whenever any shipped frame leaves its character's envelope, or when
+a reference frame's metrics no longer match the committed spec (i.e. someone
+edited a sprite without re-running `--write-spec`). If you change a metric
+definition, change it in BOTH files. Gate order when curating: metrics first
+(cheap, exact), VLM second (GPU, judgement) — a candidate must pass both.
 
 ## 6. Worked example: add a new NPC to an existing theme
 

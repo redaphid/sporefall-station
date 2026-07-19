@@ -1,0 +1,120 @@
+{
+ "vine-ranger": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 21,
+   "head_h": 27,
+   "mass": 455,
+   "cx": -0.6,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  },
+  "accent": {
+   "min_dx": 1.0,
+   "back_max_frac": 0.025
+  }
+ },
+ "bog-mutant": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 40,
+   "head_h": 33,
+   "mass": 997,
+   "cx": 0.85,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "spore-drone": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 28,
+   "head_h": 12,
+   "mass": 414,
+   "cx": 0.6,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "derelict-bot": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 38,
+   "head_h": 36,
+   "mass": 782,
+   "cx": 0.05,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "frog-settler": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 39,
+   "width": 44,
+   "head_h": 38,
+   "mass": 737,
+   "cx": -0.38,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "mycologist": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 23,
+   "head_h": 35,
+   "mass": 541,
+   "cx": -2.24,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ }
+}

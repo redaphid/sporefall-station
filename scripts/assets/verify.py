@@ -11,6 +11,9 @@ Checks each candidate/curated asset against its job spec:
 Usage:
   python3 verify.py <file-or-dir>... [--job <jobname>]   # ad-hoc file check
   python3 verify.py --pack                               # verify curated pack
+  python3 verify.py --pairs                              # idle/step consistency
+  python3 verify.py --same [a.png b.png]                 # cross-direction identity
+                                                         # (pack-wide vs each s-idle)
 Exit code = number of failures (CI-gate style). Majority vote over 3 reads.
 """
 import base64
@@ -183,6 +186,73 @@ def pairs_mode():
     sys.exit(min(fails, 120))
 
 
+SAME_PROMPT = (
+    "These two images show sprites from one pixel-art game, supposedly the SAME "
+    "character viewed from two different directions (front/side/back/three-quarter). "
+    "Judge identity, not pose: same body proportions (height, bulk, head size), same "
+    "outfit and colors, same gear. Answer ONLY with JSON: "
+    '{"same_character": <bool>, "same_proportions": <bool>, "same_outfit": <bool>, '
+    '"reason": "<short>"}'
+)
+
+
+def check_same(path_a, path_b):
+    """VLM gate: are these two sprites the same character in different poses?
+    Majority vote over VOTES reads. Returns (verdict, problems)."""
+    imgs = [_b64(path_a), _b64(path_b)]
+    votes = []
+    for _ in range(VOTES):
+        body = {"model": MODEL, "prompt": SAME_PROMPT, "images": imgs,
+                "stream": False, "think": False, "options": {"temperature": 0}}
+        raw = ""
+        for attempt in range(4):
+            try:
+                req = urllib.request.Request(OLLAMA + "/api/generate",
+                                             json.dumps(body).encode(),
+                                             {"Content-Type": "application/json"})
+                raw = json.load(urllib.request.urlopen(req, timeout=300)).get("response", "").strip()
+                break
+            except Exception:
+                import time
+                time.sleep(3 * (attempt + 1))
+        a, b = raw.find("{"), raw.rfind("}")
+        v = {}
+        if a != -1 and b > a:
+            try:
+                v = json.loads(raw[a:b + 1])
+            except Exception:
+                pass
+        votes.append(v)
+    maj = VOTES // 2 + 1
+    probs = [k for k in ("same_character", "same_proportions", "same_outfit")
+             if sum(1 for v in votes if v.get(k) is False) >= maj]
+    return votes[-1], probs
+
+
+def same_mode():
+    """--same: every curated direction frame of each character vs its s-idle.
+    (Cross-DIRECTION identity — --pairs covers idle/step within a direction.)"""
+    J = G.jobs()
+    fails = 0
+    checked = 0
+    for name, spec in J.items():
+        if spec["cat"] != "char" or (spec["dir"] == "s" and spec["frame"] == "idle"):
+            continue
+        p = os.path.join(G.THEME, spec["path"])
+        anchor = os.path.join(G.THEME, f"chars/{spec['kind']}-s-idle.png")
+        if not (os.path.exists(p) and os.path.exists(anchor)):
+            continue
+        if os.path.realpath(p) == os.path.realpath(anchor):
+            continue
+        v, probs = check_same(anchor, p)
+        checked += 1
+        fails += 1 if probs else 0
+        mark = "ok  " if not probs else "FAIL"
+        print(f"{mark} {os.path.basename(p):34s} {probs} {v.get('reason', '')[:70]}", flush=True)
+    print(f"\n{fails} FAIL / {checked} identity-checked")
+    sys.exit(min(fails, 120))
+
+
 STYLE_PROMPT = (
     "Image 1 is a candidate sprite; images 2 and 3 are style anchors from the same "
     "pixel-art game. Judge whether the candidate belongs to the same game: same "
@@ -242,6 +312,14 @@ def main():
         return
     if "--style" in sys.argv:
         style_mode()
+        return
+    if "--same" in sys.argv:
+        rest = [a for a in sys.argv[1:] if not a.startswith("--")]
+        if len(rest) == 2:  # ad-hoc: verify.py --same a.png b.png
+            v, probs = check_same(rest[0], rest[1])
+            print(("ok  " if not probs else "FAIL"), probs, v)
+            sys.exit(1 if probs else 0)
+        same_mode()
         return
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     J = G.jobs()

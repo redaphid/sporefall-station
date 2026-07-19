@@ -74,6 +74,16 @@ export class EntityViews {
     this.root.sortableChildren = true
   }
 
+  /** Drop every pooled sprite so the next update() rebuilds them against the
+   * (possibly hot-swapped) art registry — used on runtime theme change. */
+  refresh(): void {
+    for (const view of this.views.values()) {
+      this.root.removeChild(view.sprite)
+      view.sprite.destroy()
+    }
+    this.views.clear()
+  }
+
   update(entities: readonly Entity[], alpha: number, tick: number): void {
     for (const view of this.views.values()) view.seen = false
     const t = tick + alpha // continuous view-time for smooth procedural juice

@@ -15,6 +15,9 @@ export interface CompoundPlan {
   doors: { x: number; y: number }[]
   /** The open pit (ground tiles, not Floor). */
   courtyard: Rect
+  /** Where a mission objective belongs: a CORNER room (two doors deep, off the
+   * ring) — explicitly a room, never the open courtyard pit. */
+  objectiveRoom: Rect
 }
 
 /** Requires interior >= 11x11. `rect` is the footprint incl. building walls. */
@@ -92,7 +95,9 @@ export const carveCompound = (
     doors.push(c.door)
   }
 
-  return { rooms, doors, courtyard }
+  // Objective room: the SE corner room — a deliberate designation (deepest
+  // corner from the canonical NW building probe), never the courtyard pit.
+  return { rooms, doors, courtyard, objectiveRoom: cornerDoors[3].room }
 }
 
 /** The gated edge: a straight walled passage from street to courtyard, double

@@ -93,6 +93,9 @@ export type SimEvent =
   | { type: 'noise'; x: number; y: number }
   | { type: 'runOver'; floor: number }
   | { type: 'roll'; x: number; y: number; entityId: EntityId }
+  /** Stop-drop-and-roll: a roll start smothered `entityId`'s burning status.
+   * `remainingTicks` is the burn left AFTER the douse — 0 = fully extinguished. */
+  | { type: 'burnDoused'; x: number; y: number; entityId: EntityId; remainingTicks: number }
   /** An NPC's AI adopted a new goal worth noting (aggro/flee/alert/search/…) —
    * `prev` is the goal it left, `targetId` who/what the new goal concerns. */
   | { type: 'aiGoal'; entityId: EntityId; goal: string; prev: string; targetId?: EntityId }

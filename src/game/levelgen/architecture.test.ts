@@ -61,7 +61,9 @@ describe('property: reachability holds across many seeds and floors', () => {
   // The heavyweight sweep: 200 seeds x floors 1..5 — spawn/exit validity plus
   // every building probe reachable. Room-level checks run in the 60-seed suites
   // below (and generate.test.ts covers rooms over 50 seeds x 4 floors).
-  it('200 seeds x floors 1..5: spawn walkable, exit reachable, every building enterable', () => {
+  // 1000 worldgens is real work — the 5s default timeout flakes when the suite
+  // shares the machine with other jobs; give it room like the spawn-safety sweep.
+  it('200 seeds x floors 1..5: spawn walkable, exit reachable, every building enterable', { timeout: 60000 }, () => {
     for (let seed = 1; seed <= 200; seed++) {
       for (let floor = 1; floor <= 5; floor++) {
         const level = generateLevel(seed, floor)

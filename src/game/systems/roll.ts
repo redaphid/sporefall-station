@@ -12,6 +12,15 @@ export const ROLL_COOLDOWN = 24
 /** Burst speed while rolling (tiles/sec) — well above the ~4.5 walk speed so a
  * roll clearly repositions, still through the normal collision path (no clipping). */
 export const ROLL_SPEED = 12
+/** Stop, drop, and roll: each roll START smothers this many ticks off a burning
+ * status. Tuned against the TYPICAL player ignition — the 240-tick weapon/item
+ * burn (data/items `molotov`, data/mods `incendiary`): a fresh one dies in
+ * exactly TWO rolls (roll 1 → 90 left, roll 2 lands after the 36-tick roll
+ * cycle → out), and any burn in its last 5s dies in ONE. A FLAT chunk, not a
+ * multiplier, so it's legible ("each roll smothers 5 seconds of fire") and
+ * roll-spam can't cheese past zero — the douse clamps at extinguished and the
+ * cooldown gates re-rolling anyway. */
+export const DOUSE_TICKS = 150
 
 /** True while `e` is inside its active roll window at `tick` — the single source
  * of truth for i-frames (combat), the movement burst, and the render tumble. */
@@ -60,5 +69,26 @@ export const rollSystem = (w: World, inputs: Map<number, InputCmd>): void => {
       dirY: dy,
     }
     w.events.push({ type: 'roll', x: e.pos.x, y: e.pos.y, entityId: e.id })
+
+    // Stop-drop-and-roll: the roll's START smothers a burning status. An instant,
+    // once per roll — NOT a lingering aura, so a burn caught MID-roll sticks until
+    // the next roll. Extinguishing deletes the effect before this tick's
+    // elementSystem runs (rollSystem precedes it in tickWorld), so a burn doused
+    // to zero deals no damage this tick; a merely-shortened burn keeps ticking.
+    // Standing IN the flames re-ignites the same tick (fireSystem runs later) —
+    // you have to roll OUT of the fire, as in life.
+    const burn = e.fx?.burning
+    if (burn !== undefined) {
+      const remaining = burn.until - w.tick
+      if (remaining <= DOUSE_TICKS) delete e.fx!.burning
+      else burn.until -= DOUSE_TICKS
+      w.events.push({
+        type: 'burnDoused',
+        x: e.pos.x,
+        y: e.pos.y,
+        entityId: e.id,
+        remainingTicks: Math.max(0, remaining - DOUSE_TICKS),
+      })
+    }
   }
 }

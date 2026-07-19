@@ -139,6 +139,22 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Control for the dodge-roll video: never roll — the same bullet connects.
   dodgeControl: [{ ticks: 60 }],
 
+  // Stop-drop-and-roll (#roll-douses-fire): the player starts ABLAZE (a fresh
+  // 240-tick weapon burn), burns for a beat, then rolls twice — roll 1 at tick
+  // 30 smothers 150 ticks, roll 2 at tick 75 kills the remainder. Paired with
+  // `stopDropControl` (same world, no rolls → the burn runs its full 240 ticks
+  // and costs ~52 hp instead of 16).
+  stopDropRoll: [
+    { ticks: 30 }, // ablaze: the ember pulse + hp drain establish the stakes
+    { ticks: 1, roll: true, x: 1 }, // roll 1 (east): burn cut 240→60 remaining
+    { ticks: 44 }, // cooldown; still alight, still ticking
+    { ticks: 1, roll: true, x: -1 }, // roll 2 (back west): burn OUT at tick 75
+    { ticks: 164 }, // stand clean — no pulse, hp holds
+  ],
+
+  // Control for stop-drop-and-roll: never roll — the same burn runs all 240 ticks.
+  stopDropControl: [{ ticks: 240 }],
+
   // Animation-state showcase (feat/sprite-animation): cycle a character through
   // every animation state against the `anim-stage` inline world (player on the
   // lane at x6, one guard thug at x12, a slow bullet inbound from the west that
@@ -190,6 +206,16 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // what we're recording. 660 ticks (~22s) covers chip → panel → link tap →
   // animated pan out/back → edge indicator beats.
   missionui: [{ ticks: 660 }],
+
+  // Mission-marker proof (marker-vs-render parity at the SE map corner): stand
+  // still while the e2e teleport-hops the player along the 🎯 marker toward the
+  // briefcase, walk the last stretch EAST onto it (real pickup), then hold. The
+  // long windows give the wall-clock Playwright acts deterministic sim room.
+  missionMarker: [
+    { ticks: 300 }, // spawn beat + hops land in here
+    { ticks: 25, x: 1 }, // the last metre: walk east onto the briefcase
+    { ticks: 275 }, // completion + exit-compass beats
+  ],
 
   // Mission-UI progress states: the `mission` walk to the briefcase, then a LONG
   // stand-still beat (600 ticks) so the e2e can open the panel and tap the exit

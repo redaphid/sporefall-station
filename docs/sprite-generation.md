@@ -88,6 +88,7 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 | `consistency.py` | Silhouette-metric consistency harness + per-character spec gate (§5b). |
 | `consistency-spec.json` | Committed per-character proportion envelopes (ref frame + tolerances). |
 | `procedural.py` | Deterministic PIL sprites for sparse particles/FX. |
+| `tilesets_floor.py` | Macro-tile floor/street redesign: 64px (2×2-tile) procedural macros (`proc`) → SD img2img refine (`sd`; floors get `restamp_floor` to re-assert seams/rivets/roots after the paint pass) → slice into the shipped variant pools + moss overlay decals (`final`). Pairs with the manifest `macroTiles` section and `tile.<name>.overlay` keys (docs/themes.md). |
 | `manifest.py` | Emits `manifest.json` against the schema in `docs/themes.md`, with within-theme direction borrowing, and registers the theme in `public/themes/index.json`. |
 | `sheets.py` | Contact sheets + 4×4 tiling proofs into `docs/assets/swampspace/`. |
 | `curation.json` | Lineage: per job `{seed, batch, index, raw, size, ckpt}` of the curated pick. |
@@ -273,7 +274,90 @@ edited a sprite without re-running `--write-spec`). If you change a metric
 definition, change it in BOTH files. Gate order when curating: metrics first
 (cheap, exact), VLM second (GPU, judgement) — a candidate must pass both.
 
-## 6. Worked example: add a new NPC to an existing theme
+## 6. Rotoscoped animation (`scripts/assets/rotoscope/`)
+
+Flashback (1992) got its fluid animation by rotoscoping filmed actors. The
+modern equivalent here renders a rigged 3D walk cycle and lets the diffusion
+pipeline "trace" every frame into pack style — 3D supplies the frame-to-frame
+coherence AI can't, AI supplies the look 3D can't. Three stages, one command:
+
+```bash
+cd scripts/assets/rotoscope
+export SWAMPSPACE_STAGE=/tmp/swampspace-stage
+CHAR=vine-ranger bash run.sh     # render -> trace -> gate -> manifest
+```
+
+### Stage 1 — motion source (`rig_walk.py` via `render.sh`)
+
+A fully **procedural** color-blocked humanoid proxy — every mesh is a bpy
+primitive created by the script, so the motion source has **no external
+rig/asset and no license baggage**. The walk is the classic 4-keypose stride
+(contact/down/passing/up, Williams) written out as 8 explicit poses; hip
+height is solved per frame by leg FK so the stance foot always touches the
+ground (bob emerges from geometry, feet never float). The proxy is
+color-blocked as the character (teal suit, orange cap, visor, boots) because
+at low denoise the tracer keeps color regions — that's what keeps every frame
+the same character.
+
+It renders on the `soul` box: a **Windows** Blender 5.x driven headless from
+WSL over ssh. The exact invocation (`render.sh` does all of this):
+
+```bash
+ssh soul   # alias in ~/.ssh/config (cloudflared); NOT soul.local. The
+           # "Could not request local forwarding" noise is benign tunnel chatter.
+# inside: binary /mnt/d/tools/blender/blender.exe, and paths handed to Blender
+# must be D:/-style (the exe is a Windows binary; /mnt/d = D:). Remote shell is
+# zsh — unmatched globs abort, clean up with find. Workdir: /mnt/d/tmp/backseat-roto.
+/mnt/d/tools/blender/blender.exe -b -P 'D:/tmp/backseat-roto/rig_walk.py' -- \
+  --out 'D:/tmp/backseat-roto/frames' --res 1024
+```
+
+Output: `walk-<dir>-<n>.png`, 5 dirs × 8 frames, RGBA-transparent, one fixed
+orthographic camera (slight-high game angle, elevation 14°) so framing/scale
+are identical across every frame and direction. e/ne face RIGHT per the pack
+facing convention (west is engine-mirrored, never drawn).
+
+### Stage 2 — AI tracer (`trace.py`)
+
+Each frame goes through ComfyUI **img2img at denoise 0.35** with the
+character's curated s-idle as IPAdapter anchor (per-direction weights from
+§4.5), same seed for all 40 frames. Model: SDXL + pixel-art LoRA by default;
+the shipped vine-ranger cycle was traced on the documented low-VRAM fallback
+(`CKPT=dreamshaper_8.safetensors LORA= SIZE=512`) because resident VLM models
+had squeezed the shared GPU into offload mode (5 s vs 200 s per frame) — at
+48 px after k-centroid + palette lock the two paths were indistinguishable in
+an A/B pilot (`e-0`/`s-0`, seed 414977). The 3D render pins pose and
+composition; diffusion only re-develops the surface into pack pixel art.
+Then, instead of per-frame rembg (alpha flicker) the traced RGB is masked by
+the **Blender frame's own alpha**, and every frame is downscaled through
+**one fixed crop window** (union bbox of all 40 Blender frames) —
+k-centroid + locked palette — so scale and feet anchoring never pump between
+frames. Results land as `public/themes/swampspace/chars/<char>-<dir>-walk-<n>.png`.
+
+Shared-GPU manners: the tracer is fire-and-forget and resumable — it submits
+in waves of ≤8, polls history, harvests finished frames even if a previous
+client was killed, and skips frames already traced. `--no-trace` skips the AI
+entirely and ships palette-quantized 3D frames (the coherence-safe fallback);
+`--post-only` redoes the downscale from cached traces. `DENOISE=`/`SEED=` to
+re-tune.
+
+### Stage 3 — gate (`gate.py`) and manifest
+
+`gate.py` (exit code = failures): deterministic checks (48×48, hard alpha,
+every pixel in the locked palette, feet on the bottom rows, no content-height
+pumping across the cycle), a coherence metric (fraction of changed pixels
+between adjacent frames — a spike over 3× the direction's median is tracing
+flicker), and the qwen3-vl gates (facing per frame, same-character contract
+between the two contact poses). `manifest.py` then emits the
+`char.<arch>.<dir>-walk-0..7` clips plus `anim.walk` cadence (4 ticks/frame:
+8-frame stride ≈ 1.07 s; the engine-default 6 was tuned for the 2-frame flip).
+Legacy `idle`/`step` keys stay as the fallback for states/directions without
+clips (docs/themes.md "Animation states").
+
+In-game proof: `bash e2e/run-roto-walk.sh` (port 4993) records the ranger
+walking the full 8-direction compass circle on the new cycles.
+
+## 7. Worked example: add a new NPC to an existing theme
 
 Goal: a "marsh-witch" NPC for swampspace, mapped to the `civilian` archetype.
 

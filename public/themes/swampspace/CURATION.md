@@ -86,3 +86,51 @@ like costume changes against their idles in the walk cycle.
 
 Contact sheets: `docs/assets/swampspace/{pack,tiles,chars,props,items,fx}.png`;
 in-game capture: `docs/assets/swampspace/ingame-swampspace.png`.
+
+## Floor/street macro redesign (fix/floor-tile-structure)
+
+The original interior floors shipped as uniform bright-green speckle over dark
+plates ("confetti moss") and the bog repeated identical ripple dash clusters.
+Both surfaces were rebuilt by `scripts/assets/tilesets_floor.py`:
+
+- `tile.floor` (8 variants) = two 64px (2×2-tile) macro plates sliced
+  row-major, declared via manifest `macroTiles.floor: 2`. Lineage: procedural
+  macro (fixed seeds 7000/7001) → SD1.5 img2img (dreamshaper_8, 512px,
+  denoise 0.3, seeds 90210/90223, seamless offset+heal) → k-centroid 64 →
+  heal to the close-valued FLOOR_FAMILY ramp → `restamp_floor` re-asserts
+  seams/rivets/buckled-plate roots. (Denoise 0.4 washed the plates — rejected.)
+- `tile.street` (12 variants) = three procedural 64px macros (seeds 8000-8002;
+  ring / drift / calm — the big ripple bloom lands on ~1/3 of cells). The SD
+  pass was A/B'd and REJECTED for streets: it broke ring containment at macro
+  borders and brightened the calm water.
+- `tile.floor.overlay` (4 RGBA decals, seeds 9500+37n) — context-placed moss
+  (wall bases / corners / door thresholds / plate seams) via
+  `src/render/tileSelect.ts planTileOverlays`; art is procedural (clumps with
+  dark MOSS_DEEP rims, mass biased to the tile's top edge).
+- `floor-accent-{0,1}` rebased onto the plate deck (seeds 9000/9100);
+  `street-accent-2` is a new lily/scum feature tile (seed 8500).
+- Whole-screen judgement shots (seed 11, zoom 0.5/1/2):
+  `~/Videos/backseat/floor-redesign-*.png`.
+
+## Rotoscoped walk cycles (feat/rotoscoped-walk)
+
+`char.player.<dir>-walk-0..7` — 40 frames, `chars/vine-ranger-<dir>-walk-<n>.png`,
+built by `scripts/assets/rotoscope/` (docs/sprite-generation.md §6):
+
+- Motion source: fully procedural Blender proxy (`rig_walk.py`, no external
+  rig/mesh — license-clean by construction), 4-keypose 8-frame stride with
+  FK-grounded feet, rendered headless on `soul` (Blender 5.0.1, EEVEE,
+  1024px, ortho elev 14°), 5 dirs; e/ne face right (west engine-mirrored).
+- Trace: ComfyUI img2img denoise 0.35, seed 414977 for all 40 frames,
+  IPAdapter anchor `anchors/vine-ranger-s-idle.png` (weights s .8 / se .7 /
+  e .55 / ne .5 / n .5), SD1.5 low-VRAM path (dreamshaper_8 @512 — A/B'd
+  indistinguishable from SDXL at 48px after palette lock; run tag `sd15a`).
+- Post: Blender-alpha masking (no per-frame rembg flicker), one fixed crop
+  window for all 40 frames (no scale pumping), cap-region signature-color
+  rescue, k-centroid -> 34-color palette -> 48px, temporal mode-smoothing.
+- Gates (`gate.py`): palette/alpha/feet determinism + adjacent-frame
+  coherence (deltas at/below the pure-3D control floor) + palette-histogram
+  flicker + qwen3-vl facing & same-character contracts.
+- Film strips: `docs/assets/swampspace/rotoscope-walk-<dir>.png`; in-game
+  proof `~/Videos/backseat/roto-walk-swampspace.mp4` (before:
+  `roto-walk-before-2frame.mp4`). Manifest cadence `anim.walk: 4`.

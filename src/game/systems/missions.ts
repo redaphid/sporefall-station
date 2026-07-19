@@ -17,7 +17,10 @@ const spawnDoors = (w: World): void => {
     for (const d of b.doors) {
       const e = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
       const isMissionBuilding = i === w.mission.targetBuilding
-      // Locks harden with depth: floor 1-2 pickable by Thief passive, floor 3+ needs a channel
+      // Locks harden with depth: the lock level sets the pick-channel LENGTH
+      // (see interaction.pickTicks) — L1 on floors 1-2, L2 from floor 3. Every
+      // level is pickable by the default player; grenades breach as the loud
+      // alternative (combat.detonate), so mission doors never dead-end a run.
       const lockLevel = isMissionBuilding ? Math.min(2, 1 + Math.floor((w.floor - 1) / 2)) : 0
       e.door = { open: false, locked: isMissionBuilding, lockLevel }
       e.interact = { verb: 'open', range: 1.3 }

@@ -60,6 +60,14 @@ PALETTE_SECTION = {
     },
 }
 
+# Animation states emitted as frame clips when their files exist
+# (walk cycles come from the rotoscope pipeline; more states as art lands).
+ANIM_STATES = ("walk", "attack", "hurt", "roll", "death")
+# Cadence: 8-frame rotoscoped walk at 4 ticks/frame = 32 ticks (~1.07 s) per
+# stride — the engine default of 6 was tuned for the 2-frame legacy cycle and
+# reads sluggish over 8 frames.
+ANIM_SECTION = {"walk": 4}
+
 CHAR_FILES = {arch: kind for arch, (kind, *_rest) in G.CHARS.items()}
 CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
                    if t in CHAR_FILES and arch in ("gangster",)})
@@ -89,8 +97,23 @@ def build():
         else:
             print(f"  (missing, key omitted: {key} -> {rel})", file=sys.stderr)
 
-    put("tile.floor", "tiles/deck-moss.png")
-    put("tile.wall", "tiles/root-bulkhead.png")
+    # Tile pools: every tiles/<name>-N.png run (variants), tiles/<name>-accent-N.png
+    # (rare accents) and tiles/<name>-overlay-N.png (context-placed RGBA decals —
+    # see docs/themes.md "tile.<name>.overlay" and tileSelect.planTileOverlays).
+    def put_pool(key, pattern):
+        rels = []
+        n = 0
+        while exists(pattern.format(n)):
+            rels.append(pattern.format(n))
+            n += 1
+        if rels:
+            sprites[key] = rels
+        return len(rels)
+
+    for tile_name in ("street", "sidewalk", "floor", "wall", "grass", "exit"):
+        put_pool(f"tile.{tile_name}", f"tiles/{tile_name}-{{}}.png")
+        put_pool(f"tile.{tile_name}.accent", f"tiles/{tile_name}-accent-{{}}.png")
+        put_pool(f"tile.{tile_name}.overlay", f"tiles/{tile_name}-overlay-{{}}.png")
     # Character keys resolve *per key* against the theme chain, so any key we
     # omit falls back to CITY's art — a spore-drone cop facing south would turn
     # into a human cop when walking east. Mention every direction key
@@ -109,6 +132,17 @@ def build():
                     sprites[f"char.{arch}.{d}-{frame}"] = rel
                 else:
                     print(f"  (no art at all: char.{arch}.{d}-{frame})", file=sys.stderr)
+            # Animation-state clips (char.<arch>.<dir>-<state>-<n>, n contiguous
+            # from 0 — docs/themes.md "Animation states"). Emitted per actually-
+            # present file; the rotoscope pipeline (scripts/assets/rotoscope/)
+            # produces 8-frame walk cycles. Legacy idle/step keys above remain
+            # as the fallback for directions/states without clips.
+            for state in ANIM_STATES:
+                for n in range(8):
+                    rel = f"chars/{kind}-{d}-{state}-{n}.png"
+                    if not exists(rel):
+                        break  # frames must be contiguous from 0
+                    sprites[f"char.{arch}.{d}-{state}-{n}"] = rel
     put("prop.default", "props/cargo-pod.png")
     for eng, ours in PROP_KEYS.items():
         put(f"prop.{eng}", f"props/{ours}.png")
@@ -135,6 +169,12 @@ def build():
         "palette": PALETTE_SECTION,
         "names": NAMES,
         "sprites": sprites,
+        "anim": ANIM_SECTION,
+        # floor + street pools are sliced from 2x2-tile macro images
+        # (tilesets_floor.py); the renderer places slices by position so plate
+        # seams / ripple rings span tiles (docs/themes.md "macroTiles").
+        "macroTiles": {name: 2 for name in ("floor", "street")
+                       if len(sprites.get(f"tile.{name}", [])) >= 4},
     }
     out = os.path.join(THEME, "manifest.json")
     json.dump(manifest, open(out, "w"), indent=2)

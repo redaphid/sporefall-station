@@ -99,6 +99,18 @@ const MOVE_EPS = 0.05
 export const isMoving = (vx: number, vy: number, threshold = MOVE_EPS): boolean =>
   Math.hypot(vx, vy) > threshold
 
+/** Locomotion signal for the animation state machine. The sim's `vel` carries
+ * only impulses (knockback) — input/AI locomotion integrates straight into
+ * `pos` (movement.ts), so `isMoving(vel)` misses ordinary walking entirely and
+ * the walk state (clips, step flip, procedural gait) never triggered from
+ * normal movement. The truthful render-side signal is the per-tick
+ * displacement `pos - prevPos`, which covers input walking, AI steering and
+ * knockback slides alike. `dt` is the sim tick length in seconds. */
+export const entityMoving = (
+  e: { pos: { x: number; y: number }; prevPos: { x: number; y: number } },
+  dt: number,
+): boolean => isMoving((e.pos.x - e.prevPos.x) / dt, (e.pos.y - e.prevPos.y) / dt)
+
 /** Vertical bob for a walking character, in pixels. Zero at t=0, |bob| <= 1.5. */
 export const walkBob = (t: number): number => Math.sin(t * 0.9) * 1.5
 

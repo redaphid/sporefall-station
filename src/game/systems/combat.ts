@@ -4,7 +4,7 @@ import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
-import { addEntity, type World } from '../world'
+import { addEntity, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
@@ -65,6 +65,13 @@ export const applyDamage = (
   target.vel.x += (dx / len) * knockback
   target.vel.y += (dy / len) * knockback
   w.events.push({ type: 'hit', x: target.pos.x, y: target.pos.y, targetId: target.id, amount })
+
+  // A landed blow breaks a lockpick channel — the one non-movement interrupt.
+  // Only LANDED blows: iframes/roll/downed early-outs above never reach here.
+  if (target.playerCtl?.channel) {
+    w.events.push({ type: 'pickCancel', entityId: target.playerCtl.channel.targetId, byId: target.id, reason: 'hurt' })
+    target.playerCtl.channel = undefined
+  }
 
   // Civilians panic when hurt; bouncers take it personally
   if (target.ai) {
@@ -214,10 +221,25 @@ export const spawnProjectile = (
  * projectile system can import it without a cycle back through applyDamage. */
 export const detonate = (w: World, x: number, y: number, radius: number, damage: number, ownerId: EntityId): void => {
   w.events.push({ type: 'explosion', x, y, radius })
+  // Explosions are LOUD: every NPC in earshot comes to investigate the boom —
+  // the price of the fast door-breach path below (vs the slow, quiet pick).
+  emitNoise(w, x, y)
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
     const dist = Math.hypot(other.pos.x - x, other.pos.y - y)
     if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
+  }
+  // Breach: a blast centred close enough blows a door open, locked or not —
+  // the always-available alternative to picking (the player special IS a
+  // grenade), so a mission door can never dead-end a run. Centre distance on
+  // purpose (no door-radius bonus): a charge must be placed AT the door, so
+  // one grenade can't take both bunker airlock doors (2 tiles apart) at once.
+  for (const d of w.entities) {
+    if (d.dead || !d.door || d.door.open) continue
+    if (Math.hypot(d.pos.x - x, d.pos.y - y) > radius) continue
+    d.door.locked = false
+    d.door.open = true
+    w.events.push({ type: 'doorBreach', entityId: d.id, x: d.pos.x, y: d.pos.y })
   }
 }
 

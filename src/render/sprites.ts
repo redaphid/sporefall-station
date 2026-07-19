@@ -1,7 +1,8 @@
 import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
-import { burnPulse, charFootPx, cycleFrame, depthKey, facingDir, isMoving } from './anim'
+import { SIM_DT } from '../game/types'
+import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
   effectiveClips,
@@ -222,8 +223,9 @@ export class EntityViews {
       // composed from their weapon-mod provenance. Grenades/thrown items keep
       // their entity sprite here.
       if (e.kind === 'projectile' && e.archetype === 'projectile') continue
-      // Doors render differently open vs closed; treat state as part of identity.
-      const artKey = e.door ? (e.door.open ? 'door.open' : 'door') : e.archetype
+      // Doors render differently open vs closed vs LOCKED (padlock art) —
+      // treat state as part of identity so unlocking swaps the sprite.
+      const artKey = e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype
       let view = this.views.get(e.id)
       if (!view || view.archetype !== artKey) {
         if (view) {
@@ -260,7 +262,7 @@ export class EntityViews {
       view.prevCooldown = cd
 
       const character = this.art.isCharacterSprite(artKey)
-      const moving = isMoving(e.vel.x, e.vel.y)
+      const moving = entityMoving(e, SIM_DT)
       const roll = e.playerCtl?.roll
       const rolling = roll !== undefined && tick < roll.untilTick
 

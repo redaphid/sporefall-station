@@ -119,3 +119,43 @@ describe('Camera zoom target + smoothing', () => {
     expect(c.zoom).toBe(mid)
   })
 })
+
+describe('soft edge clamp (corner-spawn framing)', () => {
+  // A player standing in the map's NW corner must NOT be pinned to the screen
+  // corner under the HUD stack: the clamp allows OVERSCAN_FRAC of the half-view
+  // past the level edge, so the corner sits well inside the frame.
+  const recWorld = () => {
+    const w = {
+      pos: { x: 0, y: 0 },
+      scale: { x: 1, set(v: number) { this.x = v } },
+      position: { set(x: number, y: number) { w.pos.x = x; w.pos.y = y } },
+    }
+    return w
+  }
+
+  it('frames a corner player OVERSCAN_FRAC of the half-view inside the screen', () => {
+    const c = new Camera()
+    c.snapTo(1.5, 1.5) // world corner (tiles)
+    const w = recWorld()
+    c.update(1 / 60)
+    c.apply(w as never, SCREEN.w, SCREEN.h, LEVEL.w, LEVEL.h)
+    const T = 32 // TILE_PX at zoom 1
+    const playerScreenX = w.pos.x + 1.5 * T
+    const playerScreenY = w.pos.y + 1.5 * T
+    // Hard clamp would put the player 48px from the corner; the soft clamp
+    // must pull it in by OVERSCAN_FRAC * halfView (= 160px at 800x600).
+    expect(playerScreenX).toBe(48 + (SCREEN.w / 2) * Camera.OVERSCAN_FRAC)
+    expect(playerScreenY).toBe(48 + (SCREEN.h / 2) * Camera.OVERSCAN_FRAC)
+  })
+
+  it('mid-map framing is unchanged: no overscan bias away from the player', () => {
+    const c = new Camera()
+    c.snapTo(200, 200) // deep inside the 400x400 level
+    const w = recWorld()
+    c.update(1 / 60)
+    c.apply(w as never, SCREEN.w, SCREEN.h, LEVEL.w, LEVEL.h)
+    const T = 32
+    expect(w.pos.x + 200 * T).toBe(SCREEN.w / 2) // player dead-centre
+    expect(w.pos.y + 200 * T).toBe(SCREEN.h / 2)
+  })
+})

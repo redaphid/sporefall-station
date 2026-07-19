@@ -75,12 +75,15 @@ still loadable by id without an index entry).
   },
 
   "sprites": {                   // sprite key → file path. Paths are relative
-    "tile.floor": "tiles/floor.png",        //   to this theme's folder, or
-    "tile.wall": "/sprites/brick-wall.png", //   app-root-relative with a
-    "fx.flame": ["fx/flame-1.png", "fx/flame-2.png"], // leading "/". fx.* keys
-    "item.default": null         //   take ARRAYS (animation frames). `null`
-  },                             //   means "force the built-in procedural art"
-                                 //   (blocks fallback to the default theme).
+    "tile.floor": ["tiles/floor-0.png", "tiles/floor-1.png"], // to this theme's
+    "tile.wall": "/sprites/brick-wall.png", //   folder, or app-root-relative
+    "tile.grass.accent": ["tiles/roots.png"], //  with a leading "/". fx.* keys
+    "fx.flame": ["fx/flame-1.png", "fx/flame-2.png"], // take ARRAYS (animation
+    "item.default": null         //   frames); tile.* keys take arrays too
+  },                             //   (coord-hash VARIANTS + rare accents).
+                                 //   `null` means "force the built-in
+                                 //   procedural art" (blocks fallback to the
+                                 //   default theme).
 
   "anim": {                      // OPTIONAL per-state animation cadence, in sim
     "walk": 6,                   //   TICKS PER FRAME (30 ticks = 1s). Integers
@@ -102,8 +105,8 @@ the console and in `validateManifest` unit tests.
 
 | Key | What / notes |
 |---|---|
-| `tile.floor` | interior floor tile (drawn in a grid, should tile seamlessly) |
-| `tile.wall` | wall tile (tiles seamlessly) |
+| `tile.<name>` | ground/wall tile art, `<name>` ∈ `street sidewalk floor wall grass exit`. A single path OR an **array of variant paths** — the tilemap alternates variants by a deterministic per-coordinate hash, so big surfaces read as texture instead of one repeated stamp (same seed → same ground on every device). Should tile seamlessly. The wall's first variant is also clipped onto the bevelled corner-cut tiles. |
+| `tile.<name>.accent` | OPTIONAL rare-detail pool for that surface (root cluster, vent grate, glowing spore patch…). One accent replaces the base variant on ~1/17 tiles, picked on the same coordinate hash. Array or single path. |
 | `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player cop thug civilian scientist gangster robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
 | `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
 | `unit.player`, `unit.cop` | single-sprite billboard fallback (no directions) |

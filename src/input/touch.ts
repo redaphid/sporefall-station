@@ -238,18 +238,20 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     const bottom = 92 + row * PITCH
     const b = document.createElement('div')
     b.textContent = label
+    // Ghost buttons: visible enough to find with a thumb, dim enough that the
+    // world stays the subject (they brighten on press for feedback).
     b.style.cssText =
       `position:absolute;right:${right}px;bottom:${bottom}px;width:${BTN}px;height:${BTN}px;border-radius:50%;` +
-      'background:#ffffff1c;border:2px solid #ffffff38;color:#fff;display:flex;align-items:center;' +
-      `justify-content:center;font:700 12px system-ui;pointer-events:auto;touch-action:none;` +
+      'background:#ffffff10;border:1px solid #ffffff2a;color:#ffffffb8;display:flex;align-items:center;' +
+      `justify-content:center;font:600 12px system-ui;pointer-events:auto;touch-action:none;` +
       'user-select:none;-webkit-user-select:none'
     b.addEventListener('pointerdown', (ev) => {
       ev.preventDefault()
-      b.style.background = '#ffffff40'
+      b.style.background = '#ffffff38'
       onDown()
     })
     const up = (): void => {
-      b.style.background = '#ffffff1c'
+      b.style.background = '#ffffff10'
     }
     b.addEventListener('pointerup', up)
     b.addEventListener('pointercancel', up)
@@ -290,14 +292,17 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     for (const slot of slots) {
       const el = document.createElement('div')
       el.textContent = `${slot.label} ${slot.qty}`
+      // Quiet chrome: the WORLD is the subject. The active slot is a dark
+      // translucent pill with a gold edge/text — an accent, not a gold slab
+      // brighter than anything in the scene.
       el.style.cssText =
-        `padding:6px 10px;border-radius:6px;font:700 13px system-ui;pointer-events:auto;touch-action:none;` +
-        'user-select:none;-webkit-user-select:none;border:2px solid ' +
-        (slot.active ? '#d4af37' : '#ffffff38') +
+        `padding:4px 9px;border-radius:6px;font:600 12px system-ui;pointer-events:auto;touch-action:none;` +
+        'user-select:none;-webkit-user-select:none;border:1px solid ' +
+        (slot.active ? '#d4af3799' : '#ffffff24') +
         ';background:' +
-        (slot.active ? '#d4af37cc' : '#000000aa') +
+        (slot.active ? '#151009c0' : '#00000080') +
         ';color:' +
-        (slot.active ? '#111' : '#eee')
+        (slot.active ? '#e8c96a' : '#cfcfcf')
       // Equip the tapped slot's REAL inventory index (display order skips the
       // briefcase, so never send the strip position).
       el.addEventListener('pointerdown', (ev) => {

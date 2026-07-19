@@ -47,6 +47,12 @@ export interface Building {
   poi?: BuildingPoi
   /** Compound pit (open ground) — populate routes patrol beats around it. */
   courtyard?: Rect
+  /** The room a mission objective (briefcase / boss) belongs in — designated
+   * EXPLICITLY by the generator that carved the building (bunker core, vault,
+   * loop core, …). This is the contract missions.ts places targets by; never
+   * infer it from `rooms` array order. Not part of tiles/solid, so it is
+   * levelChecksum- and wire-invisible (levels regenerate from seed+floor). */
+  objectiveRoom?: Rect
 }
 
 /** A floor's district flavour — drives density, footprints and role palette. */

@@ -203,6 +203,7 @@ describe('shatter — frozen bodies gib on impact', () => {
 
   it('a FROZEN PLAYER shattering DOWNS them without gib-vanishing: no shattered flag, no ice-gib event, still in the snapshot', () => {
     const p = spawnPlayer(w, 0, 20, 20)
+    p.health!.iframes = 0 // shed spawn grace: this tests the frozen-shatter path
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)
     expect(p.shattered).toBeFalsy() // NOT gibbed — stays a visible body
@@ -214,6 +215,7 @@ describe('shatter — frozen bodies gib on impact', () => {
 
   it('a frozen player who is OUT OF LIVES shatters straight to a real death (still no gib flag)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
+    p.health!.iframes = 0 // shed spawn grace: this tests the frozen-shatter path
     w.revivesLeft = 0
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)

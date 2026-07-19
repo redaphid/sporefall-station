@@ -64,6 +64,9 @@ export const hapticForEvent = (ev: SimEvent, self?: HapticSelf): HapticCmd | nul
     case 'roll':
       // Only my own roll buzzes — a light tap on the dodge's kick-off.
       return self != null && ev.entityId === self.id ? { key: 'roll', style: 'light' } : null
+    case 'burnDoused':
+      // Smothering your own burn earns a firmer confirmation than the roll's tap.
+      return self != null && ev.entityId === self.id ? { key: 'burnDoused', style: 'medium', vibrateMs: 35 } : null
     default:
       return null
   }

@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { PLAYER_HP, PLAYER_MELEE_MULT, PLAYER_SPEED, spawnPlayer } from './player'
-import { makeEntity, type Entity } from './entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { addEntity, createWorld, tickWorld, type World } from './world'
 import { emptyInput, type InputCmd } from './types'
 import { serializeWorld, deserializeWorld } from './serialize'
@@ -42,7 +42,9 @@ describe('spawnPlayer — the starter weapon is a proper slotted ItemStack', () 
   it('every player spawns with the same defaults: hp, speed, pistol, ready special', () => {
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 20, 20)
-    expect(p.health).toEqual({ hp: PLAYER_HP, max: PLAYER_HP, iframes: 0 })
+    // Fresh spawns carry spawn-grace iframes (see SPAWN_GRACE_TICKS) so a
+    // hostile parked on the spawn tile can't delete them before input matters.
+    expect(p.health).toEqual({ hp: PLAYER_HP, max: PLAYER_HP, iframes: SPAWN_GRACE_TICKS })
     expect(p.speed).toBe(PLAYER_SPEED)
     expect(p.combat!.weapon).toBe('pistol')
     expect(p.playerCtl!.abilityCooldown).toBe(0)

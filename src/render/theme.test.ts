@@ -65,10 +65,24 @@ describe('validateManifest', () => {
     expect(manifest.sprites.projectile).toEqual(['p.png'])
   })
 
-  it('rejects a frame array on a non-fx key', () => {
-    const { manifest, warnings } = validateManifest({ sprites: { 'tile.floor': ['a.png', 'b.png'] } })
-    expect(manifest.sprites['tile.floor']).toBeUndefined()
+  it('rejects a frame array on a key that is neither fx.* nor tile.*', () => {
+    const { manifest, warnings } = validateManifest({ sprites: { 'unit.player': ['a.png', 'b.png'] } })
+    expect(manifest.sprites['unit.player']).toBeUndefined()
     expect(warnings.join('\n')).toContain('fx.*')
+  })
+
+  it('accepts variant arrays on tile.* keys (and accent pools)', () => {
+    const { manifest, warnings } = validateManifest({
+      sprites: {
+        'tile.floor': ['a.png', 'b.png'],
+        'tile.grass.accent': ['roots.png', 'spores.png'],
+        'tile.street': 's.png', // single path still coerces to a 1-variant pool
+      },
+    })
+    expect(warnings).toEqual([])
+    expect(manifest.sprites['tile.floor']).toEqual(['a.png', 'b.png'])
+    expect(manifest.sprites['tile.grass.accent']).toEqual(['roots.png', 'spores.png'])
+    expect(manifest.sprites['tile.street']).toEqual(['s.png'])
   })
 
   it('keeps null as an explicit procedural opt-out', () => {

@@ -122,6 +122,8 @@ export interface Entity {
   facing: number // radians
 
   health?: { hp: number; max: number; iframes: number }
+  // (Spawn-protection grace for players rides `health.iframes` — see
+  // SPAWN_GRACE_TICKS below — so every damage source already honors it.)
   combat?: { weapon: string; cooldown: number }
   ai?: AiState
   playerCtl?: {
@@ -197,6 +199,14 @@ export interface Entity {
    * selected entities with a normal `entities`/`get` query (filter on this flag). */
   selected?: boolean
 }
+
+/** Spawn-protection grace, in ticks (~3s at 30tps), granted to players when they
+ * spawn or land on a new floor. Rides `health.iframes`, which applyDamage checks
+ * before any hit, so melee, bullets, explosions and DOT hits all respect it. It
+ * decays via the normal status-system countdown; a fresh spawn can act freely
+ * (grace is invulnerability, not a stun). Lives here — the one leaf module both
+ * `player.ts` and `systems/missions.ts` can import without a cycle. */
+export const SPAWN_GRACE_TICKS = 90
 
 /** Bare entity with no id — World.addEntity assigns ids so worlds stay self-contained. */
 export const makeEntity = (

@@ -1,5 +1,6 @@
 import type { Container } from 'pixi.js'
 import { TILE_PX } from './art'
+import { appliedCenter, OVERSCAN_FRAC } from './cameraModel'
 import { decayShake, stackShake } from './juice'
 import { anchoredCenter, clampZoom, smoothZoom, ZOOM_DEFAULT } from './zoomModel'
 
@@ -9,6 +10,9 @@ const FOLLOW_HOLD_S = 0.3
 
 /** Camera in world (tile) coordinates, applied as a container translation. */
 export class Camera {
+  /** Fraction of the half-view allowed past a level edge (see cameraModel.ts). */
+  static readonly OVERSCAN_FRAC = OVERSCAN_FRAC
+
   x = 0
   y = 0
   /** View-only magnification (1 = native). Scales the world container; the sim
@@ -106,11 +110,9 @@ export class Camera {
     }
     const T = TILE_PX * this.zoom
     if (world.scale.x !== this.zoom) world.scale.set(this.zoom)
-    const halfW = screenW / 2 / T
-    const halfH = screenH / 2 / T
-    // Clamp so we don't show past level edges (unless level smaller than view)
-    const cx = levelW * T > screenW ? Math.min(Math.max(this.x, halfW), levelW - halfW) : levelW / 2
-    const cy = levelH * T > screenH ? Math.min(Math.max(this.y, halfH), levelH - halfH) : levelH / 2
+    // Soft edge clamp — the SHARED definition (cameraModel.appliedCenter), also
+    // used by every DOM-overlay projection, so markers always match the render.
+    const { x: cx, y: cy } = appliedCenter(this.x, this.y, T, screenW, screenH, levelW, levelH)
     this.appliedX = cx
     this.appliedY = cy
     world.position.set(

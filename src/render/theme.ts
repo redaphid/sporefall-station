@@ -53,8 +53,24 @@ const UNIT_WALKERS = ['thug', 'scientist', 'robot'] as const
 /** Keys whose value is an animation-frame ARRAY (everything else is a single path). */
 export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.explosion', 'fx.pickup', 'fx.blood'])
 
+/** Tile names addressable from palette.tiles and tile.* sprite keys (mirrors the
+ * Tile enum by name — the render layer maps them back to ids; the pure layer
+ * stays game-free). */
+export const TILE_NAMES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit'] as const
+
+/** tile.* sprite keys accept a single path OR an array: the array's entries are
+ * VARIANTS the tilemap alternates deterministically by tile coordinate, so big
+ * surfaces read as texture instead of one repeated stamp. `tile.<name>.accent`
+ * is an optional rare-detail pool (root clusters, grates, spore patches…)
+ * sprinkled at low frequency on the same hash. */
+const isTileKey = (k: string): boolean => k.startsWith('tile.')
+
 const buildSpriteKeys = (): Set<string> => {
-  const keys = new Set<string>(['tile.floor', 'tile.wall', 'item.default', 'prop.default', 'projectile', 'grenade'])
+  const keys = new Set<string>(['item.default', 'prop.default', 'projectile', 'grenade'])
+  for (const t of TILE_NAMES) {
+    keys.add(`tile.${t}`)
+    keys.add(`tile.${t}.accent`)
+  }
   for (const c of CHAR_NAMES) for (const d of DIRS5) for (const f of ['idle', 'step']) keys.add(`char.${c}.${d}-${f}`)
   // Animation-state frames (docs/themes.md "Animation states"):
   // char.<kind>.<dir>-<state>-<n>, n contiguous from 0.
@@ -72,10 +88,6 @@ const buildSpriteKeys = (): Set<string> => {
 
 /** Every sprite key the engine will ever look up. */
 export const SPRITE_KEYS: ReadonlySet<string> = buildSpriteKeys()
-
-/** Tile names addressable from palette.tiles (mirrors the Tile enum by name —
- * the render layer maps them back to ids; the pure layer stays game-free). */
-export const TILE_NAMES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit'] as const
 
 // ---------------------------------------------------------------------------
 // Manifest shape (post-validation: everything normalized + safe).
@@ -226,8 +238,8 @@ const validateSprites = (raw: unknown, warn: (w: string) => void): ThemeManifest
       continue
     }
     const paths = Array.isArray(v) ? v : [v]
-    if (!FX_KEYS.has(k) && Array.isArray(v)) {
-      warn(`sprites.${k}: frame arrays are only valid for fx.* keys`)
+    if (!FX_KEYS.has(k) && !isTileKey(k) && Array.isArray(v)) {
+      warn(`sprites.${k}: arrays are only valid for fx.* (frames) and tile.* (variants) keys`)
       continue
     }
     const bad = paths.find((p) => !isSafePath(p))

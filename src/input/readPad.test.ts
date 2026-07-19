@@ -22,6 +22,16 @@ const fakePad = (
  * value = state * (2/7) - 1  →  states 0-7 are directions, 15 is "no direction". */
 const hatValue = (state: number) => state * (2 / 7) - 1
 
+/** Expected stick output after the RADIAL deadzone + rescale: magnitude ramps
+ * from 0 at the 0.28 rim to 1 at full tilt, direction preserved, clamped at 1.
+ * Computed independently of the implementation. */
+const dz = (x: number, y = 0) => {
+  const mag = Math.hypot(x, y)
+  if (mag < 0.28) return { x: 0, y: 0 }
+  const k = Math.min(1, (mag - 0.28) / (1 - 0.28)) / mag
+  return { x: x * k, y: y * k }
+}
+
 const std = padProfile(fakePad({ mapping: 'standard' }))
 
 describe('readPad', () => {
@@ -31,9 +41,27 @@ describe('readPad', () => {
       expect(s.moveX).toBe(0)
       expect(s.moveY).toBe(0)
     })
-    it('passes through a real push past the deadzone', () => {
+    it('rescales a real push past the deadzone (radial: 0 at the rim, 1 at full tilt)', () => {
       const s = readPad(fakePad({ axes: [0.9, 0] }), std)
-      expect(s.moveX).toBeCloseTo(0.9)
+      expect(s.moveX).toBeCloseTo(dz(0.9).x, 5)
+    })
+    it('ramps smoothly from the deadzone rim instead of snapping to 0.28', () => {
+      const s = readPad(fakePad({ axes: [0.29, 0] }), std)
+      expect(s.moveX).toBeGreaterThan(0)
+      expect(s.moveX).toBeLessThan(0.03)
+    })
+    it('keeps the pushed direction on a near-vertical diagonal (no axis snapping)', () => {
+      const s = readPad(fakePad({ axes: [0.15, -0.9] }), std)
+      expect(s.moveX).toBeGreaterThan(0) // per-axis clipping would zero this
+      expect(s.moveY / s.moveX).toBeCloseTo(-0.9 / 0.15, 5) // direction preserved
+    })
+    it('reaches exactly full speed at full tilt', () => {
+      const s = readPad(fakePad({ axes: [1, 0] }), std)
+      expect(s.moveX).toBeCloseTo(1, 5)
+    })
+    it('clamps an out-of-spec axis (>1) to magnitude 1', () => {
+      const s = readPad(fakePad({ axes: [1.6, 0] }), std)
+      expect(s.moveX).toBeCloseTo(1, 5)
     })
   })
 
@@ -112,7 +140,7 @@ describe('readPad', () => {
     it('respects the stick when the hat axis is absent entirely', () => {
       const s = readPad(fakePad({ axisCount: 4, axes: [0, -0.9] }), gen)
       expect(s.moveX).toBe(0)
-      expect(s.moveY).toBeCloseTo(-0.9)
+      expect(s.moveY).toBeCloseTo(dz(-0.9).x, 5)
     })
 
     // 0 decodes to state 3.5 -- exactly between two directions, so it is not a
@@ -127,14 +155,14 @@ describe('readPad', () => {
 
     it('respects the stick when the hat axis reads exactly 0', () => {
       const s = readPad(fakePad({ axes: [0, -0.9, 0, 0, 0, 0, 0, 0, 0, 0] }), zero2)
-      expect(s.moveY).toBeCloseTo(-0.9)
+      expect(s.moveY).toBeCloseTo(dz(-0.9).x, 5)
     })
 
     it('respects the stick when the hat axis rests at 3.2857', () => {
       const axes: number[] = [0, -0.9]
       axes[9] = 3.2857
       const s = readPad(fakePad({ axes }), zero2)
-      expect(s.moveY).toBeCloseTo(-0.9)
+      expect(s.moveY).toBeCloseTo(dz(-0.9).x, 5)
     })
 
     it.each([-0.3, 0.3, 0.05, -0.9, 0.62, 2, -1.4, 100, -100])(
@@ -197,14 +225,14 @@ describe('readPad', () => {
       const axes: number[] = [-0.9]
       axes[9] = hatValue(2) // hat says right, stick says hard left
       const s = readPad(fakePad({ axes }), zero2)
-      expect(s.moveX).toBeCloseTo(-0.9)
+      expect(s.moveX).toBeCloseTo(dz(-0.9).x, 5)
     })
 
     it('fills only the axis the stick leaves centred when the hat is diagonal', () => {
       const axes: number[] = [-0.9, 0]
       axes[9] = hatValue(3) // hat says down-right: (1, 1)
       const s = readPad(fakePad({ axes }), zero2)
-      expect(s.moveX).toBeCloseTo(-0.9) // stick keeps X
+      expect(s.moveX).toBeCloseTo(dz(-0.9).x, 5) // stick keeps X
       expect(s.moveY).toBe(1) // hat fills Y
     })
 
@@ -232,16 +260,16 @@ describe('readPad', () => {
     })
 
     it('lets the player walk up', () => {
-      expect(readPad(pad([0, -0.9, 0, 0]), prof).moveY).toBeCloseTo(-0.9)
+      expect(readPad(pad([0, -0.9, 0, 0]), prof).moveY).toBeCloseTo(dz(-0.9).x, 5)
     })
 
     it('lets the player walk down deliberately', () => {
-      expect(readPad(pad([0, 0.9, 0, 0]), prof).moveY).toBeCloseTo(0.9)
+      expect(readPad(pad([0, 0.9, 0, 0]), prof).moveY).toBeCloseTo(dz(0.9).x, 5)
     })
 
     it('lets the player walk left and right', () => {
-      expect(readPad(pad([-0.9, 0, 0, 0]), prof).moveX).toBeCloseTo(-0.9)
-      expect(readPad(pad([0.9, 0, 0, 0]), prof).moveX).toBeCloseTo(0.9)
+      expect(readPad(pad([-0.9, 0, 0, 0]), prof).moveX).toBeCloseTo(dz(-0.9).x, 5)
+      expect(readPad(pad([0.9, 0, 0, 0]), prof).moveX).toBeCloseTo(dz(0.9).x, 5)
     })
   })
 
@@ -261,16 +289,16 @@ describe('readPad', () => {
       const axes: number[] = [0.9, -0.5]
       axes[9] = -1
       const s = readPad(fakePad({ axes }), std)
-      expect(s.moveX).toBeCloseTo(0.9)
-      expect(s.moveY).toBeCloseTo(-0.5)
+      expect(s.moveX).toBeCloseTo(dz(0.9, -0.5).x, 5)
+      expect(s.moveY).toBeCloseTo(dz(0.9, -0.5).y, 5)
     })
   })
 
   describe('aim from the right stick', () => {
     it('reads the right stick (axes 2/3) into aimX/aimY past the deadzone', () => {
       const s = readPad(fakePad({ axes: [0, 0, 0.8, -0.9] }), std)
-      expect(s.aimX).toBeCloseTo(0.8)
-      expect(s.aimY).toBeCloseTo(-0.9)
+      expect(s.aimX).toBeCloseTo(dz(0.8, -0.9).x, 5)
+      expect(s.aimY).toBeCloseTo(dz(0.8, -0.9).y, 5)
     })
     it('ignores right-stick drift inside the deadzone', () => {
       const s = readPad(fakePad({ axes: [0, 0, 0.1, -0.1] }), std)
@@ -349,7 +377,7 @@ describe('readPad', () => {
     it('does not fire from a fully deflected right stick', () => {
       const s = readPad(fakePad({ axes: [0, 0, 0.9, 0] }), std)
       expect(s.attack).toBe(false)
-      expect(s.aimX).toBeCloseTo(0.9)
+      expect(s.aimX).toBeCloseTo(dz(0.9).x, 5)
     })
     it('does not fire from a hard diagonal deflection either', () => {
       const s = readPad(fakePad({ axes: [0, 0, -1, -1] }), std)
@@ -484,8 +512,8 @@ describe('readPad', () => {
 
     it('still moves from the left stick with the triggers resting at -1', () => {
       const s = readPad(fakePad({ axes: [0.9, -0.9, -1, -1], axisCount: 8 }), raw)
-      expect(s.moveX).toBeCloseTo(0.9)
-      expect(s.moveY).toBeCloseTo(-0.9)
+      expect(s.moveX).toBeCloseTo(dz(0.9, -0.9).x, 5)
+      expect(s.moveY).toBeCloseTo(dz(0.9, -0.9).y, 5)
     })
 
     it('survives an empty axes array with no aim axes named', () => {
@@ -524,8 +552,8 @@ describe('readPad', () => {
 
     it('aims from a genuinely deflected right stick without firing (buttons fire)', () => {
       const s = readPad(canonPad({ axes: [0, 0, 0.9, -0.8] }), canon)
-      expect(s.aimX).toBeCloseTo(0.9)
-      expect(s.aimY).toBeCloseTo(-0.8)
+      expect(s.aimX).toBeCloseTo(dz(0.9, -0.8).x, 5)
+      expect(s.aimY).toBeCloseTo(dz(0.9, -0.8).y, 5)
       expect(s.attack).toBe(false)
     })
 

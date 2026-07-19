@@ -196,6 +196,19 @@ const accentDx = (path: string): [number, number] => {
   return [accX / accN - sumX / mass, accN / Math.max(1, headPx)]
 }
 
+// Frames split into FAMILIES (mirror of consistency.py family()): a rotoscoped
+// 'walk' cycle swings width/foot_y far more than a pose frame, so each family
+// is judged on its BUILD (height / head-block / mass) against the reference
+// pose rather than frame-by-frame. A walk cycle that is a slimmer character
+// than the idle is the "not the same character" defect this file exists to
+// catch — reported once per family, not once per frame.
+const familyOf = (frame: string): 'walk' | 'pose' => (frame.includes('-walk-') || /(^|-)walk-\d+$/.test(frame) ? 'walk' : 'pose')
+const FAMILY_TOL = { height: 3, head_h: 4, mass_frac: 0.25 } // consistency.py FAMILY_TOL
+const median = (xs: number[]): number => {
+  const s = [...xs].sort((a, b) => a - b)
+  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2
+}
+
 // <kind>-<dir>-<frame>.png, kind and frame may contain '-' (bog-mutant-s-attack-1)
 const parseFrame = (file: string): { kind: string; frame: string } | null => {
   const toks = file.replace(/\.png$/, '').split('-')
@@ -231,7 +244,21 @@ describe('swampspace character-sprite consistency (committed spec)', () => {
 
   for (const [kind, frames] of byKind) {
     describe(kind, () => {
-      for (const { frame, file } of frames) {
+      // Each non-pose animation family must read as the SAME CHARACTER as the
+      // reference pose — one assertion per family, on the family's median build.
+      for (const fam of [...new Set(frames.map((f) => familyOf(f.frame)))].filter((f) => f !== 'pose')) {
+        it(`the '${fam}' frames are the same build as the reference pose`, () => {
+          const s = spec[kind]
+          expect(s).toBeDefined()
+          const ms = frames.filter((f) => familyOf(f.frame) === fam).map((f) => silhouette(f.file))
+          const why = `the '${fam}' frames are a different build from '${s.ref_frame}' — the player would change shape when they move; regenerate that set against this character's spec`
+          expect(Math.abs(median(ms.map((m) => m.height)) - s.ref.height), why).toBeLessThanOrEqual(FAMILY_TOL.height)
+          expect(Math.abs(median(ms.map((m) => m.head_h)) - s.ref.head_h), why).toBeLessThanOrEqual(FAMILY_TOL.head_h)
+          expect(Math.abs(median(ms.map((m) => m.mass)) - s.ref.mass) / s.ref.mass, why).toBeLessThanOrEqual(FAMILY_TOL.mass_frac)
+        })
+      }
+
+      for (const { frame, file } of frames.filter((f) => familyOf(f.frame) === 'pose')) {
         it(`${frame} stays within the character's silhouette envelope`, () => {
           const s = spec[kind]
           expect(s).toBeDefined()

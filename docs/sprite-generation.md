@@ -266,6 +266,19 @@ python3 consistency.py --files spr.png  # ad-hoc metrics for sweep candidates
 python3 consistency.py --write-spec vine-ranger=s-idle   # (re)derive a spec
 ```
 
+**Animation families.** Frames are grouped into families — `pose` (idle / step /
+attack) and `walk` (a rotoscoped 8-frame cycle). A stride legitimately swings
+width and foot row far more than a pose does, so non-pose families are NOT
+judged frame-by-frame; each is judged on its **median build** (height, head
+block, mass) against the character's reference pose, with looser tolerances
+(`FAMILY_TOL`: height ±3 px, head ±4 px, mass ±25%). This catches the failure
+that matters — *a walk cycle that is a slimmer or gear-less character than the
+idle, so the player changes shape the moment they move* — and reports it once
+per family instead of once per frame. The rotoscope pipeline's own
+`scripts/assets/rotoscope/gate.py` checks consistency WITHIN a cycle (no scale
+pumping); it cannot see this, because nothing there compares the cycle to the
+character's curated idle. That comparison is this harness's job.
+
 This is a **standing check**: `src/render/charConsistency.test.ts` re-implements
 the same metrics (self-contained PNG decode, mirrored constants) and fails the
 vitest suite whenever any shipped frame leaves its character's envelope, or when

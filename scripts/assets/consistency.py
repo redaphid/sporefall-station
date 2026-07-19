@@ -164,6 +164,24 @@ def load_spec():
     return json.load(open(SPEC_PATH)) if os.path.exists(SPEC_PATH) else {}
 
 
+def family(frame):
+    """Frames split into FAMILIES by animation kind: 'walk' (an 8-frame
+    rotoscoped cycle whose stride legitimately swings width/foot_y far more
+    than a pose frame) vs 'pose' (idle/step/attack). Each family is measured
+    against its own reference, and the families' BUILDS are then compared to
+    each other — a walk cycle that is a slimmer character than the idle is the
+    exact "not the same character" defect this harness exists to catch, but it
+    should report as ONE finding, not one per frame."""
+    return "walk" if "-walk-" in f"-{frame}" or frame.split("-")[-2:-1] == ["walk"] else "pose"
+
+
+# How far a family's BUILD may sit from the character's reference build before
+# the families read as different characters. Deliberately looser than the
+# per-frame envelope (a stride is not an idle) but tight on the identity cues:
+# overall height, head-block (helmet/cap read) and pixel mass (bulk + gear).
+FAMILY_TOL = {"height": 3, "head_h": 4, "mass_frac": 0.25}
+
+
 def check(data, spec):
     """Gate every measured frame against the committed per-character spec.
     Returns a list of violation strings."""
@@ -174,7 +192,33 @@ def check(data, spec):
             probs.append(f"{kind}: no spec committed (run --write-spec)")
             continue
         ref, tol = s["ref"], s["tol"]
+        # --- family build check: does each animation family read as the same
+        # character as the spec's reference pose?
+        fams = {}
         for fr, m in frames.items():
+            fams.setdefault(family(fr), []).append(m)
+        for fam, ms in sorted(fams.items()):
+            if fam == "pose":
+                continue  # the pose family IS the reference family
+            med = {k: float(np.median([m[k] for m in ms])) for k in ("height", "head_h", "mass")}
+            devs = []
+            if abs(med["height"] - ref["height"]) > FAMILY_TOL["height"]:
+                devs.append(f"height {med['height']:.0f} vs {ref['height']}")
+            if abs(med["head_h"] - ref["head_h"]) > FAMILY_TOL["head_h"]:
+                devs.append(f"head_h {med['head_h']:.0f} vs {ref['head_h']}")
+            if abs(med["mass"] - ref["mass"]) / max(1, ref["mass"]) > FAMILY_TOL["mass_frac"]:
+                devs.append(f"mass {med['mass']:.0f} vs {ref['mass']} "
+                            f"({(med['mass'] / ref['mass'] - 1) * 100:+.0f}%)")
+            if devs:
+                probs.append(
+                    f"{kind}: the '{fam}' frames are a DIFFERENT BUILD from the "
+                    f"'{s['ref_frame']}' reference — {'; '.join(devs)}. "
+                    f"({len(ms)} frames; regenerate the {fam} set against this "
+                    f"character's spec, or the player changes shape when they move.)")
+        # --- per-frame envelope, within each family
+        for fr, m in frames.items():
+            if family(fr) != "pose":
+                continue  # non-pose families are judged by the build check above
             checks = [
                 ("height", abs(m["height"] - ref["height"]), tol["height"]),
                 ("width", abs(m["width"] - ref["width"]), tol["width"]),

@@ -75,5 +75,14 @@ like costume changes against their idles in the walk cycle.
   increment, one `sweep` per pose with the anchors already in
   `scripts/assets/anchors/`.
 
+- VLM gate status at ship time: per-sweep gating ran during curation
+  (facing/anthropomorphism spot checks); the final whole-pack `--pack` /
+  `--pairs` / `--style` batch run was blocked by other tenants monopolizing
+  the shared qwen3-vl instance and should be re-run when the GPU frees:
+  `cd scripts/assets && python3 verify.py --pack && python3 verify.py --pairs
+  && python3 verify.py --style`. Every shipped sprite WAS human-reviewed on a
+  final-size contact sheet; pair consistency is enforced by construction
+  (steps are low-denoise img2img from their idles).
+
 Contact sheets: `docs/assets/swampspace/{pack,tiles,chars,props,items,fx}.png`;
 in-game capture: `docs/assets/swampspace/ingame-swampspace.png`.

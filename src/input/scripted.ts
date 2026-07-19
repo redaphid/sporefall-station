@@ -139,6 +139,23 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Control for the dodge-roll video: never roll — the same bullet connects.
   dodgeControl: [{ ticks: 60 }],
 
+  // Animation-state showcase (feat/sprite-animation): cycle a character through
+  // every animation state against the `anim-stage` inline world (player on the
+  // lane at x6, one guard thug at x12, a slow bullet inbound from the west that
+  // stings the player ~tick 138). idle breathe → walk → attack (pistol shots
+  // lunge; the thug flinches HURT then topples DEATH ~tick 104) → the west
+  // bullet lands (player HURT flinch) → dodge ROLL east + landing squash →
+  // final idle. Every beat is deterministic from this timeline + the world.
+  animStates: [
+    { ticks: 30 }, // idle: breathe
+    { ticks: 20, x: 1 }, // walk east 6 → 9 (lean + bob + stride)
+    { ticks: 30 }, // idle again, facing east
+    { ticks: 40, attack: true }, // pistol: shots at 80/98/116 — thug hurt, then dies
+    { ticks: 100 }, // stand: the west bullet arrives ~138 → player hurt flinch
+    { ticks: 1, roll: true, x: 1 }, // dodge-roll east (tumble, tick 220)
+    { ticks: 59 }, // landing squash, settle back to idle breathe
+  ],
+
   // Weapon-mod PICKUP headline (feat/mod-pickups): drop onto the lane, then stroll
   // east collecting two scattered mod-gems — the equipped pistol gains a badge per
   // grab (hotbar + inspect update). Paired with the `mod-pickup` inline world whose

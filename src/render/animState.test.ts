@@ -8,7 +8,9 @@ import {
   HURT_FLASH_TICKS,
   LOOP_STATES,
   MAX_ANIM_FRAMES,
+  MAX_TICK_SKIP,
   resolveAnimState,
+  sceneContinuous,
   resolveClip,
   STATE_FALLBACK,
   STATE_TICKS,
@@ -282,6 +284,30 @@ describe('constants sanity', () => {
 
   it('MAX_ANIM_FRAMES bounds the manifest key grammar', () => {
     expect(MAX_ANIM_FRAMES).toBe(8)
+  })
+})
+
+describe('sceneContinuous — render-derived death vs scene cuts', () => {
+  it('a normal +1 tick on the same floor is continuous (a vanished character died)', () => {
+    expect(sceneContinuous(100, 1, 101, 1)).toBe(true)
+    expect(sceneContinuous(100, 1, 100, 1)).toBe(true) // same-tick re-render
+  })
+
+  it('tolerates hitstop skips up to MAX_TICK_SKIP, no further', () => {
+    expect(sceneContinuous(100, 1, 100 + MAX_TICK_SKIP, 1)).toBe(true)
+    expect(sceneContinuous(100, 1, 100 + MAX_TICK_SKIP + 1, 1)).toBe(false)
+  })
+
+  it('a floor change is a scene cut — no ghost burst on the new level', () => {
+    expect(sceneContinuous(100, 1, 101, 2)).toBe(false)
+  })
+
+  it('a restart (tick regression) is a scene cut, even on the same floor number', () => {
+    expect(sceneContinuous(300, 1, 0, 1)).toBe(false)
+  })
+
+  it('the very first update (no previous frame) is never continuous', () => {
+    expect(sceneContinuous(-1, -1, 0, 1)).toBe(false)
   })
 })
 

@@ -1,6 +1,5 @@
 import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
-import type { SimEvent } from '../game/types'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { burnPulse, charFootPx, cycleFrame, depthKey, facingDir, isMoving } from './anim'
 import {
@@ -8,6 +7,7 @@ import {
   effectiveClips,
   resolveAnimState,
   resolveClip,
+  sceneContinuous,
   STATE_TICKS,
   type ResolvedAnim,
 } from './animState'
@@ -183,41 +183,36 @@ export class EntityViews {
   }
 
   /**
-   * Consume this tick's sim events (call once per NEW tick, before update()).
-   * A `death` event naming a character converts its pooled sprite into a
-   * short-lived death ghost — the corpse is swept from the snapshot the same
-   * tick, so this render-side handoff is what makes a death ANIMATION possible
-   * without touching the sim. `floorChange` clears any lingering ghosts.
+   * Convert a vanished character view into a death ghost. Corpses are swept
+   * from the snapshot the SAME tick they die, and the one-tick `death` event
+   * is unreliable render-side (a slow frame can run 2+ sim ticks and the event
+   * list is cleared each tick) — so death is DERIVED from observed change:
+   * a character that was here last frame and is gone now, while tick/floor
+   * advanced continuously, died. Floor changes / restarts (floor switch, tick
+   * jump or regression) destroy views normally — no ghost burst on a new level.
    */
-  noteEvents(events: readonly SimEvent[], tick: number): void {
-    for (const ev of events) {
-      if (ev.type === 'floorChange') {
-        this.clearGhosts()
-        continue
-      }
-      if (ev.type !== 'death') continue
-      const view = this.views.get(ev.entityId)
-      if (!view || !this.art.isCharacterSprite(view.archetype)) continue
-      this.views.delete(ev.entityId)
-      // Reset any mid-roll anchor/rotation so the fall pivots on the feet.
-      view.sprite.anchor.set(0.5, 1)
-      view.sprite.position.set(view.footX, view.footY)
-      view.sprite.rotation = 0
-      view.sprite.scale.set(view.flip ? -1 : 1, 1)
-      this.ghosts.push({
-        sprite: view.sprite,
-        artKey: view.archetype,
-        start: tick,
-        facing: view.facing,
-        flip: view.flip,
-        id: ev.entityId,
-        texKey: view.texKey,
-      })
-      if (this.ghosts.length > MAX_GHOSTS) this.expireGhost(0)
-    }
+  private toGhost(view: View, id: number, tick: number): void {
+    // Reset any mid-roll anchor/rotation so the fall pivots on the feet.
+    view.sprite.anchor.set(0.5, 1)
+    view.sprite.position.set(view.footX, view.footY)
+    view.sprite.rotation = 0
+    view.sprite.scale.set(view.flip ? -1 : 1, 1)
+    this.ghosts.push({
+      sprite: view.sprite,
+      artKey: view.archetype,
+      start: tick,
+      facing: view.facing,
+      flip: view.flip,
+      id,
+      texKey: view.texKey,
+    })
+    if (this.ghosts.length > MAX_GHOSTS) this.expireGhost(0)
   }
 
-  update(entities: readonly Entity[], alpha: number, tick: number): void {
+  private prevTick = -1
+  private prevFloor = -1
+
+  update(entities: readonly Entity[], alpha: number, tick: number, floor = 0): void {
     for (const view of this.views.values()) view.seen = false
     const t = tick + alpha // continuous view-time for smooth procedural juice
 
@@ -368,11 +363,23 @@ export class EntityViews {
       view.sprite.zIndex = depthKey(e.kind, y)
     }
 
+    // Scene continuity: same floor, tick moving forward by a frame-plausible
+    // step. A floor switch or restart (tick regression / big jump) is a scene
+    // CUT — vanished views are dropped, never ghosted, and ghosts cleared.
+    const continuous = sceneContinuous(this.prevTick, this.prevFloor, tick, floor)
+    if (!continuous && this.prevFloor !== -1) this.clearGhosts()
+    this.prevTick = tick
+    this.prevFloor = floor
+
     for (const [id, view] of this.views) {
       if (!view.seen) {
-        this.root.removeChild(view.sprite)
-        view.sprite.destroy()
         this.views.delete(id)
+        if (continuous && this.art.isCharacterSprite(view.archetype)) {
+          this.toGhost(view, id, tick) // died this tick — the sprite lives on briefly
+        } else {
+          this.root.removeChild(view.sprite)
+          view.sprite.destroy()
+        }
       }
     }
 

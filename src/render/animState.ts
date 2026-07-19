@@ -106,6 +106,27 @@ export const resolveAnimState = (a: AnimInputs): ResolvedAnim => {
 }
 
 // ---------------------------------------------------------------------------
+// Death derivation — scene continuity.
+//
+// Corpses are swept from the snapshot the SAME tick they die, and the one-tick
+// `death` event is unreliable render-side (a slow frame can run 2+ sim ticks;
+// the event list is cleared every tick). So death is DERIVED from observed
+// change: a character view that vanished while the scene stayed CONTINUOUS
+// died and becomes a ghost. A floor switch or restart (floor change, tick
+// regression, or an implausibly large jump) is a scene cut — no ghosts.
+
+/** Ticks the entity layer may skip and still count as continuous: hitstop
+ * freezes the layer up to HITSTOP_MAX (6) frames while the sim runs on. */
+export const MAX_TICK_SKIP = 6
+
+export const sceneContinuous = (
+  prevTick: number,
+  prevFloor: number,
+  tick: number,
+  floor: number,
+): boolean => prevTick >= 0 && floor === prevFloor && tick >= prevTick && tick - prevTick <= MAX_TICK_SKIP
+
+// ---------------------------------------------------------------------------
 // Clip resolution — per-state frame lists with fallback chains.
 
 /** Per-state fallback order (first entry is the state itself). A state with no

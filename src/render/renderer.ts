@@ -187,9 +187,6 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       // once per tick.
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
-        // Character deaths hand their sprite to the entity layer as a death
-        // ghost (the corpse is swept from the snapshot this same tick).
-        entities.noteEvents(view.events, view.tick)
         for (const ev of view.events) {
           const isSelf =
             view.self != null &&
@@ -231,7 +228,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       if (frozen) hitstop = tickHitstop(hitstop)
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
-        entities.update(view.entities, alpha, view.tick)
+        entities.update(view.entities, alpha, view.tick, view.floor)
         bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)
       }

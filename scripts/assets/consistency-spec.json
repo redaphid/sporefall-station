@@ -19,7 +19,8 @@
   },
   "accent": {
    "min_dx": 1.0,
-   "back_max_frac": 0.025
+   "back_max_frac": 0.09,
+   "back_min_dx": -2.0
   }
  },
  "bog-mutant": {

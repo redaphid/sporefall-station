@@ -197,9 +197,17 @@ def check(data, spec):
                     elif dx < acc["min_dx"]:
                         probs.append(f"{kind} {fr}: faces LEFT (accent dx {dx:+.1f} < {acc['min_dx']}) — "
                                      "drawn side art must face right; flip the raw and re-final")
-                if d in ("ne", "n") and frac > acc["back_max_frac"]:
-                    probs.append(f"{kind} {fr}: back view shows the face accent "
-                                 f"(frac {frac:.3f} > {acc['back_max_frac']})")
+                if d in ("ne", "n"):
+                    # A cap CROWN is legitimately visible from behind (modest,
+                    # centered-or-right accent); a face-sized accent or a
+                    # left-shifted one means the frame is not a right-turned
+                    # back view at all.
+                    if frac > acc["back_max_frac"]:
+                        probs.append(f"{kind} {fr}: back view shows a face-sized accent "
+                                     f"(frac {frac:.3f} > {acc['back_max_frac']})")
+                    elif frac > 0 and dx < acc["back_min_dx"]:
+                        probs.append(f"{kind} {fr}: back view accent is left-shifted "
+                                     f"(dx {dx:+.1f} < {acc['back_min_dx']}) — faces left")
     return probs
 
 

@@ -31,9 +31,11 @@ type Spec = Record<
     // facing gate (opt-in): drawn side art must face RIGHT — the engine mirrors
     // the west half (docs/sprite-generation.md §3). For characters whose face
     // carries a hot accent (the ranger's amber visor): 'e'/'se' frames need the
-    // accent centroid ≥ min_dx px RIGHT of the body centroid; back views
-    // ('ne'/'n') must show ≤ back_max_frac accent in the head zone.
-    accent?: { min_dx: number; back_max_frac: number }
+    // accent centroid ≥ min_dx px RIGHT of the body centroid. Back views
+    // ('ne'/'n') may show the cap CROWN (modest, centered-or-right accent) but
+    // fail on a face-sized accent (> back_max_frac of the head zone) or a
+    // left-shifted one (dx < back_min_dx ⇒ the frame faces left).
+    accent?: { min_dx: number; back_max_frac: number; back_min_dx: number }
   }
 >
 
@@ -248,8 +250,11 @@ describe('swampspace character-sprite consistency (committed spec)', () => {
               expect(frac, 'face accent missing — side art cannot face right without a face').toBeGreaterThan(0)
               expect(dx, `faces LEFT (accent dx ${dx.toFixed(1)}) — drawn side art must face right (west is mirrored)`).toBeGreaterThanOrEqual(s.accent.min_dx)
             }
-            if (dir === 'ne' || dir === 'n')
-              expect(frac, `back view shows the face accent (frac ${frac.toFixed(3)})`).toBeLessThanOrEqual(s.accent.back_max_frac)
+            if (dir === 'ne' || dir === 'n') {
+              expect(frac, `back view shows a face-sized accent (frac ${frac.toFixed(3)})`).toBeLessThanOrEqual(s.accent.back_max_frac)
+              if (frac > 0)
+                expect(dx, `back view accent is left-shifted (dx ${dx.toFixed(1)}) — frame faces left`).toBeGreaterThanOrEqual(s.accent.back_min_dx)
+            }
           }
         })
       }

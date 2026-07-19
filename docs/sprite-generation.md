@@ -247,12 +247,15 @@ foot_y ±1 px, hand-tunable per character in the spec file).
 
 A spec may also carry an `accent` block — the FACING gate (see §3: drawn side
 art faces right). For characters whose face has a hot-accent marker (the
-ranger's amber visor, palette colors `#ffd83e #ff9032 #e04a2a`): on `e`/`se`
-frames the accent centroid must sit ≥ `min_dx` px to the RIGHT of the body
-centroid; on `ne`/`n` (back views) the accent may cover at most
-`back_max_frac` of the head zone (a visor visible "from behind" means the
-frame isn't a back view at all — exactly how the original left-facing set
-would have been caught).
+ranger's amber visor / orange cap, palette colors `#ffd83e #ff9032 #e04a2a`):
+on `e`/`se` frames the accent centroid must sit ≥ `min_dx` px to the RIGHT of
+the body centroid; on `ne`/`n` (back views) a modest centered-or-right accent
+is fine — that's the cap CROWN, which SHOULD stay visible from behind so the
+character keeps its signature color from every direction (the VLM reads a
+capless back view as a different character) — but a face-sized accent
+(> `back_max_frac` of the head zone) or a left-shifted one (dx <
+`back_min_dx`) fails: the frame isn't a right-turned back view at all —
+exactly how the original left-facing set would have been caught.
 
 ```bash
 python3 consistency.py                  # report: per-frame metrics + max deviation

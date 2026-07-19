@@ -139,7 +139,7 @@ describe('nextFloor carry-over', () => {
     const w = makeRun(12)
     const p = w.entities.find((e) => e.playerCtl)!
     p.playerCtl!.downed = { bleedTicks: 100, reviveProgress: 0 }
-    p.playerCtl!.channel = { kind: 'lockpick', targetId: 999, ticksLeft: 10 }
+    p.playerCtl!.channel = { kind: 'lockpick', targetId: 999, ticksLeft: 10, total: 60 }
     p.playerCtl!.crimeUntilTick = w.tick + 500
     p.dead = false
     nextFloor(w)

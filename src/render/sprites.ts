@@ -223,8 +223,9 @@ export class EntityViews {
       // composed from their weapon-mod provenance. Grenades/thrown items keep
       // their entity sprite here.
       if (e.kind === 'projectile' && e.archetype === 'projectile') continue
-      // Doors render differently open vs closed; treat state as part of identity.
-      const artKey = e.door ? (e.door.open ? 'door.open' : 'door') : e.archetype
+      // Doors render differently open vs closed vs LOCKED (padlock art) —
+      // treat state as part of identity so unlocking swaps the sprite.
+      const artKey = e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype
       let view = this.views.get(e.id)
       if (!view || view.archetype !== artKey) {
         if (view) {

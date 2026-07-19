@@ -80,6 +80,14 @@ export type SimEvent =
   | { type: 'hit'; x: number; y: number; targetId: EntityId; amount: number }
   | { type: 'death'; x: number; y: number; entityId: EntityId }
   | { type: 'doorToggle'; entityId: EntityId; open: boolean }
+  /** `byId` began picking `entityId`'s lock: `ticks` is the full channel length
+   * so any UI (host or net client) can draw a progress ring from this alone. */
+  | { type: 'pickStart'; entityId: EntityId; byId: EntityId; ticks: number }
+  /** A pick channel ended early — `moved` (deliberate stick input / knockback),
+   * `hurt` (took a hit), or `gone` (door opened/unlocked by other means). */
+  | { type: 'pickCancel'; entityId: EntityId; byId: EntityId; reason: 'moved' | 'hurt' | 'gone' }
+  /** An explosion blew a door open (locked or not) — the loud breach path. */
+  | { type: 'doorBreach'; entityId: EntityId; x: number; y: number }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */

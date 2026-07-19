@@ -437,6 +437,25 @@ export const createArt = (
       g.destroy()
       return tex
     }
+    if (archetype === 'door.locked') {
+      // Locked door: same panel, but colder and wearing a visible padlock —
+      // "this one won't just open" must read at a glance from across a room.
+      const g = new Graphics()
+        .rect(0, 0, TILE_PX, TILE_PX)
+        .fill(colorOverride ?? 0x6f5636)
+        .rect(2, 2, TILE_PX - 4, TILE_PX - 4)
+        .stroke({ width: 2, color: 0x000000, alpha: 0.45 })
+        // padlock body + shackle, centred
+        .roundRect(TILE_PX * 0.5 - 5, TILE_PX * 0.5 - 2, 10, 9, 2)
+        .fill(0xd8b13a)
+        .circle(TILE_PX * 0.5, TILE_PX * 0.5 - 3, 4)
+        .stroke({ width: 2.5, color: 0xd8b13a })
+        .circle(TILE_PX * 0.5, TILE_PX * 0.5 + 2.5, 1.6)
+        .fill(0x3a2e10)
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
     if (archetype === 'door.open') {
       // Open door: slim panel against the jamb
       const g = new Graphics().rect(0, 0, 6, TILE_PX).fill(colorOverride ?? 0x8a6a3f)

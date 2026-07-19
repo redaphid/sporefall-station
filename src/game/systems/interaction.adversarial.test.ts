@@ -3,7 +3,9 @@ import { makeEntity, type Entity } from '../entity'
 import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { addEntity, createWorld, type World } from '../world'
-import { interactionSystem, nearestInteractable } from './interaction'
+import { deserializeWorld, serializeWorld } from '../serialize'
+import { applyDamage, detonate } from './combat'
+import { interactionSystem, nearestInteractable, pickTicks } from './interaction'
 import { spawnObject } from './objects'
 
 const inputs = (...pairs: [number, InputCmd][]): Map<number, InputCmd> => new Map(pairs)
@@ -145,67 +147,252 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
   })
 })
 
-describe('lockpick channel', () => {
+describe('lockpick channel — deterministic, lock-level timed', () => {
   let w: World
   beforeEach(() => {
     w = createWorld(1, 1)
   })
 
-  it('any locked door starts a lockpick channel — no class pops locks instantly anymore', () => {
-    for (const lockLevel of [1, 2]) {
+  it('a locked door starts a channel whose length comes from the lock level (no class pops locks instantly)', () => {
+    for (const [lockLevel, ticks] of [
+      [1, 60],
+      [2, 105],
+      [3, 150],
+    ] as const) {
       const world = createWorld(1, 1)
       const p = spawnPlayer(world, 0, 20, 20)
       const door = lockedDoor(world, 20.8, 20, lockLevel)
       settle(p)
       interactionSystem(world, inputs([0, interactCmd()]))
       expect(door.door!.locked).toBe(true) // still locked: the pick is a channel, not instant
-      expect(p.playerCtl!.channel).toEqual({ kind: 'lockpick', targetId: door.id, ticksLeft: 45 })
+      expect(p.playerCtl!.channel).toEqual({ kind: 'lockpick', targetId: door.id, ticksLeft: ticks, total: ticks })
+      expect(world.events).toContainEqual({ type: 'pickStart', entityId: door.id, byId: p.id, ticks })
     }
   })
 
-  it('moving cancels an in-progress channel', () => {
+  it('ADVERSARIAL: degenerate lock levels clamp into the table — NO lock is ever unpickable', () => {
+    expect(pickTicks(0)).toBe(60) // "locked at L0" still picks like L1
+    expect(pickTicks(-3)).toBe(60)
+    expect(pickTicks(99)).toBe(150) // absurdly high level caps at L3 time
+    expect(pickTicks(2.7)).toBe(105) // fractional level floors to L2
+  })
+
+  it('EXACT TICKS: the door stays shut through tick total-1 and opens ON the final tick — always, no dice', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    const door = lockedDoor(w, 20.8, 20, 1) // L1 = 60 ticks
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    for (let t = 0; t < 59; t++) {
+      interactionSystem(w, idleFor(0))
+      expect(door.door!.open).toBe(false)
+      expect(p.playerCtl!.channel).toBeDefined()
+    }
+    w.events.length = 0
+    interactionSystem(w, idleFor(0)) // tick 60: pop
+    expect(p.playerCtl!.channel).toBeUndefined()
+    expect(door.door!.locked).toBe(false)
+    expect(door.door!.open).toBe(true)
+    expect(w.events).toContainEqual({ type: 'doorToggle', entityId: door.id, open: true })
+  })
+
+  it('determinism: two identical worlds pick on exactly the same tick', () => {
+    const run = (): number => {
+      const world = createWorld(9, 1)
+      const p = spawnPlayer(world, 0, 20, 20)
+      const door = lockedDoor(world, 20.8, 20, 2)
+      settle(p)
+      interactionSystem(world, inputs([0, interactCmd()]))
+      let t = 0
+      while (!door.door!.open && t < 500) {
+        interactionSystem(world, idleFor(0))
+        t++
+      }
+      return t
+    }
+    expect(run()).toBe(run())
+    expect(run()).toBeLessThan(500)
+  })
+
+  it('deliberate stick input cancels the channel with a pickCancel(moved) event', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    const door = lockedDoor(w, 20.8, 20)
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    expect(p.playerCtl!.channel).toBeDefined()
+    w.events.length = 0
+    interactionSystem(w, inputs([0, { ...emptyInput(), moveX: 1 }]))
+    expect(p.playerCtl!.channel).toBeUndefined()
+    expect(w.events).toContainEqual({ type: 'pickCancel', entityId: door.id, byId: p.id, reason: 'moved' })
+  })
+
+  it('real knockback displacement cancels; a pushApart-scale nudge does NOT', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     lockedDoor(w, 20.8, 20)
     settle(p)
     interactionSystem(w, inputs([0, interactCmd()]))
+    // Brushing NPC shove: a few hundredths of a tile per tick. Pick survives.
+    p.prevPos.x = p.pos.x - 0.04
+    interactionSystem(w, idleFor(0))
     expect(p.playerCtl!.channel).toBeDefined()
-    p.pos.x += 0.5 // drifted since prevPos
+    // Grenade knockback: a quarter tile in one tick. Pick breaks.
+    p.prevPos.x = p.pos.x - 0.25
     interactionSystem(w, idleFor(0))
     expect(p.playerCtl!.channel).toBeUndefined()
   })
 
-  it('a channel aborts if the target door is unlocked by other means mid-pick', () => {
+  it('ADVERSARIAL: sub-deadzone stick drift (thumb resting on the stick) does not cancel', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    const door = lockedDoor(w, 20.8, 20, 1)
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    // NOTE: interactionSystem alone never moves the player; the real movement
+    // system zeroes intent below its own deadzone. Here the stick reads 0.2 —
+    // under PICK_MOVE_DEADZONE — for the whole channel: the pick must complete.
+    for (let t = 0; t < 60; t++) interactionSystem(w, inputs([0, { ...emptyInput(), moveX: 0.2 }]))
+    expect(door.door!.open).toBe(true)
+  })
+
+  it('taking a hit cancels the channel with pickCancel(hurt); a blow eaten by iframes does not', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    p.health!.iframes = 0
+    const door = lockedDoor(w, 20.8, 20)
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    w.events.length = 0
+    applyDamage(w, p, 5, 30, 20, 0, 999) // zero knockback: the HIT itself must break it
+    expect(p.playerCtl!.channel).toBeUndefined()
+    expect(w.events).toContainEqual({ type: 'pickCancel', entityId: door.id, byId: p.id, reason: 'hurt' })
+    // Restart the pick; now the player has iframes from that hit — an absorbed
+    // blow is NOT a landed hit and must not break the new channel.
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    expect(p.playerCtl!.channel).toBeDefined()
+    applyDamage(w, p, 5, 30, 20, 0, 999)
+    expect(p.playerCtl!.channel).toBeDefined()
+  })
+
+  it('a channel aborts (reason gone) if the target door is unlocked by other means mid-pick', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     const door = lockedDoor(w, 20.8, 20)
     settle(p)
     interactionSystem(w, inputs([0, interactCmd()]))
     door.door!.locked = false // unlocked by other means, say
+    w.events.length = 0
     interactionSystem(w, idleFor(0))
     expect(p.playerCtl!.channel).toBeUndefined()
+    expect(w.events).toContainEqual({ type: 'pickCancel', entityId: door.id, byId: p.id, reason: 'gone' })
   })
 
-  it('a completed channel with a lucky roll opens the door (seed chosen so chance(0.7) passes)', () => {
-    // Find a seed whose first mission-independent rng roll succeeds.
-    let opened = false
-    for (let seed = 1; seed < 40 && !opened; seed++) {
-      const world = createWorld(seed, 1)
-      const p = spawnPlayer(world, 0, 20, 20)
-      const door = lockedDoor(world, 20.8, 20)
-      settle(p)
-      interactionSystem(world, inputs([0, interactCmd()]))
-      p.playerCtl!.channel!.ticksLeft = 1 // fast-forward to completion
-      settle(p)
-      interactionSystem(world, idleFor(0))
-      expect(p.playerCtl!.channel).toBeUndefined()
-      if (!door.door!.locked) {
-        opened = true
-        expect(door.door!.open).toBe(true)
-      } else {
-        // Botched pick: makes noise and stamps a crime window.
-        expect(p.playerCtl!.crimeUntilTick).toBeGreaterThan(world.tick)
-      }
+  it('ADVERSARIAL: creeping out of reach (many sub-threshold nudges) still drops the pick at 1.6 tiles', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    lockedDoor(w, 20.8, 20)
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    // Each tick moves 0.1 (under PICK_DRIFT_CANCEL) but accumulates away.
+    for (let t = 0; t < 20 && p.playerCtl!.channel; t++) {
+      p.prevPos.x = p.pos.x
+      p.pos.x -= 0.1
+      interactionSystem(w, idleFor(0))
     }
-    expect(opened).toBe(true) // at least one seed opened, proving the success path
+    expect(p.playerCtl!.channel).toBeUndefined()
+    expect(w.entities.find((e) => e.door)!.door!.open).toBe(false)
+  })
+
+  it('CO-OP: two players picking the same door — first pop opens it, the other cancels gone (no double toggle)', () => {
+    const a = spawnPlayer(w, 0, 20, 20)
+    const b = spawnPlayer(w, 1, 21.6, 20)
+    const door = lockedDoor(w, 20.8, 20, 1)
+    settle(a)
+    settle(b)
+    interactionSystem(w, inputs([0, interactCmd()], [1, emptyInput()]))
+    interactionSystem(w, inputs([0, emptyInput()], [1, interactCmd()])) // b starts 1 tick later
+    for (let t = 0; t < 70; t++) interactionSystem(w, idleFor(0, 1))
+    expect(door.door!.open).toBe(true)
+    expect(a.playerCtl!.channel).toBeUndefined()
+    expect(b.playerCtl!.channel).toBeUndefined()
+    // Exactly ONE doorToggle fired across the whole run — replay every tick's
+    // events? events reset per tickWorld, but here we drove interactionSystem
+    // directly, so the log accumulated: count them.
+    expect(w.events.filter((e) => e.type === 'doorToggle')).toHaveLength(1)
+  })
+
+  it('SERIALIZE: a world snapshotted MID-CHANNEL resumes and pops the lock on the identical tick', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    lockedDoor(w, 20.8, 20, 2)
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    for (let t = 0; t < 40; t++) interactionSystem(w, idleFor(0)) // 40/105 in
+    const json = serializeWorld(w)
+    const w2 = deserializeWorld(json)
+    const remaining = (world: World): number => {
+      const pl = world.entities.find((e) => e.playerCtl)!
+      const d = world.entities.find((e) => e.door)!
+      let t = 0
+      while (!d.door!.open && t < 300) {
+        interactionSystem(world, new Map([[0, emptyInput()]]))
+        t++
+      }
+      expect(pl.playerCtl!.channel).toBeUndefined()
+      return t
+    }
+    expect(remaining(w2)).toBe(remaining(w)) // both pop after exactly 65 more ticks
+  })
+})
+
+describe('explosive breach — the loud alternative to picking', () => {
+  let w: World
+  beforeEach(() => {
+    w = createWorld(1, 1)
+  })
+
+  it('a blast centred at a locked door blows it open (unlocked + open + doorBreach event) and is HEARD', () => {
+    const door = lockedDoor(w, 20, 20, 2)
+    const noisesBefore = w.noises.length
+    detonate(w, 20, 20.5, 1.8, 40, 1)
+    expect(door.door!.locked).toBe(false)
+    expect(door.door!.open).toBe(true)
+    expect(w.events).toContainEqual({ type: 'doorBreach', entityId: door.id, x: door.pos.x, y: door.pos.y })
+    expect(w.noises.length).toBeGreaterThan(noisesBefore) // NPCs will come investigate
+  })
+
+  it('a plain CLOSED (unlocked) door also blows open — explosions do not discriminate', () => {
+    const e = addEntity(w, makeEntity('door', 'door', 20, 20, 0.5))
+    e.door = { open: false, locked: false, lockLevel: 0 }
+    detonate(w, 20.4, 20, 1.8, 40, 1)
+    expect(e.door.open).toBe(true)
+    expect(w.events.some((ev) => ev.type === 'doorBreach' && ev.entityId === e.id)).toBe(true)
+  })
+
+  it('BUNKER SPACING: one grenade cannot take both airlock doors 2 tiles apart (centre-distance rule)', () => {
+    const outer = lockedDoor(w, 20, 20, 2)
+    const inner = lockedDoor(w, 20, 22, 2) // vestibule between: 2.0 apart
+    detonate(w, 20, 20, 1.8, 40, 1) // grenade blast radius = 1.8
+    expect(outer.door!.open).toBe(true)
+    expect(inner.door!.open).toBe(false)
+    expect(inner.door!.locked).toBe(true)
+  })
+
+  it('ADVERSARIAL: an already-open door and a dead door emit no breach event', () => {
+    const open = addEntity(w, makeEntity('door', 'door', 20, 20, 0.5))
+    open.door = { open: true, locked: false, lockLevel: 0 }
+    const dead = lockedDoor(w, 20.5, 20)
+    dead.dead = true
+    detonate(w, 20.2, 20, 2, 40, 1)
+    expect(w.events.filter((ev) => ev.type === 'doorBreach')).toHaveLength(0)
+  })
+
+  it('breaching a mission door mid-pick cancels the picker with reason gone (not a silent stall)', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    p.health!.iframes = 9999 // survive the nearby blast — we are testing the channel, not hp
+    const door = lockedDoor(w, 20.8, 20, 2)
+    settle(p)
+    interactionSystem(w, inputs([0, interactCmd()]))
+    detonate(w, 20.8, 20, 1.5, 40, 999)
+    w.events.length = 0
+    settle(p)
+    interactionSystem(w, idleFor(0))
+    expect(p.playerCtl!.channel).toBeUndefined()
+    expect(w.events).toContainEqual({ type: 'pickCancel', entityId: door.id, byId: p.id, reason: 'gone' })
   })
 })
 

@@ -89,3 +89,23 @@ describe('computeTouchLabels', () => {
     expect(cooling.spcEnabled).toBe(false)
   })
 })
+
+describe('USE while lockpicking', () => {
+  it('shows Picking… for the whole channel, then returns to the target verb', () => {
+    const self = player()
+    self.playerCtl!.channel = { kind: 'lockpick', targetId: 7, ticksLeft: 30, total: 60 }
+    const d = door(false, true)
+    const labels = computeTouchLabels(view(self, [self, d]))
+    expect(labels.use).toBe('Picking…')
+    expect(labels.useEnabled).toBe(true)
+    self.playerCtl!.channel = undefined
+    expect(computeTouchLabels(view(self, [self, d])).use).toBe('Unlock')
+  })
+
+  it('ADVERSARIAL: Picking… wins even if the nearest interactable changed mid-channel', () => {
+    const self = player()
+    self.playerCtl!.channel = { kind: 'lockpick', targetId: 7, ticksLeft: 5, total: 60 }
+    const other = door(false, false) // an unlocked door crept closer
+    expect(computeTouchLabels(view(self, [self, other])).use).toBe('Picking…')
+  })
+})

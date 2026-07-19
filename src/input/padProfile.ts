@@ -75,7 +75,6 @@ export interface PadProfile {
    * press into an absolute slot index. */
   hotbarPrev: number[]
   hotbarNext: number[]
-  join: number[]
   dpad: [number, number, number, number]
   moveAxes: [number, number]
   /** Right stick → aim (twin-stick), or null when we do not know which axes the
@@ -96,26 +95,31 @@ export interface PadProfile {
 const CANONICAL_AXIS_COUNT = 4
 
 /**
- * THE button map (W3C standard indices). This is the single place button
- * bindings live — every profile shares it.
+ * THE button map (W3C standard indices, verified against the spec's Standard
+ * Gamepad layout — w3.org/TR/gamepad — and Chromium's CanonicalButtonIndex).
+ * This is the single place button bindings live — every profile shares it.
  *
- *   0  A        attack
- *   1  B        interact
- *   2  X        special
- *   3  Y        special
- *   4  LB (L1)  dodge-roll
- *   5  RB (R1)  attack
- *   6  LT (L2)  attack  — the explicit fire trigger
- *   7  RT (R2)  attack
- *   8  Back     throw held item
- *   9  Start    pause
- *   10 L3       hotbar prev
- *   11 R3       hotbar next
+ *   0  A  (bottom face)   attack
+ *   1  B  (right face)    interact
+ *   2  X  (left face)     special
+ *   3  Y  (top face)      special
+ *   4  LB (L1)            dodge-roll
+ *   5  RB (R1)            attack
+ *   6  LT (L2, trigger)   attack  — the explicit fire trigger
+ *   7  RT (R2, trigger)   attack
+ *   8  Back/Select/View   throw held item
+ *   9  Start/Menu         pause
+ *   10 L3 (stick click)   hotbar prev
+ *   11 R3 (stick click)   hotbar next
  *   12-15 d-pad up/down/left/right (movement)
+ *   16 Home/Guide — deliberately unmapped (the OS/browser owns it)
+ *
+ * Axes (standard): 0/1 left stick X/Y (movement), 2/3 right stick X/Y (aim).
  *
  * Firing is BUTTONS ONLY (A / RB / L2 / R2, all held-to-fire); the aim stick
- * aims and never fires. Join: any face button or Start press-to-joins an
- * unassigned pad (gamepadCoop makes the joining press otherwise inert).
+ * aims and never fires. Join is NOT a button list any more: any mapped button
+ * or a firm, proven stick push joins an unassigned pad (rules in padJoin.ts),
+ * and gamepadCoop keeps the joining input inert until it is released.
  */
 const BUTTONS = {
   attack: [0, 5, 6, 7],
@@ -126,9 +130,28 @@ const BUTTONS = {
   throw: [8],
   hotbarPrev: [10],
   hotbarNext: [11],
-  join: [0, 1, 2, 3, 9],
   dpad: [12, 13, 14, 15] as [number, number, number, number],
 }
+
+/**
+ * A fresh copy of the REMAPPABLE slice of THE button map — the defaults the
+ * user remap layer (remap.ts) overlays. Deliberately excludes `dpad`
+ * (movement — remapping it would let a face button move the player, which the
+ * touch/stick model never allows); join is not remappable either — it is not a
+ * button list at all (any input joins, padJoin.ts). Axes are not here at all:
+ * only BUTTONS are remappable, ever — the raw-pad safety invariant (no
+ * unproven axis may fire) must not acquire a user-configurable hole.
+ */
+export const defaultButtons = () => ({
+  attack: [...BUTTONS.attack],
+  interact: [...BUTTONS.interact],
+  special: [...BUTTONS.special],
+  roll: [...BUTTONS.roll],
+  pause: [...BUTTONS.pause],
+  throw: [...BUTTONS.throw],
+  hotbarPrev: [...BUTTONS.hotbarPrev],
+  hotbarNext: [...BUTTONS.hotbarNext],
+})
 
 const STANDARD: PadProfile = {
   kind: 'standard',

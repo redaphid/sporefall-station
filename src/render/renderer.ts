@@ -1,4 +1,4 @@
-import { Application, ColorMatrixFilter, Container, Sprite, Texture } from 'pixi.js'
+import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
@@ -49,6 +49,10 @@ export interface GameRenderer {
    * The e2e ground truth that DOM overlays (mission marker, locator) must
    * agree with; never derived from duplicated camera math. */
   worldToScreen(wx: number, wy: number): { x: number; y: number }
+  /** Twin-stick aim reticles to draw this frame, in world TILE coordinates
+   * (computed by input/aim.padAimReticles). Pass [] to clear. Presentation
+   * only — the sim never sees them. */
+  setReticles(reticles: readonly { x: number; y: number }[]): void
 }
 
 /** Canvas clear color when no theme palette provides one. */
@@ -112,8 +116,32 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const entities = new EntityViews(art)
   const bullets = new BulletLayer(art)
   const effects = new EffectsLayer(art)
-  world.addChild(tilemap.root, entities.root, bullets.root, effects.root)
+  // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
+  // so the camera transform (and shake) applies for free. Fed per frame via
+  // setReticles; pool grows to the largest simultaneous count and hides spares.
+  const reticleLayer = new Container()
+  world.addChild(tilemap.root, entities.root, bullets.root, effects.root, reticleLayer)
   app.stage.addChild(world)
+
+  let reticleList: readonly { x: number; y: number }[] = []
+  const makeReticle = (): Graphics => {
+    const g = new Graphics()
+      .circle(0, 0, TILE_PX * 0.24)
+      .stroke({ color: 0xffffff, width: 2, alpha: 0.85 })
+      .circle(0, 0, TILE_PX * 0.05)
+      .fill({ color: 0xffffff, alpha: 0.9 })
+    g.eventMode = 'none'
+    reticleLayer.addChild(g)
+    return g
+  }
+  const drawReticles = (): void => {
+    while (reticleLayer.children.length < reticleList.length) makeReticle()
+    reticleLayer.children.forEach((g, i) => {
+      const r = reticleList[i]
+      g.visible = r !== undefined
+      if (r) g.position.set(r.x * TILE_PX, r.y * TILE_PX)
+    })
+  }
 
   const applyThemePalette = (c: ThemeChain): void => {
     const p = resolvePalette(c)
@@ -213,6 +241,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       const p = world.toGlobal({ x: wx * TILE_PX, y: wy * TILE_PX })
       return { x: p.x, y: p.y }
     },
+    setReticles(reticles): void {
+      reticleList = reticles
+    },
     setLevel(level: Level): void {
       currentLevel = level
       tilemap.build(level, art)
@@ -274,6 +305,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)
       }
+      drawReticles()
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
       tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)

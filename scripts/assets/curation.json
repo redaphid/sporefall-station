@@ -49,10 +49,13 @@
   "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.hydro-recycler/prop-hydro-recycler-s414500_00001_.png"
  },
  "char.vine-ranger.se-idle": {
-  "seed": 414500,
+  "seed": 414700,
   "batch": 4,
-  "index": 4,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-idle/char-vine-ranger-se-idle-s414500_00005_.png"
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-idle-dx1/char-vine-ranger-se-idle-dx1-s414700_00001_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "consistency fix: i2i from s-idle raw d0.5 ipw0.7; slim match, quarter-right"
  },
  "char.vine-ranger.e-idle": {
   "seed": 414700,
@@ -91,13 +94,13 @@
   "note": "i2i from idle d0.38"
  },
  "char.vine-ranger.se-step": {
-  "seed": 414590,
+  "seed": 414700,
   "batch": 4,
   "index": 2,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-step/char-vine-ranger-se-step-s414590_00003_.png",
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-step-dx1/char-vine-ranger-se-step-dx1-s414700_00003_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "i2i"
+  "note": "consistency fix: i2i from NEW se-idle raw d0.38; stride"
  },
  "char.vine-ranger.e-step": {
   "seed": 414700,

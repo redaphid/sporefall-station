@@ -138,6 +138,34 @@ def luma_sprite(src: Image.Image, canvas: int) -> Image.Image:
     return Image.fromarray(arr.astype(np.uint8), "RGBA")
 
 
+def derive_step(idle: Image.Image) -> Image.Image:
+    """Synthesize a mid-stride step frame from a 48px idle sprite: below the
+    hip line, shift the left leg-half up/right and the right half down, with a
+    1px torso lean. Deterministic, palette-preserving — used for NPCs when GPU
+    budget rules out a diffusion sweep per pose (the engine alternates
+    idle/step while moving, so a 1-2px gait read is all that's needed)."""
+    im = idle.convert("RGBA")
+    a = np.asarray(im)
+    h, w = a.shape[:2]
+    alpha_rows = np.where(a[..., 3].any(axis=1))[0]
+    if len(alpha_rows) == 0:
+        return im
+    top, bottom = alpha_rows[0], alpha_rows[-1]
+    hip = top + int((bottom - top) * 0.62)
+    out = np.zeros_like(a)
+    out[:, :] = a
+    legs = a[hip:, :, :]
+    out[hip:, :, :] = 0
+    mid = w // 2
+    # left half: up 1px and 1px inward; right half: down 1px
+    out[hip - 1:h - 1, :mid] = np.maximum(out[hip - 1:h - 1, :mid], legs[:h - hip, :mid])
+    out[hip + 1:h, mid:] = np.maximum(out[hip + 1:h, mid:], legs[: h - hip - 1, mid:])
+    # subtle torso lean: shift rows above hip by 1px toward facing side
+    torso = out[top:hip, :, :].copy()
+    out[top:hip, 1:, :] = torso[:, : w - 1, :]
+    return Image.fromarray(out, "RGBA")
+
+
 def contact_sheet(images: list[tuple[str, Image.Image]], cols: int = 8,
                   cell: int = 96, scale: int = 1, label: bool = True) -> Image.Image:
     """Grid sheet of (name, image) pairs on a dark checker background."""

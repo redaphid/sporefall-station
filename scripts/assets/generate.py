@@ -13,7 +13,7 @@ Recipe (researched + calibrated):
     NOT SD1.5; triggers "masterpiece, pixpix, 8-bit, pixel_art", CFG 3.5, euler)
   * IPAdapterAdvanced "style transfer" anchoring: ENVIRONMENT anchors for
     props/items, each character's curated s-idle for its other 9 poses
-  * tiles: Model Patch Seamless (mtb) circular padding -> truly tileable
+  * tiles: half-offset + img2img heal pass -> seamless by construction
   * post: k-centroid downscale -> locked 34-color palette (no dither)
   * gate: qwen3-vl verifier (verify.py) + human curation of seed sweeps
 

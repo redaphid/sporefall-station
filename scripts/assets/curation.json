@@ -108,5 +108,16 @@
   "index": null,
   "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/tile.root-bulkhead/tile-root-bulkhead-s414504_00001_.png",
   "note": "provisional; resweep pending"
+ },
+ "char.spore-drone.s-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-idle/char-spore-drone-s-idle-s414500_00007_.png",
+  "size": 1024,
+  "note": "divergent-prompt config"
+ },
+ "char.spore-drone.s-step": {
+  "derived": "procedural derive_step from s-idle"
  }
 }

@@ -123,9 +123,65 @@ def grenade_ball(px=20):
     save(im, "fx/spore-pod.png")
 
 
+def biolume_flame(px=48):
+    """Three flicker frames of a bioluminescent teal-green flame (the diffusion
+    sweeps produced gray scene remnants, and drawn frames animate coherently)."""
+    import math
+    for i in (1, 2, 3):
+        rng = random.Random(771200 + i)
+        im = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        cx, base = px // 2, px - 4
+        h = int(px * (0.72 + 0.1 * math.sin(i * 2.1)))  # frame-varying height
+        # layered teardrop: dark teal rim -> spore green -> pale core
+        for col, f in ((TEAL_MD, 1.0), (SPORE, 0.72), (SPORE_PALE, 0.45), (WHITE, 0.2)):
+            hh, ww = int(h * f), int(px * 0.30 * f) + 2
+            wob = rng.randint(-2, 2)
+            d.polygon([(cx + wob, base - hh),
+                       (cx + ww, base - hh // 3),
+                       (cx + ww // 2, base),
+                       (cx - ww // 2, base),
+                       (cx - ww, base - hh // 3)], fill=col + (255,))
+        for _ in range(5):  # rising motes
+            x = cx + rng.randint(-px // 4, px // 4)
+            y = base - h - rng.randint(0, px // 5)
+            d.point((x, y), rng.choice([SPORE, SPORE_PALE, CYAN]) + (230,))
+        save(im, f"fx/biolume-flame-{i}.png")
+
+
+def spore_burst(px=64):
+    """Three expanding phases of a spore explosion: flash -> ring -> drift."""
+    import math
+    for i in (1, 2, 3):
+        rng = random.Random(771300 + i)
+        im = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        c = px // 2
+        r = int(px * (0.16 + 0.14 * i))
+        if i == 1:  # hot core flash
+            d.ellipse((c - r, c - r, c + r, c + r), fill=SPORE_PALE + (255,))
+            d.ellipse((c - r // 2, c - r // 2, c + r // 2, c + r // 2), fill=WHITE + (255,))
+            spikes = 6
+        else:  # expanding ragged ring, hollowing out
+            width = max(2, 6 - i)
+            d.ellipse((c - r, c - r, c + r, c + r), outline=SPORE + (255,), width=width)
+            d.ellipse((c - r + 3, c - r + 3, c + r - 3, c + r - 3),
+                      outline=TEAL_MD + (200,), width=2)
+            spikes = 10
+        for k in range(spikes):  # thrown spore motes
+            ang = k * (6.283 / spikes) + rng.random() * 0.5
+            rr = r + rng.randint(1, px // 6)
+            x, y = c + math.cos(ang) * rr, c + math.sin(ang) * rr
+            mote = rng.choice([SPORE, SPORE_PALE, AMBER])
+            d.ellipse((x - 1, y - 1, x + 1, y + 1), fill=mote + (255,))
+        save(im, f"fx/spore-burst-{i}.png")
+
+
 if __name__ == "__main__":
     hit_spark()
     pickup_sparkle()
     ichor_splat()
     projectile()
     grenade_ball()
+    biolume_flame()
+    spore_burst()

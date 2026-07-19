@@ -6,6 +6,7 @@
 // writes deferred onto the sim step).
 
 import { makeEntity, type Entity } from '../game/entity'
+import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behaviors'
 import { NPCS } from '../game/data/npcs'
 import { MODS, isModId, modMaxStacks } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
@@ -33,6 +34,7 @@ export const WRITE_VERBS = new Set([
   'annotate',
   'clearAnnotations',
   'addMod',
+  'setBehavior',
 ])
 
 export interface VerbCtx {
@@ -92,6 +94,22 @@ const mergeInto = (target: Record<string, unknown>, patch: Record<string, unknow
     if (isPlainObject(pv) && isPlainObject(tv)) mergeInto(tv, pv)
     else target[k] = coerce(tv, pv)
   }
+}
+
+/** Whitelist-copy behavior params from untrusted input. Only known fields are
+ * read, and every number is checked finite — a hostile patch can neither reach
+ * a prototype nor NaN-poison the deterministic sim. */
+const sanitizeBehaviorParams = (raw: Record<string, unknown>): import('../game/entity').AiBehaviorParams => {
+  const out: import('../game/entity').AiBehaviorParams = {}
+  if (raw.waypoints !== undefined) {
+    if (!Array.isArray(raw.waypoints)) throw new Error('params.waypoints must be an array of {x,y}')
+    out.waypoints = raw.waypoints.map((p) => {
+      if (!isPlainObject(p) || typeof p.x !== 'number' || typeof p.y !== 'number' || !Number.isFinite(p.x) || !Number.isFinite(p.y))
+        throw new Error('params.waypoints entries must be {x:number, y:number}')
+      return { x: p.x, y: p.y }
+    })
+  }
+  return out
 }
 
 const nextPlayerSlot = (w: World): number => {
@@ -327,6 +345,62 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
       else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
       return JSON.stringify({ id: e.id, weapon: e.combat?.weapon, mods: stack.mods })
+    }
+
+    case 'ai': {
+      // Why did this NPC do that? One legible dump: the resolved behavior, its
+      // consideration list, the chosen goal + when, and the last think's scores.
+      const e = entity(w, rest)
+      if (!e.ai) throw new Error(`entity ${e.id} has no ai component (try: setBehavior ${e.id} basic)`)
+      const requested = e.ai.behavior ?? DEFAULT_BEHAVIOR
+      const registered = !!BEHAVIORS[requested]
+      const def = behaviorFor(e)
+      return JSON.stringify({
+        id: e.id,
+        archetype: e.archetype,
+        behavior: requested,
+        // A stale/unknown id still runs — but say so instead of lying.
+        ...(registered ? {} : { unknownBehavior: true, effective: DEFAULT_BEHAVIOR }),
+        considerations: def.considerations,
+        state: serializeEntity(e).ai,
+      })
+    }
+
+    case 'behaviors':
+      // The pluggable-behavior registry: what brains exist and what each weighs.
+      return JSON.stringify(
+        Object.fromEntries(
+          Object.entries(BEHAVIORS).map(([id, d]) => [id, { about: d.about, considerations: d.considerations }]),
+        ),
+      )
+
+    case 'setBehavior': {
+      // Swap (or bootstrap) an entity's brain at runtime:
+      //   setBehavior <id> <behaviorId> [paramsJson]   e.g.
+      //   setBehavior 12 patrol {"waypoints":[{"x":10,"y":11},{"x":16,"y":11}]}
+      const [ids, bid] = rest.split(/\s+/)
+      const jsonStart = rest.indexOf('{')
+      const e = entity(w, ids)
+      if (!bid || !BEHAVIORS[bid])
+        throw new Error(`unknown behavior "${bid ?? ''}" — known: ${Object.keys(BEHAVIORS).sort().join(', ')}`)
+      let params: import('../game/entity').AiBehaviorParams | undefined
+      if (jsonStart >= 0) {
+        const parsed = JSON.parse(decodeArg(rest.slice(jsonStart))) as unknown
+        if (!isPlainObject(parsed)) throw new Error('setBehavior params must be a JSON object')
+        assertNoForbiddenKeys(parsed)
+        params = sanitizeBehaviorParams(parsed)
+      }
+      // Bootstrap a brain onto anything — a prop can be given legs for a repro.
+      e.ai ??= { mode: 'idle', faction: 'neutral', home: { x: e.pos.x, y: e.pos.y }, thinkAt: w.tick, sightRange: 6 }
+      e.ai.behavior = bid
+      if (params) e.ai.params = params
+      // Shed transient decision state so the new brain starts clean, now.
+      e.ai.targetId = undefined
+      e.ai.waypoint = undefined
+      e.ai.search = undefined
+      e.ai.patrolIndex = 0
+      e.ai.thinkAt = w.tick
+      return runVerb(w, `ai ${e.id}`, ctx)
     }
 
     case 'command':

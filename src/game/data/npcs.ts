@@ -12,6 +12,10 @@ export interface NpcDef {
   fleesOnDamage: boolean
   /** Peaceful until hit, then fights back (bouncers). */
   retaliates?: boolean
+  /** Behavior registry id (systems/behaviors.ts) newly spawned NPCs of this
+   * archetype think with. Absent → 'basic'. Populate may override per-spawn
+   * (street cops get a patrol beat, some civilians scavenge). */
+  behavior?: string
 }
 
 export const NPCS: Record<string, NpcDef> = {
@@ -34,6 +38,7 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
+    behavior: 'hunter',
   },
   cop: {
     archetype: 'cop',
@@ -54,6 +59,7 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
+    behavior: 'hunter',
   },
   bouncer: {
     archetype: 'bouncer',
@@ -75,6 +81,7 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 6,
     hostility: 'never',
     fleesOnDamage: true,
+    behavior: 'skittish',
   },
   shopkeeper: {
     archetype: 'shopkeeper',
@@ -95,6 +102,7 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 6,
     hostility: 'never',
     fleesOnDamage: true,
+    behavior: 'skittish',
   },
   robot: {
     archetype: 'robot',

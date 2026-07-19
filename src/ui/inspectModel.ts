@@ -54,6 +54,8 @@ export const inspectCard = (e: Entity): InspectCard => {
     // Disposition: the AI's current goal/mode is the closest friendly read.
     if (e.ai.goal) rows.push({ label: 'Disposition', value: pretty(e.ai.goal) })
     else if (e.ai.mode) rows.push({ label: 'Disposition', value: pretty(e.ai.mode) })
+    // Which pluggable brain is running (non-default only — 'basic' is implied).
+    if (e.ai.behavior && e.ai.behavior !== 'basic') rows.push({ label: 'Behavior', value: pretty(e.ai.behavior) })
   }
 
   if (e.playerCtl) {

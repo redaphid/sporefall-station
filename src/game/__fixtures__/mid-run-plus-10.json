@@ -117,6 +117,12 @@
         },
         "thinkAt": 42,
         "sightRange": 8,
+        "lastScores": {
+          "threat": 80.903,
+          "pursueMemory": 1.5,
+          "wander": 1
+        },
+        "goalSince": 0,
         "goal": "battle",
         "targetId": 1,
         "lastKnownTargetPos": {
@@ -172,6 +178,10 @@
         },
         "thinkAt": 40,
         "sightRange": 7,
+        "lastScores": {
+          "wander": 1
+        },
+        "goalSince": 0,
         "goal": "wander",
         "waypoint": {
           "x": -1.5,

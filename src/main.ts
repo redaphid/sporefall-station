@@ -110,7 +110,12 @@ const boot = async (): Promise<void> => {
       // browser test can draw over the scene without a hub.
       ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
         runVerb(hostWorld, `annotate ${line}`)
-      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) => runVerb(hostWorld, line)
+      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) =>
+        runVerb(hostWorld, line, { setTheme: (id) => void renderer.setTheme(id) })
+      // Awaitable theme swap for e2e screenshot tests (the `theme` verb is
+      // fire-and-forget; this resolves when the new assets are actually baked).
+      ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
+        renderer.setTheme(id)
       // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
       // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
       // the local player's equipped gun. Exposed here so a screenshot e2e can show
@@ -163,7 +168,10 @@ const boot = async (): Promise<void> => {
     // `?debug=<name>` labels this game in the hub's registry so multiple games on
     // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
     const name = params.get('debug') || undefined
-    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, { name })
+    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
+      name,
+      setTheme: (id) => void renderer.setTheme(id),
+    })
   }
   runLoop(session, renderer, uiMount, coop, touch, debug)
 }

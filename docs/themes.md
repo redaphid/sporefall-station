@@ -237,7 +237,10 @@ everything else stays city.
 
 1. `mkdir public/themes/<id>` — id is lowercase `[a-z0-9-]+` (e.g. `swamp`).
 2. Drop asset PNGs in the folder (any subfolder layout you like — the manifest
-   maps keys to paths, the engine imposes no file naming).
+   maps keys to paths, the engine imposes no file naming). To *generate* the
+   art with the local ComfyUI pipeline (seed sweeps, IPAdapter anchoring,
+   palette locking, VLM gating), follow **`docs/sprite-generation.md`** — the
+   `scripts/assets/` toolchain that built the `swampspace` pack.
 3. Write `public/themes/<id>/manifest.json` against the schema above. Start
    partial; add keys as art lands.
 4. Add `{ "id": "<id>", "name": "<Display Name>" }` to `public/themes/index.json`.

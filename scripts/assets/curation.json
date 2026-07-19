@@ -1,0 +1,309 @@
+{
+ "tile.deck-moss": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/tile.deck-moss/tile-deck-moss-s414500_00002_.png"
+ },
+ "prop.spore-barrel": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.spore-barrel/prop-spore-barrel-s414504_00004_.png"
+ },
+ "char.vine-ranger.s-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.s-idle/char-vine-ranger-s-idle-s414500_00005_.png",
+  "note": "vivid-prompt resweep"
+ },
+ "prop.cargo-pod": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.cargo-pod/prop-cargo-pod-s414500_00003_.png"
+ },
+ "prop.cryo-terminal": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.cryo-terminal/prop-cryo-terminal-s414504_00001_.png"
+ },
+ "prop.nutrient-dispenser": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.nutrient-dispenser/prop-nutrient-dispenser-s414500_00001_.png"
+ },
+ "prop.console-monitor": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.console-monitor/prop-console-monitor-s414500_00001_.png"
+ },
+ "prop.hydro-recycler": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.hydro-recycler/prop-hydro-recycler-s414500_00001_.png"
+ },
+ "char.vine-ranger.se-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 4,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-idle/char-vine-ranger-se-idle-s414500_00005_.png"
+ },
+ "char.vine-ranger.e-idle": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-idle/char-vine-ranger-e-idle-s414504_00004_.png"
+ },
+ "char.vine-ranger.ne-idle": {
+  "seed": 414595,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-idle-r3/char-vine-ranger-ne-idle-r3-s414595_00003_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "r3 i2i from e-idle d0.55 (arch/spray artifacts in r1)"
+ },
+ "char.vine-ranger.n-idle": {
+  "seed": 414504,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-idle/char-vine-ranger-n-idle-s414504_00002_.png"
+ },
+ "char.vine-ranger.s-step": {
+  "seed": 414590,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.s-step/char-vine-ranger-s-step-s414590_00003_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i from idle d0.38"
+ },
+ "char.vine-ranger.se-step": {
+  "seed": 414590,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.se-step/char-vine-ranger-se-step-s414590_00003_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "char.vine-ranger.e-step": {
+  "seed": 414590,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-step/char-vine-ranger-e-step-s414590_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "char.vine-ranger.ne-step": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-step/char-vine-ranger-ne-step-s414500_00008_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i from r3 ne-idle"
+ },
+ "char.vine-ranger.n-step": {
+  "seed": 414590,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-step/char-vine-ranger-n-step-s414590_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "tile.root-bulkhead": {
+  "seed": 414580,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/tile.root-bulkhead/tile-root-bulkhead-s414580_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "SD1.5 seamless offset-heal"
+ },
+ "char.spore-drone.s-idle": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-idle/char-spore-drone-s-idle-s414500_00007_.png",
+  "size": 1024,
+  "note": "divergent-prompt config"
+ },
+ "char.spore-drone.s-step": {
+  "seed": 414590,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-step/char-spore-drone-s-step-s414590_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "char.bog-mutant.s-idle": {
+  "seed": 414560,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-idle/char-bog-mutant-s-idle-s414560_00004_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "divergent-prompt SD1.5"
+ },
+ "char.mycologist.s-idle": {
+  "seed": 414564,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.mycologist.s-idle/char-mycologist-s-idle-s414564_00004_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "re-pick: prior had baked root arch"
+ },
+ "char.derelict-bot.s-idle": {
+  "seed": 414560,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.derelict-bot.s-idle/char-derelict-bot-s-idle-s414560_00004_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "divergent-prompt SD1.5"
+ },
+ "char.frog-settler.s-idle": {
+  "seed": 414564,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.frog-settler.s-idle/char-frog-settler-s-idle-s414564_00001_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "divergent-prompt SD1.5"
+ },
+ "item.phosphor-flask": {
+  "seed": 414570,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.phosphor-flask/item-phosphor-flask-s414570_00004_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "icon config"
+ },
+ "item.shard-knife": {
+  "seed": 414570,
+  "batch": 4,
+  "index": 3,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.shard-knife/item-shard-knife-s414570_00004_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "icon config"
+ },
+ "item.scatter-blaster": {
+  "seed": 414570,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.scatter-blaster/item-scatter-blaster-s414570_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "icon config"
+ },
+ "item.spore-grenade": {
+  "seed": 414570,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.spore-grenade/item-spore-grenade-s414570_00003_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "icon config"
+ },
+ "item.credit-chits": {
+  "seed": 414570,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.credit-chits/item-credit-chits-s414570_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "icon config"
+ },
+ "char.bog-mutant.s-step": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-step/char-bog-mutant-s-step-s414500_00003_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "char.derelict-bot.s-step": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.derelict-bot.s-step/char-derelict-bot-s-step-s414500_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "char.frog-settler.s-step": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.frog-settler.s-step/char-frog-settler-s-step-s414500_00003_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i"
+ },
+ "item.biogel-kit": {
+  "seed": 414575,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.biogel-kit/item-biogel-kit-r2-s414575_00002_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "r2 icon"
+ },
+ "item.root-club": {
+  "seed": 414575,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.root-club/item-root-club-r2-s414575_00001_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "r2 icon (weakest of pack)"
+ },
+ "item.spore-pistol": {
+  "seed": 414575,
+  "batch": 4,
+  "index": 0,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/item.spore-pistol/item-spore-pistol-r2-s414575_00001_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "r2 icon"
+ },
+ "char.mycologist.s-step": {
+  "seed": 414500,
+  "batch": 4,
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.mycologist.s-step/char-mycologist-s-step-s414500_00006_.png",
+  "size": 512,
+  "ckpt": "dreamshaper_8",
+  "note": "i2i from re-picked idle"
+ },
+ "extra.chars/bog-mutant-s-attack-1.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-attack-1/char-bog-mutant-s-attack-1-r2-s414610_00003_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "extra.chars/bog-mutant-s-attack-2.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-attack-2/char-bog-mutant-s-attack-2-r2-s414610_00001_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "extra.chars/spore-drone-s-attack-1.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-1/char-spore-drone-s-attack-1-s414600_00003_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "extra.chars/spore-drone-s-attack-2.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-2/char-spore-drone-s-attack-2-s414600_00004_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ }
+}

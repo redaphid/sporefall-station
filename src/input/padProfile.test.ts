@@ -63,9 +63,6 @@ describe('padProfile', () => {
     it('has no separate hat axis', () => {
       expect(p.hatAxis).toBe(null)
     })
-    it('lets any face button or start trigger press-to-join', () => {
-      expect(p.join).toEqual(expect.arrayContaining([0, 1, 2, 3, 9]))
-    })
     it('maps throw and weapon-cycle to free buttons that do not collide with move/attack/roll', () => {
       expect(p.throw.length).toBeGreaterThan(0)
       expect(p.hotbarPrev.length).toBeGreaterThan(0)
@@ -92,7 +89,6 @@ describe('padProfile', () => {
         throw: [8],
         hotbarPrev: [10],
         hotbarNext: [11],
-        join: [0, 1, 2, 3, 9],
         dpad: [12, 13, 14, 15],
         moveAxes: [0, 1],
         aimAxes: [2, 3],

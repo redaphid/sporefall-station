@@ -256,7 +256,7 @@ describe('remapProfile — the read-path overlay', () => {
     expect(p.attack).toEqual([1])
     expect(p.interact).toEqual([0, 5, 6, 7])
   })
-  it('never touches axes, dpad, join, or kind — remap cannot smuggle analog trust', () => {
+  it('never touches axes, dpad, or kind — remap cannot smuggle analog trust', () => {
     setButtonMap(bindButton(defaultButtonMap(), 'attack', 1))
     for (const base of [STD, RAW]) {
       const p = remapProfile(base)
@@ -265,7 +265,6 @@ describe('remapProfile — the read-path overlay', () => {
       expect(p.aimAxes).toEqual(base.aimAxes) // raw stays null: no aim stick appears
       expect(p.hatAxis).toEqual(base.hatAxis)
       expect(p.dpad).toEqual(base.dpad)
-      expect(p.join).toEqual(base.join)
     }
   })
   it('applies uniformly to every profile kind (one map for all pads)', () => {

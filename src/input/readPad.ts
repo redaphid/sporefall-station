@@ -19,7 +19,7 @@ export interface PadState {
   hotbarNext: boolean
 }
 
-const DEADZONE = 0.28
+export const DEADZONE = 0.28
 
 /** Analog trigger threshold: past half-travel counts as pressed. Matters for
  * L2/R2 fire — some pads report a trigger's travel only in `.value` and are
@@ -28,35 +28,54 @@ const DEADZONE = 0.28
  * fake a press. */
 const TRIGGER_PRESS = 0.5
 
-/** Is button `i` down on this pad? Exported so the remap capture (padCapture.ts)
- * uses the EXACT same press definition as gameplay — a reading that can't fire
- * an action can't bind one either. */
+/** Is button `i` down on this pad? Exported for padJoin (a press is a fact
+ * about the pad regardless of which action its index maps to, so ANY press is
+ * valid join intent) and for the remap capture (padCapture.ts), which must use
+ * the EXACT same press definition as gameplay — a reading that can't fire an
+ * action can't bind one either. */
 export const buttonPressed = (pad: Gamepad, i: number): boolean => {
   const b = pad.buttons[i]
   if (!b) return false
   return b.pressed || (b.value > TRIGGER_PRESS && b.value <= 1)
 }
 
-const pressed = buttonPressed
-
-const anyPressed = (pad: Gamepad, idxs: number[]): boolean => idxs.some((i) => pressed(pad, i))
+const anyPressed = (pad: Gamepad, idxs: number[]): boolean => idxs.some((i) => buttonPressed(pad, i))
 
 /** One axis reading, or undefined if the pad simply does not have that axis (or
  * reports garbage for it). Keeping "absent" distinct from "reads 0" matters:
  * a hat that isn't there and a hat pushed to some value are different facts,
- * and collapsing both to 0 is what pinned the player to a wall (see hatDir). */
-const axisAt = (pad: Gamepad, i: number): number | undefined => {
+ * and collapsing both to 0 is what pinned the player to a wall (see hatDir).
+ * Exported for padJoin, which reads raw axes to judge join intent. */
+export const axisValue = (pad: Gamepad, i: number): number | undefined => {
   const v = pad.axes[i]
   if (typeof v !== 'number' || !Number.isFinite(v)) return undefined
   return v
 }
 
-/** An analog stick axis, deadzoned. A missing/garbage axis is centred. */
-const stick = (pad: Gamepad, i: number): number => {
-  const v = axisAt(pad, i)
-  if (v === undefined) return 0
-  return Math.abs(v) < DEADZONE ? 0 : v
+/**
+ * RADIAL deadzone with rescale, applied to a stick as a 2D pair — the feel fix
+ * over per-axis clipping. Two properties matter:
+ *
+ *  1. **No snap at the deadzone edge.** Output magnitude ramps smoothly from 0
+ *     at the deadzone rim to 1 at full tilt ((mag - DZ) / (1 - DZ)), instead of
+ *     jumping from 0 to 0.28 the moment the stick crosses the rim.
+ *  2. **No axis-aligned bias.** Per-axis clipping zeroes a small X component
+ *     while keeping a large Y, snapping near-vertical pushes exactly vertical
+ *     and making diagonals feel sticky. Judging the vector's magnitude keeps
+ *     the direction the player actually pushed.
+ *
+ * Magnitude clamps to 1 so an out-of-spec driver (|v| > 1) can't overspeed. */
+export const radialDeadzone = (x: number, y: number): { x: number; y: number } => {
+  const mag = Math.hypot(x, y)
+  if (mag < DEADZONE) return { x: 0, y: 0 }
+  const k = Math.min(1, (mag - DEADZONE) / (1 - DEADZONE)) / mag
+  return { x: x * k, y: y * k }
 }
+
+/** A stick's axis pair read together and radially deadzoned. Missing/garbage
+ * axes read centred. */
+const stickPair = (pad: Gamepad, ix: number, iy: number): { x: number; y: number } =>
+  radialDeadzone(axisValue(pad, ix) ?? 0, axisValue(pad, iy) ?? 0)
 
 // The eight hat directions, clockwise from up.
 const HAT_DIRS: [number, number][] = [
@@ -117,14 +136,15 @@ const hatDir = (v: number | undefined): [number, number] | null => {
 }
 
 export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
-  let moveX = stick(pad, profile.moveAxes[0])
-  let moveY = stick(pad, profile.moveAxes[1])
+  const move = stickPair(pad, profile.moveAxes[0], profile.moveAxes[1])
+  let moveX = move.x
+  let moveY = move.y
 
   const [up, down, left, right] = profile.dpad
-  if (pressed(pad, left)) moveX = -1
-  if (pressed(pad, right)) moveX = 1
-  if (pressed(pad, up)) moveY = -1
-  if (pressed(pad, down)) moveY = 1
+  if (buttonPressed(pad, left)) moveX = -1
+  if (buttonPressed(pad, right)) moveX = 1
+  if (buttonPressed(pad, up)) moveY = -1
+  if (buttonPressed(pad, down)) moveY = 1
 
   // The hat FILLS IN: it claims an axis nothing else has already moved, rather
   // than overwriting one. Precedence is by confidence, not by source -- a stick
@@ -135,7 +155,7 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
   // who is pushing a real input. Per-axis, so a diagonal hat still contributes
   // its Y while the stick holds X.
   if (profile.hatAxis !== null) {
-    const dir = hatDir(axisAt(pad, profile.hatAxis))
+    const dir = hatDir(axisValue(pad, profile.hatAxis))
     if (dir) {
       if (moveX === 0) moveX = dir[0]
       if (moveY === 0) moveY = dir[1]
@@ -146,8 +166,9 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
   // reads centred. This is not "no aim": selectAim falls back to the movement
   // vector, and the fire buttons are untouched. See PadProfile.aimAxes for why
   // guessing here is unacceptable in a way that guessing a d-pad index is not.
-  const aimX = profile.aimAxes === null ? 0 : stick(pad, profile.aimAxes[0])
-  const aimY = profile.aimAxes === null ? 0 : stick(pad, profile.aimAxes[1])
+  const aim = profile.aimAxes === null ? { x: 0, y: 0 } : stickPair(pad, profile.aimAxes[0], profile.aimAxes[1])
+  const aimX = aim.x
+  const aimY = aim.y
 
   return {
     moveX,

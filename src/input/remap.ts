@@ -201,9 +201,10 @@ export const resetButtonMapCacheForTest = (): void => {
 
 /**
  * The read-path overlay: the user's button map layered over a resolved
- * profile. Buttons only — kind, moveAxes, aimAxes, hatAxis, dpad and join pass
+ * profile. Buttons only — kind, moveAxes, aimAxes, hatAxis and dpad pass
  * through untouched, so no remap can ever grant an axis the profile refused to
- * trust, move the player off a face button, or change how pads join.
+ * trust or move the player off a face button. Joining (padJoin.ts: any button,
+ * or a proven stick push) is independent of this overlay entirely.
  */
 export const remapProfile = (profile: PadProfile): PadProfile => {
   const m = getButtonMap()

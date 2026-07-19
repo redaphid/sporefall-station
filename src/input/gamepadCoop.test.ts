@@ -38,6 +38,16 @@ const press = (i: number) => {
   return b
 }
 
+/** Expected stick output after readPad's RADIAL deadzone + rescale: magnitude
+ * ramps from 0 at the 0.28 rim to 1 at full tilt, direction preserved.
+ * Computed independently of the implementation. */
+const dz = (x: number, y = 0) => {
+  const mag = Math.hypot(x, y)
+  if (mag < 0.28) return { x: 0, y: 0 }
+  const k = Math.min(1, (mag - 0.28) / (1 - 0.28)) / mag
+  return { x: x * k, y: y * k }
+}
+
 describe('createGamepadCoop', () => {
   let pads: (Gamepad | null)[]
   let coop: ReturnType<typeof createGamepadCoop>
@@ -76,12 +86,14 @@ describe('createGamepadCoop', () => {
   describe('per-player input routing', () => {
     beforeEach(() => {
       pads = [pad(0, { buttons: press(0) })]
-      coop.sample()
+      coop.sample() // join
+      pads = [pad(0)]
+      coop.sample() // release the join press so nothing stays inert-masked
     })
-    it('feeds stick movement to the joined player', () => {
+    it('feeds stick movement to the joined player (radially rescaled)', () => {
       pads = [pad(0, { axes: [0.9, 0] })]
       const r = coop.sample()
-      expect(r.inputs.get(0)!.moveX).toBeCloseTo(0.9)
+      expect(r.inputs.get(0)!.moveX).toBeCloseTo(dz(0.9).x, 5)
     })
     it('holds attack while the button is down', () => {
       pads = [pad(0, { buttons: press(0) })]
@@ -92,12 +104,12 @@ describe('createGamepadCoop', () => {
       pads = [pad(0, { axes: [0, 0, 0, -0.9] })]
       const cmd = coop.sample().inputs.get(0)!
       expect(cmd.aimX).toBeCloseTo(0)
-      expect(cmd.aimY).toBeCloseTo(-0.9)
+      expect(cmd.aimY).toBeCloseTo(dz(-0.9).x, 5)
     })
     it('falls back to aim-where-you-move when the right stick is centred', () => {
       pads = [pad(0, { axes: [0.9, 0] })]
       const cmd = coop.sample().inputs.get(0)!
-      expect(cmd.aimX).toBeCloseTo(0.9)
+      expect(cmd.aimX).toBeCloseTo(dz(0.9).x, 5)
       expect(cmd.aimY).toBeCloseTo(0)
     })
   })
@@ -156,7 +168,9 @@ describe('createGamepadCoop', () => {
   describe('firing is buttons only: L2 shoots, the aim stick never does', () => {
     beforeEach(() => {
       pads = [pad(0, { buttons: press(0) })]
-      coop.sample()
+      coop.sample() // join
+      pads = [pad(0)]
+      coop.sample() // release the join press
     })
     it('holds attack while L2 (button 6) is down', () => {
       pads = [pad(0, { buttons: press(6) })]
@@ -165,7 +179,7 @@ describe('createGamepadCoop', () => {
     it('aims from the right stick without setting attack', () => {
       pads = [pad(0, { axes: [0, 0, 0.9, 0] })]
       const cmd = coop.sample().inputs.get(0)!
-      expect(cmd.aimX).toBeCloseTo(0.9)
+      expect(cmd.aimX).toBeCloseTo(dz(0.9).x, 5)
       expect(cmd.attack).toBe(false)
     })
     it('leaves attack false for a centred right stick and no button', () => {
@@ -178,16 +192,19 @@ describe('createGamepadCoop', () => {
       pads = [pad(0, { buttons: b, axes: [0, 0, 0, -0.9] })]
       const cmd = coop.sample().inputs.get(0)!
       expect(cmd.attack).toBe(true)
-      expect(cmd.aimY).toBeCloseTo(-0.9)
+      expect(cmd.aimY).toBeCloseTo(dz(-0.9).x, 5)
     })
   })
 
   /**
-   * The press that joins a pad is spent on joining. Start doubles as the pause
-   * button, so before this rule a player pressing Start to join instantly
-   * paused the game; a face-button join fired an attack for the same reason.
+   * The input that joins a pad is spent on joining — on the joining sample AND
+   * for as long as it stays physically held. Start doubles as the pause button;
+   * X/Y are the special (grenade) buttons; attack/special are LEVEL-triggered
+   * in the sim. Before the held-until-release rule, the joining press went
+   * inert for exactly one sample and then fired anyway on the next — joining
+   * with X threw a grenade every time (a human press spans many samples).
    */
-  describe('the joining press is inert', () => {
+  describe('the joining input is inert until released', () => {
     it('does not pause when Start is the join press', () => {
       pads = [pad(0, { buttons: press(9) })]
       const r = coop.sample()
@@ -214,11 +231,154 @@ describe('createGamepadCoop', () => {
       pads = [pad(0, { buttons: press(9) })] // deliberate pause
       expect(coop.sample().pauses).toContain(0)
     })
-    it('attacks normally on the sample after an A-button join while still held', () => {
+    it('does NOT attack while the A join press stays held (the level-trigger leak)', () => {
       pads = [pad(0, { buttons: press(0) })]
       coop.sample()
       pads = [pad(0, { buttons: press(0) })]
+      expect(coop.sample().inputs.get(0)!.attack).toBe(false)
+      pads = [pad(0, { buttons: press(0) })]
+      expect(coop.sample().inputs.get(0)!.attack).toBe(false)
+    })
+    it('attacks on a fresh A press after the join press is released', () => {
+      pads = [pad(0, { buttons: press(0) })]
+      coop.sample() // join
+      pads = [pad(0)]
+      coop.sample() // release
+      pads = [pad(0, { buttons: press(0) })]
       expect(coop.sample().inputs.get(0)!.attack).toBe(true)
+    })
+
+    // The reported bug, exactly: joining with the special/grenade button (X)
+    // must never throw a grenade — not on the join sample, not while held.
+    it('joining with X never fires special until a fresh press', () => {
+      pads = [pad(0, { buttons: press(2) })]
+      const r = coop.sample()
+      expect(r.joins).toContain(0)
+      expect(r.inputs.get(0)!.special).toBe(false)
+      for (let i = 0; i < 5; i++) {
+        pads = [pad(0, { buttons: press(2) })]
+        expect(coop.sample().inputs.get(0)!.special).toBe(false)
+      }
+      pads = [pad(0)]
+      coop.sample() // release
+      pads = [pad(0, { buttons: press(2) })]
+      expect(coop.sample().inputs.get(0)!.special).toBe(true)
+    })
+
+    // EVERY joinable button, exhaustively: while the joining press is held, NO
+    // gameplay action of any kind may fire on any sample.
+    it.each([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])(
+      'button %i joins the pad and stays fully inert while held',
+      (i) => {
+        coop.update(
+          viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'bat', qty: 1 }], activeSlot: 0 }]),
+        )
+        pads = [pad(0, { buttons: press(i) })]
+        const first = coop.sample()
+        expect(first.joins).toContain(0)
+        // Join sample + three held samples: nothing fires.
+        const samples = [first]
+        for (let s = 0; s < 3; s++) {
+          pads = [pad(0, { buttons: press(i) })]
+          samples.push(coop.sample())
+        }
+        for (const r of samples) {
+          const cmd = r.inputs.get(0)!
+          expect(cmd.attack).toBe(false)
+          expect(cmd.interact).toBe(false)
+          expect(cmd.special).toBe(false)
+          expect(cmd.roll).toBe(false)
+          expect(cmd.throwItem).toBe(false)
+          expect(cmd.hotbar).toBe(-1)
+          expect(r.pauses).toHaveLength(0)
+        }
+      },
+    )
+  })
+
+  /**
+   * Stick-to-join: an unjoined pad joins on a firm, sustained push of a trusted
+   * stick — so a player who only touches the joystick is never locked out. The
+   * detailed trust rules (neutral proof, thresholds, raw-pad axes) are unit-
+   * tested in padJoin.test.ts; this suite covers the coop wiring.
+   */
+  describe('stick movement joins an unjoined pad', () => {
+    const wiggle = (moveX: number) => pad(0, { axes: [moveX, 0] })
+
+    it('joins after a sustained firm push (idle first, then three firm samples)', () => {
+      pads = [wiggle(0)]
+      coop.sample()
+      let joined = false
+      for (let i = 0; i < 3; i++) {
+        pads = [wiggle(0.9)]
+        joined ||= coop.sample().joins.length > 0
+      }
+      expect(joined).toBe(true)
+    })
+    it('the joining push is inert on the join sample, then movement flows', () => {
+      pads = [wiggle(0)]
+      coop.sample()
+      pads = [wiggle(0.9)]
+      coop.sample()
+      pads = [wiggle(0.9)]
+      coop.sample()
+      pads = [wiggle(0.9)]
+      const joinSample = coop.sample() // sustain reached: joins HERE
+      expect(joinSample.joins).toContain(0)
+      expect(joinSample.inputs.get(0)!.moveX).toBe(0) // spent on joining
+      expect(joinSample.inputs.get(0)!.attack).toBe(false)
+      pads = [wiggle(0.9)]
+      const next = coop.sample()
+      expect(next.inputs.get(0)!.moveX).toBeCloseTo(dz(0.9).x, 5) // now it drives
+    })
+    it('a below-threshold wiggle never joins', () => {
+      pads = [wiggle(0)]
+      coop.sample()
+      for (let i = 0; i < 20; i++) {
+        pads = [wiggle(0.4)]
+        expect(coop.sample().joins).toHaveLength(0)
+      }
+    })
+    it('drift at ±0.3 never joins', () => {
+      for (let i = 0; i < 50; i++) {
+        pads = [wiggle(i % 2 === 0 ? 0.3 : -0.3)]
+        expect(coop.sample().joins).toHaveLength(0)
+      }
+    })
+    it('a raw pad joins from its (trusted, proven) left stick too', () => {
+      pads = [pad(0, { mapping: '', axes: [0, 0] })]
+      coop.sample()
+      let joined = false
+      for (let i = 0; i < 3; i++) {
+        pads = [pad(0, { mapping: '', axes: [0.9, 0] })]
+        joined ||= coop.sample().joins.length > 0
+      }
+      expect(joined).toBe(true)
+    })
+    it('a raw pad NEVER joins from untrusted aim axes pinned at full deflection', () => {
+      for (let i = 0; i < 50; i++) {
+        pads = [pad(0, { mapping: '', axes: [0, 0, -1, -1] })]
+        expect(coop.sample().joins).toHaveLength(0)
+      }
+    })
+    it('a resting trigger pair on a canonical pad (aim axes at -1) never joins', () => {
+      for (let i = 0; i < 50; i++) {
+        pads = [pad(0, { mapping: '', axisCount: 4, axes: [0, 0, -1, -1] })]
+        expect(coop.sample().joins).toHaveLength(0)
+      }
+    })
+    it('two pads can join by different means and get distinct slots', () => {
+      pads = [pad(0), pad(1)]
+      coop.sample() // both prove neutral
+      for (let i = 0; i < 3; i++) {
+        pads = [pad(0, { axes: [0, -0.9] }), pad(1)]
+        coop.sample()
+      }
+      pads = [pad(0, { axes: [0, -0.9] }), pad(1, { buttons: press(0) })]
+      coop.sample()
+      const dbg = coop.debug()
+      const slots = dbg.map((p) => p.slot).sort()
+      expect(slots).toEqual([0, 1])
     })
   })
 
@@ -370,7 +530,9 @@ describe('createGamepadCoop', () => {
 
     beforeEach(() => {
       pads = [androidPad({ buttons: press(0) })]
-      coop.sample()
+      coop.sample() // join
+      pads = [androidPad()]
+      coop.sample() // release the join press
     })
 
     it('feeds no movement at all while the pad sits idle', () => {
@@ -382,7 +544,7 @@ describe('createGamepadCoop', () => {
 
     it('feeds stick Y through instead of a phantom +Y', () => {
       pads = [androidPad({ axes: [0, -0.9] })]
-      expect(coop.sample().inputs.get(0)!.moveY).toBeCloseTo(-0.9)
+      expect(coop.sample().inputs.get(0)!.moveY).toBeCloseTo(dz(0, -0.9).y, 5)
     })
 
     it('does not pin aim southward when idle (aim-where-you-move reads moveY)', () => {
@@ -408,7 +570,9 @@ describe('createGamepadCoop', () => {
 
     beforeEach(() => {
       pads = [rawPad({ buttons: press(0) })]
-      coop.sample()
+      coop.sample() // join
+      pads = [rawPad()]
+      coop.sample() // release the join press
     })
 
     it('feeds no attack while the pad sits idle with its triggers resting at -1', () => {
@@ -451,8 +615,8 @@ describe('createGamepadCoop', () => {
     it('still aims where the player moves, so the pad is not disarmed', () => {
       pads = [rawPad({ axes: [0, -0.9, -1, -1] })]
       const cmd = coop.sample().inputs.get(0)!
-      expect(cmd.moveY).toBeCloseTo(-0.9)
-      expect(cmd.aimY).toBeCloseTo(-0.9) // selectAim falls back to the move vector
+      expect(cmd.moveY).toBeCloseTo(dz(0, -0.9).y, 5)
+      expect(cmd.aimY).toBeCloseTo(dz(0, -0.9).y, 5) // selectAim falls back to the move vector
       expect(cmd.attack).toBe(false)
     })
 
@@ -473,14 +637,16 @@ describe('createGamepadCoop', () => {
 
     beforeEach(() => {
       pads = [canonPad({ buttons: press(0) })]
-      coop.sample()
+      coop.sample() // join
+      pads = [canonPad()]
+      coop.sample() // release the join press
     })
 
     it('feeds right-stick aim through to the InputCmd without firing', () => {
       pads = [canonPad({ axes: [0, 0, 0.9, -0.8] })]
       const cmd = coop.sample().inputs.get(0)!
-      expect(cmd.aimX).toBeCloseTo(0.9)
-      expect(cmd.aimY).toBeCloseTo(-0.8)
+      expect(cmd.aimX).toBeCloseTo(dz(0.9, -0.8).x, 5)
+      expect(cmd.aimY).toBeCloseTo(dz(0.9, -0.8).y, 5)
       expect(cmd.attack).toBe(false)
     })
 
@@ -490,7 +656,7 @@ describe('createGamepadCoop', () => {
       pads = [canonPad({ buttons: b, axes: [0, 0, 0.9, -0.8] })]
       const cmd = coop.sample().inputs.get(0)!
       expect(cmd.attack).toBe(true)
-      expect(cmd.aimX).toBeCloseTo(0.9)
+      expect(cmd.aimX).toBeCloseTo(dz(0.9, -0.8).x, 5)
     })
 
     it('feeds d-pad movement from canonical buttons 12-15, where Chromium puts the hat', () => {

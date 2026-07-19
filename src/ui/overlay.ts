@@ -144,6 +144,11 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
   let inspect: InspectState | undefined
   let lastCard: InfoCard | undefined
   let lastCardKey = ''
+  /** Wall-clock when the popup (re)opened — the chip ignores clicks for its
+   * first instants so a touch tap's COMPATIBILITY click (fired at the same
+   * point right after touchend) can't ghost-expand a chip that just appeared
+   * under the finger. */
+  let openedAtMs = 0
 
   const camState = (view: RenderView): CameraState | undefined => {
     const cam = cameraSource?.()
@@ -161,6 +166,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     inspect = { id, mode, openedTick: tick, sx: -9999, sy: -9999 }
     lastCard = undefined
     lastCardKey = ''
+    openedAtMs = performance.now()
   }
 
   const expand = (): void => {
@@ -280,8 +286,9 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     }
     card.appendChild(header)
 
-    // hp bar (both modes — the one vital stat worth the chip's pixels).
-    if (c.hp && c.hp.max > 0) {
+    // hp bar (both modes — the one vital stat worth the chip's pixels). Hidden
+    // on a destroyed card: a corpse with a "full" bar reads as a lie.
+    if (c.hp && c.hp.max > 0 && !destroyed) {
       const bar = document.createElement('div')
       bar.dataset.inspectHp = `${c.hp.hp}/${c.hp.max}`
       bar.style.cssText = 'height:6px;border-radius:3px;background:#ffffff22;margin:6px 0 2px;overflow:hidden'
@@ -338,7 +345,9 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
   // Chip-expand wiring (the card mode never reaches these: pointer-events:none).
   card.addEventListener('pointerdown', (ev) => ev.stopPropagation())
   card.addEventListener('click', () => {
-    if (inspect?.mode === 'chip') expand()
+    // Ghost-click guard: the compatibility click of the very tap that opened
+    // this chip must not immediately expand it.
+    if (inspect?.mode === 'chip' && performance.now() - openedAtMs > 250) expand()
   })
 
   const updatePopup = (view: RenderView, cam: CameraState | undefined, vw: number, vh: number): void => {

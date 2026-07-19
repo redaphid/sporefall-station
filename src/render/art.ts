@@ -1,6 +1,7 @@
 import { Graphics, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
 import { MODS } from '../game/data/mods'
+import { DIR_FALLBACK, type Dir5 } from './theme'
 
 export const TILE_PX = 32
 
@@ -33,18 +34,26 @@ export interface ArtRegistry {
   /** Soft white radial halo — the sprite FALLBACK glow when the energy shader
    * is unavailable (additive, tinted per style). */
   bulletGlow(): Texture
+  /** The active theme's bullet base art (`sprites.projectile`, docs/themes.md),
+   * if any — mod visual traits compose ON TOP of it (tint/stretch/energy).
+   * Undefined → the procedural tintable white disc carries the whole look. */
+  themedBullet(): Texture | undefined
 }
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
 
-/** A billboarded character's facings. Left is the side sprite flipped in the
- * renderer, so only three sprites (front/side/back) are generated per pose. */
+/** A billboarded character's facings as the current renderer consumes them.
+ * Left is the side sprite flipped in the renderer. Derived on demand from the
+ * 5-direction CharSet (s/se/e/ne/n) that themes author. */
 export type Facing = 'front' | 'side' | 'back'
 export interface DirPose {
   idle?: Texture
   step?: Texture
 }
 export type DirSet = Record<Facing, DirPose>
+/** Theme-authored 5-direction art (docs/themes.md); missing directions borrow
+ * a neighbor via DIR_FALLBACK. The west half is mirrored at draw time. */
+export type CharSet = Partial<Record<Dir5, DirPose>>
 
 export interface SpriteTextures {
   floor?: Texture
@@ -61,8 +70,12 @@ export interface SpriteTextures {
   thugStep?: Texture
   scientistStep?: Texture
   robotStep?: Texture
-  /** Directional character sets, keyed by archetype. */
-  chars?: Record<string, DirSet>
+  /** Themed projectile/grenade base textures — weapon-mod visual traits (tints,
+   * trails) compose ON TOP of these; procedural dots when absent. */
+  projectile?: Texture
+  grenade?: Texture
+  /** Directional character sets (5 drawn dirs), keyed by archetype. */
+  chars?: Record<string, CharSet>
   /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
   items?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/atm/…). */
@@ -74,6 +87,13 @@ export interface SpriteTextures {
   explosion?: Texture[]
   pickup?: Texture[]
   blood?: Texture[]
+}
+
+/** Palette overrides for the PROCEDURAL art, resolved from the active theme
+ * chain (name-keyed; parsed to numbers upstream in theme.ts). */
+export interface ArtPalette {
+  tiles?: Record<string, number>
+  entities?: Record<string, number>
 }
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
@@ -119,13 +139,14 @@ const STEP_ARCHETYPES: Record<string, keyof SpriteTextures> = {
   robot: 'robotStep',
 }
 
-export interface SpriteTextures {
-  floor?: Texture
-  wall?: Texture
-  player?: Texture
-  cop?: Texture
-  item?: Texture
-  prop?: Texture
+/** palette.tiles is name-keyed (pure layer, no Tile enum); map back to ids. */
+const TILE_ID_BY_NAME: Record<string, number> = {
+  street: Tile.Street,
+  sidewalk: Tile.Sidewalk,
+  floor: Tile.Floor,
+  wall: Tile.Wall,
+  grass: Tile.Grass,
+  exit: Tile.Exit,
 }
 
 const TILE_COLORS: Record<number, number> = {
@@ -150,9 +171,17 @@ const ENTITY_COLORS: Record<string, number> = {
   default: 0xcccccc,
 }
 
-export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): ArtRegistry => {
+export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}, palette: ArtPalette = {}): ArtRegistry => {
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
+
+  // Themed procedural colors: theme palette wins over the built-in constants.
+  const tileColors: Record<number, number> = { ...TILE_COLORS }
+  for (const [name, color] of Object.entries(palette.tiles ?? {})) {
+    const id = TILE_ID_BY_NAME[name]
+    if (id !== undefined) tileColors[id] = color
+  }
+  const entityColors: Record<string, number> = { ...ENTITY_COLORS, ...palette.entities }
 
   // Deterministic pseudo-noise for texture detail (not the sim's rng)
   const hash2 = (a: number, b: number): number => {
@@ -162,7 +191,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   }
 
   const drawTile = (tileId: number, variant: number): Texture => {
-    const color = TILE_COLORS[tileId] ?? 0xff00ff
+    const color = tileColors[tileId] ?? 0xff00ff
     const g = new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill(color)
     const T = TILE_PX
     switch (tileId) {
@@ -305,7 +334,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
       g.destroy()
       return tex
     }
-    const color = colorOverride ?? ENTITY_COLORS[archetype] ?? ENTITY_COLORS.default
+    const color = colorOverride ?? entityColors[archetype] ?? entityColors.default
     const r = TILE_PX * 0.35
     const g = new Graphics()
       // body with a darker rim
@@ -332,6 +361,10 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   const spriteForArchetype = (archetype: string): Texture | undefined => {
     const key = SPRITE_ARCHETYPES[archetype]
     if (key) return sprites[key] as Texture | undefined
+    // Themed projectile/grenade base art; mod-driven visual traits (elemental
+    // tints etc.) are applied by the renderer on top of whatever base loads.
+    if (archetype === 'projectile') return sprites.projectile
+    if (archetype === 'grenade') return sprites.grenade
     if (archetype.startsWith('pickup.')) {
       const id = archetype.slice('pickup.'.length)
       return sprites.items?.[id] ?? sprites.items?.[ITEM_ALIAS[id]] ?? sprites.item
@@ -342,9 +375,28 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     return undefined
   }
 
+  // Project a theme's 5-direction CharSet onto the renderer's front/side/back
+  // view, applying the per-direction art fallback (missing `n` borrows `s`,
+  // etc. — see DIR_FALLBACK). Cached per archetype; rebuilt with the registry
+  // on theme swap.
+  const dirSetCache = new Map<string, DirSet | undefined>()
+  const deriveDirSet = (set: CharSet): DirSet => {
+    const pick = (d: Dir5): DirPose => {
+      for (const cand of DIR_FALLBACK[d]) {
+        const pose = set[cand]
+        if (pose?.idle) return pose
+      }
+      return {}
+    }
+    return { front: pick('s'), side: pick('e'), back: pick('n') }
+  }
   const characterSet = (archetype: string): DirSet | undefined => {
+    if (dirSetCache.has(archetype)) return dirSetCache.get(archetype)
     const alias = CHARSET_ALIAS[archetype]
-    return alias ? sprites.chars?.[alias] : undefined
+    const raw = alias ? sprites.chars?.[alias] : undefined
+    const derived = raw ? deriveDirSet(raw) : undefined
+    dirSetCache.set(archetype, derived)
+    return derived
   }
 
   const isCharacterSprite = (archetype: string): boolean =>
@@ -419,5 +471,6 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     effectFrames,
     bulletCore,
     bulletGlow,
+    themedBullet: () => sprites.projectile,
   }
 }

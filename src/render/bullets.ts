@@ -37,6 +37,10 @@ const hash01 = (id: number, frame: number): number => {
 
 interface BulletView {
   core: Sprite
+  /** True when the core shows the theme's bullet base art (docs/themes.md
+   * `projectile` key) — traits then compose ON TOP (tint/stretch/energy);
+   * false = the procedural white disc carries the tint alone. */
+  themed: boolean
   traits: BulletTraits
   /** Cache key: the serialized mod list this view was composed from. */
   modsKey: string
@@ -64,17 +68,26 @@ export class BulletLayer {
   }
 
   private makeView(e: Entity): BulletView {
-    const core = new Sprite(this.art.bulletCore())
+    const themedTex = this.art.themedBullet()
+    const core = new Sprite(themedTex ?? this.art.bulletCore())
     core.anchor.set(0.5)
     this.coreLayer.addChild(core)
     const mods = e.projectile?.mods
     return {
       core,
+      themed: themedTex !== undefined,
       traits: composeBulletTraits(mods),
       modsKey: JSON.stringify(mods ?? null),
       history: [],
       seen: true,
     }
+  }
+
+  /** Drop every pooled view so the next update() rebuilds against the (possibly
+   * hot-swapped) art registry — mirrors EntityViews.refresh() on theme change. */
+  refresh(): void {
+    for (const view of this.views.values()) this.destroyView(view)
+    this.views.clear()
   }
 
   update(entities: readonly Entity[], alpha: number, tick: number): void {
@@ -113,8 +126,11 @@ export class BulletLayer {
       const core = view.core
       core.position.set(wx + jx, wy + jy)
       core.rotation = e.facing
-      core.tint = tr.color
-      const s = (CORE_PX / CORE_TEX_R) * tr.size * pulse
+      // Themed base art keeps its own colors when vanilla; mod traits tint on
+      // top when present (docs/themes.md `projectile` composition rule). The
+      // procedural white disc always carries the composed tint (vanilla=gold).
+      core.tint = view.themed && tr.power === 0 ? 0xffffff : tr.color
+      const s = (view.themed ? 1 : CORE_PX / CORE_TEX_R) * tr.size * pulse
       core.scale.set(s * tr.length, s)
       core.zIndex = wy
 

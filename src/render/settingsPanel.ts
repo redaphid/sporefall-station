@@ -16,6 +16,7 @@
 
 import { loadSettings, saveSettings, type EffectsQuality, type GameSettings } from '../app/settings'
 import { createButtonCapture, type ButtonCapture } from '../input/padCapture'
+import { buttonPressed } from '../input/readPad'
 import {
   ACTION_LABELS,
   bindButton,
@@ -66,7 +67,8 @@ export const createSettingsPanel = (
   const panel = document.createElement('div')
   markUiChrome(panel)
   panel.style.cssText =
-    'position:absolute;right:10px;top:52px;z-index:70;display:none;min-width:236px;max-height:calc(100% - 64px);overflow-y:auto;padding:12px 14px;' +
+    'position:absolute;right:10px;top:52px;z-index:70;display:none;min-width:236px;max-width:300px;' +
+    'max-height:calc(100% - 64px);overflow-y:auto;padding:12px 14px;' +
     'background:#1a1a22ee;color:#eee;font:13px system-ui;border:1px solid #0008;border-radius:10px;' +
     'box-shadow:0 6px 24px #0008;pointer-events:auto;touch-action:manipulation'
 
@@ -113,11 +115,21 @@ export const createSettingsPanel = (
   ctl.appendChild(ctlHead)
 
   const bindBtns = new Map<PadAction, HTMLButtonElement>()
-  let capture: { action: PadAction; machine: ButtonCapture; timer: ReturnType<typeof setInterval> } | null = null
+  interface Capture {
+    action: PadAction
+    machine: ButtonCapture
+    timer: ReturnType<typeof setInterval>
+    /** Once bound: the captured button, drained until RELEASED. The press that
+     * binds must be spent entirely — without this, binding a held-to-fire
+     * action (attack) makes the still-held finger start shooting the instant
+     * the bind lands. Capped so a stuck button can't disable pads forever. */
+    drain?: { button: number; until: number }
+  }
+  let capture: Capture | null = null
 
   const renderRows = (): void => {
     for (const [action, btn] of bindBtns) {
-      if (capture?.action === action) continue // capture text is managed by captureTick
+      if (capture?.action === action && !capture.drain) continue // capture text is managed by captureTick
       btn.textContent = bindingLabel(map[action])
       btn.style.color = '#eee'
     }
@@ -133,12 +145,18 @@ export const createSettingsPanel = (
 
   const captureTick = (): void => {
     if (!capture) return
+    if (capture.drain) {
+      const held = getPads().some((p) => p !== null && buttonPressed(p, capture!.drain!.button))
+      if (!held || Date.now() >= capture.drain.until) stopCapture()
+      return
+    }
     const st = capture.machine.poll(getPads(), Date.now())
     const btn = bindBtns.get(capture.action)!
     if (st.phase === 'bound') {
       map = bindButton(map, capture.action, st.button)
       setButtonMap(map) // persists + applies on the next gamepad poll
-      stopCapture()
+      capture.drain = { button: st.button, until: Date.now() + 3000 }
+      renderRows() // show the new binding immediately; inertness holds until release
     } else if (st.phase === 'timed-out') {
       stopCapture()
     } else {
@@ -215,13 +233,15 @@ export const createSettingsPanel = (
 
   // Cancel paths beyond timeout: Esc, and a tap/click anywhere that is not the
   // capturing row. The listeners live as long as the panel does (it is never
-  // torn down). The click that STARTS a capture bubbles here with the row
-  // itself as target, so it never self-cancels.
+  // torn down in the app), but they guard on isConnected so a REPLACED panel
+  // can never reach through the global capture flag and strand a live one.
+  // The click that STARTS a capture bubbles here with the row itself as
+  // target, so it never self-cancels.
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') stopCapture()
+    if (panel.isConnected && e.key === 'Escape') stopCapture()
   })
   document.addEventListener('click', (e) => {
-    if (!capture) return
+    if (!capture || !panel.isConnected) return
     const t = e.target as Element | null
     if (t?.closest('[data-remap-action]') !== bindBtns.get(capture.action)) stopCapture()
   })

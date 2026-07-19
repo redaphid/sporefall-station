@@ -162,15 +162,38 @@ describe('settings panel — controller remap section', () => {
     expect(bindBtn('attack').textContent).toContain('no controller detected')
   })
 
-  it('the next button press binds, persists, and ends capture', () => {
+  it('the next button press binds, persists, and updates the row', () => {
     create()
     pads = [fakePad()]
     bindBtn('attack').click()
     pads = [fakePad({ pressed: [1] })] // press B
     vi.advanceTimersByTime(60)
     expect(bindBtn('attack').textContent).toBe('B')
-    expect(isPadCaptureActive()).toBe(false)
     expect(storedMap().attack).toEqual([1])
+  })
+
+  it('inertness DRAINS: the flag stays up while the captured button is held, drops on release', () => {
+    create()
+    pads = [fakePad()]
+    bindBtn('attack').click()
+    pads = [fakePad({ pressed: [1] })]
+    vi.advanceTimersByTime(60) // bound — but B is still held (now attack, held-to-fire)
+    expect(isPadCaptureActive()).toBe(true) // still inert: the binding press must not start shooting
+    vi.advanceTimersByTime(500)
+    expect(isPadCaptureActive()).toBe(true)
+    pads = [fakePad()] // released
+    vi.advanceTimersByTime(60)
+    expect(isPadCaptureActive()).toBe(false)
+  })
+
+  it('a stuck captured button cannot hold pads hostage: the drain caps out (~3s)', () => {
+    create()
+    pads = [fakePad()]
+    bindBtn('attack').click()
+    pads = [fakePad({ pressed: [1] })]
+    vi.advanceTimersByTime(60)
+    vi.advanceTimersByTime(3100) // never released
+    expect(isPadCaptureActive()).toBe(false)
   })
 
   it('binding a taken button SWAPS: the other row updates too', () => {

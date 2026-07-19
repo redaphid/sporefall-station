@@ -11,8 +11,10 @@
 
 import type { ObjectiveLink } from './missionModel'
 
-/** Seconds the camera dwells on the target (including the glide out). */
-export const FOCUS_SECONDS = 3
+/** Seconds the camera dwells on the target (including the glide out). Generous
+ * on purpose: any real movement input cancels the focus instantly, so the long
+ * dwell only ever plays out when the player is actually standing still. */
+export const FOCUS_SECONDS = 5
 /** Seconds of eased glide back to the player after the dwell. */
 export const RETURN_SECONDS = 1.2
 /** Player displacement (world tiles) from the tap position that cancels the

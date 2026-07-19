@@ -162,6 +162,20 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // animated pan out/back → edge indicator beats.
   missionui: [{ ticks: 660 }],
 
+  // Mission-UI progress states: the `mission` walk to the briefcase, then a LONG
+  // stand-still beat (600 ticks) so the e2e can open the panel and tap the exit
+  // link with generous wall-clock slack (screenshots are slow under video
+  // recording), then finish the floor.
+  missionProgress: [
+    { ticks: 40 },
+    { ticks: 64, y: 1 }, // down onto the lane
+    { ticks: 30 },
+    { ticks: 57, x: 1 }, // onto the briefcase (~tick 190: objective completes)
+    { ticks: 600 }, // hold: panel/link interactions land in this window
+    { ticks: 34, x: 1 }, // head for the open exit
+    { ticks: 90 }, // floor 2 beat
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

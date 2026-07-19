@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
 import { loadSettings } from '../app/settings'
-import { createArt, type ArtRegistry } from './art'
+import { createArt, TILE_PX, type ArtRegistry } from './art'
 import { BulletLayer } from './bullets'
 import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from './theme'
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
@@ -44,6 +44,11 @@ export interface GameRenderer {
    * live art registry (so it matches the active theme exactly), cached per key,
    * cache dropped on theme swap. Undefined when extraction isn't possible. */
   entityThumb(artKey: string): string | undefined
+  /** Where a world tile coord is ACTUALLY drawn, in screen px — read straight
+   * off the world container's live transform (post edge-clamp, post shake).
+   * The e2e ground truth that DOM overlays (mission marker, locator) must
+   * agree with; never derived from duplicated camera math. */
+  worldToScreen(wx: number, wy: number): { x: number; y: number }
 }
 
 /** Canvas clear color when no theme palette provides one. */
@@ -203,6 +208,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     camera,
     setTheme,
     entityThumb,
+    worldToScreen(wx: number, wy: number): { x: number; y: number } {
+      // The live container transform — the rendered truth, no re-derived math.
+      const p = world.toGlobal({ x: wx * TILE_PX, y: wy * TILE_PX })
+      return { x: p.x, y: p.y }
+    },
     setLevel(level: Level): void {
       currentLevel = level
       tilemap.build(level, art)

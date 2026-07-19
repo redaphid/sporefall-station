@@ -39,6 +39,11 @@ export interface GameRenderer {
   /** Hot-swap the active visual theme (presentation only — never touches the
    * sim). Resolves when the new assets are baked and applied. */
   setTheme(id: string): Promise<void>
+  /** Sprite thumbnail for an art key ('cop', 'medkit', 'door', …) as a PNG data
+   * URL — the inspect card's picture of the thing tapped. Extracted from the
+   * live art registry (so it matches the active theme exactly), cached per key,
+   * cache dropped on theme swap. Undefined when extraction isn't possible. */
+  entityThumb(artKey: string): string | undefined
 }
 
 /** Canvas clear color when no theme palette provides one. */
@@ -126,11 +131,27 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
   const grade = new ColorMatrixFilter()
 
   let currentLevel: Level | undefined
+  // Inspect-card thumbnails: art key → data URL, extracted lazily from the live
+  // registry. Theme-keyed implicitly — the cache empties on every theme swap.
+  const thumbs = new Map<string, string | undefined>()
+  const entityThumb = (artKey: string): string | undefined => {
+    if (thumbs.has(artKey)) return thumbs.get(artKey)
+    let url: string | undefined
+    try {
+      const canvas = app.renderer.extract.canvas(inner.entity(artKey)) as HTMLCanvasElement
+      url = typeof canvas.toDataURL === 'function' ? canvas.toDataURL() : undefined
+    } catch {
+      url = undefined // headless/degraded contexts: the card falls back to a glyph
+    }
+    thumbs.set(artKey, url)
+    return url
+  }
   const setTheme = async (id: string): Promise<void> => {
     chain = await loadThemeChain(id)
     setActiveThemeChain(chain)
     inner = await buildArt(chain)
     applyThemePalette(chain)
+    thumbs.clear() // thumbnails must re-extract from the swapped registry
     // Rebake the static tile layer and drop pooled entity sprites so every
     // layer re-pulls textures from the swapped registry on the next frame.
     if (currentLevel) tilemap.build(currentLevel, art)
@@ -171,6 +192,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
     app,
     camera,
     setTheme,
+    entityThumb,
     setLevel(level: Level): void {
       currentLevel = level
       tilemap.build(level, art)

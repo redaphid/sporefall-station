@@ -6,21 +6,32 @@
 //     pins/arrows/circles/text banners. Text is legible by construction (measured,
 //     clamped fully on-screen, de-overlapped, backed + shadowed — see
 //     annotationLayout.ts, which is unit-tested).
-//   • Selection: the player taps an entity to point it out; it gets a highlight
-//     ring and a friendly tap-inspect card. Selection is a plain per-entity flag
-//     (Entity.selected), so an agent reads it with a normal `entities` query.
+//   • Inspect: the player clicks (desktop) or taps/long-presses (touch) an
+//     entity to pop up information on it. A quick tap opens a compact CHIP
+//     (name + one line); a long-press — or a desktop click, or tapping the
+//     chip — opens the full CARD (hp bar, per-kind rows from inspectModel's
+//     buildInfoCard, mission locate action). The card anchors BESIDE the
+//     entity, clamped fully on-screen (cardAnchor), follows it as it moves,
+//     shows a brief "destroyed" state if it dies mid-inspect, and auto-closes
+//     on a timeout. The inspected entity keeps the highlight ring via the same
+//     inert `Entity.selected` flag an agent uses, so determinism is untouched.
 //
-// All positions come from the read-only camera projection (locatorModel.ts); the
-// renderer's draw code is untouched. Selection writes only the inert `selected`
-// flag, so determinism is preserved.
+// Touch gestures arrive via inspectAt() from the touch layer (which owns the
+// stick/pinch claiming rules — the press discrimination itself is pressModel.ts)
+// or, when the touch controls are hidden (controller active), from this
+// overlay's own listeners. The popup never blocks gameplay input: the card root
+// ignores pointer events and only its close/locate/expand affordances opt in.
+//
+// All positions come from the read-only camera projection (locatorModel.ts);
+// the renderer's draw code is untouched.
 
 import type { RenderView } from '../app/session'
-import type { Entity } from '../game/entity'
 import type { Annotation } from '../game/types'
 import { visibleAnnotations } from '../game/annotations'
-import { pickNearestEntity, clearSelection, setSelected, selectedEntities, PICK_RADIUS } from '../game/select'
+import { pickNearestEntity, pickRadiusAt, clearSelection, setSelected, selectedEntities } from '../game/select'
 import { TILE_PX } from '../render/art'
 import {
+  cardAnchor,
   clampToViewport,
   deOverlap,
   entityLabelAnchor,
@@ -30,18 +41,43 @@ import {
   type Rect,
 } from './annotationLayout'
 import { projectToScreen, screenToWorld, type CameraState } from './locatorModel'
-import { inspectCard } from './inspectModel'
+import { buildInfoCard, type InfoCard } from './inspectModel'
+import { createPressTracker, LONG_PRESS_MS } from './pressModel'
 import { themeDisplayName } from '../render/themeState'
 import type { CameraSource } from './screens'
 
+/** How the popup was asked for — a compact chip (quick tap) or the full card. */
+export type InspectMode = 'chip' | 'card'
+
 export interface Overlay {
   update(view: RenderView): void
+  /** Open the info popup for whatever entity is under screen point (clientX/Y).
+   * The touch input layer calls this AFTER its claiming rules ruled the press
+   * neutral (never a stick, pinch, or button). A miss dismisses any open popup. */
+  inspectAt(mode: InspectMode, clientX: number, clientY: number): void
+}
+
+export interface OverlayOpts {
+  /** Mission-panel camera focus (focusModel via main.ts) — the card's locate
+   * action for the mission target routes here; no camera logic is duplicated. */
+  onFocus?: (link: { targetId: number }) => void
+  /** Sprite thumbnail for an art key as a data URL (renderer extract), if any. */
+  thumbnail?: (artKey: string) => string | undefined
+  /** Where the popup element lives. On phones this must be the UI layer (#ui),
+   * which paints ABOVE the touch stick zones — otherwise the chip/✕/locate
+   * affordances would be unreachable under them. Defaults to `mount`. Both
+   * mounts are full-viewport fixed layers, so coordinates line up 1:1. */
+  cardMount?: HTMLElement
 }
 
 const DEFAULT_COLOR = '#ffd76a'
 const SELECT_COLOR = '#5aa9ff'
-/** Tap vs drag: a pointer that travels more than this (px) is a joystick drag, not a tap. */
-const TAP_SLOP = 10
+/** Sim ticks a chip stays up before auto-dismissing (≈5s at 30tps). */
+const CHIP_TICKS = 150
+/** Sim ticks the full card stays up before auto-dismissing (≈20s). */
+const CARD_TICKS = 600
+/** Sim ticks the "destroyed" state lingers before the popup closes (≈1.2s). */
+const DESTROYED_TICKS = 36
 
 /** Common legibility styling every annotation TEXT element shares: a backing
  * plate, a text-shadow, a min-legible font, and word-boundary wrapping. The
@@ -72,55 +108,292 @@ interface TextItem {
   targetId?: number
 }
 
-export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource): Overlay => {
-  // Layers: shapes under text under selection under the inspect card.
+/** The live inspect popup. */
+interface InspectState {
+  id: number
+  mode: InspectMode
+  openedTick: number
+  /** Tick we noticed the entity dead/gone — drives the destroyed lingering. */
+  deadTick?: number
+  /** Last screen anchor, kept when the entity vanishes mid-inspect. */
+  sx: number
+  sy: number
+}
+
+export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, opts: OverlayOpts = {}): Overlay => {
+  // Layers: shapes under text under selection under the inspect popup.
   const shapeLayer = layer(mount, 66)
   const textLayer = layer(mount, 67)
   const selectLayer = layer(mount, 68)
 
+  // The popup root: never blocks gameplay — only its affordances opt back in.
   const card = document.createElement('div')
+  card.className = 'inspect-card'
   card.style.cssText =
-    'position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;max-width:240px;display:none;' +
-    'flex-direction:column;gap:8px;z-index:69;pointer-events:auto;font:13px system-ui'
-  mount.appendChild(card)
+    'position:absolute;left:0;top:0;display:none;z-index:69;pointer-events:none;' +
+    'box-sizing:border-box;max-width:250px;background:rgba(12,14,22,.93);' +
+    'border:1px solid var(--theme-accent, #5aa9ff);border-radius:10px;padding:8px 10px;' +
+    'color:#eee;font:13px system-ui;text-shadow:0 1px 2px #000;box-shadow:0 3px 14px #000a'
+  ;(opts.cardMount ?? mount).appendChild(card)
 
   const shapeEls = new Map<string, HTMLElement>()
   const textEls = new Map<string, TextEl>()
   const selectEls = new Map<number, HTMLElement>()
 
   let lastView: RenderView | undefined
+  let inspect: InspectState | undefined
+  let lastCard: InfoCard | undefined
+  let lastCardKey = ''
+  /** Wall-clock when the popup (re)opened — the chip ignores clicks for its
+   * first instants so a touch tap's COMPATIBILITY click (fired at the same
+   * point right after touchend) can't ghost-expand a chip that just appeared
+   * under the finger. */
+  let openedAtMs = 0
 
   const camState = (view: RenderView): CameraState | undefined => {
     const cam = cameraSource?.()
     return cam ? { ...cam, levelW: view.level.w, levelH: view.level.h } : undefined
   }
 
-  // --- tap-to-select: pick the nearest entity under a tap, toggle its `selected`
-  // flag; a tap on empty space clears the selection. Never consumes movement input
-  // (listener is passive and only reacts to non-drag taps).
-  let downX = 0
-  let downY = 0
-  let downId = -1
-  mount.addEventListener('pointerdown', (ev) => {
-    downX = ev.clientX
-    downY = ev.clientY
-    downId = ev.pointerId
-  })
-  mount.addEventListener('pointerup', (ev) => {
-    if (ev.pointerId !== downId) return
-    if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > TAP_SLOP) return // a drag, not a tap
+  const close = (): void => {
+    inspect = undefined
+    lastCard = undefined
+    lastCardKey = ''
+    if (lastView) clearSelection(lastView.entities)
+  }
+
+  const openOn = (id: number, mode: InspectMode, tick: number): void => {
+    inspect = { id, mode, openedTick: tick, sx: -9999, sy: -9999 }
+    lastCard = undefined
+    lastCardKey = ''
+    openedAtMs = performance.now()
+  }
+
+  const expand = (): void => {
+    if (!inspect || !lastView) return
+    inspect = { ...inspect, mode: 'card', openedTick: lastView.tick }
+    lastCardKey = ''
+  }
+
+  const inspectAt = (mode: InspectMode, clientX: number, clientY: number): void => {
     const view = lastView
     const cam = view && camState(view)
     if (!view || !cam) return
     const rect = mount.getBoundingClientRect()
-    const w = screenToWorld(ev.clientX - rect.left, ev.clientY - rect.top, cam)
-    // Ignore projectiles/fire so a tap lands on the actor/prop the player means.
-    const hit = pickNearestEntity(view.entities, w.x, w.y, PICK_RADIUS, (e) => e.kind !== 'projectile' && e.kind !== 'fire')
-    if (hit) setSelected(hit, !hit.selected)
-    else clearSelection(view.entities)
+    const w = screenToWorld(clientX - rect.left, clientY - rect.top, cam)
+    // Zoom-aware pick reach: pickRadiusAt is pure game-side math — the VIEW
+    // passes the current px-per-tile in, so src/game stays camera-free.
+    // Projectiles are skipped so a tap lands on the actor/prop the player means;
+    // fire IS inspectable ("Burning — stay clear").
+    const hit = pickNearestEntity(view.entities, w.x, w.y, pickRadiusAt(TILE_PX * cam.zoom), (e) => e.kind !== 'projectile')
+    if (!hit) {
+      close() // tap on empty space dismisses
+      return
+    }
+    if (inspect?.id === hit.id && inspect.mode === mode) {
+      close() // tapping the same entity the same way again toggles it off
+      return
+    }
+    clearSelection(view.entities)
+    setSelected(hit, true)
+    openOn(hit.id, mode, view.tick)
+  }
+
+  // --- pointer wiring on the canvas mount. On phones the touch layer's stick
+  // zones sit above this mount and forward neutral presses via inspectAt(); this
+  // path serves the desktop mouse and the controller-active case (touch controls
+  // hidden → taps land here). Same pure press discrimination (pressModel.ts).
+  const press = createPressTracker()
+  let pressTimer: ReturnType<typeof setTimeout> | undefined
+  mount.addEventListener('pointerdown', (ev) => {
+    press.down(ev.pointerId, ev.clientX, ev.clientY, performance.now())
+    clearTimeout(pressTimer)
+    if (ev.pointerType !== 'mouse') {
+      pressTimer = setTimeout(() => {
+        const at = press.origin()
+        if (at && press.poll(performance.now()) === 'longpress') inspectAt('card', at.x, at.y)
+      }, LONG_PRESS_MS)
+    }
+  })
+  mount.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
+  mount.addEventListener('pointerup', (ev) => {
+    clearTimeout(pressTimer)
+    const outcome = press.up(ev.pointerId, performance.now())
+    if (outcome === null) return
+    // Desktop click = the full card straight away; a touch tap opens the chip,
+    // a threshold-crossing release (late timer) still opens the card.
+    if (ev.pointerType === 'mouse') inspectAt('card', ev.clientX, ev.clientY)
+    else inspectAt(outcome === 'longpress' ? 'card' : 'chip', ev.clientX, ev.clientY)
+  })
+  mount.addEventListener('pointercancel', (ev) => {
+    clearTimeout(pressTimer)
+    press.cancel(ev.pointerId)
+    press.up(ev.pointerId, performance.now())
   })
 
+  // ---- popup DOM rendering (change-detected; repositioned every frame).
+  const renderPopup = (c: InfoCard, mode: InspectMode, destroyed: boolean): void => {
+    const key = `${mode}:${destroyed}:${JSON.stringify(c)}`
+    if (key === lastCardKey) return
+    lastCardKey = key
+    card.dataset.mode = mode
+    card.replaceChildren()
+    card.style.opacity = destroyed ? '0.75' : '1'
+
+    const header = document.createElement('div')
+    header.style.cssText = 'display:flex;align-items:center;gap:8px'
+    const thumbUrl = opts.thumbnail?.(c.artKey)
+    if (thumbUrl) {
+      const img = document.createElement('img')
+      img.src = thumbUrl
+      img.alt = ''
+      img.style.cssText =
+        `width:${mode === 'card' ? 36 : 26}px;height:${mode === 'card' ? 36 : 26}px;flex:0 0 auto;` +
+        'image-rendering:pixelated;object-fit:contain;filter:drop-shadow(0 1px 2px #000)'
+      header.appendChild(img)
+    } else {
+      const glyph = document.createElement('span')
+      glyph.textContent = c.glyph
+      glyph.style.cssText = `font-size:${mode === 'card' ? 22 : 16}px;line-height:1;flex:0 0 auto`
+      header.appendChild(glyph)
+    }
+    const titleBox = document.createElement('div')
+    titleBox.style.cssText = 'flex:1 1 auto;min-width:0'
+    const title = document.createElement('div')
+    title.dataset.inspectTitle = ''
+    title.textContent = destroyed ? `${c.title} — destroyed` : c.title
+    title.style.cssText =
+      'font:700 14px system-ui;color:var(--theme-accent, #5aa9ff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+    titleBox.appendChild(title)
+    if (mode === 'card') {
+      const sub = document.createElement('div')
+      sub.textContent = c.kind
+      sub.style.cssText = 'font:600 11px system-ui;opacity:.6;text-transform:capitalize'
+      titleBox.appendChild(sub)
+    }
+    header.appendChild(titleBox)
+    if (mode === 'card') {
+      // ✕ — one of the popup's few interactive spots; the rest passes through.
+      const x = document.createElement('button')
+      x.dataset.inspectClose = ''
+      x.textContent = '✕'
+      x.style.cssText =
+        'pointer-events:auto;appearance:none;border:0;background:transparent;color:#eee;opacity:.7;' +
+        'font:700 14px system-ui;cursor:pointer;padding:2px 4px;flex:0 0 auto;align-self:flex-start'
+      x.addEventListener('pointerdown', (ev) => ev.stopPropagation())
+      x.addEventListener('click', close)
+      header.appendChild(x)
+    }
+    card.appendChild(header)
+
+    // hp bar (both modes — the one vital stat worth the chip's pixels). Hidden
+    // on a destroyed card: a corpse with a "full" bar reads as a lie.
+    if (c.hp && c.hp.max > 0 && !destroyed) {
+      const bar = document.createElement('div')
+      bar.dataset.inspectHp = `${c.hp.hp}/${c.hp.max}`
+      bar.style.cssText = 'height:6px;border-radius:3px;background:#ffffff22;margin:6px 0 2px;overflow:hidden'
+      const fill = document.createElement('div')
+      const frac = Math.max(0, Math.min(1, c.hp.hp / c.hp.max))
+      fill.style.cssText = `height:100%;width:${Math.round(frac * 100)}%;border-radius:3px;background:${
+        frac > 0.5 ? '#7fd17f' : frac > 0.25 ? '#ffd76a' : '#ff6b6b'
+      }`
+      bar.appendChild(fill)
+      card.appendChild(bar)
+    }
+
+    if (c.tagline) {
+      const tag = document.createElement('div')
+      tag.dataset.inspectTagline = ''
+      tag.textContent = destroyed ? 'Destroyed' : c.tagline
+      tag.style.cssText = 'font:600 12px system-ui;opacity:.85;margin-top:4px'
+      card.appendChild(tag)
+    }
+
+    if (mode === 'card' && !destroyed) {
+      for (const row of c.rows) {
+        const r = document.createElement('div')
+        r.style.cssText = 'display:flex;justify-content:space-between;gap:12px;font:13px system-ui;line-height:1.5'
+        const k = document.createElement('span')
+        k.textContent = row.label
+        k.style.opacity = '0.7'
+        const v = document.createElement('span')
+        v.textContent = row.value
+        v.style.cssText = 'font-weight:600;text-align:right'
+        r.append(k, v)
+        card.appendChild(r)
+      }
+      if (c.mission && opts.onFocus) {
+        const m = document.createElement('button')
+        m.dataset.inspectMission = ''
+        m.textContent = '🎯 Mission target — locate'
+        m.style.cssText =
+          'pointer-events:auto;appearance:none;display:block;width:100%;margin-top:6px;border-radius:7px;' +
+          'border:1px solid var(--theme-accent, #ffd76a);background:transparent;color:var(--theme-accent, #ffd76a);' +
+          'font:700 12px system-ui;padding:4px 6px;cursor:pointer'
+        const targetId = c.mission.targetId
+        m.addEventListener('pointerdown', (ev) => ev.stopPropagation())
+        m.addEventListener('click', () => opts.onFocus?.({ targetId }))
+        card.appendChild(m)
+      }
+    }
+
+    // The whole CHIP is tappable — expanding to the full card is its one job.
+    const chipTappable = mode === 'chip' && !destroyed
+    card.style.cursor = chipTappable ? 'pointer' : 'default'
+    card.style.pointerEvents = chipTappable ? 'auto' : 'none'
+  }
+  // Chip-expand wiring (the card mode never reaches these: pointer-events:none).
+  card.addEventListener('pointerdown', (ev) => ev.stopPropagation())
+  card.addEventListener('click', () => {
+    // Ghost-click guard: the compatibility click of the very tap that opened
+    // this chip must not immediately expand it.
+    if (inspect?.mode === 'chip' && performance.now() - openedAtMs > 250) expand()
+  })
+
+  const updatePopup = (view: RenderView, cam: CameraState | undefined, vw: number, vh: number): void => {
+    if (!inspect) {
+      card.style.display = 'none'
+      return
+    }
+    const e = view.entities.find((t) => t.id === inspect!.id)
+    const gone = !e || !!e.dead
+
+    // Death/despawn mid-inspect: linger briefly in a destroyed state, then close.
+    if (gone && inspect.deadTick === undefined) inspect.deadTick = view.tick
+    if (!gone) inspect.deadTick = undefined
+    const timedOut =
+      (inspect.deadTick !== undefined && view.tick - inspect.deadTick >= DESTROYED_TICKS) ||
+      view.tick - inspect.openedTick >= (inspect.mode === 'chip' ? CHIP_TICKS : CARD_TICKS)
+    if (timedOut) {
+      close()
+      card.style.display = 'none'
+      return
+    }
+
+    const c = e
+      ? buildInfoCard(e, { selfId: view.self?.id, missionTargetId: view.missionTargetId }, themeDisplayName)
+      : lastCard // entity despawned entirely — show its last known card as destroyed
+    if (!c) {
+      close()
+      card.style.display = 'none'
+      return
+    }
+    lastCard = c
+    renderPopup(c, inspect.mode, gone)
+    card.style.display = 'block'
+
+    // Anchor beside the LIVE entity (follows it); keep the last anchor if gone.
+    if (e && cam) {
+      const p = projectToScreen(e.pos.x, e.pos.y, cam)
+      inspect.sx = p.x
+      inspect.sy = p.y
+    }
+    const at = cardAnchor(inspect.sx, inspect.sy, card.offsetWidth, card.offsetHeight, vw, vh)
+    card.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`
+  }
+
   return {
+    inspectAt,
     update(view: RenderView): void {
       lastView = view
       const cam = camState(view)
@@ -232,7 +505,8 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource): 
           textEls.delete(k)
         }
 
-      // ---- selection: a highlight ring on every selected entity + the inspect card.
+      // ---- selection rings: every selected entity (player-inspected or
+      // agent-multi-selected) gets the highlight.
       const selected = selectedEntities(view.entities)
       const liveSel = new Set<number>()
       if (cam) {
@@ -253,7 +527,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource): 
           selectEls.delete(id)
         }
 
-      renderCard(card, selected)
+      updatePopup(view, cam, vw, vh)
     },
   }
 }
@@ -368,41 +642,4 @@ const mkRing = (parent: HTMLElement): HTMLElement => {
     `border:3px solid ${SELECT_COLOR};box-shadow:0 0 8px ${SELECT_COLOR},inset 0 0 8px ${SELECT_COLOR}`
   parent.appendChild(el)
   return el
-}
-
-/** The tap-inspect readout — one friendly card per selected entity (multi-select). */
-const renderCard = (card: HTMLElement, selected: readonly Entity[]): void => {
-  if (selected.length === 0) {
-    card.style.display = 'none'
-    card.replaceChildren()
-    return
-  }
-  card.style.display = 'flex'
-  card.replaceChildren(
-    ...selected.map((e) => {
-      const c = inspectCard(e, themeDisplayName)
-      const box = document.createElement('div')
-      box.className = 'inspect-card'
-      box.style.cssText =
-        'background:rgba(12,14,22,.92);border:1px solid rgba(90,169,255,.5);border-radius:8px;padding:8px 10px;' +
-        'color:#eee;text-shadow:0 1px 2px #000;box-shadow:0 3px 12px #0009'
-      const title = document.createElement('div')
-      title.textContent = c.title
-      title.style.cssText = 'font:700 14px system-ui;color:#5aa9ff;margin-bottom:4px'
-      box.appendChild(title)
-      for (const row of c.rows) {
-        const r = document.createElement('div')
-        r.style.cssText = 'display:flex;justify-content:space-between;gap:12px;font:13px system-ui;line-height:1.5'
-        const k = document.createElement('span')
-        k.textContent = row.label
-        k.style.opacity = '0.7'
-        const v = document.createElement('span')
-        v.textContent = row.value
-        v.style.fontWeight = '600'
-        r.append(k, v)
-        box.appendChild(r)
-      }
-      return box
-    }),
-  )
 }

@@ -15,6 +15,20 @@ import type { World } from './world'
  * friendly margin while staying tight enough that taps feel precise. */
 export const PICK_RADIUS = 1.4
 
+/** Smallest comfortable tap target in screen px (half-width): below this a
+ * finger can't reliably hit an entity, so the WORLD radius grows to cover it. */
+export const MIN_PICK_PX = 24
+
+/**
+ * Zoom-aware pick radius (world tiles) given the current screen scale in
+ * px-per-tile. At normal/high zoom the sprite-derived PICK_RADIUS wins (taps on
+ * the visible sprite always land); zoomed far OUT the sprite shrinks below a
+ * finger, so the radius grows to keep MIN_PICK_PX of screen reach. Pure math —
+ * callers pass `TILE_PX * zoom`. Degenerate scales fall back to PICK_RADIUS.
+ */
+export const pickRadiusAt = (pxPerTile: number): number =>
+  Number.isFinite(pxPerTile) && pxPerTile > 0 ? Math.max(PICK_RADIUS, MIN_PICK_PX / pxPerTile) : PICK_RADIUS
+
 /**
  * Nearest non-dead entity whose centre is within `maxRadius` world tiles of
  * (wx,wy), or undefined if none. Ties break by smaller distance, then smaller id,

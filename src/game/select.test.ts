@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { spawnNpc } from './populate'
 import { spawnPlayer } from './player'
 import { deserializeWorld, serializeWorld } from './serialize'
-import { clearSelection, pickNearestEntity, selectedEntities, setSelected, toggleSelected } from './select'
+import { clearSelection, MIN_PICK_PX, PICK_RADIUS, pickNearestEntity, pickRadiusAt, selectedEntities, setSelected, toggleSelected } from './select'
 import { createWorld, type World } from './world'
 
 const world = (): World => createWorld(4321, 1)
@@ -47,6 +47,47 @@ describe('pickNearestEntity — pointer → world → nearest', () => {
     spawnNpc(w, 'cop', 10, 10)
     expect(pickNearestEntity(w.entities, NaN, 10, 1.2)).toBeUndefined()
     expect(pickNearestEntity(w.entities, 10, Infinity, 1.2)).toBeUndefined()
+  })
+})
+
+describe('pickRadiusAt — zoom-aware pick radius (px-per-tile in, world tiles out)', () => {
+  const TILE = 32 // mirrors render TILE_PX; the helper itself is unit-agnostic
+
+  it('at 1× and above, the sprite-derived PICK_RADIUS wins', () => {
+    expect(pickRadiusAt(TILE * 1)).toBe(PICK_RADIUS)
+    expect(pickRadiusAt(TILE * 2)).toBe(PICK_RADIUS)
+    expect(pickRadiusAt(TILE * 4)).toBe(PICK_RADIUS) // max zoom: still full sprite reach
+  })
+
+  it('zoomed far out, the radius grows to preserve MIN_PICK_PX of screen reach', () => {
+    const r = pickRadiusAt(TILE * 0.5) // 16 px/tile
+    expect(r).toBeCloseTo(MIN_PICK_PX / 16)
+    expect(r).toBeGreaterThan(PICK_RADIUS)
+    // The guaranteed screen reach holds at the far extreme too.
+    expect(pickRadiusAt(TILE * 0.25) * TILE * 0.25).toBeCloseTo(MIN_PICK_PX)
+  })
+
+  it('the crossover is continuous: just past the break-even scale nothing jumps', () => {
+    const breakEven = MIN_PICK_PX / PICK_RADIUS
+    expect(pickRadiusAt(breakEven)).toBeCloseTo(PICK_RADIUS)
+    expect(pickRadiusAt(breakEven + 0.01)).toBe(PICK_RADIUS)
+    expect(pickRadiusAt(breakEven - 0.01)).toBeGreaterThan(PICK_RADIUS)
+  })
+
+  it('degenerate scales (0, negative, NaN, Infinity→0 reach) fall back safely', () => {
+    expect(pickRadiusAt(0)).toBe(PICK_RADIUS)
+    expect(pickRadiusAt(-5)).toBe(PICK_RADIUS)
+    expect(pickRadiusAt(NaN)).toBe(PICK_RADIUS)
+    expect(pickRadiusAt(Infinity)).toBe(PICK_RADIUS)
+  })
+
+  it('picking with the grown radius actually lands a tap that PICK_RADIUS would miss', () => {
+    const w = world()
+    const cop = spawnNpc(w, 'cop', 10, 10)
+    const scale = TILE * 0.5 // zoomed out
+    const missAt = 10 + PICK_RADIUS + 0.05 // just outside the base radius
+    expect(pickNearestEntity(w.entities, missAt, 10, PICK_RADIUS)).toBeUndefined()
+    expect(pickNearestEntity(w.entities, missAt, 10, pickRadiusAt(scale))).toBe(cop)
   })
 })
 

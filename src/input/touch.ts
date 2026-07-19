@@ -5,6 +5,7 @@ import { pinchZoom, type ZoomSink } from '../render/zoomModel'
 import { aimFires, selectAim } from './aim'
 import type { InputSource } from './input'
 import { createPinchTracker } from './pinch'
+import { createPressTracker, LONG_PRESS_MS } from '../ui/pressModel'
 import { computeTouchLabels } from './touchLabels'
 
 // Re-exported from the shared, DOM-free aim module so existing importers
@@ -23,6 +24,10 @@ export interface TouchInput extends InputSource {
    * display:none, so nothing here hit-tests, and any in-flight stick drag or
    * pinch is cancelled cleanly (vectors zeroed, captures released). */
   setVisible(visible: boolean): void
+  /** Receive neutral tap / long-press gestures for tap-to-inspect (screen
+   * client px). Only presses the claiming rules ruled NEUTRAL arrive here —
+   * a press that became a stick, pinch, or button never does (pressModel.ts). */
+  setInspectHandler(cb: (mode: 'tap' | 'longpress', clientX: number, clientY: number) => void): void
 }
 
 /**
@@ -77,6 +82,38 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
   controls.addEventListener('pointerup', pinchUp)
   controls.addEventListener('pointercancel', pinchUp)
 
+  // --- tap / long-press to INSPECT (pressModel.ts owns the discrimination).
+  // Listens at the controls level (zone events bubble here) but only presses
+  // that BEGIN on a stick zone count — buttons and hotbar slots capture their
+  // own taps and must never double as inspect presses. A press that becomes a
+  // stick (>slop movement) or is joined by a second fresh finger (pinch/twin
+  // plant) silently drops out inside the tracker; a clean quick release taps,
+  // a clean 400ms hold long-presses. The stick claim is never cancelled, so
+  // inspect steals no input in either direction.
+  let press = createPressTracker() // recreated on hide (see setVisible)
+  let inspectCb: ((mode: 'tap' | 'longpress', clientX: number, clientY: number) => void) | undefined
+  let pressTimer: ReturnType<typeof setTimeout> | undefined
+  controls.addEventListener('pointerdown', (ev) => {
+    if (!(ev.target instanceof HTMLElement) || ev.target.dataset.stickZone === undefined) return
+    // Register EVERY zone press (even one the pinch just consumed): the
+    // tracker's join rule is what disqualifies the other finger of a pinch.
+    press.down(ev.pointerId, ev.clientX, ev.clientY, performance.now())
+    clearTimeout(pressTimer)
+    pressTimer = setTimeout(() => {
+      const at = press.origin()
+      if (at && press.poll(performance.now()) === 'longpress') inspectCb?.('longpress', at.x, at.y)
+    }, LONG_PRESS_MS + 10)
+  })
+  controls.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
+  controls.addEventListener('pointerup', (ev) => {
+    const out = press.up(ev.pointerId, performance.now())
+    if (out !== null) inspectCb?.(out, ev.clientX, ev.clientY)
+  })
+  controls.addEventListener('pointercancel', (ev) => {
+    press.cancel(ev.pointerId)
+    press.up(ev.pointerId, performance.now())
+  })
+
   // A virtual stick that pops up under the thumb on its half of the screen and
   // reports a -1..1 vector via `onMove`. Shared by the move and aim sticks.
   const makeStick = (side: 'left' | 'right', onMove: (x: number, y: number) => void): void => {
@@ -90,6 +127,7 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     // Append the zone AFTER the art but BEFORE the buttons/hotbar (created later)
     // so those interactive controls sit on top and capture their own taps.
     const zone = document.createElement('div')
+    zone.dataset.stickZone = side // inspect presses may only start on a zone
     zone.style.cssText = `position:absolute;${side}:0;top:0;bottom:0;width:50%;pointer-events:auto;touch-action:none`
     controls.append(base, nub, zone)
 
@@ -131,7 +169,11 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
       }
       if (!willClaim || tracker.consumed(ev.pointerId)) return
       pointer = ev.pointerId
-      zone.setPointerCapture(ev.pointerId)
+      try {
+        zone.setPointerCapture(ev.pointerId)
+      } catch {
+        /* synthetic events (tests) have no active pointer to capture */
+      }
       ox = ev.clientX
       oy = ev.clientY
       base.style.display = 'block'
@@ -260,6 +302,9 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
 
   let shown = true
   return {
+    setInspectHandler(cb): void {
+      inspectCb = cb
+    },
     setVisible(visible: boolean): void {
       if (visible === shown) return
       shown = visible
@@ -273,6 +318,11 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
         // while the controls were live, so they still deliver once.
         for (const reg of stickRegs) reg.cancel()
         tracker.reset()
+        // Same story for the inspect press: its pointerup will never arrive,
+        // so drop any half-tracked press and its pending long-press timer —
+        // a stale entry would wrongly disqualify the next fresh press.
+        clearTimeout(pressTimer)
+        press = createPressTracker()
       }
       // One toggle on the wrapper covers sticks + buttons + hotbar; a hidden
       // wrapper is hit-test-inert, so taps in former stick zones flow through

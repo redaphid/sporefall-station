@@ -78,7 +78,12 @@ const boot = async (): Promise<void> => {
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
   if (!session) return
   const scenario = params.get('scenario')
-  if (scenario && session instanceof HostSession) applyScenario(session.world, scenario)
+  if (scenario && session instanceof HostSession) {
+    applyScenario(session.world, scenario)
+    // Scenarios may carve/build tiles (stages, walls) — re-bake the tilemap so
+    // the render matches the sim's level, not the pre-scenario one.
+    renderer.setLevel(session.world.level)
+  }
   // #50 exact-world-state injection: `?world=<fixture>` replaces the freshly
   // built world with a deserialized snapshot BEFORE the loop starts, so a feature
   // test can set world state EXACTLY and still run the real systems (composes with

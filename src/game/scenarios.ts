@@ -4,7 +4,7 @@
 import { WEAPONS } from './data/items'
 import { makeEntity, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
-import { spawnNpc } from './populate'
+import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { freeze, wet } from './systems/interactions'
 import { spawnObject } from './systems/objects'
@@ -417,6 +417,79 @@ const setupNpcCombat = (w: World): void => {
   }
 }
 
+/** The pluggable-behavior showcase (feat/npc-ai-ecs): four brains on one stage.
+ * A skittish civilian (attacked by the scripted player) flees and runs to the
+ * patrolling cop to report the crime; a hunter gangster chases the player, loses
+ * them behind an L-wall, walks to last-known and sweeps; a scavenger works a
+ * corner of pickups; the cop walks its beat until the alert pulls it off.
+ * Peaceful world — every hostility on stage comes from behaviors + disposition. */
+const setupNpcAi = (w: World): void => {
+  const cx = 32
+  const cy = 32
+  // Blank clearing: open floor, no random crowd/loot on stage. Wider to the
+  // west so the whole cast stays inside the player-following camera at zoom 1.
+  for (let y = cy - 13; y <= cy + 13; y++) {
+    for (let x = cx - 16; x <= cx + 13; x++) {
+      w.level.tiles[y * w.level.w + x] = Tile.Floor
+      w.level.solid[y * w.level.w + x] = 0
+    }
+  }
+  const players = w.entities.filter((e) => !!e.playerCtl)
+  w.entities = players
+  w.byId.clear()
+  for (const e of players) w.byId.set(e.id, e)
+  w.hostile = false
+
+  // The L-wall hide pocket: vertical x=23 rows 26..31, horizontal row 26 x 20..23.
+  const solidify = (x: number, y: number): void => {
+    w.level.tiles[y * w.level.w + x] = Tile.Wall
+    w.level.solid[y * w.level.w + x] = 1
+  }
+  for (let y = 26; y <= 31; y++) solidify(23, y)
+  for (let x = 20; x <= 23; x++) solidify(x, 26)
+
+  const player = players[0]
+  if (player) {
+    player.pos = { x: cx - 3.5, y: cy + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // the skittish civilian stands just east
+    if (player.health) player.health = { hp: 500, max: 500, iframes: 0 } // survive the whole clip
+  }
+
+  // Skittish: the victim-to-be, in fists' reach east of the player. Holds its
+  // spot (guard) so the scripted punch lands regardless of wander dice.
+  spawnNpc(w, 'civilian', cx - 2.3, cy + 0.5).ai!.guard = true
+
+  // Hunter: sees far, holds a grudge, carries a bat (a chase, not a shootout).
+  const hunter = spawnNpc(w, 'gangster', cx + 8.5, cy + 0.5)
+  hunter.combat!.weapon = 'bat'
+  hunter.ai!.sightRange = 14
+  if (player) hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
+
+  // Patrol: the only cop on stage — also the guard the civilian will run to.
+  // The beat stays >10 tiles from the victim (never a crime witness) yet inside
+  // the fleeing civilian's 14-tile alert range, north where the camera ends up.
+  const cop = spawnNpc(w, 'cop', cx - 5.5, cy - 10.5)
+  assignPatrol(cop, [
+    { x: cx - 5.5, y: cy - 10.5 },
+    { x: cx - 1.5, y: cy - 10.5 },
+    { x: cx - 5.5, y: cy - 12.5 },
+  ])
+
+  // Scavenger: a gleaner and its corner of loose loot, west of the hide pocket
+  // so its whole fetch-and-stash routine plays on camera.
+  const scav = spawnNpc(w, 'civilian', cx - 14.5, cy - 2.5)
+  scav.ai!.behavior = 'scavenger'
+  const drop = (itemId: string, x: number, y: number): void => {
+    const e = makeEntity('pickup', `pickup.${itemId}`, x, y, 0.3)
+    e.pickup = { itemId, qty: 1 }
+    addEntity(w, e)
+  }
+  drop('bandage', cx - 15.5, cy - 3.5)
+  drop('cash', cx - 14.5, cy - 0.5)
+  drop('medkit', cx - 15.5, cy - 6.5)
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'npc-combat') setupNpcCombat(w)
   if (name === 'objects') setupObjects(w)
@@ -432,4 +505,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'shooting') stageShooting(w)
   if (name === 'mission') stageMission(w)
   if (name === 'ai-goals') setupAiGoals(w)
+  if (name === 'npc-ai') setupNpcAi(w)
 }

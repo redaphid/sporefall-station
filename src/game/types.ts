@@ -93,3 +93,9 @@ export type SimEvent =
   | { type: 'noise'; x: number; y: number }
   | { type: 'runOver'; floor: number }
   | { type: 'roll'; x: number; y: number; entityId: EntityId }
+  /** An NPC's AI adopted a new goal worth noting (aggro/flee/alert/search/…) —
+   * `prev` is the goal it left, `targetId` who/what the new goal concerns. */
+  | { type: 'aiGoal'; entityId: EntityId; goal: string; prev: string; targetId?: EntityId }
+  /** A frightened NPC reached a guard and reported its scarer: the guard
+   * (`entityId`) now hunts `targetId`, tipped off by `byId`. */
+  | { type: 'alerted'; entityId: EntityId; byId: EntityId; targetId: EntityId }

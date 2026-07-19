@@ -1,8 +1,13 @@
 import { Graphics, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
 import { MODS } from '../game/data/mods'
+import type { Dir } from './anim'
 
 export const TILE_PX = 32
+
+/** Character sprite canvas: 48×48 on the 32px tiles. Feet-anchored, so a
+ * character stands 1.5 tiles tall and overlaps the tile behind/above it. */
+export const CHAR_PX = 48
 
 /**
  * Maps logical art keys to textures. v1 is procedural colored shapes;
@@ -14,13 +19,15 @@ export interface ArtRegistry {
   /** variant in [0, TILE_VARIANTS) — picked per position for texture variety. */
   tile(tileId: number, variant?: number): Texture
   entity(archetype: string): Texture
-  /** White silhouette of the entity texture, swapped in during hit flash. */
-  entityFlash(archetype: string): Texture
+  /** White silhouette of the entity texture, swapped in during hit flash. For a
+   * character pass its current drawn facing so the flash keeps the pose. */
+  entityFlash(archetype: string, dir?: Facing): Texture
   /** True when this archetype draws as a billboarded character sprite (which
    * should flip left/right, not rotate like the top-down procedural blobs). */
   isCharacterSprite(archetype: string): boolean
-  /** Directional sprite set (front/side/back × idle/step) for an archetype, if
-   * one is loaded — lets the renderer swap by heading instead of rotating. */
+  /** Directional sprite set (s/se/e/ne/n × idle/step) for an archetype. File art
+   * wins when loaded; every character archetype always gets at least the
+   * procedural fallback set, so nothing breaks when a theme lacks files. */
   characterSet(archetype: string): DirSet | undefined
   /** The walking (step) pose for an archetype, if a step frame exists. */
   walkStep(archetype: string): Texture | undefined
@@ -32,14 +39,27 @@ export interface ArtRegistry {
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
 
-/** A billboarded character's facings. Left is the side sprite flipped in the
- * renderer, so only three sprites (front/side/back) are generated per pose. */
-export type Facing = 'front' | 'side' | 'back'
+/** A billboarded character's DRAWN facings: s, se, e, ne, n. The west half
+ * (w/sw/nw) is the east art flipped in the renderer, so five sprites cover all
+ * eight compass headings. */
+export type Facing = Dir
+export const FACINGS: readonly Facing[] = ['s', 'se', 'e', 'ne', 'n']
 export interface DirPose {
   idle?: Texture
   step?: Texture
 }
 export type DirSet = Record<Facing, DirPose>
+
+/** Per-facing fallback chain when a drawn direction is missing from a file set
+ * (e.g. a legacy 3-direction theme): diagonals fall back to their nearest
+ * cardinal, everything ultimately falls back to south (toward camera). */
+export const FACING_FALLBACK: Record<Facing, readonly Facing[]> = {
+  s: ['s'],
+  se: ['se', 'e', 's'],
+  e: ['e', 's'],
+  ne: ['ne', 'n', 'e', 's'],
+  n: ['n', 's'],
+}
 
 export interface SpriteTextures {
   floor?: Texture
@@ -141,8 +161,16 @@ const ENTITY_COLORS: Record<string, number> = {
   cop: 0x7f9fd1,
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
+  scientist: 0xd9e4e8,
+  robot: 0x8fa1b3,
   crate: 0x9c6b3f,
   default: 0xcccccc,
+}
+
+/** Scale a 0xRRGGBB colour by `f` (each channel clamped to 255). */
+const shade = (color: number, f: number): number => {
+  const ch = (c: number): number => Math.max(0, Math.min(255, Math.round(c * f)))
+  return (ch((color >> 16) & 0xff) << 16) | (ch((color >> 8) & 0xff) << 8) | ch(color & 0xff)
 }
 
 export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): ArtRegistry => {
@@ -324,6 +352,110 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     return tex
   }
 
+  /** Procedural billboarded character on the CHAR_PX (48×48) canvas: a chunky
+   * figure with per-direction head/eye/hand placement so all five drawn facings
+   * read at a glance. Feet sit on the canvas bottom (the sprite is anchored
+   * bottom-centre). This is the guaranteed fallback art when a theme ships no
+   * character files — every direction exists for every character archetype. */
+  const drawCharacter = (
+    archetype: string,
+    dir: Facing,
+    frame: 'idle' | 'step',
+    colorOverride?: number,
+  ): Texture => {
+    const color = colorOverride ?? ENTITY_COLORS[archetype] ?? ENTITY_COLORS[CHARSET_ALIAS[archetype]] ?? ENTITY_COLORS.default
+    const dark = colorOverride ?? shade(color, 0.55)
+    const light = colorOverride ?? shade(color, 1.25)
+    const outline = colorOverride ?? 0x101018
+    const cx = CHAR_PX / 2
+    const lift = frame === 'step' ? 1 : 0 // step pose bobs the body, feet stay planted
+    // Per-direction lean: diagonals shift head/torso toward the heading so
+    // se/ne read as 3/4 views; e is a full profile.
+    const headDx = { s: 0, se: 2.5, e: 3.5, ne: 2.5, n: 0 }[dir]
+    const bodyDx = { s: 0, se: 1, e: 2, ne: 1, n: 0 }[dir]
+    const profile = dir === 'e'
+
+    // Transparent full-canvas rect pins generateTexture's bounds to the whole
+    // 48×48 canvas, so the feet anchor (bottom-centre) is exact.
+    const g = new Graphics().rect(0, 0, CHAR_PX, CHAR_PX).fill({ color: 0, alpha: 0 })
+
+    // Legs: idle stands square; step strides — trailing leg lifted, leading planted.
+    const legW = 5
+    const legH = 10
+    const legY = 47 - legH
+    if (frame === 'idle') {
+      g.rect(cx - 7 + bodyDx, legY, legW, legH).fill(dark)
+      g.rect(cx + 2 + bodyDx, legY, legW, legH).fill(dark)
+    } else {
+      g.rect(cx - 9 + bodyDx, legY + 2, legW, legH - 2).fill(dark)
+      g.rect(cx + 4 + bodyDx, legY, legW, legH).fill(dark)
+    }
+
+    // Torso: narrower in profile so east reads slimmer than south.
+    const torsoW = profile ? 14 : 18
+    g.roundRect(cx - torsoW / 2 + bodyDx, 20 - lift, torsoW, 19, 6)
+      .fill(color)
+      .roundRect(cx - torsoW / 2 + bodyDx, 20 - lift, torsoW, 19, 6)
+      .stroke({ width: 2, color: outline, alpha: 0.5 })
+
+    // Arms: both visible facing camera-ish; one leading arm in profile.
+    if (dir === 's' || dir === 'se') {
+      g.rect(cx - torsoW / 2 - 3 + bodyDx, 22 - lift, 3, 10).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.8))
+      g.rect(cx + torsoW / 2 + bodyDx, 22 - lift, 3, 10).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.8))
+    } else if (profile) {
+      g.rect(cx + 2 + bodyDx, 23 - lift, 4, 10).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.8))
+    }
+
+    // Head, lightened so it pops against the torso.
+    g.circle(cx + headDx, 13 - lift, 8.5)
+      .fill(light)
+      .circle(cx + headDx, 13 - lift, 8.5)
+      .stroke({ width: 2, color: outline, alpha: 0.5 })
+    // Back-of-head cap for away-facing poses (n/ne) — no face visible.
+    if (dir === 'n' || dir === 'ne') {
+      g.circle(cx + headDx, 11.5 - lift, 6.8).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.7))
+    }
+
+    // Eyes: two facing camera, two shifted on the se diagonal, one in profile.
+    const eye = colorOverride ?? 0x101018
+    if (dir === 's') {
+      g.circle(cx - 3.5, 12 - lift, 1.7).fill(eye)
+      g.circle(cx + 3.5, 12 - lift, 1.7).fill(eye)
+    } else if (dir === 'se') {
+      g.circle(cx + headDx - 1, 12.5 - lift, 1.7).fill(eye)
+      g.circle(cx + headDx + 4.5, 12.5 - lift, 1.7).fill(eye)
+    } else if (profile) {
+      g.circle(cx + headDx + 4.5, 12 - lift, 1.7).fill(eye)
+    }
+
+    // Held-item nub at the leading hand (hidden when facing away).
+    if (dir === 's' || dir === 'se' || profile) {
+      g.circle(cx + torsoW / 2 + bodyDx + 2, 30 - lift, 2.5).fill(colorOverride ?? 0x3a3a44)
+    }
+
+    const tex = renderer.generateTexture(g)
+    g.destroy()
+    return tex
+  }
+
+  // Procedural directional sets, cached per ARCHETYPE (not alias) so aliased
+  // bodies keep their own colour (boss red, bouncer tan, …).
+  const procCharCache = new Map<string, DirSet>()
+  const procCharSet = (archetype: string): DirSet => {
+    let set = procCharCache.get(archetype)
+    if (!set) {
+      set = FACINGS.reduce(
+        (acc, d) => ({
+          ...acc,
+          [d]: { idle: drawCharacter(archetype, d, 'idle'), step: drawCharacter(archetype, d, 'step') },
+        }),
+        {} as DirSet,
+      )
+      procCharCache.set(archetype, set)
+    }
+    return set
+  }
+
   const spriteForArchetype = (archetype: string): Texture | undefined => {
     const key = SPRITE_ARCHETYPES[archetype]
     if (key) return sprites[key] as Texture | undefined
@@ -339,12 +471,13 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
 
   const characterSet = (archetype: string): DirSet | undefined => {
     const alias = CHARSET_ALIAS[archetype]
-    return alias ? sprites.chars?.[alias] : undefined
+    if (!alias) return undefined
+    // File art wins; the procedural set guarantees every direction exists even
+    // when a theme ships no character files at all.
+    return sprites.chars?.[alias] ?? procCharSet(archetype)
   }
 
-  const isCharacterSprite = (archetype: string): boolean =>
-    characterSet(archetype) !== undefined ||
-    (spriteForArchetype(archetype) !== undefined && archetype in SPRITE_ARCHETYPES)
+  const isCharacterSprite = (archetype: string): boolean => archetype in CHARSET_ALIAS
 
   const walkStep = (archetype: string): Texture | undefined => {
     const key = STEP_ARCHETYPES[archetype]
@@ -367,11 +500,15 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   }
 
   const flashCache = new Map<string, Texture>()
-  const entityFlash = (archetype: string): Texture => {
-    let tex = flashCache.get(archetype)
+  const entityFlash = (archetype: string, dir?: Facing): Texture => {
+    // Characters flash as a white silhouette of their current facing so the
+    // pose (and the 48px feet-anchored canvas) never jumps during the flash.
+    const character = archetype in CHARSET_ALIAS
+    const key = character ? `${archetype}|${dir ?? 's'}` : archetype
+    let tex = flashCache.get(key)
     if (!tex) {
-      tex = drawEntity(archetype, 0xffffff)
-      flashCache.set(archetype, tex)
+      tex = character ? drawCharacter(archetype, dir ?? 's', 'idle', 0xffffff) : drawEntity(archetype, 0xffffff)
+      flashCache.set(key, tex)
     }
     return tex
   }

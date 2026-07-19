@@ -2,7 +2,7 @@ import { Application, Assets, ColorMatrixFilter, Container, Sprite, Texture, typ
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
-import { createArt, TILE_PX, type ArtRegistry, type DirSet, type Facing, type SpriteTextures } from './art'
+import { CHAR_PX, createArt, FACINGS, TILE_PX, type ArtRegistry, type DirSet, type Facing, type SpriteTextures } from './art'
 import { Camera } from './camera'
 import { EffectsLayer } from './effects'
 import { createHaptics } from './haptics'
@@ -33,7 +33,6 @@ export interface GameRenderer {
   draw(view: RenderView, alpha: number, dt: number): void
 }
 
-const CHAR_PX = Math.round(TILE_PX * 0.95)
 const ITEM_PX = Math.round(TILE_PX * 0.6)
 const FLAME_PX = Math.round(TILE_PX * 1.4)
 const FX_PX = Math.round(TILE_PX * 1.7)
@@ -41,7 +40,12 @@ const FX_PX = Math.round(TILE_PX * 1.7)
 /** Bake a source PNG to a fixed-size, renderer-friendly texture. Returns
  * undefined on failure so every sprite is optional and the procedural art in
  * art.ts fills any gap — a missing asset can never blank the screen. */
-const bake = async (renderer: Renderer, url: string, size: number): Promise<Texture | undefined> => {
+const bake = async (
+  renderer: Renderer,
+  url: string,
+  size: number,
+  quiet = false,
+): Promise<Texture | undefined> => {
   try {
     const src: Texture = await Assets.load(url)
     const sprite = new Sprite(src)
@@ -53,7 +57,8 @@ const bake = async (renderer: Renderer, url: string, size: number): Promise<Text
     holder.destroy({ children: true })
     return tex
   } catch (err) {
-    console.warn(`[sprites] failed to load ${url}, using procedural fallback`, err)
+    // Probe loads (a fallback exists) fail silently; real gaps still warn.
+    if (!quiet) console.warn(`[sprites] failed to load ${url}, using procedural fallback`, err)
     return undefined
   }
 }
@@ -67,21 +72,28 @@ const loadSprites = async (renderer: Renderer): Promise<SpriteTextures> => {
   const many = async (names: string[], size: number): Promise<Texture[]> =>
     (await Promise.all(names.map((n) => one(n, size)))).filter((t): t is Texture => t !== undefined)
 
-  // Directional set: front/side/back × idle/step, under sprites/chars/<name>/.
-  const DIRS: Facing[] = ['front', 'side', 'back']
+  // Directional set: s/se/e/ne/n × idle/step, under sprites/chars/<name>/
+  // (files named `<dir>-<frame>.png`). Legacy 3-direction packs still load:
+  // front→s, side→e, back→n; missing diagonals fall back per-facing at render
+  // time (FACING_FALLBACK), so old themes keep working untouched.
+  const LEGACY_DIR: Partial<Record<Facing, string>> = { s: 'front', e: 'side', n: 'back' }
   const dirSet = async (name: string): Promise<DirSet> => {
+    // Every pose is optional (render-time fallback covers gaps), so probes are
+    // quiet — a theme missing some directions is normal, not an error.
+    const pose = async (d: Facing, frame: 'idle' | 'step'): Promise<Texture | undefined> => {
+      const tex = await bake(renderer, url(`chars/${name}/${d}-${frame}`), CHAR_PX, true)
+      const legacy = LEGACY_DIR[d]
+      if (tex || !legacy) return tex
+      return bake(renderer, url(`chars/${name}/${legacy}-${frame}`), CHAR_PX, true)
+    }
     const poses = await Promise.all(
-      DIRS.map(async (d) => ({
-        d,
-        idle: await one(`chars/${name}/${d}-idle`, CHAR_PX),
-        step: await one(`chars/${name}/${d}-step`, CHAR_PX),
-      })),
+      FACINGS.map(async (d) => ({ d, idle: await pose(d, 'idle'), step: await pose(d, 'step') })),
     )
     return poses.reduce((set, p) => ({ ...set, [p.d]: { idle: p.idle, step: p.step } }), {} as DirSet)
   }
   const dirSetIfAny = async (name: string): Promise<DirSet | undefined> => {
     const set = await dirSet(name)
-    return DIRS.some((d) => set[d].idle) ? set : undefined
+    return FACINGS.some((d) => set[d].idle) ? set : undefined
   }
 
   const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot']

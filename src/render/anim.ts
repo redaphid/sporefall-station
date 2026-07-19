@@ -23,17 +23,75 @@ export const onceFrame = (
   return idx >= frames ? -1 : idx
 }
 
-export type Dir = 'front' | 'side' | 'back'
+/** The five DRAWN character facings. West-side headings (w/sw/nw) reuse the
+ * east-side art (e/se/ne) mirrored horizontally, so artists draw five sprites
+ * per pose, not eight. Sprite files are named `<kind>-<dir>-<frame>` with
+ * dir ∈ {s,se,e,ne,n} and frame ∈ {idle,step}. */
+export type Dir = 's' | 'se' | 'e' | 'ne' | 'n'
 
-/** Map a heading (radians; screen +x right, +y down) to a sprite facing and
- * whether to flip horizontally. Down → front (toward camera), up → back, and
- * left/right → the side sprite (flipped when heading left). */
-export const facingDir = (facing: number): { dir: Dir; flip: boolean } => {
-  const c = Math.cos(facing)
-  const s = Math.sin(facing)
-  if (Math.abs(s) >= Math.abs(c)) return { dir: s > 0 ? 'front' : 'back', flip: false }
-  return { dir: 'side', flip: c < 0 }
+/** All eight compass headings an entity can face on screen. */
+export type Facing8 = 'e' | 'se' | 's' | 'sw' | 'w' | 'nw' | 'n' | 'ne'
+
+/** Compass order matching heading sectors: index k covers headings within
+ * ±22.5° of k·45°, in screen coords (+x right → east, +y down → south). */
+const SECTORS: readonly Facing8[] = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']
+
+const TAU = Math.PI * 2
+
+/** Snap a heading (radians; screen +x right, +y down) to one of the eight
+ * compass facings. Sector boundaries sit at 22.5° offsets so the diagonals get
+ * full 45° sectors. Boundary headings (exactly 22.5° past a sector centre)
+ * round forward (ccw→cw order): 22.5° → 'se'. Non-finite headings read south
+ * (toward the camera) — the neutral "idle" facing. */
+export const facing8 = (facing: number): Facing8 => {
+  if (!Number.isFinite(facing)) return 's'
+  const a = ((facing % TAU) + TAU) % TAU // normalize to [0, 2π)
+  return SECTORS[Math.round(a / (Math.PI / 4)) % 8]
 }
+
+/** Which drawn sprite renders each compass facing, and whether it mirrors. */
+const DRAWN: Record<Facing8, { dir: Dir; flip: boolean }> = {
+  e: { dir: 'e', flip: false },
+  se: { dir: 'se', flip: false },
+  s: { dir: 's', flip: false },
+  sw: { dir: 'se', flip: true },
+  w: { dir: 'e', flip: true },
+  nw: { dir: 'ne', flip: true },
+  n: { dir: 'n', flip: false },
+  ne: { dir: 'ne', flip: false },
+}
+
+/** Map a heading (radians; screen +x right, +y down) to the drawn sprite facing
+ * and whether to flip horizontally: 8 compass sectors rendered from 5 drawn
+ * directions, with the west half mirrored from the east half. */
+export const facingDir = (facing: number): { dir: Dir; flip: boolean } => DRAWN[facing8(facing)]
+
+/** Character sprites anchor bottom-centre at the entity's FEET, half a tile
+ * below the entity centre (the entity stands on the lower half of its tile). */
+export const CHAR_FOOT_OFFSET = 0.5
+
+/** World-pixel y of a character's feet — the sprite's bottom-centre anchor.
+ * Deliberately independent of the sprite canvas size: growing the canvas makes
+ * the character taller ABOVE its feet (overlapping the tile behind it), never
+ * sinks it into the ground. */
+export const charFootPx = (yTiles: number, tilePx: number): number => (yTiles + CHAR_FOOT_OFFSET) * tilePx
+
+/** Vertical world-pixel span [top, bottom] of a feet-anchored sprite. The
+ * bottom is canvas-size-invariant; only the top moves when the canvas grows. */
+export const charSpriteBounds = (
+  yTiles: number,
+  tilePx: number,
+  canvasPx: number,
+): { top: number; bottom: number } => {
+  const bottom = charFootPx(yTiles, tilePx)
+  return { top: bottom - canvasPx, bottom }
+}
+
+/** Depth key for the y-sorted entity layer. Every grounded entity sorts by its
+ * world y (equivalently its sprite bottom — all sprites share the same +0.5
+ * foot offset, so relative order is identical); flames float above everything
+ * they consume. Bigger key draws in front. */
+export const depthKey = (kind: string, yTiles: number): number => (kind === 'fire' ? yTiles + 1000 : yTiles)
 
 const MOVE_EPS = 0.05
 

@@ -72,7 +72,7 @@ const harness = (over: Partial<GameSettings> = {}): Harness => {
   const calls: HapticCmd[] = []
   let time = 1000
   let native = true
-  const settings: GameSettings = { hapticsEnabled: true, hapticsIntensity: 0.7, effectsQuality: 'high', ...over }
+  const settings: GameSettings = { hapticsEnabled: true, hapticsIntensity: 0.7, effectsQuality: 'high', theme: 'city', ...over }
   const driver: HapticDriver = {
     isNative: () => native,
     now: () => time,

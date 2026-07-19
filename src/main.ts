@@ -20,6 +20,8 @@ import { BroadcastChannelTransport } from './net/transport/broadcastChannelTrans
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
+import type { ZoomSink } from './render/zoomModel'
+import { wireWheelZoom } from './input/wheelZoom'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
@@ -54,10 +56,18 @@ const boot = async (): Promise<void> => {
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
   // A `?script=` deterministic input timeline replaces live input for e2e videos.
   const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
+  // View-only zoom control: pinch (touch) + scrollwheel (desktop), both routed
+  // through the camera's smooth, anchored zoom target. Zero effect on the sim.
+  const zoomSink: ZoomSink = {
+    get: () => renderer.camera.zoomTarget,
+    set: (z, ax, ay) => renderer.camera.setZoom(z, ax, ay),
+    reset: () => renderer.camera.resetZoom(),
+  }
+  wireWheelZoom(renderer.app.canvas, zoomSink)
   let touch: TouchInput | undefined
   let input: InputSource = script ? createScriptedInput(script) : createKeyboard()
   if (!script && navigator.maxTouchPoints > 0) {
-    touch = createTouch(uiMount)
+    touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
   const coop = createGamepadCoop()
@@ -95,7 +105,7 @@ const boot = async (): Promise<void> => {
     }
   }
   const zoom = Number(params.get('zoom'))
-  if (zoom >= 1 && zoom <= 4) renderer.camera.zoom = zoom
+  if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
   if (params.has('e2e')) {
     ;(window as unknown as { __sor: Session }).__sor = session
     if (session instanceof HostSession) {
@@ -107,7 +117,12 @@ const boot = async (): Promise<void> => {
       // browser test can draw over the scene without a hub.
       ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
         runVerb(hostWorld, `annotate ${line}`)
-      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) => runVerb(hostWorld, line)
+      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) =>
+        runVerb(hostWorld, line, { setTheme: (id) => void renderer.setTheme(id) })
+      // Awaitable theme swap for e2e screenshot tests (the `theme` verb is
+      // fire-and-forget; this resolves when the new assets are actually baked).
+      ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
+        renderer.setTheme(id)
       // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
       // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
       // the local player's equipped gun. Exposed here so a screenshot e2e can show
@@ -129,6 +144,13 @@ const boot = async (): Promise<void> => {
       ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
         applyPick(id)
         draftScreen.hide()
+      }
+      // Drive the view zoom headlessly: smooth (real interpolation path) or
+      // snapped (deterministic stills at exact zoom levels).
+      ;(window as unknown as { __zoom: (z: number, snap?: boolean) => number }).__zoom = (z, snap) => {
+        if (snap) renderer.camera.snapZoom(z)
+        else renderer.camera.setZoom(z)
+        return renderer.camera.zoomTarget
       }
       // Project a world tile to a screen pixel via the LIVE camera, so an e2e can
       // click exactly on an entity (mirrors the overlay's own projection).
@@ -160,7 +182,10 @@ const boot = async (): Promise<void> => {
     // `?debug=<name>` labels this game in the hub's registry so multiple games on
     // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
     const name = params.get('debug') || undefined
-    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, { name })
+    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
+      name,
+      setTheme: (id) => void renderer.setTheme(id),
+    })
   }
   runLoop(session, renderer, uiMount, coop, touch, debug)
 }

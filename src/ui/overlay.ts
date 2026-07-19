@@ -31,6 +31,7 @@ import {
 } from './annotationLayout'
 import { projectToScreen, screenToWorld, type CameraState } from './locatorModel'
 import { inspectCard } from './inspectModel'
+import { themeDisplayName } from '../render/themeState'
 import type { CameraSource } from './screens'
 
 export interface Overlay {
@@ -379,7 +380,7 @@ const renderCard = (card: HTMLElement, selected: readonly Entity[]): void => {
   card.style.display = 'flex'
   card.replaceChildren(
     ...selected.map((e) => {
-      const c = inspectCard(e)
+      const c = inspectCard(e, themeDisplayName)
       const box = document.createElement('div')
       box.className = 'inspect-card'
       box.style.cssText =

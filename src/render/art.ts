@@ -1,12 +1,13 @@
 import { Graphics, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
 import { MODS } from '../game/data/mods'
-import type { Dir } from './anim'
+import { DIRS5, type Dir5 } from './theme'
 
 export const TILE_PX = 32
 
-/** Character sprite canvas: 48×48 on the 32px tiles. Feet-anchored, so a
- * character stands 1.5 tiles tall and overlaps the tile behind/above it. */
+/** Character sprite canvas: 48×48 over the 32px tiles. Feet-anchored, so a
+ * character stands 1.5 tiles tall and overlaps the tile behind/above it
+ * (docs/themes.md "Character art convention"). */
 export const CHAR_PX = 48
 
 /**
@@ -19,47 +20,45 @@ export interface ArtRegistry {
   /** variant in [0, TILE_VARIANTS) — picked per position for texture variety. */
   tile(tileId: number, variant?: number): Texture
   entity(archetype: string): Texture
-  /** White silhouette of the entity texture, swapped in during hit flash. For a
-   * character pass its current drawn facing so the flash keeps the pose. */
-  entityFlash(archetype: string, dir?: Facing): Texture
+  /** White silhouette of the entity texture, swapped in during hit flash. For
+   * a character pass its current drawn facing so the flash keeps the pose. */
+  entityFlash(archetype: string, dir?: Dir5): Texture
   /** True when this archetype draws as a billboarded character sprite (which
    * should flip left/right, not rotate like the top-down procedural blobs). */
   isCharacterSprite(archetype: string): boolean
-  /** Directional sprite set (s/se/e/ne/n × idle/step) for an archetype. File art
-   * wins when loaded; every character archetype always gets at least the
-   * procedural fallback set, so nothing breaks when a theme lacks files. */
-  characterSet(archetype: string): DirSet | undefined
+  /** 5-direction sprite set (s/se/e/ne/n × idle/step) for an archetype. Theme
+   * file art wins when loaded; every character archetype always gets at least
+   * the procedural fallback set, so no theme gap can break a facing. Missing
+   * drawn directions borrow a neighbor at draw time (DIR_FALLBACK). */
+  characterSet(archetype: string): CharSet | undefined
   /** The walking (step) pose for an archetype, if a step frame exists. */
   walkStep(archetype: string): Texture | undefined
   /** Fire flicker frames (empty → caller falls back to the procedural flame). */
   flameFrames(): readonly Texture[]
   /** A one-shot effect clip's frames, by effect key. Empty if not loaded. */
   effectFrames(key: EffectKey): readonly Texture[]
+  /** White bullet core disc (radius 8px) — tinted/scaled per composed style. */
+  bulletCore(): Texture
+  /** Soft white radial halo — the sprite FALLBACK glow when the energy shader
+   * is unavailable (additive, tinted per style). */
+  bulletGlow(): Texture
+  /** The active theme's bullet base art (`sprites.projectile`, docs/themes.md),
+   * if any — mod visual traits compose ON TOP of it (tint/stretch/energy).
+   * Undefined → the procedural tintable white disc carries the whole look. */
+  themedBullet(): Texture | undefined
 }
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
 
-/** A billboarded character's DRAWN facings: s, se, e, ne, n. The west half
- * (w/sw/nw) is the east art flipped in the renderer, so five sprites cover all
- * eight compass headings. */
-export type Facing = Dir
-export const FACINGS: readonly Facing[] = ['s', 'se', 'e', 'ne', 'n']
 export interface DirPose {
   idle?: Texture
   step?: Texture
 }
-export type DirSet = Record<Facing, DirPose>
-
-/** Per-facing fallback chain when a drawn direction is missing from a file set
- * (e.g. a legacy 3-direction theme): diagonals fall back to their nearest
- * cardinal, everything ultimately falls back to south (toward camera). */
-export const FACING_FALLBACK: Record<Facing, readonly Facing[]> = {
-  s: ['s'],
-  se: ['se', 'e', 's'],
-  e: ['e', 's'],
-  ne: ['ne', 'n', 'e', 's'],
-  n: ['n', 's'],
-}
+/** A billboarded character's 5 DRAWN directions (docs/themes.md): s, se, e,
+ * ne, n. The west half (w/sw/nw) is the east art mirrored at draw time, so
+ * five sprites cover all eight compass headings. Missing directions borrow a
+ * neighbor via DIR_FALLBACK when the renderer picks a pose. */
+export type CharSet = Partial<Record<Dir5, DirPose>>
 
 export interface SpriteTextures {
   floor?: Texture
@@ -76,8 +75,12 @@ export interface SpriteTextures {
   thugStep?: Texture
   scientistStep?: Texture
   robotStep?: Texture
-  /** Directional character sets, keyed by archetype. */
-  chars?: Record<string, DirSet>
+  /** Themed projectile/grenade base textures — weapon-mod visual traits (tints,
+   * trails) compose ON TOP of these; procedural dots when absent. */
+  projectile?: Texture
+  grenade?: Texture
+  /** Directional character sets (5 drawn dirs), keyed by archetype. */
+  chars?: Record<string, CharSet>
   /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
   items?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/atm/…). */
@@ -89,6 +92,13 @@ export interface SpriteTextures {
   explosion?: Texture[]
   pickup?: Texture[]
   blood?: Texture[]
+}
+
+/** Palette overrides for the PROCEDURAL art, resolved from the active theme
+ * chain (name-keyed; parsed to numbers upstream in theme.ts). */
+export interface ArtPalette {
+  tiles?: Record<string, number>
+  entities?: Record<string, number>
 }
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
@@ -134,13 +144,14 @@ const STEP_ARCHETYPES: Record<string, keyof SpriteTextures> = {
   robot: 'robotStep',
 }
 
-export interface SpriteTextures {
-  floor?: Texture
-  wall?: Texture
-  player?: Texture
-  cop?: Texture
-  item?: Texture
-  prop?: Texture
+/** palette.tiles is name-keyed (pure layer, no Tile enum); map back to ids. */
+const TILE_ID_BY_NAME: Record<string, number> = {
+  street: Tile.Street,
+  sidewalk: Tile.Sidewalk,
+  floor: Tile.Floor,
+  wall: Tile.Wall,
+  grass: Tile.Grass,
+  exit: Tile.Exit,
 }
 
 const TILE_COLORS: Record<number, number> = {
@@ -173,9 +184,17 @@ const shade = (color: number, f: number): number => {
   return (ch((color >> 16) & 0xff) << 16) | (ch((color >> 8) & 0xff) << 8) | ch(color & 0xff)
 }
 
-export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): ArtRegistry => {
+export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}, palette: ArtPalette = {}): ArtRegistry => {
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
+
+  // Themed procedural colors: theme palette wins over the built-in constants.
+  const tileColors: Record<number, number> = { ...TILE_COLORS }
+  for (const [name, color] of Object.entries(palette.tiles ?? {})) {
+    const id = TILE_ID_BY_NAME[name]
+    if (id !== undefined) tileColors[id] = color
+  }
+  const entityColors: Record<string, number> = { ...ENTITY_COLORS, ...palette.entities }
 
   // Deterministic pseudo-noise for texture detail (not the sim's rng)
   const hash2 = (a: number, b: number): number => {
@@ -185,7 +204,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   }
 
   const drawTile = (tileId: number, variant: number): Texture => {
-    const color = TILE_COLORS[tileId] ?? 0xff00ff
+    const color = tileColors[tileId] ?? 0xff00ff
     const g = new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill(color)
     const T = TILE_PX
     switch (tileId) {
@@ -328,7 +347,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
       g.destroy()
       return tex
     }
-    const color = colorOverride ?? ENTITY_COLORS[archetype] ?? ENTITY_COLORS.default
+    const color = colorOverride ?? entityColors[archetype] ?? entityColors.default
     const r = TILE_PX * 0.35
     const g = new Graphics()
       // body with a darker rim
@@ -352,18 +371,38 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     return tex
   }
 
+  const spriteForArchetype = (archetype: string): Texture | undefined => {
+    const key = SPRITE_ARCHETYPES[archetype]
+    if (key) return sprites[key] as Texture | undefined
+    // Themed projectile/grenade base art; mod-driven visual traits (elemental
+    // tints etc.) are applied by the renderer on top of whatever base loads.
+    if (archetype === 'projectile') return sprites.projectile
+    if (archetype === 'grenade') return sprites.grenade
+    if (archetype.startsWith('pickup.')) {
+      const id = archetype.slice('pickup.'.length)
+      return sprites.items?.[id] ?? sprites.items?.[ITEM_ALIAS[id]] ?? sprites.item
+    }
+    const propKey = PROP_SPRITE[archetype]
+    if (propKey) return sprites.props?.[propKey]
+    if (archetype === 'crate' || archetype.startsWith('prop')) return sprites.prop
+    return undefined
+  }
+
   /** Procedural billboarded character on the CHAR_PX (48×48) canvas: a chunky
    * figure with per-direction head/eye/hand placement so all five drawn facings
    * read at a glance. Feet sit on the canvas bottom (the sprite is anchored
    * bottom-centre). This is the guaranteed fallback art when a theme ships no
-   * character files — every direction exists for every character archetype. */
+   * character files — every direction exists for every character archetype.
+   * Colours come from the palette-merged entityColors, so themes recolour the
+   * procedural bodies too. */
   const drawCharacter = (
     archetype: string,
-    dir: Facing,
+    dir: Dir5,
     frame: 'idle' | 'step',
     colorOverride?: number,
   ): Texture => {
-    const color = colorOverride ?? ENTITY_COLORS[archetype] ?? ENTITY_COLORS[CHARSET_ALIAS[archetype]] ?? ENTITY_COLORS.default
+    const color =
+      colorOverride ?? entityColors[archetype] ?? entityColors[CHARSET_ALIAS[archetype]] ?? entityColors.default
     const dark = colorOverride ?? shade(color, 0.55)
     const light = colorOverride ?? shade(color, 1.25)
     const outline = colorOverride ?? 0x101018
@@ -399,11 +438,12 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
       .stroke({ width: 2, color: outline, alpha: 0.5 })
 
     // Arms: both visible facing camera-ish; one leading arm in profile.
+    const arm = colorOverride ?? shade(color, 0.8)
     if (dir === 's' || dir === 'se') {
-      g.rect(cx - torsoW / 2 - 3 + bodyDx, 22 - lift, 3, 10).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.8))
-      g.rect(cx + torsoW / 2 + bodyDx, 22 - lift, 3, 10).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.8))
+      g.rect(cx - torsoW / 2 - 3 + bodyDx, 22 - lift, 3, 10).fill(arm)
+      g.rect(cx + torsoW / 2 + bodyDx, 22 - lift, 3, 10).fill(arm)
     } else if (profile) {
-      g.rect(cx + 2 + bodyDx, 23 - lift, 4, 10).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.8))
+      g.rect(cx + 2 + bodyDx, 23 - lift, 4, 10).fill(arm)
     }
 
     // Head, lightened so it pops against the torso.
@@ -413,7 +453,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
       .stroke({ width: 2, color: outline, alpha: 0.5 })
     // Back-of-head cap for away-facing poses (n/ne) — no face visible.
     if (dir === 'n' || dir === 'ne') {
-      g.circle(cx + headDx, 11.5 - lift, 6.8).fill(shade(colorOverride ?? color, colorOverride ? 1 : 0.7))
+      g.circle(cx + headDx, 11.5 - lift, 6.8).fill(colorOverride ?? shade(color, 0.7))
     }
 
     // Eyes: two facing camera, two shifted on the se diagonal, one in profile.
@@ -440,40 +480,24 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
 
   // Procedural directional sets, cached per ARCHETYPE (not alias) so aliased
   // bodies keep their own colour (boss red, bouncer tan, …).
-  const procCharCache = new Map<string, DirSet>()
-  const procCharSet = (archetype: string): DirSet => {
+  const procCharCache = new Map<string, CharSet>()
+  const procCharSet = (archetype: string): CharSet => {
     let set = procCharCache.get(archetype)
     if (!set) {
-      set = FACINGS.reduce(
-        (acc, d) => ({
-          ...acc,
-          [d]: { idle: drawCharacter(archetype, d, 'idle'), step: drawCharacter(archetype, d, 'step') },
-        }),
-        {} as DirSet,
-      )
+      set = {}
+      for (const d of DIRS5) {
+        set[d] = { idle: drawCharacter(archetype, d, 'idle'), step: drawCharacter(archetype, d, 'step') }
+      }
       procCharCache.set(archetype, set)
     }
     return set
   }
 
-  const spriteForArchetype = (archetype: string): Texture | undefined => {
-    const key = SPRITE_ARCHETYPES[archetype]
-    if (key) return sprites[key] as Texture | undefined
-    if (archetype.startsWith('pickup.')) {
-      const id = archetype.slice('pickup.'.length)
-      return sprites.items?.[id] ?? sprites.items?.[ITEM_ALIAS[id]] ?? sprites.item
-    }
-    const propKey = PROP_SPRITE[archetype]
-    if (propKey) return sprites.props?.[propKey]
-    if (archetype === 'crate' || archetype.startsWith('prop')) return sprites.prop
-    return undefined
-  }
-
-  const characterSet = (archetype: string): DirSet | undefined => {
+  const characterSet = (archetype: string): CharSet | undefined => {
     const alias = CHARSET_ALIAS[archetype]
     if (!alias) return undefined
-    // File art wins; the procedural set guarantees every direction exists even
-    // when a theme ships no character files at all.
+    // Theme file art wins; the procedural set guarantees every character
+    // archetype renders in all five drawn directions even with zero files.
     return sprites.chars?.[alias] ?? procCharSet(archetype)
   }
 
@@ -485,6 +509,33 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   }
 
   const flameFrames = (): readonly Texture[] => sprites.flames ?? []
+
+  // Shared bullet textures — generated ONCE, then tinted/scaled per bullet so
+  // every projectile batches on the same two textures (no per-frame generation).
+  let bulletCoreTex: Texture | undefined
+  const bulletCore = (): Texture => {
+    if (!bulletCoreTex) {
+      const g = new Graphics().circle(8, 8, 8).fill(0xffffff)
+      bulletCoreTex = renderer.generateTexture(g)
+      g.destroy()
+    }
+    return bulletCoreTex
+  }
+  let bulletGlowTex: Texture | undefined
+  const bulletGlow = (): Texture => {
+    if (!bulletGlowTex) {
+      // Concentric falloff rings approximate a radial gradient (no shaders here —
+      // this texture IS the fallback for GPUs where the energy shader won't build).
+      const g = new Graphics()
+      const R = 24
+      for (let i = 6; i >= 1; i--) {
+        g.circle(R, R, (R * i) / 6).fill({ color: 0xffffff, alpha: 0.05 + (6 - i) * 0.03 })
+      }
+      bulletGlowTex = renderer.generateTexture(g)
+      g.destroy()
+    }
+    return bulletGlowTex
+  }
 
   const effectFrames = (key: EffectKey): readonly Texture[] => sprites[key] ?? []
 
@@ -500,7 +551,7 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
   }
 
   const flashCache = new Map<string, Texture>()
-  const entityFlash = (archetype: string, dir?: Facing): Texture => {
+  const entityFlash = (archetype: string, dir?: Dir5): Texture => {
     // Characters flash as a white silhouette of their current facing so the
     // pose (and the 48px feet-anchored canvas) never jumps during the flash.
     const character = archetype in CHARSET_ALIAS
@@ -522,5 +573,8 @@ export const createArt = (renderer: Renderer, sprites: SpriteTextures = {}): Art
     walkStep,
     flameFrames,
     effectFrames,
+    bulletCore,
+    bulletGlow,
+    themedBullet: () => sprites.projectile,
   }
 }

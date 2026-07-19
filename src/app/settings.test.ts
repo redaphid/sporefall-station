@@ -31,7 +31,20 @@ describe('clampSettings', () => {
   })
 
   it('round-trips a fully-valid object', () => {
-    const s = { hapticsEnabled: false, hapticsIntensity: 0.5, effectsQuality: 'low' as const }
+    const s = { hapticsEnabled: false, hapticsIntensity: 0.5, effectsQuality: 'low' as const, theme: 'swamp' }
     expect(clampSettings(s)).toEqual(s)
+  })
+
+  it('defaults theme to city', () => {
+    expect(clampSettings({}).theme).toBe('city')
+  })
+
+  it('keeps a valid theme id and rejects invalid ones', () => {
+    expect(clampSettings({ theme: 'swamp-2' }).theme).toBe('swamp-2')
+    expect(clampSettings({ theme: 'Swamp' }).theme).toBe('city') // uppercase
+    expect(clampSettings({ theme: '../etc' }).theme).toBe('city') // traversal
+    expect(clampSettings({ theme: '' }).theme).toBe('city')
+    expect(clampSettings({ theme: 'x'.repeat(65) }).theme).toBe('city')
+    expect(clampSettings({ theme: 42 }).theme).toBe('city')
   })
 })

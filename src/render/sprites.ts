@@ -2,7 +2,8 @@ import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { burnPulse, charFootPx, cycleFrame, depthKey, facingDir, isMoving, walkBob } from './anim'
-import { FACING_FALLBACK, TILE_PX, type ArtRegistry, type DirPose, type DirSet, type Facing } from './art'
+import { TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
+import { DIR_FALLBACK, type Dir5 } from './theme'
 
 const elementTint = (fx: Fx | undefined): number => {
   if (!fx) return 0xffffff
@@ -26,12 +27,16 @@ interface View {
 const FIRE_TPF = 4
 const WALK_TPF = 6
 
-const DIR_INDEX: Record<Facing, number> = { s: 0, se: 1, e: 2, ne: 3, n: 4 }
+const DIR_INDEX: Record<Dir5, number> = { s: 0, se: 1, e: 2, ne: 3, n: 4 }
 
-/** First pose in the facing's fallback chain that has an idle texture, so a
- * legacy 3-direction file set still covers all five drawn facings. */
-const poseFor = (set: DirSet, dir: Facing): DirPose | undefined => {
-  for (const d of FACING_FALLBACK[dir]) if (set[d]?.idle) return set[d]
+/** First pose in the facing's DIR_FALLBACK chain that has an idle texture, so
+ * a partial file set (e.g. a 3-direction theme) still covers all five drawn
+ * facings by borrowing a neighbor. */
+const poseFor = (set: CharSet, dir: Dir5): DirPose | undefined => {
+  for (const d of DIR_FALLBACK[dir]) {
+    const pose = set[d]
+    if (pose?.idle) return pose
+  }
   return undefined
 }
 
@@ -91,12 +96,26 @@ export class EntityViews {
     this.root.sortableChildren = true
   }
 
+  /** Drop every pooled sprite so the next update() rebuilds them against the
+   * (possibly hot-swapped) art registry — used on runtime theme change. */
+  refresh(): void {
+    for (const view of this.views.values()) {
+      this.root.removeChild(view.sprite)
+      view.sprite.destroy()
+    }
+    this.views.clear()
+  }
+
   update(entities: readonly Entity[], alpha: number, tick: number): void {
     for (const view of this.views.values()) view.seen = false
     const t = tick + alpha // continuous view-time for smooth procedural juice
 
     for (const e of entities) {
       if (e.dead) continue
+      // Bullets ('projectile' archetype) draw in the procedural BulletLayer,
+      // composed from their weapon-mod provenance. Grenades/thrown items keep
+      // their entity sprite here.
+      if (e.kind === 'projectile' && e.archetype === 'projectile') continue
       // Doors render differently open vs closed; treat state as part of identity.
       const artKey = e.door ? (e.door.open ? 'door.open' : 'door') : e.archetype
       let view = this.views.get(e.id)

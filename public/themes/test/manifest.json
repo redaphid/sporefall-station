@@ -1,0 +1,28 @@
+{
+  "name": "Test (magenta)",
+  "version": 1,
+  "palette": {
+    "background": "#200020",
+    "uiAccent": "#ff00ff",
+    "tiles": {
+      "street": "#3a003a",
+      "sidewalk": "#550055",
+      "grass": "#660066",
+      "wall": "#12001a"
+    },
+    "entities": {
+      "civilian": "#ff77ff",
+      "crate": "#aa00aa"
+    }
+  },
+  "names": {
+    "cop": "Test Warden",
+    "thug": "Glitch Goblin",
+    "civilian": "Pixel Person"
+  },
+  "sprites": {
+    "tile.floor": "floor.png",
+    "tile.wall": "does-not-exist.png",
+    "item.default": null
+  }
+}

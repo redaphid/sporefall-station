@@ -7,6 +7,7 @@ import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import { SIM_DT } from './game/types'
+import { padAimReticles, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
   anyPadProducing,
@@ -324,6 +325,21 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   return session
 }
 
+/** "Controller detected" toast for a pad the browser exposes but that hasn't
+ * joined yet. Any button or a firm stick push joins (padJoin.ts), so this only
+ * shows in the window between exposure and the player's first real input —
+ * exactly when a hint is worth having and invisible the rest of the time. */
+const createPadHint = (mount: HTMLElement): ((show: boolean) => void) => {
+  const el = document.createElement('div')
+  el.textContent = 'Controller detected — press any button or move a stick to join'
+  el.style.cssText =
+    'position:absolute;top:14px;left:50%;transform:translateX(-50%);display:none;z-index:55;' +
+    'font:600 13px system-ui;color:#fff;background:#000a;padding:6px 14px;border-radius:9px;' +
+    'pointer-events:none;white-space:nowrap'
+  mount.appendChild(el)
+  return (show) => (el.style.display = show ? 'block' : 'none')
+}
+
 const createPauseBanner = (mount: HTMLElement): ((paused: boolean) => void) => {
   const el = document.createElement('div')
   el.textContent = 'PAUSED'
@@ -384,6 +400,7 @@ const runLoop = (
   touch?.setInspectHandler((mode, x, y) => commOverlay.inspectAt(mode === 'tap' ? 'chip' : 'card', x, y))
   const overlay = createControllersOverlay(uiMount)
   const showPause = createPauseBanner(uiMount)
+  const showPadHint = createPadHint(uiMount)
   let currentLevel = session.renderView().level
 
   // Touch-controls visibility (stickVisibility.ts): last actor wins, pad wins
@@ -438,6 +455,14 @@ const runLoop = (
     renderer.draw(view, alpha, dt)
     hud.update(view)
     const pads = coop.debug()
+    // Twin-stick aim reticles: one per joined pad with a deflected right stick,
+    // anchored to that pad's player entity. Presentation only.
+    const anchors: ReticleAnchor[] = []
+    for (const e of view.entities)
+      if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
+    renderer.setReticles(padAimReticles(pads, anchors))
+    // Exposed-but-unjoined pad: nudge the player that any input joins.
+    showPadHint(pads.some((p) => p.slot === null))
     vis = stepVisibility(vis, {
       padJoined: anyPadActive(pads),
       padActivity: anyPadProducing(pads),

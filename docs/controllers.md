@@ -24,13 +24,50 @@ multiple local players on one shared screen.
 - Each pad's `InputCmd` is keyed by player id and consumed by the existing
   movement / combat / interaction systems — no system changes needed.
 
-## Press-to-join & hotplug
+## Join & hotplug: ANY input joins, and the joining input is inert
 
-- An unassigned connected pad that presses **any** join button claims the lowest
-  free player slot.
+- An unassigned connected pad joins on **any input**: any mapped button
+  (face/bumper/trigger/Start/Back/stick-click/d-pad), **or a firm, sustained
+  stick push** — raw magnitude > 0.5 for 3 consecutive polls on a *trusted*
+  stick pair that has been seen resting in the deadzone at least once
+  ("neutral proof"; rules + rationale in `src/input/padJoin.ts`). Neutral
+  proof is what keeps an analog trigger misread as a stick axis — which rests
+  at −1, i.e. "fully deflected", once touched — from ghost-joining, and drift
+  (±0.3) sits below both the deadzone-neutral test and the join threshold.
+- **The joining input is spent on joining.** It produces zero gameplay actions
+  on the joining sample *and for as long as it stays physically held* — a
+  fresh press after release acts normally. Level-triggered actions
+  (attack, special) made "inert for one sample" insufficient: a human's join
+  press is still held on the next poll, so joining with X used to throw a
+  grenade. `gamepadCoop.ts` masks every button held at the join until release.
 - Disconnect mid-game frees the slot and emits a leave event; the sim never
   crashes on `null` holes in the `getGamepads()` array.
 - A survivor keeps its slot across a reshuffle; a fresh pad reuses a freed slot.
+
+### What the browser gates before we ever see the pad
+
+Browsers hide gamepads from `navigator.getGamepads()` until the user first
+interacts with one — a fingerprinting protection, out of our hands. Per MDN,
+the surfacing interaction for an already-connected pad is when the user
+"presses a button or moves an axis" (Chromium has historically required a
+button press); Firefox additionally requires the interaction to happen while
+the page is visible. So the very first physical press on a just-connected pad
+may be consumed by the browser purely to expose the pad to the page. Our
+guarantee starts at exposure: whatever input arrives first — button or stick —
+joins the pad cleanly and stays inert until released. While a pad is exposed
+but unjoined, the app shows a "Controller detected — press any button or move
+a stick to join" toast (`createPadHint` in `src/main.ts`).
+
+### Feel
+
+- Sticks use a **radial deadzone with rescale** (`readPad.ts`): output
+  magnitude ramps smoothly from 0 at the 0.28 rim to 1 at full tilt, direction
+  preserved (no per-axis clipping, so no axis-snapped diagonals, no jump at
+  the rim, and out-of-spec drivers clamp to magnitude 1).
+- A deflected **right stick draws an aim reticle** ahead of that pad's player
+  (`padAimReticles` in `src/input/aim.ts`, drawn by the renderer): distance
+  eases with stick tilt, so twin-stick aim is visibly live and pointing where
+  the player thinks. Movement-fallback aim shows no reticle on purpose.
 
 ## Normalisation across controller types
 
@@ -42,8 +79,8 @@ raw index.
 | Profile | When | Notes |
 | --- | --- | --- |
 | `standard` | `mapping === 'standard'` | Precise W3C indices. Xbox, PlayStation, and 8bitdo in **X-input** all land here. |
-| `zero2` | non-standard id matching `/8bitdo|zero/i` | Permissive face-button sets + hat axis 9. |
-| `generic` | any other non-standard pad | Same permissive shape. |
+| `canonical` | `mapping === ''`, exactly 4 axes | Chromium-on-Android's canonical shape — W3C indices the browser won't vouch for. Trusted, including right-stick aim on axes 2/3. |
+| `raw` | `mapping === ''`, any other axis count | Genuinely unmapped (desktop Linux/evdev). W3C button order as a documented best guess, defensive movement axes, **no aim stick** (axes 2/3 could be resting triggers). Check live indices with `?pads=1`/F9. |
 
 ## 8bitdo Zero 2 (the tiny keychain pad)
 

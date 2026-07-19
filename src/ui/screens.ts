@@ -42,17 +42,9 @@ const RESTART_HEADLINE: Record<RestartReason, string> = {
  */
 export type CameraSource = () => Omit<CameraState, 'levelW' | 'levelH'>
 
-/** Mission banner, floor-change flash, the run-over overlay, and the co-op locator. All DOM. */
+/** Floor-change flash, the run-over overlay, and the co-op locator. All DOM.
+ * (The mission readout moved into missionPanel.ts — the tappable chip/panel.) */
 export const createScreens = (mount: HTMLElement, onRestart?: () => void, cameraSource?: CameraSource): Screens => {
-  const mission = document.createElement('div')
-  // Offset by the notch/status-bar inset (env() → viewport-fit=cover in index.html), and
-  // drop below the health-bar band so the centered mission text never overlaps the HUD's
-  // top-left health bar on narrow/foldable screens.
-  mission.style.cssText =
-    'position:absolute;top:calc(env(safe-area-inset-top, 0px) + 34px);left:50%;transform:translateX(-50%);color:#eee;font:600 14px system-ui;' +
-    'text-shadow:0 1px 3px #000;pointer-events:none;text-align:center;max-width:70vw'
-  mount.appendChild(mission)
-
   const banner = document.createElement('div')
   banner.style.cssText =
     'position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);color:#ffd76a;font:800 28px system-ui;' +
@@ -165,16 +157,10 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
     positionMarkers(locator, locatorEls, markers)
   }
 
-  let lastMission = ''
   let shownReason: RestartReason | null = null
   let lastEventTick = -1
   return {
     update(view: RenderView): void {
-      const text = view.missionComplete ? `Floor ${view.floor} — EXIT is open!` : `Floor ${view.floor} — ${view.missionText}`
-      if (text !== lastMission) {
-        lastMission = text
-        mission.textContent = text
-      }
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
         for (const ev of view.events) {

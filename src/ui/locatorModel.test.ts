@@ -3,6 +3,7 @@ import {
   DOWNED_COLOR,
   locatorMarkers,
   playerColor,
+  pointMarker,
   playerLabel,
   projectToScreen,
   screenToWorld,
@@ -191,5 +192,85 @@ describe('screenToWorld — inverse of projectToScreen (tap → world point)', (
     const back = screenToWorld(p.x, p.y, c)
     expect(back.x).toBeCloseTo(3, 6)
     expect(back.y).toBeCloseTo(4, 6)
+  })
+})
+
+describe('pointMarker (mission-objective / generic point locator)', () => {
+  // cam(): centre (50,50), 800x600, TILE_PX 32 → visible half-extent 12.5 x 9.375
+  // tiles; EDGE_MARGIN 28px insets the on-screen band.
+  it('an on-screen point projects to its screen position with self-relative angle/dist', () => {
+    const m = pointMarker({ x: 50, y: 50 }, { x: 52, y: 50 }, cam())
+    expect(m).toMatchObject({ onScreen: true, sx: 464, sy: 300, dist: 2 })
+    expect(m!.angle).toBeCloseTo(0) // due east
+  })
+
+  it('pins an off-screen point to each screen edge (E/W/N/S), inset by the margin', () => {
+    const c = cam()
+    const east = pointMarker({ x: 50, y: 50 }, { x: 90, y: 50 }, c)!
+    expect(east.onScreen).toBe(false)
+    expect(east.sx).toBe(800 - 28)
+    expect(east.sy).toBe(300)
+    const west = pointMarker({ x: 50, y: 50 }, { x: 10, y: 50 }, c)!
+    expect(west.sx).toBe(28)
+    const north = pointMarker({ x: 50, y: 50 }, { x: 50, y: 10 }, c)!
+    expect(north.sy).toBe(28)
+    expect(north.sx).toBe(400)
+    const south = pointMarker({ x: 50, y: 50 }, { x: 50, y: 90 }, c)!
+    expect(south.sy).toBe(600 - 28)
+  })
+
+  it('a diagonal off-screen point lands in the matching inset corner region', () => {
+    const m = pointMarker({ x: 50, y: 50 }, { x: 90, y: 90 }, cam())!
+    expect(m.onScreen).toBe(false)
+    // 45° ray: hits the shorter (vertical) half-extent first → pinned at the
+    // bottom edge, x short of the corner but past centre.
+    expect(m.sy).toBe(600 - 28)
+    expect(m.sx).toBeGreaterThan(400)
+    expect(m.sx).toBeLessThanOrEqual(800 - 28)
+    expect(m.angle).toBeCloseTo(Math.PI / 4)
+  })
+
+  it('all four corners point outward with the right angle sign', () => {
+    const c = cam()
+    for (const [tx, ty] of [
+      [90, 90],
+      [10, 90],
+      [10, 10],
+      [90, 10],
+    ]) {
+      const m = pointMarker({ x: 50, y: 50 }, { x: tx, y: ty }, c)!
+      expect(m.onScreen).toBe(false)
+      expect(Math.sign(Math.cos(m.angle))).toBe(Math.sign(tx - 50))
+      expect(Math.sign(Math.sin(m.angle))).toBe(Math.sign(ty - 50))
+    }
+  })
+
+  it('distance is measured from the FROM point (the player), rounded', () => {
+    const m = pointMarker({ x: 0, y: 0 }, { x: 3, y: 4 }, cam())!
+    expect(m.dist).toBe(5)
+  })
+
+  it('a point just inside the edge margin counts as off-screen (marker never clips)', () => {
+    // 12.5 tiles ≈ the exact screen edge; 12 tiles = 16px from the edge < 28px margin.
+    const m = pointMarker({ x: 50, y: 50 }, { x: 62, y: 50 }, cam())!
+    expect(m.onScreen).toBe(false)
+  })
+
+  it('rejects non-finite inputs outright (never a NaN-positioned DOM node)', () => {
+    expect(pointMarker({ x: NaN, y: 50 }, { x: 52, y: 50 }, cam())).toBeUndefined()
+    expect(pointMarker({ x: 50, y: 50 }, { x: Infinity, y: 50 }, cam())).toBeUndefined()
+    expect(pointMarker({ x: 50, y: 50 }, { x: 52, y: NaN }, cam())).toBeUndefined()
+  })
+
+  it('a degenerate zero-size screen still yields a finite anchor', () => {
+    const m = pointMarker({ x: 50, y: 50 }, { x: 90, y: 50 }, cam({ screenW: 0, screenH: 0 }))!
+    expect(Number.isFinite(m.sx)).toBe(true)
+    expect(Number.isFinite(m.sy)).toBe(true)
+  })
+
+  it('the target sitting exactly ON the player still works (angle 0, dist 0, on-screen)', () => {
+    const m = pointMarker({ x: 50, y: 50 }, { x: 50, y: 50 }, cam())!
+    expect(m.onScreen).toBe(true)
+    expect(m.dist).toBe(0)
   })
 })

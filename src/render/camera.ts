@@ -60,11 +60,14 @@ export class Camera {
     this.setZoom(ZOOM_DEFAULT)
   }
 
-  follow(tx: number, ty: number, dt: number): void {
+  /** Ease toward a target. `rate` is the exponential time constant — the default 8
+   * is the snappy gameplay follow; the mission-focus pan passes a lower rate so
+   * the camera GLIDES (an animated pan, not a cut). */
+  follow(tx: number, ty: number, dt: number, rate = 8): void {
     // An in-flight anchored zoom owns the camera; player-follow resumes after.
     if (this.followHold > 0) return
     // Framerate-independent exponential lerp
-    const k = 1 - Math.exp(-8 * dt)
+    const k = 1 - Math.exp(-rate * dt)
     this.x += (tx - this.x) * k
     this.y += (ty - this.y) * k
   }

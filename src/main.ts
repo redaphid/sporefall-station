@@ -27,6 +27,9 @@ import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 import { createOverlay } from './ui/overlay'
+import { createMissionPanel } from './ui/missionPanel'
+import { resolveLink } from './ui/missionModel'
+import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 // verbs.ts is already in the core bundle (serialize.ts imports serializeEntity from
 // it), so this static import adds nothing to the release size; the runVerb hooks it
 // backs are still only wired under ?e2e below.
@@ -337,6 +340,18 @@ const runLoop = (
     screenH: renderer.app.screen.height,
   })
   const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined, cameraSource)
+  // Mission panel + objective hyperlinks: tapping a linked objective row starts a
+  // VIEW-ONLY camera focus (focusModel.ts) — an animated glide to the target and
+  // back. Nothing here writes sim state; determinism is untouched.
+  let focus: FocusState | undefined
+  const missionPanel = createMissionPanel(uiMount, {
+    cameraSource,
+    onFocus: (link) => {
+      const self = session.renderView().self
+      if (self) focus = startFocus(link, self.pos)
+    },
+    focusSource: () => focus?.target,
+  })
   // Annotation + selection overlay. Mounted on the canvas container (#app, which
   // receives pointer events — #ui is pointer-events:none) so a tap reaches it to
   // pick an entity; the touch sticks live on #ui and still capture their own
@@ -367,7 +382,18 @@ const runLoop = (
     if (view.self) {
       const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
       const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
-      renderer.camera.follow(px, py, dt)
+      // Objective focus: while live, the camera glides to the link target and
+      // back (focusPanRate < normal → an animated pan, never a cut). The focus
+      // dies on its own timer, when the player moves, or if the target despawns.
+      const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
+      focus = tickFocus(focus, dt, view.self.pos, focusPos)
+      const rate = focusPanRate(focus)
+      if (focus) {
+        const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
+        renderer.camera.follow(t.x, t.y, dt, rate)
+      } else {
+        renderer.camera.follow(px, py, dt, rate)
+      }
     }
     renderer.draw(view, alpha, dt)
     hud.update(view)
@@ -377,6 +403,7 @@ const runLoop = (
     touch?.update(view)
     coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
     screens.update(view)
+    missionPanel.update(view)
     commOverlay.update(view)
     overlay.update(pads)
     showPause(session.isPaused ?? false)

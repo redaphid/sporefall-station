@@ -86,6 +86,7 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 | `palette.py` | The locked theme palette (34 colors for swampspace). Run it to emit a swatch sheet. |
 | `verify.py` | VLM gate (§5). |
 | `procedural.py` | Deterministic PIL sprites for sparse particles/FX. |
+| `tilesets_floor.py` | Macro-tile floor/street redesign: 64px (2×2-tile) procedural macros (`proc`) → SD img2img refine (`sd`; floors get `restamp_floor` to re-assert seams/rivets/roots after the paint pass) → slice into the shipped variant pools + moss overlay decals (`final`). Pairs with the manifest `macroTiles` section and `tile.<name>.overlay` keys (docs/themes.md). |
 | `manifest.py` | Emits `manifest.json` against the schema in `docs/themes.md`, with within-theme direction borrowing, and registers the theme in `public/themes/index.json`. |
 | `sheets.py` | Contact sheets + 4×4 tiling proofs into `docs/assets/swampspace/`. |
 | `curation.json` | Lineage: per job `{seed, batch, index, raw, size, ckpt}` of the curated pick. |

@@ -398,6 +398,49 @@ def heal(im: Image.Image, family: list[tuple[int, int, int]]) -> Image.Image:
     return im
 
 
+def restamp_floor(im: Image.Image, idx: int) -> Image.Image:
+    """Re-assert the deck's load-bearing structure over an SD-refined macro:
+    the img2img pass paints better per-plate wear than procedural noise, but
+    tends to erase rivets and the buckled-plate roots — so SD supplies the
+    texture and this pass guarantees the structure (same fixed layout the
+    procedural macro used; deterministic)."""
+    p = Painter(7300 + idx, M)
+    p.im = im.convert("RGB")
+    p.px = p.im.load()
+    rng = p.rng
+    xs = [0, 26] if idx == 0 else [0, 40]
+    ys = [0, 38] if idx == 0 else [0, 22, 46]
+    plates = []
+    for yi, y0 in enumerate(ys):
+        y1 = (ys + [M])[yi + 1]
+        for xi, x0 in enumerate(xs):
+            x1 = (xs + [M])[xi + 1]
+            plates.append((x0, y0, x1, y1))
+    for y0 in ys:  # thin seams (SD thickens them; re-draw crisp 1px)
+        for x in range(M):
+            if rng.random() < 0.9:
+                p.set(x, y0, SEAM)
+    for x0 in xs:
+        for y in range(M):
+            if rng.random() < 0.9:
+                p.set(x0, y, SEAM)
+    for (x0, y0, x1, y1) in plates:
+        for (rx, ry) in [(x0 + 3, y0 + 3), (x1 - 4, y0 + 3), (x0 + 3, y1 - 4), (x1 - 4, y1 - 4)]:
+            if rng.random() < 0.75:
+                p.set(rx, ry, RIVET)
+                p.set(rx + 1, ry + 1, SEAM)
+    if idx == 1:  # the buckled plate with roots (a 1-in-8 slice feature)
+        x0, y0, x1, y1 = plates[2]
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        p.blob(cx, cy, 3.2, CAVITY, 0.7)
+        for _ in range(4):
+            p.worm(cx + rng.uniform(-2, 2), cy + rng.uniform(-2, 2), rng.randint(6, 11), ROOT_MID)
+        for _ in range(2):
+            p.worm(cx + rng.uniform(-1, 1), cy + rng.uniform(-1, 1), rng.randint(3, 6), ROOT_LIGHT)
+        p.blob(cx, cy, 5.5, MOSS_DEEP, 0.25)
+    return p.im
+
+
 def cmd_proc(outdir: Path) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     for i in range(2):
@@ -420,7 +463,7 @@ SD_RECIPES = {
         "seams, worn scratched dark green-grey steel, faint moss stains in the "
         "seams, muted low contrast, quiet dark surface, SNES rpg dungeon floor "
         "texture, seamless game tile, flat top-down view",
-        0.4,
+        0.3,  # 0.4 washed the plates; 0.3 keeps structure, adds wear
     ),
     "street": (
         "masterpiece, pixpix, 8-bit, pixel_art, top-down dark bog water, still "
@@ -453,6 +496,8 @@ def cmd_sd(procdir: Path, outdir: Path) -> None:
             raw = run(graph, str(outdir / "raw"))
             im = Image.open(raw[-1]).convert("RGB")
             small = heal(kcentroid(im, M, M), fams[name])
+            if name == "floor":
+                small = restamp_floor(small, i)
             small.save(outdir / f"{name}-macro-{i}.png")
             print(f"{name}-macro-{i}: refined (denoise {denoise})")
 

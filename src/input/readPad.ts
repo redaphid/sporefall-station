@@ -28,11 +28,16 @@ const DEADZONE = 0.28
  * fake a press. */
 const TRIGGER_PRESS = 0.5
 
-const pressed = (pad: Gamepad, i: number): boolean => {
+/** Is button `i` down on this pad? Exported so the remap capture (padCapture.ts)
+ * uses the EXACT same press definition as gameplay — a reading that can't fire
+ * an action can't bind one either. */
+export const buttonPressed = (pad: Gamepad, i: number): boolean => {
   const b = pad.buttons[i]
   if (!b) return false
   return b.pressed || (b.value > TRIGGER_PRESS && b.value <= 1)
 }
+
+const pressed = buttonPressed
 
 const anyPressed = (pad: Gamepad, idxs: number[]): boolean => idxs.some((i) => pressed(pad, i))
 

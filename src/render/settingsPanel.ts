@@ -1,11 +1,33 @@
 /**
  * A tiny gear-button settings panel for the feel knobs: effects quality (for
- * low-end devices) and haptics (phone-only). Self-contained DOM mounted on the
- * game canvas host; persists via settings.ts and reports changes so the live
- * renderer/haptics pick them up without a reload.
+ * low-end devices), haptics (phone-only), theme, and controller button
+ * remapping. Self-contained DOM mounted on the game canvas host; persists via
+ * settings.ts / remap.ts and reports changes so the live renderer/haptics/
+ * gamepad reader pick them up without a reload.
+ *
+ * The Controller section: one row per remappable action showing its current
+ * binding by canonical name (A/B/…/Start, 'Button N' for exotic indices). Tap
+ * a binding → capture mode ("press a button…"): the next NEW button press on
+ * any connected pad binds (axes never bind — see padCapture.ts), Esc or a tap
+ * anywhere else cancels, and it times out after ~8s. While capturing, the
+ * remap layer's capture flag keeps the press out of gameplay entirely.
+ * Binding a button another action owns SWAPS the two (stated in the UI copy).
  */
 
 import { loadSettings, saveSettings, type EffectsQuality, type GameSettings } from '../app/settings'
+import { createButtonCapture, type ButtonCapture } from '../input/padCapture'
+import {
+  ACTION_LABELS,
+  bindButton,
+  bindingLabel,
+  defaultButtonMap,
+  getButtonMap,
+  PAD_ACTIONS,
+  resetAction,
+  setButtonMap,
+  setPadCapture,
+  type PadAction,
+} from '../input/remap'
 import { markUiChrome } from '../ui/chrome'
 
 export interface SettingsPanel {
@@ -22,6 +44,8 @@ export const createSettingsPanel = (
   native: boolean,
   onChange: (s: GameSettings) => void,
   themes: ThemeOption[] = [],
+  // Injectable for tests; the default is the same live surface gamepadCoop polls.
+  getPads: () => readonly (Gamepad | null)[] = () => navigator.getGamepads?.() ?? [],
 ): SettingsPanel => {
   let current = loadSettings()
 
@@ -42,7 +66,7 @@ export const createSettingsPanel = (
   const panel = document.createElement('div')
   markUiChrome(panel)
   panel.style.cssText =
-    'position:absolute;right:10px;top:52px;z-index:70;display:none;min-width:200px;padding:12px 14px;' +
+    'position:absolute;right:10px;top:52px;z-index:70;display:none;min-width:236px;max-height:calc(100% - 64px);overflow-y:auto;padding:12px 14px;' +
     'background:#1a1a22ee;color:#eee;font:13px system-ui;border:1px solid #0008;border-radius:10px;' +
     'box-shadow:0 6px 24px #0008;pointer-events:auto;touch-action:manipulation'
 
@@ -77,6 +101,131 @@ export const createSettingsPanel = (
     : `<div style="opacity:.6">Vibration: phone only</div>`
 
   panel.innerHTML = qualityRow + themeRow + hapticRows
+
+  // ---- Controller section: button remapping (remap.ts overlay) ------------
+  let map = getButtonMap()
+  const ctl = document.createElement('div')
+  ctl.id = 'ctl'
+  ctl.style.cssText = 'margin-top:12px;border-top:1px solid #ffffff22;padding-top:10px'
+  const ctlHead = document.createElement('div')
+  ctlHead.textContent = 'Controller'
+  ctlHead.style.cssText = 'font-weight:600;margin-bottom:6px'
+  ctl.appendChild(ctlHead)
+
+  const bindBtns = new Map<PadAction, HTMLButtonElement>()
+  let capture: { action: PadAction; machine: ButtonCapture; timer: ReturnType<typeof setInterval> } | null = null
+
+  const renderRows = (): void => {
+    for (const [action, btn] of bindBtns) {
+      if (capture?.action === action) continue // capture text is managed by captureTick
+      btn.textContent = bindingLabel(map[action])
+      btn.style.color = '#eee'
+    }
+  }
+
+  const stopCapture = (): void => {
+    if (!capture) return
+    clearInterval(capture.timer)
+    capture = null
+    setPadCapture(false) // gameplay sees pads again from the next sample
+    renderRows()
+  }
+
+  const captureTick = (): void => {
+    if (!capture) return
+    const st = capture.machine.poll(getPads(), Date.now())
+    const btn = bindBtns.get(capture.action)!
+    if (st.phase === 'bound') {
+      map = bindButton(map, capture.action, st.button)
+      setButtonMap(map) // persists + applies on the next gamepad poll
+      stopCapture()
+    } else if (st.phase === 'timed-out') {
+      stopCapture()
+    } else {
+      // Chrome exposes a pad only after a button press — tell the player that.
+      btn.textContent = st.phase === 'no-pads' ? 'no controller detected — press any button on it' : 'press a button…'
+      btn.style.color = '#8cf'
+    }
+  }
+
+  const startCapture = (action: PadAction): void => {
+    const again = capture?.action === action
+    stopCapture()
+    if (again) return // tapping the already-capturing row cancels it
+    setPadCapture(true) // the captured press must be inert in gameplay
+    capture = { action, machine: createButtonCapture(), timer: setInterval(captureTick, 50) }
+    captureTick()
+  }
+
+  const rowBtnStyle =
+    'background:#111;color:#eee;border:1px solid #0006;border-radius:5px;padding:3px 7px;cursor:pointer;' +
+    'font:12px system-ui;text-align:left;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+    'touch-action:manipulation'
+
+  for (const action of PAD_ACTIONS) {
+    const row = document.createElement('div')
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:5px'
+    const label = document.createElement('span')
+    label.textContent = ACTION_LABELS[action]
+    label.style.cssText = 'width:88px;flex:none'
+    const bind = document.createElement('button')
+    bind.dataset.remapAction = action
+    bind.style.cssText = rowBtnStyle
+    bind.addEventListener('click', () => startCapture(action))
+    const reset = document.createElement('button')
+    reset.dataset.remapReset = action
+    reset.textContent = '↺'
+    reset.setAttribute('aria-label', `Reset ${ACTION_LABELS[action]} binding`)
+    reset.style.cssText =
+      'background:#111;color:#eee;border:1px solid #0006;border-radius:5px;padding:3px 6px;cursor:pointer;' +
+      'font:12px system-ui;flex:none;touch-action:manipulation'
+    reset.addEventListener('click', () => {
+      stopCapture()
+      map = resetAction(map, action)
+      setButtonMap(map)
+      renderRows()
+    })
+    bindBtns.set(action, bind)
+    row.append(label, bind, reset)
+    ctl.appendChild(row)
+  }
+
+  const resetAll = document.createElement('button')
+  resetAll.id = 'ctl-reset'
+  resetAll.textContent = 'Reset to defaults'
+  resetAll.style.cssText =
+    'width:100%;margin-top:4px;background:#111;color:#eee;border:1px solid #0006;border-radius:5px;padding:4px;' +
+    'cursor:pointer;font:12px system-ui;touch-action:manipulation'
+  resetAll.addEventListener('click', () => {
+    stopCapture()
+    map = defaultButtonMap()
+    setButtonMap(map)
+    renderRows()
+  })
+  ctl.appendChild(resetAll)
+
+  const hint = document.createElement('div')
+  hint.textContent =
+    'Tap a binding, then press the button on your controller. A button that is already in use swaps with that action.'
+  hint.style.cssText = 'opacity:.55;margin-top:6px;font-size:11px;line-height:1.35'
+  ctl.appendChild(hint)
+
+  renderRows()
+  panel.appendChild(ctl)
+
+  // Cancel paths beyond timeout: Esc, and a tap/click anywhere that is not the
+  // capturing row. The listeners live as long as the panel does (it is never
+  // torn down). The click that STARTS a capture bubbles here with the row
+  // itself as target, so it never self-cancels.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') stopCapture()
+  })
+  document.addEventListener('click', (e) => {
+    if (!capture) return
+    const t = e.target as Element | null
+    if (t?.closest('[data-remap-action]') !== bindBtns.get(capture.action)) stopCapture()
+  })
+
   mount.appendChild(gear)
   mount.appendChild(panel)
 
@@ -97,6 +246,7 @@ export const createSettingsPanel = (
 
   gear.addEventListener('click', () => {
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none'
+    if (panel.style.display === 'none') stopCapture() // closing the panel always ends capture
   })
   q.addEventListener('change', () => apply({ effectsQuality: q.value as EffectsQuality }))
   th?.addEventListener('change', () => apply({ theme: th.value }))

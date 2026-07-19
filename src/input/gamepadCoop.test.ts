@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { anyPadActive, createGamepadCoop, cycleHotbar, type CoopDebugPad } from './gamepadCoop'
 import { padProfile } from './padProfile'
+import { bindButton, defaultButtonMap, setButtonMap, setPadCapture } from './remap'
 import type { RenderView } from '../app/session'
 
 const STD = padProfile({ id: 'x', mapping: 'standard', axes: [] })
@@ -505,6 +506,109 @@ describe('createGamepadCoop', () => {
       expect(cmd.aimX).toBe(0)
       expect(cmd.aimY).toBe(0)
       expect(cmd.attack).toBe(false)
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The remap overlay + capture inertness, through the REAL sampling loop.
+// ---------------------------------------------------------------------------
+describe('user remap through sample()', () => {
+  let pads: (Gamepad | null)[]
+  let coop: ReturnType<typeof createGamepadCoop>
+
+  beforeEach(() => {
+    pads = []
+    coop = createGamepadCoop(() => pads)
+    setButtonMap(defaultButtonMap())
+    setPadCapture(false)
+  })
+  afterEach(() => {
+    setButtonMap(defaultButtonMap())
+    setPadCapture(false)
+  })
+
+  const join = () => {
+    pads = [pad(0, { buttons: press(0) })]
+    coop.sample()
+    pads = [pad(0)]
+    coop.sample()
+  }
+
+  it('a rebind applies on the very next sample — no reload, no recreation', () => {
+    join()
+    setButtonMap(bindButton(defaultButtonMap(), 'attack', 1)) // attack↔interact swap
+    pads = [pad(0, { buttons: press(1) })]
+    expect(coop.sample().inputs.get(0)!.attack).toBe(true)
+  })
+
+  it('after the swap, the OLD attack button drives interact instead of attack', () => {
+    join()
+    setButtonMap(bindButton(defaultButtonMap(), 'attack', 1))
+    pads = [pad(0, { buttons: press(0) })] // A: now one of interact's swapped-in buttons
+    const cmd = coop.sample().inputs.get(0)!
+    expect(cmd.attack).toBe(false)
+    expect(cmd.interact).toBe(true) // rising edge
+  })
+
+  it('remap applies to raw pads identically (shared map, shared overlay)', () => {
+    setButtonMap(bindButton(defaultButtonMap(), 'attack', 1))
+    pads = [pad(0, { mapping: '', axisCount: 8, buttons: press(0) })]
+    coop.sample() // join (face buttons stay the join set, unremapped)
+    pads = [pad(0, { mapping: '', axisCount: 8, buttons: press(1) })]
+    expect(coop.sample().inputs.get(0)!.attack).toBe(true)
+  })
+
+  it('join stays on the DEFAULT face buttons even when those are remapped away', () => {
+    setButtonMap(bindButton(defaultButtonMap(), 'attack', 17))
+    pads = [pad(0, { buttons: press(0) })] // A no longer attacks, but still joins
+    expect(coop.sample().joins).toHaveLength(1)
+  })
+
+  describe('capture inertness (setPadCapture)', () => {
+    it('a press during capture fires NO action for a joined pad', () => {
+      join()
+      setPadCapture(true)
+      pads = [pad(0, { buttons: press(0) })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.attack).toBe(false)
+      expect(cmd.interact).toBe(false)
+    })
+
+    it('Start during capture does not pause', () => {
+      join()
+      setPadCapture(true)
+      pads = [pad(0, { buttons: press(9) })]
+      expect(coop.sample().pauses).toHaveLength(0)
+    })
+
+    it('a face-button press during capture does not JOIN an unassigned pad', () => {
+      setPadCapture(true)
+      pads = [pad(0, { buttons: press(0) })]
+      expect(coop.sample().joins).toHaveLength(0)
+      expect(coop.sample().inputs.size).toBe(0)
+    })
+
+    it('releasing the captured button after capture ends never edge-fires (interact/roll stay quiet)', () => {
+      join()
+      setPadCapture(true)
+      pads = [pad(0, { buttons: press(1) })] // held through capture
+      coop.sample()
+      setPadCapture(false)
+      // Still held on the first post-capture sample: no rising edge (it rose during capture).
+      expect(coop.sample().inputs.get(0)!.interact).toBe(false)
+      pads = [pad(0)] // released
+      expect(coop.sample().inputs.get(0)!.interact).toBe(false)
+    })
+
+    it('normal play resumes the sample after capture ends', () => {
+      join()
+      setPadCapture(true)
+      pads = [pad(0, { buttons: press(0) })]
+      coop.sample()
+      setPadCapture(false)
+      pads = [pad(0, { buttons: press(0) })]
+      expect(coop.sample().inputs.get(0)!.attack).toBe(true) // held-to-fire resumes
     })
   })
 })

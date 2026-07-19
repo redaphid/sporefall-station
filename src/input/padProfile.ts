@@ -130,6 +130,26 @@ const BUTTONS = {
   dpad: [12, 13, 14, 15] as [number, number, number, number],
 }
 
+/**
+ * A fresh copy of the REMAPPABLE slice of THE button map — the defaults the
+ * user remap layer (remap.ts) overlays. Deliberately excludes `join` (meta:
+ * how an unassigned pad enters the game, not a game action) and `dpad`
+ * (movement — remapping it would let a face button move the player, which the
+ * touch/stick model never allows). Axes are not here at all: only BUTTONS are
+ * remappable, ever — the raw-pad safety invariant (no unproven axis may fire)
+ * must not acquire a user-configurable hole.
+ */
+export const defaultButtons = () => ({
+  attack: [...BUTTONS.attack],
+  interact: [...BUTTONS.interact],
+  special: [...BUTTONS.special],
+  roll: [...BUTTONS.roll],
+  pause: [...BUTTONS.pause],
+  throw: [...BUTTONS.throw],
+  hotbarPrev: [...BUTTONS.hotbarPrev],
+  hotbarNext: [...BUTTONS.hotbarNext],
+})
+
 const STANDARD: PadProfile = {
   kind: 'standard',
   ...BUTTONS,

@@ -57,7 +57,8 @@ def lin(hexstr):
 
 COL_SUIT = lin("#3a7a80")      # teal spacesuit
 COL_SUIT_DARK = lin("#24565c")  # lower legs / shading blocks
-COL_CAP = lin("#ff9032")       # orange-amber cap
+COL_CAP = lin("#ff7a14")       # orange-amber cap (hot: must survive
+                               # shading + palette-snap as #ff9032, not tan)
 COL_VISOR = lin("#1c1420")     # dark visor face
 COL_BOOT = lin("#6b4d26")      # tan-brown boots
 COL_STRAP = lin("#4a3419")     # leather chest strap
@@ -76,21 +77,25 @@ SHOULDER_H = 0.36   # spine origin -> shoulder joints
 NECK_H = 0.475      # spine origin -> head origin
 
 
-def mat(name, color):
+def mat(name, color, glow=0.0):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     bsdf = m.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Base Color"].default_value = color
     bsdf.inputs["Roughness"].default_value = 0.85
+    if glow:  # signature colors must stay saturated through shading
+        bsdf.inputs["Emission Color"].default_value = color
+        bsdf.inputs["Emission Strength"].default_value = glow
     return m
 
 
 MATS = {}
+GLOW = {"cap": 0.55, "visor": 0.15}
 
 
 def M(name, color):
     if name not in MATS:
-        MATS[name] = mat(name, color)
+        MATS[name] = mat(name, color, glow=GLOW.get(name, 0.0))
     return MATS[name]
 
 

@@ -97,8 +97,24 @@ def build():
         else:
             print(f"  (missing, key omitted: {key} -> {rel})", file=sys.stderr)
 
-    put("tile.floor", "tiles/deck-moss.png")
-    put("tile.wall", "tiles/root-bulkhead.png")
+    # Tile variant pools (tile.<name> arrays) + rare accents, emitted from the
+    # files the tilesets pipeline actually produced (bd4bce's tile sets were
+    # hand-added to the manifest without teaching this script — regenerating
+    # silently dropped them; never let the manifest and this script diverge).
+    LEGACY_TILE = {"floor": "tiles/deck-moss.png", "wall": "tiles/root-bulkhead.png"}
+    for tname in ("street", "sidewalk", "floor", "wall", "grass", "exit"):
+        variants = []
+        while exists(f"tiles/{tname}-{len(variants)}.png"):
+            variants.append(f"tiles/{tname}-{len(variants)}.png")
+        if variants:
+            sprites[f"tile.{tname}"] = variants
+        elif tname in LEGACY_TILE:
+            put(f"tile.{tname}", LEGACY_TILE[tname])
+        accents = []
+        while exists(f"tiles/{tname}-accent-{len(accents)}.png"):
+            accents.append(f"tiles/{tname}-accent-{len(accents)}.png")
+        if accents:
+            sprites[f"tile.{tname}.accent"] = accents
     # Character keys resolve *per key* against the theme chain, so any key we
     # omit falls back to CITY's art — a spore-drone cop facing south would turn
     # into a human cop when walking east. Mention every direction key

@@ -39,6 +39,10 @@ CHAR = os.environ.get("CHAR", "vine-ranger")
 OUTDIR = os.environ.get("OUTDIR", os.path.join(G.THEME, "chars"))
 DENOISE = float(os.environ.get("DENOISE", "0.35"))
 SEED = int(os.environ.get("SEED", "414977"))
+# Tag isolates this run's ComfyUI output prefixes: harvest_history matches
+# by prefix, and a retrace after a motion-source change must never pick up
+# stale frames from an earlier run.
+TAG = os.environ.get("ROTO_TAG", "r1")
 CANVAS, CONTENT = 48, 46
 
 DIRS = ["s", "se", "e", "ne", "n"]
@@ -97,7 +101,7 @@ def harvest_history(want):
         for out in entry.get("outputs", {}).values():
             for im in out.get("images", []):
                 for (d, f) in list(missing):
-                    if im["filename"].startswith(f"roto-{CHAR}-{d}-{f}-"):
+                    if im["filename"].startswith(f"roto-{CHAR}-{TAG}-{d}-{f}-"):
                         _download(im, want[(d, f)])
                         print(f"harvested {d}-{f} from server history")
                         missing.discard((d, f))
@@ -127,7 +131,7 @@ def trace(dirs, frames):
         g = comfy.build_graph(
             pos=pos, neg=neg, seed=SEED, batch=1, refs=refs,
             ip_weight=IPW[d], init=prep_white(d, f), denoise=DENOISE, alpha=False,
-            prefix=f"roto-{CHAR}-{d}-{f}",
+            prefix=f"roto-{CHAR}-{TAG}-{d}-{f}",
         )
         pid = comfy.post("/prompt", {"prompt": g})["prompt_id"]
         print(f"queued {d}-{f}", flush=True)

@@ -78,14 +78,14 @@ describe('validateManifest', () => {
   })
 
   it.each([
-    ['../../../etc/passwd', 'traversal'],
-    ['http://evil.example/x.png', 'scheme'],
-    ['data:image/png;base64,xxxx', 'scheme'],
-    ['a\\b.png', 'backslash'],
-    ['', 'empty'],
-    [42, 'number'],
-    [{}, 'object'],
-  ])('drops unsafe sprite path %j (%s)', (path) => {
+    '../../../etc/passwd', // traversal
+    'http://evil.example/x.png', // scheme
+    'data:image/png;base64,xxxx', // scheme
+    'a\\b.png', // backslash
+    '', // empty
+    42, // number
+    {}, // object
+  ])('drops unsafe sprite path %j', (path) => {
     const { manifest, warnings } = validateManifest({ sprites: { 'tile.floor': path } })
     expect(manifest.sprites['tile.floor']).toBeUndefined()
     expect(warnings.length).toBe(1)

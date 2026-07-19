@@ -10,9 +10,11 @@
 //     ✓ done, 🔒 locked); a row with a link is a hyperlink — tapping it asks
 //     main.ts to focus the camera on the target (view-layer pan only) and the
 //     panel folds itself away again.
-//   • MARKERS: while an objective link exists, an on-screen 🎯 caret sits over
-//     the target and an edge-pinned gold ➤ + distance points at it whenever it
-//     is off-screen. During an active focus the target gets a pulsing ring.
+//   • MARKERS: while an objective link exists, an on-screen caret (🎯 target /
+//     🏁 exit) sits over it and an edge-pinned gold ➤ + distance points at it
+//     whenever it is off-screen. Once the mission completes, the exit row's
+//     point link becomes the objective — the SAME machinery, no separate exit
+//     compass. During an active focus the target gets a pulsing ring.
 //     None of it accepts pointer events — gameplay input is never blocked.
 
 import type { RenderView } from '../app/session'
@@ -165,19 +167,24 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
     )
   }
 
-  // ---- markers: the primary entity objective gets a persistent locator; the
+  // ---- markers: the current objective gets a persistent locator; the
   // currently-focused link (entity OR point) gets the pulsing ring.
   const updateMarkers = (view: RenderView): void => {
     const camRaw = opts.cameraSource?.()
     const cam: CameraState | undefined = camRaw ? { ...camRaw, levelW: view.level.w, levelH: view.level.h } : undefined
     const self = view.self
 
-    // Persistent objective locator — only for ENTITY links (the exit already has
-    // its own compass), only while the objective is still active.
-    const entityObjective = rows.find((o) => o.state === 'active' && o.link?.targetId !== undefined)
-    const target = entityObjective?.link && resolveLink(entityObjective.link, view.entities)
+    // Persistent objective locator — the FIRST active linked row: the mission
+    // target while the objective is live (entity link), then the exit once it
+    // opens (point link). ONE mechanism for both — the old separate "exit
+    // compass" (fixed window-pinned arrow, no projection) is gone; the exit
+    // gets the same on-target caret / canvas-bounds edge arrow as any target.
+    const objective = rows.find((o) => o.state === 'active' && o.link)
+    const isExit = objective?.key === 'exit'
+    const target = objective?.link && resolveLink(objective.link, view.entities)
     const m = target && self && cam ? pointMarker(self.pos, target, cam) : undefined
     if (m && m.onScreen) {
+      caret.textContent = isExit ? '🏁' : '🎯'
       caret.style.display = 'block'
       caret.style.left = `${Math.round(m.sx)}px`
       caret.style.top = `${Math.round(m.sy - 18)}px`
@@ -188,7 +195,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
       edge.style.display = 'flex'
       edge.style.transform = `translate(${Math.round(m.sx)}px, ${Math.round(m.sy)}px) translate(-50%,-50%)`
       edgeArrow.style.transform = `rotate(${m.angle}rad)`
-      edgeLabel.textContent = `🎯 ${m.dist}m`
+      edgeLabel.textContent = isExit ? `EXIT · ${m.dist}m` : `🎯 ${m.dist}m`
     } else {
       edge.style.display = 'none'
     }

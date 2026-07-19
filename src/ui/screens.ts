@@ -66,19 +66,12 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
   mount.appendChild(overlay)
   const headline = overlay.querySelector<HTMLElement>('#headline')!
 
-  // Exit compass: once the exit is open, a rotating arrow at the bottom points
-  // the way to the exit tile with a live distance readout, so it's obvious where
-  // to go to finish the floor.
-  const exitPtr = document.createElement('div')
-  exitPtr.style.cssText =
-    'position:absolute;bottom:76px;left:50%;transform:translateX(-50%);display:none;flex-direction:column;' +
-    'align-items:center;gap:1px;color:#ffd76a;font:800 13px system-ui;text-shadow:0 1px 3px #000;pointer-events:none;z-index:70'
-  exitPtr.innerHTML =
-    '<div id="exitArrow" style="font-size:30px;line-height:1;transition:transform .1s">➤</div>' +
-    '<div id="exitLabel">EXIT</div>'
-  mount.appendChild(exitPtr)
-  const exitArrow = exitPtr.querySelector<HTMLElement>('#exitArrow')!
-  const exitLabel = exitPtr.querySelector<HTMLElement>('#exitLabel')!
+  // NOTE: the old fixed-position "exit compass" that lived here is gone — it
+  // did no world→screen projection (window-pinned bottom-centre, even with the
+  // exit visibly on screen). The exit objective now runs through the SAME
+  // pointMarker machinery as the mission target (missionPanel.ts): on-screen
+  // caret over the exit tile, canvas-bounds edge arrow with true bearing when
+  // it is off-screen.
 
   // Co-op teammate locator (issue #34): a DOM overlay of per-teammate markers.
   // Off-screen teammates get an edge-pinned rotating ➤ with a distance readout;
@@ -175,23 +168,6 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
           }
         }
       }
-      // Point at the exit whenever it's open (mission done / reach missions).
-      if (view.missionComplete && !view.gameOver && view.self) {
-        const dx = view.level.exit.x - view.self.pos.x
-        const dy = view.level.exit.y - view.self.pos.y
-        const dist = Math.hypot(dx, dy)
-        if (dist < 1.4) {
-          exitPtr.style.display = 'none'
-        } else {
-          exitPtr.style.display = 'flex'
-          // ➤ glyph points east at 0°, matching world +x; +y is screen-down.
-          exitArrow.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`
-          exitLabel.textContent = `EXIT · ${Math.round(dist)}m`
-        }
-      } else {
-        exitPtr.style.display = 'none'
-      }
-
       updateLocator(view)
 
       // Restart affordance: up at game-over AND the moment the local player is

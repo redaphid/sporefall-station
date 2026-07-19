@@ -243,9 +243,14 @@ facing convention (west is engine-mirrored, never drawn).
 
 ### Stage 2 — AI tracer (`trace.py`)
 
-Each frame goes through ComfyUI **img2img at denoise 0.35** (SDXL + pixel-art
-LoRA) with the character's curated s-idle as IPAdapter anchor (per-direction
-weights from §4.5), same seed for all 40 frames. The 3D render pins pose and
+Each frame goes through ComfyUI **img2img at denoise 0.35** with the
+character's curated s-idle as IPAdapter anchor (per-direction weights from
+§4.5), same seed for all 40 frames. Model: SDXL + pixel-art LoRA by default;
+the shipped vine-ranger cycle was traced on the documented low-VRAM fallback
+(`CKPT=dreamshaper_8.safetensors LORA= SIZE=512`) because resident VLM models
+had squeezed the shared GPU into offload mode (5 s vs 200 s per frame) — at
+48 px after k-centroid + palette lock the two paths were indistinguishable in
+an A/B pilot (`e-0`/`s-0`, seed 414977). The 3D render pins pose and
 composition; diffusion only re-develops the surface into pack pixel art.
 Then, instead of per-frame rembg (alpha flicker) the traced RGB is masked by
 the **Blender frame's own alpha**, and every frame is downscaled through

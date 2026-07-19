@@ -284,12 +284,92 @@ describe('canonical key set sanity', () => {
     expect(SPRITE_KEYS.has('projectile')).toBe(true)
     expect(SPRITE_KEYS.has('grenade')).toBe(true)
   })
-  it('contains all 70 char keys (5 dirs × 2 frames × 7 characters)', () => {
+  it('contains all 70 legacy char keys (5 dirs × 2 frames × 7 characters) plus the state-frame grammar', () => {
     const charKeys = [...SPRITE_KEYS].filter((k) => k.startsWith('char.'))
-    expect(charKeys.length).toBe(70)
+    const legacy = charKeys.filter((k) => /-(idle|step)$/.test(k))
+    expect(legacy.length).toBe(70)
+    // 7 chars × 5 dirs × 6 states × 8 frames of char.<c>.<d>-<state>-<n>.
+    expect(charKeys.length).toBe(70 + 7 * 5 * ANIM_STATES.length * MAX_ANIM_FRAMES)
     expect(DIRS5.length).toBe(5)
   })
   it('fx keys are a subset of the sprite keys', () => {
     for (const k of FX_KEYS) expect(SPRITE_KEYS.has(k)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Animation-state schema extension (docs/themes.md "Animation states").
+import { ANIM_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES } from './animState'
+import { resolveAnimTpf, resolveAnimTpfs } from './theme'
+
+describe('animation-state sprite keys', () => {
+  it('accepts every char.<kind>.<dir>-<state>-<n> key in the grammar', () => {
+    const sprites: Record<string, string> = {}
+    for (const s of ANIM_STATES) sprites[`char.player.s-${s}-0`] = `${s}.png`
+    sprites['char.thug.ne-attack-7'] = 'a7.png'
+    const { manifest, warnings } = validateManifest({ sprites })
+    expect(warnings).toEqual([])
+    for (const s of ANIM_STATES) expect(manifest.sprites[`char.player.s-${s}-0`]).toEqual([`${s}.png`])
+    expect(manifest.sprites['char.thug.ne-attack-7']).toEqual(['a7.png'])
+  })
+
+  it('rejects frame indices beyond MAX_ANIM_FRAMES-1, unknown states, and unknown dirs', () => {
+    const { manifest, warnings } = validateManifest({
+      sprites: {
+        [`char.player.s-attack-${MAX_ANIM_FRAMES}`]: 'x.png', // n out of range
+        'char.player.s-dance-0': 'x.png', // not a state
+        'char.player.sw-attack-0': 'x.png', // west half is mirrored, never drawn
+        'char.dragon.s-attack-0': 'x.png', // not a character
+      },
+    })
+    expect(Object.keys(manifest.sprites)).toEqual([])
+    expect(warnings.length).toBe(4)
+  })
+
+  it('legacy idle/step keys coexist with new-grammar keys for the same direction', () => {
+    const { manifest, warnings } = validateManifest({
+      sprites: { 'char.cop.e-idle': 'i.png', 'char.cop.e-step': 's.png', 'char.cop.e-hurt-0': 'h.png' },
+    })
+    expect(warnings).toEqual([])
+    expect(Object.keys(manifest.sprites).length).toBe(3)
+  })
+})
+
+describe('manifest anim section (per-state ticks-per-frame)', () => {
+  it('keeps valid integer tpf overrides per state', () => {
+    const { manifest, warnings } = validateManifest({ anim: { walk: 4, attack: 1, idle: 30 } })
+    expect(warnings).toEqual([])
+    expect(manifest.anim).toEqual({ walk: 4, attack: 1, idle: 30 })
+  })
+
+  it('drops unknown states and out-of-range/non-integer values with warnings', () => {
+    const { manifest, warnings } = validateManifest({
+      anim: { walk: 0, hurt: 31, idle: 2.5, death: '5', sprint: 6 },
+    })
+    expect(manifest.anim).toEqual({})
+    expect(warnings.length).toBe(5)
+  })
+
+  it('degrades a non-object anim section to empty with one warning', () => {
+    const { manifest, warnings } = validateManifest({ anim: [6] })
+    expect(manifest.anim).toEqual({})
+    expect(warnings.length).toBe(1)
+  })
+
+  it('a manifest with no anim section resolves every state to the engine default', () => {
+    const chain: ThemeChain = [theme('city', {})]
+    for (const s of ANIM_STATES) expect(resolveAnimTpf(s, chain)).toBe(DEFAULT_TPF[s])
+  })
+
+  it('resolves through the chain: active theme wins, city fills, default backstops', () => {
+    const chain: ThemeChain = [theme('swamp', { anim: { walk: 3 } }), theme('city', { anim: { walk: 9, attack: 4 } })]
+    expect(resolveAnimTpf('walk', chain)).toBe(3) // active wins
+    expect(resolveAnimTpf('attack', chain)).toBe(4) // city fills
+    expect(resolveAnimTpf('hurt', chain)).toBe(DEFAULT_TPF.hurt) // default backstops
+    expect(resolveAnimTpfs(chain)).toMatchObject({ walk: 3, attack: 4, hurt: DEFAULT_TPF.hurt })
+  })
+
+  it('an empty chain resolves everything to defaults (procedural-only boot)', () => {
+    expect(resolveAnimTpfs([])).toEqual(DEFAULT_TPF)
   })
 })

@@ -107,13 +107,13 @@ describe('touch controls — #4 hide under an active controller', () => {
     root = mount()
   })
 
-  it('setControllerActive(true) hides all controls; (false) shows them', () => {
+  it('setVisible(false) hides all controls; (true) shows them', () => {
     const touch = createTouch(root)
     const wrapper = root.firstElementChild as HTMLElement
     expect(wrapper.style.display).not.toBe('none') // visible by default
-    touch.setControllerActive(true)
+    touch.setVisible(false)
     expect(wrapper.style.display).toBe('none')
-    touch.setControllerActive(false)
+    touch.setVisible(true)
     expect(wrapper.style.display).toBe('block')
   })
 })

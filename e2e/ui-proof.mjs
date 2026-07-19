@@ -122,11 +122,11 @@ await record('ui-controller-hide', 'Buttons/joysticks HIDE when a controller is 
   await page.waitForTimeout(400)
   await page.screenshot({ path: join(OUT, `${name}-01-touch-visible.png`) })
   shots.push(`${name}-01-touch-visible.png`)
-  await page.evaluate(() => window.__touch.setControllerActive(true)) // gamepad joins
+  await page.evaluate(() => window.__touch.setVisible(false)) // gamepad joins
   await page.waitForTimeout(500)
   await page.screenshot({ path: join(OUT, `${name}-02-hidden-under-pad.png`) })
   shots.push(`${name}-02-hidden-under-pad.png`)
-  await page.evaluate(() => window.__touch.setControllerActive(false)) // pad leaves → back
+  await page.evaluate(() => window.__touch.setVisible(true)) // pad leaves → back
   await page.waitForTimeout(400)
 })
 

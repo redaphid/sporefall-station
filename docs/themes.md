@@ -79,8 +79,14 @@ still loadable by id without an index entry).
     "tile.wall": "/sprites/brick-wall.png", //   app-root-relative with a
     "fx.flame": ["fx/flame-1.png", "fx/flame-2.png"], // leading "/". fx.* keys
     "item.default": null         //   take ARRAYS (animation frames). `null`
-  }                              //   means "force the built-in procedural art"
-}                                //   (blocks fallback to the default theme).
+  },                             //   means "force the built-in procedural art"
+                                 //   (blocks fallback to the default theme).
+
+  "anim": {                      // OPTIONAL per-state animation cadence, in sim
+    "walk": 6,                   //   TICKS PER FRAME (30 ticks = 1s). Integers
+    "attack": 2                  //   1..30. States you omit use the engine
+  }                              //   defaults (see "Animation states" below).
+}
 ```
 
 Colors are `#rrggbb` (7-char hex). Paths may not contain `..` or a URL scheme.
@@ -98,7 +104,8 @@ the console and in `validateManifest` unit tests.
 |---|---|
 | `tile.floor` | interior floor tile (drawn in a grid, should tile seamlessly) |
 | `tile.wall` | wall tile (tiles seamlessly) |
-| `char.<name>.<dir>-<frame>` | directional billboard character. `<name>` ∈ `player cop thug civilian scientist gangster robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys total. See "Character art convention" below. |
+| `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player cop thug civilian scientist gangster robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
+| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
 | `unit.player`, `unit.cop` | single-sprite billboard fallback (no directions) |
 | `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `thug scientist robot` |
 | `item.default` | generic ground-item sprite |
@@ -140,6 +147,69 @@ weapon-mod gems and pickup-outline shapes are procedural (themeable via
   (front/side/back) is mapped onto `s`/`e`/`n` in its manifest and the diagonals
   fall back per the rules above.
 
+### Animation states (`char.<name>.<dir>-<state>-<n>`)
+
+Characters animate through six NAMED STATES, resolved every frame from sim
+state (render-only — the sim knows nothing about animation):
+
+| State | Kind | Triggered by | Window |
+|---|---|---|---|
+| `idle` | loop | nothing else active | — |
+| `walk` | loop | entity is moving | while moving |
+| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting) | 6 ticks |
+| `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | 8 ticks |
+| `roll` | one-shot | dodge-roll active | the sim's roll window (12 ticks) |
+| `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | 18 ticks |
+
+**Priority when several conditions hold at once (highest wins):**
+`death > roll > hurt > attack > walk > idle`.
+
+**Key grammar.** Each state takes up to 8 frames per drawn direction:
+`char.<name>.<dir>-<state>-<n>` with `<n>` ∈ `0..7`. Frames must be
+**contiguous from 0** — the first missing index ends the clip (a gap after it
+is ignored). Loop states cycle their frames forever (phase-shifted per entity
+so crowds don't move in lockstep); one-shots play once from the state's start
+and **hold their last frame** until the window closes.
+
+**Cadence.** Each state has a default ticks-per-frame — `idle` 12, `walk` 6,
+`attack` 2, `hurt` 3, `roll` 3, `death` 5 — overridable per state via the
+manifest `anim` section (integers 1..30). Frame selection is a pure function
+of sim tick + entity id: deterministic on every device and replay.
+
+**Backward compatibility (exact).** The legacy keys keep working unchanged:
+
+- `char.<name>.<dir>-idle` ≡ the single `idle` frame.
+- `char.<name>.<dir>-step` ≡ the second frame of a synthesized 2-frame `walk`
+  clip: `walk = [idle, step]` (just `[idle]` when `step` is missing).
+- A theme that ships ONLY idle/step renders **exactly as today**.
+- New-grammar clips WIN over the synthesis: if `…-walk-0`… exists, `-step` is
+  ignored for the walk cycle (it still backs the synthesis where walk clips
+  are absent for some other direction).
+
+**Per-state fallback chains (exact).** A state with no frames of its own
+borrows the **first frame only** of the next state in its chain that has any
+(a held stand-in pose — the engine's procedural motion layer still lunges/
+flinches/topples on top, so borrowed states read correctly):
+
+- `idle` → `idle` (procedural art guarantees it always exists)
+- `walk` → `walk` → `idle` (via the legacy synthesis above)
+- `attack` → `attack` → `walk` frame 0 → `idle`
+- `hurt` → `hurt` → `idle`
+- `roll` → `roll` → `walk` frame 0 → `idle`
+- `death` → `death` → `hurt` frame 0 → `idle`
+
+Direction fallback (`se→s`, `e→s`, `ne→e→s`, `n→s`) applies BEFORE state
+fallback: the drawn direction is chosen first, then that direction's clips
+resolve. Only when a character has no `char.*` idle art at all does it fall to
+its `unit.*` sprite, then to procedural art — which implements every state via
+the same chains, so a zero-asset theme still animates.
+
+The engine also layers **procedural motion** (walk lean+bob, idle breathing,
+attack lunge, hurt flinch, roll tumble + landing squash, death topple+fade) as
+subtle transform offsets around the feet anchor — themes get it for free; it
+composes with any frames you ship. Tuning lives in `src/render/motion.ts`
+(`MOTION` table).
+
 ## Fallback semantics (exact)
 
 For each sprite key, resolution walks a **theme chain**: `[active theme, city]`
@@ -157,7 +227,8 @@ For each sprite key, resolution walks a **theme chain**: `[active theme, city]`
 Names: `active.names[archetype]` → `city.names[archetype]` → title-cased
 archetype key (`door.open` → "Door Open"). Palette scalars (`background`,
 `uiAccent`, `floorTint`) and per-key `tiles`/`entities` colors resolve the same
-way: active → city → built-in constant.
+way: active → city → built-in constant. `anim` cadences too: active theme's
+`anim.<state>` → city's → the engine default.
 
 So a **partial theme is always safe**: theme five sprites and two names and
 everything else stays city.

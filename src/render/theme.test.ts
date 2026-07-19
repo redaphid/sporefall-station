@@ -261,6 +261,18 @@ describe('shipped theme packs', () => {
     }
   })
 
+  it('swampspace manifest validates with zero warnings and every referenced file exists on disk', () => {
+    const { manifest, warnings } = validateManifest(load('swampspace'))
+    expect(warnings).toEqual([])
+    expect(manifest.name).toBe('Sporefall Station')
+    expect(manifest.names.thug).toBe('Bog Mutant') // flavor-names section present
+    const chain: ThemeChain = [{ id: 'swampspace', dir: 'themes/swampspace/', manifest }]
+    for (const key of Object.keys(manifest.sprites)) {
+      for (const p of resolveSpritePaths(key, chain) ?? [])
+        expect(existsSync(join(process.cwd(), 'public', p)), `${key} → ${p}`).toBe(true)
+    }
+  })
+
   it('test theme validates with zero warnings and its floor.png exists (its broken wall ref is intentional)', () => {
     const { manifest, warnings } = validateManifest(load('test'))
     expect(warnings).toEqual([])

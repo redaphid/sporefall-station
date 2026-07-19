@@ -17,3 +17,6 @@ keystore.properties
 *.jks
 *.p12
 *.pkcs12
+
+__pycache__/
+*.pyc

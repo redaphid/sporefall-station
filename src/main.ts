@@ -8,6 +8,13 @@ import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import { SIM_DT } from './game/types'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
+import {
+  anyPadProducing,
+  detectTouchCaps,
+  initialVisibility,
+  stepVisibility,
+  sticksVisible,
+} from './input/stickVisibility'
 import { createControllersOverlay } from './input/controllersOverlay'
 import { createKeyboard } from './input/keyboard'
 import { createScriptedInput, scriptTicks, SCRIPTS } from './input/scripted'
@@ -367,6 +374,22 @@ const runLoop = (
   const showPause = createPauseBanner(uiMount)
   let currentLevel = session.renderView().level
 
+  // Touch-controls visibility (stickVisibility.ts): last actor wins, pad wins
+  // ties. The touch signal is a PASSIVE capture listener — it never claims,
+  // preventDefaults, or stops a touch, so stick/pinch/inspect claiming rules
+  // are untouched; it only notes "a finger touched the screen" so hidden
+  // controls can come back on a shared couch device.
+  const caps = detectTouchCaps(navigator, (q) => window.matchMedia(q))
+  let vis = initialVisibility()
+  let touchSeen = false
+  window.addEventListener(
+    'pointerdown',
+    (ev) => {
+      if (ev.pointerType === 'touch') touchSeen = true
+    },
+    { capture: true, passive: true },
+  )
+
   let acc = 0
   let last = performance.now()
   const frame = (now: number): void => {
@@ -403,8 +426,13 @@ const runLoop = (
     renderer.draw(view, alpha, dt)
     hud.update(view)
     const pads = coop.debug()
-    // A live controller takes over → hide the on-screen touch sticks/buttons.
-    touch?.setControllerActive(anyPadActive(pads))
+    vis = stepVisibility(vis, {
+      padJoined: anyPadActive(pads),
+      padActivity: anyPadProducing(pads),
+      touchActivity: touchSeen,
+    })
+    touchSeen = false
+    touch?.setVisible(sticksVisible(vis, caps))
     touch?.update(view)
     coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
     screens.update(view)

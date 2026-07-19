@@ -166,3 +166,42 @@ describe('two-finger double-tap → zoom reset', () => {
     expect(t.up(3, 210 + TAP_MS + 50).resetTap).toBe(false)
   })
 })
+
+describe('reset — the touch layer vanished mid-gesture (controller takeover)', () => {
+  it('forgets an active pinch: pinchActive false, old fingers no longer consumed', () => {
+    const t = createPinchTracker()
+    t.down(1, 100, 300, 'left', false, 0)
+    t.down(2, 200, 300, 'left', false, 50)
+    expect(t.pinchActive()).toBe(true)
+    t.reset()
+    expect(t.pinchActive()).toBe(false)
+    expect(t.consumed(1)).toBe(false)
+    expect(t.consumed(2)).toBe(false)
+  })
+
+  it('a ghost finger (down, never up) cannot pair into a phantom pinch after reset', () => {
+    const t = createPinchTracker()
+    t.down(1, 100, 300, 'left', false, 0) // its up will never arrive
+    t.reset()
+    // A genuinely new touch on the same half must NOT pinch with the ghost.
+    expect(t.down(2, 160, 300, 'left', false, 20)).toEqual([])
+    expect(t.pinchActive()).toBe(false)
+  })
+
+  it('after reset the tracker still works: two fresh fingers pinch normally', () => {
+    const t = createPinchTracker()
+    t.down(1, 100, 300, 'right', true, 0)
+    t.reset()
+    expect(t.down(3, 100, 300, 'right', false, 500)).toEqual([])
+    expect(t.down(4, 180, 300, 'right', false, 520)).toEqual([3, 4])
+    expect(t.pinchActive()).toBe(true)
+  })
+
+  it('an orphaned up after reset is a harmless no-op', () => {
+    const t = createPinchTracker()
+    t.down(1, 100, 300, 'left', false, 0)
+    t.down(2, 200, 300, 'left', false, 50)
+    t.reset()
+    expect(t.up(1, 100)).toEqual({ pinchEnded: false, resetTap: false })
+  })
+})

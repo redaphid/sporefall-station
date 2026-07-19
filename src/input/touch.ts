@@ -17,9 +17,12 @@ const STICK_RADIUS = 60 // px of thumb travel for full speed
  * can hide itself when a gamepad takes over. */
 export interface TouchInput extends InputSource {
   update(view: RenderView): void
-  /** Hide the on-screen sticks/buttons while a controller is driving (and show
-   * them again when it leaves). */
-  setControllerActive(active: boolean): void
+  /** Show/hide every on-screen control. The policy (who wins between touch and
+   * a gamepad, desktop vs phone) lives in stickVisibility.ts — this only
+   * applies the verdict. Hiding is visual AND input-inert: the wrapper is
+   * display:none, so nothing here hit-tests, and any in-flight stick drag or
+   * pinch is cancelled cleanly (vectors zeroed, captures released). */
+  setVisible(visible: boolean): void
 }
 
 /**
@@ -34,10 +37,12 @@ export interface TouchInput extends InputSource {
  */
 export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => {
   // One wrapper owns every touch control, so a controller takeover hides them all
-  // with a single display toggle (setControllerActive). pointer-events:none lets
+  // with a single display toggle (setVisible). pointer-events:none lets
   // taps fall through to the canvas except where a child (stick zone / button /
-  // hotbar slot) opts back in.
+  // hotbar slot) opts back in. data-role lets tests and e2e find it by meaning,
+  // not by DOM position.
   const controls = document.createElement('div')
+  controls.dataset.role = 'touch-controls'
   controls.style.cssText = 'position:absolute;inset:0;pointer-events:none;touch-action:none'
   mount.appendChild(controls)
 
@@ -253,12 +258,27 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     }
   }
 
+  let shown = true
   return {
-    setControllerActive(active: boolean): void {
-      // A gamepad has taken over → hide every on-screen control (and reveal them
-      // again when it leaves). One toggle on the wrapper covers sticks + buttons +
-      // hotbar; hidden controls receive no pointer events, so sampling idles out.
-      controls.style.display = active ? 'none' : 'block'
+    setVisible(visible: boolean): void {
+      if (visible === shown) return
+      shown = visible
+      if (!visible) {
+        // Hiding mid-gesture: a finger may be captured on a stick RIGHT NOW,
+        // and once the wrapper is display:none its pointerup will never reach
+        // us. Release every in-flight claim (vector → 0, capture released, art
+        // hidden) so no input sticks, and wipe the pinch tracker so a
+        // half-tracked ghost finger can't pair into a phantom pinch later.
+        // Already-latched button edges are NOT cleared: those presses happened
+        // while the controls were live, so they still deliver once.
+        for (const reg of stickRegs) reg.cancel()
+        tracker.reset()
+      }
+      // One toggle on the wrapper covers sticks + buttons + hotbar; a hidden
+      // wrapper is hit-test-inert, so taps in former stick zones flow through
+      // to the canvas underneath (inspect, annotations) instead of being
+      // claimed here.
+      controls.style.display = visible ? 'block' : 'none'
     },
     update(view: RenderView): void {
       const { use, useEnabled, spc, spcEnabled, throwEnabled } = computeTouchLabels(view)

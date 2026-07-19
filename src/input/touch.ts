@@ -1,8 +1,10 @@
 import type { RenderView } from '../app/session'
 import { emptyInput, type InputCmd } from '../game/types'
 import { hotbarSlots, type HotbarSlot } from '../ui/hotbarModel'
+import { pinchZoom, type ZoomSink } from '../render/zoomModel'
 import { aimFires, selectAim } from './aim'
 import type { InputSource } from './input'
+import { createPinchTracker } from './pinch'
 import { computeTouchLabels } from './touchLabels'
 
 // Re-exported from the shared, DOM-free aim module so existing importers
@@ -24,8 +26,13 @@ export interface TouchInput extends InputSource {
  * Twin virtual joysticks (left = move, right = aim/fire) + right-side action
  * buttons + a tappable hotbar strip and throw button. DOM/pointer based, with
  * edge-accumulated taps so none are lost between sim ticks.
+ *
+ * With a `zoom` sink, two fingers on the SAME half also pinch-to-zoom (claiming
+ * rules + rationale: pinch.ts). Pinching fingers emit no stick input; buttons
+ * and the hotbar are never part of a pinch (their touches target those elements,
+ * not the stick zones, so the tracker never sees them).
  */
-export const createTouch = (mount: HTMLElement): TouchInput => {
+export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => {
   // One wrapper owns every touch control, so a controller takeover hides them all
   // with a single display toggle (setControllerActive). pointer-events:none lets
   // taps fall through to the canvas except where a child (stick zone / button /
@@ -44,6 +51,26 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
   let rollEdge = false
   let hotbarEdge = -1
   let seq = 0
+
+  // --- pinch-to-zoom plumbing (see pinch.ts for the claiming rules). The
+  // tracker only ever sees touches that land on the stick zones; each stick
+  // registers a cancel hook so a fresh claim converted to a pinch zeroes out
+  // instantly (no phantom movement/aim).
+  const tracker = createPinchTracker()
+  const stickRegs: { pointerId(): number | null; cancel(): void }[] = []
+  let pinchStartZoom = 1
+  controls.addEventListener('pointermove', (ev) => {
+    const st = tracker.move(ev.pointerId, ev.clientX, ev.clientY)
+    if (st && zoom) {
+      const rect = controls.getBoundingClientRect()
+      zoom.set(pinchZoom(pinchStartZoom, st.startDist, st.dist), st.midX - rect.left, st.midY - rect.top)
+    }
+  })
+  const pinchUp = (ev: PointerEvent): void => {
+    if (tracker.up(ev.pointerId, performance.now()).resetTap) zoom?.reset()
+  }
+  controls.addEventListener('pointerup', pinchUp)
+  controls.addEventListener('pointercancel', pinchUp)
 
   // A virtual stick that pops up under the thumb on its half of the screen and
   // reports a -1..1 vector via `onMove`. Shared by the move and aim sticks.
@@ -64,8 +91,40 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
     let pointer: number | null = null
     let ox = 0
     let oy = 0
+    const hide = (): void => {
+      base.style.display = 'none'
+      nub.style.display = 'none'
+    }
+    // A fresh claim converted into a pinch: zero the vector and drop the claim —
+    // the touch had sub-threshold deflection, so nothing fired or moved yet.
+    stickRegs.push({
+      pointerId: () => pointer,
+      cancel: () => {
+        if (pointer === null) return
+        try {
+          zone.releasePointerCapture(pointer)
+        } catch {
+          /* already released */
+        }
+        pointer = null
+        onMove(0, 0)
+        hide()
+      },
+    })
     zone.addEventListener('pointerdown', (ev) => {
-      if (pointer !== null) return
+      const willClaim = pointer === null
+      // Register with the pinch tracker FIRST: it may claim this touch (and a
+      // fresh earlier one) for a pinch instead of the stick.
+      const consumedIds = tracker.down(ev.pointerId, ev.clientX, ev.clientY, side, willClaim, performance.now())
+      if (consumedIds.length > 0) {
+        for (const reg of stickRegs) {
+          const p = reg.pointerId()
+          if (p !== null && consumedIds.includes(p)) reg.cancel()
+        }
+        if (zoom) pinchStartZoom = zoom.get()
+        return // this touch belongs to the pinch, never to a stick
+      }
+      if (!willClaim || tracker.consumed(ev.pointerId)) return
       pointer = ev.pointerId
       zone.setPointerCapture(ev.pointerId)
       ox = ev.clientX
@@ -93,8 +152,7 @@ export const createTouch = (mount: HTMLElement): TouchInput => {
       if (ev.pointerId !== pointer) return
       pointer = null
       onMove(0, 0)
-      base.style.display = 'none'
-      nub.style.display = 'none'
+      hide()
     }
     zone.addEventListener('pointerup', end)
     zone.addEventListener('pointercancel', end)

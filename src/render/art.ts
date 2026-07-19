@@ -3,6 +3,7 @@ import { Tile } from '../game/levelgen/level'
 import { MODS } from '../game/data/mods'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
+import { pickTileVariant } from './tileSelect'
 
 export const TILE_PX = 32
 
@@ -29,8 +30,16 @@ export const TILE_ACCENT_EVERY = 17
 export interface ArtRegistry {
   /** `hash` is any deterministic per-coordinate value (tilemap hashes tx,ty).
    * It picks among themed variants/accents or the procedural TILE_VARIANTS —
-   * same hash, same texture, on every device. */
-  tile(tileId: number, hash?: number): Texture
+   * same hash, same texture, on every device. Pass the tile coordinates too
+   * when you have them: surfaces a theme declares in `macroTiles` then pick
+   * their variant by position (adjacent macro slices land adjacently). */
+  tile(tileId: number, hash?: number, tx?: number, ty?: number): Texture
+  /** Context-placed RGBA decal pool for a surface (`tile.<name>.overlay`) —
+   * empty when the theme ships none. Placement: tileSelect.planTileOverlays. */
+  tileOverlayPool(tileId: number): readonly Texture[]
+  /** Macro side (N of an N×N sliced pool) the active theme declares for a
+   * surface, if any — the tilemap feeds it back into variant/overlay planning. */
+  tileMacro(tileId: number): number | undefined
   /** Wall-contact shadow strip for a ground tile's `side` facing the wall:
    * strongest below a wall (side 'n' — the wall stands to the tile's north),
    * subtle on the flanks. Overlay-blended by the tilemap. */
@@ -93,6 +102,10 @@ export interface SpriteTextures {
   tiles?: Record<string, Texture[]>
   /** Rare accent pools per tile name (see TILE_ACCENT_EVERY). */
   tileAccents?: Record<string, Texture[]>
+  /** Context-placed RGBA decal pools per tile name (`tile.<name>.overlay`). */
+  tileOverlays?: Record<string, Texture[]>
+  /** Macro-slicing declarations per tile name (manifest `macroTiles`). */
+  tileMacro?: Record<string, number>
   player?: Texture
   cop?: Texture
   item?: Texture
@@ -354,7 +367,7 @@ export const createArt = (
     Object.entries(TILE_ID_BY_NAME).map(([name, id]) => [id, name]),
   )
 
-  const tile = (tileId: number, hash = 0): Texture => {
+  const tile = (tileId: number, hash = 0, tx?: number, ty?: number): Texture => {
     const name = TILE_NAME_BY_ID[tileId]
     const variants = name ? sprites.tiles?.[name] : undefined
     if (variants && variants.length > 0) {
@@ -363,7 +376,8 @@ export const createArt = (
       if (accents && accents.length > 0 && hash % TILE_ACCENT_EVERY === 0) {
         return accents[(hash >>> 5) % accents.length]
       }
-      return variants[(hash >>> 2) % variants.length]
+      const macro = tx !== undefined && ty !== undefined ? sprites.tileMacro?.[name] : undefined
+      return variants[pickTileVariant(variants.length, macro, tx ?? 0, ty ?? 0, hash)]
     }
     // Bevelled corners wear the themed wall art (clipped) when the theme ships one.
     const themedWall = sprites.tiles?.wall
@@ -697,8 +711,20 @@ export const createArt = (
     return tex
   }
 
+  const EMPTY_POOL: readonly Texture[] = []
+  const tileOverlayPool = (tileId: number): readonly Texture[] => {
+    const name = TILE_NAME_BY_ID[tileId]
+    return (name ? sprites.tileOverlays?.[name] : undefined) ?? EMPTY_POOL
+  }
+  const tileMacroFor = (tileId: number): number | undefined => {
+    const name = TILE_NAME_BY_ID[tileId]
+    return name ? sprites.tileMacro?.[name] : undefined
+  }
+
   return {
     tile,
+    tileOverlayPool,
+    tileMacro: tileMacroFor,
     wallShadow,
     groundSeam,
     entity,

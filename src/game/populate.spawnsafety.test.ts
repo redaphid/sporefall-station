@@ -87,7 +87,9 @@ describe('an idle just-spawned player survives (the seed-7 regression)', () => {
     expect(p.health!.hp).toBeGreaterThan(0)
   })
 
-  it('sweep seeds 1..100: no idle spawn is downed within 10 seconds', () => {
+  // 100 full worldgens × 300 ticks is real work (~8s on a loaded box) — the
+  // 5s default timeout flakes when the suite runs alongside other jobs.
+  it('sweep seeds 1..100: no idle spawn is downed within 10 seconds', { timeout: 60000 }, () => {
     for (let seed = 1; seed <= 100; seed++) {
       const { w, p } = buildRun(seed)
       const inputs = new Map([[0, idle]])

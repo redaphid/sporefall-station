@@ -119,15 +119,18 @@ export class BulletLayer {
       core.zIndex = wy
 
       // --- Energy field: halo + chroma via the batched shader (or sprite fallback).
+      // Radius and intensity are CAPPED well below screen scale: many pellets
+      // overlap additively, and a monster build must still leave the fight
+      // readable rather than white out the lane.
       const wantGlow = tr.glow > 0 || tr.jitter > 0.05 || tr.chroma > 0
-      const glowR = TILE_PX * (0.55 + 0.45 * tr.glow) * tr.size
+      const glowR = Math.min(TILE_PX * (0.45 + 0.4 * tr.glow) * tr.size, TILE_PX * 1.1)
       if (this.energy.ok) {
         if (wantGlow) {
           this.energy.push({
             x: wx, y: wy, angle: e.facing,
-            radiusPx: glowR, stretch: 0.6 + 0.4 * tr.length,
+            radiusPx: glowR, stretch: Math.min(0.6 + 0.4 * tr.length, 1.6),
             color: tr.glowColor,
-            intensity: 0.25 + tr.glow * 0.9,
+            intensity: 0.2 + tr.glow * 0.55,
             pulse: tr.pulse, jitter: tr.jitter, chroma: tr.chroma,
             seed,
           })

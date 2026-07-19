@@ -71,8 +71,12 @@ export const TRAIL_CAP = 5
 const SIZE_MIN = 0.6
 const SIZE_MAX = 2.4
 const LENGTH_MAX = 3.2
-/** Weight of the base gold in the hue blend — mods must overcome it. */
-const BASE_HUE_WEIGHT = 0.8
+/** Weight of the base gold in the hue blend — kept LOW so an element's
+ * canonical hue dominates (gold+blue in RGB otherwise washes to green). */
+const BASE_HUE_WEIGHT = 0.3
+/** Post-blend saturation push: weighted RGB mixes drift grey; this pulls the
+ * composed hue back out so builds stay vivid against the pixel-art floors. */
+const SAT_BOOST = 1.35
 
 /**
  * THE mod-id → visual-trait table. Add a registry entry here when adding a mod
@@ -135,6 +139,13 @@ const rgb = (c: number): [number, number, number] => [(c >> 16) & 0xff, (c >> 8)
 const hex = (r: number, g: number, b: number): number =>
   (Math.round(clamp(r, 0, 255)) << 16) | (Math.round(clamp(g, 0, 255)) << 8) | Math.round(clamp(b, 0, 255))
 
+/** Push a color's channels away from its own luminance (re-saturate). */
+const saturate = (c: number, amount: number): number => {
+  const [r, g, b] = rgb(c)
+  const lum = 0.299 * r + 0.587 * g + 0.114 * b
+  return hex(lum + (r - lum) * amount, lum + (g - lum) * amount, lum + (b - lum) * amount)
+}
+
 /** Weighted RGB blender: fold colors in with weights, read the mix out. */
 const makeBlend = (baseColor: number, baseWeight: number) => {
   const base = rgb(baseColor)
@@ -192,8 +203,10 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
   if (active.length === 0) return t
 
   const core = makeBlend(BASE_BULLET_COLOR, BASE_HUE_WEIGHT)
-  const glow = makeBlend(BASE_BULLET_COLOR, 0.15)
-  const trail = makeBlend(BASE_BULLET_COLOR, 0.15)
+  // Glow/trail hues blend ONLY from contributing mods (no gold base): an ice
+  // halo must be pure ice, not gold-washed. No contributors → core color.
+  const glow = makeBlend(BASE_BULLET_COLOR, 0)
+  const trail = makeBlend(BASE_BULLET_COLOR, 0)
   let sizeMul = 1
   let lengthMul = 1
   let glowSum = 0
@@ -226,11 +239,11 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
 
   t.size = clamp(sizeMul, SIZE_MIN, SIZE_MAX)
   t.length = clamp(lengthMul, 1, LENGTH_MAX)
-  t.color = core.mix()
+  t.color = saturate(core.mix(), SAT_BOOST)
   t.glow = saturating(glowSum, 0.95)
-  t.glowColor = glow.weight() > 0 ? glow.mix() : t.color
+  t.glowColor = saturate(glow.weight() > 0 ? glow.mix() : t.color, SAT_BOOST)
   t.trail = clamp(Math.round(Math.min(trailSum * 2, TRAIL_CAP)), 0, TRAIL_CAP)
-  t.trailColor = trail.weight() > 0 ? trail.mix() : t.color
+  t.trailColor = saturate(trail.weight() > 0 ? trail.mix() : t.color, SAT_BOOST)
   t.jitter = saturating(jitterSum, 0.9)
   t.pulse = saturating(pulseSum, 0.9)
   t.flecks = saturating(flecksSum, 1)

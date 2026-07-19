@@ -38,6 +38,7 @@ OUTDIR = os.environ.get("OUTDIR", os.path.join(G.THEME, "chars"))
 DIRS = ["s", "se", "e", "ne", "n"]
 FRAMES = list(range(8))
 PAL = set(tuple(c) for c in RGB)
+RGBL = [tuple(c) for c in RGB]
 
 
 def frame_path(d, f):
@@ -69,8 +70,11 @@ def deterministic(dirs):
             if off:
                 fails.append(f"{tag}: {len(off)} px off-palette (e.g. {off[0]})")
             rows = np.where(alpha.any(axis=1))[0]
-            if rows[-1] < 43:
-                fails.append(f"{tag}: feet float (lowest opaque row {rows[-1]} < 43)")
+            # gait bob legitimately lifts the lowest pixel a few rows
+            # (heel-strike toe-up, push-off) — the pure-3D control set does
+            # the same, so only flag frames well off the ground
+            if rows[-1] < 40:
+                fails.append(f"{tag}: feet float (lowest opaque row {rows[-1]} < 40)")
             heights[(d, f)] = rows[-1] - rows[0] + 1
         hs = [heights[(d, f)] for f in FRAMES if (d, f) in heights]
         if hs and max(hs) - min(hs) > 6:
@@ -78,7 +82,11 @@ def deterministic(dirs):
     return fails
 
 
-def coherence(dirs, spike=3.0, mean_cap=0.45):
+def coherence(dirs, spike=3.0, mean_cap=0.88, hist_cap=0.45):
+    # hist_cap calibration: after temporal smoothing, honest 48px back-view
+    # cycles measure up to ~0.38 (the yawing torso genuinely exposes different
+    # shade areas mid-swing); the cap-color identity flicker this check exists
+    # for measured ~0.45+ on affected frames. 0.45 splits the two.
     fails = []
     for d in dirs:
         ims = []
@@ -97,12 +105,32 @@ def coherence(dirs, spike=3.0, mean_cap=0.45):
         mean = sum(deltas) / len(deltas)
         print(f"  {d}: adjacent-frame deltas "
               + " ".join(f"{x:.2f}" for x in deltas) + f" (median {med:.2f})")
+        # Calibration: at 48px, swinging limbs alone flip 0.4-0.8 of the union
+        # (the pure-3D control set measures 0.44-0.85), so the pixel delta only
+        # catches catastrophic per-frame identity swaps…
         if mean > mean_cap:
             fails.append(f"{d}: mean adjacent delta {mean:.2f} > {mean_cap} (flicker)")
         for f, x in enumerate(deltas):
             if med > 0.02 and x > spike * med:
                 fails.append(f"{d}: delta {f}->{(f + 1) % 8} = {x:.2f} spikes over "
                              f"{spike}x median {med:.2f} (frame pops)")
+        # …while APPEARANCE flicker (e.g. the cap reading orange in one frame,
+        # tan in the next) shows up as a palette-histogram outlier even when
+        # the pose barely moves. L1 distance of each frame's palette-color
+        # distribution from the direction's mean distribution.
+        hists = []
+        for im in ims:
+            op = im[im[..., 3] > 0][:, :3]
+            hv = np.zeros(len(RGBL))
+            for i, c in enumerate(RGBL):
+                hv[i] = (np.abs(op - np.array(c)).sum(axis=1) == 0).sum()
+            hists.append(hv / max(1, len(op)))
+        meanh = np.mean(hists, axis=0)
+        for f, hv in enumerate(hists):
+            dist = float(np.abs(hv - meanh).sum())
+            if dist > hist_cap:
+                fails.append(f"{d}-{f}: palette histogram drifts {dist:.2f} > "
+                             f"{hist_cap} from the cycle mean (appearance flicker)")
     return fails
 
 

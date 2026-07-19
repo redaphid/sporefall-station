@@ -1,7 +1,8 @@
 import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
-import { burnPulse, charFootPx, cycleFrame, depthKey, facingDir, isMoving } from './anim'
+import { SIM_DT } from '../game/types'
+import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
   effectiveClips,
@@ -260,7 +261,7 @@ export class EntityViews {
       view.prevCooldown = cd
 
       const character = this.art.isCharacterSprite(artKey)
-      const moving = isMoving(e.vel.x, e.vel.y)
+      const moving = entityMoving(e, SIM_DT)
       const roll = e.playerCtl?.roll
       const rolling = roll !== undefined && tick < roll.untilTick
 

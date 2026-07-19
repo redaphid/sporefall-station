@@ -192,6 +192,17 @@ def post_frame(d, f, win, use_trace=True):
     tp = os.path.join(TRACED, f"walk-{d}-{f}.png")
     if use_trace:
         rgb = np.asarray(Image.open(tp).convert("RGB").resize(src.size, Image.LANCZOS))
+        # Signature-color rescue: the 3D proxy is a SEMANTIC mask — its cap
+        # pixels are known exactly. Shaded back-view orange otherwise snaps to
+        # the palette's tan (a blond-hair flicker across ne/n frames); bias
+        # masked pixels toward the character's signature orange so the palette
+        # lock resolves them to #ff9032/#e04a2a like the curated idles.
+        bl = np.asarray(src)[..., :3].astype(np.float32)
+        r, g, b = bl[..., 0], bl[..., 1], bl[..., 2]
+        cap = (r > 140) & (g > 55) & (g < 185) & (b < 95) & (r > g * 1.3) & (alpha > 100)
+        rgbf = rgb.astype(np.float32)
+        rgbf[cap] = rgbf[cap] * 0.35 + np.float32([255, 144, 50]) * 0.65
+        rgb = rgbf.clip(0, 255).astype(np.uint8)
     else:
         rgb = np.asarray(src)[..., :3]
     im = Image.fromarray(np.dstack([rgb, np.where(alpha > 100, 255, 0).astype("uint8")]),
@@ -202,6 +213,25 @@ def post_frame(d, f, win, use_trace=True):
     im = P.to_palette(P.kcentroid(im, tw, th))
     out = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
     out.paste(im, ((CANVAS - tw) // 2, CANVAS - th - 1))
+    return out
+
+
+def temporal_smooth(frames48, masks48):
+    """Kill single-frame color sparkle (AI re-shading wobble) without touching
+    motion: every frame shares the fixed window, so for pixels that are BODY in
+    frame f-1, f and f+1 alike (stable Blender alpha — torso, not swinging
+    limbs), a color that disagrees with both temporal neighbors while the
+    neighbors agree with each other is a one-frame flicker: snap it to them."""
+    import numpy as np
+    out = [a.copy() for a in frames48]
+    for f in range(8):
+        a, b, c = frames48[(f - 1) % 8], frames48[f], frames48[(f + 1) % 8]
+        ma, mb, mc = masks48[(f - 1) % 8], masks48[f], masks48[(f + 1) % 8]
+        stable = ma & mb & mc
+        neigh_agree = (a[..., :3] == c[..., :3]).all(axis=-1)
+        differs = (b[..., :3] != a[..., :3]).any(axis=-1)
+        fix = stable & neigh_agree & differs
+        out[f][fix, :3] = a[fix, :3]
     return out
 
 
@@ -236,9 +266,15 @@ if __name__ == "__main__":
     win = union_window(DIRS, FRAMES)  # always ALL frames: window must be global
     print(f"window {win} denoise={DENOISE} seed={SEED} trace={use_trace}")
     os.makedirs(OUTDIR, exist_ok=True)
+    import numpy as np
     for d in dirs:
-        for f in frames:
-            out = post_frame(d, f, win, use_trace=use_trace)
+        outs = [post_frame(d, f, win, use_trace=use_trace) for f in frames]
+        if frames == FRAMES:
+            arrs = [np.asarray(o).copy() for o in outs]
+            masks = [a[..., 3] > 0 for a in arrs]
+            arrs = temporal_smooth(arrs, masks)
+            outs = [Image.fromarray(a, "RGBA") for a in arrs]
+        for f, out in zip(frames, outs):
             dest = os.path.join(OUTDIR, f"{CHAR}-{d}-walk-{f}.png")
             out.save(dest)
             print(f"{d}-{f} -> {dest}")

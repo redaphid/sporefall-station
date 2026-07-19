@@ -62,10 +62,23 @@ COL_CAP = lin("#ff7a14")       # orange-amber cap (hot: must survive
 COL_VISOR = lin("#1c1420")     # dark visor face
 COL_BOOT = lin("#6b4d26")      # tan-brown boots
 COL_STRAP = lin("#4a3419")     # leather chest strap
-COL_PACK = lin("#163a3e")      # back pack
+COL_PACK = lin("#59636d")      # back pack: locked-palette GREY, not teal. The
+                               # back quarter is 16 of the 40 frames and the
+                               # pack owns most of those pixels — the curated
+                               # n-idle spends 96 px on #59636d and 57 on
+                               # #3c444d, so a dark-teal pack (the r1 color)
+                               # reads as a different character from behind
+                               # even when the silhouette is exact. Shading
+                               # spreads this base across the palette's grey
+                               # ramp the same way the curated art does.
 COL_GLOVE = lin("#23282e")     # gloves
 COL_VINE = lin("#4c6b28")      # vine wrap on one arm
-COL_ARMOR = lin("#4d6068")     # grey plate: pauldrons, chest rig, knee/shin
+COL_ARMOR = lin("#7b8791")     # grey plate: pauldrons, chest rig, collar,
+                               # knee. Sits a ramp step above COL_PACK so lit
+                               # plating resolves to #7b8791/#a2adb4 and shaded
+                               # plating to #59636d — the curated ranger's grey
+                               # gear read, which a teal-leaning grey loses to
+                               # the suit color at palette-snap.
 COL_POUCH = lin("#5a4526")     # belt pouches / utility rig
 
 # ---- proportions: the CURATED vine-ranger's build, not a generic humanoid ---

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity, type Faction } from '../entity'
 import { addEntity, createWorld, emitNoise, type World } from '../world'
-import { arbitrateGoal, BATTLE, FLEE, INVESTIGATE, PURSUE, WANDER } from './goals'
+import { arbitrateGoal } from './behaviors'
+import { BATTLE, FLEE, INVESTIGATE, PURSUE, WANDER } from './goals'
 
 const ARCH: Record<Faction, string> = { cop: 'cop', gang: 'gangster', neutral: 'bouncer', civ: 'civilian' }
 

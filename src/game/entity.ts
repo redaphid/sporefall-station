@@ -12,7 +12,7 @@ export interface StatusEntry {
 
 export type Fx = Record<string, StatusEntry>
 
-export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'sleep'
+export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
 export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
 
 /** A disposition band, derived from numeric hate by `determineRel`. */
@@ -22,6 +22,25 @@ export type RelStatus = 'Friendly' | 'Neutral' | 'Annoyed' | 'Hostile'
 export interface RelEntry {
   hate: number
   code: RelStatus
+}
+
+/** Data parameters a behavior reads (systems/behaviors.ts). Plain JSON — part
+ * of the entity, so a configured brain snapshots and replays losslessly. */
+export interface AiBehaviorParams {
+  /** Patrol: the waypoint loop to walk, in order. */
+  waypoints?: Vec2[]
+}
+
+/** A hunter's area sweep after a chase goes cold: `cx/cy` anchor the spot where
+ * the trail was lost, `x/y` is the sweep point currently being checked, `left`
+ * counts remaining sweeps, `until` (absolute tick) abandons an unreachable point. */
+export interface AiSearch {
+  cx: number
+  cy: number
+  x: number
+  y: number
+  left: number
+  until: number
 }
 
 export interface AiState {
@@ -40,8 +59,31 @@ export interface AiState {
   /** Holds position instead of idle-wandering until it spots a target. */
   guard?: boolean
   /** The goal chosen by the last arbitration (battle/flee/pursue/investigate/
-   * wander) — drives `mode`, exposed for debugging and the e2e. */
+   * wander/patrol/search/alert/scavenge) — drives `mode`, exposed for debugging. */
   goal?: string
+  /** Behavior registry id (systems/behaviors.ts). Absent/unknown → 'basic'. */
+  behavior?: string
+  /** Data parameters for the behavior (e.g. patrol waypoints). */
+  params?: AiBehaviorParams
+  /** Why the last think chose its goal: per-consideration top scores — the
+   * legible "thought record" an agent (or the `ai` debug verb) reads back. */
+  lastScores?: Record<string, number>
+  /** Tick the current `goal` was adopted (how long it has wanted this). */
+  goalSince?: number
+  /** Patrol: index into `params.waypoints` of the leg being walked. */
+  patrolIndex?: number
+  /** Hunter: the in-progress area sweep after losing a target. */
+  search?: AiSearch
+  /** Who scared this NPC (set on fleeing/alerting) — the alert's subject. */
+  fearId?: EntityId
+  /** Skittish: threat id already reported to a guard (don't re-alert). */
+  alerted?: EntityId
+  /** Where/when this NPC last made real progress toward an UNSEEN chase goal —
+   * steering is straight-line (no pathfinder), so a concave wall can wedge a
+   * pursuer; stalling too long declares the trail cold instead. */
+  progress?: { x: number; y: number; tick: number }
+  /** Scavenger: item ids collected so far — a legible loot trail. */
+  stash?: string[]
 }
 
 /** One applied weapon modifier: a registry id (`data/mods.ts`) plus a

@@ -82,7 +82,18 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): vo
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
       const spot = randomFloorInBuilding(w, rng, building)
-      if (spot) spawnNpc(w, spec.archetype, spot.x, spot.y, wrng)
+      if (!spot) continue
+      const npc = spawnNpc(w, spec.archetype, spot.x, spot.y, wrng)
+      // One thug per warehouse walks rounds through the stock instead of
+      // loitering — an interior patrol the players can time and slip past.
+      if (building.role === 'warehouse' && spec.archetype === 'thug' && i === 0) {
+        const beat = [{ x: spot.x, y: spot.y }]
+        for (let j = 0; j < 2; j++) {
+          const p = randomFloorInBuilding(w, rng, building)
+          if (p) beat.push(p)
+        }
+        assignPatrol(npc, beat)
+      }
     }
   }
   if (building.role === 'shop') stockShop(w, rng, building)
@@ -135,12 +146,27 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
     const spot = randomTileOfType(w, rng, Tile.Sidewalk) ?? randomTileOfType(w, rng, Tile.Street)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
+  // Scavengers: a couple of civ-faction gleaners drawn to loose loot, so the
+  // street competes with the players for unclaimed pickups.
+  const scavengers = rng.int(1, 2)
+  for (let i = 0; i < scavengers; i++) {
+    const spot = randomTileOfType(w, rng, Tile.Sidewalk) ?? randomTileOfType(w, rng, Tile.Street)
+    if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng).ai!.behavior = 'scavenger'
+  }
   const copPairs = 1 + Math.floor(w.floor / 3)
   for (let i = 0; i < copPairs; i++) {
     const spot = randomTileOfType(w, rng, Tile.Street)
     if (spot) {
-      spawnNpc(w, 'cop', spot.x, spot.y, wrng)
-      spawnNpc(w, 'cop', spot.x + 0.8, spot.y, wrng)
+      const a = spawnNpc(w, 'cop', spot.x, spot.y, wrng)
+      const b = spawnNpc(w, 'cop', spot.x + 0.8, spot.y, wrng)
+      // The pair walks a shared street beat instead of loitering at one corner.
+      const beat = [{ x: spot.x, y: spot.y }]
+      for (let j = 0; j < 2; j++) {
+        const p = randomTileOfType(w, rng, Tile.Street)
+        if (p) beat.push(p)
+      }
+      assignPatrol(a, beat)
+      assignPatrol(b, beat)
     }
   }
 }
@@ -230,8 +256,20 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng
     home: { x, y },
     thinkAt: 0,
     sightRange: def.sightRange,
+    // Behavior is a component: the archetype only supplies the DEFAULT brain
+    // (populate/scenarios/debug verbs override per-entity). Absent → 'basic'.
+    ...(def.behavior ? { behavior: def.behavior } : {}),
   }
   return addEntity(w, e)
+}
+
+/** Turn an NPC into a patroller walking `waypoints` (copied, so callers can
+ * reuse their arrays). No-op when fewer than 2 points — a beat needs legs. */
+export const assignPatrol = (e: Entity, waypoints: { x: number; y: number }[]): void => {
+  if (!e.ai || waypoints.length < 2) return
+  e.ai.behavior = 'patrol'
+  e.ai.params = { ...e.ai.params, waypoints: waypoints.map((p) => ({ x: p.x, y: p.y })) }
+  e.ai.patrolIndex = 0
 }
 
 const randomFloorInBuilding = (

@@ -1,8 +1,7 @@
-// AI goals — desirability arbitration. Re-expressed from observed Streets of
-// Rogue behavior (BrainUpdate.GoalArbitrate + Relationships AssessBattle/
-// AssessFlee), not ported code. Each thinking NPC scores a set of candidate
-// goals from world state and commits to the highest scorer, replacing the flat
-// idle/aggro/flee FSM decision with a situational one.
+// AI goal primitives — the perception + desirability scoring toolkit the
+// pluggable behaviors (./behaviors.ts) are composed from. Re-expressed from
+// observed Streets of Rogue behavior (BrainUpdate.GoalArbitrate + Relationships
+// AssessBattle/AssessFlee), not ported code.
 //
 // The two competing drives against a Hostile target, both weighted by how much
 // it is hated (so the deeper grudge wins the target):
@@ -10,21 +9,20 @@
 //   FLEE    desirability ∝ WOUNDEDNESS  — a hurt body runs, even if it never
 //                                          flees "on damage" normally.
 // They cross around a third of max health (2·hp vs max−hp), so a badly wounded
-// NPC breaks off and flees. A remembered-but-unseen target is PURSUEd toward its
-// last-known spot; a heard disturbance with no threat around is INVESTIGATEd;
-// otherwise the NPC just WANDERs. Grounded in Relationships.cs AssessBattle
+// NPC breaks off and flees. Grounded in Relationships.cs AssessBattle
 // (L4048-4053: relHate·health·2/(dist·2.5)) / AssessFlee (L4058-4077:
-// relHate·clamp(max−health)/(dist·2.5)) and BrainUpdate.GoalArbitrate's
-// keep-the-highest loop. Deterministic: no rand, ascending-id iteration, ties
-// resolve by candidate order (Wander first, then targets by id, strictly-greater
-// replaces).
+// relHate·clamp(max−health)/(dist·2.5)).
+//
+// This module holds only PURE, stateless helpers: goal codes, score formulas,
+// and perception queries. Which considerations an NPC weighs — and how they
+// combine into a decision — lives in ./behaviors.ts, keyed by the entity's
+// `ai.behavior` component.
 
-import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
 import { doorClosedAt, type World } from '../world'
-import { dispositionToward, initialPlayerHate } from './relationships'
+import { initialPlayerHate } from './relationships'
 
 export const WANDER = 'wander'
 export const BATTLE = 'battle'
@@ -46,23 +44,39 @@ export const HEAR_RANGE = 12
  * stored opinion — the `CRIME_HATE` threshold, so battleScore clears WANDER. */
 export const WORLD_HOSTILE_HATE = 5
 /** Multiple of sightRange an NPC keeps chasing a remembered target before giving up. */
-const LEASH = 1.5
+export const LEASH = 1.5
 
+/** What one arbitration decides: a goal code plus, when relevant, the entity it
+ * is about (`target`), a world point (`at`), and — for goals that are ABOUT one
+ * entity while MOVING to another (alerting a guard about an attacker) — the
+ * `subject` the goal concerns. */
 export interface Goal {
   code: string
   target?: EntityId
   at?: Vec2
+  subject?: EntityId
 }
 
-const battleScore = (hate: number, hp: number, dist: number): number => (hate * hp * 2) / (dist * DIST_K)
+export const battleScore = (hate: number, hp: number, dist: number): number => (hate * hp * 2) / (dist * DIST_K)
 
-const fleeScore = (hate: number, hp: number, max: number, dist: number): number =>
+export const fleeScore = (hate: number, hp: number, max: number, dist: number): number =>
   (hate * Math.min(1000, Math.max(1, max - hp))) / (dist * DIST_K)
 
-const canSee = (w: World, a: Entity, b: Entity): boolean =>
+export const canSeeEntity = (w: World, a: Entity, b: Entity): boolean =>
   hasLineOfSight(w.level, a.pos.x, a.pos.y, b.pos.x, b.pos.y, (tx, ty) => doorClosedAt(w, tx, ty))
 
-const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
+/** True when `a` actually PERCEIVES `b`: inside its (cloak-halved) sight range
+ * AND with unbroken line of sight. The one definition of "can it see it" used by
+ * scoring, memory updates, and steering — so an NPC can never track a live
+ * position it has no way of knowing. */
+export const perceives = (w: World, a: Entity, b: Entity): boolean => {
+  const sight = a.ai?.sightRange ?? 0
+  const range = b.status && b.status.cloakUntil > w.tick ? sight * 0.5 : sight
+  if (Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y) > range) return false
+  return canSeeEntity(w, a, b)
+}
+
+export const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
   const stored = e.ai?.rel?.[targetId]?.hate
   if (stored !== undefined) return stored
   const base = initialPlayerHate(e.ai?.faction ?? 'neutral')
@@ -71,7 +85,7 @@ const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
   return w.hostile ? Math.max(base, WORLD_HOSTILE_HATE) : base
 }
 
-const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {
+export const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {
   let best: Vec2 | undefined
   let bestDist = HEAR_RANGE
   for (const n of w.noises) {
@@ -81,70 +95,4 @@ const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {
     best = { x: n.x, y: n.y }
   }
   return best
-}
-
-interface Best {
-  code: string
-  score: number
-  target?: EntityId
-  at?: Vec2
-}
-
-/** Score every candidate goal and return the winner. */
-export const arbitrateGoal = (w: World, e: Entity): Goal => {
-  const ai = e.ai!
-  const hp = e.health?.hp ?? 1
-  const max = e.health?.max ?? 1
-
-  // Panic overrides aggression: a skittish NPC (civilian/scientist) that has been
-  // scared into fleeing keeps running from its scarer until it's well clear — a
-  // hostile world makes it an enemy only until it's hurt, then it just flees.
-  if (NPCS[e.archetype]?.fleesOnDamage && ai.mode === 'flee' && ai.targetId !== undefined) {
-    const threat = w.byId.get(ai.targetId)
-    if (threat && !threat.dead && Math.hypot(threat.pos.x - e.pos.x, threat.pos.y - e.pos.y) <= ai.sightRange * 2) {
-      return { code: FLEE, target: ai.targetId }
-    }
-  }
-
-  let best: Best = { code: WANDER, score: WANDER_SCORE }
-
-  for (const p of w.entities) {
-    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    const hostile = w.hostile || dispositionToward(e, p.id) === 'Hostile' || (ai.faction === 'cop' && w.alarm >= 2)
-    if (!hostile) continue
-    const dist = Math.max(1, Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y))
-    // Cloaked players are much harder to spot.
-    const sight = p.status && p.status.cloakUntil > w.tick ? ai.sightRange * 0.5 : ai.sightRange
-    if (dist > sight || !canSee(w, e, p)) continue // must actually perceive it
-    const hate = hateToward(w, e, p.id)
-    const aggress = battleScore(hate, hp, dist)
-    if (aggress > best.score) best = { code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: aggress, target: p.id }
-    const flee = fleeScore(hate, hp, max, dist)
-    if (flee > best.score) best = { code: FLEE, score: flee, target: p.id }
-  }
-
-  // No fresh target beat wander: keep chasing a remembered one, keep fleeing a
-  // recent scare, else investigate a noise, else wander.
-  if (best.code === WANDER && ai.targetId !== undefined && ai.lastKnownTargetPos) {
-    const t = w.byId.get(ai.targetId)
-    if (t && !t.dead && Math.hypot(t.pos.x - e.pos.x, t.pos.y - e.pos.y) <= ai.sightRange * LEASH) {
-      best = { code: PURSUE, score: WANDER_SCORE + 0.5, target: ai.targetId }
-    }
-  }
-  // A frightened NPC (e.g. a civilian who saw a crime) keeps fleeing its scarer
-  // until it's well clear, even though it has no hostile disposition to score.
-  if (best.code === WANDER && ai.mode === 'flee' && ai.targetId !== undefined) {
-    const threat = w.byId.get(ai.targetId)
-    if (threat && !threat.dead && Math.hypot(threat.pos.x - e.pos.x, threat.pos.y - e.pos.y) <= ai.sightRange * 2) {
-      best = { code: FLEE, score: WANDER_SCORE + 0.5, target: ai.targetId }
-    }
-  }
-  if (best.code === WANDER) {
-    const noise = nearestNoise(w, e)
-    if (noise) best = { code: INVESTIGATE, score: INVESTIGATE_SCORE, at: noise }
-  }
-
-  if (best.target !== undefined) return { code: best.code, target: best.target }
-  if (best.at) return { code: best.code, at: best.at }
-  return { code: best.code }
 }

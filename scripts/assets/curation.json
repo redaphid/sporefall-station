@@ -58,31 +58,31 @@
   "note": "consistency fix: i2i from s-idle raw d0.5 ipw0.7; slim match, quarter-right"
  },
  "char.vine-ranger.e-idle": {
-  "seed": 414700,
+  "seed": 414800,
   "batch": 4,
   "index": 2,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-idle-dx3/char-vine-ranger-e-idle-dx3-s414700_00003_.png",
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-idle-cap1/char-vine-ranger-e-idle-cap1_00003_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "consistency fix: i2i from s-idle raw d0.75 ipw0.55 (cross-direction anchor chain); faces right"
+  "note": "consistency fix r2: i2i from chain e-idle d0.45 with orange-visor emphasis (VLM flagged head accents); faces right"
  },
  "char.vine-ranger.ne-idle": {
   "seed": 414704,
   "batch": 4,
-  "index": 0,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-idle-dx1/char-vine-ranger-ne-idle-dx1-s414704_00001_.png",
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-idle-cap1/char-vine-ranger-ne-idle-cap1-s414704_00002_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "consistency fix: i2i from NEW e-idle raw d0.55 ipw0.5; back-quarter right, face hidden"
+  "note": "consistency fix r2: i2i from cap e-idle raw d0.55; back-quarter right, back gear visible"
  },
  "char.vine-ranger.n-idle": {
   "seed": 414700,
   "batch": 4,
-  "index": 3,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-idle-dx1/char-vine-ranger-n-idle-dx1-s414700_00004_.png",
+  "index": 1,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-idle-cap1/char-vine-ranger-n-idle-cap1-s414700_00002_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "consistency fix: i2i from NEW ne-idle raw d0.5 ipw0.5; pure back view, no accent"
+  "note": "consistency fix r2: i2i from cap ne-idle raw d0.5; pure back view"
  },
  "char.vine-ranger.s-step": {
   "seed": 414590,
@@ -105,29 +105,29 @@
  "char.vine-ranger.e-step": {
   "seed": 414700,
   "batch": 4,
-  "index": 1,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-step-dx1/char-vine-ranger-e-step-dx1-s414700_00002_.png",
+  "index": 2,
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.e-step-cap1/char-vine-ranger-e-step-cap1-s414700_00003_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "consistency fix: i2i from NEW e-idle raw d0.38; stride, faces right"
+  "note": "consistency fix r2: i2i from cap e-idle raw d0.38; stride, faces right"
  },
  "char.vine-ranger.ne-step": {
   "seed": 414700,
   "batch": 4,
   "index": 2,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-step-dx1/char-vine-ranger-ne-step-dx1-s414700_00003_.png",
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.ne-step-cap1/char-vine-ranger-ne-step-cap1-s414700_00003_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "consistency fix: i2i from NEW ne-idle raw d0.38; stride, back-quarter right"
+  "note": "consistency fix r2: i2i from cap ne-idle raw d0.38; stride, back-quarter right"
  },
  "char.vine-ranger.n-step": {
   "seed": 414700,
   "batch": 4,
   "index": 0,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-step-dx1/char-vine-ranger-n-step-dx1-s414700_00001_.png",
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.n-step-cap1/char-vine-ranger-n-step-cap1-s414700_00001_.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
-  "note": "consistency fix: i2i from NEW n-idle raw d0.38; stride, pure back view"
+  "note": "consistency fix r2: i2i from cap n-idle raw d0.38; stride, pure back"
  },
  "tile.root-bulkhead": {
   "seed": 414580,

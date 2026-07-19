@@ -31,6 +31,17 @@ describe('padProfile', () => {
     it('maps attack to the bottom face button', () => {
       expect(p.attack).toContain(0)
     })
+    it('maps L2 (button 6) to attack — the explicit fire trigger', () => {
+      expect(p.attack).toContain(6)
+    })
+    it('keeps R2 (button 7) and RB (5) on attack alongside L2', () => {
+      expect(p.attack).toContain(7)
+      expect(p.attack).toContain(5)
+    })
+    it('moves dodge-roll off L2 onto LB alone, so roll and fire cannot collide', () => {
+      expect(p.roll).toEqual([4])
+      expect(p.roll).not.toContain(6)
+    })
     it('maps interact to the right face button', () => {
       expect(p.interact).toContain(1)
     })
@@ -68,15 +79,15 @@ describe('padProfile', () => {
       for (const b of allButtons(p)) expect(p.dpad).not.toContain(b)
     })
 
-    // The regression guard that matters most: standard is the vouched layout and
-    // this change must not have moved a single index of it.
-    it('is byte-for-byte the W3C layout we already shipped', () => {
+    // The regression guard that matters most: the exact shipped layout.
+    // L2 (6) is attack — the explicit fire trigger — and roll is LB (4) alone.
+    it('is byte-for-byte the documented button map', () => {
       expect(p).toEqual({
         kind: 'standard',
-        attack: [0, 5, 7],
+        attack: [0, 5, 6, 7],
         interact: [1],
         special: [2, 3],
-        roll: [4, 6],
+        roll: [4],
         pause: [9],
         throw: [8],
         hotbarPrev: [10],
@@ -148,10 +159,10 @@ describe('padProfile', () => {
     })
 
     // The bug-2 fix. On a raw evdev pad axes 2/3 are as likely to be analog
-    // triggers (resting at -1, hypot 1.41 > the 0.5 aim-fire threshold) as a
-    // right stick. Guessing costs constant fire with no recourse; refusing costs
-    // twin-stick aim while aim-where-you-move and the attack button still work.
-    it('refuses to guess an aim stick, so a resting trigger pair cannot fire', () => {
+    // triggers (resting at -1 once touched) as a right stick. A guessed aim
+    // stick would pin aim to a constant diagonal with no recourse; refusing
+    // costs twin-stick aim while aim-where-you-move and the fire buttons work.
+    it('refuses to guess an aim stick, so a resting trigger pair cannot steer aim', () => {
       expect(p.aimAxes).toBe(null)
     })
 
@@ -159,11 +170,20 @@ describe('padProfile', () => {
       expect(p.hatAxis).toBe(9)
     })
 
+    // One button map for every profile: the W3C order is the best guess we have
+    // for an unknown pad (it is the order browsers themselves map unknowns
+    // into), and a single map means one obvious place bindings live.
+    it('shares the standard button map — raw differs only in analog trust', () => {
+      const std = padProfile(desc('x', 'standard', 4))
+      expect({ ...p, kind: std.kind, aimAxes: std.aimAxes, hatAxis: std.hatAxis }).toEqual(std)
+    })
+
     it('still offers a face button for attack', () => {
       expect(p.attack.length).toBeGreaterThan(0)
     })
-    it('still offers a pause button', () => {
-      expect(p.pause.length).toBeGreaterThan(0)
+    it('puts pause on Start (9) and fire on L2 (6), same as standard', () => {
+      expect(p.pause).toEqual([9])
+      expect(p.attack).toContain(6)
     })
     it('also maps throw and weapon-cycle (best-guess, needs a real-device check)', () => {
       expect(p.throw.length).toBeGreaterThan(0)

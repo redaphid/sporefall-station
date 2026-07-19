@@ -6,6 +6,11 @@
 
 export type EffectsQuality = 'off' | 'low' | 'high'
 
+/** Backbuffer shader pipeline budget: 'full' = distortion + feedback trails +
+ * fractal flourishes, 'reduced' = distortion only (no feedback/fractals),
+ * 'off' = direct render, pipeline bypassed entirely. */
+export type ShaderFxMode = 'full' | 'reduced' | 'off'
+
 export interface GameSettings {
   /** Master switch for vibration. Phone-only; a no-op on web/desktop anyway. */
   hapticsEnabled: boolean
@@ -13,6 +18,8 @@ export interface GameSettings {
   hapticsIntensity: number
   /** Visual juice budget: 'off' for low-end devices, 'high' for GPU filters. */
   effectsQuality: EffectsQuality
+  /** Backbuffer weapon-FX pipeline budget (see render/backbuffer.ts). */
+  shaderFx: ShaderFxMode
   /** Active visual theme id (public/themes/<id>/). Pure presentation — never
    * touches the sim; peers in a net game may each use a different theme. */
   theme: string
@@ -24,10 +31,12 @@ export const defaultSettings = (): GameSettings => ({
   hapticsEnabled: true,
   hapticsIntensity: 0.7,
   effectsQuality: 'high',
+  shaderFx: 'full',
   theme: 'city',
 })
 
 const QUALITIES: readonly EffectsQuality[] = ['off', 'low', 'high']
+const FX_MODES: readonly ShaderFxMode[] = ['full', 'reduced', 'off']
 
 /** Mirrors theme.ts isValidThemeId without importing the render layer. */
 const THEME_ID_RE = /^[a-z0-9][a-z0-9-]*$/
@@ -49,6 +58,7 @@ export const clampSettings = (raw: unknown): GameSettings => {
     effectsQuality: QUALITIES.includes(r.effectsQuality as EffectsQuality)
       ? (r.effectsQuality as EffectsQuality)
       : base.effectsQuality,
+    shaderFx: FX_MODES.includes(r.shaderFx as ShaderFxMode) ? (r.shaderFx as ShaderFxMode) : base.shaderFx,
     theme:
       typeof r.theme === 'string' && r.theme.length <= 64 && THEME_ID_RE.test(r.theme)
         ? r.theme

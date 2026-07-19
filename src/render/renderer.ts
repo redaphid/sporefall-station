@@ -2,9 +2,11 @@ import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Text
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
-import { loadSettings } from '../app/settings'
+import { loadSettings, type ShaderFxMode } from '../app/settings'
 import { createArt, TILE_PX, type ArtRegistry } from './art'
+import { BackbufferPipeline } from './backbuffer'
 import { BulletLayer } from './bullets'
+import { DistortionPool, packPrims, specsForEvents, sustainedSpecs, type UvProjector } from './distortion'
 import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from './theme'
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
 import { setActiveThemeChain } from './themeState'
@@ -171,8 +173,51 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       pickToastText.position.set(ui.toast.x * TILE_PX, (ui.toast.y - 0.85) * TILE_PX)
     }
   }
+  // The pick layer lives INSIDE `world`: it is world-space affordance art, so
+  // it rides the camera transform and (deliberately) the distortion field too.
   world.addChild(tilemap.root, entities.root, bullets.root, effects.root, reticleLayer, pickLayer)
-  app.stage.addChild(world)
+
+  // --- Backbuffer weapon-FX pipeline (backbuffer.ts). The world lives inside
+  // `sceneRoot`; the pipeline either composites it through the distortion
+  // shader (scene -> RT -> one full-screen pass, prev frame retained for
+  // feedback) or, in 'off'/failure modes, mounts it straight on the stage.
+  // `sceneBg` matters only when piped: the RT clears transparent, so the
+  // theme's canvas colour must ride along inside the scene pass.
+  // `?fx=` (dev, session-only) overrides the persisted Shader FX setting;
+  // `?fxscale=` tunes the composite's render scale (phone GPU headroom).
+  const sceneRoot = new Container()
+  const sceneBg = new Sprite(Texture.WHITE)
+  sceneBg.tint = DEFAULT_BACKGROUND
+  sceneBg.eventMode = 'none'
+  sceneRoot.addChild(sceneBg, world)
+  const urlFx = ((): ShaderFxMode | undefined => {
+    const raw = new URLSearchParams(location.search).get('fx')
+    return raw === 'full' || raw === 'reduced' || raw === 'off' ? raw : undefined
+  })()
+  const fxScale = ((): number | undefined => {
+    const raw = Number(new URLSearchParams(location.search).get('fxscale'))
+    return Number.isFinite(raw) && raw > 0 ? raw : undefined
+  })()
+  const pipeline = new BackbufferPipeline(app.renderer, sceneRoot, {
+    mode: urlFx ?? loadSettings().shaderFx,
+    scale: fxScale,
+  })
+  const distortion = new DistortionPool()
+  app.stage.addChild(pipeline.view)
+  // Read-only pipeline introspection for e2e/perf harnesses: proves the
+  // composite path is genuinely live (vs silently fallen back) in a real
+  // browser. Tiny, side-effect-free, and present in every build like __world.
+  ;(window as unknown as { __fx?: unknown }).__fx = {
+    get mode() {
+      return pipeline.getMode()
+    },
+    get active() {
+      return pipeline.active
+    },
+    get failed() {
+      return pipeline.failed
+    },
+  }
 
   let reticleList: readonly { x: number; y: number }[] = []
   const makeReticle = (): Graphics => {
@@ -197,6 +242,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const applyThemePalette = (c: ThemeChain): void => {
     const p = resolvePalette(c)
     app.renderer.background.color = p.background ?? DEFAULT_BACKGROUND
+    sceneBg.tint = p.background ?? DEFAULT_BACKGROUND
+    // The fractal pass stays palette-coherent: its tint ramp derives from the
+    // active theme's background + accent, not hardcoded hues.
+    pipeline.setPalette(p.background ?? DEFAULT_BACKGROUND, p.uiAccent ?? 0xffe066)
     tilemap.root.tint = p.floorTint ?? 0xffffff
     if (p.uiAccent !== undefined)
       document.documentElement.style.setProperty('--theme-accent', `#${p.uiAccent.toString(16).padStart(6, '0')}`)
@@ -265,6 +314,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       const prevTheme = settings.theme
       settings = s
       if (s.theme !== prevTheme) void setTheme(s.theme)
+      // A `?fx=` URL override pins the mode for the session; otherwise the
+      // panel's Shader FX choice applies live (and persists via settings.ts).
+      pipeline.setMode(urlFx ?? s.shaderFx)
     },
     themeList,
   ).settings()
@@ -348,6 +400,12 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         }
         sound.handle(view.events)
         haptics.handle(view.events, view.self)
+        // Distortion primitives (backbuffer pipeline): expire, then spawn from
+        // this tick's events and refresh the sustained (fire-cell / deep-stack
+        // round) prims. Pool-capped; pure functions of the tick + world state.
+        distortion.update(view.tick)
+        for (const spec of specsForEvents(view.events, view.tick)) distortion.spawn(spec, view.tick)
+        for (const spec of sustainedSpecs(view.entities)) distortion.spawn(spec, view.tick)
       }
 
       // Hitstop: hold the actors still for a few frames on a weighty impact for a
@@ -365,6 +423,39 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
       tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)
+
+      // --- Backbuffer composite: pack the live distortion prims into the
+      // shader's uniform arrays (screen-uv space via the REAL world transform —
+      // no duplicated camera math) and run the scene->composite passes. When
+      // the pipeline is off/failed this whole block reduces to a cheap no-op.
+      if (pipeline.active) {
+        const sw2 = app.screen.width
+        const sh2 = app.screen.height
+        sceneBg.setSize(sw2, sh2)
+        // Screen px per world tile, read off the live transform (shake included).
+        const o0 = world.toGlobal({ x: 0, y: 0 })
+        const o1 = world.toGlobal({ x: TILE_PX, y: 0 })
+        const pxPerTile = Math.hypot(o1.x - o0.x, o1.y - o0.y)
+        const proj: UvProjector = {
+          toUv: (x, y) => {
+            const p = world.toGlobal({ x: x * TILE_PX, y: y * TILE_PX })
+            return { x: p.x / sw2, y: p.y / sh2 }
+          },
+          radiusToUv: (r) => (r * pxPerTile) / sh2,
+        }
+        // Exit-portal idle flourish: anchored on the level's exit tile.
+        if (currentLevel) {
+          const e = proj.toUv(currentLevel.exit.x + 0.5, currentLevel.exit.y + 0.5)
+          pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))
+        } else {
+          pipeline.clearPortal()
+        }
+        const count = packPrims(distortion, view.tick + alpha, proj, pipeline.primA, pipeline.primB)
+        pipeline.render(view.tick + alpha, count)
+      } else {
+        pipeline.render(view.tick + alpha, 0) // keeps the direct path mounted
+        sceneBg.setSize(app.screen.width, app.screen.height)
+      }
 
       // --- Screen post: damage/low-health vignette + element wash + grade.
       vignette = decayVignette(vignette, dt)

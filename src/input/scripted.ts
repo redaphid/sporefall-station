@@ -57,6 +57,18 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
 // scenario (spawn 1.5,1.5; lane y=11; medkit x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
+  // Pluggable-NPC-AI showcase (scenario `npc-ai`, stage centre 32,32): stand
+  // among the cast, sucker-punch the civilian (skittish → alert), then flee
+  // west and duck north behind the L-wall so the hunter loses the trail and
+  // sweeps. The rest of the clip watches the behaviors play out.
+  'npc-ai': [
+    { ticks: 40 }, // establish: patrol walks its beat, scavenger heads for loot
+    { ticks: 12, attack: true }, // punch the civilian east of us (a crime!)
+    { ticks: 60, x: -1 }, // flee west along the lane, hunter in pursuit
+    { ticks: 54, y: -1 }, // cut north past the wall's open west end
+    { ticks: 12, x: 1 }, // tuck into the pocket behind the L-wall
+    { ticks: 330 }, // hide: alert lands, hunter sweeps, scavenger cleans up
+  ],
   demo: [
     { ticks: 50 }, // settle on spawn
     { ticks: 64, y: 1 }, // drop down into the plaza lane

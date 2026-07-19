@@ -203,6 +203,25 @@ describe('hunter', () => {
     void lastSeen
   })
 
+  it('wedged on a concave wall corner it declares the trail cold instead of pushing forever', () => {
+    const { w, player, hunter } = hunterScene()
+    run(w, 12)
+    expect(hunter.ai!.mode).toBe('aggro')
+    // An L-wall between the hunter and the remembered spot: straight-line
+    // steering wedges on the inside corner (there is no pathfinder).
+    for (let y = 16; y <= 21; y++) wall(w, 12, y)
+    for (let x = 8; x <= 12; x++) wall(w, x, 21)
+    player.pos = { x: 10.5, y: 18.5 } // unseen, behind the L
+    player.prevPos = { x: 10.5, y: 18.5 }
+    hunter.ai!.lastKnownTargetPos = { x: 10.5, y: 18.5 }
+    run(w, 400)
+    // The stall detector broke the wedge: it is no longer grinding at the wall
+    // chasing a memory — it swept (or gave up) and its state says so.
+    expect(hunter.ai!.lastKnownTargetPos).toBeUndefined()
+    expect(['search', 'wander', 'battle', 'pursue']).toContain(hunter.ai!.goal)
+    expect(Number.isFinite(hunter.pos.x)).toBe(true)
+  })
+
   it('survives its quarry despawning mid-hunt', () => {
     const { w, player, hunter } = hunterScene()
     run(w, 12)

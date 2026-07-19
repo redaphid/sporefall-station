@@ -78,6 +78,10 @@ export interface AiState {
   fearId?: EntityId
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
+  /** Where/when this NPC last made real progress toward an UNSEEN chase goal —
+   * steering is straight-line (no pathfinder), so a concave wall can wedge a
+   * pursuer; stalling too long declares the trail cold instead. */
+  progress?: { x: number; y: number; tick: number }
   /** Scavenger: item ids collected so far — a legible loot trail. */
   stash?: string[]
 }

@@ -25,6 +25,11 @@ const ALERT_REACH = 1.4
 const SCAVENGE_REACH = 0.55
 /** Goal codes whose adoption (or abandonment) is worth a world event. */
 const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
+/** Ticks of no movement progress toward an unseen chase goal before the trail
+ * is declared cold (steering is straight-line; concave walls can wedge it). */
+const STALL_TICKS = 45
+/** Movement below this distance across STALL_TICKS counts as no progress. */
+const STALL_DIST = 0.5
 
 export const aiSystem = (w: World): void => {
   for (const e of w.entities) {
@@ -211,6 +216,17 @@ const steer = (w: World, e: Entity): void => {
       if (e.combat && e.combat.cooldown <= 0) fireWeapon(w, e) // shared melee swing
       return
     }
+    if (seen) {
+      ai.progress = undefined // live pursuit — stall bookkeeping is for cold trails
+    } else if (!ai.progress || Math.hypot(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
+      ai.progress = { x: e.pos.x, y: e.pos.y, tick: w.tick } // moved — mark fresh progress
+    } else if (w.tick - ai.progress.tick > STALL_TICKS) {
+      // Wedged against geometry chasing a memory: declare the trail cold so the
+      // behavior can move on (a hunter opens its sweep, basic gives up).
+      ai.lastKnownTargetPos = undefined
+      ai.progress = undefined
+      return
+    }
     if (dist > 0.2) {
       e.intent.x = dx / dist
       e.intent.y = dy / dist
@@ -218,6 +234,7 @@ const steer = (w: World, e: Entity): void => {
     } else {
       // Reached last known position with no target in sight
       ai.lastKnownTargetPos = undefined
+      ai.progress = undefined
     }
     return
   }

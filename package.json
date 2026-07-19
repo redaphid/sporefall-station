@@ -30,6 +30,7 @@
     "test:e2e:items": "bash e2e/run-items.sh",
     "test:e2e:rel": "bash e2e/run-rel.sh",
     "test:e2e:ai": "bash e2e/run-ai.sh",
+    "test:e2e:npc-ai": "bash e2e/run-npc-ai.sh",
     "test:e2e:obj": "bash e2e/run-obj.sh",
     "e2e:features": "bash e2e/run-features.sh",
     "e2e:comm-ui": "bash e2e/run-comm-ui.sh",

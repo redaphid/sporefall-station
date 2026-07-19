@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gate the rotoscoped walk-cycle frames before they ship.
 
-Three layers, exit code = number of failures (CI-gate style):
+Four layers, exit code = number of failures (CI-gate style):
 
 1. DETERMINISTIC (no GPU): every frame is 48x48, hard alpha (0|255), every
    opaque pixel is in the locked theme palette, feet touch the bottom rows,
@@ -10,12 +10,22 @@ Three layers, exit code = number of failures (CI-gate style):
    between adjacent frames (cyclic). A frame whose delta spikes far above the
    direction's median is AI-tracing flicker — the failure mode that kills the
    rotoscoped read. Also fails if the mean delta itself is huge.
-3. VLM (Ollama qwen3-vl, majority vote — reuses scripts/assets/verify.py):
+3. IDENTITY (no GPU): is this cycle the SAME CHARACTER as the curated art?
+   Delegates to scripts/assets/consistency.py — the single source of the
+   silhouette metrics and the committed per-character spec. Layers 1 and 2
+   only ever looked WITHIN the cycle, so a perfectly coherent, perfectly
+   palette-clean cycle of a *different, slimmer, gear-less* character passed
+   them cleanly and shipped (the r1 vine-ranger walk: head_h 6 vs the idle's
+   27, mass -35%; the player changed physique the instant they walked). One
+   harness, not two: consistency.py owns the metrics, this layer runs them at
+   the same moment the cycle is gated, and src/render/charConsistency.test.ts
+   is the standing tripwire over the same spec file.
+4. VLM (Ollama qwen3-vl, majority vote — reuses scripts/assets/verify.py):
    facing convention per frame (n/ne: no face; e: profile; s: not away) and a
    same-character contract between the two contact poses (frames 0 and 4).
 
   python3 gate.py                      # gate the shipped theme frames
-  python3 gate.py --no-vlm             # deterministic + coherence only
+  python3 gate.py --no-vlm             # deterministic + coherence + identity
   python3 gate.py --dirs e,s           # subset
 Env: CHAR (vine-ranger), OUTDIR (public/themes/swampspace/chars), OLLAMA, VOTES.
 """
@@ -29,6 +39,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.dirname(HERE)
 sys.path.insert(0, ASSETS)
 
+import consistency as C   # noqa: E402
 import generate as G      # noqa: E402
 import verify as V        # noqa: E402
 from palette import RGB   # noqa: E402
@@ -134,6 +145,21 @@ def coherence(dirs, spike=3.0, mean_cap=0.88, hist_cap=0.45):
     return fails
 
 
+def identity():
+    """Does the shipped cycle read as the SAME CHARACTER as the curated art?
+
+    Delegates wholesale to consistency.py against the committed spec — this
+    gate deliberately owns NO metric definitions of its own, so the rotoscope
+    pipeline and the standing vitest tripwire can never drift apart on what
+    "the same character" means. Whole-character by nature (the walk family is
+    compared to the character's reference POSE), so it ignores --dirs.
+    """
+    # consistency.py reads the theme chars dir; honour this gate's OUTDIR so a
+    # staged/scratch run gates the frames it actually produced.
+    C.CHARS_DIR = OUTDIR
+    return C.check(C.collect(CHAR), C.load_spec())
+
+
 def vlm(dirs):
     fails = []
     maj = V.VOTES // 2 + 1
@@ -171,6 +197,9 @@ if __name__ == "__main__":
     c = coherence(dirs)
     print(f"[coherence] {len(c)} failures")
     fails += c
+    i = identity()
+    print(f"[identity] {len(i)} failures")
+    fails += i
     if "--no-vlm" not in args:
         v = vlm(dirs)
         print(f"[vlm] {len(v)} failures")

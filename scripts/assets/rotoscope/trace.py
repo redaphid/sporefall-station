@@ -37,7 +37,13 @@ WHITE = os.path.join(STAGE, "white")
 TRACED = os.path.join(STAGE, "traced")
 CHAR = os.environ.get("CHAR", "vine-ranger")
 OUTDIR = os.environ.get("OUTDIR", os.path.join(G.THEME, "chars"))
-DENOISE = float(os.environ.get("DENOISE", "0.35"))
+# r1 traced at 0.35: enough to restyle the surface, NOT enough to put the
+# ranger's gear back on a proxy that was not wearing any — the shipped cycle
+# read as a gear-less character. The silhouette is pinned by the Blender alpha
+# in post_frame (diffusion cannot move it), so denoise here only buys surface
+# detail and is safe to push: 0.48 restores plating/vine/harness while the
+# init image still holds pose and color regions.
+DENOISE = float(os.environ.get("DENOISE", "0.48"))
 SEED = int(os.environ.get("SEED", "414977"))
 # Tag isolates this run's ComfyUI output prefixes: harvest_history matches
 # by prefix, and a retrace after a motion-source change must never pick up
@@ -49,8 +55,13 @@ DIRS = ["s", "se", "e", "ne", "n"]
 FRAMES = list(range(8))
 # IPAdapter weight per direction (from the pack playbook: away-facing poses
 # drop the anchor weight so the anchor's front view can't fight the pose —
-# here pose is nailed by the init image, but face bleed-through still applies)
-IPW = {"s": 0.8, "se": 0.7, "e": 0.55, "ne": 0.5, "n": 0.5}
+# here pose is nailed by the init image, but face bleed-through still applies).
+# Raised from r1's {0.8 0.7 0.55 0.5 0.5}: the anchor IS the identity contract
+# (the curated s-idle), and r1 leaned too little on it to restore the ranger's
+# gear. Front quarters take the bigger lift; n/ne stay lower because the
+# anchor is a FRONT view and over-weighting it bleeds a visor onto a back
+# view — which gate.py's VLM face check and the accent gate both fail on.
+IPW = {"s": 0.95, "se": 0.85, "e": 0.7, "ne": 0.6, "n": 0.55}
 DIR_NEG = {
     "e": "facing the viewer, front view, symmetrical face",
     "ne": "face, eyes, mouth, facing the viewer, front view",
@@ -168,9 +179,17 @@ def trace(dirs, frames):
         raise TimeoutError(f"still pending: {sorted(pending.values())}")
 
 
-def union_window(dirs, frames, pad=18):
+def union_window(dirs, frames, pad=4):
     """One crop window (from the BLENDER frames' alpha) shared by every frame:
-    frame-to-frame scale/position stay rigid, feet bob stays real."""
+    frame-to-frame scale/position stay rigid, feet bob stays real.
+
+    `pad` is dead margin INSIDE the 46-row content budget, so it costs standing
+    height on every frame: at pad=18 the cycle measured 41px against the
+    curated idle's 44 (exactly the family tolerance, no margin). The window is
+    taken at alpha>24 while post_frame masks at alpha>100, so the bbox is
+    already a hair looser than the content — a small pad is enough and buys
+    ~2px of height back. Note the pad does NOT affect the AI trace, which runs
+    on the full-res white composite; this window only drives the downscale."""
     import numpy as np
     x0 = y0 = 10**9
     x1 = y1 = -1

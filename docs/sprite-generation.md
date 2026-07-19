@@ -274,10 +274,19 @@ block, mass) against the character's reference pose, with looser tolerances
 (`FAMILY_TOL`: height ±3 px, head ±4 px, mass ±25%). This catches the failure
 that matters — *a walk cycle that is a slimmer or gear-less character than the
 idle, so the player changes shape the moment they move* — and reports it once
-per family instead of once per frame. The rotoscope pipeline's own
-`scripts/assets/rotoscope/gate.py` checks consistency WITHIN a cycle (no scale
-pumping); it cannot see this, because nothing there compares the cycle to the
-character's curated idle. That comparison is this harness's job.
+per family instead of once per frame.
+
+**One harness, not two.** `scripts/assets/rotoscope/gate.py` layers 1-2 only
+ever look WITHIN a cycle (coherence, palette, alpha, feet, no scale pumping),
+so a perfectly coherent cycle *of the wrong character* passed them cleanly and
+shipped — that is exactly how the r1 vine-ranger walk (head_h 6 vs the idle's
+27, mass −35%) reached `main`. `gate.py` therefore has an **identity layer**
+that calls `consistency.check(consistency.collect(CHAR), load_spec())`
+directly. It defines no metrics of its own: `consistency.py` owns them, the
+rotoscope gate runs them at the moment a cycle is gated, and
+`src/render/charConsistency.test.ts` is the standing tripwire over the same
+spec file. Loosening `FAMILY_TOL` to make a cycle pass defeats all three at
+once — fix the motion source instead (§6, stage 1).
 
 This is a **standing check**: `src/render/charConsistency.test.ts` re-implements
 the same metrics (self-contained PNG decode, mirrored constants) and fails the
@@ -312,6 +321,35 @@ color-blocked as the character (teal suit, orange cap, visor, boots) because
 at low denoise the tracer keeps color regions — that's what keeps every frame
 the same character.
 
+> **The proxy silhouette IS the identity contract — match it to the curated
+> art before rendering.** `post_frame` masks the traced RGB with the *Blender*
+> alpha, so the proxy's outline, not diffusion, decides the shipped
+> silhouette: whatever build the proxy has is the build the player gets.
+> Version 1 of the ranger proxy was a generic lithe humanoid (width/height
+> 0.28, long legs, a bare neck under a small head) while the curated ranger is
+> a geared figure (0.455, short-legged, helmet sitting straight on the
+> collar). The cycle gated green on coherence and shipped — and the player
+> visibly changed physique the instant they walked.
+>
+> Derive the proxy's proportions from the curated `s-idle`'s row profile
+> (`python3 consistency.py <char>`, or read occupancy per row) as **fractions
+> of standing height**, and reproduce them:
+>
+> | band | ranger | why it matters |
+> |---|---|---|
+> | 0.00-0.19 | helmet, ~0.59 of the shoulder peak | must clear the 55% head-block cut |
+> | 0.20-0.39 | shoulders/chest, **peak** width | pauldrons + pack, sets width/height |
+> | 0.41-0.55 | waist then hip/belt flare | keeps the occupancy run unbroken |
+> | 0.57-1.00 | legs, ~0.45 of peak | well under the cut, so `head_h` breaks cleanly at the crotch |
+>
+> The two traps, both of which bit r1: a **bare neck** notches occupancy below
+> the cut and collapses `head_h` (27 → 3), and **default humanoid leg length**
+> (0.56 of height vs the ranger's 0.39) makes a short-torsoed, slim read.
+> Gear the proxy — pauldrons, collar, chest rig, backpack, belt pouches, knee
+> plates, thicker limbs — until `python3 consistency.py --check` passes on the
+> `--no-trace` output. That loop needs **no GPU** and is the cheap way to
+> converge: render, `trace.py --no-trace`, measure, adjust.
+
 It renders on the `soul` box: a **Windows** Blender 5.x driven headless from
 WSL over ssh. The exact invocation (`render.sh` does all of this):
 
@@ -332,9 +370,16 @@ facing convention (west is engine-mirrored, never drawn).
 
 ### Stage 2 — AI tracer (`trace.py`)
 
-Each frame goes through ComfyUI **img2img at denoise 0.35** with the
-character's curated s-idle as IPAdapter anchor (per-direction weights from
-§4.5), same seed for all 40 frames. Model: SDXL + pixel-art LoRA by default;
+Each frame goes through ComfyUI **img2img at denoise 0.48** with the
+character's curated s-idle as IPAdapter anchor (per-direction weights
+`s .95 / se .85 / e .70 / ne .60 / n .55`), same seed for all 40 frames.
+Because the silhouette is pinned by the Blender alpha downstream, denoise here
+can only change *surface*, never build — so it is safe to push, and pushing it
+is what puts the ranger's plating, harness and vine detail back on (r1's 0.35
+with anchor weights ~0.5-0.8 restyled the surface but left a gear-less
+character). Back quarters keep the lower anchor weights on purpose: the anchor
+is a FRONT view, and over-weighting it bleeds a visor onto a back view, which
+the VLM face check and the accent gate both fail. Model: SDXL + pixel-art LoRA by default;
 the shipped vine-ranger cycle was traced on the documented low-VRAM fallback
 (`CKPT=dreamshaper_8.safetensors LORA= SIZE=512`) because resident VLM models
 had squeezed the shared GPU into offload mode (5 s vs 200 s per frame) — at
@@ -360,8 +405,10 @@ re-tune.
 every pixel in the locked palette, feet on the bottom rows, no content-height
 pumping across the cycle), a coherence metric (fraction of changed pixels
 between adjacent frames — a spike over 3× the direction's median is tracing
-flicker), and the qwen3-vl gates (facing per frame, same-character contract
-between the two contact poses). `manifest.py` then emits the
+flicker), an **identity layer** that delegates to `consistency.py` so the cycle
+must read as the same character as the curated idle (§5b — this is the layer
+that would have stopped r1), and the qwen3-vl gates (facing per frame,
+same-character contract between the two contact poses). `manifest.py` then emits the
 `char.<arch>.<dir>-walk-0..7` clips plus `anim.walk` cadence (4 ticks/frame:
 8-frame stride ≈ 1.07 s; the engine-default 6 was tuned for the 2-frame flip).
 Legacy `idle`/`step` keys stay as the fallback for states/directions without

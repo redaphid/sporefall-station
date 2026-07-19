@@ -77,6 +77,13 @@ export interface PinchTracker {
   /** Consumed touches must never emit stick/aim input. */
   consumed(id: number): boolean
   pinchActive(): boolean
+  /**
+   * Forget every tracked touch and any active pinch. For when the touch layer
+   * is hidden mid-gesture (controller takeover): its pointerup events will
+   * never arrive, and a half-tracked ghost finger must not pair with a real
+   * one into a phantom pinch after the controls come back.
+   */
+  reset(): void
 }
 
 export const createPinchTracker = (): PinchTracker => {
@@ -142,5 +149,11 @@ export const createPinchTracker = (): PinchTracker => {
 
     consumed: (id) => touches.get(id)?.consumed ?? false,
     pinchActive: () => pinch !== null,
+    reset(): void {
+      touches.clear()
+      pinch = null
+      // lastTapT intentionally survives: a double-tap-to-reset straddling a
+      // hide/show would just fail to reset zoom, which is harmless either way.
+    },
   }
 }

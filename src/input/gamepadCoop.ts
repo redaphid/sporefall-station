@@ -61,10 +61,9 @@ export const cycleHotbar = (inv: ItemStack[], activeSlot: number, dir: 1 | -1): 
   return slots[next].index
 }
 
-/** Is a controller actually driving the game? True once at least one pad has
- * press-to-joined a player slot (a merely-connected-but-unjoined pad doesn't
- * count). Drives hiding the on-screen touch controls. Pure + exported so the
- * show/hide decision is unit-testable apart from the DOM. */
+/** Is any pad press-to-joined into a player slot? (A merely-connected-but-
+ * unjoined pad doesn't count.) One input to the touch-controls show/hide
+ * policy — the full rule matrix lives in stickVisibility.ts. */
 export const anyPadActive = (pads: readonly CoopDebugPad[]): boolean => pads.some((p) => p.slot !== null)
 
 export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads?.() ?? []) => {

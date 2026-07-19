@@ -190,6 +190,13 @@ const run = async () => {
   resetRow === 'A · RB · L2 · R2' ? ok('Reset to defaults restores the rows') : fail(`after reset attack row is '${resetRow}'`)
   await page.click(gear)
   await settle(600)
+  // The no-pads dance above disconnected the pad, so it is UNJOINED now: the
+  // first A press is spent on joining (inert until released — the join rule).
+  // Release, then a fresh press must fire on the restored defaults.
+  await setPad({ pressed: [0] })
+  await settle()
+  await setPad({})
+  await settle(400)
   await setPad({ pressed: [0] })
   await settle(600)
   const aRestored = await projectiles()

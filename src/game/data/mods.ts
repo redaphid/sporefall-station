@@ -187,3 +187,25 @@ export const isModId = (id: string): id is keyof typeof MODS => Object.prototype
 
 /** The cap for a mod id (its own `maxStacks`, else the default). */
 export const modMaxStacks = (id: string): number => MODS[id]?.maxStacks ?? DEFAULT_MAX_STACKS
+
+/** Canonicalize a mod list: drop unknown ids and non-positive stacks, floor and
+ * cap stack counts, sort by id. The ONE normal form for mod provenance carried
+ * on a projectile (entity + wire codec + renderer), so the same loadout is
+ * byte-identical however it was accumulated. Returns undefined when nothing
+ * survives, so callers can keep the field absent (snapshot-stable). */
+export const normalizeMods = (
+  mods: readonly { id: string; stacks: number }[] | undefined,
+): { id: string; stacks: number }[] | undefined => {
+  if (!mods || mods.length === 0) return undefined
+  const byId = new Map<string, number>()
+  for (const m of mods) {
+    if (!MODS[m.id] || !(m.stacks > 0)) continue
+    const stacks = Math.min(Math.floor(m.stacks), modMaxStacks(m.id))
+    if (stacks <= 0) continue
+    byId.set(m.id, Math.min((byId.get(m.id) ?? 0) + stacks, modMaxStacks(m.id)))
+  }
+  if (byId.size === 0) return undefined
+  return [...byId.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, stacks]) => ({ id, stacks }))
+}

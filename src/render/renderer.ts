@@ -4,6 +4,7 @@ import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
 import { loadSettings } from '../app/settings'
 import { createArt, type ArtRegistry } from './art'
+import { BulletLayer } from './bullets'
 import { resolvePalette, resolveThemeId, type ThemeChain } from './theme'
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
 import { setActiveThemeChain } from './themeState'
@@ -76,12 +77,16 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
     walkStep: (a) => inner.walkStep(a),
     flameFrames: () => inner.flameFrames(),
     effectFrames: (k) => inner.effectFrames(k),
+    bulletCore: () => inner.bulletCore(),
+    bulletGlow: () => inner.bulletGlow(),
+    themedBullet: () => inner.themedBullet(),
   }
   const world = new Container()
   const tilemap = new TilemapView()
   const entities = new EntityViews(art)
+  const bullets = new BulletLayer(art)
   const effects = new EffectsLayer(art)
-  world.addChild(tilemap.root, entities.root, effects.root)
+  world.addChild(tilemap.root, entities.root, bullets.root, effects.root)
   app.stage.addChild(world)
 
   const applyThemePalette = (c: ThemeChain): void => {
@@ -124,6 +129,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
     // layer re-pulls textures from the swapped registry on the next frame.
     if (currentLevel) tilemap.build(currentLevel, art)
     entities.refresh()
+    bullets.refresh()
   }
 
   const native = Capacitor.isNativePlatform()
@@ -217,6 +223,7 @@ export const createRenderer = async (mount: HTMLElement): Promise<GameRenderer> 
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
         entities.update(view.entities, alpha, view.tick)
+        bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)
       }
       camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)

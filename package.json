@@ -26,7 +26,6 @@
     "e2e:showcase": "node e2e/record-showcase.mjs",
     "test:e2e:theme": "bash e2e/run-theme.sh",
     "test:e2e:fire": "bash e2e/run-fire.sh",
-    "test:e2e:mission-ui": "bash e2e/run-mission-ui.sh",
     "test:e2e:weapons": "bash e2e/run-weapons.sh",
     "test:e2e:frost": "bash e2e/run-frost.sh",
     "test:e2e:items": "bash e2e/run-items.sh",

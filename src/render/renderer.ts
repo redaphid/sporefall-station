@@ -30,6 +30,8 @@ import { TilemapView } from './tilemap'
 
 /** Cold blue used to recolour frost (shatter/shock) sparks. */
 const FROST_TINT = 0x8fd0ff
+/** Pale steam-white for the stop-drop-and-roll burn-doused puff. */
+const STEAM_TINT = 0xe8f4f8
 
 export interface GameRenderer {
   app: Application
@@ -268,6 +270,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
             effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
           } else if (ev.type === 'shock') {
             effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
+          } else if (ev.type === 'burnDoused') {
+            // Stop-drop-and-roll steam puff: a pale quench flash where the burn
+            // was smothered, so the shortened/killed burn reads as CAUSED by the roll.
+            effects.spawn('hit', ev.x, ev.y, view.tick, STEAM_TINT)
           } else if (ev.type === 'pickup' || ev.type === 'modPickup') {
             const by = view.entities.find((e) => e.id === ev.byId)
             if (by) effects.spawn('pickup', by.pos.x, by.pos.y, view.tick)

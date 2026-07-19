@@ -191,15 +191,12 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // animated pan out/back → edge indicator beats.
   missionui: [{ ticks: 660 }],
 
-  // Mission-marker proof (marker-vs-render parity at the SE map corner): stand
-  // still while the e2e teleport-hops the player along the 🎯 marker toward the
-  // briefcase, walk the last stretch EAST onto it (real pickup), then hold. The
-  // long windows give the wall-clock Playwright acts deterministic sim room.
-  missionMarker: [
-    { ticks: 300 }, // spawn beat + hops land in here
-    { ticks: 25, x: 1 }, // the last metre: walk east onto the briefcase
-    { ticks: 275 }, // completion + exit-compass beats
-  ],
+  // Mission-marker proof (marker-vs-render parity at the SE map corner): the
+  // player stands still for the whole clip; every move is a debug-verb teleport
+  // hop sequenced by the e2e itself (never a fixed-tick walk — Playwright's
+  // wall-clock cost per still would race it). The pickup still runs the real
+  // autoPickup system: the final hop just lands inside pickup range.
+  missionMarker: [{ ticks: 400 }],
 
   // Mission-UI progress states: the `mission` walk to the briefcase, then a LONG
   // stand-still beat (600 ticks) so the e2e can open the panel and tap the exit

@@ -289,5 +289,21 @@
   "size": 512,
   "ckpt": "dreamshaper_8",
   "note": "i2i from re-picked idle"
+ },
+ "extra.chars/bog-mutant-s-attack-1.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-attack-1/char-bog-mutant-s-attack-1-r2-s414610_00003_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "extra.chars/bog-mutant-s-attack-2.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-attack-2/char-bog-mutant-s-attack-2-r2-s414610_00001_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "extra.chars/spore-drone-s-attack-1.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-1/char-spore-drone-s-attack-1-s414600_00003_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "extra.chars/spore-drone-s-attack-2.png": {
+  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-2/char-spore-drone-s-attack-2-s414600_00004_.png",
+  "note": "staged for animation-state system; NOT in manifest (schema pending)"
  }
 }

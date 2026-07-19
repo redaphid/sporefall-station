@@ -120,11 +120,18 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
 
     const result = assignPads(assignments, connected, joining)
     assignments = result.assignments
+    // The press that JOINS a pad is spent on joining: it must not double as a
+    // game action on the same sample. Start is both a join button and the pause
+    // button, so without this a player pressing Start to join instantly paused
+    // the game (and a face-button join fired an attack). Reading the joining
+    // pad as idle for THIS sample only — while still recording its real state
+    // into `last` below — keeps the held button from edge-firing later too.
+    const joinedNow = new Set(result.events.filter((e) => e.type === 'join').map((e) => e.padIndex))
 
     const inputs = new Map<number, InputCmd>()
     const pauses: number[] = []
     for (const [padIndex, slot] of assignments) {
-      const s = states.get(padIndex) ?? idle
+      const s = joinedNow.has(padIndex) ? idle : (states.get(padIndex) ?? idle)
       inputs.set(slot, toCmd(padIndex, slot, s))
       if (rose(padIndex, s, 'pause')) pauses.push(slot)
     }

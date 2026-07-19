@@ -152,18 +152,72 @@ describe('createGamepadCoop', () => {
     })
   })
 
-  describe('aim-to-fire parity: right stick fires attack', () => {
+  describe('firing is buttons only: L2 shoots, the aim stick never does', () => {
     beforeEach(() => {
       pads = [pad(0, { buttons: press(0) })]
       coop.sample()
     })
-    it('sets attack when the right stick deflects past the fire threshold, no button', () => {
-      pads = [pad(0, { axes: [0, 0, 0.9, 0] })]
+    it('holds attack while L2 (button 6) is down', () => {
+      pads = [pad(0, { buttons: press(6) })]
       expect(coop.sample().inputs.get(0)!.attack).toBe(true)
+    })
+    it('aims from the right stick without setting attack', () => {
+      pads = [pad(0, { axes: [0, 0, 0.9, 0] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.aimX).toBeCloseTo(0.9)
+      expect(cmd.attack).toBe(false)
     })
     it('leaves attack false for a centred right stick and no button', () => {
       pads = [pad(0)]
       expect(coop.sample().inputs.get(0)!.attack).toBe(false)
+    })
+    it('fires and aims together: L2 held with the stick deflected', () => {
+      const b: boolean[] = []
+      b[6] = true
+      pads = [pad(0, { buttons: b, axes: [0, 0, 0, -0.9] })]
+      const cmd = coop.sample().inputs.get(0)!
+      expect(cmd.attack).toBe(true)
+      expect(cmd.aimY).toBeCloseTo(-0.9)
+    })
+  })
+
+  /**
+   * The press that joins a pad is spent on joining. Start doubles as the pause
+   * button, so before this rule a player pressing Start to join instantly
+   * paused the game; a face-button join fired an attack for the same reason.
+   */
+  describe('the joining press is inert', () => {
+    it('does not pause when Start is the join press', () => {
+      pads = [pad(0, { buttons: press(9) })]
+      const r = coop.sample()
+      expect(r.joins).toContain(0)
+      expect(r.pauses).toHaveLength(0)
+    })
+    it('does not attack when A is the join press', () => {
+      pads = [pad(0, { buttons: press(0) })]
+      const r = coop.sample()
+      expect(r.joins).toContain(0)
+      expect(r.inputs.get(0)!.attack).toBe(false)
+    })
+    it('does not fire a pause edge from Start merely HELD since the join', () => {
+      pads = [pad(0, { buttons: press(9) })]
+      coop.sample()
+      pads = [pad(0, { buttons: press(9) })]
+      expect(coop.sample().pauses).toHaveLength(0)
+    })
+    it('pauses on a fresh Start press after release', () => {
+      pads = [pad(0, { buttons: press(9) })] // join
+      coop.sample()
+      pads = [pad(0)] // release
+      coop.sample()
+      pads = [pad(0, { buttons: press(9) })] // deliberate pause
+      expect(coop.sample().pauses).toContain(0)
+    })
+    it('attacks normally on the sample after an A-button join while still held', () => {
+      pads = [pad(0, { buttons: press(0) })]
+      coop.sample()
+      pads = [pad(0, { buttons: press(0) })]
+      expect(coop.sample().inputs.get(0)!.attack).toBe(true)
     })
   })
 
@@ -421,12 +475,21 @@ describe('createGamepadCoop', () => {
       coop.sample()
     })
 
-    it('feeds right-stick aim and the twin-stick attack through to the InputCmd', () => {
+    it('feeds right-stick aim through to the InputCmd without firing', () => {
       pads = [canonPad({ axes: [0, 0, 0.9, -0.8] })]
       const cmd = coop.sample().inputs.get(0)!
       expect(cmd.aimX).toBeCloseTo(0.9)
       expect(cmd.aimY).toBeCloseTo(-0.8)
+      expect(cmd.attack).toBe(false)
+    })
+
+    it('fires from L2 (canonical button 6) while aiming with the right stick', () => {
+      const b: boolean[] = []
+      b[6] = true
+      pads = [canonPad({ buttons: b, axes: [0, 0, 0.9, -0.8] })]
+      const cmd = coop.sample().inputs.get(0)!
       expect(cmd.attack).toBe(true)
+      expect(cmd.aimX).toBeCloseTo(0.9)
     })
 
     it('feeds d-pad movement from canonical buttons 12-15, where Chromium puts the hat', () => {

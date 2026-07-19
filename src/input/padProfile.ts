@@ -1,18 +1,24 @@
 /**
  * How to read one pad, resolved from its mapping + the SHAPE of its axes array.
- * Controllers report wildly different button orders, so every read goes through
- * a profile instead of hard-coded indices.
  *
- * Three profiles:
+ * There is ONE button map — the W3C standard layout, defined once in `BUTTONS`
+ * below. The three profiles differ only in how much of the pad's ANALOG data
+ * they are willing to trust:
+ *
  *   - standard  : `mapping === 'standard'`. The W3C layout, vouched for by the
  *                 browser. Xbox, PlayStation, and an 8bitdo Zero 2 in X-input
  *                 mode all land here, so X-input is the recommended Zero 2 mode.
  *   - canonical : `mapping === ''` but the pad is shaped like Chromium's Android
  *                 canonical mapper made it. Same indices as standard (see below).
  *   - raw       : `mapping === ''` and NOT that shape — a genuinely unmapped pad,
- *                 in practice desktop Linux/evdev. Indices are the driver's, so
- *                 they are a documented BEST GUESS; see the controllers overlay,
- *                 which shows live indices for a real-device check.
+ *                 in practice desktop Linux/evdev. The button indices are the
+ *                 driver's, so the shared map is a documented BEST GUESS there
+ *                 (the W3C order is as good a guess as any — it is the order
+ *                 browsers themselves map unknown pads into); the controllers
+ *                 overlay (F9 / ?pads=1) shows live indices for a real-device
+ *                 check. What raw must NOT do is trust analog axes it cannot
+ *                 prove: no aim stick (see `aimAxes`), and movement axes are
+ *                 read defensively (deadzone, hat-neutrality in readPad).
  *
  * ## Why `mapping === ''` does not mean "unmapped" on Android
  *
@@ -45,14 +51,10 @@
  * ## The known soft spot
  *
  * An axis count of 4 is necessary for the canonical shape but not, strictly,
- * sufficient: a genuinely raw pad that happened to expose exactly 4 axes with
- * triggers on 2/3 (a left stick + two analog triggers and no right stick) would
- * be read as canonical and could fire on its own. No such pad is known — a raw
- * pad with analog triggers virtually always exposes a right stick too, putting
- * it at 6+ axes — and the alternative defences are worse: sampling resting values
- * at connect time reads a lie (a trigger reports 0 until first touched and only
- * then rests at -1), and motion-gating each axis would put mutable state inside
- * an otherwise pure read. If such a pad ever turns up, gate `CANONICAL` on
+ * sufficient: a genuinely raw pad that happened to expose exactly 4 axes would
+ * be read as canonical and its axes 2/3 trusted as an aim stick. No such pad is
+ * known — a raw pad with analog triggers virtually always exposes a right stick
+ * too, putting it at 6+ axes. If one ever turns up, gate `CANONICAL` on
  * `buttons.length` too: Chromium's canonical mapper reports exactly 16 or 17
  * buttons (`getButtonsLength()` → `CanonicalButtonIndex.COUNT`, minus one when
  * the pad has no meta button), which a raw pad has no reason to match.
@@ -64,25 +66,25 @@ export interface PadProfile {
   attack: number[]
   interact: number[]
   special: number[]
-  /** Dodge-roll button(s) — the left shoulder/trigger, clear of attack/aim. */
+  /** Dodge-roll button (edge in gamepadCoop). */
   roll: number[]
   pause: number[]
-  /** Throw the held item / grenade (edge). A free button clear of attack/roll. */
+  /** Throw the held item / grenade (edge). */
   throw: number[]
-  /** Cycle to the previous / next hotbar weapon (edge). Two distinct free buttons;
-   * gamepadCoop turns the press into an absolute slot index. */
+  /** Cycle to the previous / next hotbar weapon (edge); gamepadCoop turns the
+   * press into an absolute slot index. */
   hotbarPrev: number[]
   hotbarNext: number[]
   join: number[]
   dpad: [number, number, number, number]
   moveAxes: [number, number]
   /** Right stick → aim (twin-stick), or null when we do not know which axes the
-   * aim stick is on. NEVER guess this: aim past AIM_FIRE also ATTACKS, so a wrong
-   * guess does not merely misaim, it fires forever. A raw pad's axes 2/3 are as
-   * likely to be analog triggers — which rest at -1, for hypot 1.41, well past the
-   * 0.5 threshold — as a right stick. null costs that pad twin-stick aim while
-   * aim-where-you-move and the attack button keep working; a bad guess costs the
-   * player the game with no recourse. */
+   * aim stick is on. NEVER guess this: a raw pad's axes 2/3 are as likely to be
+   * analog triggers — which rest at -1 once touched — as a right stick, and a
+   * resting trigger pair read as aim would pin the player's aim to a constant
+   * up-left with no recourse (selectAim prefers a deflected aim stick over the
+   * movement vector). null costs that pad twin-stick aim while aim-where-you-move
+   * and the fire buttons keep working. */
   aimAxes: [number, number] | null
   /** An 8-way hat squeezed onto one axis, as evdev surfaces it. Real on desktop
    * Linux; provably absent on Android (see the file header), so only `raw` has it. */
@@ -93,24 +95,44 @@ export interface PadProfile {
  * `new float[CanonicalAxisIndex.COUNT]`: LEFT_STICK_X/Y + RIGHT_STICK_X/Y. */
 const CANONICAL_AXIS_COUNT = 4
 
-const STANDARD: PadProfile = {
-  kind: 'standard',
-  attack: [0, 5, 7],
+/**
+ * THE button map (W3C standard indices). This is the single place button
+ * bindings live — every profile shares it.
+ *
+ *   0  A        attack
+ *   1  B        interact
+ *   2  X        special
+ *   3  Y        special
+ *   4  LB (L1)  dodge-roll
+ *   5  RB (R1)  attack
+ *   6  LT (L2)  attack  — the explicit fire trigger
+ *   7  RT (R2)  attack
+ *   8  Back     throw held item
+ *   9  Start    pause
+ *   10 L3       hotbar prev
+ *   11 R3       hotbar next
+ *   12-15 d-pad up/down/left/right (movement)
+ *
+ * Firing is BUTTONS ONLY (A / RB / L2 / R2, all held-to-fire); the aim stick
+ * aims and never fires. Join: any face button or Start press-to-joins an
+ * unassigned pad (gamepadCoop makes the joining press otherwise inert).
+ */
+const BUTTONS = {
+  attack: [0, 5, 6, 7],
   interact: [1],
   special: [2, 3],
-  roll: [4, 6], // LB / LT
+  roll: [4],
   pause: [9],
-  // Face buttons (0-3) and all four shoulders (4-7) are already bound above, so
-  // the newly-mapped verbs take the remaining free buttons on a W3C standard pad:
-  //   throw   → Back/Select (8)
-  //   cycle   → left-stick click L3 (10, prev) / right-stick click R3 (11, next)
-  // Stick-clicks aren't glamorous but they're the only conflict-free pair here;
-  // real-device tuning may prefer LB/RB, but those collide with roll/attack.
   throw: [8],
   hotbarPrev: [10],
   hotbarNext: [11],
   join: [0, 1, 2, 3, 9],
-  dpad: [12, 13, 14, 15],
+  dpad: [12, 13, 14, 15] as [number, number, number, number],
+}
+
+const STANDARD: PadProfile = {
+  kind: 'standard',
+  ...BUTTONS,
   moveAxes: [0, 1],
   aimAxes: [2, 3],
   hatAxis: null,
@@ -126,35 +148,20 @@ const STANDARD: PadProfile = {
 const CANONICAL: PadProfile = { ...STANDARD, kind: 'canonical' }
 
 /**
- * A genuinely unmapped pad. Every index here is a BEST GUESS and stays one — we
- * have no evidence about this pad's layout, so this profile deliberately keeps
- * the permissive button spread it always had rather than pretending a raw evdev
- * pad is W3C-shaped. The one thing it must not do is guess an aim stick.
+ * A genuinely unmapped pad (desktop Linux/evdev). Buttons use the same shared
+ * map — a best guess there, checkable live in the controllers overlay. The two
+ * differences are about analog trust:
+ *   - no aim stick (see PadProfile.aimAxes — not a guess we are allowed to make)
+ *   - a speculative one-axis hat on axis 9, real on desktop Linux and impossible
+ *     on Android. readPad treats a missing axis, a resting hat, and any
+ *     non-exact-state value as NO direction and lets the hat fill in only axes
+ *     the stick and d-pad leave centred, so the guess costs nothing when it is
+ *     wrong and wins a working d-pad when it is right.
  */
 const RAW: PadProfile = {
+  ...STANDARD,
   kind: 'raw',
-  attack: [0, 1],
-  interact: [2, 3],
-  special: [4, 5],
-  roll: [6, 7],
-  // Pause narrowed from the old greedy [8,9,10,11] guess to Start (9) — matching
-  // the standard profile — so 8/10/11 are free for the new verbs, laid out like
-  // standard: throw on 8, cycle on 10 (prev) / 11 (next). All BEST GUESS: the
-  // controllers overlay shows live indices for a real-device check.
-  pause: [9],
-  throw: [8],
-  hotbarPrev: [10],
-  hotbarNext: [11],
-  join: [0, 1, 2, 3, 4, 5],
-  dpad: [12, 13, 14, 15],
-  moveAxes: [0, 1],
-  // Not a guess we are allowed to make — see PadProfile.aimAxes.
   aimAxes: null,
-  // Kept, and kept only here: the one-axis hat is real on desktop Linux (a dev
-  // environment for this project) and cannot exist on Android. readPad treats a
-  // missing axis, a resting hat, and any non-exact-state value as NO direction
-  // and lets the hat fill in only axes the stick and d-pad leave centred, so the
-  // guess costs nothing when it is wrong and wins a working d-pad when it is right.
   hatAxis: 9,
 }
 

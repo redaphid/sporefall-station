@@ -1,14 +1,14 @@
 /** Below this stick deflection the aim stick is treated as centred. */
 export const AIM_DEADZONE = 0.15
 
-// Firing model: this is a twin-stick shooter — deflecting the aim stick past
-// this fraction both aims AND fires. Shared by touch (its SOLE attack path) and
-// the gamepad (attack = button OR this), so aiming shoots the same on both.
+// Touch firing model: deflecting the on-screen aim stick past this fraction
+// both aims AND fires — it is touch's SOLE attack path (a phone has no trigger).
+// Gamepads do NOT share this rule: they fire from buttons only (A/RB/L2/R2),
+// so an axis reading can never shoot on a pad.
 export const AIM_FIRE = 0.5
 
-/** Twin-stick fire rule: the aim stick past the fire threshold shoots. Pure +
- * exported so the fire path is unit-testable without the DOM, and reused by every
- * input source so the threshold matches. */
+/** Touch fire rule: the aim stick past the fire threshold shoots. Pure +
+ * exported so the fire path is unit-testable without the DOM. */
 export const aimFires = (aimX: number, aimY: number): boolean => Math.hypot(aimX, aimY) > AIM_FIRE
 
 export interface Aim {

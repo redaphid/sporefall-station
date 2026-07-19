@@ -1,7 +1,9 @@
 import { HostSession } from './app/hostSession'
+import { createInspect, installInspect, type Inspect } from './app/inspect'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
 import type { Session } from './app/session'
+import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
@@ -38,10 +40,6 @@ import { createOverlay } from './ui/overlay'
 import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
-// verbs.ts is already in the core bundle (serialize.ts imports serializeEntity from
-// it), so this static import adds nothing to the release size; the runVerb hooks it
-// backs are still only wired under ?e2e below.
-import { runVerb } from './debug/verbs'
 import { projectToScreen } from './ui/locatorModel'
 import { createDraftScreen } from './ui/draftScreen'
 import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
@@ -125,19 +123,46 @@ const boot = async (): Promise<void> => {
   }
   const zoom = Number(params.get('zoom'))
   if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
+  // The always-on AI inspection surface (docs/ai-inspection.md): `window.world`
+  // + `window.backseat` in EVERY build, including release. Reads are harmless
+  // (the world is plain serializable objects — the AI-native design) and let an
+  // agent driving the browser answer "what is happening right now?" against the
+  // deployed site with no debug-hub infrastructure. Mutation (`backseat.verb`)
+  // stays dev-gated: only `?debug`/`?e2e` enable it; otherwise it refuses with
+  // an explanation. All getters, so world replacement (?world=, load, restart)
+  // is tracked automatically.
+  const inspect = createInspect({
+    getWorld: () => ('world' in session ? (session as HostSession).world : undefined),
+    getView: () => session.renderView(),
+    sessionInfo: () => ({
+      mode,
+      paused: session.isPaused ?? false,
+      ...(session instanceof NetHostSession ? { peers: session.lobbyPlayers() } : {}),
+    }),
+    devWrites: params.has('debug') || params.has('e2e'),
+    version: APP_VERSION,
+    setTheme: (id) => void renderer.setTheme(id),
+  })
+  installInspect(inspect, window)
+  console.log(`backseat build ${APP_VERSION}: window.world + window.backseat.help() for inspection`)
+  // Legacy e2e hook names alias the canonical surface so existing tests keep
+  // working; `__world` is a getter for the same live world `window.world` serves.
+  const aliasWorldHook = (): void => {
+    Object.defineProperty(window, '__world', { configurable: true, get: () => inspect.ns.world })
+  }
   if (params.has('e2e')) {
     ;(window as unknown as { __sor: Session }).__sor = session
     if (session instanceof HostSession) {
       const hostWorld = session.world
       ;(window as unknown as { __debug: unknown }).__debug = createDebugApi(hostWorld)
-      ;(window as unknown as { __world: unknown }).__world = hostWorld
-      // Headless hook for the screenshot e2es: drive the real `annotate` /
-      // `clearAnnotations` verb path (same guards as the live debug channel) so a
-      // browser test can draw over the scene without a hub.
+      aliasWorldHook()
+      // Headless hooks for the screenshot e2es, now thin aliases over the
+      // canonical `window.backseat` surface: `backseat.verb` drives the same
+      // `runVerb` dispatcher (same guards as the live debug channel), and the
+      // `?e2e` flag satisfies its dev-write gate.
       ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
-        runVerb(hostWorld, `annotate ${line}`)
-      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) =>
-        runVerb(hostWorld, line, { setTheme: (id) => void renderer.setTheme(id) })
+        inspect.ns.verb('annotate', line)
+      ;(window as unknown as { __verb: (line: string) => string }).__verb = (line) => inspect.ns.verb(line)
       // Awaitable theme swap for e2e screenshot tests (the `theme` verb is
       // fire-and-forget; this resolves when the new assets are actually baked).
       ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
@@ -183,10 +208,16 @@ const boot = async (): Promise<void> => {
           levelW: hostWorld.level.w,
           levelH: hostWorld.level.h,
         })
+      // GROUND TRUTH projection: where the world container ACTUALLY drew a
+      // world point this frame (post edge-clamp + shake). e2es assert the DOM
+      // overlays (mission 🎯, locator) against THIS, so any drift between the
+      // overlay math and the render transform fails loudly.
+      ;(window as unknown as { __renderedProject: (wx: number, wy: number) => { x: number; y: number } }).__renderedProject =
+        (wx, wy) => renderer.worldToScreen(wx, wy)
     }
   }
   if (script && session instanceof HostSession) {
-    ;(window as unknown as { __world: unknown }).__world = session.world
+    aliasWorldHook()
     ;(window as unknown as { __scriptTicks: number }).__scriptTicks = scriptTicks(script)
   }
   // Live ECS debug harness (issue #29): only under `?debug`, only for sessions
@@ -206,7 +237,7 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
-  runLoop(session, renderer, uiMount, coop, touch, debug)
+  runLoop(session, renderer, uiMount, coop, inspect, touch, debug)
 }
 
 interface SessionDeps {
@@ -355,6 +386,7 @@ const runLoop = (
   renderer: GameRenderer,
   uiMount: HTMLElement,
   coop: ReturnType<typeof createGamepadCoop>,
+  inspect: Inspect,
   touch?: TouchInput,
   debug?: { afterTick(): void },
 ): void => {
@@ -428,10 +460,12 @@ const runLoop = (
     while (acc >= SIM_DT) {
       session.tick()
       debug?.afterTick() // stream this tick's events + drain queued debug mutations
+      inspect.afterTick() // buffer this tick's events for backseat.events()
       acc -= SIM_DT
     }
     const alpha = acc / SIM_DT
     const view = session.renderView()
+    inspect.frame(view) // cache the view for backseat reads (+ client event harvest)
     if (view.level !== currentLevel) {
       currentLevel = view.level
       renderer.setLevel(view.level)

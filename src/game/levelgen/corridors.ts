@@ -21,6 +21,9 @@ export interface CarvedPlan {
   doors: { x: number; y: number }[]
   /** Corridor floor rects (level coords) — patrol/waypoint friendly. */
   corridors: Rect[]
+  /** Where a mission objective belongs — always a ROOM, never a corridor
+   * segment: the loop's sealed core, or the far-end room off the spine. */
+  objectiveRoom: Rect
 }
 
 /** Minimal grid surface the carvers need; lets a transposed adapter reuse them. */
@@ -59,6 +62,7 @@ export const carveHallways = (rng: Rng, grid: TileGrid, rect: Rect, interior: Re
     rooms: plan.rooms.map(tRect),
     doors: plan.doors.map(tPoint),
     corridors: plan.corridors.map(tRect),
+    objectiveRoom: tRect(plan.objectiveRoom),
   }
 }
 
@@ -86,7 +90,10 @@ const carveStraight = (rng: Rng, g: GridView, rect: Rect, interior: Rect): Carve
   const botY = ky + cwid + 1
   splitSlabAlongX(rng, g, { x: interior.x, y: botY, w: interior.w, h: interior.y + interior.h - botY }, ky + cwid, rooms, doors)
   punchSpineEnds(rng, g, rect, ky, cwid, doors)
-  return { rooms, doors, corridors: [corridor] }
+  // Objective room: the far-end room of the lower slab (the last one carved) —
+  // an explicit designation, and always a real room off the spine.
+  const objectiveRoom = rooms.length > 1 ? rooms[rooms.length - 1] : corridor
+  return { rooms, doors, corridors: [corridor], objectiveRoom }
 }
 
 /** Straight spine plus a perpendicular spur to the far wall (L: spur near an
@@ -139,7 +146,10 @@ const carveBranch = (rng: Rng, g: GridView, rect: Rect, interior: Rect, tee: boo
   g.set(spurDoor.x, spurDoor.y, Tile.Floor)
   doors.push(spurDoor)
   punchSpineEnds(rng, g, rect, ky, cwid, doors)
-  return { rooms, doors, corridors: [main, spur] }
+  // Objective room: the far room beside the spur (last carved) — never the
+  // spine or spur corridors themselves.
+  const objectiveRoom = rooms.length > 2 ? rooms[rooms.length - 1] : main
+  return { rooms, doors, corridors: [main, spur], objectiveRoom }
 }
 
 /** Ring corridor: outer rooms all around, a sealed core inside the loop. */
@@ -207,7 +217,8 @@ const carveLoop = (rng: Rng, g: GridView, interior: Rect): CarvedPlan => {
   g.set(coreDoor.x, coreDoor.y, Tile.Floor)
   doors.push(coreDoor)
   rooms.push(core)
-  return { rooms, doors, corridors: ring }
+  // The sealed core inside the ring is the natural objective room.
+  return { rooms, doors, corridors: ring, objectiveRoom: core }
 }
 
 /** Perimeter walls of a rect (the rect itself, 1 tile thick). */

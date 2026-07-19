@@ -97,24 +97,23 @@ def build():
         else:
             print(f"  (missing, key omitted: {key} -> {rel})", file=sys.stderr)
 
-    # Tile variant pools (tile.<name> arrays) + rare accents, emitted from the
-    # files the tilesets pipeline actually produced (bd4bce's tile sets were
-    # hand-added to the manifest without teaching this script — regenerating
-    # silently dropped them; never let the manifest and this script diverge).
-    LEGACY_TILE = {"floor": "tiles/deck-moss.png", "wall": "tiles/root-bulkhead.png"}
-    for tname in ("street", "sidewalk", "floor", "wall", "grass", "exit"):
-        variants = []
-        while exists(f"tiles/{tname}-{len(variants)}.png"):
-            variants.append(f"tiles/{tname}-{len(variants)}.png")
-        if variants:
-            sprites[f"tile.{tname}"] = variants
-        elif tname in LEGACY_TILE:
-            put(f"tile.{tname}", LEGACY_TILE[tname])
-        accents = []
-        while exists(f"tiles/{tname}-accent-{len(accents)}.png"):
-            accents.append(f"tiles/{tname}-accent-{len(accents)}.png")
-        if accents:
-            sprites[f"tile.{tname}.accent"] = accents
+    # Tile pools: every tiles/<name>-N.png run (variants), tiles/<name>-accent-N.png
+    # (rare accents) and tiles/<name>-overlay-N.png (context-placed RGBA decals —
+    # see docs/themes.md "tile.<name>.overlay" and tileSelect.planTileOverlays).
+    def put_pool(key, pattern):
+        rels = []
+        n = 0
+        while exists(pattern.format(n)):
+            rels.append(pattern.format(n))
+            n += 1
+        if rels:
+            sprites[key] = rels
+        return len(rels)
+
+    for tile_name in ("street", "sidewalk", "floor", "wall", "grass", "exit"):
+        put_pool(f"tile.{tile_name}", f"tiles/{tile_name}-{{}}.png")
+        put_pool(f"tile.{tile_name}.accent", f"tiles/{tile_name}-accent-{{}}.png")
+        put_pool(f"tile.{tile_name}.overlay", f"tiles/{tile_name}-overlay-{{}}.png")
     # Character keys resolve *per key* against the theme chain, so any key we
     # omit falls back to CITY's art — a spore-drone cop facing south would turn
     # into a human cop when walking east. Mention every direction key
@@ -171,6 +170,11 @@ def build():
         "names": NAMES,
         "sprites": sprites,
         "anim": ANIM_SECTION,
+        # floor + street pools are sliced from 2x2-tile macro images
+        # (tilesets_floor.py); the renderer places slices by position so plate
+        # seams / ripple rings span tiles (docs/themes.md "macroTiles").
+        "macroTiles": {name: 2 for name in ("floor", "street")
+                       if len(sprites.get(f"tile.{name}", [])) >= 4},
     }
     out = os.path.join(THEME, "manifest.json")
     json.dump(manifest, open(out, "w"), indent=2)

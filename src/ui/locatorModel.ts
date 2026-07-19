@@ -1,10 +1,12 @@
 import { TILE_PX } from '../render/art'
+import { appliedCenter } from '../render/cameraModel'
 
 /**
  * Co-op teammate locator (issue #34). Pure geometry so it's fully unit-tested:
  * screens.ts feeds it the camera/screen state each frame and renders the DOM
- * overlays it returns. Mirrors the EXIT compass math (atan2 on the world delta,
- * rounded distance) — no pixi involvement, DOM markers only.
+ * overlays it returns (atan2 on the world delta, rounded distance) — no pixi
+ * involvement, DOM markers only. ALL objective/teammate indicators route
+ * through here; there is deliberately no other projection or compass path.
  */
 
 /** Stable per-slot caret colours; teammates keep the same hue all game.
@@ -66,14 +68,12 @@ const EDGE_MARGIN = 28
  */
 export const projectToScreen = (wx: number, wy: number, cam: CameraState): { x: number; y: number } => {
   const T = TILE_PX * cam.zoom
-  const halfW = cam.screenW / 2 / T
-  const halfH = cam.screenH / 2 / T
-  const cx = cam.levelW * T > cam.screenW ? clamp(cam.x, halfW, cam.levelW - halfW) : cam.levelW / 2
-  const cy = cam.levelH * T > cam.screenH ? clamp(cam.y, halfH, cam.levelH - halfH) : cam.levelH / 2
-  return { x: cam.screenW / 2 + (wx - cx) * T, y: cam.screenH / 2 + (wy - cy) * T }
+  // The APPLIED camera centre — the shared soft-edge clamp (cameraModel.ts),
+  // identical to what Camera.apply renders with. Never re-derive it here: a
+  // divergent clamp misplaces every marker precisely in map corners.
+  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH)
+  return { x: cam.screenW / 2 + (wx - c.x) * T, y: cam.screenH / 2 + (wy - c.y) * T }
 }
-
-const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 
 /**
  * Inverse of {@link projectToScreen}: a screen pixel back to a world tile coord,
@@ -83,11 +83,8 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
  */
 export const screenToWorld = (sx: number, sy: number, cam: CameraState): { x: number; y: number } => {
   const T = TILE_PX * cam.zoom
-  const halfW = cam.screenW / 2 / T
-  const halfH = cam.screenH / 2 / T
-  const cx = cam.levelW * T > cam.screenW ? clamp(cam.x, halfW, cam.levelW - halfW) : cam.levelW / 2
-  const cy = cam.levelH * T > cam.screenH ? clamp(cam.y, halfH, cam.levelH - halfH) : cam.levelH / 2
-  return { x: cx + (sx - cam.screenW / 2) / T, y: cy + (sy - cam.screenH / 2) / T }
+  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH)
+  return { x: c.x + (sx - cam.screenW / 2) / T, y: c.y + (sy - cam.screenH / 2) / T }
 }
 
 /**
@@ -118,7 +115,7 @@ export const pointMarker = (
   if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return undefined
   const dx = target.x - from.x
   const dy = target.y - from.y
-  // ➤ points east at 0°, matching world +x; +y is screen-down — same as the EXIT compass.
+  // ➤ points east at 0°, matching world +x; +y is screen-down.
   const angle = Math.atan2(dy, dx)
   const dist = Math.round(Math.hypot(dx, dy))
   const p = projectToScreen(target.x, target.y, cam)

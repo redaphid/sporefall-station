@@ -101,6 +101,9 @@ export const tintForEvent = (ev: SimEvent): { warm: number; cold: number } => {
       return { warm: 0, cold: 0.7 }
     case 'shock':
       return { warm: 0, cold: 0.4 }
+    case 'burnDoused':
+      // Quenching a burn reads as a cool steam beat against fire's warm wash.
+      return { warm: 0, cold: 0.25 }
     default:
       return { warm: 0, cold: 0 }
   }

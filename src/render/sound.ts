@@ -65,6 +65,10 @@ export class Sound {
         case 'floorChange':
           this.jingle(1.25)
           break
+        case 'burnDoused':
+          // A short falling hiss — steam off a smothered burn.
+          this.noise('douse', 0.12, 0.35)
+          break
       }
     }
   }

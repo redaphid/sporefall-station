@@ -9,13 +9,15 @@ import type { Rect } from './rooms'
  *     with flanking walls so the vestibule is the only way through,
  *   - an innermost chamber sealed behind its own wall ring, its door facing
  *     AWAY from the airlock.
- * The chamber is pushed LAST into `rooms`, which is the slot mission
- * generation targets (missions.ts roomCenter) — a bunker mission objective
- * always sits in the deepest room, behind three locked doors.
+ * The chamber is the plan's explicit `objectiveRoom` — the room mission
+ * generation places its target in — so a bunker mission objective always
+ * sits in the deepest room, behind three locked doors.
  */
 export interface BunkerPlan {
   rooms: Rect[]
   doors: { x: number; y: number }[]
+  /** Where a mission objective belongs: the innermost chamber. */
+  objectiveRoom: Rect
 }
 
 /** Requires rect >= 13x13 (2-thick walls + guard band + 3-tile core). */
@@ -71,6 +73,6 @@ export const carveBunker = (rng: Rng, grid: TileGrid, rect: Rect): BunkerPlan =>
   grid.set(coreDoor.x, coreDoor.y, Tile.Floor)
   doors.push(coreDoor)
 
-  // Guard band first, innermost chamber LAST (the mission-target slot).
-  return { rooms: [bi, core], doors }
+  // Guard band + innermost chamber; the chamber is the explicit objective room.
+  return { rooms: [bi, core], doors, objectiveRoom: core }
 }

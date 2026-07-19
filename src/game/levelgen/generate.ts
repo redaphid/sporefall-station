@@ -69,7 +69,9 @@ const buildClassicCity = (rng: Rng, grid: TileGrid, w: number, h: number): Build
     const rooms: Rect[] = []
     const doors = splitRooms(brng, grid, interior, rooms)
     doors.push(...punchExteriorDoors(brng, grid, rect))
-    buildings.push({ rect, rooms, doors, role: brng.pick(CLASSIC_ROLES) })
+    // Objective room: the last BSP leaf — explicit, and pinned by regression
+    // tests so floor-1 mission placements stay byte-identical.
+    buildings.push({ rect, rooms, doors, role: brng.pick(CLASSIC_ROLES), objectiveRoom: rooms[rooms.length - 1] })
   }
   return buildings
 }
@@ -123,7 +125,14 @@ const buildThemedCity = (
     // Bunker: fills its whole lot inset — a fortress never has a front yard.
     if (inset.w >= 13 && inset.h >= 13 && lrng.chance(bunkerChance)) {
       const plan = carveBunker(lrng, grid, inset)
-      buildings.push({ rect: inset, rooms: plan.rooms, doors: plan.doors, role: 'bunker', poi: 'bunker' })
+      buildings.push({
+        rect: inset,
+        rooms: plan.rooms,
+        doors: plan.doors,
+        role: 'bunker',
+        poi: 'bunker',
+        objectiveRoom: plan.objectiveRoom,
+      })
       continue
     }
 
@@ -144,6 +153,7 @@ const buildThemedCity = (
     const doors: { x: number; y: number }[] = []
     let poi: Building['poi']
     let courtyard: Rect | undefined
+    let objectiveRoom: Rect | undefined
     const large = interior.w >= 11 && interior.h >= 11
     if (large && lrng.chance(theme.courtyardChance)) {
       // Courtyard compound: a ring of rooms around an open pit, with a street gate.
@@ -151,6 +161,7 @@ const buildThemedCity = (
       rooms.push(...plan.rooms)
       doors.push(...plan.doors)
       courtyard = plan.courtyard
+      objectiveRoom = plan.objectiveRoom
       poi = 'courtyard'
     } else if (interior.w >= 12 && interior.h >= 12 && lrng.chance(theme.vaultChance)) {
       // Open hall with a single sealed reward chamber — no split walls to break.
@@ -159,6 +170,7 @@ const buildThemedCity = (
       if (vault) {
         rooms.push(vault.rect)
         doors.push(vault.door)
+        objectiveRoom = vault.rect
         poi = 'vault'
       }
     } else if (Math.min(interior.w, interior.h) >= 9 && lrng.chance(theme.hallwayChance)) {
@@ -167,6 +179,7 @@ const buildThemedCity = (
       if (plan) {
         rooms.push(...plan.rooms)
         doors.push(...plan.doors)
+        objectiveRoom = plan.objectiveRoom
         poi = 'hallway'
       } else {
         doors.push(...splitRooms(lrng, grid, interior, rooms))
@@ -175,7 +188,9 @@ const buildThemedCity = (
       doors.push(...splitRooms(lrng, grid, interior, rooms))
     }
     doors.push(...punchExteriorDoors(lrng, grid, rect))
-    buildings.push({ rect, rooms, doors: dedupeDoors(doors), role: lrng.pick(theme.roles), poi, courtyard })
+    // Fallback (plain BSP interiors): the last leaf, made explicit.
+    objectiveRoom ??= rooms[rooms.length - 1]
+    buildings.push({ rect, rooms, doors: dedupeDoors(doors), role: lrng.pick(theme.roles), poi, courtyard, objectiveRoom })
   }
   return buildings
 }

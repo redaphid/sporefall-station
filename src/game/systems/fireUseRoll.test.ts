@@ -1,7 +1,8 @@
-// Feature: the FIRE button arbitrates off the ACTIVE slot + availability.
-//  1. active slot = usable non-weapon (consumable/throwable) → USE it (no bullet)
-//  2. active slot = weapon that can fire/swing → fire it (unchanged)
-//  3. nothing to use AND nothing that can fire (empty gun clicks) → dodge-roll
+// Feature: FIRE and USE arbitrate off the ACTIVE slot; the dodge-roll fallback
+// lives on the USE button ONLY.
+//  FIRE (attack): usable non-weapon in hand → USE it (no bullet); else fire the
+//    equipped weapon; nothing to fire (empty gun) → a DRY no-op — never a roll.
+//  USE (throwItem): use the held/active usable item; nothing usable → dodge-roll.
 // Tests set state exactly, run the REAL systems (combatSystem / tickWorld), and
 // assert — adversarial cases included (cooldown gating, full-HP waste, co-op).
 
@@ -17,6 +18,10 @@ import { ROLL_COOLDOWN, ROLL_TICKS } from './roll'
 /** A one-slot input map with `attack` (the fire button) pressed. */
 const fire = (extra: Partial<InputCmd> = {}): Map<number, InputCmd> =>
   new Map([[0, { ...emptyInput(), attack: true, ...extra }]])
+
+/** A one-slot input map with `throwItem` (the use button) pressed. */
+const use = (extra: Partial<InputCmd> = {}): Map<number, InputCmd> =>
+  new Map([[0, { ...emptyInput(), throwItem: true, ...extra }]])
 
 /** A player on the guaranteed-open spawn tile, facing +x. */
 const player = (w: World, id = 0): Entity => {
@@ -108,8 +113,8 @@ describe('fire button — a weapon in hand fires as before', () => {
   })
 
   it('bare fists (empty hands, no slot) PUNCH — they do NOT roll', () => {
-    // Documents the resolved decision: fists are a real attack, so unarmed fire
-    // swings; only an equipped-but-unfireable weapon falls through to a roll.
+    // Fists are a real attack, so unarmed FIRE swings. FIRE never rolls at all —
+    // the dodge-roll fallback is on the USE button (see the use-button suites).
     p.combat!.weapon = 'fists'
     p.playerCtl!.inventory = []
     p.playerCtl!.activeSlot = -1
@@ -119,7 +124,7 @@ describe('fire button — a weapon in hand fires as before', () => {
   })
 })
 
-describe('fire button — nothing to use or fire → dodge-roll fallback', () => {
+describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
@@ -127,66 +132,115 @@ describe('fire button — nothing to use or fire → dodge-roll fallback', () =>
     p = player(w)
   })
 
-  it('an out-of-ammo gun → fire rolls instead of a dead click, spawns no bullet', () => {
+  it('an out-of-ammo gun → fire clicks: no bullet AND no roll (the fallback is not on FIRE)', () => {
     p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }] // empty mag
     p.playerCtl!.activeSlot = 0
     combatSystem(w, fire({ moveX: 1 }))
-    const roll = p.playerCtl!.roll
-    expect(roll).toBeDefined()
-    expect(roll!.untilTick).toBe(w.tick + ROLL_TICKS)
-    expect(roll!.dirX).toBeCloseTo(1, 6) // rolled along the move vector
+    expect(p.playerCtl!.roll).toBeUndefined() // FIRE does not backflip
     expect(projectiles(w)).toHaveLength(0)
   })
 
-  it('the fallback roll direction falls back to facing when the stick is centred', () => {
+  it('holding fire on an empty gun NEVER rolls across a full roll cycle', () => {
     p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
     p.playerCtl!.activeSlot = 0
+    let rollStarts = 0
+    const span = ROLL_TICKS + ROLL_COOLDOWN + 5
+    for (let t = 0; t < span; t++) {
+      const before = w.events.length
+      tickWorld(w, fire({ moveX: 1 }))
+      rollStarts += w.events.slice(before).filter((ev) => ev.type === 'roll').length
+    }
+    expect(rollStarts).toBe(0)
+    expect(bullets(w)).toHaveLength(0)
+  })
+})
+
+describe('use button — nothing usable → dodge-roll (the backflip)', () => {
+  let w: World
+  let p: Entity
+  beforeEach(() => {
+    w = createWorld(1, 1)
+    p = player(w)
+  })
+
+  it('empty hands (no usable item) → USE rolls, along the move vector', () => {
+    p.playerCtl!.inventory = [] // nothing to use
+    p.playerCtl!.activeSlot = -1
+    combatSystem(w, use({ moveX: 1 }))
+    const roll = p.playerCtl!.roll
+    expect(roll).toBeDefined()
+    expect(roll!.untilTick).toBe(w.tick + ROLL_TICKS)
+    expect(roll!.dirX).toBeCloseTo(1, 6)
+    expect(projectiles(w)).toHaveLength(0)
+  })
+
+  it('an out-of-ammo gun active (not a usable item) → USE rolls', () => {
+    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
+    p.playerCtl!.activeSlot = 0
+    combatSystem(w, use({ moveX: 1 }))
+    expect(p.playerCtl!.roll).toBeDefined()
+    expect(projectiles(w)).toHaveLength(0)
+  })
+
+  it('the roll direction falls back to facing when the stick is centred', () => {
+    p.playerCtl!.inventory = []
+    p.playerCtl!.activeSlot = -1
     p.facing = Math.PI / 2 // down
-    combatSystem(w, fire()) // no move input
+    combatSystem(w, use()) // no move input
     const roll = p.playerCtl!.roll!
     expect(roll.dirX).toBeCloseTo(0, 6)
     expect(roll.dirY).toBeCloseTo(1, 6)
   })
 
-  it('adversarial: a re-press mid-roll does NOT re-roll (anti-chain gate holds)', () => {
-    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
+  it('edge case: USE with a usable item HELD always uses it, never rolls', () => {
+    p.health = { hp: 50, max: 120, iframes: 0 }
+    p.playerCtl!.inventory = [{ itemId: 'bandage', qty: 1 }]
     p.playerCtl!.activeSlot = 0
-    combatSystem(w, fire({ moveX: 1 }))
+    combatSystem(w, use({ moveX: 1 })) // moving AND a bandage in hand
+    expect(p.health!.hp).toBe(80) // healed
+    expect(p.playerCtl!.roll).toBeUndefined() // used the item, did NOT roll
+    expect(p.playerCtl!.inventory).toHaveLength(0)
+  })
+
+  it('adversarial: a re-press mid-roll does NOT re-roll (anti-chain gate holds)', () => {
+    p.playerCtl!.inventory = []
+    p.playerCtl!.activeSlot = -1
+    combatSystem(w, use({ moveX: 1 }))
     const first = { ...p.playerCtl!.roll! }
     w.tick += Math.floor(ROLL_TICKS / 2) // still mid-roll window
-    combatSystem(w, fire({ moveX: 0, moveY: 1 })) // mash fire again
+    combatSystem(w, use({ moveX: 0, moveY: 1 })) // mash use again
     expect(p.playerCtl!.roll).toEqual(first) // unchanged — no second roll
   })
 
   it('adversarial: a re-press during the post-roll COOLDOWN does not re-roll', () => {
-    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
-    p.playerCtl!.activeSlot = 0
-    combatSystem(w, fire({ moveX: 1 }))
+    p.playerCtl!.inventory = []
+    p.playerCtl!.activeSlot = -1
+    combatSystem(w, use({ moveX: 1 }))
     const first = { ...p.playerCtl!.roll! }
     w.tick = first.cooldownUntilTick - 1 // window over, still cooling down
-    combatSystem(w, fire({ moveX: 0, moveY: 1 }))
+    combatSystem(w, use({ moveX: 0, moveY: 1 }))
     expect(p.playerCtl!.roll).toEqual(first) // still gated by cooldown
   })
 })
 
-describe('fire→roll fallback — integration through the full tick pipeline', () => {
-  it('holding fire on an empty gun rolls, waits out the cooldown, then rolls again', () => {
+describe('use→roll fallback — integration through the full tick pipeline', () => {
+  it('holding use with empty hands rolls, waits out the cooldown, then rolls again', () => {
     const w = createWorld(1, 1)
     const p = player(w)
-    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
-    p.playerCtl!.activeSlot = 0
-    // Hold fire for a full roll+cooldown cycle plus a couple ticks. Real pipeline:
+    p.playerCtl!.inventory = []
+    p.playerCtl!.activeSlot = -1
+    // Hold use for a full roll+cooldown cycle plus a couple ticks. Real pipeline:
     // rollSystem clears the spent roll at cooldownUntilTick, then combatSystem
     // re-rolls the SAME tick — so exactly two roll starts, no chain-lock between.
     let rollStarts = 0
     const span = ROLL_TICKS + ROLL_COOLDOWN + 2
     for (let t = 0; t < span; t++) {
       const before = w.events.length
-      tickWorld(w, fire({ moveX: 1 }))
+      tickWorld(w, use({ moveX: 1 }))
       rollStarts += w.events.slice(before).filter((ev) => ev.type === 'roll').length
     }
     expect(rollStarts).toBe(2)
-    expect(bullets(w)).toHaveLength(0) // the empty gun never fired
+    expect(bullets(w)).toHaveLength(0)
     expect(p.dead).toBeFalsy()
   })
 })
@@ -219,15 +273,42 @@ describe('fire button — co-op resolves per player independently', () => {
     expect(gunnerBullets).toHaveLength(1)
     expect(bullets(w).filter((b) => b.projectile!.ownerId === healer.id)).toHaveLength(0)
   })
+
+  it('co-op USE: one player rolls (empty hands) while the other uses a bandage, same tick', () => {
+    const w = createWorld(1, 1)
+    const s = w.level.spawn
+    const roller = spawnPlayer(w, 0, s.x, s.y)
+    roller.facing = 0
+    roller.playerCtl!.inventory = [] // nothing usable → rolls
+    roller.playerCtl!.activeSlot = -1
+
+    const healer = spawnPlayer(w, 1, s.x + 2, s.y)
+    healer.facing = 0
+    healer.health = { hp: 40, max: 120, iframes: 0 }
+    healer.playerCtl!.inventory = [{ itemId: 'bandage', qty: 1 }]
+    healer.playerCtl!.activeSlot = 0
+
+    combatSystem(
+      w,
+      new Map([
+        [0, { ...emptyInput(), throwItem: true, moveX: 1 }],
+        [1, { ...emptyInput(), throwItem: true }],
+      ]),
+    )
+
+    expect(roller.playerCtl!.roll).toBeDefined() // empty-handed use → backflip
+    expect(healer.playerCtl!.roll).toBeUndefined() // used the bandage instead
+    expect(healer.health!.hp).toBe(70)
+  })
 })
 
-describe('fire→roll fallback — determinism / serialization', () => {
-  it('a fire-triggered roll round-trips and replays byte-identically', () => {
+describe('use→roll fallback — determinism / serialization', () => {
+  it('a use-triggered roll round-trips and replays byte-identically', () => {
     const w = createWorld(9, 1)
     const p = player(w)
-    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
-    p.playerCtl!.activeSlot = 0
-    tickWorld(w, fire({ moveX: 1 })) // fire an empty gun → roll begins
+    p.playerCtl!.inventory = []
+    p.playerCtl!.activeSlot = -1
+    tickWorld(w, use({ moveX: 1 })) // use with empty hands → roll begins
     const json = serializeWorld(w)
     const a = deserializeWorld(json)
     const b = deserializeWorld(json)

@@ -68,6 +68,13 @@ Gate every merge on `pnpm run build` (typecheck) + `pnpm exec vitest run` + `pnp
 all green, resolve conflicts (watch for *semantic* conflicts, not just textual),
 re-run the full suite after each merge, then `git push origin main`.
 
+**Keep release notes current.** Each merge to `main` should update
+`src/ui/releaseNotes.ts` — prepend a single one-line, player-facing summary of
+the change (punchy, ~40 chars, no internal/tooling churn) and trim to the latest
+few. That file is the source of truth for the "what's new" line under the version
+number on the start menu, so the menu always reflects recent builds. Skip it only
+for pure internals with nothing a player would notice.
+
 ## Map of the codebase
 
 | Path | What |

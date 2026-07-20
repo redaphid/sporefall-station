@@ -398,25 +398,33 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
       if (throwGrenade(w, e)) e.playerCtl.abilityCooldown = SPECIAL_COOLDOWN_TICKS
     }
 
-    // Hotbar: equip a slot; Use/Throw: use the held item (throw or consume).
+    // Hotbar: equip a slot.
     if (cmd.hotbar >= 0) equipSlot(e, cmd.hotbar)
-    if (cmd.throwItem && e.combat.cooldown <= 0 && useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
+
+    // USE/Throw button: use the held/active usable item (consume or throw); when
+    // there's NOTHING usable, dodge-roll instead — the "backflip on the use key"
+    // fallback (the ONLY place the fire↔use arbitration ever rolls). A roll that
+    // starts here ends the player's turn (continue) so a same-tick fire can't also
+    // land; tryStartRoll self-gates on the roll cooldown (no chaining). Gated on
+    // combat.cooldown so use/roll share the item-use cadence.
+    if (cmd.throwItem && e.combat.cooldown <= 0) {
+      if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
+      else if (tryStartRoll(w, e, cmd.moveX, cmd.moveY)) continue // nothing usable → backflip
+    }
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
-    // FIRE-button arbitration off the ACTIVE slot + availability:
+    // FIRE button arbitration off the ACTIVE slot:
     //  1. a usable non-weapon in hand (bandage/consumable → heal, throwable →
     //     lob) is USED via the same item-effect path as the Use button — the
     //     "shooting uses my equipped item" rule. No bullet, no swing.
     //  2. otherwise fire the equipped weapon (gun/melee/fists) — unchanged.
-    //  3. nothing to use AND nothing that can fire (an out-of-ammo gun clicks) →
-    //     dodge-roll instead of a no-op, respecting the roll cooldown so a
-    //     re-press mid-roll / on cooldown can't double-roll (tryStartRoll gates).
+    // Nothing to fire (an out-of-ammo gun) is a dry no-op: the dodge-roll fallback
+    // lives on the USE button above, never on FIRE.
     const active = activeStack(e)
     if (active && isUsableItem(active.itemId)) {
       if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
       continue
     }
-    if (fireWeapon(w, e)) continue // THE single fire-site: mods/elements/pellets fold in here
-    tryStartRoll(w, e, cmd.moveX, cmd.moveY) // empty-handed fallback → dodge-roll
+    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
   }
 }

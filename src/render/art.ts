@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
+import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
@@ -77,6 +78,11 @@ export interface ArtRegistry {
   /** Cadence (sim ticks per frame) for an animation state — theme override or
    * the engine default. */
   animTpf(state: AnimStateName): number
+  /** Grip-anchored held-weapon silhouette for a weapon id (procedural, cached).
+   * Drawn pointing +x with the grip near the left edge (WEAPON_ANCHOR), so the
+   * renderer pins it to the hand and rotates it around the grip for the swing.
+   * Every id resolves to a shape (unknown → generic rod), so it's never blank. */
+  weaponTexture(weaponId: string): Texture
 }
 
 export type EffectKey = 'hit' | 'explosion' | 'pickup' | 'blood'
@@ -703,6 +709,77 @@ export const createArt = (
     return bulletGlowTex
   }
 
+  // ---- Held weapons --------------------------------------------------------
+  // Procedural grip-anchored silhouettes, drawn pointing +x on a fixed canvas so
+  // the renderer rotates them around the grip to swing. One texture per shape,
+  // cached; the mod SKIN (tint/scale/glow) is applied by the renderer on top, so
+  // a modded weapon reuses the same base texture (no per-mod generation).
+  const drawWeapon = (shape: WeaponShape): Texture => {
+    const { w, h, grip } = WEAPON_CANVAS
+    const my = h / 2 // grip / handle centre-line
+    // Transparent full-canvas rect pins generateTexture's bounds so the grip
+    // anchor (grip/w, 0.5) is exact regardless of the drawn silhouette.
+    const g = new Graphics().rect(0, 0, w, h).fill({ color: 0, alpha: 0 })
+    const wood = 0x8a5a2b
+    const steel = 0xb8bcc6
+    const darkSteel = 0x6d7079
+    switch (shape) {
+      case 'hammer': {
+        // Long haft + a big blocky head at the tip — an unmistakable sledge.
+        g.rect(grip, my - 1.5, w - grip - 12, 3).fill(wood)
+        g.roundRect(w - 15, my - 8, 13, 16, 2).fill(steel)
+        g.roundRect(w - 15, my - 8, 13, 16, 2).stroke({ width: 1.5, color: 0x101018, alpha: 0.6 })
+        g.rect(w - 15, my - 8, 4, 16).fill({ color: 0xffffff, alpha: 0.18 }) // struck-face glint
+        break
+      }
+      case 'club': {
+        // Tapered bat: thin at the grip, fat at the business end.
+        g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).fill(wood)
+        g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).stroke({ width: 1, color: 0x3a2410, alpha: 0.5 })
+        g.circle(grip + 2, my, 2.5).fill(0x5a3a1a) // pommel knob
+        break
+      }
+      case 'blade': {
+        // Short knife: dark grip + guard, then a bright triangular blade.
+        const bx = grip + 9
+        g.rect(grip, my - 2, 9, 4).fill(0x2a2a30) // grip
+        g.rect(bx - 1, my - 4, 2, 8).fill(darkSteel) // guard
+        g.poly([bx, my - 3, w - 6, my, bx, my + 3]).fill(steel) // blade
+        g.poly([bx, my - 3, w - 6, my, bx, my + 3]).stroke({ width: 0.75, color: 0x101018, alpha: 0.5 })
+        break
+      }
+      case 'gun': {
+        // Compact pistol: barrel forward, a stub grip below the breech.
+        g.roundRect(grip, my - 3, w - grip - 12, 6, 1.5).fill(darkSteel) // body/barrel
+        g.rect(w - 14, my - 4, 8, 8).fill(0x50535b) // breech block
+        g.rect(grip + 3, my + 2, 5, 7).fill(0x2f3138) // grip
+        g.circle(w - 5, my, 2).fill(0x2a2a30) // muzzle
+        break
+      }
+      case 'rod': {
+        // Generic fallback rod — plain but visible, so no weapon is ever blank.
+        g.rect(grip, my - 2, w - grip - 3, 4).fill(darkSteel)
+        g.rect(grip, my - 2, w - grip - 3, 4).stroke({ width: 1, color: 0x101018, alpha: 0.5 })
+        break
+      }
+    }
+    const tex = renderer.generateTexture(g)
+    g.destroy()
+    return tex
+  }
+
+  const weaponCache = new Map<string, Texture>()
+  const weaponTexture = (weaponId: string): Texture => {
+    // Key by SHAPE, not id — every gun shares one texture, tinted per mod skin.
+    const shape = weaponShape(weaponId)
+    let tex = weaponCache.get(shape)
+    if (!tex) {
+      tex = drawWeapon(shape)
+      weaponCache.set(shape, tex)
+    }
+    return tex
+  }
+
   const effectFrames = (key: EffectKey): readonly Texture[] => sprites[key] ?? []
 
   const entity = (archetype: string): Texture => {
@@ -757,5 +834,6 @@ export const createArt = (
     bulletGlow,
     themedBullet: () => sprites.projectile,
     animTpf: (state) => animTpfs[state] ?? DEFAULT_TPF[state],
+    weaponTexture,
   }
 }

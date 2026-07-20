@@ -131,6 +131,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     bulletGlow: () => inner.bulletGlow(),
     themedBullet: () => inner.themedBullet(),
     animTpf: (s) => inner.animTpf(s),
+    weaponTexture: (id) => inner.weaponTexture(id),
   }
   const world = new Container()
   const tilemap = new TilemapView()

@@ -335,12 +335,32 @@ export interface Decision {
 
 const round3 = (n: number): number => Math.round(n * 1000) / 1000
 
+/** #62 — incumbent-goal hysteresis margin (a deadband). The goal an NPC ALREADY
+ * holds (same code+target) gets its COMPARE score scaled up by this fraction, so
+ * a rival goal must beat the standing one by a clear margin — not a hair — to
+ * win. Kills the #59 battle<->flee reversal that a 1-hp spore-DOT/regen jitter
+ * otherwise trips every think. Strictly WITHIN a tier: a higher TIER
+ * (panic/threat over ambient) still preempts instantly, so responsiveness to a
+ * real, new threat is unchanged. Shipped ON; A/B-disable via
+ * `w.aiFlags.hysteresis === false`. `lastScores` stays RAW so the "why" trail is
+ * honest — only arbitration sees the bonus. */
+export const HYSTERESIS_MARGIN = 0.25
+
 /** Run one think: evaluate the entity's behavior and pick the winning goal.
- * Highest tier wins; within a tier, strictly-greater score in consideration /
- * candidate order — byte-for-byte deterministic. */
+ * Highest tier wins; within a tier, strictly-greater EFFECTIVE score (the
+ * incumbent gets the hysteresis bonus) in consideration / candidate order —
+ * byte-for-byte deterministic. */
 export const decide = (w: World, e: Entity): Decision => {
   const def = behaviorFor(e)
+  const hyst = w.aiFlags?.hysteresis !== false // shipped ON; only an explicit false disables
+  const incumbentCode = e.ai?.goal
+  const incumbentTarget = e.ai?.targetId
+  const isIncumbent = (c: Candidate): boolean =>
+    c.code === incumbentCode && (c.target ?? undefined) === (incumbentTarget ?? undefined)
+  // Effective compare score: raw, but the standing goal gets the hysteresis bonus.
+  const eff = (c: Candidate): number => (hyst && isIncumbent(c) ? c.score * (1 + HYSTERESIS_MARGIN) : c.score)
   let best: Candidate = { code: WANDER, score: WANDER_SCORE, tier: TIER_AMBIENT }
+  let bestEff = eff(best)
   const scores: Record<string, number> = {}
   for (const id of def.considerations) {
     const consider = CONSIDERATIONS[id]
@@ -348,7 +368,11 @@ export const decide = (w: World, e: Entity): Decision => {
     for (const c of consider(w, e)) {
       const top = scores[id]
       if (top === undefined || c.score > top) scores[id] = round3(c.score)
-      if (c.tier > best.tier || (c.tier === best.tier && c.score > best.score)) best = c
+      const ce = eff(c)
+      if (c.tier > best.tier || (c.tier === best.tier && ce > bestEff)) {
+        best = c
+        bestEff = ce
+      }
     }
   }
   const goal: Goal = { code: best.code }

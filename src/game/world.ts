@@ -101,6 +101,25 @@ export interface World {
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
    * cloaked-guard exemptions still apply — this only sets the baseline stance. */
   hostile: boolean
+  /** AI feature toggles. The shipped autonomy fixes — #62 goal hysteresis and
+   * #63 NPC-vs-NPC targeting — are ON by default; a value is only needed to
+   * FORCE a feature off for A/B measurement (the ai-sim harness / regression
+   * tests), or to explicitly enable/disable the gated spore-infection feature
+   * (#64), which otherwise follows the mission/floor gate. NOT serialized
+   * (serialize.ts whitelists fields), so the release/replay path is
+   * byte-identical whether or not this is present. */
+  aiFlags?: {
+    /** Incumbent-goal hysteresis/deadband in `decide` (#62, fixes #59 thrash).
+     * Undefined → ON (shipped). `false` → the old zero-deadband behaviour. */
+    hysteresis?: boolean
+    /** `threat` scores any Hostile-disposition entity, not only players — the
+     * autonomous faction/sworn-enemy matrix (#63). Undefined → ON (shipped).
+     * `false` → the old players-only scan. */
+    npcVsNpc?: boolean
+    /** Spore contagion turns exposed crew into hostile Infected (#64). Undefined
+     * → follow the mission/floor gate; `true`/`false` → force on/off. */
+    infection?: boolean
+  }
   /** Inert on-screen annotations (labels/pins/arrows/circles/text) the render
    * overlay draws OVER the world. NO sim system reads or mutates this, so it never
    * touches determinism — it just serializes/replays with the world (see types.ts

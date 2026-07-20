@@ -84,12 +84,16 @@ CHARS = {
                # the signature colors/visor/cap so identity is preserved; only the
                # MASS grows. Target silhouette (consistency.py): height 44,
                # width ~29, head_h ~28, mass ~720. See docs/sprite-generation.md §8.
-               "a heroic broad-shouldered swamp ranger explorer in a bright teal-blue spacesuit, "
-               "bulky armoured pauldrons and chest plate, a large backpack, a heavy utility belt "
-               "with pouches, tan leather chest straps and a large glowing orange-amber visor, "
-               "green vines wrapped around one arm, sturdy tan boots, vivid saturated colors, "
-               "high contrast, chunky heavyset proportions, wide imposing silhouette, big head, "
-               "short legs", ""),
+               "a heroic broad-shouldered swamp ranger explorer standing upright and straight at "
+               "full height with arms relaxed at the sides, wearing a smooth domed orange helmet "
+               "with a large dark glass visor covering the whole face, a bright teal-blue armored "
+               "spacesuit, bulky grey armoured pauldrons and chest plate, a large grey backpack, a "
+               "heavy utility belt with pouches, tan leather chest straps, a few green vines wrapped "
+               "around one forearm, sturdy tan boots, vivid saturated teal and orange colors, high "
+               "contrast, chunky heavyset proportions, wide imposing silhouette, big helmeted head, "
+               "short legs",
+               "green hair, mane, fur, leaves on the head, moss on the face, bare head, human hair, "
+               "animal, creature, monster, mushroom, naked"),
     "cop": ("spore-drone",
             "a hovering robotic security drone machine, a rounded gray metal pod body with NO "
             "legs, moss patches on the shell, one large glowing green sensor eye, small thruster "

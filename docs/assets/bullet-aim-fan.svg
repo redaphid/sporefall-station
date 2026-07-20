@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="590" viewBox="0 0 520 590" font-family="system-ui,sans-serif">
+<rect width="100%" height="100%" fill="#0b0b12"/>
+<text x="260" y="30" fill="#eee" font-size="18" text-anchor="middle">Bullet heading follows continuous aim (real sim, seed 1)</text>
+<text x="260" y="52" fill="#9aa" font-size="12" text-anchor="middle">52 shots at 7° steps — thin coloured rays; faint grey = the old 8-way buckets</text>
+<g transform="translate(0,60)">
+<circle cx="260" cy="260" r="230" fill="none" stroke="#333" stroke-width="1"/>
+<line x1="260" y1="260" x2="490.00" y2="260.00" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="422.63" y2="422.63" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="260.00" y2="490.00" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="97.37" y2="422.63" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="30.00" y2="260.00" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="97.37" y2="97.37" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="260.00" y2="30.00" stroke="#888" stroke-width="6" opacity="0.18"/><line x1="260" y1="260" x2="422.63" y2="97.37" stroke="#888" stroke-width="6" opacity="0.18"/>
+<line x1="260" y1="260" x2="490.00" y2="260.00" stroke="hsl(0 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="488.29" y2="288.03" stroke="hsl(7 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="483.17" y2="315.64" stroke="hsl(14 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="474.72" y2="342.42" stroke="hsl(21 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="463.08" y2="367.98" stroke="hsl(28 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="448.40" y2="391.92" stroke="hsl(35 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="430.92" y2="413.90" stroke="hsl(42 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="410.89" y2="433.58" stroke="hsl(49 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="388.61" y2="450.68" stroke="hsl(56 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="364.42" y2="464.93" stroke="hsl(63 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="338.66" y2="476.13" stroke="hsl(70 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="311.74" y2="484.11" stroke="hsl(77 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="284.04" y2="488.74" stroke="hsl(84 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="255.99" y2="489.96" stroke="hsl(91 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="227.99" y2="487.76" stroke="hsl(98 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="200.47" y2="482.16" stroke="hsl(105 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="173.84" y2="473.25" stroke="hsl(112 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="148.49" y2="461.16" stroke="hsl(119 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="124.81" y2="446.07" stroke="hsl(126 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="103.14" y2="428.21" stroke="hsl(133 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="83.81" y2="407.84" stroke="hsl(140 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="67.11" y2="385.27" stroke="hsl(147 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="53.28" y2="360.83" stroke="hsl(154 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="42.53" y2="334.88" stroke="hsl(161 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="35.03" y2="307.82" stroke="hsl(168 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="30.88" y2="280.05" stroke="hsl(175 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="30.14" y2="251.97" stroke="hsl(182 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="32.83" y2="224.02" stroke="hsl(189 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="38.91" y2="196.60" stroke="hsl(196 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="48.28" y2="170.13" stroke="hsl(203 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="60.81" y2="145.00" stroke="hsl(210 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="76.31" y2="121.58" stroke="hsl(217 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="94.55" y2="100.23" stroke="hsl(224 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="115.26" y2="81.26" stroke="hsl(231 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="138.12" y2="64.95" stroke="hsl(238 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="162.80" y2="51.55" stroke="hsl(245 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="188.93" y2="41.26" stroke="hsl(252 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="216.11" y2="34.23" stroke="hsl(259 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="243.96" y2="30.56" stroke="hsl(266 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="272.04" y2="30.32" stroke="hsl(273 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="299.94" y2="33.49" stroke="hsl(280 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="327.25" y2="40.05" stroke="hsl(287 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="353.55" y2="49.88" stroke="hsl(294 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="378.46" y2="62.85" stroke="hsl(301 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="401.60" y2="78.76" stroke="hsl(308 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="422.63" y2="97.37" stroke="hsl(315 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="441.24" y2="118.40" stroke="hsl(322 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="457.15" y2="141.54" stroke="hsl(329 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="470.12" y2="166.45" stroke="hsl(336 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="479.95" y2="192.75" stroke="hsl(343 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="486.51" y2="220.06" stroke="hsl(350 85% 55%)" stroke-width="2"/>
+<line x1="260" y1="260" x2="489.68" y2="247.96" stroke="hsl(357 85% 55%)" stroke-width="2"/>
+<circle cx="260" cy="260" r="5" fill="#fff"/>
+</g>
+</svg>

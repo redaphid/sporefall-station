@@ -9,7 +9,7 @@ import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import { SIM_DT } from './game/types'
-import { padAimReticles, type ReticleAnchor } from './input/aim'
+import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
   anyPadProducing,
@@ -76,8 +76,29 @@ const boot = async (): Promise<void> => {
     reset: () => renderer.camera.resetZoom(),
   }
   wireWheelZoom(renderer.app.canvas, zoomSink)
+  // Mouse aim (desktop/keyboard): track the cursor in canvas space and hand the
+  // keyboard a provider that turns it into a CONTINUOUS aim vector from the local
+  // player toward the cursor — so a keyboard player's bullet follows the mouse to
+  // any angle instead of snapping to one of the 8 WASD headings. Mouse pointers
+  // only; touch keeps its own on-screen aim stick. The provider reads the live
+  // container transform via renderer.worldToScreen, so it agrees pixel-for-pixel
+  // with what's drawn. Nothing here touches the sim — aimX/aimY already ride the
+  // InputCmd (and the wire) as a continuous heading.
+  let pointerScreen: { x: number; y: number } | null = null
+  window.addEventListener('pointermove', (ev) => {
+    if (ev.pointerType === 'touch') return
+    const rect = renderer.app.canvas.getBoundingClientRect()
+    pointerScreen = { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
+  })
+  const readPointerAim = (): Aim | null => {
+    if (!pointerScreen) return null
+    const self = session?.renderView().self
+    if (!self) return null
+    const ps = renderer.worldToScreen(self.pos.x, self.pos.y)
+    return pointerAim(ps.x, ps.y, pointerScreen.x, pointerScreen.y)
+  }
   let touch: TouchInput | undefined
-  let input: InputSource = script ? createScriptedInput(script) : createKeyboard()
+  let input: InputSource = script ? createScriptedInput(script) : createKeyboard(readPointerAim)
   if (!script && navigator.maxTouchPoints > 0) {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)

@@ -1,10 +1,18 @@
 import { emptyInput, type InputCmd } from '../game/types'
-import { selectAim } from './aim'
+import { selectAim, type Aim } from './aim'
 import type { InputSource } from './input'
 
 /** WASD/arrows move, J/space attack, K/E interact, L/shift special, 1-6 equip
- * hotbar slot, Q/G throw, F/left-ctrl dodge-roll. */
-export const createKeyboard = (): InputSource => {
+ * hotbar slot, Q/G throw, F/left-ctrl dodge-roll.
+ *
+ * `readPointerAim` (optional) supplies the MOUSE as a continuous aim device: a
+ * unit vector from the player toward the cursor (see aim.pointerAim). When it
+ * returns a deflected vector the bullet follows the cursor to ANY angle; when it
+ * returns null/(0,0) — no mouse yet, or the cursor is on the player — aim falls
+ * back to the 8-way WASD movement vector (the legacy behavior, and the reason
+ * keyboard fire used to be 8-directional). Absent entirely (headless/tests), the
+ * source behaves exactly as before. */
+export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource => {
   const down = new Set<string>()
   // Taps between samples must not be lost — accumulate edges.
   let attackEdge = false
@@ -49,7 +57,11 @@ export const createKeyboard = (): InputSource => {
       throwEdge = false
       rollEdge = false
       hotbarEdge = -1
-      const aim = selectAim(cmd.moveX, cmd.moveY)
+      // Mouse aim wins when the cursor is off the player (continuous heading);
+      // otherwise selectAim falls back to the WASD move vector. Passing (0,0)
+      // when no pointer is available reproduces the pre-mouse behavior exactly.
+      const p = readPointerAim?.() ?? null
+      const aim = selectAim(cmd.moveX, cmd.moveY, p?.x ?? 0, p?.y ?? 0)
       cmd.aimX = aim.x
       cmd.aimY = aim.y
       return cmd

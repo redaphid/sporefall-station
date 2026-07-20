@@ -160,6 +160,13 @@ export interface Entity {
   // (Spawn-protection grace for players rides `health.iframes` — see
   // SPAWN_GRACE_TICKS below — so every damage source already honors it.)
   combat?: { weapon: string; cooldown: number }
+  /** #78 — damage AFFINITY table: a multiplier on incoming damage keyed by kind
+   * (`'physical'` for weapon impact/explosions, or an element id: `burning`,
+   * `spore`, `poisoned`). 1 = neutral, <1 resistant, 0 = immune, >1 vulnerable.
+   * A missing key (or absent table) is neutral (×1), so every existing entity
+   * and fixture is byte-identical. Copied from the archetype (`NpcDef.resist`)
+   * at spawn; this is what makes different enemies demand different tools. */
+  resist?: Record<string, number>
   ai?: AiState
   playerCtl?: {
     playerId: number
@@ -323,3 +330,9 @@ export const makeEntity = (
   radius,
   facing: 0,
 })
+
+/** #78 — the incoming-damage multiplier `e` takes from `kind` ('physical' or an
+ * element id). Absent table/key → 1 (neutral), so it never perturbs an entity
+ * that carries no affinities. The single source of truth read by the impact
+ * damage path (combat.applyDamage) and the element DOT tick (elementSystem). */
+export const resistMult = (e: Entity, kind: string): number => e.resist?.[kind] ?? 1

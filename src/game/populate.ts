@@ -296,6 +296,9 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng
   // Varied loadout when populated with a weapon stream; direct callers (tests,
   // scenarios) with no `wrng` keep the archetype's signature weapon for stability.
   e.combat = { weapon: wrng ? rollWeapon(wrng) : def.weapon, cooldown: 0 }
+  // #78 — carry the archetype's damage-affinity table onto the entity so the
+  // shared damage path can read it (absent for neutral townsfolk).
+  if (def.resist) e.resist = { ...def.resist }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
   e.ai = {
     mode: 'idle',

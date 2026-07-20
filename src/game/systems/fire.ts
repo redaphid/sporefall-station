@@ -9,7 +9,7 @@
 // object positions in ascending entity-id order, no randomness.
 
 import { ELEMENTS } from '../data/elements'
-import { makeEntity, type Entity } from '../entity'
+import { makeEntity, resistMult, type Entity } from '../entity'
 import { addEntity, type World } from '../world'
 import { kill } from './combat'
 import { addStatus } from './statusFx'
@@ -91,8 +91,12 @@ export const elementSystem = (w: World): void => {
       const def = ELEMENTS[kind]
       if (!def || def.dot <= 0) continue
       if (w.tick % def.interval !== 0) continue
-      e.health.hp -= def.dot
-      w.events.push({ type: 'hit', x: e.pos.x, y: e.pos.y, targetId: e.id, amount: def.dot })
+      // #78 damage affinity: a fireproof body barely feels burning; a flammable
+      // one takes extra. Missing table → ×1 (unchanged DOT).
+      const dmg = Math.round(def.dot * resistMult(e, kind))
+      if (dmg <= 0) continue // immune (mult 0) — the status lingers but does no harm
+      e.health.hp -= dmg
+      w.events.push({ type: 'hit', x: e.pos.x, y: e.pos.y, targetId: e.id, amount: dmg })
       if (e.health.hp <= 0) {
         kill(w, e)
         break

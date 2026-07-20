@@ -16,6 +16,12 @@ export interface NpcDef {
    * archetype think with. Absent → 'basic'. Populate may override per-spawn
    * (street cops get a patrol beat, some civilians scavenge). */
   behavior?: string
+  /** #78 — damage AFFINITY table copied to `Entity.resist` at spawn: incoming
+   * damage multiplier keyed by `'physical'` (impact/explosion) or an element id
+   * (`burning`/`spore`/`poisoned`). 1 neutral, <1 resist, 0 immune, >1 weak.
+   * Absent → neutral to everything (the townsfolk baseline). This is what makes
+   * a Sporefall enemy DEMAND a particular tool — no single weapon clears them all. */
+  resist?: Record<string, number>
 }
 
 export const NPCS: Record<string, NpcDef> = {
@@ -113,5 +119,53 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 7,
     hostility: 'always',
     fleesOnDamage: false,
+    // Derelict Unit: armour-plated (bullets/melee ping off) and biologically
+    // inert (spore/toxins do nothing) — but its servos cook, so FIRE is the key.
+    resist: { physical: 0.4, burning: 1.5, poisoned: 0, spore: 0 },
+  },
+
+  // ── #78 Sporefall threat roster — each DEMANDS a different tool ──────────────
+  // A rock-paper-scissors so no single weapon clears the deck: the brute laughs
+  // off bullets (burn it), the cinder shrugs off fire (shoot it), the sporeling
+  // ignores toxins (bullets or fire). Placement into encounters is a follow-up;
+  // these are the tuned palette (spawnable by scenarios / the boss / debug).
+  brute: {
+    // Chitin-plated bruiser: soaks impact, slow, but flammable — bring fire.
+    archetype: 'brute',
+    faction: 'gang',
+    hp: 95,
+    speed: 2.5,
+    weapon: 'bat',
+    sightRange: 8,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'hunter',
+    resist: { physical: 0.35, burning: 1.5, poisoned: 1.0 },
+  },
+  cinder: {
+    // Ash-dweller: fireproof, so a flamethrower/molotov build stalls — shoot it.
+    archetype: 'cinder',
+    faction: 'gang',
+    hp: 45,
+    speed: 3.4,
+    weapon: 'fists',
+    sightRange: 8,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'hunter',
+    resist: { physical: 1.1, burning: 0.2 },
+  },
+  sporeling: {
+    // Fast, fragile swarm-thing: spore-immune and toxin-resistant, but flammable
+    // and squishy to bullets — poison whiffs, crowd/AoE or fire shines.
+    archetype: 'sporeling',
+    faction: 'gang',
+    hp: 22,
+    speed: 4.4,
+    weapon: 'fists',
+    sightRange: 9,
+    hostility: 'always',
+    fleesOnDamage: false,
+    resist: { burning: 1.5, poisoned: 0.15, spore: 0 },
   },
 }

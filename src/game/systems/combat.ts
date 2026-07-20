@@ -2,7 +2,7 @@ import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../play
 import { WEAPONS, itemClass, type StatusApply } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
-import { makeEntity, type Entity, type WeaponMod } from '../entity'
+import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
@@ -98,6 +98,9 @@ export const applyDamage = (
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
   // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.
   if (amount < 0) amount = 0
+  // #78 damage affinity: armoured bodies shrug off impact, flammable ones don't.
+  // Impact/explosion damage is 'physical'; missing table → ×1 (unchanged).
+  amount = Math.round(amount * resistMult(target, 'physical'))
   if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS

@@ -17,14 +17,37 @@ export interface CoopSource {
 // stays under the primary human; extra pads become players 1, 2, 3.
 const spawnOffset = (slot: number): number => slot * 1.5
 
+/** Clamp an aim vector to unit magnitude, preserving its angle. Out-of-spec pads
+ * (Stadia reads up to ~1.11 on diagonals) would otherwise over-scale the reticle
+ * and any magnitude-driven consumer; the sim's facing is angle-only so this is a
+ * no-op there. A zero/near-zero vector passes through untouched. */
+const clampAim = (x: number, y: number): { x: number; y: number } => {
+  const mag = Math.hypot(x, y)
+  return mag > 1 ? { x: x / mag, y: y / mag } : { x, y }
+}
+
+/**
+ * Merge two commands that drive the SAME player entity (the primary human, whose
+ * keyboard/touch and first pad both feed slot 0). Move and aim are selected
+ * INDEPENDENTLY: move by move magnitude, aim by AIM magnitude. Gating aim on move
+ * magnitude was the stationary-aim bug — a deflected aim stick while standing
+ * still (move = 0) lost to the idle move source, freezing `facing` at the last
+ * heading while the reticle still pointed at the true aim. A centred aim on both
+ * sources passes (0,0) through, letting the sim hold the last facing.
+ *
+ * Different players occupy different slots and never merge here, so this cannot
+ * cross-contaminate one player's aim with another's.
+ */
 const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
-  const useB = Math.hypot(b.moveX, b.moveY) > Math.hypot(a.moveX, a.moveY)
+  const useBMove = Math.hypot(b.moveX, b.moveY) > Math.hypot(a.moveX, a.moveY)
+  const useBAim = Math.hypot(b.aimX, b.aimY) > Math.hypot(a.aimX, a.aimY)
+  const aim = clampAim(useBAim ? b.aimX : a.aimX, useBAim ? b.aimY : a.aimY)
   return {
     seq: a.seq,
-    moveX: useB ? b.moveX : a.moveX,
-    moveY: useB ? b.moveY : a.moveY,
-    aimX: useB ? b.aimX : a.aimX,
-    aimY: useB ? b.aimY : a.aimY,
+    moveX: useBMove ? b.moveX : a.moveX,
+    moveY: useBMove ? b.moveY : a.moveY,
+    aimX: aim.x,
+    aimY: aim.y,
     attack: a.attack || b.attack,
     interact: a.interact || b.interact,
     special: a.special || b.special,

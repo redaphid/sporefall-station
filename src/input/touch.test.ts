@@ -67,6 +67,41 @@ describe('touch controls — #2 the ATK button is removed (aim joystick fires)',
     expect(aimFires(0, -0.8)).toBe(true)
     expect(createTouch(mount()).sample().attack).toBe(false) // centred → no fire
   })
+
+  it('the MOVE stick snaps to (0,0) on release — a lifted finger never keeps walking', () => {
+    const touch = createTouch(root)
+    const moveZone = [...root.querySelectorAll<HTMLElement>('div')].find(
+      (z) => z.style.width === '50%' && z.style.left === '0px',
+    )!
+    moveZone.setPointerCapture = () => {}
+    moveZone.releasePointerCapture = () => {}
+    const PE = (window as unknown as { PointerEvent: typeof PointerEvent }).PointerEvent
+    moveZone.dispatchEvent(new PE('pointerdown', { pointerId: 3, clientX: 100, clientY: 100 }))
+    moveZone.dispatchEvent(new PE('pointermove', { pointerId: 3, clientX: 200, clientY: 100 }))
+    expect(Math.abs(touch.sample().moveX)).toBeGreaterThan(0.5) // deflected → moving
+    // Lift the finger: the released stick MUST report exactly neutral.
+    moveZone.dispatchEvent(new PE('pointerup', { pointerId: 3, clientX: 200, clientY: 100 }))
+    const cmd = touch.sample()
+    expect(cmd.moveX).toBe(0)
+    expect(cmd.moveY).toBe(0)
+  })
+
+  it('a lost pointer (pointercancel mid-drag) also snaps the MOVE stick to (0,0)', () => {
+    const touch = createTouch(root)
+    const moveZone = [...root.querySelectorAll<HTMLElement>('div')].find(
+      (z) => z.style.width === '50%' && z.style.left === '0px',
+    )!
+    moveZone.setPointerCapture = () => {}
+    moveZone.releasePointerCapture = () => {}
+    const PE = (window as unknown as { PointerEvent: typeof PointerEvent }).PointerEvent
+    moveZone.dispatchEvent(new PE('pointerdown', { pointerId: 4, clientX: 100, clientY: 100 }))
+    moveZone.dispatchEvent(new PE('pointermove', { pointerId: 4, clientX: 100, clientY: 220 }))
+    expect(Math.abs(touch.sample().moveY)).toBeGreaterThan(0.5)
+    moveZone.dispatchEvent(new PE('pointercancel', { pointerId: 4, clientX: 100, clientY: 220 }))
+    const cmd = touch.sample()
+    expect(cmd.moveX).toBe(0)
+    expect(cmd.moveY).toBe(0)
+  })
 })
 
 describe('touch controls — #3 the action buttons are a compact, non-overlapping cluster', () => {

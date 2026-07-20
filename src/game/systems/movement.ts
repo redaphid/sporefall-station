@@ -1,6 +1,7 @@
 import type { Entity } from '../entity'
+import { isSolidTile } from '../levelgen/level'
 import { SIM_DT, type InputCmd } from '../types'
-import { isBlocked, type World } from '../world'
+import type { World } from '../world'
 import { isRolling, ROLL_SPEED } from './roll'
 import { isImmobilized } from './statusFx'
 
@@ -82,7 +83,25 @@ const circleFits = (
 }
 
 export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void => {
-  const blocked = (tx: number, ty: number): boolean => isBlocked(w, tx, ty)
+  // Collision is the sim's hottest inner loop: every moving entity probes several
+  // tiles per axis sub-step, every tick. Consulting `isBlocked` there once meant a
+  // FULL `w.entities` scan per tile (doorClosedAt) — O(n²) across the crowd, and it
+  // fired on ordinary floor tiles too (isSolidTile is false, so the door scan always
+  // ran). With the AI overhaul pushing entity counts up, that scan dominated the
+  // frame on mobile, starving the fixed-step loop → the sim ran behind real time,
+  // reading as stuck-walk + laggy pause/roll. Build the closed-door tile set ONCE
+  // per tick and probe it in O(1). Numeric tile key `ty*w + tx` is unique for every
+  // in-bounds tile; out-of-bounds tiles are solid, so isSolidTile short-circuits
+  // before the set is ever consulted (no negative-coord key collision reachable).
+  const lw = w.level.w
+  const closedDoors = new Set<number>()
+  for (const d of w.entities) {
+    if (d.door && !d.door.open && !d.dead) {
+      closedDoors.add(Math.floor(d.pos.y) * lw + Math.floor(d.pos.x))
+    }
+  }
+  const blocked = (tx: number, ty: number): boolean =>
+    isSolidTile(w.level, tx, ty) || closedDoors.has(ty * lw + tx)
   for (const e of w.entities) {
     if (e.dead || e.projectile) continue
     const stunned = (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)

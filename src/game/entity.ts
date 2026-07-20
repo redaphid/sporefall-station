@@ -12,6 +12,25 @@ export interface StatusEntry {
 
 export type Fx = Record<string, StatusEntry>
 
+/** Anti-chain-lock bookkeeping for ONE immobilize kind ('electrified'/'frozen'),
+ * keyed by kind on `Entity.lockout`. Kept OUT of `fx` on purpose: it outlives the
+ * active immobilize (to enforce a post-immobilize immunity window and remember the
+ * diminishing "tier"), and render/element systems iterate `fx` — a bookkeeping
+ * entry there would draw a phantom status. All fields are absolute ticks / a small
+ * int, so it snapshots and replays byte-for-byte like any other component.
+ *
+ *  `guardUntil` — no NEW immobilize of this kind may start before this tick (the
+ *   guaranteed counterplay window after an immobilize ends).
+ *  `chainUntil` — the chain stays "hot" until here; a hit that lands while hot is
+ *   diminished (see statusFx.ts); after it the chain cools and re-starts at full.
+ *  `tier` — how many immobilizes deep this hot chain is (1 = first, full duration).
+ */
+export interface LockoutEntry {
+  guardUntil: number
+  chainUntil: number
+  tier: number
+}
+
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
 export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
 
@@ -234,6 +253,10 @@ export interface Entity {
   status?: { stun: number; sleep: number; hitFlashUntil: number; cloakUntil: number }
   /** Active status/element effects, keyed by kind ('burning', ...). */
   fx?: Fx
+  /** Anti-chain-lock trackers for immobilize statuses, keyed by kind. Absent until
+   * an immobilize lands; pruned when its chain cools (statusFx.ts). Never immobilizes
+   * on its own — pure bookkeeping that a single stunGun can't perma-lock the player. */
+  lockout?: Record<string, LockoutEntry>
   /** Tiles/objects/actors that fire can catch and spread through. */
   flammable?: boolean
   /** A fire hazard occupying this cell — kind 'fire'. `fuel` burns down 1/tick. */

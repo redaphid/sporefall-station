@@ -166,6 +166,11 @@ export interface Entity {
     homing?: number
     /** Spawn N damaging children on the first body it strikes (split/multishot). */
     split?: { count: number; damage: number; speed: number; ttl: number }
+    /** Shatter into a RADIAL burst of short-range fragments on ANY termination —
+     * wall/ttl/body impact (splinterShot). Distinct from `split` (a forward fork
+     * on first body hit): this is an omnidirectional shrapnel spray at the point
+     * the round dies. Fragments never carry this field, so they can't re-splinter. */
+    splinter?: { count: number; damage: number; speed: number; ttl: number }
     /** Heal the owner by frac·damage dealt on each hit (lifesteal). */
     lifestealFrac?: number
     /** Bodies already struck (pierce), so one victim isn't re-hit every tick. */

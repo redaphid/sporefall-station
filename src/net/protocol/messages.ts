@@ -52,6 +52,7 @@ export const WIRE_MODS = [
   'split',
   'lifesteal',
   'detonator',
+  'splinterShot',
 ] as const
 
 const wireModIndex = new Map<string, number>(WIRE_MODS.map((m, i) => [m, i]))

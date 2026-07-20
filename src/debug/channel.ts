@@ -249,6 +249,43 @@ export const startDebugChannel = (
   return { afterTick, stop }
 }
 
+/** A live debug link that survives a New-Seed / play-again reset. `restart()`
+ * swaps `session.world` for a brand-new World object (`createWorld`), so a channel
+ * bound to the OLD world would keep heart-beating its now-frozen tick as a zombie
+ * while the fresh run went un-bridged and never registered. `rebind` re-establishes
+ * the link against the NEW world exactly like a fresh page boot: it STOPS the old
+ * channel (closing its socket so the hub drops the stale registration — no zombie)
+ * then dials a fresh channel bound to the new world (a new `hello` → the hub
+ * immediately sees the live, advancing run). */
+export interface DebugLink {
+  /** Stream this tick's events + drain queued mutations against the CURRENT world. */
+  afterTick(): void
+  /** Re-establish the link against a new world after a New-Seed / restart. */
+  rebind(world: World): void
+  /** Permanent teardown. */
+  stop(): void
+}
+
+/** Start a rebindable debug link. Wraps `startDebugChannel` and, on `rebind`,
+ * tears the old channel down and dials a fresh one against the new world so the
+ * in-place New-Seed reset re-registers on the hub the same way a page reload does. */
+export const startDebugLink = (
+  world: World,
+  url: string,
+  log: (m: string) => void = console.log,
+  opts: ChannelOpts = {},
+): DebugLink => {
+  let channel = startDebugChannel(world, url, log, opts)
+  return {
+    afterTick: () => channel.afterTick(),
+    rebind: (next: World): void => {
+      channel.stop() // close the old socket → hub drops the frozen zombie registration
+      channel = startDebugChannel(next, url, log, opts) // fresh hello, bound to the NEW world
+    },
+    stop: () => channel.stop(),
+  }
+}
+
 /** Bridge a headless GameHarness over the hub — same wire protocol, but verbs go
  * through `runHarnessVerb` (create/join_bot/start_run/tick/record/…) so the CLI
  * and MCP can drive a whole session with no game/phone. The harness self-drives

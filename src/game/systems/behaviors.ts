@@ -52,7 +52,7 @@ import {
   perceives,
   type Goal,
 } from './goals'
-import { dispositionToward } from './relationships'
+import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
 export const PATROL = 'patrol'
@@ -76,25 +76,49 @@ export type Consideration = (w: World, e: Entity) => Candidate[]
 
 const dist2d = (ax: number, ay: number, bx: number, by: number): number => Math.hypot(ax - bx, ay - by)
 
+/** #63 — is `target` an enemy `e` should fight/flee? The one hostility predicate
+ * the `threat` scan uses. Players keep the exact pre-#63 rule. NPC-vs-NPC (ON by
+ * default; `w.aiFlags.npcVsNpc === false` restores the players-only scan) reads
+ * a stored opinion first, then the FACTION MATRIX (`initialFactionHate`), so
+ * sworn enemies (cop↔gang) are mutually Hostile, same-faction stays Friendly,
+ * and unrelated factions ignore each other — the crew, the law, and the gangs
+ * tear into each OTHER, not just the players. Pure lookups, ascending-id caller. */
+const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
+  const ai = e.ai!
+  if (target.playerCtl) {
+    if (target.dead || target.playerCtl.downed) return false
+    // Derelict Units (robots) sleep through a peaceful station, but a power cut
+    // wakes them into open hostility — the standing cost of the power-cut path.
+    return (
+      w.hostile ||
+      dispositionToward(e, target.id) === 'Hostile' ||
+      (ai.faction === 'cop' && w.alarm >= 2) ||
+      (e.archetype === 'robot' && anyPowerCut(w))
+    )
+  }
+  if (w.aiFlags?.npcVsNpc === false || !target.ai || target === e) return false
+  // A stored grudge (a witnessed crime, retaliation) wins; else the opening
+  // faction stance decides — this is what wakes the dormant sworn-enemy matrix.
+  const stored = ai.rel?.[target.id]
+  if (stored) return stored.code === 'Hostile'
+  return determineRel(initialFactionHate(ai.faction, target.ai.faction)) === 'Hostile'
+}
+
 // ── Threat: fight-or-flight against every perceived enemy ──────────────────
 // The candidates must STRICTLY beat the wander baseline to register, exactly as
 // the pre-registry arbitration compared them against `WANDER_SCORE`.
 const threat: Consideration = (w, e) => {
-  const ai = e.ai!
   const hp = e.health?.hp ?? 1
   const max = e.health?.max ?? 1
   const out: Candidate[] = []
-  for (const p of w.entities) {
-    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    // Derelict Units (robots) sleep through a peaceful station, but a power cut
-    // wakes them into open hostility — the standing cost of the power-cut path,
-    // felt even in an otherwise non-hostile world.
-    const hostile =
-      w.hostile ||
-      dispositionToward(e, p.id) === 'Hostile' ||
-      (ai.faction === 'cop' && w.alarm >= 2) ||
-      (e.archetype === 'robot' && anyPowerCut(w))
-    if (!hostile) continue
+  // #63: score any Hostile entity, not only players. The player-only scan is
+  // the fast path when NPC-vs-NPC is forced off. Perf: naive O(N²) over the
+  // cast — fine at current NPC counts; bucket the wide scan if deeper floors
+  // grow the population (noted on the issue).
+  const pool = w.aiFlags?.npcVsNpc === false ? w.entities.filter((x) => x.playerCtl) : w.entities
+  for (const p of pool) {
+    if (p === e || p.dead || !p.health) continue
+    if (!isHostileTarget(w, e, p)) continue
     const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
     if (!perceives(w, e, p)) continue // must actually perceive it (range + LOS, cloak-aware)
     const hate = hateToward(w, e, p.id)

@@ -1,7 +1,7 @@
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import type { World } from '../world'
-import { isImmobilized } from './statusFx'
+import { hasStatus, isImmobilized, removeStatus } from './statusFx'
 
 // Dodge-roll tuning (Enter-the-Gungeon flavour). Ticks are absolute-tick windows,
 // so the whole mechanic is a pure function of world tick + input — no timers.
@@ -21,6 +21,13 @@ export const ROLL_SPEED = 12
  * roll-spam can't cheese past zero — the douse clamps at extinguished and the
  * cooldown gates re-rolling anyway. */
 export const DOUSE_TICKS = 150
+/** Shake-off: pressing dodge while ELECTRIFIED can't start a roll (you're
+ * immobilised), but each press chips this many ticks off the shock — a struggle
+ * to break free. Edge-triggered (InputCmd.roll is one press each), a FLAT chunk
+ * so it's legible ("mash to recover") and clamps at cleared; against the 30-tick
+ * environmental zap and the 45-tick Tesla hit that's a few mashes to break out,
+ * so it shortens the stun without trivially cancelling it. */
+export const SHOCK_SHAKE_TICKS = 8
 
 /** True while `e` is inside its active roll window at `tick` — the single source
  * of truth for i-frames (combat), the movement burst, and the render tumble. */
@@ -44,11 +51,29 @@ export const rollSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // snapshots clean and the ready-check a simple presence test.
     if (pc.roll && w.tick >= pc.roll.cooldownUntilTick) pc.roll = undefined
     if (e.dead || pc.downed) continue
+    const cmd = inputs.get(pc.playerId)
+
+    // Mash-out: a dodge press while ELECTRIFIED can't start a roll, but it shakes
+    // off a bit of the shock (SHOCK_SHAKE_TICKS) — a struggle to break free. We
+    // shorten the effect's ABSOLUTE expiry (snapshot-safe); once the remaining
+    // shock is within one chunk the press clears it outright, so it can't
+    // underflow past zero. Placed before BOTH the roll-in-progress gate and the
+    // immobilise gate below — either would otherwise swallow the press and leave
+    // an electrified player with no way to struggle free. One reduction per
+    // press: InputCmd.roll is edge-triggered by every input source, so mashing
+    // (not holding) is what drives it, mirroring how a roll itself is triggered.
+    if (cmd?.roll && hasStatus(e, 'electrified')) {
+      const shock = e.fx!.electrified
+      if (shock.until - w.tick <= SHOCK_SHAKE_TICKS) removeStatus(e, 'electrified')
+      else shock.until -= SHOCK_SHAKE_TICKS
+      continue
+    }
+
     // Already rolling, or still cooling down → ignore further roll presses.
     if (pc.roll) continue
+
     const stunned = e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)
     if (stunned || isImmobilized(e)) continue
-    const cmd = inputs.get(pc.playerId)
     if (!cmd || !cmd.roll) continue
 
     // Roll in the move direction; fall back to facing when the stick is centred.

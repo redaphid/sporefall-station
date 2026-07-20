@@ -5,8 +5,8 @@ import { hotbarSlots } from '../ui/hotbarModel'
 import { selectAim } from './aim'
 import { assignPads } from './padAssign'
 import { initialJoinIntent, stepJoinIntent, type JoinIntentState } from './padJoin'
-import { padProfile } from './padProfile'
-import { readPad, type PadState } from './readPad'
+import { padProfile, type PadKind } from './padProfile'
+import { buttonPressed, readPad, type PadState } from './readPad'
 import { isPadCaptureActive, remapProfile } from './remap'
 
 /**
@@ -29,6 +29,17 @@ export interface CoopDebugPad {
   id: string
   slot: number | null
   state: PadState
+  /** RAW diagnostics for the controllers overlay (F9 / ?pads=1). These are the
+   * ground-truth the shared button map is decoded FROM, so a non-standard pad
+   * (e.g. an 8BitDo in D-input mode, whose driver indices are not the W3C order)
+   * can be read off directly: which physical button lands on which index, and
+   * what the axes report. Optional so test fixtures need not fabricate them. */
+  mapping?: string
+  kind?: PadKind
+  /** Indices currently pressed (via readPad's own press definition). */
+  buttonsDown?: number[]
+  /** Raw axis values, as the driver reports them. */
+  axes?: number[]
 }
 
 export interface CoopSample {
@@ -214,6 +225,10 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
       id: p.id,
       slot: assignments.has(p.index) ? assignments.get(p.index)! : null,
       state: states.get(p.index) ?? idle,
+      mapping: p.mapping,
+      kind: padProfile(p).kind,
+      buttonsDown: p.buttons.map((_, i) => i).filter((i) => buttonPressed(p, i)),
+      axes: [...p.axes],
     }))
 
     for (const p of live) last.set(p.index, states.get(p.index) ?? idle)

@@ -94,11 +94,19 @@ export class HostSession implements Session {
   }
 
   /** Play again from a game-over: rebuild the run in place. (Solo has no
-   * transport; joined co-op pads re-press to rejoin.) */
-  restart(): void {
+   * transport; joined co-op pads re-press to rejoin.) A `seed` argument starts a
+   * FRESH run from a new seed ("New Seed"); omitted replays the current seed. */
+  restart(seed?: number): void {
+    if (seed !== undefined) this.seed = seed >>> 0
     this.joined.clear()
     this.buildRun()
     this.isPaused = false
+  }
+
+  /** The current run's seed — the app layer reads it to choose a DIFFERENT one
+   * for "New Seed". */
+  get currentSeed(): number {
+    return this.seed
   }
 
   private spawnJoined(slot: number): void {

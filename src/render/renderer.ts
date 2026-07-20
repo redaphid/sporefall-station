@@ -59,6 +59,10 @@ export interface GameRenderer {
    * live art registry (so it matches the active theme exactly), cached per key,
    * cache dropped on theme swap. Undefined when extraction isn't possible. */
   entityThumb(artKey: string): string | undefined
+  /** Procedural weapon-art thumbnail (loadout panel picture) for a weapon id, as
+   * a PNG data URL from the live theme's art. Cached; undefined when extraction
+   * isn't possible (headless). */
+  weaponThumb(weaponId: string): string | undefined
   /** Where a world tile coord is ACTUALLY drawn, in screen px — read straight
    * off the world container's live transform (post edge-clamp, post shake).
    * The e2e ground truth that DOM overlays (mission marker, locator) must
@@ -301,12 +305,28 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     thumbs.set(artKey, url)
     return url
   }
+  // Loadout-panel weapon pictures: weapon id → data URL, extracted from the live
+  // procedural weapon art (art.weaponTexture). Same cache discipline as thumbs.
+  const weaponThumbs = new Map<string, string | undefined>()
+  const weaponThumb = (weaponId: string): string | undefined => {
+    if (weaponThumbs.has(weaponId)) return weaponThumbs.get(weaponId)
+    let url: string | undefined
+    try {
+      const canvas = app.renderer.extract.canvas(inner.weaponTexture(weaponId)) as HTMLCanvasElement
+      url = typeof canvas.toDataURL === 'function' ? canvas.toDataURL() : undefined
+    } catch {
+      url = undefined // headless/degraded contexts: the panel falls back to a glyph
+    }
+    weaponThumbs.set(weaponId, url)
+    return url
+  }
   const setTheme = async (id: string): Promise<void> => {
     chain = await loadThemeChain(id)
     setActiveThemeChain(chain)
     inner = await buildArt(chain)
     applyThemePalette(chain)
     thumbs.clear() // thumbnails must re-extract from the swapped registry
+    weaponThumbs.clear() // weapon pictures too
     // Rebake the static tile layer and drop pooled entity sprites so every
     // layer re-pulls textures from the swapped registry on the next frame.
     if (currentLevel) tilemap.build(currentLevel, art)
@@ -351,6 +371,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     camera,
     setTheme,
     entityThumb,
+    weaponThumb,
     worldToScreen(wx: number, wy: number): { x: number; y: number } {
       // The live container transform — the rendered truth, no re-derived math.
       const p = world.toGlobal({ x: wx * TILE_PX, y: wy * TILE_PX })

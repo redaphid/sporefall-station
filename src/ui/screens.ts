@@ -2,6 +2,8 @@ import type { RenderView } from '../app/session'
 import { MODS } from '../game/data/mods'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 import { markUiChrome } from './chrome'
+import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
+import { buildLoadout } from './loadoutModel'
 
 export interface Screens {
   update(view: RenderView): void
@@ -45,7 +47,16 @@ export type CameraSource = () => Omit<CameraState, 'levelW' | 'levelH'>
 
 /** Floor-change flash, the run-over overlay, and the co-op locator. All DOM.
  * (The mission readout moved into missionPanel.ts — the tappable chip/panel.) */
-export const createScreens = (mount: HTMLElement, onRestart?: () => void, cameraSource?: CameraSource): Screens => {
+export const createScreens = (
+  mount: HTMLElement,
+  onRestart?: () => void,
+  cameraSource?: CameraSource,
+  /** "New Seed" — restart into a FRESH seed. Wired on host/solo; omitted on a
+   * client (which can't drive the seed) so the button simply isn't shown. */
+  onNewSeed?: () => void,
+  /** Procedural weapon-art thumbnail provider for the loadout panel. */
+  weaponThumb?: WeaponThumb,
+): Screens => {
   const banner = document.createElement('div')
   banner.style.cssText =
     'position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);color:#ffd76a;font:800 28px system-ui;' +
@@ -60,11 +71,31 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
   overlay.innerHTML = `
     <div id="headline" style="font:800 34px system-ui;color:#e0483f">YOU GOT ROLLED</div>
     <div id="stats"></div>
-    <button id="restart" style="font:600 16px system-ui;padding:10px 26px;border-radius:8px;border:0;
-      background:#7fd17f;color:#0b0b12;cursor:pointer">Run it back</button>
+    <div id="loadoutHost" style="display:flex;justify-content:center;width:100%"></div>
+    <div id="btnRow" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button id="restart" style="font:600 16px system-ui;padding:10px 26px;border-radius:8px;border:0;
+        background:#7fd17f;color:#0b0b12;cursor:pointer">Run it back</button>
+      <button id="newseed" style="font:600 16px system-ui;padding:10px 26px;border-radius:8px;border:1px solid #ffd76a;
+        background:#1b1e28;color:#ffd76a;cursor:pointer">🎲 New Seed</button>
+    </div>
   `
   mount.appendChild(overlay)
   const headline = overlay.querySelector<HTMLElement>('#headline')!
+
+  // The gun + mods readout, shared with the pause overlay's copy in main.ts.
+  const loadout = createLoadoutPanel(weaponThumb)
+  overlay.querySelector<HTMLElement>('#loadoutHost')!.appendChild(loadout.el)
+
+  const newseedBtn = overlay.querySelector<HTMLButtonElement>('#newseed')!
+  if (onNewSeed) {
+    newseedBtn.addEventListener('click', () => {
+      overlay.style.display = 'none'
+      onNewSeed()
+    })
+  } else {
+    // Client (or no seed authority): New Seed isn't ours to drive.
+    newseedBtn.style.display = 'none'
+  }
 
   // NOTE: the old fixed-position "exit compass" that lived here is gone — it
   // did no world→screen projection (window-pinned bottom-centre, even with the
@@ -183,6 +214,8 @@ export const createScreens = (mount: HTMLElement, onRestart?: () => void, camera
               : onRestart
                 ? 'Restart the run now, or wait for a revive.'
                 : 'Waiting on your team…'
+          // Freeze the fallen player's gun + mods into the panel as it opens.
+          loadout.update(buildLoadout(view.self))
           overlay.style.display = 'flex'
         } else {
           // Revived / fresh run began — drop back into play.

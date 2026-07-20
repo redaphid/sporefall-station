@@ -44,7 +44,8 @@
       "health": {
         "hp": 88,
         "max": 120,
-        "iframes": 1
+        "iframes": 1,
+        "lastHurtTick": 36
       },
       "combat": {
         "weapon": "pistol",
@@ -96,7 +97,8 @@
       "health": {
         "hp": 18,
         "max": 60,
-        "iframes": 3
+        "iframes": 3,
+        "lastHurtTick": 38
       },
       "combat": {
         "weapon": "bat",

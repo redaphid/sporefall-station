@@ -140,7 +140,16 @@ export interface Entity {
   radius: number
   facing: number // radians
 
-  health?: { hp: number; max: number; iframes: number }
+  health?: {
+    hp: number
+    max: number
+    iframes: number
+    /** Absolute tick of the last LANDED blow (set by combat.applyDamage and the
+     * shock arc). Drives passive regen: the "unharmed" clock (systems/regen.ts)
+     * counts from here. Optional/absent until first hurt, so pre-feature snapshots
+     * round-trip byte-for-byte (same discipline as `mods`/`annotations`). */
+    lastHurtTick?: number
+  }
   // (Spawn-protection grace for players rides `health.iframes` — see
   // SPAWN_GRACE_TICKS below — so every damage source already honors it.)
   combat?: { weapon: string; cooldown: number }
@@ -154,6 +163,12 @@ export interface Entity {
     activeSlot: number
     cash: number
     crimeUntilTick: number
+    /** Passive-regen bookkeeping (systems/regen.ts): consecutive ticks this player
+     * has been BOTH completely still and unharmed. Reset to absent the instant they
+     * move or take a hit; once it reaches REGEN_CALM_TICKS the player heals over
+     * time. Absent (never 0) when the streak is broken, so an active/moving player
+     * serializes byte-for-byte as before this feature. */
+    regenCalm?: number
     downed?: { bleedTicks: number; reviveProgress: number }
     /** Timed action in progress (lockpicking). Deliberate movement, damage, or
      * drifting out of range cancels it. `total` is the full channel length so

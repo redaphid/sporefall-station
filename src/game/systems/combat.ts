@@ -88,6 +88,11 @@ export const applyDamage = (
   if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
+  // Stamp the last-hurt tick: passive regen (systems/regen.ts) counts its
+  // "unharmed" window from here, so any landed blow (even a clamped 0-damage one)
+  // interrupts and restarts the wait. Only LANDED blows reach this line — the
+  // iframes/roll/downed/resist early-outs above never do.
+  target.health.lastHurtTick = w.tick
   if (target.status) {
     target.status.hitFlashUntil = w.tick + FLASH_TICKS
     target.status.sleep = 0 // damage wakes sleepers

@@ -126,7 +126,27 @@ export const startHub = (port = DEFAULT_HUB_PORT, opts: HubOpts | ((m: string) =
         case 'hello':
           role = msg.role
           if (role === 'game') {
-            const id = `g${++gameSeq}`
+            // A client that persists a STABLE id (survives reload/New-Seed/death)
+            // re-registers under the SAME id: treat it as a RECONNECTION of the same
+            // logical game — evict the prior socket (drop the frozen zombie) and reuse
+            // the id, never minting a fresh `g#`. Clients without a stable id fall back
+            // to connection-order ids (backward compatible). Handles both orderings of
+            // the reconnect race (old close before/after the new hello): the guarded
+            // close handler below only drops `byId` when it still points at THIS entry.
+            const stableId = typeof msg.gameId === 'string' && msg.gameId ? msg.gameId : undefined
+            const id = stableId ?? `g${++gameSeq}`
+            if (stableId) {
+              const prev = byId.get(stableId)
+              if (prev && prev.socket !== sock) {
+                games.delete(prev.socket)
+                try {
+                  prev.socket.close()
+                } catch {
+                  /* already closing */
+                }
+                log(`game reconnected: ${id} — replaced prior connection`)
+              }
+            }
             const entry: InternalGame = { id, name: msg.name ?? id, socket: sock, connectedAt: now(), lastSeen: now(), tick: null, lastTickAt: now(), gameOver: false }
             games.set(sock, entry)
             byId.set(id, entry)
@@ -189,7 +209,10 @@ export const startHub = (port = DEFAULT_HUB_PORT, opts: HubOpts | ((m: string) =
       const g = games.get(sock)
       if (g) {
         games.delete(sock)
-        byId.delete(g.id)
+        // Only drop the id if it STILL points to this entry: a stable-id reconnection
+        // may have already rebound `byId[id]` to the new socket, and a late close of
+        // the old socket must not evict the fresh registration.
+        if (byId.get(g.id) === g) byId.delete(g.id)
         log(`game disconnected: ${g.id} — ${games.size} remaining`)
       }
       debuggers.delete(sock)

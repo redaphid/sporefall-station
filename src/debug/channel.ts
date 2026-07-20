@@ -12,12 +12,62 @@
 // testing. `connectWithBackoff` transparently re-dials the hub with exponential
 // backoff so a long e2e/record session survives drops without losing the game.
 
+import { migrateLegacyKey, type LocalStorageLike } from '../app/storageMigration'
 import type { SimEvent } from '../game/types'
 import type { World } from '../game/world'
 import type { GameHarness } from './harness'
 import { runHarnessVerb } from './harness'
 import type { DebugMsg, HelloMsg } from './protocol'
 import { runVerb, verbName, WRITE_VERBS } from './verbs'
+
+/** localStorage slot for the STABLE debug game id (post-rebrand convention). */
+export const DEBUG_GAME_ID_KEY = 'sporefall.debugGameId'
+/** Pre-rebrand key for the same id, read-migrated once into `DEBUG_GAME_ID_KEY`. */
+export const LEGACY_DEBUG_GAME_ID_KEY = 'sor.debugGameId'
+
+/** Best-effort access to `window.localStorage`, or `undefined` where it is absent
+ * (headless Node harness / privacy-locked webview) — resolution then falls back to
+ * an ephemeral id and the hub's connection-order behavior. */
+const domIdStore = (): LocalStorageLike | undefined => {
+  try {
+    return typeof localStorage !== 'undefined' ? (localStorage as LocalStorageLike) : undefined
+  } catch {
+    return undefined // access itself can throw in locked-down webviews
+  }
+}
+
+/** A fresh UUID — app/debug layer, so `crypto.randomUUID()` is fine (the `src/game/`
+ * determinism ban does not apply here). `undefined` where no crypto source exists. */
+const randomGameId = (): string | undefined => {
+  try {
+    return globalThis.crypto?.randomUUID?.()
+  } catch {
+    return undefined
+  }
+}
+
+/** Resolve the STABLE per-browser/tab debug game id: read it from localStorage if
+ * present (migrating a legacy `sor.*` value forward), else mint one via
+ * `crypto.randomUUID()` and persist it. Because it is persisted, it survives reload,
+ * New-Seed, and death — so the hub re-registers every one as the SAME logical game
+ * instead of churning `g#`. A DIFFERENT browser has a different localStorage and so
+ * is genuinely a different instance. Returns `undefined` only when neither a store
+ * nor a UUID source is available (headless) — callers then omit `gameId` and the hub
+ * falls back to connection-order ids (backward compatible). Store/generator are
+ * injectable for tests. */
+export const resolveDebugGameId = (store = domIdStore(), gen: () => string | undefined = randomGameId): string | undefined => {
+  if (!store) return gen()
+  try {
+    migrateLegacyKey(store, DEBUG_GAME_ID_KEY, LEGACY_DEBUG_GAME_ID_KEY)
+    const existing = store.getItem(DEBUG_GAME_ID_KEY)
+    if (existing) return existing
+    const fresh = gen()
+    if (fresh) store.setItem(DEBUG_GAME_ID_KEY, fresh)
+    return fresh
+  } catch {
+    return gen() // a storage failure must never wedge the debug link
+  }
+}
 
 export interface DebugChannel {
   /** Call once per sim tick, after `session.tick()`: stream this tick's events
@@ -37,6 +87,10 @@ export interface ChannelOpts {
   WebSocketImpl?: typeof WebSocket
   /** Stable label sent in `hello` so the hub can identify/route this game. */
   name?: string
+  /** STABLE game id sent in `hello`. Persisted per browser/tab (see
+   * `resolveDebugGameId`), so the hub reuses the SAME id across reload/New-Seed/death
+   * instead of minting a fresh `g#`. Omitted → the hub auto-assigns (backward compat). */
+  gameId?: string
   /** Renderer hook for the `theme` verb (presentation-only hot-swap); absent in
    * headless contexts, where the verb reports itself unavailable. */
   setTheme?: (id: string) => void
@@ -113,7 +167,7 @@ const connectWithBackoff = (
     ws.onopen = () => {
       ready = true
       attempt = 0
-      const hello: HelloMsg = { t: 'hello', role: 'game', ...(opts.name ? { name: opts.name } : {}) }
+      const hello: HelloMsg = { t: 'hello', role: 'game', ...(opts.name ? { name: opts.name } : {}), ...(opts.gameId ? { gameId: opts.gameId } : {}) }
       ws!.send(JSON.stringify(hello))
       log(`[debug] connected to ${url}`)
     }
@@ -275,12 +329,18 @@ export const startDebugLink = (
   log: (m: string) => void = console.log,
   opts: ChannelOpts = {},
 ): DebugLink => {
-  let channel = startDebugChannel(world, url, log, opts)
+  // Resolve the STABLE game id ONCE and reuse it for every (re)connect — the initial
+  // dial AND every New-Seed/death `rebind`. The hub then sees each re-registration as
+  // the SAME logical game (same id, prior socket evicted) instead of churning `g#`.
+  // An explicit `opts.gameId` (tests) wins; otherwise fall back to the persisted id.
+  const gameId = opts.gameId ?? resolveDebugGameId()
+  const linkOpts: ChannelOpts = gameId ? { ...opts, gameId } : opts
+  let channel = startDebugChannel(world, url, log, linkOpts)
   return {
     afterTick: () => channel.afterTick(),
     rebind: (next: World): void => {
       channel.stop() // close the old socket → hub drops the frozen zombie registration
-      channel = startDebugChannel(next, url, log, opts) // fresh hello, bound to the NEW world
+      channel = startDebugChannel(next, url, log, linkOpts) // fresh hello, SAME stable id, NEW world
     },
     stop: () => channel.stop(),
   }

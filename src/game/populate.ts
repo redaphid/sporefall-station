@@ -60,6 +60,48 @@ export const populateWorld = (w: World): void => {
   spawnStreetLife(w, rng, wrng)
   sprinkleLoot(w, rng)
   scatterModPickups(w)
+  // #78 follow-up: seed the resist-differentiated Sporefall roster into normal
+  // encounters on its OWN rng fork, so the loot/position/weapon dice above stay
+  // byte-identical per seed — only the entity list grows.
+  spawnEncounters(w, w.rng.fork('encounters'))
+}
+
+/** #78 — inject the Sporefall threat roster (brute/cinder/sporeling/robot) into
+ * normal floors so the anti-dominance matchups (burn the brute, shoot the
+ * cinder, fire/bullets the swarm, fire the robot) actually come up in play.
+ * Weighted by floor + theme, deterministic on its isolated `encounters` fork; no
+ * weapon roll (creatures keep their signature weapon), so the npc-weapons stream
+ * is untouched too. */
+const spawnEncounters = (w: World, erng: Rng): void => {
+  const theme = w.level.theme
+  const floor = w.floor
+  for (const b of w.level.buildings) {
+    // Spore-vermin: a swarm that thickens with depth (and where blooms grow).
+    let sporelings = 0
+    if (erng.chance(floor >= 2 ? 0.45 : 0.2)) sporelings += erng.int(1, 1 + Math.min(3, floor))
+    // Cinders: industrial fire-dwellers (a fireproof answer to a flame build).
+    let cinders = 0
+    if (theme === 'industrial' && erng.chance(0.5)) cinders += erng.int(1, 2)
+    else if (erng.chance(0.12)) cinders += 1
+    // Brutes: armoured spikes on deeper floors — bring fire, not bullets.
+    let brutes = 0
+    if (floor >= 3 && erng.chance(0.35)) brutes += 1
+    else if (floor >= 2 && erng.chance(0.12)) brutes += 1
+    // Derelict Units: industrial/deep — armour + bio-inert, servos cook to fire.
+    let robots = 0
+    if ((theme === 'industrial' || floor >= 4) && erng.chance(0.3)) robots += 1
+    for (const [arch, n] of [
+      ['sporeling', sporelings],
+      ['cinder', cinders],
+      ['brute', brutes],
+      ['robot', robots],
+    ] as const) {
+      for (let i = 0; i < n; i++) {
+        const spot = randomFloorInBuilding(w, erng, b)
+        if (spot) spawnNpc(w, arch, spot.x, spot.y)
+      }
+    }
+  }
 }
 
 const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number, number] }[]> = {

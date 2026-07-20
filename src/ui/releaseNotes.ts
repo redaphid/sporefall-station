@@ -9,9 +9,9 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'New enemies: brute, cinder, sporeling swarms',
   'Swarms converge on the loudest bait',
   'Panic spreads — crowds stampede in waves',
-  'New enemy types demand different weapons',
   'NPCs work and defend their own buildings',
 ]
 

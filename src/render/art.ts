@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Texture, type Renderer } from 'pixi.js'
 import { Tile } from '../game/levelgen/level'
-import { MODS } from '../game/data/mods'
+import { modPickupColor } from './modColors'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
@@ -496,11 +496,11 @@ export const createArt = (
       g.destroy()
       return tex
     }
-    // A weapon-mod pickup: a rarity-coloured diamond gem (common grey · rare blue ·
-    // legendary gold) so a kid can spot "a mod, and how special" from across a room.
+    // A weapon-mod pickup: a diamond gem tinted with the mod TYPE's own unique
+    // colour (see modColors.ts) so a kid can tell which mod it is from across a
+    // room. Unknown/new ids fall back to a neutral slate.
     if (archetype.startsWith('mod.')) {
-      const rarity = MODS[archetype.slice('mod.'.length)]?.rarity
-      const gem = rarity === 'legendary' ? 0xffb020 : rarity === 'rare' ? 0x4aa3ff : 0xff5bd0
+      const gem = modPickupColor(archetype.slice('mod.'.length))
       const r = TILE_PX * 0.28
       const g = new Graphics()
         .poly([r, 0, r * 2, r, r, r * 2, 0, r])

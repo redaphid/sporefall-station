@@ -16,6 +16,9 @@ export interface ScriptStep {
   y?: number
   /** Held down for every tick of the segment (cooldown-gated by the sim). */
   attack?: boolean
+  /** The USE/throw button, held for every tick of the segment (cooldown-gated):
+   * uses the held/active item, or dodge-rolls when there's nothing usable. */
+  use?: boolean
   /** Edge actions: fire once, on the first tick of the segment. */
   interact?: boolean
   special?: boolean
@@ -31,6 +34,7 @@ const stepCmd = (s: ScriptStep, i: number, seq: number): InputCmd => {
   cmd.moveX = s.x ?? 0
   cmd.moveY = s.y ?? 0
   cmd.attack = !!s.attack
+  cmd.throwItem = !!s.use
   cmd.interact = !!s.interact && i === 0
   cmd.special = !!s.special && i === 0
   cmd.roll = !!s.roll && i === 0
@@ -164,13 +168,13 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 49 }, // stand healed; nothing was fired
   ],
 
-  // Fire→dodge-roll fallback headline: the active gun is OUT OF AMMO, so pressing
-  // FIRE (nothing to shoot, nothing usable) rolls instead of a dead click — the
-  // i-frames carry the player through an inbound bullet. Same duel world as
-  // dodgeRoll, triggered off the FIRE button. Backs feature-fire-item-roll.
-  fireFallbackRoll: [
+  // Use→dodge-roll fallback headline: hands hold nothing usable (an out-of-ammo
+  // gun), so pressing USE dodge-rolls ("backflip on the use key") — the i-frames
+  // carry the player through an inbound bullet. Same duel world as dodgeRoll,
+  // triggered off the USE button. Backs feature-fire-item-roll.
+  useFallbackRoll: [
     { ticks: 15 }, // the bullet closes in
-    { ticks: 1, attack: true, x: 1 }, // FIRE an empty gun → dodge-roll east through it
+    { ticks: 1, use: true, x: 1 }, // USE with nothing usable → dodge-roll east through it
     { ticks: 44 }, // finish the tumble, untouched
   ],
 

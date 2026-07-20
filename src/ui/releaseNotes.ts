@@ -11,7 +11,7 @@
 export const RELEASE_NOTES: readonly string[] = [
   'Renamed to Sporefall Station — new missions',
   'Aiming fixed — gamepad owns aim',
-  'Fire = use item; dodge-roll when empty',
+  'Fire uses your item; use-key dodge-rolls',
   'Rest to heal — stand still to regen HP',
 ]
 

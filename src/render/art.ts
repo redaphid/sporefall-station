@@ -749,11 +749,31 @@ export const createArt = (
         break
       }
       case 'gun': {
-        // Compact pistol: barrel forward, a stub grip below the breech.
-        g.roundRect(grip, my - 3, w - grip - 12, 6, 1.5).fill(darkSteel) // body/barrel
-        g.rect(w - 14, my - 4, 8, 8).fill(0x50535b) // breech block
-        g.rect(grip + 3, my + 2, 5, 7).fill(0x2f3138) // grip
-        g.circle(w - 5, my, 2).fill(0x2a2a30) // muzzle
+        // Semi-auto PISTOL, barrel along +x on the aim line (y = my), grip hung
+        // below the rear so the hand (grip anchor) holds the handle and the
+        // muzzle points straight down the aim. Reads grip + guard + slide + barrel.
+        const gx = grip
+        const gunGrip = 0x33363d
+        const frameY = my - 5 // top of the slide/frame
+        // Grip/handle: angled down and slightly back from the frame rear.
+        const handle = [gx - 1, frameY + 4, gx + 6, frameY + 4, gx + 4, my + 9, gx - 3, my + 8]
+        g.poly(handle).fill(gunGrip)
+        g.poly(handle).stroke({ width: 1, color: 0x101018, alpha: 0.55 })
+        // Trigger guard: a ring under the frame just forward of the grip.
+        g.circle(gx + 8, my + 3, 3).stroke({ width: 1.5, color: 0x2a2c33 })
+        // Slide / frame: the boxy top body.
+        g.roundRect(gx - 1, frameY, 22, 7, 1.5).fill(steel)
+        g.roundRect(gx - 1, frameY, 22, 7, 1.5).stroke({ width: 1, color: 0x101018, alpha: 0.5 })
+        // Rear slide serrations + a rear sight nub — grip texture that reads at zoom.
+        g.rect(gx + 1, frameY, 1.5, 7).fill({ color: 0x101018, alpha: 0.32 })
+        g.rect(gx + 4, frameY, 1.5, 7).fill({ color: 0x101018, alpha: 0.32 })
+        g.rect(gx, frameY - 1.5, 3, 1.5).fill(darkSteel) // rear sight
+        // Barrel: a slimmer bar from the slide to the muzzle, centred on the aim line.
+        const barX = gx + 20
+        g.rect(barX, my - 2, w - barX - 3, 4).fill(darkSteel)
+        g.rect(barX + 2, frameY + 1, 2, 1.5).fill(steel) // front sight
+        // Muzzle at the very tip, on the aim line where bullets exit.
+        g.circle(w - 3, my, 2).fill(0x1b1c21)
         break
       }
       case 'rod': {

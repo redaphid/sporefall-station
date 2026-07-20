@@ -301,6 +301,39 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 80 }, // briefcase auto-grabs → MISSION COMPLETE banner
   ],
 
+  // Weapon-AIM showcase (fix/weapon-aim-and-pistol-art): the held weapon points
+  // at the CONTINUOUS aim (facing = the move heading here), full 360° INCLUDING
+  // straight DOWN — decoupled from the body's 8-way sprite quantization. Move into
+  // open space, then pulse a facing and HOLD it (aim (0,0) holds the last heading)
+  // so the e2e can snap a still per direction: E, SE, S (down!), SW (west mirror),
+  // W. Backs the feature-weapon-aim stills.
+  aimShowcase: [
+    { ticks: 20 }, // settle
+    { ticks: 40, x: 1, y: 1 }, // walk into the open (SE), away from the walls
+    { ticks: 30 }, // settle, planted
+    { ticks: 5, x: 1 }, // face E (0°)
+    { ticks: 90 }, // hold E
+    { ticks: 5, x: 1, y: 1 }, // face SE (45°)
+    { ticks: 90 }, // hold SE
+    { ticks: 5, y: 1 }, // face S — straight DOWN (90°): the case the old code never showed
+    { ticks: 90 }, // hold DOWN
+    { ticks: 5, x: -1, y: 1 }, // face SW (135°, west mirror)
+    { ticks: 90 }, // hold SW
+    { ticks: 5, x: -1 }, // face W (180°, west mirror)
+    { ticks: 90 }, // hold W
+  ],
+
+  // Swing-composes-on-aim proof: face straight DOWN, then HOLD the attack — the
+  // melee arc sweeps around the downward aim (idle points down; attacking arcs
+  // about it), not around a fixed idle. Backs the feature-weapon-aim swing still.
+  aimDownSwing: [
+    { ticks: 20 }, // settle
+    { ticks: 40, y: 1 }, // walk down into the open, facing DOWN
+    { ticks: 10 }, // planted, facing down
+    { ticks: 120, attack: true }, // swing on cadence around the down aim
+    { ticks: 20 }, // aftermath
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

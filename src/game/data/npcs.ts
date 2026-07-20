@@ -166,6 +166,7 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,
+    behavior: 'vermin', // #66: a hive drawn to the loudest/brightest stimulus
     resist: { burning: 1.5, poisoned: 0.15, spore: 0 },
   },
 }

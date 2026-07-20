@@ -55,6 +55,7 @@ import {
 } from './goals'
 import { infectionActive } from './infection'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
+import { strongestStimulus } from './stimulus'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
 export const PATROL = 'patrol'
@@ -197,6 +198,21 @@ const fleeMemory: Consideration = (w, e) => {
   const t = w.byId.get(ai.targetId)
   if (!t || t.dead || dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) > ai.sightRange * 2) return []
   return [{ code: FLEE, score: MEMORY_SCORE, tier: TIER_MEMORY, target: ai.targetId }]
+}
+
+// ── #66 Draw field: a hive member with no direct target drifts toward the
+// STRONGEST nearby stimulus (loudest noise / brightest bloom / fire) — so a
+// swarm pools on a shared focus and can be baited off the players. A flocking
+// bias at MEMORY tier: it beats wander/investigate but any perceived target
+// (threat/infest, THREAT tier) still overrides it. ────────────────────────────
+export const DRAWN = 'drawn'
+const DRAW_RANGE = 16
+const DRAW_SCORE = WANDER_SCORE + 0.6
+
+const drawnToStimulus: Consideration = (w, e) => {
+  const s = strongestStimulus(w, e.pos.x, e.pos.y, DRAW_RANGE)
+  if (!s) return []
+  return [{ code: DRAWN, score: DRAW_SCORE, tier: TIER_MEMORY, at: { x: s.x, y: s.y } }]
 }
 
 // ── Investigate: a heard disturbance with nothing scarier around ───────────
@@ -431,6 +447,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   pursueMemory,
   fleeMemory,
   investigate,
+  drawnToStimulus,
   patrol,
   scavenge,
   garrison,
@@ -469,8 +486,12 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     considerations: ['fear', 'contagiousFear', 'threat', 'fleeMemory', 'scavenge', 'workMyRoom', 'wander'],
   },
   infected: {
-    about: '#64: a spore-turned host — shambles at the nearest clean body, never flees',
-    considerations: ['infest', 'pursueMemory', 'wander'],
+    about: '#64/#66: a spore-turned host — hunts the nearest clean body, else drifts toward the hive stimulus',
+    considerations: ['infest', 'drawnToStimulus', 'pursueMemory', 'wander'],
+  },
+  vermin: {
+    about: '#66: spore-vermin — attacks what it sees, else swarms toward the loudest/brightest stimulus',
+    considerations: ['threat', 'drawnToStimulus', 'wander'],
   },
 }
 

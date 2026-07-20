@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Swarms converge on the loudest bait',
   'Panic spreads — crowds stampede in waves',
   'New enemy types demand different weapons',
   'NPCs work and defend their own buildings',
-  'Factions fight each other — cops vs gangs',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

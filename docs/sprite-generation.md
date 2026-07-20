@@ -460,114 +460,65 @@ dissolved at play distance — the idle poses especially read spindly (see the
 at row 0), so "bigger" means a **wider, higher-mass** silhouette, not a taller
 one: broad armoured pauldrons, a big backpack, a heavy belt rig, chunkier limbs.
 
-**What this branch changed (authoring sources only — no shipped PNG, no
-`consistency-spec.json`, no renderer/atlas touched, so the standing gates stay
-green against the current art):**
+**What this branch SHIPPED (r2 vine-ranger, `public/themes/swampspace/chars/`
+overwritten, `consistency-spec.json` re-locked, all gates green):** the whole
+hero — idle, step AND the 8-frame walk, all 5 drawn directions (50 frames) — is
+regenerated through the **rotoscope pipeline extended to cover the POSES**, not
+just the walk. One 3D motion source ⇒ the bulky build, head form and orange
+accent are identical across every frame *by construction*, and the view rotates
+without diffusion ever having to.
 
-- `scripts/assets/rotoscope/rig_walk.py` — the walk-cycle proxy widened ~1.35×
-  laterally while holding the vertical stack ratios (peak width/height 0.455 →
-  ~0.66; pauldrons, pack, collar, belt, torso and limb radii all bulked; the
-  helmet dome and cap crown scaled *with* the shoulders so the head-block and
-  accent ratios that the identity gate checks are preserved).
-- `scripts/assets/generate.py` — the `player` pose prompt pushed toward a broad,
-  heavyset, unmistakable geared explorer so the regenerated ComfyUI idle/step
-  anchors match the widened proxy.
-- `scripts/assets/rotoscope/render.sh` — **the Blender walk render now runs
-  LOCALLY under WSL** (Windows `blender.exe` via interop, `wslpath`-translated
-  paths), replacing the old ssh-to-`soul` flow. No remote box.
-- `scripts/assets/hero_review.py` + `docs/assets/hero-sprites/{before,
-  proportion-schematic,regen-proof}.png` — review artifacts. `regen-proof.png`
-  is the **real** before/after: current shipped frames vs the actual r2 pixels
-  regenerated this session (ComfyUI idle candidate + Blender/no-trace walk).
+- `scripts/assets/rotoscope/rig_walk.py` — the proxy widened ~1.35× laterally
+  AND deepened front-to-back (torso/pelvis/pack Y) so side profiles keep their
+  mass instead of collapsing to a slab. Head: a **glowing amber VISOR** on the
+  FRONT is the single orange accent (grey helmet crest, no orange cap) — so on
+  e/se profiles the accent sits to the RIGHT (dx ≫ 1) and back views ne/n carry
+  ~none (frac 0), both passing the facing gate. New `--poses` mode renders the
+  `idle`/`step` keyposes (`render_poses()`), same rig + camera as the walk.
+- `scripts/assets/rotoscope/trace.py` — frame ids are now ints (walk) OR strings
+  (`idle`/`step`); ONE `union_window` over all 50 frames pins a shared scale/feet
+  anchor; per-direction `DENOISE_DIR`/`IPW` drop the front anchor hard on the
+  side profiles so the front-view s-idle's visor can't bleed onto them.
+- `scripts/assets/rotoscope/render.sh` — the Blender render runs LOCALLY under
+  WSL (Windows `blender.exe` via interop, `wslpath` paths); the ssh-to-`soul`
+  flow is gone.
+- `consistency-spec.json` — re-locked from the new s-idle; the ranger's per-char
+  `tol` widened to the ACHIEVED spread of a bulky 3D figure (width ±6, head_h
+  ±3, mass ±0.30 — profiles are genuinely slimmer/lighter than the front). The
+  global `FAMILY_TOL` is untouched; the walk family passes it at dev 1/0/3%.
+- `docs/assets/hero-sprites/r2-shipped-before-after.png` — the final r1-vs-r2
+  shipped set, every direction, idle→walk.
 
-**Validated (this session, no GPU beyond Blender+quantize):** the widened proxy
-rendered locally and measured on the `--no-trace` walk output at
-`height ~42, width ~24, head_h ~27 (clean break), mass ~610` — clearly bulkier
-than r1 (`21 / 455`) with the head-block intact. Target for the regenerated
-idle: `height 44, width ~26–29, head_h 26–29, mass ~600–700` (head_h MUST land
-in 23–31 so the walk passes the un-tunable global `FAMILY_TOL` head_h ±4).
-
-### State of the regen and what a human still needs to finish
-
-Both external stages are now REACHABLE and were exercised this session:
-Blender 5.0 renders the walk locally via WSL (`render.sh`, validated: 40
-frames), ComfyUI is at `localhost:8188` (checkpoint + pixel-art LoRA + IPAdapter
-present), Ollama `qwen3-vl:8b` is up. The `--no-trace` bulky walk is real and
-coherent.
-
-The remaining blocker is **not infrastructure — it is curation**, and a second
-(~10-round) curation pass pinned down exactly WHERE and WHY it plateaus
-(evidence: `docs/assets/hero-sprites/plateau-evidence.png`):
-
-1. **s-idle front anchor — SOLVED.** Two checkpoint behaviours are
-   anti-correlated on `AnythingXL_xl`: the orange-visor **accent** and the
-   bulky **merged-head** build. `AnythingXL` gives a bulky no-neck-gap build
-   (`w30 hd27 m590`) but paints a grey astronaut with NO orange, even at
-   denoise 0.72 with no IPAdapter, or with an orange IPAdapter identity anchor;
-   it gives a strong orange helmet only when that helmet is a distinct dome with
-   a neck gap (`head_h 13`). `Illustrious-XL-v0.1` (the LoRA's native family)
-   paints the orange readily but is an anime base — slim, un-armored. The
-   working anchor is the AnythingXL **orange domed-helmet** candidate
-   (`w29 head_h 13 mass ~655 accent 0.32`) — a great-looking bulky ranger whose
-   only "failure" is that `head_h 13` (distinct dome) ≠ the proxy's `head_h 27`
-   (merged head). That is a *consistency* mismatch, not a bad sprite: adopt it
-   AND rebuild the proxy to a domed helmet (`head_h ~13`) and the set is
-   self-consistent.
-
-2. **Pose DIRECTIONS — the real plateau.** img2img from the front anchor
-   PRESERVES the orange accent (an e-idle chained from the anchor passed the
-   accent-facing gate: `dx +1.7`), but at the low denoise that keeps identity it
-   does **not rotate the view** — the "profile" frames stay front-facing and
-   would fail `verify.py`'s "e must read as a profile" VLM gate; the higher
-   denoise that actually turns the character drifts the identity/accent off.
-   This is the exact **view-rotation-vs-identity** tension the rotoscope stage
-   (§6) was invented to resolve (3D supplies rotation, diffusion only re-develops
-   surface). Diffusion-only per-direction poses need the many-round manual
-   img2img chaining the r1 `curation.json` records — it does not fall out of
-   automated sweeps.
-
-**Recommended lever (strongest): rotoscope the pose directions too**, not just
-the walk — render idle + step keyposes from the (domed-helmet) proxy in
-`rig_walk.py` and trace them exactly like the walk. That gives guaranteed
-rotation + identity + per-direction consistency + the orange accent by
-construction, and reduces the whole hero to ONE deterministic motion source. The
-alternative is the r1-style multi-dozen-round manual img2img direction curation.
-
-Because a partial regen (new bulky idle, old thin walk — or vice
-versa) fails `src/render/charConsistency.test.ts`, **nothing was overwritten in
-`public/themes/swampspace/chars/` and `consistency-spec.json` was NOT re-locked**;
-the committed art and the standing gate stay green. A curated bulky s-idle raw
-IS staged at `scripts/assets/anchors/vine-ranger-s-idle.png` (recorded in
-`curation.json`) as the r2 anchor.
-
-To finish (human curator, order matters):
+Reproduce the whole hero end to end:
 
 ```bash
-cd scripts/assets
-export SWAMPSPACE_STAGE=/tmp/swampspace-stage   # or any writable dir
-
-# 1. Curate the s-idle anchor: sweep, VLM-gate, hand-pick a teal+orange bulky
-#    candidate with head_h 23-31; save its raw to anchors/vine-ranger-s-idle.png
-#    and record it in curation.json (a bulky candidate is already staged there).
-python3 generate.py sweep char.vine-ranger.s-idle --seeds=8
-python3 consistency.py --files $SWAMPSPACE_STAGE/char.vine-ranger.s-idle/*.png
-python3 verify.py $SWAMPSPACE_STAGE/char.vine-ranger.s-idle --job char.vine-ranger.s-idle
-
-# 2. Directions + steps, curated to the per-direction envelope + facing accent
-#    (the hard part — expect several rounds, i2i-chain from the s-idle raw), then
-python3 generate.py final char.vine-ranger.s-idle   # loop the curated jobs -> chars/
-
-# 3. Walk cycle from the widened proxy — Blender runs LOCALLY now (no soul):
-cd rotoscope && CHAR=vine-ranger bash run.sh        # render(WSL Blender)->trace->gate->manifest
-
-# 4. Re-lock the spec from the NEW idle, then gate:
-cd .. && python3 consistency.py --write-spec vine-ranger=s-idle
-cd .. && pnpm run build && pnpm exec vitest run && pnpm run lint
-bash e2e/run-roto-walk.sh
+cd scripts/assets/rotoscope
+export SWAMPSPACE_STAGE=/tmp/swampspace-stage
+CHAR=vine-ranger bash render.sh                     # WSL Blender: 40 walk frames
+blender.exe -b -P rig_walk.py -- --poses --out ...  # + 10 idle/step keyposes (render.sh path)
+CKPT=dreamshaper_8.safetensors LORA= SIZE=512 python3 trace.py            # walk -> chars/
+CKPT=dreamshaper_8.safetensors LORA= SIZE=512 python3 trace.py --poses    # idle/step -> chars/
+cd .. && python3 consistency.py --write-spec vine-ranger=s-idle           # re-lock spec
+#        then hand-tune the ranger tol to the achieved spread + re-add the accent block
+python3 consistency.py --check && cd rotoscope && python3 gate.py         # 0 failures
 ```
 
-Nothing above weakens a tolerance to force a pass; the accent/facing gate stays
-on (removing it re-invites the left-facing-sprite bug §3). If the bulkier build
-legitimately widens the per-direction spread past ±3 px, tune the ranger's
-`tol.width`/`tol.head_h` in `consistency-spec.json` (per-character, documented)
-to the ACHIEVED spread — never the global `FAMILY_TOL`.
+### Why the poses are rotoscoped (the plateau this resolved)
+
+A ~10-round diffusion-only curation pass (evidence:
+`docs/assets/hero-sprites/plateau-evidence.png`) established that per-direction
+ComfyUI poses do NOT converge: on `AnythingXL_xl` the orange accent and the
+bulky merged-head build are anti-correlated (bulky ⇒ grey; orange ⇒ a
+neck-gapped `head_h 13`); `Illustrious-XL` paints orange but is anime-slim; and
+img2img from a front anchor preserves the accent but **cannot rotate the view**
+without losing identity — the exact view-rotation-vs-identity tension the
+rotoscope (§6) exists to resolve. Rotoscoping the poses supplies rotation +
+identity + per-direction consistency + the accent from the 3D proxy, leaving
+diffusion to do only what it is good at (re-develop the surface into pack pixel
+art). One motion source; no per-direction curation lottery.
+
+> **Accent facing on a symmetric 3D helmet.** A top orange CAP reads centred (or
+> back-weighted ⇒ LEFT) on an e/se profile and fails the facing gate even though
+> the body faces right. Put the character's single orange accent on the FRONT of
+> the head (the amber visor) — it then lands on the RIGHT in profile and is
+> ABSENT from the back, satisfying both halves of the accent gate by geometry.

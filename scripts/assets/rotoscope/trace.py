@@ -61,23 +61,53 @@ FRAMES = list(range(8))
 # gear. Front quarters take the bigger lift; n/ne stay lower because the
 # anchor is a FRONT view and over-weighting it bleeds a visor onto a back
 # view — which gate.py's VLM face check and the accent gate both fail on.
-IPW = {"s": 0.95, "se": 0.85, "e": 0.7, "ne": 0.6, "n": 0.55}
+# r2 (rotoscoped poses): the SIDE quarters (se/e) drop the anchor HARD. The
+# anchor is a FRONT-view s-idle; at high weight its centred orange visor bleeds
+# onto the profile and the accent centroid slides back to centre (dx→0), failing
+# the "drawn side art faces right" gate even though the proxy placed the orange
+# correctly to the right. The pose/build/colour are already pinned by the Blender
+# init + the signature-colour rescue, so the profiles need almost none of the
+# front anchor.
+IPW = {"s": 0.95, "se": 0.35, "e": 0.30, "ne": 0.6, "n": 0.55}
+# Per-direction denoise: profiles trace LOW so the proxy's own right-placed
+# cap/visor survives instead of being repainted as a centred front visor.
+DENOISE_DIR = {"se": 0.34, "e": 0.24}
 DIR_NEG = {
-    "e": "facing the viewer, front view, symmetrical face",
+    "se": "front view, facing the viewer, visor facing forward, symmetrical face",
+    "e": "front view, facing the viewer, visor facing forward, symmetrical face",
     "ne": "face, eyes, mouth, facing the viewer, front view",
     "n": "face, eyes, mouth, visor on the front, facing the viewer, front view",
 }
 
 
+# Frame ids are ints (walk cycle frames 0..7) OR strings ("idle"/"step", the
+# rotoscoped pose keyframes rendered by rig_walk.py --poses). Both come from the
+# SAME proxy/camera and are traced + downscaled through ONE shared window, so the
+# poses carry the walk's exact build, head form and orange accent (§8: diffusion
+# could not rotate the poses without losing identity — the 3D proxy does).
+POSE_FRAMES = ["idle", "step"]
+
+
+def frame_base(d, f):
+    """Blender/traced/white basename for a frame id."""
+    return f"walk-{d}-{f}" if isinstance(f, int) else f"pose-{d}-{f}"
+
+
+def out_name(d, f):
+    """Shipped chars/ filename stem: walk frames keep the -walk-<n> suffix,
+    pose frames ship as the plain -idle/-step keys the manifest expects."""
+    return f"{CHAR}-{d}-walk-{f}" if isinstance(f, int) else f"{CHAR}-{d}-{f}"
+
+
 def blend_path(d, f):
-    return os.path.join(BLEND, f"walk-{d}-{f}.png")
+    return os.path.join(BLEND, frame_base(d, f) + ".png")
 
 
 def prep_white(d, f):
     """Composite the transparent Blender frame onto flat white (the pack's
     generation background convention) for img2img."""
     os.makedirs(WHITE, exist_ok=True)
-    dest = os.path.join(WHITE, f"walk-{d}-{f}.png")
+    dest = os.path.join(WHITE, frame_base(d, f) + ".png")
     im = Image.open(blend_path(d, f)).convert("RGBA")
     bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
     bg.alpha_composite(im)
@@ -129,9 +159,9 @@ def trace(dirs, frames):
     anchor = os.path.join(G.ANCHORS, f"{CHAR}-s-idle.png")
     refs = [anchor] if os.path.exists(anchor) else None
     os.makedirs(TRACED, exist_ok=True)
-    want = {(d, f): os.path.join(TRACED, f"walk-{d}-{f}.png")
+    want = {(d, f): os.path.join(TRACED, frame_base(d, f) + ".png")
             for d in dirs for f in frames
-            if not os.path.exists(os.path.join(TRACED, f"walk-{d}-{f}.png"))}
+            if not os.path.exists(os.path.join(TRACED, frame_base(d, f) + ".png"))}
     if not want:
         return
     def submit(d, f):
@@ -141,7 +171,8 @@ def trace(dirs, frames):
                         + [f"two characters, crowd, cropped, close-up, portrait, {G.NEG_BASE}"])
         g = comfy.build_graph(
             pos=pos, neg=neg, seed=SEED, batch=1, refs=refs,
-            ip_weight=IPW[d], init=prep_white(d, f), denoise=DENOISE, alpha=False,
+            ip_weight=IPW[d], init=prep_white(d, f),
+            denoise=DENOISE_DIR.get(d, DENOISE), alpha=False,
             prefix=f"roto-{CHAR}-{TAG}-{d}-{f}",
         )
         pid = comfy.post("/prompt", {"prompt": g})["prompt_id"]
@@ -172,7 +203,7 @@ def trace(dirs, frames):
             outs = [o for o in entry["outputs"].values() if "images" in o]
             if not outs:
                 continue
-            _download(outs[-1]["images"][0], os.path.join(TRACED, f"walk-{d}-{f}.png"))
+            _download(outs[-1]["images"][0], os.path.join(TRACED, frame_base(d, f) + ".png"))
             del pending[pid]
             print(f"traced {d}-{f}  ({len(pending)} to go)", flush=True)
     if pending:
@@ -208,7 +239,7 @@ def post_frame(d, f, win, use_trace=True):
     import numpy as np
     src = Image.open(blend_path(d, f)).convert("RGBA")
     alpha = np.asarray(src)[..., 3]
-    tp = os.path.join(TRACED, f"walk-{d}-{f}.png")
+    tp = os.path.join(TRACED, frame_base(d, f) + ".png")
     if use_trace:
         rgb = np.asarray(Image.open(tp).convert("RGB").resize(src.size, Image.LANCZOS))
         # Signature-color rescue: the 3D proxy is a SEMANTIC mask — its cap
@@ -275,27 +306,34 @@ if __name__ == "__main__":
         return default
 
     dirs = [d for d in opt("--dirs", ",".join(DIRS)).split(",") if d]
-    frames = [int(f) for f in opt("--frames", ",".join(map(str, FRAMES))).split(",")]
+    # --poses traces the idle/step keyposes; default traces the 8-frame walk.
+    poses = "--poses" in args
+    if poses:
+        frames = [f for f in opt("--frames", ",".join(POSE_FRAMES)).split(",") if f]
+    else:
+        frames = [int(f) for f in opt("--frames", ",".join(map(str, FRAMES))).split(",")]
     bad = [d for d in dirs if d not in DIRS]
     if bad:
         sys.exit(f"unknown dirs {bad}")
     use_trace = "--no-trace" not in args
     if use_trace and "--post-only" not in args:
         trace(dirs, frames)
-    win = union_window(DIRS, FRAMES)  # always ALL frames: window must be global
-    print(f"window {win} denoise={DENOISE} seed={SEED} trace={use_trace}")
+    # ONE window over EVERY shipped frame (walk + poses) so walk/idle/step share
+    # an identical scale and feet anchor — no pumping when the player stops moving.
+    win = union_window(DIRS, list(FRAMES) + POSE_FRAMES)
+    print(f"window {win} denoise={DENOISE} seed={SEED} trace={use_trace} poses={poses}")
     os.makedirs(OUTDIR, exist_ok=True)
     import numpy as np
     for d in dirs:
         outs = [post_frame(d, f, win, use_trace=use_trace) for f in frames]
-        if frames == FRAMES:
+        if not poses and frames == FRAMES:  # temporal smooth only over the walk cycle
             arrs = [np.asarray(o).copy() for o in outs]
             masks = [a[..., 3] > 0 for a in arrs]
             arrs = temporal_smooth(arrs, masks)
             outs = [Image.fromarray(a, "RGBA") for a in arrs]
         for f, out in zip(frames, outs):
-            dest = os.path.join(OUTDIR, f"{CHAR}-{d}-walk-{f}.png")
+            dest = os.path.join(OUTDIR, out_name(d, f) + ".png")
             out.save(dest)
             print(f"{d}-{f} -> {dest}")
-    if frames == FRAMES:
+    if not poses and frames == FRAMES:
         strips(dirs)

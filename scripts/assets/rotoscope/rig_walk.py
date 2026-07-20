@@ -59,7 +59,15 @@ COL_SUIT = lin("#3a7a80")      # teal spacesuit
 COL_SUIT_DARK = lin("#24565c")  # lower legs / shading blocks
 COL_CAP = lin("#ff7a14")       # orange-amber cap (hot: must survive
                                # shading + palette-snap as #ff9032, not tan)
-COL_VISOR = lin("#1c1420")     # dark visor face
+COL_VISOR = lin("#ff9032")     # GLOWING AMBER visor (the ranger's signature,
+                               # docs: "large glowing orange-amber visor"). Made
+                               # hot-orange in r2 so the FRONT of the head carries
+                               # the accent: on e/se profiles the visor then sits
+                               # to the RIGHT of the body centroid and the
+                               # accent-facing gate passes by construction (a
+                               # top-only orange CAP spreads symmetrically under
+                               # the tracer and reads centred, dx→0). Snaps to the
+                               # locked accent #ff9032.
 COL_BOOT = lin("#6b4d26")      # tan-brown boots
 COL_STRAP = lin("#4a3419")     # leather chest strap
 COL_PACK = lin("#59636d")      # back pack: locked-palette GREY, not teal. The
@@ -142,7 +150,7 @@ def mat(name, color, glow=0.0):
 
 
 MATS = {}
-GLOW = {"cap": 0.55, "visor": 0.15}
+GLOW = {"cap": 0.55, "visor": 0.5}  # visor glows amber (signature accent)
 
 
 def M(name, color):
@@ -210,7 +218,7 @@ hips.location = (0, 0, HIP_H)
 # hip/belt rig: the curated ranger flares back OUT at the belt (span 15 after
 # a 13 waist) — pelvis plus utility pouches, so the head-block occupancy run
 # survives the waist and only breaks at the crotch.
-pelvis = box("pelvis", hips, (0, 0, 0.02), (0.54, 0.26, 0.18), ("suit", COL_SUIT))
+pelvis = box("pelvis", hips, (0, 0, 0.02), (0.54, 0.34, 0.18), ("suit", COL_SUIT))
 for side, sx in (("L", -1), ("R", 1)):
     box(f"pouch.{side}", hips, (sx * 0.31, -0.02, 0.0), (0.19, 0.16, 0.16),
         ("pouch", COL_POUCH))
@@ -235,8 +243,11 @@ spine.parent = hips
 spine.location = (0, 0, SPINE_OFF)
 
 # long, deep torso (0.20-0.55 of height) — the ranger is long-torsoed; widened
-# in r2 so the chest carries the broad-shouldered read down to the belt
-box("torso", spine, (0, 0, 0.30), (0.66, 0.30, 0.60), ("suit", COL_SUIT))
+# in r2 so the chest carries the broad-shouldered read down to the belt, and
+# DEEPENED (Y 0.30->0.42) so the side/quarter profiles keep the character's
+# mass instead of collapsing to a thin slab (keeps the per-direction envelope
+# tight instead of leaning on loose tolerances)
+box("torso", spine, (0, 0, 0.30), (0.66, 0.42, 0.60), ("suit", COL_SUIT))
 # chest rig plate: the geared read on the front quarter
 box("chestrig", spine, (0, -0.165, 0.32), (0.50, 0.07, 0.22), ("armor", COL_ARMOR))
 # leather chest strap: thin diagonal slab across the front
@@ -244,7 +255,7 @@ strap = box("strap", spine, (0, -0.158, 0.22), (0.54, 0.02, 0.07), ("strap", COL
 strap.rotation_euler = (0, math.radians(28), 0)
 # backpack: real bulk, and the thing that reads as gear from n/ne — enlarged in
 # r2 (wider AND deeper) so the pack hump is unmistakable from behind at zoom
-box("pack", spine, (0, 0.24, 0.34), (0.46, 0.30, 0.40), ("pack", COL_PACK))
+box("pack", spine, (0, 0.28, 0.34), (0.46, 0.40, 0.40), ("pack", COL_PACK))
 
 # collar: bridges shoulders to helmet. The ranger has NO bare neck — this
 # block is what keeps the head-block occupancy run unbroken from the helmet
@@ -287,7 +298,14 @@ box("visor", head, (0, -0.24, 0.03), (0.31, 0.10, 0.13), ("visor", COL_VISOR))
 # a different character), so this is the shape the identity gate allows. Scaled
 # WITH the dome in r2 (radius 0.24 vs skull 0.30), keeping the same
 # narrower-than-skull ratio so the accent fraction stays inside the gate.
-ball("cap", head, (0, 0.02, 0.29), 0.24, ("cap", COL_CAP), squash=(1.0, 1.05, 0.42))
+# Grey helmet crest (r2): the ranger's single orange accent is now the amber
+# VISOR on the FRONT of the head, NOT a cap. A top crown reads centred (or, when
+# back-weighted, LEFT) on an e/se profile and cancels the visor's right-placed
+# orange, failing the facing gate; an orange element that only ever shows on the
+# FRONT means s/se/e carry the accent to the right (dx≫0) while the back views
+# ne/n show ~no accent (frac 0 ≤ the back-view cap, passes trivially). The crest
+# stays as a grey helmet detail so the dome still reads as a helmet, not a ball.
+ball("cap", head, (0, 0.0, 0.30), 0.15, ("armor", COL_ARMOR), squash=(0.9, 1.15, 0.5))
 
 # ---- camera / light: the game's slight-high three-quarter read --------------
 ELEV = math.radians(14)
@@ -347,30 +365,23 @@ def leg_drop(th_deg, knee_deg):
     return THIGH * math.cos(th) + SHIN * math.cos(shin_angle)
 
 
-def pose(f):
-    k = f % 4
-    if f < 4:
-        r, l = R_LEG[k], L_LEG[k]
-        hip_yaw, sway = HIP_YAW[k], SWAY[k]
-    else:  # mirrored half: left leg does what right did
-        r, l = L_LEG[k], R_LEG[k]
-        hip_yaw, sway = -HIP_YAW[k], -SWAY[k]
-
+def apply_pose(r, l, hip_yaw=0.0, sway=0.0, bob=0.0):
+    """Set every joint for one keypose (legs, auto-grounded hips, spine, head,
+    counter-swinging arms). Shared by the walk cycle AND the idle/step poses so
+    they are literally the same rig — the build, head form and orange accent are
+    identical across every shipped frame by construction."""
     for side, (th, kn, ft) in (("R", r), ("L", l)):
         thighs[side].rotation_euler = (math.radians(-th), 0, 0)
         shins[side].rotation_euler = (math.radians(kn), 0, 0)
         boots[side].rotation_euler = (math.radians(-ft), 0, 0)
-
     # auto-ground: hips height so the lowest ankle sits just above the boot sole
     drop = max(leg_drop(*r[:2]), leg_drop(*l[:2]))
-    hips.location = (sway, 0, 0.12 + drop + 0.03 + BOB_ART[k])
+    hips.location = (sway, 0, 0.12 + drop + 0.03 + bob)
     hips.rotation_euler = (0, math.radians(-sway * 120), math.radians(hip_yaw))
-
     spine.rotation_euler = (math.radians(-6),  # forward lean (front = -Y)
                             math.radians(sway * 80),
                             math.radians(-hip_yaw * 0.7))
     head.rotation_euler = (math.radians(4), 0, math.radians(-hip_yaw * 0.3))
-
     # arms counter-swing (opposite the same-side leg), elbows carry through
     for side, leg in (("R", r), ("L", l)):
         arm_fwd = -0.75 * leg[0]
@@ -379,12 +390,52 @@ def pose(f):
         farms[side].rotation_euler = (math.radians(-elbow), 0, 0)
 
 
-for dname, yaw in DIRS.items():
-    root.rotation_euler = (0, 0, math.radians(yaw))
-    for f in range(FRAMES):
-        pose(f)
-        sc.render.filepath = f"{OUT}/walk-{dname}-{f}.png"
-        bpy.ops.render.render(write_still=True)
-        print(f"rendered walk-{dname}-{f}")
+def pose(f):
+    k = f % 4
+    if f < 4:
+        r, l = R_LEG[k], L_LEG[k]
+        hip_yaw, sway = HIP_YAW[k], SWAY[k]
+    else:  # mirrored half: left leg does what right did
+        r, l = L_LEG[k], R_LEG[k]
+        hip_yaw, sway = -HIP_YAW[k], -SWAY[k]
+    apply_pose(r, l, hip_yaw, sway, BOB_ART[k])
 
-print("RIG_WALK_DONE")
+
+# Static idle / step keyposes — the SAME proxy the walk uses, so the poses carry
+# the walk's bulky build, merged head (head_h family) and orange cap/visor accent
+# with zero drift; view rotation is the fixed ortho camera + root yaw, never
+# diffusion (that is the whole point — diffusion could not rotate the poses
+# without losing identity, §8). (right_leg, left_leg, hip_yaw, sway); legs are
+# (thigh, kneeFlex, footPitch).
+POSES = {
+    "idle": ((3, 10, 2), (3, 10, 2), 0.0, 0.0),          # square upright stance
+    "step": ((24, 8, 10), (-24, 30, -22), 6.0, 0.010),   # mid-stride, R leg forward
+}
+
+
+def render_walk():
+    for dname, yaw in DIRS.items():
+        root.rotation_euler = (0, 0, math.radians(yaw))
+        for f in range(FRAMES):
+            pose(f)
+            sc.render.filepath = f"{OUT}/walk-{dname}-{f}.png"
+            bpy.ops.render.render(write_still=True)
+            print(f"rendered walk-{dname}-{f}")
+    print("RIG_WALK_DONE")
+
+
+def render_poses():
+    for dname, yaw in DIRS.items():
+        root.rotation_euler = (0, 0, math.radians(yaw))
+        for name, (r, l, hy, sw) in POSES.items():
+            apply_pose(r, l, hy, sw, 0.0)
+            sc.render.filepath = f"{OUT}/pose-{dname}-{name}.png"
+            bpy.ops.render.render(write_still=True)
+            print(f"rendered pose-{dname}-{name}")
+    print("RIG_POSES_DONE")
+
+
+if "--poses" in argv:
+    render_poses()
+else:
+    render_walk()

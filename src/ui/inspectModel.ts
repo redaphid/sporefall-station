@@ -219,10 +219,16 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
     card.tagline ??= e.door.open ? 'Walk on through' : e.door.locked ? 'Locked — Use starts the pick (stand still), or blast it open' : 'Closed — opens on use'
   }
 
-  if (e.combat?.weapon) {
-    rows.push({ label: 'Weapon', value: itemName(e.combat.weapon) })
-    // Surface the equipped gun's mods so a kid can SEE their build (#41/#51).
-    if (e.playerCtl) for (const r of modRows(weaponStack(e))) rows.push(r)
+  // Anyone who can hold a weapon — an NPC via `combat.weapon`, a player via the
+  // equipped slot — gets a Weapon line so you can see what's pointed at you. Bare
+  // fists (or a missing weapon) read as "Unarmed" rather than the "Fists" item
+  // name or a blank. Mods on the equipped gun are surfaced for whoever carries
+  // them (weaponStack is empty for NPCs, whose weapons are vanilla today), so an
+  // NPC's build would be as legible as a player's (#41/#51).
+  if (e.combat) {
+    const wid = e.combat.weapon
+    rows.push({ label: 'Weapon', value: wid && wid !== 'fists' ? itemName(wid) : 'Unarmed' })
+    for (const r of modRows(weaponStack(e))) rows.push(r)
   }
 
   if (e.pickup) {

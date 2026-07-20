@@ -92,6 +92,10 @@ export type SimEvent =
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */
   | { type: 'modPickup'; entityId: EntityId; byId: EntityId; modId: string; weapon: string; maxed: boolean }
+  /** A dying NPC dropped its carried `itemId` weapon as a grabbable pickup
+   * (`entityId`) at `x,y`. `fromId` is the corpse it fell from. Rolled from the
+   * world RNG at the kill site — a pure function of seed + inputs. */
+  | { type: 'weaponDrop'; entityId: EntityId; fromId: EntityId; itemId: string; x: number; y: number }
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }

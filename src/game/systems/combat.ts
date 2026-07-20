@@ -16,6 +16,38 @@ const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
 
+/** Probability a dying NPC drops the weapon it was carrying as a grabbable
+ * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
+ * single death site, mirroring the codebase's per-system-constant convention
+ * (IFRAME_TICKS above, PICK_TICKS in interaction.ts). Any lethal death routes
+ * through `kill`, so an NPC felled by a player, a fire tick, or an explosion all
+ * roll identically. The roll draws from the world RNG (`w.rng`) so it is a pure
+ * function of seed + inputs — a test predicts every drop from the seed. */
+export const WEAPON_DROP_CHANCE = 0.25
+
+/** A weapon id a corpse can actually drop: a real slotted melee/ranged weapon in
+ * the registry, never innate 'fists' (the unarmed sentinel — dropping "Fists"
+ * would be nonsense). Unarmed NPCs return false here and never draw the RNG. */
+const isDroppableWeapon = (weaponId: string): boolean =>
+  weaponId !== 'fists' &&
+  (WEAPONS[weaponId]?.kind === 'melee' || WEAPONS[weaponId]?.kind === 'ranged')
+
+/** On an NPC death, occasionally drop its carried weapon as a world pickup the
+ * player can grab — reusing the `pickup.<itemId>` archetype + `collect` path
+ * (interaction.ts), so a dropped gun equips exactly like any floor weapon. The
+ * roll draws from `w.rng` ONLY when there is a real weapon to drop, so unarmed
+ * deaths never perturb the shared stream. NPC loadouts are innate (no inventory,
+ * no mods), so the weapon id is the whole of the carried state to preserve. */
+const rollWeaponDrop = (w: World, victim: Entity): void => {
+  const weaponId = victim.combat?.weapon
+  if (!weaponId || !isDroppableWeapon(weaponId)) return
+  if (!w.rng.chance(WEAPON_DROP_CHANCE)) return
+  const drop = makeEntity('pickup', `pickup.${weaponId}`, victim.pos.x, victim.pos.y, 0.3)
+  drop.pickup = { itemId: weaponId, qty: 1 }
+  addEntity(w, drop)
+  w.events.push({ type: 'weaponDrop', entityId: drop.id, fromId: victim.id, itemId: weaponId, x: victim.pos.x, y: victim.pos.y })
+}
+
 /** Interaction-matrix rule: a solid IMPACT on a frozen body shatters it — an
  * instant kill regardless of the blow's damage, clearing the frost. Only impact
  * (this path) shatters; damage-over-time never routes through here, so a frozen
@@ -127,7 +159,10 @@ export const kill = (w: World, target: Entity): void => {
     target.playerCtl.downed = { bleedTicks: 30 * 30, reviveProgress: 0 }
     return
   }
+  // NPC death: mark dead, then roll for a weapon drop. Ordering the roll AFTER
+  // `dead = true` keeps the spawned pickup from ever re-entering this same kill.
   target.dead = true
+  rollWeaponDrop(w, target)
 }
 
 /** Swing at the nearest live target inside range and a 90° arc around facing. */

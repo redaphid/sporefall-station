@@ -228,18 +228,25 @@ describe('inventory — adversarial', () => {
       expect(e.playerCtl!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
     })
 
-    it('through combatSystem: attacking while holding bandages wears the bat', () => {
+    it('through combatSystem: firing with bandages HELD uses the bandage, leaving the bat in hand', () => {
+      // Feature: the fire button uses a usable ACTIVE item instead of the swung
+      // weapon. Holding a bandage over an equipped bat → fire heals & spends the
+      // bandage; the bat is neither swung nor worn, and stays the swung weapon
+      // (not reset to fists) so the next non-consumable fire swings it again.
       const e = player(w)
-      dummy(w, 21, 20) // someone to hit so the swing lands
+      e.health!.hp = 60
+      dummy(w, 21, 20) // a target that WOULD be hit if the bat swung
       e.playerCtl!.inventory = [
         { itemId: 'bat', qty: 5 },
         { itemId: 'bandage', qty: 1 },
       ]
-      equipSlot(e, 0)
-      equipSlot(e, 1) // hold bandages, bat still swung
+      equipSlot(e, 0) // weapon = bat
+      equipSlot(e, 1) // hold the bandage as the active item
       combatSystem(w, attack())
-      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(4)
-      expect(e.playerCtl!.inventory.some((s) => s.itemId === 'bandage')).toBe(true)
+      expect(e.health!.hp).toBe(90) // 60 + 30 heal → the bandage was USED
+      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(5) // bat untouched
+      expect(e.combat!.weapon).toBe('bat') // still in hand, not reset to fists
+      expect(e.playerCtl!.inventory.some((s) => s.itemId === 'bandage')).toBe(false) // spent
     })
   })
 })

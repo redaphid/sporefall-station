@@ -1,16 +1,16 @@
 import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
-import { WEAPONS, type StatusApply } from '../data/items'
+import { WEAPONS, itemClass, type StatusApply } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
+import { activeStack, equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
-import { isRolling } from './roll'
+import { isRolling, tryStartRoll } from './roll'
 import { spawnSporeBurst } from './spore'
 
 const IFRAME_TICKS = 5
@@ -370,6 +370,15 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   return true
 }
 
+/** Item classes the FIRE button diverts to item-USE instead of a weapon shot:
+ * a consumable (bandage/medkit → heal, adrenaline → buff) or a throwable (lobbed).
+ * When the active slot holds one of these, "shooting" uses it via the same
+ * item-effect path as the dedicated Use button — no bullet is spawned. */
+const isUsableItem = (itemId: string): boolean => {
+  const c = itemClass(itemId)
+  return c === 'consumable' || c === 'throwable'
+}
+
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
@@ -389,6 +398,20 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     if (cmd.throwItem && e.combat.cooldown <= 0 && useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
-    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
+    // FIRE-button arbitration off the ACTIVE slot + availability:
+    //  1. a usable non-weapon in hand (bandage/consumable → heal, throwable →
+    //     lob) is USED via the same item-effect path as the Use button — the
+    //     "shooting uses my equipped item" rule. No bullet, no swing.
+    //  2. otherwise fire the equipped weapon (gun/melee/fists) — unchanged.
+    //  3. nothing to use AND nothing that can fire (an out-of-ammo gun clicks) →
+    //     dodge-roll instead of a no-op, respecting the roll cooldown so a
+    //     re-press mid-roll / on cooldown can't double-roll (tryStartRoll gates).
+    const active = activeStack(e)
+    if (active && isUsableItem(active.itemId)) {
+      if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
+      continue
+    }
+    if (fireWeapon(w, e)) continue // THE single fire-site: mods/elements/pellets fold in here
+    tryStartRoll(w, e, cmd.moveX, cmd.moveY) // empty-handed fallback → dodge-roll
   }
 }

@@ -8,7 +8,7 @@
 import { WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
 import type { World } from '../world'
-import { ALERT, PATROL, SCAVENGE, SEARCH, decide } from './behaviors'
+import { ALERT, GARRISON, PATROL, SCAVENGE, SEARCH, WORK, decide } from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
@@ -104,6 +104,15 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     // Sweeping for a lost quarry: keep targetId (the hunt's bookkeeping) and
     // walk the current sweep point.
     ai.mode = 'wander'
+    if (goal.at) ai.waypoint = { x: goal.at.x, y: goal.at.y }
+    return
+  }
+  if (goal.code === WORK || goal.code === GARRISON) {
+    // #77 territory: hold station in / converge on a building-derived spot.
+    // Same steering as investigate — walk to the point, settle (idle) on arrival.
+    ai.mode = 'wander'
+    ai.targetId = undefined
+    ai.lastKnownTargetPos = undefined
     if (goal.at) ai.waypoint = { x: goal.at.x, y: goal.at.y }
     return
   }

@@ -1,3 +1,4 @@
+import type { BuildingRole } from './levelgen/level'
 import type { EntityId, Vec2 } from './types'
 
 export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | 'interactable' | 'fire'
@@ -77,6 +78,12 @@ export interface AiState {
   rel?: Record<EntityId, RelEntry>
   /** Holds position instead of idle-wandering until it spots a target. */
   guard?: boolean
+  /** #77 — the station module this NPC BELONGS to: index into `level.buildings`
+   * plus that building's role, stamped at spawn by populate. Drives the
+   * territorial goals (work its room, garrison/defend the objective wing).
+   * Absent for street life / roamers and any directly-spawned (test/scenario)
+   * NPC → snapshot-stable, and the brain falls back to plain wander. */
+  zone?: { building: number; role: BuildingRole }
   /** The goal chosen by the last arbitration (battle/flee/pursue/investigate/
    * wander/patrol/search/alert/scavenge) — drives `mode`, exposed for debugging. */
   goal?: string

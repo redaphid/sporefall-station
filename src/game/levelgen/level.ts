@@ -196,6 +196,26 @@ export const tileAt = (level: Level, x: number, y: number): number => {
   return level.tiles[y * level.w + x]
 }
 
+/** Tile-space point-in-rect test (integer tile coords). */
+export const rectContains = (r: Rect, tx: number, ty: number): boolean =>
+  tx >= r.x && ty >= r.y && tx < r.x + r.w && ty < r.y + r.h
+
+/** Tile-centre world coord of a rect's geometric centre. */
+export const rectCenter = (r: Rect): { x: number; y: number } => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 })
+
+/** Index of the building whose footprint contains world point (x,y), or -1 —
+ * the "whose turf is this?" query for the territory AI (#77). Linear scan
+ * (buildings are few); first match in ascending order wins, so it is fully
+ * deterministic. Buildings regenerate from seed+floor, so this is stable. */
+export const buildingAt = (level: Level, x: number, y: number): number => {
+  const tx = Math.floor(x)
+  const ty = Math.floor(y)
+  for (let i = 0; i < level.buildings.length; i++) {
+    if (rectContains(level.buildings[i].rect, tx, ty)) return i
+  }
+  return -1
+}
+
 export const isSolidTile = (level: Level, x: number, y: number): boolean => {
   if (x < 0 || y < 0 || x >= level.w || y >= level.h) return true
   return level.solid[y * level.w + x] === 1

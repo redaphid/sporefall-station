@@ -33,6 +33,7 @@
 
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
+import { type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, type World } from '../world'
 import {
   BATTLE,
@@ -298,12 +299,79 @@ const scavenge: Consideration = (w, e) => {
   return [{ code: SCAVENGE, score: SCAVENGE_SCORE, tier: TIER_AMBIENT, target: best.id }]
 }
 
+// ── #77 Territory: NPCs derive goals from the station module they belong to ──
+// A zoned NPC (populate stamps `ai.zone`) doesn't wander the whole map: it holds
+// its own building (`workMyRoom`), and — if it belongs to the objective wing —
+// masses on the objective room as a garrison (`garrison`) and turns on any
+// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (street life,
+// test/scenario spawns) fall through untouched. All pure lookups over the level
+// geometry + ascending-id scans; no `Date`/`Math.random`.
+export const WORK = 'work'
+export const GARRISON = 'garrison'
+
+/** A resident holds its room over aimless wander (beats WANDER, loses to
+ * investigate/patrol so a real disturbance or beat still wins). */
+const WORK_SCORE = WANDER_SCORE + 0.3
+/** The objective wing's garrison pools on the core — above patrol, so the guards
+ * assigned a beat still converge on the room the players must breach. */
+const GARRISON_SCORE = 2.5
+/** Defending the wing is a THREAT-tier escalation, a hair above the wander floor
+ * so it always registers; it rides the same aggro path as `threat`. */
+const DEFEND_SCORE = WANDER_SCORE + 2
+
+const buildingOf = (w: World, e: Entity): Building | undefined => {
+  const z = e.ai?.zone
+  if (!z) return undefined
+  return w.level.buildings[z.building]
+}
+
+// A resident with no threat holds station in its OWN building — steers back to
+// its home room when it drifts out, then settles at its post. Legible "this NPC
+// belongs here" behaviour instead of map-wide wander.
+const workMyRoom: Consideration = (w, e) => {
+  if (!buildingOf(w, e)) return []
+  const home = e.ai!.home
+  return [{ code: WORK, score: WORK_SCORE, tier: TIER_AMBIENT, at: { x: home.x, y: home.y } }]
+}
+
+// The objective building's residents form a GARRISON: absent an intruder they
+// converge on and hold the objective room — guards massing on the wing the
+// players must breach, instead of scattering to their own posts.
+const garrison: Consideration = (w, e) => {
+  const z = e.ai?.zone
+  if (!z || w.mission.targetBuilding !== z.building) return []
+  const b = w.level.buildings[z.building]
+  const room = b?.objectiveRoom ?? b?.rect
+  if (!room) return []
+  return [{ code: GARRISON, score: GARRISON_SCORE, tier: TIER_AMBIENT, at: rectCenter(room) }]
+}
+
+// A fighting resident escalates on any intruder INSIDE its wing — a localized
+// garrison response, not the whole-floor alarm flash. The timid (fleesOnDamage
+// workers) don't charge; they rely on flee/panic.
+const defendMyWing: Consideration = (w, e) => {
+  const b = buildingOf(w, e)
+  if (!b || NPCS[e.archetype]?.fleesOnDamage) return []
+  const out: Candidate[] = []
+  for (const p of w.entities) {
+    if (p === e || p.dead || !p.health) continue
+    const intruder = p.playerCtl ? !p.playerCtl.downed : isHostileTarget(w, e, p)
+    if (!intruder) continue
+    if (!rectContains(b.rect, Math.floor(p.pos.x), Math.floor(p.pos.y))) continue
+    if (!perceives(w, e, p)) continue
+    const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
+    out.push({ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: DEFEND_SCORE, tier: TIER_THREAT, target: p.id })
+  }
+  return out
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
   panic,
   fear,
   threat,
+  defendMyWing,
   hunt,
   alertGuards,
   pursueMemory,
@@ -311,6 +379,8 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   investigate,
   patrol,
   scavenge,
+  garrison,
+  workMyRoom,
   wander,
 }
 
@@ -325,24 +395,24 @@ export const DEFAULT_BEHAVIOR = 'basic'
 
 export const BEHAVIORS: Record<string, BehaviorDef> = {
   basic: {
-    about: 'fight, flee, investigate, wander — the default townsfolk brain',
-    considerations: ['panic', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'wander'],
+    about: 'fight, flee, investigate, hold its turf, wander — the default townsfolk brain',
+    considerations: ['panic', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   patrol: {
-    about: 'walks a fixed waypoint beat; still fights and investigates',
-    considerations: ['panic', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'patrol', 'wander'],
+    about: 'walks a fixed beat; garrisons the objective wing; still fights and investigates',
+    considerations: ['panic', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'patrol', 'workMyRoom', 'wander'],
   },
   hunter: {
-    about: 'presses a chase to last-known position, then sweeps the area before giving up',
-    considerations: ['threat', 'hunt', 'fleeMemory', 'investigate', 'wander'],
+    about: 'presses a chase to last-known position, then sweeps the area; holds its turf when idle',
+    considerations: ['threat', 'defendMyWing', 'hunt', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   skittish: {
     about: 'flees trouble and runs to the nearest guard to raise the alarm',
-    considerations: ['alertGuards', 'fear', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'wander'],
+    considerations: ['alertGuards', 'fear', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   scavenger: {
     about: 'drawn to loose items it can see; grabs them into its stash',
-    considerations: ['fear', 'threat', 'fleeMemory', 'scavenge', 'wander'],
+    considerations: ['fear', 'threat', 'fleeMemory', 'scavenge', 'workMyRoom', 'wander'],
   },
 }
 

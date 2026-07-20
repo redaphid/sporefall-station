@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'NPCs work and defend their own buildings',
   'Factions fight each other — cops vs gangs',
   'Testing: infinite ammo',
   'Enemies commit — no fight/flee twitching',
-  'Renamed to Sporefall Station — new missions',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

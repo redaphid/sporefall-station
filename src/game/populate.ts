@@ -55,7 +55,7 @@ export const populateWorld = (w: World): void => {
   // shifting the loot/position dice — layout stays bit-identical per seed.
   const wrng = w.rng.fork('npc-weapons')
   for (let i = 0; i < w.level.buildings.length; i++) {
-    populateBuilding(w, rng, wrng, w.level.buildings[i])
+    populateBuilding(w, rng, wrng, w.level.buildings[i], i)
   }
   spawnStreetLife(w, rng, wrng)
   sprinkleLoot(w, rng)
@@ -81,7 +81,7 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   ],
 }
 
-const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): void => {
+const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, buildingIdx: number): void => {
   const specs = [...ROLE_SPAWNS[building.role]]
   // Difficulty ramp: deeper floors gang up
   if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'gangster', count: [1, 2] })
@@ -100,6 +100,9 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building): vo
       const beat = patrolBeat(building, spec === specs[0] && i === 0)
       const pos = beat ? beat[0] : spot
       const npc = spawnNpc(w, spec.archetype, pos.x, pos.y, wrng)
+      // #77 — bind the NPC to the module it lives/works/guards in, so its brain
+      // can derive territorial goals (hold its room, garrison/defend the wing).
+      if (npc.ai) npc.ai.zone = { building: buildingIdx, role: building.role }
       if (beat) assignPatrol(npc, beat)
       // One thug per warehouse walks rounds through the stock instead of
       // loitering — an interior patrol the players can time and slip past.

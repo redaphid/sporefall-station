@@ -8,6 +8,8 @@ import { createDebugApi } from './game/debug'
 import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
+import type { World } from './game/world'
+import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { SIM_DT } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
@@ -107,7 +109,29 @@ const boot = async (): Promise<void> => {
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
   if (!session) return
+
+  // ── Save-game persistence (feat/localstorage-resume) ──────────────────────
+  // Persist the AUTHORITATIVE world to localStorage so a full-page reload
+  // seamlessly rejoins the in-progress run. SOLO/host only (HostSession owns the
+  // authoritative world); a NetClient rejoins via the host, and we never persist
+  // a client-predicted world as authoritative. Explicit dev world-injection flows
+  // (`?world=`, `?scenario=`, `?script=`) take precedence over auto-resume.
+  const store = browserStore()
+  const persister: Persister | undefined = store && session instanceof HostSession ? createPersister(store) : undefined
   const scenario = params.get('scenario')
+  const explicitWorldOverride = !!scenario || !!params.get('world') || !!params.get('script')
+  let resumed = false
+  if (persister && store && session instanceof HostSession && !explicitWorldOverride) {
+    const saved = readSave(store) // null on no/corrupt/version-mismatched save → fresh game
+    if (saved) {
+      session.world = saved
+      session.self = saved.entities.find((e) => e.playerCtl) ?? session.self
+      renderer.setLevel(saved.level)
+      resumed = true
+      console.log(`backseat: resumed in-progress run (floor ${saved.floor}, tick ${saved.tick})`)
+    }
+  }
+
   if (scenario && session instanceof HostSession) {
     applyScenario(session.world, scenario)
     // Scenarios may carve/build tiles (stages, walls) — re-bake the tilemap so
@@ -258,7 +282,17 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
-  runLoop(session, renderer, uiMount, coop, inspect, touch, debug)
+  runLoop(session, renderer, uiMount, coop, inspect, touch, debug, persister, resumed)
+}
+
+/** localStorage as a `KeyValueStore`, or `undefined` where it is unavailable
+ * (SSR / privacy-locked WebView) — persistence then silently no-ops. */
+const browserStore = (): KeyValueStore | undefined => {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : undefined
+  } catch {
+    return undefined // access itself can throw in locked-down webviews
+  }
 }
 
 interface SessionDeps {
@@ -402,6 +436,20 @@ const createPauseBanner = (mount: HTMLElement): ((paused: boolean) => void) => {
   return (paused) => (el.style.display = paused ? 'flex' : 'none')
 }
 
+/** Subtle, self-dismissing "resumed" confirmation shown once when an
+ * in-progress run is restored from localStorage. Presentation only. */
+const showResumedToast = (mount: HTMLElement): void => {
+  const el = document.createElement('div')
+  el.textContent = 'Resumed your run'
+  el.style.cssText =
+    'position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:56;' +
+    'font:600 13px system-ui;color:#fff;background:#000a;padding:6px 14px;border-radius:9px;' +
+    'pointer-events:none;white-space:nowrap;transition:opacity .5s;opacity:1'
+  mount.appendChild(el)
+  setTimeout(() => (el.style.opacity = '0'), 2200)
+  setTimeout(() => el.remove(), 2800)
+}
+
 const runLoop = (
   session: Session,
   renderer: GameRenderer,
@@ -410,8 +458,31 @@ const runLoop = (
   inspect: Inspect,
   touch?: TouchInput,
   debug?: { afterTick(): void },
+  persister?: Persister,
+  resumed = false,
 ): void => {
   const hud = createHud(uiMount)
+  // Save-game plumbing (solo/host only — `persister` is undefined otherwise).
+  // The authoritative world lives on the HostSession and is REPLACED wholesale
+  // by restart(); read it fresh each call so we always persist the current run.
+  const hostWorld = (): World | undefined => (session instanceof HostSession ? session.world : undefined)
+  if (persister) {
+    const flush = (): void => {
+      const w = hostWorld()
+      if (w) persister.flush(w)
+    }
+    // pagehide + visibilitychange:hidden are the reliable "app is going away"
+    // signals in BOTH desktop Chrome and the Capacitor Android WebView (Android
+    // often kills the tab without ever firing beforeunload; visibility-hidden is
+    // the one that reliably lands when the user backgrounds the app). beforeunload
+    // is a best-effort desktop belt-and-braces. All just force a final save.
+    window.addEventListener('pagehide', flush)
+    window.addEventListener('beforeunload', flush)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush()
+    })
+  }
+  if (resumed) showResumedToast(uiMount)
   // Host/solo can restart in place (transport preserved); a client has no
   // restart() and instead waits for the host's fresh GameStart over the link.
   // Feed the teammate locator read-only camera/screen state so it can project
@@ -423,7 +494,16 @@ const runLoop = (
     screenW: renderer.app.screen.width,
     screenH: renderer.app.screen.height,
   })
-  const screens = createScreens(uiMount, session.restart ? () => session.restart!() : undefined, cameraSource)
+  // Play-again wraps restart() so a NEW run overwrites any (possibly game-over)
+  // save: clear immediately, then the rebuilt world re-saves on the normal cadence
+  // — the player is never trapped resuming into a dead run with no way forward.
+  const onRestart = session.restart
+    ? () => {
+        session.restart!()
+        persister?.clear()
+      }
+    : undefined
+  const screens = createScreens(uiMount, onRestart, cameraSource)
   // Mission panel + objective hyperlinks: tapping a linked objective row starts a
   // VIEW-ONLY camera focus (focusModel.ts) — an animated glide to the target and
   // back. Nothing here writes sim state; determinism is untouched.
@@ -483,6 +563,12 @@ const runLoop = (
       debug?.afterTick() // stream this tick's events + drain queued debug mutations
       inspect.afterTick() // buffer this tick's events for backseat.events()
       acc -= SIM_DT
+    }
+    // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
+    // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
+    if (persister) {
+      const w = hostWorld()
+      if (w) persister.maybeSave(w)
     }
     const alpha = acc / SIM_DT
     const view = session.renderView()

@@ -45,6 +45,24 @@ OUTDIR = os.environ.get("OUTDIR", os.path.join(G.THEME, "chars"))
 # init image still holds pose and color regions.
 DENOISE = float(os.environ.get("DENOISE", "0.48"))
 SEED = int(os.environ.get("SEED", "414977"))
+# ControlNet path (default ON): the Blender DEPTH pass (walk-<d>-<f>-depth.png)
+# pins pose/structure DURING diffusion, so denoise can go high (0.85) to fully
+# restyle the surface and put the ranger's gear/visor back WITHOUT the pose or
+# build drifting — escaping the r1 trap where 0.35 was too weak for gear and a
+# higher denoise drifted identity because pose was only masked after the fact.
+# The depth map is Blender's own Z (a ready-made control map — no 2D estimator,
+# so it is temporally stable across frames). Off with CONTROLNET=0 (falls back
+# to the mask-only path at DENOISE).
+USE_CN = os.environ.get("CONTROLNET", "1") != "0"
+CN_MODEL = os.environ.get("CN_MODEL", "control_v11f1p_sd15_depth.pth")
+CN_STRENGTH = float(os.environ.get("CN_STRENGTH", "0.85"))
+CN_DENOISE = float(os.environ.get("CN_DENOISE", "0.85"))
+# CN_END < 1.0 = "pin then release": ControlNet guides only the first CN_END
+# fraction of sampling steps (locking pose/composition early) then lets go, so
+# the character's fine surface — the anchor's vines/colors via IPAdapter — can
+# reassert in the late steps instead of being held to the geared 3D proxy
+# geometry for the whole schedule (which over-armors the identity read).
+CN_END = float(os.environ.get("CN_END", "1.0"))
 # Tag isolates this run's ComfyUI output prefixes: harvest_history matches
 # by prefix, and a retrace after a motion-source change must never pick up
 # stale frames from an earlier run.
@@ -71,6 +89,10 @@ DIR_NEG = {
 
 def blend_path(d, f):
     return os.path.join(BLEND, f"walk-{d}-{f}.png")
+
+
+def depth_path(d, f):
+    return os.path.join(BLEND, f"walk-{d}-{f}-depth.png")
 
 
 def prep_white(d, f):
@@ -134,18 +156,23 @@ def trace(dirs, frames):
             if not os.path.exists(os.path.join(TRACED, f"walk-{d}-{f}.png"))}
     if not want:
         return
+    use_cn = USE_CN and os.path.exists(depth_path(dirs[0], frames[0]))
+
     def submit(d, f):
         pos = (f"{G.TRIGGER}, full body game character sprite, {desc}, "
                f"{G.DIRS[d]}, {G.STEP}, {G.BG_CHAR}, {G.LOOK}")
         neg = ", ".join([p for p in (DIR_NEG.get(d, ""),) if p]
                         + [f"two characters, crowd, cropped, close-up, portrait, {G.NEG_BASE}"])
+        cn = dict(control=depth_path(d, f), controlnet=CN_MODEL,
+                  cn_strength=CN_STRENGTH, cn_end=CN_END) if use_cn else {}
         g = comfy.build_graph(
             pos=pos, neg=neg, seed=SEED, batch=1, refs=refs,
-            ip_weight=IPW[d], init=prep_white(d, f), denoise=DENOISE, alpha=False,
-            prefix=f"roto-{CHAR}-{TAG}-{d}-{f}",
+            ip_weight=IPW[d], init=prep_white(d, f),
+            denoise=CN_DENOISE if use_cn else DENOISE, alpha=False,
+            prefix=f"roto-{CHAR}-{TAG}-{d}-{f}", **cn,
         )
         pid = comfy.post("/prompt", {"prompt": g})["prompt_id"]
-        print(f"queued {d}-{f}", flush=True)
+        print(f"queued {d}-{f}" + (" [cn+depth]" if use_cn else ""), flush=True)
         return pid
 
     # Waves of <=8 in flight: the GPU is shared — don't monopolize the queue.

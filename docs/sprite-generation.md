@@ -368,6 +368,19 @@ orthographic camera (slight-high game angle, elevation 14°) so framing/scale
 are identical across every frame and direction. e/ne face RIGHT per the pack
 facing convention (west is engine-mirrored, never drawn).
 
+Alongside each color frame `rig_walk.py` also emits a **native depth (Z) pass**
+`walk-<dir>-<n>-depth.png` (white = near, black = far), the ControlNet control
+map for Stage 2. It comes from Blender's real Z buffer through a **fixed
+map-range** (`DIST ± 0.9 m`, script-derived) — *fixed*, not a per-frame
+Normalize, so the depth is temporally stable across all 40 frames (a 2D depth
+estimator renormalizes per frame and its noise flickers frame-to-frame; the
+true Z with a fixed window does not). Disable with `--depth 0`. NB Blender 5.0's
+compositor is the unified node-group compositor: `scene.node_tree` is gone (use
+`scene.compositing_node_group`), the `Composite` node is replaced by the group's
+`NodeGroupOutput`, and range math is the generic `ShaderNodeMapRange`
+(`CompositorNodeMapRange` no longer exists). Engine enum is `BLENDER_EEVEE`
+(no `_NEXT` in this build).
+
 ### Stage 2 — AI tracer (`trace.py`)
 
 Each frame goes through ComfyUI **img2img at denoise 0.48** with the
@@ -392,12 +405,36 @@ the **Blender frame's own alpha**, and every frame is downscaled through
 k-centroid + locked palette — so scale and feet anchoring never pump between
 frames. Results land as `public/themes/swampspace/chars/<char>-<dir>-walk-<n>.png`.
 
+**ControlNet + depth path (default ON).** Masking pose *after* diffusion makes
+denoise a fragile single knob — too low (0.35) leaves a gear-less character, too
+high drifts identity because nothing pinned the pose *during* the redraw. The
+fix is to feed Stage 1's depth pass to a **depth ControlNet** so pose/structure
+is held DURING diffusion, orthogonally to the IPAdapter identity anchor
+(IPAdapter patches the MODEL, ControlNet patches the CONDITIONING — one
+KSampler). With pose pinned by ControlNet *and* the silhouette pinned by the
+Blender alpha downstream, denoise is free to go high — `trace.py` defaults to
+**`CN_DENOISE=0.85`** — for a full pack-style redraw that restores plating,
+harness and vine detail without the build or pose moving. Knobs:
+`CONTROLNET=0` falls back to the mask-only path at `DENOISE`;
+`CN_MODEL` (default the SD1.5 depth CN `control_v11f1p_sd15_depth.pth`; use the
+SDXL depth/union CN when tracing on SDXL), `CN_STRENGTH` (0.85), `CN_DENOISE`.
+Wired through `comfy.build_graph(control=, controlnet=, cn_strength=, …)`; the
+Blender depth is a ready-made control map so no preprocessor runs (pass
+`cn_preprocess` only when the control image is a raw photo/render needing e.g.
+`DepthAnythingV2Preprocessor`). Validated on the vine-ranger: at 0.85 the RGB
+surface changes (~19% of the sprite's pixels — plating/harness/gear) while the
+**alpha is byte-identical** to the mask-only cycle, so `consistency.py` reports
+the same silhouette/identity metrics (0 violations) and the qwen3-vl gate reads
+the same character — the redraw is surface-only by construction.
+
 Shared-GPU manners: the tracer is fire-and-forget and resumable — it submits
 in waves of ≤8, polls history, harvests finished frames even if a previous
 client was killed, and skips frames already traced. `--no-trace` skips the AI
 entirely and ships palette-quantized 3D frames (the coherence-safe fallback);
 `--post-only` redoes the downscale from cached traces. `DENOISE=`/`SEED=` to
-re-tune.
+re-tune. Review before shipping: trace to a scratch dir with `OUTDIR=` and
+diff against the shipped cycle (see the ControlNet review deliverable) rather
+than overwriting `public/themes/.../chars` in place.
 
 ### Stage 3 — gate (`gate.py`) and manifest
 
@@ -416,6 +453,135 @@ clips (docs/themes.md "Animation states").
 
 In-game proof: `bash e2e/run-roto-walk.sh` (port 4993) records the ranger
 walking the full 8-direction compass circle on the new cycles.
+
+## 6c. Findings: ControlNet + native depth pass (rotoscope, 2026-07)
+
+A full investigation of adding a **depth ControlNet** to the tracer, driven by
+Blender's own Z buffer. This section is the durable record — read it before
+touching the ControlNet path so you don't re-derive it the expensive way. The
+`.claude/skills/sprite-art` skill is the step-by-step operator's version.
+
+### The technique and why native depth beats a 2D estimator
+
+IPAdapter and ControlNet are **orthogonal** and compose in one graph: IPAdapter
+patches the **MODEL** (identity/style anchor), ControlNet patches the
+**CONDITIONING** (pose/structure). One `KSampler` reads both
+(`comfy.build_graph(refs=…, control=…, controlnet=…)`). So pose can be pinned
+*during* diffusion instead of only masked after — which is what lets denoise go
+high (restore gear) without pose or build wandering.
+
+The control map **must be Blender's real Z pass, not a 2D depth estimator**
+(DepthAnythingV2/Zoe/etc.):
+
+- **Temporal stability.** An estimator renormalizes each frame to its own
+  min/max, so its output *flickers* frame-to-frame — fatal for an animation.
+  The Blender Z through a **fixed** `ShaderNodeMapRange` window (`DIST ± 0.9 m`,
+  script-derived) is deterministic and identical-scaled across all 40 frames.
+- **Free and exact.** The proxy already exists; the Z pass is one extra render
+  target, no inference, and it is a *semantic* depth (the proxy's true geometry)
+  rather than a guess from a flat sprite.
+- **Measured result.** At `CN_DENOISE=0.85` the traced RGB changed ~19 % of the
+  sprite's pixels (plating/harness/vine) while the **alpha stayed
+  byte-identical** to the mask-only cycle — because `post_frame` still masks
+  with the Blender alpha. So `consistency.py` reports the *same* silhouette /
+  build metrics → **0 violations**, identical to the shipped cycle. Pose-lock is
+  total; the redraw is provably surface-only.
+
+### The denoise-vs-"armored" tradeoff (the real catch)
+
+Pose-lock held perfectly, but the **qwen3-vl identity gate FAILED on the
+front/profile frames** (`verify.py --same <frame> anchor`): back-¾ (`ne`) read
+as the same character, but `s`/`e`/`n` read as "blocky armor vs. vine-covered
+design." Crucially this is **not a denoise-tuning miss** — it reproduced across:
+
+| config | `s`/`e` VLM verdict |
+|---|---|
+| `CN_DENOISE=0.85` | FAIL (white harness patches replace vines) |
+| `CN_DENOISE=0.60` | FAIL (blocky armor vs vine-covered) |
+| pin-then-release `CN_END=0.55`, `CN_STRENGTH=0.6`, denoise 0.75 | FAIL (angular vs vine-curvy) |
+
+**Root cause:** the depth ControlNet *faithfully reproduces the geared 3D proxy
+geometry* (pauldrons, chest-rig, knee-plates — deliberately modeled so the
+silhouette matches the ranger's build, see §6 Stage 1). Depth control renders
+that geometry as literal hard-surface armor. The mask-only path enforces only
+the alpha *silhouette*, leaving diffusion free to develop a softer, painterly,
+vine-covered surface inside it — which is closer to the curated anchor. **So for
+an organic/vine identity draped over a geared silhouette, depth ControlNet
+over-constrains toward armor.** It is the *right* tool for a genuinely
+hard-surface character (a robot, power armor), and the wrong default for the
+vine-ranger. (Note the VLM is conservative: on the contact sheets a human may
+still prefer the CN frames — they are more detailed and still clearly the teal /
+orange-cap / vine ranger. This is an owner's-eye call, which is why the frames
+are a review deliverable, not an auto-merge.)
+
+### Tuning knobs and softening options
+
+`trace.py` env (all plumbed through `comfy.build_graph`):
+
+- `CONTROLNET=0` — fall back to the mask-only path at `DENOISE`.
+- `CN_MODEL` — the ControlNet checkpoint. SD1.5 default
+  `control_v11f1p_sd15_depth.pth` (matches the dreamshaper low-VRAM path); use
+  the SDXL depth/union CN (`xinsir-controlnet-union-sdxl-1.0-promax`,
+  `SDXL/depth-zoe-xl-v1.0-controlnet`) when tracing on SDXL.
+- `CN_STRENGTH` (0.85) — ControlNet conditioning weight.
+- `CN_DENOISE` (0.85) — sampler denoise on the CN path (safe to raise; pose is
+  pinned by CN and silhouette by the alpha mask).
+- `CN_END` (1.0) — **pin-then-release**: ControlNet guides only the first
+  `CN_END` fraction of steps, then releases so IPAdapter/vines reassert late.
+
+To soften the armored read (untried-to-completion levers, in order of promise):
+1. **Much lower `CN_STRENGTH` (~0.3)** — let depth nudge composition without
+   dictating hard-surface detail.
+2. **Switch the control to lineart or normal** at low strength — outlines/normals
+   constrain pose without imposing plate volumes the way depth does.
+3. **Emphasize vines in the proxy** — add vine geometry / bias the color-blocking
+   in `rig_walk.py`, or add "vine-covered, organic" to the trace prompt, so the
+   surface the ControlNet structure gets developed *into* is the vine read.
+4. Accept it and keep the mask-only shipped cycle for this character; reserve the
+   depth-CN path for hard-surface cast members.
+
+### Blender 5.0 compositor API port (save the next person hours)
+
+The depth pass uses the compositor, which was **rebuilt in Blender 5.0** into a
+unified node-group compositor. The old API is gone:
+
+| Blender ≤4.x | Blender 5.0 |
+|---|---|
+| `scene.node_tree` | `scene.compositing_node_group` (a `CompositorNodeTree` you create + assign) |
+| `CompositorNodeComposite` (output sink) | `NodeGroupOutput` (add an `Image` OUTPUT socket to `ng.interface` first) |
+| `CompositorNodeMapRange` | `ShaderNodeMapRange` (compositor now uses generic shader nodes; `clamp` attr, output `"Result"`) |
+| `CompositorNodeRLayers` | unchanged; depth socket is `"Depth"` (fallback `"Z"`) |
+
+Also: the engine enum in this build is `BLENDER_EEVEE` (no `_NEXT`) — the render
+settings block already guards for that. Working pattern is in `rig_walk.py`
+(the `DEPTH` block); a color pass renders with `use_compositing=False` +
+`film_transparent=True`, then the depth pass with `use_compositing=True` +
+`film_transparent=False` + `color_mode="RGB"`.
+
+### Infra reality (as run 2026-07)
+
+- **"soul" is this local WSL box.** Blender is `/mnt/d/tools/blender/blender.exe`
+  (a **Windows** binary — v5.0.1), ComfyUI is `http://localhost:8188`, qwen3-vl
+  is `http://localhost:11434`. The `render.sh` `ssh soul` path routes through
+  Cloudflare Access whose token had expired (needs a browser login) and is
+  **unnecessary** — render locally.
+- **Windows-binary path translation.** The exe reads `D:/…`, not `/mnt/d/…`.
+  Put the workdir under `/mnt/d` (used `/mnt/d/tmp/backseat-roto`), hand Blender
+  `D:/tmp/backseat-roto/…` paths (`wslpath -w <path>` converts). Run color+depth
+  with `blender.exe -b -P 'D:/…/rig_walk.py' -- --out 'D:/…/frames' --res 1024`.
+- ComfyUI first-run loads (checkpoint + IPAdapter + ControlNet + any
+  preprocessor) cost minutes; warm gens are seconds. Traces are resumable
+  (`trace.py` harvests server history) — a killed poll loses nothing rendered.
+
+### Deliverables (this investigation)
+
+Under `~/Videos/backseat/rotoscope-controlnet/` (outside the repo — sprite frames
+are NOT committed pending the owner's visual decision):
+
+- `SHEET-rotoscope-before-after.png` — all 40, shipped r1 vs CN-depth 0.85, per direction.
+- `SHEET-cn-denoise-variants.png` — `s`/`e` across shipped / .85 / .60 / pin-release.
+- `walk-cycle-shipped-vs-controlnet.gif` — animated 8-frame cycle, all 5 dirs, shipped vs CN (judge motion/temporal stability, not just static poses).
+- `frames/` — the 40 candidate CN sprites. `depth/` — the 40 Blender Z-pass control maps.
 
 ## 7. Worked example: add a new NPC to an existing theme
 

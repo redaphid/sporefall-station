@@ -62,7 +62,22 @@ def build_graph(
     alpha: bool = True,
     prefix: str = "swampspace",
     size: int | None = None,
+    control: str | None = None,
+    controlnet: str | None = None,
+    cn_strength: float = 1.0,
+    cn_start: float = 0.0,
+    cn_end: float = 1.0,
+    cn_preprocess: str | None = None,
+    cn_union_type: str | None = None,
 ):
+    """Optional ControlNet branch (orthogonal to IPAdapter): IPAdapter patches
+    the MODEL for identity/style; ControlNet patches the CONDITIONING for
+    pose/structure, so pose can be pinned DURING diffusion and denoise pushed
+    high without the pose or build drifting. `control` is the control image;
+    for a ready-made control map (e.g. the rotoscope's Blender depth pass) leave
+    `cn_preprocess` None, else pass a preprocessor node class (e.g.
+    "DepthAnythingV2Preprocessor"). `cn_union_type` sets the mode on a union
+    controlnet (xinsir/promax)."""
     size = size or SIZE
     g = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CKPT}}}
     model, clip = ["1", 0], ["1", 1]
@@ -110,8 +125,31 @@ def build_graph(
                              "combine_embeds": "average", "start_at": 0.0, "end_at": 0.9,
                              "embeds_scaling": "V only"}}
         model = ["9", 0]
+    # ControlNet: patches the CONDITIONING (pose/structure), orthogonal to the
+    # IPAdapter model patch above. `control` is a control image; if
+    # `cn_preprocess` is set it runs that preprocessor first, otherwise the
+    # image is used as-is (the rotoscope feeds Blender's ready-made depth pass).
+    positive, negative = ["3", 0], ["4", 0]
+    if control and controlnet:
+        g["60"] = {"class_type": "LoadImage", "inputs": {"image": upload(control)}}
+        ctrl_img = ["60", 0]
+        if cn_preprocess:
+            g["61"] = {"class_type": cn_preprocess, "inputs": {"image": ctrl_img, "resolution": size}}
+            ctrl_img = ["61", 0]
+        g["62"] = {"class_type": "ControlNetLoader", "inputs": {"control_net_name": controlnet}}
+        cnet = ["62", 0]
+        if cn_union_type:
+            g["63"] = {"class_type": "SetUnionControlNetType",
+                       "inputs": {"control_net": cnet, "type": cn_union_type}}
+            cnet = ["63", 0]
+        g["64"] = {"class_type": "ControlNetApplyAdvanced",
+                   "inputs": {"positive": positive, "negative": negative,
+                              "control_net": cnet, "image": ctrl_img,
+                              "strength": cn_strength, "start_percent": cn_start,
+                              "end_percent": cn_end}}
+        positive, negative = ["64", 0], ["64", 1]
     g["6"] = {"class_type": "KSampler",
-              "inputs": {"model": model, "positive": ["3", 0], "negative": ["4", 0],
+              "inputs": {"model": model, "positive": positive, "negative": negative,
                          "latent_image": latent, "seed": seed, "steps": STEPS, "cfg": CFG,
                          "sampler_name": SAMPLER, "scheduler": SCHED, "denoise": denoise}}
     g["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}

@@ -300,6 +300,55 @@ sc.render.film_transparent = True
 sc.render.image_settings.file_format = "PNG"
 sc.render.image_settings.color_mode = "RGBA"
 
+# ---- native depth (Z) pass for the ControlNet tracer ------------------------
+# The AI tracer (trace.py) can hold pose during diffusion via a depth ControlNet
+# instead of only masking after the fact — which lets denoise go high (restore
+# gear/visor) with pose frame-locked. The control map MUST come from Blender's
+# real Z buffer, NOT a 2D depth estimator: the estimator renormalizes per frame
+# and its noise flickers frame-to-frame, whereas a fixed map-range on the true Z
+# is deterministic and temporally stable across all 40 frames (identical ortho
+# camera => identical depth window). White = near the camera, black = far.
+DEPTH = arg("--depth", "1") != "0"
+if DEPTH:
+    # Blender 5.0's compositor is the unified node-group compositor:
+    # scene.node_tree is gone (use scene.compositing_node_group), the Composite
+    # node is replaced by the group's NodeGroupOutput, and range math uses the
+    # generic ShaderNodeMapRange (CompositorNodeMapRange no longer exists).
+    bpy.context.view_layer.use_pass_z = True
+    sc.use_nodes = True
+    ng = bpy.data.node_groups.new("depthcomp", "CompositorNodeTree")
+    sc.compositing_node_group = ng
+    ng.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+    rl = ng.nodes.new("CompositorNodeRLayers")
+    mr = ng.nodes.new("ShaderNodeMapRange")
+    mr.clamp = True
+    # FIXED window around the ortho camera distance (script-derived, so it stays
+    # correct if DIST changes): +/-0.9m brackets the character's depth extent.
+    # A FIXED window (not a per-frame Normalize) is what makes the depth map
+    # temporally stable across all 40 frames — the whole point over 2D estimation.
+    mr.inputs["From Min"].default_value = DIST - 0.9   # nearest -> 1.0 (white)
+    mr.inputs["From Max"].default_value = DIST + 0.9   # farthest -> 0.0 (black)
+    mr.inputs["To Min"].default_value = 1.0
+    mr.inputs["To Max"].default_value = 0.0
+    out = ng.nodes.new("NodeGroupOutput")
+    depth_socket = rl.outputs.get("Depth") or rl.outputs.get("Z")
+    ng.links.new(depth_socket, mr.inputs["Value"])
+    ng.links.new(mr.outputs["Result"], out.inputs[0])
+
+
+def render_to(path, *, depth=False):
+    if depth:
+        sc.render.use_compositing = True
+        sc.render.film_transparent = False
+        sc.render.image_settings.color_mode = "RGB"
+    else:
+        sc.render.use_compositing = False
+        sc.render.film_transparent = True
+        sc.render.image_settings.color_mode = "RGBA"
+    sc.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+
+
 # ---- the walk cycle: 8 explicit keyposes ------------------------------------
 # Right-leg stride, degrees, forward = positive. 8 frames = contact / down /
 # passing / up, then the mirrored half. (thigh, kneeFlex, footPitch)
@@ -363,8 +412,9 @@ for dname, yaw in DIRS.items():
     root.rotation_euler = (0, 0, math.radians(yaw))
     for f in range(FRAMES):
         pose(f)
-        sc.render.filepath = f"{OUT}/walk-{dname}-{f}.png"
-        bpy.ops.render.render(write_still=True)
+        render_to(f"{OUT}/walk-{dname}-{f}.png", depth=False)
+        if DEPTH:
+            render_to(f"{OUT}/walk-{dname}-{f}-depth.png", depth=True)
         print(f"rendered walk-{dname}-{f}")
 
 print("RIG_WALK_DONE")

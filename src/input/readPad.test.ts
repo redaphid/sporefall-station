@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readPad } from './readPad'
+import { DEADZONE, readPad } from './readPad'
 import { padProfile } from './padProfile'
 
 const btn = (pressed: boolean) => ({ pressed, touched: pressed, value: pressed ? 1 : 0 })
@@ -304,6 +304,55 @@ describe('readPad', () => {
       const s = readPad(fakePad({ axes: [0, 0, 0.1, -0.1] }), std)
       expect(s.aimX).toBe(0)
       expect(s.aimY).toBe(0)
+    })
+  })
+
+  /**
+   * Analog-stick DRIFT rejection — the 8BitDo-Lite-2-keeps-walking report. A
+   * drifty Bluetooth pad does not return its sticks to exactly 0; the radial
+   * deadzone (readPad.radialDeadzone, DEADZONE) is what makes a RELEASED stick
+   * yield exactly zero movement/aim. These pin the property on BOTH sticks with
+   * the exact adversarial vectors, so a future tweak to DEADZONE or the rescale
+   * can't silently reopen the drift.
+   */
+  describe('drift rejection on a released stick (radial deadzone, both sticks)', () => {
+    it('has a deadzone radius generous enough for a drifty BT pad (>= 0.15)', () => {
+      // The residual noise of a worn/cheap stick sits well under this; a value
+      // in the 0.15..0.30 band kills it without eating meaningful deflection.
+      expect(DEADZONE).toBeGreaterThanOrEqual(0.15)
+      expect(DEADZONE).toBeLessThanOrEqual(0.35)
+    })
+
+    // Movement stick.
+    it('a residual left-stick drift of (0.08, 0.05) yields exactly zero movement', () => {
+      const s = readPad(fakePad({ axes: [0.08, 0.05] }), std)
+      expect(s.moveX).toBe(0)
+      expect(s.moveY).toBe(0)
+    })
+    it('asymmetric release noise (-0.12, 0.19) — magnitude still inside the rim — is zero', () => {
+      const s = readPad(fakePad({ axes: [-0.12, 0.19] }), std) // mag ≈ 0.225 < 0.28
+      expect(s.moveX).toBe(0)
+      expect(s.moveY).toBe(0)
+    })
+    it('a deflection just past the rim is small but nonzero and smoothly scaled (no snap)', () => {
+      const s = readPad(fakePad({ axes: [DEADZONE + 0.01, 0] }), std)
+      expect(s.moveX).toBeGreaterThan(0)
+      expect(s.moveX).toBeLessThan(0.05) // ramps from 0 at the rim, not a jump to 0.28
+    })
+    it('full deflection still reaches full magnitude (deadzone did not cost range)', () => {
+      const s = readPad(fakePad({ axes: [0, 1] }), std)
+      expect(Math.hypot(s.moveX, s.moveY)).toBeCloseTo(1, 5)
+    })
+
+    // Aim stick — the SAME treatment (drift would otherwise nudge the reticle).
+    it('a residual right-stick drift of (0.08, 0.05) yields exactly zero aim', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0.08, 0.05] }), std)
+      expect(s.aimX).toBe(0)
+      expect(s.aimY).toBe(0)
+    })
+    it('a real right-stick push past the rim survives (aim is not over-suppressed)', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0, -0.95] }), std)
+      expect(Math.hypot(s.aimX, s.aimY)).toBeGreaterThan(0)
     })
   })
 

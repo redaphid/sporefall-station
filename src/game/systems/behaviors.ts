@@ -433,6 +433,56 @@ const infest: Consideration = (w, e) => {
   return [{ code: bestD <= ENGAGE_RANGE ? BATTLE : PURSUE, score: INFEST_SCORE, tier: TIER_THREAT, target: best.id }]
 }
 
+// ── #67 Predator ecology: a scavenger hunts the WEAKEST thing it sees and shies
+// from a healthy pack. Prey = any living body of a DIFFERENT faction (players
+// have none → always prey); its own kind (same faction) is the pack, never
+// hunted, so a brood stays coherent while culling the wounded of every side. ───
+const STALK_SCORE = 4
+const PACK_K = 3 // this many healthy enemies within reach → disengage
+const PACK_RADIUS = 6
+const HEALTHY_FRAC = 0.6 // "healthy" = hp at/above this fraction of max
+
+const isPrey = (e: Entity, p: Entity): boolean =>
+  p !== e && !p.dead && !!p.health && (!!p.playerCtl || !!p.ai) && p.ai?.faction !== e.ai!.faction
+
+// Prefer the lowest-HP perceived body — the wounded get finished.
+const stalkWeakest: Consideration = (w, e) => {
+  let best: Entity | undefined
+  let bestHp = Infinity
+  for (const p of w.entities) {
+    if (!isPrey(e, p) || !perceives(w, e, p)) continue
+    if (p.health!.hp < bestHp) {
+      bestHp = p.health!.hp
+      best = p
+    }
+  }
+  if (!best) return []
+  const dist = Math.max(1, dist2d(best.pos.x, best.pos.y, e.pos.x, e.pos.y))
+  return [{ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: STALK_SCORE, tier: TIER_THREAT, target: best.id }]
+}
+
+// Outnumbered by HEALTHY enemies → break off and reposition (PANIC tier, so it
+// overrides the stalk: a predator won't wade into a losing fight).
+const packAvoid: Consideration = (w, e) => {
+  let healthy = 0
+  let nearest: Entity | undefined
+  let nd = Infinity
+  for (const p of w.entities) {
+    if (!isPrey(e, p)) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d > PACK_RADIUS) continue
+    if (p.health!.hp >= p.health!.max * HEALTHY_FRAC) {
+      healthy++
+      if (d < nd) {
+        nd = d
+        nearest = p
+      }
+    }
+  }
+  if (healthy >= PACK_K && nearest) return [{ code: FLEE, score: 1, tier: TIER_PANIC, target: nearest.id }]
+  return []
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -442,6 +492,8 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   threat,
   defendMyWing,
   infest,
+  packAvoid,
+  stalkWeakest,
   hunt,
   alertGuards,
   pursueMemory,
@@ -492,6 +544,10 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   vermin: {
     about: '#66: spore-vermin — attacks what it sees, else swarms toward the loudest/brightest stimulus',
     considerations: ['threat', 'drawnToStimulus', 'wander'],
+  },
+  predator: {
+    about: '#67: a scavenger — culls the WEAKEST body in sight, flees a healthy pack, drifts to stimulus',
+    considerations: ['packAvoid', 'stalkWeakest', 'drawnToStimulus', 'wander'],
   },
 }
 

@@ -90,11 +90,16 @@ const spawnEncounters = (w: World, erng: Rng): void => {
     // Derelict Units: industrial/deep — armour + bio-inert, servos cook to fire.
     let robots = 0
     if ((theme === 'industrial' || floor >= 4) && erng.chance(0.3)) robots += 1
+    // Stalkers (#67): a scavenger that culls the wounded — a lone opportunist,
+    // deeper floors, low count (a pack of them would just avoid each other).
+    let stalkers = 0
+    if (floor >= 2 && erng.chance(0.25)) stalkers += 1
     for (const [arch, n] of [
       ['sporeling', sporelings],
       ['cinder', cinders],
       ['brute', brutes],
       ['robot', robots],
+      ['stalker', stalkers],
     ] as const) {
       for (let i = 0; i < n; i++) {
         const spot = randomFloorInBuilding(w, erng, b)

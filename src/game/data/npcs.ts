@@ -169,4 +169,19 @@ export const NPCS: Record<string, NpcDef> = {
     behavior: 'vermin', // #66: a hive drawn to the loudest/brightest stimulus
     resist: { burning: 1.5, poisoned: 0.15, spore: 0 },
   },
+  stalker: {
+    // #67 Mireclaw brood scavenger: hunts the weakest, shies from a healthy pack.
+    // Its own faction ('neutral') is its pack — it culls the wounded of every
+    // OTHER side (crew, cops, gangs, players). Fast, fragile, opportunistic.
+    archetype: 'stalker',
+    faction: 'neutral',
+    hp: 30,
+    speed: 4.2,
+    weapon: 'knife',
+    sightRange: 10,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'predator',
+    resist: { poisoned: 0.4, spore: 0 },
+  },
 }

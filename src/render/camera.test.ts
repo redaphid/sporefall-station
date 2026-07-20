@@ -159,3 +159,75 @@ describe('soft edge clamp (corner-spawn framing)', () => {
     expect(w.pos.y + 200 * T).toBe(SCREEN.h / 2)
   })
 })
+
+describe('follow smoothness — no pixel-snap jitter (rotoscope regression)', () => {
+  // The bug: apply() snapped the world CONTAINER origin to whole screen pixels
+  // while every sprite inside sits at a sub-pixel world position. A followed
+  // player is ~screen-static with the world scrolling under it, so the
+  // round-vs-subpixel residual sawtoothed the player ±0.5px EVERY frame — most
+  // visible once the crisp rotoscoped walk cycle shipped. The container must now
+  // carry the exact sub-pixel transform; a fixed world point's ON-SCREEN
+  // position must be a MONOTONIC function of a monotonically-advancing player,
+  // i.e. it may never move backward while the player moves strictly forward.
+  const recWorld = () => {
+    const w = {
+      pos: { x: 0, y: 0 },
+      scale: { x: 1, set(v: number) { this.x = v } },
+      position: { set(x: number, y: number) { w.pos.x = x; w.pos.y = y } },
+    }
+    return w
+  }
+
+  const TILE_PX = 32 // == art.TILE_PX at zoom 1; screen px per world tile
+
+  // Drive follow+update+apply exactly as renderer.draw does, tracking the
+  // on-screen position of the followed world point across the frame sequence.
+  const followScreenTrack = (speedTilesPerS: number, dt: number): number[] => {
+    const c = new Camera()
+    c.snapTo(200, 200) // deep mid-map: no edge clamp interferes
+    const w = recWorld()
+    let px = 200 // player world-x (tiles), advancing strictly forward
+    const track: number[] = []
+    for (let f = 0; f < 400; f++) {
+      px += speedTilesPerS * dt
+      c.follow(px, 200, dt)
+      c.update(dt)
+      c.apply(w as never, SCREEN.w, SCREEN.h, LEVEL.w, LEVEL.h)
+      // Where the player (a fixed sub-pixel world point) actually lands on screen.
+      track.push(w.pos.x + px * TILE_PX)
+    }
+    return track
+  }
+
+  it('the followed player never jitters backward while walking forward (multiple speeds/framerates)', () => {
+    for (const speed of [1.2, 3, 3.7, 6]) {
+      for (const dt of [1 / 60, 1 / 45, 1 / 90]) {
+        const track = followScreenTrack(speed, dt)
+        // Skip the initial catch-up transient; assert monotonic thereafter.
+        for (let i = 51; i < track.length; i++) {
+          const step = track[i] - track[i - 1]
+          expect(
+            step,
+            `backward jitter at f=${i} speed=${speed} dt=${dt.toFixed(4)} (step=${step.toFixed(3)}px)`,
+          ).toBeGreaterThanOrEqual(-1e-9)
+        }
+      }
+    }
+  })
+
+  it('a converged follow leaves the container at the EXACT sub-pixel transform (no ±0.5px snap)', () => {
+    const c = new Camera()
+    c.snapTo(200, 200)
+    const w = recWorld()
+    // A deliberately sub-pixel target: 200 + 0.3/32 tile => 0.3px off the grid.
+    const tx = 200 + 0.3 / 32
+    for (let i = 0; i < 400; i++) {
+      c.follow(tx, 200, 1 / 60)
+      c.update(1 / 60)
+      c.apply(w as never, SCREEN.w, SCREEN.h, LEVEL.w, LEVEL.h)
+    }
+    // Container must hold the fractional offset, not a rounded integer.
+    expect(w.pos.x).toBeCloseTo(SCREEN.w / 2 - tx * TILE_PX, 6)
+    expect(Number.isInteger(w.pos.x)).toBe(false)
+  })
+})

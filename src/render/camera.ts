@@ -115,10 +115,18 @@ export class Camera {
     const { x: cx, y: cy } = appliedCenter(this.x, this.y, T, screenW, screenH, levelW, levelH)
     this.appliedX = cx
     this.appliedY = cy
-    world.position.set(
-      Math.round(screenW / 2 - (cx + this.shakeX) * T),
-      Math.round(screenH / 2 - (cy + this.shakeY) * T),
-    )
+    // Carry the EXACT sub-pixel camera transform on the container — do NOT snap
+    // it to whole screen pixels here. Snapping the container origin while every
+    // sprite inside sits at a sub-pixel position makes the FOLLOWED subject
+    // sawtooth ±0.5px: the world scrolls under a near-static player, so the
+    // round-vs-subpixel residual jitters the player every frame (worst on the
+    // crisp rotoscoped walk cycle, which is why the jitter surfaced with it).
+    // Pixel crispness is restored uniformly by the renderer's global
+    // `roundPixels: true` (renderer.ts), which snaps each renderable's FINAL
+    // screen position — so the whole scene advances in coherent, monotonic 1px
+    // steps with no per-object shimmer, and the marker/DOM projections (which
+    // already read the unrounded appliedCenter) now match the render exactly.
+    world.position.set(screenW / 2 - (cx + this.shakeX) * T, screenH / 2 - (cy + this.shakeY) * T)
   }
 
   /** Visible world-pixel rect (in unscaled world units) for culling. */

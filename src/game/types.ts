@@ -130,3 +130,6 @@ export type SimEvent =
   /** A frightened NPC reached a guard and reported its scarer: the guard
    * (`entityId`) now hunts `targetId`, tipped off by `byId`. */
   | { type: 'alerted'; entityId: EntityId; byId: EntityId; targetId: EntityId }
+  /** #68 A dormant entity woke — `by` names the stimulus kind that tripped it
+   * (noise/proximity/damage/power-cut/spore/fire). */
+  | { type: 'woke'; entityId: EntityId; by: string }

@@ -87,7 +87,8 @@ export const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
   // is active), host and clean are floored to open hostility so the crew fights/
   // flees a host even in an otherwise peaceful world. A stored opinion still wins.
   const infectionInvolved = !!e.infected || !!w.byId.get(targetId)?.infected
-  const forced = w.hostile || infectionInvolved || (e.archetype === 'robot' && anyPowerCut(w))
+  const rousedByCut = !!e.ai?.wakeOn?.includes('power-cut') && anyPowerCut(w)
+  const forced = w.hostile || infectionInvolved || rousedByCut
   return forced ? Math.max(base, WORLD_HOSTILE_HATE) : base
 }
 

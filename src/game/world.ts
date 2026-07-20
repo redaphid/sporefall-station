@@ -3,6 +3,7 @@ import { generateLevel } from './levelgen/generate'
 import { isSolidTile, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
+import { awakeningSystem } from './systems/dormancy'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
@@ -230,6 +231,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
+  awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)
   movementSystem(w, inputs)

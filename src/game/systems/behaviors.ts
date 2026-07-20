@@ -101,7 +101,7 @@ const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
       w.hostile ||
       dispositionToward(e, target.id) === 'Hostile' ||
       (ai.faction === 'cop' && w.alarm >= 2) ||
-      (e.archetype === 'robot' && anyPowerCut(w))
+      (!!ai.wakeOn?.includes('power-cut') && anyPowerCut(w))
     )
   }
   if (w.aiFlags?.npcVsNpc === false || !target.ai || target === e) return false

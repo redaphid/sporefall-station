@@ -34,6 +34,13 @@ const STALL_DIST = 0.5
 export const aiSystem = (w: World): void => {
   for (const e of w.entities) {
     if (!e.ai || e.dead) continue
+    // #68: a dormant entity is INERT — no think, no move (the awakeningSystem,
+    // run just before this, flips it active the tick a stimulus trips it).
+    if (e.ai.dormant) {
+      e.intent.x = 0
+      e.intent.y = 0
+      continue
+    }
     if ((e.status && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)) {
       e.intent.x = 0
       e.intent.y = 0

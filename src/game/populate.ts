@@ -94,12 +94,16 @@ const spawnEncounters = (w: World, erng: Rng): void => {
     // deeper floors, low count (a pack of them would just avoid each other).
     let stalkers = 0
     if (floor >= 2 && erng.chance(0.25)) stalkers += 1
+    // Spore pods (#68): a dormant nest — a stealth set-piece to tiptoe past or trip.
+    let pods = 0
+    if (floor >= 2 && erng.chance(0.3)) pods += erng.int(2, 4)
     for (const [arch, n] of [
       ['sporeling', sporelings],
       ['cinder', cinders],
       ['brute', brutes],
       ['robot', robots],
       ['stalker', stalkers],
+      ['pod', pods],
     ] as const) {
       for (let i = 0; i < n; i++) {
         const spot = randomFloorInBuilding(w, erng, b)
@@ -356,6 +360,10 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng
     // Behavior is a component: the archetype only supplies the DEFAULT brain
     // (populate/scenarios/debug verbs override per-entity). Absent → 'basic'.
     ...(def.behavior ? { behavior: def.behavior } : {}),
+    // #68 dormancy: spawn inert with its wake triggers (a sleeping pod / the
+    // Derelict Unit's power-cut rouse).
+    ...(def.dormant ? { dormant: true } : {}),
+    ...(def.wakeOn ? { wakeOn: [...def.wakeOn] } : {}),
   }
   return addEntity(w, e)
 }

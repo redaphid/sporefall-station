@@ -78,6 +78,15 @@ export interface AiState {
   rel?: Record<EntityId, RelEntry>
   /** Holds position instead of idle-wandering until it spots a target. */
   guard?: boolean
+  /** #68 — INERT until a stimulus wakes it: no move, no target, minimal
+   * perception (the awakeningSystem flips it false and emits `woke`). A sleeping
+   * pod / dormant unit the player can tiptoe past — or trip. */
+  dormant?: boolean
+  /** #68 — stimulus kinds that WAKE this entity from `dormant` (and, for a
+   * non-dormant Derelict Unit, the `'power-cut'` that rouses it to hostility):
+   * 'noise' | 'spore' | 'fire' | 'proximity' | 'power-cut' | 'damage'. The
+   * data-row that replaces the hardcoded `archetype === 'robot'` special case. */
+  wakeOn?: string[]
   /** #77 — the station module this NPC BELONGS to: index into `level.buildings`
    * plus that building's role, stamped at spawn by populate. Drives the
    * territorial goals (work its room, garrison/defend the objective wing).

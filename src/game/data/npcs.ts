@@ -22,6 +22,11 @@ export interface NpcDef {
    * Absent → neutral to everything (the townsfolk baseline). This is what makes
    * a Sporefall enemy DEMAND a particular tool — no single weapon clears them all. */
   resist?: Record<string, number>
+  /** #68 — spawns INERT until a stimulus wakes it (a sleeping pod/unit). */
+  dormant?: boolean
+  /** #68 — stimulus kinds that wake it (also the Derelict Unit's `'power-cut'`
+   * rouse). Copied to `Entity.wakeOn` at spawn. */
+  wakeOn?: string[]
 }
 
 export const NPCS: Record<string, NpcDef> = {
@@ -122,6 +127,8 @@ export const NPCS: Record<string, NpcDef> = {
     // Derelict Unit: armour-plated (bullets/melee ping off) and biologically
     // inert (spore/toxins do nothing) — but its servos cook, so FIRE is the key.
     resist: { physical: 0.4, burning: 1.5, poisoned: 0, spore: 0 },
+    // #68: the power-cut rouse is now a data row, not an `archetype ===` branch.
+    wakeOn: ['power-cut'],
   },
 
   // ── #78 Sporefall threat roster — each DEMANDS a different tool ──────────────
@@ -183,5 +190,22 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
     behavior: 'predator',
     resist: { poisoned: 0.4, spore: 0 },
+  },
+  pod: {
+    // #68 Spore pod: a dormant egg-sac — inert until a nearby noise, a body that
+    // strays too close, or a hit trips it; then it hatches into a hostile hive
+    // thing. A room of these is a stealth set-piece: tiptoe through, or set it off.
+    archetype: 'pod',
+    faction: 'neutral',
+    hp: 26,
+    speed: 3.0,
+    weapon: 'fists',
+    sightRange: 8,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'vermin',
+    dormant: true,
+    wakeOn: ['noise', 'proximity', 'damage', 'fire'],
+    resist: { spore: 0, poisoned: 0.3, burning: 1.4 },
   },
 }

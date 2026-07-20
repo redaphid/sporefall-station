@@ -202,6 +202,75 @@ describe('clamps under monster builds', () => {
   })
 })
 
+describe('combinatorial colour — the core tint blends each mod\'s PICKUP colour', () => {
+  const R = (c: number): number => (c >> 16) & 0xff
+  const B = (c: number): number => c & 0xff
+
+  it('two elements blend: the mix carries BOTH pickup hues, not one last-wins preset', () => {
+    const frost = composeBulletTraits([{ id: 'frost', stacks: 1 }]).color
+    const fire = composeBulletTraits([{ id: 'incendiary', stacks: 1 }]).color
+    const both = composeBulletTraits([
+      { id: 'frost', stacks: 1 },
+      { id: 'incendiary', stacks: 1 },
+    ]).color
+    // Frost's blue shows through the fire, and fire's red shows through the frost:
+    // a genuine mix — impossible if one mod simply overrode the other.
+    expect(B(both), 'frost blue must survive the blend').toBeGreaterThan(B(fire))
+    expect(R(both), 'fire red must survive the blend').toBeGreaterThan(R(frost))
+    expect(both).not.toBe(frost)
+    expect(both).not.toBe(fire)
+  })
+
+  it('each added mod SHIFTS the composed tint (combinatorial, never last-wins)', () => {
+    const a = composeBulletTraits([{ id: 'frost', stacks: 1 }]).color
+    const ab = composeBulletTraits([
+      { id: 'frost', stacks: 1 },
+      { id: 'lifesteal', stacks: 1 },
+    ]).color
+    const abc = composeBulletTraits([
+      { id: 'frost', stacks: 1 },
+      { id: 'lifesteal', stacks: 1 },
+      { id: 'shock', stacks: 1 },
+    ]).color
+    // Every mod added changes the colour — three distinct tints, monotonic build-up.
+    expect(ab).not.toBe(a)
+    expect(abc).not.toBe(ab)
+    // Vampiric maroon pulls red UP relative to lone frost; that pull persists.
+    expect(R(ab)).toBeGreaterThan(R(a))
+  })
+
+  it('the composed core hue tracks each element\'s canonical pickup colour', () => {
+    // frost → blue-dominant, incendiary → red-dominant, matching modColors.
+    const frost = composeBulletTraits([{ id: 'frost', stacks: 1 }]).color
+    const fire = composeBulletTraits([{ id: 'incendiary', stacks: 1 }]).color
+    expect(B(frost)).toBeGreaterThan(R(frost))
+    expect(R(fire)).toBeGreaterThan(B(fire))
+  })
+})
+
+describe('splinterShot — the new shatter mod reads as shards', () => {
+  it('sheds shard flecks and jitter, and changes the vanilla look', () => {
+    const t = composeBulletTraits([{ id: 'splinterShot', stacks: 1 }])
+    expect(t.flecks).toBeGreaterThan(0)
+    expect(t.jitter).toBeGreaterThan(0)
+    expect(t).not.toEqual(baseBulletTraits())
+  })
+
+  it('participates in the blend: splinterShot + frost differs from either alone', () => {
+    const shard = composeBulletTraits([{ id: 'splinterShot', stacks: 1 }])
+    const frost = composeBulletTraits([{ id: 'frost', stacks: 1 }])
+    const both = composeBulletTraits([
+      { id: 'splinterShot', stacks: 1 },
+      { id: 'frost', stacks: 1 },
+    ])
+    expect(both).not.toEqual(shard)
+    expect(both).not.toEqual(frost)
+    // Both signatures survive: frost's trail/glow AND the shard flecks.
+    expect(both.flecks).toBeGreaterThan(0)
+    expect(both.trail).toBeGreaterThanOrEqual(frost.trail)
+  })
+})
+
 describe('distort — the backbuffer refraction gate is a MOD TRAIT, not stack count', () => {
   // The exact set of air-warping mods (energy / heat / blast). distortion.ts's
   // sustainedSpecs gates the on-screen refraction lens on traits.distort > 0.

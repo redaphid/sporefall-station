@@ -19,7 +19,7 @@ describe('resolveWeapon — vanilla passthrough', () => {
     expect(r.knockback).toBe(3)
     expect(r.onHit).toBeUndefined()
     expect(r.triggers).toEqual([])
-    expect(r.behavior).toEqual({ pierce: 0, bounce: 0, homing: 0, explodeRadius: 0, explodeDamage: 0, split: 0, lifestealFrac: 0 })
+    expect(r.behavior).toEqual({ pierce: 0, bounce: 0, homing: 0, explodeRadius: 0, explodeDamage: 0, split: 0, splinter: 0, lifestealFrac: 0 })
   })
 
   it('undefined mods arg behaves as empty', () => {

@@ -79,6 +79,35 @@ const spawnSplit = (w: World, e: Entity): void => {
   }
 }
 
+/** Shatter a dying projectile into a RADIAL burst of short-range fragments
+ * (splinterShot). Distinct from `spawnSplit` (a forward fork on the first body
+ * hit): this fires an omnidirectional shrapnel ring at the point the round dies —
+ * wall, ttl expiry, or enemy. Directions are evenly spread around the circle with
+ * a deterministic per-fragment jitter drawn from the world RNG (`w.rng`, whose
+ * stream position serializes → replay-identical). Fragments carry NO `splinter`
+ * field, so they can never re-splinter — the recursion guard. They inherit the
+ * parent's element (onHit) and mod provenance (for the shared visual) but not its
+ * explode/split/pierce/triggers, so a shatter can't cascade or double-detonate. */
+const spawnSplinter = (w: World, e: Entity): void => {
+  const p = e.projectile!
+  const s = p.splinter!
+  const base = w.rng.next() * Math.PI * 2 // deterministic ring rotation
+  const slice = (Math.PI * 2) / s.count
+  for (let i = 0; i < s.count; i++) {
+    // Even spacing + a bounded jitter that stays inside the fragment's own slice,
+    // so shards never perfectly overlap yet the spray never clumps.
+    const a = base + i * slice + (w.rng.next() - 0.5) * slice * 0.6
+    const child = makeEntity('projectile', 'projectile', e.pos.x, e.pos.y, 0.1)
+    child.facing = a
+    child.vel.x = Math.cos(a) * s.speed
+    child.vel.y = Math.sin(a) * s.speed
+    child.projectile = { ownerId: p.ownerId, damage: s.damage, ttl: s.ttl }
+    if (p.onHit) child.projectile.onHit = { ...p.onHit }
+    if (p.mods) child.projectile.mods = p.mods.map((m) => ({ ...m }))
+    addEntity(w, child)
+  }
+}
+
 export const projectileSystem = (w: World): void => {
   for (const e of w.entities) {
     if (!e.projectile || e.dead) continue
@@ -90,6 +119,7 @@ export const projectileSystem = (w: World): void => {
 
     if (p.ttl <= 0) {
       if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+      if (p.splinter) spawnSplinter(w, e)
       land(w, e)
       e.dead = true
       continue
@@ -97,6 +127,7 @@ export const projectileSystem = (w: World): void => {
     if (isBlocked(w, Math.floor(e.pos.x), Math.floor(e.pos.y))) {
       if (bounceOffWall(w, e)) continue // ricochet — stays alive
       if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+      if (p.splinter) spawnSplinter(w, e)
       land(w, e)
       e.dead = true
       continue
@@ -112,6 +143,7 @@ export const projectileSystem = (w: World): void => {
 
       if (p.explode) {
         detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+        if (p.splinter) spawnSplinter(w, e)
         land(w, e)
         e.dead = true
         break
@@ -143,6 +175,9 @@ export const projectileSystem = (w: World): void => {
         if (p.split) p.split = undefined
         continue
       }
+      // Terminal body impact: shatter into shrapnel (splinter fires alongside any
+      // forward split fork above — both are bounded, neither cascades).
+      if (p.splinter) spawnSplinter(w, e)
       land(w, e)
       e.dead = true
       break

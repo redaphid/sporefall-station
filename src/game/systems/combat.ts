@@ -210,6 +210,7 @@ export interface ProjectileSpec {
   explodeRadius?: number
   explodeDamage?: number
   split?: number
+  splinter?: number
   lifestealFrac?: number
   triggers?: ResolvedTrigger[]
 }
@@ -244,6 +245,9 @@ export const spawnProjectile = (
     if (spec.homing) p.homing = spec.homing
     if (spec.explodeRadius && spec.explodeDamage) p.explode = { radius: spec.explodeRadius, damage: spec.explodeDamage }
     if (spec.split && spec.split > 0) p.split = { count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }
+    // Splinter: a radial shrapnel burst on death — many short-lived, weak fragments
+    // (fast but ttl ~6 ticks → a tight scatter, not a second volley).
+    if (spec.splinter && spec.splinter > 0) p.splinter = { count: spec.splinter, damage: Math.max(1, Math.round(damage * 0.35)), speed: speed * 0.7, ttl: 6 }
     if (spec.lifestealFrac) p.lifestealFrac = spec.lifestealFrac
     if (spec.triggers && spec.triggers.length) p.triggers = spec.triggers
   }
@@ -303,7 +307,7 @@ export const runHitTriggers = (
  * byte-for-byte as before. */
 const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
   const b = rw.behavior
-  const has = b.pierce || b.bounce || b.homing || b.explodeRadius || b.split || b.lifestealFrac || rw.triggers.length
+  const has = b.pierce || b.bounce || b.homing || b.explodeRadius || b.split || b.splinter || b.lifestealFrac || rw.triggers.length
   if (!has) return undefined
   return {
     pierce: b.pierce || undefined,
@@ -312,6 +316,7 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
     explodeRadius: b.explodeRadius || undefined,
     explodeDamage: b.explodeDamage || undefined,
     split: b.split || undefined,
+    splinter: b.splinter || undefined,
     lifestealFrac: b.lifestealFrac || undefined,
     triggers: rw.triggers.length ? rw.triggers : undefined,
   }

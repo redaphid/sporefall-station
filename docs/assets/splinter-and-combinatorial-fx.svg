@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="720" viewBox="0 0 1180 720" font-family="ui-sans-serif, system-ui, sans-serif">
+  <rect width="100%" height="100%" fill="#12141c"/>
+  <text x="20" y="34" fill="#f0f2ff" font-size="18" font-weight="700">Combinatorial bullet FX — composeBulletTraits() blends each mod's pickup colour</text>
+  
+    <g>
+      <text x="150" y="74" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">vanilla</text>
+      <text x="150" y="152" text-anchor="middle" fill="#8890a8" font-size="9">#ffe066</text>
+      <ellipse cx="150" cy="106" rx="10.0" ry="10.0" fill="#ffe066"/>
+      <text x="150" y="168" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.00 · len 1.00 · glow 0.00 · trail 0 · flecks 0.00 · chroma 0.00 · distort 0.00</text>
+    </g>
+
+    <g>
+      <text x="430" y="74" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">frost</text>
+      <text x="430" y="152" text-anchor="middle" fill="#8890a8" font-size="9">#54e2dd</text>
+      <ellipse cx="404.5" cy="106" rx="7.0" ry="5.5" fill="#c0efff" opacity="0.24"/>
+      <ellipse cx="413.0" cy="106" rx="7.0" ry="5.5" fill="#c0efff" opacity="0.12"/>
+      <ellipse cx="430" cy="106" rx="12.2" ry="12.2" fill="#7cdaff" opacity="0.11"/>
+      <ellipse cx="430" cy="106" rx="10.0" ry="10.0" fill="#54e2dd"/>
+      <text x="430" y="168" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.00 · len 1.00 · glow 0.22 · trail 2 · flecks 0.00 · chroma 0.00 · distort 0.00</text>
+    </g>
+
+    <g>
+      <text x="710" y="74" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">incendiary</text>
+      <text x="710" y="152" text-anchor="middle" fill="#8890a8" font-size="9">#ff9217</text>
+      <ellipse cx="684.5" cy="106" rx="7.0" ry="5.5" fill="#ffac15" opacity="0.24"/>
+      <ellipse cx="693.0" cy="106" rx="7.0" ry="5.5" fill="#ffac15" opacity="0.12"/>
+      <ellipse cx="710" cy="106" rx="12.5" ry="12.5" fill="#ff5200" opacity="0.12"/>
+      <ellipse cx="710" cy="106" rx="10.0" ry="10.0" fill="#ff9217"/>
+      <text x="710" y="168" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.00 · len 1.00 · glow 0.25 · trail 2 · flecks 0.00 · chroma 0.00 · distort 0.21</text>
+    </g>
+
+    <g>
+      <text x="990" y="74" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">frost + incendiary</text>
+      <text x="990" y="152" text-anchor="middle" fill="#8890a8" font-size="9">#a7b583</text>
+      <ellipse cx="947.5" cy="106" rx="7.0" ry="5.5" fill="#ebce8f" opacity="0.48"/>
+      <ellipse cx="956.0" cy="106" rx="7.0" ry="5.5" fill="#ebce8f" opacity="0.36"/>
+      <ellipse cx="964.5" cy="106" rx="7.0" ry="5.5" fill="#ebce8f" opacity="0.24"/>
+      <ellipse cx="973.0" cy="106" rx="7.0" ry="5.5" fill="#ebce8f" opacity="0.12"/>
+      <ellipse cx="990" cy="106" rx="13.7" ry="13.7" fill="#d99178" opacity="0.19"/>
+      <ellipse cx="990" cy="106" rx="10.0" ry="10.0" fill="#a7b583"/>
+      <text x="990" y="168" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.00 · len 1.00 · glow 0.37 · trail 4 · flecks 0.00 · chroma 0.00 · distort 0.21</text>
+    </g>
+
+    <g>
+      <text x="150" y="204" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">frost + incendiary + shock</text>
+      <text x="150" y="282" text-anchor="middle" fill="#8890a8" font-size="9">#c7c34f</text>
+      <ellipse cx="99.0" cy="236" rx="7.0" ry="5.5" fill="#e7d5a7" opacity="0.60"/>
+      <ellipse cx="107.5" cy="236" rx="7.0" ry="5.5" fill="#e7d5a7" opacity="0.48"/>
+      <ellipse cx="116.0" cy="236" rx="7.0" ry="5.5" fill="#e7d5a7" opacity="0.36"/>
+      <ellipse cx="124.5" cy="236" rx="7.0" ry="5.5" fill="#e7d5a7" opacity="0.24"/>
+      <ellipse cx="133.0" cy="236" rx="7.0" ry="5.5" fill="#e7d5a7" opacity="0.12"/>
+      <ellipse cx="150" cy="236" rx="14.6" ry="14.6" fill="#c7a6a8" opacity="0.23"/>
+      <ellipse cx="150" cy="236" rx="10.0" ry="10.0" fill="#c7c34f"/>
+      <text x="150" y="298" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.00 · len 1.00 · glow 0.46 · trail 5 · flecks 0.00 · chroma 0.12 · distort 0.35</text>
+    </g>
+
+    <g>
+      <text x="430" y="204" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">splinterShot</text>
+      <text x="430" y="282" text-anchor="middle" fill="#8890a8" font-size="9">#ff8081</text>
+      <ellipse cx="413.7" cy="236" rx="6.0" ry="4.7" fill="#ffcaeb" opacity="0.12"/>
+      <ellipse cx="430" cy="236" rx="8.6" ry="8.6" fill="#ff8081"/>
+      <rect x="443.0" y="234.4" width="3.2" height="3.2" transform="rotate(45 444.6 236.0)" fill="#ff8081" opacity="0.9"/>
+      <rect x="432.9" y="248.3" width="3.2" height="3.2" transform="rotate(45 434.5 249.9)" fill="#ff8081" opacity="0.9"/>
+      <rect x="416.6" y="243.0" width="3.2" height="3.2" transform="rotate(45 418.2 244.6)" fill="#ff8081" opacity="0.9"/>
+      <rect x="416.6" y="225.8" width="3.2" height="3.2" transform="rotate(45 418.2 227.4)" fill="#ff8081" opacity="0.9"/>
+      <rect x="432.9" y="220.5" width="3.2" height="3.2" transform="rotate(45 434.5 222.1)" fill="#ff8081" opacity="0.9"/>
+      <text x="430" y="298" text-anchor="middle" fill="#6b7290" font-size="7.5">size 0.86 · len 1.00 · glow 0.00 · trail 1 · flecks 0.41 · chroma 0.00 · distort 0.00</text>
+    </g>
+
+    <g>
+      <text x="710" y="204" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">splinterShot + frost + overload</text>
+      <text x="710" y="282" text-anchor="middle" fill="#8890a8" font-size="9">#7ca0d9</text>
+      <ellipse cx="674.9" cy="236" rx="7.8" ry="6.1" fill="#dbe2fe" opacity="0.36"/>
+      <ellipse cx="683.6" cy="236" rx="7.8" ry="6.1" fill="#dbe2fe" opacity="0.24"/>
+      <ellipse cx="692.4" cy="236" rx="7.8" ry="6.1" fill="#dbe2fe" opacity="0.12"/>
+      <ellipse cx="710" cy="236" rx="14.7" ry="14.7" fill="#cfb08b" opacity="0.18"/>
+      <ellipse cx="710" cy="236" rx="11.1" ry="11.1" fill="#7ca0d9"/>
+      <rect x="725.5" y="234.4" width="3.2" height="3.2" transform="rotate(45 727.1 236.0)" fill="#7ca0d9" opacity="0.9"/>
+      <rect x="713.7" y="250.7" width="3.2" height="3.2" transform="rotate(45 715.3 252.3)" fill="#7ca0d9" opacity="0.9"/>
+      <rect x="694.5" y="244.5" width="3.2" height="3.2" transform="rotate(45 696.1 246.1)" fill="#7ca0d9" opacity="0.9"/>
+      <rect x="694.5" y="224.3" width="3.2" height="3.2" transform="rotate(45 696.1 225.9)" fill="#7ca0d9" opacity="0.9"/>
+      <rect x="713.7" y="218.1" width="3.2" height="3.2" transform="rotate(45 715.3 219.7)" fill="#7ca0d9" opacity="0.9"/>
+      <text x="710" y="298" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.11 · len 1.00 · glow 0.36 · trail 3 · flecks 0.41 · chroma 0.33 · distort 0.00</text>
+    </g>
+
+    <g>
+      <text x="990" y="204" text-anchor="middle" fill="#e8e8f0" font-size="13" font-weight="600">glassCannon + explosive + homing</text>
+      <text x="990" y="282" text-anchor="middle" fill="#8890a8" font-size="9">#e357ae</text>
+      <ellipse cx="946.6" cy="236" rx="13.6" ry="10.7" fill="#ff7fee" opacity="0.36"/>
+      <ellipse cx="957.5" cy="236" rx="13.6" ry="10.7" fill="#ff7fee" opacity="0.24"/>
+      <ellipse cx="968.3" cy="236" rx="13.6" ry="10.7" fill="#ff7fee" opacity="0.12"/>
+      <ellipse cx="990" cy="236" rx="24.7" ry="24.7" fill="#ff53a7" opacity="0.27"/>
+      <ellipse cx="990" cy="236" rx="19.4" ry="19.4" fill="#e357ae"/>
+      <text x="990" y="298" text-anchor="middle" fill="#6b7290" font-size="7.5">size 1.94 · len 1.00 · glow 0.53 · trail 3 · flecks 0.00 · chroma 0.33 · distort 0.56</text>
+    </g>
+  <line x1="20" y1="354" x2="1160" y2="354" stroke="#2a2e3c"/>
+  <text x="20" y="378" fill="#f0f2ff" font-size="18" font-weight="700">Splinter shot — real sim: 12 fragments scatter radially on impact (seed 7, deterministic)</text>
+  <circle cx="120" cy="530" r="5" fill="#6b7290"/><text x="120" y="520" text-anchor="middle" fill="#8890a8" font-size="9">muzzle</text>
+  <circle cx="120.0" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="132.1" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="144.3" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="156.4" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="168.5" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="180.7" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="192.8" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="204.9" cy="530.0" r="2" fill="#ffd8b1" opacity="0.5"/>
+  <circle cx="217.1" cy="530.0" r="7" fill="none" stroke="#ff5fa2" stroke-width="1.5" opacity="0.7"/>
+  <line x1="217.1" y1="530.0" x2="207.4" y2="485.2" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="205.4" y="483.2" width="4" height="4" transform="rotate(45 207.4 485.2)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="226.6" y2="485.1" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="224.6" y="483.1" width="4" height="4" transform="rotate(45 226.6 485.1)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="253.3" y2="501.9" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="251.3" y="499.9" width="4" height="4" transform="rotate(45 253.3 501.9)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="262.1" y2="521.2" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="260.1" y="519.2" width="4" height="4" transform="rotate(45 262.1 521.2)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="262.4" y2="537.0" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="260.4" y="535.0" width="4" height="4" transform="rotate(45 262.4 537.0)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="252.7" y2="558.8" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="250.7" y="556.8" width="4" height="4" transform="rotate(45 252.7 558.8)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="231.0" y2="573.7" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="229.0" y="571.7" width="4" height="4" transform="rotate(45 231.0 573.7)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="200.3" y2="572.7" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="198.3" y="570.7" width="4" height="4" transform="rotate(45 200.3 572.7)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="181.2" y2="558.6" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="179.2" y="556.6" width="4" height="4" transform="rotate(45 181.2 558.6)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="173.1" y2="543.1" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="171.1" y="541.1" width="4" height="4" transform="rotate(45 173.1 543.1)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="173.1" y2="517.1" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="171.1" y="515.1" width="4" height="4" transform="rotate(45 173.1 517.1)" fill="#ff9ec9"/>
+  <line x1="217.1" y1="530.0" x2="185.5" y2="496.7" stroke="#ff5fa2" stroke-width="2" opacity="0.85"/>
+  <rect x="183.5" y="494.7" width="4" height="4" transform="rotate(45 185.5 496.7)" fill="#ff9ec9"/>
+  <text x="120" y="730" fill="#8890a8" font-size="11">muzzle → parent round travels +x → strikes the target → shatters into a radial shrapnel ring (pink vectors = fragment headings)</text>
+</svg>

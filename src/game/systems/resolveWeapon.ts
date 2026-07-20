@@ -42,7 +42,7 @@ const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.m
 const hyperbolic = (perStack: number, stacks: number): number => 1 - 1 / (1 + perStack * stacks)
 
 const zeroBehavior = (): BulletBehavior => ({
-  pierce: 0, bounce: 0, homing: 0, explodeRadius: 0, explodeDamage: 0, split: 0, lifestealFrac: 0,
+  pierce: 0, bounce: 0, homing: 0, explodeRadius: 0, explodeDamage: 0, split: 0, splinter: 0, lifestealFrac: 0,
 })
 
 /**
@@ -83,6 +83,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       if (b.pierce) behavior.pierce += b.pierce * stacks
       if (b.bounce) behavior.bounce += b.bounce * stacks
       if (b.split) behavior.split += b.split * stacks
+      if (b.splinter) behavior.splinter += b.splinter * stacks
       if (b.homing) behavior.homing += b.homing * stacks
       if (b.explodeRadius) behavior.explodeRadius += b.explodeRadius * stacks
       if (b.explodeDamage) behavior.explodeDamage += b.explodeDamage * stacks
@@ -116,6 +117,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       explodeRadius: clamp(behavior.explodeRadius, 0, 20),
       explodeDamage: clamp(Math.round(behavior.explodeDamage), 0, DAMAGE_CAP),
       split: clamp(Math.round(behavior.split), 0, BEHAVIOR_CAP),
+      splinter: clamp(Math.round(behavior.splinter), 0, BEHAVIOR_CAP),
       lifestealFrac: clamp(behavior.lifestealFrac, 0, 0.95),
     },
     triggers,

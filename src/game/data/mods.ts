@@ -28,6 +28,8 @@ export interface BulletBehavior {
   explodeRadius: number
   explodeDamage: number
   split: number
+  /** Fragment count for the on-termination radial shatter (splinterShot). */
+  splinter: number
   lifestealFrac: number
 }
 
@@ -165,6 +167,15 @@ export const MODS: Record<string, ModDef> = {
     maxStacks: 3,
     blurb: 'Bullets burst into shards on a hit.',
     behavior: { split: 2 },
+  },
+  splinterShot: {
+    id: 'splinterShot', name: 'Splinter Shot', icon: '🔪', category: 'behavior', rarity: 'rare',
+    maxStacks: 3,
+    // DISTINCT from `split` (a forward FORK on the first body hit): splinterShot
+    // makes the round SHATTER into a radial spray of short-range shrapnel wherever
+    // it dies — a wall, ttl expiry, or an enemy. Great for corners and crowds.
+    blurb: 'Shatters into a burst of shrapnel wherever it lands.',
+    behavior: { splinter: 4 },
   },
   lifesteal: {
     id: 'lifesteal', name: 'Vampiric', icon: '🩸', category: 'behavior', rarity: 'rare',

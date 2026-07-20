@@ -127,6 +127,106 @@ describe('behavior mods — real fire path', () => {
     expect(shards.every((s) => s.projectile!.ownerId === p.id)).toBe(true)
   })
 
+  // ---- splinterShot: a radial shrapnel shatter on termination -------------
+  // `advance()` never culls dead entities, so every projectile ever spawned (the
+  // parent + its fragments) stays in w.entities → an EXACT total count.
+  const projTotal = (w: World): number => w.entities.filter((e) => e.kind === 'projectile').length
+
+  it('splinterShot: a round shatters into a radial fragment burst on impact', () => {
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'splinterShot', stacks: 1 }])
+    npc(w, 22, 20)
+    fire(w, p)
+    expect(projTotal(w)).toBe(1) // just the parent so far
+    advance(w, 12)
+    // parent (1) + 4 fragments (splinter:4 × 1 stack). Fragments inherit the owner.
+    expect(projTotal(w)).toBe(1 + 4)
+    const frags = w.entities.filter((e) => e.kind === 'projectile' && e.id !== w.entities.find((x) => x.kind === 'projectile')!.id)
+    expect(frags.every((f) => f.projectile!.ownerId === p.id)).toBe(true)
+  })
+
+  it('more stacks → more fragments (splinter:4 per stack)', () => {
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'splinterShot', stacks: 3 }])
+    npc(w, 22, 20)
+    fire(w, p)
+    advance(w, 12)
+    expect(projTotal(w)).toBe(1 + 12) // 4 × 3 stacks
+  })
+
+  it('a vanilla round never splinters', () => {
+    const p = armed(w, 20, 20, 'pistol')
+    npc(w, 22, 20)
+    fire(w, p)
+    advance(w, 12)
+    expect(projTotal(w)).toBe(1) // the one round, no fragments
+  })
+
+  it('fragments never re-splinter — the burst is bounded and dies out', () => {
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'splinterShot', stacks: 3 }])
+    npc(w, 22, 20)
+    fire(w, p)
+    advance(w, 4)
+    const born = projTotal(w)
+    expect(born).toBe(1 + 12)
+    // No fragment carries the splinter field (the recursion guard is the field,
+    // not the mod-provenance list).
+    const frags = w.entities.filter((e) => e.kind === 'projectile' && e.projectile!.splinter === undefined)
+    expect(frags.length).toBeGreaterThanOrEqual(12)
+    // Run far past the fragment ttl (6): everything dies, nothing new is born.
+    advance(w, 40)
+    expect(projTotal(w)).toBe(born) // no cascade
+    expect(w.entities.some((e) => e.kind === 'projectile' && !e.dead)).toBe(false)
+  })
+
+  it('splinter fires on a WALL/ttl impact too, not only on a body', () => {
+    // No NPC in front: the round flies until ttl and shatters in place.
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'splinterShot', stacks: 1 }])
+    fire(w, p)
+    advance(w, 80) // outlast the pistol's range/ttl
+    expect(projTotal(w)).toBe(1 + 4)
+  })
+
+  it('splinter + split COMPOSE: a forward fork AND a radial shatter both fire', () => {
+    const p = armed(w, 20, 20, 'pistol', [
+      { id: 'split', stacks: 1 }, // 2 forward-fork children on the first body
+      { id: 'splinterShot', stacks: 1 }, // 4 radial fragments on death
+    ])
+    npc(w, 22, 20)
+    fire(w, p)
+    advance(w, 12)
+    // parent (1) + split fork (2) + splinter shatter (4) = 7, and neither child
+    // type carries split/splinter → no further children.
+    expect(projTotal(w)).toBe(1 + 2 + 4)
+  })
+
+  it('splinter fragments inherit the parent element (splinter + frost → icy shards)', () => {
+    const p = armed(w, 20, 20, 'pistol', [
+      { id: 'frost', stacks: 1 },
+      { id: 'splinterShot', stacks: 1 },
+    ])
+    npc(w, 22, 20)
+    fire(w, p)
+    advance(w, 12)
+    // Fragments are the projectiles WITHOUT a splinter field (the parent keeps its).
+    const frags = w.entities.filter((e) => e.kind === 'projectile' && e.projectile!.splinter === undefined)
+    expect(frags.length).toBeGreaterThan(0)
+    expect(frags.every((f) => f.projectile!.onHit?.status === 'frozen')).toBe(true)
+  })
+
+  it('a seeded splinter build replays identically from two deserialized copies', () => {
+    const seed = createWorld(7, 1)
+    const shooter = armed(seed, 20, 20, 'pistol', [{ id: 'splinterShot', stacks: 3 }])
+    npc(seed, 23, 20)
+    shooter.combat!.cooldown = 0
+    const json = serializeWorld(seed)
+    const a = deserializeWorld(json)
+    const b = deserializeWorld(json)
+    for (let i = 0; i < 40; i++) {
+      tickWorld(a, new Map([[0, { ...emptyInput(), attack: true }]]))
+      tickWorld(b, new Map([[0, { ...emptyInput(), attack: true }]]))
+    }
+    expectWorldEqual(a, b) // identical fragment positions/angles ⇒ RNG-deterministic
+  })
+
   it('detonator: killing an NPC chain-explodes onto a neighbor (on-kill trigger)', () => {
     const p = armed(w, 20, 20, 'pistol', [{ id: 'detonator', stacks: 1 }])
     const weak = npc(w, 22, 20, 10) // dies to one 14-dmg pistol shot

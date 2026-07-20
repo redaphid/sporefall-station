@@ -40,6 +40,7 @@ export const MOD_PICKUP_COLORS: Record<string, number> = {
   homing: 0xdcbeff, //   lavender  — curve toward target
   explosive: 0xe6194b, // red      — blast (semantic)
   split: 0xffd8b1, //    apricot   — shards
+  splinterShot: 0xff5fa2, // rose  — shrapnel shatter burst
   lifesteal: 0x800000, // maroon   — blood (semantic)
   // ---- TRIGGER -------------------------------------------------------------
   detonator: 0xf032e6, // magenta  — chain-explosion legendary

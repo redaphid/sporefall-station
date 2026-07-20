@@ -13,6 +13,7 @@
 
 import { MODS, modMaxStacks } from '../game/data/mods'
 import type { WeaponMod } from '../game/entity'
+import { modPickupColor } from './modColors'
 
 /** The composed appearance of one bullet. All fields finite and clamped. */
 export interface BulletTraits {
@@ -53,7 +54,12 @@ export interface BulletTraitDelta {
   sizeMul?: number
   /** Elongation factor per stack (compounds). */
   lengthMul?: number
-  /** Core-hue contribution: blended into the tint with `weight` per stack. */
+  /** Core-hue contribution. The CORE tint blends each mod's canonical pickup
+   * colour (`modColors.modPickupColor` — the single source of truth, so a bullet's
+   * body reads the same hue as the diamond you grabbed and the gun it feeds) at
+   * `weight` per stack. `color` here is the ACCENT hue this mod pulls its glow /
+   * trail toward when it declares no explicit glowColor/trailColor — it no longer
+   * drives the core tint. */
   hue?: { color: number; weight: number }
   /** Halo strength added per stack. */
   glowAdd?: number
@@ -129,8 +135,11 @@ export const MOD_VISUALS: Record<string, BulletTraitDelta> = {
   // Explosive: an armed grenade-round — fat, red-hot, throbbing; the volatile
   // payload warps the air ahead of it (distort).
   explosive: { sizeMul: 1.14, hue: { color: 0xff5030, weight: 0.5 }, glowAdd: 0.35, glowColor: 0xff4020, pulseAdd: 0.5, distortAdd: 0.4 },
-  // Splinter: shard flecks orbit the round, hinting the burst to come.
+  // Splinter (fork): shard flecks orbit the round, hinting the burst to come.
   split: { flecksAdd: 0.7, hue: { color: 0xc0ff90, weight: 0.25 }, trailAdd: 0.5, trailColor: 0xd8ffb0 },
+  // Splinter Shot (shatter): a small, sharp, jittering shard that sheds a fine
+  // rose glass-dust trail — a round visibly about to fracture into shrapnel.
+  splinterShot: { sizeMul: 0.9, hue: { color: 0xff9ec9, weight: 0.4 }, flecksAdd: 0.5, jitterAdd: 0.14, trailAdd: 0.4, trailColor: 0xffd0e8 },
   // Vampiric: crimson round dripping a blood trail.
   lifesteal: { hue: { color: 0xd8304a, weight: 0.7 }, trailAdd: 1, trailColor: 0xa01830, glowAdd: 0.12, glowColor: 0xd8304a },
 
@@ -229,14 +238,17 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
   let distortSum = 0
   let power = 0
 
-  for (const { delta, stacks } of active) {
+  for (const { id, delta, stacks } of active) {
     power += stacks
     // Per-stack compounding softens after the first stack (sqrt taper) so five
     // stacks read "much more", not "off the chart".
     const eff = 1 + Math.sqrt(stacks) - 1 // 1, 1.41, 1.73 … effective stacks
     if (delta.sizeMul) sizeMul *= Math.pow(delta.sizeMul, eff)
     if (delta.lengthMul) lengthMul *= Math.pow(delta.lengthMul, eff)
-    if (delta.hue) core.add(delta.hue.color, delta.hue.weight * eff)
+    // Core tint blends the mod's CANONICAL pickup colour (source of truth in
+    // modColors) — so the bullet body is a genuine weighted mix of every stacked
+    // mod's diamond hue, and reads its whole build at a glance.
+    if (delta.hue) core.add(modPickupColor(id), delta.hue.weight * eff)
     if (delta.glowAdd) {
       glowSum += delta.glowAdd * eff
       glow.add(delta.glowColor ?? delta.hue?.color ?? BASE_BULLET_COLOR, (delta.glowAdd || 0.1) * eff)

@@ -57,6 +57,31 @@ export const createDebugClient = (url = defaultHubUrl(), opts: DebugClientOpts =
   let backoff = baseMs
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
+  // Callers that issue a verb before the socket has opened (e.g. a one-shot CLI
+  // invocation: connect() then immediately raw()) park here for the first/next
+  // 'open' instead of failing fast. Resolved true on open, false on close/timeout.
+  let openWaiters: Array<(ok: boolean) => void> = []
+  const flushOpen = (ok: boolean): void => {
+    const pending = openWaiters
+    openWaiters = []
+    for (const fn of pending) fn(ok)
+  }
+  /** Resolve when the socket is (or becomes) open, or false after `ms`/on close. */
+  const waitConnected = (ms: number): Promise<boolean> =>
+    new Promise((resolve) => {
+      if (connected) return resolve(true)
+      if (closed) return resolve(false)
+      let settled = false
+      const fn = (ok: boolean): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(ok)
+      }
+      openWaiters.push(fn)
+      const timer = setTimeout(() => fn(false), ms)
+    })
+
   /** Reject every in-flight verb — the socket carrying their replies is gone. */
   const failPending = (message: string): void => {
     for (const w of waiters.values()) w.reject(new Error(message))
@@ -100,6 +125,7 @@ export const createDebugClient = (url = defaultHubUrl(), opts: DebugClientOpts =
       connected = true
       backoff = baseMs // healthy again → next drop retries quickly
       sock.send(JSON.stringify({ t: 'hello', role: 'debugger' } satisfies DebugMsg))
+      flushOpen(true) // release any verbs that were waiting for the socket to open
     })
     sock.addEventListener('error', onDown)
     sock.addEventListener('close', onDown)
@@ -122,9 +148,15 @@ export const createDebugClient = (url = defaultHubUrl(), opts: DebugClientOpts =
   }
 
   const client: DebugClient = {
-    raw: (verb, { timeoutMs = 5000, target } = {}) =>
-      new Promise((res, rej) => {
-        if (!connected || !ws) return rej(new Error(`not connected to the hub at ${url} (retrying)`))
+    raw: async (verb, { timeoutMs = 5000, target } = {}) => {
+      // Wait (bounded by timeoutMs) for the socket to open before giving up: a
+      // one-shot caller (CLI) connects then immediately issues a verb, so failing
+      // fast would break it. A genuinely down hub still rejects after timeoutMs.
+      if (!connected && !(await waitConnected(timeoutMs))) {
+        throw new Error(`not connected to the hub at ${url} (retrying)`)
+      }
+      return new Promise<string>((res, rej) => {
+        if (!ws) return rej(new Error(`not connected to the hub at ${url} (retrying)`))
         const id = seq++
         waiters.set(id, { resolve: res, reject: rej })
         try {
@@ -136,7 +168,8 @@ export const createDebugClient = (url = defaultHubUrl(), opts: DebugClientOpts =
         setTimeout(() => {
           if (waiters.delete(id)) rej(new Error(`verb timed out (${timeoutMs}ms): ${verb}`))
         }, timeoutMs)
-      }),
+      })
+    },
     games: async () => JSON.parse(await client.raw('games')) as GameInfo[],
     onEvent: (cb) => eventCbs.push(cb),
     close: () => {

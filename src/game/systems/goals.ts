@@ -21,7 +21,7 @@
 import type { Entity } from '../entity'
 import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
-import { doorClosedAt, type World } from '../world'
+import { anyPowerCut, doorClosedAt, type World } from '../world'
 import { initialPlayerHate } from './relationships'
 
 export const WANDER = 'wander'
@@ -81,8 +81,11 @@ export const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
   if (stored !== undefined) return stored
   const base = initialPlayerHate(e.ai?.faction ?? 'neutral')
   // A hostile world floors an un-opinionated NPC's grudge to the hostile band so
-  // it engages regardless of faction; a stored opinion (e.g. befriended) still wins.
-  return w.hostile ? Math.max(base, WORLD_HOSTILE_HATE) : base
+  // it engages regardless of faction; likewise a POWER CUT rouses the station's
+  // Derelict Units (robots) into open hostility — the standing cost of that path.
+  // Either way a stored opinion (e.g. befriended) still wins.
+  const forced = w.hostile || (e.archetype === 'robot' && anyPowerCut(w))
+  return forced ? Math.max(base, WORLD_HOSTILE_HATE) : base
 }
 
 export const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {

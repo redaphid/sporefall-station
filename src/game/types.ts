@@ -88,6 +88,18 @@ export type SimEvent =
   | { type: 'pickCancel'; entityId: EntityId; byId: EntityId; reason: 'moved' | 'hurt' | 'gone' }
   /** An explosion blew a door open (locked or not) — the loud breach path. */
   | { type: 'doorBreach'; entityId: EntityId; x: number; y: number }
+  /** A sealed/overgrown hatch was cleared. `via` records HOW: a `keycard` in
+   * hand, a `power` cut to its wing, `fire` eroding the growth, the linked
+   * `node` dying, or a `breach` (grenade — loud, and it ruptures a spore-sac). */
+  | { type: 'sealOpen'; entityId: EntityId; via: 'keycard' | 'power' | 'fire' | 'node' | 'breach' }
+  /** A player tried to open a sealed hatch with no means (no keycard, powered
+   * wing, or unremoved growth) — the UI can say WHAT it needs. */
+  | { type: 'sealDenied'; entityId: EntityId; byId: EntityId; sealKind: 'keycard' | 'power' | 'overgrown' }
+  /** A generator/Cryo Terminal was hacked, cutting power to `wing` (World.powerCut). */
+  | { type: 'powerCut'; wing: string; byId: EntityId }
+  /** A `contain` mission's Spore Node bloomed (soft-fail): the room floods with
+   * spores. Not a loss — just harder. */
+  | { type: 'bloom'; x: number; y: number; entityId: EntityId }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */

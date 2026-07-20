@@ -182,6 +182,10 @@ export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'ammo'
 export const itemClass = (itemId: string): ItemClass => {
   if (itemId === 'cash') return 'cash'
   if (itemId === 'briefcase') return 'key'
+  // Wing keycards ('keycard' or 'keycard.<wing>'): a key-class item, so they
+  // ignore slot limits, survive a down (recover keeps only 'key' items), and
+  // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
+  if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
   if (itemId === 'ammo') return 'ammo'
   if (WEAPONS[itemId]) return WEAPONS[itemId].kind
   if (THROWABLES[itemId]) return 'throwable'

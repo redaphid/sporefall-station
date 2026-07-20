@@ -1,0 +1,169 @@
+{
+  "v": 1,
+  "seed": 104,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 4,
+  "alarm": 1,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Reach the exit"
+  },
+  "noises": [],
+  "events": [
+    {
+      "type": "powerCut",
+      "wing": "north",
+      "byId": 1
+    },
+    {
+      "type": "use",
+      "entityId": 3,
+      "byId": 1
+    },
+    {
+      "type": "sealOpen",
+      "entityId": 2,
+      "via": "power"
+    },
+    {
+      "type": "doorToggle",
+      "entityId": 2,
+      "open": true
+    }
+  ],
+  "rng": 1392318473,
+  "baseRng": 104,
+  "levelChecksum": 2016106042,
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 19.6,
+        "y": 20
+      },
+      "prevPos": {
+        "x": 19.6,
+        "y": 20
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 200
+          }
+        ],
+        "activeSlot": 0,
+        "cash": 0,
+        "crimeUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "door",
+      "archetype": "door",
+      "pos": {
+        "x": 20.5,
+        "y": 20
+      },
+      "prevPos": {
+        "x": 20.5,
+        "y": 20
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.5,
+      "facing": 0,
+      "door": {
+        "open": true,
+        "locked": false,
+        "lockLevel": 2,
+        "sealKind": "power",
+        "wing": "north"
+      },
+      "interact": {
+        "verb": "open",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 3,
+      "kind": "interactable",
+      "archetype": "generator",
+      "pos": {
+        "x": 22.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 30,
+        "max": 30,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      },
+      "wing": "north",
+      "used": true
+    }
+  ],
+  "hostile": false,
+  "powerCut": {
+    "north": true
+  }
+}

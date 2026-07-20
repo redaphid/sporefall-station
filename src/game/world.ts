@@ -5,6 +5,7 @@ import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
+import { sporeSystem } from './systems/spore'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
@@ -15,12 +16,22 @@ import { statusFxSystem } from './systems/statusFx'
 import type { Annotation, EntityId, InputCmd, SimEvent } from './types'
 
 export interface MissionState {
-  template: 'steal' | 'assassinate' | 'reach'
+  /** `steal`/`assassinate`/`reach` are the classic objectives. Sporefall adds:
+   *  `contain`    — destroy the Spore Node (targetEntityId) before it BLOOMS;
+   *                 the bloom is a soft-fail (room floods with spores), never a loss.
+   *  `infiltrate` — reach & eliminate a target sealed behind a biolock (open it by
+   *                 keycard, power-cut, or breach). Completes on target death. */
+  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate'
   targetEntityId?: EntityId
   targetBuilding?: number
   complete: boolean
   exitUnlocked: boolean
   description: string
+  /** `contain` only: absolute tick the Spore Node blooms if still alive. Optional
+   * so every other mission serializes byte-for-byte as before. */
+  bloomTick?: number
+  /** `contain` only: the bloom already fired (soft-fail latched, room flooded). */
+  bloomed?: boolean
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */
@@ -64,6 +75,11 @@ export interface World {
   events: SimEvent[]
   /** City heat 0..3 — cop aggro threshold. */
   alarm: number
+  /** Per-wing power state: `powerCut[wing] === true` means that wing's grid is
+   * down (a hacked generator/Cryo Terminal), which auto-unseals its `'power'`
+   * biolocks and wakes its Derelict Units. A wing absent/false = powered (the
+   * default — a fresh station is fully lit). Keyed by wing id. */
+  powerCut: Record<string, boolean>
   /** Active heard disturbances; NPCs investigate the nearest. */
   noises: Noise[]
   gameOver: boolean
@@ -103,6 +119,7 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     baseRng,
     events: [],
     alarm: 0,
+    powerCut: {},
     noises: [],
     gameOver: false,
     mode,
@@ -110,6 +127,13 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     hostile,
     annotations: [],
   }
+}
+
+/** Is any wing's power currently cut? Robots (Derelict Units) turn hostile while
+ * so (behaviors.ts) — the standing cost of the power-cut infiltration path. */
+export const anyPowerCut = (w: World): boolean => {
+  for (const k in w.powerCut) if (w.powerCut[k]) return true
+  return false
 }
 
 /** Register a heard disturbance at a point; NPCs nearby will investigate it. */
@@ -153,6 +177,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   projectileSystem(w)
   interactionSystem(w, inputs)
   fireSystem(w)
+  sporeSystem(w)
   elementSystem(w)
   statusSystem(w)
   statusFxSystem(w)

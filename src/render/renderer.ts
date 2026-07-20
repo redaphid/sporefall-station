@@ -29,6 +29,7 @@ import { createPickTracker } from './pickModel'
 import { createSettingsPanel } from './settingsPanel'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
+import { StatusFxLayer } from './statusShaders'
 import { TilemapView } from './tilemap'
 
 /** World-space label style for the lockpick prompt/toast (small, outlined). */
@@ -137,6 +138,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const tilemap = new TilemapView()
   const entities = new EntityViews(art)
   const bullets = new BulletLayer(art)
+  // Per-character status-effect shaders (lightning/fire/frost/poison/wet),
+  // modulated by uniforms derived from the applying weapon + its mods. A batched
+  // GPU mesh in world space — no per-entity filter — so it rides the camera
+  // transform and the backbuffer composite like the bullets do.
+  const statusFx = new StatusFxLayer()
   const effects = new EffectsLayer(art)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
@@ -181,7 +187,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   }
   // The pick layer lives INSIDE `world`: it is world-space affordance art, so
   // it rides the camera transform and (deliberately) the distortion field too.
-  world.addChild(tilemap.root, entities.root, bullets.root, effects.root, reticleLayer, pickLayer)
+  world.addChild(tilemap.root, entities.root, statusFx.root, bullets.root, effects.root, reticleLayer, pickLayer)
 
   // --- Backbuffer weapon-FX pipeline (backbuffer.ts). The world lives inside
   // `sceneRoot`; the pipeline either composites it through the distortion
@@ -421,6 +427,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
         entities.update(view.entities, alpha, view.tick, view.floor)
+        statusFx.update(view.entities, alpha, view.tick)
         bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)
       }

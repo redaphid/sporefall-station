@@ -54,10 +54,40 @@ export const destroyObject = (w: World, e: Entity, byId: number): void => {
   if (def.explode) applyAreaEffect(w, e.pos.x, e.pos.y, { kind: 'explode', radius: def.explode.radius, damage: def.explode.damage }, byId)
 }
 
-/** E-interact use: dispense cash or an item once. Returns whether it fired. */
+/** Cut power to a wing: flip the grid flag AND pay the cost. The station notices
+ * the outage (alarm ticks up) and its Derelict Units power back on — every
+ * sleeper wakes. The flag itself (World.powerCut) auto-unseals that wing's
+ * `'power'` biolocks (interaction.sealSystem) and keeps robots hostile while it
+ * lasts (behaviors.ts). One documented, deterministic trade-off. */
+const cutPower = (w: World, wing: string, byId: number): void => {
+  w.powerCut[wing] = true
+  w.alarm = Math.min(3, w.alarm + 1)
+  for (const e of w.entities) {
+    if (e.dead) continue
+    if (e.status && e.status.sleep > 0) e.status.sleep = 0
+    if (e.ai && e.ai.mode === 'sleep') {
+      e.ai.mode = 'wander'
+      e.ai.thinkAt = w.tick
+    }
+  }
+  w.events.push({ type: 'powerCut', wing, byId })
+}
+
+/** E-interact use: hack a wing's power, or dispense cash/an item once. Returns
+ * whether it fired. */
 export const useObject = (w: World, agent: Entity, e: Entity): boolean => {
   const def = OBJECTS[e.archetype]
-  if (!def?.use || e.used) return false
+  if (!def) return false
+  // A hackable generator/Cryo Terminal wired to a wing cuts that wing's power
+  // (once). Objects that are hackable but wingless (the ATM) fall through to
+  // their normal `use` payout below.
+  if (def.hackable && e.wing !== undefined && !e.used) {
+    e.used = true
+    cutPower(w, e.wing, agent.id)
+    w.events.push({ type: 'use', entityId: e.id, byId: agent.id })
+    return true
+  }
+  if (!def.use || e.used) return false
   e.used = true
   if (def.use.gives === 'cash') {
     if (agent.playerCtl) agent.playerCtl.cash += def.use.amount ?? 25

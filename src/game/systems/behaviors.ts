@@ -33,7 +33,7 @@
 
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
-import type { World } from '../world'
+import { anyPowerCut, type World } from '../world'
 import {
   BATTLE,
   ENGAGE_RANGE,
@@ -86,7 +86,14 @@ const threat: Consideration = (w, e) => {
   const out: Candidate[] = []
   for (const p of w.entities) {
     if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    const hostile = w.hostile || dispositionToward(e, p.id) === 'Hostile' || (ai.faction === 'cop' && w.alarm >= 2)
+    // Derelict Units (robots) sleep through a peaceful station, but a power cut
+    // wakes them into open hostility — the standing cost of the power-cut path,
+    // felt even in an otherwise non-hostile world.
+    const hostile =
+      w.hostile ||
+      dispositionToward(e, p.id) === 'Hostile' ||
+      (ai.faction === 'cop' && w.alarm >= 2) ||
+      (e.archetype === 'robot' && anyPowerCut(w))
     if (!hostile) continue
     const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
     if (!perceives(w, e, p)) continue // must actually perceive it (range + LOS, cloak-aware)

@@ -28,6 +28,26 @@ export const selectAim = (moveX: number, moveY: number, aimX = 0, aimY = 0): Aim
   return { x: 0, y: 0 }
 }
 
+/**
+ * The MOUSE as a continuous aim device — the keyboard's twin-stick equivalent.
+ * Returns the unit vector from the player's on-screen position toward the mouse,
+ * so a keyboard player's bullet follows the cursor to ANY angle instead of
+ * snapping to one of the eight WASD headings (the movement-fallback aim was the
+ * sole reason keyboard fire was 8-way; the sim itself always fired along the
+ * continuous `aimX/aimY`). Screen +y is down, matching world +y, so the vector's
+ * `atan2(y,x)` is the sim facing directly — no axis flip. A mouse resting exactly
+ * on the player returns (0,0), letting `selectAim` fall back to the move vector.
+ * Pure + exported so the conversion is unit-tested without the DOM; the result is
+ * normalized to keep `aimX/aimY` in the same −1..1 range every other source uses.
+ */
+export const pointerAim = (playerX: number, playerY: number, pointerX: number, pointerY: number): Aim => {
+  const dx = pointerX - playerX
+  const dy = pointerY - playerY
+  const mag = Math.hypot(dx, dy)
+  if (mag < 1e-6) return { x: 0, y: 0 }
+  return { x: dx / mag, y: dy / mag }
+}
+
 /** Reticle distance from the player, in tiles: eases from NEAR at the deadzone
  * rim to FAR at full stick tilt, so the reticle telegraphs both direction and
  * how hard the stick is pushed. */

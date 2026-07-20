@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AIM_DEADZONE, padAimReticles, RETICLE_FAR, RETICLE_NEAR, selectAim } from './aim'
+import { AIM_DEADZONE, padAimReticles, pointerAim, RETICLE_FAR, RETICLE_NEAR, selectAim } from './aim'
 
 describe('selectAim', () => {
   it('uses the aim stick when it is deflected past the deadzone', () => {
@@ -20,6 +20,42 @@ describe('selectAim', () => {
   it('returns a centred (0,0) vector when neither stick is deflected', () => {
     const a = selectAim(0, 0)
     expect(a).toEqual({ x: 0, y: 0 })
+  })
+})
+
+describe('pointerAim — the mouse as a continuous aim device', () => {
+  it('points from the player toward the cursor as a unit vector', () => {
+    const a = pointerAim(100, 100, 200, 100) // cursor due-right
+    expect(a.x).toBeCloseTo(1, 6)
+    expect(a.y).toBeCloseTo(0, 6)
+  })
+
+  it('resolves an ARBITRARY off-axis angle, not one of the 8 compass headings', () => {
+    // Cursor 100px right, 30px down → atan2(30,100) ≈ 16.7°, nowhere near a
+    // 45°-multiple. The vector must preserve that exact heading.
+    const a = pointerAim(0, 0, 100, 30)
+    const deg = (Math.atan2(a.y, a.x) * 180) / Math.PI
+    expect(deg).toBeCloseTo(16.699, 2)
+    expect(Math.hypot(a.x, a.y)).toBeCloseTo(1, 6) // normalized
+  })
+
+  it('a sweep of cursor positions yields correspondingly different, non-bucketed headings', () => {
+    const degs = [5, 22.5, 61, 100, 143, 199, 271, 340].map((d) => {
+      const r = (d * Math.PI) / 180
+      const a = pointerAim(0, 0, Math.cos(r) * 50, Math.sin(r) * 50)
+      return ((Math.atan2(a.y, a.x) * 180) / Math.PI + 360) % 360
+    })
+    degs.forEach((got, i) => expect(got).toBeCloseTo([5, 22.5, 61, 100, 143, 199, 271, 340][i], 3))
+    expect(new Set(degs.map((d) => Math.round(d))).size).toBe(8) // all distinct
+  })
+
+  it('screen +y (down) maps to world +y (down) with no axis flip', () => {
+    const a = pointerAim(0, 0, 0, 50) // cursor below the player on screen
+    expect(a.y).toBeCloseTo(1, 6)
+  })
+
+  it('returns (0,0) when the cursor rests exactly on the player (fallback to move)', () => {
+    expect(pointerAim(42, 42, 42, 42)).toEqual({ x: 0, y: 0 })
   })
 })
 

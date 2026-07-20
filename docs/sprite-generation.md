@@ -472,52 +472,73 @@ green against the current art):**
 - `scripts/assets/generate.py` — the `player` pose prompt pushed toward a broad,
   heavyset, unmistakable geared explorer so the regenerated ComfyUI idle/step
   anchors match the widened proxy.
+- `scripts/assets/rotoscope/render.sh` — **the Blender walk render now runs
+  LOCALLY under WSL** (Windows `blender.exe` via interop, `wslpath`-translated
+  paths), replacing the old ssh-to-`soul` flow. No remote box.
 - `scripts/assets/hero_review.py` + `docs/assets/hero-sprites/{before,
-  proportion-schematic}.png` — no-GPU review artifacts (real current frames +
-  a proportion diagram of the r1→r2 target).
+  proportion-schematic,regen-proof}.png` — review artifacts. `regen-proof.png`
+  is the **real** before/after: current shipped frames vs the actual r2 pixels
+  regenerated this session (ComfyUI idle candidate + Blender/no-trace walk).
 
-**Target silhouette for the regenerated idle** (verify, do not eyeball):
-`height 44, width ~29, head_h ~28, mass ~720, cx ~-0.6, foot_y 45`.
+**Validated (this session, no GPU beyond Blender+quantize):** the widened proxy
+rendered locally and measured on the `--no-trace` walk output at
+`height ~42, width ~24, head_h ~27 (clean break), mass ~610` — clearly bulkier
+than r1 (`21 / 455`) with the head-block intact. Target for the regenerated
+idle: `height 44, width ~26–29, head_h 26–29, mass ~600–700` (head_h MUST land
+in 23–31 so the walk passes the un-tunable global `FAMILY_TOL` head_h ±4).
 
-### The manual regeneration a human must run (needs GPU + the Blender box)
+### State of the regen and what a human still needs to finish
 
-This could NOT be run on the branch: the walk cycle's motion source is Blender
-on the `soul` box (§6, Stage 1) and a coherent resize needs BOTH the poses
-(ComfyUI) and the walk (Blender+ComfyUI) regenerated together — a partial
-regen (new bulky idle, old thin walk) would fail the walk-family check in
-`src/render/charConsistency.test.ts`. Run all of it, in order:
+Both external stages are now REACHABLE and were exercised this session:
+Blender 5.0 renders the walk locally via WSL (`render.sh`, validated: 40
+frames), ComfyUI is at `localhost:8188` (checkpoint + pixel-art LoRA + IPAdapter
+present), Ollama `qwen3-vl:8b` is up. The `--no-trace` bulky walk is real and
+coherent.
+
+The remaining blocker is **not infrastructure — it is curation.** The
+idle/step **poses** are ComfyUI txt2img/img2img, and getting a candidate that
+is simultaneously (a) the teal suit + orange visor identity, (b) bulky, (c)
+head_h in 23–31 to match the walk, and (d) consistent to ±3 px width / ±2 px
+head_h across all 5 directions with the orange-visor **accent** the facing gate
+needs, did NOT converge from automated seed sweeps (28 candidates): the
+checkpoint drifts to grey astronaut / green-maned swamp-creature reads and
+drops the orange accent on side views. This is the same multi-round hand-curation
+the r1 `curation.json` notes record ("consistency fix r2/r3", "orange-visor
+emphasis"). Because a partial regen (new bulky idle, old thin walk — or vice
+versa) fails `src/render/charConsistency.test.ts`, **nothing was overwritten in
+`public/themes/swampspace/chars/` and `consistency-spec.json` was NOT re-locked**;
+the committed art and the standing gate stay green. A curated bulky s-idle raw
+IS staged at `scripts/assets/anchors/vine-ranger-s-idle.png` (recorded in
+`curation.json`) as the r2 anchor.
+
+To finish (human curator, order matters):
 
 ```bash
 cd scripts/assets
-export SWAMPSPACE_STAGE=/tmp/swampspace-stage
+export SWAMPSPACE_STAGE=/tmp/swampspace-stage   # or any writable dir
 
-# 1. New idle anchor to the r2 build (ComfyUI). Sweep, gate, curate the widest
-#    on-target candidate; record the pick in curation.json and save its 512px
-#    raw to anchors/vine-ranger-s-idle.png.
+# 1. Curate the s-idle anchor: sweep, VLM-gate, hand-pick a teal+orange bulky
+#    candidate with head_h 23-31; save its raw to anchors/vine-ranger-s-idle.png
+#    and record it in curation.json (a bulky candidate is already staged there).
 python3 generate.py sweep char.vine-ranger.s-idle --seeds=8
-python3 consistency.py --files $SWAMPSPACE_STAGE/char.vine-ranger.s-idle/*.png  # pick ~w29/mass720
+python3 consistency.py --files $SWAMPSPACE_STAGE/char.vine-ranger.s-idle/*.png
 python3 verify.py $SWAMPSPACE_STAGE/char.vine-ranger.s-idle --job char.vine-ranger.s-idle
 
-# 2. Directions + steps chain outward from the new s-idle (§4.11, §4.6), then
-#    finalize the 48px poses into public/themes/swampspace/chars/.
-python3 generate.py final char.vine-ranger.s-idle   # (loop the curated jobs)
+# 2. Directions + steps, curated to the per-direction envelope + facing accent
+#    (the hard part — expect several rounds, i2i-chain from the s-idle raw), then
+python3 generate.py final char.vine-ranger.s-idle   # loop the curated jobs -> chars/
 
-# 3. Re-lock the spec from the NEW idle so the standing test validates the new
-#    build (this is what makes charConsistency.test.ts pass on the new art).
-python3 consistency.py --write-spec vine-ranger=s-idle
+# 3. Walk cycle from the widened proxy — Blender runs LOCALLY now (no soul):
+cd rotoscope && CHAR=vine-ranger bash run.sh        # render(WSL Blender)->trace->gate->manifest
 
-# 4. Walk cycle from the widened proxy (Blender on `soul`, then trace, then gate):
-cd rotoscope
-CHAR=vine-ranger bash run.sh          # render(soul) -> trace(ComfyUI) -> gate -> manifest
-python3 gate.py                        # must be green (identity layer uses the new spec)
-
-# 5. Full gate + in-game proof.
-cd ../../.. && pnpm run build && pnpm exec vitest run && pnpm run lint
-bash e2e/run-roto-walk.sh              # ranger walks the 8-dir compass on the new cycle
+# 4. Re-lock the spec from the NEW idle, then gate:
+cd .. && python3 consistency.py --write-spec vine-ranger=s-idle
+cd .. && pnpm run build && pnpm exec vitest run && pnpm run lint
+bash e2e/run-roto-walk.sh
 ```
 
-Convergence tip (no GPU): iterate the proxy against the target with
-`trace.py --no-trace` + `python3 consistency.py --check` before spending GPU on
-the tracer — that loop only needs Blender, not ComfyUI. After step 3 the
-committed spec and the shipped PNGs move together, exactly as the pipeline
-requires; nothing here weakens a tolerance to force a pass.
+Nothing above weakens a tolerance to force a pass; the accent/facing gate stays
+on (removing it re-invites the left-facing-sprite bug §3). If the bulkier build
+legitimately widens the per-direction spread past ±3 px, tune the ranger's
+`tol.width`/`tol.head_h` in `consistency-spec.json` (per-character, documented)
+to the ACHIEVED spread — never the global `FAMILY_TOL`.

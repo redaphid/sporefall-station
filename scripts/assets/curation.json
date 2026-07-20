@@ -12,11 +12,11 @@
   "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/prop.spore-barrel/prop-spore-barrel-s414504_00004_.png"
  },
  "char.vine-ranger.s-idle": {
-  "seed": 414500,
+  "seed": 530000,
   "batch": 4,
   "index": 0,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.s-idle/char-vine-ranger-s-idle-s414500_00005_.png",
-  "note": "vivid-prompt resweep"
+  "raw": "/home/hypnodroid/Projects/mobile-streets-of-rogue/.claude/worktrees/agent-a551c303aa2bcb103/scripts/assets/anchors/vine-ranger-s-idle.png",
+  "note": "r2 hero revision: bulky upright, orange visor, walk-compatible hd29"
  },
  "prop.cargo-pod": {
   "seed": 414500,

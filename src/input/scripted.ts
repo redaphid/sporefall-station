@@ -118,6 +118,19 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 60 },
   ],
 
+  // Melee-swing headline (feat/weapon-sprites): drop onto the lane, march east
+  // into the thug line (combat-stage: thugs at x=12/15/18, y=11), then HOLD the
+  // attack — the equipped melee weapon swings on its cooldown cadence, arcing
+  // through the crowd. Backs the weapon-swing feature video (plain + modded).
+  meleeSwing: [
+    { ticks: 30 }, // settle on spawn
+    { ticks: 64, y: 1 }, // drop down onto the lane (y≈11)
+    { ticks: 66, x: 1 }, // march east into melee range of the first thug (~x11.5)
+    { ticks: 6, x: 1 }, // face east, planted
+    { ticks: 150, x: 1, attack: true }, // press in swinging — arcs land, crowd reels
+    { ticks: 40 }, // aftermath beat
+  ],
+
   // Stand and watch, longer: input-free 260 ticks. Backs the shader-FX videos —
   // the showcase scenario's staggered grenades boom at ~70/140/210 (shockwave +
   // kaleidoscopic bloom), and the exit-portal idle clip just breathes.

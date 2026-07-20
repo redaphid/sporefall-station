@@ -15,6 +15,10 @@ import {
 import { composeMotion, IDENTITY_POSE, type MotionPose } from './motion'
 import { TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
+import { weaponStack } from '../game/systems/inventory'
+import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
+import { recoilKick, weaponPose } from './weaponPose'
+import { composeWeaponSkin } from './weaponSkin'
 
 const elementTint = (fx: Fx | undefined): number => {
   if (!fx) return 0xffffff
@@ -42,6 +46,14 @@ interface View {
   flip: boolean
   footX: number
   footY: number
+  /** Held-weapon sprite (melee/ranged), pinned to the hand and swung on attack.
+   * Absent for bare fists / non-characters. A separate sibling sprite (not a
+   * child of the body) so it keeps its own grip anchor and mirror-free rotation. */
+  weapon?: Sprite
+  /** Additive glow halo behind a MOD-lit weapon (absent when unmodded). */
+  weaponGlow?: Sprite
+  /** Shape key of the weapon texture currently shown (skip redundant swaps). */
+  weaponShapeKey?: string
 }
 
 /** A character that just died: the entity is swept from the snapshot the same
@@ -161,6 +173,7 @@ export class EntityViews {
    * (possibly hot-swapped) art registry — used on runtime theme change. */
   refresh(): void {
     for (const view of this.views.values()) {
+      this.hideWeapon(view)
       this.root.removeChild(view.sprite)
       view.sprite.destroy()
     }
@@ -229,6 +242,7 @@ export class EntityViews {
       let view = this.views.get(e.id)
       if (!view || view.archetype !== artKey) {
         if (view) {
+          this.hideWeapon(view)
           this.root.removeChild(view.sprite)
           view.sprite.destroy()
         }
@@ -363,6 +377,12 @@ export class EntityViews {
       // y-sort: grounded entities stack by world y (feet), flames float above
       // whatever they're consuming.
       view.sprite.zIndex = depthKey(e.kind, y)
+
+      // --- Layer 3: the held weapon — a hand-anchored sprite that swings on
+      // attack (melee) or recoils (ranged) and re-tints from its mods. Rolling
+      // is a whole-body tumble, so the weapon is stowed for its duration.
+      if (character && !rolling) this.updateWeapon(view, e, anim, t)
+      else this.hideWeapon(view)
     }
 
     // Scene continuity: same floor, tick moving forward by a frame-plausible
@@ -376,6 +396,7 @@ export class EntityViews {
     for (const [id, view] of this.views) {
       if (!view.seen) {
         this.views.delete(id)
+        this.hideWeapon(view) // a corpse drops its weapon; the ghost is body-only
         if (continuous && this.art.isCharacterSprite(view.archetype)) {
           this.toGhost(view, id, tick) // died this tick — the sprite lives on briefly
         } else {
@@ -386,6 +407,94 @@ export class EntityViews {
     }
 
     this.updateGhosts(tick, t)
+  }
+
+  /** Attach/update the wielder's held-weapon sprite. Position, rotation, tint
+   * and glow are all pure functions of sim-derived signals (facing, the attack
+   * window, the equipped weapon's mods), so the swing is deterministic and
+   * replay-stable — the renderer only draws what the sim already implies. */
+  private updateWeapon(view: View, e: Entity, anim: ResolvedAnim, t: number): void {
+    const weaponId = e.combat?.weapon
+    if (weaponId === undefined || !hasHeldWeapon(weaponId)) {
+      this.hideWeapon(view)
+      return
+    }
+
+    if (!view.weapon) {
+      const spr = new Sprite(this.art.weaponTexture(weaponId))
+      spr.anchor.set(WEAPON_ANCHOR.x, WEAPON_ANCHOR.y)
+      this.root.addChild(spr)
+      view.weapon = spr
+      view.weaponShapeKey = undefined
+    }
+    const weapon = view.weapon
+    const shapeKey = weaponShape(weaponId)
+    if (view.weaponShapeKey !== shapeKey) {
+      weapon.texture = this.art.weaponTexture(weaponId)
+      view.weaponShapeKey = shapeKey
+    }
+
+    // Mods → skin (tint keyed off the pickup palette; NPCs carry no inventory so
+    // `weaponStack` is undefined → the untinted base look).
+    const skin = composeWeaponSkin(weaponStack(e)?.mods)
+
+    // Pose: melee swings over the attack window; ranged holds and recoils.
+    const { dir, flip } = facingDir(e.facing)
+    const melee = isMeleeWeapon(weaponId)
+    const progress = anim.state === 'attack' ? (t - anim.start) / STATE_TICKS.attack : undefined
+    const pose = weaponPose(dir, melee ? progress : undefined, flip)
+    const kick = melee ? 0 : recoilKick(progress)
+
+    // The body sprite already sits at the interpolated feet point (with its
+    // lunge/flinch motion folded in); hang the hand off that, so the weapon
+    // tracks every body offset for free.
+    const baseX = view.sprite.position.x + Math.cos(e.facing) * kick
+    const baseY = view.sprite.position.y + Math.sin(e.facing) * kick
+    weapon.position.set(baseX + pose.hx, baseY + pose.hy)
+    weapon.rotation = pose.angle
+    weapon.scale.set(skin.scale)
+    weapon.tint = skin.tint
+    weapon.alpha = view.sprite.alpha
+    // In front of the body normally; tucked behind for away-facing poses.
+    weapon.zIndex = view.sprite.zIndex + (pose.behind ? -0.5 : 0.5)
+
+    if (skin.glow > 0) {
+      if (!view.weaponGlow) {
+        const glow = new Sprite(this.art.bulletGlow())
+        glow.anchor.set(0.5)
+        glow.blendMode = 'add'
+        this.root.addChild(glow)
+        view.weaponGlow = glow
+      }
+      const glow = view.weaponGlow
+      // Centre the halo on the weapon head (out along the blade from the grip).
+      const reach = 20 * skin.scale
+      glow.position.set(weapon.position.x + Math.cos(pose.angle) * reach, weapon.position.y + Math.sin(pose.angle) * reach)
+      glow.tint = skin.glowColor
+      glow.alpha = skin.glow * view.sprite.alpha
+      glow.scale.set(0.7 * skin.scale)
+      glow.zIndex = weapon.zIndex - 0.1
+    } else if (view.weaponGlow) {
+      this.root.removeChild(view.weaponGlow)
+      view.weaponGlow.destroy()
+      view.weaponGlow = undefined
+    }
+  }
+
+  /** Drop a view's weapon/glow sprites (bare fists, non-characters, rolling, or
+   * on view teardown). Idempotent. */
+  private hideWeapon(view: View): void {
+    if (view.weapon) {
+      this.root.removeChild(view.weapon)
+      view.weapon.destroy()
+      view.weapon = undefined
+    }
+    if (view.weaponGlow) {
+      this.root.removeChild(view.weaponGlow)
+      view.weaponGlow.destroy()
+      view.weaponGlow = undefined
+    }
+    view.weaponShapeKey = undefined
   }
 
   /** Advance death ghosts: play the death clip (theme frames or the held last

@@ -4,8 +4,10 @@ import { formatReleaseNotes } from './releaseNotes'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
-/** Solo / Host / Join picker shown at boot. */
-export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
+/** Solo / Host / Join picker shown at boot. `onPick` fires SYNCHRONOUSLY inside
+ * the button's click handler (before resolve) so the caller can run gesture-only
+ * browser APIs — e.g. requesting fullscreen — while the user activation is live. */
+export const pickMode = (mount: HTMLElement, onPick?: (mode: GameMode) => void): Promise<GameMode> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
     markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
@@ -24,6 +26,7 @@ export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
         'background:#ffffff10;color:#eee;cursor:pointer;width:min(320px,80vw);text-align:left'
       b.innerHTML = `${label} <span style="opacity:.6;font-weight:400;font-size:13px"><br>${blurb}</span>`
       b.addEventListener('click', () => {
+        onPick?.(mode) // gesture-live: fullscreen request happens here
         overlay.remove()
         resolve(mode)
       })

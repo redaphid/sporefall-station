@@ -15,6 +15,7 @@ const nonDefault: GameSettings = {
   effectsQuality: 'low',
   shaderFx: 'reduced',
   theme: 'swampspace',
+  fullscreen: false,
 }
 
 // happy-dom's localStorage is method-less under current Node; give the module a

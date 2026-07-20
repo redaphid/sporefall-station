@@ -69,6 +69,22 @@ describe('settings gear — press-exempt chrome', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ theme: 'swampspace' }))
   })
 
+  it('the Fullscreen toggle is present off-native and reports a change', () => {
+    const onChange = vi.fn()
+    createSettingsPanel(root, false, onChange, THEMES)
+    const fsBox = panelOf(root).querySelector<HTMLInputElement>('#fs')!
+    expect(fsBox).toBeTruthy()
+    expect(fsBox.type).toBe('checkbox')
+    fsBox.checked = false
+    fsBox.dispatchEvent(new Event('change'))
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ fullscreen: false }))
+  })
+
+  it('the Fullscreen toggle is hidden on native (the app shell is already fullscreen)', () => {
+    createSettingsPanel(root, true, () => {}, THEMES)
+    expect(panelOf(root).querySelector('#fs')).toBeNull()
+  })
+
   it('no theme picker with a single installed theme (nothing to pick)', () => {
     createSettingsPanel(root, false, () => {}, [{ id: 'city', name: 'City' }])
     expect(panelOf(root).querySelector('#th')).toBeNull()

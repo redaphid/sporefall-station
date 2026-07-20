@@ -25,6 +25,9 @@ export interface GameSettings {
   /** Active visual theme id (public/themes/<id>/). Pure presentation — never
    * touches the sim; peers in a net game may each use a different theme. */
   theme: string
+  /** Browser fullscreen on run-start (desktop/web only; the native Capacitor
+   * shell is already fullscreen). Requested from the run-start user gesture. */
+  fullscreen: boolean
 }
 
 const STORAGE_KEY = 'sporefall.settings'
@@ -37,6 +40,7 @@ export const defaultSettings = (): GameSettings => ({
   effectsQuality: 'high',
   shaderFx: 'full',
   theme: 'city',
+  fullscreen: true,
 })
 
 const QUALITIES: readonly EffectsQuality[] = ['off', 'low', 'high']
@@ -67,6 +71,7 @@ export const clampSettings = (raw: unknown): GameSettings => {
       typeof r.theme === 'string' && r.theme.length <= 64 && THEME_ID_RE.test(r.theme)
         ? r.theme
         : base.theme,
+    fullscreen: typeof r.fullscreen === 'boolean' ? r.fullscreen : base.fullscreen,
   }
 }
 

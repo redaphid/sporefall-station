@@ -15,6 +15,14 @@ import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
+import { loadSettings } from './app/settings'
+import {
+  canRequestFullscreen,
+  enterFullscreen,
+  fullscreenSupported,
+  isFullscreen,
+  shouldHideCursor,
+} from './ui/fullscreenModel'
 import { SIM_DT } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
@@ -69,7 +77,25 @@ const boot = async (): Promise<void> => {
   const room = params.get('room') ?? 'car'
   const name = params.get('name') ?? `Player-${(Math.random() * 90 + 10) | 0}`
 
-  const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount))
+  // Browser fullscreen on run-start: the Fullscreen API needs a live user
+  // gesture, so we request it from INSIDE the Solo/Host/Join button click (the
+  // `onPick` hook), gated by the player's setting + feature detection. The
+  // native Capacitor shell is already fullscreen, so it's skipped there. Whole
+  // page (documentElement) so the #ui HUD/overlay layer is included. `?mode=`
+  // (dev/e2e) bypasses the picker and simply doesn't request — that's fine.
+  const nativeApp = Capacitor.isNativePlatform()
+  const requestFullscreenOnGesture = (): void => {
+    if (
+      canRequestFullscreen({
+        enabled: loadSettings().fullscreen,
+        supported: fullscreenSupported(),
+        native: nativeApp,
+        alreadyFullscreen: isFullscreen(),
+      })
+    )
+      enterFullscreen()
+  }
+  const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount, requestFullscreenOnGesture))
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
@@ -517,6 +543,15 @@ const runLoop = (
   resumed = false,
 ): void => {
   const hud = createHud(uiMount)
+  // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
+  // only (`cursor: none` on the canvas) — mouse AIM reads the cursor's ABSOLUTE
+  // position (the window `pointermove` tracker → aim.pointerAim), so we must NOT
+  // use Pointer Lock (relative deltas would break aiming). The cursor returns on
+  // pause / death / game-over (their buttons must stay clickable) and it's a
+  // harmless no-op on touch/gamepad, which have no OS cursor. Overlays live on
+  // #ui (a sibling of the canvas), so their own cursor is unaffected.
+  const canvas = renderer.app.canvas
+  let cursorHidden = false
   // Save-game plumbing (solo/host only — `persister` is undefined otherwise).
   // The authoritative world lives on the HostSession and is REPLACED wholesale
   // by restart(); read it fresh each call so we always persist the current run.
@@ -714,6 +749,15 @@ const runLoop = (
     commOverlay.update(view)
     overlay.update(pads)
     pauseOverlay.update(session.isPaused ?? false, view)
+    const hide = shouldHideCursor({
+      paused: session.isPaused ?? false,
+      gameOver: view.gameOver,
+      selfDead: !!view.self?.dead,
+    })
+    if (hide !== cursorHidden) {
+      canvas.style.cursor = hide ? 'none' : ''
+      cursorHidden = hide
+    }
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

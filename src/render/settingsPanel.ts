@@ -30,6 +30,7 @@ import {
   type PadAction,
 } from '../input/remap'
 import { markUiChrome } from '../ui/chrome'
+import { enterFullscreen, exitFullscreen } from '../ui/fullscreenModel'
 
 export interface SettingsPanel {
   settings(): GameSettings
@@ -99,6 +100,15 @@ export const createSettingsPanel = (
       </select>
     </label>`
       : ''
+  // Fullscreen toggle — desktop/web only. The native Capacitor shell is already
+  // fullscreen, so the row is hidden there (nothing to toggle). Toggling here is
+  // itself a user gesture, so the Fullscreen API request is honoured directly.
+  const fullscreenRow = native
+    ? ''
+    : `
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="checkbox" id="fs"> Fullscreen
+    </label>`
   const hapticRows = native
     ? `
     <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -109,7 +119,7 @@ export const createSettingsPanel = (
     </label>`
     : `<div style="opacity:.6">Vibration: phone only</div>`
 
-  panel.innerHTML = qualityRow + themeRow + hapticRows
+  panel.innerHTML = qualityRow + themeRow + fullscreenRow + hapticRows
 
   // ---- Controller section: button remapping (remap.ts overlay) ------------
   let map = getButtonMap()
@@ -262,6 +272,8 @@ export const createSettingsPanel = (
   fx.value = current.shaderFx
   const th = panel.querySelector<HTMLSelectElement>('#th')
   if (th && themes.some((t) => t.id === current.theme)) th.value = current.theme
+  const fs = panel.querySelector<HTMLInputElement>('#fs') // null on native
+  if (fs) fs.checked = current.fullscreen
   const hen = panel.querySelector<HTMLInputElement>('#hen')
   const hin = panel.querySelector<HTMLInputElement>('#hin')
   if (hen) hen.checked = current.hapticsEnabled
@@ -280,6 +292,14 @@ export const createSettingsPanel = (
   q.addEventListener('change', () => apply({ effectsQuality: q.value as EffectsQuality }))
   fx.addEventListener('change', () => apply({ shaderFx: fx.value as ShaderFxMode }))
   th?.addEventListener('change', () => apply({ theme: th.value }))
+  // The checkbox change IS the user gesture, so enter/exit fullscreen directly
+  // here (feature-detected + rejection-swallowing inside the glue). Persist the
+  // choice so run-start honours it next time.
+  fs?.addEventListener('change', () => {
+    if (fs.checked) enterFullscreen(document.documentElement)
+    else exitFullscreen()
+    apply({ fullscreen: fs.checked })
+  })
   hen?.addEventListener('change', () => apply({ hapticsEnabled: hen.checked }))
   hin?.addEventListener('input', () => apply({ hapticsIntensity: Number(hin.value) }))
 

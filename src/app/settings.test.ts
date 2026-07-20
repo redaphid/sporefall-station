@@ -49,8 +49,16 @@ describe('clampSettings', () => {
       effectsQuality: 'low' as const,
       shaderFx: 'reduced' as const,
       theme: 'swamp',
+      fullscreen: false,
     }
     expect(clampSettings(s)).toEqual(s)
+  })
+
+  it('honours an explicit fullscreen boolean and defaults to true', () => {
+    expect(clampSettings({ fullscreen: false }).fullscreen).toBe(false)
+    expect(clampSettings({ fullscreen: true }).fullscreen).toBe(true)
+    expect(clampSettings({}).fullscreen).toBe(true) // default on
+    expect(clampSettings({ fullscreen: 'yes' }).fullscreen).toBe(true) // non-bool → default
   })
 
   it('defaults theme to city', () => {

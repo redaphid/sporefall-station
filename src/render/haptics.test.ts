@@ -78,6 +78,7 @@ const harness = (over: Partial<GameSettings> = {}): Harness => {
     effectsQuality: 'high',
     shaderFx: 'full',
     theme: 'city',
+    fullscreen: true,
     ...over,
   }
   const driver: HapticDriver = {

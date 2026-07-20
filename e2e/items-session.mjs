@@ -41,7 +41,7 @@ const check = (cond, msg) => {
 
 const world = (page) =>
   page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     const s = v.self
     const npcs = []
     let fires = 0
@@ -68,7 +68,7 @@ const ready = async (page, scenario) => {
     return !!c && c.clientWidth > 100 && c.clientHeight > 100
   }, { timeout: 20000 })
   await page.waitForFunction(() => {
-    const s = window.__sor
+    const s = window.__sporefall
     return !!s && !!s.renderView && !!s.renderView().self
   }, { timeout: 20000 })
   await sleep(300)

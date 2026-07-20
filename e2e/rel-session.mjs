@@ -41,7 +41,7 @@ const check = (cond, msg) => {
 // Read the scenario NPCs' faction, aggro mode, and disposition toward the player.
 const factions = (page) =>
   page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     const selfId = v.self.id
     const out = { cops: [], bouncer: null }
     for (const e of v.entities) {
@@ -75,7 +75,7 @@ const main = async () => {
     return !!c && c.clientWidth > 100 && c.clientHeight > 100
   }, { timeout: 20000 })
   await page.waitForFunction(() => {
-    const s = window.__sor
+    const s = window.__sporefall
     return !!s && !!s.renderView && !!s.renderView().self
   }, { timeout: 20000 })
   await sleep(400)

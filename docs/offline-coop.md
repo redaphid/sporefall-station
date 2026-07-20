@@ -1,6 +1,6 @@
 # Offline co-op over Bluetooth (no internet, no server)
 
-Play Backseat together on two (or more) Android phones with **no
+Play Sporefall Station together on two (or more) Android phones with **no
 Wi-Fi, no cell signal, and no server** — perfect for a car, a plane, a
 basement, or anywhere off the grid. The phones talk **directly to each other
 over Bluetooth**.
@@ -30,7 +30,7 @@ over Bluetooth**.
 3. Every **other** phone: open the game → pick a character → tap
    **"Join co-op"**. After a moment you'll see a list of **nearby games**.
 4. On each joining phone, **tap the host's name** (it looks like
-   `SoR <name>`). Say **Allow** to any Bluetooth question that pops up.
+   `Spore <name>`). Say **Allow** to any Bluetooth question that pops up.
 5. The joining phones now show **"Connected — waiting for host to start."**
 6. Back on the **Host** phone, everyone shows up in the list. Tap
    **"Start game."**
@@ -51,7 +51,7 @@ over Bluetooth**.
    it — it only uses Bluetooth to find the other phones, never your location.)
 4. You'll see a **HOSTING** screen that says *"Waiting for players…"* Leave this
    screen up and keep the phone **awake** (screen on). Your phone is now
-   broadcasting a game called **`SoR <your name>`**.
+   broadcasting a game called **`Spore <your name>`**.
 5. As friends join, their names appear in the list.
 6. When everyone's in, tap the green **Start game** button.
 
@@ -63,7 +63,7 @@ over Bluetooth**.
 3. The **first time**, Android asks for **Nearby devices / Bluetooth**
    permission. Tap **Allow**.
 4. A **NEARBY GAMES** screen appears and scans over Bluetooth. Within a few
-   seconds the host's game (**`SoR <name>`**) shows up as a button.
+   seconds the host's game (**`Spore <name>`**) shows up as a button.
 5. **Tap the host's button.** If Android asks to pair or connect, say **Allow /
    Pair**.
 6. You'll see **LOBBY → "Connected — waiting for host to start."** Now just wait
@@ -207,7 +207,7 @@ hardware:
    truly offline.
 3. Phone A: character → **Host co-op** → Allow Bluetooth → "Waiting for
    players…".
-4. Phone B: character → **Join co-op** → Allow Bluetooth → tap **`SoR …`** in
+4. Phone B: character → **Join co-op** → Allow Bluetooth → tap **`Spore …`** in
    the Nearby Games list → wait in the lobby.
 5. Phone A: **Start game.** Confirm both phones show the same city and each
    moves its own character; verify the other player's avatar moves on your

@@ -3,6 +3,7 @@ import { HostSession } from './hostSession'
 import {
   clearSave,
   createPersister,
+  LEGACY_SAVE_KEY,
   makeEnvelope,
   readSave,
   restoreEnvelope,
@@ -211,5 +212,40 @@ describe('persistence — throttled persister', () => {
     const set = vi.spyOn(store, 'setItem')
     persister.maybeSave(w)
     expect(set).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('persistence — rebrand save migration (sor.savegame → sporefall.savegame)', () => {
+  it('adopts a pre-rebrand run: legacy key present, new absent → restored under the new key', () => {
+    const store = memStore()
+    const w = liveWorld(7, 9) // a real in-progress run at "floor N"
+    const snapshot = serializeWorld(w)
+    // Simulate a save written by the pre-rename build.
+    store.map.set(LEGACY_SAVE_KEY, JSON.stringify(makeEnvelope(w, 999)))
+
+    const restored = readSave(store)
+    expect(restored).not.toBeNull()
+    expect(serializeWorld(restored!)).toEqual(snapshot) // the run survives the rename
+    // Migrated exactly once: value now lives under the new key, legacy reclaimed.
+    expect(store.map.has(SAVE_KEY)).toBe(true)
+    expect(store.map.has(LEGACY_SAVE_KEY)).toBe(false)
+  })
+
+  it('prefers the new key: a current sporefall.savegame wins, legacy is ignored', () => {
+    const store = memStore()
+    const current = liveWorld(2, 4)
+    writeSave(store, current, 0) // new-key save from the renamed build
+    store.map.set(LEGACY_SAVE_KEY, '{"totally":"stale garbage"}') // stale legacy blob
+
+    const restored = readSave(store)
+    expect(restored).not.toBeNull()
+    expect(serializeWorld(restored!)).toEqual(serializeWorld(current))
+    expect(store.map.get(LEGACY_SAVE_KEY)).toBe('{"totally":"stale garbage"}') // untouched
+  })
+
+  it('both keys absent → a fresh run (null), nothing created', () => {
+    const store = memStore()
+    expect(readSave(store)).toBeNull()
+    expect(store.map.size).toBe(0)
   })
 })

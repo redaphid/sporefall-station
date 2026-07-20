@@ -48,7 +48,7 @@ const main = async () => {
     return !!c && c.clientWidth > 100 && c.clientHeight > 100
   }, { timeout: 20000 })
   await page.waitForFunction(() => {
-    const s = window.__sor
+    const s = window.__sporefall
     return !!s && !!s.renderView && !!s.renderView().self
   }, { timeout: 20000 })
   log('canvas + sim ready')
@@ -72,7 +72,7 @@ const main = async () => {
 
   const readState = () =>
     page.evaluate(() => {
-      const v = window.__sor.renderView()
+      const v = window.__sporefall.renderView()
       const s = v.self
       if (!s) return null
       let npc = null, npcD = 1e9, door = null, doorD = 1e9, item = null, itemD = 1e9

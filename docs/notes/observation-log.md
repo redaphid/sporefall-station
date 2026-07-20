@@ -1,8 +1,8 @@
-# Backseat — live observation log
+# Sporefall Station — live observation log
 
 Append-only running log from a live-observer agent driving Chrome against the dev
 server (`localhost:5173/?debug`). Each pass records wall-clock, `world.tick`, and
-what was seen. Read-only observation via `window.backseat` / `window.world`.
+what was seen. Read-only observation via `window.sporefall` / `window.world`.
 
 Session start: 2026-07-19, build **267**, solo run, floor 1, seed **2602185732**.
 
@@ -43,16 +43,16 @@ only in bursts when the tab is briefly foregrounded (e.g. when `computer` takes 
 screenshot). Consequence: `world.tick` jumps unpredictably between reads
 (observed jumps 0 -> 1957 -> 2610), and continuous frame-accurate observation of
 a *hidden* tab is not possible. While foregrounded it runs ~30 ticks/s.
-`backseat.tick()` was 0 during the frozen start but matches `world.tick` once the
+`sporefall.tick()` was 0 during the frozen start but matches `world.tick` once the
 sim is actually running (no stale-read bug — the 0 was real).
 `window.world.byId` is a **Map** (use `.get(id)`, not `[id]`), while the
-`backseat.*` clones are plain objects.
+`sporefall.*` clones are plain objects.
 
 ### Pass 1 — tick ~2610-2664 (idle player got swarmed and downed)
 With NO input supplied (observer never drove the player), the player left spawn
 region and by ~tick 2610 was at (14.2, 8.6) and **downed**: hp 0,
 `playerCtl.downed = {bleedTicks: 128, reviveProgress: 0}`, `revivesLeft: 2`,
-`gameOver: false`. So Backseat has a downed/bleed-out + revive mechanic that fires
+`gameOver: false`. So Sporefall Station has a downed/bleed-out + revive mechanic that fires
 even in solo — with no teammate to revive, a solo down is a slow death unless
 self-revive exists. NPC id 1 (a `civ`-faction "skittish" civilian) had gone
 `ai.mode: aggro` targeting the player (id 86) with a `stunGun`, and thugs were

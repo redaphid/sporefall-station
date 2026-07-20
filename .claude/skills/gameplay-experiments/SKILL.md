@@ -1,7 +1,7 @@
 ---
 name: gameplay-experiments
 description: >-
-  Explore Backseat's world in the ECS debugger, compose deterministic scenarios
+  Explore Sporefall Station's world in the ECS debugger, compose deterministic scenarios
   (heists, set-pieces, emergent-mechanic tests), narrate them on screen with the
   annotation system, and produce annotated screenshot/video recordings. Use when
   asked to "try out" gameplay ideas, design multi-stage co-op scenarios, discover

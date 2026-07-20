@@ -19,11 +19,11 @@ describe('toAdvertiseName', () => {
     expect(toAdvertiseName('Sam    S')).toBe('Sam S')
   })
 
-  it('falls back to SoR for empty / whitespace / missing names', () => {
-    expect(toAdvertiseName('')).toBe('SoR')
-    expect(toAdvertiseName('   ')).toBe('SoR')
-    expect(toAdvertiseName(null)).toBe('SoR')
-    expect(toAdvertiseName(undefined)).toBe('SoR')
+  it('falls back to Spore for empty / whitespace / missing names', () => {
+    expect(toAdvertiseName('')).toBe('Spore')
+    expect(toAdvertiseName('   ')).toBe('Spore')
+    expect(toAdvertiseName(null)).toBe('Spore')
+    expect(toAdvertiseName(undefined)).toBe('Spore')
   })
 
   it('trims trailing space left by truncation', () => {
@@ -59,7 +59,7 @@ describe('toAdvertiseName', () => {
     expect(/[\uD800-\uDBFF]/.test(out.slice(-1))).toBe(false)
   })
 
-  it('does not fall back to SoR when the name has real content', () => {
+  it('does not fall back to Spore when the name has real content', () => {
     expect(toAdvertiseName('☕')).toBe('☕')
   })
 })

@@ -1,6 +1,6 @@
 # Gameplay experiments — worked guide
 
-How to invent, narrate, and record gameplay in Backseat using the AI-native ECS.
+How to invent, narrate, and record gameplay in Sporefall Station using the AI-native ECS.
 This is the long-form companion to the [`gameplay-experiments`](../.claude/skills/gameplay-experiments/SKILL.md)
 skill. The whole point: because the sim is a pure function of a seeded PRNG plus
 per-tick input, any scenario you build is **exactly reproducible** — so a recording

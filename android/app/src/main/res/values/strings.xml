@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Backseat</string>
-    <string name="title_activity_main">Backseat</string>
+    <string name="app_name">Sporefall Station</string>
+    <string name="title_activity_main">Sporefall Station</string>
     <string name="package_name">com.hypnodroid.backseat</string>
     <string name="custom_url_scheme">com.hypnodroid.backseat</string>
 </resources>

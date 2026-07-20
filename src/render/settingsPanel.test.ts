@@ -133,7 +133,7 @@ describe('settings panel — controller remap section', () => {
   const create = () => createSettingsPanel(root, false, () => {}, THEMES, () => pads)
   const bindBtn = (action: string) => panelOf(root).querySelector<HTMLButtonElement>(`[data-remap-action="${action}"]`)!
   const resetBtn = (action: string) => panelOf(root).querySelector<HTMLButtonElement>(`[data-remap-reset="${action}"]`)!
-  const storedMap = () => JSON.parse(localStorage.getItem('sor.padmap') ?? 'null')?.map
+  const storedMap = () => JSON.parse(localStorage.getItem('sporefall.padmap') ?? 'null')?.map
 
   beforeEach(() => {
     vi.useFakeTimers()
@@ -361,7 +361,7 @@ describe('settings panel — controller remap section', () => {
   })
 
   it('a panel created after a previous session shows the PERSISTED bindings', () => {
-    localStorage.setItem('sor.padmap', JSON.stringify({ v: 1, map: { ...defaultButtonMap(), attack: [1], interact: [0, 5, 6, 7] } }))
+    localStorage.setItem('sporefall.padmap', JSON.stringify({ v: 1, map: { ...defaultButtonMap(), attack: [1], interact: [0, 5, 6, 7] } }))
     resetButtonMapCacheForTest()
     create()
     expect(bindBtn('attack').textContent).toBe('B')

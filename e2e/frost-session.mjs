@@ -34,7 +34,7 @@ const screenshot = async (page, label) => {
 
 const npcs = (page) =>
   page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     const out = []
     for (const e of v.entities) {
       if (e.kind !== 'npc') continue
@@ -61,7 +61,7 @@ const ready = async (page, url) => {
     return !!c && c.clientWidth > 100 && c.clientHeight > 100
   }, { timeout: 20000 })
   await page.waitForFunction(() => {
-    const s = window.__sor
+    const s = window.__sporefall
     return !!s && !!s.renderView && !!s.renderView().self && !!window.__debug
   }, { timeout: 20000 })
   await sleep(300)

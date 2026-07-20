@@ -79,7 +79,7 @@ pnpm exec tsx tools/mcp-debug/server.ts               # http://localhost:7811/mc
 ```json
 {
   "mcpServers": {
-    "sor-ecs-debug": {
+    "sporefall-ecs-debug": {
       "type": "http",
       "url": "http://localhost:7811/mcp"
     }

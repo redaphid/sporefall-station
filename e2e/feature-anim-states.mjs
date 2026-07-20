@@ -114,11 +114,11 @@ for (const s of STILLS) {
     // wrap session.tick to become a no-op once the world reaches the tick.
     // The render loop keeps drawing the frozen tick — a razor-sharp still of a
     // 6-tick state. (Never resumed; each still gets its own page load.)
-    await page.waitForFunction(() => window.__sor !== undefined, { timeout: 20000 })
+    await page.waitForFunction(() => window.__sporefall !== undefined, { timeout: 20000 })
     await page.evaluate((t) => {
-      const sor = window.__sor
-      const orig = sor.tick.bind(sor)
-      sor.tick = () => {
+      const sporefall = window.__sporefall
+      const orig = sporefall.tick.bind(sporefall)
+      sporefall.tick = () => {
         if (window.__world.tick >= t) return
         orig()
       }

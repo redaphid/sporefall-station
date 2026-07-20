@@ -29,7 +29,7 @@ export class BroadcastChannelTransport implements Transport {
     private latencyMs = 40,
     private jitterMs = 15,
   ) {
-    this.channel = new BroadcastChannel(`sor-${room}`)
+    this.channel = new BroadcastChannel(`sporefall-${room}`)
   }
 
   async start(): Promise<void> {

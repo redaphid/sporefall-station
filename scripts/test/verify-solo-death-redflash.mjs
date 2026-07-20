@@ -1,7 +1,7 @@
 // #52 proof: drive the REAL solo build to (a) a downed→self-revive and (b) a
 // pool-exhausted death→run-over restart overlay, capturing screenshots + a video
 // that show the low-health red vignette is NOT stuck on a 0-hp/dead/gameOver
-// body. Uses the ?e2e debug surface (window.__sor / window.__debug) on the live
+// body. Uses the ?e2e debug surface (window.__sporefall / window.__debug) on the live
 // host world — no page reload, connection-preserving restart flow (#31).
 //
 //   BASE_URL=http://localhost:4173 node scripts/test/verify-solo-death-redflash.mjs
@@ -44,7 +44,7 @@ const snap = async (label) => {
   await page.screenshot({ path })
   shots.push(path)
 }
-const tick = () => page.evaluate(() => window.__sor?.world?.tick ?? -1)
+const tick = () => page.evaluate(() => window.__sporefall?.world?.tick ?? -1)
 const waitTicks = async (n) => {
   const start = await tick()
   while ((await tick()) < start + n) await page.waitForTimeout(30)
@@ -52,7 +52,7 @@ const waitTicks = async (n) => {
 // Read a compact view of the local player + run state off the live world.
 const readState = () =>
   page.evaluate(() => {
-    const w = window.__sor.world
+    const w = window.__sporefall.world
     const p = w.entities.find((e) => e.playerCtl)
     return {
       tick: w.tick,
@@ -72,7 +72,7 @@ const readState = () =>
 
 await page.goto(`${BASE}/?e2e&mode=solo&seed=7`, { waitUntil: 'networkidle' })
 // Wait for the host world + a player entity to exist.
-await page.waitForFunction(() => window.__sor?.world?.entities?.some((e) => e.playerCtl), null, { timeout: 15000 })
+await page.waitForFunction(() => window.__sporefall?.world?.entities?.some((e) => e.playerCtl), null, { timeout: 15000 })
 await waitTicks(5)
 console.log('booted:', JSON.stringify(await readState()))
 await snap('01-alive')
@@ -80,7 +80,7 @@ await snap('01-alive')
 // ---- Phase A: down the solo player, prove the red vignette is gated OFF while
 // downed, then let the bleed-out self-revive (revive pool still full). ----------
 await page.evaluate(() => {
-  const w = window.__sor.world
+  const w = window.__sporefall.world
   const p = w.entities.find((e) => e.playerCtl)
   p.health.iframes = 0
   p.health.hp = 1
@@ -96,7 +96,7 @@ await snap('02-downed')
 // Prove DOT can't trap the downed body: keep hitting — must stay downed, timer
 // must not re-arm. Then shorten the bleed and let it self-revive.
 await page.evaluate(() => {
-  const w = window.__sor.world
+  const w = window.__sporefall.world
   const p = w.entities.find((e) => e.playerCtl)
   for (let i = 0; i < 3; i++) window.__debug.hit(window.__pid, 9999)
   p.playerCtl.downed.bleedTicks = 4 // fast-forward the 30s bleed for the video
@@ -110,14 +110,14 @@ await snap('03-revived')
 // ---- Phase B: exhaust the revive pool, then a death is a real run-over → the
 // connection-preserving restart overlay (no page reload). ----------------------
 await page.evaluate(() => {
-  const w = window.__sor.world
+  const w = window.__sporefall.world
   const p = w.entities.find((e) => e.playerCtl)
   w.revivesLeft = 0 // comeback economy spent
   p.health.iframes = 0
   p.health.hp = 1
 })
 await page.evaluate(() => window.__debug.hit(window.__pid, 9999)) // lethal with empty pool → DEATH
-await page.waitForFunction(() => window.__sor.world.gameOver === true, null, { timeout: 5000 })
+await page.waitForFunction(() => window.__sporefall.world.gameOver === true, null, { timeout: 5000 })
 await page.waitForFunction(
   () => {
     const b = document.querySelector('#restart')
@@ -134,7 +134,7 @@ await snap('04-gameover-restart')
 
 // ---- Restart in place (host restart, transport untouched) clears run state. ---
 await page.click('#restart')
-await page.waitForFunction(() => window.__sor.world.gameOver === false, null, { timeout: 5000 })
+await page.waitForFunction(() => window.__sporefall.world.gameOver === false, null, { timeout: 5000 })
 await waitTicks(5)
 s = await readState()
 check(!s.gameOver && !s.dead && s.hp > 0, `restart cleared state → fresh run (gameOver=${s.gameOver}, hp=${s.hp})`)

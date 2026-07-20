@@ -40,7 +40,7 @@ const check = (cond, msg) => {
 
 const readWorld = (page) =>
   page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     const self = { x: v.self.pos.x, y: v.self.pos.y, hp: v.self.health ? v.self.health.hp : null }
     const npcs = []
     for (const e of v.entities) {
@@ -71,7 +71,7 @@ const main = async () => {
     return !!c && c.clientWidth > 100 && c.clientHeight > 100
   }, { timeout: 20000 })
   await page.waitForFunction(() => {
-    const s = window.__sor
+    const s = window.__sporefall
     return !!s && !!s.renderView && !!s.renderView().self && !!window.__debug
   }, { timeout: 20000 })
   await sleep(300)

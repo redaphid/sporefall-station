@@ -151,7 +151,7 @@ const main = async () => {
   // frame straight onto the room channel addressed to the client.
   const clientId = clientTransport.id
   const hostWireId = hostTransport.id
-  const raw = new BroadcastChannel(`sor-${room}`)
+  const raw = new BroadcastChannel(`sporefall-${room}`)
   const badSnapshot = new Uint8Array([MsgType.Snapshot, 0xff]) // header only → decode reads past end
   for (const pkt of frameMessage(badSnapshot, 244)) {
     raw.postMessage({ kind: 'data', from: hostWireId, to: clientId, bytes: [...pkt] })

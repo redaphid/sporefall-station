@@ -132,7 +132,7 @@ const boot = async (): Promise<void> => {
       session.self = saved.entities.find((e) => e.playerCtl) ?? session.self
       renderer.setLevel(saved.level)
       resumed = true
-      console.log(`backseat: resumed in-progress run (floor ${saved.floor}, tick ${saved.tick})`)
+      console.log(`sporefall: resumed in-progress run (floor ${saved.floor}, tick ${saved.tick})`)
     }
   }
 
@@ -173,10 +173,10 @@ const boot = async (): Promise<void> => {
   const zoom = Number(params.get('zoom'))
   if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
   // The always-on AI inspection surface (docs/ai-inspection.md): `window.world`
-  // + `window.backseat` in EVERY build, including release. Reads are harmless
+  // + `window.sporefall` in EVERY build, including release. Reads are harmless
   // (the world is plain serializable objects — the AI-native design) and let an
   // agent driving the browser answer "what is happening right now?" against the
-  // deployed site with no debug-hub infrastructure. Mutation (`backseat.verb`)
+  // deployed site with no debug-hub infrastructure. Mutation (`sporefall.verb`)
   // stays dev-gated: only `?debug`/`?e2e` enable it; otherwise it refuses with
   // an explanation. All getters, so world replacement (?world=, load, restart)
   // is tracked automatically.
@@ -193,20 +193,20 @@ const boot = async (): Promise<void> => {
     setTheme: (id) => void renderer.setTheme(id),
   })
   installInspect(inspect, window)
-  console.log(`backseat build ${APP_VERSION}: window.world + window.backseat.help() for inspection`)
+  console.log(`sporefall build ${APP_VERSION}: window.world + window.sporefall.help() for inspection`)
   // Legacy e2e hook names alias the canonical surface so existing tests keep
   // working; `__world` is a getter for the same live world `window.world` serves.
   const aliasWorldHook = (): void => {
     Object.defineProperty(window, '__world', { configurable: true, get: () => inspect.ns.world })
   }
   if (params.has('e2e')) {
-    ;(window as unknown as { __sor: Session }).__sor = session
+    ;(window as unknown as { __sporefall: Session }).__sporefall = session
     if (session instanceof HostSession) {
       const hostWorld = session.world
       ;(window as unknown as { __debug: unknown }).__debug = createDebugApi(hostWorld)
       aliasWorldHook()
       // Headless hooks for the screenshot e2es, now thin aliases over the
-      // canonical `window.backseat` surface: `backseat.verb` drives the same
+      // canonical `window.sporefall` surface: `sporefall.verb` drives the same
       // `runVerb` dispatcher (same guards as the live debug channel), and the
       // `?e2e` flag satisfies its dev-write gate.
       ;(window as unknown as { __annotate: (line: string) => string }).__annotate = (line) =>
@@ -339,7 +339,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
 
   if (mode === 'host') {
     // Advertise the host's display name so the join list can label this phone
-    // (issue #35). No "SoR " tag: the scan already filters by service UUID, and
+    // (issue #35). No "Spore " tag: the scan already filters by service UUID, and
     // the ~8-char advertisement budget is too tight to waste on a prefix.
     const transport = native
       ? new BleHostTransport(deps.name, dbg.log)
@@ -642,7 +642,7 @@ const runLoop = (
     while (acc >= SIM_DT) {
       session.tick()
       debug?.afterTick() // stream this tick's events + drain queued debug mutations
-      inspect.afterTick() // buffer this tick's events for backseat.events()
+      inspect.afterTick() // buffer this tick's events for sporefall.events()
       acc -= SIM_DT
     }
     // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
@@ -653,7 +653,7 @@ const runLoop = (
     }
     const alpha = acc / SIM_DT
     const view = session.renderView()
-    inspect.frame(view) // cache the view for backseat reads (+ client event harvest)
+    inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
     if (view.level !== currentLevel) {
       currentLevel = view.level
       renderer.setLevel(view.level)

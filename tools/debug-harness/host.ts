@@ -22,7 +22,7 @@ const url = process.env.DEBUG_HUB_URL ?? hubUrl('127.0.0.1', Number(process.env.
 const harness = new GameHarness()
 const channel = startHarnessChannel(harness, url, (m) => console.log(m))
 
-console.log(`sor debug harness backend → ${url}`)
+console.log(`sporefall debug harness backend → ${url}`)
 console.log('drive it with tools/debug-cli/cli.ts (create / join_bot / start_run / tick / record_start …)')
 
 process.on('SIGINT', () => {

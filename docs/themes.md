@@ -18,7 +18,7 @@ UI *calls* it ("Bog Warden" in a swamp theme).
 
 | Mechanism | Behavior |
 |---|---|
-| Settings panel (gear icon) | Persisted to localStorage (`sor.settings`, field `theme`). |
+| Settings panel (gear icon) | Persisted to localStorage (`sporefall.settings`, field `theme`). |
 | `?theme=<id>` URL param | Dev override for this session only; does **not** persist. |
 | Debug verb `theme <id>` | Runtime hot-swap via the debug channel / MCP / `window.__verb`. |
 | `window.__setTheme(id)` (under `?e2e`) | Returns a promise that resolves when the swap finishes — for tests. |

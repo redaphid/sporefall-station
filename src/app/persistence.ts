@@ -16,6 +16,7 @@
 
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import type { World } from '../game/world'
+import { migrateLegacyKey } from './storageMigration'
 
 /** Minimal localStorage-shaped seam so the pure logic can be tested against an
  * in-memory map. `window.localStorage` satisfies this interface as-is. */
@@ -26,7 +27,11 @@ export interface KeyValueStore {
 }
 
 /** The single slot an in-progress run occupies. */
-export const SAVE_KEY = 'sor.savegame'
+export const SAVE_KEY = 'sporefall.savegame'
+
+/** Pre-rebrand key for the same slot. Read-migrated once into `SAVE_KEY` so the
+ * rename never orphans a live in-progress run. */
+export const LEGACY_SAVE_KEY = 'sor.savegame'
 
 /**
  * Envelope schema version — bump to invalidate ALL prior saves whenever a
@@ -94,6 +99,8 @@ export const writeSave = (store: KeyValueStore, world: World, now: number): void
  * restore is DROPPED here so a broken blob can't wedge every subsequent boot.
  */
 export const readSave = (store: KeyValueStore): World | null => {
+  // Rebrand migration: adopt a pre-rename save before reading (one-time copy).
+  migrateLegacyKey(store, SAVE_KEY, LEGACY_SAVE_KEY)
   let raw: string | null
   try {
     raw = store.getItem(SAVE_KEY)

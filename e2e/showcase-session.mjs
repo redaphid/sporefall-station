@@ -30,7 +30,7 @@ const screenshot = async (page, label) => {
 
 const probe = (page) =>
   page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     let fires = 0
     let events = v.events.map((e) => e.type)
     const walkers = {}
@@ -55,7 +55,7 @@ const main = async () => {
   const url = `${BASE}/?mode=solo&scenario=showcase&e2e=1&zoom=2.2&seed=${SEED}`
   log('goto', url)
   await page.goto(url, { waitUntil: 'domcontentloaded' })
-  await page.waitForFunction(() => window.__sor && window.__sor.renderView().entities.length > 0, {
+  await page.waitForFunction(() => window.__sporefall && window.__sporefall.renderView().entities.length > 0, {
     timeout: 20000,
   })
 
@@ -65,7 +65,7 @@ const main = async () => {
     window.__evlog = {}
     const tick = () => {
       try {
-        for (const e of window.__sor.renderView().events) window.__evlog[e.type] = (window.__evlog[e.type] ?? 0) + 1
+        for (const e of window.__sporefall.renderView().events) window.__evlog[e.type] = (window.__evlog[e.type] ?? 0) + 1
       } catch {}
       requestAnimationFrame(tick)
     }
@@ -111,7 +111,7 @@ const main = async () => {
   }
   await screenshot(page, 'final')
   const dbg = await page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     const p = v.entities.find((e) => e.playerCtl)
     return {
       evlog: window.__evlog,

@@ -33,7 +33,7 @@ const FAKE_PAD_RIG = `
   window.__pads = []
   Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => window.__pads })
   window.__mkPad = () => ({
-    index: 0, id: 'Backseat Fake Pad (STANDARD GAMEPAD)', mapping: 'standard', connected: true,
+    index: 0, id: 'Sporefall Station Fake Pad (STANDARD GAMEPAD)', mapping: 'standard', connected: true,
     timestamp: 0, axes: [0, 0, 0, 0],
     buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
   })

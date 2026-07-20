@@ -160,7 +160,7 @@ const combat = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__
   await page.goto(`${BASE}/?mode=solo&e2e=1&seed=42`, { waitUntil: 'networkidle' })
   await page.waitForFunction(() => (window.__world?.tick ?? 0) > 2, { timeout: 20000 })
   const grabbed = await page.evaluate(() => ({
-    json: window.backseat.serialize(),
+    json: window.sporefall.serialize(),
     exit: window.__world.level.exit,
   }))
   await browser.close()

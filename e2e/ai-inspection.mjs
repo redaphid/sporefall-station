@@ -1,4 +1,4 @@
-// window.backseat / window.world e2e: drive the REAL built page purely through
+// window.sporefall / window.world e2e: drive the REAL built page purely through
 // the console inspection surface, exactly as an AI agent in the browser would
 // (claude-in-chrome runs JavaScript in the page and reads the console).
 //
@@ -26,7 +26,7 @@ const boot = async (params) => {
   page.on('console', (m) => consoleLines.push(m.text()))
   page.on('pageerror', (e) => pageErrors.push(String(e)))
   await page.goto(`${BASE}/?${new URLSearchParams(params)}`, { waitUntil: 'networkidle' })
-  await page.waitForFunction(() => window.backseat && window.world && window.backseat.tick() > 10, null, {
+  await page.waitForFunction(() => window.sporefall && window.world && window.sporefall.tick() > 10, null, {
     timeout: 30000,
   })
   return { page, consoleLines, pageErrors }
@@ -37,7 +37,7 @@ const boot = async (params) => {
   const { page, consoleLines, pageErrors } = await boot({ mode: 'solo', seed: 7 })
 
   const s = await page.evaluate(() => {
-    const b = window.backseat
+    const b = window.sporefall
     const player = b.player()
     const before = { x: player.pos.x, y: player.pos.y }
     const refusal = b.verb(`teleport ${player.id} 1 1`)
@@ -68,7 +68,7 @@ const boot = async (params) => {
     }
   })
 
-  check(typeof s.help === 'string' && s.help.includes('backseat.verb'), 'prod: help() documents the API')
+  check(typeof s.help === 'string' && s.help.includes('sporefall.verb'), 'prod: help() documents the API')
   check(typeof s.version === 'string' && s.version.length > 0, 'prod: version() reports a build')
   check(s.tickType === 'number' && s.tick > 10, 'prod: tick() advances')
   check(s.session.mode === 'solo' && s.session.paused === false, 'prod: session() has {mode, paused}')
@@ -89,7 +89,7 @@ const boot = async (params) => {
   check(s.worldIsSame && typeof s.worldTick === 'number', 'prod: window.world is the same live world')
   check(s.frozen, 'prod: namespace is frozen')
   check(
-    consoleLines.some((l) => l.includes('backseat') && l.includes('window.world')),
+    consoleLines.some((l) => l.includes('sporefall') && l.includes('window.world')),
     'prod: boot console line advertises the surface',
   )
   check(pageErrors.length === 0, `prod: no page errors (${pageErrors.join(' | ')})`)
@@ -100,7 +100,7 @@ const boot = async (params) => {
 {
   const { page, pageErrors } = await boot({ mode: 'solo', seed: 7, debug: '' })
   const s = await page.evaluate(() => {
-    const b = window.backseat
+    const b = window.sporefall
     const id = b.player().id
     const reply = JSON.parse(b.verb('teleport', `${id} 3 3`))
     const pos = b.entity(id).pos
@@ -121,12 +121,12 @@ const boot = async (params) => {
   const s = await page.evaluate(() => {
     const state = JSON.parse(window.__verb('state'))
     return {
-      sameWorld: window.__world === window.world && window.__world === window.backseat.world,
+      sameWorld: window.__world === window.world && window.__world === window.sporefall.world,
       stateTick: state.tick,
-      verbWrites: JSON.parse(window.__verb(`teleport ${window.backseat.player().id} 4 4`)).pos.x === 4,
+      verbWrites: JSON.parse(window.__verb(`teleport ${window.sporefall.player().id} 4 4`)).pos.x === 4,
     }
   })
-  check(s.sameWorld, 'e2e: __world aliases window.world / backseat.world')
+  check(s.sameWorld, 'e2e: __world aliases window.world / sporefall.world')
   check(typeof s.stateTick === 'number', 'e2e: __verb still answers verbs')
   check(s.verbWrites, 'e2e: __verb still writes (the ?e2e gate)')
   check(pageErrors.length === 0, `e2e: no page errors (${pageErrors.join(' | ')})`)

@@ -1,5 +1,5 @@
 // The always-on browser-console inspection surface: `window.world` and
-// `window.backseat` (docs/ai-inspection.md). This is the AI-native ECS
+// `window.sporefall` (docs/ai-inspection.md). This is the AI-native ECS
 // philosophy applied to the console — an agent driving Chrome (claude-in-chrome)
 // against a dev build OR the deployed site can answer "what is happening in this
 // game right now?" with no debug-hub WebSocket infrastructure.
@@ -46,7 +46,7 @@ export interface PredictedWorldView {
   mission: { description: string; complete: boolean; targetEntityId?: number }
 }
 
-export interface Backseat {
+export interface Sporefall {
   /** Live world reference — authoritative on host/solo, predicted view on a client. */
   readonly world: World | PredictedWorldView
   help(): string
@@ -79,7 +79,7 @@ export interface InspectDeps {
 }
 
 export interface Inspect {
-  ns: Backseat
+  ns: Sporefall
   /** Call once per sim tick (host/solo): harvest this tick's events before the
    * next tick wipes world.events. Duplicate-tick calls (pause) are ignored. */
   afterTick(): void
@@ -97,7 +97,7 @@ const HELP: readonly { sig: string; doc: string }[] = [
   { sig: 'session()', doc: '{mode, paused, floor, tick, gameOver, seed?, difficulty?, alarm?, peers?}' },
   { sig: 'version()', doc: 'running build number' },
   { sig: "entities(filter?)", doc: "JSON clones of matching entities. filter: a kind/archetype/component name ('npc', 'guard', 'door') or a predicate ('e => e.health?.hp < 3')" },
-  { sig: 'entity(id)', doc: 'one entity as a JSON clone (undefined if absent), e.g. backseat.entity(12)' },
+  { sig: 'entity(id)', doc: 'one entity as a JSON clone (undefined if absent), e.g. sporefall.entity(12)' },
   { sig: 'player(playerId?)', doc: 'the local player entity (or player N) as a JSON clone' },
   { sig: 'mission()', doc: 'current mission state {description, complete, ...}' },
   { sig: 'events(sinceTick?)', doc: `recent sim events tagged {tick, type, ...} — ring buffer of the last ~${EVENT_TICK_WINDOW} ticks` },
@@ -162,16 +162,16 @@ export const createInspect = (deps: InspectDeps): Inspect => {
     }
   }
 
-  const ns: Backseat = {
+  const ns: Sporefall = {
     get world() {
       return deps.getWorld() ?? predictedWorld()
     },
 
     help: () =>
       [
-        'backseat — console inspection surface for the live game (docs/ai-inspection.md).',
+        'sporefall — console inspection surface for the live game (docs/ai-inspection.md).',
         'Everything but .world returns detached JSON clones; mutating them never touches the sim.',
-        ...HELP.map(({ sig, doc }) => `  backseat.${sig} — ${doc}`),
+        ...HELP.map(({ sig, doc }) => `  sporefall.${sig} — ${doc}`),
       ].join('\n'),
 
     tick: () => deps.getWorld()?.tick ?? view().tick,
@@ -234,13 +234,13 @@ export const createInspect = (deps: InspectDeps): Inspect => {
       const full = args === undefined ? line : `${line} ${args}`
       if (!deps.devWrites)
         return (
-          'backseat.verb is disabled in this build: mutation verbs are dev-only. ' +
+          'sporefall.verb is disabled in this build: mutation verbs are dev-only. ' +
           'Reload with ?debug in the URL to enable them. ' +
-          'Read-only inspection (backseat.world/entities/events/serialize/…) works right here.'
+          'Read-only inspection (sporefall.world/entities/events/serialize/…) works right here.'
         )
       const w = deps.getWorld()
       if (!w)
-        return 'backseat.verb needs the authoritative world — this is a join (client) session; run verbs on the host device (or a solo session).'
+        return 'sporefall.verb needs the authoritative world — this is a join (client) session; run verbs on the host device (or a solo session).'
       return runVerb(w, full, { events, setTheme: deps.setTheme })
     },
   }
@@ -265,8 +265,8 @@ export const createInspect = (deps: InspectDeps): Inspect => {
 }
 
 /** Install the surface on a window-like target: `world` (getter, so it tracks
- * world replacement via ?world= / the load verb / restart) and `backseat`. */
+ * world replacement via ?world= / the load verb / restart) and `sporefall`. */
 export const installInspect = (inspect: Inspect, target: object): void => {
   Object.defineProperty(target, 'world', { configurable: true, get: () => inspect.ns.world })
-  Object.defineProperty(target, 'backseat', { configurable: true, value: inspect.ns })
+  Object.defineProperty(target, 'sporefall', { configurable: true, value: inspect.ns })
 }

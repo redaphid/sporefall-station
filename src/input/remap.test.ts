@@ -226,23 +226,41 @@ describe('persistence round-trip', () => {
     expect(loadButtonMap()).toEqual(defaultButtonMap())
   })
   it('loads defaults from corrupt JSON', () => {
-    localStorage.setItem('sor.padmap', '{not json')
+    localStorage.setItem('sporefall.padmap', '{not json')
     expect(loadButtonMap()).toEqual(defaultButtonMap())
   })
   it('loads defaults from valid-JSON garbage', () => {
-    localStorage.setItem('sor.padmap', JSON.stringify({ v: 1, map: { attack: ['axis 2'] } }))
+    localStorage.setItem('sporefall.padmap', JSON.stringify({ v: 1, map: { attack: ['axis 2'] } }))
     expect(loadButtonMap()).toEqual(defaultButtonMap())
   })
   it('setButtonMap persists under the versioned key', () => {
     setButtonMap(bindButton(defaultButtonMap(), 'attack', 1))
-    const raw = JSON.parse(localStorage.getItem('sor.padmap')!)
+    const raw = JSON.parse(localStorage.getItem('sporefall.padmap')!)
     expect(raw.v).toBe(1)
     expect(raw.map.attack).toEqual([1])
   })
   it('getButtonMap picks up what a previous session stored', () => {
-    localStorage.setItem('sor.padmap', JSON.stringify({ v: 1, map: bindButton(defaultButtonMap(), 'special', 30) }))
+    localStorage.setItem('sporefall.padmap', JSON.stringify({ v: 1, map: bindButton(defaultButtonMap(), 'special', 30) }))
     resetButtonMapCacheForTest()
     expect(getButtonMap().special).toEqual([30])
+  })
+})
+
+describe('persistence — rebrand migration (sor.padmap → sporefall.padmap)', () => {
+  it('adopts a pre-rebrand remap: legacy present, new absent → loaded + moved to the new key', () => {
+    const user = bindButton(defaultButtonMap(), 'attack', 1)
+    localStorage.setItem('sor.padmap', JSON.stringify({ v: 1, map: user }))
+    expect(loadButtonMap()).toEqual(user)
+    expect(localStorage.getItem('sporefall.padmap')).not.toBeNull()
+    expect(localStorage.getItem('sor.padmap')).toBeNull() // legacy reclaimed
+  })
+
+  it('prefers the new key; a stale sor.padmap is ignored', () => {
+    const current = bindButton(defaultButtonMap(), 'special', 5)
+    localStorage.setItem('sporefall.padmap', JSON.stringify({ v: 1, map: current }))
+    localStorage.setItem('sor.padmap', JSON.stringify({ v: 1, map: bindButton(defaultButtonMap(), 'attack', 9) }))
+    expect(loadButtonMap()).toEqual(current)
+    expect(localStorage.getItem('sor.padmap')).not.toBeNull() // untouched
   })
 })
 

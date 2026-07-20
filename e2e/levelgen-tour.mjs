@@ -34,7 +34,7 @@ await page.goto(`${BASE}/?mode=solo&e2e&seed=7&world=@inline`, { waitUntil: 'net
 await page.waitForFunction(() => typeof window.__loadWorld === 'function')
 
 const state = { scenes: [] }
-const tick = () => page.evaluate(() => window.__sor?.world?.tick ?? 0)
+const tick = () => page.evaluate(() => window.__sporefall?.world?.tick ?? 0)
 const dwell = async (ticks) => {
   const start = await tick()
   while ((await tick()) < start + ticks) await page.waitForTimeout(50)
@@ -60,7 +60,7 @@ const scene = async (name, expectFn) => {
   await page.evaluate(() => window.__zoom(1.3))
   await dwell(45)
   const info = await page.evaluate(() => {
-    const w = window.__sor.world
+    const w = window.__sporefall.world
     return {
       floor: w.floor,
       theme: w.level.theme,

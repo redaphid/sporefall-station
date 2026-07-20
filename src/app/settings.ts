@@ -4,6 +4,8 @@
  * clamp/parse helpers are pure so they can be unit-tested without a DOM.
  */
 
+import { migrateLegacyKey } from './storageMigration'
+
 export type EffectsQuality = 'off' | 'low' | 'high'
 
 /** Backbuffer shader pipeline budget: 'full' = distortion + feedback trails +
@@ -25,7 +27,9 @@ export interface GameSettings {
   theme: string
 }
 
-const STORAGE_KEY = 'sor.settings'
+const STORAGE_KEY = 'sporefall.settings'
+/** Pre-rebrand key, read-migrated once into STORAGE_KEY. */
+const LEGACY_STORAGE_KEY = 'sor.settings'
 
 export const defaultSettings = (): GameSettings => ({
   hapticsEnabled: true,
@@ -69,6 +73,7 @@ export const clampSettings = (raw: unknown): GameSettings => {
 export const loadSettings = (): GameSettings => {
   try {
     if (typeof localStorage === 'undefined') return defaultSettings()
+    migrateLegacyKey(localStorage, STORAGE_KEY, LEGACY_STORAGE_KEY)
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultSettings()
     return clampSettings(JSON.parse(raw))

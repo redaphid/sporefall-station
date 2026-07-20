@@ -1,6 +1,6 @@
 # Sprite generation — setup & pipeline guide
 
-How to generate theme sprite packs for Backseat with a local ComfyUI, from a
+How to generate theme sprite packs for Sporefall Station with a local ComfyUI, from a
 cold machine to a merged `public/themes/<id>/` package. The reference
 implementation is the **swampspace** pack ("Sporefall Station") built by
 `scripts/assets/`; its per-asset lineage is `public/themes/swampspace/CURATION.md`.

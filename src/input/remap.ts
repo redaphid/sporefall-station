@@ -27,6 +27,7 @@
  */
 
 import { defaultButtons, type PadProfile } from './padProfile'
+import { migrateLegacyKey } from '../app/storageMigration'
 
 export type ButtonMap = ReturnType<typeof defaultButtons>
 export type PadAction = keyof ButtonMap
@@ -142,11 +143,14 @@ export const resetAction = (map: ButtonMap, action: PadAction): ButtonMap => {
   return next
 }
 
-const STORAGE_KEY = 'sor.padmap'
+const STORAGE_KEY = 'sporefall.padmap'
+/** Pre-rebrand key, read-migrated once into STORAGE_KEY. */
+const LEGACY_STORAGE_KEY = 'sor.padmap'
 
 export const loadButtonMap = (): ButtonMap => {
   try {
     if (typeof localStorage === 'undefined') return defaultButtonMap()
+    migrateLegacyKey(localStorage, STORAGE_KEY, LEGACY_STORAGE_KEY)
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultButtonMap()
     return clampButtonMap(JSON.parse(raw))

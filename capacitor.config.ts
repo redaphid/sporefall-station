@@ -18,7 +18,7 @@ const otaUpdateUrl =
 
 const config: CapacitorConfig = {
   appId: 'com.hypnodroid.backseat',
-  appName: 'Backseat',
+  appName: 'Sporefall Station',
   webDir: 'dist',
   android: {
     // Game renders its own splash-free boot; keep the webview edge-to-edge.

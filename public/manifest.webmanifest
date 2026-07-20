@@ -1,6 +1,6 @@
 {
-  "name": "Backseat",
-  "short_name": "Backseat",
+  "name": "Sporefall Station",
+  "short_name": "Sporefall",
   "description": "A top-down roguelike brawler. Play in the browser or install to your phone.",
   "start_url": "/",
   "scope": "/",

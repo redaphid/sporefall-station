@@ -144,7 +144,7 @@ const run = async () => {
     th.dispatchEvent(new Event('change'))
   })
   await settle(page, 600) // async theme swap
-  const savedTheme = await page.evaluate(() => JSON.parse(localStorage.getItem('sor.settings') ?? '{}').theme)
+  const savedTheme = await page.evaluate(() => JSON.parse(localStorage.getItem('sporefall.settings') ?? '{}').theme)
   savedTheme === 'swampspace' ? ok('theme change persisted (picker functions)') : fail(`theme not saved: ${savedTheme}`)
   await shot(page, 'theme-swapped')
 

@@ -1,6 +1,6 @@
 ---
 name: ecs-debug
-description: Attach to the running Streets-of-Rogue ECS engine to inspect, mutate, snapshot/restore, and single-step the live world. Use when debugging or reasoning about game runtime state — connecting via the debug hub/CLI/MCP, dumping or loading an exact WorldJson, stepping N ticks, reading entities/events, discovering component shape via the schema verb, or attaching a real JS debugger with `node --inspect`. Ports: hub 7810, MCP 7811.
+description: Attach to the running Sporefall Station ECS engine to inspect, mutate, snapshot/restore, and single-step the live world. Use when debugging or reasoning about game runtime state — connecting via the debug hub/CLI/MCP, dumping or loading an exact WorldJson, stepping N ticks, reading entities/events, discovering component shape via the schema verb, or attaching a real JS debugger with `node --inspect`. Ports: hub 7810, MCP 7811.
 ---
 
 # ECS debug: attach & inspect the live world
@@ -92,7 +92,7 @@ npx tsx tools/mcp-debug/server.ts          # http://localhost:7811/mcp
 `.mcp.json` — Streamable HTTP, **not** SSE:
 
 ```json
-{ "mcpServers": { "sor-ecs-debug": { "type": "http", "url": "http://localhost:7811/mcp" } } }
+{ "mcpServers": { "sporefall-ecs-debug": { "type": "http", "url": "http://localhost:7811/mcp" } } }
 ```
 
 Tools: `game_state`, `schema`, `list_entities`, `inspect`, `events`,

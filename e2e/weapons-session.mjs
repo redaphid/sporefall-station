@@ -34,7 +34,7 @@ const screenshot = async (page, label) => {
 
 const state = (page) =>
   page.evaluate(() => {
-    const v = window.__sor.renderView()
+    const v = window.__sporefall.renderView()
     const s = v.self
     const slots = (s.playerCtl.inventory || []).map((x) => ({ itemId: x.itemId, qty: x.qty }))
     const ammoOf = (id) => {
@@ -83,7 +83,7 @@ const main = async () => {
     return !!c && c.clientWidth > 100 && c.clientHeight > 100
   }, { timeout: 20000 })
   await page.waitForFunction(() => {
-    const s = window.__sor
+    const s = window.__sporefall
     return !!s && !!s.renderView && !!s.renderView().self
   }, { timeout: 20000 })
   await sleep(400)

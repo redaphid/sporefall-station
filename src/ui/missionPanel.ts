@@ -48,8 +48,8 @@ const injectCss = (): void => {
   cssInjected = true
   const style = document.createElement('style')
   style.textContent =
-    '@keyframes sor-focus-pulse{0%{transform:scale(.85);opacity:.95}50%{transform:scale(1.15);opacity:.55}100%{transform:scale(.85);opacity:.95}}' +
-    '@keyframes sor-target-bob{0%{transform:translate(-50%,-100%) translateY(0)}50%{transform:translate(-50%,-100%) translateY(-4px)}100%{transform:translate(-50%,-100%) translateY(0)}}'
+    '@keyframes sporefall-focus-pulse{0%{transform:scale(.85);opacity:.95}50%{transform:scale(1.15);opacity:.55}100%{transform:scale(.85);opacity:.95}}' +
+    '@keyframes sporefall-target-bob{0%{transform:translate(-50%,-100%) translateY(0)}50%{transform:translate(-50%,-100%) translateY(-4px)}100%{transform:translate(-50%,-100%) translateY(0)}}'
   document.head.appendChild(style)
 }
 
@@ -103,7 +103,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
   caret.textContent = '🎯'
   caret.style.cssText =
     'position:absolute;left:0;top:0;display:none;font-size:18px;line-height:1;' +
-    'filter:drop-shadow(0 1px 2px #000);animation:sor-target-bob 1.6s ease-in-out infinite'
+    'filter:drop-shadow(0 1px 2px #000);animation:sporefall-target-bob 1.6s ease-in-out infinite'
   markers.appendChild(caret)
 
   const edge = document.createElement('div')
@@ -122,7 +122,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
   ring.style.cssText =
     'position:absolute;left:0;top:0;display:none;width:56px;height:56px;border-radius:50%;' +
     `border:3px solid ${GOLD};box-shadow:0 0 10px ${GOLD},inset 0 0 10px ${GOLD};` +
-    'animation:sor-focus-pulse 1.1s ease-in-out infinite'
+    'animation:sporefall-focus-pulse 1.1s ease-in-out infinite'
   markers.appendChild(ring)
 
   // ---- per-frame update, cheap change-detection everywhere.

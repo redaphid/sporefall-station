@@ -1,7 +1,7 @@
 # Live-world experiments log
 
 Format: hypothesis -> mutation -> observed effect -> restored. Snapshot before any
-mutation (`dump`/`backseat.serialize()`), restore after (`load`).
+mutation (`dump`/`sporefall.serialize()`), restore after (`load`).
 
 ---
 

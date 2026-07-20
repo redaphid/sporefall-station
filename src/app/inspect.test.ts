@@ -1,4 +1,4 @@
-// Adversarial unit tests for the window.backseat inspection surface glue:
+// Adversarial unit tests for the window.sporefall inspection surface glue:
 // filters (name/component/predicate, hostile predicates), the events ring
 // buffer across per-tick wipes (dupes, eviction, caps), read-only enforcement
 // in production mode, client (no-world) fallbacks, and help() completeness —
@@ -47,7 +47,7 @@ const hostDeps = (w: World, over: Partial<InspectDeps> = {}): InspectDeps => ({
   ...over,
 })
 
-describe('backseat.entities filters', () => {
+describe('sporefall.entities filters', () => {
   const w = buildWorld()
   const { ns } = createInspect(hostDeps(w))
 
@@ -77,7 +77,7 @@ describe('backseat.entities filters', () => {
   })
 })
 
-describe('backseat entity/player/mission reads', () => {
+describe('sporefall entity/player/mission reads', () => {
   const w = buildWorld()
   const { ns } = createInspect(hostDeps(w))
 
@@ -281,12 +281,12 @@ describe('help() completeness', () => {
   it('documents every member of the namespace (fails on an undocumented addition)', () => {
     const help = ns.help()
     for (const key of Object.keys(ns)) {
-      expect(help, `member "${key}" is missing from help()`).toMatch(new RegExp(`backseat\\.${key}\\b`))
+      expect(help, `member "${key}" is missing from help()`).toMatch(new RegExp(`sporefall\\.${key}\\b`))
     }
   })
 
   it('mentions no member that does not exist', () => {
-    const documented = [...ns.help().matchAll(/^ {2}backseat\.([A-Za-z]+)/gm)].map((m) => m[1])
+    const documented = [...ns.help().matchAll(/^ {2}sporefall\.([A-Za-z]+)/gm)].map((m) => m[1])
     expect(documented.length).toBeGreaterThan(0)
     for (const name of documented) {
       expect(name in ns, `help() documents "${name}" which is not on the namespace`).toBe(true)
@@ -301,6 +301,6 @@ describe('installInspect', () => {
     const target: Record<string, unknown> = {}
     installInspect(inspect, target)
     expect(target.world).toBe(w) // the LIVE reference, not a copy
-    expect(target.backseat).toBe(inspect.ns)
+    expect(target.sporefall).toBe(inspect.ns)
   })
 })

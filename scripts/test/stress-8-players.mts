@@ -112,7 +112,7 @@ const run = (nPlayers: number, ticks: number, combat: boolean): void => {
   console.log(`host aggregate downstream (all ${Math.max(0, nPlayers - 1)} remote clients): ${aggKbps.toFixed(1)} kbps`)
 }
 
-console.log('Backseat 8-player performance harness — populated floor, real sim + snapshot encoder')
+console.log('Sporefall Station 8-player performance harness — populated floor, real sim + snapshot encoder')
 run(4, 2000, false)
 run(8, 2000, false)
 run(8, 2000, true)

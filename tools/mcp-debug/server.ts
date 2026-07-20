@@ -25,7 +25,7 @@ const run = async (fn: () => Promise<string>) => {
 const id = z.union([z.number(), z.string()])
 
 export function buildMcpServer(raw: Raw): McpServer {
-  const server = new McpServer({ name: 'sor-ecs-debug', version: '0.1.0' })
+  const server = new McpServer({ name: 'sporefall-ecs-debug', version: '0.1.0' })
 
   // ---- game selection (multi-game hubs) ---------------------------------
   // A hub may host several games; these pick which one the other tools drive.
@@ -150,11 +150,14 @@ export function startServer(raw: Raw, port: number): Promise<Server> {
   return new Promise((resolve) => httpServer.listen(port, () => resolve(httpServer)))
 }
 
-/** Connect the shared debugger bridge to the hub, then serve MCP on `port`. */
+/** Bind the MCP HTTP server on `port`, then wire it to the shared debugger
+ * bridge. The bridge connects to the hub in the BACKGROUND (self-healing with
+ * backoff), so this resolves — and the port serves — even when the hub is down;
+ * verbs fail fast with a clear error until the hub is reachable. */
 export async function main(port = Number(process.env.PORT ?? DEFAULT_MCP_PORT)): Promise<{ server: Server; bridge: DebugClient }> {
   const bridge = await connectDebugger()
   const server = await startServer((verb) => bridge.raw(verb), port)
-  console.log(`sor-ecs-debug mcp on http://localhost:${port}/mcp (hub: ${defaultHubUrl()})`)
+  console.log(`sporefall-ecs-debug mcp on http://localhost:${port}/mcp (hub: ${defaultHubUrl()})`)
   return { server, bridge }
 }
 

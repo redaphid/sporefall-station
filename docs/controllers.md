@@ -85,7 +85,7 @@ raw index.
 ## 8bitdo Zero 2 (the tiny keychain pad)
 
 Physical inputs: **D-pad, A, B, X, Y, L, R, Select, Start** — 8 buttons + d-pad,
-**no analog sticks**. Enough buttons for every SoR action; the real problem is
+**no analog sticks**. Enough buttons for every Sporefall Station action; the real problem is
 its mapping changes per Bluetooth power-on mode.
 
 ### Recommended: X-input mode (`Start` + `X` at power-on)

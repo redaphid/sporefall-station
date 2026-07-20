@@ -5,7 +5,7 @@
 //   • rebind attack to B via the capture flow (fake pad presses B)
 //   • the captured press is INERT: nothing fires while capture is open
 //   • after the bind: B fires, A does not (swap moved interact onto A/RB/L2/R2)
-//   • the swap is visible in the UI rows and in localStorage (sor.padmap v1)
+//   • the swap is visible in the UI rows and in localStorage (sporefall.padmap v1)
 //   • reload: the remap survives; B still fires, A still does not
 //   • no-pads capture prompt explains Chrome's press-to-appear rule
 //   • Reset to defaults: A fires again
@@ -120,9 +120,9 @@ const run = async () => {
   interactNow === 'A · RB · L2 · R2'
     ? ok('SWAP: interact row inherited attack\'s old buttons')
     : fail(`interact row shows '${interactNow}' after swap`)
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sor.padmap') ?? 'null'))
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('sporefall.padmap') ?? 'null'))
   stored?.v === 1 && String(stored?.map?.attack) === '1'
-    ? ok('remap persisted to localStorage (sor.padmap v1)')
+    ? ok('remap persisted to localStorage (sporefall.padmap v1)')
     : fail(`stored map wrong: ${JSON.stringify(stored)}`)
   await shots_('panel-rebound')
 

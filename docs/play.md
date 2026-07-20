@@ -1,4 +1,4 @@
-# How to Play Backseat
+# How to Play Sporefall Station
 
 Two ways to play. The browser one is easiest.
 
@@ -31,7 +31,7 @@ Now there's a game icon on your phone. Tap it to play.
    (Prefer the source page? The same file is on the releases page:
    https://github.com/redaphid/mobile-streets-of-rogue/releases/latest)
 
-Open **Backseat** from your app drawer and play.
+Open **Sporefall Station** from your app drawer and play.
 
 **You only install once — it updates itself.** When you're online, the app
 quietly grabs the newest version in the background and uses it next time you

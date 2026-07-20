@@ -17,7 +17,7 @@ export const ADVERTISE_NAME_MAX = 8
 /**
  * Host side: turn a display name into the short local name we put on the air.
  * Collapses whitespace, truncates to the advertisement budget, and falls back to
- * 'SoR' so we never advertise an empty name.
+ * 'Spore' so we never advertise an empty name.
  */
 export const toAdvertiseName = (raw: string | null | undefined): string => {
   const clean = (raw ?? '').replace(/\s+/g, ' ').trim()
@@ -26,7 +26,7 @@ export const toAdvertiseName = (raw: string | null | undefined): string => {
   // invalid code unit that encodes to a broken UTF-8 byte on the air.
   if (/[\uD800-\uDBFF]$/.test(short)) short = short.slice(0, -1)
   short = short.trim()
-  return short || 'SoR'
+  return short || 'Spore'
 }
 
 /**

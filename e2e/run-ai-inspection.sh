@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# window.backseat inspection-surface e2e: build, serve the real bundle on its
+# window.sporefall inspection-surface e2e: build, serve the real bundle on its
 # OWN port, and drive the page purely via the console surface (see
 # ai-inspection.mjs) — with and without ?debug, plus the ?e2e legacy aliases.
 #

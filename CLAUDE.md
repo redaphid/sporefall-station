@@ -1,6 +1,6 @@
 # CLAUDE.md — working in this repo
 
-Backseat: a top-down co-op roguelite (Capacitor/Android, TypeScript,
+Sporefall Station: a top-down co-op roguelite (Capacitor/Android, TypeScript,
 pixi.js) played over Bluetooth LE with no cell service. This file orients an AI
 agent working on the codebase. Human-facing setup lives in `README.md`.
 
@@ -25,9 +25,9 @@ What "AI-native" means here, concretely:
   `expectWorldEqual`) builds tests on top: load an exact state → run the real
   systems → assert. Fixtures live in `src/game/__fixtures__/`.
 - **Inspect from the browser console.** EVERY build (including the deployed
-  site) exposes `window.world` (live World) and `window.backseat` (curated
-  read-only namespace: entities/events/schema/serialize/…; `backseat.help()`
-  self-documents). Mutation via `backseat.verb(...)` stays `?debug`-gated. An
+  site) exposes `window.world` (live World) and `window.sporefall` (curated
+  read-only namespace: entities/events/schema/serialize/…; `sporefall.help()`
+  self-documents). Mutation via `sporefall.verb(...)` stays `?debug`-gated. An
   agent driving Chrome needs no hub for this — see `docs/ai-inspection.md`.
 - **Inspect & mutate at runtime.** Under `?debug`, the webview dials out to a
   WebSocket hub (`tools/debug-hub`); a CLI (`tools/debug-cli`) and an MCP server

@@ -25,7 +25,7 @@ the snapshot's seed+floor* and checksum-verified, so a fixture stays tiny (no
 tiles) and a seed/floor drift fails loudly instead of drawing the wrong map.
 
 It composes with everything: `?script=` then plays from tick 0 of the injected
-world, `?e2e` still exposes `window.__sor` / `window.__world` / `window.__debug`.
+world, `?e2e` still exposes `window.__sporefall` / `window.__world` / `window.__debug`.
 Absent `?world=`, boot is unchanged.
 
 **Inline snapshots** (no committed file): pass `?world=@inline&e2e=1`; boot

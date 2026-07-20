@@ -8,7 +8,7 @@
 import { WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
 import { emitFear, type World } from '../world'
-import { ALERT, DRAWN, GARRISON, PATROL, SCAVENGE, SEARCH, WORK, decide } from './behaviors'
+import { ALERT, DRAWN, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, WORK, decide } from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
@@ -120,10 +120,10 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     if (goal.at) ai.waypoint = { x: goal.at.x, y: goal.at.y }
     return
   }
-  if (goal.code === WORK || goal.code === GARRISON || goal.code === DRAWN) {
-    // #77 territory / #66 hive draw: steer toward a world-derived point (home
-    // room, objective core, or the strongest stimulus). Same steering as
-    // investigate — walk to the point, settle (idle) on arrival.
+  if (goal.code === WORK || goal.code === GARRISON || goal.code === DRAWN || goal.code === RETREAT) {
+    // #77 territory / #66 hive draw / #69 boss retreat-to-spore: steer toward a
+    // world-derived point (home room, objective core, strongest stimulus, or the
+    // spore cloud). Same steering as investigate — walk there, settle on arrival.
     ai.mode = 'wander'
     ai.targetId = undefined
     ai.lastKnownTargetPos = undefined

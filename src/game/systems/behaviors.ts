@@ -483,6 +483,68 @@ const packAvoid: Consideration = (w, e) => {
   return []
 }
 
+// ── #69 Mireclaw Alpha: a PHASED apex predator (composes spore/hive/dormancy).
+// Movement/targeting is gated on its own HP; the world-mutating side (summoning
+// brood, regenerating in the cloud, the enrage speed burst) lives in
+// systems/mireclaw.ts. Phase 1 (healthy) just pressures via `threat`/`hunt`. ───
+/** Below this HP fraction the boss retreats to the spore cloud to regenerate. */
+export const MIRECLAW_RETREAT_FRAC = 0.5
+/** Below this HP fraction it ENRAGES — drops all self-preservation, goes faster. */
+export const MIRECLAW_ENRAGE_FRAC = 0.2
+export const RETREAT = 'retreat'
+
+const nearestPlayer = (w: World, e: Entity): Entity | undefined => {
+  let best: Entity | undefined
+  let bestD = Infinity
+  for (const p of w.entities) {
+    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d < bestD) {
+      bestD = d
+      best = p
+    }
+  }
+  return best
+}
+
+const nearestSpore = (w: World, e: Entity): Entity | undefined => {
+  let best: Entity | undefined
+  let bestD = Infinity
+  for (const s of w.entities) {
+    if (!s.spore || s.dead) continue
+    const d = dist2d(s.pos.x, s.pos.y, e.pos.x, e.pos.y)
+    if (d < bestD) {
+      bestD = d
+      best = s
+    }
+  }
+  return best
+}
+
+// Phase 3: below the enrage line the boss abandons self-preservation and charges
+// the nearest player at PANIC tier — outscoring any flee, so it NEVER breaks off.
+const enrage: Consideration = (w, e) => {
+  const hp = e.health?.hp ?? 1
+  const max = e.health?.max ?? 1
+  if (hp > max * MIRECLAW_ENRAGE_FRAC) return []
+  const p = nearestPlayer(w, e)
+  if (!p) return []
+  const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
+  return [{ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: 20, tier: TIER_PANIC, target: p.id }]
+}
+
+// Phase 2: wounded (but not yet enraged) → retreat to the nearest spore cloud and
+// hold there to regenerate (systems/mireclaw.ts heals it). PANIC tier suppresses
+// the flee a wounded body would otherwise pick, and steers to the cloud instead.
+const retreatToSpore: Consideration = (w, e) => {
+  const hp = e.health?.hp ?? 1
+  const max = e.health?.max ?? 1
+  if (hp > max * MIRECLAW_RETREAT_FRAC || hp <= max * MIRECLAW_ENRAGE_FRAC) return []
+  const spore = nearestSpore(w, e)
+  if (!spore) return [] // no cloud to hide in → fall through to threat/hunt
+  return [{ code: RETREAT, score: 6, tier: TIER_PANIC, at: { x: spore.pos.x, y: spore.pos.y } }]
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -494,6 +556,8 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   infest,
   packAvoid,
   stalkWeakest,
+  enrage,
+  retreatToSpore,
   hunt,
   alertGuards,
   pursueMemory,
@@ -548,6 +612,10 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   predator: {
     about: '#67: a scavenger — culls the WEAKEST body in sight, flees a healthy pack, drifts to stimulus',
     considerations: ['packAvoid', 'stalkWeakest', 'drawnToStimulus', 'wander'],
+  },
+  mireclaw: {
+    about: '#69 Mireclaw Alpha boss — phased: pressure & summon, retreat-to-spore-regen, then enrage',
+    considerations: ['enrage', 'retreatToSpore', 'threat', 'hunt', 'wander'],
   },
 }
 

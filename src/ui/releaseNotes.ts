@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Mireclaw Alpha boss: summons, heals, enrages',
   'Dormant pods wake to noise — sneak or trip',
   'Scavengers hunt the wounded, avoid packs',
   'New enemies: brute, cinder, sporeling swarms',
-  'Swarms converge on the loudest bait',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

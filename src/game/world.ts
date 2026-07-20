@@ -4,6 +4,7 @@ import { isSolidTile, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
+import { mireclawSystem } from './systems/mireclaw'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
@@ -248,6 +249,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   elementSystem(w)
   statusSystem(w)
   statusFxSystem(w)
+  mireclawSystem(w) // #69 boss phases: summon / regen-in-cloud / enrage (after HP + spore/fire settle)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so
   // stillness reflects the settled position/velocity), before mission/sweep.

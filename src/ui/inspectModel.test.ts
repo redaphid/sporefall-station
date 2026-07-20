@@ -54,8 +54,8 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
 
   it('non-default brains get a Brain row; the default basic brain is implied', () => {
     const w = world()
-    const boss = spawnNpc(w, 'boss', 5, 5) // hunter
-    expect(rowMap(buildInfoCard(boss).rows).Brain).toBe('Hunter')
+    const boss = spawnNpc(w, 'boss', 5, 5) // #69 Mireclaw Alpha phased boss brain
+    expect(rowMap(buildInfoCard(boss).rows).Brain).toBe('Mireclaw')
     const thug = spawnNpc(w, 'thug', 6, 6) // basic
     expect(rowMap(buildInfoCard(thug).rows).Brain).toBeUndefined()
     // An unknown behavior id (stale snapshot) degrades to no Brain row, no throw.

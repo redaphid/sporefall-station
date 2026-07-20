@@ -41,6 +41,8 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
   },
   boss: {
+    // #69 Mireclaw Alpha: a phased apex predator, not a fat gangster. Lives in
+    // the spore (immune) and uses it as a lifeline in phase 2.
     archetype: 'boss',
     faction: 'gang',
     hp: 80,
@@ -49,7 +51,8 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
-    behavior: 'hunter',
+    behavior: 'mireclaw',
+    resist: { spore: 0 },
   },
   cop: {
     archetype: 'cop',

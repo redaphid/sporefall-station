@@ -78,6 +78,10 @@ export interface AiState {
   rel?: Record<EntityId, RelEntry>
   /** Holds position instead of idle-wandering until it spots a target. */
   guard?: boolean
+  /** #69 Mireclaw boss — next tick it may summon brood (phase-1 throttle). */
+  summonAt?: number
+  /** #69 Mireclaw boss — phase-3 enrage latched (one-time speed boost applied). */
+  enraged?: boolean
   /** #68 — INERT until a stimulus wakes it: no move, no target, minimal
    * perception (the awakeningSystem flips it false and emits `woke`). A sleeping
    * pod / dormant unit the player can tiptoe past — or trip. */

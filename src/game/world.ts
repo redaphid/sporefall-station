@@ -52,6 +52,26 @@ export interface Noise {
   expires: number
 }
 
+/** #65 — a FEAR PULSE: a scream a fleeing/dying body throws off that nearby
+ * crew catch and stampede from, even with no first-hand sight of the threat. A
+ * point that decays like a noise; `sourceId` is who emitted it (so a body never
+ * catches its own fear). */
+export interface FearPulse {
+  x: number
+  y: number
+  /** Absolute tick at which it fades. */
+  expires: number
+  sourceId: EntityId
+  /** Tick it was emitted. A pulse is only CAUGHT on a later tick, so terror
+   * advances one hop per tick (a rolling wave) instead of the whole crowd fleeing
+   * in a single pass as `emitFear` appends mid-`aiSystem`. */
+  born: number
+}
+
+/** Ticks a fear pulse lingers (~1s at 30tps) — short, so terror rolls as a wave
+ * and dies down rather than freezing a whole floor. */
+export const FEAR_TTL = 30
+
 /** Ticks a noise lingers for NPCs to hear and investigate (~3s at 30tps). */
 export const NOISE_TTL = 90
 
@@ -92,6 +112,8 @@ export interface World {
   powerCut: Record<string, boolean>
   /** Active heard disturbances; NPCs investigate the nearest. */
   noises: Noise[]
+  /** #65 — active fear pulses; frightened crew nearby catch them and stampede. */
+  fear: FearPulse[]
   gameOver: boolean
   /** Difficulty rules for this run (see RunMode). */
   mode: RunMode
@@ -150,6 +172,7 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     alarm: 0,
     powerCut: {},
     noises: [],
+    fear: [],
     gameOver: false,
     mode,
     revivesLeft: REVIVES_PER_RUN,
@@ -168,6 +191,13 @@ export const anyPowerCut = (w: World): boolean => {
 /** Register a heard disturbance at a point; NPCs nearby will investigate it. */
 export const emitNoise = (w: World, x: number, y: number, ttl = NOISE_TTL): void => {
   w.noises.push({ x, y, expires: w.tick + ttl })
+}
+
+/** #65 — throw off a fear pulse from a body's position (it starts fleeing, or
+ * dies). Nearby fleesOnDamage crew catch it and stampede, and re-emit their own,
+ * so terror rolls as a wave. `sourceId` keeps a body from catching its own. */
+export const emitFear = (w: World, e: Entity, ttl = FEAR_TTL): void => {
+  w.fear.push({ x: e.pos.x, y: e.pos.y, expires: w.tick + ttl, sourceId: e.id, born: w.tick })
 }
 
 export const addEntity = (w: World, e: Entity): Entity => {
@@ -195,6 +225,7 @@ export const isBlocked = (w: World, tx: number, ty: number): boolean =>
 export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   w.events.length = 0
   if (w.noises.length > 0) w.noises = w.noises.filter((n) => n.expires > w.tick)
+  if (w.fear.length > 0) w.fear = w.fear.filter((f) => f.expires > w.tick)
   for (const e of w.entities) {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y

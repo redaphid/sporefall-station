@@ -34,7 +34,7 @@
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { type Building, rectCenter, rectContains } from '../levelgen/level'
-import { anyPowerCut, type World } from '../world'
+import { anyPowerCut, type FearPulse, type World } from '../world'
 import {
   BATTLE,
   ENGAGE_RANGE,
@@ -153,6 +153,30 @@ const fearCandidates = (w: World, e: Entity, archetypeGated: boolean): Candidate
 }
 const panic: Consideration = (w, e) => fearCandidates(w, e, true)
 const fear: Consideration = (w, e) => fearCandidates(w, e, false)
+
+// ── #65 Contagious fear: a scream travels. A timid crew member within range of
+// a fear pulse (a fleeing/dying body's terror) stampedes AWAY from it — even
+// with no first-hand sight of the threat — so panic rolls down a corridor as a
+// wave. Scored just BELOW first-hand panic, so a real, seen threat still wins;
+// gated to `fleesOnDamage` crew, so hardened factions don't stampede. ──────────
+const FEAR_RADIUS = 5
+const CONTAGIOUS_FEAR_SCORE = 0.8 // < first-hand panic (1)
+
+const contagiousFear: Consideration = (w, e) => {
+  if (!NPCS[e.archetype]?.fleesOnDamage) return []
+  let best: FearPulse | undefined
+  let bestD = FEAR_RADIUS
+  for (const f of w.fear) {
+    if (f.sourceId === e.id) continue // never catch your own scream
+    if (f.born === w.tick) continue // a pulse is only caught on a LATER tick (rolling wave, not a flash)
+    const d = dist2d(f.x, f.y, e.pos.x, e.pos.y)
+    if (d > bestD) continue
+    bestD = d
+    best = f
+  }
+  if (!best) return []
+  return [{ code: FLEE, score: CONTAGIOUS_FEAR_SCORE, tier: TIER_PANIC, at: { x: best.x, y: best.y } }]
+}
 
 // ── Memory: a remembered-but-unseen target is worth acting on ──────────────
 const MEMORY_SCORE = WANDER_SCORE + 0.5
@@ -398,6 +422,7 @@ const infest: Consideration = (w, e) => {
 export const CONSIDERATIONS: Record<string, Consideration> = {
   panic,
   fear,
+  contagiousFear,
   threat,
   defendMyWing,
   infest,
@@ -424,8 +449,8 @@ export const DEFAULT_BEHAVIOR = 'basic'
 
 export const BEHAVIORS: Record<string, BehaviorDef> = {
   basic: {
-    about: 'fight, flee, investigate, hold its turf, wander — the default townsfolk brain',
-    considerations: ['panic', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    about: 'fight, flee, catch panic, investigate, hold its turf, wander — the default townsfolk brain',
+    considerations: ['panic', 'contagiousFear', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   patrol: {
     about: 'walks a fixed beat; garrisons the objective wing; still fights and investigates',
@@ -436,12 +461,12 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     considerations: ['threat', 'defendMyWing', 'hunt', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   skittish: {
-    about: 'flees trouble and runs to the nearest guard to raise the alarm',
-    considerations: ['alertGuards', 'fear', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    about: 'flees trouble, catches the crowd’s panic, and runs to the nearest guard to raise the alarm',
+    considerations: ['alertGuards', 'fear', 'contagiousFear', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   scavenger: {
     about: 'drawn to loose items it can see; grabs them into its stash',
-    considerations: ['fear', 'threat', 'fleeMemory', 'scavenge', 'workMyRoom', 'wander'],
+    considerations: ['fear', 'contagiousFear', 'threat', 'fleeMemory', 'scavenge', 'workMyRoom', 'wander'],
   },
   infected: {
     about: '#64: a spore-turned host — shambles at the nearest clean body, never flees',

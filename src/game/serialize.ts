@@ -11,7 +11,7 @@ import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
 import { hashLabel, mulberry32 } from './rng'
 import type { Annotation, SimEvent } from './types'
-import { createWorld, type MissionState, type Noise, type World } from './world'
+import { createWorld, type FearPulse, type MissionState, type Noise, type World } from './world'
 
 /** The versioned on-disk shape of a whole world. Stable and JSON-safe: every
  * field is a scalar, a plain record, or a verbatim entity clone. `level` is
@@ -26,6 +26,9 @@ export interface WorldJson {
   gameOver: boolean
   mission: MissionState
   noises: Noise[]
+  /** #65 active fear pulses (World.fear). Omitted when empty so pre-feature
+   * snapshots round-trip byte-for-byte and load with no pulses. */
+  fear?: FearPulse[]
   /** Pending FX/net events (empty at a tick boundary; carried for completeness). */
   events: SimEvent[]
   /** Sim stream position (host AI/loot/mission dice) — the byte-identical keystone. */
@@ -61,6 +64,8 @@ export const serializeWorld = (w: World): WorldJson => ({
   gameOver: w.gameOver,
   mission: { ...w.mission },
   noises: w.noises.map((n) => ({ ...n })),
+  // Omit when empty so pre-feature snapshots round-trip byte-for-byte.
+  ...(w.fear.length ? { fear: w.fear.map((f) => ({ ...f })) } : {}),
   events: clone(w.events),
   rng: w.rng.state(),
   baseRng: w.baseRng.state(),
@@ -92,6 +97,7 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.gameOver = j.gameOver
   w.mission = { ...j.mission }
   w.noises = j.noises.map((n) => ({ ...n }))
+  w.fear = j.fear ? j.fear.map((f) => ({ ...f })) : [] // pre-feature snapshots load with no pulses
   w.events = clone(j.events)
   // Resume both streams at their exact saved positions. The sim stream is the
   // `sim:<floor>` fork of the root, so recover its seed the same way `fork` did.

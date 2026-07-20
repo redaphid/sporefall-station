@@ -4,7 +4,7 @@ import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
-import { addEntity, emitNoise, type World } from '../world'
+import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { activeStack, equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
@@ -181,8 +181,11 @@ export const kill = (w: World, target: Entity): void => {
     target.playerCtl.downed = { bleedTicks: 30 * 30, reviveProgress: 0 }
     return
   }
-  // NPC death: mark dead, then roll for a weapon drop. Ordering the roll AFTER
-  // `dead = true` keeps the spawned pickup from ever re-entering this same kill.
+  // NPC death: a body dropping throws off a fear pulse (#65) — nearby crew see
+  // it fall and stampede, even with no sight of the killer.
+  if (target.ai) emitFear(w, target)
+  // Mark dead, then roll for a weapon drop. Ordering the roll AFTER `dead = true`
+  // keeps the spawned pickup from ever re-entering this same kill.
   target.dead = true
   rollWeaponDrop(w, target)
 }

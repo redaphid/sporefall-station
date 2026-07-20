@@ -7,7 +7,7 @@
 
 import { WEAPONS } from '../data/items'
 import type { Entity } from '../entity'
-import type { World } from '../world'
+import { emitFear, type World } from '../world'
 import { ALERT, GARRISON, PATROL, SCAVENGE, SEARCH, WORK, decide } from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
@@ -83,9 +83,15 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     return
   }
   if (goal.code === FLEE) {
+    const wasFleeing = ai.mode === 'flee'
     ai.mode = 'flee'
     ai.targetId = goal.target
     ai.fearId = goal.target // remember the scarer — the alert's subject
+    // #65: a contagious flee runs from a POINT (the fear pulse), not an entity.
+    ai.fleeFrom = goal.target === undefined ? goal.at : undefined
+    // A body that JUST broke into flight screams — throwing a fear pulse nearby
+    // crew catch and stampede from (world.ts emitFear / behaviors.contagiousFear).
+    if (!wasFleeing) emitFear(w, e)
     return
   }
   if (goal.code === INVESTIGATE) {
@@ -250,9 +256,12 @@ const steer = (w: World, e: Entity): void => {
 
   if (ai.mode === 'flee') {
     const threat = ai.targetId !== undefined ? w.byId.get(ai.targetId) : undefined
-    if (!threat) return
-    const dx = e.pos.x - threat.pos.x
-    const dy = e.pos.y - threat.pos.y
+    // Run from the threat entity if there is one, else from the fear-pulse point
+    // (#65 stampede) — the crew flees off-screen danger it never directly saw.
+    const from = threat ? threat.pos : ai.fleeFrom
+    if (!from) return
+    const dx = e.pos.x - from.x
+    const dy = e.pos.y - from.y
     const dist = Math.hypot(dx, dy) || 1
     e.intent.x = dx / dist
     e.intent.y = dy / dist

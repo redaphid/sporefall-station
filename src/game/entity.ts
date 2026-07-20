@@ -102,6 +102,9 @@ export interface AiState {
   search?: AiSearch
   /** Who scared this NPC (set on fleeing/alerting) — the alert's subject. */
   fearId?: EntityId
+  /** #65 — a POINT to flee away from when there is no threat ENTITY to run from
+   * (a caught fear pulse / stampede). Steering uses it when `targetId` is unset. */
+  fleeFrom?: Vec2
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
   /** Where/when this NPC last made real progress toward an UNSEEN chase goal —

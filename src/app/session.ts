@@ -44,6 +44,10 @@ export interface Session {
    * game-over with no reconnect or app restart. Authoritative sessions
    * (solo/host) implement it; a client leaves it undefined and waits for the
    * host's restart to arrive over the existing link.
+   *
+   * `seed` (optional) starts the fresh run from a NEW seed — the "New Seed"
+   * action, which yields a different level rather than replaying the same one.
+   * Omitted → the run rebuilds from the current seed (plain "play again").
    */
-  restart?(): void
+  restart?(seed?: number): void
 }

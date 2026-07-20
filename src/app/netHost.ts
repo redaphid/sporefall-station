@@ -83,7 +83,9 @@ export class NetHostSession implements Session {
   debugInventorySends = 0
 
   constructor(
-    readonly seed: number,
+    /** Mutable so "New Seed" (restart(seed)) can re-seed the run in place; the
+     * next GameStart broadcasts the new seed to every still-connected peer. */
+    public seed: number,
     private hostName: string,
     private localInput: InputSource,
     private transport: Transport,
@@ -140,7 +142,8 @@ export class NetHostSession implements Session {
    * reconnect, no re-pairing, no app restart. Game state and connection state are
    * kept separate: this resets the former and leaves the latter untouched.
    */
-  restart(): void {
+  restart(seed?: number): void {
+    if (seed !== undefined) this.seed = seed >>> 0
     this.world = createWorld(this.seed, 1, this.mode)
     this.ghosts.clear()
     // Force a fresh inventory push after respawn: the new loadout must reach every

@@ -2,7 +2,11 @@ import { HostSession } from './app/hostSession'
 import { createInspect, installInspect, type Inspect } from './app/inspect'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
-import type { Session } from './app/session'
+import type { RenderView, Session } from './app/session'
+import { pickNewSeed } from './app/newSeed'
+import { createLoadoutPanel, type WeaponThumb } from './ui/loadoutPanel'
+import { buildLoadout } from './ui/loadoutModel'
+import { markUiChrome } from './ui/chrome'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import { loadFixtureJson } from './game/fixtures'
@@ -426,14 +430,60 @@ const createPadHint = (mount: HTMLElement): ((show: boolean) => void) => {
   return (show) => (el.style.display = show ? 'block' : 'none')
 }
 
-const createPauseBanner = (mount: HTMLElement): ((paused: boolean) => void) => {
+/** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
+ * panel and the Resume / New Seed / Run-it-back actions. `onResume` unpauses,
+ * `onNewSeed`/`onRestart` are wired only on host/solo (undefined hides the
+ * button). Reachable via Escape (main.ts) or the pad's Start button. */
+interface PauseOverlay {
+  update(paused: boolean, view: RenderView): void
+}
+const createPauseOverlay = (
+  mount: HTMLElement,
+  actions: { onResume: () => void; onNewSeed?: () => void; onRestart?: () => void; weaponThumb?: WeaponThumb },
+): PauseOverlay => {
   const el = document.createElement('div')
-  el.textContent = 'PAUSED'
+  markUiChrome(el)
   el.style.cssText =
-    'position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:60;' +
-    'font:800 48px system-ui;color:#fff;letter-spacing:4px;background:#0007;pointer-events:none'
+    'position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;' +
+    'gap:16px;z-index:60;background:#0009;pointer-events:auto;text-align:center;padding:20px;box-sizing:border-box'
+  el.innerHTML = `<div style="font:800 40px system-ui;color:#fff;letter-spacing:6px;text-shadow:0 2px 8px #000">PAUSED</div>`
+  const panel = createLoadoutPanel(actions.weaponThumb)
+  el.appendChild(panel.el)
+  const row = document.createElement('div')
+  row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center'
+  const btn = (label: string, primary: boolean): HTMLButtonElement => {
+    const b = document.createElement('button')
+    b.textContent = label
+    b.style.cssText = primary
+      ? 'font:600 16px system-ui;padding:10px 24px;border-radius:8px;border:0;background:#7fd17f;color:#0b0b12;cursor:pointer'
+      : 'font:600 16px system-ui;padding:10px 24px;border-radius:8px;border:1px solid #ffd76a;background:#1b1e28;color:#ffd76a;cursor:pointer'
+    return b
+  }
+  const resumeBtn = btn('Resume', true)
+  resumeBtn.addEventListener('click', actions.onResume)
+  row.appendChild(resumeBtn)
+  if (actions.onNewSeed) {
+    const nsBtn = btn('🎲 New Seed', false)
+    nsBtn.addEventListener('click', actions.onNewSeed)
+    row.appendChild(nsBtn)
+  }
+  if (actions.onRestart) {
+    const rbBtn = btn('Run it back', false)
+    rbBtn.addEventListener('click', actions.onRestart)
+    row.appendChild(rbBtn)
+  }
+  el.appendChild(row)
   mount.appendChild(el)
-  return (paused) => (el.style.display = paused ? 'flex' : 'none')
+  let wasPaused = false
+  return {
+    update(paused, view) {
+      // Never over the death/game-over overlay — that screen owns its own panel.
+      const show = paused && !view.gameOver && !view.self?.dead
+      if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
+      wasPaused = show
+      el.style.display = show ? 'flex' : 'none'
+    },
+  }
 }
 
 /** Subtle, self-dismissing "resumed" confirmation shown once when an
@@ -503,7 +553,19 @@ const runLoop = (
         persister?.clear()
       }
     : undefined
-  const screens = createScreens(uiMount, onRestart, cameraSource)
+  // "New Seed": read the run's CURRENT seed off the authoritative session, pick a
+  // DIFFERENT one (app-layer random — never the sim), restart into it, and clear
+  // the save so a reload doesn't resume the old run. Only host/solo drive the
+  // seed; a client has no restart() so it gets no New Seed button.
+  const seedOf = (): number =>
+    session instanceof HostSession ? session.currentSeed : session instanceof NetHostSession ? session.seed : 0
+  const onNewSeed = session.restart
+    ? () => {
+        session.restart!(pickNewSeed(seedOf()))
+        persister?.clear()
+      }
+    : undefined
+  const screens = createScreens(uiMount, onRestart, cameraSource, onNewSeed, renderer.weaponThumb)
   // Mission panel + objective hyperlinks: tapping a linked objective row starts a
   // VIEW-ONLY camera focus (focusModel.ts) — an animated glide to the target and
   // back. Nothing here writes sim state; determinism is untouched.
@@ -532,7 +594,26 @@ const runLoop = (
   })
   touch?.setInspectHandler((mode, x, y) => commOverlay.inspectAt(mode === 'tap' ? 'chip' : 'card', x, y))
   const overlay = createControllersOverlay(uiMount)
-  const showPause = createPauseBanner(uiMount)
+  // Pause overlay carries the shared gun+mods panel and the Resume / New Seed /
+  // Run-it-back actions. Solo/host can toggle pause with Escape (app-layer flip
+  // of session.isPaused — never touches the sim); the pad's Start also pauses.
+  const canPause = session instanceof HostSession
+  const setPaused = (p: boolean): void => {
+    if (session instanceof HostSession) session.isPaused = p
+  }
+  const pauseOverlay = createPauseOverlay(uiMount, {
+    onResume: () => setPaused(false),
+    onNewSeed,
+    onRestart,
+    weaponThumb: renderer.weaponThumb,
+  })
+  if (canPause)
+    window.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return
+      const view = session.renderView()
+      if (view.gameOver || view.self?.dead) return // death screen owns the moment
+      setPaused(!(session.isPaused ?? false))
+    })
   const showPadHint = createPadHint(uiMount)
   let currentLevel = session.renderView().level
 
@@ -617,7 +698,7 @@ const runLoop = (
     missionPanel.update(view)
     commOverlay.update(view)
     overlay.update(pads)
-    showPause(session.isPaused ?? false)
+    pauseOverlay.update(session.isPaused ?? false, view)
     requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)

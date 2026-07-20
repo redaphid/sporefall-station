@@ -64,6 +64,50 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
   })
 })
 
+describe('buildInfoCard — the weapon an NPC is carrying', () => {
+  const weaponRow = (e: Entity): string | undefined => rowMap(buildInfoCard(e).rows).Weapon
+
+  it('an armed NPC names its weapon — a thug swings a Bat, a gangster a Pistol', () => {
+    expect(weaponRow(spawnNpc(world(), 'thug', 5, 5))).toBe('Bat')
+    expect(weaponRow(spawnNpc(world(), 'gangster', 5, 5))).toBe('Pistol')
+  })
+
+  it('a fists-only NPC reads as "Unarmed", not the "Fists" item name', () => {
+    expect(weaponRow(spawnNpc(world(), 'civilian', 5, 5))).toBe('Unarmed')
+    expect(weaponRow(spawnNpc(world(), 'bouncer', 5, 5))).toBe('Unarmed')
+  })
+
+  it('a blank or missing weapon still reads "Unarmed" — never blank/undefined', () => {
+    const empty = spawnNpc(world(), 'thug', 5, 5)
+    empty.combat!.weapon = ''
+    expect(weaponRow(empty)).toBe('Unarmed')
+    const gone = spawnNpc(world(), 'thug', 5, 5)
+    delete (gone.combat as unknown as Record<string, unknown>).weapon // combat present, weapon absent
+    expect(weaponRow(gone)).toBe('Unarmed')
+  })
+
+  it('a modded weapon surfaces its mod rows for whoever carries it (not player-gated)', () => {
+    // NPC weapons are vanilla today, but the mod readout keys off the equipped
+    // stack, not `playerCtl` — so any carrier's build shows. Proven via a player.
+    const p = spawnPlayer(world(), 0, 2, 2)
+    p.combat!.weapon = 'sledgehammer'
+    p.playerCtl!.inventory.push({ itemId: 'sledgehammer', qty: 1, mods: [{ id: 'frost', stacks: 1 }] })
+    p.playerCtl!.activeSlot = p.playerCtl!.inventory.length - 1
+    const rows = rowMap(buildInfoCard(p).rows)
+    expect(rows.Weapon).toBe('Sledgehammer')
+    expect(rows['❄️ Cryo Rounds']).toBe('×1')
+  })
+
+  it('a non-combatant (door, pickup) has no Weapon row at all', () => {
+    const d = makeEntity('door', 'door.wood', 3, 3)
+    d.door = { open: false, locked: false, lockLevel: 0 }
+    expect(weaponRow(d)).toBeUndefined()
+    const pk = makeEntity('pickup', 'medkit', 1, 1)
+    pk.pickup = { itemId: 'medkit', qty: 1 }
+    expect(weaponRow(pk)).toBeUndefined()
+  })
+})
+
 describe('aiPhrase — AI state in plain words', () => {
   const ai = (over: object) =>
     ({ mode: 'idle', faction: 'civ', home: { x: 0, y: 0 }, thinkAt: 0, sightRange: 6, ...over }) as never

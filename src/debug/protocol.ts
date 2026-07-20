@@ -17,6 +17,12 @@ export interface HelloMsg {
    * player name). Older game clients omit it; the hub falls back to connection
    * order (`g1`, `g2`, …) so they still register and route. */
   name?: string
+  /** Optional STABLE per-browser/tab game id the client persists in localStorage
+   * (`sporefall.debugGameId`). It survives reload, New-Seed, and death, so the hub
+   * treats every re-registration under this id as a RECONNECTION of the SAME logical
+   * game — reusing the id (no `g#` churn across a death) and evicting the prior
+   * socket. Older clients omit it and fall back to connection-order ids. */
+  gameId?: string
 }
 /** Debugger → game: run one verb line. `id` correlates the reply. `target` picks
  * which connected game to route to (id or name); omitted → the debugger's sticky

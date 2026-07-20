@@ -335,6 +335,65 @@ describe('readPad', () => {
     })
   })
 
+  /**
+   * The exact reported symptom, pinned by index: "R2 (button 7) triggers Start".
+   * These guard the DISJOINTNESS of the W3C standard layout — that a physical
+   * index fires only its own action and never a neighbour's — since the mapping
+   * table (padProfile) is off-by-nothing today but is precisely what a shifted
+   * or non-standard-pad table would corrupt.
+   */
+  describe('button-index → action disjointness (W3C standard mapping)', () => {
+    const press = (i: number) => {
+      const buttons: boolean[] = []
+      buttons[i] = true
+      return readPad(fakePad({ buttons }), std)
+    }
+
+    it('index 7 (R2, the right trigger) fires attack and NOT pause/start', () => {
+      const s = press(7)
+      expect(s.attack).toBe(true)
+      expect(s.pause).toBe(false)
+    })
+
+    it('index 9 (Start) fires pause and NOT attack — the inverse of the bug', () => {
+      const s = press(9)
+      expect(s.pause).toBe(true)
+      expect(s.attack).toBe(false)
+    })
+
+    // A representative sweep of the standard layout: each index lights its own
+    // action and no other. Attack is intentionally the OR of {0,5,6,7}, so those
+    // four share it; every other index owns exactly one action.
+    it.each([
+      [0, { attack: true }], // A
+      [1, { interact: true }], // B
+      [2, { special: true }], // X
+      [3, { special: true }], // Y
+      [4, { roll: true }], // LB
+      [5, { attack: true }], // RB
+      [6, { attack: true }], // L2
+      [7, { attack: true }], // R2
+      [8, { throwItem: true }], // Back/Select
+      [9, { pause: true }], // Start
+      [10, { hotbarPrev: true }], // L3
+      [11, { hotbarNext: true }], // R3
+    ] as const)('index %i lights exactly its own action', (i, expected) => {
+      const s = press(i)
+      const fields = ['attack', 'interact', 'special', 'roll', 'pause', 'throwItem', 'hotbarPrev', 'hotbarNext'] as const
+      for (const f of fields) expect(s[f]).toBe(f in expected ? expected[f as keyof typeof expected] : false)
+    })
+
+    it('composes simultaneous presses — R2 + Start fire attack AND pause together', () => {
+      const buttons: boolean[] = []
+      buttons[7] = true // R2
+      buttons[9] = true // Start
+      const s = readPad(fakePad({ buttons }), std)
+      expect(s.attack).toBe(true)
+      expect(s.pause).toBe(true)
+      expect(s.interact).toBe(false)
+    })
+  })
+
   describe('throw / weapon-switch buttons', () => {
     const gen = padProfile(fakePad({ id: 'Some Generic USB Joystick', mapping: '' }))
 

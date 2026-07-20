@@ -30,9 +30,30 @@ const actions = (s: PadState): string => {
 // Slot maps straight to player id; humans count from 1, so slot 0 is P1.
 const label = (slot: number | null): string => (slot === null ? 'press to join' : `P${slot + 1}`)
 
+/**
+ * The RAW diagnostic line: the ground-truth the shared button map is decoded
+ * FROM. On a non-standard pad (an 8BitDo in D-input mode, a raw evdev joystick)
+ * the driver's button INDICES are not the W3C order, so the only way to see
+ * WHERE a physical button actually lands is to read the raw index off. Pressing
+ * R2 and seeing `btn:9` (Start's index) is the direct proof of a misreport — and
+ * exactly what to rebind against in Settings → Controller. Axes are shown too so
+ * a trigger reported as an axis (D-input pads often do this) is visible rather
+ * than silently missing. Empty pieces are dropped; a wholly idle pad still shows
+ * its mapping/kind so the profile in force is never a mystery.
+ */
+export const formatPadDiag = (pad: CoopDebugPad): string => {
+  const parts: string[] = []
+  const map = pad.mapping === undefined ? undefined : pad.mapping === '' ? '""' : pad.mapping
+  if (map !== undefined || pad.kind !== undefined) parts.push([map, pad.kind].filter(Boolean).join(' '))
+  if (pad.buttonsDown && pad.buttonsDown.length > 0) parts.push(`btn:${pad.buttonsDown.join(',')}`)
+  if (pad.axes && pad.axes.length > 0) parts.push(`ax:${pad.axes.map((a) => a.toFixed(2)).join(',')}`)
+  return parts.join(' ')
+}
+
 export const formatPadRow = (pad: CoopDebugPad): string => {
   const live = [dirs(pad.state), actions(pad.state)].filter((s) => s.length > 0).join(' ')
-  return `${label(pad.slot)}  ${pad.id}  [${live}]`
+  const diag = formatPadDiag(pad)
+  return `${label(pad.slot)}  ${pad.id}  [${live}]${diag ? `  «${diag}»` : ''}`
 }
 
 export const createControllersOverlay = (mount: HTMLElement) => {

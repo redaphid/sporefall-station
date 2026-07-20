@@ -76,25 +76,43 @@ export type Consideration = (w: World, e: Entity) => Candidate[]
 
 const dist2d = (ax: number, ay: number, bx: number, by: number): number => Math.hypot(ax - bx, ay - by)
 
+/** PROTOTYPE (feat/sporefall-ai): is `target` an enemy `e` should fight/flee?
+ * Baseline covers players only. With `proto.npcVsNpc` the same test runs against
+ * other NPCs via their Hostile disposition (waking the faction/sworn-enemy
+ * matrix). With `proto.infection` the Infected and the uninfected are mutual
+ * enemies regardless of faction — a body is either host or predator. */
+const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
+  const ai = e.ai!
+  if (w.proto?.infection && (e.infected || target.infected)) {
+    // Infected hunt any non-infected living body; the uninfected fight Infected.
+    return e.infected ? !target.infected : !!target.infected
+  }
+  if (target.playerCtl) {
+    if (target.dead || target.playerCtl.downed) return false
+    return (
+      w.hostile ||
+      dispositionToward(e, target.id) === 'Hostile' ||
+      (ai.faction === 'cop' && w.alarm >= 2) ||
+      (e.archetype === 'robot' && anyPowerCut(w))
+    )
+  }
+  if (!w.proto?.npcVsNpc || !target.ai || target === e || target.dead) return false
+  return dispositionToward(e, target.id) === 'Hostile'
+}
+
 // ── Threat: fight-or-flight against every perceived enemy ──────────────────
 // The candidates must STRICTLY beat the wander baseline to register, exactly as
 // the pre-registry arbitration compared them against `WANDER_SCORE`.
 const threat: Consideration = (w, e) => {
-  const ai = e.ai!
   const hp = e.health?.hp ?? 1
   const max = e.health?.max ?? 1
   const out: Candidate[] = []
-  for (const p of w.entities) {
-    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
-    // Derelict Units (robots) sleep through a peaceful station, but a power cut
-    // wakes them into open hostility — the standing cost of the power-cut path,
-    // felt even in an otherwise non-hostile world.
-    const hostile =
-      w.hostile ||
-      dispositionToward(e, p.id) === 'Hostile' ||
-      (ai.faction === 'cop' && w.alarm >= 2) ||
-      (e.archetype === 'robot' && anyPowerCut(w))
-    if (!hostile) continue
+  // Baseline scans only players; the prototype flags widen the candidate pool
+  // (other NPCs / the Infected) through `isHostileTarget`.
+  const pool = w.proto?.npcVsNpc || w.proto?.infection ? w.entities : w.entities.filter((x) => x.playerCtl)
+  for (const p of pool) {
+    if (p.dead || !p.health) continue
+    if (!isHostileTarget(w, e, p)) continue
     const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
     if (!perceives(w, e, p)) continue // must actually perceive it (range + LOS, cloak-aware)
     const hate = hateToward(w, e, p.id)
@@ -274,6 +292,28 @@ const scavenge: Consideration = (w, e) => {
   return [{ code: SCAVENGE, score: SCAVENGE_SCORE, tier: TIER_AMBIENT, target: best.id }]
 }
 
+// ── Infest: the mindless Infected host — aggro the nearest clean body, never
+// flee, never reason. Only active on an `infected` entity (prototype). ────────
+const INFEST_SCORE = 5
+
+const infest: Consideration = (w, e) => {
+  if (!e.infected) return []
+  let best: Entity | undefined
+  let bestD = Infinity
+  for (const p of w.entities) {
+    if (p.dead || !p.health || p.infected) continue
+    if (!p.playerCtl && !p.ai) continue // a living body to hunt
+    if (!perceives(w, e, p)) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d < bestD) {
+      bestD = d
+      best = p
+    }
+  }
+  if (!best) return []
+  return [{ code: bestD <= ENGAGE_RANGE ? BATTLE : PURSUE, score: INFEST_SCORE, tier: TIER_THREAT, target: best.id }]
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -287,6 +327,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   investigate,
   patrol,
   scavenge,
+  infest,
   wander,
 }
 
@@ -320,6 +361,10 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     about: 'drawn to loose items it can see; grabs them into its stash',
     considerations: ['fear', 'threat', 'fleeMemory', 'scavenge', 'wander'],
   },
+  infected: {
+    about: 'PROTOTYPE: a spore-turned host — shambles at the nearest clean body, never flees',
+    considerations: ['infest', 'pursueMemory', 'wander'],
+  },
 }
 
 /** Resolve an entity's behavior, falling back to `basic` for a missing or
@@ -335,12 +380,28 @@ export interface Decision {
 
 const round3 = (n: number): number => Math.round(n * 1000) / 1000
 
+/** PROTOTYPE (feat/sporefall-ai): incumbent-goal hysteresis margin. When on,
+ * the goal the NPC ALREADY holds (same code+target) gets its compare score
+ * scaled up by this fraction — so a rival goal must beat it by a clear margin,
+ * not a hair, to win. A deadband: kills the #59 battle<->flee reversal a 1-hp
+ * regen/spore-DOT jitter otherwise triggers every think. Within-tier only;
+ * a higher TIER (panic/threat over ambient) still preempts instantly. */
+const HYSTERESIS_MARGIN = 0.25
+
 /** Run one think: evaluate the entity's behavior and pick the winning goal.
  * Highest tier wins; within a tier, strictly-greater score in consideration /
  * candidate order — byte-for-byte deterministic. */
 export const decide = (w: World, e: Entity): Decision => {
   const def = behaviorFor(e)
+  const hyst = w.proto?.hysteresis === true
+  const incumbentCode = e.ai?.goal
+  const incumbentTarget = e.ai?.targetId
+  const isIncumbent = (c: Candidate): boolean =>
+    c.code === incumbentCode && (c.target ?? undefined) === (incumbentTarget ?? undefined)
+  // Effective compare score: raw, but the standing goal gets the hysteresis bonus.
+  const eff = (c: Candidate): number => (hyst && isIncumbent(c) ? c.score * (1 + HYSTERESIS_MARGIN) : c.score)
   let best: Candidate = { code: WANDER, score: WANDER_SCORE, tier: TIER_AMBIENT }
+  let bestEff = eff(best)
   const scores: Record<string, number> = {}
   for (const id of def.considerations) {
     const consider = CONSIDERATIONS[id]
@@ -348,7 +409,11 @@ export const decide = (w: World, e: Entity): Decision => {
     for (const c of consider(w, e)) {
       const top = scores[id]
       if (top === undefined || c.score > top) scores[id] = round3(c.score)
-      if (c.tier > best.tier || (c.tier === best.tier && c.score > best.score)) best = c
+      const ce = eff(c)
+      if (c.tier > best.tier || (c.tier === best.tier && ce > bestEff)) {
+        best = c
+        bestEff = ce
+      }
     }
   }
   const goal: Goal = { code: best.code }

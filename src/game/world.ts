@@ -6,6 +6,7 @@ import { aiSystem } from './systems/ai'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
+import { infectionSystem } from './systems/infection'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
@@ -101,6 +102,19 @@ export interface World {
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
    * cloaked-guard exemptions still apply — this only sets the baseline stance. */
   hostile: boolean
+  /** PROTOTYPE ONLY (feat/sporefall-ai worktree). Runtime-only flags that switch
+   * on experimental Sporefall AI mechanics for headless simulation/measurement.
+   * NOT serialized (serialize.ts whitelists fields), absent by default → the
+   * shipped brain path is byte-identical. Never set in a real/release world. */
+  proto?: {
+    /** Deadband + incumbent-goal hysteresis in `decide` (fixes #59 thrash). */
+    hysteresis?: boolean
+    /** `threat` scores any Hostile-disposition entity, not only players — wakes
+     * the dormant faction/sworn-enemy matrix for autonomous NPC-vs-NPC combat. */
+    npcVsNpc?: boolean
+    /** Spore contamination turns exposed crew into hostile Infected (contagion). */
+    infection?: boolean
+  }
   /** Inert on-screen annotations (labels/pins/arrows/circles/text) the render
    * overlay draws OVER the world. NO sim system reads or mutates this, so it never
    * touches determinism — it just serializes/replays with the world (see types.ts
@@ -187,6 +201,9 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   interactionSystem(w, inputs)
   fireSystem(w)
   sporeSystem(w)
+  // PROTOTYPE (feat/sporefall-ai): spore contagion. Flag-gated — absent in every
+  // shipped/serialized world, so the release sim path is byte-identical.
+  if (w.proto?.infection) infectionSystem(w)
   elementSystem(w)
   statusSystem(w)
   statusFxSystem(w)

@@ -36,7 +36,7 @@ class FakeWS {
   fireOpen(): void {
     this.onopen?.()
   }
-  msgs(): Array<{ t: string; tick?: number; role?: string; name?: string }> {
+  msgs(): Array<{ t: string; tick?: number; gameOver?: boolean; role?: string; name?: string }> {
     return this.sent.map((s) => JSON.parse(s))
   }
 }
@@ -86,6 +86,19 @@ describe('heartbeat', () => {
     vi.advanceTimersByTime(1000)
     const ping = FakeWS.instances[0].msgs().find((m) => m.t === 'ping')
     expect(ping).toMatchObject({ t: 'ping', tick: 42 })
+    ch.stop()
+  })
+
+  it('keeps heart-beating a game-over world (independent of the sim loop) so the hub sees it live', () => {
+    const { world, ch } = setup()
+    FakeWS.instances[0].fireOpen()
+    // Sim loop has halted on game-over: tick frozen, afterTick() no longer called.
+    world.gameOver = true
+    world.tick = 77
+    vi.advanceTimersByTime(3000) // three heartbeat intervals with a frozen tick
+    const pings = FakeWS.instances[0].msgs().filter((m) => m.t === 'ping')
+    expect(pings.length).toBeGreaterThanOrEqual(3) // heartbeat never stopped
+    expect(pings.at(-1)).toMatchObject({ t: 'ping', tick: 77, gameOver: true })
     ch.stop()
   })
 

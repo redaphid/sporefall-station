@@ -165,6 +165,34 @@ describe('event streaming + ordering', () => {
   })
 })
 
+describe('a game-over / non-ticking world stays fully inspectable + mutable', () => {
+  // The exact moment an agent wants the debug channel most: the sim loop has
+  // stopped calling afterTick(), but the channel must still answer verbs so the
+  // world can be inspected — or the player revived — through game-over.
+  it('answers reads (state / entities / dump) on a gameOver world', () => {
+    const { w, ws } = setup()
+    spawnNpc(w, 'cop', 0, 0)
+    w.gameOver = true
+    ws.recv({ t: 'req', id: 1, verb: 'state' })
+    ws.recv({ t: 'req', id: 2, verb: 'entities' })
+    ws.recv({ t: 'req', id: 3, verb: 'dump' })
+    const reps = ws.ofType('rep')
+    expect(reps.map((r) => r.id).sort()).toEqual([1, 2, 3])
+    expect(reps.every((r) => r.ok)).toBe(true)
+    expect(JSON.parse(reps.find((r) => r.id === 1)!.body).gameOver).toBe(true)
+  })
+  it('still applies a write (revive via set) on a gameOver world', () => {
+    const { w, ws, ch } = setup()
+    const npc = spawnNpc(w, 'thug', 0, 0)
+    w.gameOver = true
+    ws.recv({ t: 'req', id: 5, verb: `set ${npc.id} {"health":{"hp":99}}` })
+    ch.afterTick() // the mutation queue still drains when the channel is pumped
+    const rep = ws.ofType('rep').find((r) => r.id === 5) as RepMsg
+    expect(rep.ok).toBe(true)
+    expect(npc.health!.hp).toBe(99)
+  })
+})
+
 describe('malformed / irrelevant inbound messages', () => {
   it('ignores non-JSON frames without crashing', () => {
     const { ws } = setup()

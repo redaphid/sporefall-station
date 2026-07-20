@@ -40,14 +40,21 @@ export interface GameEntry {
   gameOver: boolean
 }
 
-/** Dead-vs-alive by liveness, NOT age. Freshness (recent heartbeat) is the core
- * signal; a real-time game that reports a tick is additionally dead once that
- * tick freezes (backgrounded/throttled webview). A harness reports no tick, so
- * `ticking` is `null` and it stays live on freshness alone. */
+/** Dead-vs-alive by liveness, NOT age. Freshness (recent heartbeat) is the ONLY
+ * liveness signal: as long as the channel keeps heart-beating, the game is a
+ * valid target for inspection/mutation — even when its tick has stopped
+ * (game-over, pause, or a backgrounded/throttled webview whose sim loop halted).
+ * The channel's heartbeat runs on an independent timer, not the sim loop, so a
+ * frozen world still reports in; only a genuinely disconnected/orphaned game
+ * stops heart-beating and goes stale.
+ *
+ * `ticking` is a SEPARATE, advisory signal (surfaced to the human, never used to
+ * refuse verbs): a real-time game that reports a tick is "not ticking" once that
+ * tick stops advancing; a harness reports no tick, so `ticking` is `null`. */
 export const liveness = (e: GameEntry, now: number, opts: LivenessOpts): { live: boolean; ticking: boolean | null } => {
-  const fresh = now - e.lastSeen <= opts.staleMs
+  const live = now - e.lastSeen <= opts.staleMs
   const ticking = e.tick === null ? null : now - e.lastTickAt <= opts.frozenMs
-  return { live: fresh && ticking !== false, ticking }
+  return { live, ticking }
 }
 
 interface InternalGame extends GameEntry {

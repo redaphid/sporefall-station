@@ -18,8 +18,11 @@ describe('liveness (pure)', () => {
   it('fresh heartbeat with advancing tick → live + ticking', () => {
     expect(liveness(base({ tick: 50, lastTickAt: 1000 }), 1500, OPTS)).toEqual({ live: true, ticking: true })
   })
-  it('fresh heartbeat but frozen tick → dead + not ticking (backgrounded webview)', () => {
-    expect(liveness(base({ tick: 50, lastTickAt: 1000, lastSeen: 3000 }), 3000, OPTS)).toEqual({ live: false, ticking: false })
+  it('fresh heartbeat but frozen tick → STILL live (game-over/paused), just not ticking', () => {
+    // A game-over or paused world stops advancing its tick but keeps heart-beating
+    // on its independent timer. It must remain a valid target — only `ticking`
+    // flips false (advisory), never `live`.
+    expect(liveness(base({ tick: 50, lastTickAt: 1000, lastSeen: 3000 }), 3000, OPTS)).toEqual({ live: true, ticking: false })
   })
   it('missed heartbeats (stale) → dead', () => {
     expect(liveness(base({ tick: 50, lastTickAt: 5000, lastSeen: 1000 }), 5000, OPTS).live).toBe(false)
@@ -194,7 +197,7 @@ describe('hub registry + routing (integration)', () => {
     expect(list.map((g) => g.name)).toEqual(['bob'])
   })
 
-  it('flags a frozen (non-advancing tick) game as not live', async () => {
+  it('flags a frozen (non-advancing tick) game as not-ticking but STILL live + routable', async () => {
     const { url } = await startTestHub()
     const alice = await connectGame(url, 'alice')
     const dbg = await open(url)
@@ -203,11 +206,36 @@ describe('hub registry + routing (integration)', () => {
 
     await ping(alice, { tick: 100 }) // establishes a tick at t=1000
     clock.t = 1000 + 1500 // past frozenMs
-    await ping(alice, { tick: 100 }) // fresh heartbeat, SAME tick → frozen
+    await ping(alice, { tick: 100 }) // fresh heartbeat, SAME tick → frozen but connected
 
     const list = JSON.parse((await rpc(dbg, 'games')).body) as GameInfoRow[]
     const row = list.find((g) => g.name === 'alice')!
+    expect(row.ticking).toBe(false) // advisory: tick stopped
+    expect(row.live).toBe(true) // still heart-beating → connected → live
+
+    // A frozen-but-connected game is the sole live game → default routing hits it
+    // with no --game, exactly when an agent wants to inspect/revive it.
+    expect((await rpc(dbg, 'state')).body).toBe('alice')
+  })
+
+  it('a game-over world (frozen tick, gameOver flag) still serves verbs with no --game', async () => {
+    const { url } = await startTestHub()
+    const solo = await connectGame(url, 'solo')
+    const dbg = await open(url)
+    dbg.send(JSON.stringify({ t: 'hello', role: 'debugger' }))
+    await settle()
+
+    await ping(solo, { tick: 500 }) // ticked while alive at t=1000
+    clock.t = 1000 + 2000 // past frozenMs: the sim loop halted on game-over
+    await ping(solo, { tick: 500, gameOver: true } as { tick: number }) // heartbeat continues, tick frozen
+
+    const row = (JSON.parse((await rpc(dbg, 'games')).body) as GameInfoRow[]).find((g) => g.name === 'solo')!
     expect(row.ticking).toBe(false)
-    expect(row.live).toBe(false)
+    expect(row.live).toBe(true)
+
+    // state / dump / set must all route without --game on the game-over world.
+    expect((await rpc(dbg, 'state')).body).toBe('solo')
+    expect((await rpc(dbg, 'dump')).body).toBe('solo')
+    expect((await rpc(dbg, 'set 5 {"health":{"hp":1}}')).body).toBe('solo')
   })
 })

@@ -112,6 +112,10 @@ export type SimEvent =
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
   | { type: 'use'; entityId: EntityId; byId: EntityId }
+  /** The mission's objective gateway (`door.objectiveGate`) was breached/unlocked
+   * by the player — a point-of-no-return that turned the whole floor hostile
+   * (alarm maxed, every non-allied NPC aggros the party). Fires once per floor. */
+  | { type: 'bossDoorBreached'; entityId: EntityId; x: number; y: number }
   | { type: 'missionComplete'; description: string }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }

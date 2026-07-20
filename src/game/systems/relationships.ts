@@ -66,6 +66,27 @@ export const addHate = (npc: Entity, targetId: EntityId, amount: number): void =
   rel[targetId] = { hate, code: determineRel(hate) }
 }
 
+/**
+ * Turn the WHOLE floor hostile toward `target` — the deliberate, level-wide
+ * escalation the boss-door breach triggers (missions.ts). Reuses the same
+ * disposition + aggro machinery a witnessed crime drives, applied to every NPC
+ * at once and unconditionally: max the alarm, push each NPC's hate past the
+ * Hostile threshold, and lock them onto the target with a fresh memory so they
+ * beeline in even from across the floor. Co-op allies (playerCtl) and corpses
+ * are skipped — only faction/enemy NPCs flip. Idempotent per the caller's latch.
+ */
+export const raiseFloorAggro = (w: World, target: Entity): void => {
+  w.alarm = 3
+  for (const e of w.entities) {
+    if (!e.ai || e.dead || e.playerCtl) continue
+    addHate(e, target.id, CRIME_HATE) // base 0/5 + 5 → always >= 5 = Hostile
+    e.ai.mode = 'aggro'
+    e.ai.targetId = target.id
+    e.ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
+    e.ai.thinkAt = w.tick // re-think this same tick
+  }
+}
+
 /** A player attack on a civ/cop is a crime. Every NPC within sight that is an
  * ally of the victim (same faction) or the law (a cop) accrues hate toward the
  * attacker and, once hostile, turns to aggro them; witnessing civilians flee. */

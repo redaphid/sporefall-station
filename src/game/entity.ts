@@ -204,6 +204,12 @@ export interface Entity {
    *   Spore Node (`nodeId`), or by breaching (ruptures a spore-sac).
    *  `growthHp` — bog integrity; fire/burning erodes it to 0 → the hatch unseals.
    *  `nodeId`   — the Spore Node entity feeding this growth; its death unseals.
+   *
+   * ── Boss-door aggro: the mission objective's gateway ──
+   *  `objectiveGate` — this is the door directly guarding the mission target (boss
+   *   room / objective room). Breaching it (unlock by ANY means — pick, keycard,
+   *   power-cut, breach) is a point-of-no-return that turns the whole floor hostile
+   *   (see systems/missions.ts). Tagged at mission-gen; absent on every other door.
    */
   door?: {
     open: boolean
@@ -215,6 +221,7 @@ export interface Entity {
     overgrown?: boolean
     growthHp?: number
     nodeId?: EntityId
+    objectiveGate?: boolean
   }
   interact?: { verb: 'open' | 'pickup' | 'talk' | 'use'; range: number }
   /** A generator / Cryo Terminal's power grid: hacking it cuts power to this

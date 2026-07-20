@@ -1,5 +1,6 @@
 import { APP_VERSION, otaBundleVersion } from '../app/version'
 import { markUiChrome } from './chrome'
+import { formatReleaseNotes } from './releaseNotes'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
@@ -37,6 +38,22 @@ export const pickMode = (mount: HTMLElement): Promise<GameMode> =>
     void otaBundleVersion().then((b) => {
       if (b && b !== APP_VERSION) ver.textContent = `${APP_VERSION} · ota ${b}`
     })
+    // Brief, player-facing "what's new" notes directly under the version number.
+    // Small and muted so it reads as supporting text, not a headline. Source of
+    // truth + formatting live in releaseNotes.ts (curated per merge to `main`).
+    const notes = formatReleaseNotes()
+    if (notes.length > 0) {
+      const notesBox = document.createElement('div')
+      notesBox.style.cssText =
+        'margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:2px;' +
+        'font:400 12px system-ui;line-height:1.35;color:#ffffff80;text-align:center;max-width:min(320px,80vw)'
+      for (const line of notes) {
+        const row = document.createElement('div')
+        row.textContent = line
+        notesBox.appendChild(row)
+      }
+      overlay.appendChild(notesBox)
+    }
     mount.appendChild(overlay)
   })
 

@@ -1,8 +1,10 @@
 // The distortion-primitive layer under the backbuffer pipeline (backbuffer.ts):
-// a small pooled set of screen-space displacement sources — shockwave rings
-// (explosions), heat shimmer (fire cells / doused-burn steam), refraction
-// pulses (impacts, deep-stack rounds in flight) and kaleidoscopic bloom cores
-// (explosion centres, fractal pass) — all summed by ONE composite shader pass.
+// a small pooled set of screen-space displacement sources — shockwave rings +
+// kaleidoscopic bloom cores (explosions) and refraction lenses (rounds whose
+// build carries an air-warping mod, in flight) — all summed by ONE composite
+// shader pass. The distortion is deliberately SCOPED to those genuine, effect-
+// backed sources; it must never appear on bare ground with nothing behind it
+// (the shimmer `kind` the shader still understands is currently unused).
 //
 // Pure module: no pixi, no DOM, no RNG. Prims are spawned from sim events and
 // entity state, and every animated quantity derives from the tick counter and
@@ -105,7 +107,15 @@ export class DistortionPool {
 }
 
 /** Map one tick's sim events to primitive spawns. Pure — same events, same
- * tick → the same spec list, in event order. */
+ * tick → the same spec list, in event order.
+ *
+ * SCOPE: the backbuffer distortion is reserved for genuine, mod-driven bullet
+ * effects (see sustainedSpecs) plus the one unmistakable blast — an explosion,
+ * which is itself the payload of the explosive/detonator mods (and throwables).
+ * Generic combat pings (`hit`/`shatter`/`shock`) and doused-burn steam used to
+ * spawn refractions/shimmer here too, which painted warps on bare ground with
+ * no build behind them — the "distortion on the map with no effect" bug. They
+ * are intentionally NOT mapped: a plain shot striking a wall must not warp it. */
 export const specsForEvents = (events: readonly SimEvent[], tick: number): DistortionSpec[] => {
   const out: DistortionSpec[] = []
   for (const ev of events) {
@@ -115,55 +125,38 @@ export const specsForEvents = (events: readonly SimEvent[], tick: number): Disto
       out.push({ kind: 'shockwave', x: ev.x, y: ev.y, radius: ev.radius * 2.4 + 1.2, strength: 1, seed, life: 20 })
       // …and the core blooms a brief kaleidoscopic fractal (fractal pass).
       out.push({ kind: 'bloom', x: ev.x, y: ev.y, radius: ev.radius * 1.5 + 0.6, strength: 1, seed, life: 26 })
-    } else if (ev.type === 'shatter') {
-      out.push({ kind: 'refraction', x: ev.x, y: ev.y, radius: 1.2, strength: 0.6, seed: seedHash(ev.entityId), life: 12 })
-    } else if (ev.type === 'shock') {
-      out.push({ kind: 'refraction', x: ev.x, y: ev.y, radius: 1.0, strength: 0.5, seed: seedHash(ev.targetId), life: 10 })
-    } else if (ev.type === 'hit') {
-      out.push({ kind: 'refraction', x: ev.x, y: ev.y, radius: 0.7, strength: 0.3, seed: seedHash(ev.targetId), life: 8 })
-    } else if (ev.type === 'burnDoused') {
-      // Stop-drop-and-roll steam: a hot shimmer puff where the burn quenched.
-      out.push({ kind: 'shimmer', x: ev.x, y: ev.y, radius: 1.4, strength: 0.8, seed: seedHash(ev.entityId), life: 30 })
     }
   }
   return out
 }
 
-/** Mod-stack power at which an in-flight round starts warping air around it —
- * the same threshold that unlocks chroma in bulletVisuals. */
-const DEEP_STACK_POWER = 3
-
 /**
  * Sustained, entity-tracked prims — refreshed by key every tick while their
- * source lives, expiring a beat after it disappears:
- *  - fire cells shimmer (heat haze over every burning tile),
- *  - deep-stack rounds (power ≥ 3 — the chroma tier) drag a refraction pulse.
- * The trait→uniform bridge: strength scales off the composed bullet traits.
- */
+ * source lives, expiring a beat after it disappears.
+ *
+ * The ONLY sustained source is an in-flight round whose build carries an
+ * air-warping mod (BulletTraits.distort > 0 — energy overcharge / heat / blast:
+ * glassCannon, explosive, detonator, shock, incendiary, homing). That round
+ * drags a refraction lens while it flies; the moment it dies the key stops
+ * refreshing and the prim fades. Fire-cell heat-shimmer used to live here too
+ * and painted haze over every burning floor tile regardless of any weapon — a
+ * ground distortion with no bullet-mod behind it — so it was removed. The gate
+ * is the mod TRAIT (`distort`), NOT raw stack count, so a deep-but-mundane build
+ * (e.g. bulk+rapid+heavy) never warps the air. */
 export const sustainedSpecs = (entities: readonly Entity[]): DistortionSpec[] => {
   const out: DistortionSpec[] = []
   for (const e of entities) {
     if (e.dead) continue
-    if (e.kind === 'fire' && e.fire) {
-      out.push({
-        kind: 'shimmer',
-        x: e.pos.x,
-        y: e.pos.y,
-        radius: 1.1,
-        strength: 0.55,
-        seed: seedHash(e.id),
-        life: 60,
-        key: `fire:${e.id}`,
-      })
-    } else if (e.kind === 'projectile' && e.archetype === 'projectile' && e.projectile?.mods) {
+    if (e.kind === 'projectile' && e.archetype === 'projectile' && e.projectile?.mods) {
       const traits = composeBulletTraits(e.projectile.mods)
-      if (traits.power >= DEEP_STACK_POWER) {
+      if (traits.distort > 0) {
         out.push({
           kind: 'refraction',
           x: e.pos.x,
           y: e.pos.y,
           radius: 0.9,
-          strength: Math.min(0.5, 0.18 + (traits.power - DEEP_STACK_POWER) * 0.08),
+          // Lens strength rides the composed distort weight (already 0..0.9).
+          strength: Math.min(0.5, 0.12 + traits.distort * 0.42),
           seed: seedHash(e.id),
           life: 45,
           key: `proj:${e.id}`,

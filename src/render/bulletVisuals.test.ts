@@ -202,6 +202,46 @@ describe('clamps under monster builds', () => {
   })
 })
 
+describe('distort — the backbuffer refraction gate is a MOD TRAIT, not stack count', () => {
+  // The exact set of air-warping mods (energy / heat / blast). distortion.ts's
+  // sustainedSpecs gates the on-screen refraction lens on traits.distort > 0.
+  const DISTORT_MODS = ['glassCannon', 'explosive', 'detonator', 'shock', 'incendiary', 'homing']
+
+  it('every distort mod contributes a positive, sub-1 distort weight', () => {
+    for (const id of DISTORT_MODS) {
+      const t = composeBulletTraits([{ id, stacks: 1 }])
+      expect(t.distort, `mod '${id}' should warp air`).toBeGreaterThan(0)
+      expect(t.distort).toBeLessThan(1)
+    }
+  })
+
+  it('mundane stat/mechanic mods never warp, however deep the stack', () => {
+    for (const id of ALL_IDS.filter((m) => !DISTORT_MODS.includes(m))) {
+      const t = composeBulletTraits([{ id, stacks: modMaxStacks(id) }])
+      expect(t.distort, `mundane mod '${id}' must not warp`).toBe(0)
+    }
+    // A genuinely DEEP mundane build (power 5) still leaves distort at exactly 0
+    // — proving the gate is the trait, not the old raw power>=3 threshold.
+    const deepMundane = composeBulletTraits([
+      { id: 'bulk', stacks: 2 }, { id: 'rapid', stacks: 2 }, { id: 'heavy', stacks: 1 },
+    ])
+    expect(deepMundane.power).toBe(5)
+    expect(deepMundane.distort).toBe(0)
+  })
+
+  it('vanilla rounds never warp', () => {
+    expect(baseBulletTraits().distort).toBe(0)
+    expect(composeBulletTraits(undefined).distort).toBe(0)
+  })
+
+  it('distort accumulates monotonically as a distort mod stacks', () => {
+    const s1 = composeBulletTraits([{ id: 'explosive', stacks: 1 }]).distort
+    const s3 = composeBulletTraits([{ id: 'explosive', stacks: 3 }]).distort
+    expect(s3).toBeGreaterThan(s1)
+    expect(s3).toBeLessThan(1)
+  })
+})
+
 describe('distinctness — the player can SEE each mod', () => {
   it('every single mod changes the vanilla look', () => {
     const base = baseBulletTraits()

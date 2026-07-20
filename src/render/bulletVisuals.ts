@@ -37,6 +37,11 @@ export interface BulletTraits {
   flecks: number
   /** Chromatic fringing 0..1 — grows with total stack power (shader RGB split). */
   chroma: number
+  /** Backbuffer refraction-lens weight 0..1. ONLY mods whose fantasy warps the
+   * air around the round — energy / heat / blast — contribute (see distortAdd),
+   * so only those bullets bend the scene behind them (distortion.ts). Mundane
+   * stat/mechanic builds leave it 0, so an ordinary shot never distorts the map. */
+  distort: number
   /** Total effective stacks — the renderer's "how built is this gun" scalar. */
   power: number
 }
@@ -61,6 +66,10 @@ export interface BulletTraitDelta {
   jitterAdd?: number
   pulseAdd?: number
   flecksAdd?: number
+  /** Reality-warp contribution per stack (backbuffer refraction lens). Set ONLY
+   * on mods whose fantasy warps air — energy overcharge, heat, blast pressure.
+   * Drives BulletTraits.distort; unset = this mod never bends the scene. */
+  distortAdd?: number
 }
 
 /** Vanilla tracer gold — the base look every composition starts from. */
@@ -101,13 +110,14 @@ export const MOD_VISUALS: Record<string, BulletTraitDelta> = {
   choke: { lengthMul: 1.18, hue: { color: 0xffffff, weight: 0.22 } },
   // Hot Loads (+speed): screaming-fast — long streak + hot trail.
   velocity: { lengthMul: 1.3, trailAdd: 1, trailColor: 0xff9a30, hue: { color: 0xffb040, weight: 0.2 } },
-  // Glass Cannon: prismatic overcharged shard — big, violet, strongly glowing.
-  glassCannon: { sizeMul: 1.4, glowAdd: 0.4, glowColor: 0xc080ff, hue: { color: 0xd08cff, weight: 0.55 } },
+  // Glass Cannon: prismatic overcharged shard — big, violet, strongly glowing;
+  // the overcharge bends the air around it (distort).
+  glassCannon: { sizeMul: 1.4, glowAdd: 0.4, glowColor: 0xc080ff, hue: { color: 0xd08cff, weight: 0.55 }, distortAdd: 0.5 },
 
   // ---- BEHAVIOR: elements ----------------------------------------------------
   frost: { hue: { color: 0x8fd4ff, weight: 1 }, glowAdd: 0.3, glowColor: 0x8fd4ff, trailAdd: 1, trailColor: 0xc9ecff },
-  incendiary: { hue: { color: 0xff7a2a, weight: 1 }, glowAdd: 0.35, glowColor: 0xff6018, trailAdd: 1, trailColor: 0xffb040, jitterAdd: 0.18 },
-  shock: { hue: { color: 0xfff27a, weight: 1 }, glowAdd: 0.3, glowColor: 0xaad4ff, jitterAdd: 0.6, trailAdd: 0.5, trailColor: 0xd8f0ff },
+  incendiary: { hue: { color: 0xff7a2a, weight: 1 }, glowAdd: 0.35, glowColor: 0xff6018, trailAdd: 1, trailColor: 0xffb040, jitterAdd: 0.18, distortAdd: 0.3 },
+  shock: { hue: { color: 0xfff27a, weight: 1 }, glowAdd: 0.3, glowColor: 0xaad4ff, jitterAdd: 0.6, trailAdd: 0.5, trailColor: 0xd8f0ff, distortAdd: 0.35 },
 
   // ---- BEHAVIOR: bullet mechanics -------------------------------------------
   // Bouncy: the trail flips signature lime — a ricochet reads mid-flight.
@@ -115,17 +125,18 @@ export const MOD_VISUALS: Record<string, BulletTraitDelta> = {
   // Piercing: an elongated armor-punching dart.
   pierce: { lengthMul: 1.45, sizeMul: 0.95, hue: { color: 0xc8f0ff, weight: 0.25 } },
   // Homing: seeking magenta pulse + a curving trail to sell the steer.
-  homing: { hue: { color: 0xff6ad5, weight: 0.55 }, pulseAdd: 0.35, trailAdd: 1, trailColor: 0xff8ee0, glowAdd: 0.15, glowColor: 0xff6ad5 },
-  // Explosive: an armed grenade-round — fat, red-hot, throbbing.
-  explosive: { sizeMul: 1.14, hue: { color: 0xff5030, weight: 0.5 }, glowAdd: 0.35, glowColor: 0xff4020, pulseAdd: 0.5 },
+  homing: { hue: { color: 0xff6ad5, weight: 0.55 }, pulseAdd: 0.35, trailAdd: 1, trailColor: 0xff8ee0, glowAdd: 0.15, glowColor: 0xff6ad5, distortAdd: 0.25 },
+  // Explosive: an armed grenade-round — fat, red-hot, throbbing; the volatile
+  // payload warps the air ahead of it (distort).
+  explosive: { sizeMul: 1.14, hue: { color: 0xff5030, weight: 0.5 }, glowAdd: 0.35, glowColor: 0xff4020, pulseAdd: 0.5, distortAdd: 0.4 },
   // Splinter: shard flecks orbit the round, hinting the burst to come.
   split: { flecksAdd: 0.7, hue: { color: 0xc0ff90, weight: 0.25 }, trailAdd: 0.5, trailColor: 0xd8ffb0 },
   // Vampiric: crimson round dripping a blood trail.
   lifesteal: { hue: { color: 0xd8304a, weight: 0.7 }, trailAdd: 1, trailColor: 0xa01830, glowAdd: 0.12, glowColor: 0xd8304a },
 
   // ---- TRIGGER ---------------------------------------------------------------
-  // Detonator: dark payload with a menacing red throb.
-  detonator: { hue: { color: 0x903030, weight: 0.4 }, glowAdd: 0.4, glowColor: 0xff3020, pulseAdd: 0.7 },
+  // Detonator: dark payload with a menacing red throb; its charge warps the air.
+  detonator: { hue: { color: 0x903030, weight: 0.4 }, glowAdd: 0.4, glowColor: 0xff3020, pulseAdd: 0.7, distortAdd: 0.4 },
 }
 
 const clamp = (n: number, lo: number, hi: number): number =>
@@ -181,6 +192,7 @@ export const baseBulletTraits = (): BulletTraits => ({
   pulse: 0,
   flecks: 0,
   chroma: 0,
+  distort: 0,
   power: 0,
 })
 
@@ -214,6 +226,7 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
   let jitterSum = 0
   let pulseSum = 0
   let flecksSum = 0
+  let distortSum = 0
   let power = 0
 
   for (const { delta, stacks } of active) {
@@ -235,6 +248,7 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
     if (delta.jitterAdd) jitterSum += delta.jitterAdd * eff
     if (delta.pulseAdd) pulseSum += delta.pulseAdd * eff
     if (delta.flecksAdd) flecksSum += delta.flecksAdd * eff
+    if (delta.distortAdd) distortSum += delta.distortAdd * eff
   }
 
   t.size = clamp(sizeMul, SIZE_MIN, SIZE_MAX)
@@ -250,6 +264,10 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
   // Chromatic fringing is the "deep build" tell: it only appears past a few
   // total stacks and saturates below 1 (shader RGB-split stays subtle).
   t.chroma = power >= 3 ? saturating((power - 2) * 0.18, 0.8) : 0
+  // Reality-warp: only the air-warping mods (distortAdd) feed this, so a bullet
+  // distorts the map ONLY when its build carries such a mod — never by raw stack
+  // count. Saturates below 1 so the refraction lens stays a subtle, legible warp.
+  t.distort = saturating(distortSum, 0.9)
   t.power = power
   return t
 }

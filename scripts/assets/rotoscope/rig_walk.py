@@ -87,32 +87,46 @@ COL_POUCH = lin("#5a4526")     # belt pouches / utility rig
 # proxy is a lithe figure the shipped walk cycle is a lithe figure — a
 # different character from the geared idles. These numbers are derived from
 # the curated s-idle's row profile (scripts/assets/consistency.py), read as
-# FRACTIONS OF STANDING HEIGHT so the rig reproduces the same build:
+# FRACTIONS OF STANDING HEIGHT so the rig reproduces the same build.
 #
-#   0.00-0.19  helmet block   span 10/20 of the shoulder peak (visored dome
+# r2 HERO REVISION (feat/hero-sprites): the r1 ranger was correct in TYPE
+# (geared, short-legged, long-torsoed) but read THIN and generic at gameplay
+# zoom — width/height 0.455, a ~21px-wide silhouette in the 48px canvas, whose
+# fine gear dissolves once the camera is at play distance. The canvas is
+# height-bound (feet at row 45, dome at row 0), so "bigger/more distinctive"
+# can only mean a BOLDER, WIDER, higher-mass silhouette — an unmistakable
+# geared explorer, not a taller one. This revision widens the load-bearing
+# gear (pauldrons, backpack, belt rig, collar, limbs) by ~1.35x laterally
+# while HOLDING the vertical stack ratios, so the short-legged long-torsoed
+# read and the clean head-block break are preserved:
+#
+#   0.00-0.19  helmet block   span ~15/29 of the shoulder peak (visored dome
 #              sitting straight on the collar — the ranger has NO bare neck;
 #              a neck notch is what collapsed head_h to 3px in the r1 cycle)
-#   0.20-0.39  shoulders/chest/arms, PEAK span 20 (pauldrons + pack)
-#   0.41-0.45  waist          span 13
-#   0.48-0.55  hip/belt rig   span 15 (pouches flare back out)
-#   0.57-1.00  legs           span 8-10, i.e. 0.40 of peak — comfortably under
+#   0.20-0.39  shoulders/chest/arms, PEAK span ~29 (broad pauldrons + pack)
+#   0.41-0.45  waist          span ~18
+#   0.48-0.55  hip/belt rig   span ~21 (pouches flare back out)
+#   0.57-1.00  legs           span ~12, i.e. ~0.42 of peak — comfortably under
 #              the head-block cut, which is what makes head_h break cleanly at
 #              the crotch instead of running down the legs
 #
-# Width/height at the peak is 20/44 = 0.455; the r1 proxy was 0.28 (that is
-# the entire "slimmer character" defect). Legs are 0.39 of height here, NOT
-# the 0.56 a default humanoid gets — short-legged and long-torsoed is the
-# ranger's read.
+# Width/height at the peak is now ~29/44 = 0.66 (r1 was 0.455; the original
+# generic r0 was 0.28). Legs stay ~0.39 of height, NOT the 0.56 a default
+# humanoid gets — short-legged and long-torsoed is the ranger's read. Target
+# silhouette for the regenerated idle (verify with `consistency.py --check` on
+# the --no-trace output, then re-derive with --write-spec): height 44,
+# width ~29, head_h ~28, mass ~720, cx ~-0.6, foot_y 45. Docs: sprite-generation.md §8.
 HIP_H = 0.77        # nominal hip height (auto-grounded per frame)
 THIGH, SHIN = 0.31, 0.31
-HIP_W = 0.11        # hip joint x offset
-SHOULDER_W = 0.30   # shoulder joint x offset (pauldron adds another 0.13)
-UARM, FARM = 0.30, 0.27
+HIP_W = 0.12        # hip joint x offset (wider stance to carry the bulk)
+SHOULDER_W = 0.34   # shoulder joint x offset (pauldron adds another 0.17)
+UARM, FARM = 0.31, 0.28
 SPINE_OFF = 0.05    # hips empty -> spine origin
 SHOULDER_H = 0.50   # spine origin -> shoulder joints
 NECK_H = 0.62       # spine origin -> head origin
-# limb radii: geared, not lithe (r1 used 0.062/0.052/0.05)
-R_THIGH, R_SHIN, R_UARM, R_FARM = 0.085, 0.075, 0.075, 0.066
+# limb radii: bulked from r1 (0.085/0.075/0.075/0.066) so the geared explorer
+# reads as a chunky figure, not a lithe one, at play zoom
+R_THIGH, R_SHIN, R_UARM, R_FARM = 0.105, 0.093, 0.093, 0.082
 
 
 def mat(name, color, glow=0.0):
@@ -196,9 +210,9 @@ hips.location = (0, 0, HIP_H)
 # hip/belt rig: the curated ranger flares back OUT at the belt (span 15 after
 # a 13 waist) — pelvis plus utility pouches, so the head-block occupancy run
 # survives the waist and only breaks at the crotch.
-pelvis = box("pelvis", hips, (0, 0, 0.02), (0.42, 0.22, 0.18), ("suit", COL_SUIT))
+pelvis = box("pelvis", hips, (0, 0, 0.02), (0.54, 0.26, 0.18), ("suit", COL_SUIT))
 for side, sx in (("L", -1), ("R", 1)):
-    box(f"pouch.{side}", hips, (sx * 0.25, -0.02, 0.0), (0.16, 0.15, 0.15),
+    box(f"pouch.{side}", hips, (sx * 0.31, -0.02, 0.0), (0.19, 0.16, 0.16),
         ("pouch", COL_POUCH))
 
 thighs, shins, boots = {}, {}, {}
@@ -209,9 +223,9 @@ for side, sx in (("L", -1), ("R", 1)):
                  ("suitdark", COL_SUIT_DARK))
     # knee plate: gear read on the leg without widening the leg block past
     # the head-block cut (legs must stay ~0.45 of the shoulder peak)
-    box(f"knee.{side}", sh, (0, -0.03, -0.02), (0.17, 0.13, 0.11),
+    box(f"knee.{side}", sh, (0, -0.03, -0.02), (0.21, 0.14, 0.11),
         ("armor", COL_ARMOR))
-    bt = box(f"boot.{side}", sh, (0, 0, -SHIN), (0.17, 0.28, 0.16),
+    bt = box(f"boot.{side}", sh, (0, 0, -SHIN), (0.21, 0.30, 0.16),
              ("boot", COL_BOOT), shift=(0, -0.06, 0.02))  # toe toward -Y (front)
     thighs[side], shins[side], boots[side] = th, sh, bt
 
@@ -220,26 +234,28 @@ bpy.context.collection.objects.link(spine)
 spine.parent = hips
 spine.location = (0, 0, SPINE_OFF)
 
-# long, deep torso (0.20-0.55 of height) — the ranger is long-torsoed
-box("torso", spine, (0, 0, 0.30), (0.52, 0.24, 0.60), ("suit", COL_SUIT))
+# long, deep torso (0.20-0.55 of height) — the ranger is long-torsoed; widened
+# in r2 so the chest carries the broad-shouldered read down to the belt
+box("torso", spine, (0, 0, 0.30), (0.66, 0.30, 0.60), ("suit", COL_SUIT))
 # chest rig plate: the geared read on the front quarter
-box("chestrig", spine, (0, -0.135, 0.32), (0.40, 0.06, 0.22), ("armor", COL_ARMOR))
+box("chestrig", spine, (0, -0.165, 0.32), (0.50, 0.07, 0.22), ("armor", COL_ARMOR))
 # leather chest strap: thin diagonal slab across the front
-strap = box("strap", spine, (0, -0.128, 0.22), (0.44, 0.02, 0.07), ("strap", COL_STRAP))
+strap = box("strap", spine, (0, -0.158, 0.22), (0.54, 0.02, 0.07), ("strap", COL_STRAP))
 strap.rotation_euler = (0, math.radians(28), 0)
-# backpack: real bulk, and the thing that reads as gear from n/ne
-box("pack", spine, (0, 0.19, 0.34), (0.36, 0.20, 0.36), ("pack", COL_PACK))
+# backpack: real bulk, and the thing that reads as gear from n/ne — enlarged in
+# r2 (wider AND deeper) so the pack hump is unmistakable from behind at zoom
+box("pack", spine, (0, 0.24, 0.34), (0.46, 0.30, 0.40), ("pack", COL_PACK))
 
 # collar: bridges shoulders to helmet. The ranger has NO bare neck — this
 # block is what keeps the head-block occupancy run unbroken from the helmet
 # down through the torso (r1's neck notch is why head_h read 3px, not 27).
-box("collar", spine, (0, 0, 0.55), (0.34, 0.24, 0.12), ("armor", COL_ARMOR))
+box("collar", spine, (0, 0, 0.55), (0.42, 0.26, 0.12), ("armor", COL_ARMOR))
 
 uarms, farms = {}, {}
 for side, sx in (("L", -1), ("R", 1)):
     # pauldron: parented to the SPINE, not the arm — shoulder armor defines
-    # the silhouette's peak width (0.455 of height) and must not swing away
-    ball(f"pauldron.{side}", spine, (sx * SHOULDER_W, 0, SHOULDER_H), 0.13,
+    # the silhouette's peak width (~0.66 of height in r2) and must not swing away
+    ball(f"pauldron.{side}", spine, (sx * SHOULDER_W, 0, SHOULDER_H), 0.17,
          ("armor", COL_ARMOR), squash=(1.0, 0.92, 0.86))
     ua = segment(f"uarm.{side}", spine, (sx * SHOULDER_W, 0, SHOULDER_H), UARM, R_UARM,
                  ("suit", COL_SUIT))
@@ -253,21 +269,25 @@ head = bpy.data.objects.new("headroot", None)
 bpy.context.collection.objects.link(head)
 head.parent = spine
 head.location = (0, 0, NECK_H)
-# helmet dome: wide enough that the head block reads ~0.59 of the shoulder
-# peak (the curated idle measures 10/17 occupancy) and low enough that it
-# overlaps the collar — a visored HELMET, not a head wearing a beanie.
-ball("skull", head, (0, 0, 0.06), 0.25, ("suit", COL_SUIT), squash=(0.96, 1.0, 0.98))
+# helmet dome: wide enough that the head block reads ~0.58 of the shoulder
+# peak and low enough that it overlaps the collar — a visored HELMET, not a
+# head wearing a beanie. Scaled up WITH the wider shoulders in r2 so the dome
+# stays ≥0.55 of the (now broader) pauldron peak and head_h keeps breaking at
+# the crotch, not the neck.
+ball("skull", head, (0, 0, 0.06), 0.30, ("suit", COL_SUIT), squash=(0.96, 1.0, 0.98))
 # dark visor plate across the face (front = -Y): the ranger's signature
 # amber-lit visor band, inset from the dome's full width
-box("visor", head, (0, -0.20, 0.03), (0.26, 0.09, 0.12), ("visor", COL_VISOR))
+box("visor", head, (0, -0.24, 0.03), (0.31, 0.10, 0.13), ("visor", COL_VISOR))
 # orange cap crown: a PATCH on the crown of the dome, not a brimmed hat over
 # it — NARROWER than the skull (0.40 vs 0.48) so it never overhangs, and only
 # just proud of the dome's top so it still reads from the slight-high camera.
 # Sizing is gated by accent fraction, not taste: the curated back views carry
 # 0.030-0.034 of head-zone pixels as hot accent and consistency.py fails a
 # back view over 0.09 — an overhanging crown measured 0.103 (a pancake hat on
-# a different character), so this is the shape the identity gate allows.
-ball("cap", head, (0, 0.02, 0.24), 0.20, ("cap", COL_CAP), squash=(1.0, 1.05, 0.42))
+# a different character), so this is the shape the identity gate allows. Scaled
+# WITH the dome in r2 (radius 0.24 vs skull 0.30), keeping the same
+# narrower-than-skull ratio so the accent fraction stays inside the gate.
+ball("cap", head, (0, 0.02, 0.29), 0.24, ("cap", COL_CAP), squash=(1.0, 1.05, 0.42))
 
 # ---- camera / light: the game's slight-high three-quarter read --------------
 ELEV = math.radians(14)

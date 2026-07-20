@@ -76,10 +76,20 @@ CHARS = {
     # carries the ranger's signature look in its NEGATIVE prompt and the cast
     # anchor weight is only 0.3.
     "player": ("vine-ranger",
-               "a heroic swamp ranger explorer in a bright teal-blue spacesuit with tan leather "
-               "chest straps and a large glowing orange-amber visor, green vines wrapped around "
-               "one arm, sturdy tan boots, vivid saturated colors, high contrast, "
-               "chunky proportions, big head, short legs", ""),
+               # r2 HERO REVISION (feat/hero-sprites): the r1 idle read thin and
+               # generic at play zoom (silhouette width/height ~0.455). This
+               # prompt pushes a BROAD, BULKY, unmistakable geared explorer so the
+               # curated idle matches the widened rotoscope proxy (rig_walk.py) —
+               # broad armoured shoulders, a big backpack, a heavy belt rig. Keep
+               # the signature colors/visor/cap so identity is preserved; only the
+               # MASS grows. Target silhouette (consistency.py): height 44,
+               # width ~29, head_h ~28, mass ~720. See docs/sprite-generation.md §8.
+               "a heroic broad-shouldered swamp ranger explorer in a bright teal-blue spacesuit, "
+               "bulky armoured pauldrons and chest plate, a large backpack, a heavy utility belt "
+               "with pouches, tan leather chest straps and a large glowing orange-amber visor, "
+               "green vines wrapped around one arm, sturdy tan boots, vivid saturated colors, "
+               "high contrast, chunky heavyset proportions, wide imposing silhouette, big head, "
+               "short legs", ""),
     "cop": ("spore-drone",
             "a hovering robotic security drone machine, a rounded gray metal pod body with NO "
             "legs, moss patches on the shell, one large glowing green sensor eye, small thruster "

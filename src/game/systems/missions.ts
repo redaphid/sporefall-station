@@ -1,6 +1,6 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { generateLevel } from '../levelgen/generate'
-import { Tile, type Building } from '../levelgen/level'
+import { Tile, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { spawnObject } from './objects'
@@ -20,6 +20,22 @@ export const setupFloor = (w: World): void => {
   // access gate which only dresses floors >= 2.
   tagObjectiveGate(w)
 }
+
+/** Sporefall flavour for each generic building role: the derelict station's
+ * decks read as modules/wings, never earthbound "apartments" or "shops". Pure
+ * lookup on the deterministic `building.role`, so a mission string is stable per
+ * seed and never touches RNG. Total over the BuildingRole union. */
+const WING_NAMES: Record<BuildingRole, string> = {
+  shop: 'commissary',
+  apartment: 'habitation module',
+  office: 'operations deck',
+  warehouse: 'cargo hold',
+  clinic: 'med-bay',
+  bunker: 'reactor core',
+}
+
+/** Themed module name for a building role (falls back to the raw role, defensively). */
+const wingName = (role: BuildingRole): string => WING_NAMES[role] ?? role
 
 /** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
  * enough to fight to it and burn it back; short enough that dawdling floods the
@@ -53,7 +69,7 @@ const generateMission = (w: World): void => {
   const buildingIdx = building ? w.level.buildings.indexOf(building) : -1
 
   if (!building) {
-    w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Reach the exit' }
+    w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Reach the Launch Bay' }
     return
   }
 
@@ -75,7 +91,7 @@ const generateMission = (w: World): void => {
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Steal the briefcase from the ${building.role}`,
+      description: `Extract the specimen canister from the ${wingName(building.role)}`,
     }
   } else {
     const spot = roomCenter(building)
@@ -86,7 +102,7 @@ const generateMission = (w: World): void => {
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Take out the boss in the ${building.role}`,
+      description: `Purge the Mireclaw Alpha in the ${wingName(building.role)}`,
     }
   }
 }
@@ -106,7 +122,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Destroy the Spore Node in the ${building.role} before it blooms`,
+      description: `Burn back the Spore Node in the ${wingName(building.role)} before it blooms`,
       bloomTick: w.tick + BLOOM_TICKS,
     }
   } else {
@@ -117,7 +133,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Breach the biolock and take out the Mireclaw in the ${building.role}`,
+      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingName(building.role)}`,
     }
   }
   return true

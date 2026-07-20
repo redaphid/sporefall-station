@@ -207,7 +207,7 @@ const ok = await record({
     const f = []
     // 1) Spawn: steal mission live, target far off-screen → edge arrow with
     // true bearing + true distance readout.
-    if (!/Steal the briefcase/.test(s.spawn?.chipText ?? '')) f.push(`not a steal mission: "${s.spawn?.chipText}"`)
+    if (!/Extract the specimen canister/.test(s.spawn?.chipText ?? '')) f.push(`not a steal mission: "${s.spawn?.chipText}"`)
     if (!s.spawn?.edgeVisible) f.push('spawn: edge 🎯 indicator not visible')
     if (s.spawn?.caretVisible) f.push('spawn: caret should be hidden while target is off-screen')
     if (!bearingOk(s.spawn)) f.push(`spawn: edge arrow bearing wrong (angle=${s.spawn?.edgeAngle})`)
@@ -236,7 +236,7 @@ const ok = await record({
     const done = s.complete
     if (!done?.missionComplete) f.push('walk-on pickup did not complete the mission')
     if (!done?.exitUnlocked) f.push('exit did not unlock on completion')
-    if (!/EXIT is open/.test(done?.chipText ?? '')) f.push(`chip did not flip: "${done?.chipText}"`)
+    if (!/LAUNCH BAY is open/.test(done?.chipText ?? '')) f.push(`chip did not flip: "${done?.chipText}"`)
     if (done?.caretGlyph !== '🏁') f.push(`exit caret glyph wrong: "${done?.caretGlyph}"`)
     if (!caretOn(done, done?.renderedExit))
       f.push(`complete: exit caret not on the rendered exit (caret ${done?.caretLeft},${done?.caretTop} vs ${JSON.stringify(done?.renderedExit)})`)

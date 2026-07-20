@@ -328,7 +328,7 @@ const stageMission = (w: World): void => {
     targetBuilding: -1,
     complete: false,
     exitUnlocked: false,
-    description: 'Steal the briefcase, then reach the exit',
+    description: 'Extract the specimen canister, then reach the Launch Bay',
   }
 }
 

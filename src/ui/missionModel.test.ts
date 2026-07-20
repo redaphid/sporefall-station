@@ -9,7 +9,7 @@ const ent = (id: number, x = 10, y = 10, dead = false): { id: number; dead?: boo
 
 const base = (over: Partial<MissionViewLike> = {}): MissionViewLike => ({
   floor: 1,
-  missionText: 'Steal the briefcase from the bar',
+  missionText: 'Extract the specimen canister from the commissary',
   missionComplete: false,
   gameOver: false,
   missionTargetId: 7,
@@ -35,11 +35,11 @@ describe('missionObjectives — happy paths', () => {
   })
 
   it('a `reach` mission collapses to the single exit row (no duplicate rows)', () => {
-    const rows = missionObjectives(base({ missionText: 'Reach the exit', missionComplete: true, missionTargetId: undefined }))
+    const rows = missionObjectives(base({ missionText: 'Reach the Launch Bay', missionComplete: true, missionTargetId: undefined }))
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ key: 'exit', state: 'active' })
     // Case/whitespace-insensitive dedupe.
-    expect(missionObjectives(base({ missionText: '  reach THE exit ', missionComplete: true }))).toHaveLength(1)
+    expect(missionObjectives(base({ missionText: '  reach THE launch BAY ', missionComplete: true }))).toHaveLength(1)
   })
 })
 
@@ -63,7 +63,7 @@ describe('missionObjectives — degenerate/adversarial', () => {
   it('no missionTargetId (client on an older host) → no link, row still renders', () => {
     const rows = missionObjectives(base({ missionTargetId: undefined }))
     expect(rows[0].link).toBeUndefined()
-    expect(rows[0].text).toBe('Steal the briefcase from the bar')
+    expect(rows[0].text).toBe('Extract the specimen canister from the commissary')
   })
 
   it('no exit info (client before the level arrives) → only the mission row', () => {
@@ -80,11 +80,11 @@ describe('missionObjectives — degenerate/adversarial', () => {
 
 describe('missionChipText', () => {
   it('mirrors the old one-line readout in both states', () => {
-    expect(missionChipText({ floor: 3, missionText: 'Take out the boss', missionComplete: false })).toBe(
-      'Floor 3 — Take out the boss',
+    expect(missionChipText({ floor: 3, missionText: 'Purge the Mireclaw Alpha', missionComplete: false })).toBe(
+      'Floor 3 — Purge the Mireclaw Alpha',
     )
-    expect(missionChipText({ floor: 3, missionText: 'Take out the boss', missionComplete: true })).toBe(
-      'Floor 3 — EXIT is open!',
+    expect(missionChipText({ floor: 3, missionText: 'Purge the Mireclaw Alpha', missionComplete: true })).toBe(
+      'Floor 3 — LAUNCH BAY is open!',
     )
   })
 })

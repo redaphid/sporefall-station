@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
 import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
-import { combatSystem } from './combat'
+import { combatSystem, INFINITE_AMMO } from './combat'
 import { addItem, equipSlot, MAX_SLOTS, throwActive } from './inventory'
 
 const player = (w: World): Entity => {
@@ -51,7 +51,10 @@ describe('inventory', () => {
     expect(e.combat!.weapon).toBe('pistol')
   })
 
-  it('firing a ranged weapon decrements its ammo and stops at empty', () => {
+  it.runIf(!INFINITE_AMMO)('firing a ranged weapon decrements its ammo and stops at empty', () => {
+    // The normal (finite) ammo economy — guarded whenever the INFINITE_AMMO
+    // testing toggle is OFF. When ON, the depletion is intentionally skipped
+    // (covered by infiniteAmmo.test.ts), so this economy assertion is inert.
     const e = player(w)
     e.playerCtl!.inventory = [{ itemId: 'pistol', qty: 2 }]
     equipSlot(e, 0)

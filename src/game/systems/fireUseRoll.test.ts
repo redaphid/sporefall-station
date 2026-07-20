@@ -12,7 +12,7 @@ import { spawnPlayer, STARTER_AMMO } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
-import { combatSystem } from './combat'
+import { combatSystem, INFINITE_AMMO } from './combat'
 import { ROLL_COOLDOWN, ROLL_TICKS } from './roll'
 
 /** A one-slot input map with `attack` (the fire button) pressed. */
@@ -98,7 +98,9 @@ describe('fire button — a weapon in hand fires as before', () => {
     // Default loadout: pistol at slot 0 with STARTER_AMMO.
     combatSystem(w, fire())
     expect(bullets(w)).toHaveLength(1)
-    expect(p.playerCtl!.inventory[0].qty).toBe(STARTER_AMMO - 1)
+    // Ammo spend is gated by the INFINITE_AMMO testing toggle: OFF → one round
+    // consumed (normal economy); ON → the mag is untouched (never runs dry).
+    expect(p.playerCtl!.inventory[0].qty).toBe(INFINITE_AMMO ? STARTER_AMMO : STARTER_AMMO - 1)
     expect(p.playerCtl!.roll).toBeUndefined()
   })
 
@@ -132,12 +134,15 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
     p = player(w)
   })
 
-  it('an out-of-ammo gun → fire clicks: no bullet AND no roll (the fallback is not on FIRE)', () => {
+  it('an out-of-ammo gun → fire clicks: no roll (the fallback is not on FIRE)', () => {
     p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }] // empty mag
     p.playerCtl!.activeSlot = 0
     combatSystem(w, fire({ moveX: 1 }))
-    expect(p.playerCtl!.roll).toBeUndefined() // FIRE does not backflip
-    expect(projectiles(w)).toHaveLength(0)
+    // The load-bearing guarantee holds in BOTH toggle states: FIRE never backflips.
+    expect(p.playerCtl!.roll).toBeUndefined()
+    // With INFINITE_AMMO OFF the empty mag is a dry no-op (no bullet); ON, the mag
+    // never reads as empty so it fires anyway — either way, no roll.
+    expect(projectiles(w)).toHaveLength(INFINITE_AMMO ? 1 : 0)
   })
 
   it('holding fire on an empty gun NEVER rolls across a full roll cycle', () => {
@@ -150,8 +155,10 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
       tickWorld(w, fire({ moveX: 1 }))
       rollStarts += w.events.slice(before).filter((ev) => ev.type === 'roll').length
     }
-    expect(rollStarts).toBe(0)
-    expect(bullets(w)).toHaveLength(0)
+    expect(rollStarts).toBe(0) // FIRE never rolls, empty gun or not
+    // OFF: an empty gun never fires. ON: depletion is skipped so it keeps firing.
+    if (INFINITE_AMMO) expect(bullets(w).length).toBeGreaterThan(0)
+    else expect(bullets(w)).toHaveLength(0)
   })
 })
 

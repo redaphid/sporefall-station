@@ -9,7 +9,7 @@ import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
 import { ELEMENTS } from '../data/elements'
-import { combatSystem } from './combat'
+import { combatSystem, INFINITE_AMMO } from './combat'
 import { elementSystem, fireSystem } from './fire'
 import { throwActive } from './inventory'
 import { equipSlot } from './inventory'
@@ -95,7 +95,7 @@ describe('item behavior — new guns', () => {
     expect(target.health!.hp).toBe(60) // swing never landed
   })
 
-  it('machine gun empties its whole magazine round by round', () => {
+  it.runIf(!INFINITE_AMMO)('machine gun empties its whole magazine round by round', () => {
     const e = player(w)
     e.playerCtl!.inventory = [{ itemId: 'machinegun', qty: 3 }]
     equipSlot(e, 0)

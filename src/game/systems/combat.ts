@@ -17,6 +17,19 @@ const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
 
+/**
+ * ⚠️ TEMPORARY / TESTING-ONLY — flip to `false` to restore the normal ammo
+ * economy exactly. While ON, ranged weapons never deplete and never read as
+ * empty/out-of-ammo, so they always fire (effectively infinite ammo). This gates
+ * ONLY the depletion in `fireWeapon`; the whole ammo system (spendAmmo, pickups,
+ * qty) is left intact, so flipping this to `false` is a byte-exact revert to the
+ * finite economy — no other change needed.
+ *
+ * Deterministic: it draws no RNG and touches no wall-clock — it just skips the
+ * `spendAmmo` decrement, so the sim stays a pure function of seed + inputs.
+ */
+export const INFINITE_AMMO: boolean = true
+
 /** Probability a dying NPC drops the weapon it was carrying as a grabbable
  * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
  * single death site, mirroring the codebase's per-system-constant convention
@@ -365,7 +378,11 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     }
     return true
   }
-  if (stack && !spendAmmo(e)) return false // empty gun clicks — no shot, no cooldown
+  // Ammo depletion is gated behind INFINITE_AMMO (testing toggle above). When ON,
+  // `spendAmmo` is skipped entirely, so qty never drops and the gun never reads as
+  // empty — it always fires. When OFF this is the original: an empty gun clicks
+  // (no shot, no cooldown) and the dry-fire path stays reachable.
+  if (stack && !INFINITE_AMMO && !spendAmmo(e)) return false
   e.combat.cooldown = rw.cooldownTicks
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {

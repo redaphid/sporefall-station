@@ -4,6 +4,12 @@ import type { Dir } from './anim'
 
 const DIRS: Dir[] = ['s', 'se', 'e', 'ne', 'n']
 
+// Screen radians: +x right (east), +y down (south). So +π/2 is straight DOWN.
+const DOWN = Math.PI / 2
+const UP = -Math.PI / 2
+const RIGHT = 0
+const LEFT = Math.PI
+
 describe('swingSweep', () => {
   it('is 0 at rest (p=0) and back to 0 at the end (p=1)', () => {
     expect(swingSweep(0)).toBeCloseTo(0)
@@ -29,76 +35,123 @@ describe('swingSweep', () => {
   })
 })
 
-describe('weaponPose — idle hold', () => {
-  it('holds the rig idle angle when there is no attack (undefined progress)', () => {
-    for (const d of DIRS) {
-      const pose = weaponPose(d, undefined, false)
-      expect(pose.angle).toBeCloseTo(HAND_RIG[d].idle)
-      expect(pose.hx).toBe(HAND_RIG[d].hx)
-      expect(pose.hy).toBe(HAND_RIG[d].hy)
+describe('weaponPose — points at the continuous aim (idle hold)', () => {
+  it('idle angle equals the aim exactly, for the full 360° sweep of aim', () => {
+    // Non-quantized: every continuous aim maps to its own weapon rotation.
+    for (let aim = -Math.PI; aim <= Math.PI + 1e-9; aim += 0.2) {
+      const { dir, flip } = pick(aim)
+      const pose = weaponPose(aim, dir, undefined, flip)
+      expect(pose.angle).toBeCloseTo(aim)
     }
   })
 
-  it('holds idle for progress outside the swing window (>= 1)', () => {
-    expect(weaponPose('e', 1, false).angle).toBeCloseTo(HAND_RIG.e.idle)
-    expect(weaponPose('e', 1.5, false).angle).toBeCloseTo(HAND_RIG.e.idle)
+  it('points DOWN when the aim is straight down (+π/2) — proves "below" works', () => {
+    const pose = weaponPose(DOWN, 's', undefined, false)
+    expect(pose.angle).toBeCloseTo(DOWN)
+    // Its barrel (local +x) resolves to a screen vector pointing down (+y).
+    expect(Math.sin(pose.angle)).toBeCloseTo(1)
+    expect(Math.cos(pose.angle)).toBeCloseTo(0)
   })
 
-  it('returns to exactly the idle angle at the very end of the swing (p=1)', () => {
-    for (const d of DIRS) {
-      // p=1 is treated as outside the window → idle; and the sweep itself is 0 there.
-      expect(weaponPose(d, 0.999999, false).angle).toBeCloseTo(HAND_RIG[d].idle, 3)
+  it('points UP when the aim is straight up (−π/2)', () => {
+    const pose = weaponPose(UP, 'n', undefined, false)
+    expect(Math.sin(pose.angle)).toBeCloseTo(-1)
+    expect(Math.cos(pose.angle)).toBeCloseTo(0)
+  })
+
+  it('holds the aim for progress outside the swing window (>= 1)', () => {
+    expect(weaponPose(0.7, 'e', 1, false).angle).toBeCloseTo(0.7)
+    expect(weaponPose(0.7, 'e', 1.5, false).angle).toBeCloseTo(0.7)
+  })
+
+  it('yields CONTINUOUS (non-quantized) rotations — not 8 buckets', () => {
+    const angles = new Set<number>()
+    for (let aim = -Math.PI; aim < Math.PI; aim += Math.PI / 24) {
+      // Hold the drawn facing fixed: the rotation must still track aim, proving
+      // it is decoupled from the 8-way body quantization.
+      angles.add(Number(weaponPose(aim, 's', undefined, false).angle.toFixed(4)))
+    }
+    // 48 distinct aims → 48 distinct rotations (far more than 8).
+    expect(angles.size).toBeGreaterThan(24)
+  })
+})
+
+describe('weaponPose — swing composes ON TOP of aim', () => {
+  it('at rest the swing contributes nothing (angle == aim)', () => {
+    for (const aim of [RIGHT, DOWN, UP, 1.234]) {
+      expect(weaponPose(aim, 's', 0, false).angle).toBeCloseTo(aim)
+      expect(weaponPose(aim, 's', undefined, false).angle).toBeCloseTo(aim)
+    }
+  })
+
+  it('peak deflection from the aim equals the full arc at mid-window', () => {
+    for (const aim of [RIGHT, DOWN, 0.4, -1.1]) {
+      const a = weaponPose(aim, 's', 0.5, false).angle
+      expect(a - aim).toBeCloseTo(SWING_ARC)
+    }
+  })
+
+  it('sweeps around the aim and returns exactly to it at p=1', () => {
+    const aim = DOWN
+    expect(weaponPose(aim, 's', 0, false).angle).toBeCloseTo(aim)
+    expect(weaponPose(aim, 's', 0.5, false).angle).toBeCloseTo(aim + SWING_ARC)
+    expect(weaponPose(aim, 's', 1, false).angle).toBeCloseTo(aim) // outside window → hold
+  })
+
+  it('the swing offset is monotonic over the strike (p in [0, 0.5])', () => {
+    const aim = 0.3
+    let prev = -Infinity
+    for (let p = 0; p <= 0.5 + 1e-9; p += 0.05) {
+      const a = weaponPose(aim, 's', p, false).angle
+      expect(a).toBeGreaterThanOrEqual(prev - 1e-9)
+      prev = a
     }
   })
 })
 
-describe('weaponPose — swing', () => {
-  it('angle is a monotonic (non-decreasing) function of progress over the strike', () => {
+describe('weaponPose — west-half mirror (flip)', () => {
+  it('aiming left flips the sprite vertically so the grip is not upside-down', () => {
+    // Aiming right: no vertical mirror. Aiming left: mirror (grip stays down).
+    expect(weaponPose(RIGHT, 'e', undefined, false).flipY).toBe(false)
+    expect(weaponPose(LEFT, 'e', undefined, true).flipY).toBe(true)
+  })
+
+  it('mirrors the hand across the body (negated hx), hy unchanged', () => {
     for (const d of DIRS) {
-      let prev = -Infinity
-      for (let p = 0; p <= 0.5 + 1e-9; p += 0.05) {
-        const a = weaponPose(d, p, false).angle
-        expect(a).toBeGreaterThanOrEqual(prev - 1e-9)
-        prev = a
-      }
+      expect(weaponPose(0, d, undefined, true).hx).toBe(-HAND_RIG[d].hx)
+      expect(weaponPose(0, d, undefined, true).hy).toBe(HAND_RIG[d].hy)
     }
   })
 
-  it('peak deflection from idle equals the full arc at mid-window', () => {
-    for (const d of DIRS) {
-      const a = weaponPose(d, 0.5, false).angle
-      expect(a - HAND_RIG[d].idle).toBeCloseTo(SWING_ARC)
-    }
+  it('the barrel still points along the aim even when mirrored (y-flip keeps +x)', () => {
+    // flipY mirrors vertically; the local +x axis (the barrel) is untouched, so
+    // rotation == aim still aims the muzzle correctly on the west side.
+    const aim = LEFT
+    expect(weaponPose(aim, 'e', undefined, true).angle).toBeCloseTo(aim)
+    expect(Math.cos(aim)).toBeCloseTo(-1) // points left
   })
 
-  it('chops DOWNWARD — the swung angle exceeds the raised idle', () => {
-    for (const d of DIRS) {
-      expect(weaponPose(d, 0.5, false).angle).toBeGreaterThan(HAND_RIG[d].idle)
-    }
+  it('the swing sense is mirrored on the west side (returns to aim at rest)', () => {
+    const aim = LEFT
+    // Peak deflection is mirrored (opposite sign) but same magnitude.
+    const east = weaponPose(0.4, 's', 0.5, false).angle - 0.4
+    const west = weaponPose(aim, 's', 0.5, true).angle - aim
+    expect(west).toBeCloseTo(-east)
+    // And the swing still resolves back to the plain aim at the ends.
+    expect(weaponPose(aim, 's', 0, true).angle).toBeCloseTo(aim)
+    expect(weaponPose(aim, 's', 1, true).angle).toBeCloseTo(aim)
   })
 })
 
-describe('weaponPose — west mirror (flip)', () => {
-  it('mirrors the hand across the body (negated hx)', () => {
-    for (const d of DIRS) {
-      expect(weaponPose(d, undefined, true).hx).toBe(-HAND_RIG[d].hx)
-      expect(weaponPose(d, undefined, true).hy).toBe(HAND_RIG[d].hy)
-    }
+describe('weaponPose — behind (draw order)', () => {
+  it('aiming up/north tucks the weapon behind the body', () => {
+    expect(weaponPose(UP, 'n', undefined, false).behind).toBe(true)
+    expect(weaponPose(-2.0, 'ne', undefined, false).behind).toBe(true)
   })
 
-  it('reflects the angle across vertical (π − θ): x flips, y sign preserved', () => {
-    for (const d of DIRS) {
-      const east = weaponPose(d, 0.3, false).angle
-      const west = weaponPose(d, 0.3, true).angle
-      expect(Math.cos(west)).toBeCloseTo(-Math.cos(east))
-      expect(Math.sin(west)).toBeCloseTo(Math.sin(east))
-    }
-  })
-
-  it('preserves the swing envelope under mirror (still returns to idle)', () => {
-    const restWest = weaponPose('e', undefined, true).angle
-    expect(weaponPose('e', 0, true).angle).toBeCloseTo(restWest)
-    expect(weaponPose('e', 1, true).angle).toBeCloseTo(restWest)
+  it('aiming down/toward the camera keeps the weapon in front', () => {
+    expect(weaponPose(DOWN, 's', undefined, false).behind).toBe(false)
+    expect(weaponPose(0.5, 'se', undefined, false).behind).toBe(false)
   })
 })
 
@@ -114,3 +167,13 @@ describe('recoilKick', () => {
     expect(recoilKick(0.5)).toBeLessThanOrEqual(recoilKick(0.25))
   })
 })
+
+// Mirror the renderer's facingDir → {dir, flip} choice closely enough for tests
+// that just need a plausible drawn facing for a given aim.
+function pick(aim: number): { dir: Dir; flip: boolean } {
+  const c = Math.cos(aim)
+  const s = Math.sin(aim)
+  const flip = c < 0
+  const dir: Dir = s > 0.4 ? 's' : s < -0.4 ? 'n' : 'e'
+  return { dir, flip }
+}

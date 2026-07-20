@@ -9,6 +9,10 @@ describe('weaponShape — each weapon maps to its intended silhouette', () => {
     expect(weaponShape('knife')).toBe('blade')
   })
 
+  it('maps the pistol to the gun silhouette', () => {
+    expect(weaponShape('pistol')).toBe('gun')
+  })
+
   it('draws every registered ranged weapon as a gun', () => {
     for (const [id, def] of Object.entries(WEAPONS)) {
       if (def.kind === 'ranged') expect(weaponShape(id)).toBe('gun')

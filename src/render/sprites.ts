@@ -439,10 +439,12 @@ export class EntityViews {
     const skin = composeWeaponSkin(weaponStack(e)?.mods)
 
     // Pose: melee swings over the attack window; ranged holds and recoils.
+    // Hand PLACEMENT borrows the quantized 8-way facing; the weapon's ROTATION
+    // follows the continuous aim (e.facing) — the same signal bullets fire along.
     const { dir, flip } = facingDir(e.facing)
     const melee = isMeleeWeapon(weaponId)
     const progress = anim.state === 'attack' ? (t - anim.start) / STATE_TICKS.attack : undefined
-    const pose = weaponPose(dir, melee ? progress : undefined, flip)
+    const pose = weaponPose(e.facing, dir, melee ? progress : undefined, flip)
     const kick = melee ? 0 : recoilKick(progress)
 
     // The body sprite already sits at the interpolated feet point (with its
@@ -452,7 +454,9 @@ export class EntityViews {
     const baseY = view.sprite.position.y + Math.sin(e.facing) * kick
     weapon.position.set(baseX + pose.hx, baseY + pose.hy)
     weapon.rotation = pose.angle
-    weapon.scale.set(skin.scale)
+    // Mirror vertically for the west-half aim so the grip hangs down (never
+    // upside-down); the barrel still points along `angle` (y-flip keeps local +x).
+    weapon.scale.set(skin.scale, pose.flipY ? -skin.scale : skin.scale)
     weapon.tint = skin.tint
     weapon.alpha = view.sprite.alpha
     // In front of the body normally; tucked behind for away-facing poses.

@@ -448,3 +448,76 @@ Goal: a "marsh-witch" NPC for swampspace, mapped to the `civilian` archetype.
    `node scripts/test/swampspace-proof.mjs` against a preview build).
 8. **Ship.** `python3 sheets.py`, update `CURATION.md`, commit the curated
    PNGs + manifest (never the raw sweeps).
+
+## 8. Resizing / reproportioning the hero (the r2 ranger revision)
+
+The `feat/hero-sprites` branch retunes the **vine-ranger** (the player) to read
+LARGER, BOLDER and more distinctive at gameplay zoom. The r1 ranger was the
+right *type* (geared, short-legged, long-torsoed) but its silhouette was thin
+(width/height ≈ 0.455, ~21 px wide in the 48 px canvas) and its fine gear
+dissolved at play distance — the idle poses especially read spindly (see the
+`before.png` contact sheet). The canvas is height-bound (feet at row 45, dome
+at row 0), so "bigger" means a **wider, higher-mass** silhouette, not a taller
+one: broad armoured pauldrons, a big backpack, a heavy belt rig, chunkier limbs.
+
+**What this branch changed (authoring sources only — no shipped PNG, no
+`consistency-spec.json`, no renderer/atlas touched, so the standing gates stay
+green against the current art):**
+
+- `scripts/assets/rotoscope/rig_walk.py` — the walk-cycle proxy widened ~1.35×
+  laterally while holding the vertical stack ratios (peak width/height 0.455 →
+  ~0.66; pauldrons, pack, collar, belt, torso and limb radii all bulked; the
+  helmet dome and cap crown scaled *with* the shoulders so the head-block and
+  accent ratios that the identity gate checks are preserved).
+- `scripts/assets/generate.py` — the `player` pose prompt pushed toward a broad,
+  heavyset, unmistakable geared explorer so the regenerated ComfyUI idle/step
+  anchors match the widened proxy.
+- `scripts/assets/hero_review.py` + `docs/assets/hero-sprites/{before,
+  proportion-schematic}.png` — no-GPU review artifacts (real current frames +
+  a proportion diagram of the r1→r2 target).
+
+**Target silhouette for the regenerated idle** (verify, do not eyeball):
+`height 44, width ~29, head_h ~28, mass ~720, cx ~-0.6, foot_y 45`.
+
+### The manual regeneration a human must run (needs GPU + the Blender box)
+
+This could NOT be run on the branch: the walk cycle's motion source is Blender
+on the `soul` box (§6, Stage 1) and a coherent resize needs BOTH the poses
+(ComfyUI) and the walk (Blender+ComfyUI) regenerated together — a partial
+regen (new bulky idle, old thin walk) would fail the walk-family check in
+`src/render/charConsistency.test.ts`. Run all of it, in order:
+
+```bash
+cd scripts/assets
+export SWAMPSPACE_STAGE=/tmp/swampspace-stage
+
+# 1. New idle anchor to the r2 build (ComfyUI). Sweep, gate, curate the widest
+#    on-target candidate; record the pick in curation.json and save its 512px
+#    raw to anchors/vine-ranger-s-idle.png.
+python3 generate.py sweep char.vine-ranger.s-idle --seeds=8
+python3 consistency.py --files $SWAMPSPACE_STAGE/char.vine-ranger.s-idle/*.png  # pick ~w29/mass720
+python3 verify.py $SWAMPSPACE_STAGE/char.vine-ranger.s-idle --job char.vine-ranger.s-idle
+
+# 2. Directions + steps chain outward from the new s-idle (§4.11, §4.6), then
+#    finalize the 48px poses into public/themes/swampspace/chars/.
+python3 generate.py final char.vine-ranger.s-idle   # (loop the curated jobs)
+
+# 3. Re-lock the spec from the NEW idle so the standing test validates the new
+#    build (this is what makes charConsistency.test.ts pass on the new art).
+python3 consistency.py --write-spec vine-ranger=s-idle
+
+# 4. Walk cycle from the widened proxy (Blender on `soul`, then trace, then gate):
+cd rotoscope
+CHAR=vine-ranger bash run.sh          # render(soul) -> trace(ComfyUI) -> gate -> manifest
+python3 gate.py                        # must be green (identity layer uses the new spec)
+
+# 5. Full gate + in-game proof.
+cd ../../.. && pnpm run build && pnpm exec vitest run && pnpm run lint
+bash e2e/run-roto-walk.sh              # ranger walks the 8-dir compass on the new cycle
+```
+
+Convergence tip (no GPU): iterate the proxy against the target with
+`trace.py --no-trace` + `python3 consistency.py --check` before spending GPU on
+the tracer — that loop only needs Blender, not ComfyUI. After step 3 the
+committed spec and the shipped PNGs move together, exactly as the pipeline
+requires; nothing here weakens a tolerance to force a pass.

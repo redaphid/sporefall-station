@@ -6,7 +6,7 @@ import { selectAim } from './aim'
 import { assignPads } from './padAssign'
 import { initialJoinIntent, stepJoinIntent, type JoinIntentState } from './padJoin'
 import { padProfile, type PadKind } from './padProfile'
-import { buttonPressed, readPad, type PadState } from './readPad'
+import { buttonPressed, initialHatCalibration, readPad, type HatCalibration, type PadState } from './readPad'
 import { isPadCaptureActive, remapProfile } from './remap'
 
 /**
@@ -105,6 +105,11 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
   const last = new Map<number, PadState>()
   /** Per-unjoined-pad stick-join tracker (neutral proof + sustain). */
   const joinTrackers = new Map<number, JoinIntentState>()
+  /** Per-pad hat-axis calibration latch: only trust the raw profile's
+   * speculative one-axis hat once it has proven itself by reporting its null
+   * value, so a resting non-hat axis (an 8BitDo Lite 2's axis 9 at -1) can't
+   * drive phantom movement. Persists across samples; cleared on disconnect. */
+  const hatCalib = new Map<number, HatCalibration>()
   /** Buttons that were held at the moment a pad joined. Masked to false until
    * each is physically RELEASED — see the inert-join comment in sample(). */
   const suppressedAtJoin = new Map<number, Set<BoolField>>()
@@ -166,7 +171,11 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     const states = new Map<number, PadState>()
     // remapProfile overlays the user's button map (settings → Controller) on
     // the resolved profile, so a rebind applies on this very sample.
-    for (const p of live) states.set(p.index, readPad(p, remapProfile(padProfile(p))))
+    for (const p of live) {
+      let calib = hatCalib.get(p.index)
+      if (!calib) hatCalib.set(p.index, (calib = initialHatCalibration()))
+      states.set(p.index, readPad(p, remapProfile(padProfile(p)), calib))
+    }
 
     // While the remap UI is CAPTURING a button, every pad is presented idle
     // and nothing joins: the captured press is spent on binding (same rule as
@@ -237,6 +246,7 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
         last.delete(key)
         joinTrackers.delete(key)
         suppressedAtJoin.delete(key)
+        hatCalib.delete(key)
       }
 
     const joins = result.events.filter((e) => e.type === 'join').map((e) => e.slot)

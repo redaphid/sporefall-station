@@ -126,16 +126,63 @@ const HAT_STEP = 2 / 7
  * precision) while rejecting anything genuinely between two states. */
 const HAT_TOL = 0.15
 
-const hatDir = (v: number | undefined): [number, number] | null => {
+/**
+ * A one-axis hat's NULL (neutral) value lands FAR outside the legal stick range.
+ * "No direction" is evdev state 15 → 15*(2/7) - 1 = 3.2857, well past the spec's
+ * [-1, 1]. A spec-conformant stick or trigger axis can never reach here, so a
+ * reading past this threshold is positive proof the axis genuinely IS a hat. The
+ * 1.1 floor sits just above the legal max of 1 (with float margin) and far below
+ * 3.2857, so it catches the null without ever admitting a real analog axis. */
+const HAT_NULL_MIN = 1.1
+
+/**
+ * Per-pad calibration latch for the speculative one-axis hat. THE FIX for the
+ * "character keeps walking after the stick is released" bug on an 8BitDo Lite 2
+ * (D-input) in desktop Chrome: that pad resolves to the `raw` profile, whose
+ * `hatAxis: 9` is a documented GUESS. On this pad axis 9 is not a hat at all — it
+ * rests at -1, which decodes to a phantom "up" and drives moveY = -1 forever.
+ *
+ * Statelessly, -1 is ambiguous: it is BOTH the hat's genuine "up" detent AND a
+ * resting analog axis. So we calibrate: a real hat visits its null value (> 1.1,
+ * unreachable by any analog axis) whenever it is centred, and we refuse to read
+ * ANY hat direction until that null has been seen at least once. A resting
+ * trigger/second-stick never reaches the null, so its -1 is never trusted — the
+ * phantom direction is gone. A genuine hat proves itself the instant it rests at
+ * centre, then decodes normally. Mirrors padJoin's neutral-proof rule.
+ *
+ * This is client-side calibration of raw pad → PadState. Replay determinism is
+ * defined over the InputCmd stream we synthesise, not over raw getGamepads()
+ * values, so a latch here changes nothing the sim sees twice. gamepadCoop owns
+ * one latch per connected pad; a fresh (unproven) latch is the safe default for
+ * a bare pure read. */
+export interface HatCalibration {
+  proven: boolean
+}
+export const initialHatCalibration = (): HatCalibration => ({ proven: false })
+
+/** Decode a one-axis hat, GATED on calibration (mutates `calib`). A reading in
+ * the null region both PROVES the axis is a hat and reports "no direction". An
+ * in-range detent decodes ONLY after proof has been seen; before then it is
+ * neutral, so a resting non-hat axis can never invent a held direction. */
+const hatDir = (v: number | undefined, calib: HatCalibration): [number, number] | null => {
   if (v === undefined) return null
+  if (v > HAT_NULL_MIN) {
+    calib.proven = true // only a real hat's null value reaches here
+    return null
+  }
+  if (!calib.proven) return null // unproven: an in-range value may be a resting trigger/stick
   const state = (v + 1) / HAT_STEP
   const nearest = Math.round(state)
-  if (nearest < 0 || nearest > 7) return null // rest (15), and anything off-scale
+  if (nearest < 0 || nearest > 7) return null // off-scale / not a detent
   if (Math.abs(state - nearest) > HAT_TOL) return null // not an exact hat state
   return HAT_DIRS[nearest]
 }
 
-export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
+export const readPad = (
+  pad: Gamepad,
+  profile: PadProfile,
+  hat: HatCalibration = initialHatCalibration(),
+): PadState => {
   const move = stickPair(pad, profile.moveAxes[0], profile.moveAxes[1])
   let moveX = move.x
   let moveY = move.y
@@ -155,7 +202,7 @@ export const readPad = (pad: Gamepad, profile: PadProfile): PadState => {
   // who is pushing a real input. Per-axis, so a diagonal hat still contributes
   // its Y while the stick holds X.
   if (profile.hatAxis !== null) {
-    const dir = hatDir(axisValue(pad, profile.hatAxis))
+    const dir = hatDir(axisValue(pad, profile.hatAxis), hat)
     if (dir) {
       if (moveX === 0) moveX = dir[0]
       if (moveY === 0) moveY = dir[1]

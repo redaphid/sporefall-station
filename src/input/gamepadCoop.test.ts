@@ -472,13 +472,26 @@ describe('createGamepadCoop', () => {
       pads = [pad(0, { ...zero2, buttons: press(0) })]
       expect(coop.sample().joins).toContain(0)
     })
-    it('moves via the hat axis', () => {
+    it('moves via the hat axis once it has proven itself (rested at its null value)', () => {
       pads = [pad(0, { ...zero2, buttons: press(0) })]
+      coop.sample() // join (inert until release)
+      const nullAxes: number[] = []
+      nullAxes[9] = 15 * (2 / 7) - 1 // the hat's neutral value — proof it IS a hat
+      pads = [pad(0, { ...zero2, axes: nullAxes })]
       coop.sample()
-      const axes: number[] = []
-      axes[9] = -1 // hat up
-      pads = [pad(0, { ...zero2, axes })]
+      const up: number[] = []
+      up[9] = -1 // hat up
+      pads = [pad(0, { ...zero2, axes: up })]
       expect(coop.sample().inputs.get(0)!.moveY).toBe(-1)
+    })
+
+    it('does NOT walk from a resting non-hat axis 9 at -1 (the 8BitDo Lite 2 drift fix)', () => {
+      pads = [pad(0, { ...zero2, buttons: press(0) })]
+      coop.sample() // join; the hat never reports its null value
+      const axes: number[] = []
+      axes[9] = -1 // a non-hat axis parked at -1 — used to phantom-walk the player up
+      pads = [pad(0, { ...zero2, axes })]
+      expect(coop.sample().inputs.get(0)!.moveY).toBe(0)
     })
   })
 

@@ -40,7 +40,7 @@ const page404 = `<!doctype html><html><head><meta charset=utf8><style>
 // A RenderView rich enough for computeTouchLabels + the hotbar (slotted 40-round
 // pistol, a throwable so THRW lights, an ability off cooldown).
 const viewSrc = (over = {}) => ({
-  entities: [], events: [], tick: 0, floor: 1, missionText: 'Reach the exit', missionComplete: false,
+  entities: [], events: [], tick: 0, floor: 1, missionText: 'Reach the Launch Bay', missionComplete: false,
   gameOver: false,
   level: { w: 40, h: 40, exit: { x: 20, y: 20 } },
   self: {

@@ -121,7 +121,7 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
       template: 'reach',
       complete: true,
       exitUnlocked: true,
-      description: 'Reach the exit',
+      description: 'Reach the Launch Bay',
     },
     rng: baseRng.fork(`sim:${floor}`),
     baseRng,

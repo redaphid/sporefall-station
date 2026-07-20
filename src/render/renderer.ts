@@ -89,6 +89,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     resolution: Math.min(window.devicePixelRatio || 1, 2),
     autoDensity: true,
     antialias: false,
+    // Snap every renderable's FINAL screen position to a whole pixel. The world
+    // container now carries the true sub-pixel camera transform (camera.apply);
+    // this global snap keeps tiles/sprites crisp WITHOUT the container-origin
+    // rounding that made the followed player sawtooth ±0.5px (camera jitter).
+    roundPixels: true,
   })
   mount.appendChild(app.canvas)
 

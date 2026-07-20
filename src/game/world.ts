@@ -6,6 +6,7 @@ import { aiSystem } from './systems/ai'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
+import { infectionActive, infectionSystem } from './systems/infection'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
@@ -206,6 +207,11 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   interactionSystem(w, inputs)
   fireSystem(w)
   sporeSystem(w)
+  // #64 spore contagion — gated OFF by default (systems/infection.ts
+  // INFECTION_ENABLED); when active, exposed crew turn into Infected hosts. Runs
+  // after sporeSystem/fireSystem so this tick's spore + burning are already set
+  // (the fire cure reads `burning`), before elementSystem applies the DOT.
+  if (infectionActive(w)) infectionSystem(w)
   elementSystem(w)
   statusSystem(w)
   statusFxSystem(w)

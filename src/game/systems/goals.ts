@@ -83,8 +83,11 @@ export const hateToward = (w: World, e: Entity, targetId: EntityId): number => {
   // A hostile world floors an un-opinionated NPC's grudge to the hostile band so
   // it engages regardless of faction; likewise a POWER CUT rouses the station's
   // Derelict Units (robots) into open hostility — the standing cost of that path.
-  // Either way a stored opinion (e.g. befriended) still wins.
-  const forced = w.hostile || (e.archetype === 'robot' && anyPowerCut(w))
+  // #64: when the Infected are involved (a field only ever set while the feature
+  // is active), host and clean are floored to open hostility so the crew fights/
+  // flees a host even in an otherwise peaceful world. A stored opinion still wins.
+  const infectionInvolved = !!e.infected || !!w.byId.get(targetId)?.infected
+  const forced = w.hostile || infectionInvolved || (e.archetype === 'robot' && anyPowerCut(w))
   return forced ? Math.max(base, WORLD_HOSTILE_HATE) : base
 }
 

@@ -53,6 +53,7 @@ import {
   perceives,
   type Goal,
 } from './goals'
+import { infectionActive } from './infection'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
@@ -86,6 +87,11 @@ const dist2d = (ax: number, ay: number, bx: number, by: number): number => Math.
  * tear into each OTHER, not just the players. Pure lookups, ascending-id caller. */
 const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
   const ai = e.ai!
+  // #64 — the Infected and the uninfected are mutual enemies regardless of
+  // faction: a body is either host or prey. Overrides faction/player rules.
+  if (infectionActive(w) && (e.infected || target.infected)) {
+    return e.infected ? !target.infected : !!target.infected
+  }
   if (target.playerCtl) {
     if (target.dead || target.playerCtl.downed) return false
     // Derelict Units (robots) sleep through a peaceful station, but a power cut
@@ -365,6 +371,28 @@ const defendMyWing: Consideration = (w, e) => {
   return out
 }
 
+// ── #64 Infest: the mindless Infected host — shamble at the nearest clean
+// body, never flee, never reason. Only fires on an `infected` entity. ─────────
+const INFEST_SCORE = 5
+
+const infest: Consideration = (w, e) => {
+  if (!e.infected) return []
+  let best: Entity | undefined
+  let bestD = Infinity
+  for (const p of w.entities) {
+    if (p.dead || !p.health || p.infected) continue
+    if (!p.playerCtl && !p.ai) continue // a living body to hunt
+    if (!perceives(w, e, p)) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d < bestD) {
+      bestD = d
+      best = p
+    }
+  }
+  if (!best) return []
+  return [{ code: bestD <= ENGAGE_RANGE ? BATTLE : PURSUE, score: INFEST_SCORE, tier: TIER_THREAT, target: best.id }]
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -372,6 +400,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   fear,
   threat,
   defendMyWing,
+  infest,
   hunt,
   alertGuards,
   pursueMemory,
@@ -413,6 +442,10 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   scavenger: {
     about: 'drawn to loose items it can see; grabs them into its stash',
     considerations: ['fear', 'threat', 'fleeMemory', 'scavenge', 'workMyRoom', 'wander'],
+  },
+  infected: {
+    about: '#64: a spore-turned host — shambles at the nearest clean body, never flees',
+    considerations: ['infest', 'pursueMemory', 'wander'],
   },
 }
 

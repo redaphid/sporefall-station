@@ -295,6 +295,15 @@ export interface Entity {
   /** A usable object (ATM/vending) that has already dispensed once. */
   used?: boolean
   dead?: boolean
+  // ── #64 spore contamination (gated by systems/infection.ts INFECTION_ENABLED) ──
+  /** Cumulative spore-exposure load; at INFECT_THRESHOLD a crew member TURNS.
+   * Absent until first exposed → snapshot-stable, and never set while the
+   * infection feature is off (the shipped default). */
+  sporeLoad?: number
+  /** This agent has turned into a mindless Infected host — hostile to every
+   * uninfected body, driven by the `infected` brain (systems/behaviors.ts). Set
+   * only by the infection system when the feature is enabled. */
+  infected?: boolean
   /** General UI selection state — the player tapped/clicked this entity to point
    * it out. Multi-select: any number of entities may be `selected` at once. Inert
    * to the sim (no system reads it), so it never affects determinism; it rides

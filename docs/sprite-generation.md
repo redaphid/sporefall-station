@@ -495,16 +495,45 @@ frames), ComfyUI is at `localhost:8188` (checkpoint + pixel-art LoRA + IPAdapter
 present), Ollama `qwen3-vl:8b` is up. The `--no-trace` bulky walk is real and
 coherent.
 
-The remaining blocker is **not infrastructure — it is curation.** The
-idle/step **poses** are ComfyUI txt2img/img2img, and getting a candidate that
-is simultaneously (a) the teal suit + orange visor identity, (b) bulky, (c)
-head_h in 23–31 to match the walk, and (d) consistent to ±3 px width / ±2 px
-head_h across all 5 directions with the orange-visor **accent** the facing gate
-needs, did NOT converge from automated seed sweeps (28 candidates): the
-checkpoint drifts to grey astronaut / green-maned swamp-creature reads and
-drops the orange accent on side views. This is the same multi-round hand-curation
-the r1 `curation.json` notes record ("consistency fix r2/r3", "orange-visor
-emphasis"). Because a partial regen (new bulky idle, old thin walk — or vice
+The remaining blocker is **not infrastructure — it is curation**, and a second
+(~10-round) curation pass pinned down exactly WHERE and WHY it plateaus
+(evidence: `docs/assets/hero-sprites/plateau-evidence.png`):
+
+1. **s-idle front anchor — SOLVED.** Two checkpoint behaviours are
+   anti-correlated on `AnythingXL_xl`: the orange-visor **accent** and the
+   bulky **merged-head** build. `AnythingXL` gives a bulky no-neck-gap build
+   (`w30 hd27 m590`) but paints a grey astronaut with NO orange, even at
+   denoise 0.72 with no IPAdapter, or with an orange IPAdapter identity anchor;
+   it gives a strong orange helmet only when that helmet is a distinct dome with
+   a neck gap (`head_h 13`). `Illustrious-XL-v0.1` (the LoRA's native family)
+   paints the orange readily but is an anime base — slim, un-armored. The
+   working anchor is the AnythingXL **orange domed-helmet** candidate
+   (`w29 head_h 13 mass ~655 accent 0.32`) — a great-looking bulky ranger whose
+   only "failure" is that `head_h 13` (distinct dome) ≠ the proxy's `head_h 27`
+   (merged head). That is a *consistency* mismatch, not a bad sprite: adopt it
+   AND rebuild the proxy to a domed helmet (`head_h ~13`) and the set is
+   self-consistent.
+
+2. **Pose DIRECTIONS — the real plateau.** img2img from the front anchor
+   PRESERVES the orange accent (an e-idle chained from the anchor passed the
+   accent-facing gate: `dx +1.7`), but at the low denoise that keeps identity it
+   does **not rotate the view** — the "profile" frames stay front-facing and
+   would fail `verify.py`'s "e must read as a profile" VLM gate; the higher
+   denoise that actually turns the character drifts the identity/accent off.
+   This is the exact **view-rotation-vs-identity** tension the rotoscope stage
+   (§6) was invented to resolve (3D supplies rotation, diffusion only re-develops
+   surface). Diffusion-only per-direction poses need the many-round manual
+   img2img chaining the r1 `curation.json` records — it does not fall out of
+   automated sweeps.
+
+**Recommended lever (strongest): rotoscope the pose directions too**, not just
+the walk — render idle + step keyposes from the (domed-helmet) proxy in
+`rig_walk.py` and trace them exactly like the walk. That gives guaranteed
+rotation + identity + per-direction consistency + the orange accent by
+construction, and reduces the whole hero to ONE deterministic motion source. The
+alternative is the r1-style multi-dozen-round manual img2img direction curation.
+
+Because a partial regen (new bulky idle, old thin walk — or vice
 versa) fails `src/render/charConsistency.test.ts`, **nothing was overwritten in
 `public/themes/swampspace/chars/` and `consistency-spec.json` was NOT re-locked**;
 the committed art and the standing gate stay green. A curated bulky s-idle raw

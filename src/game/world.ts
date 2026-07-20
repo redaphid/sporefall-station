@@ -32,6 +32,14 @@ export interface MissionState {
   bloomTick?: number
   /** `contain` only: the bloom already fired (soft-fail latched, room flooded). */
   bloomed?: boolean
+  /** The door entity DIRECTLY guarding the objective (boss room / objective room)
+   * — its nearest gateway, tagged at mission-gen (`door.objectiveGate`). Unlocking
+   * it by ANY means turns the whole floor hostile (see missions.maybeTriggerBossAggro).
+   * Optional so `reach` (no target building) and pre-feature snapshots omit it. */
+  objectiveDoorId?: EntityId
+  /** Latch: the boss-door aggro escalation has already fired (once per floor).
+   * Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
+  bossAggroTriggered?: boolean
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */

@@ -1,0 +1,11 @@
+# Boss-door aggro proof — seed=1 floor=2 template=steal
+objective gate: door #97 at (3.5,55.5) locked=true objectiveGate=true
+NPCs on floor: 42   alarm=0   bossAggroTriggered=false
+BEFORE breach — dispositions {"Friendly":0,"Neutral":35,"Annoyed":0,"Hostile":7,"aggro":0}
+
+>> detonate a grenade ON the objective gate (player #105) …
+AFTER breach  — alarm=3   bossAggroTriggered=true
+AFTER breach  — dispositions {"Friendly":0,"Neutral":0,"Annoyed":0,"Hostile":42,"aggro":42}
+events this tick: bossDoorBreached
+
+RESULT: 42/42 NPCs Hostile, 42/42 aggro, alarm 3/3 — FLOOR FULLY HOSTILE ✓

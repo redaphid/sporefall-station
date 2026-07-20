@@ -5,6 +5,7 @@ import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
+import { raiseFloorAggro } from './relationships'
 import { addEntity, type World } from '../world'
 
 export const setupFloor = (w: World): void => {
@@ -14,6 +15,10 @@ export const setupFloor = (w: World): void => {
   // …then dress the objective's gateway as a real access puzzle (Sporefall):
   // a biolock or an overgrown hatch, with its key/generator/Spore Node placed.
   applyAccessGate(w)
+  // Finally, tag the objective's gateway door so a breach of it can turn the
+  // floor hostile — runs on EVERY floor (even floor 1's plain locks), unlike the
+  // access gate which only dresses floors >= 2.
+  tagObjectiveGate(w)
 }
 
 /** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
@@ -133,17 +138,11 @@ const applyAccessGate = (w: World): void => {
   const bi = w.mission.targetBuilding
   if (bi === undefined || bi < 0) return
   const building = w.level.buildings[bi]
-  const doors = buildingDoors(w, building)
-  if (doors.length === 0) return
-  const rng = w.rng.fork('access')
-  const room = building.objectiveRoom ?? building.rect
-  const cx = room.x + room.w / 2
-  const cy = room.y + room.h / 2
   // The gateway is the door nearest the objective room; outer doors stay plain
   // (pickable) so only the LAST step is gated — never the whole building.
-  const gate = doors.reduce((best, d) =>
-    Math.hypot(d.pos.x - cx, d.pos.y - cy) < Math.hypot(best.pos.x - cx, best.pos.y - cy) ? d : best,
-  )
+  const gate = objectiveGateDoor(w, building)
+  if (!gate) return
+  const rng = w.rng.fork('access')
   const wing = `wing${bi}`
   // contain → overgrown; infiltrate → biolock (keycard/power); else free choice.
   const scheme =
@@ -186,6 +185,34 @@ const buildingDoors = (w: World, building: Building): Entity[] =>
   w.entities.filter(
     (e) => e.door && building.doors.some((d) => d.x === Math.floor(e.pos.x) && d.y === Math.floor(e.pos.y)),
   )
+
+/** The single door DIRECTLY gating the objective: the building door nearest the
+ * objective room's centre. Deterministic (a pure nearest-reduce, no RNG). Both
+ * the access-gate dressing and the boss-door tag key off this, so the door that
+ * gets sealed is exactly the door that triggers the aggro. Undefined if the
+ * building has no doors. */
+const objectiveGateDoor = (w: World, building: Building): Entity | undefined => {
+  const doors = buildingDoors(w, building)
+  if (doors.length === 0) return undefined
+  const room = building.objectiveRoom ?? building.rect
+  const cx = room.x + room.w / 2
+  const cy = room.y + room.h / 2
+  return doors.reduce((best, d) =>
+    Math.hypot(d.pos.x - cx, d.pos.y - cy) < Math.hypot(best.pos.x - cx, best.pos.y - cy) ? d : best,
+  )
+}
+
+/** Mark the objective's gateway so a breach of it (by ANY unlock method) turns
+ * the floor hostile. Runs on every floor with a target building — `reach` (no
+ * building) has no boss door, so nothing is tagged and the escalation never fires. */
+const tagObjectiveGate = (w: World): void => {
+  const bi = w.mission.targetBuilding
+  if (bi === undefined || bi < 0) return
+  const gate = objectiveGateDoor(w, w.level.buildings[bi])
+  if (!gate) return
+  gate.door!.objectiveGate = true
+  w.mission.objectiveDoorId = gate.id
+}
 
 /** A random interior Floor tile of the building (never spawn/exit), or null. */
 const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; ty: number } | null => {
@@ -251,8 +278,52 @@ const roomCenter = (b: Building): { x: number; y: number } => {
   return { x: room.x + room.w / 2, y: room.y + room.h / 2 }
 }
 
+/** The player nearest the breached door — the focus the floor turns on (co-op
+ * NPCs re-target the closest threat anyway; this just seeds the memory). Falls
+ * back to any player entity if none are alive. */
+const aggroFocus = (w: World, door: Entity): Entity | undefined => {
+  let best: Entity | undefined
+  let bestD = Infinity
+  for (const e of w.entities) {
+    if (!e.playerCtl || e.dead) continue
+    const d = Math.hypot(e.pos.x - door.pos.x, e.pos.y - door.pos.y)
+    if (d < bestD) {
+      bestD = d
+      best = e
+    }
+  }
+  return best ?? w.entities.find((e) => e.playerCtl)
+}
+
+/**
+ * Boss-door escalation. The moment the objective's gateway door is UNLOCKED by
+ * any means — picked, keycarded, power-cut, or breached (all of which drop
+ * `door.locked` and/or set `door.open`) — the whole floor turns hostile: alarm
+ * maxes and every non-allied NPC aggros the party. Point of no return, latched
+ * once per floor via `mission.bossAggroTriggered` so it fires exactly one time
+ * and re-opening/re-toggling the door never re-triggers it. Deterministic: a
+ * pure read of door state + a fixed aggro flip, no RNG or wall-clock.
+ */
+const maybeTriggerBossAggro = (w: World): void => {
+  if (w.mission.bossAggroTriggered) return
+  const id = w.mission.objectiveDoorId
+  if (id === undefined) return
+  const door = w.byId.get(id)
+  if (!door?.door) return
+  // Still sealed shut → not yet breached. Any unlock method leaves it either
+  // unlocked (power-cut) or open (pick/keycard/breach/overgrown-clear).
+  if (door.door.locked && !door.door.open) return
+  w.mission.bossAggroTriggered = true
+  const focus = aggroFocus(w, door)
+  if (focus) raiseFloorAggro(w, focus)
+  else w.alarm = 3
+  w.events.push({ type: 'bossDoorBreached', entityId: id, x: door.pos.x, y: door.pos.y })
+}
+
 export const missionSystem = (w: World): void => {
   if (w.gameOver) return
+
+  maybeTriggerBossAggro(w)
 
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {

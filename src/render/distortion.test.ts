@@ -107,15 +107,16 @@ describe('specsForEvents — event → primitive mapping', () => {
     expect(wave.seed).toBe(bloom.seed) // one blast, one phase
   })
 
-  it('impacts and doused burns map to refraction / shimmer', () => {
+  it('generic combat pings do NOT map to distortion (scoped to blasts + mod rounds)', () => {
+    // Regression: hit/shatter/shock/burnDoused used to each spawn a refraction or
+    // shimmer, warping bare ground on any stray shot. They must now map to nothing.
     const evs: SimEvent[] = [
       { type: 'hit', x: 1, y: 1, targetId: 9, amount: 3 },
       { type: 'shatter', x: 2, y: 2, entityId: 8 },
       { type: 'shock', x: 3, y: 3, targetId: 7 },
       { type: 'burnDoused', x: 4, y: 4, entityId: 6, remainingTicks: 0 },
     ]
-    const kinds = specsForEvents(evs, 0).map((s) => s.kind)
-    expect(kinds).toEqual(['refraction', 'refraction', 'refraction', 'shimmer'])
+    expect(specsForEvents(evs, 0)).toHaveLength(0)
   })
 
   it('irrelevant events spawn nothing', () => {
@@ -140,42 +141,52 @@ describe('specsForEvents — event → primitive mapping', () => {
 })
 
 describe('sustainedSpecs — entity-tracked prims', () => {
-  it('fire cells shimmer, keyed by entity id', () => {
+  it('fire cells do NOT distort (heat-haze on bare ground was removed)', () => {
+    // Regression: fire cells used to shimmer heat-haze over every burning tile,
+    // a ground distortion with no weapon behind it. They must contribute nothing.
     const fire = makeEntity('fire', 'fire', 4, 5, 0.4)
     fire.fire = { fuel: 30 }
-    const specs = sustainedSpecs([fire])
-    expect(specs).toHaveLength(1)
-    expect(specs[0].kind).toBe('shimmer')
-    expect(specs[0].key).toBe(`fire:${fire.id}`)
-    expect(specs[0].x).toBe(4)
+    expect(sustainedSpecs([fire])).toHaveLength(0)
   })
 
-  it('deep-stack rounds (power >= 3) refract; shallow builds do not', () => {
-    const deep = makeEntity('projectile', 'projectile', 1, 1, 0.1)
-    deep.projectile = {
-      ownerId: 1,
-      damage: 1,
-      ttl: 30,
-      // Three effective stacks — the chroma tier (frost caps at 1 stack).
-      mods: [{ id: 'frost', stacks: 1 }, { id: 'overload', stacks: 1 }, { id: 'rapid', stacks: 1 }],
+  it('only rounds whose build carries an air-warping mod refract', () => {
+    // explosive carries distortAdd → the round warps the air.
+    const warping = makeEntity('projectile', 'projectile', 1, 1, 0.1)
+    warping.projectile = { ownerId: 1, damage: 1, ttl: 30, mods: [{ id: 'explosive', stacks: 1 }] }
+    // A DEEP but mundane stat build (power 5, no distort mod) must NOT warp —
+    // the gate is the mod trait, not raw stack count (the old power>=3 bug).
+    const deepMundane = makeEntity('projectile', 'projectile', 2, 2, 0.1)
+    deepMundane.projectile = {
+      ownerId: 1, damage: 1, ttl: 30,
+      mods: [{ id: 'bulk', stacks: 2 }, { id: 'rapid', stacks: 2 }, { id: 'heavy', stacks: 1 }],
     }
-    const shallow = makeEntity('projectile', 'projectile', 2, 2, 0.1)
-    shallow.projectile = { ownerId: 1, damage: 1, ttl: 30, mods: [{ id: 'frost', stacks: 1 }] }
     const vanilla = makeEntity('projectile', 'projectile', 3, 3, 0.1)
     vanilla.projectile = { ownerId: 1, damage: 1, ttl: 30 }
-    const specs = sustainedSpecs([deep, shallow, vanilla])
+    const specs = sustainedSpecs([warping, deepMundane, vanilla])
     expect(specs).toHaveLength(1)
     expect(specs[0].kind).toBe('refraction')
-    expect(specs[0].key).toBe(`proj:${deep.id}`)
+    expect(specs[0].key).toBe(`proj:${warping.id}`)
     expect(specs[0].strength).toBeGreaterThan(0)
     expect(specs[0].strength).toBeLessThanOrEqual(0.5)
   })
 
+  it('every distortion mod, alone, makes its round refract', () => {
+    for (const id of ['glassCannon', 'explosive', 'detonator', 'shock', 'incendiary', 'homing']) {
+      const p = makeEntity('projectile', 'projectile', 1, 1, 0.1)
+      p.projectile = { ownerId: 1, damage: 1, ttl: 30, mods: [{ id, stacks: 1 }] }
+      expect(sustainedSpecs([p]), `mod '${id}' should warp`).toHaveLength(1)
+    }
+  })
+
+  it('empty world / no projectiles → no distortion at all', () => {
+    expect(sustainedSpecs([])).toHaveLength(0)
+  })
+
   it('dead entities contribute nothing', () => {
-    const fire = makeEntity('fire', 'fire', 4, 5, 0.4)
-    fire.fire = { fuel: 30 }
-    fire.dead = true
-    expect(sustainedSpecs([fire])).toHaveLength(0)
+    const p = makeEntity('projectile', 'projectile', 4, 5, 0.4)
+    p.projectile = { ownerId: 1, damage: 1, ttl: 30, mods: [{ id: 'explosive', stacks: 1 }] }
+    p.dead = true
+    expect(sustainedSpecs([p])).toHaveLength(0)
   })
 })
 

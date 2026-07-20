@@ -39,8 +39,8 @@ export interface MissionViewLike {
 }
 
 /** Case-insensitive "this mission IS the exit objective" test, so a `reach`
- * template doesn't render as two identical rows. */
-const isReachText = (text: string): boolean => text.trim().toLowerCase() === 'reach the exit'
+ * template doesn't render as two identical rows. The exit is the Launch Bay. */
+const isReachText = (text: string): boolean => text.trim().toLowerCase() === 'reach the launch bay'
 
 /**
  * Build the objective rows for the current frame.
@@ -66,7 +66,7 @@ export const missionObjectives = (v: MissionViewLike): Objective[] => {
   if (v.exit) {
     rows.push({
       key: 'exit',
-      text: 'Reach the exit',
+      text: 'Reach the Launch Bay',
       state: v.missionComplete ? 'active' : 'locked',
       link: v.missionComplete ? { x: v.exit.x + 0.5, y: v.exit.y + 0.5 } : undefined,
     })
@@ -85,7 +85,7 @@ const entityLink = (v: MissionViewLike): ObjectiveLink | undefined => {
 
 /** Collapsed-chip text — parity with the old one-line mission readout. */
 export const missionChipText = (v: Pick<MissionViewLike, 'floor' | 'missionText' | 'missionComplete'>): string =>
-  v.missionComplete ? `Floor ${v.floor} — EXIT is open!` : `Floor ${v.floor} — ${v.missionText}`
+  v.missionComplete ? `Floor ${v.floor} — LAUNCH BAY is open!` : `Floor ${v.floor} — ${v.missionText}`
 
 /**
  * Resolve a link to its CURRENT world position: a live entity's live pos, or

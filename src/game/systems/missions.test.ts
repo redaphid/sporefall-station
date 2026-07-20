@@ -55,6 +55,36 @@ describe('roguelite loop', () => {
     throw new Error('no assassinate mission found in 30 seeds')
   })
 
+  it('mission descriptions are themed to the Sporefall fiction (no off-theme words)', () => {
+    // Themed templates per generated mission type — the description must match its
+    // template's phrasing and never leak the old earthbound vocabulary.
+    const THEMED: Record<string, RegExp> = {
+      steal: /^Extract the specimen canister from the /,
+      assassinate: /^Purge the Mireclaw Alpha in the /,
+      reach: /^Reach the Launch Bay$/,
+      contain: /^Burn back the Spore Node in the .* before it blooms$/,
+      infiltrate: /^Breach the biolock and purge the Mireclaw Alpha in the /,
+    }
+    const OFF_THEME = /briefcase|\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
+    const seen = new Set<string>()
+    for (let floor = 1; floor <= 6; floor++) {
+      for (let seed = 1; seed < 30; seed++) {
+        const w = createWorld(seed, floor)
+        populateWorld(w)
+        setupFloor(w)
+        const desc = w.mission.description
+        expect(desc.length).toBeGreaterThan(0)
+        const pattern = THEMED[w.mission.template]
+        expect(pattern, `unexpected template ${w.mission.template}`).toBeDefined()
+        expect(desc, `bad ${w.mission.template} desc: "${desc}"`).toMatch(pattern)
+        expect(desc, `off-theme word in: "${desc}"`).not.toMatch(OFF_THEME)
+        seen.add(w.mission.template)
+      }
+    }
+    // We should have exercised the shallow steal/assassinate/reach path at least.
+    expect(seen.has('steal') || seen.has('assassinate')).toBe(true)
+  })
+
   it('standing on the unlocked exit advances the floor, keeping players and healing them', () => {
     const { w } = makeRun(12)
     const player = w.entities.find((e) => e.playerCtl)!

@@ -62,7 +62,10 @@ const pretty = (s: string): string =>
     .join(' ')
 
 /** Human name for whichever weapon/throwable/consumable id we can resolve. */
-const itemName = (id: string): string => WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id)
+const itemName = (id: string): string =>
+  id === 'briefcase'
+    ? 'Specimen Canister'
+    : (WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id))
 
 /** One row per weapon mod on a stack: "❄️ Cryo Rounds" → "×N". Empty for a
  * vanilla / absent stack, so an unmodded gun shows just the Weapon row. */
@@ -255,7 +258,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
       } else if (e.pickup.itemId === 'cash') {
         card.tagline = 'Money — grab it'
       } else if (e.pickup.itemId === 'briefcase') {
-        card.tagline = 'The goods — this is what you came for'
+        card.tagline = 'The specimen canister — this is what you came for'
       }
     }
   }

@@ -132,7 +132,7 @@ const ok1 = await record({
     // Start: collapsed chip carries the mission line; the target is off-screen
     // so the 🎯 edge indicator (and no caret/ring) shows.
     if (!s.start?.chipVisible) f.push('chip not visible at start')
-    if (!/Floor 1 — Steal the briefcase/.test(s.start?.chipText ?? '')) f.push(`chip text wrong: "${s.start?.chipText}"`)
+    if (!/Floor 1 — Extract the specimen canister/.test(s.start?.chipText ?? '')) f.push(`chip text wrong: "${s.start?.chipText}"`)
     if (s.start?.panelOpen) f.push('panel should start collapsed')
     if (!s.start?.edgeIndicator) f.push('edge indicator missing while target off-screen')
     if (s.start?.focusRing) f.push('focus ring must not show before a tap')
@@ -186,7 +186,7 @@ const ok2 = await record({
     const f = []
     if (s.active?.missionComplete) f.push('mission should start incomplete')
     if (s.active?.rows.find((r) => r.key === 'exit')?.state !== 'locked') f.push('exit not locked at start')
-    if (!/EXIT is open/.test(s.complete?.chipText ?? '')) f.push(`chip did not flip on completion: "${s.complete?.chipText}"`)
+    if (!/LAUNCH BAY is open/.test(s.complete?.chipText ?? '')) f.push(`chip did not flip on completion: "${s.complete?.chipText}"`)
     const done = s.panelDone?.rows.find((r) => r.key === 'mission')
     if (done?.state !== 'done') f.push(`mission row not done: ${JSON.stringify(done)}`)
     if (done?.linked) f.push('despawned target must drop its hyperlink')
@@ -214,7 +214,7 @@ const ok3 = await record({
       act: seq(
         (page) =>
           page.evaluate(() => {
-            window.__world.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Reach the exit' }
+            window.__world.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Reach the Launch Bay' }
           }),
         settle(120),
         click('[data-mission-chip]'),

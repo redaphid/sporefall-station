@@ -35,6 +35,68 @@ export const isRolling = (e: Entity, tick: number): boolean =>
   e.playerCtl?.roll !== undefined && tick < e.playerCtl.roll.untilTick
 
 /**
+ * Try to START a dodge-roll for `e` toward the desired heading (`dirX,dirY` —
+ * typically the move stick; a centred stick falls back to `e.facing`). Returns
+ * true only when a roll actually began. It self-gates: no roll while dead, downed,
+ * already rolling OR still cooling down (no chaining), stunned, asleep, or
+ * frozen/immobilised.
+ *
+ * THE single roll-start path. Both the dodge button (rollSystem) and the FIRE
+ * button's "nothing to use or fire" fallback (combatSystem) funnel through here,
+ * so a roll begun either way is byte-identical — same tick windows, same `roll`
+ * event, same stop-drop-and-roll douse.
+ */
+export const tryStartRoll = (w: World, e: Entity, dirX: number, dirY: number): boolean => {
+  const pc = e.playerCtl
+  if (!pc || e.dead || pc.downed) return false
+  // Already rolling, or still cooling down → no re-roll (the anti-chain gate).
+  if (pc.roll) return false
+  const stunned = e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)
+  if (stunned || isImmobilized(e)) return false
+
+  // Roll in the desired direction; fall back to facing when the stick is centred.
+  let dx = dirX
+  let dy = dirY
+  const len = Math.hypot(dx, dy)
+  if (len > 0.01) {
+    dx /= len
+    dy /= len
+  } else {
+    dx = Math.cos(e.facing)
+    dy = Math.sin(e.facing)
+  }
+  pc.roll = {
+    untilTick: w.tick + ROLL_TICKS,
+    cooldownUntilTick: w.tick + ROLL_TICKS + ROLL_COOLDOWN,
+    dirX: dx,
+    dirY: dy,
+  }
+  w.events.push({ type: 'roll', x: e.pos.x, y: e.pos.y, entityId: e.id })
+
+  // Stop-drop-and-roll: the roll's START smothers a burning status. An instant,
+  // once per roll — NOT a lingering aura, so a burn caught MID-roll sticks until
+  // the next roll. Extinguishing deletes the effect before this tick's
+  // elementSystem runs (rollSystem precedes it in tickWorld), so a burn doused
+  // to zero deals no damage this tick; a merely-shortened burn keeps ticking.
+  // Standing IN the flames re-ignites the same tick (fireSystem runs later) —
+  // you have to roll OUT of the fire, as in life.
+  const burn = e.fx?.burning
+  if (burn !== undefined) {
+    const remaining = burn.until - w.tick
+    if (remaining <= DOUSE_TICKS) delete e.fx!.burning
+    else burn.until -= DOUSE_TICKS
+    w.events.push({
+      type: 'burnDoused',
+      x: e.pos.x,
+      y: e.pos.y,
+      entityId: e.id,
+      remainingTicks: Math.max(0, remaining - DOUSE_TICKS),
+    })
+  }
+  return true
+}
+
+/**
  * Start/expire dodge-rolls. Runs BEFORE movement so a roll begun this tick already
  * bursts this tick, and BEFORE combat so a rolling player can't also attack.
  *
@@ -57,11 +119,11 @@ export const rollSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // off a bit of the shock (SHOCK_SHAKE_TICKS) — a struggle to break free. We
     // shorten the effect's ABSOLUTE expiry (snapshot-safe); once the remaining
     // shock is within one chunk the press clears it outright, so it can't
-    // underflow past zero. Placed before BOTH the roll-in-progress gate and the
-    // immobilise gate below — either would otherwise swallow the press and leave
-    // an electrified player with no way to struggle free. One reduction per
-    // press: InputCmd.roll is edge-triggered by every input source, so mashing
-    // (not holding) is what drives it, mirroring how a roll itself is triggered.
+    // underflow past zero. Placed before the roll-start below — it would otherwise
+    // swallow the press and leave an electrified player with no way to struggle
+    // free. One reduction per press: InputCmd.roll is edge-triggered by every
+    // input source, so mashing (not holding) is what drives it, mirroring how a
+    // roll itself is triggered.
     if (cmd?.roll && hasStatus(e, 'electrified')) {
       const shock = e.fx!.electrified
       if (shock.until - w.tick <= SHOCK_SHAKE_TICKS) removeStatus(e, 'electrified')
@@ -69,51 +131,7 @@ export const rollSystem = (w: World, inputs: Map<number, InputCmd>): void => {
       continue
     }
 
-    // Already rolling, or still cooling down → ignore further roll presses.
-    if (pc.roll) continue
-
-    const stunned = e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)
-    if (stunned || isImmobilized(e)) continue
     if (!cmd || !cmd.roll) continue
-
-    // Roll in the move direction; fall back to facing when the stick is centred.
-    let dx = cmd.moveX
-    let dy = cmd.moveY
-    const len = Math.hypot(dx, dy)
-    if (len > 0.01) {
-      dx /= len
-      dy /= len
-    } else {
-      dx = Math.cos(e.facing)
-      dy = Math.sin(e.facing)
-    }
-    pc.roll = {
-      untilTick: w.tick + ROLL_TICKS,
-      cooldownUntilTick: w.tick + ROLL_TICKS + ROLL_COOLDOWN,
-      dirX: dx,
-      dirY: dy,
-    }
-    w.events.push({ type: 'roll', x: e.pos.x, y: e.pos.y, entityId: e.id })
-
-    // Stop-drop-and-roll: the roll's START smothers a burning status. An instant,
-    // once per roll — NOT a lingering aura, so a burn caught MID-roll sticks until
-    // the next roll. Extinguishing deletes the effect before this tick's
-    // elementSystem runs (rollSystem precedes it in tickWorld), so a burn doused
-    // to zero deals no damage this tick; a merely-shortened burn keeps ticking.
-    // Standing IN the flames re-ignites the same tick (fireSystem runs later) —
-    // you have to roll OUT of the fire, as in life.
-    const burn = e.fx?.burning
-    if (burn !== undefined) {
-      const remaining = burn.until - w.tick
-      if (remaining <= DOUSE_TICKS) delete e.fx!.burning
-      else burn.until -= DOUSE_TICKS
-      w.events.push({
-        type: 'burnDoused',
-        x: e.pos.x,
-        y: e.pos.y,
-        entityId: e.id,
-        remainingTicks: Math.max(0, remaining - DOUSE_TICKS),
-      })
-    }
+    tryStartRoll(w, e, cmd.moveX, cmd.moveY)
   }
 }

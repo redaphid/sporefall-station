@@ -155,6 +155,25 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Control for the dodge-roll video: never roll — the same bullet connects.
   dodgeControl: [{ ticks: 60 }],
 
+  // Fire-uses-active-item headline: a wounded player holds a bandage in the active
+  // slot and presses FIRE — instead of a gun shot, the bandage is USED (heals) and
+  // spent. No bullet leaves the barrel. Backs feature-fire-item-roll.
+  fireUseItem: [
+    { ticks: 20 }, // establish: wounded, bandage in hand
+    { ticks: 1, attack: true }, // FIRE → uses the bandage, hp jumps
+    { ticks: 49 }, // stand healed; nothing was fired
+  ],
+
+  // Fire→dodge-roll fallback headline: the active gun is OUT OF AMMO, so pressing
+  // FIRE (nothing to shoot, nothing usable) rolls instead of a dead click — the
+  // i-frames carry the player through an inbound bullet. Same duel world as
+  // dodgeRoll, triggered off the FIRE button. Backs feature-fire-item-roll.
+  fireFallbackRoll: [
+    { ticks: 15 }, // the bullet closes in
+    { ticks: 1, attack: true, x: 1 }, // FIRE an empty gun → dodge-roll east through it
+    { ticks: 44 }, // finish the tumble, untouched
+  ],
+
   // Stop-drop-and-roll (#roll-douses-fire): the player starts ABLAZE (a fresh
   // 240-tick weapon burn), burns for a beat, then rolls twice — roll 1 at tick
   // 30 smothers 150 ticks, roll 2 at tick 75 kills the remainder. Paired with

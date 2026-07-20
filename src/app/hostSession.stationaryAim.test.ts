@@ -92,15 +92,21 @@ describe('stationary aim: a deflected aim stick drives facing even with the move
     expect(session.self.facing).toBeCloseTo(Math.PI / 4, 6)
   })
 
-  it('a real mouse-aiming keyboard still wins when the pad aim is centred (mouse path intact)', () => {
-    const mouseAim = { sample: (): InputCmd => ({ ...emptyInput(), aimX: 0, aimY: 1 }) } // aim down
+  it('a joined pad SUPPRESSES the mouse even when the stick is centred → facing HOLDS', () => {
+    // Once a pad drives slot 0 the desktop mouse must not move the gun. A centred
+    // stick emits (0,0), so facing holds its prior value instead of snapping to
+    // the mouse cursor. (Pre-follow-up this took the mouse aim; that was the
+    // residual half of the bug.)
+    const mouseAim = { sample: (): InputCmd => ({ ...emptyInput(), aimX: 0, aimY: 1 }) } // cursor down, mag 1
     const coop = scripted([
       { inputs: new Map([[0, padCmd(0, 0, 0, 0)]]), joins: [0], leaves: [], pauses: [] },
     ])
     const session = new HostSession(1, mouseAim, coop)
+    session.self.facing = 1.234 // a known prior heading
     const cmd = tickCapture(session).get(0)!
-    expect(session.self.facing).toBeCloseTo(Math.atan2(1, 0), 6)
-    expect(cmd.aimY).toBe(1)
+    expect(session.self.facing).toBe(1.234) // held, NOT the mouse (down)
+    expect(cmd.aimX).toBe(0)
+    expect(cmd.aimY).toBe(0)
   })
 })
 
@@ -141,17 +147,17 @@ describe('co-op: each player keeps its own aim; one player standing still does n
   })
 })
 
-describe('desktop mouse-aim must NOT hijack an actively-aimed gamepad (the re-run bug)', () => {
+describe('a joined pad OWNS aim: the desktop mouse never moves the gun (the re-run bug)', () => {
   // The desktop mouse-aim provider (keyboard.ts + main.ts pointerAim) emits a
   // CONSTANT unit vector toward wherever the cursor last sat — magnitude ~1
-  // forever, even when the player is on the pad and never touches the mouse. A
-  // pure aim-magnitude race let that stale mag-1 phantom tie/beat a stationary
-  // stick reading ≤1.0, snapping facing to the cursor: the gun points where the
-  // mouse sits (often ~opposite the real aim → "inverted"). The deflected pad
-  // stick must win; only a CENTRED pad yields to the mouse.
+  // forever, even when the player is on the pad and never touches the mouse.
+  // "It's tracking my mouse AND my gamepad — it should only track the gamepad if
+  // one is detected." A pad on slot 0 IS one detected, so the pad owns aim
+  // outright: a deflected stick aims; a centred stick HOLDS the last facing; the
+  // mouse contributes nothing, deflected or centred.
   const mouseUp = { sample: (): InputCmd => ({ ...emptyInput(), aimX: 0, aimY: -1 }) } // cursor up, mag 1
 
-  it('cardinal stationary stick (mag exactly 1.0) beats a stale mouse aim (mag 1.0)', () => {
+  it('cardinal stationary stick (mag exactly 1.0) drives facing; the stale mouse is ignored', () => {
     // Stadia cardinals read ~1.0 (over-unity only on diagonals). Player aims DOWN.
     const coop = scripted([
       { inputs: new Map([[0, padCmd(0, 0, 0, 1.0)]]), joins: [0], leaves: [], pauses: [] },
@@ -162,7 +168,7 @@ describe('desktop mouse-aim must NOT hijack an actively-aimed gamepad (the re-ru
     expect(cmd.aimY).toBeCloseTo(1, 6)
   })
 
-  it('a PARTIALLY-deflected stick (mag 0.6) still beats the mouse — deflection is deliberate', () => {
+  it('a PARTIALLY-deflected stick (mag 0.6) drives facing — the mouse is ignored', () => {
     const coop = scripted([
       { inputs: new Map([[0, padCmd(0, 0, 0, 0.6)]]), joins: [0], leaves: [], pauses: [] },
     ])
@@ -171,7 +177,7 @@ describe('desktop mouse-aim must NOT hijack an actively-aimed gamepad (the re-ru
     expect(session.self.facing).toBeCloseTo(Math.PI / 2, 6) // DOWN (pad)
   })
 
-  it('an over-unity diagonal stick (mag ~1.11) beats the mouse and is clamped', () => {
+  it('an over-unity diagonal stick (mag ~1.11) drives facing and is clamped', () => {
     const coop = scripted([
       { inputs: new Map([[0, padCmd(0, 0, 0.785, 0.785)]]), joins: [0], leaves: [], pauses: [] },
     ])
@@ -179,24 +185,6 @@ describe('desktop mouse-aim must NOT hijack an actively-aimed gamepad (the re-ru
     const cmd = tickCapture(session).get(0)!
     expect(session.self.facing).toBeCloseTo(Math.PI / 4, 6) // down-right (pad)
     expect(Math.hypot(cmd.aimX, cmd.aimY)).toBeLessThanOrEqual(1 + 1e-9)
-  })
-
-  it('a stick BELOW the deadzone (mag 0.1) yields to the mouse — no phantom flicker', () => {
-    const coop = scripted([
-      { inputs: new Map([[0, padCmd(0, 0, 0, 0.1)]]), joins: [0], leaves: [], pauses: [] },
-    ])
-    const session = new HostSession(1, mouseUp, coop)
-    tickCapture(session)
-    expect(session.self.facing).toBeCloseTo(-Math.PI / 2, 6) // UP (mouse), pad ignored
-  })
-
-  it('a CENTRED stick yields to the mouse — desktop mouse-aim still works with a pad plugged in', () => {
-    const coop = scripted([
-      { inputs: new Map([[0, padCmd(0, 0, 0, 0)]]), joins: [0], leaves: [], pauses: [] },
-    ])
-    const session = new HostSession(1, mouseUp, coop)
-    tickCapture(session)
-    expect(session.self.facing).toBeCloseTo(-Math.PI / 2, 6) // UP (mouse)
   })
 
   it('the classic "inverted" case: cursor opposite the aim, stick wins so the gun is NOT flipped', () => {
@@ -209,5 +197,20 @@ describe('desktop mouse-aim must NOT hijack an actively-aimed gamepad (the re-ru
     const session = new HostSession(1, mouseUpLeft, coop)
     tickCapture(session)
     expect(session.self.facing).toBeCloseTo(Math.PI / 4, 6) // down-right (pad), not up-left (mouse)
+  })
+
+  it('stick RELEASED with the cursor opposite → facing HOLDS the last pad aim, no mouse snap', () => {
+    // Tick 1: aim DOWN with the stick. Tick 2: release the stick (centred) while
+    // the mouse cursor sits UP. Facing must HOLD down — never snap to the cursor.
+    const mouseUpProvider = { sample: (): InputCmd => ({ ...emptyInput(), aimX: 0, aimY: -1 }) }
+    const coop = scripted([
+      { inputs: new Map([[0, padCmd(0, 0, 0, 1.0)]]), joins: [0], leaves: [], pauses: [] }, // aim down
+      { inputs: new Map([[0, padCmd(0, 0, 0, 0)]]), joins: [], leaves: [], pauses: [] }, // stick released
+    ])
+    const session = new HostSession(1, mouseUpProvider, coop)
+    tickCapture(session) // tick 1 → facing down
+    expect(session.self.facing).toBeCloseTo(Math.PI / 2, 6)
+    tickCapture(session) // tick 2 → still down (held), NOT up (mouse)
+    expect(session.self.facing).toBeCloseTo(Math.PI / 2, 6)
   })
 })

@@ -5,7 +5,6 @@ import { setupFloor } from '../game/systems/missions'
 import { createWorld, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
-import { AIM_DEADZONE } from '../input/aim'
 import type { CoopSample } from '../input/gamepadCoop'
 import type { RenderView, Session } from './session'
 
@@ -31,32 +30,31 @@ const clampAim = (x: number, y: number): { x: number; y: number } => {
  * Merge two commands that drive the SAME player entity (the primary human). The
  * ONLY call site folds a pad's command (`b`) onto the local keyboard/touch
  * command (`a`) for slot 0 — so `a` is always the keyboard/touch source and `b`
- * is always the pad. Move and aim are selected INDEPENDENTLY.
+ * is always the pad, and this runs ONLY when a pad IS present/joined on slot 0.
  *
- * Move: by move magnitude (the larger wins).
+ * Move: by move magnitude (the larger wins), so WASD and the stick both drive.
  *
- * Aim: a pad's aim STICK deflected past its deadzone is a DELIBERATE aim and
- * OUTRANKS the keyboard/mouse aim. This matters because the desktop mouse-aim
- * provider (keyboard.ts + main.ts) emits a CONSTANT unit vector toward wherever
- * the cursor last sat — magnitude ~1 forever, even when the player is on the pad
- * and never touching the mouse. A pure magnitude race let that stale phantom
- * (mag 1.0) tie or beat a stationary stick reading ≤1.0 and snap `facing` to the
- * cursor — the "gun points at the mouse / aim feels inverted" bug on
- * desktop+gamepad (a re-run of the stationary-aim freeze wearing a mouse mask).
- * Only when the pad stick is CENTRED (aim ≤ deadzone) does the keyboard/mouse
- * aim take over; a centred aim on BOTH sources passes (0,0) through so the sim
- * holds the last facing instead of snapping to a default.
+ * Aim: once a PAD is on slot 0, the PAD OWNS AIM OUTRIGHT — the desktop mouse
+ * never moves the gun. `b` already carries a deadzoned aim (gamepadCoop.toCmd →
+ * selectAim): a deflected stick is its aim; a CENTRED stick is (0,0), which the
+ * sim reads as "hold the last facing" (movement.ts gates on |aim| > 0.01). So
+ * releasing the stick HOLDS the last aim instead of snapping to the stale cursor.
+ * The keyboard/mouse aim (`a`) is dropped entirely here.
  *
- * Gating aim on MOVE magnitude was the original stationary-aim bug (a deflected
- * aim stick while move = 0 lost to the idle move source). Different players
- * occupy different slots and never merge here, so this cannot cross-contaminate
- * one player's aim with another's.
+ * Why: the desktop mouse-aim provider (keyboard.ts + main.ts) emits a CONSTANT
+ * unit vector toward wherever the cursor last sat — magnitude ~1 forever, even
+ * when the player is on the pad and never touching the mouse. Letting it into the
+ * merge at all made the gun track BOTH the mouse and the stick — "it should only
+ * track the gamepad if one is detected". A pad on slot 0 means one is detected.
+ *
+ * The no-pad desktop mouse+keyboard path and the phone/touch path never reach
+ * here (no pad on slot 0 → `mergeCmd` is not called), so both are unchanged.
+ * Different players occupy different slots and never merge here, so this cannot
+ * cross-contaminate one player's aim with another's.
  */
 const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
   const useBMove = Math.hypot(b.moveX, b.moveY) > Math.hypot(a.moveX, a.moveY)
-  const bAim = Math.hypot(b.aimX, b.aimY)
-  const useBAim = bAim > AIM_DEADZONE || bAim > Math.hypot(a.aimX, a.aimY)
-  const aim = clampAim(useBAim ? b.aimX : a.aimX, useBAim ? b.aimY : a.aimY)
+  const aim = clampAim(b.aimX, b.aimY)
   return {
     seq: a.seq,
     moveX: useBMove ? b.moveX : a.moveX,

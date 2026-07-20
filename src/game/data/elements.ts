@@ -18,4 +18,8 @@ export const ELEMENTS: Record<string, ElementDef> = {
   wet: { id: 'wet', dot: 0, interval: 30, durationTicks: 150 },
   electrified: { id: 'electrified', dot: 0, interval: 30, durationTicks: 30 },
   poisoned: { id: 'poisoned', dot: 1, interval: 15, durationTicks: 120 },
+  // Bog spores: a choking damage-over-time laid by a spore hazard cell (a
+  // ruptured spore-sac or a Spore Node's bloom). Softer than fire but stickier —
+  // a longer tail, so a spore-flooded room keeps gnawing after you leave it.
+  spore: { id: 'spore', dot: 1, interval: 12, durationTicks: 150 },
 }

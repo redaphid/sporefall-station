@@ -11,6 +11,7 @@ import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling } from './roll'
+import { spawnSporeBurst } from './spore'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -276,9 +277,23 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   for (const d of w.entities) {
     if (d.dead || !d.door || d.door.open) continue
     if (Math.hypot(d.pos.x - x, d.pos.y - y) > radius) continue
-    d.door.locked = false
-    d.door.open = true
+    const door = d.door
+    const wasOvergrown = door.overgrown === true
+    // A biolock or bog seal breached is LOUD: the always-available fallback that
+    // guarantees no hatch dead-ends a run, but it announces you to the station.
+    const wasSealed = wasOvergrown || door.sealKind !== undefined
+    door.overgrown = false
+    if (wasOvergrown) door.growthHp = 0
+    door.locked = false
+    door.open = true
     w.events.push({ type: 'doorBreach', entityId: d.id, x: d.pos.x, y: d.pos.y })
+    if (wasOvergrown) {
+      // Rupture the spore-sac the bog had swollen behind the hatch: a spreading
+      // spore gout floods the breach (deterministic, see systems/spore.ts).
+      spawnSporeBurst(w, Math.floor(d.pos.x), Math.floor(d.pos.y))
+      w.events.push({ type: 'sealOpen', entityId: d.id, via: 'breach' })
+    }
+    if (wasSealed) w.alarm = Math.min(3, w.alarm + 1)
   }
 }
 

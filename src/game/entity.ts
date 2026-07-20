@@ -185,8 +185,45 @@ export interface Entity {
     mods?: WeaponMod[]
   }
   pickup?: { itemId: string; qty: number }
-  door?: { open: boolean; locked: boolean; lockLevel: number }
+  /**
+   * A door/hatch. `open`/`locked`/`lockLevel` are the original mundane lock (a
+   * pick channel opens it — interaction.ts). Everything below is OPTIONAL, so a
+   * plain door serializes byte-for-byte as before (same discipline as `mods`):
+   *
+   * ── Increment A "Credentials & Power": a sealed biolock hatch ──
+   *  `sealKind` — how it opens beyond a breach: `'pick'` (mundane, the slow
+   *   channel), `'keycard'` (needs the `keyId` item in hand), or `'power'` (auto-
+   *   unseals when its `wing`'s power is cut, `World.powerCut`). A sealed hatch is
+   *   also `locked:true` (so lock-aware code still treats it as shut).
+   *  `keyId` — the exact item id a keycard seal demands (e.g. 'keycard.north').
+   *  `wing`  — the power grid this hatch (and its generator) belong to.
+   *
+   * ── Increment B "The Living Seal": an overgrown hatch ──
+   *  `overgrown` — bog-sealed, not locked in the mechanical sense: no pick/keycard
+   *   opens it. Clear it with FIRE (erodes `growthHp`), by killing the linked
+   *   Spore Node (`nodeId`), or by breaching (ruptures a spore-sac).
+   *  `growthHp` — bog integrity; fire/burning erodes it to 0 → the hatch unseals.
+   *  `nodeId`   — the Spore Node entity feeding this growth; its death unseals.
+   */
+  door?: {
+    open: boolean
+    locked: boolean
+    lockLevel: number
+    sealKind?: 'pick' | 'keycard' | 'power'
+    keyId?: string
+    wing?: string
+    overgrown?: boolean
+    growthHp?: number
+    nodeId?: EntityId
+  }
   interact?: { verb: 'open' | 'pickup' | 'talk' | 'use'; range: number }
+  /** A generator / Cryo Terminal's power grid: hacking it cuts power to this
+   * `wing` (World.powerCut), auto-unsealing that wing's `'power'` biolocks. */
+  wing?: string
+  /** A spreading bog-spore hazard occupying this cell — kind 'fire' (a non-
+   * colliding ground hazard). `fuel` burns down 1/tick; while it lasts it lays
+   * the `spore` element on bodies standing in the cell (see systems/spore.ts). */
+  spore?: { fuel: number }
   status?: { stun: number; sleep: number; hitFlashUntil: number; cloakUntil: number }
   /** Active status/element effects, keyed by kind ('burning', ...). */
   fx?: Fx

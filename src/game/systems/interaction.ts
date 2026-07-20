@@ -7,6 +7,7 @@ import type { InputCmd } from '../types'
 import { type World } from '../world'
 import { addItem, applyModPickup, equipSlot } from './inventory'
 import { useObject } from './objects'
+import { fireAt } from './fire'
 
 const INTERACT_RANGE = 1.3
 /** How far a channeling picker may drift from the door before the pick drops. */
@@ -36,7 +37,67 @@ const REVIVE_TICKS = 90 // 3s of teammate proximity
 /** Fraction of max HP a revived player comes back with — a low, exposed start. */
 const REVIVE_HP_FRACTION = 0.3
 
+/** How much a burning cell erodes an overgrown hatch's growth, and how often. */
+const GROWTH_EROSION = 1
+const GROWTH_EROSION_INTERVAL = 6
+
+/** Un-overgrow a hatch (fire ate the bog, or its Spore Node died): it becomes a
+ * plain open, passable doorway. One place does the mutation + event. */
+const clearOvergrowth = (w: World, d: Entity, via: 'fire' | 'node' | 'breach'): void => {
+  const door = d.door!
+  door.overgrown = false
+  door.growthHp = 0
+  door.locked = false
+  door.open = true
+  w.events.push({ type: 'sealOpen', entityId: d.id, via })
+}
+
+/**
+ * Reconcile every hatch's SEAL against the world each tick — the systemic half
+ * of the door mechanic, independent of any player pressing E:
+ *  - an OVERGROWN hatch clears when its linked Spore Node dies, or when fire
+ *    (a cell fire or a lingering `burning` status) erodes its `growthHp` to 0;
+ *  - a POWER biolock auto-unseals while its wing's grid is cut (World.powerCut),
+ *    and re-seals if power is restored — so cutting power really is a key.
+ * Runs before player interaction so a just-cut wing is openable this same tick.
+ */
+export const sealSystem = (w: World): void => {
+  for (const d of w.entities) {
+    if (!d.door || d.dead) continue
+    const door = d.door
+    if (door.overgrown) {
+      // The Spore Node feeding this growth died → the seal rots away.
+      if (door.nodeId !== undefined) {
+        const node = w.byId.get(door.nodeId)
+        if (!node || node.dead) {
+          clearOvergrowth(w, d, 'node')
+          continue
+        }
+      }
+      // Fire erodes the bog: a cell fire on the hatch, or a `burning` status
+      // caught earlier, gnaws `growthHp` down on a timer until it gives way.
+      const burning = fireAt(w, Math.floor(d.pos.x), Math.floor(d.pos.y)) || d.fx?.burning !== undefined
+      if (burning && w.tick % GROWTH_EROSION_INTERVAL === 0) {
+        door.growthHp = (door.growthHp ?? 0) - GROWTH_EROSION
+        if (door.growthHp <= 0) clearOvergrowth(w, d, 'fire')
+      }
+      continue
+    }
+    // Power biolock tracks its wing's grid: unseal on cut, re-seal on restore.
+    if (door.sealKind === 'power' && door.wing) {
+      const cut = w.powerCut[door.wing] === true
+      if (cut && door.locked) {
+        door.locked = false
+        w.events.push({ type: 'sealOpen', entityId: d.id, via: 'power' })
+      } else if (!cut && !door.locked && !door.open) {
+        door.locked = true // power restored while shut → the seal re-engages
+      }
+    }
+  }
+}
+
 export const interactionSystem = (w: World, inputs: Map<number, InputCmd>): void => {
+  sealSystem(w)
   for (const p of w.entities) {
     if (!p.playerCtl || p.dead) continue
     if (p.playerCtl.downed) {
@@ -78,22 +139,56 @@ const autoPickup = (w: World, p: Entity): void => {
 const handleInteract = (w: World, p: Entity): void => {
   const target = nearestInteractable(w.entities, p)
   if (!target) return
-  if (OBJECTS[target.archetype]?.use) {
+  if (OBJECTS[target.archetype]?.use || OBJECTS[target.archetype]?.hackable) {
     useObject(w, p, target)
     return
   }
   if (target.door) {
     const door = target.door
+    // An OVERGROWN hatch answers to no hand on the panel — burn it, kill its
+    // Spore Node, or breach it. A press just names what it needs.
+    if (door.overgrown) {
+      w.events.push({ type: 'sealDenied', entityId: target.id, byId: p.id, sealKind: 'overgrown' })
+      return
+    }
     if (!door.locked) {
       door.open = !door.open
       w.events.push({ type: 'doorToggle', entityId: target.id, open: door.open })
-    } else if (!p.playerCtl!.channel) {
+      return
+    }
+    // KEYCARD biolock: the right card in hand pops it instantly (no stand-still
+    // channel) — access is a sub-objective (go get the card), not a time-tax.
+    if (door.sealKind === 'keycard') {
+      if (hasKeycard(p, door.keyId)) {
+        door.locked = false
+        door.open = true
+        w.events.push({ type: 'sealOpen', entityId: target.id, via: 'keycard' })
+      } else {
+        w.events.push({ type: 'sealDenied', entityId: target.id, byId: p.id, sealKind: 'keycard' })
+      }
+      return
+    }
+    // POWER biolock: only a cut wing (auto-unsealed by sealSystem into the
+    // !locked branch above) or a breach opens it. A bare press can't.
+    if (door.sealKind === 'power') {
+      w.events.push({ type: 'sealDenied', entityId: target.id, byId: p.id, sealKind: 'power' })
+      return
+    }
+    // Mundane lock (`sealKind:'pick'` or a plain locked door): the slow channel.
+    if (!p.playerCtl!.channel) {
       const total = pickTicks(door.lockLevel)
       p.playerCtl!.channel = { kind: 'lockpick', targetId: target.id, ticksLeft: total, total }
       w.events.push({ type: 'pickStart', entityId: target.id, byId: p.id, ticks: total })
     }
   }
 }
+
+/** Does this player hold the keycard a biolock demands? A seal with an explicit
+ * `keyId` wants that exact card; a keyless seal accepts any wing keycard. */
+const hasKeycard = (p: Entity, keyId: string | undefined): boolean =>
+  p.playerCtl!.inventory.some((s) =>
+    keyId !== undefined ? s.itemId === keyId : s.itemId === 'keycard' || s.itemId.startsWith('keycard.'),
+  )
 
 /**
  * Advance a lockpick channel. Picking is DETERMINISTIC: hold your ground for

@@ -1,14 +1,27 @@
-import { makeEntity, SPAWN_GRACE_TICKS } from '../entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { generateLevel } from '../levelgen/generate'
-import type { Building } from '../levelgen/level'
+import { Tile, type Building } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
+import type { Rng } from '../rng'
+import { spawnObject } from './objects'
+import { spawnSporeBurst } from './spore'
 import { addEntity, type World } from '../world'
 
 export const setupFloor = (w: World): void => {
   // Mission first — door locking depends on which building it targets.
   generateMission(w)
   spawnDoors(w)
+  // …then dress the objective's gateway as a real access puzzle (Sporefall):
+  // a biolock or an overgrown hatch, with its key/generator/Spore Node placed.
+  applyAccessGate(w)
 }
+
+/** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
+ * enough to fight to it and burn it back; short enough that dawdling floods the
+ * room (a soft-fail — harder, never a loss). ~40s at 30tps. */
+const BLOOM_TICKS = 40 * 30
+/** Bog integrity of an overgrown gateway hatch — fire erodes it (interaction). */
+const GATEWAY_GROWTH_HP = 12
 
 /** Door entities on every building door tile. Mission building's exterior doors are locked. */
 const spawnDoors = (w: World): void => {
@@ -39,6 +52,13 @@ const generateMission = (w: World): void => {
     return
   }
 
+  // Deep floors (5+) are the bog's heart: the mission itself becomes a Sporefall
+  // objective — CONTAIN a blooming Spore Node, or INFILTRATE past a biolock to a
+  // Mireclaw. Gated to floor >= 5 (nothing pins deep floors), and drawn only
+  // there: the `&&` short-circuits on shallow floors so the mission RNG stream
+  // stays byte-identical to the frozen steal/assassinate placement table.
+  if (w.floor >= 5 && generateSporefallMission(w, rng, building, buildingIdx)) return
+
   if (rng.chance(0.5)) {
     const spot = roomCenter(building)
     const item = makeEntity('pickup', 'pickup.briefcase', spot.x, spot.y, 0.3)
@@ -64,6 +84,147 @@ const generateMission = (w: World): void => {
       description: `Take out the boss in the ${building.role}`,
     }
   }
+}
+
+/** Deep-floor (5+) Sporefall objective. Returns true if it claimed the mission.
+ *  contain    — a Spore Node grows in the core; destroy it before it blooms.
+ *  infiltrate — a Mireclaw hides behind a biolock; get past it and put it down.
+ * The gateway seal + key/generator/node are placed later by applyAccessGate,
+ * which reads w.mission.template, so the two stay in lock-step. */
+const generateSporefallMission = (w: World, rng: Rng, building: Building, buildingIdx: number): boolean => {
+  const spot = roomCenter(building)
+  if (rng.chance(0.5)) {
+    const node = spawnObject(w, 'sporeNode', Math.floor(spot.x), Math.floor(spot.y))
+    w.mission = {
+      template: 'contain',
+      targetEntityId: node.id,
+      targetBuilding: buildingIdx,
+      complete: false,
+      exitUnlocked: false,
+      description: `Destroy the Spore Node in the ${building.role} before it blooms`,
+      bloomTick: w.tick + BLOOM_TICKS,
+    }
+  } else {
+    const boss = spawnNpc(w, 'boss', spot.x, spot.y)
+    w.mission = {
+      template: 'infiltrate',
+      targetEntityId: boss.id,
+      targetBuilding: buildingIdx,
+      complete: false,
+      exitUnlocked: false,
+      description: `Breach the biolock and take out the Mireclaw in the ${building.role}`,
+    }
+  }
+  return true
+}
+
+/**
+ * Dress the mission building's GATEWAY (the door nearest the objective room) as
+ * a real access puzzle — the heart of the redesign. The scheme is chosen to fit
+ * the template (contain → overgrown, infiltrate → biolock, steal/assassinate →
+ * any of the three) from a DEDICATED `access` fork, so it never perturbs the
+ * mission/loot/populate streams. Every scheme leaves the BREACH path open (a
+ * grenade opens any hatch — combat.detonate), and places its own soft key
+ * (keycard / generator / a reachable Spore Node), so a run is never dead-ended.
+ * Only floors >= 2 are gated (floor 1 stays the tutorial city of plain locks).
+ */
+const applyAccessGate = (w: World): void => {
+  if (w.floor < 2) return
+  const bi = w.mission.targetBuilding
+  if (bi === undefined || bi < 0) return
+  const building = w.level.buildings[bi]
+  const doors = buildingDoors(w, building)
+  if (doors.length === 0) return
+  const rng = w.rng.fork('access')
+  const room = building.objectiveRoom ?? building.rect
+  const cx = room.x + room.w / 2
+  const cy = room.y + room.h / 2
+  // The gateway is the door nearest the objective room; outer doors stay plain
+  // (pickable) so only the LAST step is gated — never the whole building.
+  const gate = doors.reduce((best, d) =>
+    Math.hypot(d.pos.x - cx, d.pos.y - cy) < Math.hypot(best.pos.x - cx, best.pos.y - cy) ? d : best,
+  )
+  const wing = `wing${bi}`
+  // contain → overgrown; infiltrate → biolock (keycard/power); else free choice.
+  const scheme =
+    w.mission.template === 'contain'
+      ? 2
+      : w.mission.template === 'infiltrate'
+        ? rng.int(0, 1)
+        : rng.int(0, 2)
+
+  if (scheme === 0) {
+    // Keycard biolock: card carried in a cargo pod elsewhere in the building.
+    gate.door!.locked = true
+    gate.door!.sealKind = 'keycard'
+    gate.door!.keyId = `keycard.${wing}`
+    gate.door!.wing = wing
+    placeKeycard(w, building, `keycard.${wing}`, rng)
+  } else if (scheme === 1) {
+    // Power biolock: cut the wing at its generator (the loud, systemic key).
+    gate.door!.locked = true
+    gate.door!.sealKind = 'power'
+    gate.door!.wing = wing
+    placeGenerator(w, building, wing, rng)
+  } else {
+    // Overgrown hatch fed by a Spore Node. For a `contain` mission the node IS
+    // the objective (already placed); otherwise spawn a fresh, reachable node.
+    gate.door!.locked = true
+    gate.door!.overgrown = true
+    gate.door!.growthHp = GATEWAY_GROWTH_HP
+    gate.flammable = true // fire can catch on the bog and erode the growth
+    const nodeId =
+      w.mission.template === 'contain' && w.mission.targetEntityId !== undefined
+        ? w.mission.targetEntityId
+        : placeSporeNode(w, building, rng)?.id
+    if (nodeId !== undefined) gate.door!.nodeId = nodeId
+  }
+}
+
+/** Door entities standing on this building's door tiles. */
+const buildingDoors = (w: World, building: Building): Entity[] =>
+  w.entities.filter(
+    (e) => e.door && building.doors.some((d) => d.x === Math.floor(e.pos.x) && d.y === Math.floor(e.pos.y)),
+  )
+
+/** A random interior Floor tile of the building (never spawn/exit), or null. */
+const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; ty: number } | null => {
+  const sx = Math.floor(w.level.spawn.x)
+  const sy = Math.floor(w.level.spawn.y)
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
+    const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
+    if (w.level.tiles[ty * w.level.w + tx] !== Tile.Floor) continue
+    if (tx === sx && ty === sy) continue
+    if (tx === w.level.exit.x && ty === w.level.exit.y) continue
+    return { tx, ty }
+  }
+  return null
+}
+
+/** Drop the wing keycard in a cargo pod somewhere in the building (reachable —
+ * outside the gate it opens). Guaranteed by breach even if placement fails. */
+const placeKeycard = (w: World, building: Building, keyId: string, rng: Rng): void => {
+  const t = randomFloorTile(w, building, rng)
+  if (!t) return
+  const e = makeEntity('pickup', `pickup.${keyId}`, t.tx + 0.5, t.ty + 0.5, 0.3)
+  e.pickup = { itemId: keyId, qty: 1 }
+  addEntity(w, e)
+}
+
+/** Spawn the wing's generator inside the building — hacking it cuts the wing. */
+const placeGenerator = (w: World, building: Building, wing: string, rng: Rng): void => {
+  const t = randomFloorTile(w, building, rng)
+  if (!t) return
+  const gen = spawnObject(w, 'generator', t.tx, t.ty)
+  gen.wing = wing
+}
+
+/** Spawn a reachable Spore Node (its death un-overgrows the linked gateway). */
+const placeSporeNode = (w: World, building: Building, rng: Rng): Entity | null => {
+  const t = randomFloorTile(w, building, rng)
+  if (!t) return null
+  return spawnObject(w, 'sporeNode', t.tx, t.ty)
 }
 
 const farthestBuilding = (w: World): Building | null => {
@@ -99,9 +260,16 @@ export const missionSystem = (w: World): void => {
         (e) => e.playerCtl && e.playerCtl.inventory.some((s) => s.itemId === 'briefcase'),
       )
       if (holder) completeMission(w)
-    } else if (w.mission.template === 'assassinate') {
+    } else if (
+      w.mission.template === 'assassinate' ||
+      w.mission.template === 'infiltrate' ||
+      w.mission.template === 'contain'
+    ) {
+      // All three complete when their target is gone — the boss/Mireclaw is
+      // dead, or the Spore Node is destroyed (by ANY cause: shot, burned, blasted).
       const target = w.mission.targetEntityId !== undefined ? w.byId.get(w.mission.targetEntityId) : undefined
       if (!target || target.dead) completeMission(w)
+      else if (w.mission.template === 'contain') maybeBloom(w, target)
     }
   }
 
@@ -131,6 +299,17 @@ export const missionSystem = (w: World): void => {
   if (players.length === 1 && !players[0].dead) return
   w.gameOver = true
   w.events.push({ type: 'runOver', floor: w.floor })
+}
+
+/** `contain` soft-fail: if the Spore Node lives past its bloom tick, it BLOOMS —
+ * a spore gout floods the core (harder to fight through), latched once. This is
+ * never a loss: the objective is still to destroy the node, just now amid spores. */
+const maybeBloom = (w: World, node: Entity): void => {
+  if (w.mission.bloomed || w.mission.bloomTick === undefined) return
+  if (w.tick < w.mission.bloomTick) return
+  w.mission.bloomed = true
+  spawnSporeBurst(w, Math.floor(node.pos.x), Math.floor(node.pos.y))
+  w.events.push({ type: 'bloom', x: node.pos.x, y: node.pos.y, entityId: node.id })
 }
 
 const completeMission = (w: World): void => {
@@ -171,6 +350,7 @@ export const nextFloor = (w: World): void => {
     w.byId.set(p.id, p)
   }
   w.alarm = 0
+  w.powerCut = {} // a fresh floor is fully powered again
   populateWorld(w)
   setupFloor(w)
   w.events.push({ type: 'floorChange', floor: w.floor })

@@ -52,6 +52,9 @@ export const shock = (w: World, origin: Entity): void => {
     if (e.health && !e.playerCtl?.downed) {
       // A downed body is out of the fight — shock damage can't re-kill it (#52).
       e.health.hp -= ELEC_DAMAGE
+      // This is the one damage site that bypasses combat.applyDamage, so stamp the
+      // last-hurt tick here too — an arc still counts as being harmed for regen.
+      e.health.lastHurtTick = w.tick
       w.events.push({ type: 'shock', x: e.pos.x, y: e.pos.y, targetId: e.id })
       if (e.health.hp <= 0) kill(w, e)
     }

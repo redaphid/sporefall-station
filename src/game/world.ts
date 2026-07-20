@@ -11,6 +11,7 @@ import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
 import { rollSystem } from './systems/roll'
 import { projectileSystem } from './systems/projectiles'
+import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
 import type { Annotation, EntityId, InputCmd, SimEvent } from './types'
@@ -189,6 +190,10 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   elementSystem(w)
   statusSystem(w)
   statusFxSystem(w)
+  // Regen runs LAST among the damage-aware systems: after every source that can
+  // hurt a player this tick (so "hurt this tick" is final) and after movement (so
+  // stillness reflects the settled position/velocity), before mission/sweep.
+  regenSystem(w)
   missionSystem(w)
   sweepDead(w)
   w.tick++

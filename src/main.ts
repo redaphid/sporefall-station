@@ -9,6 +9,7 @@ import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
+import type { DebugLink } from './debug/channel'
 import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
@@ -273,15 +274,19 @@ const boot = async (): Promise<void> => {
   // that own an authoritative world (solo/host). Dynamic import keeps it out of
   // normal builds. The hub URL derives from whoever served the app, so it "just
   // works" under Vite live-reload from the laptop.
-  let debug: { afterTick(): void } | undefined
+  // A rebindable link (not a bare channel): New-Seed / play-again swaps the
+  // session's World object in place, and the link's `rebind` re-dials the hub
+  // against the fresh world (see runLoop) so the reset re-registers exactly like a
+  // page reload — no frozen zombie, no blind observer. See DebugLink in channel.ts.
+  let debug: DebugLink | undefined
   if (params.has('debug') && 'world' in session) {
-    const { startDebugChannel } = await import('./debug/channel')
+    const { startDebugLink } = await import('./debug/channel')
     const { hubUrl, DEFAULT_HUB_PORT } = await import('./debug/protocol')
     const port = Number(params.get('debugPort')) || DEFAULT_HUB_PORT
     // `?debug=<name>` labels this game in the hub's registry so multiple games on
     // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
     const name = params.get('debug') || undefined
-    debug = startDebugChannel((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
+    debug = startDebugLink((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
       name,
       setTheme: (id) => void renderer.setTheme(id),
     })
@@ -507,7 +512,7 @@ const runLoop = (
   coop: ReturnType<typeof createGamepadCoop>,
   inspect: Inspect,
   touch?: TouchInput,
-  debug?: { afterTick(): void },
+  debug?: DebugLink,
   persister?: Persister,
   resumed = false,
 ): void => {
@@ -544,6 +549,14 @@ const runLoop = (
     screenW: renderer.app.screen.width,
     screenH: renderer.app.screen.height,
   })
+  // `restart()` swaps `session.world` for a brand-new World object, so re-dial the
+  // debug link against the fresh world (dev-only; `debug` is undefined without
+  // `?debug`). Without this the in-place reset leaves the hub bound to the OLD,
+  // now-frozen world — a zombie — while the live run goes un-bridged (the New-Seed
+  // blind-observer bug); a full page reload re-ran boot() and never hit it.
+  const rebindDebug = (): void => {
+    if ('world' in session) debug?.rebind((session as { world: World }).world)
+  }
   // Play-again wraps restart() so a NEW run overwrites any (possibly game-over)
   // save: clear immediately, then the rebuilt world re-saves on the normal cadence
   // — the player is never trapped resuming into a dead run with no way forward.
@@ -551,6 +564,7 @@ const runLoop = (
     ? () => {
         session.restart!()
         persister?.clear()
+        rebindDebug()
       }
     : undefined
   // "New Seed": read the run's CURRENT seed off the authoritative session, pick a
@@ -563,6 +577,7 @@ const runLoop = (
     ? () => {
         session.restart!(pickNewSeed(seedOf()))
         persister?.clear()
+        rebindDebug()
       }
     : undefined
   const screens = createScreens(uiMount, onRestart, cameraSource, onNewSeed, renderer.weaponThumb)

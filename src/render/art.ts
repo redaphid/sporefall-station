@@ -6,20 +6,24 @@ import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
 
-// HI-RES PROTOTYPE TOGGLE (art-cn1 review). Flip BOTH constants to 2× —
-// `TILE_PX = 64`, `CHAR_PX = 96` (below) — and record with
-// `?theme=swampspace-hires` to get the native-96 vine-ranger (512→96 instead of
-// 512→48, so detail survives). Render-layer only: the sim never sees pixels, so
-// determinism is unaffected. Left at 32/48 by default so the shipped 48px art +
-// camera tests stay coherent; the weapon-scale fix in sprites.ts (`CHAR_PX/48`)
-// keeps the held weapon pinned/proportional at either size. The hi-res B video
-// (~/Videos/backseat/art-hires) was recorded from the 64/96 build.
+// Logical tile size. TILE_PX stays 32 so camera framing/zoom tests hold; hi-res
+// packs (artScale 2) bake their 64px tile art at this logical size but double
+// pixel DENSITY, so detail survives. Render-layer only: the sim never sees
+// pixels, so determinism is unaffected. The held-weapon scale in sprites.ts
+// (`CHAR_PX/48`) tracks CHAR_PX so weapons stay pinned/proportional.
 export const TILE_PX = 32
 
-/** Character sprite canvas: 48×48 over the 32px tiles. Feet-anchored, so a
- * character stands 1.5 tiles tall and overlaps the tile behind/above it
- * (docs/themes.md "Character art convention"). */
-export const CHAR_PX = 48
+/** Character sprite canvas: 64×64 over the 32px tiles. Feet-anchored, so a
+ * character stands 2 tiles tall and overlaps the tile behind/above it
+ * (docs/themes.md "Character art convention"). Genesis-upgrade: raised from 48
+ * (1.5 tiles) so figures carry 16-bit-era screen presence; theme art bakes to
+ * this logical size regardless of its source resolution (themeLoader), and the
+ * procedural fallback figure below draws on a fixed 48 design grid scaled up. */
+export const CHAR_PX = 64
+
+/** The design grid drawCharacter's literal coordinates target; the baked
+ * texture is scaled CHAR_PX/CHAR_DESIGN_PX so fallback art tracks CHAR_PX. */
+const CHAR_DESIGN_PX = 48
 
 /**
  * Maps logical art keys to textures. v1 is procedural colored shapes;
@@ -763,7 +767,7 @@ export const createArt = (
     const dark = colorOverride ?? shade(color, 0.55)
     const light = colorOverride ?? shade(color, 1.25)
     const outline = colorOverride ?? 0x101018
-    const cx = CHAR_PX / 2
+    const cx = CHAR_DESIGN_PX / 2
     const lift = frame === 'step' ? 1 : 0 // step pose bobs the body, feet stay planted
     // Per-direction lean: diagonals shift head/torso toward the heading so
     // se/ne read as 3/4 views; e is a full profile.
@@ -772,8 +776,8 @@ export const createArt = (
     const profile = dir === 'e'
 
     // Transparent full-canvas rect pins generateTexture's bounds to the whole
-    // 48×48 canvas, so the feet anchor (bottom-centre) is exact.
-    const g = new Graphics().rect(0, 0, CHAR_PX, CHAR_PX).fill({ color: 0, alpha: 0 })
+    // design canvas, so the feet anchor (bottom-centre) is exact.
+    const g = new Graphics().rect(0, 0, CHAR_DESIGN_PX, CHAR_DESIGN_PX).fill({ color: 0, alpha: 0 })
 
     // Legs: idle stands square; step strides — trailing leg lifted, leading planted.
     const legW = 5
@@ -830,8 +834,13 @@ export const createArt = (
       g.circle(cx + torsoW / 2 + bodyDx + 2, 30 - lift, 2.5).fill(colorOverride ?? 0x3a3a44)
     }
 
-    const tex = renderer.generateTexture(g)
-    g.destroy()
+    // Bake at CHAR_PX: the figure is drawn on the 48 design grid, scaled up in
+    // a holder so its bounds (and feet anchor) land exactly on the real canvas.
+    const holder = new Container()
+    g.scale.set(CHAR_PX / CHAR_DESIGN_PX)
+    holder.addChild(g)
+    const tex = renderer.generateTexture(holder)
+    holder.destroy({ children: true })
     return tex
   }
 

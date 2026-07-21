@@ -10,10 +10,10 @@ import type { EntityId } from './types'
 import type { World } from './world'
 
 /** Default tap-pick radius in world tiles. Characters draw on a feet-anchored
- * 48px canvas over 32px tiles, so the farthest visible pixel from the entity
- * centre is the top corner: √(0.75² + 1²) = 1.25 tiles. 1.4 keeps a finger-
+ * 64px canvas over 32px tiles, so the farthest visible pixel from the entity
+ * centre is the top corner: √(1² + 1.5²) ≈ 1.80 tiles. 1.95 keeps a finger-
  * friendly margin while staying tight enough that taps feel precise. */
-export const PICK_RADIUS = 1.4
+export const PICK_RADIUS = 1.95
 
 /** Smallest comfortable tap target in screen px (half-width): below this a
  * finger can't reliably hit an entity, so the WORLD radius grows to cover it. */

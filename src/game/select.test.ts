@@ -60,11 +60,11 @@ describe('pickRadiusAt — zoom-aware pick radius (px-per-tile in, world tiles o
   })
 
   it('zoomed far out, the radius grows to preserve MIN_PICK_PX of screen reach', () => {
-    const r = pickRadiusAt(TILE * 0.5) // 16 px/tile
-    expect(r).toBeCloseTo(MIN_PICK_PX / 16)
+    const r = pickRadiusAt(TILE * 0.25) // 8 px/tile — below the break-even scale
+    expect(r).toBeCloseTo(MIN_PICK_PX / 8)
     expect(r).toBeGreaterThan(PICK_RADIUS)
     // The guaranteed screen reach holds at the far extreme too.
-    expect(pickRadiusAt(TILE * 0.25) * TILE * 0.25).toBeCloseTo(MIN_PICK_PX)
+    expect(pickRadiusAt(TILE * 0.125) * TILE * 0.125).toBeCloseTo(MIN_PICK_PX)
   })
 
   it('the crossover is continuous: just past the break-even scale nothing jumps', () => {
@@ -84,7 +84,7 @@ describe('pickRadiusAt — zoom-aware pick radius (px-per-tile in, world tiles o
   it('picking with the grown radius actually lands a tap that PICK_RADIUS would miss', () => {
     const w = world()
     const cop = spawnNpc(w, 'cop', 10, 10)
-    const scale = TILE * 0.5 // zoomed out
+    const scale = TILE * 0.25 // zoomed out past the break-even scale
     const missAt = 10 + PICK_RADIUS + 0.05 // just outside the base radius
     expect(pickNearestEntity(w.entities, missAt, 10, PICK_RADIUS)).toBeUndefined()
     expect(pickNearestEntity(w.entities, missAt, 10, pickRadiusAt(scale))).toBe(cop)

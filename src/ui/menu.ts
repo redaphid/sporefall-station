@@ -1,6 +1,7 @@
 import { APP_VERSION, otaBundleVersion } from '../app/version'
 import { markUiChrome } from './chrome'
 import { formatReleaseNotes } from './releaseNotes'
+import { installGamepadMenuNav } from './gamepadMenu'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
@@ -19,6 +20,8 @@ export const pickMode = (mount: HTMLElement, onPick?: (mode: GameMode) => void):
       ['host', 'Host co-op', 'Others join your game'],
       ['join', 'Join co-op', 'Find a nearby host'],
     ]
+    const navButtons: HTMLButtonElement[] = []
+    let stopNav: () => void = () => {}
     for (const [mode, label, blurb] of options) {
       const b = document.createElement('button')
       b.style.cssText =
@@ -26,12 +29,16 @@ export const pickMode = (mount: HTMLElement, onPick?: (mode: GameMode) => void):
         'background:#ffffff10;color:#eee;cursor:pointer;width:min(320px,80vw);text-align:left'
       b.innerHTML = `${label} <span style="opacity:.6;font-weight:400;font-size:13px"><br>${blurb}</span>`
       b.addEventListener('click', () => {
+        stopNav()
         onPick?.(mode) // gesture-live: fullscreen request happens here
         overlay.remove()
         resolve(mode)
       })
+      navButtons.push(b)
       overlay.appendChild(b)
     }
+    // Controller support: a gamepad-only player can move focus + confirm here.
+    stopNav = installGamepadMenuNav(() => navButtons)
     // Big version readout under the mode picker so you can tell at a glance which
     // build a phone is on (esp. after an OTA update) before starting a game.
     const ver = document.createElement('div')
@@ -89,12 +96,14 @@ export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Pr
       buttons.push(b)
       overlay.appendChild(b)
     }
+    let stopNav: () => void = () => {}
     addButton('Bluetooth (phone host)', 'Pick a nearby phone hosting a game', () => {
       statusEl.textContent = 'Opening Bluetooth chooser…'
       for (const b of buttons) b.disabled = true
       // Called directly in the click handler: Chrome requires a user gesture.
       requestBleDevice().then(
         () => {
+          stopNav()
           overlay.remove()
           resolve('ble')
         },
@@ -106,9 +115,11 @@ export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Pr
       )
     })
     addButton('Same-computer tabs (dev)', 'Join a host tab in this browser', () => {
+      stopNav()
       overlay.remove()
       resolve('tabs')
     })
+    stopNav = installGamepadMenuNav(() => buttons)
     mount.appendChild(overlay)
   })
 
@@ -129,6 +140,7 @@ export const pickHost = (
     const hostsEl = overlay.querySelector<HTMLElement>('#hosts')!
     mount.appendChild(overlay)
     const seen = new Set<string>()
+    const stopNav = installGamepadMenuNav(() => Array.from(hostsEl.querySelectorAll('button')))
     startScan((h) => {
       if (seen.has(h.deviceId)) return
       seen.add(h.deviceId)
@@ -138,6 +150,7 @@ export const pickHost = (
         'font:600 16px system-ui;padding:12px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
         'background:#ffffff10;color:#eee;cursor:pointer'
       b.addEventListener('click', () => {
+        stopNav()
         overlay.remove()
         resolve(h.deviceId)
       })
@@ -168,6 +181,7 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
   const statusEl = overlay.querySelector<HTMLElement>('#status')!
 
   let startResolve: (() => void) | null = null
+  let stopNav: () => void = () => {}
   if (isHost) {
     const startBtn = document.createElement('button')
     startBtn.textContent = 'Start game'
@@ -176,6 +190,8 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
       'color:#0b0b12;cursor:pointer;margin-top:8px'
     startBtn.addEventListener('click', () => startResolve?.())
     overlay.appendChild(startBtn)
+    // Host can start the co-op run from a controller.
+    stopNav = installGamepadMenuNav(() => [startBtn])
   }
 
   // Build/OTA version readout, so you can tell at a glance which build a phone is
@@ -206,6 +222,9 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
       statusEl.textContent = text
     },
     waitForStart: () => new Promise((r) => (startResolve = r)),
-    close: () => overlay.remove(),
+    close: () => {
+      stopNav()
+      overlay.remove()
+    },
   }
 }

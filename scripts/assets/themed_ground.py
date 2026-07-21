@@ -25,10 +25,19 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import comfy  # noqa: E402
 from comfy import build_graph, run  # noqa: E402
 from post import kcentroid  # noqa: E402
 import tiles_genesis as G  # noqa: E402
 from tiles_genesis_sd import seamless_kcentroid  # noqa: E402
+
+# TILE RECIPE: Juggernaut Ragnarok + Pixel Art XL LoRA @ 0.7. Juggernaut alone is
+# painterly, so its downscaled output reads as noisy AI-texture noodles (amateurish);
+# Pixel Art XL (NeriJS, the community standard — NOT the skormino halftone LoRA)
+# resolves the detail into deliberate, chunky, crafted pixel clusters. 0.7 keeps
+# organic detail; 1.0 over-blocks. Env LORA=/LORA_W= override.
+comfy.LORA = os.environ.get("LORA", "XL/pixel-art-xl.safetensors")
+comfy.LORA_W = float(os.environ.get("LORA_W", "0.7"))
 
 STAGE = Path(os.environ.get("SWAMPSPACE_STAGE", "/tmp/swampspace-stage")) / "themed"
 T = 64

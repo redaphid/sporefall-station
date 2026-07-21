@@ -24,9 +24,16 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import comfy  # noqa: E402
 from comfy import build_graph, run  # noqa: E402
 from post import kcentroid  # noqa: E402
 import tiles_genesis as G  # noqa: E402
+
+# TILE RECIPE: Juggernaut Ragnarok + Pixel Art XL LoRA @ 0.7 — painterly Juggernaut
+# alone downscales to noisy noodles; Pixel Art XL (NeriJS standard, NOT skormino)
+# resolves detail into crafted, chunky pixel clusters. See themed_ground.py.
+comfy.LORA = os.environ.get("LORA", "XL/pixel-art-xl.safetensors")
+comfy.LORA_W = float(os.environ.get("LORA_W", "0.7"))
 
 
 def seamless_kcentroid(im, res):

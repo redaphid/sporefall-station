@@ -58,7 +58,11 @@
    "tiles/street-8.png",
    "tiles/street-9.png",
    "tiles/street-10.png",
-   "tiles/street-11.png"
+   "tiles/street-11.png",
+   "tiles/street-12.png",
+   "tiles/street-13.png",
+   "tiles/street-14.png",
+   "tiles/street-15.png"
   ],
   "tile.street.accent": [
    "tiles/street-accent-0.png",
@@ -79,7 +83,15 @@
    "tiles/floor-4.png",
    "tiles/floor-5.png",
    "tiles/floor-6.png",
-   "tiles/floor-7.png"
+   "tiles/floor-7.png",
+   "tiles/floor-8.png",
+   "tiles/floor-9.png",
+   "tiles/floor-10.png",
+   "tiles/floor-11.png",
+   "tiles/floor-12.png",
+   "tiles/floor-13.png",
+   "tiles/floor-14.png",
+   "tiles/floor-15.png"
   ],
   "tile.floor.accent": [
    "tiles/floor-accent-0.png",

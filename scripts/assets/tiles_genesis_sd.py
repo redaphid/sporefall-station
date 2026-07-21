@@ -60,13 +60,13 @@ NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, depth of "
 # Prompts name the VALUE of the surface explicitly — the value plan is the
 # whole point (docs/genesis-upgrade.md) — and the band is re-enforced after.
 UNITS = {
-    "floor": ("macro", 2,
+    "floor": ("macro", 4,
               f"top-down derelict space station deck floor, dark tan and gray "
               f"riveted metal plates with dark seams, moss and thin vines creeping "
               f"in the seams, rust streaks, rot, grimy interior floor sinking into "
               f"swamp, {GEN}, seamless tileable game texture, flat top-down "
               f"orthographic view", 0.5, True),
-    "street": ("macro", 3,
+    "street": ("macro", 4,
                f"top-down dark sunken metal causeway, near-black wet rusted "
                f"grating and cracked asphalt half-submerged in black swamp water, "
                f"thin moss veins in the cracks, very dark, {GEN}, seamless "
@@ -182,7 +182,7 @@ def repaint(surface, unit_idx, seeds, outdir):
     print(f"  {surface}[{unit_idx}] -> seed{best_s}")
 
     # slice row-major into shipped tile files
-    counts = {"floor": 8, "street": 12, "grass": 12, "sidewalk": 4, "wall": 3, "exit": 1}
+    counts = {"floor": 16, "street": 16, "grass": 12, "sidewalk": 4, "wall": 3, "exit": 1}
     if kind == "single":
         Image.fromarray(best, "RGB").save(outdir / f"{surface}-0.png")
         return

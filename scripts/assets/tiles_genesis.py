@@ -61,6 +61,20 @@ def lum(img):
     return float((0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]).mean())
 
 
+def edge_calm(img, to_color, px=3):
+    """Pull a tile's outer `px` ring toward a SHARED color so every variant of an
+    organic surface meets every other without a seam. High-contrast features
+    stay in the interior; the border becomes common ground. `to_color` is the
+    same constant for all variants of a surface — that's what makes an arbitrary
+    field of them tile (continuity for many-variant grass)."""
+    a = np.asarray(img, np.float32)
+    H, W = a.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    edge = np.minimum.reduce([yy, xx, H - 1 - yy, W - 1 - xx])
+    calm = np.clip(edge / px, 0, 1)[..., None]
+    return a * calm + np.asarray(to_color, np.float32)[None, None] * (1 - calm)
+
+
 def despeckle(img, passes=1):
     """Kill isolated single pixels: any pixel differing from BOTH horizontal
     and BOTH vertical neighbors (wrap) is replaced by its most common neighbor.
@@ -231,24 +245,30 @@ def bog_tile(T, v):
 
 
 def bog_macro(T, m):
-    """2Tx2T bog supertile: clump + hollow fields span the whole 2x2 area so
-    tufts flow ACROSS tile boundaries — sliced row-major, the per-tile grid
-    that made the shipped grass read as a repeating stamp disappears and the
-    visible repeat period doubles (manifest macroTiles.grass=2)."""
+    """2Tx2T bog supertile — LOW CONTRAST and edge-calm so many variants read as
+    ONE continuous mossy field (the interesting features live in rare accents,
+    not every tile). No near-black hollows (they read as 'dark gray' spam and
+    expose the tile grid); just a gentle 3-value olive tonal weave. The outer
+    ring is pulled toward the mid green so ANY macro tiles seamlessly against
+    ANY other across cell boundaries — the continuity multiple variants need."""
     M = 2 * T
     rng = np.random.default_rng(16500 + m)
-    img = field(M, rng, hexc("#22380f"), hexc("#35511a"), sigma=M / 5, ramp=0.6)
+    base = field(M, rng, hexc("#2e460f"), hexc("#4c6b28"), sigma=M / 5, ramp=0.5)
     clump = tnoise(M, rng, M / 6, octaves=2)
-    img[clump > 0.58] = hexc("#4c6b28")
-    img[clump > 0.74] = hexc("#67873c")
-    img[clump > 0.90] = hexc("#86a750")
-    # wet peat hollows: SMALL and scattered (higher freq, rarer threshold) so
-    # they read as speckled dark spots, not big repeating diagonal ovals.
-    dark = tnoise(M, rng, M / 9)
-    img[dark > 0.86] = hexc("#141a16")
-    for _ in range(4):
-        img[rng.integers(0, M), rng.integers(0, M)] = hexc("#46e078")
-    return img
+    base[clump > 0.62] = hexc("#4c6b28") * 0.5 + base[clump > 0.62] * 0.5
+    base[clump > 0.80] = hexc("#67873c")           # brighter tuft tips, sparse
+    shade = tnoise(M, rng, M / 6, octaves=2)
+    base[shade > 0.80] = hexc("#35511a") * 0.6 + base[shade > 0.80] * 0.4  # soft dark moss
+    # fine dithered grain so it doesn't read as flat paint
+    grain = tnoise(M, rng, M / 20)
+    base[grain > 0.7] = base[grain > 0.7] * 0.9 + hexc("#67873c")[None] * 0.1
+    # edge-calm: blend the outer ring toward the field mean so cross-cell seams
+    # vanish regardless of which macro sits next to which.
+    yy, xx = np.mgrid[0:M, 0:M].astype(np.float32)
+    edge = np.minimum.reduce([yy, xx, M - 1 - yy, M - 1 - xx])
+    calm = np.clip(edge / 5.0, 0, 1)[..., None]
+    mean = base.reshape(-1, 3).mean(0)
+    return base * calm + mean[None, None] * (1 - calm)
 
 
 def exit_tile(T, v=0):

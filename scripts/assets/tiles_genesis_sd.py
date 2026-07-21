@@ -28,35 +28,55 @@ from comfy import build_graph, run  # noqa: E402
 from post import kcentroid  # noqa: E402
 import tiles_genesis as G  # noqa: E402
 
+
+def seamless_kcentroid(im, res):
+    """Downscale so the result WRAPS: tile the source 3x3, k-centroid the whole
+    thing, crop the center. Every edge pixel of the crop is averaged from a
+    continuous neighborhood that includes the opposite side, so left==right and
+    top==bottom by construction. Fixes the repeat-seam that independent-edge
+    downscaling (plain kcentroid) leaves behind — the tile-continuity the field
+    needs to assemble without visible seams."""
+    a = np.asarray(im.convert("RGB"))
+    tiled = np.tile(a, (3, 3, 1))
+    big = kcentroid(Image.fromarray(tiled, "RGB"), 3 * res, 3 * res).convert("RGB")
+    b = np.asarray(big)
+    return Image.fromarray(b[res:2 * res, res:2 * res], "RGB")
+
 STAGE = Path(os.environ.get("SWAMPSPACE_STAGE", "/tmp/swampspace-stage")) / "genesis-tiles"
 T = int(os.environ.get("TILE_T", "64"))
 
-PIX = "masterpiece, pixpix, 8-bit, pixel_art"
-GEN = ("sega genesis 16-bit game art, bold flat color areas, ordered dither "
-       "shading, crisp chunky pixel clusters, high value contrast")
-NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, text, "
-       "watermark, frame, border, vignette, object, creature, character, "
-       "figure, face, low contrast, murky, washed out")
+# Juggernaut Ragnarok + no LoRA recipe (comfy.py defaults): the model draws real
+# detail at high denoise and the k-centroid+palette downscale IS the pixel-art
+# step. Prompts ask for hand-crafted pixel art + explicit VALUE (the value plan);
+# enforce_band re-snaps the band after.
+GEN = ("hand-crafted 16-bit pixel art game tile, sega genesis, careful pixel "
+       "shading, crisp defined shapes, deliberate dithering")
+NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, depth of "
+       "field, text, watermark, frame, border, vignette, object, creature, "
+       "character, figure, face, camouflage, military camo, low contrast, "
+       "muddy, washed out")
 
 # surface -> (unit kind, unit count, prompt, denoise, seamless)
 # Prompts name the VALUE of the surface explicitly — the value plan is the
 # whole point (docs/genesis-upgrade.md) — and the band is re-enforced after.
 UNITS = {
     "floor": ("macro", 2,
-              f"{PIX}, top-down warm tan sci-fi deck floor tile, light caramel "
-              f"metal plates with dark seams and rivets, small moss tufts in "
-              f"the seams, bright readable interior floor, {GEN}, seamless "
-              f"game texture, flat top-down view", 0.42, True),
+              f"top-down warm tan sci-fi deck floor tile, light caramel metal "
+              f"plates with dark seams and rivets, small moss tufts in the "
+              f"seams, bright readable interior floor, {GEN}, seamless tileable "
+              f"game texture, flat top-down orthographic view", 0.5, True),
     "street": ("macro", 3,
-               f"{PIX}, top-down dark asphalt street tile, near-black cracked "
-               f"tarmac with faint cool gray wear patches, thin moss veins in "
-               f"the cracks, dark ground texture, {GEN}, seamless game "
-               f"texture, flat top-down view", 0.42, True),
-    "grass": ("macro", 2,
-              f"{PIX}, top-down swamp moss ground, chunky clumps of "
-              f"olive and bright green bog grass tufts, big irregular dark "
-              f"peat hollows, a few glowing spore dots, no repeating pattern, "
-              f"{GEN}, seamless game texture, flat top-down view", 0.5, True),
+               f"top-down dark asphalt street tile, near-black cracked tarmac "
+               f"with faint cool gray wear patches, thin moss veins in the "
+               f"cracks, dark ground, {GEN}, seamless tileable game texture, "
+               f"flat top-down orthographic view", 0.5, True),
+    # grass is a uniform detailed carpet: individual seamless tiles (no macro,
+    # no edge-flattening); high denoise so Juggernaut draws real blades.
+    "grass": ("field", 12,
+              f"top-down pixel art grass tile, dense tufts of green swamp grass, "
+              f"individual grass blades, careful dithered light and shadow "
+              f"shading, {GEN}, seamless tileable game terrain, flat top-down "
+              f"orthographic view", 0.82, True),
     "sidewalk": ("mosaic", 1,
                  f"{PIX}, top-down light gray metal walkway tile, pale bright "
                  f"riveted plates with dark expansion joints, tiny moss "
@@ -85,13 +105,21 @@ ACCENTS = {  # name -> (count, base fn, prompt hint, denoise)
 # Which band each accent must sit near (accents may pop a little hotter).
 ACCENT_BAND = {"street-accent": "street", "floor-accent": "floor", "grass-accent": "grass"}
 
+# Organic-field surfaces calmed to a shared border color for cross-tile
+# continuity. Grass no longer needs it — the high-freq detailed blades hide
+# cross-variant seams and edge-calm would flatten the detail. Kept for future
+# smooth surfaces.
+EDGE_CALM = {}
+
 
 def base_unit(surface, unit_idx):
     """The structural init image for one unit, author-res (2T for macro/mosaic)."""
     kind = UNITS[surface][0]
     if kind == "macro":
-        fn = {"floor": G.floor_macro, "street": G.street_macro, "grass": G.bog_macro}[surface]
+        fn = {"floor": G.floor_macro, "street": G.street_macro}[surface]
         return G.snap(fn(T, unit_idx)), 2 * T
+    if kind == "field":  # one detailed seamless tile per unit (grass)
+        return G.snap(G.bog_tile(T, unit_idx)), T
     if kind == "single":
         return G.snap(G.exit_tile(T)), T
     # mosaic: 2x2 of consecutive variants
@@ -134,9 +162,14 @@ def repaint(surface, unit_idx, seeds, outdir):
                             prefix=f"genesis-{surface}-{unit_idx}")
         raw = run(graph, str(udir / "raw"))
         im = Image.open(raw[-1]).convert("RGB")
-        small = kcentroid(im, res, res).convert("RGB")
+        small = seamless_kcentroid(im, res)  # wrap-safe downscale (continuity)
         clean = G.despeckle(small, passes=4 if surface in G.FLAT else 2)
-        banded = G.enforce_band(np.asarray(clean, np.float32), surface)
+        arr = np.asarray(clean, np.float32)
+        # organic fields: pull every variant's border to a SHARED green so an
+        # arbitrary mix of macros tiles seamlessly across cell boundaries.
+        if surface in EDGE_CALM:
+            arr = G.edge_calm(arr, EDGE_CALM[surface], px=4)
+        banded = G.enforce_band(arr, surface)
         cand_path = udir / f"unit-{unit_idx}-seed{s}.png"
         Image.fromarray(banded, "RGB").save(cand_path)
         candidates.append((score(banded, surface), s, banded))
@@ -148,9 +181,12 @@ def repaint(surface, unit_idx, seeds, outdir):
     print(f"  {surface}[{unit_idx}] -> seed{best_s}")
 
     # slice row-major into shipped tile files
-    counts = {"floor": 8, "street": 12, "grass": 8, "sidewalk": 4, "wall": 3, "exit": 1}
+    counts = {"floor": 8, "street": 12, "grass": 12, "sidewalk": 4, "wall": 3, "exit": 1}
     if kind == "single":
         Image.fromarray(best, "RGB").save(outdir / f"{surface}-0.png")
+        return
+    if kind == "field":  # one tile per unit, no slicing
+        Image.fromarray(best, "RGB").save(outdir / f"{surface}-{unit_idx}.png")
         return
     for q in range(4):
         v = unit_idx * 4 + q

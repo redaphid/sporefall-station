@@ -18,8 +18,13 @@ import uuid
 
 HOST = os.environ.get("COMFY", "http://localhost:8188")
 
-CKPT = os.environ.get("CKPT", "AnythingXL_xl.safetensors")
-LORA = os.environ.get("LORA", "pixel_art_style_by_skormino_v7.05_test_72img.safetensors")
+# Juggernaut Ragnarok (SDXL) with NO pixel LoRA is the tile recipe: the skormino
+# pixel LoRA imposed an ugly halftone-dither "camo blob" look; Juggernaut at high
+# denoise draws real detail (grass blades, plate wear) and the k-centroid+palette
+# downscale IS the pixel-art step — cleaner, more "attentive" pixel art. Override
+# with CKPT=/LORA= for the older character/prop recipes.
+CKPT = os.environ.get("CKPT", "SDXL1.0/juggernautXL_ragnarokBy.safetensors")
+LORA = os.environ.get("LORA", "")
 LORA_W = float(os.environ.get("LORA_W", "1.0"))
 SIZE = int(os.environ.get("SIZE", "1024"))
 # skormino v7.05 documented recipe: CFG 3-4, 28+ steps, euler
@@ -162,11 +167,14 @@ def build_graph(
         g["13"] = {"class_type": "Image Tile Offset (mtb)",
                    "inputs": {"image": out, "tilesX": 2, "tilesY": 2}}
         g["14"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["13", 0], "vae": ["1", 2]}}
+        # Heal denoise: too low leaves the offset seam as a visible center cross;
+        # SEAMLESS_HEAL raises it to fully blend (default 0.55).
+        heal = float(os.environ.get("SEAMLESS_HEAL", "0.55"))
         g["15"] = {"class_type": "KSampler",
                    "inputs": {"model": model, "positive": ["3", 0], "negative": ["4", 0],
                               "latent_image": ["14", 0], "seed": seed + 1, "steps": STEPS,
                               "cfg": CFG, "sampler_name": SAMPLER, "scheduler": SCHED,
-                              "denoise": 0.35}}
+                              "denoise": heal}}
         g["16"] = {"class_type": "VAEDecode", "inputs": {"samples": ["15", 0], "vae": ["1", 2]}}
         out = ["16", 0]
     if alpha:

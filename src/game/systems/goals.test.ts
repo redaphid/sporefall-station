@@ -17,7 +17,8 @@ const npc = (w: World, faction: Faction, x: number, y: number, hp = 40, max = 40
 const player = (w: World, x: number, y: number): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', x, y))
   e.health = { hp: 100, max: 100, iframes: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, inventory: [], cash: 0, crimeUntilTick: 0, activeSlot: -1 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
 

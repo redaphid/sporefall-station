@@ -9,7 +9,12 @@ const STD = padProfile({ id: 'x', mapping: 'standard', axes: [] })
 // A minimal render view carrying just the player entities' inventory/activeSlot,
 // which is all the coop hotbar-cycle resolver reads.
 const viewWith = (players: { playerId: number; inventory: { itemId: string; qty: number }[]; activeSlot: number }[]) =>
-  ({ entities: players.map((p) => ({ playerCtl: p })) } as unknown as RenderView)
+  ({
+    entities: players.map((p) => ({
+      playerCtl: { playerId: p.playerId },
+      loadout: { inventory: p.inventory, activeSlot: p.activeSlot },
+    })),
+  } as unknown as RenderView)
 
 const btn = (pressed: boolean) => ({ pressed, touched: pressed, value: pressed ? 1 : 0 })
 

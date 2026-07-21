@@ -344,7 +344,7 @@ export const missionSystem = (w: World): void => {
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
       const holder = w.entities.find(
-        (e) => e.playerCtl && e.playerCtl.inventory.some((s) => s.itemId === 'briefcase'),
+        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
       )
       if (holder) completeMission(w)
     } else if (
@@ -430,7 +430,7 @@ export const nextFloor = (w: World): void => {
       p.playerCtl.channel = undefined
       p.playerCtl.crimeUntilTick = 0
       // Key items don't carry across floors
-      p.playerCtl.inventory = p.playerCtl.inventory.filter((s) => s.itemId !== 'briefcase')
+      if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'briefcase')
     }
     p.dead = false
     w.entities.push(p)

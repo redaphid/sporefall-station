@@ -67,9 +67,9 @@ describe('serializeWorld / deserializeWorld', () => {
 const zeroPlayerAmmo = (j: WorldJson): WorldJson => ({
   ...j,
   entities: j.entities.map((e) => {
-    const pc = e.playerCtl as { inventory?: { itemId: string; qty: number }[] } | undefined
-    if (!pc?.inventory) return e
-    return { ...e, playerCtl: { ...pc, inventory: pc.inventory.map((s) => ({ ...s, qty: 0 })) } }
+    const ld = e.loadout as { inventory?: { itemId: string; qty: number }[] } | undefined
+    if (!ld?.inventory) return e
+    return { ...e, loadout: { ...ld, inventory: ld.inventory.map((s) => ({ ...s, qty: 0 })) } }
   }),
 })
 

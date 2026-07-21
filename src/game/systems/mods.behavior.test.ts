@@ -20,7 +20,7 @@ const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMo
   const p = spawnPlayer(w, 0, x, y)
   // Replace the slotted starter with the weapon under test (starter is now a real
   // slotted ItemStack, so pushing would leave it in slot 0 and mis-equip).
-  p.playerCtl!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
+  p.loadout!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
   equipSlot(p, 0)
   p.facing = 0 // +x
   return p
@@ -292,7 +292,7 @@ describe('modded loadouts — determinism & serialization', () => {
       { id: 'bounce', stacks: 1 },
       { id: 'frost', stacks: 1 },
     ])
-    p.playerCtl!.inventory[0].qty = 999
+    p.loadout!.inventory[0].qty = 999
     npc(w, 24, 20, 40)
     npc(w, 24, 22, 40)
     return w
@@ -304,7 +304,7 @@ describe('modded loadouts — determinism & serialization', () => {
     const restored = deserializeWorld(json)
     expect(serializeWorld(restored)).toEqual(json)
     // the mods survived the trip
-    const stack = restored.entities.find((e) => e.playerCtl)!.playerCtl!.inventory[0]
+    const stack = restored.entities.find((e) => e.playerCtl)!.loadout!.inventory[0]
     expect(stack.mods).toEqual([
       { id: 'bulk', stacks: 2 },
       { id: 'bounce', stacks: 1 },

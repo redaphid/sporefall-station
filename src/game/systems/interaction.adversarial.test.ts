@@ -96,7 +96,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.cash = 50
-    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 10 }]
+    p.loadout!.inventory = [{ itemId: 'bat', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 3, reviveProgress: 0 }
     settle(p)
     const ids = idleFor(0)
@@ -112,9 +112,9 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     // penalty: the carried bat is dropped, but the comeback re-grants the starter
     // loadout so the player is NOT stuck with a phantom weapon (issue: revived
     // players couldn't pick up mods). The pistol starter is real + slotted.
-    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
-    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
-    expect(p.playerCtl!.activeSlot).toBe(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.loadout!.activeSlot).toBe(0)
     expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(1) // penalty: one comeback spent
   })
@@ -140,7 +140,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     const p = spawnPlayer(cw, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.cash = 50
-    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 10 }]
+    p.loadout!.inventory = [{ itemId: 'bat', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 2, reviveProgress: 0 }
     settle(p)
     const ids = idleFor(0)
@@ -148,7 +148,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     interactionSystem(cw, ids) // 2 → 0
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.playerCtl!.cash).toBe(50) // no penalty
-    expect(p.playerCtl!.inventory).toHaveLength(1)
+    expect(p.loadout!.inventory).toHaveLength(1)
     expect(cw.revivesLeft).toBe(2) // untouched — casual doesn't spend the pool
   })
 })
@@ -428,8 +428,8 @@ describe('auto-pickup', () => {
     pickup('bat', 20, 20)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
-    expect(p.playerCtl!.activeSlot).toBeGreaterThanOrEqual(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
+    expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
   })
 
   it('a consumable auto-heals a hurt player instead of taking a slot', () => {
@@ -439,7 +439,7 @@ describe('auto-pickup', () => {
     settle(p)
     interactionSystem(w, idleFor(0))
     expect(p.health!.hp).toBe(40)
-    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'bandage')).toBe(false)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(false)
   })
 
   it('an out-of-reach pickup is left alone', () => {

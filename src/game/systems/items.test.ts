@@ -15,7 +15,8 @@ const player = (w: World, x = 20, y = 20): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, inventory: [], cash: 0, crimeUntilTick: 0, activeSlot: -1 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.loadout = { inventory: [], activeSlot: -1 }
   e.facing = 0
   return e
 }
@@ -74,7 +75,7 @@ describe('item breadth', () => {
   describe('ranged weapons', () => {
     it('a shotgun fires its full spread of pellets in one shot, at varied angles', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'shotgun', qty: 6 }]
+      e.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
       equipSlot(e, 0)
       combatSystem(w, attack())
       const pellets = w.entities.filter((x) => x.projectile)
@@ -84,7 +85,7 @@ describe('item breadth', () => {
 
     it('a freeze ray freezes the target it hits', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'freezeRay', qty: 6 }]
+      e.loadout!.inventory = [{ itemId: 'freezeRay', qty: 6 }]
       equipSlot(e, 0)
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
@@ -94,7 +95,7 @@ describe('item breadth', () => {
 
     it('a tranquilizer puts the target to sleep', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'tranquilizer', qty: 5 }]
+      e.loadout!.inventory = [{ itemId: 'tranquilizer', qty: 5 }]
       equipSlot(e, 0)
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
@@ -106,7 +107,7 @@ describe('item breadth', () => {
   describe('melee onHit', () => {
     it('a sledgehammer stuns what it hits', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'sledgehammer', qty: 12 }]
+      e.loadout!.inventory = [{ itemId: 'sledgehammer', qty: 12 }]
       equipSlot(e, 0)
       const target = dummy(w, 21, 20)
       combatSystem(w, attack())
@@ -117,19 +118,19 @@ describe('item breadth', () => {
   describe('throwables', () => {
     it('throwing a freeze grenade freezes a nearby NPC where it lands', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'freezeGrenade', qty: 1 }]
-      e.playerCtl!.activeSlot = 0
+      e.loadout!.inventory = [{ itemId: 'freezeGrenade', qty: 1 }]
+      e.loadout!.activeSlot = 0
       const victim = dummy(w, 23, 20)
       throwActive(w, e)
       for (let t = 0; t < 60 && !hasStatus(victim, 'frozen'); t++) projectileSystem(w)
       expect(hasStatus(victim, 'frozen')).toBe(true)
-      expect(e.playerCtl!.inventory).toHaveLength(0)
+      expect(e.loadout!.inventory).toHaveLength(0)
     })
 
     it('throwing chloroform puts a nearby NPC to sleep', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'chloroform', qty: 1 }]
-      e.playerCtl!.activeSlot = 0
+      e.loadout!.inventory = [{ itemId: 'chloroform', qty: 1 }]
+      e.loadout!.activeSlot = 0
       const victim = dummy(w, 22, 20)
       throwActive(w, e)
       for (let t = 0; t < 60 && victim.status!.sleep === 0; t++) projectileSystem(w)
@@ -141,17 +142,17 @@ describe('item breadth', () => {
     it('a burger heals the user', () => {
       const e = player(w)
       e.health!.hp = 50
-      e.playerCtl!.inventory = [{ itemId: 'burger', qty: 1 }]
-      e.playerCtl!.activeSlot = 0
+      e.loadout!.inventory = [{ itemId: 'burger', qty: 1 }]
+      e.loadout!.activeSlot = 0
       useHeld(w, e)
       expect(e.health!.hp).toBeGreaterThan(50)
-      expect(e.playerCtl!.inventory).toHaveLength(0)
+      expect(e.loadout!.inventory).toHaveLength(0)
     })
 
     it('an adrenaline shot applies a self buff status', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'adrenaline', qty: 1 }]
-      e.playerCtl!.activeSlot = 0
+      e.loadout!.inventory = [{ itemId: 'adrenaline', qty: 1 }]
+      e.loadout!.activeSlot = 0
       useHeld(w, e)
       expect(hasStatus(e, 'hasted')).toBe(true)
     })

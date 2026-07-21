@@ -74,8 +74,8 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   it('a lone downed player bleeds the timer down and self-revives at low hp, dropping cash + items', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.cash = 120
-    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 8 }]
-    p.playerCtl!.activeSlot = 0
+    p.loadout!.inventory = [{ itemId: 'bat', qty: 8 }]
+    p.loadout!.activeSlot = 0
     down(w, p)
     p.playerCtl!.downed!.bleedTicks = 4 // shorten the wait
     settle(p)
@@ -86,15 +86,15 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     expect(p.playerCtl!.cash).toBe(0)
     // The carried bat drops, but the comeback re-grants a real slotted starter
     // pistol (no phantom weapon) so mod pickups keep working post-revive.
-    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
-    expect(p.playerCtl!.activeSlot).toBe(0)
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.loadout!.activeSlot).toBe(0)
     expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(REVIVES_PER_RUN - 1) // exactly one comeback spent
   })
 
   it('a KEY item survives the comeback penalty (only non-key items drop)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.playerCtl!.inventory = [
+    p.loadout!.inventory = [
       { itemId: 'briefcase', qty: 1 }, // key
       { itemId: 'pistol', qty: 6 }, // non-key
     ]
@@ -104,7 +104,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     runUntilResolved(w, p)
     // Key item survives; the picked-up pistol drops and is replaced by the
     // re-granted starter pistol slotted ahead of the key.
-    expect(p.playerCtl!.inventory).toEqual([
+    expect(p.loadout!.inventory).toEqual([
       { itemId: 'pistol', qty: STARTER_AMMO },
       { itemId: 'briefcase', qty: 1 },
     ])
@@ -228,7 +228,7 @@ describe('casual mode — forgiving (kid mode)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0 // even with an empty pool, casual downs (never a real death)
     p.playerCtl!.cash = 77
-    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 3 }]
+    p.loadout!.inventory = [{ itemId: 'bat', qty: 3 }]
     down(w, p)
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toBeDefined()
@@ -237,7 +237,7 @@ describe('casual mode — forgiving (kid mode)', () => {
     runUntilResolved(w, p)
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.playerCtl!.cash).toBe(77) // no penalty
-    expect(p.playerCtl!.inventory).toHaveLength(1)
+    expect(p.loadout!.inventory).toHaveLength(1)
     expect(w.revivesLeft).toBe(0) // pool untouched (stays where it was)
   })
 

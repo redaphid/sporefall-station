@@ -91,8 +91,8 @@ describe('buildInfoCard — the weapon an NPC is carrying', () => {
     // stack, not `playerCtl` — so any carrier's build shows. Proven via a player.
     const p = spawnPlayer(world(), 0, 2, 2)
     p.combat!.weapon = 'sledgehammer'
-    p.playerCtl!.inventory.push({ itemId: 'sledgehammer', qty: 1, mods: [{ id: 'frost', stacks: 1 }] })
-    p.playerCtl!.activeSlot = p.playerCtl!.inventory.length - 1
+    p.loadout!.inventory.push({ itemId: 'sledgehammer', qty: 1, mods: [{ id: 'frost', stacks: 1 }] })
+    p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     const rows = rowMap(buildInfoCard(p).rows)
     expect(rows.Weapon).toBe('Sledgehammer')
     expect(rows['❄️ Cryo Rounds']).toBe('×1')
@@ -156,8 +156,8 @@ describe('buildInfoCard — players', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
     p.combat!.weapon = 'shotgun'
-    p.playerCtl!.inventory.push({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
-    p.playerCtl!.activeSlot = p.playerCtl!.inventory.length - 1
+    p.loadout!.inventory.push({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
+    p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     p.playerCtl!.cash = 120
     const card = buildInfoCard(p)
     const rows = rowMap(card.rows)
@@ -172,8 +172,8 @@ describe('buildInfoCard — players', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
     p.combat!.weapon = 'pistol'
-    p.playerCtl!.inventory.push({ itemId: 'pistol', qty: 6 })
-    p.playerCtl!.activeSlot = p.playerCtl!.inventory.length - 1
+    p.loadout!.inventory.push({ itemId: 'pistol', qty: 6 })
+    p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     expect(buildInfoCard(p).rows.some((r) => r.value.startsWith('×'))).toBe(false)
   })
 

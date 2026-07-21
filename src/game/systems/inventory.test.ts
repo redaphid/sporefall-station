@@ -9,7 +9,8 @@ const player = (w: World): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', 20, 20))
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, inventory: [], cash: 0, crimeUntilTick: 0, activeSlot: -1 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
 
@@ -42,12 +43,12 @@ describe('inventory', () => {
 
   it('equipping a weapon slot changes the active weapon', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [
+    e.loadout!.inventory = [
       { itemId: 'bat', qty: 12 },
       { itemId: 'pistol', qty: 8 },
     ]
     expect(equipSlot(e, 1)).toBe(true)
-    expect(e.playerCtl!.activeSlot).toBe(1)
+    expect(e.loadout!.activeSlot).toBe(1)
     expect(e.combat!.weapon).toBe('pistol')
   })
 
@@ -56,7 +57,7 @@ describe('inventory', () => {
     // testing toggle is OFF. When ON, the depletion is intentionally skipped
     // (covered by infiniteAmmo.test.ts), so this economy assertion is inert.
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'pistol', qty: 2 }]
+    e.loadout!.inventory = [{ itemId: 'pistol', qty: 2 }]
     equipSlot(e, 0)
     const shots = () => w.entities.filter((x) => x.projectile).length
 
@@ -64,32 +65,32 @@ describe('inventory', () => {
     e.combat!.cooldown = 0
     combatSystem(w, attack())
     e.combat!.cooldown = 0
-    expect(e.playerCtl!.inventory[0].qty).toBe(0)
+    expect(e.loadout!.inventory[0].qty).toBe(0)
     const firedTwice = shots()
     expect(firedTwice).toBe(2)
 
     combatSystem(w, attack()) // empty — no shot
     expect(shots()).toBe(firedTwice)
-    expect(e.playerCtl!.inventory[0].qty).toBe(0)
+    expect(e.loadout!.inventory[0].qty).toBe(0)
   })
 
   it('a melee weapon breaks when its durability runs out', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'knife', qty: 2 }]
+    e.loadout!.inventory = [{ itemId: 'knife', qty: 2 }]
     equipSlot(e, 0)
     combatSystem(w, attack())
     e.combat!.cooldown = 0
     combatSystem(w, attack())
-    expect(e.playerCtl!.inventory).toHaveLength(0)
+    expect(e.loadout!.inventory).toHaveLength(0)
     expect(e.combat!.weapon).toBe('fists')
   })
 
   it('throwing spawns a projectile and removes it from the inventory', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'molotov', qty: 1 }]
-    e.playerCtl!.activeSlot = 0
+    e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
+    e.loadout!.activeSlot = 0
     expect(throwActive(w, e)).toBe(true)
     expect(w.entities.some((x) => x.projectile)).toBe(true)
-    expect(e.playerCtl!.inventory).toHaveLength(0)
+    expect(e.loadout!.inventory).toHaveLength(0)
   })
 })

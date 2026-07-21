@@ -107,12 +107,12 @@ const setupInventory = (w: World): void => {
     player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
-    player.playerCtl.inventory = [
+    player.loadout!.inventory = [
       { itemId: 'bat', qty: WEAPONS.bat.durability! },
       { itemId: 'pistol', qty: 3 },
       { itemId: 'molotov', qty: 2 },
     ]
-    player.playerCtl.activeSlot = 0
+    player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'bat'
   }
   crate(w, x + 4, y)
@@ -129,7 +129,7 @@ const setupItems = (w: World): void => {
     player.pos = { x: x + 1 + 0.5, y: y + 0.5 }
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
-    player.playerCtl.inventory = [
+    player.loadout!.inventory = [
       { itemId: 'shotgun', qty: 6 },
       { itemId: 'freezeGrenade', qty: 2 },
       { itemId: 'chloroform', qty: 2 },
@@ -137,7 +137,7 @@ const setupItems = (w: World): void => {
       { itemId: 'sledgehammer', qty: WEAPONS.sledgehammer.durability! },
       { itemId: 'adrenaline', qty: 1 },
     ]
-    player.playerCtl.activeSlot = 0
+    player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'shotgun'
   }
   bystander(w, x + 4, y)
@@ -502,8 +502,8 @@ const stageArtCompare = (w: World): void => {
     player.pos = { x: 8 + 0.5, y: LANE_Y + 0.5 }
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = Math.PI / 2 // idle facing south (toward camera)
-    player.playerCtl.inventory = [{ itemId: 'bat', qty: 1 }]
-    player.playerCtl.activeSlot = 0
+    player.loadout!.inventory = [{ itemId: 'bat', qty: 1 }]
+    player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'bat'
   }
   stageThug(w, 18, LANE_Y)

@@ -60,15 +60,17 @@
       "playerCtl": {
         "playerId": 0,
         "abilityCooldown": 0,
+        "cash": 0,
+        "crimeUntilTick": 488
+      },
+      "loadout": {
         "inventory": [
           {
             "itemId": "pistol",
             "qty": 197
           }
         ],
-        "activeSlot": 0,
-        "cash": 0,
-        "crimeUntilTick": 488
+        "activeSlot": 0
       }
     },
     {

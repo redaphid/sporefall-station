@@ -140,10 +140,10 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
         p.pickup = undefined
         p.playerCtl = {
           playerId: 0,
-          inventory: [{ itemId: 'briefcase', qty: 1 }],
           cash: 0,
           crimeUntilTick: 0,
         } as never
+        p.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 } as never
         w.entities.push(p as never)
         w.byId.set(p.id, p as never)
       } else {

@@ -1,5 +1,5 @@
 import { WEAPONS } from './data/items'
-import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type ItemStack } from './entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type Loadout } from './entity'
 import { addEntity, type World } from './world'
 
 // ---- Player defaults ------------------------------------------------------
@@ -45,7 +45,7 @@ export const STARTER_AMMO = 200
  * durability. Innate fists (no magSize/durability) stay UNSLOTTED — bare hands
  * with no mod list, resolving vanilla — so the inventory is empty and
  * activeSlot -1, exactly as before. */
-export const starterLoadout = (startWeapon: string): { inventory: ItemStack[]; activeSlot: number } => {
+export const starterLoadout = (startWeapon: string): Loadout => {
   const def = WEAPONS[startWeapon]
   if (def?.kind === 'ranged') return { inventory: [{ itemId: startWeapon, qty: STARTER_AMMO }], activeSlot: 0 }
   if (def?.durability !== undefined) return { inventory: [{ itemId: startWeapon, qty: def.durability }], activeSlot: 0 }
@@ -61,12 +61,12 @@ export const spawnPlayer = (w: World, playerId: number, x: number, y: number): E
   e.health = { hp: PLAYER_HP, max: PLAYER_HP, iframes: SPAWN_GRACE_TICKS }
   e.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  const { inventory, activeSlot } = starterLoadout(PLAYER_START_WEAPON)
+  // The loadout is the SHARED equipment component (players and NPCs alike carry
+  // one); playerCtl now holds only player-specific concerns.
+  e.loadout = starterLoadout(PLAYER_START_WEAPON)
   e.playerCtl = {
     playerId,
     abilityCooldown: 0,
-    inventory,
-    activeSlot,
     cash: 0,
     crimeUntilTick: 0,
   }

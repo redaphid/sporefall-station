@@ -49,7 +49,7 @@ describe('addMod verb', () => {
     const id = armedPlayer(w)
     runVerb(w, `addMod ${id} bounce 2`)
     const e = JSON.parse(runVerb(w, `get ${id}`))
-    expect(e.playerCtl.inventory[0].mods).toEqual([{ id: 'bounce', stacks: 2 }])
+    expect(e.loadout!.inventory[0].mods).toEqual([{ id: 'bounce', stacks: 2 }])
   })
 
   it('rejects an unknown mod id', () => {
@@ -67,8 +67,8 @@ describe('addMod verb', () => {
   it('errors clearly when the entity has no slotted weapon', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     // Strip the starter loadout: bare hands, nothing slotted.
-    p.playerCtl!.inventory = []
-    p.playerCtl!.activeSlot = -1
+    p.loadout!.inventory = []
+    p.loadout!.activeSlot = -1
     p.combat!.weapon = 'fists'
     expect(() => runVerb(w, `addMod ${p.id} frost`)).toThrow(/no slotted weapon/)
   })

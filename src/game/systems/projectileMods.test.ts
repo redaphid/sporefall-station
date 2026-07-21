@@ -16,7 +16,7 @@ import { equipSlot } from './inventory'
 
 const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMod[]): Entity => {
   const p = spawnPlayer(w, 0, x, y)
-  p.playerCtl!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
+  p.loadout!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
   equipSlot(p, 0)
   p.facing = 0
   return p

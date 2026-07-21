@@ -15,7 +15,7 @@ export const pickMode = (mount: HTMLElement, onPick?: (mode: GameMode) => void):
       'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
       'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
     const options: [GameMode, string, string][] = [
-      ['solo', 'Solo run', 'Just you vs the city'],
+      ['solo', 'Solo run', 'Just you vs the spores'],
       ['host', 'Host co-op', 'Others join your game'],
       ['join', 'Join co-op', 'Find a nearby host'],
     ]

@@ -195,7 +195,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
       edge.style.display = 'flex'
       edge.style.transform = `translate(${Math.round(m.sx)}px, ${Math.round(m.sy)}px) translate(-50%,-50%)`
       edgeArrow.style.transform = `rotate(${m.angle}rad)`
-      edgeLabel.textContent = isExit ? `EXIT · ${m.dist}m` : `🎯 ${m.dist}m`
+      edgeLabel.textContent = isExit ? `LAUNCH BAY · ${m.dist}m` : `🎯 ${m.dist}m`
     } else {
       edge.style.display = 'none'
     }

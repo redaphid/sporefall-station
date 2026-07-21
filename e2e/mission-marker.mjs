@@ -250,7 +250,7 @@ const ok = await record({
     if (eg?.caretVisible) f.push('mid-map: caret must hide while the exit is off-screen')
     if (!bearingToOk(eg, eg?.exitPoint)) f.push(`mid-map: exit bearing wrong (angle=${eg?.edgeAngle})`)
     const wantExitDist = Math.round(distTo(eg, eg?.exitPoint))
-    const labelDist = Number((eg?.edgeLabel ?? '').match(/EXIT · (\d+)m/)?.[1] ?? NaN)
+    const labelDist = Number((eg?.edgeLabel ?? '').match(/LAUNCH BAY · (\d+)m/)?.[1] ?? NaN)
     if (!(Math.abs(labelDist - wantExitDist) <= 2)) f.push(`mid-map: exit label "${eg?.edgeLabel}" != ~${wantExitDist}m`)
     if (eg?.canvas && eg.edgeX !== null) {
       const inCanvas =

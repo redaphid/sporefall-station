@@ -303,7 +303,7 @@ const run = async () => {
   // Mission target: make the gangster the objective, inspect it, use LOCATE.
   await desk.evaluate(() => {
     window.__world.mission.template = 'assassinate'
-    window.__world.mission.description = 'Take out the gangster'
+    window.__world.mission.description = 'Purge the Mireclaw Alpha'
     window.__world.mission.complete = false
     window.__world.mission.targetEntityId = 4
   })

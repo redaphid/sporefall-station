@@ -246,6 +246,21 @@ const ENTITY_COLORS: Record<string, number> = {
   default: 0xcccccc,
 }
 
+// Interior furnishings (feat/levelgen-fill-interiors) drawn as tinted footprint
+// boxes rather than the character fallback — a room full of these reads as
+// furnished, not full of monsters. Bespoke prop sprites are a deferred
+// follow-up; keyed here by the object archetype id.
+const FURNITURE_COLORS: Record<string, number> = {
+  bunk: 0x6b7a8f,
+  desk: 0x8a6a3f,
+  shelf: 0x7a5a34,
+  cabinet: 0xcfd6da,
+  bench: 0xa9b4bb,
+  locker: 0x59616b,
+  table: 0x9c6b3f,
+  plant: 0x2e7d46,
+}
+
 /** Scale a 0xRRGGBB colour by `f` (each channel clamped to 255). */
 const shade = (color: number, f: number): number => {
   const ch = (c: number): number => Math.max(0, Math.min(255, Math.round(c * f)))
@@ -523,6 +538,23 @@ export const createArt = (
         .stroke({ width: 2, color: 0x101018, alpha: 0.6 })
         .poly([r, r * 0.35, r * 1.55, r, r, r * 1.65, r * 0.45, r])
         .stroke({ width: 1.5, color: 0xffffff, alpha: 0.35 })
+      const tex = renderer.generateTexture(g)
+      g.destroy()
+      return tex
+    }
+    // Interior furnishings: a tinted footprint box with a lit top edge, so a
+    // furnished room reads as occupied instead of a herd of eyeballed creatures.
+    const furn = FURNITURE_COLORS[archetype]
+    if (furn !== undefined) {
+      const pad = TILE_PX * 0.14
+      const s = TILE_PX - pad * 2
+      const g = new Graphics()
+        .roundRect(pad, pad, s, s, 3)
+        .fill(colorOverride ?? furn)
+        .roundRect(pad, pad, s, s, 3)
+        .stroke({ width: 2, color: 0x000000, alpha: 0.4 })
+        .rect(pad, pad, s, 3)
+        .fill({ color: 0xffffff, alpha: 0.15 })
       const tex = renderer.generateTexture(g)
       g.destroy()
       return tex

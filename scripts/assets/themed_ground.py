@@ -7,15 +7,15 @@
          variant is the SAME material, only varied) + varied seeds, post, and
          write a field preview assembled exactly like the engine.
 
-Theme (docs/genesis-upgrade.md + owner note): an abandoned space outpost SINKING
-into an alien swamp — dark, murky, tangled vines and roots over sunken metal,
-faint glowing green spores and amber embers, overgrown, moody, low light. NOT a
-clean lawn. Juggernaut Ragnarok + no LoRA (comfy.py default); k-centroid+palette
-is the pixel-art step.
+Theme knobs (palette, value bands, terrain prompts, fiction) come from
+theme_config.py — retarget there. Recipe: Juggernaut Ragnarok + Pixel Art XL @ 0.7
++ circular seamless; k-centroid+palette is the pixel-art step.
 
-Usage:
-  SWAMPSPACE_STAGE=/tmp/swampspace-stage python3 themed_ground.py hero <surface> [n]
-  SWAMPSPACE_STAGE=/tmp/swampspace-stage python3 themed_ground.py set  <surface> <hero.png> [count]
+Modes: hero (candidates → pick anchor), set (IPAdapter-anchored to a hero),
+master (hero + consistent variations), vary (img2img variations of a hero),
+diverse (one master per DIVERSE terrain → varied field). Usage:
+  SWAMPSPACE_STAGE=/tmp/<theme>-stage SEAMLESS_MODE=circular \
+    python3 themed_ground.py diverse grass 4 54 2
 """
 import os
 import sys
@@ -53,24 +53,16 @@ NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, isometric, "
 # per the tile-theming research: base reads as one calm material, features live
 # in ~15% accent tiles). One wrapping master is generated and SLICED so every
 # base variant shares material/lighting and co-tiles (Red Blob / SLYNYRD).
-# Diverse bog masters: DIFFERENT terrain within the ONE dark-swamp palette so a
+# Diverse ground masters: DIFFERENT terrain within the ONE theme palette so a
 # field that snaps them together (the engine alternates a master per macro-cell)
-# reads as a varied, complicated swamp — mossy stretches, open lake-water, root
-# tangle, rocky mire, sunken wreck — not one pattern repeated. Owner asks: "more
-# variation and complication when snapping together tiles"; "the dark greeny-blue
-# reads as a lake" → lean into water as a real terrain.
-DIVERSE = {
-    "grass": [
-        "dense olive-green moss and low creeping vines carpeting the ground, thick overgrowth, a few dark roots",
-        "open pool of dark greeny-blue swamp water and black mud, mossy banks and floating vegetation around the edges, wet",
-        "thick tangle of dark brown roots and gnarled vines over mud, sparse moss, twisted overgrowth",
-        "rocky boggy mire, wet dark stones and gravel with patches of moss and small murky puddles, scattered debris",
-        "half-sunken rusted metal grating and outpost debris swallowed by moss and vines, dark swamp reclaiming the wreck",
-    ],
-}
-DIVERSE_WRAP = ("top-down dark alien swamp bog, {}, dark and moody, even visual "
-                "density, low contrast, no bright glow, {}, seamless tileable game "
-                "terrain, flat top-down orthographic view")
+# reads as varied, complicated ground — not one pattern repeated. The terrain
+# list is per-theme (theme_config.py `diverse`).
+from theme_config import THEME  # noqa: E402
+DIVERSE = THEME["diverse"]
+DIVERSE_WRAP = ("top-down " + THEME["fiction"].split(" — ")[0] + ", {}, dark and "
+                "moody, even visual density, low contrast, no bright glow, {}, "
+                "seamless tileable game terrain, flat top-down orthographic view")
+_TILES_DIR = THEME["tiles_dir"]
 
 BASE_PROMPTS = {
     "grass": ("top-down dark alien swamp bog floor, thin tangled dark vines and "
@@ -326,19 +318,19 @@ if __name__ == "__main__":
         band = float(sys.argv[4]) if len(sys.argv) > 4 else 50.0
         sd = int(sys.argv[5]) if len(sys.argv) > 5 else 3
         nm = int(sys.argv[6]) if len(sys.argv) > 6 else 2
-        outd = Path(sys.argv[7]) if len(sys.argv) > 7 else Path("../../public/themes/swampspace-hires/tiles")
+        outd = Path(sys.argv[7]) if len(sys.argv) > 7 else Path(_TILES_DIR)
         master_slice(surface, tps, band, sd, outd, nm)
     elif mode == "diverse":
         # diverse <surface> <tiles_per_side> <band> <seeds> [outdir]
         tps = int(sys.argv[3]) if len(sys.argv) > 3 else 4
         band = float(sys.argv[4]) if len(sys.argv) > 4 else 54.0
         sd = int(sys.argv[5]) if len(sys.argv) > 5 else 2
-        outd = Path(sys.argv[6]) if len(sys.argv) > 6 else Path("../../public/themes/swampspace-hires/tiles")
+        outd = Path(sys.argv[6]) if len(sys.argv) > 6 else Path(_TILES_DIR)
         diverse_masters(surface, tps, band, sd, outd)
     elif mode == "vary":
         # vary <surface> <tiles_per_side> <band> <n_variations> [outdir]
         tps = int(sys.argv[3]) if len(sys.argv) > 3 else 4
         band = float(sys.argv[4]) if len(sys.argv) > 4 else 54.0
         nv = int(sys.argv[5]) if len(sys.argv) > 5 else 2
-        outd = Path(sys.argv[6]) if len(sys.argv) > 6 else Path("../../public/themes/swampspace-hires/tiles")
+        outd = Path(sys.argv[6]) if len(sys.argv) > 6 else Path(_TILES_DIR)
         vary_master(surface, tps, band, outd, nv, outd)

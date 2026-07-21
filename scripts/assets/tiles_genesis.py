@@ -29,16 +29,15 @@ from scipy.ndimage import gaussian_filter, binary_dilation
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from palette import RGB  # noqa: E402
+from theme_config import THEME  # noqa: E402
 
 PAL = np.array(RGB, np.float32)
 
-# Per-surface mean-luminance targets — the value plan, used by the SD post
-# pass to re-enforce the band after diffusion repaints texture.
-# Dark swamp-outpost value plan: bog and street sit dark (sinking-in), interior
-# deck a grimy mid, walkway a subdued light, exit the one hot glow. Street pushed
-# below grass so a causeway reads distinct from adjacent bog.
-BAND = {"wall": 30.0, "street": 40.0, "grass": 54.0, "floor": 82.0,
-        "sidewalk": 118.0, "exit": 150.0}
+# Per-surface mean-luminance targets — the value plan, from the active theme
+# (theme_config.py). Used by the SD post pass to re-enforce the band after
+# diffusion repaints texture. Ground dark, structure a step up, goal the one hot
+# value; touching surfaces ≥1 band apart. Retarget in theme_config.py.
+BAND = dict(THEME["bands"])
 
 BAYER4 = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], np.float32) / 16.0
 

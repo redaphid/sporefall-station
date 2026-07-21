@@ -3,8 +3,8 @@
 
 For each surface unit (a 2x2 macro supertile or a 2x2 mosaic of variants):
   banded base (tiles_genesis.py) -> x8 nearest to 1024 -> img2img sweep
-  (SDXL + skormino pixel LoRA, seamless model patch, N seeds) -> k-centroid
-  back to author res -> Bayer-dither palette snap -> band re-enforcement
+  (Juggernaut Ragnarok + Pixel Art XL LoRA @ 0.7, circular seamless, N seeds) ->
+  circular k-centroid -> palette snap + despeckle -> band re-enforcement
   (enforce_band: diffusion may not drift the value plan) -> score & pick ->
   slice row-major into the shipped tile files.
 
@@ -276,7 +276,7 @@ def contact_sheet(surface):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     seeds = 3
-    outdir = Path("../../public/themes/swampspace-hires/tiles")
+    import theme_config as _tc; outdir = Path(_tc.THEME["tiles_dir"])
     for a in sys.argv[1:]:
         if a.startswith("--seeds"):
             seeds = int(a.split("=")[1])

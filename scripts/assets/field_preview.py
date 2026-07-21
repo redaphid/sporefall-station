@@ -19,7 +19,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-MACRO = {"floor": 2, "street": 2}  # mirror manifest macroTiles (grass is per-tile now)
+MACRO = {"floor": 2, "street": 2, "grass": 4}  # mirror manifest macroTiles
 
 
 def coord_hash(tx, ty):

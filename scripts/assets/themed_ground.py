@@ -40,6 +40,17 @@ NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, isometric, "
        "object, creature, character, figure, face, clean lawn, bright cheerful, "
        "grass field, camouflage, low contrast, washed out")
 
+# DARK, low-contrast BASE prompts — no bright glow (that's reserved for accents,
+# per the tile-theming research: base reads as one calm material, features live
+# in ~15% accent tiles). One wrapping master is generated and SLICED so every
+# base variant shares material/lighting and co-tiles (Red Blob / SLYNYRD).
+BASE_PROMPTS = {
+    "grass": ("top-down dark alien swamp bog floor, tangled dark vines and roots "
+              "over wet olive-green moss and murky black peat, overgrown, sunken, "
+              "very dark and moody, low contrast, no bright lights, no glow, "
+              f"{GEN}, seamless tileable game terrain, flat top-down orthographic view"),
+}
+
 # Themed prompts per surface — the swamp-outpost fiction, not generic ground.
 PROMPTS = {
     "grass": ("top-down dark alien swamp bog floor, tangled dark vines and "
@@ -119,6 +130,53 @@ def build_set(surface, hero_path, count):
     return d
 
 
+def gen_master(surface, tiles_per_side, band_target, seeds, seed_base, d):
+    """Best-of-`seeds` wrapping master, dark-banded, at (tiles_per_side*T)px."""
+    pos = BASE_PROMPTS[surface]
+    base = G.snap(G.bog_tile(T, 0))
+    ip = d / "init.png"
+    Image.fromarray(base, "RGB").resize((1024, 1024), Image.NEAREST).save(ip)
+    N = tiles_per_side * T
+    best, best_score = None, -1e9
+    for s in range(seeds):
+        g = build_graph(pos=pos, neg=NEG, seed=seed_base + s * 811, init=str(ip),
+                        denoise=0.82, seamless=True, alpha=False,
+                        prefix=f"master-{surface}-{seed_base}-{s}")
+        raw = run(g, str(d / "raw"))
+        big = seamless_kcentroid(Image.open(raw[-1]).convert("RGB"), N)
+        clean = G.despeckle(big, passes=1)
+        arr = np.asarray(clean, np.float32)
+        arr = np.clip(arr * ((band_target + 12.75) / (G.lum(arr) + 12.75)), 0, 255)
+        master = G.snap(arr, dither=0.0)
+        err = abs(G.lum(master) - band_target)
+        rng = min(float(np.asarray(master, float).std()), 30)
+        score = -err + rng * 0.3
+        print(f"  master {surface} seed{seed_base}+{s}: lum={G.lum(master):.1f} std={rng:.1f} score={score:.1f}")
+        if score > best_score:
+            best, best_score = master, score
+    return best
+
+
+def master_slice(surface, tiles_per_side, band_target, seeds, outdir, n_masters=2):
+    """Generate `n_masters` wrapping masters and slice each into a tiles_per_side^2
+    macro (placed by POSITION so vines flow across tiles; the engine alternates
+    masters per macro-cell → variety with a tiles_per_side-tile repeat period).
+    The research's slice-a-wrapping-master method, upgraded to macro placement so
+    structured (high-contrast vine) base tiles stay continuous."""
+    d = STAGE / surface / "master"
+    d.mkdir(parents=True, exist_ok=True)
+    per = tiles_per_side * tiles_per_side
+    for m in range(n_masters):
+        best = gen_master(surface, tiles_per_side, band_target, seeds, 7700 + m * 5000, d)
+        for q in range(per):
+            ty, tx = divmod(q, tiles_per_side)
+            v = m * per + q
+            Image.fromarray(best[ty * T:(ty + 1) * T, tx * T:(tx + 1) * T], "RGB").save(
+                outdir / f"{surface}-{v}.png")
+        print(f"{surface}: master {m} -> {per} slices (lum {G.lum(best):.1f})")
+    print(f"{surface}: {n_masters} masters, {n_masters*per} base tiles -> {outdir}")
+
+
 if __name__ == "__main__":
     mode = sys.argv[1]
     surface = sys.argv[2]
@@ -126,3 +184,11 @@ if __name__ == "__main__":
         hero(surface, int(sys.argv[3]) if len(sys.argv) > 3 else 6)
     elif mode == "set":
         build_set(surface, sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 12)
+    elif mode == "master":
+        # master <surface> <tiles_per_side> <band> <seeds> <n_masters> [outdir]
+        tps = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+        band = float(sys.argv[4]) if len(sys.argv) > 4 else 50.0
+        sd = int(sys.argv[5]) if len(sys.argv) > 5 else 3
+        nm = int(sys.argv[6]) if len(sys.argv) > 6 else 2
+        outd = Path(sys.argv[7]) if len(sys.argv) > 7 else Path("../../public/themes/swampspace-hires/tiles")
+        master_slice(surface, tps, band, sd, outd, nm)

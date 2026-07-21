@@ -43,3 +43,27 @@ Baseline screenshots: `e2e/scene-shots.mjs` (`PREFIX=before`), committed under
 
 Scene rig: `e2e/scene-shots.mjs` — teleports the player through hand-picked
 tile situations (street junction, interiors, park edge) and screenshots each.
+
+## Tile-theming research (2026-07, applied)
+
+Findings from pixel-art tileset literature (SLYNYRD, Red Blob Games, BorisTheBrave,
+saint11, MegaCat VDP guide) that now drive the pipeline:
+
+- **Base reads as ONE material; features are rare.** Feature/decorated tiles at
+  ~10–20% frequency (engine: `TILE_ACCENT_EVERY`); base tiles fill the rest.
+  Reserve near-full brightness for glow pixels + sprites ONLY — never on every
+  base tile (that was the "polka-dot" failure).
+- **Generate one large WRAPPING master, slice it.** Every slice shares
+  material/lighting and co-tiles. For high-contrast/structured bases, place slices
+  by POSITION (macro) so features flow across tiles; alternate masters per cell for
+  variety. `themed_ground.py master` + `vary` (consistent variations via
+  img2img+IPAdapter anchored to the hero master).
+- **Even visual weight per tile** or a dark/light checkerboard betrays the grid.
+  The master picker penalizes per-slice luminance spread (`checker`).
+- **Value discipline:** ground in a compressed dark band, structure one step up,
+  glow+sprites brightest. Contrast > hue (squint test).
+- **Palette quantization is the strongest cohesion lever** (already: `to_palette`).
+- **Diffusion coherence:** Juggernaut Ragnarok + NO pixel LoRA (the skormino LoRA
+  caused halftone "camo blobs"); k-centroid+palette IS the pixel-art step; low-denoise
+  img2img from an approved hero keeps material, varies arrangement; IPAdapter env-anchor
+  for set coherence. Full sources: research report in session notes.

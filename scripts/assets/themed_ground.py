@@ -50,6 +50,23 @@ BASE_PROMPTS = {
               "ground, dark and moody, even visual density, low contrast, no big "
               "black holes, no empty patches, no bright lights, no glow, "
               f"{GEN}, seamless tileable game terrain, flat top-down orthographic view"),
+    "floor": ("top-down derelict space station deck floor, dark tan and gray "
+              "riveted metal plates evenly tiled, thin moss and vines creeping in "
+              "the panel seams, rust streaks, rot, sinking into swamp, dark and "
+              "grimy, even visual density, no big holes, no bright glow, "
+              f"{GEN}, seamless tileable game texture, flat top-down orthographic view"),
+    "street": ("top-down dark sunken metal causeway half-submerged in black swamp "
+               "water, cracked dark asphalt and rusted grating, thin moss veins, "
+               "very dark near-black, wet, even density, no bright glow, "
+               f"{GEN}, seamless tileable game texture, flat top-down orthographic view"),
+    "wall": ("top-down dark bulkhead wall, near-black rusted metal panels woven "
+             "with thick dark roots and vines, wet, overgrown, grimy, even "
+             "density, no bright glow, "
+             f"{GEN}, seamless tileable game texture, straight-on view"),
+    "sidewalk": ("top-down weathered gray metal walkway plates, pale dark-gray "
+                 "riveted panels with mossy expansion joints, grimy and worn, wet, "
+                 "even density, subdued, "
+                 f"{GEN}, seamless tileable game texture, flat top-down orthographic view"),
 }
 
 # Themed prompts per surface — the swamp-outpost fiction, not generic ground.

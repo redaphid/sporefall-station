@@ -39,10 +39,28 @@ FEATURES = {
 }
 
 
+def bog_border(v):
+    """The exact bog tile an accent is based on — used to restore the border
+    after diffusion so the accent seats seamlessly in the field."""
+    src = sorted(TILES.glob("grass-[0-9]*.png"))[v * 5 % 48]
+    return np.asarray(Image.open(src).convert("RGB"), np.float32)
+
+
+def blend_border(accent, bog, feather=6):
+    """Keep the accent's CENTER, restore the bog at the EDGES (feathered) so the
+    tile's border matches its neighbours exactly — the feature reads as sitting
+    IN the swamp, not in a box."""
+    H, W = accent.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    edge = np.minimum.reduce([yy, xx, H - 1 - yy, W - 1 - xx])
+    center = np.clip((edge - feather) / feather, 0, 1)[..., None]  # 0 at rim, 1 inside
+    return (accent.astype(np.float32) * center + bog * (1 - center))
+
+
 def feature_init(v, colors):
     """A real dark bog tile with a soft radial feature blob painted in the
     center — border stays bog, center seeds the feature."""
-    src = sorted(TILES.glob("grass-[0-9]*.png"))[v * 5 % 32]
+    src = sorted(TILES.glob("grass-[0-9]*.png"))[v * 5 % 48]
     img = np.asarray(Image.open(src).convert("RGB"), np.float32)
     cx = cy = T / 2 - 0.5
     yy, xx = np.mgrid[0:T, 0:T]
@@ -73,7 +91,8 @@ def main():
             raw = run(g, str(STAGE / "raw"))
             small = kcentroid(Image.open(raw[-1]).convert("RGB"), T, T).convert("RGB")
             clean = G.despeckle(small, passes=2)
-            out = G.snap(np.asarray(clean, np.float32), dither=0.0)
+            blended = blend_border(np.asarray(clean, np.float32), bog_border(v))
+            out = G.snap(blended, dither=0.0)
             Image.fromarray(out, "RGB").save(STAGE / f"acc-{v}-seed{s}.png")
             # prefer a candidate that stays mostly dark (feature is local, not the
             # whole tile) but has a bright peak

@@ -34,8 +34,11 @@ PAL = np.array(RGB, np.float32)
 
 # Per-surface mean-luminance targets — the value plan, used by the SD post
 # pass to re-enforce the band after diffusion repaints texture.
-BAND = {"wall": 33.0, "street": 53.0, "grass": 66.0, "floor": 90.0,
-        "sidewalk": 140.0, "exit": 155.0}
+# Dark swamp-outpost value plan: bog and street sit dark (sinking-in), interior
+# deck a grimy mid, walkway a subdued light, exit the one hot glow. Street pushed
+# below grass so a causeway reads distinct from adjacent bog.
+BAND = {"wall": 30.0, "street": 40.0, "grass": 54.0, "floor": 82.0,
+        "sidewalk": 118.0, "exit": 150.0}
 
 BAYER4 = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], np.float32) / 16.0
 

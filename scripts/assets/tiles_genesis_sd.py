@@ -61,15 +61,16 @@ NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, depth of "
 # whole point (docs/genesis-upgrade.md) — and the band is re-enforced after.
 UNITS = {
     "floor": ("macro", 2,
-              f"top-down warm tan sci-fi deck floor tile, light caramel metal "
-              f"plates with dark seams and rivets, small moss tufts in the "
-              f"seams, bright readable interior floor, {GEN}, seamless tileable "
-              f"game texture, flat top-down orthographic view", 0.5, True),
+              f"top-down derelict space station deck floor, dark tan and gray "
+              f"riveted metal plates with dark seams, moss and thin vines creeping "
+              f"in the seams, rust streaks, rot, grimy interior floor sinking into "
+              f"swamp, {GEN}, seamless tileable game texture, flat top-down "
+              f"orthographic view", 0.5, True),
     "street": ("macro", 3,
-               f"top-down dark asphalt street tile, near-black cracked tarmac "
-               f"with faint cool gray wear patches, thin moss veins in the "
-               f"cracks, dark ground, {GEN}, seamless tileable game texture, "
-               f"flat top-down orthographic view", 0.5, True),
+               f"top-down dark sunken metal causeway, near-black wet rusted "
+               f"grating and cracked asphalt half-submerged in black swamp water, "
+               f"thin moss veins in the cracks, very dark, {GEN}, seamless "
+               f"tileable game texture, flat top-down orthographic view", 0.5, True),
     # grass is a uniform detailed carpet: individual seamless tiles (no macro,
     # no edge-flattening); high denoise so Juggernaut draws real blades.
     "grass": ("field", 12,
@@ -78,14 +79,14 @@ UNITS = {
               f"shading, {GEN}, seamless tileable game terrain, flat top-down "
               f"orthographic view", 0.82, True),
     "sidewalk": ("mosaic", 1,
-                 f"top-down light gray metal walkway tile, pale bright "
-                 f"riveted plates with dark expansion joints, tiny moss "
-                 f"flecks in the joints, large flat plates, {GEN}, "
+                 f"top-down weathered gray metal walkway plates, worn dark-gray "
+                 f"riveted panels with mossy expansion joints, grimy, wet, "
+                 f"subdued, large flat plates, {GEN}, "
                  f"seamless game texture, flat top-down view", 0.32, True),
     "wall": ("mosaic", 1,
-             f"top-down game wall tile, near-black root-woven metal "
-             f"bulkhead with a pale lit steel cap strip along the top edge of "
-             f"each tile, thick dark roots over dark panels, {GEN}, "
+             f"top-down game wall tile, near-black rusted metal bulkhead woven "
+             f"with thick dark roots and vines, a dim lit steel cap strip along "
+             f"the top edge, wet and overgrown, {GEN}, "
              f"straight-on view", 0.35, False),
     "exit": ("single", 1,
              f"top-down glowing green launch pad game tile, a bright "

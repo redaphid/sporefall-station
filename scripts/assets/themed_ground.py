@@ -45,9 +45,10 @@ NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, isometric, "
 # in ~15% accent tiles). One wrapping master is generated and SLICED so every
 # base variant shares material/lighting and co-tiles (Red Blob / SLYNYRD).
 BASE_PROMPTS = {
-    "grass": ("top-down dark alien swamp bog floor, tangled dark vines and roots "
-              "over wet olive-green moss and murky black peat, overgrown, sunken, "
-              "very dark and moody, low contrast, no bright lights, no glow, "
+    "grass": ("top-down dark alien swamp bog floor, thin tangled dark vines and "
+              "roots evenly spread over damp olive-green moss, uniform overgrown "
+              "ground, dark and moody, even visual density, low contrast, no big "
+              "black holes, no empty patches, no bright lights, no glow, "
               f"{GEN}, seamless tileable game terrain, flat top-down orthographic view"),
 }
 
@@ -150,8 +151,16 @@ def gen_master(surface, tiles_per_side, band_target, seeds, seed_base, d):
         master = G.snap(arr, dither=0.0)
         err = abs(G.lum(master) - band_target)
         rng = min(float(np.asarray(master, float).std()), 30)
-        score = -err + rng * 0.3
-        print(f"  master {surface} seed{seed_base}+{s}: lum={G.lum(master):.1f} std={rng:.1f} score={score:.1f}")
+        # even visual weight: penalize spread of per-slice mean luminance (the
+        # dark/light checkerboard the research warns about).
+        a = np.asarray(master, float)
+        L = 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
+        slice_means = [L[ty * T:(ty + 1) * T, tx * T:(tx + 1) * T].mean()
+                       for ty in range(tiles_per_side) for tx in range(tiles_per_side)]
+        checker = float(np.std(slice_means))
+        score = -err + rng * 0.3 - checker * 1.2
+        print(f"  master {surface} seed{seed_base}+{s}: lum={G.lum(master):.1f} "
+              f"std={rng:.1f} checker={checker:.1f} score={score:.1f}")
         if score > best_score:
             best, best_score = master, score
     return best
@@ -177,6 +186,41 @@ def master_slice(surface, tiles_per_side, band_target, seeds, outdir, n_masters=
     print(f"{surface}: {n_masters} masters, {n_masters*per} base tiles -> {outdir}")
 
 
+def vary_master(surface, tiles_per_side, band_target, hero_tiles_dir, n_variations, outdir):
+    """Keep macro 0 as the hero, then generate n_variations MORE masters as
+    img2img of the hero (low denoise + IPAdapter anchor) so every macro is the
+    SAME material, only rearranged — continuous AND varied. Reads the hero from
+    grass-0..(per-1) already in outdir, writes variations after it."""
+    d = STAGE / surface / "vary"
+    d.mkdir(parents=True, exist_ok=True)
+    per = tiles_per_side * tiles_per_side
+    # reconstruct hero master from its shipped slices
+    N = tiles_per_side * T
+    hero = np.zeros((N, N, 3), np.uint8)
+    for q in range(per):
+        ty, tx = divmod(q, tiles_per_side)
+        hero[ty * T:(ty + 1) * T, tx * T:(tx + 1) * T] = np.asarray(
+            Image.open(Path(hero_tiles_dir) / f"{surface}-{q}.png").convert("RGB"))
+    hero_path = d / "hero.png"
+    Image.fromarray(hero, "RGB").resize((1024, 1024), Image.NEAREST).save(hero_path)
+    pos = BASE_PROMPTS[surface]
+    for m in range(1, n_variations + 1):
+        g = build_graph(pos=pos, neg=NEG, seed=4400 + m * 971, init=str(hero_path),
+                        denoise=0.5, seamless=True, alpha=False, refs=[str(hero_path)],
+                        ip_weight=0.7, prefix=f"vary-{surface}-{m}")
+        raw = run(g, str(d / "raw"))
+        big = seamless_kcentroid(Image.open(raw[-1]).convert("RGB"), N)
+        clean = G.despeckle(big, passes=1)
+        arr = np.clip(np.asarray(clean, np.float32) *
+                      ((band_target + 12.75) / (G.lum(clean) + 12.75)), 0, 255)
+        var = G.snap(arr, dither=0.0)
+        for q in range(per):
+            ty, tx = divmod(q, tiles_per_side)
+            Image.fromarray(var[ty * T:(ty + 1) * T, tx * T:(tx + 1) * T], "RGB").save(
+                Path(outdir) / f"{surface}-{m * per + q}.png")
+        print(f"{surface}: variation {m} (lum {G.lum(var):.1f})")
+
+
 if __name__ == "__main__":
     mode = sys.argv[1]
     surface = sys.argv[2]
@@ -192,3 +236,10 @@ if __name__ == "__main__":
         nm = int(sys.argv[6]) if len(sys.argv) > 6 else 2
         outd = Path(sys.argv[7]) if len(sys.argv) > 7 else Path("../../public/themes/swampspace-hires/tiles")
         master_slice(surface, tps, band, sd, outd, nm)
+    elif mode == "vary":
+        # vary <surface> <tiles_per_side> <band> <n_variations> [outdir]
+        tps = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+        band = float(sys.argv[4]) if len(sys.argv) > 4 else 54.0
+        nv = int(sys.argv[5]) if len(sys.argv) > 5 else 2
+        outd = Path(sys.argv[6]) if len(sys.argv) > 6 else Path("../../public/themes/swampspace-hires/tiles")
+        vary_master(surface, tps, band, outd, nv, outd)

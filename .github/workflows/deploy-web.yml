@@ -1,14 +1,17 @@
 name: deploy-web
 
-# Deploy the Vite web build to Cloudflare Pages on every push to main.
+# Deploy the Vite web build + WebSocket relay to Cloudflare WORKERS on every push
+# to main. One Worker serves the static game (Assets binding) AND hosts the
+# multiplayer Durable Object (RoomDO) on the same origin — see wrangler.jsonc.
 # This is the "always current" browser on-ramp for the nephews: open a URL,
 # get the latest game. Independent of the native APK / OTA path.
 #
 # One-time setup (see docs/deploy.md):
-#   1. Create a Cloudflare Pages project (Direct Upload) named
-#      `backseat` (or edit the name below + wrangler.toml).
-#   2. Add repo secrets CLOUDFLARE_API_TOKEN (Pages:Edit) and
-#      CLOUDFLARE_ACCOUNT_ID.
+#   1. Add repo secrets CLOUDFLARE_API_TOKEN (with the "Edit Cloudflare Workers"
+#      template — Workers Scripts:Edit) and CLOUDFLARE_ACCOUNT_ID.
+#   2. Set the SITE_URL repo VARIABLE to the Worker's public origin
+#      (https://sporefall-station.<your-subdomain>.workers.dev or a custom
+#      domain) so the OTA manifest + APK links point at the live site.
 
 on:
   push:
@@ -27,7 +30,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy web build to Cloudflare Pages
+    name: Deploy web build + relay to Cloudflare Workers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,9 +64,10 @@ jobs:
           # Incrementing integer (commit count) to match the in-app build number
           # baked by vite.config.ts, so the lobby version and OTA version line up.
           VER="$(git rev-list --count HEAD)"
-          # Public origin of the Pages project. Override with the SITE_URL repo
-          # variable if the project name / custom domain differs.
-          SITE="${SITE_URL:-https://backseat-sd8.pages.dev}"
+          # Public origin of the Worker. SET the SITE_URL repo variable to the
+          # real workers.dev subdomain (or custom domain); this fallback only
+          # keeps a first deploy from failing before that variable is set.
+          SITE="${SITE_URL:-https://sporefall-station.workers.dev}"
           SITE="${SITE%/}"
           mkdir -p dist/ota
           # Zip the built app (index.html at the zip root); exclude the ota/ dir
@@ -92,14 +96,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy Worker (static assets + relay Durable Object)
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Uses pages_build_output_dir ("dist") from wrangler.toml.
-          command: pages deploy --project-name=backseat
+          # Uploads dist/ (assets binding) + the Worker + RoomDO migration from
+          # wrangler.jsonc.
+          command: deploy
 
       - name: Print deployment URL
         env:

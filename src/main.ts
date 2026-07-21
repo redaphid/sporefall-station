@@ -43,6 +43,7 @@ import { notifyOtaReady } from './app/ota'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
+import { resolveWsBaseUrl, WsTransport } from './net/transport/wsTransport'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import type { ZoomSink } from './render/zoomModel'
@@ -348,6 +349,9 @@ interface SessionDeps {
  */
 const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> => {
   const pref = new URLSearchParams(location.search).get('transport')
+  // `?transport=ws` joins over the Cloudflare Worker relay (Durable Object) —
+  // the WebSocket multiplayer path (no Bluetooth, works across networks).
+  if (pref === 'ws') return new WsTransport('client', deps.room, resolveWsBaseUrl(location.search))
   if (pref !== 'tabs' && isWebBluetoothAvailable()) {
     const webBle = new WebBluetoothClientTransport()
     const choice = await pickJoinTransport(deps.uiMount, () => webBle.requestDevice())
@@ -372,9 +376,12 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
     // Advertise the host's display name so the join list can label this phone
     // (issue #35). No "Spore " tag: the scan already filters by service UUID, and
     // the ~8-char advertisement budget is too tight to waste on a prefix.
-    const transport = native
-      ? new BleHostTransport(deps.name, dbg.log)
-      : new BroadcastChannelTransport('host', deps.room)
+    const wsHost = new URLSearchParams(location.search).get('transport') === 'ws'
+    const transport = wsHost
+      ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
+      : native
+        ? new BleHostTransport(deps.name, dbg.log)
+        : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     const session = new NetHostSession(deps.seed, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)

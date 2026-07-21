@@ -1,0 +1,33 @@
+{
+  // Cloudflare WORKERS config (migrated from Pages). One Worker serves the static
+  // game AND hosts the WebSocket multiplayer relay (a Durable Object) on the same
+  // origin — no CORS, one deploy. See docs/deploy.md.
+  //
+  //   local:   npx wrangler dev            (http://localhost:8787)
+  //   deploy:  npx wrangler deploy         (CI does this on push to main)
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sporefall-station",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-04-07",
+
+  // Serve the Vite build. Only /ws/* and /ota/* run the Worker; every other path
+  // is served straight from these assets (free, cached). public/_headers and
+  // public/_redirects (copied into dist/ by Vite) are honored, including the SPA
+  // fallback and the /download APK short-links.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/ws/*", "/ota/*"]
+  },
+
+  // One Durable Object instance per multiplayer room. SQLite-backed class (the
+  // current default for new DOs); the relay itself stores nothing, but SQLite
+  // classes are required for new_sqlite_classes migrations.
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "RoomDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO"] }],
+
+  "observability": { "enabled": true }
+}

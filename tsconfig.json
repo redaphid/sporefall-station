@@ -14,5 +14,8 @@
     "useDefineForClassFields": true,
     "types": ["vite/client"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  // src/worker runs on Cloudflare Workers (workerd), not the DOM — it is
+  // type-checked by tsconfig.worker.json with @cloudflare/workers-types instead.
+  "exclude": ["src/worker"]
 }

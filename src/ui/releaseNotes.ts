@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Online co-op over WebSocket (beta)',
   'Fixed stuck movement + snappier controls',
   'Fullscreen + hidden cursor while playing',
   'Mireclaw Alpha boss: summons, heals, enrages',
-  'Dormant pods wake to noise — sneak or trip',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

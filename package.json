@@ -6,12 +6,15 @@
   "packageManager": "pnpm@10.26.0",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "workerd"
     ]
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json && vite build",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,6 +25,9 @@
     "dev:live": "bash scripts/dev-live.sh",
     "install:apk": "bash scripts/install-apk.sh",
     "e2e": "./e2e/run.sh",
+    "e2e:ws": "bash e2e/run-ws.sh",
+    "e2e:ws:relay": "node e2e/ws-relay.mjs",
+    "e2e:ws:mp": "node e2e/ws-multiplayer.mjs",
     "e2e:play": "node e2e/play-session.mjs",
     "e2e:showcase": "node e2e/record-showcase.mjs",
     "test:e2e:theme": "bash e2e/run-theme.sh",
@@ -51,6 +57,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
+    "@cloudflare/workers-types": "^5.20260719.1",
     "@eslint/js": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^24.13.3",
@@ -65,6 +72,7 @@
     "typescript-eslint": "^8.62.1",
     "vite": "^8.1.3",
     "vitest": "^4.1.9",
+    "wrangler": "^4.112.0",
     "ws": "^8.21.1",
     "zod": "^4.4.3"
   }

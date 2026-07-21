@@ -20,3 +20,8 @@ keystore.properties
 
 __pycache__/
 *.pyc
+.observer/
+.gm/
+
+# Cloudflare Workers local dev/build cache (wrangler dev, wrangler deploy).
+.wrangler/

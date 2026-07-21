@@ -1,0 +1,26 @@
+{
+  // The Cloudflare Worker (src/worker) type-checks SEPARATELY from the browser
+  // app: it runs on workerd, not the DOM. It uses @cloudflare/workers-types
+  // globals (DurableObject, WebSocketPair, DurableObjectNamespace, …) instead of
+  // the "DOM" lib, which would otherwise redeclare fetch/WebSocket/Request with
+  // browser-shaped signatures and conflict. `pnpm run build` runs both compiles.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "useDefineForClassFields": true,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"]
+  },
+  // Only the Worker entry + the pure modules it pulls in. tsc follows the imports
+  // (roomRelay → wsWire → framing/codec), so those get checked here too.
+  "include": ["src/worker"]
+}

@@ -7,7 +7,7 @@ Two independent channels:
 
 | Channel | Workflow | Trigger | Output |
 | --- | --- | --- | --- |
-| Web (Cloudflare Pages) | `.github/workflows/deploy-web.yml` | push to `main` | a play URL + an OTA bundle, always current |
+| Web (Cloudflare Workers) | `.github/workflows/deploy-web.yml` | push to `main` | a play URL + WS relay + an OTA bundle, always current |
 | Android APK | `.github/workflows/release-apk.yml` | push a `v*` tag | APK on a GitHub Release |
 
 The web deploy also ships **OTA updates** to installed APKs (see section C) —
@@ -19,43 +19,54 @@ keeps a rolling `latest` prerelease. Tagged releases are handled only by
 
 ---
 
-## A. Cloudflare Pages web deploy
+## A. Cloudflare Workers web deploy
 
-**Approach:** `cloudflare/wrangler-action@v3` running `wrangler pages deploy`.
-This is Cloudflare's current recommended path — the old `cloudflare/pages-action`
-is **deprecated** and points at wrangler-action. The build output dir (`dist`)
-comes from `wrangler.toml` (`pages_build_output_dir = "dist"`).
+**Approach:** `cloudflare/wrangler-action@v3` running `wrangler deploy`. A single
+**Worker** serves both the static game and the multiplayer relay from one origin:
 
-- SPA fallback + cache/security headers: `public/_redirects` and
-  `public/_headers` (Vite copies them into `dist/`).
-- PWA (Add-to-Home-Screen): `public/manifest.webmanifest` + `public/icons/*`,
-  linked from `index.html`.
+- **Static game** — the `assets` binding in `wrangler.jsonc` (`directory: "./dist"`)
+  serves the Vite build. Only `/ws/*` and `/ota/*` run Worker code
+  (`run_worker_first`); everything else is served straight from assets (free,
+  cached). `public/_redirects` and `public/_headers` are honored (SPA fallback,
+  cache/security headers, `/download` APK links). PWA:
+  `public/manifest.webmanifest` + `public/icons/*`.
+- **WebSocket multiplayer** — `/ws/:room` routes to the **RoomDO Durable Object**
+  (`src/worker/`), a host↔client relay. This is *why* we're on Workers, not Pages:
+  Pages Functions can't host Durable Objects. See `docs/offline-coop.md` for the
+  transport model and `e2e/run-ws.sh` for the end-to-end proof.
+- **OTA** — `/ota/check` is a Worker route (`src/worker/ota.ts`), ported from the
+  old Pages Function.
+
+The worker entry (`src/worker/index.ts`) type-checks separately from the browser
+app via `tsconfig.worker.json` (workerd globals, not DOM); `pnpm run build` runs
+both compiles.
 
 ### One-time setup
 
-1. **Create the Pages project** (Direct Upload). Either:
-   - Dashboard: Cloudflare dashboard → **Workers & Pages** → **Create** →
-     **Pages** → **Upload assets**. Name it **`backseat`** (must match
-     `--project-name` in `deploy-web.yml` and `name` in `wrangler.toml`).
-   - Or CLI, which also does the first deploy:
-     ```bash
-     pnpm install --frozen-lockfile
-     pnpm run build            # produces dist/  (leave CAP_SERVER_URL unset!)
-     pnpm exec wrangler login       # opens a browser to authorize your account
-     pnpm exec wrangler pages deploy --project-name=backseat
-     ```
+1. **Log in / first deploy** (also creates the Worker):
+   ```bash
+   pnpm install --frozen-lockfile
+   pnpm run build            # produces dist/  (leave CAP_SERVER_URL unset!)
+   pnpm exec wrangler login  # opens a browser to authorize your account
+   pnpm exec wrangler deploy # uploads dist/ + the Worker + the RoomDO migration
+   ```
+   Local iteration: `pnpm run worker:dev` (a.k.a. `wrangler dev`) serves the whole
+   thing at `http://localhost:8787`, Durable Object included.
 2. **Create an API token** for CI: Cloudflare dashboard → **My Profile** →
-   **API Tokens** → **Create Token** → template **"Edit Cloudflare Workers"**,
-   or a custom token with **Account → Cloudflare Pages → Edit** permission.
+   **API Tokens** → **Create Token** → template **"Edit Cloudflare Workers"**.
 3. **Find your Account ID:** dashboard → **Workers & Pages** (right sidebar), or
    `pnpm exec wrangler whoami`.
 4. **Add GitHub repo secrets** (Settings → Secrets and variables → Actions):
-   - `CLOUDFLARE_API_TOKEN` — the token from step 2 (Pages:Edit scope).
+   - `CLOUDFLARE_API_TOKEN` — the token from step 2 (Workers Scripts:Edit scope).
    - `CLOUDFLARE_ACCOUNT_ID` — from step 3.
-5. Push to `main`. The deploy runs; the workflow log prints the deployment URL.
-   Your stable URL is `https://backseat-sd8.pages.dev`.
-6. **Update the play URL** in `docs/play.md` and `README.md` if the project name
-   differs.
+5. **Set the `SITE_URL` repo variable** (Settings → Secrets and variables →
+   Actions → *Variables*) to the Worker's public origin,
+   `https://sporefall-station.<your-subdomain>.workers.dev` (from the first
+   deploy's output) or a custom domain. The OTA manifest + APK links are built
+   from it. Point `OTA_UPDATE_URL` (build-time) / `capacitor.config.ts` at the
+   same origin so installed APKs check the right endpoint.
+6. Push to `main`. The deploy runs; the workflow log prints the deployment URL.
+7. **Update the play URL** in `docs/play.md` and `README.md` to match.
 
 > **Important — `CAP_SERVER_URL`:** the web deploy must build with
 > `CAP_SERVER_URL` **unset/empty**. When set, `capacitor.config.ts` points the
@@ -66,11 +77,12 @@ comes from `wrangler.toml` (`pages_build_output_dir = "dist"`).
 
 | Secret | Where | Scope |
 | --- | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | GitHub repo secret | Account → Cloudflare Pages → Edit |
+| `CLOUDFLARE_API_TOKEN` | GitHub repo secret | Edit Cloudflare Workers (Workers Scripts:Edit) |
 | `CLOUDFLARE_ACCOUNT_ID` | GitHub repo secret | — |
+| `SITE_URL` | GitHub repo *variable* | the Worker's public origin (for OTA/APK links) |
 
-Nothing secret is committed. `wrangler.toml` holds only the project name and
-build dir.
+Nothing secret is committed. `wrangler.jsonc` holds only the Worker name, the
+assets dir, and the Durable Object binding.
 
 ---
 

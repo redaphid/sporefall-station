@@ -10,9 +10,9 @@
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
   'Controllers can navigate menus',
-  'Hi-res art theme (toggle in Settings)',
-  'Online co-op over WebSocket (beta)',
-  'Fixed stuck movement + snappier controls',
+  'Revived players keep a moddable gun',
+  'Rooms furnished — labs, bunks, stockrooms',
+  'Fixed 8BitDo controller drift + walking',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

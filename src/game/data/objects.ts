@@ -39,4 +39,20 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // (shoot it down), and it spills fungal loot. Its DEATH un-overgrows every
   // hatch whose `door.nodeId` points at it (interaction.sealSystem).
   sporeNode: { id: 'sporeNode', name: 'Spore Node', hp: 45, flammable: true, ignite: true, loot: ['bandage', 'gasGrenade', 'molotov', 'cash'] },
+
+  // ── Interior furnishings (feat/levelgen-fill-interiors) ──────────────────
+  // Role-appropriate props that make a room read as OCCUPIED and legible rather
+  // than an empty box. Placed by populate.furnishInteriors on its own rng fork.
+  // They behave like every other world object — soft, destructible obstacles —
+  // and a few spill role-flavoured loot when smashed, so a stockroom or armory
+  // rewards a demolition. Bespoke sprite art is a deferred follow-up; the
+  // renderer draws them as tinted footprint boxes for now.
+  bunk: { id: 'bunk', name: 'Bunk', hp: 25, flammable: true, loot: ['bandage', 'cash'] },
+  desk: { id: 'desk', name: 'Desk', hp: 20, flammable: true, loot: ['cash'] },
+  shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['bandage', 'cash', 'molotov'] },
+  cabinet: { id: 'cabinet', name: 'Supply Cabinet', hp: 22, loot: ['medkit', 'bandage'] },
+  bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['bandage', 'gasGrenade'] },
+  locker: { id: 'locker', name: 'Weapons Locker', hp: 30, loot: ['knife', 'pistol', 'cash'] },
+  table: { id: 'table', name: 'Table', hp: 16, flammable: true },
+  plant: { id: 'plant', name: 'Planter', hp: 10, flammable: true },
 }

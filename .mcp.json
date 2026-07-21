@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sporefall-ecs-debug": {
+      "type": "http",
+      "url": "http://localhost:7811/mcp"
+    }
+  }
+}

@@ -43,7 +43,7 @@ export const createHud = (mount: HTMLElement): Hud => {
       const bandages = self.playerCtl?.inventory.filter((s) => CONSUMABLES[s.itemId]).reduce((n, s) => n + s.qty, 0) ?? 0
       const cd = self.playerCtl?.abilityCooldown ?? 0
       const ability = self.playerCtl ? ` · ${SPECIAL_NAME}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
-      const briefcase = self.playerCtl?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 💼' : ''
+      const briefcase = self.playerCtl?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 🧪' : ''
       const text = `${weapon} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${briefcase}`
       if (text !== lastInfo) {
         lastInfo = text

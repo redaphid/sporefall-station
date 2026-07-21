@@ -4,6 +4,7 @@ import { Tile, type Building } from './levelgen/level'
 import type { Rect } from './levelgen/rooms'
 import type { Rng } from './rng'
 import { weightedModId } from './systems/draft'
+import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 
 /** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
@@ -64,6 +65,109 @@ export const populateWorld = (w: World): void => {
   // encounters on its OWN rng fork, so the loot/position/weapon dice above stay
   // byte-identical per seed — only the entity list grows.
   spawnEncounters(w, w.rng.fork('encounters'))
+  furnishInteriors(w)
+}
+
+/** Role-appropriate interior furnishings. Reuses props that already have art
+ * (crate/barrel/tv/toilet/vending/atm) plus the new furniture archetypes, so a
+ * room reads as WHAT IT IS at a glance: a bunkroom, a lab, a stockroom, an
+ * armory, a shop floor. Repeats bias the weighting toward the room's signature
+ * prop. Everything here is a soft, destructible object — never a solid tile —
+ * so it can't wall off a room, block reachability, or trap an occupant. */
+export const FURNISH: Record<Building['role'], readonly string[]> = {
+  shop: ['shelf', 'shelf', 'crate', 'vending', 'atm'],
+  apartment: ['bunk', 'bunk', 'tv', 'table', 'plant'],
+  office: ['desk', 'desk', 'tv', 'cabinet', 'plant'],
+  warehouse: ['crate', 'crate', 'crate', 'shelf', 'barrel'],
+  clinic: ['bench', 'cabinet', 'cabinet', 'toilet', 'plant'],
+  bunker: ['locker', 'locker', 'crate', 'barrel', 'table'],
+}
+
+/** Hard ceiling on furnishings per room, so a big open hall gets a believable
+ * few — not two dozen crates packed shoulder to shoulder. */
+export const FURNISH_MAX_PER_ROOM = 6
+
+const ORTHO = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const
+
+/** A building's room rects can NEST — the vault layout carves a small sealed
+ * chamber inside one big open-hall room (`rooms = [interior, vault]`). So a
+ * floor tile belongs to the SMALLEST room that contains it; the hall and its
+ * vault are then furnished (and counted) independently, never double-stacked.
+ * Returns the owning index into `rooms`, or -1 if no room covers the tile. */
+export const roomOwningTile = (rooms: readonly Rect[], tx: number, ty: number): number => {
+  let best = -1
+  let bestArea = Infinity
+  for (let i = 0; i < rooms.length; i++) {
+    const r = rooms[i]
+    if (tx < r.x || ty < r.y || tx >= r.x + r.w || ty >= r.y + r.h) continue
+    const area = r.w * r.h
+    if (area < bestArea) {
+      bestArea = area
+      best = i
+    }
+  }
+  return best
+}
+
+/** Deterministically furnish every building interior with role-appropriate
+ * props so rooms feel occupied and legible instead of empty boxes. Runs on a
+ * DEDICATED `furnish` fork so it neither perturbs nor is perturbed by the
+ * loot/AI/mod streams — same seed+floor → the same furniture on every peer, and
+ * every pre-existing populate test stays byte-identical. Placement leaves every
+ * doorway (and the tile just inside it), the player spawn tile and the exit tile
+ * clear, never stacks two props on one tile, and caps density at ~¼ of a room's
+ * free floor so rooms stay walkable — even degenerate 2×2 vaults and closets. */
+const furnishInteriors = (w: World): void => {
+  const rng = w.rng.fork('furnish')
+  const lw = w.level.w
+  const spawnTx = Math.floor(w.level.spawn.x)
+  const spawnTy = Math.floor(w.level.spawn.y)
+  const exitTx = Math.floor(w.level.exit.x)
+  const exitTy = Math.floor(w.level.exit.y)
+  for (const building of w.level.buildings) {
+    // Keep every doorway (and the tile immediately inside it) clear so a
+    // furnishing can never plug the only way in or out of a room.
+    const keepClear = new Set<number>()
+    for (const d of building.doors) {
+      keepClear.add(d.y * lw + d.x)
+      for (const [dx, dy] of ORTHO) keepClear.add((d.y + dy) * lw + (d.x + dx))
+    }
+    const palette = FURNISH[building.role]
+    for (let ri = 0; ri < building.rooms.length; ri++) {
+      const room = building.rooms[ri]
+      // Collect the room's free interior floor tiles (never a wall, doorway,
+      // door-adjacent, spawn or exit tile — and only tiles this room OWNS, so a
+      // nested vault chamber isn't furnished twice as part of its outer hall).
+      const free: { x: number; y: number }[] = []
+      for (let ty = room.y; ty < room.y + room.h; ty++) {
+        for (let tx = room.x; tx < room.x + room.w; tx++) {
+          if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+          if (keepClear.has(ty * lw + tx)) continue
+          if (tx === spawnTx && ty === spawnTy) continue
+          if (tx === exitTx && ty === exitTy) continue
+          if (roomOwningTile(building.rooms, tx, ty) !== ri) continue
+          free.push({ x: tx, y: ty })
+        }
+      }
+      // A closet with fewer than two free tiles stays bare — nowhere to stand
+      // otherwise. Everything roomier gets at least one furnishing.
+      if (free.length < 2) continue
+      const n = Math.min(FURNISH_MAX_PER_ROOM, Math.max(1, Math.floor(free.length / 4)))
+      for (let i = 0; i < n && free.length > 0; i++) {
+        // Draw a tile, then swap-remove it so no two props ever stack.
+        const idx = rng.int(0, free.length - 1)
+        const cell = free[idx]
+        free[idx] = free[free.length - 1]
+        free.pop()
+        spawnObject(w, rng.pick(palette), cell.x, cell.y)
+      }
+    }
+  }
 }
 
 /** #78 — inject the Sporefall threat roster (brute/cinder/sporeling/robot) into

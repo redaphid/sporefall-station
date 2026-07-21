@@ -99,7 +99,7 @@ export interface ThemeInfo {
 /** Themes advertised to the settings picker (public/themes/index.json). Any
  * failure falls back to just the default theme — the picker never breaks. */
 export const listThemes = async (): Promise<ThemeInfo[]> => {
-  const fallback: ThemeInfo[] = [{ id: DEFAULT_THEME_ID, name: 'City' }]
+  const fallback: ThemeInfo[] = [{ id: DEFAULT_THEME_ID, name: 'Sporefall Station' }]
   try {
     const res = await fetch(`${BASE}themes/index.json`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)

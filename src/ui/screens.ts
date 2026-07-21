@@ -4,6 +4,7 @@ import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } f
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout } from './loadoutModel'
+import { installGamepadMenuNav } from './gamepadMenu'
 
 export interface Screens {
   update(view: RenderView): void
@@ -128,6 +129,11 @@ export const createScreens = (
     restartBtn.style.cursor = 'default'
     restartBtn.style.background = '#3a3a44'
   }
+  // Controller support on the run-over overlay: a gamepad-only player can move
+  // between "Run it back" / "New Seed" and confirm. The nav loop lives for the
+  // overlay's lifetime; it idles cheaply while the overlay is hidden (its buttons
+  // report no offsetParent) and skips the disabled/hidden client variants.
+  installGamepadMenuNav(() => [restartBtn, newseedBtn])
   const stats = overlay.querySelector<HTMLElement>('#stats')!
 
   let bannerTimer: ReturnType<typeof setTimeout> | undefined

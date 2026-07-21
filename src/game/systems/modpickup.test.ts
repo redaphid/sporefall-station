@@ -102,13 +102,18 @@ describe('mod pickup — degenerate inputs are safe', () => {
     expect(w.events.some((e) => e.type === 'modPickup')).toBe(false)
   })
 
-  it('an unslotted class-starter gun (combat.weapon set, not in inventory) is left too', () => {
+  it('a PHANTOM moddable weapon (combat.weapon set, no slot) MATERIALIZES on grab, then takes the mod', () => {
     const p = player(w)
-    p.combat!.weapon = 'pistol' // held but not a slot → no mod list to write to
+    p.combat!.weapon = 'pistol' // held but not slotted → phantom (legacy save / bug)
     const pick = dropMod(w, 'incendiary', p)
     step(w)
-    expect(w.byId.get(pick.id)).toBeDefined()
-    expect(w.events.some((e) => e.type === 'modPickup')).toBe(false)
+    // The phantom is healed: pistol slotted + equipped, and the mod landed on it.
+    expect(weaponStack(p)?.itemId).toBe('pistol')
+    expect(p.playerCtl!.activeSlot).toBe(0)
+    expect(p.combat!.weapon).toBe('pistol')
+    expect(mods(p)).toEqual([{ id: 'incendiary', stacks: 1 }])
+    expect(w.byId.get(pick.id)).toBeUndefined() // consumed + swept
+    expect(w.events.some((e) => e.type === 'modPickup')).toBe(true)
   })
 
   it('a downed player does not vacuum up mods', () => {

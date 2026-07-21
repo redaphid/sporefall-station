@@ -12,7 +12,7 @@
     "targetBuilding": 4,
     "complete": false,
     "exitUnlocked": false,
-    "description": "Steal the briefcase from the bunker"
+    "description": "Extract the specimen canister from the reactor core"
   },
   "noises": [],
   "events": [],

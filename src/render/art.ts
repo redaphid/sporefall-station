@@ -6,6 +6,14 @@ import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
 
+// HI-RES PROTOTYPE TOGGLE (art-cn1 review). Flip BOTH constants to 2× —
+// `TILE_PX = 64`, `CHAR_PX = 96` (below) — and record with
+// `?theme=swampspace-hires` to get the native-96 vine-ranger (512→96 instead of
+// 512→48, so detail survives). Render-layer only: the sim never sees pixels, so
+// determinism is unaffected. Left at 32/48 by default so the shipped 48px art +
+// camera tests stay coherent; the weapon-scale fix in sprites.ts (`CHAR_PX/48`)
+// keeps the held weapon pinned/proportional at either size. The hi-res B video
+// (~/Videos/backseat/art-hires) was recorded from the 64/96 build.
 export const TILE_PX = 32
 
 /** Character sprite canvas: 48×48 over the 32px tiles. Feet-anchored, so a

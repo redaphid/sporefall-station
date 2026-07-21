@@ -357,6 +357,37 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 20 }, // aftermath
   ],
 
+  // Hero-art review showcase (art-cn1 in-game): stand idle facing the camera,
+  // then walk a full compass circle — E, SE, S, SW, W, NW, N, NE — with a LONG
+  // hold after each leg so a screenshot lands cleanly on that facing (captures
+  // lag the sim ~60 ticks under video recording; 90-tick holds absorb it). The
+  // eight legs cancel pairwise so the walker returns to centre, then it marches
+  // east into the thug pair and swings the bat — the combat beat. Pairs with the
+  // `artcompare` scenario (player on the lane at x8, thugs at x18/19). Backs the
+  // 48px-downscale-vs-hi-res A/B hero-art comparison videos.
+  artcompare: [
+    { ticks: 90 }, // idle, facing south (toward camera)
+    { ticks: 14, x: 1 }, // E
+    { ticks: 90 },
+    { ticks: 14, x: 1, y: 1 }, // SE
+    { ticks: 90 },
+    { ticks: 14, y: 1 }, // S
+    { ticks: 90 },
+    { ticks: 14, x: -1, y: 1 }, // SW (mirrored se art)
+    { ticks: 90 },
+    { ticks: 14, x: -1 }, // W (mirrored e art)
+    { ticks: 90 },
+    { ticks: 14, x: -1, y: -1 }, // NW (mirrored ne art)
+    { ticks: 90 },
+    { ticks: 14, y: -1 }, // N
+    { ticks: 90 },
+    { ticks: 14, x: 1, y: -1 }, // NE
+    { ticks: 90 },
+    { ticks: 10, x: 1 }, // face east, staying on the lane clear of the thug line
+    { ticks: 160, attack: true }, // plant and fire east down the lane into the thug line
+    { ticks: 40 }, // aftermath beat
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

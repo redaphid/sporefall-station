@@ -490,7 +490,28 @@ const setupNpcAi = (w: World): void => {
   drop('medkit', cx - 15.5, cy - 6.5)
 }
 
+// Hero-art showcase (art-cn1 review): a blank plaza with the player on the lane
+// and a small thug pair far east. The `artcompare` script walks a full compass
+// circle in place (showing every drawn facing), then marches east and swings —
+// so a recording captures idle + all directions + combat in one deterministic
+// run, directly comparable across art/engine-resolution builds.
+const stageArtCompare = (w: World): void => {
+  clearStage(w)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: 8 + 0.5, y: LANE_Y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = Math.PI / 2 // idle facing south (toward camera)
+    player.playerCtl.inventory = [{ itemId: 'bat', qty: 1 }]
+    player.playerCtl.activeSlot = 0
+    if (player.combat) player.combat.weapon = 'bat'
+  }
+  stageThug(w, 18, LANE_Y)
+  stageThug(w, 19, LANE_Y)
+}
+
 export const applyScenario = (w: World, name: string): void => {
+  if (name === 'artcompare') stageArtCompare(w)
   if (name === 'npc-combat') setupNpcCombat(w)
   if (name === 'objects') setupObjects(w)
   if (name === 'fire') setupFire(w)

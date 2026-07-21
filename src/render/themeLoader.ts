@@ -39,15 +39,25 @@ const GRENADE_PX = 14
 /** Bake a source PNG to a fixed-size, renderer-friendly texture. Returns
  * undefined on failure so every sprite stays optional and the procedural art
  * in art.ts fills the gap — a missing asset can never blank the screen. */
-const bake = async (renderer: Renderer, url: string, size: number): Promise<Texture | undefined> => {
+const bake = async (
+  renderer: Renderer,
+  url: string,
+  size: number,
+  artScale = 1,
+): Promise<Texture | undefined> => {
   try {
     const src: Texture = await Assets.load(url)
     const sprite = new Sprite(src)
+    // Bake to the SAME logical footprint (`size`) regardless of pack; `artScale`
+    // only raises the texture's pixel DENSITY (resolution). A hi-res pack whose
+    // art is authored at `size * artScale` px is then captured 1:1 and reads
+    // crisp, while the sprite still measures `size` logical px so nothing in the
+    // layout/camera/draw code changes.
     sprite.width = size
     sprite.height = size
     const holder = new Container()
     holder.addChild(sprite)
-    const tex = renderer.generateTexture(holder)
+    const tex = renderer.generateTexture({ target: holder, resolution: artScale })
     holder.destroy({ children: true })
     return tex
   } catch (err) {
@@ -71,8 +81,9 @@ export const fetchTheme = async (id: string): Promise<LoadedTheme | undefined> =
   }
 }
 
-/** Build the resolution chain for a theme id: [active, city] (city alone when
- * it IS the active theme; possibly shorter when a fetch fails). */
+/** Build the resolution chain for a theme id: [active, swampspace-base]
+ * (swampspace alone when it IS the active theme — the normal case now that it is
+ * the only shipped pack; possibly shorter when a fetch fails). */
 export const loadThemeChain = async (id: string): Promise<ThemeChain> => {
   const wanted = isValidThemeId(id) ? id : DEFAULT_THEME_ID
   const base = await fetchTheme(DEFAULT_THEME_ID)
@@ -108,14 +119,17 @@ export const listThemes = async (): Promise<ThemeInfo[]> => {
 /** Bake every sprite the chain resolves into the ArtRegistry's texture record.
  * Keys nobody maps stay undefined → procedural art. */
 export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain): Promise<SpriteTextures> => {
+  // The active (most-specific) theme sets the texture density for the whole
+  // bake; the base pack in the chain is only a fallback for missing keys.
+  const artScale = chain[0]?.manifest.artScale ?? 1
   const urls = (key: string): string[] | undefined => resolveSpritePaths(key, chain)?.map((p) => BASE + p)
   const one = async (key: string, size: number): Promise<Texture | undefined> => {
     const u = urls(key)
-    return u && u.length > 0 ? bake(renderer, u[0], size) : undefined
+    return u && u.length > 0 ? bake(renderer, u[0], size, artScale) : undefined
   }
   const many = async (key: string, size: number): Promise<Texture[]> => {
     const u = urls(key) ?? []
-    return (await Promise.all(u.map((f) => bake(renderer, f, size)))).filter((t): t is Texture => t !== undefined)
+    return (await Promise.all(u.map((f) => bake(renderer, f, size, artScale)))).filter((t): t is Texture => t !== undefined)
   }
 
   // Animation-state clip: frames n = 0,1,2,… must be CONTIGUOUS from 0 in the

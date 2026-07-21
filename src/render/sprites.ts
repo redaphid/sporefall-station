@@ -13,7 +13,7 @@ import {
   type ResolvedAnim,
 } from './animState'
 import { composeMotion, IDENTITY_POSE, type MotionPose } from './motion'
-import { TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
+import { CHAR_PX, TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
 import { weaponStack } from '../game/systems/inventory'
 import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
@@ -450,13 +450,17 @@ export class EntityViews {
     // The body sprite already sits at the interpolated feet point (with its
     // lunge/flinch motion folded in); hang the hand off that, so the weapon
     // tracks every body offset for free.
-    const baseX = view.sprite.position.x + Math.cos(e.facing) * kick
-    const baseY = view.sprite.position.y + Math.sin(e.facing) * kick
-    weapon.position.set(baseX + pose.hx, baseY + pose.hy)
+    // Hand-rig offsets, recoil and the weapon canvas are authored in 48px-char
+    // pixels; scale them with the actual CHAR_PX so the held weapon stays pinned
+    // and proportional if the render-layer sprite size is bumped (hi-res proto).
+    const hs = CHAR_PX / 48
+    const baseX = view.sprite.position.x + Math.cos(e.facing) * kick * hs
+    const baseY = view.sprite.position.y + Math.sin(e.facing) * kick * hs
+    weapon.position.set(baseX + pose.hx * hs, baseY + pose.hy * hs)
     weapon.rotation = pose.angle
     // Mirror vertically for the west-half aim so the grip hangs down (never
     // upside-down); the barrel still points along `angle` (y-flip keeps local +x).
-    weapon.scale.set(skin.scale, pose.flipY ? -skin.scale : skin.scale)
+    weapon.scale.set(skin.scale * hs, (pose.flipY ? -skin.scale : skin.scale) * hs)
     weapon.tint = skin.tint
     weapon.alpha = view.sprite.alpha
     // In front of the body normally; tucked behind for away-facing poses.

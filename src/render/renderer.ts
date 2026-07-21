@@ -102,8 +102,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   })
   mount.appendChild(app.canvas)
 
-  // --- Theme: `?theme=` (dev, session-only) beats the persisted setting. The
-  // chain is [active, city]; every miss falls through to procedural art.
+  // --- Theme: `?theme=` (dev, session-only) beats the persisted setting.
+  // Sporefall Station is the only shipped pack; the chain is [swampspace] and
+  // every miss falls through to procedural art.
   const themeParam = new URLSearchParams(location.search).get('theme')
   let chain: ThemeChain = await loadThemeChain(resolveThemeId(themeParam, loadSettings().theme))
   setActiveThemeChain(chain)

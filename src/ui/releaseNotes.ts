@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Hi-res art theme (toggle in Settings)',
   'Online co-op over WebSocket (beta)',
   'Fixed stuck movement + snappier controls',
   'Fullscreen + hidden cursor while playing',
-  'Mireclaw Alpha boss: summons, heals, enrages',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

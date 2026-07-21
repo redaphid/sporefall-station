@@ -1,14 +1,10 @@
 [
   {
-    "id": "city",
-    "name": "City"
-  },
-  {
-    "id": "test",
-    "name": "Test (magenta)"
-  },
-  {
     "id": "swampspace",
     "name": "Sporefall Station"
+  },
+  {
+    "id": "swampspace-hires",
+    "name": "Sporefall Station (hi-res)"
   }
 ]

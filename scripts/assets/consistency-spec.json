@@ -2,25 +2,20 @@
  "vine-ranger": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
+   "height": 41,
    "width": 21,
-   "head_h": 27,
-   "mass": 455,
-   "cx": -0.6,
-   "foot_y": 45
+   "head_h": 26,
+   "mass": 544,
+   "cx": -0.43,
+   "foot_y": 43
   },
   "tol": {
-   "height": 2,
+   "height": 3,
    "width": 3,
-   "head_h": 2,
-   "mass_frac": 0.22,
-   "cx": 2.5,
-   "foot_y": 1
-  },
-  "accent": {
-   "min_dx": 1.0,
-   "back_max_frac": 0.09,
-   "back_min_dx": -2.0
+   "head_h": 15,
+   "mass_frac": 0.23,
+   "cx": 1.7,
+   "foot_y": 4
   }
  },
  "bog-mutant": {

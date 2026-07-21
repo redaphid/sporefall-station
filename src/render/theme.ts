@@ -10,7 +10,10 @@
 
 import { ANIM_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
-export const DEFAULT_THEME_ID = 'city'
+// Sporefall Station is the one shipped theme (the old city/test packs are no
+// longer supported). It is also the fallback base of the resolution chain, so
+// any un-mapped sprite falls through to procedural art rather than another pack.
+export const DEFAULT_THEME_ID = 'swampspace'
 
 /** Theme ids are folder names under public/themes/ — keep them URL/path safe. */
 const THEME_ID_RE = /^[a-z0-9][a-z0-9-]*$/
@@ -121,6 +124,13 @@ export interface ThemeManifest {
    * the macro cell so adjacent slices land adjacently (plate seams and large
    * features span tiles); pools without an entry keep the pure-hash pick. */
   macroTiles: Record<string, number>
+  /** Texture DENSITY multiplier (1..4, default 1). Sprites keep the same
+   * logical/world footprint, but their source art is authored at this multiple
+   * and baked at `resolution: artScale`, so a hi-res pack (artScale 2 → 96px
+   * chars / 64px tiles) reads crisp — especially zoomed in — with no change to
+   * layout, camera, or the sim. The sole knob that distinguishes the hi-res
+   * theme from the base one. */
+  artScale: number
 }
 
 /** A manifest bound to the folder it loaded from (dir is app-root-relative,
@@ -143,6 +153,7 @@ export const emptyManifest = (): ThemeManifest => ({
   sprites: {},
   anim: {},
   macroTiles: {},
+  artScale: 1,
 })
 
 // ---------------------------------------------------------------------------
@@ -328,7 +339,12 @@ export const validateManifest = (raw: unknown): ValidatedManifest => {
   manifest.sprites = validateSprites(raw.sprites, warn)
   manifest.anim = validateAnim(raw.anim, warn)
   manifest.macroTiles = validateMacroTiles(raw.macroTiles, warn)
-  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'macroTiles'])
+  if (raw.artScale !== undefined) {
+    if (typeof raw.artScale === 'number' && Number.isInteger(raw.artScale) && raw.artScale >= 1 && raw.artScale <= 4)
+      manifest.artScale = raw.artScale
+    else warn(`artScale: expected an integer 1..4, got ${JSON.stringify(raw.artScale)}; using 1`)
+  }
+  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'macroTiles', 'artScale'])
   for (const k of Object.keys(raw)) if (!known.has(k)) warn(`manifest: unknown key "${k}" dropped`)
   return { manifest, warnings }
 }

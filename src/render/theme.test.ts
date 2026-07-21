@@ -112,6 +112,19 @@ describe('validateManifest', () => {
     expect(validateManifest({}).manifest.macroTiles).toEqual({})
   })
 
+  it('accepts an integer artScale 1..4 and defaults/rejects everything else', () => {
+    expect(validateManifest({ artScale: 2 }).manifest.artScale).toBe(2)
+    expect(validateManifest({ artScale: 1 }).manifest.artScale).toBe(1)
+    expect(validateManifest({ artScale: 4 }).manifest.artScale).toBe(4)
+    expect(validateManifest({}).manifest.artScale).toBe(1) // default
+    // adversarial: out of range, non-integer, wrong type all fall back to 1 + warn
+    for (const bad of [0, 5, -2, 2.5, '2', null, true, [2]]) {
+      const { manifest, warnings } = validateManifest({ artScale: bad })
+      expect(manifest.artScale).toBe(1)
+      expect(warnings.join('\n')).toContain('artScale')
+    }
+  })
+
   it('keeps null as an explicit procedural opt-out', () => {
     const { manifest, warnings } = validateManifest({ sprites: { 'item.default': null } })
     expect(warnings).toEqual([])
@@ -333,11 +346,14 @@ describe('shipped theme packs', () => {
     expect(manifest.names.cop).toBe('Test Warden')
   })
 
-  it('themes index lists valid ids including city', () => {
+  it('themes index lists only the Sporefall Station packs (base + hi-res)', () => {
     const raw = JSON.parse(readFileSync(join(process.cwd(), 'public', 'themes', 'index.json'), 'utf8')) as Array<{
       id: string
     }>
-    expect(raw.some((t) => t.id === 'city')).toBe(true)
+    // Only Sporefall Station is shipped now (city/test are gone), advertised as
+    // two packs — the base art and the hi-res art — so the settings picker
+    // offers exactly that one toggle.
+    expect(raw.map((t) => t.id).sort()).toEqual(['swampspace', 'swampspace-hires'])
     for (const t of raw) expect(isValidThemeId(t.id)).toBe(true)
   })
 })

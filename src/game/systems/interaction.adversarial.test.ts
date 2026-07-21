@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { spawnPlayer } from '../player'
+import { spawnPlayer, STARTER_AMMO } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { addEntity, createWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
@@ -109,7 +109,13 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
     expect(p.playerCtl!.cash).toBe(0) // penalty: cash dropped
-    expect(p.playerCtl!.inventory).toHaveLength(0) // penalty: non-key items dropped
+    // penalty: the carried bat is dropped, but the comeback re-grants the starter
+    // loadout so the player is NOT stuck with a phantom weapon (issue: revived
+    // players couldn't pick up mods). The pistol starter is real + slotted.
+    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.playerCtl!.activeSlot).toBe(0)
+    expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(1) // penalty: one comeback spent
   })
 

@@ -4,7 +4,7 @@
 // interactionSystem, missionSystem) so the rules are pinned independent of the
 // net/session plumbing, plus a few end-to-end passes through tickWorld.
 import { beforeEach, describe, expect, it } from 'vitest'
-import { spawnPlayer } from '../player'
+import { spawnPlayer, STARTER_AMMO } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, REVIVES_PER_RUN, tickWorld, type RunMode, type World } from '../world'
 import { kill } from './combat'
@@ -84,8 +84,11 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
     expect(p.playerCtl!.cash).toBe(0)
-    expect(p.playerCtl!.inventory).toHaveLength(0)
-    expect(p.playerCtl!.activeSlot).toBe(-1)
+    // The carried bat drops, but the comeback re-grants a real slotted starter
+    // pistol (no phantom weapon) so mod pickups keep working post-revive.
+    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.playerCtl!.activeSlot).toBe(0)
+    expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(REVIVES_PER_RUN - 1) // exactly one comeback spent
   })
 
@@ -99,7 +102,12 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     p.playerCtl!.downed!.bleedTicks = 2
     settle(p)
     runUntilResolved(w, p)
-    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'briefcase', qty: 1 }])
+    // Key item survives; the picked-up pistol drops and is replaced by the
+    // re-granted starter pistol slotted ahead of the key.
+    expect(p.playerCtl!.inventory).toEqual([
+      { itemId: 'pistol', qty: STARTER_AMMO },
+      { itemId: 'briefcase', qty: 1 },
+    ])
   })
 
   it('the penalty lands EXACTLY ONCE — a further interaction tick after recovery does not re-charge', () => {

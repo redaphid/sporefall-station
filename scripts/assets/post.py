@@ -75,12 +75,42 @@ def bbox_crop(im: Image.Image, pad_frac: float = 0.02) -> Image.Image:
     return im.crop((x0, y0, x1, y1))
 
 
+def black_key(im: Image.Image, dist_thresh: float = 30, lum_thresh: float = 22) -> Image.Image:
+    """Derive alpha from distance-to-black: a pixel is opaque if it is far enough
+    from pure black OR bright enough. Used for raws that ship on a black backdrop
+    with NO alpha channel — the durable character anchor raws (512px black-bg RGB)
+    and luma FX. Numpy-only (no scipy): a plain threshold, no connected-component
+    cleanup, which is all the palette+kcentroid downscale needs to read cleanly."""
+    a = np.asarray(im.convert("RGB")).astype(np.float32)
+    dist = np.sqrt((a ** 2).sum(-1))
+    lum = a @ np.array([0.299, 0.587, 0.114], np.float32)
+    mask = (dist > dist_thresh) | (lum > lum_thresh)
+    rgba = np.dstack([np.asarray(im.convert("RGB")),
+                      np.where(mask, 255, 0).astype(np.uint8)])
+    return Image.fromarray(rgba, "RGBA")
+
+
+def has_alpha(im: Image.Image) -> bool:
+    """True if the image carries a meaningful (non-fully-opaque) alpha channel."""
+    if im.mode not in ("RGBA", "LA", "P"):
+        return False
+    a = np.asarray(im.convert("RGBA"))[..., 3]
+    return bool((a < 250).any())
+
+
 def sprite(src: Image.Image, canvas: int, content: int | None = None,
            anchor: str = "bottom") -> Image.Image:
-    """Full sprite post: bbox -> k-centroid to fit `content` px -> palette ->
-    place on a transparent `canvas` px square (feet at bottom-center for
-    characters, centered for props/items)."""
+    """Full sprite post: (background-key if the raw has no alpha) -> bbox ->
+    k-centroid to fit `content` px -> palette -> place on a transparent `canvas`
+    px square (feet at bottom-center for characters, centered for props/items).
+
+    The durable character anchor raws are 512px RGB on a BLACK backdrop with no
+    alpha; without keying, bbox_crop would keep the whole black frame as a box
+    (the regression that shipped a black-boxed hero). `has_alpha` routes alpha-cut
+    raws (Rembg'd items) straight through and keys only the black-bg ones."""
     content = content or canvas
+    if not has_alpha(src):
+        src = black_key(src)
     im = bbox_crop(src)
     w, h = im.size
     if w >= h:

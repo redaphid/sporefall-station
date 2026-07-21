@@ -53,14 +53,24 @@ python3 consistency.py --files $STAGE/<job>/*.png        # silhouette metrics
 python3 verify.py $STAGE/<job> --job <job>               # qwen3-vl per-asset
 ```
 
-Record the winner in `curation.json`, save its 512px raw to `anchors/` if it is
-a character s-idle (it becomes the IPAdapter reference), then:
+Approve the winner with the **`curate` verb** — it copies the raw into the
+committed `raws/` dir and records a portable (relative) path in `curation.json`,
+so `final` reproduces the exact approved pixels forever (docs §2b — this closed
+the /tmp curation-loss gotcha). For a character s-idle also save the 512px raw
+to `anchors/` (it becomes the IPAdapter reference).
 
 ```sh
-python3 generate.py final <job>                          # post-process into public/themes/<id>/
+python3 generate.py curate <job> $STAGE/<job>/<picked-file>.png \
+    --seed <N> --index <I> --size 512 --ckpt dreamshaper_8 --note "<why>"
+python3 generate.py final <job>                          # post the durable raw into public/themes/<id>/
 python3 manifest.py && python3 sheets.py
 pnpm exec vitest run src/render/theme.test.ts            # schema + file integrity
 ```
+
+`final` will **not** silently regenerate a lost pick (the graph drifts —
+same-seed regen ≠ the approved art); it points you to re-curate. `--allow-regen`
+is the explicit escape hatch. Audit reproducibility any time with
+`python3 migrate_curation.py` (lists PERSISTED / LOST picks).
 
 Hard-won rules (details in docs §4): IPAdapter refs must be ENVIRONMENT-only for
 props/tiles, CHARACTER-only for figures; items get NO refs; palette-lock is the
@@ -160,4 +170,10 @@ owner's. Only after approval do the new frames replace the shipped ones.
 - **First ComfyUI load is minutes, warm is seconds.** Keep batches ≤4; the
   tracer is resumable (harvests server history) so a killed poll loses nothing.
 - **Never** introduce raw sweeps into `public/themes/` — only curated,
-  post-processed picks are committed; raws stay in `$SWAMPSPACE_STAGE`.
+  post-processed picks land there. Uncurated sweeps stay in `$SWAMPSPACE_STAGE`;
+  the **approved** raw is committed to `scripts/assets/raws/` via `curate`.
+- **A curated pick is an artifact — commit its raw.** Recording only the
+  `$STAGE`/`/tmp` path (the old way) loses the pick when the session ends, and
+  same-seed regen drifts. Always `curate` (→ `raws/`, relative path). Anchors in
+  `anchors/` are the durable char s-idle raws and the only survivors of the last
+  loss; `post.sprite` black-keys those alpha-less black-bg raws automatically.

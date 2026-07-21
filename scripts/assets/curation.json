@@ -15,7 +15,7 @@
   "seed": 414500,
   "batch": 4,
   "index": 0,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.vine-ranger.s-idle/char-vine-ranger-s-idle-s414500_00005_.png",
+  "raw": "raws/char.vine-ranger.s-idle.png",
   "note": "vivid-prompt resweep"
  },
  "prop.cargo-pod": {
@@ -142,7 +142,7 @@
   "seed": 414500,
   "batch": 4,
   "index": 2,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-idle/char-spore-drone-s-idle-s414500_00007_.png",
+  "raw": "raws/char.spore-drone.s-idle.png",
   "size": 1024,
   "note": "divergent-prompt config"
  },
@@ -159,7 +159,7 @@
   "seed": 414560,
   "batch": 4,
   "index": 3,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.bog-mutant.s-idle/char-bog-mutant-s-idle-s414560_00004_.png",
+  "raw": "raws/char.bog-mutant.s-idle.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
   "note": "divergent-prompt SD1.5"
@@ -168,7 +168,7 @@
   "seed": 414564,
   "batch": 4,
   "index": 3,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.mycologist.s-idle/char-mycologist-s-idle-s414564_00004_.png",
+  "raw": "raws/char.mycologist.s-idle.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
   "note": "re-pick: prior had baked root arch"
@@ -177,7 +177,7 @@
   "seed": 414560,
   "batch": 4,
   "index": 3,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.derelict-bot.s-idle/char-derelict-bot-s-idle-s414560_00004_.png",
+  "raw": "raws/char.derelict-bot.s-idle.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
   "note": "divergent-prompt SD1.5"
@@ -186,7 +186,7 @@
   "seed": 414564,
   "batch": 4,
   "index": 0,
-  "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.frog-settler.s-idle/char-frog-settler-s-idle-s414564_00001_.png",
+  "raw": "raws/char.frog-settler.s-idle.png",
   "size": 512,
   "ckpt": "dreamshaper_8",
   "note": "divergent-prompt SD1.5"

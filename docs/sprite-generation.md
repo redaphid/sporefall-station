@@ -113,7 +113,56 @@ pnpm exec vitest run src/render/theme.test.ts    # schema + file integrity
 ```
 
 Sweep outputs land in `$SWAMPSPACE_STAGE/<job>/`; curated, post-processed
-sprites land in `public/themes/swampspace/`. Only the latter is committed.
+sprites land in `public/themes/swampspace/`. Both the shipped sprite **and the
+curated raw** are committed (raws in `scripts/assets/raws/`, see §2b).
+
+## 2b. Durable curation — never lose an approved pick (hard-won 2026-07)
+
+**The gotcha that cost a pack.** The original pipeline recorded each curated
+pick's raw *only by its `$STAGE` (/tmp) path*. Those paths die with the session.
+`final` then fell back to a same-seed **regen** — but the ComfyUI graph and
+prompts drift over time, so regenerating a lost pick produces *different* art (a
+same-seed `spore-pistol` regen came back a contaminated blob). Net effect: 34 of
+40 curated picks (every item/prop/tile, all step and non-`s` direction frames)
+became **unreproducible** — the shipped 48/32px sprites survived, but there was
+no faithful path to re-derive or re-scale them. Only the 6 character `s-idle`
+anchors (deliberately committed to `anchors/`) survived.
+
+**The fix — a curated raw is an artifact, so commit it.**
+
+- `scripts/assets/raws/<job>.png` is the durable, **committed** home for every
+  curated sweep raw. `curation.json` stores each `raw` as a path **relative to
+  `scripts/assets/`** (`"raws/item.spore-pistol.png"`) so it survives machine,
+  user and `/tmp` churn — never record a `$STAGE`/`/tmp` absolute path again.
+- `generate.resolve_raw(job, pick)` resolves **durable-first**: the recorded
+  relative raw → `raws/<job>.png` → (for characters) the `anchors/<kind>-<dir>-<frame>.png`
+  exemplar. `final` and the step/direction `init_from_idle` chains all go through it.
+- **Approve a pick with the `curate` verb** — this is the *only* correct way to
+  bless a sweep candidate:
+
+  ```bash
+  python3 generate.py sweep item.spore-pistol --seeds=8   # -> $STAGE
+  # review the contact sheet, then approve the winner:
+  python3 generate.py curate item.spore-pistol \
+      $STAGE/item.spore-pistol/item-spore-pistol-s414575_00001_.png \
+      --seed 414575 --index 0 --size 512 --ckpt dreamshaper_8 --note "icon"
+  python3 generate.py final item.spore-pistol                # posts the durable raw
+  ```
+
+  `curate` copies the file into `raws/` and records the relative path — so
+  `final` reproduces the exact approved pixels forever, at any target size.
+- `final` **no longer silently drift-regens.** A lost pick prints how to
+  re-curate and skips; `--allow-regen` is the explicit (drift-prone) escape hatch.
+- `post.sprite` background-keys **alpha-less** raws (the 512px black-bg character
+  anchors) before cropping — without this, `bbox_crop` keeps the whole black
+  frame and ships a black-boxed figure. Alpha-cut raws (Rembg'd items) pass
+  straight through unchanged (`post.has_alpha` routes it).
+
+**Migration / audit.** `python3 migrate_curation.py` (dry run; `--write` to
+apply) backfills every currently-recoverable raw into `raws/` and rewrites its
+path to relative, then prints the PERSISTED / ALREADY-DURABLE / **LOST** split.
+The LOST list is the exact re-curation backlog: each entry needs a fresh
+`sweep` → `curate`. Re-run it after any curation change as a standing audit.
 
 ## 3. The generation contract
 

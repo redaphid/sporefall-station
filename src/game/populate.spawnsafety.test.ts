@@ -87,9 +87,12 @@ describe('an idle just-spawned player survives (the seed-7 regression)', () => {
     expect(p.health!.hp).toBeGreaterThan(0)
   })
 
-  // 100 full worldgens × 300 ticks is real work (~8s on a loaded box) — the
-  // 5s default timeout flakes when the suite runs alongside other jobs.
-  it('sweep seeds 1..100: no idle spawn is downed within 10 seconds', { timeout: 60000 }, () => {
+  // 100 full worldgens × 300 ticks is real work (~10s on a loaded box) — the 5s
+  // default timeout flakes when the suite runs alongside other jobs, so allow 30s.
+  // That ceiling also GUARDS the furnished-interiors perf fix: furniture (~175
+  // props/floor, all with hp) used to join the O(n²) collision + fire-spread scans
+  // and blew this sweep past 60s; if that superlinear cost ever returns, 30s trips.
+  it('sweep seeds 1..100: no idle spawn is downed within 10 seconds', { timeout: 30000 }, () => {
     for (let seed = 1; seed <= 100; seed++) {
       const { w, p } = buildRun(seed)
       const inputs = new Map([[0, idle]])

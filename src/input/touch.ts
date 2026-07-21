@@ -366,8 +366,8 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
         setEnabled(throwBtn, throwEnabled)
       }
 
-      const inv = view.self?.playerCtl?.inventory ?? []
-      const active = view.self?.playerCtl?.activeSlot ?? -1
+      const inv = view.self?.loadout?.inventory ?? []
+      const active = view.self?.loadout?.activeSlot ?? -1
       const slots = hotbarSlots(inv, active)
       const key = slots.map((s) => `${s.index}:${s.itemId}·${s.qty}${s.active ? '*' : ''}`).join(',')
       if (key !== lastHotbar) {

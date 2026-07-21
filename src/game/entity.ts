@@ -146,6 +146,22 @@ export interface ItemStack {
   mods?: WeaponMod[]
 }
 
+/** Slot-based equipment — the ONE loadout representation shared by players AND
+ * NPCs, so "an enemy's inventory === a player's inventory" is a structural fact,
+ * not a parallel code path. Every inventory accessor (systems/inventory.ts) and
+ * the shared fire site (combat.fireWeapon) read it off `Entity.loadout`, so a
+ * modded gun folds its mods into the projectile identically whoever pulls the
+ * trigger. OPTIONAL on the entity: an entity with no `loadout` (a townsfolk with
+ * innate fists, a class-starter with no slot) resolves VANILLA — undefined stack,
+ * infinite/no-wear — exactly as an inventory-less NPC did before this component
+ * existed, so every pre-loadout snapshot round-trips byte-for-byte. */
+export interface Loadout {
+  /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
+  inventory: ItemStack[]
+  /** Equipped/hotbar slot index into `inventory`; -1 = bare fists. */
+  activeSlot: number
+}
+
 export interface Entity {
   id: EntityId
   kind: EntityKind
@@ -184,13 +200,14 @@ export interface Entity {
    * at spawn; this is what makes different enemies demand different tools. */
   resist?: Record<string, number>
   ai?: AiState
+  /** Slot-based equipment (weapons + items + weapon-mods) — shared by players and
+   * NPCs alike (see `Loadout`). The player's hotbar and an enemy's carried, moddable
+   * arsenal are ONE component read by ONE set of accessors. Absent = innate/vanilla
+   * loadout (bare fists, no mods), the pre-loadout default for weaponless NPCs. */
+  loadout?: Loadout
   playerCtl?: {
     playerId: number
     abilityCooldown: number
-    /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
-    inventory: ItemStack[]
-    /** Equipped/hotbar slot index into `inventory`; -1 = bare fists. */
-    activeSlot: number
     cash: number
     crimeUntilTick: number
     /** Passive-regen bookkeeping (systems/regen.ts): consecutive ticks this player

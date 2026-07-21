@@ -10,7 +10,8 @@ const player = (w: World, x = 20, y = 20): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, inventory: [], cash: 0, crimeUntilTick: 0, activeSlot: -1 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
 
@@ -36,22 +37,22 @@ describe('inventory — adversarial', () => {
   describe('equipSlot bounds and class gating', () => {
     it('refuses a slot index past the end of the inventory', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'bat', qty: 12 }]
+      e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
       expect(equipSlot(e, 99)).toBe(false)
-      expect(e.playerCtl!.activeSlot).toBe(-1)
+      expect(e.loadout!.activeSlot).toBe(-1)
       expect(e.combat!.weapon).toBe('fists')
     })
 
     it('refuses a negative slot index', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'bat', qty: 12 }]
+      e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
       expect(equipSlot(e, -5)).toBe(false)
-      expect(e.playerCtl!.activeSlot).toBe(-1)
+      expect(e.loadout!.activeSlot).toBe(-1)
     })
 
     it('refuses to equip a non-usable class (cash/key/ammo)', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'cash', qty: 10 },
         { itemId: 'briefcase', qty: 1 },
         { itemId: 'ammo', qty: 30 },
@@ -59,19 +60,19 @@ describe('inventory — adversarial', () => {
       expect(equipSlot(e, 0)).toBe(false)
       expect(equipSlot(e, 1)).toBe(false)
       expect(equipSlot(e, 2)).toBe(false)
-      expect(e.playerCtl!.activeSlot).toBe(-1)
+      expect(e.loadout!.activeSlot).toBe(-1)
     })
 
     it('equipping a consumable holds it without changing the swung weapon', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'bat', qty: 12 },
         { itemId: 'bandage', qty: 2 },
       ]
       equipSlot(e, 0)
       expect(e.combat!.weapon).toBe('bat')
       expect(equipSlot(e, 1)).toBe(true)
-      expect(e.playerCtl!.activeSlot).toBe(1)
+      expect(e.loadout!.activeSlot).toBe(1)
       // A consumable is "held" for Use; the bat stays in hand for swinging.
       expect(e.combat!.weapon).toBe('bat')
     })
@@ -86,17 +87,17 @@ describe('inventory — adversarial', () => {
 
     it('throwing with no throwable (only a weapon) returns false', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'bat', qty: 12 }]
+      e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
       equipSlot(e, 0)
       expect(throwActive(w, e)).toBe(false)
     })
 
     it('throwing the last throwable empties the slot; a second throw returns false', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'molotov', qty: 1 }]
-      e.playerCtl!.activeSlot = 0
+      e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
+      e.loadout!.activeSlot = 0
       expect(throwActive(w, e)).toBe(true)
-      expect(e.playerCtl!.inventory).toHaveLength(0)
+      expect(e.loadout!.inventory).toHaveLength(0)
       expect(throwActive(w, e)).toBe(false)
     })
 
@@ -116,10 +117,10 @@ describe('inventory — adversarial', () => {
 
     it('an empty slotted gun clicks (spendAmmo false) but stays in the slot', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
+      e.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }]
       equipSlot(e, 0)
       expect(spendAmmo(e)).toBe(false)
-      expect(e.playerCtl!.inventory).toHaveLength(1) // dead weight, not gone
+      expect(e.loadout!.inventory).toHaveLength(1) // dead weight, not gone
     })
   })
 
@@ -127,34 +128,34 @@ describe('inventory — adversarial', () => {
     it('wearMelee with no active slot (bare fists) is a no-op', () => {
       const e = player(w)
       expect(() => wearMelee(e)).not.toThrow()
-      expect(e.playerCtl!.inventory).toHaveLength(0)
+      expect(e.loadout!.inventory).toHaveLength(0)
     })
 
     it('breaking the equipped weapon drops the player to fists and clears activeSlot', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [{ itemId: 'knife', qty: 1 }]
+      e.loadout!.inventory = [{ itemId: 'knife', qty: 1 }]
       equipSlot(e, 0)
       wearMelee(e)
-      expect(e.playerCtl!.inventory).toHaveLength(0)
+      expect(e.loadout!.inventory).toHaveLength(0)
       expect(e.combat!.weapon).toBe('fists')
-      expect(e.playerCtl!.activeSlot).toBe(-1)
+      expect(e.loadout!.activeSlot).toBe(-1)
       expect(activeStack(e)).toBeUndefined()
     })
 
     it('removing a slot below the active slot shifts activeSlot down and keeps the weapon', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'molotov', qty: 1 },
         { itemId: 'bat', qty: 12 },
       ]
       equipSlot(e, 1) // bat active at index 1
       expect(e.combat!.weapon).toBe('bat')
       // Throw the molotov in the lower slot; the array shrinks under the active slot.
-      e.playerCtl!.activeSlot = 1
+      e.loadout!.activeSlot = 1
       throwActive(w, e) // throws slot 0 (only throwable), removeSlot(0)
-      expect(e.playerCtl!.inventory).toHaveLength(1)
-      expect(e.playerCtl!.inventory[0].itemId).toBe('bat')
-      expect(e.playerCtl!.activeSlot).toBe(0)
+      expect(e.loadout!.inventory).toHaveLength(1)
+      expect(e.loadout!.inventory[0].itemId).toBe('bat')
+      expect(e.loadout!.activeSlot).toBe(0)
       expect(e.combat!.weapon).toBe('bat')
     })
   })
@@ -191,33 +192,33 @@ describe('inventory — adversarial', () => {
   describe('held item vs swung weapon must not cross wires', () => {
     it('swinging the bat wears the bat, not the held consumable', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'bat', qty: 5 },
         { itemId: 'bandage', qty: 1 },
       ]
       equipSlot(e, 0) // weapon = bat
       equipSlot(e, 1) // hold the bandage; weapon still bat
       wearMelee(e)
-      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(4)
-      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'bandage')!.qty).toBe(1)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(4)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'bandage')!.qty).toBe(1)
     })
 
     it('firing the pistol spends the pistol mag, not the held throwable', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'pistol', qty: 8 },
         { itemId: 'molotov', qty: 3 },
       ]
       equipSlot(e, 0) // weapon = pistol
       equipSlot(e, 1) // hold the molotov; weapon still pistol
       expect(spendAmmo(e)).toBe(true)
-      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'pistol')!.qty).toBe(7)
-      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(3)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'pistol')!.qty).toBe(7)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(3)
     })
 
     it('throwing the held throwable keeps the real weapon in hand (not reset to fists)', () => {
       const e = player(w)
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'bat', qty: 5 },
         { itemId: 'molotov', qty: 1 },
       ]
@@ -225,7 +226,7 @@ describe('inventory — adversarial', () => {
       equipSlot(e, 1) // hold the molotov
       throwActive(w, e) // spends the molotov, empties slot 1
       expect(e.combat!.weapon).toBe('bat')
-      expect(e.playerCtl!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
+      expect(e.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
     })
 
     it('through combatSystem: firing with bandages HELD uses the bandage, leaving the bat in hand', () => {
@@ -236,7 +237,7 @@ describe('inventory — adversarial', () => {
       const e = player(w)
       e.health!.hp = 60
       dummy(w, 21, 20) // a target that WOULD be hit if the bat swung
-      e.playerCtl!.inventory = [
+      e.loadout!.inventory = [
         { itemId: 'bat', qty: 5 },
         { itemId: 'bandage', qty: 1 },
       ]
@@ -244,9 +245,9 @@ describe('inventory — adversarial', () => {
       equipSlot(e, 1) // hold the bandage as the active item
       combatSystem(w, attack())
       expect(e.health!.hp).toBe(90) // 60 + 30 heal → the bandage was USED
-      expect(e.playerCtl!.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(5) // bat untouched
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(5) // bat untouched
       expect(e.combat!.weapon).toBe('bat') // still in hand, not reset to fists
-      expect(e.playerCtl!.inventory.some((s) => s.itemId === 'bandage')).toBe(false) // spent
+      expect(e.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(false) // spent
     })
   })
 })

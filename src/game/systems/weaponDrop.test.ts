@@ -34,7 +34,8 @@ const player = (w: World, x = 5.5, y = 5.5, playerId = 0): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId, abilityCooldown: 0, inventory: [], cash: 0, crimeUntilTick: 0, activeSlot: -1 }
+  e.playerCtl = { playerId, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
 
@@ -129,8 +130,8 @@ describe('weapon drop — a dropped weapon equips through the real pickup path',
     runTicks(w, new Map([[0, {}]]), 1) // interactionSystem.autoPickup grabs it
 
     expect(p.combat!.weapon).toBe('shotgun') // equipped as the swung weapon
-    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'shotgun')).toBe(true)
-    expect(p.playerCtl!.activeSlot).toBeGreaterThanOrEqual(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'shotgun')).toBe(true)
+    expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
     expect(drops(w)).toHaveLength(0) // consumed + swept
   })
 })

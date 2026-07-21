@@ -1,5 +1,6 @@
+import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
-import { makeEntity, type Entity } from './entity'
+import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
 import { Tile, type Building } from './levelgen/level'
 import type { Rect } from './levelgen/rooms'
 import type { Rng } from './rng'
@@ -49,6 +50,55 @@ const rollWeapon = (rng: Rng): string => {
   return NPC_ARSENAL[0][0]
 }
 
+/** Weapon-mods an enemy can spawn WIELDING — the tactically-loud ones, so a
+ * modded foe reads as a distinct threat that demands different play: punch
+ * through your cover (pierce), blow up on impact (explosive), out-DPS you
+ * (rapid), freeze/ignite you (frost/incendiary), or chase you round a corner
+ * (homing). This is the "build matters" payoff — a modded enemy's shots fold its
+ * mods into the projectile at the shared fire site exactly like a player's. */
+const ENEMY_MODS: [string, number][] = [
+  ['pierce', 4],
+  ['explosive', 3],
+  ['rapid', 3],
+  ['frost', 2],
+  ['incendiary', 2],
+  ['homing', 1],
+]
+const ENEMY_MOD_TOTAL = ENEMY_MODS.reduce((s, [, wt]) => s + wt, 0)
+
+const weightedEnemyMod = (rng: Rng): string => {
+  let roll = rng.int(1, ENEMY_MOD_TOTAL)
+  for (const [id, wt] of ENEMY_MODS) {
+    roll -= wt
+    if (roll <= 0) return id
+  }
+  return ENEMY_MODS[0][0]
+}
+
+/** Deterministically hand a fraction of the floor's ARMED, ranged enemies a
+ * single weapon-mod, so a run fields the odd tactically-distinct foe (a pierce
+ * shooter that ignores your cover, an explosive one you can't crowd). Only ranged
+ * loadouts qualify — a mod has to fold into a PROJECTILE to be legible — and a
+ * fists/melee enemy is skipped WITHOUT drawing, so the roll stream stays a pure
+ * function of which enemies happen to carry guns. Floor-scaled (8%/gun on floor 1
+ * up to a 40% cap) so early floors stay gentle and depth turns up the heat but
+ * never blankets it. Runs as a POST-PASS over the spawned entities (id order) on
+ * a DEDICATED `npc-mods` fork so it perturbs neither the layout/loot dice nor the
+ * weapon-assignment stream — same seed+floor → the same enemies carry the same
+ * mods, on every peer and every replay. */
+const armModdedEnemies = (w: World): void => {
+  const rng = w.rng.fork('npc-mods')
+  const pMod = Math.min(0.4, 0.08 * w.floor)
+  for (const e of w.entities) {
+    if (e.kind !== 'npc' || !e.loadout || !e.combat) continue
+    if (WEAPONS[e.combat.weapon]?.kind !== 'ranged') continue // a mod only reads folded into a bullet
+    if (!rng.chance(pMod)) continue
+    const stack = e.loadout.inventory[e.loadout.activeSlot]
+    if (!stack) continue
+    ;(stack.mods ??= []).push({ id: weightedEnemyMod(rng), stacks: 1 })
+  }
+}
+
 /** Host-only: fill a freshly generated level with NPCs and loot. */
 export const populateWorld = (w: World): void => {
   const rng = w.rng.fork('populate')
@@ -65,6 +115,10 @@ export const populateWorld = (w: World): void => {
   // encounters on its OWN rng fork, so the loot/position/weapon dice above stay
   // byte-identical per seed — only the entity list grows.
   spawnEncounters(w, w.rng.fork('encounters'))
+  // #78 payoff: once every enemy carries a real, moddable loadout, hand some of
+  // the armed ones a weapon-mod so "build matters" cuts both ways — on its own
+  // `npc-mods` fork, so it never disturbs the layout/loot/weapon streams above.
+  armModdedEnemies(w)
   furnishInteriors(w)
 }
 
@@ -441,6 +495,24 @@ const randomFloorInRoom = (
   return null
 }
 
+/** Build an NPC's slotted loadout so its carried weapon is modelled EXACTLY like
+ * a player's — a real `ItemStack` in a real slot, able to hold weapon-mods whose
+ * effects fold into its shots at the shared fire site. A ranged weapon slots with
+ * a full magazine, a melee weapon with its durability; innate fists (no magSize /
+ * durability) get NO loadout — undefined, resolving vanilla exactly as a
+ * weaponless NPC did before this component existed, so DEFAULT behavior is
+ * unchanged. `mods` (optional) seeds a MODDED enemy — a pierce/explosive/frost gun
+ * a tactically distinct threat. */
+export const npcLoadout = (weaponId: string, mods?: readonly WeaponMod[]): Loadout | undefined => {
+  const def = WEAPONS[weaponId]
+  if (!def) return undefined
+  const qty = def.kind === 'ranged' ? (def.magSize ?? 1) : def.durability
+  if (qty === undefined) return undefined // fists / no-durability melee: innate, unslotted
+  const stack: ItemStack = { itemId: weaponId, qty }
+  if (mods && mods.length) stack.mods = mods.map((m) => ({ id: m.id, stacks: m.stacks }))
+  return { inventory: [stack], activeSlot: 0 }
+}
+
 export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng?: Rng): Entity => {
   const def = NPCS[archetype]
   const e = makeEntity('npc', archetype, x, y)
@@ -450,7 +522,13 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng
   e.health = { hp, max: hp, iframes: 0 }
   // Varied loadout when populated with a weapon stream; direct callers (tests,
   // scenarios) with no `wrng` keep the archetype's signature weapon for stability.
-  e.combat = { weapon: wrng ? rollWeapon(wrng) : def.weapon, cooldown: 0 }
+  const weapon = wrng ? rollWeapon(wrng) : def.weapon
+  e.combat = { weapon, cooldown: 0 }
+  // Slot that weapon into the SHARED loadout component so the NPC carries it just
+  // like a player would — moddable, resolved through the one fire site. Innate
+  // fists stay unslotted (loadout absent → vanilla), so default behavior holds.
+  const ld = npcLoadout(weapon)
+  if (ld) e.loadout = ld
   // #78 — carry the archetype's damage-affinity table onto the entity so the
   // shared damage path can read it (absent for neutral townsfolk).
   if (def.resist) e.resist = { ...def.resist }

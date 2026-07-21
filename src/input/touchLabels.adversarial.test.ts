@@ -9,11 +9,10 @@ const player = (opts: { weapon?: string; cd?: number } = {}): Entity => {
   p.playerCtl = {
     playerId: 0,
     abilityCooldown: opts.cd ?? 0,
-    inventory: [],
-    activeSlot: -1,
     cash: 0,
     crimeUntilTick: 0,
   }
+  p.loadout = { inventory: [], activeSlot: -1 }
   return p
 }
 

@@ -10,11 +10,10 @@ const player = (abilityCooldown = 0): Entity => {
   p.playerCtl = {
     playerId: 0,
     abilityCooldown,
-    inventory: [],
-    activeSlot: -1,
     cash: 0,
     crimeUntilTick: 0,
   }
+  p.loadout = { inventory: [], activeSlot: -1 }
   return p
 }
 
@@ -75,7 +74,7 @@ describe('computeTouchLabels', () => {
   it('THROW only enables when a throwable is carried', () => {
     expect(computeTouchLabels(view(player())).throwEnabled).toBe(false)
     const armed = player()
-    armed.playerCtl!.inventory = [{ itemId: 'grenade', qty: 2 }]
+    armed.loadout!.inventory = [{ itemId: 'grenade', qty: 2 }]
     expect(computeTouchLabels(view(armed)).throwEnabled).toBe(true)
   })
 

@@ -51,35 +51,35 @@ describe('INFINITE_AMMO toggle — the temporary testing state', () => {
 
     it('firing far past the magazine leaves ammo unchanged and keeps spawning bullets', () => {
       const mag = 5
-      p.playerCtl!.inventory = [{ itemId: 'pistol', qty: mag }]
-      p.playerCtl!.activeSlot = 0
+      p.loadout!.inventory = [{ itemId: 'pistol', qty: mag }]
+      p.loadout!.activeSlot = 0
       const shots = mag * 8 // 40 presses on a 5-round mag
       fireN(w, p, shots)
       expect(bullets(w)).toHaveLength(shots) // bullets keep coming past the old mag
-      expect(p.playerCtl!.inventory[0].qty).toBe(mag) // ...and the mag never dropped
+      expect(p.loadout!.inventory[0].qty).toBe(mag) // ...and the mag never dropped
     })
 
     it('an already-empty mag (qty 0) still fires — the gun never reads as out-of-ammo', () => {
-      p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 0 }]
-      p.playerCtl!.activeSlot = 0
+      p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }]
+      p.loadout!.activeSlot = 0
       fireN(w, p, 10)
       expect(bullets(w)).toHaveLength(10)
-      expect(p.playerCtl!.inventory[0].qty).toBe(0) // stays 0, never goes negative
+      expect(p.loadout!.inventory[0].qty).toBe(0) // stays 0, never goes negative
     })
 
     it('an automatic weapon (machinegun) empties nothing across a long burst', () => {
       p.combat!.weapon = 'machinegun'
-      p.playerCtl!.inventory = [{ itemId: 'machinegun', qty: 3 }]
-      p.playerCtl!.activeSlot = 0
+      p.loadout!.inventory = [{ itemId: 'machinegun', qty: 3 }]
+      p.loadout!.activeSlot = 0
       fireN(w, p, 30)
       expect(bullets(w)).toHaveLength(30)
-      expect(p.playerCtl!.inventory[0].qty).toBe(3)
+      expect(p.loadout!.inventory[0].qty).toBe(3)
     })
 
     it('the default STARTER_AMMO loadout never draws down', () => {
       // Default pistol loadout carries STARTER_AMMO; fire more than a full mag.
       fireN(w, p, STARTER_AMMO + 25)
-      expect(p.playerCtl!.inventory[0].qty).toBe(STARTER_AMMO)
+      expect(p.loadout!.inventory[0].qty).toBe(STARTER_AMMO)
       expect(bullets(w).length).toBeGreaterThan(STARTER_AMMO) // past the old cap
     })
   })
@@ -91,10 +91,10 @@ describe('INFINITE_AMMO toggle — the temporary testing state', () => {
     it('firing depletes the mag and an empty gun then produces no bullet', () => {
       const w = createWorld(1, 1)
       const p = player(w)
-      p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 2 }]
-      p.playerCtl!.activeSlot = 0
+      p.loadout!.inventory = [{ itemId: 'pistol', qty: 2 }]
+      p.loadout!.activeSlot = 0
       fireN(w, p, 2)
-      expect(p.playerCtl!.inventory[0].qty).toBe(0)
+      expect(p.loadout!.inventory[0].qty).toBe(0)
       expect(bullets(w)).toHaveLength(2)
       combatSystem(w, fire()) // empty mag → dry click, no shot
       expect(bullets(w)).toHaveLength(2)
@@ -107,20 +107,20 @@ describe('INFINITE_AMMO toggle — the temporary testing state', () => {
   it('spendAmmo itself still decrements and empties (mechanism preserved either way)', () => {
     const w = createWorld(1, 1)
     const p = player(w)
-    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 2 }]
-    p.playerCtl!.activeSlot = 0
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 2 }]
+    p.loadout!.activeSlot = 0
     expect(spendAmmo(p)).toBe(true)
-    expect(p.playerCtl!.inventory[0].qty).toBe(1)
+    expect(p.loadout!.inventory[0].qty).toBe(1)
     expect(spendAmmo(p)).toBe(true)
-    expect(p.playerCtl!.inventory[0].qty).toBe(0)
+    expect(p.loadout!.inventory[0].qty).toBe(0)
     expect(spendAmmo(p)).toBe(false) // empty → clicks
   })
 
   it('firing under the toggle round-trips and replays byte-identically (determinism)', () => {
     const w = createWorld(7, 1)
     const p = player(w)
-    p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 3 }]
-    p.playerCtl!.activeSlot = 0
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 3 }]
+    p.loadout!.activeSlot = 0
     tickWorld(w, fire()) // one real tick with the fire button down
     const json = serializeWorld(w)
     const a = deserializeWorld(json)

@@ -33,8 +33,8 @@ describe('spawnPlayer — the starter weapon is a proper slotted ItemStack', () 
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 20, 20)
     expect(p.combat!.weapon).toBe('pistol')
-    expect(p.playerCtl!.activeSlot).toBe(0)
-    expect(p.playerCtl!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.loadout!.activeSlot).toBe(0)
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
     // The mod list resolves through the SAME weaponStack path the fire site uses.
     expect(weaponStack(p)?.itemId).toBe('pistol')
   })
@@ -70,8 +70,8 @@ describe('the player melee multiplier', () => {
   it('a player swings a melee weapon harder than an NPC with the same weapon', () => {
     const w = createWorld(3, 1)
     const p = spawnPlayer(w, 0, 20, 20)
-    p.playerCtl!.inventory = [{ itemId: 'bat', qty: 100 }]
-    p.playerCtl!.activeSlot = 0
+    p.loadout!.inventory = [{ itemId: 'bat', qty: 100 }]
+    p.loadout!.activeSlot = 0
     p.combat = { weapon: 'bat', cooldown: 0 }
     p.facing = 0
     const victim = spawnNpc(w, 'thug', 20.9, 20)

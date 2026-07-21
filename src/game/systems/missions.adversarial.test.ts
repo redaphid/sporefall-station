@@ -31,7 +31,7 @@ describe('mission completion edges', () => {
     const w = firstOf(1, 'steal')
     const p = w.entities.find((e) => e.playerCtl)!
     expect(w.mission.exitUnlocked).toBe(false)
-    p.playerCtl!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
     missionSystem(w)
     expect(w.mission.complete).toBe(true)
     expect(w.mission.exitUnlocked).toBe(true)
@@ -57,7 +57,7 @@ describe('mission completion edges', () => {
   it('completing is idempotent — a second pass does not re-emit missionComplete', () => {
     const w = firstOf(1, 'steal')
     const p = w.entities.find((e) => e.playerCtl)!
-    p.playerCtl!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
     missionSystem(w)
     w.events.length = 0
     missionSystem(w)
@@ -128,11 +128,11 @@ describe('nextFloor carry-over', () => {
   it('the briefcase (key item) does not survive the floor transition, other items do', () => {
     const w = makeRun(12)
     const p = w.entities.find((e) => e.playerCtl)!
-    p.playerCtl!.inventory.push({ itemId: 'briefcase', qty: 1 })
-    p.playerCtl!.inventory.push({ itemId: 'bat', qty: 16 })
+    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'bat', qty: 16 })
     nextFloor(w)
-    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'briefcase')).toBe(false)
-    expect(p.playerCtl!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'briefcase')).toBe(false)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
   })
 
   it('descending CLEARS a downed state and its channel/crime bookkeeping (a downed teammate is carried alive)', () => {
@@ -165,7 +165,7 @@ describe('run-over vs the mission system guard', () => {
     const w = firstOf(1, 'steal')
     w.gameOver = true
     const p = w.entities.find((e) => e.playerCtl)!
-    p.playerCtl!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
     missionSystem(w)
     expect(w.mission.complete).toBe(false) // never processed under the guard
   })

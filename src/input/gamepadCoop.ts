@@ -264,7 +264,8 @@ export const createGamepadCoop = (getPads: GetPads = () => navigator.getGamepads
     for (const e of view.entities) {
       const ctl = e.playerCtl
       if (!ctl) continue
-      hotbarBySlot.set(ctl.playerId, { inv: ctl.inventory, activeSlot: ctl.activeSlot })
+      const ld = e.loadout ?? { inventory: [], activeSlot: -1 }
+      hotbarBySlot.set(ctl.playerId, { inv: ld.inventory, activeSlot: ld.activeSlot })
     }
   }
 

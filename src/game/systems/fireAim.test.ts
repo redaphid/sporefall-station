@@ -19,7 +19,7 @@ import { movementSystem } from './movement'
 
 const armed = (w: World, x: number, y: number) => {
   const p = spawnPlayer(w, 0, x, y)
-  p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 99 }]
+  p.loadout!.inventory = [{ itemId: 'pistol', qty: 99 }]
   equipSlot(p, 0)
   return p
 }

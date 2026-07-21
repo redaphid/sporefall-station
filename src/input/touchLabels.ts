@@ -48,6 +48,6 @@ export const computeTouchLabels = (view: RenderView): TouchLabels => {
     useEnabled: picking || !!target,
     spc: cd > 0 ? `${SPECIAL_NAME} ${Math.ceil(cd / 30)}s` : SPECIAL_NAME,
     spcEnabled: cd <= 0,
-    throwEnabled: hasThrowable(self.playerCtl?.inventory ?? []),
+    throwEnabled: hasThrowable(self.loadout?.inventory ?? []),
   }
 }

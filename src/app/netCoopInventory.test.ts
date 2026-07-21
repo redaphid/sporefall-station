@@ -151,17 +151,17 @@ describe('co-op client inventory (issue #57)', () => {
     const { host, bob } = await startPair(201)
     const avatar = avatarOf(host, 1)
     const { inventory, activeSlot } = richLoadout()
-    avatar.playerCtl!.inventory = inventory
-    avatar.playerCtl!.activeSlot = activeSlot
+    avatar.loadout!.inventory = inventory
+    avatar.loadout!.activeSlot = activeSlot
     avatar.combat!.weapon = 'pistol'
 
     await tickN(host, bob, 6)
 
     const self = bob.session.renderView().self!
-    const inv = self.playerCtl!.inventory
+    const inv = self.loadout!.inventory
     // Full slot list arrives — the pistol, the modded freeze ray, the stun gun.
     expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'freezeRay', 'stunGun', 'bandage'])
-    expect(self.playerCtl!.activeSlot).toBe(0)
+    expect(self.loadout!.activeSlot).toBe(0)
     // Ammo qty rides along per slot.
     expect(inv.find((s) => s.itemId === 'pistol')!.qty).toBe(20)
     // Per-weapon mods survive to the client so the badge renders.
@@ -175,11 +175,11 @@ describe('co-op client inventory (issue #57)', () => {
     const input = makeInput()
     const { host, bob } = await startPair(202, input.source)
     const avatar = avatarOf(host, 1)
-    avatar.playerCtl!.inventory = richLoadout().inventory
-    avatar.playerCtl!.activeSlot = 0
+    avatar.loadout!.inventory = richLoadout().inventory
+    avatar.loadout!.activeSlot = 0
     avatar.combat!.weapon = 'pistol'
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.playerCtl!.activeSlot).toBe(0)
+    expect(bob.session.renderView().self!.loadout!.activeSlot).toBe(0)
 
     // Client taps hotbar slot 1 (the freeze ray).
     input.set({ hotbar: 1 })
@@ -188,26 +188,26 @@ describe('co-op client inventory (issue #57)', () => {
     await tickN(host, bob, 4)
 
     // Host equipped it authoritatively…
-    expect(avatar.playerCtl!.activeSlot).toBe(1)
+    expect(avatar.loadout!.activeSlot).toBe(1)
     expect(avatar.combat!.weapon).toBe('freezeRay')
     // …and the change came back to the client.
     const self = bob.session.renderView().self!
-    expect(self.playerCtl!.activeSlot).toBe(1)
+    expect(self.loadout!.activeSlot).toBe(1)
     expect(self.combat!.weapon).toBe('freezeRay')
   })
 
   it('syncs ammo count to the client as the host spends rounds', async () => {
     const { host, bob } = await startPair(203)
     const avatar = avatarOf(host, 1)
-    avatar.playerCtl!.inventory = [{ itemId: 'pistol', qty: 20 }]
-    avatar.playerCtl!.activeSlot = 0
+    avatar.loadout!.inventory = [{ itemId: 'pistol', qty: 20 }]
+    avatar.loadout!.activeSlot = 0
     avatar.combat!.weapon = 'pistol'
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.playerCtl!.inventory[0].qty).toBe(20)
+    expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(20)
 
-    avatar.playerCtl!.inventory[0].qty = 12 // host fired 8 rounds
+    avatar.loadout!.inventory[0].qty = 12 // host fired 8 rounds
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.playerCtl!.inventory[0].qty).toBe(12)
+    expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(12)
   })
 
   it('late-joiner receives its full inventory', async () => {
@@ -224,14 +224,14 @@ describe('co-op client inventory (issue #57)', () => {
     expect(late.session.phase).toBe('playing')
 
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    avatar.playerCtl!.inventory = richLoadout().inventory
-    avatar.playerCtl!.activeSlot = 1
+    avatar.loadout!.inventory = richLoadout().inventory
+    avatar.loadout!.activeSlot = 1
     avatar.combat!.weapon = 'freezeRay'
     await tickN(host, late, 6)
 
     const self = late.session.renderView().self!
-    expect(self.playerCtl!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'freezeRay', 'stunGun', 'bandage'])
-    expect(self.playerCtl!.activeSlot).toBe(1)
+    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'freezeRay', 'stunGun', 'bandage'])
+    expect(self.loadout!.activeSlot).toBe(1)
   })
 
   it('gives multiple clients each THEIR own inventory, not each other\'s', async () => {
@@ -250,10 +250,10 @@ describe('co-op client inventory (issue #57)', () => {
 
     const bobAvatar = avatarOf(host, 1)
     const caraAvatar = avatarOf(host, 2)
-    bobAvatar.playerCtl!.inventory = [{ itemId: 'pistol', qty: 5 }]
-    bobAvatar.playerCtl!.activeSlot = 0
-    caraAvatar.playerCtl!.inventory = [{ itemId: 'shotgun', qty: 3 }, { itemId: 'stunGun', qty: 4 }]
-    caraAvatar.playerCtl!.activeSlot = 1
+    bobAvatar.loadout!.inventory = [{ itemId: 'pistol', qty: 5 }]
+    bobAvatar.loadout!.activeSlot = 0
+    caraAvatar.loadout!.inventory = [{ itemId: 'shotgun', qty: 3 }, { itemId: 'stunGun', qty: 4 }]
+    caraAvatar.loadout!.activeSlot = 1
 
     for (let i = 0; i < 6; i++) {
       host.tick()
@@ -262,23 +262,23 @@ describe('co-op client inventory (issue #57)', () => {
       await flush()
     }
 
-    expect(bob.session.renderView().self!.playerCtl!.inventory.map((s) => s.itemId)).toEqual(['pistol'])
-    expect(cara.session.renderView().self!.playerCtl!.inventory.map((s) => s.itemId)).toEqual(['shotgun', 'stunGun'])
-    expect(cara.session.renderView().self!.playerCtl!.activeSlot).toBe(1)
+    expect(bob.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol'])
+    expect(cara.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toEqual(['shotgun', 'stunGun'])
+    expect(cara.session.renderView().self!.loadout!.activeSlot).toBe(1)
   })
 
   it('does not flood the reliable channel — inventory is sent only on change', async () => {
     const { host, bob } = await startPair(206)
     const avatar = avatarOf(host, 1)
-    avatar.playerCtl!.inventory = [{ itemId: 'pistol', qty: 20 }]
-    avatar.playerCtl!.activeSlot = 0
+    avatar.loadout!.inventory = [{ itemId: 'pistol', qty: 20 }]
+    avatar.loadout!.activeSlot = 0
     await tickN(host, bob, 4)
     const sentAfterFirst = host.debugInventorySends
     // No inventory change over many ticks → no further inventory sends.
     await tickN(host, bob, 30)
     expect(host.debugInventorySends).toBe(sentAfterFirst)
     // A change resumes sending.
-    avatar.playerCtl!.inventory[0].qty = 19
+    avatar.loadout!.inventory[0].qty = 19
     await tickN(host, bob, 2)
     expect(host.debugInventorySends).toBeGreaterThan(sentAfterFirst)
   })
@@ -287,11 +287,11 @@ describe('co-op client inventory (issue #57)', () => {
     const input = makeInput()
     const { host, bob } = await startPair(207, input.source)
     const avatar = avatarOf(host, 1)
-    avatar.playerCtl!.inventory = [{ itemId: 'bandage', qty: 3 }]
-    avatar.playerCtl!.activeSlot = 0
+    avatar.loadout!.inventory = [{ itemId: 'bandage', qty: 3 }]
+    avatar.loadout!.activeSlot = 0
     avatar.health!.hp = 40 // hurt, so the bandage actually heals
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.playerCtl!.inventory[0].qty).toBe(3)
+    expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(3)
 
     input.set({ throwItem: true }) // Use the held bandage
     await tickN(host, bob, 2)
@@ -299,25 +299,25 @@ describe('co-op client inventory (issue #57)', () => {
     await tickN(host, bob, 4)
 
     // Host consumed one and healed authoritatively…
-    expect(avatar.playerCtl!.inventory[0].qty).toBe(2)
+    expect(avatar.loadout!.inventory[0].qty).toBe(2)
     expect(avatar.health!.hp).toBe(70)
     // …and the client's own inventory reflects the spend.
-    expect(bob.session.renderView().self!.playerCtl!.inventory[0].qty).toBe(2)
+    expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(2)
   })
 
   it("syncs a weapon-mod applied on the host to the client's own weapon (mod pickup)", async () => {
     const { host, bob } = await startPair(208)
     const avatar = avatarOf(host, 1)
-    avatar.playerCtl!.inventory = [{ itemId: 'pistol', qty: 20 }]
-    avatar.playerCtl!.activeSlot = 0
+    avatar.loadout!.inventory = [{ itemId: 'pistol', qty: 20 }]
+    avatar.loadout!.activeSlot = 0
     avatar.combat!.weapon = 'pistol'
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.playerCtl!.inventory[0].mods).toBeUndefined()
+    expect(bob.session.renderView().self!.loadout!.inventory[0].mods).toBeUndefined()
 
     // Host grabs a mod pickup for this player → the mod lands on the equipped gun.
-    avatar.playerCtl!.inventory[0].mods = [{ id: 'frost', stacks: 1 }]
+    avatar.loadout!.inventory[0].mods = [{ id: 'frost', stacks: 1 }]
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.playerCtl!.inventory[0].mods).toEqual([{ id: 'frost', stacks: 1 }])
+    expect(bob.session.renderView().self!.loadout!.inventory[0].mods).toEqual([{ id: 'frost', stacks: 1 }])
   })
 
   it('re-sends the full inventory to a rejoining client (ghost reclaim)', async () => {
@@ -335,7 +335,7 @@ describe('co-op client inventory (issue #57)', () => {
     host.beginGame()
     await flush()
     const entityId = host.peersBySlot.get(welcome.slot)!.entityId!
-    host.world.byId.get(entityId)!.playerCtl!.inventory = richLoadout().inventory
+    host.world.byId.get(entityId)!.loadout!.inventory = richLoadout().inventory
     host.tick()
     await flush()
     a.drop()

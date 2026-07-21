@@ -365,13 +365,14 @@ export class NetClientSession implements Session {
     // and mod badges all work as a joiner. Until that first inventory arrives, fall
     // back to the HUD bandage/briefcase summary so nothing phantom-floods the hotbar.
     if (this.self?.playerCtl) {
+      const ld = (this.self.loadout ??= { inventory: [], activeSlot: -1 })
       if (this.localInv) {
-        this.self.playerCtl.inventory = this.localInv.inventory
-        this.self.playerCtl.activeSlot = this.localInv.activeSlot
+        ld.inventory = this.localInv.inventory
+        ld.activeSlot = this.localInv.activeSlot
         if (this.self.combat) this.self.combat.weapon = this.localInv.weapon
         else this.self.combat = { weapon: this.localInv.weapon, cooldown: 0 }
       } else if (hud) {
-        this.self.playerCtl.inventory = [
+        ld.inventory = [
           ...(hud.bandages > 0 ? [{ itemId: 'bandage', qty: hud.bandages }] : []),
           ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
         ]

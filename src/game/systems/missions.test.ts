@@ -33,7 +33,7 @@ describe('roguelite loop', () => {
       const { w } = makeRun(seed)
       if (w.mission.template !== 'steal') continue
       const player = w.entities.find((e) => e.playerCtl)!
-      player.playerCtl!.inventory.push({ itemId: 'briefcase', qty: 1 })
+      player.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
       missionSystem(w)
       expect(w.mission.complete).toBe(true)
       expect(w.mission.exitUnlocked).toBe(true)

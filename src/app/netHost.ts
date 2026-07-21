@@ -196,12 +196,12 @@ export class NetHostSession implements Session {
     for (const p of this.peers.values()) {
       if (p.slot < 0 || p.entityId === undefined) continue
       const avatar = this.world.byId.get(p.entityId)
-      const ctl = avatar?.playerCtl
-      if (!ctl) continue
+      const ld = avatar?.loadout
+      if (!avatar?.playerCtl || !ld) continue
       const msg: InventoryMsg = {
         slot: p.slot,
-        inventory: ctl.inventory,
-        activeSlot: ctl.activeSlot,
+        inventory: ld.inventory,
+        activeSlot: ld.activeSlot,
         weapon: avatar.combat?.weapon ?? 'fists',
       }
       const sig = JSON.stringify([msg.inventory, msg.activeSlot, msg.weapon])
@@ -248,8 +248,8 @@ export class NetHostSession implements Session {
         cash: e.playerCtl.cash,
         weapon: e.combat?.weapon ?? 'fists',
         abilityCd: e.playerCtl.abilityCooldown,
-        bandages: e.playerCtl.inventory.filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
-        briefcase: e.playerCtl.inventory.some((s) => s.itemId === 'briefcase'),
+        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
+        briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
       }
     }
     const state: StateMsg = {

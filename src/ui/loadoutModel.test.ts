@@ -23,10 +23,12 @@ const player = (weaponId: string, mods?: { id: string; stacks: number }[]): Enti
     playerCtl: {
       playerId: 0,
       abilityCooldown: 0,
-      inventory: weaponId === 'fists' ? [] : [{ itemId: weaponId, qty: 8, ...(mods ? { mods } : {}) }],
-      activeSlot: weaponId === 'fists' ? -1 : 0,
       cash: 0,
       crimeUntilTick: 0,
+    },
+    loadout: {
+      inventory: weaponId === 'fists' ? [] : [{ itemId: weaponId, qty: 8, ...(mods ? { mods } : {}) }],
+      activeSlot: weaponId === 'fists' ? -1 : 0,
     },
   }) as Entity
 

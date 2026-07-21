@@ -261,11 +261,12 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
     e.playerCtl ??= {
       playerId: -1,
       abilityCooldown: 0,
-      inventory: [],
-      activeSlot: -1,
       cash: 0,
       crimeUntilTick: 0,
     }
+    // Loadout is the shared equipment component; the local client fills its real
+    // slots from the InventoryMsg, this is just the render-side placeholder.
+    e.loadout ??= { inventory: [], activeSlot: -1 }
     e.playerCtl.downed = (we.flags & SnapFlags.Downed) !== 0 ? (e.playerCtl.downed ?? { bleedTicks: 900, reviveProgress: 0 }) : undefined
     // Mirror the host's roll window so the client renders the tumble + agrees on
     // i-frames. A short forward-dated `untilTick` keeps the flag "live" between

@@ -40,18 +40,18 @@ export const createHud = (mount: HTMLElement): Hud => {
       }
       const weapon = WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? '—'
       const cash = self.playerCtl?.cash ?? 0
-      const bandages = self.playerCtl?.inventory.filter((s) => CONSUMABLES[s.itemId]).reduce((n, s) => n + s.qty, 0) ?? 0
+      const bandages = self.loadout?.inventory.filter((s) => CONSUMABLES[s.itemId]).reduce((n, s) => n + s.qty, 0) ?? 0
       const cd = self.playerCtl?.abilityCooldown ?? 0
       const ability = self.playerCtl ? ` · ${SPECIAL_NAME}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
-      const briefcase = self.playerCtl?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 🧪' : ''
+      const briefcase = self.loadout?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 🧪' : ''
       const text = `${weapon} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${briefcase}`
       if (text !== lastInfo) {
         lastInfo = text
         info.textContent = text
       }
 
-      const inv = self.playerCtl?.inventory ?? []
-      const active = self.playerCtl?.activeSlot ?? -1
+      const inv = self.loadout?.inventory ?? []
+      const active = self.loadout?.activeSlot ?? -1
       const slots = hotbarSlots(inv, active)
       const key = slots.map((s) => `${s.index}:${s.itemId}·${s.qty}${s.active ? '*' : ''}·${s.mods}`).join(',')
       if (key !== lastHotbar) {

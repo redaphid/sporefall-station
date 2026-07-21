@@ -186,7 +186,7 @@ const handleInteract = (w: World, p: Entity): void => {
 /** Does this player hold the keycard a biolock demands? A seal with an explicit
  * `keyId` wants that exact card; a keyless seal accepts any wing keycard. */
 const hasKeycard = (p: Entity, keyId: string | undefined): boolean =>
-  p.playerCtl!.inventory.some((s) =>
+  (p.loadout?.inventory ?? []).some((s) =>
     keyId !== undefined ? s.itemId === keyId : s.itemId === 'keycard' || s.itemId.startsWith('keycard.'),
   )
 
@@ -270,12 +270,13 @@ const recover = (w: World, p: Entity): void => {
   if (w.mode !== 'normal') return
   w.revivesLeft = Math.max(0, w.revivesLeft - 1)
   ctl.cash = 0
-  const keys = ctl.inventory.filter((s) => itemClass(s.itemId) === 'key')
+  const ld = (p.loadout ??= { inventory: [], activeSlot: -1 })
+  const keys = ld.inventory.filter((s) => itemClass(s.itemId) === 'key')
   const { inventory, activeSlot } = starterLoadout(PLAYER_START_WEAPON)
   // Starter weapon (if any) takes the front slots; keys ride along after it so
   // the starter's activeSlot index stays valid.
-  ctl.inventory = [...inventory, ...keys]
-  ctl.activeSlot = activeSlot
+  ld.inventory = [...inventory, ...keys]
+  ld.activeSlot = activeSlot
   if (p.combat) p.combat.weapon = activeSlot >= 0 ? inventory[activeSlot].itemId : 'fists'
   ctl.abilityCooldown = SPECIAL_COOLDOWN_TICKS
 }
@@ -311,8 +312,9 @@ const collect = (player: Entity, item: Entity): boolean => {
     ctl.cash += qty
     return true
   }
+  const ld = (player.loadout ??= { inventory: [], activeSlot: -1 })
   if (c === 'key') {
-    ctl.inventory.push({ itemId, qty: 1 }) // mission item, ignores slot limit
+    ld.inventory.push({ itemId, qty: 1 }) // mission item, ignores slot limit
     return true
   }
   if (c === 'consumable') {
@@ -322,19 +324,19 @@ const collect = (player: Entity, item: Entity): boolean => {
       player.health.hp = Math.min(player.health.max, player.health.hp + heal)
       return true
     }
-    return addItem(ctl.inventory, itemId, qty)
+    return addItem(ld.inventory, itemId, qty)
   }
   if (c === 'ammo') {
     // Rounds top up an existing gun; otherwise stash for the gun you'll find.
-    const gun = ctl.inventory.find((s) => itemClass(s.itemId) === 'ranged')
+    const gun = ld.inventory.find((s) => itemClass(s.itemId) === 'ranged')
     if (gun) {
       gun.qty += qty
       return true
     }
-    return addItem(ctl.inventory, itemId, qty)
+    return addItem(ld.inventory, itemId, qty)
   }
   // Weapons and throwables take a slot; auto-equip the first weapon you grab.
-  const added = addItem(ctl.inventory, itemId, startingCount(itemId, qty))
-  if (added && (c === 'melee' || c === 'ranged') && ctl.activeSlot < 0) equipSlot(player, ctl.inventory.length - 1)
+  const added = addItem(ld.inventory, itemId, startingCount(itemId, qty))
+  if (added && (c === 'melee' || c === 'ranged') && ld.activeSlot < 0) equipSlot(player, ld.inventory.length - 1)
   return added
 }

@@ -22,7 +22,8 @@ const player = (w: World, x = 20, y = 20): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, inventory: [], cash: 0, crimeUntilTick: 0, activeSlot: -1 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.loadout = { inventory: [], activeSlot: -1 }
   e.facing = 0
   return e
 }
@@ -54,7 +55,7 @@ describe('item behavior — new guns', () => {
 
   it('flamethrower sets its target burning (onHit)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
+    e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
     equipSlot(e, 0)
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
@@ -63,7 +64,7 @@ describe('item behavior — new guns', () => {
 
   it('flamethrower burn actually chews hp over time (DoT reaches elementSystem)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
+    e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
     equipSlot(e, 0)
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
@@ -77,7 +78,7 @@ describe('item behavior — new guns', () => {
 
   it('stun gun electrifies and immobilizes its target (onHit)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'stunGun', qty: 4 }]
+    e.loadout!.inventory = [{ itemId: 'stunGun', qty: 4 }]
     equipSlot(e, 0)
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'electrified'))
@@ -87,7 +88,7 @@ describe('item behavior — new guns', () => {
 
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'bat', qty: 12 }]
+    e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
     equipSlot(e, 0)
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
@@ -97,7 +98,7 @@ describe('item behavior — new guns', () => {
 
   it.runIf(!INFINITE_AMMO)('machine gun empties its whole magazine round by round', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'machinegun', qty: 3 }]
+    e.loadout!.inventory = [{ itemId: 'machinegun', qty: 3 }]
     equipSlot(e, 0)
     let shots = 0
     for (let i = 0; i < 5; i++) {
@@ -107,7 +108,7 @@ describe('item behavior — new guns', () => {
       e.combat!.cooldown = 0
     }
     expect(shots).toBe(3) // only three rounds were in the mag
-    expect(e.playerCtl!.inventory[0].qty).toBe(0)
+    expect(e.loadout!.inventory[0].qty).toBe(0)
   })
 })
 
@@ -119,8 +120,8 @@ describe('item behavior — element throwables', () => {
 
   it('molotov lands a fire hazard (onLand: fire)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'molotov', qty: 1 }]
-    e.playerCtl!.activeSlot = 0
+    e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
+    e.loadout!.activeSlot = 0
     dummy(w, 22, 20) // give it something to land on nearby
     throwActive(w, e)
     for (let t = 0; t < 40 && !w.entities.some((x) => x.fire); t++) projectileSystem(w)
@@ -129,8 +130,8 @@ describe('item behavior — element throwables', () => {
 
   it('molotov fire spreads to an adjacent flammable object', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'molotov', qty: 1 }]
-    e.playerCtl!.activeSlot = 0
+    e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
+    e.loadout!.activeSlot = 0
     const crate = addEntity(w, makeEntity('interactable', 'crate', 23, 20, 0.4))
     crate.health = { hp: 20, max: 20, iframes: 0 }
     crate.flammable = true
@@ -146,8 +147,8 @@ describe('item behavior — element throwables', () => {
 
   it('grenade blast damages actors where it lands (onLand: explode)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'grenade', qty: 1 }]
-    e.playerCtl!.activeSlot = 0
+    e.loadout!.inventory = [{ itemId: 'grenade', qty: 1 }]
+    e.loadout!.activeSlot = 0
     const victim = dummy(w, 22, 20)
     throwActive(w, e)
     for (let t = 0; t < 40 && victim.health!.hp === 60; t++) projectileSystem(w)
@@ -156,8 +157,8 @@ describe('item behavior — element throwables', () => {
 
   it('banana peel makes a nearby actor slip (onLand: slip -> stun timer)', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'banana', qty: 1 }]
-    e.playerCtl!.activeSlot = 0
+    e.loadout!.inventory = [{ itemId: 'banana', qty: 1 }]
+    e.loadout!.activeSlot = 0
     const victim = dummy(w, 21, 20)
     throwActive(w, e)
     for (let t = 0; t < 40 && victim.status!.stun === 0; t++) projectileSystem(w)
@@ -166,8 +167,8 @@ describe('item behavior — element throwables', () => {
 
   it('gas grenade poisons and the poison damages over time', () => {
     const e = player(w)
-    e.playerCtl!.inventory = [{ itemId: 'gasGrenade', qty: 1 }]
-    e.playerCtl!.activeSlot = 0
+    e.loadout!.inventory = [{ itemId: 'gasGrenade', qty: 1 }]
+    e.loadout!.activeSlot = 0
     const victim = dummy(w, 22, 20)
     throwActive(w, e)
     for (let t = 0; t < 40 && !hasStatus(victim, 'poisoned'); t++) projectileSystem(w)
@@ -190,7 +191,7 @@ describe('item behavior — freeze then shatter (element combo through items)', 
   it('a freeze-ray freeze followed by a melee impact shatters the target', () => {
     const e = player(w, 20, 20)
     const target = dummy(w, 21, 20)
-    e.playerCtl!.inventory = [
+    e.loadout!.inventory = [
       { itemId: 'freezeRay', qty: 6 },
       { itemId: 'bat', qty: 12 },
     ]

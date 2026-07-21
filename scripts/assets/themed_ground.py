@@ -53,6 +53,25 @@ NEG = ("photo, photorealistic, blurry, smooth gradients, 3d render, isometric, "
 # per the tile-theming research: base reads as one calm material, features live
 # in ~15% accent tiles). One wrapping master is generated and SLICED so every
 # base variant shares material/lighting and co-tiles (Red Blob / SLYNYRD).
+# Diverse bog masters: DIFFERENT terrain within the ONE dark-swamp palette so a
+# field that snaps them together (the engine alternates a master per macro-cell)
+# reads as a varied, complicated swamp — mossy stretches, open lake-water, root
+# tangle, rocky mire, sunken wreck — not one pattern repeated. Owner asks: "more
+# variation and complication when snapping together tiles"; "the dark greeny-blue
+# reads as a lake" → lean into water as a real terrain.
+DIVERSE = {
+    "grass": [
+        "dense olive-green moss and low creeping vines carpeting the ground, thick overgrowth, a few dark roots",
+        "open pool of dark greeny-blue swamp water and black mud, mossy banks and floating vegetation around the edges, wet",
+        "thick tangle of dark brown roots and gnarled vines over mud, sparse moss, twisted overgrowth",
+        "rocky boggy mire, wet dark stones and gravel with patches of moss and small murky puddles, scattered debris",
+        "half-sunken rusted metal grating and outpost debris swallowed by moss and vines, dark swamp reclaiming the wreck",
+    ],
+}
+DIVERSE_WRAP = ("top-down dark alien swamp bog, {}, dark and moody, even visual "
+                "density, low contrast, no bright glow, {}, seamless tileable game "
+                "terrain, flat top-down orthographic view")
+
 BASE_PROMPTS = {
     "grass": ("top-down dark alien swamp bog floor, thin tangled dark vines and "
               "roots evenly spread over damp olive-green moss, uniform overgrown "
@@ -192,6 +211,53 @@ def gen_master(surface, tiles_per_side, band_target, seeds, seed_base, d):
     return best
 
 
+def gen_master_prompt(surface, pos, tiles_per_side, band_target, seeds, seed_base, d):
+    """gen_master but with an explicit prompt (for diverse terrain masters)."""
+    base = G.snap(G.bog_tile(T, 0))
+    ip = d / "init.png"
+    Image.fromarray(base, "RGB").resize((1024, 1024), Image.NEAREST).save(ip)
+    N = tiles_per_side * T
+    best, best_score = None, -1e9
+    for s in range(seeds):
+        g = build_graph(pos=pos, neg=NEG, seed=seed_base + s * 811, init=str(ip),
+                        denoise=0.85, seamless=True, alpha=False,
+                        prefix=f"div-{surface}-{seed_base}-{s}")
+        raw = run(g, str(d / "raw"))
+        big = seamless_kcentroid(Image.open(raw[-1]).convert("RGB"), N)
+        clean = G.despeckle(big, passes=1)
+        arr = np.asarray(clean, np.float32)
+        arr = np.clip(arr * ((band_target + 12.75) / (G.lum(arr) + 12.75)), 0, 255)
+        master = G.snap(arr, dither=0.0)
+        err = abs(G.lum(master) - band_target)
+        rng = min(float(np.asarray(master, float).std()), 30)
+        score = -err + rng * 0.3
+        if score > best_score:
+            best, best_score = master, score
+    return best
+
+
+def diverse_masters(surface, tiles_per_side, band_target, seeds, outdir):
+    """One master per DIVERSE terrain prompt → the engine alternates them per
+    macro-cell, so snapping tiles together yields a VARIED swamp (moss / lake /
+    roots / mire / wreck), not one repeat. Circular padding keeps each master
+    self-tiling; all share the dark palette so region boundaries read as terrain
+    change, not seams."""
+    d = STAGE / surface / "diverse"
+    d.mkdir(parents=True, exist_ok=True)
+    per = tiles_per_side * tiles_per_side
+    prompts = DIVERSE[surface]
+    for m, terrain in enumerate(prompts):
+        pos = DIVERSE_WRAP.format(terrain, GEN)
+        best = gen_master_prompt(surface, pos, tiles_per_side, band_target, seeds,
+                                 3300 + m * 700, d)
+        for q in range(per):
+            ty, tx = divmod(q, tiles_per_side)
+            Image.fromarray(best[ty * T:(ty + 1) * T, tx * T:(tx + 1) * T], "RGB").save(
+                Path(outdir) / f"{surface}-{m * per + q}.png")
+        print(f"{surface}: master {m} [{terrain[:34]}...] lum={G.lum(best):.1f}")
+    print(f"{surface}: {len(prompts)} diverse masters, {len(prompts)*per} tiles -> {outdir}")
+
+
 def master_slice(surface, tiles_per_side, band_target, seeds, outdir, n_masters=2):
     """Generate `n_masters` wrapping masters and slice each into a tiles_per_side^2
     macro (placed by POSITION so vines flow across tiles; the engine alternates
@@ -262,6 +328,13 @@ if __name__ == "__main__":
         nm = int(sys.argv[6]) if len(sys.argv) > 6 else 2
         outd = Path(sys.argv[7]) if len(sys.argv) > 7 else Path("../../public/themes/swampspace-hires/tiles")
         master_slice(surface, tps, band, sd, outd, nm)
+    elif mode == "diverse":
+        # diverse <surface> <tiles_per_side> <band> <seeds> [outdir]
+        tps = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+        band = float(sys.argv[4]) if len(sys.argv) > 4 else 54.0
+        sd = int(sys.argv[5]) if len(sys.argv) > 5 else 2
+        outd = Path(sys.argv[6]) if len(sys.argv) > 6 else Path("../../public/themes/swampspace-hires/tiles")
+        diverse_masters(surface, tps, band, sd, outd)
     elif mode == "vary":
         # vary <surface> <tiles_per_side> <band> <n_variations> [outdir]
         tps = int(sys.argv[3]) if len(sys.argv) > 3 else 4

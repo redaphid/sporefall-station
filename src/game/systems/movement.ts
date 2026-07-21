@@ -163,26 +163,107 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
   pushApart(w, blocked)
 }
 
-/** Soft separation between live actors so they don't stack. */
+/** Soft mutual separation between two live bodies — each yields a quarter of the
+ * overlap per tick, so a stacked pair drifts apart smoothly. This is the ORIGINAL
+ * pairwise resolve, unchanged: both bodies move, including static props (a prop
+ * gives way when shoved, which the pathless NPC steering relies on to slip past
+ * furniture instead of wedging on it). A no-op when the pair doesn't overlap. */
+const resolvePair = (a: Entity, b: Entity, blocked: (tx: number, ty: number) => boolean): void => {
+  const dx = b.pos.x - a.pos.x
+  const dy = b.pos.y - a.pos.y
+  const rr = a.radius + b.radius
+  const d2 = dx * dx + dy * dy
+  if (d2 >= rr * rr || d2 === 0) return
+  const d = Math.sqrt(d2)
+  const push = ((rr - d) / 2) * 0.5 // soft: resolve half the overlap per tick
+  const nx = dx / d
+  const ny = dy / d
+  moveAndCollide(a, -nx * push, -ny * push, blocked)
+  moveAndCollide(b, nx * push, ny * push, blocked)
+}
+
+/**
+ * Soft separation so live bodies don't stack.
+ *
+ * PERF (furnished interiors, ~175 props/floor): the old pass was one O(n²) loop
+ * over EVERY entity with hp — and furniture (`interactable`) carries hp, so all
+ * ~175 static props joined the pairwise crowd, turning a ~40-actor floor into a
+ * ~215-body all-pairs sweep every tick. That ~30× blowup dominated the frame (300
+ * ticks: ~440ms of ~490ms was this one loop). But a prop never takes intent or
+ * velocity — it only ever MOVES when a mover shoves it — so the pairs that can
+ * ever resolve are mover↔mover and mover↔prop; prop↔prop is pure waste (props
+ * spawn ≥1 tile apart, radius 0.4, so two never overlap), and mover↔distant-prop
+ * is waste too. Index the props into a one-shot tile grid and, for each body,
+ * consider only movers-after-it plus props in its 3×3 tile neighbourhood — but
+ * RESOLVE every considered pair in the exact ascending array-index order the old
+ * nested loop used, with the exact same mutual-push math. Skipped pairs are only
+ * ever non-overlapping no-ops, so the world stays byte-identical per seed; the
+ * grid just drops the wasted comparisons. (Grid keyed on spawn cell: a prop shoved
+ * this tick drifts far less than a tile, so it stays in its bucket and inside the
+ * 3×3 reach of anything that could touch it — the skip set never changes.)
+ */
 const pushApart = (w: World, blocked: (tx: number, ty: number) => boolean): void => {
-  const actors = w.entities
-  for (let i = 0; i < actors.length; i++) {
-    const a = actors[i]
+  const ents = w.entities
+  const n = ents.length
+  const lw = w.level.w
+  // Ordered array indices of live MOVERS (eligible non-props), and a tile grid of
+  // live PROP indices keyed by spawn cell. Both hold array indices so pairs resolve
+  // in the same order the flat i<j loop would have.
+  const moverIdx: number[] = []
+  const propGrid = new Map<number, number[]>()
+  for (let i = 0; i < n; i++) {
+    const e = ents[i]
+    if (e.dead || !e.health || e.projectile) continue
+    if (e.kind === 'interactable') {
+      const key = Math.floor(e.pos.y) * lw + Math.floor(e.pos.x)
+      const cell = propGrid.get(key)
+      if (cell) cell.push(i)
+      else propGrid.set(key, [i])
+    } else {
+      moverIdx.push(i)
+    }
+  }
+  if (moverIdx.length === 0) return
+  const nearby: number[] = []
+  let mp = 0 // first entry of moverIdx strictly greater than the current outer i
+  for (let i = 0; i < n; i++) {
+    const a = ents[i]
     if (a.dead || !a.health || a.projectile) continue
-    for (let j = i + 1; j < actors.length; j++) {
-      const b = actors[j]
-      if (b.dead || !b.health || b.projectile) continue
-      const dx = b.pos.x - a.pos.x
-      const dy = b.pos.y - a.pos.y
-      const rr = a.radius + b.radius
-      const d2 = dx * dx + dy * dy
-      if (d2 >= rr * rr || d2 === 0) continue
-      const d = Math.sqrt(d2)
-      const push = ((rr - d) / 2) * 0.5 // soft: resolve half the overlap per tick
-      const nx = dx / d
-      const ny = dy / d
-      moveAndCollide(a, -nx * push, -ny * push, blocked)
-      moveAndCollide(b, nx * push, ny * push, blocked)
+    while (mp < moverIdx.length && moverIdx[mp] <= i) mp++
+    if (a.kind === 'interactable') {
+      // A prop only ever pairs with movers (prop↔prop can't overlap); resolve
+      // against every mover after it, in index order.
+      for (let k = mp; k < moverIdx.length; k++) resolvePair(a, ents[moverIdx[k]], blocked)
+      continue
+    }
+    // A mover pairs with movers-after-it AND props in its 3×3 neighbourhood.
+    // Collect the neighbour props (index > i), then walk both index-sorted streams
+    // in ascending order so the resolve sequence matches the old flat loop exactly.
+    nearby.length = 0
+    if (propGrid.size > 0) {
+      const atx = Math.floor(a.pos.x)
+      const aty = Math.floor(a.pos.y)
+      for (let ty = aty - 1; ty <= aty + 1; ty++) {
+        for (let tx = atx - 1; tx <= atx + 1; tx++) {
+          const cell = propGrid.get(ty * lw + tx)
+          if (!cell) continue
+          for (const pi of cell) if (pi > i) nearby.push(pi)
+        }
+      }
+      if (nearby.length > 1) nearby.sort((p, q) => p - q)
+    }
+    let k = mp
+    let s = 0
+    while (k < moverIdx.length || s < nearby.length) {
+      const mv = k < moverIdx.length ? moverIdx[k] : Infinity
+      const pv = s < nearby.length ? nearby[s] : Infinity
+      if (mv < pv) {
+        resolvePair(a, ents[mv], blocked)
+        k++
+      } else {
+        resolvePair(a, ents[pv], blocked)
+        s++
+      }
     }
   }
 }

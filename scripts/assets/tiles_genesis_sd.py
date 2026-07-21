@@ -46,12 +46,12 @@ UNITS = {
               f"{PIX}, top-down warm tan sci-fi deck floor tile, light caramel "
               f"metal plates with dark seams and rivets, small moss tufts in "
               f"the seams, bright readable interior floor, {GEN}, seamless "
-              f"game texture, flat top-down view", 0.5, True),
+              f"game texture, flat top-down view", 0.42, True),
     "street": ("macro", 3,
                f"{PIX}, top-down dark asphalt street tile, near-black cracked "
                f"tarmac with faint cool gray wear patches, thin moss veins in "
                f"the cracks, dark ground texture, {GEN}, seamless game "
-               f"texture, flat top-down view", 0.5, True),
+               f"texture, flat top-down view", 0.42, True),
     "grass": ("mosaic", 2,
               f"{PIX}, top-down swamp moss ground tile, chunky clumps of "
               f"olive and bright green bog grass tufts, dark peat hollows, "
@@ -60,8 +60,8 @@ UNITS = {
     "sidewalk": ("mosaic", 1,
                  f"{PIX}, top-down light gray metal walkway tile, pale bright "
                  f"riveted plates with dark expansion joints, tiny moss "
-                 f"flecks in the joints, light readable pavement, {GEN}, "
-                 f"seamless game texture, flat top-down view", 0.45, True),
+                 f"flecks in the joints, large flat plates, {GEN}, "
+                 f"seamless game texture, flat top-down view", 0.32, True),
     "wall": ("mosaic", 1,
              f"{PIX}, top-down game wall tile, near-black root-woven metal "
              f"bulkhead with a pale lit steel cap strip along the top edge of "
@@ -135,7 +135,8 @@ def repaint(surface, unit_idx, seeds, outdir):
         raw = run(graph, str(udir / "raw"))
         im = Image.open(raw[-1]).convert("RGB")
         small = kcentroid(im, res, res).convert("RGB")
-        banded = G.enforce_band(np.asarray(small, np.float32), surface)
+        clean = G.despeckle(small, passes=4 if surface in G.FLAT else 2)
+        banded = G.enforce_band(np.asarray(clean, np.float32), surface)
         cand_path = udir / f"unit-{unit_idx}-seed{s}.png"
         Image.fromarray(banded, "RGB").save(cand_path)
         candidates.append((score(banded, surface), s, banded))
@@ -178,7 +179,8 @@ def repaint_accent(name, v, seeds, outdir):
         raw = run(graph, str(udir / "raw"))
         im = Image.open(raw[-1]).convert("RGB")
         small = kcentroid(im, T, T).convert("RGB")
-        banded = G.enforce_band(np.asarray(small, np.float32), surface, tol=0.2)
+        clean = G.despeckle(small, passes=2)
+        banded = G.enforce_band(np.asarray(clean, np.float32), surface, tol=0.2)
         Image.fromarray(banded, "RGB").save(udir / f"acc-{v}-seed{s}.png")
         sc = score(banded, surface)
         if sc > best_score:

@@ -61,17 +61,43 @@ def lum(img):
     return float((0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]).mean())
 
 
+def despeckle(img, passes=1):
+    """Kill isolated single pixels: any pixel differing from BOTH horizontal
+    and BOTH vertical neighbors (wrap) is replaced by its most common neighbor.
+    Turns diffusion salt-and-pepper into the flat color areas Genesis art wants,
+    without touching plate edges/lines (those have same-value neighbors along
+    the line)."""
+    a = np.asarray(img, np.uint8).copy()
+    for _ in range(passes):
+        up, down = np.roll(a, 1, 0), np.roll(a, -1, 0)
+        left, right = np.roll(a, 1, 1), np.roll(a, -1, 1)
+        diff = lambda b: (np.abs(a.astype(np.int16) - b) > 8).any(-1)
+        iso = diff(up) & diff(down) & diff(left) & diff(right)
+        # replace isolated pixels with the vertical-neighbor average (cheap mode)
+        repl = ((up.astype(np.int16) + down + left + right) // 4).astype(np.uint8)
+        a[iso] = repl[iso]
+    return a
+
+
+# Flat surfaces (light metal, asphalt) checkerboard badly when the palette
+# snap dithers between two adjacent grays — a nearly-uniform value lands
+# exactly between palette entries. These snap with NO dither; the busier
+# organic surfaces keep a light dither for Genesis band transitions.
+FLAT = {"sidewalk", "street"}
+
+
 def enforce_band(img, surface, tol=0.08):
     """Scale a repainted tile's luminance back onto its band when diffusion
     drifted more than `tol` off target, then re-snap. Keeps the value plan
     machine-guaranteed while leaving in-band texture alone."""
+    d = 0.0 if surface in FLAT else 4.0
     t = BAND[surface]
     m = lum(img)
     ratio = (t + 12.75) / (m + 12.75)
     if abs(1 - ratio) <= tol:
-        return snap(np.asarray(img, np.float32))
+        return snap(np.asarray(img, np.float32), dither=d)
     s = np.clip(ratio, 0.55, 1.8)
-    return snap(np.clip(np.asarray(img, np.float32) * s, 0, 255))
+    return snap(np.clip(np.asarray(img, np.float32) * s, 0, 255), dither=d)
 
 
 def tnoise(T, rng, scale, octaves=1):

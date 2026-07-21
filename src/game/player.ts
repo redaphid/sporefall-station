@@ -45,7 +45,7 @@ export const STARTER_AMMO = 200
  * durability. Innate fists (no magSize/durability) stay UNSLOTTED — bare hands
  * with no mod list, resolving vanilla — so the inventory is empty and
  * activeSlot -1, exactly as before. */
-const starterLoadout = (startWeapon: string): { inventory: ItemStack[]; activeSlot: number } => {
+export const starterLoadout = (startWeapon: string): { inventory: ItemStack[]; activeSlot: number } => {
   const def = WEAPONS[startWeapon]
   if (def?.kind === 'ranged') return { inventory: [{ itemId: startWeapon, qty: STARTER_AMMO }], activeSlot: 0 }
   if (def?.durability !== undefined) return { inventory: [{ itemId: startWeapon, qty: def.durability }], activeSlot: 0 }

@@ -7,7 +7,7 @@
 // at zero; a throwable is lobbed and one is spent. Re-expressed from observed
 // Streets of Rogue behavior, not ported.
 
-import { CONSUMABLES, itemClass, THROWABLES } from '../data/items'
+import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
 import { MODS, modMaxStacks } from '../data/mods'
 import { makeEntity, type Entity, type ItemStack } from '../entity'
 import { addEntity, type World } from '../world'
@@ -95,15 +95,45 @@ export interface ModPickupResult {
   maxed: boolean
 }
 
+/** A freshly materialized weapon arrives loaded: a full magazine (ranged) or
+ * full durability (melee), mirroring `startingCount` / a real world pickup. */
+const freshWeaponCount = (def: (typeof WEAPONS)[string]): number => def.magSize ?? def.durability ?? 1
+
+/**
+ * Defense in depth for the PHANTOM-weapon state: an entity whose `combat.weapon`
+ * names a real, moddable weapon that has NO backing inventory slot (a legacy
+ * save from before slotted starters, or any bug that leaves `combat.weapon`
+ * dangling). Without a slot there is no `mods` list, so `applyModPickup` would
+ * silently drop the mod forever. Materialize the wielded weapon into a real,
+ * fully-loaded slot and equip it, so the mod has somewhere to land — retroactively
+ * healing the phantom the first time the player grabs a mod. Returns undefined
+ * when the wielded weapon genuinely isn't moddable (bare fists / unknown id) or
+ * the inventory is full, leaving the caller's leave-on-ground behavior intact. */
+const materializeHeldWeapon = (e: Entity): ItemStack | undefined => {
+  const ctl = e.playerCtl
+  if (!ctl || !e.combat) return undefined
+  const wid = e.combat.weapon
+  const def = WEAPONS[wid]
+  // Only real, moddable weapons materialize — fists are innate/unslotted by design.
+  if (!def || wid === 'fists') return undefined
+  if (ctl.inventory.length >= MAX_SLOTS) return undefined
+  const stack: ItemStack = { itemId: wid, qty: freshWeaponCount(def) }
+  ctl.inventory.push(stack)
+  equipSlot(e, ctl.inventory.length - 1)
+  return stack
+}
+
 /** Apply a scattered weapon-mod pickup to the grabber's currently-swung weapon,
  * reusing the draft's append/stack-cap logic (`applyDraftPick`) so world pickups
- * and the floor draft share ONE write path. Returns the result, or `null` when
- * there's no moddable weapon to receive it — bare fists or a class-starter gun
- * that isn't slotted. The kid-friendly caller leaves such a pickup on the ground
- * so it can be grabbed later once a real gun is in hand (nothing is wasted). */
+ * and the floor draft share ONE write path. If the swung weapon isn't slotted
+ * but IS a real moddable weapon (a phantom/legacy state), it is materialized
+ * into a slot first so the mod still lands. Returns the result, or `null` when
+ * there's genuinely no moddable weapon to receive it — bare fists. The
+ * kid-friendly caller leaves such a pickup on the ground so it can be grabbed
+ * later once a real gun is in hand (nothing is wasted). */
 export const applyModPickup = (e: Entity, modId: string): ModPickupResult | null => {
   if (!MODS[modId]) return null
-  const stack = weaponStack(e)
+  const stack = weaponStack(e) ?? materializeHeldWeapon(e)
   if (!stack) return null
   const cap = modMaxStacks(modId)
   const before = stack.mods?.find((m) => m.id === modId)?.stacks ?? 0

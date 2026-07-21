@@ -1,4 +1,4 @@
-import { SPECIAL_COOLDOWN_TICKS } from '../player'
+import { PLAYER_START_WEAPON, SPECIAL_COOLDOWN_TICKS, starterLoadout } from '../player'
 import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
 import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
@@ -256,7 +256,13 @@ const canSelfRecover = (w: World, p: Entity): boolean =>
 /** Bring a downed player back up. In `normal` this costs a shared revive and a
  * comeback penalty (drop cash + non-key items, ability put on full cooldown);
  * `casual` just stands them up. Both paths (teammate + self) route through here
- * so the penalty lands exactly once per recovery. */
+ * so the penalty lands exactly once per recovery.
+ *
+ * The comeback RE-GRANTS the starter loadout rather than leaving the player
+ * empty-handed: stripping the inventory but keeping the old `combat.weapon`
+ * left a PHANTOM weapon (a `combat.weapon` with no backing slot) that silently
+ * ate every subsequent mod pickup. A revived player comes back with a real,
+ * slotted, moddable starter gun and a `combat.weapon` that matches it. */
 const recover = (w: World, p: Entity): void => {
   const ctl = p.playerCtl!
   ctl.downed = undefined
@@ -264,8 +270,13 @@ const recover = (w: World, p: Entity): void => {
   if (w.mode !== 'normal') return
   w.revivesLeft = Math.max(0, w.revivesLeft - 1)
   ctl.cash = 0
-  ctl.inventory = ctl.inventory.filter((s) => itemClass(s.itemId) === 'key')
-  ctl.activeSlot = -1 // dropped the weapon we were holding
+  const keys = ctl.inventory.filter((s) => itemClass(s.itemId) === 'key')
+  const { inventory, activeSlot } = starterLoadout(PLAYER_START_WEAPON)
+  // Starter weapon (if any) takes the front slots; keys ride along after it so
+  // the starter's activeSlot index stays valid.
+  ctl.inventory = [...inventory, ...keys]
+  ctl.activeSlot = activeSlot
+  if (p.combat) p.combat.weapon = activeSlot >= 0 ? inventory[activeSlot].itemId : 'fists'
   ctl.abilityCooldown = SPECIAL_COOLDOWN_TICKS
 }
 

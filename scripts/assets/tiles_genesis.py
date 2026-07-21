@@ -230,6 +230,26 @@ def bog_tile(T, v):
     return img
 
 
+def bog_macro(T, m):
+    """2Tx2T bog supertile: clump + hollow fields span the whole 2x2 area so
+    tufts flow ACROSS tile boundaries — sliced row-major, the per-tile grid
+    that made the shipped grass read as a repeating stamp disappears and the
+    visible repeat period doubles (manifest macroTiles.grass=2)."""
+    M = 2 * T
+    rng = np.random.default_rng(16500 + m)
+    img = field(M, rng, hexc("#22380f"), hexc("#35511a"), sigma=M / 4, ramp=0.7)
+    clump = tnoise(M, rng, M / 5, octaves=2)
+    img[clump > 0.60] = hexc("#4c6b28")
+    img[clump > 0.76] = hexc("#67873c")
+    img[clump > 0.90] = hexc("#86a750")
+    dark = tnoise(M, rng, M / 5)
+    img[dark > 0.80] = hexc("#141a16")  # wet peat hollows, big and irregular
+    # a couple of biolume spore dots per macro
+    for _ in range(3):
+        img[rng.integers(0, M), rng.integers(0, M)] = hexc("#46e078")
+    return img
+
+
 def exit_tile(T, v=0):
     """Launch-bay pad: hot biolume ring — must scream against the deck."""
     rng = np.random.default_rng(17000)

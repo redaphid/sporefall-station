@@ -52,11 +52,11 @@ UNITS = {
                f"tarmac with faint cool gray wear patches, thin moss veins in "
                f"the cracks, dark ground texture, {GEN}, seamless game "
                f"texture, flat top-down view", 0.42, True),
-    "grass": ("mosaic", 2,
-              f"{PIX}, top-down swamp moss ground tile, chunky clumps of "
-              f"olive and bright green bog grass tufts, dark peat hollows, "
-              f"a few glowing spore dots, {GEN}, seamless game texture, "
-              f"flat top-down view", 0.55, True),
+    "grass": ("macro", 2,
+              f"{PIX}, top-down swamp moss ground, chunky clumps of "
+              f"olive and bright green bog grass tufts, big irregular dark "
+              f"peat hollows, a few glowing spore dots, no repeating pattern, "
+              f"{GEN}, seamless game texture, flat top-down view", 0.5, True),
     "sidewalk": ("mosaic", 1,
                  f"{PIX}, top-down light gray metal walkway tile, pale bright "
                  f"riveted plates with dark expansion joints, tiny moss "
@@ -90,7 +90,7 @@ def base_unit(surface, unit_idx):
     """The structural init image for one unit, author-res (2T for macro/mosaic)."""
     kind = UNITS[surface][0]
     if kind == "macro":
-        fn = G.floor_macro if surface == "floor" else G.street_macro
+        fn = {"floor": G.floor_macro, "street": G.street_macro, "grass": G.bog_macro}[surface]
         return G.snap(fn(T, unit_idx)), 2 * T
     if kind == "single":
         return G.snap(G.exit_tile(T)), T

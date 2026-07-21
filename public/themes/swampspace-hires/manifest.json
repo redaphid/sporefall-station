@@ -269,7 +269,8 @@
   },
   "macroTiles": {
     "floor": 2,
-    "street": 2
+    "street": 2,
+    "grass": 2
   },
   "artScale": 2
 }

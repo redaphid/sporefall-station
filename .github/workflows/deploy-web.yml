@@ -80,18 +80,23 @@ jobs:
         env:
           SITE_URL: ${{ vars.SITE_URL }}
 
-      # Self-host the Android APK on the Pages site. The repo is PRIVATE, so
-      # phones can't download the GitHub release asset directly (it's auth-walled)
-      # — serve the bytes from backseat-sd8.pages.dev/download/backseat.apk. Runs
-      # AFTER the OTA zip so the 16 MB APK never lands inside the OTA bundle.
-      # Best-effort: a fresh repo with no release still deploys the site.
+      # Self-host the Android APK on the site. The repo is PRIVATE, so phones
+      # can't download the GitHub release asset directly (it's auth-walled) —
+      # serve the bytes from <origin>/download/sporefall.apk. Runs AFTER the OTA
+      # zip so the ~16 MB APK never lands inside the OTA bundle.
+      # Prefer a stable tagged release's sporefall.apk; fall back to the rolling
+      # `latest` prerelease (refreshed on every main push by android-apk.yml) so
+      # the download link works without a tag. Best-effort: a fresh repo with no
+      # release at all still deploys the site.
       - name: Bundle the Android APK for self-hosted download
         run: |
           set -euo pipefail
           mkdir -p dist/download
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern 'backseat.apk' \
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern 'sporefall.apk' \
             --dir dist/download --clobber \
-            || echo "no published release APK yet — skipping (site still deploys)"
+            || gh release download latest --repo "$GITHUB_REPOSITORY" --pattern 'sporefall.apk' \
+                 --dir dist/download --clobber \
+            || echo "no published APK yet — skipping (site still deploys)"
           ls -la dist/download || true
         env:
           GH_TOKEN: ${{ github.token }}

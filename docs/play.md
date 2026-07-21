@@ -25,7 +25,7 @@ Now there's a game icon on your phone. Tap it to play.
 1. On your Android phone, open this link — it downloads the app straight from the
    game site (always the newest version):
    **https://sporefall.hypnodroid.com/download**
-2. Tap the downloaded **`backseat.apk`** to install it. The first time, Android asks
+2. Tap the downloaded **`sporefall.apk`** to install it. The first time, Android asks
    to **allow installing apps from this source** — say yes, then tap **Install**.
 
    (Prefer the source page? The same file is on the releases page:

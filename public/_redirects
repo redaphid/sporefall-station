@@ -1,11 +1,11 @@
 # Short link to the self-hosted APK. The real file is served statically from
-# dist/download/backseat.apk (bundled by the deploy workflow) — a real file wins
-# over the SPA catch-all below, so these just give it friendly URLs. We serve the
-# APK from OUR site (not GitHub) because the repo is private and its release
-# assets are auth-walled.
-/download      /download/backseat.apk  302
-/download/     /download/backseat.apk  302
-/get           /download/backseat.apk  302
+# dist/download/sporefall.apk (bundled by the deploy workflow) — a real file wins
+# over the SPA fallback, so these just give it friendly URLs. We serve the APK
+# from OUR site (not GitHub) because the repo is private and its release assets
+# are auth-walled.
+/download      /download/sporefall.apk  302
+/download/     /download/sporefall.apk  302
+/get           /download/sporefall.apk  302
 
 # SPA fallback (serve index.html for deep links / refreshes) is handled by
 # wrangler.jsonc's assets `not_found_handling: "single-page-application"`. A

@@ -17,7 +17,7 @@ The `android-apk` workflow already builds a current debug APK on every push. Its
 **bundle is build 355** (hi-res toggle, modded enemies, art, perf — everything).
 Install it directly:
 
-    https://github.com/redaphid/sporefall-station/releases/download/latest/ecs-game.apk
+    https://github.com/redaphid/sporefall-station/releases/download/latest/sporefall.apk
 
 This sidesteps the broken OTA chain. (That APK still bakes the *old* OTA URL — see
 §3 — so it won't self-update until §3 is done, but the installed build is current.)

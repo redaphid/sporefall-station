@@ -32,8 +32,8 @@ Every push to `main` and every PR builds `app-debug.apk` in CI (the **android-ap
 workflow). Grab it without a toolchain:
 
 - **From a workflow run:** GitHub → **Actions** → **android-apk** → newest green run →
-  **Artifacts** → `ecs-game-debug-apk`. Unzip → `app-debug.apk`.
-- **From a Release:** publishing a GitHub Release attaches the APK as `ecs-game.apk`.
+  **Artifacts** → `sporefall-debug-apk`. Unzip → `app-debug.apk`.
+- **From a Release:** publishing a GitHub Release attaches the APK as `sporefall.apk`.
   (Releases only get an APK once one is *published* — draft/absent releases show none.)
 
 Then sideload: enable "install unknown apps", copy the `.apk` to the phone, tap it —

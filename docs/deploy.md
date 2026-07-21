@@ -102,7 +102,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release appears at `.../releases/latest` with `backseat.apk`. The title says
+The release appears at `.../releases/latest` with `sporefall.apk`. The title says
 `(signed APK)` or `(debug APK)` depending on whether the secrets were present.
 
 ### Signed release APK — one-time setup (#30)

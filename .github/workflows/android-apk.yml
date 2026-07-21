@@ -66,19 +66,19 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ecs-game-debug-apk
+          name: sporefall-debug-apk
           if-no-files-found: error
           path: ${{ steps.apk.outputs.path }}
 
       - name: Stage release asset
-        run: cp "${{ steps.apk.outputs.path }}" ecs-game.apk
+        run: cp "${{ steps.apk.outputs.path }}" sporefall.apk
 
       # A release was published in the GitHub UI -> attach the APK to it.
       - name: Attach APK to published release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" ecs-game.apk --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" sporefall.apk --clobber
 
       # Tagged releases (v1.2.3) are handled by release-apk.yml.
 
@@ -92,5 +92,5 @@ jobs:
           gh release view latest >/dev/null 2>&1 \
             || gh release create latest --prerelease --target "$GITHUB_SHA" \
                  --title "Latest debug APK (main)" \
-                 --notes "Auto-built from the latest main commit. Download ecs-game.apk below."
-          gh release upload latest ecs-game.apk --clobber
+                 --notes "Auto-built from the latest main commit. Download sporefall.apk below."
+          gh release upload latest sporefall.apk --clobber

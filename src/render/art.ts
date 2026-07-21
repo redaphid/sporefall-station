@@ -173,13 +173,26 @@ const CHARSET_ALIAS: Record<string, string> = {
   shopkeeper: 'civilian',
 }
 
-// World props with a bespoke sprite (beyond the wooden crate).
-const PROP_SPRITE: Record<string, string> = {
+// World props/furnishings mapped to the closest existing themed prop sprite
+// (value = a `prop.<name>` sprite key, i.e. an entry in SpriteTextures.props).
+// Reuse is deliberate: several furniture archetypes share one on-theme texture
+// where the silhouette reads right (a weapons locker wears the cryo-terminal;
+// supply cabinet wears the nutrient dispenser; a desk wears the console). Only
+// archetypes with NO acceptable sprite fall through to a DISTINCT procedural
+// draw (FURNITURE_SHAPE) instead of a bespoke texture.
+export const PROP_SPRITE: Record<string, string> = {
   barrel: 'barrel',
   atm: 'atm',
   vending: 'vending-machine',
   tv: 'tv',
   toilet: 'toilet',
+  locker: 'locker',
+  cabinet: 'cabinet',
+  desk: 'desk',
+  // Station machinery reuses the terminal/console art (previously fell through
+  // to the character eyeball). The Cryo Terminal object is literally that art.
+  cryoTerminal: 'atm',
+  generator: 'tv',
 }
 
 // Consumables/weapons that reuse another item's sprite.
@@ -246,10 +259,37 @@ const ENTITY_COLORS: Record<string, number> = {
   default: 0xcccccc,
 }
 
-// Interior furnishings (feat/levelgen-fill-interiors) drawn as tinted footprint
-// boxes rather than the character fallback — a room full of these reads as
-// furnished, not full of monsters. Bespoke prop sprites are a deferred
-// follow-up; keyed here by the object archetype id.
+// Interior furnishings (feat/levelgen-fill-interiors). Archetypes with a good
+// themed prop texture resolve to it via PROP_SPRITE; the rest fall here and are
+// drawn as a DISTINCT procedural silhouette (bed, table, shelf, planter, egg
+// pod, slatted crate) — never a generic box and never the character eyeball.
+// A 'box' shape is the last-resort tinted footprint for anything unmapped.
+export type FurnitureShape = 'bunk' | 'table' | 'bench' | 'shelf' | 'plant' | 'crate' | 'pod' | 'box'
+
+/** Object archetypes that draw as a bespoke procedural furniture silhouette
+ * (rather than a themed prop texture). Exported so art-resolution tests can
+ * assert every interior archetype is covered — no eyeball, no bare box. */
+export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
+  bunk: 'bunk',
+  table: 'table',
+  bench: 'bench',
+  shelf: 'shelf',
+  plant: 'plant',
+  crate: 'crate',
+  pod: 'pod',
+  // The Spore Node is a stationary bog organ — the egg-pod ovoid reads it right
+  // (previously fell through to the character eyeball fallback).
+  sporeNode: 'pod',
+  // These normally resolve to a themed prop texture (see PROP_SPRITE); the box
+  // is only their fallback silhouette if a theme ships no prop art at all.
+  desk: 'box',
+  cabinet: 'box',
+  locker: 'box',
+  cryoTerminal: 'box',
+  generator: 'box',
+}
+
+/** Base tint per furniture archetype (theme palette entities can override). */
 const FURNITURE_COLORS: Record<string, number> = {
   bunk: 0x6b7a8f,
   desk: 0x8a6a3f,
@@ -259,6 +299,11 @@ const FURNITURE_COLORS: Record<string, number> = {
   locker: 0x59616b,
   table: 0x9c6b3f,
   plant: 0x2e7d46,
+  crate: 0x6b4d26,
+  pod: 0x4f7a3a,
+  sporeNode: 0x4f7a3a,
+  cryoTerminal: 0x5a7b8f,
+  generator: 0x6a6f78,
 }
 
 /** Scale a 0xRRGGBB colour by `f` (each channel clamped to 255). */
@@ -542,19 +587,119 @@ export const createArt = (
       g.destroy()
       return tex
     }
-    // Interior furnishings: a tinted footprint box with a lit top edge, so a
-    // furnished room reads as occupied instead of a herd of eyeballed creatures.
-    const furn = FURNITURE_COLORS[archetype]
-    if (furn !== undefined) {
-      const pad = TILE_PX * 0.14
-      const s = TILE_PX - pad * 2
-      const g = new Graphics()
-        .roundRect(pad, pad, s, s, 3)
-        .fill(colorOverride ?? furn)
-        .roundRect(pad, pad, s, s, 3)
-        .stroke({ width: 2, color: 0x000000, alpha: 0.4 })
-        .rect(pad, pad, s, 3)
-        .fill({ color: 0xffffff, alpha: 0.15 })
+    // Interior furnishings without a themed prop texture: each archetype draws a
+    // DISTINCT, recognizable silhouette (bed, table, bench, shelf, planter, egg
+    // pod, slatted crate) so a furnished room never reads as a herd of eyeballed
+    // creatures or a wall of identical boxes. Fully deterministic — fixed
+    // geometry per archetype, palette-driven colours, no randomness. The
+    // transparent full-tile backer makes every furnishing share the same tile
+    // footprint as the real prop sprites (loaded at TILE_PX).
+    const shape = FURNITURE_SHAPE[archetype]
+    if (shape !== undefined) {
+      const base = colorOverride ?? entityColors[archetype] ?? FURNITURE_COLORS[archetype] ?? entityColors.default
+      const dk = colorOverride ?? shade(base, 0.6)
+      const lt = colorOverride ?? shade(base, 1.3)
+      const line = colorOverride ?? 0x101018
+      const sAlpha = colorOverride ? 1 : 0.45
+      const seamA = colorOverride ? 1 : 0.3
+      const T = TILE_PX
+      const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+      switch (shape) {
+        case 'bunk': {
+          // Low bed: dark frame, lighter mattress, a pillow block at the head.
+          const fx = 3
+          const fy = T * 0.3
+          const fw = T - 6
+          const fh = T * 0.46
+          g.roundRect(fx, fy, fw, fh, 3).fill(dk)
+          g.roundRect(fx, fy, fw, fh, 3).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.roundRect(fx + 1.5, fy + 2, fw - 3, fh - 5, 2).fill(base)
+          g.roundRect(fx + 2.5, fy + 3, fw * 0.3, fh - 8, 2).fill(lt) // pillow
+          g.rect(fx + fw * 0.42, fy + 2, 1.5, fh - 5).fill({ color: line, alpha: seamA }) // blanket seam
+          break
+        }
+        case 'table': {
+          // Flat surface on four short legs peeking at the corners.
+          const legH = T * 0.3
+          const legY = T * 0.5
+          g.rect(5, legY, 3, legH).fill(dk)
+          g.rect(T - 8, legY, 3, legH).fill(dk)
+          g.roundRect(3, T * 0.34, T - 6, T * 0.2, 2).fill(base)
+          g.roundRect(3, T * 0.34, T - 6, T * 0.2, 2).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.rect(3, T * 0.34, T - 6, 2).fill(lt) // lit near edge
+          break
+        }
+        case 'bench': {
+          // Lab bench: a long low counter with a recessed under-shelf.
+          g.roundRect(3, T * 0.34, T - 6, T * 0.16, 2).fill(base)
+          g.roundRect(3, T * 0.34, T - 6, T * 0.16, 2).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.rect(3, T * 0.34, T - 6, 2).fill(lt)
+          g.roundRect(5, T * 0.56, T - 10, T * 0.14, 1).fill(dk) // under-shelf
+          break
+        }
+        case 'shelf': {
+          // Upright unit carved by two horizontal divider shelves.
+          const pad = T * 0.16
+          const s = T - pad * 2
+          g.roundRect(pad, pad, s, s, 2).fill(base)
+          g.roundRect(pad, pad, s, s, 2).stroke({ width: 2, color: line, alpha: sAlpha })
+          for (let i = 1; i <= 2; i++) {
+            const y = pad + (s * i) / 3
+            g.rect(pad, y - 1, s, 2).fill(dk)
+            g.rect(pad, y - 1, s, 1).fill({ color: lt, alpha: colorOverride ? 1 : 0.5 })
+          }
+          break
+        }
+        case 'plant': {
+          // Terracotta pot with a cluster of swamp-green foliage blobs.
+          const cx = T / 2
+          const potTop = T * 0.62
+          const potBot = T * 0.86
+          const potW = T * 0.34
+          const pot = [cx - potW / 2, potTop, cx + potW / 2, potTop, cx + potW * 0.36, potBot, cx - potW * 0.36, potBot]
+          g.poly(pot).fill(colorOverride ?? 0x6b4a2c)
+          g.poly(pot).stroke({ width: 2, color: line, alpha: sAlpha })
+          const leaf = colorOverride ?? FURNITURE_COLORS.plant
+          const leafDk = colorOverride ?? shade(FURNITURE_COLORS.plant, 0.7)
+          const leafLt = colorOverride ?? shade(FURNITURE_COLORS.plant, 1.25)
+          g.circle(cx - 6, T * 0.5, 5).fill(leafDk)
+          g.circle(cx + 6, T * 0.5, 5).fill(leafDk)
+          g.circle(cx, T * 0.4, 7).fill(leaf)
+          g.circle(cx, T * 0.28, 5).fill(leafLt)
+          break
+        }
+        case 'crate': {
+          // Wooden cargo box: corner frame + a cross brace — reads as a crate
+          // even before the themed cargo-pod texture loads.
+          const pad = T * 0.12
+          const s = T - pad * 2
+          g.rect(pad, pad, s, s).fill(base)
+          g.rect(pad, pad, s, s).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.moveTo(pad, pad).lineTo(pad + s, pad + s).stroke({ width: 2.5, color: dk, alpha: colorOverride ? 1 : 0.6 })
+          g.moveTo(pad + s, pad).lineTo(pad, pad + s).stroke({ width: 2.5, color: dk, alpha: colorOverride ? 1 : 0.6 })
+          g.rect(pad, pad, s, 3).fill(lt)
+          break
+        }
+        case 'pod': {
+          // Dormant spore egg: a rounded ovoid with a lighter dome and a seam.
+          const cx = T / 2
+          const cy = T * 0.54
+          g.ellipse(cx, cy, T * 0.3, T * 0.4).fill(base)
+          g.ellipse(cx, cy, T * 0.3, T * 0.4).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.ellipse(cx, cy - T * 0.06, T * 0.18, T * 0.22).fill(lt) // top sheen
+          g.rect(cx - 0.75, cy - T * 0.34, 1.5, T * 0.66).fill({ color: dk, alpha: colorOverride ? 1 : 0.5 }) // seam
+          break
+        }
+        default: {
+          // 'box' — last-resort tinted footprint for an unmapped/theme-less prop.
+          const pad = T * 0.14
+          const s = T - pad * 2
+          g.roundRect(pad, pad, s, s, 3).fill(base)
+          g.roundRect(pad, pad, s, s, 3).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.rect(pad, pad, s, 3).fill({ color: lt, alpha: colorOverride ? 1 : 0.6 })
+          break
+        }
+      }
       const tex = renderer.generateTexture(g)
       g.destroy()
       return tex

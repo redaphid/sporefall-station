@@ -78,17 +78,17 @@ UNITS = {
               f"shading, {GEN}, seamless tileable game terrain, flat top-down "
               f"orthographic view", 0.82, True),
     "sidewalk": ("mosaic", 1,
-                 f"{PIX}, top-down light gray metal walkway tile, pale bright "
+                 f"top-down light gray metal walkway tile, pale bright "
                  f"riveted plates with dark expansion joints, tiny moss "
                  f"flecks in the joints, large flat plates, {GEN}, "
                  f"seamless game texture, flat top-down view", 0.32, True),
     "wall": ("mosaic", 1,
-             f"{PIX}, top-down game wall tile, near-black root-woven metal "
+             f"top-down game wall tile, near-black root-woven metal "
              f"bulkhead with a pale lit steel cap strip along the top edge of "
              f"each tile, thick dark roots over dark panels, {GEN}, "
              f"straight-on view", 0.35, False),
     "exit": ("single", 1,
-             f"{PIX}, top-down glowing green launch pad game tile, a bright "
+             f"top-down glowing green launch pad game tile, a bright "
              f"bioluminescent ring pad on dark teal metal, radiant green "
              f"light, {GEN}, flat top-down view", 0.35, False),
 }
@@ -205,7 +205,7 @@ def repaint_accent(name, v, seeds, outdir):
     base = G.snap(fn(T, v))
     init_path = udir / f"init-{v}.png"
     Image.fromarray(base, "RGB").resize((1024, 1024), Image.NEAREST).save(init_path)
-    pos = f"{PIX}, top-down game tile, {hint}, {GEN}, flat top-down view"
+    pos = f"top-down game tile, {hint}, {GEN}, flat top-down view"
     best, best_score = None, -1e9
     for s in range(seeds):
         seed = 707000 + v * 131 + s * 1013

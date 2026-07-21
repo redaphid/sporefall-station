@@ -198,15 +198,38 @@ def repaint(surface, unit_idx, seeds, outdir):
             outdir / f"{surface}-{v}.png")
 
 
+def _surface_base_tile(surface, v, outdir):
+    """A real shipped base tile of `surface` — used to restore an accent's
+    border so it seats in the field instead of sitting in a box."""
+    import glob as _g
+    fs = sorted(_g.glob(str(outdir / f"{surface}-[0-9]*.png")))
+    return np.asarray(Image.open(fs[(v * 5) % len(fs)]).convert("RGB"), np.float32) if fs else None
+
+
+def _blend_border(accent, base, feather=6):
+    """Keep the accent CENTER, restore the base at the EDGES (feathered)."""
+    if base is None:
+        return accent
+    H, W = accent.shape[:2]
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    edge = np.minimum.reduce([yy, xx, H - 1 - yy, W - 1 - xx])
+    c = np.clip((edge - feather) / feather, 0, 1)[..., None]
+    return accent.astype(np.float32) * c + base * (1 - c)
+
+
 def repaint_accent(name, v, seeds, outdir):
     count, fn, hint, denoise = ACCENTS[name]
     surface = ACCENT_BAND[name]
     udir = STAGE / name
     udir.mkdir(parents=True, exist_ok=True)
-    base = G.snap(fn(T, v))
+    # init from a REAL base tile with the procedural feature over it, so the
+    # accent's border already matches the field.
+    surf_base = _surface_base_tile(surface, v, outdir)
+    feat = G.snap(fn(T, v))
+    base = feat if surf_base is None else _blend_border(feat.astype(np.float32), surf_base, 8).astype(np.uint8)
     init_path = udir / f"init-{v}.png"
     Image.fromarray(base, "RGB").resize((1024, 1024), Image.NEAREST).save(init_path)
-    pos = f"top-down game tile, {hint}, {GEN}, flat top-down view"
+    pos = f"top-down dark alien swamp game tile, {hint}, {GEN}, flat top-down orthographic view"
     best, best_score = None, -1e9
     for s in range(seeds):
         seed = 707000 + v * 131 + s * 1013
@@ -217,7 +240,9 @@ def repaint_accent(name, v, seeds, outdir):
         im = Image.open(raw[-1]).convert("RGB")
         small = kcentroid(im, T, T).convert("RGB")
         clean = G.despeckle(small, passes=2)
-        banded = G.enforce_band(np.asarray(clean, np.float32), surface, tol=0.2)
+        # restore the exact base border so the accent seats in the field
+        blended = _blend_border(np.asarray(clean, np.float32), surf_base)
+        banded = G.enforce_band(blended, surface, tol=0.25)
         Image.fromarray(banded, "RGB").save(udir / f"acc-{v}-seed{s}.png")
         sc = score(banded, surface)
         if sc > best_score:

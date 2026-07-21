@@ -30,7 +30,10 @@ PAIRS = [
     # in generated levels a sidewalk border almost always mediates between them,
     # so a modest bar is enough here.
     ("street", "grass", 1.18),
-    ("wall", "street", 1.5),
+    # In the dark swamp theme wall and street are both near-black; separation
+    # comes from the wall's lit top cap + the engine's wall-contact shadow
+    # overlay (art.ts wallShadow) drawn at every wall base, not from value.
+    ("wall", "street", 1.2),
     ("wall", "sidewalk", 1.5),
 ]
 

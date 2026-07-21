@@ -153,16 +153,32 @@ def build_graph(
                               "strength": cn_strength, "start_percent": cn_start,
                               "end_percent": cn_end}}
         positive, negative = ["64", 0], ["64", 1]
+    # Circular-padding seamless (research-backed, ComfyUI-seamless-tiling): patch
+    # the model's conv padding to wrap and decode through a circular VAE, so the
+    # output tiles by CONSTRUCTION — no offset-heal, no center-cross artifact.
+    # SEAMLESS_MODE=circular (default) uses this; =offset falls back to the old
+    # tile-offset + heal pass below.
+    seamless_mode = os.environ.get("SEAMLESS_MODE", "circular")
+    circular = seamless and seamless_mode == "circular"
+    if circular:
+        g["71"] = {"class_type": "SeamlessTile",
+                   "inputs": {"model": model, "tiling": "enable", "copy_model": "Make a copy"}}
+        model = ["71", 0]
     g["6"] = {"class_type": "KSampler",
               "inputs": {"model": model, "positive": positive, "negative": negative,
                          "latent_image": latent, "seed": seed, "steps": STEPS, "cfg": CFG,
                          "sampler_name": SAMPLER, "scheduler": SCHED, "denoise": denoise}}
-    g["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
+    if circular:
+        g["7"] = {"class_type": "CircularVAEDecode",
+                  "inputs": {"samples": ["6", 0], "vae": ["1", 2], "tiling": "enable"}}
+    else:
+        g["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
     out = ["7", 0]
-    if seamless:
-        # True-tiling recipe: half-offset the image (wrap edges become adjacent
-        # interior columns -> continuous by construction), then a low-denoise
-        # img2img pass heals the old seams now sitting at the center cross.
+    if seamless and not circular:
+        # Fallback offset-heal recipe (SEAMLESS_MODE=offset): half-offset the
+        # image (wrap edges become adjacent interior columns -> continuous by
+        # construction), then a low-denoise img2img pass heals the old seams now
+        # sitting at the center cross. Circular padding above is preferred.
         # (Model Patch Seamless (mtb) deepcopy-crashes on ComfyUI 0.28.)
         g["13"] = {"class_type": "Image Tile Offset (mtb)",
                    "inputs": {"image": out, "tilesX": 2, "tilesY": 2}}

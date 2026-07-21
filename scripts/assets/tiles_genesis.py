@@ -237,15 +237,16 @@ def bog_macro(T, m):
     visible repeat period doubles (manifest macroTiles.grass=2)."""
     M = 2 * T
     rng = np.random.default_rng(16500 + m)
-    img = field(M, rng, hexc("#22380f"), hexc("#35511a"), sigma=M / 4, ramp=0.7)
-    clump = tnoise(M, rng, M / 5, octaves=2)
-    img[clump > 0.60] = hexc("#4c6b28")
-    img[clump > 0.76] = hexc("#67873c")
+    img = field(M, rng, hexc("#22380f"), hexc("#35511a"), sigma=M / 5, ramp=0.6)
+    clump = tnoise(M, rng, M / 6, octaves=2)
+    img[clump > 0.58] = hexc("#4c6b28")
+    img[clump > 0.74] = hexc("#67873c")
     img[clump > 0.90] = hexc("#86a750")
-    dark = tnoise(M, rng, M / 5)
-    img[dark > 0.80] = hexc("#141a16")  # wet peat hollows, big and irregular
-    # a couple of biolume spore dots per macro
-    for _ in range(3):
+    # wet peat hollows: SMALL and scattered (higher freq, rarer threshold) so
+    # they read as speckled dark spots, not big repeating diagonal ovals.
+    dark = tnoise(M, rng, M / 9)
+    img[dark > 0.86] = hexc("#141a16")
+    for _ in range(4):
         img[rng.integers(0, M), rng.integers(0, M)] = hexc("#46e078")
     return img
 

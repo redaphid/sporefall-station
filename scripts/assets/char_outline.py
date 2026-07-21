@@ -62,24 +62,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--theme", default="../../public/themes/swampspace-hires")
     ap.add_argument("--width", type=int, default=2)
+    ap.add_argument("--dirs", default="chars", help="comma-separated: chars,props,items")
+    ap.add_argument("--skip-outlined", type=float, default=None,
+                    help="skip files whose rim already exceeds this (re-run safety)")
     ap.add_argument("--dry", action="store_true")
     args = ap.parse_args()
 
-    files = sorted(glob.glob(os.path.join(args.theme, "chars", "*.png")))
-    n = 0
-    for f in files:
-        im = Image.open(f)
-        before = edge_darkness(im, args.width)
-        out, rim = outline_sprite(im, args.width)
-        after = edge_darkness(out, args.width)
-        tag = "outlined" if not args.dry else "would outline"
-        if os.path.basename(f).endswith(("-idle.png", "-step.png")) or "-walk-" in f:
+    tag = "would outline" if args.dry else "outlined"
+    for sub in args.dirs.split(","):
+        files = sorted(glob.glob(os.path.join(args.theme, sub, "*.png")))
+        n = 0
+        for f in files:
+            base = os.path.basename(f)
+            if sub == "chars" and not (base.endswith(("-idle.png", "-step.png")) or "-walk-" in f):
+                continue
+            im = Image.open(f)
+            before = edge_darkness(im, args.width)
+            if args.skip_outlined is not None and before >= args.skip_outlined:
+                continue
+            out, rim = outline_sprite(im, args.width)
             if not args.dry:
                 out.save(f)
             n += 1
-            if os.path.basename(f).startswith(("vine-ranger-s", "bog-mutant-s", "spore-drone-s")):
-                print(f"  {os.path.basename(f):28s} edge_dark {before:.2f}->{after:.2f} rim+{rim}px")
-    print(f"{tag} {n} character frames (width {args.width})")
+        print(f"{tag} {n} {sub} sprites (width {args.width})")
 
 
 if __name__ == "__main__":

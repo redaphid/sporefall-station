@@ -39,6 +39,29 @@ await page.waitForFunction(() => typeof window.__loadWorld === 'function', { tim
 await page.evaluate((j) => window.__loadWorld(j), base)
 await page.waitForTimeout(1500) // theme art + first frames
 
+// SHOWCASE=1 injects a row of props + one of each NPC archetype around the
+// player, to eyeball outlines/scale/contrast for the whole cast at once.
+if (process.env.SHOWCASE) {
+  await page.evaluate(() => {
+    const w = window.__world
+    const p = w.entities.find((e) => e.playerCtl)
+    const bx = Math.round(p.pos.x) - 4
+    const by = Math.round(p.pos.y)
+    const mk = (arch, kind, dx, dy, extra = {}) => {
+      const id = (w.byId ? Math.max(0, ...w.entities.map((e) => e.id)) + 1 : w.entities.length + 1)
+      const e = { id, kind, archetype: arch, pos: { x: bx + dx, y: by + dy },
+                  prevPos: { x: bx + dx, y: by + dy }, facing: 0, ...extra }
+      w.entities.push(e)
+      if (w.byId) w.byId[id] = e
+    }
+    const props = ['barrel', 'cargoPod', 'cryoTerminal', 'vending', 'locker']
+    props.forEach((a, i) => mk(a, 'prop', i * 2, -3))
+    const npcs = ['thug', 'cop', 'scientist', 'robot', 'civilian']
+    npcs.forEach((a, i) => mk(a, 'npc', i * 2, 3, { health: { hp: 10, max: 10 }, facing: Math.PI / 2 }))
+  })
+  await page.waitForTimeout(600)
+}
+
 for (const s of SCENES) {
   await page.evaluate(({ x, y }) => {
     const w = window.__world

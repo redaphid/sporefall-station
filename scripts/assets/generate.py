@@ -20,13 +20,19 @@ Recipe (researched + calibrated):
 Usage:
   python3 generate.py --list
   python3 generate.py sweep <job>... [--seeds N]   # raw sweep into staging
-  python3 generate.py final <job>...               # regen curated pick + post
+  python3 generate.py curate <job> <file> [--seed N --index I --batch B --note "..."]
+                                                   # APPROVE a pick: copy it into
+                                                   # the durable raws/ dir + record it
+  python3 generate.py final <job>...               # post curated raw -> theme dir
   python3 generate.py final --all                  # rebuild the whole pack
+  python3 generate.py final <job> --allow-regen    # re-roll a lost pick (drifts!)
 Staging (raw sweeps, NOT committed): $SWAMPSPACE_STAGE or scratchpad/stage.
-Curated picks are recorded in curation.json ({job: {seed, index, batch}}).
+Curated picks are recorded in curation.json ({job: {seed, index, batch, raw}});
+`raw` is a path RELATIVE to scripts/assets (durable) — approve with `curate`.
 """
 import json
 import os
+import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,6 +46,67 @@ STAGE = os.environ.get(
 )
 CURATION = os.path.join(HERE, "curation.json")
 ANCHORS = os.path.join(HERE, "anchors")  # curated RAW picks used as IPAdapter refs
+# Durable, COMMITTED home for every curated sweep raw. The original pack recorded
+# raws only by their ephemeral $STAGE (/tmp) path; those paths died with the
+# session and a same-seed regen no longer reproduces the approved pick (the
+# ComfyUI graph/prompts drift over time). Curated raws now live here and are
+# committed, so `final` always reproduces the exact approved pixels. Paths in
+# curation.json are stored RELATIVE to this file (e.g. "raws/item.spore-pistol.png")
+# so they survive machine/user/tmp churn. See docs/sprite-generation.md §2b.
+RAWS = os.path.join(HERE, "raws")
+
+
+def resolve_raw(name, pick):
+    """Resolve a curated pick's raw source file, DURABLE-first. Returns an
+    existing path or None. Order:
+      1. `pick['raw']` — relative paths resolve against this dir (durable);
+         absolute paths are honored only if they still exist (legacy /tmp);
+      2. `raws/<job>.png` — the durable committed copy;
+      3. `anchors/<kind>-<dir>-<frame>.png` — for character jobs, the curated
+         s-idle anchor that survived the /tmp loss.
+    """
+    cands = []
+    raw = (pick or {}).get("raw")
+    if raw:
+        cands.append(raw if os.path.isabs(raw) else os.path.join(HERE, raw))
+    cands.append(os.path.join(RAWS, name + ".png"))
+    if name.startswith("char."):
+        parts = name.split(".")  # char.<kind>.<dir>-<frame>
+        if len(parts) == 3:
+            cands.append(os.path.join(ANCHORS, f"{parts[1]}-{parts[2]}.png"))
+    for c in cands:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
+def persist_raw(name, srcfile, seed=None, index=0, batch=None, note=None,
+                size=None, ckpt=None):
+    """Copy a chosen sweep candidate into the durable RAWS dir and record the
+    pick in curation.json with a RELATIVE raw path. This is the one true way to
+    approve a pick so it reproduces forever — never point curation.json at a
+    $STAGE/tmp path again."""
+    os.makedirs(RAWS, exist_ok=True)
+    dst = os.path.join(RAWS, name + ".png")
+    shutil.copyfile(srcfile, dst)
+    cur = json.load(open(CURATION)) if os.path.exists(CURATION) else {}
+    e = cur.get(name, {})
+    if seed is not None:
+        e["seed"] = seed
+    e["index"] = index
+    if batch is not None:
+        e["batch"] = batch
+    e["raw"] = os.path.relpath(dst, HERE)  # "raws/<job>.png" — portable
+    if size is not None:
+        e["size"] = size
+    if ckpt is not None:
+        e["ckpt"] = ckpt
+    if note is not None:
+        e["note"] = note
+    cur[name] = e
+    json.dump(cur, open(CURATION, "w"), indent=1)
+    print(f"curated {name} -> {os.path.relpath(dst, REPO)}")
+    return dst
 
 TRIGGER = "masterpiece, pixpix, 8-bit, pixel_art"
 LOOK = ("16-bit era palette, bold dark outlines, chunky readable shapes, "
@@ -274,10 +341,10 @@ def sweep(names, seeds=6, base_seed=414500):
         dest = os.path.join(STAGE, name)
         init = spec.get("init")
         if spec.get("init_from_idle"):
-            idle = cur.get(spec["init_from_idle"], {})
-            init = idle.get("raw")
-            if not (init and os.path.exists(init)):
-                print(f"SKIP {name}: curate {spec['init_from_idle']} first")
+            init = resolve_raw(spec["init_from_idle"], cur.get(spec["init_from_idle"]))
+            if not init:
+                print(f"SKIP {name}: curate {spec['init_from_idle']} first "
+                      f"(no durable raw — see `generate.py curate`)")
                 continue
         done = 0
         while done < seeds:
@@ -294,9 +361,13 @@ def sweep(names, seeds=6, base_seed=414500):
             print(f"{name}: +{len(paths)} candidates (seed {base_seed + done - n}) -> {dest}")
 
 
-def final(names):
-    """Regenerate each job's curated pick (seed+index recorded) and post-process
-    into the theme directory."""
+def final(names, allow_regen=False):
+    """Post-process each job's curated raw into the theme directory. Prefers the
+    DURABLE raw (raws/<job>.png or an anchor) so the shipped pixels reproduce
+    byte-for-byte. Same-seed REGEN is off by default: the generation graph drifts
+    over time, so regenerating a lost pick produces DIFFERENT art (this is the
+    /tmp-loss trap — a spore-pistol regen came back a contaminated blob). Pass
+    --allow-regen only to knowingly re-roll a lost pick from its recorded seed."""
     import comfy
     from PIL import Image
     import post as P
@@ -308,11 +379,18 @@ def final(names):
         if not pick:
             print(f"SKIP {name}: no curated pick in curation.json")
             continue
-        raw = pick.get("raw")  # curated raw file kept from the sweep
-        if not (raw and os.path.exists(raw)):
+        raw = resolve_raw(name, pick)  # durable-first
+        if not raw:
+            if not allow_regen:
+                print(f"SKIP {name}: no durable raw (recorded path is gone). "
+                      f"Re-curate: `generate.py sweep {name}` then "
+                      f"`generate.py curate {name} <picked-file>`. "
+                      f"(--allow-regen to re-roll from seed {pick.get('seed')}, "
+                      f"but the graph has drifted so it will NOT match the approved pick.)")
+                continue
             init = spec.get("init")
             if spec.get("init_from_idle"):
-                init = cur.get(spec["init_from_idle"], {}).get("raw")
+                init = resolve_raw(spec["init_from_idle"], cur.get(spec["init_from_idle"]))
             g = comfy.build_graph(
                 pos=spec["pos"], neg=spec["neg"], seed=pick["seed"],
                 batch=pick.get("batch", 1),
@@ -347,16 +425,41 @@ if __name__ == "__main__":
         print("\n".join(J))
         sys.exit(0)
     cmd, names = (args[0], args[1:]) if args else (None, [])
+
+    def flagval(key, default=None):
+        for f in flags:
+            if f.startswith(key + "="):
+                return f.split("=", 1)[1]
+        return default
+
+    if cmd == "curate":
+        # curate <job> <file> [--seed N --index I --batch B --size N --ckpt X --note "..."]
+        if len(names) < 2 or names[0] not in J:
+            print(__doc__)
+            print("usage: generate.py curate <job> <picked-file> [--seed N ...]")
+            sys.exit(1)
+        job, src = names[0], names[1]
+        if not os.path.exists(src):
+            print(f"no such file: {src}")
+            sys.exit(1)
+        seed = flagval("--seed")
+        batch = flagval("--batch")
+        persist_raw(job, src,
+                    seed=int(seed) if seed else None,
+                    index=int(flagval("--index", "0")),
+                    batch=int(batch) if batch else None,
+                    size=int(flagval("--size")) if flagval("--size") else None,
+                    ckpt=flagval("--ckpt"), note=flagval("--note"))
+        sys.exit(0)
+
     if "--all" in flags:
         names = list(J)
-    seeds = 6
-    for f in flags:
-        if f.startswith("--seeds="):
-            seeds = int(f.split("=")[1])
+    seeds = int(flagval("--seeds", "6"))
     bad = [n for n in names if n not in J]
     if bad or cmd not in ("sweep", "final"):
         print(__doc__)
         if bad:
             print("unknown jobs:", bad)
         sys.exit(1)
-    (sweep(names, seeds=seeds) if cmd == "sweep" else final(names))
+    (sweep(names, seeds=seeds) if cmd == "sweep"
+     else final(names, allow_regen="--allow-regen" in flags))

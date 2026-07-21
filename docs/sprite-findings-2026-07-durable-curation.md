@@ -42,9 +42,43 @@ See `docs/sprite-generation.md` §2b for the operator's version. In short:
 their paths. It doubles as a **standing audit**: re-run to see the re-curation
 backlog shrink.
 
-## 3. Item re-curation (GPU)
+## 3. Item re-curation (GPU) — BLOCKED by shared-GPU contention
 
-<!-- filled in as the sweeps complete -->
+Attempted to re-curate the lost items on real GPU to prove the loop end-to-end.
+The shared RTX 4090 was **saturated by a co-tenant** the whole window and no
+generation completed:
+
+- `system_stats` reported 20–24 GB *free* when queried between jobs, but the
+  instant any prompt ran, VRAM jumped to **23.8 GB used at 100 % GPU** and stayed
+  there — a co-tenant model (~20 GB; almost certainly a large resident model,
+  possibly the qwen3-vl:8b VLM among others) pins the card, forcing my SD1.5 job
+  into deep lowvram offload.
+- An 8-image `item.spore-pistol` sweep **timed out at 900 s** with zero output;
+  its ComfyUI history stayed empty.
+- A minimal control probe — **one** 512px SD1.5 image, no Rembg, no LoRA —
+  **also timed out (190 s)**. So it is not batch size or the isnet download; the
+  card is simply not available for our work right now.
+
+This is the exact "shared-GPU realities" trap in docs §1 (resident models squeeze
+SDXL/SD1.5 into 30-min lowvram batches). The right move is to be a good tenant:
+interrupted our own stuck jobs to free the card and **deferred generation** rather
+than hammer a contended GPU. The fixed pipeline is ready — the re-curation is a
+pure GPU-availability wait, no code work remains to start it:
+
+```bash
+cd scripts/assets
+SWAMPSPACE_STAGE=../../.art-stage CKPT=dreamshaper_8.safetensors LORA= SIZE=512 \
+  python3 generate.py sweep item.spore-pistol --seeds=8     # + the other 33 LOST jobs
+# review contact sheet, then for each winner:
+python3 generate.py curate <job> ../../.art-stage/<job>/<file> --seed N --index I --size 512 --ckpt dreamshaper_8
+python3 generate.py final <job>
+python3 migrate_curation.py            # watch the LOST count fall toward 0
+```
+
+**Verified without the GPU**, so the loop is known-good the moment the card frees:
+`final char.vine-ranger.s-idle` reproduces the hero cleanly and transparently
+from the durable anchor (the black-key fix); `curate`/`resolve_raw`/`migrate`
+all exercised; `post.has_alpha`/`black_key` unit-checked on the anchor.
 
 ## 4. Open questions / next steps
 

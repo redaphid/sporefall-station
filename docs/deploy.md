@@ -236,10 +236,10 @@ same Cloudflare Pages project as the web deploy.
 
 **Setup / config**
 
-- No extra secrets. OTA reuses the same Cloudflare Pages project and the
-  `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` from section A. Cloudflare
-  Pages Functions are included free.
-- The manifest URL defaults to `https://backseat-sd8.pages.dev/ota/check`.
+- No extra secrets. OTA is served by the same Cloudflare Worker
+  (`src/worker/ota.ts`) and reuses the `CLOUDFLARE_API_TOKEN` /
+  `CLOUDFLARE_ACCOUNT_ID` from section A.
+- The manifest URL defaults to `https://sporefall.hypnodroid.com/ota/check`.
   If your Pages project name or domain differs, set **both**:
   - Build-time env `OTA_UPDATE_URL` (baked into the APK by `capacitor.config.ts`)
     → point it at `https://<your-domain>/ota/check`.

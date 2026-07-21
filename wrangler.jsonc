@@ -10,6 +10,11 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-04-07",
 
+  // Canonical public origin. Attaches sporefall.hypnodroid.com to this Worker on
+  // deploy (the zone must live in this Cloudflare account). The free
+  // *.workers.dev origin keeps working alongside it.
+  "routes": [{ "pattern": "sporefall.hypnodroid.com", "custom_domain": true }],
+
   // Serve the Vite build. Only /ws/* and /ota/* run the Worker; every other path
   // is served straight from these assets (free, cached). public/_headers and
   // public/_redirects (copied into dist/ by Vite) are honored, including the SPA

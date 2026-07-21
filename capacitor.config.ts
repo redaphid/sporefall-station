@@ -8,13 +8,13 @@ import type { CapacitorConfig } from '@capacitor/cli'
 const serverUrl = process.env.CAP_SERVER_URL
 
 // Self-hosted OTA (over-the-air) web-bundle updates via @capgo/capacitor-updater.
-// On launch the native app POSTs to this manifest endpoint (a free Cloudflare
-// Pages Function, see functions/ota/check.ts); if a newer bundle is published it
-// downloads it and swaps it in on the next launch. Override the host with
-// OTA_UPDATE_URL at build time if the Pages project name differs.
+// On launch the native app POSTs to this manifest endpoint (the Cloudflare Worker
+// route, see src/worker/ota.ts); if a newer bundle is published it downloads it
+// and swaps it in on the next launch. Override the host with OTA_UPDATE_URL at
+// build time (CI sets it from the deploy origin).
 // statsUrl is empty to disable Capgo's stats reporting (fully self-hosted).
 const otaUpdateUrl =
-  process.env.OTA_UPDATE_URL ?? 'https://backseat-sd8.pages.dev/ota/check'
+  process.env.OTA_UPDATE_URL ?? 'https://sporefall.hypnodroid.com/ota/check'
 
 const config: CapacitorConfig = {
   appId: 'com.hypnodroid.backseat',

@@ -83,6 +83,7 @@ jobs:
         if: steps.signing.outputs.signed == 'true'
         env:
           CAP_SERVER_URL: ""
+          OTA_UPDATE_URL: ${{ vars.SITE_URL && format('{0}/ota/check', vars.SITE_URL) || 'https://sporefall.hypnodroid.com/ota/check' }}
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -93,6 +94,7 @@ jobs:
         if: steps.signing.outputs.signed != 'true'
         env:
           CAP_SERVER_URL: ""
+          OTA_UPDATE_URL: ${{ vars.SITE_URL && format('{0}/ota/check', vars.SITE_URL) || 'https://sporefall.hypnodroid.com/ota/check' }}
         run: pnpm run build:apk
 
       - name: Stage release asset

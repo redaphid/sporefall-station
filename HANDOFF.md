@@ -65,28 +65,29 @@ secrets/variables and the OTA-origin mismatch — not YAML bugs.
 
 ### 2. Move the domain over
 
-1. **Pick the canonical origin.** Either the free `https://sporefall-station.<subdomain>.workers.dev`
-   (from the §1.3 deploy output) or a **custom domain**.
-2. **Move a custom domain to the Worker:** dashboard → *Workers & Pages* →
-   `sporefall-station` → *Settings* → *Domains & Routes* → **Add custom domain**.
-   If reusing the domain the old Pages project used, **remove it from the old Pages
-   project first** (a hostname can attach to only one service).
-3. **Point CI at it** — set the `SITE_URL` repo *variable* (Settings → Secrets and
+**Canonical origin (decided):** `https://sporefall.hypnodroid.com`
+
+1. **Move the custom domain to the Worker:** dashboard → *Workers & Pages* →
+   `sporefall-station` → *Settings* → *Domains & Routes* → **Add custom domain** →
+   `sporefall.hypnodroid.com`. If this hostname is still attached to the old Pages
+   project, **remove it from the old Pages project first** (a hostname can attach to
+   only one service).
+2. **Point CI at it** — set the `SITE_URL` repo *variable* (Settings → Secrets and
    variables → Actions → **Variables**), which `deploy-web.yml` uses to build the
    OTA manifest and the `/download` APK links:
    ```bash
-   gh variable set SITE_URL -R redaphid/sporefall-station --body https://<canonical-origin>
+   gh variable set SITE_URL -R redaphid/sporefall-station --body https://sporefall.hypnodroid.com
    ```
-4. Update the play URL in `docs/play.md` and `README.md` to `<canonical-origin>`.
+3. Update the play URL in `docs/play.md` and `README.md` to `https://sporefall.hypnodroid.com`.
 
 ### 3. Repoint OTA so installed phones self-update again
 
-The APK must poll `<canonical-origin>/ota/check`, not the old Pages URL.
+The APK must poll `https://sporefall.hypnodroid.com/ota/check`, not the old Pages URL.
 
 1. **Change the build-time default:** in `capacitor.config.ts` set the
-   `otaUpdateUrl` fallback to `https://<canonical-origin>/ota/check` (currently
+   `otaUpdateUrl` fallback to `https://sporefall.hypnodroid.com/ota/check` (currently
    `https://backseat-sd8.pages.dev/ota/check`).
-2. **Have the APK build pass it:** add `OTA_UPDATE_URL: https://<canonical-origin>/ota/check`
+2. **Have the APK build pass it:** add `OTA_UPDATE_URL: https://sporefall.hypnodroid.com/ota/check`
    (or `${{ vars.SITE_URL }}/ota/check`) to `android-apk.yml` **and**
    `release-apk.yml` build env, so tagged + rolling APKs bake the right endpoint.
 3. **Rebuild + reinstall the APK once.** After that, OTA works and future `main`
@@ -94,7 +95,7 @@ The APK must poll `<canonical-origin>/ota/check`, not the old Pages URL.
 4. *(Optional bridge)* to keep phones on the OLD APK (build ≤324, baked to the
    Pages URL) updatable: keep a minimal Cloudflare Pages project at
    `backseat-sd8.pages.dev` whose `/ota/check` **302-redirects** to
-   `<canonical-origin>/ota/check`. Otherwise those installs are stranded and must
+   `https://sporefall.hypnodroid.com/ota/check`. Otherwise those installs are stranded and must
    be re-installed from the APK link above.
 
 ### 4. Re-enable CI (after §1–§3)
@@ -120,8 +121,8 @@ gh run list --workflow=deploy-web.yml -R redaphid/sporefall-station --limit 3
 ## Done when
 
 - [ ] `deploy-web` is green on push to `main`.
-- [ ] `<canonical-origin>` serves build **355** (check the version line on the start menu).
-- [ ] `<canonical-origin>/ota/check` returns a manifest for the current bundle.
+- [ ] `https://sporefall.hypnodroid.com` serves build **355** (check the version line on the start menu).
+- [ ] `https://sporefall.hypnodroid.com/ota/check` returns a manifest for the current bundle.
 - [ ] A phone with a **freshly-installed** APK OTA-updates on next launch.
 - [ ] `SITE_URL` variable + both Cloudflare secrets set on `redaphid/sporefall-station`.
 - [ ] Old-repo decision made (§5).

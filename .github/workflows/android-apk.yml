@@ -49,6 +49,11 @@ jobs:
 
       - name: Build debug APK
         run: pnpm run build:apk
+        env:
+          # Bake the OTA manifest endpoint so installed APKs poll the live Worker
+          # origin (not the retired Pages URL). Prefer the SITE_URL repo variable;
+          # fall back to the canonical custom domain.
+          OTA_UPDATE_URL: ${{ vars.SITE_URL && format('{0}/ota/check', vars.SITE_URL) || 'https://sporefall.hypnodroid.com/ota/check' }}
 
       - name: Locate APK
         id: apk

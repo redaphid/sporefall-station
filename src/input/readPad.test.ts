@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { readPad } from './readPad'
-import { padProfile } from './padProfile'
+import { DEADZONE, initialHatCalibration, readPad, type HatCalibration } from './readPad'
+import { padProfile, type PadProfile } from './padProfile'
 
 const btn = (pressed: boolean) => ({ pressed, touched: pressed, value: pressed ? 1 : 0 })
 
@@ -21,6 +21,21 @@ const fakePad = (
 /** The exact axis value a one-axis hat reports for evdev hat `state`.
  * value = state * (2/7) - 1  →  states 0-7 are directions, 15 is "no direction". */
 const hatValue = (state: number) => state * (2 / 7) - 1
+
+/** The hat's null/neutral value (state 15) — the reading that PROVES an axis is
+ * a real hat rather than a resting analog axis. */
+const HAT_NULL = hatValue(15) // 3.2857…
+
+/** A calibration latch already PROVEN by one null-value sighting, so subsequent
+ * detents decode — exactly how a real hat behaves (rests at null, then a press).
+ * Without proof, the decode refuses every in-range detent (the drift fix). */
+const provenHat = (profile: PadProfile): HatCalibration => {
+  const hat = initialHatCalibration()
+  const nullAxes: number[] = []
+  nullAxes[9] = HAT_NULL
+  readPad(fakePad({ axes: nullAxes }), profile, hat)
+  return hat
+}
 
 /** Expected stick output after the RADIAL deadzone + rescale: magnitude ramps
  * from 0 at the 0.28 rim to 1 at full tilt, direction preserved, clamped at 1.
@@ -81,24 +96,24 @@ describe('readPad', () => {
   describe('movement from a hat axis (8bitdo non-standard)', () => {
     const zero2 = padProfile(fakePad({ id: '8BitDo Zero 2', mapping: '' }))
 
-    it('decodes the "up" hat value as moveY -1', () => {
+    it('decodes the "up" hat value as moveY -1 (once the hat has proven itself)', () => {
       const axes: number[] = []
       axes[9] = -1
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveY).toBe(-1)
       expect(s.moveX).toBe(0)
     })
     it('decodes the "right" hat value as moveX 1', () => {
       const axes: number[] = []
       axes[9] = -0.4285714
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveX).toBe(1)
       expect(s.moveY).toBe(0)
     })
     it('treats an out-of-range rest value as no direction', () => {
       const axes: number[] = []
       axes[9] = 3.2857
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveX).toBe(0)
       expect(s.moveY).toBe(0)
     })
@@ -118,7 +133,7 @@ describe('readPad', () => {
     ])('decodes hat state %i as (%i, %i)', (state, x, y) => {
       const axes: number[] = []
       axes[9] = hatValue(state)
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveX).toBe(x)
       expect(s.moveY).toBe(y)
     })
@@ -203,7 +218,7 @@ describe('readPad', () => {
     it('survives an axes array longer than expected and still finds the hat', () => {
       const axes: number[] = []
       axes[9] = hatValue(0)
-      const s = readPad(fakePad({ axes, axisCount: 24 }), zero2)
+      const s = readPad(fakePad({ axes, axisCount: 24 }), zero2, provenHat(zero2))
       expect(s.moveY).toBe(-1)
     })
   })
@@ -217,21 +232,21 @@ describe('readPad', () => {
     it('lets the hat move an axis the stick leaves centred', () => {
       const axes: number[] = []
       axes[9] = hatValue(2) // right
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveX).toBe(1)
     })
 
     it('lets a deflected stick win over an active hat on the same axis', () => {
       const axes: number[] = [-0.9]
       axes[9] = hatValue(2) // hat says right, stick says hard left
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveX).toBeCloseTo(dz(-0.9).x, 5)
     })
 
     it('fills only the axis the stick leaves centred when the hat is diagonal', () => {
       const axes: number[] = [-0.9, 0]
       axes[9] = hatValue(3) // hat says down-right: (1, 1)
-      const s = readPad(fakePad({ axes }), zero2)
+      const s = readPad(fakePad({ axes }), zero2, provenHat(zero2))
       expect(s.moveX).toBeCloseTo(dz(-0.9).x, 5) // stick keeps X
       expect(s.moveY).toBe(1) // hat fills Y
     })
@@ -241,8 +256,87 @@ describe('readPad', () => {
       axes[9] = hatValue(4) // hat says down
       const buttons: boolean[] = []
       buttons[12] = true // d-pad up
-      const s = readPad(fakePad({ axes, buttons }), zero2)
+      const s = readPad(fakePad({ axes, buttons }), zero2, provenHat(zero2))
       expect(s.moveY).toBe(-1)
+    })
+  })
+
+  // THE 8BitDo-Lite-2 "keeps walking" FIX. That pad (D-input, desktop Chrome)
+  // resolves to `raw`, whose speculative hatAxis:9 is NOT a hat on it — axis 9
+  // rests at -1, which used to decode as a phantom "up" and drive moveY = -1
+  // forever. The per-pad calibration latch refuses any hat direction until the
+  // axis proves itself by reporting its null value (> 1.1), which a resting
+  // analog axis never reaches. A genuine hat proves itself the instant it rests.
+  describe('hat calibration latch (a resting non-hat axis must not walk the player)', () => {
+    const raw = padProfile(fakePad({ id: '8BitDo Lite 2 gamepad', mapping: '', axisCount: 10 }))
+
+    it('precondition: the raw profile carries a speculative hat on axis 9', () => {
+      expect(raw.kind).toBe('raw')
+      expect(raw.hatAxis).toBe(9)
+    })
+
+    it('THE FIX: a resting axis 9 at -1 with a fresh latch yields ZERO movement (was moveY -1)', () => {
+      const axes: number[] = []
+      axes[9] = -1
+      const s = readPad(fakePad({ axes }), raw, initialHatCalibration())
+      expect(s.moveX).toBe(0)
+      expect(s.moveY).toBe(0)
+    })
+
+    it('a trigger stuck at -1 across many samples never proves, so it never walks', () => {
+      const hat = initialHatCalibration()
+      const axes: number[] = []
+      axes[9] = -1
+      for (let i = 0; i < 20; i++) {
+        const s = readPad(fakePad({ axes }), raw, hat)
+        expect(s.moveX).toBe(0)
+        expect(s.moveY).toBe(0)
+      }
+      expect(hat.proven).toBe(false)
+    })
+
+    it('the left stick still drives, and a RELEASED stick truly stops (no phantom hold)', () => {
+      const hat = initialHatCalibration()
+      const walking: number[] = [0, -0.9]
+      walking[9] = -1 // non-hat axis parked at -1 the whole time
+      expect(readPad(fakePad({ axes: walking }), raw, hat).moveY).toBeCloseTo(dz(-0.9).x, 5)
+      const released: number[] = [0, 0]
+      released[9] = -1
+      const s = readPad(fakePad({ axes: released }), raw, hat)
+      expect(s.moveX).toBe(0)
+      expect(s.moveY).toBe(0)
+    })
+
+    it('a GENUINE hat still works: null at rest → neutral, then -1 → up; proof persists', () => {
+      const hat = initialHatCalibration()
+      const rest: number[] = []
+      rest[9] = HAT_NULL
+      const r = readPad(fakePad({ axes: rest }), raw, hat)
+      expect(r.moveX).toBe(0)
+      expect(r.moveY).toBe(0)
+      expect(hat.proven).toBe(true)
+
+      const up: number[] = []
+      up[9] = hatValue(0) // -1 = up
+      expect(readPad(fakePad({ axes: up }), raw, hat).moveY).toBe(-1)
+
+      // Return to neutral and press again — one null sighting proves it for good.
+      readPad(fakePad({ axes: rest }), raw, hat)
+      expect(readPad(fakePad({ axes: up }), raw, hat).moveY).toBe(-1)
+    })
+
+    it('a continuously-varying axis 9 (a real second stick) never proves and never walks', () => {
+      const hat = initialHatCalibration()
+      // A full sweep of the LEGAL analog range, hitting the exact detent values
+      // -1 (up) and +1 (up-left) too — but never the > 1.1 null. None may move.
+      for (const v of [-1, -0.7, -0.4285714, -0.1, 0, 0.3, 0.7, 1, 0.5, -0.9]) {
+        const axes: number[] = []
+        axes[9] = v
+        const s = readPad(fakePad({ axes }), raw, hat)
+        expect(s.moveX).toBe(0)
+        expect(s.moveY).toBe(0)
+      }
+      expect(hat.proven).toBe(false)
     })
   })
 
@@ -307,6 +401,55 @@ describe('readPad', () => {
     })
   })
 
+  /**
+   * Analog-stick DRIFT rejection — the 8BitDo-Lite-2-keeps-walking report. A
+   * drifty Bluetooth pad does not return its sticks to exactly 0; the radial
+   * deadzone (readPad.radialDeadzone, DEADZONE) is what makes a RELEASED stick
+   * yield exactly zero movement/aim. These pin the property on BOTH sticks with
+   * the exact adversarial vectors, so a future tweak to DEADZONE or the rescale
+   * can't silently reopen the drift.
+   */
+  describe('drift rejection on a released stick (radial deadzone, both sticks)', () => {
+    it('has a deadzone radius generous enough for a drifty BT pad (>= 0.15)', () => {
+      // The residual noise of a worn/cheap stick sits well under this; a value
+      // in the 0.15..0.30 band kills it without eating meaningful deflection.
+      expect(DEADZONE).toBeGreaterThanOrEqual(0.15)
+      expect(DEADZONE).toBeLessThanOrEqual(0.35)
+    })
+
+    // Movement stick.
+    it('a residual left-stick drift of (0.08, 0.05) yields exactly zero movement', () => {
+      const s = readPad(fakePad({ axes: [0.08, 0.05] }), std)
+      expect(s.moveX).toBe(0)
+      expect(s.moveY).toBe(0)
+    })
+    it('asymmetric release noise (-0.12, 0.19) — magnitude still inside the rim — is zero', () => {
+      const s = readPad(fakePad({ axes: [-0.12, 0.19] }), std) // mag ≈ 0.225 < 0.28
+      expect(s.moveX).toBe(0)
+      expect(s.moveY).toBe(0)
+    })
+    it('a deflection just past the rim is small but nonzero and smoothly scaled (no snap)', () => {
+      const s = readPad(fakePad({ axes: [DEADZONE + 0.01, 0] }), std)
+      expect(s.moveX).toBeGreaterThan(0)
+      expect(s.moveX).toBeLessThan(0.05) // ramps from 0 at the rim, not a jump to 0.28
+    })
+    it('full deflection still reaches full magnitude (deadzone did not cost range)', () => {
+      const s = readPad(fakePad({ axes: [0, 1] }), std)
+      expect(Math.hypot(s.moveX, s.moveY)).toBeCloseTo(1, 5)
+    })
+
+    // Aim stick — the SAME treatment (drift would otherwise nudge the reticle).
+    it('a residual right-stick drift of (0.08, 0.05) yields exactly zero aim', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0.08, 0.05] }), std)
+      expect(s.aimX).toBe(0)
+      expect(s.aimY).toBe(0)
+    })
+    it('a real right-stick push past the rim survives (aim is not over-suppressed)', () => {
+      const s = readPad(fakePad({ axes: [0, 0, 0, -0.95] }), std)
+      expect(Math.hypot(s.aimX, s.aimY)).toBeGreaterThan(0)
+    })
+  })
+
   describe('action buttons', () => {
     it('reports attack when the bottom face button is down', () => {
       const buttons: boolean[] = []
@@ -332,6 +475,65 @@ describe('readPad', () => {
       const s = readPad(fakePad(), std)
       expect(s.attack).toBe(false)
       expect(s.pause).toBe(false)
+    })
+  })
+
+  /**
+   * The exact reported symptom, pinned by index: "R2 (button 7) triggers Start".
+   * These guard the DISJOINTNESS of the W3C standard layout — that a physical
+   * index fires only its own action and never a neighbour's — since the mapping
+   * table (padProfile) is off-by-nothing today but is precisely what a shifted
+   * or non-standard-pad table would corrupt.
+   */
+  describe('button-index → action disjointness (W3C standard mapping)', () => {
+    const press = (i: number) => {
+      const buttons: boolean[] = []
+      buttons[i] = true
+      return readPad(fakePad({ buttons }), std)
+    }
+
+    it('index 7 (R2, the right trigger) fires attack and NOT pause/start', () => {
+      const s = press(7)
+      expect(s.attack).toBe(true)
+      expect(s.pause).toBe(false)
+    })
+
+    it('index 9 (Start) fires pause and NOT attack — the inverse of the bug', () => {
+      const s = press(9)
+      expect(s.pause).toBe(true)
+      expect(s.attack).toBe(false)
+    })
+
+    // A representative sweep of the standard layout: each index lights its own
+    // action and no other. Attack is intentionally the OR of {0,5,6,7}, so those
+    // four share it; every other index owns exactly one action.
+    it.each([
+      [0, { attack: true }], // A
+      [1, { interact: true }], // B
+      [2, { special: true }], // X
+      [3, { special: true }], // Y
+      [4, { roll: true }], // LB
+      [5, { attack: true }], // RB
+      [6, { attack: true }], // L2
+      [7, { attack: true }], // R2
+      [8, { throwItem: true }], // Back/Select
+      [9, { pause: true }], // Start
+      [10, { hotbarPrev: true }], // L3
+      [11, { hotbarNext: true }], // R3
+    ] as const)('index %i lights exactly its own action', (i, expected) => {
+      const s = press(i)
+      const fields = ['attack', 'interact', 'special', 'roll', 'pause', 'throwItem', 'hotbarPrev', 'hotbarNext'] as const
+      for (const f of fields) expect(s[f]).toBe(f in expected ? expected[f as keyof typeof expected] : false)
+    })
+
+    it('composes simultaneous presses — R2 + Start fire attack AND pause together', () => {
+      const buttons: boolean[] = []
+      buttons[7] = true // R2
+      buttons[9] = true // Start
+      const s = readPad(fakePad({ buttons }), std)
+      expect(s.attack).toBe(true)
+      expect(s.pause).toBe(true)
+      expect(s.interact).toBe(false)
     })
   })
 

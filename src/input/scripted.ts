@@ -388,6 +388,20 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 40 }, // aftermath beat
   ],
 
+  // Weapon-combo showcase (demo/weapon-combos): the player is PRE-POSITIONED on
+  // the lane just west of the stationary dummy row (thugs at x=12/15/18, y=11),
+  // so there is no walk-in preamble — a tight ~6.4s clip that is almost entirely
+  // "aim + hold fire + watch the on-hit effect". Face east for a beat (so aim
+  // holds the east heading), then plant and empty the weapon down the row; the
+  // final beat lingers on the aftermath (frozen/burning/shattered/exploded line).
+  // Backs one mp4 per ammo/mod combo — see e2e/weapon-combos.mjs.
+  comboFire: [
+    { ticks: 10 }, // establish the dummy row
+    { ticks: 6, x: 1 }, // turn to face east toward the targets
+    { ticks: 150, attack: true }, // plant and fire down the row (aim holds east)
+    { ticks: 26 }, // aftermath beat on the on-hit effect
+  ],
+
   // A full mission: grab the briefcase (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },

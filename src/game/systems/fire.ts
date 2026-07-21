@@ -69,9 +69,26 @@ export const fireSystem = (w: World): void => {
     }
   }
 
-  for (const t of flammables) {
-    if (!fireAt(w, Math.floor(t.pos.x), Math.floor(t.pos.y))) continue
-    addStatus(w, t, 'burning', ELEMENTS.burning.durationTicks)
+  // Set a flammable alight if it stands in a burning cell. This runs EVERY tick
+  // over every flammable, and furnished interiors make flammables plentiful (~100
+  // crates/shelves/desks a floor) — so the old per-flammable `fireAt` (a full
+  // entity scan each) was O(flammables × entities), a superlinear tax paid even on
+  // a floor with no fire at all. Snapshot the burning cells into a set ONCE (keyed
+  // like the movement door grid: `ty*w + tx`, unique per in-bounds tile) and probe
+  // it in O(1). Built here (after spread) so cells lit this tick are included, and
+  // iterated in the same flammable order, so `burning` lands byte-identically.
+  if (flammables.length > 0) {
+    const lw = w.level.w
+    const fireCells = new Set<number>()
+    for (const f of w.entities) {
+      if (f.fire && !f.dead) fireCells.add(Math.floor(f.pos.y) * lw + Math.floor(f.pos.x))
+    }
+    if (fireCells.size > 0) {
+      for (const t of flammables) {
+        if (!fireCells.has(Math.floor(t.pos.y) * lw + Math.floor(t.pos.x))) continue
+        addStatus(w, t, 'burning', ELEMENTS.burning.durationTicks)
+      }
+    }
   }
 
   for (const f of fires) {

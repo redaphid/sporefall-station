@@ -10,9 +10,9 @@
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
   'Enemies can now wield modded weapons',
+  'Furniture has real art, not boxes',
+  'Smoother sim on furnished floors',
   'Controllers can navigate menus',
-  'Revived players keep a moddable gun',
-  'Rooms furnished — labs, bunks, stockrooms',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

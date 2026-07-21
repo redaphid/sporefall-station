@@ -25,3 +25,6 @@ __pycache__/
 
 # Cloudflare Workers local dev/build cache (wrangler dev, wrangler deploy).
 .wrangler/
+
+# transient art sweep staging (never committed)
+.art-stage/

@@ -46,6 +46,16 @@ export interface PredictedWorldView {
   mission: { description: string; complete: boolean; targetEntityId?: number }
 }
 
+/** Canvas screen-recorder: captures the live WebGL canvas (shaders and all) to a
+ * downloadable `.webm`. Persisted here (in source) so it survives page refreshes,
+ * unlike a console-injected helper. */
+export interface CanvasRecorder {
+  /** Begin capturing the game canvas. Returns a status string. */
+  start(): string
+  /** Stop, build a `.webm`, and trigger a download; resolves with a status string. */
+  stop(): Promise<string>
+}
+
 export interface Sporefall {
   /** Live world reference — authoritative on host/solo, predicted view on a client. */
   readonly world: World | PredictedWorldView
@@ -61,6 +71,8 @@ export interface Sporefall {
   schema(): ReturnType<typeof buildSchema>
   serialize(): string
   verb(line: string, args?: string): string
+  /** Record the live canvas (shaders included) to a downloadable `.webm`. */
+  readonly rec: CanvasRecorder
 }
 
 export interface InspectDeps {
@@ -104,7 +116,59 @@ const HELP: readonly { sig: string; doc: string }[] = [
   { sig: 'schema()', doc: 'live component/archetype reflection derived from the entities actually present' },
   { sig: 'serialize()', doc: 'lossless WorldJson string (replayable via the load verb or ?world=)' },
   { sig: "verb(line, args?)", doc: "debug verbs — get/set/spawn/kill/teleport/step/load/annotate/ai/setBehavior/… e.g. verb('teleport 12 5 5'). Dev-gated: needs ?debug (or ?e2e); returns a refusal string in production." },
+  { sig: 'rec.start() / rec.stop()', doc: 'record the live canvas — shaders and all — to a downloadable .webm. Persisted in the build, so it survives page refreshes.' },
 ]
+
+/** Build the canvas recorder. Kept as a closure so its MediaRecorder state lives
+ * with the namespace. Every browser API is touched only at call time (never at
+ * import), so it no-ops cleanly under happy-dom/node where the DOM is absent. */
+const makeCanvasRecorder = (): CanvasRecorder => {
+  let mr: MediaRecorder | null = null
+  let chunks: Blob[] = []
+  return {
+    start: () => {
+      if (typeof document === 'undefined' || typeof MediaRecorder === 'undefined') return 'recording unavailable in this environment'
+      const cv = document.querySelector('canvas')
+      if (!cv) return 'no game canvas found'
+      if (mr) return 'already recording'
+      let stream: MediaStream
+      try {
+        stream = cv.captureStream(30)
+      } catch (e) {
+        return `captureStream failed: ${e instanceof Error ? e.message : String(e)}`
+      }
+      const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      const mime = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
+      chunks = []
+      mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size) chunks.push(e.data)
+      }
+      mr.start()
+      return `REC ● capturing the canvas (shaders included)${mime ? ` [${mime}]` : ''} — sporefall.rec.stop() to save`
+    },
+    stop: () => {
+      if (!mr) return Promise.resolve('not recording')
+      const rec = mr
+      const data = chunks
+      mr = null
+      return new Promise<string>((resolve) => {
+        rec.onstop = () => {
+          const blob = new Blob(data, { type: 'video/webm' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'sporefall-clip.webm'
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          resolve(`saved ${Math.round(blob.size / 1024)}KB .webm to your Downloads`)
+        }
+        rec.stop()
+      })
+    },
+  }
+}
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
@@ -243,6 +307,8 @@ export const createInspect = (deps: InspectDeps): Inspect => {
         return 'sporefall.verb needs the authoritative world — this is a join (client) session; run verbs on the host device (or a solo session).'
       return runVerb(w, full, { events, setTheme: deps.setTheme })
     },
+
+    rec: makeCanvasRecorder(),
   }
   Object.freeze(ns)
 

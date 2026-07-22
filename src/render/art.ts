@@ -253,6 +253,8 @@ const ENTITY_COLORS: Record<string, number> = {
   cop: 0x7f9fd1,
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
+  lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
+
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,
   crate: 0x9c6b3f,

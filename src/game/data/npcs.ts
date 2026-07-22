@@ -194,6 +194,25 @@ export const NPCS: Record<string, NpcDef> = {
     behavior: 'predator',
     resist: { poisoned: 0.4, spore: 0 },
   },
+  lurker: {
+    // Corner ambusher: hides DORMANT against the back wall of a dark room
+    // (populate.spawnLurkers picks stockrooms/guardposts/bathrooms) until a
+    // body strays close, the room's door opens, or a hit lands — then BURSTS
+    // at the intruder, fast and all-in (behaviors 'lurker' pounce). The
+    // jump-scare. Fragile on purpose: it wins the ambush or dies in the open.
+    archetype: 'lurker',
+    faction: 'gang',
+    hp: 28,
+    speed: 4.6,
+    weapon: 'knife',
+    sightRange: 8,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'lurker',
+    dormant: true,
+    wakeOn: ['proximity', 'damage', 'door'],
+    resist: { spore: 0, poisoned: 0.5 },
+  },
   pod: {
     // #68 Spore pod: a dormant egg-sac — inert until a nearby noise, a body that
     // strays too close, or a hit trips it; then it hatches into a hostile hive

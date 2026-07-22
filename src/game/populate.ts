@@ -127,9 +127,82 @@ export const populateWorld = (w: World): void => {
   // Tactical-AI post-passes, each on its OWN fork so every stream above stays
   // byte-identical per seed (the existing populate tests are the proof):
   // a bunker defender turns barricader, then gangster packs become squads
-  // (in that order, so a squad never conscripts the barricader).
+  // (in that order, so a squad never conscripts the barricader), and deep
+  // floors seed dormant corner-ambushers into back rooms.
   assignBarricaders(w)
   assignSquads(w)
+  spawnLurkers(w)
+}
+
+/** Room types a lurker haunts — dark back-of-house corners, never the front. */
+const LURKER_ROOMS: readonly RoomType[] = ['stockroom', 'guardpost', 'bathroom', 'storage']
+
+/** Seed dormant lurkers (the jump-scare ambusher, data/npcs.ts) sparingly into
+ * preferred back rooms — deeper floors haunt more, floor 1 stays clean. Own
+ * `lurkers` fork appended AFTER every other stream, so existing populate
+ * output is byte-identical per seed; only the entity list grows. The bunker
+ * BAND room (the patrol lane's room) is exempt so a parked body never sits on
+ * a promised-open beat. */
+const spawnLurkers = (w: World): void => {
+  if (w.floor < 2) return
+  const rng = w.rng.fork('lurkers')
+  for (let bi = 0; bi < w.level.buildings.length; bi++) {
+    const b = w.level.buildings[bi]
+    const p = Math.min(0.5, 0.1 + 0.08 * w.floor)
+    if (!rng.chance(p)) continue
+    const types = b.roomTypes ?? assignRoomTypes(b)
+    const rooms: number[] = []
+    for (let ri = 0; ri < b.rooms.length; ri++) {
+      if (b.role === 'bunker' && ri === 0) continue // never the guard band
+      if (LURKER_ROOMS.includes(types[ri])) rooms.push(ri)
+    }
+    if (rooms.length === 0) continue // no dark corner here — sparse is fine
+    const ri = rooms[rng.int(0, rooms.length - 1)]
+    const spot = lurkerHideTile(w, b, ri)
+    if (!spot) continue
+    const lurker = spawnNpc(w, 'lurker', spot.x + 0.5, spot.y + 0.5)
+    lurker.ai!.zone = { building: bi, role: b.role }
+    // A woken lurker that loses its prey stays parked in its corner (guard),
+    // keeping the ambush pocket armed instead of ambling into the open.
+    lurker.ai!.guard = true
+  }
+}
+
+/** The room's best hiding tile: wall-hugging, as far from every door as the
+ * room allows, free of furniture and reserved tiles. Deterministic argmax in
+ * row-major order (strictly-greater wins), or null for a bare/hostile room. */
+const lurkerHideTile = (w: World, b: Building, ri: number): { x: number; y: number } | null => {
+  const room = b.rooms[ri]
+  const lw = w.level.w
+  const spawnTx = Math.floor(w.level.spawn.x)
+  const spawnTy = Math.floor(w.level.spawn.y)
+  const exitTx = Math.floor(w.level.exit.x)
+  const exitTy = Math.floor(w.level.exit.y)
+  const taken = new Set<number>()
+  for (const e of w.entities) {
+    if (e.kind === 'interactable' && !e.dead) taken.add(Math.floor(e.pos.y) * lw + Math.floor(e.pos.x))
+  }
+  let best: { x: number; y: number } | null = null
+  let bestScore = -Infinity
+  for (let ty = room.y; ty < room.y + room.h; ty++) {
+    for (let tx = room.x; tx < room.x + room.w; tx++) {
+      if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+      if (roomOwningTile(b.rooms, tx, ty) !== ri) continue
+      if (taken.has(ty * lw + tx)) continue
+      if (tx === spawnTx && ty === spawnTy) continue
+      if (tx === exitTx && ty === exitTy) continue
+      const walls = wallNeighbours(w, tx, ty)
+      if (walls === 0) continue // it hides AGAINST something, never mid-floor
+      let dmin = Infinity
+      for (const d of b.doors) dmin = Math.min(dmin, Math.hypot(d.x - tx, d.y - ty))
+      const score = dmin + walls * 0.25 // far from doors first, cornered second
+      if (score > bestScore) {
+        bestScore = score
+        best = { x: tx, y: ty }
+      }
+    }
+  }
+  return best
 }
 
 /** Chance a bunker fields a barricader among its defenders. */

@@ -631,6 +631,31 @@ const fortify: Consideration = (w, e) => {
   return [{ code: FORTIFY, score: FORTIFY_SCORE, tier: TIER_AMBIENT, at: { x: spot.x + 0.5, y: spot.y + 0.5 } }]
 }
 
+// ── Lurker: the corner ambusher's pounce ────────────────────────────────────
+// Once its dormancy trips (dormancy.ts: proximity / its door opening / a hit),
+// the lurker BURSTS at the nearest perceivable player with total commitment —
+// PANIC tier, so nothing (not even being wounded) breaks the charge off. The
+// jump-scare only works if it never hesitates. Its `guard` flag keeps a woken
+// lurker that loses its prey parked in its corner instead of ambling away.
+const POUNCE_RANGE = 7
+const POUNCE_SCORE = 15
+
+const pounce: Consideration = (w, e) => {
+  if (e.ai!.dormant) return []
+  let best: Entity | undefined
+  let bestD = POUNCE_RANGE
+  for (const p of w.entities) {
+    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d > bestD) continue
+    if (!perceives(w, e, p)) continue
+    bestD = d
+    best = p
+  }
+  if (!best) return []
+  return [{ code: bestD <= ENGAGE_RANGE ? BATTLE : PURSUE, score: POUNCE_SCORE, tier: TIER_PANIC, target: best.id }]
+}
+
 // ── #64 Infest: the mindless Infected host — shamble at the nearest clean
 // body, never flee, never reason. Only fires on an `infected` entity. ─────────
 const INFEST_SCORE = 5
@@ -777,6 +802,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   squadStack,
   squadFollow,
   fortify,
+  pounce,
   infest,
   packAvoid,
   stalkWeakest,
@@ -844,6 +870,10 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   barricader: {
     about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',
     considerations: ['threat', 'defendMyWing', 'pursueMemory', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],
+  },
+  lurker: {
+    about: 'hides dormant in a dark corner; bursts at whoever trips it — proximity, its door opening, or a hit',
+    considerations: ['pounce', 'threat', 'pursueMemory', 'wander'],
   },
   squad: {
     about: 'moves as a unit: forms on its lead, stacks both sides of a door, breaches together, flanks the lead’s target',

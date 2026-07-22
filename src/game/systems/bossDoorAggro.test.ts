@@ -1,8 +1,12 @@
-// Boss-door aggro: unlocking the door that DIRECTLY gates the mission objective
-// (boss room / objective room) is a point of no return — the whole floor turns
-// hostile. Adversarial coverage: it fires for every unlock method (pick + breach),
-// NEVER for a normal door, latches once, spares co-op allies, and is fully
-// deterministic + round-trips.
+// The two-stage heist finale.
+// Stage 1 — gateway breach: unlocking the door that DIRECTLY gates the mission
+// objective is a point of no return — the alarm maxes and every OTHER door on
+// the floor pops open (locks, biolocks, overgrowth), but the floor does NOT
+// yet mob the party. Stage 2 — taking the prize (completeMission): every unit
+// in town aggros the prize-taker for the escape run. Adversarial coverage:
+// stage 1 fires for every unlock method (pick + breach) and NEVER for a normal
+// door, both stages latch once, allies are spared, posthumous completion
+// doesn't crash, and everything is deterministic + round-trips.
 
 import { describe, expect, it } from 'vitest'
 import type { Entity } from '../entity'
@@ -73,27 +77,58 @@ describe('boss-door aggro — the objective gateway is tagged', () => {
   })
 })
 
-describe('boss-door aggro — breaching turns the floor hostile', () => {
-  it('a grenade breach of the objective gate maxes the alarm and aggros every NPC', () => {
+describe('gateway breach (stage 1) — the station unseals', () => {
+  it('a grenade breach maxes the alarm and pops every other door open', () => {
     const { w } = bootBreachable([2, 3, 5, 6])
     const door = objectiveDoor(w)
     const player = firstPlayer(w)
-    const before = npcs(w)
-    expect(before.length).toBeGreaterThan(0)
-    // Pre-breach, a peaceful civ/cop is not yet Hostile toward the player.
-    const someNonHostileBefore = before.some((n) => dispositionToward(n, player.id) !== 'Hostile')
-    expect(someNonHostileBefore).toBe(true)
+    expect(npcs(w).length).toBeGreaterThan(0)
+    // A floor has closed (and often sealed) doors before the breach.
+    const closedBefore = w.entities.filter((e) => e.door && e.id !== door.id && (!e.door.open || e.door.locked))
+    expect(closedBefore.length).toBeGreaterThan(0)
 
     detonate(w, door.pos.x, door.pos.y, 1.8, 40, player.id)
     runTicks(w, idle(0), 1)
 
     expect(w.mission.bossAggroTriggered).toBe(true)
     expect(w.alarm).toBe(3)
-    for (const n of npcs(w)) {
-      expect(dispositionToward(n, player.id)).toBe('Hostile')
-      expect(n.ai!.mode).toBe('aggro')
-      expect(n.ai!.targetId).toBe(player.id)
+    for (const e of w.entities) {
+      if (!e.door || e.id === door.id) continue
+      expect(e.door.open, `door ${e.id} still closed after the release`).toBe(true)
+      expect(e.door.locked, `door ${e.id} still locked after the release`).toBe(false)
+      expect(e.door.overgrown ?? false, `door ${e.id} still overgrown after the release`).toBe(false)
     }
+  })
+
+  it('the breach alone does NOT aggro the floor — the manhunt waits for the prize', () => {
+    const { w } = bootBreachable([2, 3, 5, 6])
+    const door = objectiveDoor(w)
+    const player = firstPlayer(w)
+    // Blast the gate from a player standing far away so the explosion itself
+    // wounds no bystander (a hit would legitimately anger its victim).
+    const before = npcs(w).filter((n) => Math.hypot(n.pos.x - door.pos.x, n.pos.y - door.pos.y) > 3)
+    const nonHostileBefore = before.filter((n) => dispositionToward(n, player.id) !== 'Hostile')
+    expect(nonHostileBefore.length).toBeGreaterThan(0)
+
+    detonate(w, door.pos.x, door.pos.y, 1.8, 40, player.id)
+    runTicks(w, idle(0), 1)
+
+    expect(w.mission.bossAggroTriggered).toBe(true)
+    for (const n of nonHostileBefore) {
+      if (n.dead) continue
+      expect(dispositionToward(n, player.id), `npc ${n.archetype} aggroed by breach alone`).not.toBe('Hostile')
+    }
+  })
+
+  it('emits one doorsReleased event counting the doors it popped', () => {
+    const { w } = bootBreachable([2, 3, 5, 6])
+    const door = objectiveDoor(w)
+    const closedBefore = w.entities.filter((e) => e.door && e.id !== door.id && (!e.door.open || e.door.locked)).length
+    detonate(w, door.pos.x, door.pos.y, 1.8, 40, firstPlayer(w).id)
+    tickWorld(w, idle(0))
+    const released = w.events.filter((e) => e.type === 'doorsReleased')
+    expect(released.length).toBe(1)
+    expect(released[0]).toMatchObject({ type: 'doorsReleased', count: closedBefore })
   })
 
   it('emits a single bossDoorBreached event naming the gate', () => {
@@ -108,8 +143,8 @@ describe('boss-door aggro — breaching turns the floor hostile', () => {
   })
 })
 
-describe('boss-door aggro — a completed lockpick also triggers it', () => {
-  it('picking the plain floor-1 objective lock turns the floor hostile', () => {
+describe('gateway breach — a completed lockpick also triggers it', () => {
+  it('picking the plain floor-1 objective lock unseals the floor', () => {
     // Floor 1 keeps plain locks (no access gate), so the objective gate is a
     // mundane pickable door — exercise the real runChannel completion path.
     let boot1: World | undefined
@@ -134,7 +169,10 @@ describe('boss-door aggro — a completed lockpick also triggers it', () => {
     expect(door.door!.open).toBe(true)
     expect(w.mission.bossAggroTriggered).toBe(true)
     expect(w.alarm).toBe(3)
-    for (const n of npcs(w)) expect(dispositionToward(n, player.id)).toBe('Hostile')
+    for (const e of w.entities) {
+      if (!e.door || e.id === door.id) continue
+      expect(e.door.open && !e.door.locked, `door ${e.id} not released`).toBe(true)
+    }
   })
 })
 
@@ -184,15 +222,57 @@ describe('boss-door aggro — latched to fire exactly once', () => {
   })
 })
 
-describe('boss-door aggro — co-op allies are spared', () => {
-  it('a second player is not turned hostile by the escalation', () => {
-    const { seed, floor } = bootBreachable([2, 3, 5, 6])
-    const w = boot(seed, floor, 2)
-    const door = objectiveDoor(w)
+/** First seed on `floors` whose mission is `template`, with live faction NPCs. */
+const bootTemplate = (template: string, floors: number[], players = 1): World => {
+  for (let seed = 1; seed <= 300; seed++) {
+    for (const floor of floors) {
+      const w = boot(seed, floor, players)
+      if (w.mission.template !== template) continue
+      if (!w.entities.some((e) => e.ai && !e.dead && !e.playerCtl)) continue
+      return w
+    }
+  }
+  throw new Error(`no ${template} floor found`)
+}
+
+describe('taking the prize (stage 2) — every unit in town aggros the taker', () => {
+  it('grabbing the specimen canister turns the whole floor on the holder', () => {
+    const w = bootTemplate('steal', [1, 2, 3])
+    const player = firstPlayer(w)
+    const before = npcs(w)
+    expect(before.some((n) => dispositionToward(n, player.id) !== 'Hostile')).toBe(true)
+
+    // The canister lands in the holder's loadout — exactly what auto-pickup does.
+    player.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    runTicks(w, idle(0), 1)
+
+    expect(w.mission.complete).toBe(true)
+    expect(w.mission.exitUnlocked).toBe(true)
+    expect(w.alarm).toBe(3)
+    for (const n of npcs(w)) {
+      expect(dispositionToward(n, player.id)).toBe('Hostile')
+      expect(n.ai!.mode).toBe('aggro')
+      expect(n.ai!.targetId).toBe(player.id)
+    }
+  })
+
+  it('an assassination completing the mission calls the manhunt too', () => {
+    const w = bootTemplate('assassinate', [1, 2, 3])
+    const player = firstPlayer(w)
+    const boss = w.byId.get(w.mission.targetEntityId!)!
+    boss.dead = true
+    runTicks(w, idle(0), 1)
+
+    expect(w.mission.complete).toBe(true)
+    expect(w.alarm).toBe(3)
+    for (const n of npcs(w)) expect(dispositionToward(n, player.id)).toBe('Hostile')
+  })
+
+  it('co-op allies are spared by the manhunt', () => {
+    const w = bootTemplate('steal', [1, 2, 3], 2)
     const players = w.entities.filter((e) => e.playerCtl)
     expect(players.length).toBe(2)
-
-    detonate(w, door.pos.x, door.pos.y, 1.8, 40, players[0].id)
+    players[0].loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0, 1), 1)
 
     // Allies gain no brain and are never targeted by their own party's NPCs.
@@ -200,8 +280,37 @@ describe('boss-door aggro — co-op allies are spared', () => {
       expect(p.ai).toBeUndefined()
       expect(p.dead).toBeFalsy()
     }
-    const focus = players.map((p) => p.id)
-    for (const n of npcs(w)) expect(focus).toContain(n.ai!.targetId)
+    for (const n of npcs(w)) expect(n.ai!.targetId).toBe(players[0].id)
+  })
+
+  it('fires exactly once — the completion latch holds', () => {
+    const w = bootTemplate('steal', [1, 2, 3])
+    firstPlayer(w).loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    runTicks(w, idle(0), 1)
+    expect(w.mission.complete).toBe(true)
+    // Wind the alarm back down; completion must not re-raise it. (Individual
+    // NPCs may legitimately re-aggro on SIGHT — their hate is permanent — but
+    // the floor-wide escalation itself (alarm 3 + everyone flipped at once,
+    // sight or no sight) must never fire again.)
+    w.alarm = 0
+    const eventsAfter: string[] = []
+    for (let i = 0; i < 5; i++) {
+      tickWorld(w, idle(0))
+      eventsAfter.push(...w.events.map((e) => e.type))
+    }
+    expect(w.alarm).toBe(0)
+    expect(eventsAfter).not.toContain('missionComplete')
+  })
+
+  it('posthumous completion (no live player) neither crashes nor hunts anyone', () => {
+    const w = bootTemplate('assassinate', [1, 2, 3])
+    const player = firstPlayer(w)
+    const boss = w.byId.get(w.mission.targetEntityId!)!
+    // The party wiped, then the boss died anyway (fire tick, chain blast, …).
+    player.dead = true
+    boss.dead = true
+    tickWorld(w, new Map())
+    expect(w.mission.complete).toBe(true)
   })
 })
 

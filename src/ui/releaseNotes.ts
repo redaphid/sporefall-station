@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Breach the gate, grab the prize, RUN',
   'Genesis-grade swamp tiles you can read',
   'Rooms make sense: beds in bedrooms',
   'Enemies can now wield modded weapons',
-  'Furniture has real art, not boxes',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

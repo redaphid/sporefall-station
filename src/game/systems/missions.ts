@@ -294,15 +294,15 @@ const roomCenter = (b: Building): { x: number; y: number } => {
   return { x: room.x + room.w / 2, y: room.y + room.h / 2 }
 }
 
-/** The player nearest the breached door — the focus the floor turns on (co-op
+/** The live player nearest (x,y) — the focus an escalation turns on (co-op
  * NPCs re-target the closest threat anyway; this just seeds the memory). Falls
  * back to any player entity if none are alive. */
-const aggroFocus = (w: World, door: Entity): Entity | undefined => {
+const nearestPlayer = (w: World, x: number, y: number): Entity | undefined => {
   let best: Entity | undefined
   let bestD = Infinity
   for (const e of w.entities) {
     if (!e.playerCtl || e.dead) continue
-    const d = Math.hypot(e.pos.x - door.pos.x, e.pos.y - door.pos.y)
+    const d = Math.hypot(e.pos.x - x, e.pos.y - y)
     if (d < bestD) {
       bestD = d
       best = e
@@ -311,16 +311,35 @@ const aggroFocus = (w: World, door: Entity): Entity | undefined => {
   return best ?? w.entities.find((e) => e.playerCtl)
 }
 
+/** The station unseals: every door except the breached gate pops open —
+ * locks drop, biolock seals and overgrowth clear. Returns how many changed.
+ * Doors are entities, so this touches no tiles and no rng — deterministic. */
+const releaseAllDoors = (w: World, exceptId: number): number => {
+  let released = 0
+  for (const e of w.entities) {
+    if (!e.door || e.dead || e.id === exceptId) continue
+    if (e.door.open && !e.door.locked) continue
+    e.door.open = true
+    e.door.locked = false
+    e.door.overgrown = false
+    released++
+  }
+  return released
+}
+
 /**
- * Boss-door escalation. The moment the objective's gateway door is UNLOCKED by
- * any means — picked, keycarded, power-cut, or breached (all of which drop
- * `door.locked` and/or set `door.open`) — the whole floor turns hostile: alarm
- * maxes and every non-allied NPC aggros the party. Point of no return, latched
- * once per floor via `mission.bossAggroTriggered` so it fires exactly one time
- * and re-opening/re-toggling the door never re-triggers it. Deterministic: a
- * pure read of door state + a fixed aggro flip, no RNG or wall-clock.
+ * Gateway-breach escalation, stage one of the heist finale. The moment the
+ * objective's gateway door is UNLOCKED by any means — picked, keycarded,
+ * power-cut, or breached (all of which drop `door.locked` and/or set
+ * `door.open`) — the station unseals: the alarm maxes and EVERY other door on
+ * the floor pops open (locks, biolocks and overgrowth alike), releasing
+ * whatever was behind them and opening every escape route at once. The
+ * floor-wide manhunt waits for stage two: taking the prize (completeMission).
+ * Latched once per floor via `mission.bossAggroTriggered` so re-toggling the
+ * door never re-fires it. Deterministic: a pure read of door state + a fixed
+ * state flip, no RNG or wall-clock.
  */
-const maybeTriggerBossAggro = (w: World): void => {
+const maybeTriggerGateBreach = (w: World): void => {
   if (w.mission.bossAggroTriggered) return
   const id = w.mission.objectiveDoorId
   if (id === undefined) return
@@ -330,23 +349,23 @@ const maybeTriggerBossAggro = (w: World): void => {
   // unlocked (power-cut) or open (pick/keycard/breach/overgrown-clear).
   if (door.door.locked && !door.door.open) return
   w.mission.bossAggroTriggered = true
-  const focus = aggroFocus(w, door)
-  if (focus) raiseFloorAggro(w, focus)
-  else w.alarm = 3
+  w.alarm = 3
+  const released = releaseAllDoors(w, id)
   w.events.push({ type: 'bossDoorBreached', entityId: id, x: door.pos.x, y: door.pos.y })
+  w.events.push({ type: 'doorsReleased', count: released, x: door.pos.x, y: door.pos.y })
 }
 
 export const missionSystem = (w: World): void => {
   if (w.gameOver) return
 
-  maybeTriggerBossAggro(w)
+  maybeTriggerGateBreach(w)
 
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
       const holder = w.entities.find(
         (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
       )
-      if (holder) completeMission(w)
+      if (holder) completeMission(w, holder)
     } else if (
       w.mission.template === 'assassinate' ||
       w.mission.template === 'infiltrate' ||
@@ -355,8 +374,11 @@ export const missionSystem = (w: World): void => {
       // All three complete when their target is gone — the boss/Mireclaw is
       // dead, or the Spore Node is destroyed (by ANY cause: shot, burned, blasted).
       const target = w.mission.targetEntityId !== undefined ? w.byId.get(w.mission.targetEntityId) : undefined
-      if (!target || target.dead) completeMission(w)
-      else if (w.mission.template === 'contain') maybeBloom(w, target)
+      if (!target || target.dead) {
+        // Focus the manhunt on whoever is closest to the kill (the dead target
+        // still carries its last position; without one, any live player).
+        completeMission(w, target ? nearestPlayer(w, target.pos.x, target.pos.y) : nearestPlayer(w, 0, 0))
+      } else if (w.mission.template === 'contain') maybeBloom(w, target)
     }
   }
 
@@ -399,9 +421,18 @@ const maybeBloom = (w: World, node: Entity): void => {
   w.events.push({ type: 'bloom', x: node.pos.x, y: node.pos.y, entityId: node.id })
 }
 
-const completeMission = (w: World): void => {
+/**
+ * Taking the prize is stage two of the heist finale: the mission completes,
+ * the exit unlocks — and every unit in town aggros the prize-taker for the
+ * escape run (`raiseFloorAggro`: alarm maxed, every non-allied NPC hostile and
+ * locked on). `focus` is who they hunt: the briefcase holder, or whoever stood
+ * closest to the kill. A floor with no live players (posthumous completion)
+ * skips the manhunt — there is nobody to hunt. Latched by `mission.complete`,
+ * so it fires exactly once. */
+const completeMission = (w: World, focus?: Entity): void => {
   w.mission.complete = true
   w.mission.exitUnlocked = true
+  if (focus) raiseFloorAggro(w, focus)
   w.events.push({ type: 'missionComplete', description: w.mission.description })
 }
 

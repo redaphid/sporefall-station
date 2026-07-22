@@ -116,6 +116,9 @@ export type SimEvent =
    * by the player — a point-of-no-return that turned the whole floor hostile
    * (alarm maxed, every non-allied NPC aggros the party). Fires once per floor. */
   | { type: 'bossDoorBreached'; entityId: EntityId; x: number; y: number }
+  /** The gateway breach unsealed the whole floor: every other door popped open.
+   * One event for the whole release (not one per door) — x/y is the gate. */
+  | { type: 'doorsReleased'; count: number; x: number; y: number }
   | { type: 'missionComplete'; description: string }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }

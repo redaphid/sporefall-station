@@ -6,6 +6,7 @@ import { applyCornerCuts } from './corners'
 import { carveHallways } from './corridors'
 import { isWallTile, Tile, TileGrid, themeForFloor, type Building, type BuildingRole, type Level, type Theme } from './level'
 import { BORDER, cutLots, cutLotsVaried } from './lots'
+import { assignRoomTypes } from './roomTypes'
 import { splitRooms, type Rect } from './rooms'
 
 /** Chance an empty themed lot becomes a paved plaza with a green heart. */
@@ -37,6 +38,10 @@ export const generateLevel = (seed: number, floor: number): Level => {
 
   // Connectivity safety net: every building interior must be reachable on foot.
   repairConnectivity(rng.fork('repair'), grid, level)
+  // Name every room (shopfloor/bedroom/ward/…) AFTER all doors exist, so entry
+  // detection sees repair-punched street doors too. Pure geometry, no rng —
+  // tiles and every stream stay byte-identical (floor 1 included).
+  for (const b of level.buildings) b.roomTypes = assignRoomTypes(b)
   // Bevel street-facing building corners LAST — pure retexture of wall tiles
   // (still fully solid), after every pass that reasons about Tile.Wall.
   if (floor !== 1) applyCornerCuts(grid)

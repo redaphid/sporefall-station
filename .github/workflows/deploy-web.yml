@@ -45,6 +45,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # A stale theme manifest ships silently-broken art (an underfilled macro
+      # pool drops the engine to per-tile hashing; a deleted-file ref 404s), so
+      # gate the deploy on the manifest-vs-disk sync test. Regenerate pools
+      # after tile work with scripts/assets/sync_manifest.py.
+      - name: Check theme manifests against assets on disk
+        run: pnpm exec vitest run src/render/themeManifestSync.test.ts
+
       - name: Build web bundle
         run: pnpm run build
         env:

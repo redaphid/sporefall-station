@@ -44,8 +44,11 @@ jobs:
           PORT: ${{ steps.port.outputs.port }}
           E2E_SEED: "424242"
 
+      # Proof uploads are a convenience copy; quota outages ("Artifact storage
+      # quota has been hit") must not fail an otherwise-green e2e run.
       - name: Upload proof artifacts
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: web-e2e-proof

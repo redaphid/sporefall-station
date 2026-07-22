@@ -101,13 +101,26 @@ const main = async () => {
     return want
   }
 
+  // Pace the session by SIM TICKS, not wall clock: CI's software-rendered
+  // Chromium can run the frame loop at a small fraction of realtime, so a
+  // fixed sleep() covers wildly different amounts of sim — runs failed with
+  // "did not move" while the player had simply had almost no ticks to move in.
+  // Waiting on the tick counter measures the GAME's progress on any machine.
+  // The wall-clock cap keeps a truly stalled sim from hanging the job.
+  const tick = () => page.evaluate(() => window.__sporefall?.world?.tick ?? window.__world?.tick ?? 0)
+  const dwellTicks = async (n, maxMs = 20000) => {
+    const start = await tick()
+    const t0 = Date.now()
+    while ((await tick()) < start + n && Date.now() - t0 < maxMs) await sleep(50)
+  }
+
   const start = await readState()
   log('spawn at', start.self, 'mission:', start.mission)
 
   const roam = [['KeyD'], ['KeyD', 'KeyS'], ['KeyS'], ['KeyA', 'KeyS'], ['KeyA'], ['KeyW']]
   for (const combo of roam) {
     await setKeys(new Set(combo))
-    await sleep(650)
+    await dwellTicks(40) // ~0.65s of SIM per leg at 60tps, however long it takes
   }
   await releaseAll()
   const afterRoam = await readState()
@@ -128,7 +141,7 @@ const main = async () => {
         combatShot = true
       }
     }
-    await sleep(200)
+    await dwellTicks(12)
   }
   await releaseAll()
   if (!combatShot) await screenshot(page, 'combat')
@@ -146,7 +159,7 @@ const main = async () => {
         interactShot = true
       }
     }
-    await sleep(200)
+    await dwellTicks(12)
   }
   await releaseAll()
   if (!interactShot) await screenshot(page, 'interact-door')
@@ -157,12 +170,12 @@ const main = async () => {
     const target = st.item ?? st.npc ?? st.door
     if (!target) {
       await setKeys(new Set(['KeyD']))
-      await sleep(200)
+      await dwellTicks(12)
       continue
     }
     await setKeys(keysToward(st.self, target))
     if (st.item && st.itemD < 1.2) await page.keyboard.press('KeyE')
-    await sleep(200)
+    await dwellTicks(12)
   }
   await releaseAll()
   await screenshot(page, 'mission')

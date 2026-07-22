@@ -63,7 +63,11 @@ jobs:
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           ls -la "$APK"
 
+      # The artifact is a CI convenience copy; the user-facing product is the
+      # release asset below. Quota outages ("Artifact storage quota has been
+      # hit") must not abort the job and leave the rolling release stale.
       - name: Upload APK artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: sporefall-debug-apk

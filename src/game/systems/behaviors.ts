@@ -62,6 +62,10 @@ export const PATROL = 'patrol'
 export const SEARCH = 'search'
 export const ALERT = 'alert'
 export const SCAVENGE = 'scavenge'
+// Squad choreography (see the `squad` behavior below).
+export const FORMUP = 'formup'
+export const STACK = 'stack'
+export const FLANK = 'flank'
 
 // ── Decision tiers (see header) ────────────────────────────────────────────
 export const TIER_AMBIENT = 0
@@ -229,16 +233,22 @@ const wander: Consideration = () => [{ code: WANDER, score: WANDER_SCORE, tier: 
 const PATROL_SCORE = 2
 /** Close enough to a patrol waypoint to move on to the next leg. */
 const PATROL_ARRIVE = 0.6
+/** Corner beat: reaching a waypoint, the patroller plants and sweeps its
+ * facing for this long before walking the next leg — the deliberate "check the
+ * corner" pause (steer's scan gate reads `ai.scanUntil`). */
+const PATROL_PAUSE = 24
 
-const patrol: Consideration = (_w, e) => {
+const patrol: Consideration = (w, e) => {
   const ai = e.ai!
   const wps = ai.params?.waypoints
   if (!wps || wps.length === 0) return []
   let i = (ai.patrolIndex ?? 0) % wps.length
-  // Arrived → advance to the next leg (mutable AI state, on the entity).
+  // Arrived → pause to scan the corner, then advance to the next leg (mutable
+  // AI state, on the entity).
   if (dist2d(wps[i].x, wps[i].y, e.pos.x, e.pos.y) < PATROL_ARRIVE) {
     i = (i + 1) % wps.length
     ai.patrolIndex = i
+    ai.scanUntil = w.tick + PATROL_PAUSE
   }
   return [{ code: PATROL, score: PATROL_SCORE, tier: TIER_AMBIENT, at: { x: wps[i].x, y: wps[i].y } }]
 }

@@ -121,11 +121,25 @@ export interface AiState {
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
   /** Where/when this NPC last made real progress toward an UNSEEN chase goal —
-   * steering is straight-line (no pathfinder), so a concave wall can wedge a
-   * pursuer; stalling too long declares the trail cold instead. */
+   * the safety net under the router: if even a routed pursuit stalls (bodies
+   * jamming a doorway), the trail is declared cold instead of grinding. */
   progress?: { x: number; y: number; tick: number }
   /** Scavenger: item ids collected so far — a legible loot trail. */
   stash?: string[]
+  /** Cached tile route steering follows node-to-node (path.ts): tile-centre
+   * nodes, the index being walked, and the goal it was computed for. Plain
+   * JSON, so a mid-route snapshot replays byte-identically. */
+  path?: { nodes: Vec2[]; i: number; goal: Vec2 }
+  /** Next tick this NPC may recompute a route — staggered by entity id so
+   * repaths never bunch on one tick and peers stay deterministic. */
+  repathAt?: number
+  /** Stand-and-scan window (absolute tick): after arriving somewhere the NPC
+   * plants and sweeps its facing — "got here on purpose, now looking around".
+   * Any urgent mode (aggro/flee/seek) cancels it instantly. */
+  scanUntil?: number
+  /** Squad membership (behavior 'squad'): shared squad id + this member's role
+   * in the stack. Assigned by populate for gangster packs. */
+  squad?: { id: number; role: 'lead' | 'flank' | 'rear' }
 }
 
 /** One applied weapon modifier: a registry id (`data/mods.ts`) plus a

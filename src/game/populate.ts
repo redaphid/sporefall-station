@@ -1,7 +1,7 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
+import { bunkerLaneKeys, isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
 import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
 
@@ -126,8 +126,35 @@ export const populateWorld = (w: World): void => {
   furnishInteriors(w)
   // Tactical-AI post-passes, each on its OWN fork so every stream above stays
   // byte-identical per seed (the existing populate tests are the proof):
-  // gangster packs in warehouses/bunkers become door-stacking squads.
+  // a bunker defender turns barricader, then gangster packs become squads
+  // (in that order, so a squad never conscripts the barricader).
+  assignBarricaders(w)
   assignSquads(w)
+}
+
+/** Chance a bunker fields a barricader among its defenders. */
+const BARRICADER_CHANCE = 0.75
+
+/** One defender per bunker (chance-gated) becomes a 'barricader' — it plugs
+ * the garrison's doorway approaches with junk barricades, then guards. Runs
+ * on a DEDICATED `barricaders` fork over already-spawned entities in id
+ * order; no other stream moves. Patrol beats keep their brains. */
+const assignBarricaders = (w: World): void => {
+  const rng = w.rng.fork('barricaders')
+  for (let bi = 0; bi < w.level.buildings.length; bi++) {
+    const b = w.level.buildings[bi]
+    if (b.role !== 'bunker') continue
+    const pack = w.entities.filter(
+      (e) =>
+        e.kind === 'npc' &&
+        (e.archetype === 'thug' || e.archetype === 'gangster') &&
+        e.ai?.zone?.building === bi &&
+        e.ai.behavior !== 'patrol',
+    )
+    if (pack.length === 0) continue
+    if (!rng.chance(BARRICADER_CHANCE)) continue
+    pack[pack.length - 1].ai!.behavior = 'barricader' // the last-spawned defender takes the job
+  }
 }
 
 /** Squad size cap: lead + flank + rears. */
@@ -281,24 +308,11 @@ const furnishInteriors = (w: World): void => {
       keepClear.add(d.y * lw + d.x)
       for (const [dx, dy] of ORTHO) keepClear.add((d.y + dy) * lw + (d.x + dx))
     }
-    // The bunker guard's beat is a straight-line circuit of the band's inner
-    // ring (patrolBeat) with NO pathfinder — that lane is a promised-open
-    // contract, so furniture (a soft body that shoves movers) never sits on it.
-    if (building.role === 'bunker' && building.rooms.length > 0) {
-      const band = building.rooms[0]
-      const rx = band.x + 1
-      const ry = band.y + 1
-      const rw = band.w - 2
-      const rh = band.h - 2
-      for (let tx = rx; tx < rx + rw; tx++) {
-        keepClear.add(ry * lw + tx)
-        keepClear.add((ry + rh - 1) * lw + tx)
-      }
-      for (let ty = ry; ty < ry + rh; ty++) {
-        keepClear.add(ty * lw + rx)
-        keepClear.add(ty * lw + (rx + rw - 1))
-      }
-    }
+    // The bunker guard's beat circuits the band's inner ring (patrolBeat) as
+    // straight legs — that lane is a promised-open contract, so furniture (a
+    // soft body that shoves movers) never sits on it. Shared with the fortify
+    // behavior so runtime barricades honor the same lane (bunkerLaneKeys).
+    for (const k of bunkerLaneKeys(building, lw)) keepClear.add(k)
     // generateLevel always fills roomTypes; the fallback covers hand-built
     // Buildings in tests/scenarios (assignRoomTypes is pure and rng-free).
     const types = building.roomTypes ?? assignRoomTypes(building)

@@ -33,7 +33,7 @@
 
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
-import { isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
+import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, type FearPulse, type World } from '../world'
 import {
   BATTLE,
@@ -54,6 +54,7 @@ import {
   type Goal,
 } from './goals'
 import { infectionActive } from './infection'
+import { spawnObject } from './objects'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 import { strongestStimulus } from './stimulus'
 
@@ -554,6 +555,82 @@ const squadFlank: Consideration = (w, e) => {
   return [{ code: FLANK, score, tier: TIER_THREAT, target: t.id, at }]
 }
 
+// ── Barricader: a defender that PLUGS its wing's chokepoints ────────────────
+// Walks to the tile just INSIDE each of its building's doorways and builds a
+// destructible `barricade` object there (data/objects.ts): a soft junk barrier
+// that shoves like furniture and shoots like a crate. HARD SAFETY RULES, all
+// structural: never ON a door tile (only the adjacent-inside tile, so players
+// can always destroy through), never on the bunker's promised-open patrol
+// lane (bunkerLaneKeys — the same contract furniture honors), capped per
+// building, and — because a barricade is an ENTITY, never a solid tile — BFS
+// reachability over `level.solid` is untouched by construction.
+export const FORTIFY = 'fortify'
+/** Above garrison (2.5): plug the doors first, THEN mass on the core. */
+const FORTIFY_SCORE = 2.6
+/** Hard ceiling on live barricades per building. */
+export const BARRICADE_CAP = 3
+/** Close enough to the chosen tile to stand the barricade up. */
+const BUILD_REACH = 0.9
+
+const ORTHO = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const
+
+/** The next barricade site for `b`: for each door in order, the first ORTHO
+ * neighbour tile that is inside the building, walkable, off the patrol lane,
+ * not the spawn/exit tile, and not already holding a door or barricade. Tile
+ * coords, or null when every chokepoint is plugged (or unpluggable). Pure
+ * lookups in fixed order — deterministic. Exported for its own tests. */
+export const barricadeSpotFor = (w: World, b: Building): { x: number; y: number } | null => {
+  const lw = w.level.w
+  const lane = bunkerLaneKeys(b, lw)
+  const spawnTx = Math.floor(w.level.spawn.x)
+  const spawnTy = Math.floor(w.level.spawn.y)
+  const exitTx = Math.floor(w.level.exit.x)
+  const exitTy = Math.floor(w.level.exit.y)
+  const occupied = (tx: number, ty: number): boolean =>
+    w.entities.some(
+      (x) =>
+        !x.dead && (x.door !== undefined || x.archetype === 'barricade') && Math.floor(x.pos.x) === tx && Math.floor(x.pos.y) === ty,
+    )
+  for (const d of b.doors) {
+    for (const [dx, dy] of ORTHO) {
+      const tx = d.x + dx
+      const ty = d.y + dy
+      if (!rectContains(b.rect, tx, ty)) continue // the INSIDE tile only
+      if (isSolidTile(w.level, tx, ty)) continue
+      if (lane.has(ty * lw + tx)) continue // the patrol lane stays promised-open
+      if (tx === spawnTx && ty === spawnTy) continue
+      if (tx === exitTx && ty === exitTy) continue
+      if (occupied(tx, ty)) continue
+      return { x: tx, y: ty }
+    }
+  }
+  return null
+}
+
+const fortify: Consideration = (w, e) => {
+  const b = buildingOf(w, e)
+  if (!b) return []
+  let count = 0
+  for (const x of w.entities) {
+    if (x.archetype === 'barricade' && !x.dead && rectContains(b.rect, Math.floor(x.pos.x), Math.floor(x.pos.y))) count++
+  }
+  if (count >= BARRICADE_CAP) return []
+  const spot = barricadeSpotFor(w, b)
+  if (!spot) return []
+  // Standing on the site → build it (one per think); else walk to it.
+  if (dist2d(spot.x + 0.5, spot.y + 0.5, e.pos.x, e.pos.y) <= BUILD_REACH) {
+    const obj = spawnObject(w, 'barricade', spot.x, spot.y)
+    w.events.push({ type: 'barricade', entityId: obj.id, byId: e.id, x: spot.x + 0.5, y: spot.y + 0.5 })
+    return []
+  }
+  return [{ code: FORTIFY, score: FORTIFY_SCORE, tier: TIER_AMBIENT, at: { x: spot.x + 0.5, y: spot.y + 0.5 } }]
+}
+
 // ── #64 Infest: the mindless Infected host — shamble at the nearest clean
 // body, never flee, never reason. Only fires on an `infected` entity. ─────────
 const INFEST_SCORE = 5
@@ -699,6 +776,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   squadFlank,
   squadStack,
   squadFollow,
+  fortify,
   infest,
   packAvoid,
   stalkWeakest,
@@ -762,6 +840,10 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   mireclaw: {
     about: '#69 Mireclaw Alpha boss — phased: pressure & summon, retreat-to-spore-regen, then enrage',
     considerations: ['enrage', 'retreatToSpore', 'threat', 'hunt', 'wander'],
+  },
+  barricader: {
+    about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',
+    considerations: ['threat', 'defendMyWing', 'pursueMemory', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],
   },
   squad: {
     about: 'moves as a unit: forms on its lead, stacks both sides of a door, breaches together, flanks the lead’s target',

@@ -243,6 +243,30 @@ export const buildingAt = (level: Level, x: number, y: number): number => {
   return -1
 }
 
+/** The bunker guard band's PROMISED-OPEN patrol lane, as tile keys (ty*lw+tx):
+ * the band room's inner ring, which patrol steering walks as straight legs.
+ * Every runtime obstacle keeps off it — furniture (populate.furnishInteriors)
+ * and defender-built barricades (behaviors `fortify`) alike — so the contract
+ * lives in ONE place. Empty for non-bunkers. */
+export const bunkerLaneKeys = (b: Building, lw: number): Set<number> => {
+  const keys = new Set<number>()
+  if (b.role !== 'bunker' || b.rooms.length === 0) return keys
+  const band = b.rooms[0]
+  const rx = band.x + 1
+  const ry = band.y + 1
+  const rw = band.w - 2
+  const rh = band.h - 2
+  for (let tx = rx; tx < rx + rw; tx++) {
+    keys.add(ry * lw + tx)
+    keys.add((ry + rh - 1) * lw + tx)
+  }
+  for (let ty = ry; ty < ry + rh; ty++) {
+    keys.add(ty * lw + rx)
+    keys.add(ty * lw + (rx + rw - 1))
+  }
+  return keys
+}
+
 export const isSolidTile = (level: Level, x: number, y: number): boolean => {
   if (x < 0 || y < 0 || x >= level.w || y >= level.h) return true
   return level.solid[y * level.w + x] === 1

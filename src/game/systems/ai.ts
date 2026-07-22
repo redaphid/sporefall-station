@@ -11,7 +11,7 @@ import { hasLineOfSight } from '../los'
 import { isSolidTile } from '../levelgen/level'
 import { findPath } from '../path'
 import { emitFear, type World } from '../world'
-import { ALERT, DRAWN, FLANK, FORMUP, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, STACK, WORK, decide } from './behaviors'
+import { ALERT, DRAWN, FLANK, FORMUP, FORTIFY, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, STACK, WORK, decide } from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
@@ -167,11 +167,20 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     if (goal.at) ai.waypoint = { x: goal.at.x, y: goal.at.y }
     return
   }
-  if (goal.code === WORK || goal.code === GARRISON || goal.code === DRAWN || goal.code === RETREAT || goal.code === FORMUP) {
+  if (
+    goal.code === WORK ||
+    goal.code === GARRISON ||
+    goal.code === DRAWN ||
+    goal.code === RETREAT ||
+    goal.code === FORMUP ||
+    goal.code === FORTIFY
+  ) {
     // #77 territory / #66 hive draw / #69 boss retreat-to-spore / squad
-    // formation slot: steer toward a world-derived point (home room, objective
-    // core, stimulus, spore cloud, the leader's shoulder). Same steering as
-    // investigate — walk there, settle on arrival.
+    // formation slot / barricade site: steer toward a world-derived point
+    // (home room, objective core, stimulus, spore cloud, the leader's
+    // shoulder, a doorway approach). Same steering as investigate — walk
+    // there, settle on arrival (fortify builds from the consideration once
+    // the body is standing on its site).
     ai.mode = 'wander'
     ai.targetId = undefined
     ai.lastKnownTargetPos = undefined

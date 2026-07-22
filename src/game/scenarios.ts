@@ -490,6 +490,116 @@ const setupNpcAi = (w: World): void => {
   drop('medkit', cx - 15.5, cy - 6.5)
 }
 
+/** The deliberate-AI showcase (feat/npc-ai-deliberate): three tactical moments
+ * on one stage, all driven by the shipped brains + router, none scripted.
+ *  - A hunter sealed in a U-pocket ROUTES out and around to its remembered
+ *    prey (no wall-grinding).
+ *  - A 3-man squad east of a closed door: the lead holds, the pack stacks the
+ *    frame, they breach together and sweep through at the player.
+ *  - A dormant lurker in a side pocket the player later strolls past — the
+ *    proximity trip and the pounce.
+ * Player is tanky and (per the script) passive; every beat is the AI's own. */
+const setupNpcDeliberate = (w: World): void => {
+  const cx = 32
+  const cy = 32
+  // Blank clearing, sealed from the natural map so the walls genuinely wall.
+  for (let y = cy - 14; y <= cy + 14; y++) {
+    for (let x = cx - 14; x <= cx + 16; x++) {
+      w.level.tiles[y * w.level.w + x] = Tile.Floor
+      w.level.solid[y * w.level.w + x] = 0
+    }
+  }
+  const players = w.entities.filter((e) => !!e.playerCtl)
+  w.entities = players
+  w.byId.clear()
+  for (const e of players) w.byId.set(e.id, e)
+  w.hostile = true // gang cast — everyone on stage engages the player on sight
+
+  const solidify = (x: number, y: number): void => {
+    w.level.tiles[y * w.level.w + x] = Tile.Wall
+    w.level.solid[y * w.level.w + x] = 1
+  }
+  // Perimeter ring: the stage's walls must genuinely wall — no routing out
+  // through whatever the natural map happens to offer beyond the clearing.
+  for (let x = cx - 14; x <= cx + 16; x++) {
+    solidify(x, cy - 14)
+    solidify(x, cy + 14)
+  }
+  for (let y = cy - 14; y <= cy + 14; y++) {
+    solidify(cx - 14, y)
+    solidify(cx + 16, y)
+  }
+
+  const player = players[0]
+  if (player) {
+    player.pos = { x: cx - 6 + 0.5, y: cy + 0.5 } // (26.5, 32.5)
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0
+    // Five melee attackers work the passive player over for the whole clip —
+    // tank it (as npc-combat does) so the showcase never ends on a down screen.
+    if (player.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
+  }
+
+  // ── Moment 1: the U-pocket hunter (routes around, never grinds) ──────────
+  // U open to the NORTH at (21..27, 25..29); hunter parked inside.
+  for (let x = cx - 11; x <= cx - 5; x++) solidify(x, cy - 3) // south face y=29
+  for (let y = cy - 7; y <= cy - 3; y++) {
+    solidify(cx - 11, y) // west face x=21
+    solidify(cx - 5, y) // east face x=27
+  }
+  const hunter = spawnNpc(w, 'gangster', cx - 8 + 0.5, cy - 5 + 0.5) // (24.5, 27.5)
+  hunter.combat!.weapon = 'bat'
+  hunter.ai!.sightRange = 14
+  if (player) {
+    hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
+    hunter.ai!.mode = 'aggro'
+    hunter.ai!.targetId = player.id
+    hunter.ai!.lastKnownTargetPos = { x: player.pos.x, y: player.pos.y }
+  }
+
+  // ── Moment 2: the squad door-stack east of the player ────────────────────
+  // Vertical wall at x=38 with one doorway at (38,32) holding a closed door.
+  for (let y = cy - 14; y <= cy + 14; y++) if (y !== cy) solidify(cx + 6, y)
+  const door = makeEntity('door', 'door', cx + 6 + 0.5, cy + 0.5, 0.5)
+  door.door = { open: false, locked: false, lockLevel: 0 }
+  door.interact = { verb: 'open', range: 1.3 }
+  addEntity(w, door)
+  const squaddie = (x: number, y: number, role: 'lead' | 'flank' | 'rear'): Entity => {
+    const e = spawnNpc(w, 'thug', x, y)
+    e.combat!.weapon = 'bat'
+    e.ai!.behavior = 'squad'
+    e.ai!.squad = { id: 1, role }
+    e.ai!.sightRange = 12
+    return e
+  }
+  const lead = squaddie(cx + 11 + 0.5, cy + 0.5, 'lead')
+  squaddie(cx + 13 + 0.5, cy - 3 + 0.5, 'flank')
+  squaddie(cx + 13 + 0.5, cy + 3 + 0.5, 'rear')
+  if (player) {
+    lead.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
+    lead.ai!.mode = 'aggro'
+    lead.ai!.targetId = player.id
+    lead.ai!.lastKnownTargetPos = { x: player.pos.x, y: player.pos.y }
+  }
+
+  // ── Moment 3: the lurker pocket south of the player's stroll ─────────────
+  // 3-wide pocket at (25..27, 37..39), mouth open at (26,36); lurker parked
+  // against its back wall. The script walks the player past the mouth late in
+  // the clip — the proximity trip springs it.
+  for (let x = cx - 8; x <= cx - 4; x++) {
+    solidify(x, cy + 4) // top face y=36…
+    solidify(x, cy + 8) // bottom face y=40
+  }
+  w.level.tiles[(cy + 4) * w.level.w + (cx - 6)] = Tile.Floor // …with its mouth at (26,36)
+  w.level.solid[(cy + 4) * w.level.w + (cx - 6)] = 0
+  for (let y = cy + 4; y <= cy + 8; y++) {
+    solidify(cx - 8, y)
+    solidify(cx - 4, y)
+  }
+  const lurker = spawnNpc(w, 'lurker', cx - 6 + 0.5, cy + 7 + 0.5) // (26.5, 39.5)
+  lurker.ai!.guard = true
+}
+
 // Hero-art showcase (art-cn1 review): a blank plaza with the player on the lane
 // and a small thug pair far east. The `artcompare` script walks a full compass
 // circle in place (showing every drawn facing), then marches east and swings —
@@ -527,4 +637,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'mission') stageMission(w)
   if (name === 'ai-goals') setupAiGoals(w)
   if (name === 'npc-ai') setupNpcAi(w)
+  if (name === 'npc-deliberate') setupNpcDeliberate(w)
 }

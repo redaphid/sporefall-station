@@ -61,6 +61,20 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
 // scenario (spawn 1.5,1.5; lane y=11; medkit x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
+  // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
+  // the player only strolls and stands — every beat on stage is the AI's own.
+  // Establish the cast, walk south INTO the lurker pocket (the proximity trip
+  // springs the ambush), back out to centre stage, then hold while the boxed
+  // hunter routes around its U-wall and the squad stacks the door, breaches
+  // together, and sweeps in.
+  'npc-deliberate': [
+    { ticks: 50 }, // establish: lurker dormant, hunter boxed, squad posted
+    { ticks: 30, y: 1 }, // stroll south to the pocket mouth (~y 37)
+    { ticks: 120 }, // the trip: it bursts out and presses in
+    { ticks: 26, y: -1 }, // back up toward centre stage
+    { ticks: 474 }, // hunter rounds the U; squad stacks, breaches, sweeps in
+  ],
+
   // Pluggable-NPC-AI showcase (scenario `npc-ai`, stage centre 32,32): stand
   // among the cast, sucker-punch the civilian (skittish → alert), then flee
   // west and duck north behind the L-wall so the hunter loses the trail and

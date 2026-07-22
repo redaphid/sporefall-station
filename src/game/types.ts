@@ -136,3 +136,6 @@ export type SimEvent =
   /** #68 A dormant entity woke — `by` names the stimulus kind that tripped it
    * (noise/proximity/damage/power-cut/spore/fire). */
   | { type: 'woke'; entityId: EntityId; by: string }
+  /** A barricader plugged a chokepoint: destructible `barricade` object
+   * `entityId` now stands beside a doorway at x,y, built by `byId`. */
+  | { type: 'barricade'; entityId: EntityId; byId: EntityId; x: number; y: number }

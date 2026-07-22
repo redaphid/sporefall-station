@@ -253,6 +253,8 @@ const ENTITY_COLORS: Record<string, number> = {
   cop: 0x7f9fd1,
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
+  lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
+
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,
   crate: 0x9c6b3f,
@@ -277,6 +279,9 @@ export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
   plant: 'plant',
   crate: 'crate',
   pod: 'pod',
+  // A defender-built junk barrier (fortify behavior): the slatted-crate
+  // silhouette reads "pile of junk in the doorway" without bespoke art.
+  barricade: 'crate',
   // The Spore Node is a stationary bog organ — the egg-pod ovoid reads it right
   // (previously fell through to the character eyeball fallback).
   sporeNode: 'pod',
@@ -300,6 +305,7 @@ const FURNITURE_COLORS: Record<string, number> = {
   table: 0x9c6b3f,
   plant: 0x2e7d46,
   crate: 0x6b4d26,
+  barricade: 0x5a5248, // scrap-grey junk pile, distinct from the loot crate
   pod: 0x4f7a3a,
   sporeNode: 0x4f7a3a,
   cryoTerminal: 0x5a7b8f,

@@ -33,7 +33,7 @@
 
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
-import { type Building, rectCenter, rectContains } from '../levelgen/level'
+import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, type FearPulse, type World } from '../world'
 import {
   BATTLE,
@@ -54,6 +54,7 @@ import {
   type Goal,
 } from './goals'
 import { infectionActive } from './infection'
+import { spawnObject } from './objects'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 import { strongestStimulus } from './stimulus'
 
@@ -62,6 +63,10 @@ export const PATROL = 'patrol'
 export const SEARCH = 'search'
 export const ALERT = 'alert'
 export const SCAVENGE = 'scavenge'
+// Squad choreography (see the `squad` behavior below).
+export const FORMUP = 'formup'
+export const STACK = 'stack'
+export const FLANK = 'flank'
 
 // ── Decision tiers (see header) ────────────────────────────────────────────
 export const TIER_AMBIENT = 0
@@ -229,16 +234,22 @@ const wander: Consideration = () => [{ code: WANDER, score: WANDER_SCORE, tier: 
 const PATROL_SCORE = 2
 /** Close enough to a patrol waypoint to move on to the next leg. */
 const PATROL_ARRIVE = 0.6
+/** Corner beat: reaching a waypoint, the patroller plants and sweeps its
+ * facing for this long before walking the next leg — the deliberate "check the
+ * corner" pause (steer's scan gate reads `ai.scanUntil`). */
+const PATROL_PAUSE = 24
 
-const patrol: Consideration = (_w, e) => {
+const patrol: Consideration = (w, e) => {
   const ai = e.ai!
   const wps = ai.params?.waypoints
   if (!wps || wps.length === 0) return []
   let i = (ai.patrolIndex ?? 0) % wps.length
-  // Arrived → advance to the next leg (mutable AI state, on the entity).
+  // Arrived → pause to scan the corner, then advance to the next leg (mutable
+  // AI state, on the entity).
   if (dist2d(wps[i].x, wps[i].y, e.pos.x, e.pos.y) < PATROL_ARRIVE) {
     i = (i + 1) % wps.length
     ai.patrolIndex = i
+    ai.scanUntil = w.tick + PATROL_PAUSE
   }
   return [{ code: PATROL, score: PATROL_SCORE, tier: TIER_AMBIENT, at: { x: wps[i].x, y: wps[i].y } }]
 }
@@ -411,6 +422,240 @@ const defendMyWing: Consideration = (w, e) => {
   return out
 }
 
+// ── Squad tactics: 2-4 linked NPCs (`ai.squad = {id, role}`) move as a UNIT ──
+// The Rainbow-Six read: followers hold formation on the lead's shoulderline,
+// the pack stacks both sides of a closed door before entry (the lead holds
+// until everyone is on the frame, then breaches — steering opens the door on
+// contact — and the others sweep in behind), and the flank-role member swings
+// around to the far side of whatever the lead is engaging. All state is the
+// two ids on `ai.squad` plus each member's ordinary ai fields — a mid-stack
+// snapshot serializes and replays byte-identically. Deterministic: ascending-id
+// scans, geometry-only slot math, no rng.
+
+/** Followers' formation drive sits at MEMORY tier just above the hunt scores,
+ * so a follower sticks with its lead over freelancing after a cold trail —
+ * but any PERCEIVED enemy (threat tier) still snaps it into the fight. */
+const FORM_SCORE = 2
+/** Taking a door-frame slot outranks plain formation. */
+const STACKUP_SCORE = 2.6
+/** The lead's hold-at-the-door outranks its own pursuit/search memories. */
+const HOLD_SCORE = 5
+/** A mate within this range of the door counts as stacked on the frame. */
+const STACK_RANGE = 2.6
+/** The lead triggers a stack when a closed door is within this range. */
+const DOOR_NEAR = 2.2
+/** Close enough to the target that the flanker just fights (threat takes over). */
+const FLANK_ARRIVE = 2.2
+/** How far past the target the flank point sits (arrive BEHIND it). */
+const FLANK_STANDOFF = 2.5
+
+/** Every live member of `e`'s squad, in entity (ascending-id) order. */
+const liveSquad = (w: World, e: Entity): Entity[] => {
+  const id = e.ai?.squad?.id
+  if (id === undefined) return []
+  return w.entities.filter((m) => !m.dead && m.ai?.squad?.id === id)
+}
+
+/** The squad's acting leader: the member with role 'lead', else the first
+ * (lowest-id) survivor — promotion is deterministic and needs no stored state. */
+const actingLeader = (members: Entity[]): Entity | undefined =>
+  members.find((m) => m.ai!.squad!.role === 'lead') ?? members[0]
+
+/** Nearest closed, UNLOCKED door entity within `range` of `e` (a locked door
+ * cannot be breached by a squad, so it never triggers a stack). */
+const nearestClosedDoor = (w: World, e: Entity, range: number): Entity | undefined => {
+  let best: Entity | undefined
+  let bestD = range
+  for (const d of w.entities) {
+    if (!d.door || d.door.open || d.door.locked || d.door.overgrown || d.dead) continue
+    const dd = dist2d(d.pos.x, d.pos.y, e.pos.x, e.pos.y)
+    if (dd > bestD) continue
+    bestD = dd
+    best = d
+  }
+  return best
+}
+
+/** The door-frame slot for a role: one step back toward the lead's side of the
+ * doorway, one step along the frame — flank takes one side, rear the other.
+ * Degrades to the tile straight back when the frame tile is solid (corridors). */
+const stackSlot = (w: World, lead: Entity, door: Entity, role: 'flank' | 'rear'): { x: number; y: number } => {
+  const dx = Math.floor(door.pos.x)
+  const dy = Math.floor(door.pos.y)
+  // Passage axis: the doorway's open neighbours run along it; the frame is the
+  // other axis. (A doorway in a vertical wall has open tiles east/west.)
+  const horiz = !isSolidTile(w.level, dx + 1, dy) && !isSolidTile(w.level, dx - 1, dy)
+  const side = (horiz ? Math.sign(lead.pos.x - door.pos.x) : Math.sign(lead.pos.y - door.pos.y)) || 1
+  const off = role === 'flank' ? 1 : -1
+  const sx = horiz ? dx + side : dx + off
+  const sy = horiz ? dy + off : dy + side
+  if (!isSolidTile(w.level, sx, sy)) return { x: sx + 0.5, y: sy + 0.5 }
+  return { x: (horiz ? dx + side : dx) + 0.5, y: (horiz ? dy : dy + side) + 0.5 }
+}
+
+// The LEAD's half of the door choreography: about to pass a closed door with a
+// mate still off the frame → HOLD (plant, face the door) until the stack forms.
+// MEMORY tier: it outranks the lead's own pursuit of an unseen target (that is
+// the point — breach together), but a PERCEIVED enemy still preempts the hold.
+const squadStack: Consideration = (w, e) => {
+  if (!e.ai!.squad) return []
+  const members = liveSquad(w, e)
+  if (members.length < 2 || actingLeader(members) !== e) return []
+  const door = nearestClosedDoor(w, e, DOOR_NEAR)
+  if (!door) return []
+  const laggard = members.some((m) => m !== e && dist2d(m.pos.x, m.pos.y, door.pos.x, door.pos.y) > STACK_RANGE)
+  if (!laggard) return [] // everyone's on the frame — proceed and breach
+  return [{ code: STACK, score: HOLD_SCORE, tier: TIER_MEMORY, at: { x: door.pos.x, y: door.pos.y } }]
+}
+
+// A FOLLOWER's marching order: its stack slot while the lead holds at a door,
+// else its formation slot off the lead's shoulderline (flank left, rear behind).
+const squadFollow: Consideration = (w, e) => {
+  const sq = e.ai!.squad
+  if (!sq) return []
+  const members = liveSquad(w, e)
+  const lead = actingLeader(members)
+  if (!lead || lead === e) return []
+  const role = sq.role === 'flank' ? 'flank' : 'rear'
+  if (lead.ai!.goal === STACK) {
+    const door = nearestClosedDoor(w, lead, DOOR_NEAR)
+    if (door) return [{ code: FORMUP, score: STACKUP_SCORE, tier: TIER_MEMORY, at: stackSlot(w, lead, door, role) }]
+  }
+  const fx = Math.cos(lead.facing)
+  const fy = Math.sin(lead.facing)
+  const at =
+    role === 'flank'
+      ? { x: lead.pos.x - fx * 1.1 - fy * 1.4, y: lead.pos.y - fy * 1.1 + fx * 1.4 }
+      : { x: lead.pos.x - fx * 2.2, y: lead.pos.y - fy * 2.2 }
+  return [{ code: FORMUP, score: FORM_SCORE, tier: TIER_MEMORY, at }]
+}
+
+// The FLANK member swings to the far side of whatever the lead is engaging:
+// while it is on the lead's side and outside arm's reach, it routes to a point
+// BEHIND the target instead of charging the near face. Scored a hair above its
+// own threat-candidate for the same target, so the approach is the flank route;
+// the moment it is close or behind, the conditions fail and `threat` fights.
+const squadFlank: Consideration = (w, e) => {
+  const sq = e.ai!.squad
+  if (!sq || sq.role !== 'flank') return []
+  const lead = actingLeader(liveSquad(w, e))
+  if (!lead || lead === e || lead.ai!.mode !== 'aggro' || lead.ai!.targetId === undefined) return []
+  const t = w.byId.get(lead.ai!.targetId)
+  if (!t || t.dead || !t.health) return []
+  const dist = dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y)
+  if (dist <= FLANK_ARRIVE) return []
+  const sxv = e.pos.x - t.pos.x
+  const syv = e.pos.y - t.pos.y
+  const lxv = lead.pos.x - t.pos.x
+  const lyv = lead.pos.y - t.pos.y
+  if (sxv * lxv + syv * lyv <= 0) return [] // already opposite the lead
+  const ld = Math.hypot(lxv, lyv) || 1
+  const at = { x: t.pos.x - (lxv / ld) * FLANK_STANDOFF, y: t.pos.y - (lyv / ld) * FLANK_STANDOFF }
+  const score = battleScore(hateToward(w, e, t.id), e.health?.hp ?? 1, Math.max(1, dist)) + 1
+  return [{ code: FLANK, score, tier: TIER_THREAT, target: t.id, at }]
+}
+
+// ── Barricader: a defender that PLUGS its wing's chokepoints ────────────────
+// Walks to the tile just INSIDE each of its building's doorways and builds a
+// destructible `barricade` object there (data/objects.ts): a soft junk barrier
+// that shoves like furniture and shoots like a crate. HARD SAFETY RULES, all
+// structural: never ON a door tile (only the adjacent-inside tile, so players
+// can always destroy through), never on the bunker's promised-open patrol
+// lane (bunkerLaneKeys — the same contract furniture honors), capped per
+// building, and — because a barricade is an ENTITY, never a solid tile — BFS
+// reachability over `level.solid` is untouched by construction.
+export const FORTIFY = 'fortify'
+/** Above garrison (2.5): plug the doors first, THEN mass on the core. */
+const FORTIFY_SCORE = 2.6
+/** Hard ceiling on live barricades per building. */
+export const BARRICADE_CAP = 3
+/** Close enough to the chosen tile to stand the barricade up. */
+const BUILD_REACH = 0.9
+
+const ORTHO = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const
+
+/** The next barricade site for `b`: for each door in order, the first ORTHO
+ * neighbour tile that is inside the building, walkable, off the patrol lane,
+ * not the spawn/exit tile, and not already holding a door or barricade. Tile
+ * coords, or null when every chokepoint is plugged (or unpluggable). Pure
+ * lookups in fixed order — deterministic. Exported for its own tests. */
+export const barricadeSpotFor = (w: World, b: Building): { x: number; y: number } | null => {
+  const lw = w.level.w
+  const lane = bunkerLaneKeys(b, lw)
+  const spawnTx = Math.floor(w.level.spawn.x)
+  const spawnTy = Math.floor(w.level.spawn.y)
+  const exitTx = Math.floor(w.level.exit.x)
+  const exitTy = Math.floor(w.level.exit.y)
+  const occupied = (tx: number, ty: number): boolean =>
+    w.entities.some(
+      (x) =>
+        !x.dead && (x.door !== undefined || x.archetype === 'barricade') && Math.floor(x.pos.x) === tx && Math.floor(x.pos.y) === ty,
+    )
+  for (const d of b.doors) {
+    for (const [dx, dy] of ORTHO) {
+      const tx = d.x + dx
+      const ty = d.y + dy
+      if (!rectContains(b.rect, tx, ty)) continue // the INSIDE tile only
+      if (isSolidTile(w.level, tx, ty)) continue
+      if (lane.has(ty * lw + tx)) continue // the patrol lane stays promised-open
+      if (tx === spawnTx && ty === spawnTy) continue
+      if (tx === exitTx && ty === exitTy) continue
+      if (occupied(tx, ty)) continue
+      return { x: tx, y: ty }
+    }
+  }
+  return null
+}
+
+const fortify: Consideration = (w, e) => {
+  const b = buildingOf(w, e)
+  if (!b) return []
+  let count = 0
+  for (const x of w.entities) {
+    if (x.archetype === 'barricade' && !x.dead && rectContains(b.rect, Math.floor(x.pos.x), Math.floor(x.pos.y))) count++
+  }
+  if (count >= BARRICADE_CAP) return []
+  const spot = barricadeSpotFor(w, b)
+  if (!spot) return []
+  // Standing on the site → build it (one per think); else walk to it.
+  if (dist2d(spot.x + 0.5, spot.y + 0.5, e.pos.x, e.pos.y) <= BUILD_REACH) {
+    const obj = spawnObject(w, 'barricade', spot.x, spot.y)
+    w.events.push({ type: 'barricade', entityId: obj.id, byId: e.id, x: spot.x + 0.5, y: spot.y + 0.5 })
+    return []
+  }
+  return [{ code: FORTIFY, score: FORTIFY_SCORE, tier: TIER_AMBIENT, at: { x: spot.x + 0.5, y: spot.y + 0.5 } }]
+}
+
+// ── Lurker: the corner ambusher's pounce ────────────────────────────────────
+// Once its dormancy trips (dormancy.ts: proximity / its door opening / a hit),
+// the lurker BURSTS at the nearest perceivable player with total commitment —
+// PANIC tier, so nothing (not even being wounded) breaks the charge off. The
+// jump-scare only works if it never hesitates. Its `guard` flag keeps a woken
+// lurker that loses its prey parked in its corner instead of ambling away.
+const POUNCE_RANGE = 7
+const POUNCE_SCORE = 15
+
+const pounce: Consideration = (w, e) => {
+  if (e.ai!.dormant) return []
+  let best: Entity | undefined
+  let bestD = POUNCE_RANGE
+  for (const p of w.entities) {
+    if (!p.playerCtl || p.dead || p.playerCtl.downed) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d > bestD) continue
+    if (!perceives(w, e, p)) continue
+    bestD = d
+    best = p
+  }
+  if (!best) return []
+  return [{ code: bestD <= ENGAGE_RANGE ? BATTLE : PURSUE, score: POUNCE_SCORE, tier: TIER_PANIC, target: best.id }]
+}
+
 // ── #64 Infest: the mindless Infected host — shamble at the nearest clean
 // body, never flee, never reason. Only fires on an `infected` entity. ─────────
 const INFEST_SCORE = 5
@@ -553,6 +798,11 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   contagiousFear,
   threat,
   defendMyWing,
+  squadFlank,
+  squadStack,
+  squadFollow,
+  fortify,
+  pounce,
   infest,
   packAvoid,
   stalkWeakest,
@@ -616,6 +866,21 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   mireclaw: {
     about: '#69 Mireclaw Alpha boss — phased: pressure & summon, retreat-to-spore-regen, then enrage',
     considerations: ['enrage', 'retreatToSpore', 'threat', 'hunt', 'wander'],
+  },
+  barricader: {
+    about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',
+    considerations: ['threat', 'defendMyWing', 'pursueMemory', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],
+  },
+  lurker: {
+    about: 'hides dormant in a dark corner; bursts at whoever trips it — proximity, its door opening, or a hit',
+    considerations: ['pounce', 'threat', 'pursueMemory', 'wander'],
+  },
+  squad: {
+    about: 'moves as a unit: forms on its lead, stacks both sides of a door, breaches together, flanks the lead’s target',
+    // `garrison` steers the LEAD onto the objective core (followers only ever
+    // see their MEMORY-tier marching orders), so a squadded wing still masses
+    // on the room the players must breach — as a unit, behind its lead.
+    considerations: ['threat', 'defendMyWing', 'squadFlank', 'hunt', 'squadStack', 'squadFollow', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
 }
 

@@ -20,6 +20,9 @@ export const WAKE_STIMULUS_RANGE = 7
 export const WAKE_PROXIMITY_RANGE = 3
 /** A hit within this many ticks trips a `damage` sleeper. */
 export const WAKE_DAMAGE_TICKS = 20
+/** An OPEN door within this range trips a `door` sleeper (the lurker hears its
+ * room being entered). Doors spawn closed, so this arms the moment one opens. */
+export const WAKE_DOOR_RANGE = 4
 
 /** Is a living body of a DIFFERENT faction within `range` (players have none →
  * always count)? — the proximity trip. */
@@ -45,6 +48,13 @@ const wakeTrigger = (w: World, e: Entity, stimuli: ReturnType<typeof gatherStimu
     w.tick - e.health.lastHurtTick <= WAKE_DAMAGE_TICKS
   )
     return 'damage'
+  // An opened door nearby — the lurker's room was just entered.
+  if (kinds.includes('door')) {
+    for (const d of w.entities) {
+      if (d.door?.open && !d.dead && Math.hypot(d.pos.x - e.pos.x, d.pos.y - e.pos.y) <= WAKE_DOOR_RANGE)
+        return 'door'
+    }
+  }
   // Environmental stimuli (noise / fire / spore) within range.
   for (const s of stimuli) {
     if (!kinds.includes(s.kind)) continue

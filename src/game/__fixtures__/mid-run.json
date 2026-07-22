@@ -14,7 +14,7 @@
   },
   "noises": [],
   "events": [],
-  "rng": -302013443,
+  "rng": 1529552370,
   "baseRng": 20260715,
   "levelChecksum": 3150501330,
   "entities": [
@@ -31,7 +31,7 @@
         "y": 1.5
       },
       "vel": {
-        "x": -0.070543872,
+        "x": 0,
         "y": 0
       },
       "intent": {
@@ -42,9 +42,9 @@
       "radius": 0.35,
       "facing": 0,
       "health": {
-        "hp": 104,
+        "hp": 120,
         "max": 120,
-        "iframes": 0
+        "iframes": 60
       },
       "combat": {
         "weapon": "pistol",
@@ -53,23 +53,23 @@
       "status": {
         "stun": 0,
         "sleep": 0,
-        "hitFlashUntil": 24,
+        "hitFlashUntil": 0,
         "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 200
+          }
+        ],
+        "activeSlot": 0
       },
       "playerCtl": {
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
         "crimeUntilTick": 470
-      },
-      "loadout": {
-        "inventory": [
-          {
-            "itemId": "pistol",
-            "qty": 198
-          }
-        ],
-        "activeSlot": 0
       }
     },
     {
@@ -98,11 +98,21 @@
       "health": {
         "hp": 32,
         "max": 60,
-        "iframes": 0
+        "iframes": 0,
+        "lastHurtTick": 20
       },
       "combat": {
         "weapon": "bat",
         "cooldown": 6
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 15
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -151,11 +161,11 @@
       },
       "intent": {
         "x": 0,
-        "y": 0.6
+        "y": 0
       },
       "speed": 3.4,
       "radius": 0.35,
-      "facing": 1.5707963267948966,
+      "facing": 0,
       "health": {
         "hp": 40,
         "max": 40,
@@ -165,6 +175,15 @@
         "weapon": "bat",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -172,7 +191,7 @@
         "cloakUntil": 0
       },
       "ai": {
-        "mode": "wander",
+        "mode": "idle",
         "faction": "gang",
         "home": {
           "x": -1.5,
@@ -185,10 +204,7 @@
         },
         "goalSince": 0,
         "goal": "wander",
-        "waypoint": {
-          "x": -1.5,
-          "y": 5.5
-        }
+        "repathAt": 39
       }
     }
   ]

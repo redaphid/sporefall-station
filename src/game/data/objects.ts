@@ -47,6 +47,10 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // and a few spill role-flavoured loot when smashed, so a stockroom or armory
   // rewards a demolition. Bespoke sprite art is a deferred follow-up; the
   // renderer draws them as tinted footprint boxes for now.
+  // A defender-built junk barrier (behaviors.ts `fortify`): a soft, destructible
+  // body that plugs a doorway approach — shove past it slowly or smash through.
+  // Deliberately mundane: no explosion, no fire, no loot; its whole job is hp.
+  barricade: { id: 'barricade', name: 'Junk Barricade', hp: 40 },
   bunk: { id: 'bunk', name: 'Bunk', hp: 25, flammable: true, loot: ['bandage', 'cash'] },
   desk: { id: 'desk', name: 'Desk', hp: 20, flammable: true, loot: ['cash'] },
   shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['bandage', 'cash', 'molotov'] },

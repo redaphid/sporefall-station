@@ -268,11 +268,26 @@ const collectPickup = (w: World, e: Entity, item: Entity): void => {
  * repath window when the route is missing, exhausted, or the goal drifted —
  * and shove any closed unlocked door open on contact (the breach beat).
  *
- * Returns 'arrived' (standing on it), 'moving', or 'blocked' — no route exists
- * (sealed region / locked door / budget). On 'blocked' the caller decides what
- * "sensible" means for its goal; intent is left at zero (planted, not grinding).
+ * `bestEffort` (waypoint errands: garrison, work, formation, sweeps) walks to
+ * the nearest REACHABLE approach when the goal itself is sealed off — a guard
+ * masses on the locked core's door instead of shrugging across the room.
+ *
+ * Returns 'arrived' (standing on it), 'moving', or 'blocked' — no (further)
+ * route exists. On 'blocked' the caller decides what "sensible" means for its
+ * goal; intent is left at zero (planted, not grinding). The unroutable verdict
+ * is cached on `ai.path` as an empty node list, so between repath windows a
+ * stranded NPC PLANTS rather than wall-grinding; every window re-tries, so a
+ * door opening later un-strands it.
  */
-const moveToward = (w: World, e: Entity, ctx: DoorCtx, gx: number, gy: number, pace: number): 'arrived' | 'moving' | 'blocked' => {
+const moveToward = (
+  w: World,
+  e: Entity,
+  ctx: DoorCtx,
+  gx: number,
+  gy: number,
+  pace: number,
+  bestEffort = false,
+): 'arrived' | 'moving' | 'blocked' => {
   const ai = e.ai!
   const dx = gx - e.pos.x
   const dy = gy - e.pos.y
@@ -289,7 +304,18 @@ const moveToward = (w: World, e: Entity, ctx: DoorCtx, gx: number, gy: number, p
     e.intent.y = (dy / dist) * pace
     e.facing = Math.atan2(dy, dx)
   }
-  if (hasLineOfSight(w.level, e.pos.x, e.pos.y, gx, gy, doorBlocked)) {
+  // The direct shortcut wants a BODY-WIDE corridor, not a one-pixel sightline:
+  // a single Bresenham threads a doorway gap whose frame the circle then clips
+  // (two bodies jam there, pushApart cancelling their squeeze-through drift).
+  // Check the centre line plus both radius-offset lines; any clip → route via
+  // tile centres instead, which carries the body cleanly through the middle.
+  const px = (-dy / dist) * e.radius
+  const py = (dx / dist) * e.radius
+  if (
+    hasLineOfSight(w.level, e.pos.x, e.pos.y, gx, gy, doorBlocked) &&
+    hasLineOfSight(w.level, e.pos.x + px, e.pos.y + py, gx, gy, doorBlocked) &&
+    hasLineOfSight(w.level, e.pos.x - px, e.pos.y - py, gx, gy, doorBlocked)
+  ) {
     ai.path = undefined
     steerStraight()
     return 'moving'
@@ -297,29 +323,43 @@ const moveToward = (w: World, e: Entity, ctx: DoorCtx, gx: number, gy: number, p
   // Line blocked → route. Recompute only inside this entity's repath window so
   // route queries stay staggered across the crowd (deterministic per id).
   const cached = ai.path
-  const unusable =
-    !cached || cached.i >= cached.nodes.length || Math.hypot(cached.goal.x - gx, cached.goal.y - gy) > GOAL_DRIFT
-  if (unusable && w.tick >= (ai.repathAt ?? 0)) {
+  const sameGoal = cached !== undefined && Math.hypot(cached.goal.x - gx, cached.goal.y - gy) <= GOAL_DRIFT
+  const noRoute = sameGoal && cached.nodes.length === 0 // the cached "unroutable" verdict
+  const spent = sameGoal && !noRoute && cached.i >= cached.nodes.length // walked a partial route to its end
+  if (!sameGoal || noRoute || spent) {
+    if (w.tick < (ai.repathAt ?? 0)) {
+      // Window shut. A standing verdict (or a spent partial route) means we
+      // KNOW pressing straight is a wall-grind — plant instead. With no cache
+      // at all, press straight until the window opens; slide collision copes.
+      if (sameGoal) return 'blocked'
+      steerStraight()
+      return 'moving'
+    }
     ai.repathAt = w.tick + REPATH_TICKS + (e.id % REPATH_STAGGER)
-    const nodes = findPath(w.level, e.pos.x, e.pos.y, gx, gy, ctx)
+    const nodes = findPath(w.level, e.pos.x, e.pos.y, gx, gy, {
+      closedDoors: ctx.closedDoors,
+      lockedDoors: ctx.lockedDoors,
+      bestEffort,
+    })
     if (!nodes || nodes.length === 0) {
-      ai.path = undefined
-      return 'blocked' // provably unroutable right now — plant, don't grind
+      ai.path = { nodes: [], i: 0, goal: { x: gx, y: gy } } // remember the verdict
+      return 'blocked'
     }
     ai.path = { nodes, i: 0, goal: { x: gx, y: gy } }
   }
-  const p = ai.path
-  if (!p || p.i >= p.nodes.length) {
-    // No usable route and the repath window hasn't opened: press on straight
-    // for a few ticks — slide collision copes until the next recompute.
-    steerStraight()
-    return 'moving'
-  }
+  const p = ai.path!
   while (p.i < p.nodes.length && Math.hypot(p.nodes[p.i].x - e.pos.x, p.nodes[p.i].y - e.pos.y) < NODE_ARRIVE) p.i++
   if (p.i >= p.nodes.length) {
-    ai.path = undefined
-    steerStraight()
-    return 'moving'
+    // Route walked out. A FULL route ended on the goal tile — close the last
+    // stretch straight. A PARTIAL (best-effort) route ended as near as the map
+    // allows — hold here; the next window re-checks whether the world changed.
+    const end = p.nodes[p.nodes.length - 1]
+    if (Math.floor(end.x) === Math.floor(gx) && Math.floor(end.y) === Math.floor(gy)) {
+      ai.path = undefined
+      steerStraight()
+      return 'moving'
+    }
+    return 'blocked'
   }
   const node = p.nodes[p.i]
   // A closed door on the node ahead: open it the moment it is in arm's reach —
@@ -537,14 +577,18 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       ai.mode = 'idle'
       ai.path = undefined
       // Arrived on purpose → pause and look around before the next errand.
-      ai.scanUntil = w.tick + SCAN_TICKS
+      // Squad positioning (formation slots, flank runs) skips the beat: those
+      // arrivals are tactical placement, and a fidgeting stack reads wrong.
+      if (ai.goal !== FORMUP && ai.goal !== FLANK) ai.scanUntil = w.tick + SCAN_TICKS
       return
     }
     const pace = ai.mode === 'patrol' ? 0.85 : 0.6 // a beat is brisker than an amble
-    const res = moveToward(w, e, ctx, ai.waypoint.x, ai.waypoint.y, pace)
+    // Waypoint errands run BEST-EFFORT: a garrison whose core is sealed masses
+    // on its locked door (the nearest reachable approach) instead of shrugging.
+    const res = moveToward(w, e, ctx, ai.waypoint.x, ai.waypoint.y, pace, true)
     if (res === 'blocked') {
-      // Unroutable destination (a sweep point in a wall, a sealed room): drop
-      // it and re-decide instead of wall-grinding or oscillating.
+      // As close as the map allows (or nowhere to go at all): settle here and
+      // re-decide instead of wall-grinding or oscillating.
       ai.waypoint = undefined
       ai.mode = 'idle'
     }

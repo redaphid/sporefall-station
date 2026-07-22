@@ -237,7 +237,9 @@ describe('unroutable goals fail gracefully', () => {
     const npc = spawnNpc(w, 'civilian', 10.5, 20.5)
     npc.ai!.mode = 'wander'
     npc.ai!.waypoint = { x: 30.5, y: 20.5 } // sealed
-    run(w, 120)
+    // Best-effort walks it to the cell's rim (deliberate: it went and looked),
+    // then the unroutable goal is DROPPED — never a permanent wall-grind.
+    run(w, 400)
     expect(npc.ai!.waypoint).not.toEqual({ x: 30.5, y: 20.5 }) // dropped it
     expect(Number.isFinite(npc.pos.x)).toBe(true)
   })

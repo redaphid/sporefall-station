@@ -33,7 +33,7 @@
 
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
-import { type Building, rectCenter, rectContains } from '../levelgen/level'
+import { isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, type FearPulse, type World } from '../world'
 import {
   BATTLE,
@@ -421,6 +421,139 @@ const defendMyWing: Consideration = (w, e) => {
   return out
 }
 
+// ── Squad tactics: 2-4 linked NPCs (`ai.squad = {id, role}`) move as a UNIT ──
+// The Rainbow-Six read: followers hold formation on the lead's shoulderline,
+// the pack stacks both sides of a closed door before entry (the lead holds
+// until everyone is on the frame, then breaches — steering opens the door on
+// contact — and the others sweep in behind), and the flank-role member swings
+// around to the far side of whatever the lead is engaging. All state is the
+// two ids on `ai.squad` plus each member's ordinary ai fields — a mid-stack
+// snapshot serializes and replays byte-identically. Deterministic: ascending-id
+// scans, geometry-only slot math, no rng.
+
+/** Followers' formation drive sits at MEMORY tier just above the hunt scores,
+ * so a follower sticks with its lead over freelancing after a cold trail —
+ * but any PERCEIVED enemy (threat tier) still snaps it into the fight. */
+const FORM_SCORE = 2
+/** Taking a door-frame slot outranks plain formation. */
+const STACKUP_SCORE = 2.6
+/** The lead's hold-at-the-door outranks its own pursuit/search memories. */
+const HOLD_SCORE = 5
+/** A mate within this range of the door counts as stacked on the frame. */
+const STACK_RANGE = 2.6
+/** The lead triggers a stack when a closed door is within this range. */
+const DOOR_NEAR = 2.2
+/** Close enough to the target that the flanker just fights (threat takes over). */
+const FLANK_ARRIVE = 2.2
+/** How far past the target the flank point sits (arrive BEHIND it). */
+const FLANK_STANDOFF = 2.5
+
+/** Every live member of `e`'s squad, in entity (ascending-id) order. */
+const liveSquad = (w: World, e: Entity): Entity[] => {
+  const id = e.ai?.squad?.id
+  if (id === undefined) return []
+  return w.entities.filter((m) => !m.dead && m.ai?.squad?.id === id)
+}
+
+/** The squad's acting leader: the member with role 'lead', else the first
+ * (lowest-id) survivor — promotion is deterministic and needs no stored state. */
+const actingLeader = (members: Entity[]): Entity | undefined =>
+  members.find((m) => m.ai!.squad!.role === 'lead') ?? members[0]
+
+/** Nearest closed, UNLOCKED door entity within `range` of `e` (a locked door
+ * cannot be breached by a squad, so it never triggers a stack). */
+const nearestClosedDoor = (w: World, e: Entity, range: number): Entity | undefined => {
+  let best: Entity | undefined
+  let bestD = range
+  for (const d of w.entities) {
+    if (!d.door || d.door.open || d.door.locked || d.door.overgrown || d.dead) continue
+    const dd = dist2d(d.pos.x, d.pos.y, e.pos.x, e.pos.y)
+    if (dd > bestD) continue
+    bestD = dd
+    best = d
+  }
+  return best
+}
+
+/** The door-frame slot for a role: one step back toward the lead's side of the
+ * doorway, one step along the frame — flank takes one side, rear the other.
+ * Degrades to the tile straight back when the frame tile is solid (corridors). */
+const stackSlot = (w: World, lead: Entity, door: Entity, role: 'flank' | 'rear'): { x: number; y: number } => {
+  const dx = Math.floor(door.pos.x)
+  const dy = Math.floor(door.pos.y)
+  // Passage axis: the doorway's open neighbours run along it; the frame is the
+  // other axis. (A doorway in a vertical wall has open tiles east/west.)
+  const horiz = !isSolidTile(w.level, dx + 1, dy) && !isSolidTile(w.level, dx - 1, dy)
+  const side = (horiz ? Math.sign(lead.pos.x - door.pos.x) : Math.sign(lead.pos.y - door.pos.y)) || 1
+  const off = role === 'flank' ? 1 : -1
+  const sx = horiz ? dx + side : dx + off
+  const sy = horiz ? dy + off : dy + side
+  if (!isSolidTile(w.level, sx, sy)) return { x: sx + 0.5, y: sy + 0.5 }
+  return { x: (horiz ? dx + side : dx) + 0.5, y: (horiz ? dy : dy + side) + 0.5 }
+}
+
+// The LEAD's half of the door choreography: about to pass a closed door with a
+// mate still off the frame → HOLD (plant, face the door) until the stack forms.
+// MEMORY tier: it outranks the lead's own pursuit of an unseen target (that is
+// the point — breach together), but a PERCEIVED enemy still preempts the hold.
+const squadStack: Consideration = (w, e) => {
+  if (!e.ai!.squad) return []
+  const members = liveSquad(w, e)
+  if (members.length < 2 || actingLeader(members) !== e) return []
+  const door = nearestClosedDoor(w, e, DOOR_NEAR)
+  if (!door) return []
+  const laggard = members.some((m) => m !== e && dist2d(m.pos.x, m.pos.y, door.pos.x, door.pos.y) > STACK_RANGE)
+  if (!laggard) return [] // everyone's on the frame — proceed and breach
+  return [{ code: STACK, score: HOLD_SCORE, tier: TIER_MEMORY, at: { x: door.pos.x, y: door.pos.y } }]
+}
+
+// A FOLLOWER's marching order: its stack slot while the lead holds at a door,
+// else its formation slot off the lead's shoulderline (flank left, rear behind).
+const squadFollow: Consideration = (w, e) => {
+  const sq = e.ai!.squad
+  if (!sq) return []
+  const members = liveSquad(w, e)
+  const lead = actingLeader(members)
+  if (!lead || lead === e) return []
+  const role = sq.role === 'flank' ? 'flank' : 'rear'
+  if (lead.ai!.goal === STACK) {
+    const door = nearestClosedDoor(w, lead, DOOR_NEAR)
+    if (door) return [{ code: FORMUP, score: STACKUP_SCORE, tier: TIER_MEMORY, at: stackSlot(w, lead, door, role) }]
+  }
+  const fx = Math.cos(lead.facing)
+  const fy = Math.sin(lead.facing)
+  const at =
+    role === 'flank'
+      ? { x: lead.pos.x - fx * 1.1 - fy * 1.4, y: lead.pos.y - fy * 1.1 + fx * 1.4 }
+      : { x: lead.pos.x - fx * 2.2, y: lead.pos.y - fy * 2.2 }
+  return [{ code: FORMUP, score: FORM_SCORE, tier: TIER_MEMORY, at }]
+}
+
+// The FLANK member swings to the far side of whatever the lead is engaging:
+// while it is on the lead's side and outside arm's reach, it routes to a point
+// BEHIND the target instead of charging the near face. Scored a hair above its
+// own threat-candidate for the same target, so the approach is the flank route;
+// the moment it is close or behind, the conditions fail and `threat` fights.
+const squadFlank: Consideration = (w, e) => {
+  const sq = e.ai!.squad
+  if (!sq || sq.role !== 'flank') return []
+  const lead = actingLeader(liveSquad(w, e))
+  if (!lead || lead === e || lead.ai!.mode !== 'aggro' || lead.ai!.targetId === undefined) return []
+  const t = w.byId.get(lead.ai!.targetId)
+  if (!t || t.dead || !t.health) return []
+  const dist = dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y)
+  if (dist <= FLANK_ARRIVE) return []
+  const sxv = e.pos.x - t.pos.x
+  const syv = e.pos.y - t.pos.y
+  const lxv = lead.pos.x - t.pos.x
+  const lyv = lead.pos.y - t.pos.y
+  if (sxv * lxv + syv * lyv <= 0) return [] // already opposite the lead
+  const ld = Math.hypot(lxv, lyv) || 1
+  const at = { x: t.pos.x - (lxv / ld) * FLANK_STANDOFF, y: t.pos.y - (lyv / ld) * FLANK_STANDOFF }
+  const score = battleScore(hateToward(w, e, t.id), e.health?.hp ?? 1, Math.max(1, dist)) + 1
+  return [{ code: FLANK, score, tier: TIER_THREAT, target: t.id, at }]
+}
+
 // ── #64 Infest: the mindless Infected host — shamble at the nearest clean
 // body, never flee, never reason. Only fires on an `infected` entity. ─────────
 const INFEST_SCORE = 5
@@ -563,6 +696,9 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   contagiousFear,
   threat,
   defendMyWing,
+  squadFlank,
+  squadStack,
+  squadFollow,
   infest,
   packAvoid,
   stalkWeakest,
@@ -626,6 +762,13 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   mireclaw: {
     about: '#69 Mireclaw Alpha boss — phased: pressure & summon, retreat-to-spore-regen, then enrage',
     considerations: ['enrage', 'retreatToSpore', 'threat', 'hunt', 'wander'],
+  },
+  squad: {
+    about: 'moves as a unit: forms on its lead, stacks both sides of a door, breaches together, flanks the lead’s target',
+    // `garrison` steers the LEAD onto the objective core (followers only ever
+    // see their MEMORY-tier marching orders), so a squadded wing still masses
+    // on the room the players must breach — as a unit, behind its lead.
+    considerations: ['threat', 'defendMyWing', 'squadFlank', 'hunt', 'squadStack', 'squadFollow', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
 }
 

@@ -124,6 +124,44 @@ export const populateWorld = (w: World): void => {
   // `npc-mods` fork, so it never disturbs the layout/loot/weapon streams above.
   armModdedEnemies(w)
   furnishInteriors(w)
+  // Tactical-AI post-passes, each on its OWN fork so every stream above stays
+  // byte-identical per seed (the existing populate tests are the proof):
+  // gangster packs in warehouses/bunkers become door-stacking squads.
+  assignSquads(w)
+}
+
+/** Squad size cap: lead + flank + rears. */
+export const SQUAD_MAX = 4
+/** Chance an eligible gang pack actually forms up (some stay a loose rabble). */
+const SQUAD_CHANCE = 0.85
+
+/** Link each warehouse/bunker's role-spawned gang pack (thugs/gangsters bound
+ * to that building) into a `squad` (behaviors.ts): first member leads, second
+ * flanks, the rest stack rear. Post-pass over spawned entities in id order on a
+ * DEDICATED `squads` fork — no other stream moves. Patrol beats (the
+ * promised-open-lane contract) and barricaders keep their brains. */
+const assignSquads = (w: World): void => {
+  const rng = w.rng.fork('squads')
+  let nextSquad = 1
+  for (let bi = 0; bi < w.level.buildings.length; bi++) {
+    const b = w.level.buildings[bi]
+    if (b.role !== 'warehouse' && b.role !== 'bunker') continue
+    const pack = w.entities.filter(
+      (e) =>
+        e.kind === 'npc' &&
+        (e.archetype === 'thug' || e.archetype === 'gangster') &&
+        e.ai?.zone?.building === bi &&
+        e.ai.behavior !== 'patrol' &&
+        e.ai.behavior !== 'barricader',
+    )
+    if (pack.length < 2) continue
+    if (!rng.chance(SQUAD_CHANCE)) continue
+    const id = nextSquad++
+    pack.slice(0, SQUAD_MAX).forEach((m, i) => {
+      m.ai!.behavior = 'squad'
+      m.ai!.squad = { id, role: i === 0 ? 'lead' : i === 1 ? 'flank' : 'rear' }
+    })
+  }
 }
 
 /** Room-type-appropriate interior furnishings. Reuses props that already have

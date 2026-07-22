@@ -20,12 +20,21 @@
 import { isSolidTile, type Level } from './levelgen/level'
 import type { Vec2 } from './types'
 
-/** Door context for one query, as tile keys (`ty * level.w + tx`). */
-export interface PathBlockers {
+/** Door context + tuning for one query. Door sets are tile keys (`ty*w+tx`). */
+export interface PathOpts {
   /** Tiles holding a CLOSED, UNLOCKED door — passable at `DOOR_COST` extra. */
   closedDoors?: ReadonlySet<number>
   /** Tiles holding a LOCKED (or otherwise unopenable) door — solid to this walker. */
   lockedDoors?: ReadonlySet<number>
+  /** Cap on explored nodes (default PATH_MAX_NODES). */
+  maxNodes?: number
+  /** When the goal is unreachable (sealed room, locked wing), return the route
+   * to the NEAREST REACHABLE approach instead of null — "guard the door" beats
+   * standing wherever the verdict happened to land. The returned route then
+   * ends SHORT of the goal tile; callers detect that by comparing the last
+   * node's tile to the goal tile. Null is still returned when no step at all
+   * improves on standing still. */
+  bestEffort?: boolean
 }
 
 /** Default cap on explored nodes — generous for a 64×64 floor's real routes,
@@ -104,12 +113,12 @@ export const findPath = (
   fromY: number,
   toX: number,
   toY: number,
-  blockers: PathBlockers = {},
-  maxNodes = PATH_MAX_NODES,
+  opts: PathOpts = {},
 ): Vec2[] | null => {
   const lw = level.w
-  const closed = blockers.closedDoors
-  const locked = blockers.lockedDoors
+  const closed = opts.closedDoors
+  const locked = opts.lockedDoors
+  const maxNodes = opts.maxNodes ?? PATH_MAX_NODES
   const sx = Math.floor(fromX)
   const sy = Math.floor(fromY)
   const gx = Math.floor(toX)
@@ -121,9 +130,10 @@ export const findPath = (
     !isSolidTile(level, tx, ty) && !locked?.has(ty * lw + tx)
 
   if (sx === gx && sy === gy) return []
-  // A blocked goal (wall / locked door) can never be stood on — fail fast
-  // instead of flooding the whole reachable region looking for it.
-  if (!walkable(gx, gy)) return null
+  // A blocked goal (wall / locked door) can never be stood on — strict mode
+  // fails fast instead of flooding the reachable region looking for it;
+  // best-effort still walks as close to it as the map allows.
+  if (!walkable(gx, gy) && !opts.bestEffort) return null
   if (!walkable(sx, sy)) return null
 
   const gScore = new Map<number, number>()
@@ -131,24 +141,33 @@ export const findPath = (
   const open: Node[] = []
   let seq = 0
   gScore.set(startKey, 0)
-  heapPush(open, { key: startKey, g: 0, f: Math.abs(gx - sx) + Math.abs(gy - sy), seq: seq++ })
+  const startH = Math.abs(gx - sx) + Math.abs(gy - sy)
+  heapPush(open, { key: startKey, g: 0, f: startH, seq: seq++ })
+  // Best-effort bookkeeping: the expanded tile that came closest to the goal
+  // (smallest heuristic; first-seen wins ties — deterministic).
+  let bestKey = startKey
+  let bestH = startH
+
+  const reconstruct = (endKey: number): Vec2[] => {
+    const out: Vec2[] = []
+    let k = endKey
+    while (k !== startKey) {
+      out.push({ x: (k % lw) + 0.5, y: Math.floor(k / lw) + 0.5 })
+      k = cameFrom.get(k)!
+    }
+    out.reverse()
+    return out
+  }
+  /** Route to the nearest approach found, or null when standing still is it. */
+  const bestEffortResult = (): Vec2[] | null =>
+    opts.bestEffort && bestKey !== startKey ? reconstruct(bestKey) : null
 
   let explored = 0
   while (open.length > 0) {
     const cur = heapPop(open)
     if (cur.g > (gScore.get(cur.key) ?? Infinity)) continue // stale heap entry
-    if (cur.key === goalKey) {
-      // Reconstruct: goal → start, then reverse into walk order (start excluded).
-      const out: Vec2[] = []
-      let k = goalKey
-      while (k !== startKey) {
-        out.push({ x: (k % lw) + 0.5, y: Math.floor(k / lw) + 0.5 })
-        k = cameFrom.get(k)!
-      }
-      out.reverse()
-      return out
-    }
-    if (++explored > maxNodes) return null
+    if (cur.key === goalKey) return reconstruct(goalKey)
+    if (++explored > maxNodes) return bestEffortResult()
     const cx = cur.key % lw
     const cy = Math.floor(cur.key / lw)
     for (const [dx, dy] of STEPS) {
@@ -161,8 +180,13 @@ export const findPath = (
       if (ng >= (gScore.get(nKey) ?? Infinity)) continue
       gScore.set(nKey, ng)
       cameFrom.set(nKey, cur.key)
-      heapPush(open, { key: nKey, g: ng, f: ng + Math.abs(gx - nx) + Math.abs(gy - ny), seq: seq++ })
+      const h = Math.abs(gx - nx) + Math.abs(gy - ny)
+      if (h < bestH) {
+        bestH = h
+        bestKey = nKey
+      }
+      heapPush(open, { key: nKey, g: ng, f: ng + h, seq: seq++ })
     }
   }
-  return null
+  return bestEffortResult()
 }

@@ -177,7 +177,7 @@ describe('findPath — failure modes stay graceful and bounded', () => {
     carve(level, 2, 2, 30, 30)
     // Force a detour so the search must expand widely, then strangle the budget.
     for (let y = 2; y <= 28; y++) wall(level, 16, y)
-    expect(findPath(level, 5.5, 15.5, 28.5, 15.5, {}, 20)).toBeNull()
+    expect(findPath(level, 5.5, 15.5, 28.5, 15.5, { maxNodes: 20 })).toBeNull()
     // The same query with the default budget succeeds — the cap was the limit.
     expect(findPath(level, 5.5, 15.5, 28.5, 15.5)).not.toBeNull()
   })
@@ -187,6 +187,54 @@ describe('findPath — failure modes stay graceful and bounded', () => {
     carve(level, 4, 4, 10, 10)
     expect(findPath(level, 5.5, 5.5, -3.5, 5.5)).toBeNull()
     expect(findPath(level, 5.5, 5.5, 5.5, 10_000.5)).toBeNull()
+  })
+})
+
+describe('findPath — best effort (guard the approach)', () => {
+  it('an unreachable goal yields the route to the nearest reachable tile', () => {
+    const level = blank()
+    carve(level, 4, 4, 20, 20)
+    // Sealed 3×3 pocket inside the field, goal at its centre.
+    for (let x = 10; x <= 14; x++) {
+      wall(level, x, 10)
+      wall(level, x, 14)
+    }
+    for (let y = 10; y <= 14; y++) {
+      wall(level, 10, y)
+      wall(level, 14, y)
+    }
+    expect(findPath(level, 5.5, 5.5, 12.5, 12.5)).toBeNull() // strict: no route
+    const near = findPath(level, 5.5, 5.5, 12.5, 12.5, { bestEffort: true })
+    expect(near).not.toBeNull()
+    assertWellFormed(level, near!, { x: 5.5, y: 5.5 })
+    const end = near![near!.length - 1]
+    // Ends pressed against the pocket (adjacent ring), NOT on the goal tile.
+    expect(Math.abs(end.x - 12.5) + Math.abs(end.y - 12.5)).toBeLessThanOrEqual(3)
+    expect(Math.floor(end.x) === 12 && Math.floor(end.y) === 12).toBe(false)
+  })
+
+  it('goal already as close as possible → null (standing still is the answer)', () => {
+    const level = blank()
+    carve(level, 4, 4, 8, 8)
+    // Goal far outside the tiny carved pocket; start already at its nearest edge.
+    const r = findPath(level, 8.5, 6.5, 30.5, 6.5, { bestEffort: true })
+    expect(r).toBeNull()
+  })
+
+  it('best-effort is deterministic across calls', () => {
+    const level = blank()
+    carve(level, 4, 4, 20, 20)
+    for (let x = 10; x <= 14; x++) {
+      wall(level, x, 10)
+      wall(level, x, 14)
+    }
+    for (let y = 10; y <= 14; y++) {
+      wall(level, 10, y)
+      wall(level, 14, y)
+    }
+    const a = findPath(level, 5.5, 5.5, 12.5, 12.5, { bestEffort: true })
+    const b = findPath(level, 5.5, 5.5, 12.5, 12.5, { bestEffort: true })
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b))
   })
 })
 

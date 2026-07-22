@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Genesis-grade swamp tiles you can read',
   'Rooms make sense: beds in bedrooms',
   'Enemies can now wield modded weapons',
   'Furniture has real art, not boxes',
-  'Smoother sim on furnished floors',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

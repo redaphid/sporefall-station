@@ -34,6 +34,29 @@ export const WALL_CUT_OUTSIDE: Record<number, { dx: number; dy: number }> = {
 
 export type BuildingRole = 'shop' | 'apartment' | 'office' | 'warehouse' | 'clinic' | 'bunker'
 
+/** What a single room IS, within its building's fiction — drives which
+ * furniture it gets and where that furniture sits (populate.furnishInteriors),
+ * and gives missions/AI/debug a legible name for "the room you are in".
+ * Assigned per room by `assignRoomTypes` (roomTypes.ts): a PURE geometric
+ * derivation from the building's role, room sizes, street doors and objective
+ * room — it draws no rng, so adding it never perturbs generation streams. */
+export type RoomType =
+  | 'shopfloor' // customer-facing shop front: shelves, vending, the till
+  | 'stockroom' // back-of-house / warehouse stock: crates, shelving
+  | 'living' // apartment common room: tv, table
+  | 'bedroom' // bunks against the walls
+  | 'bathroom' // the smallest room in the flat
+  | 'lobby' // office reception
+  | 'office' // desks-and-cabinets workroom
+  | 'storage' // office/compound supply closet
+  | 'waiting' // clinic front room: benches
+  | 'ward' // clinic treatment room: cots and cabinets
+  | 'supply' // clinic med-supply closet
+  | 'guardpost' // bunker guard band around the core
+  | 'armory' // bunker core: weapon lockers
+  | 'barracks' // bunker sleeping quarters
+  | 'vault' // sealed reward chamber
+
 /** Layout set-piece a building can carry (beyond a plain box of rooms). */
 export type BuildingPoi = 'courtyard' | 'vault' | 'hallway' | 'bunker'
 
@@ -45,6 +68,10 @@ export interface Building {
   role: BuildingRole
   /** Optional set-piece tag for populate/missions and variety tests. */
   poi?: BuildingPoi
+  /** Per-room type, parallel to `rooms` — see `RoomType`. Filled by
+   * generateLevel for every building; optional so hand-built test Buildings
+   * stay valid (consumers fall back to `assignRoomTypes`). */
+  roomTypes?: RoomType[]
   /** Compound pit (open ground) — populate routes patrol beats around it. */
   courtyard?: Rect
   /** The room a mission objective (briefcase / boss) belongs in — designated

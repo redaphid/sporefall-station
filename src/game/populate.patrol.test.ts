@@ -24,11 +24,15 @@ const findCase = (poi: Building['poi']): { seed: number; floor: number } => {
 }
 
 /** Peaceful world (hostile=false, no players) so ambient patrol is never
- * outranked by threat-tier goals — pure patrol behavior under test. */
+ * outranked by threat-tier goals — pure patrol behavior under test. The #78
+ * encounter roster ignores `hostile` (a stalker hunts NPCs regardless) and a
+ * predator that corners the patroller pins it mid-beat by body contact — so
+ * cull predators too: this test isolates patrol STEERING, not creature brawls. */
 const buildWorld = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor, 'normal', false)
   populateWorld(w)
   setupFloor(w)
+  for (const e of w.entities) if (e.ai?.behavior === 'predator') e.dead = true
   return w
 }
 

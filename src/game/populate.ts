@@ -1,8 +1,12 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { Tile, type Building } from './levelgen/level'
+import { isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
+import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
+
+// Re-exported from its levelgen home so existing consumers/tests keep working.
+export { roomOwningTile }
 import type { Rng } from './rng'
 import { weightedModId } from './systems/draft'
 import { spawnObject } from './systems/objects'
@@ -122,19 +126,51 @@ export const populateWorld = (w: World): void => {
   furnishInteriors(w)
 }
 
-/** Role-appropriate interior furnishings. Reuses props that already have art
- * (crate/barrel/tv/toilet/vending/atm) plus the new furniture archetypes, so a
- * room reads as WHAT IT IS at a glance: a bunkroom, a lab, a stockroom, an
- * armory, a shop floor. Repeats bias the weighting toward the room's signature
- * prop. Everything here is a soft, destructible object — never a solid tile —
- * so it can't wall off a room, block reachability, or trap an occupant. */
-export const FURNISH: Record<Building['role'], readonly string[]> = {
-  shop: ['shelf', 'shelf', 'crate', 'vending', 'atm'],
-  apartment: ['bunk', 'bunk', 'tv', 'table', 'plant'],
-  office: ['desk', 'desk', 'tv', 'cabinet', 'plant'],
-  warehouse: ['crate', 'crate', 'crate', 'shelf', 'barrel'],
-  clinic: ['bench', 'cabinet', 'cabinet', 'toilet', 'plant'],
-  bunker: ['locker', 'locker', 'crate', 'barrel', 'table'],
+/** Room-type-appropriate interior furnishings. Reuses props that already have
+ * art (crate/barrel/tv/toilet/vending/atm) plus the furniture archetypes, so a
+ * room reads as WHAT IT IS at a glance: a bedroom holds bunks, a bathroom its
+ * toilet, a shop floor its shelves and till, an armory its weapon lockers.
+ * Repeats bias the weighting toward the room's signature prop. Everything here
+ * is a soft, destructible object — never a solid tile — so it can't wall off a
+ * room, block reachability, or trap an occupant. */
+export const ROOM_FURNISH: Record<RoomType, readonly string[]> = {
+  shopfloor: ['shelf', 'shelf', 'shelf', 'vending', 'atm', 'crate'],
+  stockroom: ['crate', 'crate', 'crate', 'shelf', 'barrel'],
+  living: ['tv', 'table', 'table', 'plant'],
+  bedroom: ['bunk', 'bunk', 'cabinet', 'plant'],
+  bathroom: ['toilet', 'cabinet'],
+  lobby: ['desk', 'bench', 'plant', 'vending'],
+  office: ['desk', 'desk', 'desk', 'cabinet', 'plant'],
+  storage: ['crate', 'crate', 'shelf', 'cabinet', 'barrel'],
+  waiting: ['bench', 'bench', 'plant', 'vending', 'tv'],
+  ward: ['bunk', 'bunk', 'cabinet', 'bench'],
+  supply: ['cabinet', 'cabinet', 'shelf', 'crate'],
+  guardpost: ['locker', 'crate', 'table', 'barrel'],
+  armory: ['locker', 'locker', 'locker', 'crate', 'barrel'],
+  barracks: ['bunk', 'bunk', 'locker', 'table'],
+  vault: ['locker', 'crate'],
+}
+
+/** Where a prop WANTS to stand, so placement reads like someone arranged the
+ * room: shelving/lockers/beds/appliances back against a wall, toilets and
+ * planters tucked into corners, tables out in the middle of the room, loose
+ * crates anywhere. A preference degrades gracefully (corner → wall → anywhere)
+ * when the preferred tiles are taken, so density and safety are unaffected. */
+export const PROP_PLACEMENT: Record<string, 'wall' | 'corner' | 'center' | 'any'> = {
+  shelf: 'wall',
+  cabinet: 'wall',
+  locker: 'wall',
+  bunk: 'wall',
+  tv: 'wall',
+  vending: 'wall',
+  atm: 'wall',
+  bench: 'wall',
+  desk: 'wall',
+  toilet: 'corner',
+  plant: 'corner',
+  barrel: 'corner',
+  table: 'center',
+  crate: 'any',
 }
 
 /** Hard ceiling on furnishings per room, so a big open hall gets a believable
@@ -148,28 +184,44 @@ const ORTHO = [
   [0, -1],
 ] as const
 
-/** A building's room rects can NEST — the vault layout carves a small sealed
- * chamber inside one big open-hall room (`rooms = [interior, vault]`). So a
- * floor tile belongs to the SMALLEST room that contains it; the hall and its
- * vault are then furnished (and counted) independently, never double-stacked.
- * Returns the owning index into `rooms`, or -1 if no room covers the tile. */
-export const roomOwningTile = (rooms: readonly Rect[], tx: number, ty: number): number => {
-  let best = -1
-  let bestArea = Infinity
-  for (let i = 0; i < rooms.length; i++) {
-    const r = rooms[i]
-    if (tx < r.x || ty < r.y || tx >= r.x + r.w || ty >= r.y + r.h) continue
-    const area = r.w * r.h
-    if (area < bestArea) {
-      bestArea = area
-      best = i
-    }
-  }
-  return best
+/** How many of a tile's 4 orthogonal neighbours are wall tiles — 0 means open
+ * floor mid-room, 1 means against a wall, 2+ means tucked into a corner. */
+const wallNeighbours = (w: World, tx: number, ty: number): number => {
+  let count = 0
+  for (const [dx, dy] of ORTHO) if (isWallTile(tileAt(w.level, tx + dx, ty + dy))) count++
+  return count
 }
 
-/** Deterministically furnish every building interior with role-appropriate
- * props so rooms feel occupied and legible instead of empty boxes. Runs on a
+/** Free tiles matching a prop's placement preference, degrading gracefully:
+ * corner → any wall → anywhere; wall → anywhere; center → anywhere. Always
+ * non-empty while `free` is. */
+const placementCandidates = (free: readonly FreeTile[], pref: 'wall' | 'corner' | 'center' | 'any'): FreeTile[] => {
+  if (pref === 'corner') {
+    const corners = free.filter((t) => t.walls >= 2)
+    if (corners.length > 0) return corners
+  }
+  if (pref === 'corner' || pref === 'wall') {
+    const walls = free.filter((t) => t.walls >= 1)
+    if (walls.length > 0) return walls
+  }
+  if (pref === 'center') {
+    const open = free.filter((t) => t.walls === 0)
+    if (open.length > 0) return open
+  }
+  return [...free]
+}
+
+interface FreeTile {
+  x: number
+  y: number
+  /** Orthogonal wall-neighbour count (see wallNeighbours). */
+  walls: number
+}
+
+/** Deterministically furnish every building interior with ROOM-TYPE-appropriate
+ * props, arranged how a room of that type would actually be laid out: the
+ * bedroom's bunks and the stockroom's shelving back against a wall, the
+ * bathroom's toilet in a corner, the living-room table mid-floor. Runs on a
  * DEDICATED `furnish` fork so it neither perturbs nor is perturbed by the
  * loot/AI/mod streams — same seed+floor → the same furniture on every peer, and
  * every pre-existing populate test stays byte-identical. Placement leaves every
@@ -191,13 +243,33 @@ const furnishInteriors = (w: World): void => {
       keepClear.add(d.y * lw + d.x)
       for (const [dx, dy] of ORTHO) keepClear.add((d.y + dy) * lw + (d.x + dx))
     }
-    const palette = FURNISH[building.role]
+    // The bunker guard's beat is a straight-line circuit of the band's inner
+    // ring (patrolBeat) with NO pathfinder — that lane is a promised-open
+    // contract, so furniture (a soft body that shoves movers) never sits on it.
+    if (building.role === 'bunker' && building.rooms.length > 0) {
+      const band = building.rooms[0]
+      const rx = band.x + 1
+      const ry = band.y + 1
+      const rw = band.w - 2
+      const rh = band.h - 2
+      for (let tx = rx; tx < rx + rw; tx++) {
+        keepClear.add(ry * lw + tx)
+        keepClear.add((ry + rh - 1) * lw + tx)
+      }
+      for (let ty = ry; ty < ry + rh; ty++) {
+        keepClear.add(ty * lw + rx)
+        keepClear.add(ty * lw + (rx + rw - 1))
+      }
+    }
+    // generateLevel always fills roomTypes; the fallback covers hand-built
+    // Buildings in tests/scenarios (assignRoomTypes is pure and rng-free).
+    const types = building.roomTypes ?? assignRoomTypes(building)
     for (let ri = 0; ri < building.rooms.length; ri++) {
       const room = building.rooms[ri]
       // Collect the room's free interior floor tiles (never a wall, doorway,
       // door-adjacent, spawn or exit tile — and only tiles this room OWNS, so a
       // nested vault chamber isn't furnished twice as part of its outer hall).
-      const free: { x: number; y: number }[] = []
+      const free: FreeTile[] = []
       for (let ty = room.y; ty < room.y + room.h; ty++) {
         for (let tx = room.x; tx < room.x + room.w; tx++) {
           if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
@@ -205,20 +277,21 @@ const furnishInteriors = (w: World): void => {
           if (tx === spawnTx && ty === spawnTy) continue
           if (tx === exitTx && ty === exitTy) continue
           if (roomOwningTile(building.rooms, tx, ty) !== ri) continue
-          free.push({ x: tx, y: ty })
+          free.push({ x: tx, y: ty, walls: wallNeighbours(w, tx, ty) })
         }
       }
       // A closet with fewer than two free tiles stays bare — nowhere to stand
       // otherwise. Everything roomier gets at least one furnishing.
       if (free.length < 2) continue
+      const palette = ROOM_FURNISH[types[ri]]
       const n = Math.min(FURNISH_MAX_PER_ROOM, Math.max(1, Math.floor(free.length / 4)))
       for (let i = 0; i < n && free.length > 0; i++) {
-        // Draw a tile, then swap-remove it so no two props ever stack.
-        const idx = rng.int(0, free.length - 1)
-        const cell = free[idx]
-        free[idx] = free[free.length - 1]
-        free.pop()
-        spawnObject(w, rng.pick(palette), cell.x, cell.y)
+        // Pick WHAT first, then stand it WHERE that kind of prop belongs.
+        const prop = rng.pick(palette)
+        const cands = placementCandidates(free, PROP_PLACEMENT[prop] ?? 'any')
+        const cell = cands[rng.int(0, cands.length - 1)]
+        free.splice(free.indexOf(cell), 1) // remove so no two props ever stack
+        spawnObject(w, prop, cell.x, cell.y)
       }
     }
   }

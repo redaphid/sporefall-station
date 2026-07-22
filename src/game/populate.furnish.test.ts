@@ -8,10 +8,10 @@
 // and everything round-trips through serialize/deserialize.
 
 import { describe, expect, it } from 'vitest'
-import { FURNISH, FURNISH_MAX_PER_ROOM, populateWorld, roomOwningTile } from './populate'
+import { FURNISH_MAX_PER_ROOM, PROP_PLACEMENT, ROOM_FURNISH, populateWorld, roomOwningTile } from './populate'
 import { OBJECTS } from './data/objects'
 import type { Entity } from './entity'
-import { buildingAt, Tile } from './levelgen/level'
+import { buildingAt, isWallTile, Tile, tileAt } from './levelgen/level'
 import { deserializeWorld, serializeWorld } from './serialize'
 import { createWorld, type World } from './world'
 
@@ -42,6 +42,21 @@ const freeTiles = (w: World, bi: number, ri: number): { x: number; y: number }[]
   for (const d of w.level.buildings[bi].doors) {
     keepClear.add(d.y * lw + d.x)
     for (const [dx, dy] of ORTHO) keepClear.add((d.y + dy) * lw + (d.x + dx))
+  }
+  // Mirror furnishInteriors: the bunker guard's straight-line patrol ring is a
+  // promised-open lane that furniture never occupies.
+  const b = w.level.buildings[bi]
+  if (b.role === 'bunker' && b.rooms.length > 0) {
+    const band = b.rooms[0]
+    const [rx, ry, rw, rh] = [band.x + 1, band.y + 1, band.w - 2, band.h - 2]
+    for (let tx = rx; tx < rx + rw; tx++) {
+      keepClear.add(ry * lw + tx)
+      keepClear.add((ry + rh - 1) * lw + tx)
+    }
+    for (let ty = ry; ty < ry + rh; ty++) {
+      keepClear.add(ty * lw + rx)
+      keepClear.add(ty * lw + (rx + rw - 1))
+    }
   }
   const free: { x: number; y: number }[] = []
   for (let ty = room.y; ty < room.y + room.h; ty++) {
@@ -98,7 +113,7 @@ describe('furnish interiors — rooms are no longer empty boxes', () => {
     }
   })
 
-  it('placed furniture is destructible and role-appropriate', () => {
+  it('placed furniture is destructible and appropriate to its ROOM type', () => {
     for (const s of seeds) {
       for (const f of floors) {
         const w = populated(s, f)
@@ -108,8 +123,12 @@ describe('furnish interiors — rooms are no longer empty boxes', () => {
           expect(e.health!.hp).toBeGreaterThan(0)
           const bi = buildingAt(w.level, e.pos.x, e.pos.y)
           expect(bi, `prop outside any building (${e.archetype})`).toBeGreaterThanOrEqual(0)
-          const role = w.level.buildings[bi].role
-          expect(FURNISH[role], `${e.archetype} not in the ${role} palette`).toContain(e.archetype)
+          const b = w.level.buildings[bi]
+          const ri = roomOwningTile(b.rooms, Math.floor(e.pos.x), Math.floor(e.pos.y))
+          expect(ri, `prop outside any room (${e.archetype})`).toBeGreaterThanOrEqual(0)
+          const type = b.roomTypes![ri]
+          expect(type, `room ${ri} of building ${bi} has no type`).toBeDefined()
+          expect(ROOM_FURNISH[type], `${e.archetype} not in the ${type} palette`).toContain(e.archetype)
         }
       }
     }
@@ -160,6 +179,75 @@ describe('furnish interiors — placement never breaks a room', () => {
           }
         }
       }
+    }
+  })
+})
+
+describe('furnish interiors — positions make sense for the prop', () => {
+  const wallCount = (w: World, tx: number, ty: number): number => {
+    let c = 0
+    for (const [dx, dy] of ORTHO) if (isWallTile(tileAt(w.level, tx + dx, ty + dy))) c++
+    return c
+  }
+
+  it('wall props hug walls, corner props sit in corners, center props stay off walls', () => {
+    // The graceful degradation makes the naive assertion ("every shelf touches a
+    // wall") false in crowded rooms — so assert the exact contract instead: in
+    // any room with enough preferred tiles that no placement could have run dry
+    // (≥ one spare per prop placed, whatever order tiles were consumed in),
+    // every prop MUST have landed on its preferred tile class.
+    for (const s of seeds) {
+      for (const f of floors) {
+        const w = populated(s, f)
+        const props = furniture(w)
+        for (let bi = 0; bi < w.level.buildings.length; bi++) {
+          const rooms = w.level.buildings[bi].rooms
+          for (let ri = 0; ri < rooms.length; ri++) {
+            const inRoom = propsInRoom(w, bi, ri, props)
+            if (inRoom.length === 0) continue
+            const free = freeTiles(w, bi, ri)
+            const total = inRoom.length
+            const wallTiles = free.filter((t) => wallCount(w, t.x, t.y) >= 1).length
+            const cornerTiles = free.filter((t) => wallCount(w, t.x, t.y) >= 2).length
+            const centerTiles = free.filter((t) => wallCount(w, t.x, t.y) === 0).length
+            for (const e of inRoom) {
+              const pref = PROP_PLACEMENT[e.archetype] ?? 'any'
+              const walls = wallCount(w, Math.floor(e.pos.x), Math.floor(e.pos.y))
+              const tag = `seed ${s} floor ${f} b${bi} r${ri} ${e.archetype}`
+              if ((pref === 'wall' || pref === 'corner') && wallTiles >= total) {
+                expect(walls, `${tag} should back onto a wall`).toBeGreaterThanOrEqual(1)
+              }
+              if (pref === 'corner' && cornerTiles >= total) {
+                expect(walls, `${tag} should tuck into a corner`).toBeGreaterThanOrEqual(2)
+              }
+              if (pref === 'center' && centerTiles >= total) {
+                expect(walls, `${tag} should stand mid-room`).toBe(0)
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it('signature props actually turn up in their signature rooms across a floor sweep', () => {
+    // Not a per-room guarantee (palettes are weighted draws) but across many
+    // seeds each signature pairing must occur — proving room types flow all the
+    // way through to the furniture on the floor.
+    const seen = new Set<string>()
+    for (const s of seeds) {
+      for (const f of floors) {
+        const w = populated(s, f)
+        for (const e of furniture(w)) {
+          const bi = buildingAt(w.level, e.pos.x, e.pos.y)
+          const b = w.level.buildings[bi]
+          const ri = roomOwningTile(b.rooms, Math.floor(e.pos.x), Math.floor(e.pos.y))
+          seen.add(`${b.roomTypes![ri]}:${e.archetype}`)
+        }
+      }
+    }
+    for (const pair of ['bedroom:bunk', 'bathroom:toilet', 'shopfloor:shelf', 'stockroom:crate', 'office:desk']) {
+      expect(seen, `never saw ${pair} in ${[...seen].length} pairings`).toContain(pair)
     }
   })
 })

@@ -17,7 +17,9 @@ await record({
     const live = (a) => w.entities.filter((e) => e.archetype === a && !e.dead).length
     const door = w.entities.filter((e) => e.door).sort((a, b) => Math.hypot(a.pos.x - 12, a.pos.y - 11) - Math.hypot(b.pos.x - 12, b.pos.y - 11))[0]
     const pl = w.entities.find((e) => e.playerCtl)
-    return { gameOver: w.gameOver, thugs: live('thug'), doorOpen: !!door?.door.open, bag: pl.playerCtl.inventory.reduce((n, i) => n + i.qty, 0), hp: pl.health.hp }
+    // Inventory lives on the shared `loadout` component since the npc-inventory
+    // merge — playerCtl no longer carries it.
+    return { gameOver: w.gameOver, thugs: live('thug'), doorOpen: !!door?.door.open, bag: (pl.loadout?.inventory ?? []).reduce((n, i) => n + i.qty, 0), hp: pl.health.hp }
   },
   expect: (s) => [
     !s.doorOpen && 'door never opened',

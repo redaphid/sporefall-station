@@ -103,7 +103,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   mount.appendChild(app.canvas)
 
   // --- Theme: `?theme=` (dev, session-only) beats the persisted setting.
-  // Sporefall Station is the only shipped pack; the chain is [swampspace] and
+  // Default is the hi-res pack; its chain is [swampspace-hires, swampspace] and
   // every miss falls through to procedural art.
   const themeParam = new URLSearchParams(location.search).get('theme')
   let chain: ThemeChain = await loadThemeChain(resolveThemeId(themeParam, loadSettings().theme))

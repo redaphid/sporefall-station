@@ -8,6 +8,7 @@
 
 import { Assets, Container, Sprite, Texture, type Renderer } from 'pixi.js'
 import {
+  BASE_THEME_ID,
   CHAR_NAMES,
   DEFAULT_THEME_ID,
   DIRS5,
@@ -82,12 +83,13 @@ export const fetchTheme = async (id: string): Promise<LoadedTheme | undefined> =
 }
 
 /** Build the resolution chain for a theme id: [active, swampspace-base]
- * (swampspace alone when it IS the active theme — the normal case now that it is
- * the only shipped pack; possibly shorter when a fetch fails). */
+ * (swampspace alone when it IS the active theme; possibly shorter when a fetch
+ * fails). The default hi-res pack thus resolves as [swampspace-hires,
+ * swampspace] — any key it doesn't map falls back to the base pack. */
 export const loadThemeChain = async (id: string): Promise<ThemeChain> => {
   const wanted = isValidThemeId(id) ? id : DEFAULT_THEME_ID
-  const base = await fetchTheme(DEFAULT_THEME_ID)
-  const active = wanted === DEFAULT_THEME_ID ? undefined : await fetchTheme(wanted)
+  const base = await fetchTheme(BASE_THEME_ID)
+  const active = wanted === BASE_THEME_ID ? undefined : await fetchTheme(wanted)
   return [active, base].filter((t): t is LoadedTheme => t !== undefined)
 }
 
@@ -99,7 +101,7 @@ export interface ThemeInfo {
 /** Themes advertised to the settings picker (public/themes/index.json). Any
  * failure falls back to just the default theme — the picker never breaks. */
 export const listThemes = async (): Promise<ThemeInfo[]> => {
-  const fallback: ThemeInfo[] = [{ id: DEFAULT_THEME_ID, name: 'Sporefall Station' }]
+  const fallback: ThemeInfo[] = [{ id: DEFAULT_THEME_ID, name: 'Sporefall Station (hi-res)' }]
   try {
     const res = await fetch(`${BASE}themes/index.json`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)

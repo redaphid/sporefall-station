@@ -39,7 +39,7 @@ export const defaultSettings = (): GameSettings => ({
   hapticsIntensity: 0.7,
   effectsQuality: 'high',
   shaderFx: 'full',
-  theme: 'swampspace',
+  theme: 'swampspace-hires',
   fullscreen: true,
 })
 

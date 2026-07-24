@@ -10,10 +10,15 @@
 
 import { ANIM_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
-// Sporefall Station is the one shipped theme (the old city/test packs are no
-// longer supported). It is also the fallback base of the resolution chain, so
-// any un-mapped sprite falls through to procedural art rather than another pack.
-export const DEFAULT_THEME_ID = 'swampspace'
+// The hi-res Sporefall Station pack (artScale 2 — themeLoader bakes it at
+// double texture density over the same logical sizes) is the default theme.
+export const DEFAULT_THEME_ID = 'swampspace-hires'
+
+// The original 48px pack stays the fallback BASE of every resolution chain, so
+// any sprite the active pack doesn't map falls through to it (and then to
+// procedural art) rather than going blank. The old city/test packs are no
+// longer supported.
+export const BASE_THEME_ID = 'swampspace'
 
 /** Theme ids are folder names under public/themes/ — keep them URL/path safe. */
 const THEME_ID_RE = /^[a-z0-9][a-z0-9-]*$/

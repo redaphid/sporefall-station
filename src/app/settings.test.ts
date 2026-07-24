@@ -61,16 +61,16 @@ describe('clampSettings', () => {
     expect(clampSettings({ fullscreen: 'yes' }).fullscreen).toBe(true) // non-bool → default
   })
 
-  it('defaults theme to swampspace', () => {
-    expect(clampSettings({}).theme).toBe('swampspace')
+  it('defaults theme to swampspace-hires', () => {
+    expect(clampSettings({}).theme).toBe('swampspace-hires')
   })
 
   it('keeps a valid theme id and rejects invalid ones', () => {
     expect(clampSettings({ theme: 'swamp-2' }).theme).toBe('swamp-2')
-    expect(clampSettings({ theme: 'Swamp' }).theme).toBe('swampspace') // uppercase
-    expect(clampSettings({ theme: '../etc' }).theme).toBe('swampspace') // traversal
-    expect(clampSettings({ theme: '' }).theme).toBe('swampspace')
-    expect(clampSettings({ theme: 'x'.repeat(65) }).theme).toBe('swampspace')
-    expect(clampSettings({ theme: 42 }).theme).toBe('swampspace')
+    expect(clampSettings({ theme: 'Swamp' }).theme).toBe('swampspace-hires') // uppercase
+    expect(clampSettings({ theme: '../etc' }).theme).toBe('swampspace-hires') // traversal
+    expect(clampSettings({ theme: '' }).theme).toBe('swampspace-hires')
+    expect(clampSettings({ theme: 'x'.repeat(65) }).theme).toBe('swampspace-hires')
+    expect(clampSettings({ theme: 42 }).theme).toBe('swampspace-hires')
   })
 })

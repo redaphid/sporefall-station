@@ -23,7 +23,6 @@ const player = (weaponId: string, mods?: { id: string; stacks: number }[]): Enti
     playerCtl: {
       playerId: 0,
       abilityCooldown: 0,
-      cash: 0,
       crimeUntilTick: 0,
     },
     loadout: {

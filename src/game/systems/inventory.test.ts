@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
 import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { addItem, equipSlot, MAX_SLOTS, throwActive } from './inventory'
 
 const player = (w: World): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', 20, 20))
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, crimeUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
@@ -41,43 +41,36 @@ describe('inventory', () => {
     expect(addItem(slots, 'overflow', 1)).toBe(false)
   })
 
-  it('equipping a weapon slot changes the active weapon', () => {
+  it('a weapon slot can NEVER be equipped — the weapon is permanent', () => {
     const e = player(w)
     e.loadout!.inventory = [
       { itemId: 'bat', qty: 12 },
-      { itemId: 'pistol', qty: 8 },
+      { itemId: 'pistol', qty: 1 },
     ]
-    expect(equipSlot(e, 1)).toBe(true)
-    expect(e.loadout!.activeSlot).toBe(1)
-    expect(e.combat!.weapon).toBe('pistol')
+    expect(equipSlot(e, 0)).toBe(false)
+    expect(equipSlot(e, 1)).toBe(false)
+    expect(e.loadout!.activeSlot).toBe(-1)
+    expect(e.combat!.weapon).toBe('fists') // untouched by the hotbar
   })
 
-  it.runIf(!INFINITE_AMMO)('firing a ranged weapon decrements its ammo and stops at empty', () => {
-    // The normal (finite) ammo economy — guarded whenever the INFINITE_AMMO
-    // testing toggle is OFF. When ON, the depletion is intentionally skipped
-    // (covered by infiniteAmmo.test.ts), so this economy assertion is inert.
+  it('firing a ranged weapon never decrements it — there is no ammo', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'pistol', qty: 2 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = 'pistol'
+    e.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }]
     const shots = () => w.entities.filter((x) => x.projectile).length
 
-    combatSystem(w, attack())
-    e.combat!.cooldown = 0
-    combatSystem(w, attack())
-    e.combat!.cooldown = 0
-    expect(e.loadout!.inventory[0].qty).toBe(0)
-    const firedTwice = shots()
-    expect(firedTwice).toBe(2)
-
-    combatSystem(w, attack()) // empty — no shot
-    expect(shots()).toBe(firedTwice)
-    expect(e.loadout!.inventory[0].qty).toBe(0)
+    for (let i = 0; i < 20; i++) {
+      e.combat!.cooldown = 0
+      combatSystem(w, attack())
+    }
+    expect(shots()).toBe(20)
+    expect(e.loadout!.inventory[0].qty).toBe(1) // never drew down
   })
 
   it('a melee weapon breaks when its durability runs out', () => {
     const e = player(w)
+    e.combat!.weapon = 'knife'
     e.loadout!.inventory = [{ itemId: 'knife', qty: 2 }]
-    equipSlot(e, 0)
     combatSystem(w, attack())
     e.combat!.cooldown = 0
     combatSystem(w, attack())

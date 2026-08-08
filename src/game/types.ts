@@ -80,6 +80,9 @@ export type SimEvent =
   | { type: 'hit'; x: number; y: number; targetId: EntityId; amount: number }
   | { type: 'death'; x: number; y: number; entityId: EntityId }
   | { type: 'doorToggle'; entityId: EntityId; open: boolean }
+  /** A close was refused because `byId`'s body is standing in the doorway — a shut
+   * door's tile is solid, so closing it there would entomb them permanently. */
+  | { type: 'doorBlocked'; entityId: EntityId; byId: EntityId }
   /** `byId` began picking `entityId`'s lock: `ticks` is the full channel length
    * so any UI (host or net client) can draw a progress ring from this alone. */
   | { type: 'pickStart'; entityId: EntityId; byId: EntityId; ticks: number }

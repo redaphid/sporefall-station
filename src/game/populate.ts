@@ -551,29 +551,30 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
   return null
 }
 
-// Loot is tiered by depth: floor 1 stays basic (bat/knife/bandages), then the
-// element arsenal folds in so the frost/fire/shock/sleep/poison systems come
-// online as you descend. Shops always stock element gear (see stockShop), so
-// the interaction combos stay reachable regardless of how the dice fall.
-const BASIC_LOOT = ['bat', 'knife', 'bandage', 'bandage', 'medkit', 'cash']
+// Loot is tiered by depth. WEAPONS ARE NOT LOOT any more: the player carries one
+// permanent pistol and cannot pick a weapon up, so a weapon on the floor would be
+// a dead sparkle. The weapon slots in the table are REPURPOSED to throwables —
+// the remaining offensive pickup — so the floor still rewards exploration and the
+// frost/fire/shock/sleep/poison systems still come online as you descend. Shops
+// always stock element gear (see stockShop), so the combos stay reachable.
+const BASIC_LOOT = ['molotov', 'grenade', 'bandage', 'bandage', 'medkit', 'cash']
 const ELEMENT_THROWABLES = ['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade']
-const ELEMENT_WEAPONS = ['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun']
-const GUNS = ['shotgun', 'machinegun']
 
-/** The floor's random-loot table: basics everywhere, element throwables and a
- * couple of element weapons from floor 2, the full arsenal from floor 3 on. */
+/** The floor's random-loot table: basics everywhere, the element throwables from
+ * floor 2, weighted up again from floor 3 on. */
 const lootTable = (floor: number): string[] => {
   const table = [...BASIC_LOOT]
-  if (floor >= 2) table.push(...ELEMENT_THROWABLES, 'freezeRay', 'sledgehammer')
-  if (floor >= 3) table.push(...ELEMENT_WEAPONS, ...GUNS, ...ELEMENT_THROWABLES)
+  if (floor >= 2) table.push(...ELEMENT_THROWABLES)
+  if (floor >= 3) table.push(...ELEMENT_THROWABLES)
   return table
 }
 
 /** Element gear a shop can carry — the reliable place to gear up on any floor,
- * so freeze-shatter / fire-spread combos are always within reach. */
+ * so freeze-shatter / fire-spread combos are always within reach. Weapons are
+ * gone from the stock list (the player's pistol is permanent); the shop now
+ * trades purely in throwables and healing. */
 const SHOP_STOCK = [
-  'freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun', 'shotgun',
-  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit',
+  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit', 'bandage',
 ]
 
 const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number): void => {
@@ -582,7 +583,7 @@ const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number)
   addEntity(w, e)
 }
 
-/** Lay out a shop's wares: a handful of element weapons/throwables on the floor
+/** Lay out a shop's wares: a handful of element throwables on the floor
  * for the taking, so every run has somewhere to buy into the element systems. */
 const stockShop = (w: World, rng: Rng, building: Building): void => {
   const n = rng.int(2, 4)

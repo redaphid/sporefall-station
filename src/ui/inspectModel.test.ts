@@ -152,18 +152,16 @@ describe('aiPhrase — AI state in plain words', () => {
 })
 
 describe('buildInfoCard — players', () => {
-  it('reads slot, cash, weapon and the modded build', () => {
+  it('reads slot, weapon and the modded build', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
-    p.combat!.weapon = 'shotgun'
-    p.loadout!.inventory.push({ itemId: 'shotgun', qty: 6, mods: [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }] })
-    p.loadout!.activeSlot = p.loadout!.inventory.length - 1
-    p.playerCtl!.cash = 120
+    // The permanent pistol in slot 0 is where mods live (weaponStack).
+    p.loadout!.inventory[0].mods = [{ id: 'frost', stacks: 1 }, { id: 'bounce', stacks: 2 }]
     const card = buildInfoCard(p)
     const rows = rowMap(card.rows)
     expect(rows.Player).toBe('P1')
-    expect(rows.Cash).toBe('$120')
-    expect(rows.Weapon).toBe('Shotgun')
+    expect(rows.Weapon).toBe('Pistol')
+    expect(rows.Cash).toBeUndefined() // money was removed from the game
     expect(rows['❄️ Cryo Rounds']).toBe('×1')
     expect(rows['🪃 Bouncy']).toBe('×2')
   })
@@ -268,8 +266,7 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
     })
   }
 
-  it('cash and the mission briefcase read as flavor, quantity shows for stacks', () => {
-    expect(buildInfoCard(pickup('cash', 1)).tagline).toMatch(/[Mm]oney/)
+  it('the mission briefcase reads as flavor, quantity shows for stacks', () => {
     expect(buildInfoCard(pickup('briefcase')).tagline).toMatch(/goods|came for/)
     expect(rowMap(buildInfoCard(pickup('medkit', 2)).rows).Item).toBe('Medkit ×2')
   })
@@ -286,9 +283,9 @@ describe('buildInfoCard — world objects (every OBJECTS entry)', () => {
     })
   }
 
-  it('an ATM says what it dispenses; a vending machine names the snack', () => {
+  it('a supply terminal says what it dispenses; a vending machine names the snack', () => {
     const w = world()
-    expect(rowMap(buildInfoCard(spawnObject(w, 'atm', 1, 1)).rows).Dispenses).toBe('$50')
+    expect(rowMap(buildInfoCard(spawnObject(w, 'atm', 1, 1)).rows).Dispenses).toBe('Medkit')
     expect(rowMap(buildInfoCard(spawnObject(w, 'vending', 2, 2)).rows).Dispenses).toBe('Burger')
   })
 

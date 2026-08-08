@@ -141,7 +141,7 @@ describe('sessions spawn a ready-to-play avatar with no selection step', () => {
     const session = new HostSession(7, stubInput)
     // The avatar exists BEFORE any tick — nothing waits on a selection screen.
     expect(session.self.combat!.weapon).toBe('pistol')
-    expect(session.self.loadout!.activeSlot).toBe(0)
+    expect(session.self.loadout!.activeSlot).toBe(-1) // nothing HELD; the pistol is permanent
     expect(session.self.playerCtl!.abilityCooldown).toBe(0) // grenade special ready
     for (let i = 0; i < 10; i++) session.tick() // and the real systems run on it
     expect(session.world.tick).toBe(10)

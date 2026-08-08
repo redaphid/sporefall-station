@@ -32,7 +32,7 @@ describe('draftCards — display data', () => {
   it('maps ids to kid-readable cards, dropping unknowns', () => {
     const cards = draftCards(['frost', 'nope', 'bounce'])
     expect(cards.map((c) => c.id)).toEqual(['frost', 'bounce'])
-    expect(cards[0]).toMatchObject({ name: MODS.frost.name, blurb: MODS.frost.blurb, icon: MODS.frost.icon, rarity: 'rare' })
+    expect(cards[0]).toMatchObject({ name: MODS.frost.name, blurb: MODS.frost.blurb, icon: MODS.frost.icon, rarity: MODS.frost.rarity })
   })
 })
 

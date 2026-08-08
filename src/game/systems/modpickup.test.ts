@@ -110,7 +110,6 @@ describe('mod pickup — degenerate inputs are safe', () => {
     step(w)
     // The phantom is healed: pistol slotted + equipped, and the mod landed on it.
     expect(weaponStack(p)?.itemId).toBe('pistol')
-    expect(p.loadout!.activeSlot).toBe(0)
     expect(p.combat!.weapon).toBe('pistol')
     expect(mods(p)).toEqual([{ id: 'incendiary', stacks: 1 }])
     expect(w.byId.get(pick.id)).toBeUndefined() // consumed + swept

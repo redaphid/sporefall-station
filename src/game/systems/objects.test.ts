@@ -64,12 +64,11 @@ describe('interactive objects', () => {
     expect(w.events.some((e) => e.type === 'explosion')).toBe(false)
   })
 
-  it('an ATM dispenses cash once when used', () => {
+  it('a supply terminal dispenses a medkit once when used', () => {
     const p = player(w)
     const atm = spawnObject(w, 'atm', 11, 10)
-    const before = p.playerCtl!.cash
     expect(useObject(w, p, atm)).toBe(true)
-    expect(p.playerCtl!.cash).toBeGreaterThan(before)
+    expect(w.entities.some((e) => e.pickup?.itemId === 'medkit')).toBe(true)
     // Second use is empty.
     expect(useObject(w, p, atm)).toBe(false)
   })

@@ -66,6 +66,16 @@ the next launch. A long-lived tab re-checks hourly and on every re-focus. The pa
 is deliberately *not* force-reloaded — yanking someone out of a run mid-game is
 worse than being one version behind until the next launch.
 
+**Rolling the service worker back is NOT just a revert.** Reverting the commit (or
+`wrangler rollback`) makes `/sw.js` 404 into the SPA fallback — browsers that
+already registered it then fail the update check and *keep the old worker*, serving
+the cached app forever. To actually retire it, deploy a self-destroying worker
+first: set `selfDestroying: true` on `VitePWA(...)` in `vite.config.ts` and push.
+That ships a `sw.js` that unregisters itself and clears its caches. Once clients
+have picked that up, the plugin can be removed. For an ordinary bad-build rollback
+(SW staying in place), a normal revert + redeploy is fine — the new precache
+manifest simply replaces the old one.
+
 The worker entry (`src/worker/index.ts`) type-checks separately from the browser
 app via `tsconfig.worker.json` (workerd globals, not DOM); `pnpm run build` runs
 both compiles.

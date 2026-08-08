@@ -371,6 +371,12 @@ export const ALERT_BROADCAST_TICKS = 60
  */
 const raiseStationAlert = (w: World, focus: Entity): void => {
   if (w.mission.alertTick !== undefined) return // latched: once per floor
+  // A posthumous completion (the party wiped, then a fire finished the target)
+  // hands us a CORPSE as the focus — `nearestPlayer` falls back to any player
+  // entity, live or not. Raising the alert on one would park the whole floor on
+  // a dead body and broadcast at it for the rest of the level. No intruder left
+  // standing, no manhunt.
+  if (focus.dead) return
   const doorsOpened = releaseAllDoors(w)
   raiseFloorAggro(w, focus)
   // The alert SUBSUMES the stage-one gateway breach: it is a strict superset

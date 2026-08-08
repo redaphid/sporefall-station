@@ -242,7 +242,14 @@ const pursueMemory: Consideration = (w, e) => {
 // Scored just above the other MEMORY-tier drives so a live remembered trail
 // (pursueMemory/hunt, which are better information) still wins over a
 // second-hand broadcast.
-const MANHUNT_SCORE = MEMORY_SCORE + 0.2
+/** Must clear the highest INCUMBENT memory-tier score a hunter can be sitting
+ * on, because `decide` hands the standing goal a `HYSTERESIS_MARGIN` bonus: a
+ * hunter already sweeping (`hunt`'s SEARCH, 1.4) compares at 1.4 * 1.25 = 1.75,
+ * so a broadcast scored at 1.7 would lose and the crew would keep searching an
+ * empty room while the station screamed at them. 1.9 clears that, and still
+ * sits UNDER squad formation-keeping (2.0), so a squad answers the call as a
+ * unit behind its lead instead of dissolving into individual runners. */
+const MANHUNT_SCORE = MEMORY_SCORE + 0.4
 /** Below this distance to the broadcast mark the call adds nothing — the hunter
  * is already there and should be looking around, not re-walking to the spot. */
 const MANHUNT_ARRIVE = 1.5

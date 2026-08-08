@@ -90,6 +90,30 @@ def black_key(im: Image.Image, dist_thresh: float = 30, lum_thresh: float = 22) 
     return Image.fromarray(rgba, "RGBA")
 
 
+def corner_bg(im: Image.Image) -> np.ndarray:
+    """Median of the four corner pixels — the flat studio backdrop the prompt
+    asked for. Sampled rather than assumed: SDXL renders "plain flat white" as a
+    slightly warm off-white (~217,215,214), so a hardcoded pure-white key leaves
+    a halo."""
+    a = np.asarray(im.convert("RGB")).astype(np.float32)
+    h, w, _ = a.shape
+    return np.median(np.stack([a[3, 3], a[3, w - 4], a[h - 4, 3], a[h - 4, w - 4]]), axis=0)
+
+
+def flat_key(im: Image.Image, dist_thresh: float = 38) -> Image.Image:
+    """Derive alpha from distance to the sampled corner backdrop — the LIGHT-bg
+    counterpart to `black_key`.
+
+    Needed whenever the server has no alpha-cut node: the graph's
+    `Image Rembg (Remove Background)` lives in a custom pack, so a bare ComfyUI
+    returns the raw on its backdrop with no alpha and `bbox_crop` would keep the
+    whole frame. On the flat backdrop these prompts produce, a plain distance
+    threshold is stable — subject coverage moves <1% between thresh 20 and 60."""
+    rgb = np.asarray(im.convert("RGB"))
+    dist = np.sqrt(((rgb.astype(np.float32) - corner_bg(im)) ** 2).sum(-1))
+    return Image.fromarray(np.dstack([rgb, np.where(dist > dist_thresh, 255, 0).astype(np.uint8)]), "RGBA")
+
+
 def has_alpha(im: Image.Image) -> bool:
     """True if the image carries a meaningful (non-fully-opaque) alpha channel."""
     if im.mode not in ("RGBA", "LA", "P"):
@@ -110,7 +134,12 @@ def sprite(src: Image.Image, canvas: int, content: int | None = None,
     raws (Rembg'd items) straight through and keys only the black-bg ones."""
     content = content or canvas
     if not has_alpha(src):
-        src = black_key(src)
+        # Which backdrop is it on? The durable anchors/FX are black; a raw that
+        # skipped the (custom-pack) Rembg node keeps the prompt's light studio
+        # backdrop. Keying a light bg with `black_key` would mark the WHOLE
+        # frame opaque, so pick by the sampled corner's brightness.
+        bg_lum = float(corner_bg(src) @ np.array([0.299, 0.587, 0.114], np.float32))
+        src = flat_key(src) if bg_lum > 128 else black_key(src)
     im = bbox_crop(src)
     w, h = im.size
     if w >= h:

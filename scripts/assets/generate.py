@@ -179,13 +179,21 @@ CHARS = {
     # dominant color (near-black chitin; olive/teal/tan/gray are all taken).
     # Violet is a palette ACCENT ("use sparingly"), so it is glow only, not mass.
     "stalker": ("mireclaw-stalker",
-                "a low-slung six-legged alien scavenger beast, long lean body held horizontal "
-                "close to the ground, dark brown-black chitin plates with pale bone ridges "
-                "along the spine, two oversized scythe-shaped front claws, a narrow eyeless "
-                "wedge head with mandibles, faint violet bioluminescent glow in the joint "
-                "seams, crouched stance, body much wider than it is tall",
-                "human, person, upright, standing biped, two legs, spacesuit, helmet, visor, "
-                "orange cap, teal suit, green skin, moss, olive, tall, slim, hulking muscular"),
+                "a low-slung six-legged alien scavenger beast shaped like a giant crab-mantis, "
+                "long lean horizontal body carried close to the ground on six splayed insect "
+                "legs, no upright torso, dark brown-black chitin plates with pale bone ridges "
+                "along the spine, two oversized scythe-shaped front claws held low, a narrow "
+                "eyeless wedge head with mandibles jutting FORWARD from the front of the body, "
+                "faint violet bioluminescent glow in the joint seams, "
+                "wide flat crouched silhouette twice as wide as it is tall",
+                # 3 of the first 4 seeds drifted to an UPRIGHT humanoid, and the recipe's
+                # "feet on the ground" invites a painted dirt mound that the background key
+                # then welds into the silhouette as a grey slab. Both are negatived hard.
+                "human, person, humanoid, upright, standing biped, two legs, bipedal, torso, "
+                "wings, spear, weapon in hand, spacesuit, helmet, visor, orange cap, teal suit, "
+                "green skin, moss, olive, tall, slim, hulking muscular, "
+                "ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
+                "cast shadow on the ground, diorama"),
 }
 CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
 
@@ -346,6 +354,17 @@ def resolve_refs(spec):
     return []
 
 
+def spec_alpha(spec):
+    """Whether to ask the server to cut the background.
+
+    `NO_REMBG=1` for a ComfyUI without the pack that provides
+    `Image Rembg (Remove Background)` — the raw then comes back on its flat
+    studio backdrop and `post.sprite` keys it locally (`post.flat_key`)."""
+    if os.environ.get("NO_REMBG"):
+        return False
+    return spec.get("alpha", True)
+
+
 def load_curation():
     return json.load(open(CURATION)) if os.path.exists(CURATION) else {}
 
@@ -372,7 +391,7 @@ def sweep(names, seeds=6, base_seed=414500):
                 pos=spec["pos"], neg=spec["neg"], seed=base_seed + done, batch=n,
                 seamless=spec.get("seamless", False), refs=refs or None,
                 ip_weight=spec.get("ipw", 0.8), init=init,
-                denoise=spec.get("denoise", 1.0), alpha=spec.get("alpha", True),
+                denoise=spec.get("denoise", 1.0), alpha=spec_alpha(spec),
                 prefix=name.replace(".", "-") + f"-s{base_seed + done}",
             )
             paths = comfy.run(g, dest)

@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { NPCS } from '../game/data/npcs'
 import {
   DEFAULT_THEME_ID,
   DIRS5,
@@ -324,6 +325,31 @@ describe('shipped theme packs', () => {
       for (const p of resolveSpritePaths(key, chain) ?? [])
         expect(existsSync(join(process.cwd(), 'public', p)), `${key} → ${p}`).toBe(true)
     }
+  })
+
+  // Regression: `brute`, `cinder`, `sporeling`, `stalker`, `lurker` and `pod`
+  // shipped with NO manifest entry, so `themedName` fell through to
+  // `prettyArchetype` and a derelict swamp station labelled its bio-horrors
+  // "Brute", "Cinder", "Pod". Both packs are checked because the hi-res pack
+  // does not `extend` the base — it carries its own full `names` table.
+  it.each(['swampspace', 'swampspace-hires'])('%s gives every spawnable NPC a themed name', (id) => {
+    const { manifest } = validateManifest(load(id))
+    const unnamed = Object.keys(NPCS).filter((a) => manifest.names[a] === undefined)
+    expect(unnamed, `archetypes with no themed name in ${id}`).toEqual([])
+  })
+
+  it.each(['swampspace', 'swampspace-hires'])('%s never names an NPC with its bare archetype id', (id) => {
+    const { manifest } = validateManifest(load(id))
+    // e.g. `"pod": "Pod"` would satisfy the check above while still reading as
+    // placeholder text in game — the name has to actually be lore.
+    const bare = Object.keys(NPCS).filter((a) => manifest.names[a] === prettyArchetype(a))
+    expect(bare, `archetypes named after themselves in ${id}`).toEqual([])
+  })
+
+  it('the two resolution packs agree on every NPC name', () => {
+    const base = validateManifest(load('swampspace')).manifest
+    const hires = validateManifest(load('swampspace-hires')).manifest
+    for (const a of Object.keys(NPCS)) expect(hires.names[a], a).toBe(base.names[a])
   })
 
   it('swampspace manifest validates with zero warnings and every referenced file exists on disk', () => {

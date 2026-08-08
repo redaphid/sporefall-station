@@ -13,14 +13,14 @@ import { emptyInput, type InputCmd } from '../types'
 import { createWorld, type World } from '../world'
 import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { equipSlot } from './inventory'
+
 import { combatSystem } from './combat'
 import { movementSystem } from './movement'
 
 const armed = (w: World, x: number, y: number) => {
   const p = spawnPlayer(w, 0, x, y)
   p.loadout!.inventory = [{ itemId: 'pistol', qty: 99 }]
-  equipSlot(p, 0)
+  p.combat!.weapon = 'pistol'
   return p
 }
 

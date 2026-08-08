@@ -9,7 +9,7 @@ import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
 import { ELEMENTS } from '../data/elements'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { elementSystem, fireSystem } from './fire'
 import { throwActive } from './inventory'
 import { equipSlot } from './inventory'
@@ -56,7 +56,7 @@ describe('item behavior — new guns', () => {
   it('flamethrower sets its target burning (onHit)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     expect(hasStatus(target, 'burning')).toBe(true)
@@ -65,7 +65,7 @@ describe('item behavior — new guns', () => {
   it('flamethrower burn actually chews hp over time (DoT reaches elementSystem)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     const afterHit = target.health!.hp // includes the small impact damage
@@ -79,7 +79,7 @@ describe('item behavior — new guns', () => {
   it('stun gun electrifies and immobilizes its target (onHit)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'stunGun', qty: 4 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'electrified'))
     expect(hasStatus(target, 'electrified')).toBe(true)
@@ -89,27 +89,13 @@ describe('item behavior — new guns', () => {
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
     expect(target.health!.hp).toBe(60) // swing never landed
   })
 
-  it.runIf(!INFINITE_AMMO)('machine gun empties its whole magazine round by round', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'machinegun', qty: 3 }]
-    equipSlot(e, 0)
-    let shots = 0
-    for (let i = 0; i < 5; i++) {
-      const before = w.entities.filter((x) => x.projectile).length
-      combatSystem(w, attack())
-      if (w.entities.filter((x) => x.projectile).length > before) shots++
-      e.combat!.cooldown = 0
-    }
-    expect(shots).toBe(3) // only three rounds were in the mag
-    expect(e.loadout!.inventory[0].qty).toBe(0)
-  })
 })
 
 describe('item behavior — element throwables', () => {
@@ -195,14 +181,14 @@ describe('item behavior — freeze then shatter (element combo through items)', 
       { itemId: 'freezeRay', qty: 6 },
       { itemId: 'bat', qty: 12 },
     ]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     fireUntil(w, () => hasStatus(target, 'frozen'))
     expect(hasStatus(target, 'frozen')).toBe(true)
     // Let the freeze-ray's own hit iframes lapse (as ticks pass in-game); the
     // frost lasts far longer, so the body is still frozen when we swing.
     for (let t = 0; t < 6; t++) statusSystem(w)
     // Switch to the bat and swing: an impact on a frozen body is an instant kill.
-    equipSlot(e, 1)
+    e.combat!.weapon = e.loadout!.inventory[1].itemId
     e.combat!.cooldown = 0
     combatSystem(w, attack())
     expect(target.shattered).toBe(true)
@@ -211,11 +197,14 @@ describe('item behavior — freeze then shatter (element combo through items)', 
 })
 
 describe('item data — well-formedness', () => {
-  it('every ranged weapon has a projectile speed and a magazine', () => {
+  it('every ranged weapon has a projectile speed and NO magazine (ammo is gone)', () => {
     for (const wpn of Object.values(WEAPONS)) {
       if (wpn.kind !== 'ranged') continue
       expect(wpn.projectileSpeed, wpn.id).toBeGreaterThan(0)
-      expect(wpn.magSize, wpn.id).toBeGreaterThan(0)
+      // `magSize`/`ammoPerShot` were removed with the ammo system; a stray one
+      // would silently reintroduce a magazine on a gun that can never reload.
+      expect(wpn, wpn.id).not.toHaveProperty('magSize')
+      expect(wpn, wpn.id).not.toHaveProperty('ammoPerShot')
     }
   })
 

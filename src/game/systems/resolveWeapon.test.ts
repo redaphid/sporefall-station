@@ -11,8 +11,8 @@ const mg = WEAPONS.machinegun
 describe('resolveWeapon — vanilla passthrough', () => {
   it('no mods → base stats, no behaviors, no triggers', () => {
     const r = resolveWeapon(pistol, [])
-    expect(r.damage).toBe(14)
-    expect(r.cooldownTicks).toBe(18)
+    expect(r.damage).toBe(pistol.damage)
+    expect(r.cooldownTicks).toBe(pistol.cooldownTicks)
     expect(r.pellets).toBe(1)
     expect(r.spread).toBe(0)
     expect(r.projectileSpeed).toBe(14)
@@ -37,14 +37,14 @@ describe('resolveWeapon — each STAT mod in isolation', () => {
   it('bulk: +2 pellets, ×0.8 damage, +spread', () => {
     const r = resolveWeapon(pistol, [{ id: 'bulk', stacks: 1 }])
     expect(r.pellets).toBe(3) // 1 + 2
-    expect(r.damage).toBe(Math.round(14 * 0.8)) // 11
+    expect(r.damage).toBe(Math.round(pistol.damage * 0.8))
     expect(r.spread).toBeCloseTo(0.12)
   })
 
   it('overload: ×1.25 damage (compounding) + downside cooldown', () => {
-    expect(resolveWeapon(pistol, [{ id: 'overload', stacks: 1 }]).damage).toBe(Math.round(14 * 1.25)) // 18
-    expect(resolveWeapon(pistol, [{ id: 'overload', stacks: 2 }]).damage).toBe(Math.round(14 * 1.25 ** 2)) // 22
-    expect(resolveWeapon(pistol, [{ id: 'overload', stacks: 1 }]).cooldownTicks).toBe(Math.ceil(18 * 1.08)) // 20
+    expect(resolveWeapon(pistol, [{ id: 'overload', stacks: 1 }]).damage).toBe(Math.round(pistol.damage * 1.25))
+    expect(resolveWeapon(pistol, [{ id: 'overload', stacks: 2 }]).damage).toBe(Math.round(pistol.damage * 1.25 ** 2))
+    expect(resolveWeapon(pistol, [{ id: 'overload', stacks: 1 }]).cooldownTicks).toBe(Math.ceil(pistol.cooldownTicks * 1.08))
   })
 
   it('rapid: faster fire (lower cooldown)', () => {
@@ -118,7 +118,7 @@ describe('resolveWeapon — conflicting / duplicate mods', () => {
     const a = resolveWeapon(pistol, [{ id: 'overload', stacks: 2 }])
     // two separate entries do NOT merge (draft/addMod merge them), but a single
     // entry with the same total stacks is the canonical form.
-    expect(a.damage).toBe(Math.round(14 * 1.25 ** 2))
+    expect(a.damage).toBe(Math.round(pistol.damage * 1.25 ** 2))
   })
 })
 
@@ -132,7 +132,7 @@ describe('resolveWeapon — huge stacks: finite, clamped, no NaN', () => {
 
   it('overload ×1000 is capped at maxStacks (5), damage stays finite', () => {
     const r = resolveWeapon(pistol, [{ id: 'overload', stacks: 1000 }])
-    expect(r.damage).toBe(Math.round(14 * 1.25 ** (MODS.overload.maxStacks ?? 5))) // 43
+    expect(r.damage).toBe(Math.round(pistol.damage * 1.25 ** (MODS.overload.maxStacks ?? 5)))
     assertFinite(r)
   })
 

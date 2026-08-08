@@ -28,15 +28,15 @@ const door = (open: boolean, locked = false, x = 0.5): Entity => {
 
 describe('computeTouchLabels — ATK weapon fallbacks', () => {
   it('names the fists explicitly', () => {
-    expect(computeTouchLabels(view(player({ weapon: 'fists' }))).atk).toBe('Fists')
+    expect(computeTouchLabels(view(player({ weapon: 'fists' }))).atk).toBe('ATK')
   })
 
   it('a non-WEAPON item id (e.g. a throwable in the weapon slot) falls back to Fists', () => {
-    expect(computeTouchLabels(view(player({ weapon: 'banana' }))).atk).toBe('Fists')
+    expect(computeTouchLabels(view(player({ weapon: 'banana' }))).atk).toBe('ATK')
   })
 
   it('an unknown weapon id falls back to Fists rather than crashing', () => {
-    expect(computeTouchLabels(view(player({ weapon: 'zzz-nope' }))).atk).toBe('Fists')
+    expect(computeTouchLabels(view(player({ weapon: 'zzz-nope' }))).atk).toBe('ATK')
   })
 })
 
@@ -98,7 +98,7 @@ describe('computeTouchLabels — degenerate self', () => {
     const p = makeEntity('player', 'player', 0, 0)
     p.combat = { weapon: 'pistol', cooldown: 0 }
     const labels = computeTouchLabels(view(p))
-    expect(labels.atk).toBe('Pistol')
+    expect(labels.atk).toBe('ATK')
     expect(labels.spc).toBe('Grenade')
     expect(labels.spcEnabled).toBe(true) // cd defaults to 0
   })

@@ -76,7 +76,7 @@ describe('item breadth', () => {
     it('a shotgun fires its full spread of pellets in one shot, at varied angles', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       combatSystem(w, attack())
       const pellets = w.entities.filter((x) => x.projectile)
       expect(pellets).toHaveLength(WEAPONS.shotgun.pellets!)
@@ -86,7 +86,7 @@ describe('item breadth', () => {
     it('a freeze ray freezes the target it hits', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'freezeRay', qty: 6 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && !hasStatus(target, 'frozen'); t++) projectileSystem(w)
@@ -96,7 +96,7 @@ describe('item breadth', () => {
     it('a tranquilizer puts the target to sleep', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'tranquilizer', qty: 5 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && target.status!.sleep === 0; t++) projectileSystem(w)
@@ -108,7 +108,7 @@ describe('item breadth', () => {
     it('a sledgehammer stuns what it hits', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'sledgehammer', qty: 12 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       const target = dummy(w, 21, 20)
       combatSystem(w, attack())
       expect(target.status!.stun).toBeGreaterThan(0)

@@ -29,8 +29,9 @@ export const OBJECTS: Record<string, ObjectDef> = {
   tv: { id: 'tv', name: 'TV', hp: 12 },
   toilet: { id: 'toilet', name: 'Toilet', hp: 10 },
   vending: { id: 'vending', name: 'Vending Machine', hp: 40, use: { gives: 'burger' } },
-  // Money is gone, so the ATM is purely a hackable terminal now (no payout).
-  atm: { id: 'atm', name: 'ATM', hp: 50, hackable: true },
+  // Repurposed from the ATM: money is gone, so the wall terminal dispenses a
+  // medkit instead of cash. Still hackable.
+  atm: { id: 'atm', name: 'Supply Terminal', hp: 50, hackable: true, use: { gives: 'medkit' } },
   generator: { id: 'generator', name: 'Generator', hp: 30, hackable: true, explode: { radius: 1.6, damage: 15 }, ignite: true },
   // Sporefall Station power plant — same hackable behavior as `generator`, dressed
   // as the station's Cryo Terminal so a power-cut objective reads in-fiction.

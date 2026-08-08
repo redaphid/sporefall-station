@@ -11,7 +11,6 @@ const armedPlayer = (w: World): number => {
   // The player starter is already a slotted, equipped pistol (a real ItemStack
   // that can carry mods) — no extra arming needed.
   const p = spawnPlayer(w, 0, 20, 20)
-  equipSlot(p, 0)
   return p.id
 }
 

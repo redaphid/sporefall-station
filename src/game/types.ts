@@ -116,6 +116,11 @@ export type SimEvent =
    * by the player — a point-of-no-return that turned the whole floor hostile
    * (alarm maxed, every non-allied NPC aggros the party). Fires once per floor. */
   | { type: 'bossDoorBreached'; entityId: EntityId; x: number; y: number }
+  /** THE ENTRANCE. A live player has laid eyes on the Mireclaw Alpha for the
+   * first time this floor: the UI throws its name card and pins the boss health
+   * bar, and the boss's phase machinery starts running. Fires once per floor
+   * (latched on `mission.bossRevealed`). */
+  | { type: 'bossReveal'; entityId: EntityId; x: number; y: number; maxHp: number }
   /** The gateway breach unsealed the whole floor: every other door popped open.
    * One event for the whole release (not one per door) — x/y is the gate. */
   | { type: 'doorsReleased'; count: number; x: number; y: number }

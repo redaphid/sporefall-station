@@ -173,6 +173,19 @@ CHARS = {
                  "a simple brown rope-belted poncho, webbed feet, half as tall as a human, "
                  "chunky proportions, big head",
                  "human face, spacesuit, helmet, visor, orange cap, teal suit, tall, slim"),
+    # #67 Mireclaw brood scavenger. Diverges from every other kind on BOTH axes
+    # the cast contract cares about: silhouette (the only LOW, HORIZONTAL,
+    # wider-than-tall body — everything else is an upright biped/pod/box) and
+    # dominant color (near-black chitin; olive/teal/tan/gray are all taken).
+    # Violet is a palette ACCENT ("use sparingly"), so it is glow only, not mass.
+    "stalker": ("mireclaw-stalker",
+                "a low-slung six-legged alien scavenger beast, long lean body held horizontal "
+                "close to the ground, dark brown-black chitin plates with pale bone ridges "
+                "along the spine, two oversized scythe-shaped front claws, a narrow eyeless "
+                "wedge head with mandibles, faint violet bioluminescent glow in the joint "
+                "seams, crouched stance, body much wider than it is tall",
+                "human, person, upright, standing biped, two legs, spacesuit, helmet, visor, "
+                "orange cap, teal suit, green skin, moss, olive, tall, slim, hulking muscular"),
 }
 CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
 
@@ -316,6 +329,12 @@ def jobs():
 def resolve_refs(spec):
     """Map a spec's symbolic ref group to concrete anchor image paths."""
     kind = spec.get("refs")
+    # Escape hatch for a ComfyUI without ComfyUI_IPAdapter_plus installed: the
+    # IPAdapter branch in comfy.py is gated on `refs`, so dropping them lets the
+    # rest of the recipe (LoRA + locked palette + prompt contract) still run.
+    # Style consistency then rests on the palette lock alone -- GATE THE OUTPUT.
+    if os.environ.get("NO_IPA"):
+        return []
     if kind == "env":
         return [p for p in ENV_ANCHORS if os.path.exists(p)]
     if kind == "char-anchor":  # this character's curated s-idle raw

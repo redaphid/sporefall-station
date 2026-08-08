@@ -108,10 +108,24 @@ export const aiPhrase = (ai: AiState): string => {
   return MODE_PHRASE[ai.mode] ?? pretty(ai.mode)
 }
 
-/** Innate temperament from the NPC table, human-phrased. */
+/** Innate temperament from the NPC table, human-phrased.
+ *
+ * `NpcDef.hostility` alone LIES for several archetypes, because it is not what
+ * the AI actually reads (`behaviors.isHostileTarget` goes by the faction matrix
+ * + disposition). The gates below restore the cases where the flat flag
+ * contradicts observable behaviour, so the card matches what the player sees:
+ *  - `dormant` things (pod, lurker) are INERT until tripped (`ai.ts`), so
+ *    "Attacks on sight" wrongly warned the player off a stealth set-piece.
+ *  - a non-dormant `power-cut` waker (the Derelict Unit) sleeps through a
+ *    peaceful station and only turns hostile once the lights go out.
+ *  - a `predator` (stalker) culls the WEAKEST and flees a healthy pack — it
+ *    does not simply attack whatever it sees. */
 const hostilityPhrase = (archetype: string): string | undefined => {
   const def = NPCS[archetype]
   if (!def) return undefined
+  if (def.dormant) return 'Dormant — wakes if disturbed'
+  if (def.wakeOn?.includes('power-cut')) return 'Inert — hostile after a power cut'
+  if (def.behavior === 'predator') return 'Preys on the wounded'
   if (def.hostility === 'always') return 'Attacks on sight'
   if (def.hostility === 'lawful') return 'Attacks lawbreakers'
   return def.retaliates ? 'Peaceful — hits back' : 'Peaceful'

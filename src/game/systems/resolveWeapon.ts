@@ -32,7 +32,7 @@ const PELLET_CAP = 32
 const SPEED_CAP = 60
 const KNOCKBACK_CAP = 60
 const BEHAVIOR_CAP = 50 // pierce/bounce/split integer caps
-const HOMING_CAP = 0.5 // radians/tick
+const HOMING_CAP = 0.12 // radians/tick (~3.4°) — bullets CURVE, never hook
 
 const finite = (n: number, fallback = 0): number => (Number.isFinite(n) ? n : fallback)
 const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, finite(n, lo)))

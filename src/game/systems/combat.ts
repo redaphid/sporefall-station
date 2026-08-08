@@ -221,7 +221,10 @@ export const spawnProjectile = (
     const p = e.projectile
     if (spec.pierce) p.pierceLeft = spec.pierce
     if (spec.bounce) p.bounceLeft = spec.bounce
-    if (spec.homing) p.homing = spec.homing
+    if (spec.homing) {
+      p.homing = spec.homing
+      p.aim = e.facing // freeze the shot direction: homing only forgives a near miss
+    }
     if (spec.explodeRadius && spec.explodeDamage) p.explode = { radius: spec.explodeRadius, damage: spec.explodeDamage }
     if (spec.split && spec.split > 0) p.split = { count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }
     // Splinter: a radial shrapnel burst on death — many short-lived, weak fragments

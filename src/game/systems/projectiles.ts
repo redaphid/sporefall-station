@@ -1,32 +1,65 @@
 import { makeEntity, type Entity } from '../entity'
-import { SIM_DT } from '../types'
-import { addEntity, isBlocked, type World } from '../world'
+import { hasLineOfSight } from '../los'
+import { SIM_DT, type EntityId } from '../types'
+import { addEntity, doorClosedAt, isBlocked, type World } from '../world'
 import { applyDamage, detonate, runHitTriggers } from './combat'
 import { applyAreaEffect } from './itemEffects'
+import { isObject } from './objects'
 import { applyStatus } from './statusFx'
 
-/** Steer a homing projectile: rotate its velocity toward the nearest hostile
- * body by at most `homing` radians this tick, preserving speed. Deterministic —
- * nearest wins, ties broken by ascending id, no RNG. */
+/** Shortest signed angle from `b` to `a`, wrapped to (-PI, PI]. */
+const angleDiff = (a: number, b: number): number => {
+  let d = a - b
+  while (d > Math.PI) d -= 2 * Math.PI
+  while (d < -Math.PI) d += 2 * Math.PI
+  return d
+}
+
+/** Half-angle (radians) of the acquisition cone around the LAUNCH heading. A
+ * homing round only ever considers targets inside this cone, so it forgives a
+ * near miss instead of overruling your aim — it can never hook backwards onto
+ * something you were not shooting at. ~28°. */
+const HOMING_CONE = 0.5
+
+/** A body a homing round may steer toward: a living, damageable, NON-player,
+ * NON-object entity. Excluding objects matters — crates and barrels carry
+ * `health`, and without this a bullet would curve into the nearest crate. */
+const isHomingTarget = (e: Entity, ownerId: EntityId): boolean =>
+  e.id !== ownerId && !e.dead && !!e.health && e.kind !== 'projectile' && e.kind !== 'player' && !isObject(e)
+
+/** Steer a homing projectile: rotate its velocity toward the best target by at
+ * most `homing` radians this tick, preserving speed.
+ *
+ * A valid target must be (1) inside `HOMING_CONE` of the round's LAUNCH heading
+ * (`p.aim`, fixed at spawn — NOT the current heading, which would let small
+ * per-tick turns accumulate into a hook), and (2) in unbroken LINE OF SIGHT, so
+ * an enemy behind a wall is never acquired. Nearest qualifying body wins, ties
+ * broken by ascending id. If nothing qualifies the round flies straight.
+ *
+ * Deterministic: no RNG, no wall-clock — a pure function of world state. */
 const homeToward = (w: World, e: Entity): void => {
   const p = e.projectile!
+  const aim = p.aim ?? Math.atan2(e.vel.y, e.vel.x)
   let best: Entity | null = null
   let bestDist = Infinity
   for (const o of w.entities) {
-    if (o.id === p.ownerId || o.dead || !o.health || o.kind === 'projectile' || o.kind === 'player') continue
-    const d = Math.hypot(o.pos.x - e.pos.x, o.pos.y - e.pos.y)
-    if (d < bestDist) {
-      best = o
-      bestDist = d
-    }
+    if (!isHomingTarget(o, p.ownerId)) continue
+    const dx = o.pos.x - e.pos.x
+    const dy = o.pos.y - e.pos.y
+    const d = Math.hypot(dx, dy)
+    if (d >= bestDist) continue
+    // (1) inside the acquisition cone around the ORIGINAL shot direction.
+    if (Math.abs(angleDiff(Math.atan2(dy, dx), aim)) > HOMING_CONE) continue
+    // (2) line of sight — never home through a wall or a closed door.
+    if (!hasLineOfSight(w.level, e.pos.x, e.pos.y, o.pos.x, o.pos.y, (tx, ty) => doorClosedAt(w, tx, ty))) continue
+    best = o
+    bestDist = d
   }
   if (!best) return
   const speed = Math.hypot(e.vel.x, e.vel.y) || 1
   const cur = Math.atan2(e.vel.y, e.vel.x)
   const want = Math.atan2(best.pos.y - e.pos.y, best.pos.x - e.pos.x)
-  let diff = want - cur
-  while (diff > Math.PI) diff -= 2 * Math.PI
-  while (diff < -Math.PI) diff += 2 * Math.PI
+  const diff = angleDiff(want, cur)
   const turn = Math.max(-p.homing!, Math.min(p.homing!, diff))
   const na = cur + turn
   e.vel.x = Math.cos(na) * speed

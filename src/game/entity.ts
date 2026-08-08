@@ -257,8 +257,12 @@ export interface Entity {
     pierceLeft?: number
     /** Wall bounces left — reflect off a blocked tile instead of dying (bounce). */
     bounceLeft?: number
-    /** Per-tick turn rate (radians) steering toward the nearest hostile (homing). */
+    /** Per-tick turn rate (radians) steering toward a hostile in front (homing). */
     homing?: number
+    /** LAUNCH heading, fixed at spawn. Homing only acquires targets inside a
+     * cone around THIS, never around the drifting current heading, so a round
+     * can't accumulate small turns into a hook away from where you aimed. */
+    aim?: number
     /** Spawn N damaging children on the first body it strikes (split/multishot). */
     split?: { count: number; damage: number; speed: number; ttl: number }
     /** Shatter into a RADIAL burst of short-range fragments on ANY termination —

@@ -129,7 +129,10 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
     // Derelict Unit: armour-plated (bullets/melee ping off) and biologically
     // inert (spore/toxins do nothing) — but its servos cook, so FIRE is the key.
-    resist: { physical: 0.4, burning: 1.5, poisoned: 0, spore: 0 },
+    // physical 0.4 → 0.5 for the one-weapon world: with the pistol as the ONLY
+    // gun, 0.4 meant 7.5s of unbroken fire. Fire is still the answer (×1.5),
+    // just no longer mandatory.
+    resist: { physical: 0.5, burning: 1.5, poisoned: 0, spore: 0 },
     // #68: the power-cut rouse is now a data row, not an `archetype ===` branch.
     wakeOn: ['power-cut'],
   },
@@ -150,7 +153,10 @@ export const NPCS: Record<string, NpcDef> = {
     hostility: 'always',
     fleesOnDamage: false,
     behavior: 'hunter',
-    resist: { physical: 0.35, burning: 1.5, poisoned: 1.0 },
+    // physical 0.35 → 0.55 for the one-weapon world: at 0.35 the brute was 271
+    // effective HP — ~12s of continuous pistol fire, which read as immunity, not
+    // resistance. It still soaks ~2× a same-HP enemy and still burns (×1.5).
+    resist: { physical: 0.55, burning: 1.5, poisoned: 1.0 },
   },
   cinder: {
     // Ash-dweller: fireproof, so a flamethrower/molotov build stalls — shoot it.

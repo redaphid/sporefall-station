@@ -52,13 +52,17 @@ export const WEAPONS: Record<string, WeaponDef> = {
     durability: 12,
     onHit: { status: 'stun', ticks: 20 },
   },
+  // The PLAYER'S ONLY WEAPON. Retuned upward from its old starter numbers
+  // (14 dmg / 18 ticks = 23 dps): it used to be the gun you upgraded away from,
+  // so it was balanced against finding a shotgun (40 dps) or machinegun (48 dps).
+  // As the whole arsenal it sits just under those: 18 dmg / 14 ticks = 39 dps.
   pistol: {
     id: 'pistol',
     name: 'Pistol',
     kind: 'ranged',
-    damage: 14,
+    damage: 18,
     range: 10,
-    cooldownTicks: 18,
+    cooldownTicks: 14,
     knockback: 3,
     projectileSpeed: 14,
   },

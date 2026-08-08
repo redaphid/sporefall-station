@@ -11,6 +11,11 @@ import { hashLabel, mulberry32, type Rng } from '../rng'
 /** Rarity weights for the weighted draw (ROUNDS gates power by rarity tier). */
 const RARITY_WEIGHT: Record<ModRarity, number> = { common: 6, rare: 3, legendary: 1 }
 
+/** The elemental mods. With ONE weapon these are the whole counter-play against
+ * a bullet-resistant archetype (the brute burns, the cinder does not), so every
+ * floor's hand is guaranteed to contain at least one — see `floorDraftOffer`. */
+export const ELEMENTAL_MODS = ['frost', 'incendiary', 'shock'] as const
+
 export interface DraftCard {
   id: string
   name: string
@@ -55,9 +60,20 @@ export const weightedModId = (rng: Rng): string => {
 
 /** The deterministic hand offered on clearing `floor` for a run `seed`. Uses a
  * dedicated `draft:<floor>` fork so it is reproducible and independent of the
- * sim RNG — identical on host and every client. */
-export const floorDraftOffer = (seed: number, floor: number, count = 3): string[] =>
-  draftOffer(mulberry32(hashLabel(seed >>> 0, `draft:${floor}`)), count)
+ * sim RNG — identical on host and every client.
+ *
+ * GUARANTEE: the hand always contains at least one elemental. A pistol-only run
+ * that never rolled frost/incendiary/shock would have no answer to a
+ * bullet-resistant brute, so if the weighted draw produced none, the LAST card
+ * is swapped for an elemental drawn from the same stream. Still a pure function
+ * of (seed, floor) — the swap consumes one more value from the same fork. */
+export const floorDraftOffer = (seed: number, floor: number, count = 3): string[] => {
+  const rng = mulberry32(hashLabel(seed >>> 0, `draft:${floor}`))
+  const hand = draftOffer(rng, count)
+  if (hand.length === 0 || hand.some((id) => (ELEMENTAL_MODS as readonly string[]).includes(id))) return hand
+  hand[hand.length - 1] = ELEMENTAL_MODS[rng.int(0, ELEMENTAL_MODS.length - 1)]
+  return hand
+}
 
 /** Presentation data for a set of offered mod ids (kid-readable blurbs/icons). */
 export const draftCards = (ids: readonly string[]): DraftCard[] =>

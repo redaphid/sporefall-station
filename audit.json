@@ -1,0 +1,907 @@
+{
+  "config": {
+    "seeds": [
+      1001,
+      1002,
+      1003,
+      1004,
+      1005,
+      1006,
+      2077,
+      31337
+    ],
+    "floors": [
+      1,
+      2,
+      3
+    ],
+    "ticksPerRun": 2400,
+    "runs": 24,
+    "viewTiles": 12
+  },
+  "registryBehaviors": [
+    "basic",
+    "patrol",
+    "hunter",
+    "skittish",
+    "scavenger",
+    "infected",
+    "vermin",
+    "predator",
+    "mireclaw",
+    "barricader",
+    "lurker",
+    "squad"
+  ],
+  "registryConsiderations": [
+    "panic",
+    "fear",
+    "contagiousFear",
+    "threat",
+    "defendMyWing",
+    "squadFlank",
+    "squadStack",
+    "squadFollow",
+    "fortify",
+    "pounce",
+    "infest",
+    "packAvoid",
+    "stalkWeakest",
+    "enrage",
+    "retreatToSpore",
+    "hunt",
+    "alertGuards",
+    "pursueMemory",
+    "fleeMemory",
+    "investigate",
+    "drawnToStimulus",
+    "patrol",
+    "scavenge",
+    "garrison",
+    "workMyRoom",
+    "wander"
+  ],
+  "goals": [
+    {
+      "goal": "battle",
+      "activations": 1843,
+      "activationsNearPlayer": 295,
+      "ticks": 52164,
+      "ticksNearPlayer": 9722,
+      "distinctNpcs": 198,
+      "seedsSeen": 22,
+      "behaviors": [
+        "barricader",
+        "basic",
+        "hunter",
+        "patrol",
+        "predator",
+        "scavenger",
+        "skittish",
+        "squad",
+        "vermin"
+      ],
+      "closestApproachTiles": 0.5
+    },
+    {
+      "goal": "flee",
+      "activations": 1842,
+      "activationsNearPlayer": 343,
+      "ticks": 52000,
+      "ticksNearPlayer": 7945,
+      "distinctNpcs": 183,
+      "seedsSeen": 21,
+      "behaviors": [
+        "basic",
+        "hunter",
+        "patrol",
+        "predator",
+        "scavenger",
+        "skittish",
+        "squad",
+        "vermin"
+      ],
+      "closestApproachTiles": 0.7
+    },
+    {
+      "goal": "wander",
+      "activations": 1058,
+      "activationsNearPlayer": 53,
+      "ticks": 1773258,
+      "ticksNearPlayer": 24637,
+      "distinctNpcs": 855,
+      "seedsSeen": 24,
+      "behaviors": [
+        "basic",
+        "hunter",
+        "lurker",
+        "mireclaw",
+        "predator",
+        "scavenger",
+        "skittish",
+        "vermin"
+      ],
+      "closestApproachTiles": 1.26
+    },
+    {
+      "goal": "work",
+      "activations": 533,
+      "activationsNearPlayer": 7,
+      "ticks": 808437,
+      "ticksNearPlayer": 3209,
+      "distinctNpcs": 383,
+      "seedsSeen": 24,
+      "behaviors": [
+        "barricader",
+        "basic",
+        "hunter",
+        "skittish",
+        "squad"
+      ],
+      "closestApproachTiles": 1.45
+    },
+    {
+      "goal": "pursue",
+      "activations": 240,
+      "activationsNearPlayer": 184,
+      "ticks": 4249,
+      "ticksNearPlayer": 1180,
+      "distinctNpcs": 37,
+      "seedsSeen": 16,
+      "behaviors": [
+        "barricader",
+        "basic",
+        "hunter",
+        "patrol",
+        "skittish",
+        "squad"
+      ],
+      "closestApproachTiles": 1.38
+    },
+    {
+      "goal": "patrol",
+      "activations": 223,
+      "activationsNearPlayer": 1,
+      "ticks": 269840,
+      "ticksNearPlayer": 1121,
+      "distinctNpcs": 147,
+      "seedsSeen": 24,
+      "behaviors": [
+        "patrol"
+      ],
+      "closestApproachTiles": 2.27
+    },
+    {
+      "goal": "(none)",
+      "activations": 215,
+      "activationsNearPlayer": 0,
+      "ticks": 86289,
+      "ticksNearPlayer": 0,
+      "distinctNpcs": 215,
+      "seedsSeen": 20,
+      "behaviors": [
+        "lurker",
+        "vermin"
+      ],
+      "closestApproachTiles": 3.85
+    },
+    {
+      "goal": "formup",
+      "activations": 204,
+      "activationsNearPlayer": 97,
+      "ticks": 211717,
+      "ticksNearPlayer": 2077,
+      "distinctNpcs": 93,
+      "seedsSeen": 21,
+      "behaviors": [
+        "squad"
+      ],
+      "closestApproachTiles": 1.59
+    },
+    {
+      "goal": "stack",
+      "activations": 73,
+      "activationsNearPlayer": 3,
+      "ticks": 4337,
+      "ticksNearPlayer": 314,
+      "distinctNpcs": 16,
+      "seedsSeen": 11,
+      "behaviors": [
+        "squad"
+      ],
+      "closestApproachTiles": 1.59
+    },
+    {
+      "goal": "garrison",
+      "activations": 56,
+      "activationsNearPlayer": 0,
+      "ticks": 121986,
+      "ticksNearPlayer": 0,
+      "distinctNpcs": 52,
+      "seedsSeen": 24,
+      "behaviors": [
+        "basic",
+        "hunter",
+        "patrol",
+        "skittish",
+        "squad"
+      ],
+      "closestApproachTiles": 10.84
+    },
+    {
+      "goal": "investigate",
+      "activations": 45,
+      "activationsNearPlayer": 0,
+      "ticks": 3696,
+      "ticksNearPlayer": 0,
+      "distinctNpcs": 28,
+      "seedsSeen": 3,
+      "behaviors": [
+        "barricader",
+        "basic",
+        "hunter",
+        "patrol",
+        "skittish",
+        "squad"
+      ],
+      "closestApproachTiles": 29.19
+    },
+    {
+      "goal": "fortify",
+      "activations": 41,
+      "activationsNearPlayer": 1,
+      "ticks": 15961,
+      "ticksNearPlayer": 280,
+      "distinctNpcs": 17,
+      "seedsSeen": 6,
+      "behaviors": [
+        "barricader"
+      ],
+      "closestApproachTiles": 2.68
+    },
+    {
+      "goal": "alert",
+      "activations": 18,
+      "activationsNearPlayer": 1,
+      "ticks": 812,
+      "ticksNearPlayer": 261,
+      "distinctNpcs": 18,
+      "seedsSeen": 11,
+      "behaviors": [
+        "skittish"
+      ],
+      "closestApproachTiles": 0.38
+    },
+    {
+      "goal": "drawn",
+      "activations": 11,
+      "activationsNearPlayer": 0,
+      "ticks": 1524,
+      "ticksNearPlayer": 0,
+      "distinctNpcs": 10,
+      "seedsSeen": 3,
+      "behaviors": [
+        "predator",
+        "vermin"
+      ],
+      "closestApproachTiles": 23.13
+    },
+    {
+      "goal": "scavenge",
+      "activations": 4,
+      "activationsNearPlayer": 0,
+      "ticks": 248,
+      "ticksNearPlayer": 0,
+      "distinctNpcs": 4,
+      "seedsSeen": 4,
+      "behaviors": [
+        "scavenger"
+      ],
+      "closestApproachTiles": 40.41
+    },
+    {
+      "goal": "flank",
+      "activations": 2,
+      "activationsNearPlayer": 2,
+      "ticks": 60,
+      "ticksNearPlayer": 40,
+      "distinctNpcs": 1,
+      "seedsSeen": 1,
+      "behaviors": [
+        "squad"
+      ],
+      "closestApproachTiles": 2.09
+    },
+    {
+      "goal": "search",
+      "activations": 1,
+      "activationsNearPlayer": 1,
+      "ticks": 7,
+      "ticksNearPlayer": 7,
+      "distinctNpcs": 1,
+      "seedsSeen": 1,
+      "behaviors": [
+        "squad"
+      ],
+      "closestApproachTiles": 1.81
+    }
+  ],
+  "behaviors": [
+    {
+      "behavior": "vermin",
+      "distinctNpcs": 500,
+      "npcTicks": 1048784,
+      "npcTicksNearPlayer": 15892,
+      "activations": 890,
+      "activationsNearPlayer": 86,
+      "goalMix": [
+        "wander:975393",
+        "(none):60261",
+        "flee:5955",
+        "battle:5811",
+        "drawn:1364"
+      ]
+    },
+    {
+      "behavior": "skittish",
+      "distinctNpcs": 336,
+      "npcTicks": 739993,
+      "npcTicksNearPlayer": 14251,
+      "activations": 593,
+      "activationsNearPlayer": 34,
+      "goalMix": [
+        "work:405677",
+        "wander:276532",
+        "garrison:45186",
+        "flee:9126",
+        "battle:2446",
+        "alert:812",
+        "investigate:209",
+        "pursue:5"
+      ]
+    },
+    {
+      "behavior": "squad",
+      "distinctNpcs": 147,
+      "npcTicks": 340738,
+      "npcTicksNearPlayer": 7858,
+      "activations": 864,
+      "activationsNearPlayer": 554,
+      "goalMix": [
+        "formup:211717",
+        "work:104723",
+        "garrison:14400",
+        "stack:4337",
+        "battle:3272",
+        "pursue:1047",
+        "flee:975",
+        "investigate:200",
+        "flank:60",
+        "search:7"
+      ]
+    },
+    {
+      "behavior": "hunter",
+      "distinctNpcs": 151,
+      "npcTicks": 323642,
+      "npcTicksNearPlayer": 2397,
+      "activations": 230,
+      "activationsNearPlayer": 15,
+      "goalMix": [
+        "wander:251992",
+        "work:57592",
+        "garrison:9600",
+        "battle:2576",
+        "investigate:1197",
+        "flee:526",
+        "pursue:159"
+      ]
+    },
+    {
+      "behavior": "patrol",
+      "distinctNpcs": 157,
+      "npcTicks": 317522,
+      "npcTicksNearPlayer": 2792,
+      "activations": 438,
+      "activationsNearPlayer": 32,
+      "goalMix": [
+        "patrol:269840",
+        "garrison:24000",
+        "battle:15340",
+        "flee:4194",
+        "pursue:2846",
+        "investigate:1302"
+      ]
+    },
+    {
+      "behavior": "basic",
+      "distinctNpcs": 139,
+      "npcTicks": 304455,
+      "npcTicksNearPlayer": 3644,
+      "activations": 176,
+      "activationsNearPlayer": 8,
+      "goalMix": [
+        "work:222027",
+        "wander:52011",
+        "garrison:28800",
+        "investigate:638",
+        "battle:518",
+        "flee:275",
+        "pursue:186"
+      ]
+    },
+    {
+      "behavior": "predator",
+      "distinctNpcs": 47,
+      "npcTicks": 108804,
+      "npcTicksNearPlayer": 2263,
+      "activations": 2981,
+      "activationsNearPlayer": 223,
+      "goalMix": [
+        "wander:57096",
+        "flee:29732",
+        "battle:21816",
+        "drawn:160"
+      ]
+    },
+    {
+      "behavior": "scavenger",
+      "distinctNpcs": 36,
+      "npcTicks": 79794,
+      "npcTicksNearPlayer": 1411,
+      "activations": 100,
+      "activationsNearPlayer": 34,
+      "goalMix": [
+        "wander:78215",
+        "flee:1217",
+        "scavenge:248",
+        "battle:114"
+      ]
+    },
+    {
+      "behavior": "lurker",
+      "distinctNpcs": 33,
+      "npcTicks": 76847,
+      "npcTicksNearPlayer": 0,
+      "activations": 43,
+      "activationsNearPlayer": 0,
+      "goalMix": [
+        "wander:50819",
+        "(none):26028"
+      ]
+    },
+    {
+      "behavior": "barricader",
+      "distinctNpcs": 17,
+      "npcTicks": 34806,
+      "npcTicksNearPlayer": 285,
+      "activations": 81,
+      "activationsNearPlayer": 2,
+      "goalMix": [
+        "work:18418",
+        "fortify:15961",
+        "battle:271",
+        "investigate:150",
+        "pursue:6"
+      ]
+    },
+    {
+      "behavior": "mireclaw",
+      "distinctNpcs": 13,
+      "npcTicks": 31200,
+      "npcTicksNearPlayer": 0,
+      "activations": 13,
+      "activationsNearPlayer": 0,
+      "goalMix": [
+        "wander:31200"
+      ]
+    }
+  ],
+  "behaviorsNeverInstantiated": [
+    "infected"
+  ],
+  "considerations": [
+    {
+      "consideration": "wander",
+      "timesScoredNonZero": 3320296,
+      "timesTopScorer": 1774037,
+      "maxScore": 1
+    },
+    {
+      "consideration": "workMyRoom",
+      "timesScoredNonZero": 1358152,
+      "timesTopScorer": 810351,
+      "maxScore": 1.3
+    },
+    {
+      "consideration": "patrol",
+      "timesScoredNonZero": 317522,
+      "timesTopScorer": 275287,
+      "maxScore": 2
+    },
+    {
+      "consideration": "squadFollow",
+      "timesScoredNonZero": 213298,
+      "timesTopScorer": 192024,
+      "maxScore": 2.6
+    },
+    {
+      "consideration": "garrison",
+      "timesScoredNonZero": 148800,
+      "timesTopScorer": 143575,
+      "maxScore": 2.5
+    },
+    {
+      "consideration": "stalkWeakest",
+      "timesScoredNonZero": 50907,
+      "timesTopScorer": 50907,
+      "maxScore": 4
+    },
+    {
+      "consideration": "threat",
+      "timesScoredNonZero": 40040,
+      "timesTopScorer": 39992,
+      "maxScore": 1102.488
+    },
+    {
+      "consideration": "fortify",
+      "timesScoredNonZero": 16328,
+      "timesTopScorer": 15799,
+      "maxScore": 2.6
+    },
+    {
+      "consideration": "investigate",
+      "timesScoredNonZero": 6685,
+      "timesTopScorer": 4986,
+      "maxScore": 3
+    },
+    {
+      "consideration": "squadStack",
+      "timesScoredNonZero": 4337,
+      "timesTopScorer": 4337,
+      "maxScore": 5
+    },
+    {
+      "consideration": "fleeMemory",
+      "timesScoredNonZero": 12506,
+      "timesTopScorer": 3267,
+      "maxScore": 1.5
+    },
+    {
+      "consideration": "drawnToStimulus",
+      "timesScoredNonZero": 2262,
+      "timesTopScorer": 1524,
+      "maxScore": 1.6
+    },
+    {
+      "consideration": "pursueMemory",
+      "timesScoredNonZero": 23759,
+      "timesTopScorer": 1291,
+      "maxScore": 1.5
+    },
+    {
+      "consideration": "hunt",
+      "timesScoredNonZero": 8408,
+      "timesTopScorer": 1219,
+      "maxScore": 1.6
+    },
+    {
+      "consideration": "alertGuards",
+      "timesScoredNonZero": 812,
+      "timesTopScorer": 745,
+      "maxScore": 2
+    },
+    {
+      "consideration": "packAvoid",
+      "timesScoredNonZero": 29732,
+      "timesTopScorer": 641,
+      "maxScore": 1
+    },
+    {
+      "consideration": "scavenge",
+      "timesScoredNonZero": 254,
+      "timesTopScorer": 254,
+      "maxScore": 2
+    },
+    {
+      "consideration": "squadFlank",
+      "timesScoredNonZero": 60,
+      "timesTopScorer": 60,
+      "maxScore": 82.362
+    },
+    {
+      "consideration": "fear",
+      "timesScoredNonZero": 7852,
+      "timesTopScorer": 0,
+      "maxScore": 1
+    },
+    {
+      "consideration": "defendMyWing",
+      "timesScoredNonZero": 439,
+      "timesTopScorer": 0,
+      "maxScore": 3
+    },
+    {
+      "consideration": "contagiousFear",
+      "timesScoredNonZero": 3135,
+      "timesTopScorer": 0,
+      "maxScore": 0.8
+    },
+    {
+      "consideration": "panic",
+      "timesScoredNonZero": 2301,
+      "timesTopScorer": 0,
+      "maxScore": 1
+    }
+  ],
+  "considerationsNeverEvaluated": [
+    "pounce",
+    "infest",
+    "enrage",
+    "retreatToSpore"
+  ],
+  "squads": [
+    {
+      "seed": "1001/1",
+      "squads": 1,
+      "members": 2,
+      "roles": {
+        "lead": 1,
+        "flank": 1
+      }
+    },
+    {
+      "seed": "1001/2",
+      "squads": 3,
+      "members": 10,
+      "roles": {
+        "lead": 3,
+        "flank": 3,
+        "rear": 4
+      }
+    },
+    {
+      "seed": "1001/3",
+      "squads": 3,
+      "members": 10,
+      "roles": {
+        "lead": 3,
+        "flank": 3,
+        "rear": 4
+      }
+    },
+    {
+      "seed": "1002/1",
+      "squads": 1,
+      "members": 2,
+      "roles": {
+        "lead": 1,
+        "flank": 1
+      }
+    },
+    {
+      "seed": "1002/2",
+      "squads": 3,
+      "members": 9,
+      "roles": {
+        "lead": 3,
+        "flank": 3,
+        "rear": 3
+      }
+    },
+    {
+      "seed": "1002/3",
+      "squads": 4,
+      "members": 11,
+      "roles": {
+        "lead": 4,
+        "flank": 4,
+        "rear": 3
+      }
+    },
+    {
+      "seed": "1003/1",
+      "squads": 1,
+      "members": 2,
+      "roles": {
+        "lead": 1,
+        "flank": 1
+      }
+    },
+    {
+      "seed": "1003/2",
+      "squads": 2,
+      "members": 5,
+      "roles": {
+        "lead": 2,
+        "flank": 2,
+        "rear": 1
+      }
+    },
+    {
+      "seed": "1003/3",
+      "squads": 5,
+      "members": 14,
+      "roles": {
+        "lead": 5,
+        "flank": 5,
+        "rear": 4
+      }
+    },
+    {
+      "seed": "1004/1",
+      "squads": 1,
+      "members": 2,
+      "roles": {
+        "lead": 1,
+        "flank": 1
+      }
+    },
+    {
+      "seed": "1004/2",
+      "squads": 1,
+      "members": 4,
+      "roles": {
+        "lead": 1,
+        "flank": 1,
+        "rear": 2
+      }
+    },
+    {
+      "seed": "1004/3",
+      "squads": 4,
+      "members": 12,
+      "roles": {
+        "lead": 4,
+        "flank": 4,
+        "rear": 4
+      }
+    },
+    {
+      "seed": "1005/1",
+      "squads": 1,
+      "members": 2,
+      "roles": {
+        "lead": 1,
+        "flank": 1
+      }
+    },
+    {
+      "seed": "1005/2",
+      "squads": 0,
+      "members": 0,
+      "roles": {}
+    },
+    {
+      "seed": "1005/3",
+      "squads": 5,
+      "members": 12,
+      "roles": {
+        "lead": 5,
+        "flank": 5,
+        "rear": 2
+      }
+    },
+    {
+      "seed": "1006/1",
+      "squads": 0,
+      "members": 0,
+      "roles": {}
+    },
+    {
+      "seed": "1006/2",
+      "squads": 4,
+      "members": 13,
+      "roles": {
+        "lead": 4,
+        "flank": 4,
+        "rear": 5
+      }
+    },
+    {
+      "seed": "1006/3",
+      "squads": 2,
+      "members": 6,
+      "roles": {
+        "lead": 2,
+        "flank": 2,
+        "rear": 2
+      }
+    },
+    {
+      "seed": "2077/1",
+      "squads": 1,
+      "members": 2,
+      "roles": {
+        "lead": 1,
+        "flank": 1
+      }
+    },
+    {
+      "seed": "2077/2",
+      "squads": 0,
+      "members": 0,
+      "roles": {}
+    },
+    {
+      "seed": "2077/3",
+      "squads": 3,
+      "members": 7,
+      "roles": {
+        "lead": 3,
+        "flank": 3,
+        "rear": 1
+      }
+    },
+    {
+      "seed": "31337/1",
+      "squads": 3,
+      "members": 6,
+      "roles": {
+        "lead": 3,
+        "flank": 3
+      }
+    },
+    {
+      "seed": "31337/2",
+      "squads": 4,
+      "members": 11,
+      "roles": {
+        "lead": 4,
+        "flank": 4,
+        "rear": 3
+      }
+    },
+    {
+      "seed": "31337/3",
+      "squads": 2,
+      "members": 5,
+      "roles": {
+        "lead": 2,
+        "flank": 2,
+        "rear": 1
+      }
+    }
+  ],
+  "contact": {
+    "modeAtMeleeContact": {
+      "aggro": 3772,
+      "flee": 2405,
+      "wander": 1660,
+      "idle": 774,
+      "seek": 46
+    },
+    "goalAtMeleeContact": {
+      "battle": 3661,
+      "flee": 2401,
+      "wander": 101,
+      "pursue": 99,
+      "work": 2013,
+      "formup": 47,
+      "search": 4,
+      "stack": 282,
+      "alert": 49
+    },
+    "npcEventTypesWithinFiringRange": {
+      "aiGoal": 983,
+      "alerted": 4,
+      "woke": 2
+    },
+    "attackIntervalTicks": null
+  },
+  "sealOpenVia": {},
+  "allEventTypes": {
+    "doorToggle": 22572,
+    "aiGoal": 4495,
+    "hit": 1350,
+    "sealDenied": 1310,
+    "death": 203,
+    "woke": 174,
+    "explosion": 72,
+    "barricade": 42,
+    "weaponDrop": 30,
+    "shatter": 10,
+    "alerted": 9,
+    "pickup": 4
+  }
+}

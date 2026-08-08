@@ -13,6 +13,7 @@
 //
 //   npx tsx tools/debug-hub/hub.ts [port]        (default 7810, or DEBUG_HUB_PORT)
 
+import { pathToFileURL } from 'node:url'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { DEFAULT_HUB_PORT, type DebugMsg, type GameInfo } from '../../src/debug/protocol'
 
@@ -225,6 +226,10 @@ export const startHub = (port = DEFAULT_HUB_PORT, opts: HubOpts | ((m: string) =
 }
 
 // Run directly (`npx tsx tools/debug-hub/hub.ts [port]`) → start immediately.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// `file://${process.argv[1]}` never matches on Windows (argv[1] is a `D:\...`
+// path, import.meta.url is `file:///D:/...`), so the hub silently no-op'd there
+// and every debug verb failed with "not connected to the hub". pathToFileURL
+// normalises both separators and drive letter on every platform.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   startHub(Number(process.argv[2] ?? process.env.DEBUG_HUB_PORT ?? DEFAULT_HUB_PORT))
 }

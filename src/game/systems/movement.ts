@@ -58,6 +58,21 @@ const stepAxes = (
   }
 }
 
+/**
+ * Circle vs tile AABB overlap — the exact geometry the collision resolver uses to
+ * decide a body doesn't fit. Exported so callers that need to ask "is a body
+ * standing on this tile?" (e.g. refusing to close a door onto someone —
+ * systems/interaction.ts) agree with the resolver bit-for-bit instead of
+ * re-deriving the test and drifting from it.
+ */
+export const circleOverlapsTile = (x: number, y: number, r: number, tx: number, ty: number): boolean => {
+  const cx = Math.max(tx, Math.min(x, tx + 1))
+  const cy = Math.max(ty, Math.min(y, ty + 1))
+  const ddx = x - cx
+  const ddy = y - cy
+  return ddx * ddx + ddy * ddy < r * r
+}
+
 const circleFits = (
   x: number,
   y: number,
@@ -71,12 +86,7 @@ const circleFits = (
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       if (!blocked(tx, ty)) continue
-      // Circle vs tile AABB overlap
-      const cx = Math.max(tx, Math.min(x, tx + 1))
-      const cy = Math.max(ty, Math.min(y, ty + 1))
-      const ddx = x - cx
-      const ddy = y - cy
-      if (ddx * ddx + ddy * ddy < r * r) return false
+      if (circleOverlapsTile(x, y, r, tx, ty)) return false
     }
   }
   return true

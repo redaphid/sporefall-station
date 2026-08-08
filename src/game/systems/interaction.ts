@@ -6,6 +6,7 @@ import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
 import { addItem, applyModPickup, equipSlot } from './inventory'
+import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
 
@@ -136,6 +137,25 @@ const autoPickup = (w: World, p: Entity): void => {
   }
 }
 
+/**
+ * The first live BODY whose circle overlaps this door's tile, or undefined if the
+ * doorway is clear. "Body" is the same notion movement's pushApart uses for a
+ * mover — a live, non-projectile entity with health that isn't static furniture —
+ * i.e. exactly the players and NPCs that walk under their own steam and would be
+ * entombed by a closing door. The door itself has no `health`, so it never counts
+ * as its own occupant. Iterates in array order, so the choice is deterministic.
+ */
+const doorwayOccupant = (w: World, d: Entity): Entity | undefined => {
+  const tx = Math.floor(d.pos.x)
+  const ty = Math.floor(d.pos.y)
+  for (const e of w.entities) {
+    if (e.dead || e.projectile || !e.health || e.kind === 'interactable') continue
+    if (e.id === d.id) continue
+    if (circleOverlapsTile(e.pos.x, e.pos.y, e.radius, tx, ty)) return e
+  }
+  return undefined
+}
+
 const handleInteract = (w: World, p: Entity): void => {
   const target = nearestInteractable(w.entities, p)
   if (!target) return
@@ -152,6 +172,18 @@ const handleInteract = (w: World, p: Entity): void => {
       return
     }
     if (!door.locked) {
+      // A door must never SHUT on a body standing in the doorway. movementSystem
+      // treats a closed door's tile as fully solid and moveAndCollide only ever
+      // commits a position whose whole circle fits, so a body caught inside that
+      // tile fails the fit test in every direction — permanently immobile, with no
+      // input able to free it (one press of E while stood in your own doorway was
+      // enough to brick a character). Refuse the close and say why, exactly like a
+      // real door that won't shut on someone in the way. Opening is always allowed.
+      const blocker = door.open ? doorwayOccupant(w, target) : undefined
+      if (blocker) {
+        w.events.push({ type: 'doorBlocked', entityId: target.id, byId: blocker.id })
+        return
+      }
       door.open = !door.open
       w.events.push({ type: 'doorToggle', entityId: target.id, open: door.open })
       return

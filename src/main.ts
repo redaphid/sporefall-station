@@ -40,6 +40,7 @@ import { createTouch, mergeInputs, type TouchInput } from './input/touch'
 import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { notifyOtaReady } from './app/ota'
+import { registerPwa } from './app/pwa'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
@@ -65,6 +66,11 @@ const boot = async (): Promise<void> => {
   // Confirm this bundle booted so the native OTA layer keeps it (and applies any
   // newer bundle it fetched). Non-blocking; no-op on web / dev live-reload.
   void notifyOtaReady()
+
+  // Install the offline service worker (web only — no-op inside the APK, where
+  // the bundled dist/ + OTA already provide offline). This is what makes the
+  // browser / home-screen install boot with the radio off.
+  registerPwa()
 
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!

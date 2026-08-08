@@ -2,6 +2,7 @@ import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../play
 import { WEAPONS, itemClass, type StatusApply } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
+import { PUNISH_MULT } from '../data/tells'
 import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
@@ -101,6 +102,15 @@ export const applyDamage = (
   // #78 damage affinity: armoured bodies shrug off impact, flammable ones don't.
   // Impact/explosion damage is 'physical'; missing table → ×1 (unchanged).
   amount = Math.round(amount * resistMult(target, 'physical'))
+  // #1 PUNISH: a body caught in the recovery of its own committed attack takes
+  // extra damage. This is what makes reading a tell and dodging it PAY — the
+  // recovery window is not merely "the enemy is idle", it is an opening. Read
+  // straight off the absolute windows (no import cycle back through
+  // systems/commitment.ts); absent `attack` → untouched, as before this feature.
+  const recovering = target.attack
+  if (recovering && w.tick >= recovering.recoverAt && w.tick < recovering.endAt) {
+    amount = Math.round(amount * PUNISH_MULT)
+  }
   if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
@@ -154,6 +164,23 @@ export const applyDamage = (
 }
 
 export const kill = (w: World, target: Entity): void => {
+  // #1 A body killed mid-commitment must not leave a live attack window behind:
+  // drop it and close the telegraph, so nothing is left drawing a wind-up for a
+  // swing that will never come. Inlined rather than calling
+  // `commitment.breakAttack` purely to keep combat.ts a leaf of that module (no
+  // import cycle back through `fireWeapon`); the shape is identical.
+  const committed = target.attack
+  if (committed) {
+    target.attack = undefined
+    w.events.push({
+      type: 'attackBreak',
+      entityId: target.id,
+      x: target.pos.x,
+      y: target.pos.y,
+      shape: committed.shape,
+      reason: 'death',
+    })
+  }
   // Already bleeding out? A second lethal blow (a DOT tick landing on the downed
   // body, a stray hit) must NOT re-arm the bleed timer or emit a fresh death —
   // that would reset the 30s clock every DOT interval and trap a downed solo
@@ -190,8 +217,22 @@ export const kill = (w: World, target: Entity): void => {
   rollWeaponDrop(w, target)
 }
 
-/** Swing at the nearest live target inside range and a 90° arc around facing. */
-export const meleeAttack = (w: World, attacker: Entity, damage: number, range: number, knockback: number): Entity | null => {
+/** The stock melee arc, as the minimum facing-dot a victim must satisfy
+ * (0.5 → ±60°). A committed attack's tell may widen or narrow it via
+ * `Tell.arcDot` — a raw dot, never an angle, so the hit test stays trig-free
+ * and bit-identical on every device. */
+const MELEE_ARC_DOT = 0.5
+
+/** Swing at the nearest live target inside range and the melee arc around
+ * facing. `arcDot` overrides the stock ±60° arc (see MELEE_ARC_DOT). */
+export const meleeAttack = (
+  w: World,
+  attacker: Entity,
+  damage: number,
+  range: number,
+  knockback: number,
+  arcDot: number = MELEE_ARC_DOT,
+): Entity | null => {
   const fx = Math.cos(attacker.facing)
   const fy = Math.sin(attacker.facing)
   let best: Entity | null = null
@@ -203,8 +244,8 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     const dist = Math.hypot(dx, dy)
     // Weapon range is edge-to-edge: include both bodies' radii.
     if (dist > range + attacker.radius + e.radius) continue
-    // Within 90° of facing (or point-blank)
-    if (dist > 0.3 && (dx * fx + dy * fy) / dist < 0.5) continue
+    // Within the arc around facing (or point-blank)
+    if (dist > 0.3 && (dx * fx + dy * fy) / dist < arcDot) continue
     if (dist < bestDist) {
       best = e
       bestDist = dist
@@ -361,6 +402,14 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
   }
 }
 
+/** Per-swing shaping applied by a committed attack's tell (#1, data/tells.ts):
+ * a damage multiplier paying for the wind-up, and an optional melee arc override.
+ * Absent (the player, and any legacy caller) → byte-identical to before. */
+export interface AttackShaping {
+  damageMult?: number
+  arcDot?: number
+}
+
 /** Fire the entity's equipped weapon along its current `facing`. THE single fire
  * site: players (combatSystem) and NPCs (ai.ts) both route through here, so mods,
  * elements (onHit), pellets, projectile behavior and melee arcs work identically
@@ -368,15 +417,16 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
  * (false = an empty gun clicked). Ammo/durability are spent only for INVENTORY
  * weapons (a `weaponStack`); NPCs carry no inventory, so their loadout is innate
  * and never runs dry. Callers gate on `combat.cooldown <= 0` before calling. */
-export const fireWeapon = (w: World, e: Entity): boolean => {
+export const fireWeapon = (w: World, e: Entity, shaping?: AttackShaping): boolean => {
   if (!e.combat) return false
   const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
   const stack = weaponStack(e)
   const rw = resolveWeapon(weapon, stack?.mods)
+  const mult = shaping?.damageMult ?? 1
   if (weapon.kind === 'melee') {
     e.combat.cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
-    const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
+    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1) * mult)
+    const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback, shaping?.arcDot)
     if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
       if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
@@ -391,9 +441,12 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   if (stack && !INFINITE_AMMO && !spendAmmo(e)) return false
   e.combat.cooldown = rw.cooldownTicks
   const spec = projectileSpec(rw)
+  // Rounded like the melee branch so a shaped shot carries a whole-number
+  // damage figure — identical to `rw.damage` when unshaped (mult 1).
+  const shot = mult === 1 ? rw.damage : Math.round(rw.damage * mult)
   for (let i = 0; i < rw.pellets; i++) {
     const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
-    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, stack?.mods)
+    spawnProjectile(w, e, shot, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, stack?.mods)
   }
   return true
 }

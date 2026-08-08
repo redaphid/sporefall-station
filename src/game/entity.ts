@@ -206,6 +206,14 @@ export interface Entity {
   // (Spawn-protection grace for players rides `health.iframes` — see
   // SPAWN_GRACE_TICKS below — so every damage source already honors it.)
   combat?: { weapon: string; cooldown: number }
+  /** A committed attack in flight: wind-up (the telegraph) → active (the strikes,
+   * uncancellable) → recovery (the punish window). Absent = free to act, exactly
+   * like `playerCtl.roll`; `systems/commitment.ts` drops it the tick it ends, so
+   * a resting body carries no state. Every field is an ABSOLUTE tick or a plain
+   * number, so a snapshot taken mid-wind-up replays byte-for-byte, and an entity
+   * that never attacks serializes exactly as before this feature. NPC-only today
+   * (the player's attacks stay instant — the roll is their commitment). */
+  attack?: import('./systems/commitment').AttackState
   /** #78 — damage AFFINITY table: a multiplier on incoming damage keyed by kind
    * (`'physical'` for weapon impact/explosions, or an element id: `burning`,
    * `spore`, `poisoned`). 1 = neutral, <1 resistant, 0 = immune, >1 vulnerable.

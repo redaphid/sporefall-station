@@ -12,7 +12,7 @@ import { isSolidTile } from '../levelgen/level'
 import { findPath } from '../path'
 import { emitFear, type World } from '../world'
 import { ALERT, DRAWN, FLANK, FORMUP, FORTIFY, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, STACK, WORK, decide } from './behaviors'
-import { fireWeapon } from './combat'
+import { beginAttack, stepAttack } from './commitment'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
@@ -88,6 +88,12 @@ export const aiSystem = (w: World): void => {
       e.intent.y = 0
       continue
     }
+    // #1 A committed attack outranks everything below, and runs BEFORE the
+    // stun/immobilize guard on purpose: that is what makes the active window
+    // uncancellable. `stepAttack` breaks a WIND-UP caught by a stun/freeze
+    // (falling through to the guard below), but a body already swinging is
+    // stuck with the swing and with the recovery it cannot act out of.
+    if (e.attack && stepAttack(w, e)) continue
     if ((e.status && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)) {
       e.intent.x = 0
       e.intent.y = 0
@@ -461,11 +467,15 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // Engage only a PERCEIVED target — `dist` is to the live position exactly
       // when `seen`, so range checks and trigger pulls always agree.
       if (seen && dist <= weapon.range * 0.8) {
-        e.facing = Math.atan2(dy, dx) + (w.rng.next() - 0.5) * 0.15 // imperfect aim
+        e.facing = Math.atan2(dy, dx)
         if (e.combat && e.combat.cooldown <= 0) {
-          // THE shared fire path — mods/elements/pellets apply to NPCs too.
-          fireWeapon(w, e)
-          e.combat.cooldown += w.rng.int(0, 10) // stagger volleys so they don't fire in lockstep
+          // #1 COMMIT instead of firing on the spot. `beginAttack` plants the
+          // tell's absolute windows, bakes in the one-shot aim error that used
+          // to be redrawn every tick, and draws the wind-up jitter that has
+          // replaced the old `cooldown += rng.int(0, 10)` volley stagger — so a
+          // firing line still breaks lockstep, but now visibly, by shouldering
+          // its weapons at slightly different moments.
+          beginAttack(w, e, target)
         }
         // Keep spacing: back off if crowded to melee range, else strafe a little
         // (perpendicular, side chosen by id) so a firing line doesn't clump.
@@ -480,8 +490,13 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
         return
       }
     } else if (seen && dist <= weapon.range + target.radius) {
+      // #1 THE fix for the "every archetype swings every 12 ticks" collapse the
+      // audit measured: contact no longer means an instant, identical swing. The
+      // body COMMITS to its archetype's tell — an overhead, a lunge, a snap, a
+      // flurry — and `stepAttack` (top of aiSystem) owns it from here until the
+      // recovery ends.
       e.facing = Math.atan2(dy, dx)
-      if (e.combat && e.combat.cooldown <= 0) fireWeapon(w, e) // shared melee swing
+      if (e.combat && e.combat.cooldown <= 0) beginAttack(w, e, target)
       return
     }
     if (seen) {

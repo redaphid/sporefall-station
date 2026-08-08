@@ -130,6 +130,34 @@ export type SimEvent =
   /** Stop-drop-and-roll: a roll start smothered `entityId`'s burning status.
    * `remainingTicks` is the burn left AFTER the douse — 0 = fully extinguished. */
   | { type: 'burnDoused'; x: number; y: number; entityId: EntityId; remainingTicks: number }
+  /** #1 An enemy COMMITTED to an attack and is telegraphing it. Carries the
+   * whole schedule in absolute ticks so any consumer — renderer, mixer, haptics,
+   * or a net client that never receives the component — can draw/play the exact
+   * same tell with no extrapolation. `shape` is the per-archetype silhouette
+   * (`overhead`/`lunge`/`snap`/…, see data/tells.ts), `aim` the direction the
+   * strikes will resolve along, `targetId` who it is aimed at. */
+  | {
+      type: 'attackWindup'
+      entityId: EntityId
+      x: number
+      y: number
+      shape: string
+      aim: number
+      activeAt: number
+      recoverAt: number
+      endAt: number
+      targetId: EntityId
+    }
+  /** #1 A committed attack's strike landed (or whiffed) — `index` counts strikes
+   * within this one commitment, so a three-hit flurry fires three of these. */
+  | { type: 'attackStrike'; entityId: EntityId; x: number; y: number; shape: string; aim: number; index: number }
+  /** #1 A commitment entered RECOVERY: `entityId` is planted and vulnerable
+   * (extra damage) until `endAt`. The cue to show a punish opening. */
+  | { type: 'attackRecover'; entityId: EntityId; x: number; y: number; shape: string; endAt: number }
+  /** #1 A wind-up was BROKEN before it resolved — `stun` (stunned/slept/frozen/
+   * electrified mid-telegraph) or `death`. Always closes an `attackWindup`, so no
+   * consumer is ever left drawing a telegraph for an attack that never came. */
+  | { type: 'attackBreak'; entityId: EntityId; x: number; y: number; shape: string; reason: 'stun' | 'death' }
   /** An NPC's AI adopted a new goal worth noting (aggro/flee/alert/search/…) —
    * `prev` is the goal it left, `targetId` who/what the new goal concerns. */
   | { type: 'aiGoal'; entityId: EntityId; goal: string; prev: string; targetId?: EntityId }

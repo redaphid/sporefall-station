@@ -17,6 +17,11 @@ That's it — no installing. It's always the latest version.
 
 Now there's a game icon on your phone. Tap it to play.
 
+**It works with no signal.** Once you've opened it once, the game is stored on the
+phone — tap the icon in a tunnel, on a plane, or in the middle of nowhere and it
+still boots straight into a solo run. When you *are* online it quietly picks up
+the newest version in the background.
+
 > Note: To play the 2-phone Bluetooth co-op mode, you need the Android app below.
 > The browser version is great for playing on your own.
 

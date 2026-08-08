@@ -11,6 +11,12 @@
 /
   Cache-Control: no-cache
 
+# The service worker is the ONE file that must never be served stale: it carries
+# the precache manifest, so if a CDN or browser pins an old sw.js the installed
+# PWA can never learn about a new deploy. `no-cache` = revalidate every time.
+/sw.js
+  Cache-Control: no-cache
+
 # OTA: the manifest must never be cached (so a new bundle is seen immediately);
 # the versioned bundle zips are immutable.
 /ota/version.json

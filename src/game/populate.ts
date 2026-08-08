@@ -557,7 +557,7 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
 // the remaining offensive pickup — so the floor still rewards exploration and the
 // frost/fire/shock/sleep/poison systems still come online as you descend. Shops
 // always stock element gear (see stockShop), so the combos stay reachable.
-const BASIC_LOOT = ['molotov', 'grenade', 'bandage', 'bandage', 'medkit', 'cash']
+const BASIC_LOOT = ['molotov', 'grenade', 'medkit']
 const ELEMENT_THROWABLES = ['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade']
 
 /** The floor's random-loot table: basics everywhere, the element throwables from
@@ -574,7 +574,7 @@ const lootTable = (floor: number): string[] => {
  * gone from the stock list (the player's pistol is permanent); the shop now
  * trades purely in throwables and healing. */
 const SHOP_STOCK = [
-  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit', 'bandage',
+  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit',
 ]
 
 const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number): void => {
@@ -626,6 +626,12 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
   }
 }
 
+/** Share of scattered floor pickups that are WEAPON MODS rather than items.
+ * Mods are the run's only progression now (one permanent weapon, no money, no
+ * weapon loot, no ammo), so they are the majority of what is worth walking
+ * over; the remainder is healing and throwables, which still need a source. */
+const MOD_LOOT_SHARE = 0.6
+
 const sprinkleLoot = (w: World, rng: Rng): void => {
   const table = lootTable(w.floor)
   const n = rng.int(6, 10)
@@ -633,8 +639,8 @@ const sprinkleLoot = (w: World, rng: Rng): void => {
     const building = rng.pick(w.level.buildings)
     const spot = building ? randomFloorInBuilding(w, rng, building) : null
     if (!spot) continue
-    const itemId = rng.pick(table)
-    dropPickup(w, itemId, spot.x, spot.y, itemId === 'cash' ? rng.int(10, 40) : 1)
+    if (rng.chance(MOD_LOOT_SHARE)) dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+    else dropPickup(w, rng.pick(table), spot.x, spot.y, 1)
   }
 }
 

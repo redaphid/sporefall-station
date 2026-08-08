@@ -356,7 +356,6 @@ export class NetClientSession implements Session {
     const hud = this.state.huds[this.slot]
     if (this.self && hud) {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
-      this.self.playerCtl!.cash = hud.cash
       this.self.playerCtl!.abilityCooldown = hud.abilityCd
       // The weapon is permanent and never streamed — assert it locally.
       if (this.self.combat) this.self.combat.weapon = PLAYER_START_WEAPON
@@ -365,17 +364,14 @@ export class NetClientSession implements Session {
     // Our OWN player carries the FULL authoritative inventory the host streams us
     // (slots / activeSlot / weapon mods) so item use and mod badges work as a
     // joiner. Until that first inventory arrives, fall
-    // back to the HUD bandage/briefcase summary so nothing phantom-floods the hotbar.
+    // back to the HUD briefcase summary so nothing phantom-floods the hotbar.
     if (this.self?.playerCtl) {
       const ld = (this.self.loadout ??= { inventory: [], activeSlot: -1 })
       if (this.localInv) {
         ld.inventory = this.localInv.inventory
         ld.activeSlot = this.localInv.activeSlot
       } else if (hud) {
-        ld.inventory = [
-          ...(hud.bandages > 0 ? [{ itemId: 'bandage', qty: hud.bandages }] : []),
-          ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
-        ]
+        ld.inventory = hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []
       }
     }
     const missionText =

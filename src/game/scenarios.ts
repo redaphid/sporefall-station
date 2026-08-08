@@ -1,7 +1,7 @@
 // Deterministic demo setups, selected by `?scenario=`. Kept out of the sim
 // proper: a scenario just seeds entities into a fresh world before play starts.
 
-import { WEAPONS } from './data/items'
+
 import { makeEntity, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
 import { assignPatrol, spawnNpc } from './populate'
@@ -98,8 +98,8 @@ const setupWetElectric = (w: World): void => {
   placePlayer(w, x + 2, y)
 }
 
-/** A loaded loadout (bat / pistol / molotovs) and flammable targets downrange:
- * equip the gun and fire it dry, then throw a molotov to set the crates ablaze. */
+/** The permanent pistol plus held throwables, and flammable targets downrange:
+ * shoot with FIRE, then throw a molotov with USE to set the crates ablaze. */
 const setupInventory = (w: World): void => {
   const { x, y } = findStage(w, 8)
   const player = w.entities.find((e) => e.playerCtl)
@@ -108,19 +108,18 @@ const setupInventory = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
-      { itemId: 'bat', qty: WEAPONS.bat.durability! },
-      { itemId: 'pistol', qty: 3 },
+      { itemId: 'pistol', qty: 1 },
       { itemId: 'molotov', qty: 2 },
     ]
-    player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'bat'
+    player.loadout!.activeSlot = 1 // the molotov is HELD; the pistol is permanent
+    if (player.combat) player.combat.weapon = 'pistol'
   }
   crate(w, x + 4, y)
   crate(w, x + 5, y)
 }
 
-/** A broad loadout of the new item breadth (shotgun / freeze grenade /
- * chloroform / molotov / sledgehammer / adrenaline) with a bystander and crate
+/** A broad loadout of the item breadth (freeze grenade / chloroform / molotov /
+ * adrenaline) on top of the permanent pistol, with a bystander and crate
  * downrange to use them on. */
 const setupItems = (w: World): void => {
   const { x, y } = findStage(w, 10)
@@ -130,15 +129,14 @@ const setupItems = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
-      { itemId: 'shotgun', qty: 6 },
+      { itemId: 'pistol', qty: 1 },
       { itemId: 'freezeGrenade', qty: 2 },
       { itemId: 'chloroform', qty: 2 },
       { itemId: 'molotov', qty: 2 },
-      { itemId: 'sledgehammer', qty: WEAPONS.sledgehammer.durability! },
       { itemId: 'adrenaline', qty: 1 },
     ]
-    player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'shotgun'
+    player.loadout!.activeSlot = 1
+    if (player.combat) player.combat.weapon = 'pistol'
   }
   bystander(w, x + 4, y)
   crate(w, x + 7, y)
@@ -485,8 +483,8 @@ const setupNpcAi = (w: World): void => {
     e.pickup = { itemId, qty: 1 }
     addEntity(w, e)
   }
-  drop('bandage', cx - 15.5, cy - 3.5)
-  drop('cash', cx - 14.5, cy - 0.5)
+  drop('molotov', cx - 15.5, cy - 3.5)
+  drop('grenade', cx - 14.5, cy - 0.5)
   drop('medkit', cx - 15.5, cy - 6.5)
 }
 

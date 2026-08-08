@@ -222,7 +222,6 @@ export interface Entity {
   playerCtl?: {
     playerId: number
     abilityCooldown: number
-    cash: number
     crimeUntilTick: number
     /** Passive-regen bookkeeping (systems/regen.ts): consecutive ticks this player
      * has been BOTH completely still and unharmed. Reset to absent the instant they

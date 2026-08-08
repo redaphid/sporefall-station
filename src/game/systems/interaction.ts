@@ -254,7 +254,7 @@ const canSelfRecover = (w: World, p: Entity): boolean =>
   w.entities.every((e) => e === p || !e.playerCtl || (!e.playerCtl.downed && !e.dead))
 
 /** Bring a downed player back up. In `normal` this costs a shared revive and a
- * comeback penalty (drop cash + non-key items, ability put on full cooldown);
+ * comeback penalty (drop non-key items, ability put on full cooldown);
  * `casual` just stands them up. Both paths (teammate + self) route through here
  * so the penalty lands exactly once per recovery.
  *
@@ -269,7 +269,6 @@ const recover = (w: World, p: Entity): void => {
   p.health!.hp = Math.max(1, Math.floor(p.health!.max * REVIVE_HP_FRACTION))
   if (w.mode !== 'normal') return
   w.revivesLeft = Math.max(0, w.revivesLeft - 1)
-  ctl.cash = 0
   const ld = (p.loadout ??= { inventory: [], activeSlot: -1 })
   const keys = ld.inventory.filter((s) => itemClass(s.itemId) === 'key')
   const { inventory, activeSlot } = starterLoadout(PLAYER_START_WEAPON)
@@ -308,12 +307,7 @@ const startingCount = (itemId: string, qty: number): number => {
 
 const collect = (player: Entity, item: Entity): boolean => {
   const { itemId, qty } = item.pickup!
-  const ctl = player.playerCtl!
   const c = itemClass(itemId)
-  if (c === 'cash') {
-    ctl.cash += qty
-    return true
-  }
   const ld = (player.loadout ??= { inventory: [], activeSlot: -1 })
   if (c === 'key') {
     ld.inventory.push({ itemId, qty: 1 }) // mission item, ignores slot limit

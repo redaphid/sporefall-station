@@ -163,17 +163,16 @@ export interface ConsumableDef {
 }
 
 export const CONSUMABLES: Record<string, ConsumableDef> = {
-  bandage: { id: 'bandage', name: 'Bandage', heal: 30 },
+  // No `bandage`: healing is the medkit (and the burger), full stop.
   medkit: { id: 'medkit', name: 'Medkit', heal: 100 },
   burger: { id: 'burger', name: 'Burger', heal: 20 },
   adrenaline: { id: 'adrenaline', name: 'Adrenaline', onUse: { status: 'hasted', ticks: 300 } },
 }
 
-export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' | 'cash' | 'unknown'
+export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' | 'unknown'
 
 /** What kind of thing an item id is — the switch every use-rule dispatches on. */
 export const itemClass = (itemId: string): ItemClass => {
-  if (itemId === 'cash') return 'cash'
   if (itemId === 'briefcase') return 'key'
   // Wing keycards ('keycard' or 'keycard.<wing>'): a key-class item, so they
   // ignore slot limits, survive a down (recover keeps only 'key' items), and

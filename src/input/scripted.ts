@@ -173,17 +173,18 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Control for the dodge-roll video: never roll — the same bullet connects.
   dodgeControl: [{ ticks: 60 }],
 
-  // Fire-uses-active-item headline: a wounded player holds a bandage in the active
-  // slot and presses FIRE — instead of a gun shot, the bandage is USED (heals) and
-  // spent. No bullet leaves the barrel. Backs feature-fire-item-roll.
+  // Held-item USE headline: a wounded player holds a medkit and presses USE —
+  // the medkit is consumed and hp jumps. FIRE is no longer overloaded onto items
+  // (one permanent weapon → FIRE always shoots), so this drives the USE button.
+  // Backs feature-fire-item-roll.
   fireUseItem: [
-    { ticks: 20 }, // establish: wounded, bandage in hand
-    { ticks: 1, attack: true }, // FIRE → uses the bandage, hp jumps
+    { ticks: 20 }, // establish: wounded, medkit in hand
+    { ticks: 1, use: true }, // USE → consumes the medkit, hp jumps
     { ticks: 49 }, // stand healed; nothing was fired
   ],
 
-  // Use→dodge-roll fallback headline: hands hold nothing usable (an out-of-ammo
-  // gun), so pressing USE dodge-rolls ("backflip on the use key") — the i-frames
+  // Use→dodge-roll fallback headline: hands hold nothing usable (no throwable,
+  // no consumable), so pressing USE dodge-rolls ("backflip on the use key") — the i-frames
   // carry the player through an inbound bullet. Same duel world as dodgeRoll,
   // triggered off the USE button. Backs feature-fire-item-roll.
   useFallbackRoll: [

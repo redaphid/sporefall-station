@@ -21,6 +21,9 @@ export const ARCHETYPES = [
   'pickup.bat',
   'pickup.knife',
   'pickup.pistol',
+  // RESERVED — bandages and money were removed, but this table is an
+  // append-only u8 index: dropping an entry would renumber every archetype
+  // after it and break the wire format. The ids simply never spawn now.
   'pickup.bandage',
   'pickup.medkit',
   'pickup.cash',
@@ -261,7 +264,6 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
     e.playerCtl ??= {
       playerId: -1,
       abilityCooldown: 0,
-      cash: 0,
       crimeUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
@@ -330,7 +332,7 @@ export interface StateMsg {
   /** Party-shared comebacks left this run (HUD; `normal` only). */
   revivesLeft?: number
   /** Per-slot HUD extras for each player's own display. */
-  huds: Record<number, { cash: number; abilityCd: number; bandages: number; briefcase: boolean }>
+  huds: Record<number, { abilityCd: number; briefcase: boolean }>
 }
 
 /**

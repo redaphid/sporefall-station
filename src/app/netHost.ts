@@ -244,9 +244,7 @@ export class NetHostSession implements Session {
     for (const e of this.world.entities) {
       if (!e.playerCtl) continue
       huds[e.playerCtl.playerId] = {
-        cash: e.playerCtl.cash,
         abilityCd: e.playerCtl.abilityCooldown,
-        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
         briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
       }
     }

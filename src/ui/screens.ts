@@ -216,7 +216,7 @@ export const createScreens = (
           headline.textContent = RESTART_HEADLINE[affordance.reason]
           stats.textContent =
             affordance.reason === 'gameOver'
-              ? `Made it to floor ${view.floor} · $${view.self?.playerCtl?.cash ?? 0} collected`
+              ? `Made it to floor ${view.floor}`
               : onRestart
                 ? 'Restart the run now, or wait for a revive.'
                 : 'Waiting on your team…'

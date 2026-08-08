@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { spawnPlayer, STARTER_AMMO } from '../player'
+import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { addEntity, createWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
@@ -95,7 +95,6 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
   it('a LONE downed player counts down bleedTicks and SELF-REVIVES (no one could rescue them) at a penalty', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 0
-    p.playerCtl!.cash = 50
     p.loadout!.inventory = [{ itemId: 'bat', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 3, reviveProgress: 0 }
     settle(p)
@@ -108,13 +107,12 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
-    expect(p.playerCtl!.cash).toBe(0) // penalty: cash dropped
     // penalty: the carried bat is dropped, but the comeback re-grants the starter
     // loadout so the player is NOT stuck with a phantom weapon (issue: revived
     // players couldn't pick up mods). The pistol starter is real + slotted.
     expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
-    expect(p.loadout!.activeSlot).toBe(0)
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
+    expect(p.loadout!.activeSlot).toBe(-1) // nothing HELD; the pistol is permanent, not selected
     expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(1) // penalty: one comeback spent
   })
@@ -139,7 +137,6 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     const cw = createWorld(1, 1, 'casual')
     const p = spawnPlayer(cw, 0, 20, 20)
     p.health!.hp = 0
-    p.playerCtl!.cash = 50
     p.loadout!.inventory = [{ itemId: 'bat', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 2, reviveProgress: 0 }
     settle(p)
@@ -147,7 +144,6 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     interactionSystem(cw, ids)
     interactionSystem(cw, ids) // 2 → 0
     expect(p.playerCtl!.downed).toBeUndefined()
-    expect(p.playerCtl!.cash).toBe(50) // no penalty
     expect(p.loadout!.inventory).toHaveLength(1)
     expect(cw.revivesLeft).toBe(2) // untouched — casual doesn't spend the pool
   })
@@ -414,50 +410,52 @@ describe('auto-pickup', () => {
     return e
   }
 
-  it('walking over cash banks it and consumes the pickup', () => {
+  it('walking over a throwable banks it and consumes the pickup', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    const cash = pickup('cash', 20, 20, 25)
+    const nade = pickup('grenade', 20, 20, 2)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.playerCtl!.cash).toBe(25)
-    expect(cash.dead).toBe(true)
+    expect(p.loadout!.inventory.find((s) => s.itemId === 'grenade')?.qty).toBe(2)
+    expect(nade.dead).toBe(true)
   })
 
-  it('a weapon pickup is grabbed and auto-equipped (first weapon)', () => {
+  it('a weapon pickup is LEFT ON THE GROUND — the player has one permanent weapon', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    pickup('bat', 20, 20)
+    const bat = pickup('bat', 20, 20)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
-    expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(bat.dead).toBeFalsy() // not consumed: nothing was picked up
+    expect(p.combat!.weapon).toBe('pistol') // and the pistol stays in hand
   })
 
   it('a consumable auto-heals a hurt player instead of taking a slot', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 10
-    pickup('bandage', 20, 20) // heals 30
+    pickup('medkit', 20, 20) // heals 100
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.health!.hp).toBe(40)
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(false)
+    expect(p.health!.hp).toBe(110)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'medkit')).toBe(false)
   })
 
   it('an out-of-reach pickup is left alone', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    const cash = pickup('cash', 23, 20, 25)
+    const nade = pickup('grenade', 23, 20, 2)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.playerCtl!.cash).toBe(0)
-    expect(cash.dead).toBeFalsy()
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'grenade')).toBe(false)
+    expect(nade.dead).toBeFalsy()
   })
 
   it('a downed player does not auto-pickup (they only bleed/revive)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
-    pickup('cash', 20, 20, 25)
+    const nade = pickup('grenade', 20, 20, 2)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.playerCtl!.cash).toBe(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'grenade')).toBe(false)
+    expect(nade.dead).toBeFalsy()
   })
 })
 

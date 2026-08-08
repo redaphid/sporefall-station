@@ -121,7 +121,9 @@ export const NPCS: Record<string, NpcDef> = {
   robot: {
     archetype: 'robot',
     faction: 'neutral',
-    hp: 70,
+    // hp 70 → 52 for the one-weapon world, same reasoning as the brute: the
+    // 0.4 plating is the design read, so HP carries the retune (7.5s → ~3.4s).
+    hp: 52,
     speed: 2.6,
     weapon: 'fists',
     sightRange: 7,
@@ -129,10 +131,7 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
     // Derelict Unit: armour-plated (bullets/melee ping off) and biologically
     // inert (spore/toxins do nothing) — but its servos cook, so FIRE is the key.
-    // physical 0.4 → 0.5 for the one-weapon world: with the pistol as the ONLY
-    // gun, 0.4 meant 7.5s of unbroken fire. Fire is still the answer (×1.5),
-    // just no longer mandatory.
-    resist: { physical: 0.5, burning: 1.5, poisoned: 0, spore: 0 },
+    resist: { physical: 0.4, burning: 1.5, poisoned: 0, spore: 0 },
     // #68: the power-cut rouse is now a data row, not an `archetype ===` branch.
     wakeOn: ['power-cut'],
   },
@@ -144,19 +143,21 @@ export const NPCS: Record<string, NpcDef> = {
   // these are the tuned palette (spawnable by scenarios / the boss / debug).
   brute: {
     // Chitin-plated bruiser: soaks impact, slow, but flammable — bring fire.
+    // hp 95 → 68 for the ONE-WEAPON world. Its 0.35 armour is a load-bearing
+    // design read (enemyVariety asserts bullets whiff on it), so the armour
+    // stays and the HP pool absorbs the change: 95hp@0.35 was 271 effective HP
+    // = ~12s of unbroken pistol fire, which read as immunity. 68 makes the
+    // bullets-only slog ~5s while fire (×1.5 + burn DoT) is still the answer.
     archetype: 'brute',
     faction: 'gang',
-    hp: 95,
+    hp: 68,
     speed: 2.5,
     weapon: 'bat',
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
     behavior: 'hunter',
-    // physical 0.35 → 0.55 for the one-weapon world: at 0.35 the brute was 271
-    // effective HP — ~12s of continuous pistol fire, which read as immunity, not
-    // resistance. It still soaks ~2× a same-HP enemy and still burns (×1.5).
-    resist: { physical: 0.55, burning: 1.5, poisoned: 1.0 },
+    resist: { physical: 0.35, burning: 1.5, poisoned: 1.0 },
   },
   cinder: {
     // Ash-dweller: fireproof, so a flamethrower/molotov build stalls — shoot it.

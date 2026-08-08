@@ -30,8 +30,8 @@ const seeds = Array.from({ length: 200 }, (_, i) => i + 1)
 const floors = [1, 2, 3, 4]
 
 describe('mod-pickup placement — density', () => {
-  it('the constant is 1/3 and drives roughly one pickup per three rooms', () => {
-    expect(MOD_PICKUP_ROOM_CHANCE).toBeCloseTo(1 / 3, 6)
+  it('the constant is 2/3 and drives roughly two pickups per three rooms', () => {
+    expect(MOD_PICKUP_ROOM_CHANCE).toBeCloseTo(2 / 3, 6)
     let eligibleRooms = 0
     let pickups = 0
     for (const s of seeds) {
@@ -49,11 +49,11 @@ describe('mod-pickup placement — density', () => {
       }
     }
     const ratio = pickups / eligibleRooms
-    // ~1/3, a touch under because a handful of tiny rooms find no free floor tile.
+    // ~2/3, a touch under because a handful of tiny rooms find no free floor tile.
     // A statistical bound over ~25k rooms, NOT an exact count.
     expect(eligibleRooms).toBeGreaterThan(5000)
-    expect(ratio).toBeGreaterThan(0.3)
-    expect(ratio).toBeLessThan(0.36)
+    expect(ratio).toBeGreaterThan(0.6)
+    expect(ratio).toBeLessThan(0.68)
   })
 
   it('is weighted by rarity — commons plentiful, legendaries scarce', () => {

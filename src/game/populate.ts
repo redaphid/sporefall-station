@@ -12,9 +12,12 @@ import { weightedModId } from './systems/draft'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 
-/** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
- * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
-export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
+/** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup. Raised
+ * 1/3 → 2/3 for the one-weapon world: with no weapons, ammo, money or bandages
+ * to find, MODS are the run's whole progression and the main reason to explore,
+ * so they are now the bulk of what is on the floor (item loot dropped to 3–5 per
+ * floor to match). Tunable. */
+export const MOD_PICKUP_ROOM_CHANCE = 2 / 3
 
 /** No street-life NPC (or street patrol waypoint) may be placed closer than this
  * to the player spawn. Sized past the LONGEST NPC sight range (8) so that with
@@ -626,21 +629,23 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
   }
 }
 
-/** Share of scattered floor pickups that are WEAPON MODS rather than items.
- * Mods are the run's only progression now (one permanent weapon, no money, no
- * weapon loot, no ammo), so they are the majority of what is worth walking
- * over; the remainder is healing and throwables, which still need a source. */
-const MOD_LOOT_SHARE = 0.6
+/** Item pickups scattered per floor. Cut from 6–10: with weapons, ammo, money
+ * and bandages all gone, the item table is only healing + throwables, and MODS
+ * are meant to be the bulk of what is worth walking over (see
+ * MOD_PICKUP_ROOM_CHANCE, which doubled to match). Mods keep their own
+ * dedicated placement pass so their one-per-room / never-in-spawn / never-
+ * stacked invariants stay intact. */
+const LOOT_MIN = 3
+const LOOT_MAX = 5
 
 const sprinkleLoot = (w: World, rng: Rng): void => {
   const table = lootTable(w.floor)
-  const n = rng.int(6, 10)
+  const n = rng.int(LOOT_MIN, LOOT_MAX)
   for (let i = 0; i < n; i++) {
     const building = rng.pick(w.level.buildings)
     const spot = building ? randomFloorInBuilding(w, rng, building) : null
     if (!spot) continue
-    if (rng.chance(MOD_LOOT_SHARE)) dropModPickup(w, weightedModId(rng), spot.x, spot.y)
-    else dropPickup(w, rng.pick(table), spot.x, spot.y, 1)
+    dropPickup(w, rng.pick(table), spot.x, spot.y, 1)
   }
 }
 
@@ -663,6 +668,12 @@ const scatterModPickups = (w: World): void => {
   const rng = w.rng.fork('mod-pickups')
   const spawnTx = Math.floor(w.level.spawn.x)
   const spawnTy = Math.floor(w.level.spawn.y)
+  // One roll per room does NOT by itself guarantee one pickup per TILE: adjacent
+  // or overlapping rooms can resolve to the same tile, which stacks two gems in
+  // one spot (only one is grabbable). Rare at the old 1-in-3 density, common at
+  // 2-in-3 — so the taken tiles are tracked explicitly. Deterministic: the skip
+  // consumes no extra RNG.
+  const taken = new Set<string>()
   for (const building of w.level.buildings) {
     for (const room of building.rooms) {
       // Skip the spawn room so a fresh run doesn't hand you a mod for free.
@@ -670,7 +681,11 @@ const scatterModPickups = (w: World): void => {
       if (!rng.chance(MOD_PICKUP_ROOM_CHANCE)) continue
       const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
       if (!spot) continue
-      dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+      const modId = weightedModId(rng)
+      const key = `${Math.floor(spot.x)},${Math.floor(spot.y)}`
+      if (taken.has(key)) continue
+      taken.add(key)
+      dropModPickup(w, modId, spot.x, spot.y)
     }
   }
 }

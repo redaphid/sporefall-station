@@ -71,6 +71,12 @@ export class Sound {
         case 'missionComplete':
           this.jingle()
           break
+        case 'stationAlert':
+          // The loudest cue in the game: the station has noticed. A three-cycle
+          // two-tone wail under the completion jingle — unmistakably an alarm,
+          // and clearly not a reward sound.
+          this.klaxon()
+          break
         case 'noise':
           this.blip('crack', 300, 150, 0.12, 'sawtooth', 0.4)
           break
@@ -147,5 +153,33 @@ export class Sound {
       osc.start(t)
       osc.stop(t + 0.3)
     })
+  }
+
+  /**
+   * STATION ALERT klaxon: three cycles of a two-tone wail (a rising-then-falling
+   * sawtooth), scheduled ahead on the audio clock so it rides over whatever else
+   * is firing on the same tick. Sawtooth and the slow ~0.45s sweep are what make
+   * it read as an industrial alarm rather than a game jingle.
+   */
+  private klaxon(): void {
+    const ctx = this.ensure()
+    if (!ctx || !this.gate('klaxon', 2000)) return
+    const CYCLE = 0.45
+    for (let i = 0; i < 3; i++) {
+      const t = ctx.currentTime + i * CYCLE
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(320, t)
+      osc.frequency.linearRampToValueAtTime(620, t + CYCLE * 0.45)
+      osc.frequency.linearRampToValueAtTime(320, t + CYCLE * 0.9)
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.5, t + 0.05)
+      gain.gain.setValueAtTime(0.5, t + CYCLE * 0.7)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + CYCLE * 0.95)
+      osc.connect(gain).connect(this.master!)
+      osc.start(t)
+      osc.stop(t + CYCLE)
+    }
   }
 }

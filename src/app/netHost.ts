@@ -1,7 +1,7 @@
 import { spawnPlayer } from '../game/player'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
-import { createWorld, tickWorld, type RunMode, type World } from '../game/world'
+import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -259,6 +259,7 @@ export class NetHostSession implements Session {
       missionTargetId: this.world.mission.targetEntityId,
       gameOver: this.world.gameOver,
       alarm: this.world.alarm,
+      alert: stationAlerted(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       huds,
@@ -277,6 +278,7 @@ export class NetHostSession implements Session {
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
       gameOver: this.world.gameOver,
+      alert: stationAlerted(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       self: this.self,

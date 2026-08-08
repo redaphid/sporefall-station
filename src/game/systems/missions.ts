@@ -531,8 +531,12 @@ const maybeBloom = (w: World, node: Entity): void => {
 const completeMission = (w: World, focus?: Entity): void => {
   w.mission.complete = true
   w.mission.exitUnlocked = true
-  if (focus) raiseStationAlert(w, focus)
+  // Completion is announced FIRST and the station's reaction second, so the
+  // event stream reads chronologically (prize taken → alarms) and any consumer
+  // that processes the batch in order ends on the alert — which is the thing the
+  // player actually needs to act on (see ui/screens.ts).
   w.events.push({ type: 'missionComplete', description: w.mission.description })
+  if (focus) raiseStationAlert(w, focus)
 }
 
 /** Regenerate the world in place for the next floor, carrying players over. */

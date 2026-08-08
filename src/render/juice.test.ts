@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { SimEvent } from '../game/types'
 import {
   addHitstop,
+  ALERT_WASH_MAX,
+  alertWash,
   decayShake,
   decayTint,
   decayVignette,
@@ -168,5 +170,30 @@ describe('event → shake / hitstop / tint mapping', () => {
     expect(tintForEvent({ type: 'explosion', x: 0, y: 0, radius: 2 }).warm).toBeGreaterThan(0)
     expect(tintForEvent({ type: 'shatter', x: 0, y: 0, entityId: 1 }).cold).toBeGreaterThan(0)
     expect(tintForEvent(hit(1, 5))).toEqual({ warm: 0, cold: 0 })
+  })
+})
+
+describe('station alert wash', () => {
+  it('is exactly zero when the station is calm', () => {
+    for (const t of [0, 0.3, 1, 7.77, 120]) expect(alertWash(false, t)).toBe(0)
+  })
+
+  it('never exceeds its cap, and never fully clears while alerted', () => {
+    const samples = Array.from({ length: 400 }, (_, i) => alertWash(true, i * 0.01))
+    for (const v of samples) {
+      expect(v).toBeGreaterThan(0)
+      expect(v).toBeLessThanOrEqual(ALERT_WASH_MAX)
+    }
+    // It must actually PULSE — a flat tint reads as a bug, not an alarm.
+    expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.05)
+  })
+
+  it('stays under the damage vignette cap so a hit always reads through it', () => {
+    expect(ALERT_WASH_MAX).toBeLessThan(VIGNETTE_MAX)
+  })
+
+  it('reaches its peak — the beacon actually sweeps to full brightness', () => {
+    const peak = Math.max(...Array.from({ length: 400 }, (_, i) => alertWash(true, i * 0.01)))
+    expect(peak).toBeCloseTo(ALERT_WASH_MAX, 2)
   })
 })

@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Objective done? Doors open, station hunts',
   'Doors no longer shut you in',
   'Play with no signal: works offline',
   'Hi-res art is now the default look',
-  'Enemies hunt smart: squads & ambushes',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

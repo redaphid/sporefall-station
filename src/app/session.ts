@@ -17,6 +17,11 @@ export interface RenderView {
    * clients running an older host. */
   missionTargetId?: number
   gameOver: boolean
+  /** STATION ALERT — this floor's objective is done and the escape run is on.
+   * Drives the persistent pulsing alert wash (render/juice.ts `alertWash`), as
+   * opposed to the one-shot klaxon/banner that ride the `stationAlert` event.
+   * Optional so a session that doesn't surface it simply reads calm. */
+  alert?: boolean
   /** Difficulty rules in force (host truth; clients mirror it from the host). */
   mode?: RunMode
   /** Party-shared comebacks left this run (only meaningful in `normal`). */

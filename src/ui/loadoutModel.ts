@@ -154,7 +154,7 @@ export const buildLoadout = (e: Entity | undefined): LoadoutModel | null => {
     stats.push(makeStat('spread', 'Spread', degrees(base.spread), degrees(res.spread), false, (n) => `${round(n)}°`))
     stats.push(makeStat('speed', 'Bullet speed', base.projectileSpeed, res.projectileSpeed, true, (n) => String(round(n, 1))))
     stats.push(makeStat('range', 'Range', def.range, def.range, true, (n) => `${round(n)}t`))
-    if (def.magSize) stats.push(makeStat('mag', 'Magazine', def.magSize, def.magSize, true, (n) => String(round(n))))
+    // No 'Magazine' row: guns have no ammo.
   } else {
     stats.push(makeStat('range', 'Reach', def.range, def.range, true, (n) => `${round(n, 1)}t`))
     if (def.durability) stats.push(makeStat('dura', 'Durability', def.durability, def.durability, true, (n) => String(round(n))))

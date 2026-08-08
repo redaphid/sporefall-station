@@ -1,17 +1,17 @@
 // Slot-based inventory + the item-use model. Mirrors the engine's item shape:
-// every stack is `{ itemId, qty }` and qty DOUBLES as the item's count — ammo
-// for a gun, durability for a melee weapon, a plain quantity for stackables.
-// The weapon's *class* (itemClass) picks the use rule: a ranged gun spends a
-// round per shot and, when empty, stays in the slot as a dead weight you can't
-// fire; a melee weapon spends durability per swing and BREAKS (leaves the slot)
-// at zero; a throwable is lobbed and one is spent. Re-expressed from observed
-// Streets of Rogue behavior, not ported.
+// every stack is `{ itemId, qty }` and qty DOUBLES as the item's count —
+// durability for a melee weapon, a plain quantity for stackables. There is NO
+// ammo: guns never deplete (see the one-weapon change — the player carries a
+// single permanent pistol and firing costs nothing). A melee weapon still
+// spends durability per swing and BREAKS (leaves the slot) at zero; a throwable
+// is lobbed and one is spent. Re-expressed from observed Streets of Rogue
+// behavior, not ported.
 //
 // EVERY accessor reads the loadout off `Entity.loadout` (entity.ts `Loadout`),
 // the ONE component shared by players and NPCs — so a modded enemy's gun and a
 // player's hotbar resolve through exactly the same code. An entity with no
 // `loadout` (weaponless townsfolk, a class-starter with no slot) resolves
-// VANILLA: undefined stack → infinite ammo, no wear, no mods, exactly as an
+// VANILLA: undefined stack → no wear, no mods, exactly as an
 // inventory-less NPC behaved before this component existed.
 
 import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
@@ -23,10 +23,10 @@ import { applyStatus } from './statusFx'
 
 export const MAX_SLOTS = 6
 
-/** Consumables, ammo and throwables merge into one slot; weapons don't. */
+/** Consumables and throwables merge into one slot; weapons don't. */
 export const isStackable = (itemId: string): boolean => {
   const c = itemClass(itemId)
-  return c === 'consumable' || c === 'ammo' || c === 'throwable'
+  return c === 'consumable' || c === 'throwable'
 }
 
 /** Add `qty` of `itemId` to the slots — stacking a stackable into its existing
@@ -44,22 +44,20 @@ export const addItem = (slots: ItemStack[], itemId: string, qty: number): boolea
   return true
 }
 
-/** Equip the weapon in slot `index` — sets it as the active hotbar slot and the
- * entity's swung weapon. Only melee/ranged slots can be equipped. */
-const USABLE = new Set(['melee', 'ranged', 'throwable', 'consumable'])
+/** Slot classes the hotbar can select. WEAPONS ARE NOT HERE: the player carries
+ * one permanent weapon (`combat.weapon`) that is never chosen from the hotbar,
+ * so the active slot is purely the HELD-ITEM cursor for the Use/Throw button. */
+const USABLE = new Set(['throwable', 'consumable'])
 
-/** Select slot `index` as the active/hotbar slot. Equipping a weapon also makes
- * it the swung weapon; a throwable/consumable just becomes the held item (the
- * one the Use/Throw key acts on) and leaves the current weapon in hand. */
+/** Select slot `index` as the held/active item. Only a throwable or consumable
+ * can be held; the entity's weapon is fixed and stays in hand regardless. */
 export const equipSlot = (e: Entity, index: number): boolean => {
   const ld = e.loadout
   if (!ld) return false
   const slot = ld.inventory[index]
   if (!slot) return false
-  const c = itemClass(slot.itemId)
-  if (!USABLE.has(c)) return false
+  if (!USABLE.has(itemClass(slot.itemId))) return false
   ld.activeSlot = index
-  if (e.combat && (c === 'melee' || c === 'ranged')) e.combat.weapon = slot.itemId
   return true
 }
 
@@ -71,7 +69,7 @@ export const activeStack = (e: Entity): ItemStack | undefined => {
 
 /** The slot holding the currently-swung weapon (`combat.weapon`). This is NOT
  * always `activeSlot`: a "held" throwable/consumable takes the active slot while
- * a real weapon stays in hand, so durability/ammo must follow the weapon's slot,
+ * a real weapon stays in hand, so durability must follow the weapon's slot,
  * not whatever is held. Fast-path the common case where they coincide. Returns
  * -1 when the weapon isn't slotted (bare fists, or a class-starter gun). */
 const weaponSlotIndex = (e: Entity): number => {
@@ -103,9 +101,9 @@ export interface ModPickupResult {
   maxed: boolean
 }
 
-/** A freshly materialized weapon arrives loaded: a full magazine (ranged) or
- * full durability (melee), mirroring `startingCount` / a real world pickup. */
-const freshWeaponCount = (def: (typeof WEAPONS)[string]): number => def.magSize ?? def.durability ?? 1
+/** A freshly materialized weapon arrives at full durability (melee); a gun has
+ * no ammo to track, so it is a plain count of 1. Mirrors `startingCount`. */
+const freshWeaponCount = (def: (typeof WEAPONS)[string]): number => def.durability ?? 1
 
 /**
  * Defense in depth for the PHANTOM-weapon state: an entity whose `combat.weapon`
@@ -128,7 +126,6 @@ const materializeHeldWeapon = (e: Entity): ItemStack | undefined => {
   if (ld.inventory.length >= MAX_SLOTS) return undefined
   const stack: ItemStack = { itemId: wid, qty: freshWeaponCount(def) }
   ld.inventory.push(stack)
-  equipSlot(e, ld.inventory.length - 1)
   return stack
 }
 
@@ -172,17 +169,6 @@ export const wearMelee = (e: Entity): void => {
   const stack = e.loadout!.inventory[index]
   stack.qty -= 1
   if (stack.qty <= 0) removeSlot(e, index)
-}
-
-/** Try to spend one round from the swung gun. Returns false when empty — the
- * gun stays in the slot (empty, can't fire) rather than vanishing. */
-export const spendAmmo = (e: Entity): boolean => {
-  const index = weaponSlotIndex(e)
-  if (index < 0) return true // gun not slotted (e.g. class starter): treat as unlimited
-  const stack = e.loadout!.inventory[index]
-  if (stack.qty <= 0) return false
-  stack.qty -= 1
-  return true
 }
 
 const firstThrowableSlot = (ld: Loadout): number => {

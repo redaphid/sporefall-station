@@ -5,7 +5,7 @@ import { OBJECTS } from '../data/objects'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
-import { addItem, applyModPickup, equipSlot } from './inventory'
+import { addItem, applyModPickup } from './inventory'
 import { useObject } from './objects'
 import { fireAt } from './fire'
 
@@ -277,7 +277,9 @@ const recover = (w: World, p: Entity): void => {
   // the starter's activeSlot index stays valid.
   ld.inventory = [...inventory, ...keys]
   ld.activeSlot = activeSlot
-  if (p.combat) p.combat.weapon = activeSlot >= 0 ? inventory[activeSlot].itemId : 'fists'
+  // The permanent weapon is restored by id, NOT read off activeSlot (which is
+  // now the held-item cursor and is -1 on a fresh loadout).
+  if (p.combat) p.combat.weapon = PLAYER_START_WEAPON
   ctl.abilityCooldown = SPECIAL_COOLDOWN_TICKS
 }
 
@@ -295,12 +297,12 @@ export const nearestInteractable = (entities: readonly Entity[], p: Entity): Ent
   return best
 }
 
-/** A picked-up weapon arrives loaded: its slot count starts at a full magazine
- * (ranged) or full durability (melee); anything else keeps its pickup qty. */
+/** A picked-up melee weapon arrives at full durability; a gun has no ammo to
+ * load, so it is a plain 1. Anything else keeps its pickup qty. */
 const startingCount = (itemId: string, qty: number): number => {
   const def = WEAPONS[itemId]
-  if (def?.magSize) return def.magSize
   if (def?.durability) return def.durability
+  if (def) return 1
   return qty
 }
 
@@ -326,17 +328,10 @@ const collect = (player: Entity, item: Entity): boolean => {
     }
     return addItem(ld.inventory, itemId, qty)
   }
-  if (c === 'ammo') {
-    // Rounds top up an existing gun; otherwise stash for the gun you'll find.
-    const gun = ld.inventory.find((s) => itemClass(s.itemId) === 'ranged')
-    if (gun) {
-      gun.qty += qty
-      return true
-    }
-    return addItem(ld.inventory, itemId, qty)
-  }
-  // Weapons and throwables take a slot; auto-equip the first weapon you grab.
-  const added = addItem(ld.inventory, itemId, startingCount(itemId, qty))
-  if (added && (c === 'melee' || c === 'ranged') && ld.activeSlot < 0) equipSlot(player, ld.inventory.length - 1)
-  return added
+  // Weapons are NOT collectable: the player carries one permanent weapon, so a
+  // stray weapon pickup (an old save, a scenario prop) is left on the ground
+  // rather than becoming a dead inventory slot.
+  if (c === 'melee' || c === 'ranged') return false
+  // Throwables take a slot.
+  return addItem(ld.inventory, itemId, startingCount(itemId, qty))
 }

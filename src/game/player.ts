@@ -34,21 +34,21 @@ export const throwGrenade = (w: World, self: Entity): boolean => {
   return true
 }
 
-/** Rounds the starter pistol/gun spawns loaded with — generous so the
- * early game isn't ammo-starved, but FINITE so ammo pickups still matter. */
-export const STARTER_AMMO = 200
-
-/** Build the starter weapon as a real slotted ItemStack so it behaves like any
- * picked-up weapon: it carries ammo/durability in `qty` and can hold weapon-mods
- * on its `mods` list (the fire site + mod pickups read it via `weaponStack`).
- * A ranged starter loads with STARTER_AMMO rounds, a melee starter with its
- * durability. Innate fists (no magSize/durability) stay UNSLOTTED — bare hands
- * with no mod list, resolving vanilla — so the inventory is empty and
- * activeSlot -1, exactly as before. */
+/** Build the starter weapon as a real slotted ItemStack. The slot is what gives
+ * the gun a `mods` list (the fire site + mod pickups + the draft all reach it
+ * via `weaponStack`), which is the ONLY reason the permanent pistol is modelled
+ * as inventory at all — it is never selectable and never leaves slot 0.
+ * There is no ammo, so a gun's `qty` is a flat 1; a melee starter still carries
+ * its durability. Innate fists (no durability) stay UNSLOTTED — bare hands with
+ * no mod list, resolving vanilla — so the inventory is empty and activeSlot -1.
+ *
+ * `activeSlot` is -1 even with a slotted gun: the active slot is now purely the
+ * HELD-ITEM cursor (throwable/consumable for the Use button). The weapon is not
+ * a hotbar selection any more — FIRE always fires `combat.weapon`. */
 export const starterLoadout = (startWeapon: string): Loadout => {
   const def = WEAPONS[startWeapon]
-  if (def?.kind === 'ranged') return { inventory: [{ itemId: startWeapon, qty: STARTER_AMMO }], activeSlot: 0 }
-  if (def?.durability !== undefined) return { inventory: [{ itemId: startWeapon, qty: def.durability }], activeSlot: 0 }
+  if (def?.kind === 'ranged') return { inventory: [{ itemId: startWeapon, qty: 1 }], activeSlot: -1 }
+  if (def?.durability !== undefined) return { inventory: [{ itemId: startWeapon, qty: def.durability }], activeSlot: -1 }
   return { inventory: [], activeSlot: -1 }
 }
 

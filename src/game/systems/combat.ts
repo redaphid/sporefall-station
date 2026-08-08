@@ -1,12 +1,12 @@
 import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
-import { WEAPONS, itemClass, type StatusApply } from '../data/items'
+import { WEAPONS, type StatusApply } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { activeStack, equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
+import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
@@ -16,19 +16,6 @@ import { spawnSporeBurst } from './spore'
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
-
-/**
- * ⚠️ TEMPORARY / TESTING-ONLY — flip to `false` to restore the normal ammo
- * economy exactly. While ON, ranged weapons never deplete and never read as
- * empty/out-of-ammo, so they always fire (effectively infinite ammo). This gates
- * ONLY the depletion in `fireWeapon`; the whole ammo system (spendAmmo, pickups,
- * qty) is left intact, so flipping this to `false` is a byte-exact revert to the
- * finite economy — no other change needed.
- *
- * Deterministic: it draws no RNG and touches no wall-clock — it just skips the
- * `spendAmmo` decrement, so the sim stays a pure function of seed + inputs.
- */
-export const INFINITE_AMMO: boolean = true
 
 /** Probability a dying NPC drops the weapon it was carrying as a grabbable
  * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
@@ -365,9 +352,10 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
  * site: players (combatSystem) and NPCs (ai.ts) both route through here, so mods,
  * elements (onHit), pellets, projectile behavior and melee arcs work identically
  * for either. Sets `combat.cooldown` and returns whether a shot/swing happened
- * (false = an empty gun clicked). Ammo/durability are spent only for INVENTORY
- * weapons (a `weaponStack`); NPCs carry no inventory, so their loadout is innate
- * and never runs dry. Callers gate on `combat.cooldown <= 0` before calling. */
+ * (currently always true — there is no ammo, so a gun can never click dry).
+ * Durability is spent only for INVENTORY melee weapons (a `weaponStack`); NPCs
+ * carry no inventory, so their loadout is innate and never wears out. Callers
+ * gate on `combat.cooldown <= 0` before calling. */
 export const fireWeapon = (w: World, e: Entity): boolean => {
   if (!e.combat) return false
   const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
@@ -384,11 +372,8 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     }
     return true
   }
-  // Ammo depletion is gated behind INFINITE_AMMO (testing toggle above). When ON,
-  // `spendAmmo` is skipped entirely, so qty never drops and the gun never reads as
-  // empty — it always fires. When OFF this is the original: an empty gun clicks
-  // (no shot, no cooldown) and the dry-fire path stays reachable.
-  if (stack && !INFINITE_AMMO && !spendAmmo(e)) return false
+  // No ammo: a gun always fires. (Guns carry no magazine — the player's single
+  // permanent pistol costs nothing to shoot, and NPC guns were always innate.)
   e.combat.cooldown = rw.cooldownTicks
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {
@@ -396,15 +381,6 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, stack?.mods)
   }
   return true
-}
-
-/** Item classes the FIRE button diverts to item-USE instead of a weapon shot:
- * a consumable (bandage/medkit → heal, adrenaline → buff) or a throwable (lobbed).
- * When the active slot holds one of these, "shooting" uses it via the same
- * item-effect path as the dedicated Use button — no bullet is spawned. */
-const isUsableItem = (itemId: string): boolean => {
-  const c = itemClass(itemId)
-  return c === 'consumable' || c === 'throwable'
 }
 
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
@@ -436,18 +412,11 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     }
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
-    // FIRE button arbitration off the ACTIVE slot:
-    //  1. a usable non-weapon in hand (bandage/consumable → heal, throwable →
-    //     lob) is USED via the same item-effect path as the Use button — the
-    //     "shooting uses my equipped item" rule. No bullet, no swing.
-    //  2. otherwise fire the equipped weapon (gun/melee/fists) — unchanged.
-    // Nothing to fire (an out-of-ammo gun) is a dry no-op: the dodge-roll fallback
-    // lives on the USE button above, never on FIRE.
-    const active = activeStack(e)
-    if (active && isUsableItem(active.itemId)) {
-      if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
-      continue
-    }
+    // FIRE always fires the weapon. The old arbitration ("a usable item in the
+    // active slot makes FIRE use it instead") existed only because weapons and
+    // items shared the hotbar; now the player's weapon is permanent and is NOT a
+    // hotbar selection, so FIRE is unambiguously the gun and USE is the held
+    // item. Without this, holding a grenade would leave you unable to shoot.
     fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
   }
 }

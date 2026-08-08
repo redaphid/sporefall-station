@@ -159,6 +159,24 @@ export interface ArtPalette {
   entities?: Record<string, number>
 }
 
+/**
+ * Per-archetype sprite BULK — a multiplier on the drawn billboard only.
+ *
+ * The Mireclaw Alpha borrows the thug's directional set (see CHARSET_ALIAS
+ * below) and was therefore PIXEL-IDENTICAL to the commonest enemy in the game:
+ * same body, same palette, same size. Until it gets its own art (see
+ * docs/assets/boss-art-brief.md) this is the cheap half of the fix — an Alpha
+ * that is half again the size of its own brood reads as a different creature at
+ * a glance, and the size difference survives whatever art lands later.
+ *
+ * Deliberately NOT the collision radius: entity radius stays 0.35 so the boss
+ * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the bat's
+ * 1.3) is what makes the extra bulk felt in the fight.
+ */
+export const ARCHETYPE_SCALE: Record<string, number> = {
+  boss: 1.5,
+}
+
 // Archetypes that borrow another archetype's directional set (bouncers use the
 // cop body; the boss uses the thug; shopkeepers use the civilian).
 const CHARSET_ALIAS: Record<string, string> = {

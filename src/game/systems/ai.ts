@@ -134,6 +134,12 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     ai.search = undefined // a live trail supersedes any cold-trail sweep
     const target = goal.target !== undefined ? w.byId.get(goal.target) : undefined
     if (target && perceives(w, e, target)) ai.lastKnownTargetPos = { x: target.pos.x, y: target.pos.y }
+    // A PURSUE candidate may carry an explicit `at`: a position the NPC was TOLD
+    // about rather than saw — the station-alert broadcast (behaviors.manhunt).
+    // First-hand sight always wins; this only fills in for a target the NPC
+    // cannot currently perceive, so nobody ever tracks a live position they have
+    // no way of knowing.
+    else if (goal.at) ai.lastKnownTargetPos = { x: goal.at.x, y: goal.at.y }
     return
   }
   if (goal.code === FLEE) {

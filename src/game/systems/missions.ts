@@ -311,10 +311,21 @@ const nearestPlayer = (w: World, x: number, y: number): Entity | undefined => {
   return best ?? w.entities.find((e) => e.playerCtl)
 }
 
-/** The station unseals: every door except the breached gate pops open —
+/**
+ * The station unseals: every door (except `exceptId`, if given) pops open —
  * locks drop, biolock seals and overgrowth clear. Returns how many changed.
- * Doors are entities, so this touches no tiles and no rng — deterministic. */
-const releaseAllDoors = (w: World, exceptId: number): number => {
+ * Doors are entities, so this touches no tiles and no rng — deterministic.
+ *
+ * SAFETY: this only ever sets `open = true`. It can never re-create the
+ * "character stuck in a door" bug (fix/door-stuck, 795d336), because that bug
+ * needs a door to CLOSE onto a body — a closed door's tile is solid to the
+ * collision resolver and a body inside it fails the fit test in every
+ * direction, forever. Opening is the always-safe direction, and is in fact the
+ * documented ESCAPE hatch from that state. So no doorway-occupant check is
+ * needed or wanted here: adding one could only ever refuse an open, which is
+ * the direction that frees people.
+ */
+const releaseAllDoors = (w: World, exceptId?: number): number => {
   let released = 0
   for (const e of w.entities) {
     if (!e.door || e.dead || e.id === exceptId) continue
@@ -326,6 +337,83 @@ const releaseAllDoors = (w: World, exceptId: number): number => {
   }
   return released
 }
+
+/** How often the station re-broadcasts its fix on the intruder while on alert
+ * (~2s at 30tps). This single number is the escape run's difficulty dial.
+ *
+ * It is a COARSE fix, deliberately: between broadcasts the hunters walk to a
+ * stale position, so breaking line of sight and moving buys real ground and the
+ * run stays evadable. Shorter would approach an unfair psychic tail; much
+ * longer and the manhunt loses the scent and the finale goes limp. Paired with
+ * PLAYER_SPEED 4.5 vs NPC 2.5-4.6, a player who leaves immediately outruns the
+ * pursuit and a player who loots the room gets converged on — which is exactly
+ * the "survivable if you move, punishing if you dawdle" brief. */
+export const ALERT_BROADCAST_TICKS = 60
+
+/**
+ * STATION ALERT — the escape run begins. Fired once per floor by
+ * `completeMission` the moment the objective is met:
+ *
+ *  1. EVERY door on the floor unseals and pops open (`releaseAllDoors`) — locks,
+ *     biolocks and overgrowth alike. Open-only, so the door-stuck bug stays dead.
+ *  2. Every NPC on the floor is flipped hostile and locked onto the intruder
+ *     (`raiseFloorAggro` — the existing disposition machinery, alarm maxed).
+ *  3. The alert state latches with the absolute tick, the intruder's id, and the
+ *     station's first positional fix on them.
+ *
+ * The lasting AGGRESSION is not applied here: it comes from the alert modifiers
+ * inside the normal utility scoring (systems/behaviors.ts `manhunt` /
+ * `pursueMemory` / `threat`), which read `stationAlerted(w)`. This function only
+ * sets state — no per-NPC goal is forced beyond the one-shot lock-on that
+ * `raiseFloorAggro` already did before this feature.
+ *
+ * Deterministic: pure state writes off the tick counter, no RNG, no wall-clock.
+ */
+const raiseStationAlert = (w: World, focus: Entity): void => {
+  if (w.mission.alertTick !== undefined) return // latched: once per floor
+  const doorsOpened = releaseAllDoors(w)
+  raiseFloorAggro(w, focus)
+  // The alert SUBSUMES the stage-one gateway breach: it is a strict superset
+  // (alarm maxed, every door open, plus the manhunt). Latch stage one too, or
+  // the gate we just threw open would read as a fresh breach to
+  // `maybeTriggerGateBreach` on the very next tick and re-fire the whole
+  // escalation — a spurious `bossDoorBreached` after the station is already lost.
+  w.mission.bossAggroTriggered = true
+  w.mission.alertTick = w.tick
+  w.mission.alertFocusId = focus.id
+  w.mission.alertMark = { x: focus.pos.x, y: focus.pos.y }
+  const hunters = w.entities.filter((e) => e.ai && !e.dead && !e.playerCtl).length
+  w.events.push({ type: 'stationAlert', focusId: focus.id, doorsOpened, hunters })
+}
+
+/**
+ * While the alert runs, the station re-broadcasts where the intruder is every
+ * ALERT_BROADCAST_TICKS — the PA/sensor net calling out the contact. This is a
+ * PERCEPTION input in the same family as `w.noises` and `w.fear`: it publishes a
+ * point, and the ordinary utility scoring (the `manhunt` consideration) decides
+ * who acts on it and whether anything better is on offer. It never forces a goal.
+ *
+ * The window is an ABSOLUTE-tick modulo off the latched `alertTick`, so it lands
+ * on exactly the same ticks in a replay and survives a serialize/deserialize
+ * mid-alert. A dead or departed focus stops the broadcast (the mark goes stale
+ * and the hunt decays through the normal cold-trail paths).
+ */
+const broadcastAlert = (w: World): void => {
+  const at = w.mission.alertTick
+  if (at === undefined || w.mission.alertFocusId === undefined) return
+  if ((w.tick - at) % ALERT_BROADCAST_TICKS !== 0) return
+  const focus = w.byId.get(w.mission.alertFocusId)
+  // Hunt whoever is actually still standing: a downed/dead focus hands the
+  // manhunt to the nearest live player, so a co-op partner can't stroll out.
+  const live = focus && !focus.dead && !focus.playerCtl?.downed ? focus : nearestLivePlayer(w)
+  if (!live) return
+  w.mission.alertFocusId = live.id
+  w.mission.alertMark = { x: live.pos.x, y: live.pos.y }
+}
+
+/** The nearest-to-nothing live, standing player — the manhunt's fallback focus. */
+const nearestLivePlayer = (w: World): Entity | undefined =>
+  w.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)
 
 /**
  * Gateway-breach escalation, stage one of the heist finale. The moment the
@@ -359,6 +447,10 @@ export const missionSystem = (w: World): void => {
   if (w.gameOver) return
 
   maybeTriggerGateBreach(w)
+  // Re-broadcast the intruder's position on the alert's own tick cadence. Runs
+  // BEFORE completion so the tick the alert latches is a broadcast tick by
+  // construction ((tick - alertTick) % N === 0 at tick === alertTick).
+  broadcastAlert(w)
 
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
@@ -423,16 +515,17 @@ const maybeBloom = (w: World, node: Entity): void => {
 
 /**
  * Taking the prize is stage two of the heist finale: the mission completes,
- * the exit unlocks — and every unit in town aggros the prize-taker for the
- * escape run (`raiseFloorAggro`: alarm maxed, every non-allied NPC hostile and
- * locked on). `focus` is who they hunt: the briefcase holder, or whoever stood
- * closest to the kill. A floor with no live players (posthumous completion)
- * skips the manhunt — there is nobody to hunt. Latched by `mission.complete`,
- * so it fires exactly once. */
+ * the exit unlocks — and the whole STATION goes to alert for the escape run
+ * (`raiseStationAlert`: every door thrown open, alarm maxed, every non-allied
+ * NPC hostile and hunting). `focus` is who they hunt: the briefcase holder, or
+ * whoever stood closest to the kill. A floor with no live players (posthumous
+ * completion) skips the alert — there is nobody to hunt, and an alert with no
+ * focus would leave the manhunt broadcasting at a corpse. Latched by
+ * `mission.complete`, so it fires exactly once. */
 const completeMission = (w: World, focus?: Entity): void => {
   w.mission.complete = true
   w.mission.exitUnlocked = true
-  if (focus) raiseFloorAggro(w, focus)
+  if (focus) raiseStationAlert(w, focus)
   w.events.push({ type: 'missionComplete', description: w.mission.description })
 }
 

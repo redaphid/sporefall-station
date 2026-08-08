@@ -7,7 +7,14 @@ export interface NpcDef {
   speed: number // tiles/sec
   weapon: string
   sightRange: number
-  /** Aggro anyone on sight (thugs) vs only criminals (cops) vs never (civs). */
+  /** Innate temperament: aggro anyone on sight (thugs) vs only criminals (cops)
+   * vs never (civs).
+   *
+   * NB this is FLAVOUR, not the targeting rule — the only reader is the inspect
+   * card (`ui/inspectModel.ts`). Actual fight/flee targeting is decided by
+   * `behaviors.isHostileTarget`, which goes by the faction matrix, stored
+   * disposition and `world.hostile`. Keep the two in step by hand; a value here
+   * that contradicts an archetype's behaviour just mislabels it to the player. */
   hostility: 'always' | 'lawful' | 'never'
   fleesOnDamage: boolean
   /** Peaceful until hit, then fights back (bouncers). */
@@ -22,7 +29,9 @@ export interface NpcDef {
    * Absent → neutral to everything (the townsfolk baseline). This is what makes
    * a Sporefall enemy DEMAND a particular tool — no single weapon clears them all. */
   resist?: Record<string, number>
-  /** #68 — spawns INERT until a stimulus wakes it (a sleeping pod/unit). */
+  /** #68 — spawns INERT until a stimulus wakes it (the spore pod, the lurker).
+   * NOT the Derelict Unit: that one spawns awake and merely turns hostile on a
+   * `wakeOn` power-cut, so it sets `wakeOn` WITHOUT `dormant`. */
   dormant?: boolean
   /** #68 — stimulus kinds that wake it (also the Derelict Unit's `'power-cut'`
    * rouse). Copied to `Entity.wakeOn` at spawn. */
@@ -153,7 +162,8 @@ export const NPCS: Record<string, NpcDef> = {
     resist: { physical: 0.35, burning: 1.5, poisoned: 1.0 },
   },
   cinder: {
-    // Ash-dweller: fireproof, so a flamethrower/molotov build stalls — shoot it.
+    // Ash-dweller: takes only 20% from fire (resistant, NOT immune), so a
+    // flamethrower/molotov build stalls out on it — shoot it instead.
     archetype: 'cinder',
     faction: 'gang',
     hp: 45,
@@ -215,8 +225,9 @@ export const NPCS: Record<string, NpcDef> = {
   },
   pod: {
     // #68 Spore pod: a dormant egg-sac — inert until a nearby noise, a body that
-    // strays too close, or a hit trips it; then it hatches into a hostile hive
-    // thing. A room of these is a stealth set-piece: tiptoe through, or set it off.
+    // strays too close, a hit, or FIRE trips it (see `wakeOn` below); then it
+    // hatches into a hostile hive thing. A room of these is a stealth set-piece:
+    // tiptoe through, or set it off — a stray molotov wakes the whole nest.
     archetype: 'pod',
     faction: 'neutral',
     hp: 26,

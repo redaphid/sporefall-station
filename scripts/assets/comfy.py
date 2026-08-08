@@ -18,7 +18,7 @@ import uuid
 
 HOST = os.environ.get("COMFY", "http://localhost:8188")
 
-CKPT = os.environ.get("CKPT", "AnythingXL_xl.safetensors")
+CKPT = os.environ.get("CKPT", "SDXL1.0\\anything-xl.safetensors")
 LORA = os.environ.get("LORA", "pixel_art_style_by_skormino_v7.05_test_72img.safetensors")
 LORA_W = float(os.environ.get("LORA_W", "1.0"))
 SIZE = int(os.environ.get("SIZE", "1024"))

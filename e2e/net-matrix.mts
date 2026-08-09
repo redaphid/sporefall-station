@@ -68,11 +68,27 @@ const INTEREST_RADIUS = 14
 // (Android commonly permits 4-6 with Data Length Extension; 3 leaves margin).
 //
 //   180 B x 3 packets / 0.030 s = 18,000 B/s per link.
-const PER_PEER_BUDGET_BPS = 18_000
+//
+// `--priority high` re-runs the same measurement against the ceiling you get
+// when the JOINING side calls requestConnectionPriority(high) — which the client
+// now does in bleTransport.ts. HIGH is nominally ~11.25ms:
+//   180 B x 3 packets / 0.01125 s = 48,000 B/s per link.
+// It is a request, not a guarantee, so BALANCED stays the default the gate
+// enforces. Never gate on a ceiling the stack is free to refuse.
+const PACKETS_PER_EVENT = 3
+const INTERVAL_S = { balanced: 0.03, high: 0.01125 } as const
+type Priority = keyof typeof INTERVAL_S
+
+const perPeerBudget = (p: Priority): number => Math.round((BLE_MAX_PACKET * PACKETS_PER_EVENT) / INTERVAL_S[p])
 // With several centrals a single peripheral radio TIME-SLICES connection events
-// between them, so host aggregate is NOT per-link x N. This is the shared
-// ceiling the host must fit all its clients inside.
-const AGGREGATE_BUDGET_BPS = 24_000
+// between them, so host aggregate is NOT per-link x N. Modelled as a shared
+// ceiling of 1.33x one link's worth — deliberately pessimistic, because this is
+// the number that decides whether four players fit.
+const aggregateBudget = (p: Priority): number => Math.round(perPeerBudget(p) * 1.333)
+
+/** Set from --priority. Default BALANCED: the ceiling we are guaranteed. */
+let PER_PEER_BUDGET_BPS = perPeerBudget('balanced')
+let AGGREGATE_BUDGET_BPS = aggregateBudget('balanced')
 
 /** Same mulberry32 the sim uses — every channel decision is reproducible. */
 const mulberry32 = (seed: number): (() => number) => {
@@ -502,6 +518,10 @@ const main = async (): Promise<void> => {
   const only = onlyIdx >= 0 ? args[onlyIdx + 1] : null
   const seedIdx = args.indexOf('--seed')
   const seed = seedIdx >= 0 ? Number(args[seedIdx + 1]) : 20260809
+  const prIdx = args.indexOf('--priority')
+  const priority: Priority = prIdx >= 0 && args[prIdx + 1] === 'high' ? 'high' : 'balanced'
+  PER_PEER_BUDGET_BPS = perPeerBudget(priority)
+  AGGREGATE_BUDGET_BPS = aggregateBudget(priority)
 
   if (!Number.isFinite(seed)) {
     console.error(`[net-matrix] --seed must be a number, got "${args[seedIdx + 1]}"`)
@@ -527,7 +547,10 @@ const main = async (): Promise<void> => {
   }
 
   console.log(`[net-matrix] ${chosen.length} profile(s), seed=${seed}, BLE framing at ${BLE_MAX_PACKET}B/packet${selfTest ? ' — SELF-TEST (wire deliberately corrupted)' : ''}`)
-  console.log(`[net-matrix] budget: ${PER_PEER_BUDGET_BPS} B/s per link, ${AGGREGATE_BUDGET_BPS} B/s host aggregate (BALANCED ~30ms interval, 3 pkt/event, 1M PHY, 180B payload)`)
+  console.log(`[net-matrix] budget: ${PER_PEER_BUDGET_BPS} B/s per link, ${AGGREGATE_BUDGET_BPS} B/s host aggregate (${priority.toUpperCase()} ~${INTERVAL_S[priority] * 1000}ms interval, ${PACKETS_PER_EVENT} pkt/event, 1M PHY, ${BLE_MAX_PACKET}B payload)`)
+  if (priority === 'balanced') {
+    console.log(`[net-matrix] note: the client asks for HIGH priority at join, but it is a REQUEST the stack may refuse, so the gate holds it to the BALANCED ceiling. Re-run with --priority high to see the headroom if it is granted.`)
+  }
 
   const reports: Report[] = []
   for (const p of chosen) {

@@ -203,6 +203,28 @@ export class BleClientTransport implements Transport {
       this.maxPacket = MAX_PACKET // stack refused; the 182-byte floor still works
       this.log(`join: MTU refused → maxPacket ${this.maxPacket}`)
     }
+    // Ask for a short connection interval. Until now we asked for nothing, so
+    // Android applied CONNECTION_PRIORITY_BALANCED (~30ms) — tuned for battery,
+    // not for a 10Hz game. HIGH is ~11.25ms, which raises the per-link ceiling
+    // several-fold and cuts input-to-screen latency.
+    //
+    // Three honest caveats, none of which make it not worth asking:
+    //   • It is a REQUEST. The peer and the stack may refuse or renegotiate it,
+    //     so nothing may rely on it having worked — hence the budget in
+    //     e2e/net-matrix.mts still defaults to the BALANCED figure.
+    //   • It costs battery, which matters round a campfire with no chargers.
+    //   • The central drives connection parameters, and our HOST is the
+    //     peripheral — so this only works from the joining side, and each client
+    //     must ask for its own link. With several centrals the host radio still
+    //     time-slices between them, so the win at one peer is not the win at three.
+    // Android-only in the plugin; a no-op elsewhere, which is why it cannot throw
+    // us out of the join.
+    try {
+      await BluetoothLowEnergy.requestConnectionPriority({ deviceId, priority: 'high' })
+      this.log('join: requested HIGH connection priority')
+    } catch {
+      this.log('join: connection-priority request refused — falling back to the stack default')
+    }
     this.log('join: discoverServices')
     await BluetoothLowEnergy.discoverServices({ deviceId })
     this.log('join: subscribe H2C notifications')

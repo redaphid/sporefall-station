@@ -90,7 +90,19 @@ export const clampFlags = (raw: unknown): Record<string, boolean> => {
 export const flagOn = (flags: Record<string, boolean> | undefined, key: string): boolean =>
   flags?.[key] === true
 
-/** Flags introduced after `build`, for telling him what is newly switchable.
+/**
+ * Flags introduced after `build`, for telling him what is newly switchable.
  * Off-by-default means "shipped" no longer means "he has seen it", so this is
- * how new work avoids sitting dark the way the checklists did. */
+ * how new work avoids sitting dark.
+ *
+ * NO CONSUMER YET — and that is precisely the failure this function exists to
+ * prevent, so it is called out rather than left to be discovered. An unused
+ * mechanism for surfacing unused mechanisms is the joke writing itself.
+ *
+ * RETIRE/ADOPT CONDITION: wire this into the start menu next to RELEASE_NOTES
+ * (which already shows "what's new" and is already capped and curated) so a new
+ * flag announces itself. If the second flag ships and this still has no caller,
+ * DELETE IT — the registry is small enough to read, and a dead helper is worse
+ * than no helper.
+ */
 export const flagsSince = (build: number): readonly FeatureFlag[] => FEATURE_FLAGS.filter((f) => f.since > build)

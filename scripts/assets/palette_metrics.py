@@ -8,28 +8,50 @@ nobody could say by how much, because the only gate was someone squinting at a
 actually sees, over OPAQUE pixels only (transparent padding would drag every
 average toward zero and make a small sprite look darker than a big one).
 
-The four numbers, and why each one is here:
+A METRIC THAT WAS TRIED AND REJECTED, because it is the obvious one and the
+next person will reach for it too: `grey_frac`, the fraction of literally
+colourless pixels (chroma < 12/255). The six sprites everyone agreed looked grey
+scored 0.00 on it, and the cast scored up to 0.53. The cast contains far MORE
+pure grey than the six do -- it is full of deliberate near-black outline and
+station-metal plating. What makes the cast read as colourful is not the absence
+of grey but the presence, next to that grey, of genuinely saturated pixels. The
+six had neither: no true grey, no true colour, just a uniform weak tint. So
+"how much of this is grey" is the wrong question and "how much of this is
+COLOURED" is the right one.
 
-  chroma_mean   How colourful. Mean of (max(RGB)-min(RGB))/255. Deliberately not
-                HSV saturation: S is chroma divided by value, so a near-black
-                pixel with a two-step tint scores as "saturated". Chroma stays
-                honest about the difference between olive-green and grey.
-  grey_frac     Fraction of the sprite that is literally colourless
-                (chroma < 12/255, ~1 palette step). The headline number: this is
-                the thing the owner saw. A mean can be dragged up by one hot
-                accent pixel while 80% of the body stays grey; this cannot.
+The metrics, and why each is here:
+
+  sat_frac      THE HEADLINE. Fraction of pixels with chroma > 60/255 -- i.e.
+                genuinely coloured rather than a tinted neutral. Separates the
+                two groups with no overlap at all: cast 0.12-0.57, the six
+                0.02-0.10.
+  chroma_p90    How colourful the coloured part is. 90th percentile of chroma,
+                so a body of neutrals cannot hide behind a few hot pixels, and a
+                few hot pixels cannot rescue a body of neutrals. The cleanest
+                single number available: cast 70-87 vs the six 20-22, a 3x gap.
   rim_dark_frac Bold dark outlines. Of the pixels on the alpha boundary (opaque,
-                8-adjacent to transparent), the fraction whose luma <= 48 — i.e.
-                sitting on the palette's outline darks. Measures the cast's
-                inked-edge look directly, rather than inferring it from overall
-                contrast.
-  value_range   p95-p5 of luma. Separates a flat mid-grey mass from a form with
-                lit tops and shadowed underside. Percentiles not min/max so a
-                single stray pixel cannot fake a full range.
+                8-adjacent to transparent), the fraction with luma <= 48 -- the
+                palette's outline darks. Measures the cast's inked-edge look
+                directly instead of inferring it from overall contrast.
+  value_range   p95-p5 of luma. Separates a flat mid-toned mass from a form with
+                a lit top and a shadowed underside. Percentiles not min/max so
+                one stray pixel cannot fake a full range.
+  palette_n     Distinct palette entries used. A blunt richness check: the six
+                shipped using 5-9 of the 33 available, the cast uses 9-22.
 
-`coverage` (opaque fraction of the canvas) is reported but is NOT a style
-metric -- it is a readability floor. A sprite can hit every colour target by
-becoming smaller and denser, so coverage is tracked to prove it did not.
+Chroma throughout is max(RGB)-min(RGB), deliberately NOT HSV saturation. S is
+chroma divided by value, so a near-black pixel with a two-step tint scores as
+fully "saturated" -- which is exactly the failure mode being measured. Chroma
+stays honest about the difference between olive-green and dark grey.
+
+`coverage` (opaque fraction of the canvas) is reported but NOT gated -- it is a
+readability floor, not a style target. A sprite could hit every colour number by
+shrinking, so coverage is tracked to prove it did not.
+
+One caveat on the band, stated rather than hidden: the floor for
+`rim_dark_frac` is 0.000 because spore-drone is a wispy translucent thing with
+no inked edge at all. That metric therefore cannot fail anything. It is reported
+because it is informative, not because it gates.
 
 The target band is the existing cast, not a designer's guess. `--check` fails a
 sprite that sits outside it. Usage:
@@ -71,8 +93,11 @@ NEW = [
     "brood-sac-s-idle",
 ]
 
-# A pixel below this chroma is colourless to the eye at 48px (~one palette step).
-GREY_CHROMA = 12.0
+# Above this chroma a pixel reads as a colour rather than a tinted neutral. Set
+# from the palette itself: its neutrals (the darks and the station-metal ramp)
+# top out at chroma 22, and its lowest-chroma genuine colour is 30. 60 sits
+# clear of the neutrals with margin.
+SAT_CHROMA = 60.0
 # Luma at or below this is an outline dark. The palette's darks are 8..28 luma;
 # the darkest station metal is ~39. 48 admits an inked edge, excludes body grey.
 OUTLINE_LUMA = 48.0
@@ -107,8 +132,8 @@ def measure(path: Path) -> dict:
     rgb, opaque = _load_opaque(path)
     n = int(opaque.sum())
     if n == 0:
-        return {"coverage": 0.0, "chroma_mean": 0.0, "grey_frac": 1.0,
-                "rim_dark_frac": 0.0, "value_range": 0.0, "opaque_px": 0}
+        return {"sat_frac": 0.0, "chroma_p90": 0.0, "rim_dark_frac": 0.0,
+                "value_range": 0.0, "palette_n": 0, "coverage": 0.0, "opaque_px": 0}
 
     px = rgb[opaque]                                  # (n,3)
     chroma = px.max(1) - px.min(1)                    # 0..255
@@ -120,20 +145,21 @@ def measure(path: Path) -> dict:
     rim_dark_frac = float((rim_luma <= OUTLINE_LUMA).mean()) if rim.sum() else 0.0
 
     return {
-        "chroma_mean": float(chroma.mean() / 255.0),
-        "grey_frac": float((chroma < GREY_CHROMA).mean()),
+        "sat_frac": float((chroma > SAT_CHROMA).mean()),
+        "chroma_p90": float(np.percentile(chroma, 90)),
         "rim_dark_frac": rim_dark_frac,
         "value_range": float((np.percentile(luma, 95) - np.percentile(luma, 5)) / 255.0),
+        "palette_n": len({tuple(p) for p in px.astype(int).tolist()}),
         "coverage": float(n / opaque.size),
         "opaque_px": n,
     }
 
 
-# Direction each metric must move to look MORE like the cast. Used to build a
-# one-sided band: a sprite that is *more* colourful than the least colourful cast
-# member is fine, so only the weak side is a failure.
-HIGHER_IS_CAST = {"chroma_mean": True, "grey_frac": False,
-                  "rim_dark_frac": True, "value_range": True}
+# Every style metric here is "more is more like the cast", so the band is
+# one-sided: a sprite that is MORE colourful than the least colourful cast
+# member is not a problem, and only falling under the cast's floor is.
+HIGHER_IS_CAST = {"sat_frac": True, "chroma_p90": True,
+                  "rim_dark_frac": True, "value_range": True, "palette_n": True}
 STYLE_METRICS = list(HIGHER_IS_CAST)
 
 
@@ -148,20 +174,18 @@ def band(rows: dict[str, dict]) -> dict[str, dict]:
 
 
 def failures(row: dict, b: dict[str, dict]) -> list[str]:
-    """Which style metrics fall outside the cast band, on the weak side only."""
+    """Which style metrics fall under the cast band's floor."""
     bad = []
-    for m, higher in HIGHER_IS_CAST.items():
-        lo, hi = b[m]["min"], b[m]["max"]
-        if higher and row[m] < lo:
-            bad.append(f"{m} {row[m]:.3f} < cast min {lo:.3f}")
-        elif not higher and row[m] > hi:
-            bad.append(f"{m} {row[m]:.3f} > cast max {hi:.3f}")
+    for m in HIGHER_IS_CAST:
+        lo = b[m]["min"]
+        if row[m] < lo:
+            bad.append(f"{m} {row[m]:.3f} < cast floor {lo:.3f}")
     return bad
 
 
-_COLS = [("chroma_mean", "chroma"), ("grey_frac", "grey%"),
+_COLS = [("sat_frac", "sat-frac"), ("chroma_p90", "chr-p90"),
          ("rim_dark_frac", "rim-dark"), ("value_range", "val-rng"),
-         ("coverage", "cover")]
+         ("palette_n", "pal-n"), ("coverage", "cover")]
 
 
 def _print_table(title: str, rows: dict[str, dict], b: dict | None = None) -> int:
@@ -170,7 +194,8 @@ def _print_table(title: str, rows: dict[str, dict], b: dict | None = None) -> in
           + ("   verdict" if b else ""))
     nbad = 0
     for name, r in rows.items():
-        line = f"  {name:<24}" + "".join(f"{r[k]:>10.3f}" for k, _ in _COLS)
+        line = f"  {name:<24}" + "".join(
+            f"{r[k]:>10d}" if k == "palette_n" else f"{r[k]:>10.3f}" for k, _ in _COLS)
         if b is not None:
             bad = failures(r, b)
             nbad += bool(bad)
@@ -201,7 +226,7 @@ def main() -> int:
 
     _print_table(f"CAST (defines the band) — {args.theme} @48px", cast)
     print(f"\n  {'BAND min..max':<24}"
-          + "".join(f"{b[k]['min']:>4.2f}..{b[k]['max']:<4.2f}" for k, _ in _COLS))
+          + "".join(f"{b[k]['min']:>5.2f}..{b[k]['max']:<5.2f}" for k, _ in _COLS))
     nbad = _print_table(f"\nTHE SIX — {args.theme} @48px", new, b)
 
     print(f"\n  {nbad}/{len(new)} outside the cast band")

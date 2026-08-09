@@ -108,13 +108,35 @@ describe('applyDamage reports HOW MUCH it dealt, or null if it never landed', ()
     expect(blocked.health!.hp).toBe(100)
   })
 
-  it('a shatter reports 0 dealt — the ice killed it, not the blow', () => {
-    // Guards against a NEW exploit created by the fix: if shatter reported the
-    // victim's whole hp pool as "dealt", one lifesteal round would heal a boss's
-    // entire lifebar off a grenade somebody else threw.
+  // ── SHATTER: damage DEALT vs lethality GRANTED ────────────────────────────
+  // The bullet delivers its ordinary damage; the ice then kills by a separate
+  // execute rule. Lifesteal is paid for the former only.
+  it('a shatter reports the BLOW\'S own damage, not the victim\'s hp pool', () => {
     const e = body(w, 320)
     addStatus(w, e, 'frozen', 120)
-    expect(applyDamage(w, e, 1, 0, 0, 0, 99)).toBe(0)
+    // 14 is the pistol's damage; the body is unresisted, so it passes through.
+    expect(applyDamage(w, e, 14, 0, 0, 0, 99)).toBe(14)
+    expect(e.dead).toBe(true)
+  })
+
+  it('a shatter NEVER reports the hp it removed — the exploit stays foreclosed', () => {
+    // The hazard this return value could create: if a shatter reported the 320hp
+    // it wiped, one lifesteal round would heal a whole boss lifebar off a grenade
+    // somebody else threw. Bounded to the blow, exactly like any normal hit.
+    const e = body(w, 320)
+    addStatus(w, e, 'frozen', 120)
+    const dealt = applyDamage(w, e, 14, 0, 0, 0, 99)
+    expect(dealt).toBeLessThanOrEqual(14)
+    expect(dealt).not.toBe(320)
+  })
+
+  it('a shatter still applies RESIST to the blow it reports', () => {
+    // The one intended difference from shipped behaviour: armour now reduces the
+    // lifesteal payout on an execute, as it does on every other hit.
+    const e = body(w, 320)
+    e.resist = { physical: 0.35 }
+    addStatus(w, e, 'frozen', 120)
+    expect(applyDamage(w, e, 14, 0, 0, 0, 99)).toBe(5) // round(14 * 0.35)
     expect(e.dead).toBe(true)
   })
 })

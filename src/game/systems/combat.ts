@@ -138,13 +138,30 @@ export const applyDamage = (
   // Enemies still shatter, so freeze remains a genuine execute when YOU throw it.
   if (isFrozen(target)) {
     if (!target.playerCtl) {
+      // Reports the BLOW'S OWN damage — not zero, and emphatically not the
+      // corpse's hp pool. The distinction that matters here is damage DEALT
+      // versus lethality GRANTED: the bullet delivers its ordinary damage, and
+      // the ice then kills the body by a separate execute rule. You are paid for
+      // the former only.
+      //
+      // Three values were possible and only this one is right:
+      //   - the hp removed (~320 on the boss) would let a single lifesteal round
+      //     heal a whole lifebar off a grenade somebody else threw. Never
+      //     reachable before this contract existed, because the old lifesteal
+      //     read the BULLET (`p.damage`) rather than the victim — so it is a
+      //     hazard this return value could create, and it stays foreclosed.
+      //   - 0 is safe but overcorrects past what actually shipped, and it makes
+      //     frost + lifesteal a pair that silently pays nothing on every
+      //     execute: a combination the player deliberately assembled, punished
+      //     with no feedback.
+      //   - the blow's own resisted damage is bounded exactly like any normal
+      //     hit, and reproduces shipped behaviour: 14 dmg x 0.1304 frac = 1.83
+      //     healed against an unresisted body, identical to before. An armoured
+      //     one now pays less, which is the intended resist fix, not a
+      //     regression.
+      const dealt = Math.max(0, Math.round(amount * resistMult(target, 'physical')))
       shatter(w, target)
-      // Reports 0 DEALT, deliberately: the blow landed, but the ice did the
-      // killing, not the bullet. Reporting the shattered body's whole hp pool
-      // here would let a single lifesteal round heal a 320hp boss's lifebar off
-      // a grenade somebody else threw — a brand-new exploit created by fixing
-      // this one. You are paid for damage you deal, and shatter deals none.
-      return 0
+      return dealt
     }
     removeStatus(target, 'frozen')
   }

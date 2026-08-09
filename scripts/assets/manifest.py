@@ -88,6 +88,14 @@ PROP_KEYS = {  # engine prop name -> props table key
     "barrel": "spore-barrel", "atm": "cryo-terminal",
     "vending-machine": "nutrient-dispenser", "tv": "console-monitor",
     "toilet": "hydro-recycler",
+    # Furniture that deliberately REUSES another prop's art (the same reuse
+    # art.ts PROP_SPRITE encodes: a weapons locker wears the cryo-terminal, a
+    # supply cabinet the nutrient dispenser, a desk the console). These were
+    # live in the shipped manifest but missing from this table, so ANY
+    # regeneration silently dropped prop.locker/cabinet/desk and the furniture
+    # fell back to a procedural draw — caught by artResolution.test.ts.
+    "locker": "cryo-terminal", "cabinet": "nutrient-dispenser",
+    "desk": "console-monitor",
 }
 
 

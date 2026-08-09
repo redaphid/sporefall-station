@@ -25,6 +25,16 @@
   // This does NOT put production on workers.dev: `workers_dev` stays unset, so
   // sporefall-station.loqwai.workers.dev keeps 404ing and sporefall.hypnodroid.com
   // remains the only live origin. Only the per-version preview addresses resolve.
+  //
+  // NOT SUFFICIENT ON ITS OWN — this key is necessary but does not take effect
+  // from the preview workflow. Subdomain settings are applied by `wrangler
+  // deploy`; `wrangler versions upload` (all preview-web.yml runs) does not push
+  // them, so after a preview upload the API still reports:
+  //     {"enabled": false, "previews_enabled": false}
+  // Turning previews on for real is an account-side flip on the SCRIPT's
+  // workers.dev subdomain, and enabling that subdomain is what would also expose
+  // production at sporefall-station.loqwai.workers.dev — an exposure change, so
+  // it is deliberately left for the owner rather than done from a branch.
   "preview_urls": true,
 
   // Serve the Vite build. Only /ws/* and /ota/* run the Worker; every other path

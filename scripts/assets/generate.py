@@ -587,8 +587,26 @@ def final(names, allow_regen=False):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+    # Accept BOTH `--key=value` and `--key value`. The docstring has always shown
+    # the space-separated form, but the parser only matched `--key=`, so a
+    # documented `curate ... --seed 414501 --ckpt anything-xl` recorded NONE of
+    # it — the flag matched nothing and its value fell through into the
+    # positional list, where curate ignores anything past the file. Silently
+    # losing seed/size/ckpt loses the provenance curation.json exists to keep.
+    VALUE_FLAGS = {"--seed", "--index", "--batch", "--size", "--ckpt", "--note", "--seeds"}
+    args, flagmap, rest = [], {}, list(sys.argv[1:])
+    while rest:
+        a = rest.pop(0)
+        if not a.startswith("--"):
+            args.append(a)
+        elif "=" in a:
+            k, v = a.split("=", 1)
+            flagmap[k] = v
+        elif a in VALUE_FLAGS and rest and not rest[0].startswith("--"):
+            flagmap[a] = rest.pop(0)
+        else:
+            flagmap[a] = True
+    flags = list(flagmap)
     J = jobs()
     if "--list" in flags:
         print("\n".join(J))
@@ -596,10 +614,8 @@ if __name__ == "__main__":
     cmd, names = (args[0], args[1:]) if args else (None, [])
 
     def flagval(key, default=None):
-        for f in flags:
-            if f.startswith(key + "="):
-                return f.split("=", 1)[1]
-        return default
+        v = flagmap.get(key, default)
+        return default if v is True else v
 
     if cmd == "curate":
         # curate <job> <file> [--seed N --index I --batch B --size N --ckpt X --note "..."]

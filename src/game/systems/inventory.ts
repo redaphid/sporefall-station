@@ -23,10 +23,10 @@ import { applyStatus } from './statusFx'
 
 export const MAX_SLOTS = 6
 
-/** Consumables, ammo and throwables merge into one slot; weapons don't. */
+/** Consumables and throwables merge into one slot; weapons don't. */
 export const isStackable = (itemId: string): boolean => {
   const c = itemClass(itemId)
-  return c === 'consumable' || c === 'ammo' || c === 'throwable'
+  return c === 'consumable' || c === 'throwable'
 }
 
 /** Add `qty` of `itemId` to the slots — stacking a stackable into its existing
@@ -103,9 +103,10 @@ export interface ModPickupResult {
   maxed: boolean
 }
 
-/** A freshly materialized weapon arrives loaded: a full magazine (ranged) or
- * full durability (melee), mirroring `startingCount` / a real world pickup. */
-const freshWeaponCount = (def: (typeof WEAPONS)[string]): number => def.magSize ?? def.durability ?? 1
+/** A freshly materialized weapon arrives whole: full durability for melee, and a
+ * flat 1 for a gun, which carries no ammo — the stack is a home for mods, not a
+ * round count. Mirrors `startingCount` / a real world pickup. */
+const freshWeaponCount = (def: (typeof WEAPONS)[string]): number => def.durability ?? 1
 
 /**
  * Defense in depth for the PHANTOM-weapon state: an entity whose `combat.weapon`
@@ -172,17 +173,6 @@ export const wearMelee = (e: Entity): void => {
   const stack = e.loadout!.inventory[index]
   stack.qty -= 1
   if (stack.qty <= 0) removeSlot(e, index)
-}
-
-/** Try to spend one round from the swung gun. Returns false when empty — the
- * gun stays in the slot (empty, can't fire) rather than vanishing. */
-export const spendAmmo = (e: Entity): boolean => {
-  const index = weaponSlotIndex(e)
-  if (index < 0) return true // gun not slotted (e.g. class starter): treat as unlimited
-  const stack = e.loadout!.inventory[index]
-  if (stack.qty <= 0) return false
-  stack.qty -= 1
-  return true
 }
 
 const firstThrowableSlot = (ld: Loadout): number => {

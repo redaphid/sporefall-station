@@ -3,7 +3,7 @@ import { makeEntity, type Entity, type ItemStack } from '../entity'
 import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { combatSystem } from './combat'
-import { addItem, activeStack, equipSlot, MAX_SLOTS, spendAmmo, throwActive, useHeld, wearMelee } from './inventory'
+import { addItem, activeStack, equipSlot, MAX_SLOTS, throwActive, useHeld, wearMelee } from './inventory'
 
 const player = (w: World, x = 20, y = 20): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', x, y))
@@ -50,16 +50,14 @@ describe('inventory — adversarial', () => {
       expect(e.loadout!.activeSlot).toBe(-1)
     })
 
-    it('refuses to equip a non-usable class (cash/key/ammo)', () => {
+    it('refuses to equip a non-usable class (cash/key)', () => {
       const e = player(w)
       e.loadout!.inventory = [
         { itemId: 'cash', qty: 10 },
         { itemId: 'briefcase', qty: 1 },
-        { itemId: 'ammo', qty: 30 },
       ]
       expect(equipSlot(e, 0)).toBe(false)
       expect(equipSlot(e, 1)).toBe(false)
-      expect(equipSlot(e, 2)).toBe(false)
       expect(e.loadout!.activeSlot).toBe(-1)
     })
 
@@ -104,23 +102,6 @@ describe('inventory — adversarial', () => {
     it('useHeld with nothing held returns false', () => {
       const e = player(w)
       expect(useHeld(w, e)).toBe(false)
-    })
-  })
-
-  describe('ammo bookkeeping', () => {
-    it('spendAmmo on an unslotted (class-starter) gun is unlimited', () => {
-      const e = player(w)
-      e.combat!.weapon = 'pistol' // starter gun, no slot in inventory
-      expect(spendAmmo(e)).toBe(true)
-      expect(spendAmmo(e)).toBe(true)
-    })
-
-    it('an empty slotted gun clicks (spendAmmo false) but stays in the slot', () => {
-      const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }]
-      equipSlot(e, 0)
-      expect(spendAmmo(e)).toBe(false)
-      expect(e.loadout!.inventory).toHaveLength(1) // dead weight, not gone
     })
   })
 
@@ -211,8 +192,9 @@ describe('inventory — adversarial', () => {
       ]
       equipSlot(e, 0) // weapon = pistol
       equipSlot(e, 1) // hold the molotov; weapon still pistol
-      expect(spendAmmo(e)).toBe(true)
-      expect(e.loadout!.inventory.find((s) => s.itemId === 'pistol')!.qty).toBe(7)
+      // Firing spends nothing now, so holding a throwable cannot drain the gun
+      // (nor the throwable) — the counts simply stand still.
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'pistol')!.qty).toBe(8)
       expect(e.loadout!.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(3)
     })
 

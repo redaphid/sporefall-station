@@ -27,9 +27,6 @@ export interface WeaponDef {
   knockback: number
   /** Ranged only. */
   projectileSpeed?: number
-  ammoPerShot?: number
-  /** Ranged: rounds a full slot holds — the slot's count doubles as ammo. */
-  magSize?: number
   /** Melee: swings before it breaks — the slot's count doubles as durability.
    * Absent (natural armament) = innate, never consumed. */
   durability?: number
@@ -76,8 +73,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 18,
     knockback: 3,
     projectileSpeed: 14,
-    ammoPerShot: 1,
-    magSize: 8,
   },
   shotgun: {
     id: 'shotgun',
@@ -88,7 +83,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 26,
     knockback: 4,
     projectileSpeed: 16,
-    magSize: 6,
     pellets: 5,
     spread: 0.5,
   },
@@ -101,7 +95,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 5,
     knockback: 1,
     projectileSpeed: 16,
-    magSize: 30,
   },
   freezeRay: {
     id: 'freezeRay',
@@ -112,7 +105,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 22,
     knockback: 0,
     projectileSpeed: 13,
-    magSize: 6,
     onHit: { status: 'frozen', ticks: 120 },
   },
   tranquilizer: {
@@ -124,7 +116,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 20,
     knockback: 0,
     projectileSpeed: 13,
-    magSize: 5,
     onHit: { status: 'sleep', ticks: 150 },
   },
   flamethrower: {
@@ -136,7 +127,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 6,
     knockback: 0,
     projectileSpeed: 11,
-    magSize: 40,
     onHit: { status: 'burning', ticks: 240 },
   },
   stunGun: {
@@ -148,7 +138,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 24,
     knockback: 1,
     projectileSpeed: 14,
-    magSize: 4,
     onHit: { status: 'electrified', ticks: 45 },
   },
 }
@@ -188,7 +177,7 @@ export const CONSUMABLES: Record<string, ConsumableDef> = {
   adrenaline: { id: 'adrenaline', name: 'Adrenaline', onUse: { status: 'hasted', ticks: 300 } },
 }
 
-export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'ammo' | 'key' | 'cash' | 'unknown'
+export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' | 'cash' | 'unknown'
 
 /** What kind of thing an item id is — the switch every use-rule dispatches on. */
 export const itemClass = (itemId: string): ItemClass => {
@@ -198,7 +187,6 @@ export const itemClass = (itemId: string): ItemClass => {
   // ignore slot limits, survive a down (recover keeps only 'key' items), and
   // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
   if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
-  if (itemId === 'ammo') return 'ammo'
   if (WEAPONS[itemId]) return WEAPONS[itemId].kind
   if (THROWABLES[itemId]) return 'throwable'
   if (CONSUMABLES[itemId]) return 'consumable'

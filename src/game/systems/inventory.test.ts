@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
 import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { addItem, equipSlot, MAX_SLOTS, throwActive } from './inventory'
 
 const player = (w: World): Entity => {
@@ -50,28 +50,6 @@ describe('inventory', () => {
     expect(equipSlot(e, 1)).toBe(true)
     expect(e.loadout!.activeSlot).toBe(1)
     expect(e.combat!.weapon).toBe('pistol')
-  })
-
-  it.runIf(!INFINITE_AMMO)('firing a ranged weapon decrements its ammo and stops at empty', () => {
-    // The normal (finite) ammo economy — guarded whenever the INFINITE_AMMO
-    // testing toggle is OFF. When ON, the depletion is intentionally skipped
-    // (covered by infiniteAmmo.test.ts), so this economy assertion is inert.
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'pistol', qty: 2 }]
-    equipSlot(e, 0)
-    const shots = () => w.entities.filter((x) => x.projectile).length
-
-    combatSystem(w, attack())
-    e.combat!.cooldown = 0
-    combatSystem(w, attack())
-    e.combat!.cooldown = 0
-    expect(e.loadout!.inventory[0].qty).toBe(0)
-    const firedTwice = shots()
-    expect(firedTwice).toBe(2)
-
-    combatSystem(w, attack()) // empty — no shot
-    expect(shots()).toBe(firedTwice)
-    expect(e.loadout!.inventory[0].qty).toBe(0)
   })
 
   it('a melee weapon breaks when its durability runs out', () => {

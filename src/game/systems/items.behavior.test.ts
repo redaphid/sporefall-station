@@ -9,7 +9,7 @@ import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
 import { ELEMENTS } from '../data/elements'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { elementSystem, fireSystem } from './fire'
 import { throwActive } from './inventory'
 import { equipSlot } from './inventory'
@@ -94,28 +94,6 @@ describe('item behavior — new guns', () => {
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
     expect(target.health!.hp).toBe(60) // swing never landed
-  })
-
-  it.runIf(!INFINITE_AMMO)('machine gun empties its whole magazine round by round', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'machinegun', qty: 3 }]
-    equipSlot(e, 0)
-    let shots = 0
-    for (let i = 0; i < 5; i++) {
-      const before = w.entities.filter((x) => x.projectile).length
-      combatSystem(w, attack())
-      if (w.entities.filter((x) => x.projectile).length > before) shots++
-      e.combat!.cooldown = 0
-    }
-    expect(shots).toBe(3) // only three rounds were in the mag
-    expect(e.loadout!.inventory[0].qty).toBe(0)
-  })
-})
-
-describe('item behavior — element throwables', () => {
-  let w: World
-  beforeEach(() => {
-    w = createWorld(1, 1)
   })
 
   it('molotov lands a fire hazard (onLand: fire)', () => {
@@ -211,11 +189,14 @@ describe('item behavior — freeze then shatter (element combo through items)', 
 })
 
 describe('item data — well-formedness', () => {
-  it('every ranged weapon has a projectile speed and a magazine', () => {
+  it('every ranged weapon has a projectile speed and NO magazine (ammo is gone)', () => {
     for (const wpn of Object.values(WEAPONS)) {
       if (wpn.kind !== 'ranged') continue
       expect(wpn.projectileSpeed, wpn.id).toBeGreaterThan(0)
-      expect(wpn.magSize, wpn.id).toBeGreaterThan(0)
+      // A stray magSize/ammoPerShot would silently reintroduce a magazine on a
+      // gun that has no way to reload.
+      expect(wpn, wpn.id).not.toHaveProperty('magSize')
+      expect(wpn, wpn.id).not.toHaveProperty('ammoPerShot')
     }
   })
 

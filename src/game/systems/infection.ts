@@ -7,7 +7,7 @@
 //
 // ⚠️ SHIPPED BEHIND A TOGGLE. `INFECTION_ENABLED` (below) defaults to FALSE —
 // this changes game feel substantially, so it is OFF until the owner opts in,
-// exactly like `INFINITE_AMMO`. While off, `infectionSystem` is never called,
+// a build-time feature gate. While off, `infectionSystem` is never called,
 // no entity is ever `infected`, and the brain's infection branch is skipped, so
 // the shipped sim is byte-identical. A test/sim may force it per-world via
 // `w.aiFlags.infection` (which wins over the toggle) without touching the flag.

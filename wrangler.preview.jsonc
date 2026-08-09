@@ -19,16 +19,29 @@
   "main": "src/worker/index.ts",
   "compatibility_date": "2026-04-07",
 
-  // NO `routes`. Deliberate and load-bearing:
-  //   - sporefall.hypnodroid.com stays attached to production, untouched.
-  //   - /ota/check on the custom domain keeps resolving to production, so the
-  //     APK's update channel cannot be intercepted. (`capacitor.config.ts` bakes
-  //     OTA_UPDATE_URL at BUILD time, defaulting to the custom domain, so an
-  //     installed APK never even looks at this Worker's hostname.)
-  // Exposure is the free workers.dev origin only:
-  //     https://sporefall-preview.<account-subdomain>.workers.dev
-  // Setting `workers_dev` on THIS Worker says nothing about production's
-  // exposure — it is a per-Worker setting, and production's stays false.
+  // Its OWN hostname — a sibling of production's, never production's own.
+  // `sporefall.hypnodroid.com` stays attached to `sporefall-station` and is not
+  // read or rewritten by this file. Removing this Worker removes only this name.
+  //
+  // Why a custom domain at all, when workers_dev is on: this account protects
+  // `*.loqwai.workers.dev` with Cloudflare Access, so the workers.dev URL answers
+  // 302 -> loqwai.cloudflareaccess.com for a signed-out phone. A custom hostname
+  // on this zone is public, exactly as production's already is.
+  //
+  // THIRD level, not fourth: Universal SSL on a Free plan covers `*.hypnodroid.com`
+  // but NOT `*.sporefall.hypnodroid.com`, so `preview.sporefall.hypnodroid.com`
+  // would fail TLS on a phone. Every other Worker on this zone is third-level too.
+  //
+  // This does NOT touch the APK's OTA channel: `capacitor.config.ts` bakes
+  // OTA_UPDATE_URL at BUILD time, defaulting to sporefall.hypnodroid.com, so an
+  // installed APK never resolves this hostname. `/ota/check` here reads only this
+  // Worker's own assets.
+  "routes": [{ "pattern": "sporefall-preview.hypnodroid.com", "custom_domain": true }],
+
+  // The free workers.dev origin stays on as a fallback (Access-gated, so it is
+  // useful for a signed-in desktop, not for a signed-out phone). Setting this on
+  // THIS Worker says nothing about production's exposure — it is per-Worker, and
+  // production's `enabled` is false and stays false.
   "workers_dev": true,
 
   // Same Vite build as production. `not_found_handling` means every unknown path

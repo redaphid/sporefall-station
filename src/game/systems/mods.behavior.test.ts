@@ -4,6 +4,7 @@
 // end-to-end seeded determinism through tickWorld.
 
 import { beforeEach, describe, expect, it } from 'vitest'
+import { WEAPONS } from '../data/items'
 import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import { emptyInput, type SimEvent } from '../types'
 import { addEntity, createWorld, isBlocked, tickWorld, type World } from '../world'

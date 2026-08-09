@@ -159,7 +159,7 @@ describe('applyDamage — dodge-roll i-frames (exact window)', () => {
     p.health = { hp: 100, max: 100, iframes: 0 }
   })
 
-  const hurt = (): boolean => applyDamage(w, p, 25, p.pos.x - 1, p.pos.y, 0, 999)
+  const hurt = (): number | null => applyDamage(w, p, 25, p.pos.x - 1, p.pos.y, 0, 999)
 
   it('blocks damage for every tick strictly inside the roll window', () => {
     p.playerCtl!.roll = { untilTick: w.tick + ROLL_TICKS, cooldownUntilTick: w.tick + 99, dirX: 1, dirY: 0 }

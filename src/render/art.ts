@@ -179,7 +179,7 @@ export const ARCHETYPE_SCALE: Record<string, number> = {
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
 // cop body; the boss uses the thug; shopkeepers use the civilian).
-const CHARSET_ALIAS: Record<string, string> = {
+const CHARSET_ALIAS_BASE: Record<string, string> = {
   player: 'player',
   cop: 'cop',
   gangster: 'gangster',
@@ -200,6 +200,29 @@ const CHARSET_ALIAS: Record<string, string> = {
   // pixel-identical problem ARCHETYPE_SCALE exists to paper over. If a kind's art
   // is missing the lookup still falls through to its own procedural set, which is
   // per-archetype distinct — so a partial art drop degrades, it does not break.
+}
+
+/** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
+ * map on purpose.
+ *
+ * The `newEnemyArt` setting is OFF by default, and the point of an off-by-default
+ * flag is that a player who never touches it is PROVABLY unaffected. So the
+ * default path is the original `CHARSET_ALIAS_BASE`, byte-for-byte what shipped
+ * before this art existed — not a second branch that reconstructs it and merely
+ * looks the same. Turning the setting on ADDS these entries; turning it off does
+ * not subtract anything, because nothing was ever added.
+ *
+ * Each maps to ITSELF, not a borrowed body: aliasing e.g. brute->thug would just
+ * reintroduce the pixel-identical problem. A missing file still falls through to
+ * the per-archetype procedural set, so a partial art drop degrades rather than
+ * breaks.
+ *
+ * REMOVAL PLAN: this is scaffolding, not architecture. When the colour pass
+ * lands and the art is accepted, fold these into CHARSET_ALIAS_BASE and delete
+ * the flag. A feature flag nobody removes is its own debt — see the
+ * INFECTION_ENABLED precedent, where a dead constant hid a whole unfinished
+ * system. */
+const NEW_ENEMY_CHARSET: Record<string, string> = {
   brute: 'brute',
   cinder: 'cinder',
   sporeling: 'sporeling',
@@ -388,7 +411,15 @@ export const createArt = (
   sprites: SpriteTextures = {},
   palette: ArtPalette = {},
   animTpfs: Partial<Record<AnimStateName, number>> = {},
+  /** Draw the six Sporefall threats' bespoke art instead of the generic
+   * procedural blobs. Defaults FALSE so the untouched path is the historical
+   * one. Purely local presentation — never reaches the sim or the wire. */
+  newEnemyArt = false,
 ): ArtRegistry => {
+  // Flag ON adds the six; flag OFF leaves the base map exactly as it was.
+  const CHARSET_ALIAS: Record<string, string> = newEnemyArt
+    ? { ...CHARSET_ALIAS_BASE, ...NEW_ENEMY_CHARSET }
+    : CHARSET_ALIAS_BASE
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
 

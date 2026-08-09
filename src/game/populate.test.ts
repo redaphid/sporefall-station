@@ -3,7 +3,6 @@ import { createWorld } from './world'
 import { populateWorld } from './populate'
 import { itemClass } from './data/items'
 
-const ELEMENT_WEAPONS = new Set(['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun'])
 const ELEMENT_THROWABLES = new Set(['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade'])
 
 const lootIds = (seed: number, floor: number): string[] => {

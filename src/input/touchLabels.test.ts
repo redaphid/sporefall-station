@@ -10,7 +10,6 @@ const player = (abilityCooldown = 0): Entity => {
   p.playerCtl = {
     playerId: 0,
     abilityCooldown,
-    cash: 0,
     crimeUntilTick: 0,
   }
   p.loadout = { inventory: [], activeSlot: -1 }

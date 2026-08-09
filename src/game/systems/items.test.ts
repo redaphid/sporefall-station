@@ -6,7 +6,7 @@ import { WEAPONS } from '../data/items'
 import { combatSystem } from './combat'
 import { fireAt } from './fire'
 import { applyAreaEffect } from './itemEffects'
-import { equipSlot, throwActive, useHeld } from './inventory'
+import { throwActive, useHeld } from './inventory'
 import { projectileSystem } from './projectiles'
 import { hasStatus } from './statusFx'
 

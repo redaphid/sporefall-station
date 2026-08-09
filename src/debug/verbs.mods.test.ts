@@ -4,7 +4,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createWorld, type World } from '../game/world'
 import { spawnPlayer } from '../game/player'
-import { equipSlot } from '../game/systems/inventory'
 import { runVerb, WRITE_VERBS } from './verbs'
 
 const armedPlayer = (w: World): number => {

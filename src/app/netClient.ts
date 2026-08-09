@@ -354,12 +354,16 @@ export class NetClientSession implements Session {
     const events = this.eventsOut
     this.eventsOut = []
     const hud = this.state.huds[this.slot]
+    if (this.self?.playerCtl) {
+      // The weapon is permanent, so it is NOT streamed — assert it locally, and
+      // do so unconditionally: waiting on the first StateMsg would leave our own
+      // avatar briefly weaponless (undefined `combat`) right after joining.
+      if (this.self.combat) this.self.combat.weapon = PLAYER_START_WEAPON
+      else this.self.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
+    }
     if (this.self && hud) {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
       this.self.playerCtl!.abilityCooldown = hud.abilityCd
-      // The weapon is permanent and never streamed — assert it locally.
-      if (this.self.combat) this.self.combat.weapon = PLAYER_START_WEAPON
-      else this.self.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
     }
     // Our OWN player carries the FULL authoritative inventory the host streams us
     // (slots / activeSlot / weapon mods) so item use and mod badges work as a

@@ -908,9 +908,12 @@ export const createArt = (
   const characterSet = (archetype: string): CharSet | undefined => {
     const alias = CHARSET_ALIAS[archetype]
     if (!alias) return undefined
-    // Theme file art wins; the procedural set guarantees every character
-    // archetype renders in all five drawn directions even with zero files.
-    return sprites.chars?.[alias] ?? procCharSet(archetype)
+    // An archetype's OWN art wins over the set it borrows, so dropping
+    // `char.boss.*` files into a theme pack promotes the Mireclaw Alpha off the
+    // thug body with no code change (same for bouncer/shopkeeper/gangster).
+    // Then the alias' art; then the procedural set, which guarantees every
+    // character archetype renders in all five drawn directions with zero files.
+    return sprites.chars?.[archetype] ?? sprites.chars?.[alias] ?? procCharSet(archetype)
   }
 
   const isCharacterSprite = (archetype: string): boolean => archetype in CHARSET_ALIAS

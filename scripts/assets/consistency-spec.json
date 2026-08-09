@@ -112,5 +112,119 @@
    "cx": 2.5,
    "foot_y": 1
   }
+ },
+ "mireclaw-stalker": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 32,
+   "width": 43,
+   "head_h": 6,
+   "mass": 374,
+   "cx": 1.78,
+   "foot_y": 44
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "sporeling-mite": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 26,
+   "head_h": 36,
+   "mass": 754,
+   "cx": 0.03,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "carapace-brute": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 42,
+   "width": 40,
+   "head_h": 32,
+   "mass": 1000,
+   "cx": -2.84,
+   "foot_y": 44
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "cinder-husk": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 43,
+   "width": 20,
+   "head_h": 8,
+   "mass": 374,
+   "cx": -0.31,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "gloom-lurker": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 41,
+   "width": 43,
+   "head_h": 26,
+   "mass": 862,
+   "cx": -0.62,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "brood-sac": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 37,
+   "width": 42,
+   "head_h": 35,
+   "mass": 1041,
+   "cx": -0.05,
+   "foot_y": 44
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
  }
 }

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { NPCS } from '../game/data/npcs'
 import {
   DEFAULT_THEME_ID,
+  CHAR_NAMES,
   DIRS5,
   emptyManifest,
   FX_KEYS,
@@ -390,12 +391,16 @@ describe('canonical key set sanity', () => {
     expect(SPRITE_KEYS.has('projectile')).toBe(true)
     expect(SPRITE_KEYS.has('grenade')).toBe(true)
   })
-  it('contains all 70 legacy char keys (5 dirs × 2 frames × 7 characters) plus the state-frame grammar', () => {
+  it('contains the legacy char keys (dirs × 2 frames × characters) plus the state-frame grammar', () => {
+    // Derived from CHAR_NAMES rather than hardcoded, so adding a character to
+    // the canonical set (e.g. `boss`, ahead of its art landing) does not fail a
+    // test that was only ever counting.
+    const chars = CHAR_NAMES.length
     const charKeys = [...SPRITE_KEYS].filter((k) => k.startsWith('char.'))
     const legacy = charKeys.filter((k) => /-(idle|step)$/.test(k))
-    expect(legacy.length).toBe(70)
-    // 7 chars × 5 dirs × 6 states × 8 frames of char.<c>.<d>-<state>-<n>.
-    expect(charKeys.length).toBe(70 + 7 * 5 * ANIM_STATES.length * MAX_ANIM_FRAMES)
+    expect(legacy.length).toBe(chars * DIRS5.length * 2)
+    // chars × 5 dirs × 6 states × 8 frames of char.<c>.<d>-<state>-<n>.
+    expect(charKeys.length).toBe(legacy.length + chars * DIRS5.length * ANIM_STATES.length * MAX_ANIM_FRAMES)
     expect(DIRS5.length).toBe(5)
   })
   it('fx keys are a subset of the sprite keys', () => {

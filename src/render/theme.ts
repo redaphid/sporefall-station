@@ -52,7 +52,17 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
   n: ['n', 's'],
 }
 
-export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot'] as const
+// `boss` is listed with no art shipped yet: without it here, `char.boss.*` is
+// not a canonical key, so validateManifest would DROP a boss sprite mapping
+// with a warning and the art pass could not land without a code change. Until
+// those files exist the loader finds nothing and art.characterSet falls through
+// to the thug body exactly as before.
+// #78 — the Sporefall threat roster (brute/cinder/sporeling/stalker/lurker/pod)
+// all spawn in normal play. They are canonical char keys for the same reason
+// `boss` is: without them `char.brute.*` is not canonical, so validateManifest
+// DROPS the mapping and the art can never load however many files ship.
+export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
+  'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod'] as const
 export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
 export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk'] as const
 const UNIT_SINGLES = ['player', 'cop'] as const

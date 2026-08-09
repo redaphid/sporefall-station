@@ -12,12 +12,30 @@ import { weightedModId } from './systems/draft'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 
-/** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup. Raised
- * 1/3 → 2/3 for the one-weapon world: with no weapons, ammo, money or bandages
- * to find, MODS are the run's whole progression and the main reason to explore,
- * so they are now the bulk of what is on the floor (item loot dropped to 3–5 per
- * floor to match). Tunable. */
-export const MOD_PICKUP_ROOM_CHANCE = 2 / 3
+/**
+ * How many weapon-mod pickups a floor puts on the ground. A CORE-LOOP parameter,
+ * not a drop rate: with one permanent weapon, mods are the whole build, so this
+ * number decides how many real decisions a run asks the player to make.
+ *
+ * This replaced a per-ROOM chance (2/3), which was the wrong shape twice over.
+ * It produced roughly TWENTY mods on floor 1 — you ended up holding one of
+ * everything, which is a pile rather than a choice, and it is why every run
+ * converged on the same build. And because floors differ enormously in room
+ * count, it was wildly inconsistent: measured 9.6 mods on floor 4 against 26.6 on
+ * floor 5. A core-loop parameter has to be predictable, so it is now a count.
+ *
+ * Five is chosen off the measured trade-off (scripts/test/mod-scarcity-curve.ts).
+ * Scarcity has its own failure mode — reaching an enemy having never been offered
+ * the thing that answers it — so the number has to sit between "a pile" and "a
+ * dead end". At 5 per floor:
+ *   - 15 picks across a 3-floor run: enough to build with, few enough to weigh.
+ *   - 26% of individual floors offer NO element, which is the tension.
+ *   - but only 1.8% of runs reach floor 3 with no element at all — so being
+ *     genuinely unarmed is a rounding error rather than a lost run.
+ *   - 30% of runs are never offered the single BEST counter, which is the
+ *     run-to-run variety: you improvise with the element you were given.
+ */
+export const MOD_PICKUPS_PER_FLOOR = 5
 
 /** No street-life NPC (or street patrol waypoint) may be placed closer than this
  * to the player spawn. Sized past the LONGEST NPC sight range (8) so that with
@@ -660,33 +678,49 @@ const dropModPickup = (w: World, modId: string, x: number, y: number): void => {
   addEntity(w, e)
 }
 
-/** Deterministically sprinkle weapon-mod pickups: ~`MOD_PICKUP_ROOM_CHANCE` of
- * interior rooms get exactly one, the specific mod chosen weighted by rarity. Uses
+/** Deterministically place exactly `MOD_PICKUPS_PER_FLOOR` weapon-mod pickups,
+ * spread across distinct interior rooms, each mod chosen weighted by rarity. Uses
  * a DEDICATED `mod-pickups` fork so it neither perturbs the loot/AI stream nor is
  * perturbed by it — same seed → same rooms get the same mods, on every peer. */
 const scatterModPickups = (w: World): void => {
   const rng = w.rng.fork('mod-pickups')
   const spawnTx = Math.floor(w.level.spawn.x)
   const spawnTy = Math.floor(w.level.spawn.y)
-  // One roll per room does NOT by itself guarantee one pickup per TILE: adjacent
-  // or overlapping rooms can resolve to the same tile, which stacks two gems in
-  // one spot (only one is grabbable). Rare at the old 1-in-3 density, common at
-  // 2-in-3 — so the taken tiles are tracked explicitly. Deterministic: the skip
-  // consumes no extra RNG.
-  const taken = new Set<string>()
+
+  // Every room that could host one. The spawn room is excluded so a fresh run
+  // doesn't hand you a mod for free.
+  const rooms: Rect[] = []
   for (const building of w.level.buildings) {
     for (const room of building.rooms) {
-      // Skip the spawn room so a fresh run doesn't hand you a mod for free.
       if (rectContains(room, spawnTx, spawnTy)) continue
-      if (!rng.chance(MOD_PICKUP_ROOM_CHANCE)) continue
-      const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
-      if (!spot) continue
-      const modId = weightedModId(rng)
-      const key = `${Math.floor(spot.x)},${Math.floor(spot.y)}`
-      if (taken.has(key)) continue
-      taken.add(key)
-      dropModPickup(w, modId, spot.x, spot.y)
+      rooms.push(room)
     }
+  }
+
+  // Fisher-Yates over the candidate rooms, then walk the shuffled order placing
+  // until the floor's quota is met. Shuffling (rather than rolling per room)
+  // is what makes the COUNT independent of how many rooms a floor happens to
+  // have — floors vary from ~10 to ~27 usable rooms, and the old per-room roll
+  // turned that straight into a 3x swing in how much build a floor handed you.
+  for (let i = rooms.length - 1; i > 0; i--) {
+    const j = rng.int(0, i)
+    ;[rooms[i], rooms[j]] = [rooms[j], rooms[i]]
+  }
+
+  // Adjacent or overlapping rooms can still resolve to the SAME tile, which
+  // stacks two gems in one spot where only one is grabbable — so taken tiles are
+  // tracked and skipped. A skip costs the room, not the quota.
+  const taken = new Set<string>()
+  let placed = 0
+  for (const room of rooms) {
+    if (placed >= MOD_PICKUPS_PER_FLOOR) break
+    const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
+    if (!spot) continue
+    const key = `${Math.floor(spot.x)},${Math.floor(spot.y)}`
+    if (taken.has(key)) continue
+    taken.add(key)
+    dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+    placed++
   }
 }
 

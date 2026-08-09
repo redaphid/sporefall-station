@@ -1,5 +1,5 @@
-// Weapon-mod PICKUP placement (feat/mod-pickups): scattered mods so ~1/3 of
-// interior rooms carry one to grab while exploring (the #53 draft aside). Strict +
+// Weapon-mod PICKUP placement: an exact per-floor quota of mods to grab while
+// exploring (the #53 draft aside). Strict +
 // adversarial: statistical density over many seeds, determinism per seed, and the
 // placement invariants (never a wall/exit/spawn tile, at most one per room, the
 // spawn room skipped, rarity-weighted so legendaries stay rare, and full round-trip
@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { createWorld } from './world'
-import { MOD_PICKUP_ROOM_CHANCE, populateWorld } from './populate'
+import { MOD_PICKUPS_PER_FLOOR, populateWorld } from './populate'
 import { deserializeWorld, serializeWorld } from './serialize'
 import { Tile } from './levelgen/level'
 import { MODS, isModId } from './data/mods'
@@ -29,31 +29,58 @@ const rectHas = (r: Rect, tx: number, ty: number): boolean =>
 const seeds = Array.from({ length: 200 }, (_, i) => i + 1)
 const floors = [1, 2, 3, 4]
 
-describe('mod-pickup placement — density', () => {
-  it('the constant is 2/3 and drives roughly two pickups per three rooms', () => {
-    expect(MOD_PICKUP_ROOM_CHANCE).toBeCloseTo(2 / 3, 6)
-    let eligibleRooms = 0
-    let pickups = 0
+describe('mod-pickup placement — count', () => {
+  // This used to assert a per-ROOM CHANCE of 2/3, which made the amount of build
+  // a floor handed you a function of how many rooms it happened to generate:
+  // measured 9.6 mods on floor 4 against 26.6 on floor 5, and ~20 on floor 1,
+  // which is a pile rather than a set of choices. Mods are the whole progression
+  // of a one-weapon run, so the quantity is a core-loop parameter and has to be
+  // PREDICTABLE. It is now an exact per-floor count.
+  it('places exactly MOD_PICKUPS_PER_FLOOR on every floor, regardless of room count', () => {
+    let floorsChecked = 0
+    let exact = 0
     for (const s of seeds) {
       for (const f of floors) {
-        const w = createWorld(s, f)
-        const spawnTx = Math.floor(w.level.spawn.x)
-        const spawnTy = Math.floor(w.level.spawn.y)
-        for (const b of w.level.buildings) {
-          for (const r of b.rooms) {
-            if (!rectHas(r, spawnTx, spawnTy)) eligibleRooms++
-          }
-        }
-        populateWorld(w)
-        pickups += modPickups(w).length
+        const w = populated(s, f)
+        floorsChecked++
+        if (modPickups(w).length === MOD_PICKUPS_PER_FLOOR) exact++
       }
     }
-    const ratio = pickups / eligibleRooms
-    // ~2/3, a touch under because a handful of tiny rooms find no free floor tile.
-    // A statistical bound over ~25k rooms, NOT an exact count.
-    expect(eligibleRooms).toBeGreaterThan(5000)
-    expect(ratio).toBeGreaterThan(0.6)
-    expect(ratio).toBeLessThan(0.68)
+    expect(floorsChecked).toBeGreaterThan(700)
+    // Every ordinary floor has far more eligible rooms than the quota, so the
+    // count should be hit exactly. A tiny floor that genuinely cannot host five
+    // is allowed to fall short, hence the ratio rather than a flat equality.
+    expect(exact / floorsChecked).toBeGreaterThan(0.99)
+  })
+
+  it('never exceeds the quota', () => {
+    for (const s of seeds) {
+      for (const f of floors) {
+        expect(modPickups(populated(s, f)).length).toBeLessThanOrEqual(MOD_PICKUPS_PER_FLOOR)
+      }
+    }
+  })
+
+  it('spreads them out — no floor dumps its whole quota in one room', () => {
+    // The placement walks a shuffled room list and takes one room per pickup, so
+    // each gem comes from a different room OBJECT. It cannot be asserted as
+    // "distinct rooms" from position alone, because room rects OVERLAP: a tile
+    // can legitimately sit inside two of them, so resolving a gem back to "its"
+    // room is ambiguous. What is worth guarding is the real failure — the whole
+    // quota landing in one spot — so assert genuine spatial spread instead.
+    for (const s of seeds.slice(0, 40)) {
+      for (const f of floors) {
+        const picks = modPickups(populated(s, f))
+        if (picks.length < 3) continue
+        const tiles = new Set(picks.map((e) => `${Math.floor(e.pos.x)},${Math.floor(e.pos.y)}`))
+        expect(tiles.size).toBe(picks.length) // never two gems on one tile
+        // And they are not all crammed into one corner.
+        const xs = picks.map((e) => e.pos.x)
+        const ys = picks.map((e) => e.pos.y)
+        const span = Math.max(...xs) - Math.min(...xs) + (Math.max(...ys) - Math.min(...ys))
+        expect(span).toBeGreaterThan(4)
+      }
+    }
   })
 
   it('is weighted by rarity — commons plentiful, legendaries scarce', () => {

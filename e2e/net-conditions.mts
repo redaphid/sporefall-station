@@ -342,6 +342,9 @@ interface Profile {
   }
   /** Tolerance in tiles for shared-entity position agreement. */
   posTolerance: number
+  /** Make every player unkillable, so the run never reaches game over. Isolates
+   * "the link degraded" from "everybody died and the death path misbehaves". */
+  immortal?: boolean
 }
 
 interface Result {
@@ -404,6 +407,15 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
   }
   const playing = c.session.phase === 'playing'
   if (!playing) notes.push(`CLIENT NEVER REACHED PLAY: stuck in phase '${c.session.phase}'`)
+
+  if (p.immortal) {
+    for (const e of host.world.entities) {
+      if (e.playerCtl && e.health) {
+        e.health.hp = 1e6
+        e.health.max = 1e6
+      }
+    }
+  }
 
   // Give both players some motion so snapshots are not a static scene.
   hostInput.set({ moveX: 1, moveY: 0.3, aimX: 1, aimY: 0 })
@@ -571,6 +583,10 @@ const PROFILES: Profile[] = [
   { name: 'ctl-reordering-clean-60s', cond: { ...BLE_BASE, jitterMs: 40, ordered: false }, seconds: 60, posTolerance: 5 },
   { name: 'ctl-ordered-clean-60s', cond: { ...BLE_BASE, jitterMs: 40, ordered: true }, seconds: 60, posTolerance: 5 },
   { name: 'ctl-ordered-loss1-60s', cond: { ...BLE_BASE, jitterMs: 40, lossPct: 1, ordered: true }, seconds: 60, posTolerance: 5 },
+  // Same again but nobody can die: isolates link behaviour from the death /
+  // game-over path, which also stops the world and empties snapshots.
+  { name: 'ctl-immortal-clean-60s', cond: { ...BLE_BASE, jitterMs: 40, ordered: true }, seconds: 60, posTolerance: 5, immortal: true },
+  { name: 'ctl-immortal-loss1-60s', cond: { ...BLE_BASE, jitterMs: 40, lossPct: 1, ordered: true }, seconds: 60, posTolerance: 5, immortal: true },
   {
     name: 'out-of-range-3s',
     cond: { ...BLE_BASE },

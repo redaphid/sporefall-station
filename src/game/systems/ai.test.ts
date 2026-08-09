@@ -104,8 +104,19 @@ describe('combat AI — acquire, chase, attack', () => {
     const iceman = spawnNpc(w, 'gangster', 18.5, 20.5)
     iceman.combat!.weapon = 'freezeRay' // damage 0, freezes on hit — only lands via the shared path
 
+    // Must outlast SPAWN_GRACE_TICKS (90). On-hit statuses are now gated on the
+    // blow actually landing, so spawn invulnerability blocks the freeze as well
+    // as the damage — it previously did not, which meant a player could be frozen
+    // solid during the grace window that exists to stop exactly that.
+    let frozenDuringGrace = false
+    for (let i = 0; i < 80; i++) {
+      tickWorld(w, new Map([[0, { ...emptyInput() }]]))
+      if (hasStatus(player, 'frozen')) frozenDuringGrace = true
+    }
+    expect(frozenDuringGrace).toBe(false)
+
     let frozen = false
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 150; i++) {
       tickWorld(w, new Map([[0, { ...emptyInput() }]]))
       if (hasStatus(player, 'frozen')) frozen = true
     }

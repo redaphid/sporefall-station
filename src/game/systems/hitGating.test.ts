@@ -55,7 +55,7 @@ describe('applyDamage reports whether the blow LANDED', () => {
     // The i-frame window of a real roll. This is the case that let a rolled-through
     // sledgehammer still land its stun.
     const e = body(w)
-    e.playerCtl = { playerId: 0, abilityCooldown: 0, crimeUntilTick: 0, roll: { untilTick: w.tick + 10, cooldownUntilTick: w.tick + 99, dirX: 1, dirY: 0 } }
+    e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0, roll: { untilTick: w.tick + 10, cooldownUntilTick: w.tick + 99, dirX: 1, dirY: 0 } }
     expect(isRolling(e, w.tick)).toBe(true)
     expect(applyDamage(w, e, 10, 0, 0, 0, 99)).toBe(false)
     expect(e.health!.hp).toBe(100)

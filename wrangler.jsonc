@@ -15,6 +15,18 @@
   // *.workers.dev origin keeps working alongside it.
   "routes": [{ "pattern": "sporefall.hypnodroid.com", "custom_domain": true }],
 
+  // Version preview URLs, which is the whole point of preview-web.yml. That
+  // workflow uploads a version per `preview/**` branch so risky work can be
+  // judged from a URL before it reaches the live game — but the uploads were
+  // landing with previews_enabled=false on the Worker, so the
+  // https://<version-prefix>-sporefall-station.loqwai.workers.dev address the
+  // workflow advertises answered 404 and there was nothing to review.
+  //
+  // This does NOT put production on workers.dev: `workers_dev` stays unset, so
+  // sporefall-station.loqwai.workers.dev keeps 404ing and sporefall.hypnodroid.com
+  // remains the only live origin. Only the per-version preview addresses resolve.
+  "preview_urls": true,
+
   // Serve the Vite build. Only /ws/* and /ota/* run the Worker; every other path
   // is served straight from these assets (free, cached). public/_headers and
   // public/_redirects (copied into dist/ by Vite) are honored, including the SPA

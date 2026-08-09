@@ -1,5 +1,7 @@
 import type { Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
+import { THROWABLES } from '../../game/data/items'
+import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
 import type { InputCmd } from '../../game/types'
@@ -41,7 +43,84 @@ export const ARCHETYPES = [
   'pod',
   'crate',
   'fire',
+  // --- Second sweep. The block above fixed ENEMIES only; everything a floor
+  // actually contains was still missing, so on the other phone a hundred pieces
+  // of furniture, every mod and weapon pickup, every thrown molotov and the
+  // objective keycard all rendered as duplicate Rangers. Enumerated from the
+  // registries (data/items, data/mods, data/objects, data/npcs) rather than
+  // from what one seed happened to spawn — see messages.archetypes.test.ts,
+  // which now fails if any registry grows without this list growing with it.
+  // Appended alphabetically in one block. APPEND ONLY, NEVER REORDER.
+  'atm',
+  'banana',
+  'barrel',
+  'barricade',
+  'bench',
+  'bunk',
+  'cabinet',
+  'chloroform',
+  'cryoTerminal',
+  'desk',
+  'freezeGrenade',
+  'gasGrenade',
+  'generator',
+  'locker',
+  'mod.bounce',
+  'mod.bulk',
+  'mod.choke',
+  'mod.detonator',
+  'mod.explosive',
+  'mod.frost',
+  'mod.glassCannon',
+  'mod.heavy',
+  'mod.homing',
+  'mod.incendiary',
+  'mod.lifesteal',
+  'mod.overload',
+  'mod.pierce',
+  'mod.rapid',
+  'mod.shock',
+  'mod.splinterShot',
+  'mod.split',
+  'mod.velocity',
+  'molotov',
+  'pickup.adrenaline',
+  'pickup.banana',
+  'pickup.burger',
+  'pickup.chloroform',
+  'pickup.claws',
+  'pickup.fists',
+  'pickup.flamethrower',
+  'pickup.freezeGrenade',
+  'pickup.freezeRay',
+  'pickup.gasGrenade',
+  'pickup.grenade',
+  'pickup.keycard',
+  'pickup.machinegun',
+  'pickup.molotov',
+  'pickup.shotgun',
+  'pickup.sledgehammer',
+  'pickup.stunGun',
+  'pickup.tranquilizer',
+  'plant',
+  'shelf',
+  'spore',
+  'sporeNode',
+  'table',
+  'toilet',
+  'tv',
+  'vending',
 ] as const
+
+/** The wing keycard's archetype carries a dynamic `.wing<n>` suffix
+ * (systems/missions.ts:253), so the whole family shares one wire index. */
+export const KEYCARD_ARCHETYPE = 'pickup.keycard'
+
+/** Collapse dynamic archetype families onto their registered wire archetype.
+ * Applied on encode, so `pickup.keycard.wing3` survives as a keycard instead of
+ * falling through to index 0 and arriving as a player. */
+export const normalizeArchetype = (archetype: string): string =>
+  archetype.startsWith(`${KEYCARD_ARCHETYPE}.`) ? KEYCARD_ARCHETYPE : archetype
 
 const archetypeIndex = new Map<string, number>(ARCHETYPES.map((a, i) => [a, i]))
 
@@ -98,11 +177,20 @@ export interface WireSnapshot {
   entities: WireEntity[]
 }
 
+/** World objects spawn as kind 'interactable' (systems/objects.ts:26) and thrown
+ * items fly as kind 'projectile' under their BARE item id (inventory.ts:205).
+ * Without these, a registered archetype still arrives with the wrong kind — the
+ * two screens would agree a thing is a bench and disagree that it is furniture. */
+const OBJECT_ARCHETYPES: ReadonlySet<string> = new Set(Object.keys(OBJECTS))
+const THROWN_ARCHETYPES: ReadonlySet<string> = new Set(Object.keys(THROWABLES))
+
 export const kindOf = (archetype: string): Entity['kind'] => {
   if (archetype === 'player') return 'player'
   if (archetype === 'door') return 'door'
-  if (archetype === 'projectile' || archetype === 'grenade') return 'projectile'
-  if (archetype.startsWith('pickup.')) return 'pickup'
+  if (archetype === 'projectile' || THROWN_ARCHETYPES.has(archetype)) return 'projectile'
+  if (archetype === 'fire' || archetype === 'spore') return 'fire'
+  if (archetype.startsWith('pickup.') || archetype.startsWith('mod.')) return 'pickup'
+  if (OBJECT_ARCHETYPES.has(archetype)) return 'interactable'
   return 'npc'
 }
 
@@ -111,7 +199,7 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
   w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(s.entities.length)
   for (const e of s.entities) {
     w.u16(e.id)
-    w.u8(archetypeIndex.get(e.archetype) ?? 0)
+    w.u8(archetypeIndex.get(normalizeArchetype(e.archetype)) ?? 0)
     w.u8(e.flags)
     w.u16(Math.round(e.x * POS_SCALE))
     w.u16(Math.round(e.y * POS_SCALE))

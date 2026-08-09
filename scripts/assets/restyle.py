@@ -75,33 +75,81 @@ _LUMA_W = np.array([0.299, 0.587, 0.114], dtype=np.float32)
 # `accent` recolours the brightest `accent_q` quantile -- reserved for creatures
 # whose design is literally "dark body, glowing part". Applied after the ramp so
 # it overrides it.
+#
+# Two constraints on ramp construction that the first attempt got wrong, both
+# caught by the metric rather than by eye:
+#
+#   LENGTH. A ramp of K entries caps how many palette colours the sprite can
+#   possibly contain, and 6-entry ramps pinned `palette_n` at 6-8 against a cast
+#   floor of 9. Ramps are 8-9 long.
+#
+#   LUMA SPAN. `value_range` cannot exceed the ramp's own darkest-to-lightest
+#   span, so a ramp running #141a16(luma 24)..#b08d50(145) mathematically cannot
+#   clear the cast's 0.487 floor -- 121/255 = 0.475, and it measured 0.474.
+#   Every ramp now starts at or near #08080c (luma 8) and reaches luma 145+.
+#   Starting at true black also gives the inked edge for free, since the rim is
+#   the darkest part of the raw.
 RAMPS: dict[str, dict] = {
-    # Hunched quadruped beast. Chitin: warm brown shell over near-black joints.
+    # Hunched quadruped beast. Chitin: warm tan shell over near-black joints.
     "carapace-brute": {
-        "ramp": ["#141a16", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38", "#b08d50"],
+        "ramp": ["#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26",
+                 "#8f6c38", "#b08d50", "#cbb277", "#d8a878"],
     },
-    # Charcoal husk with ember eyes. Stays the darkest of the six on purpose;
-    # its read comes from the embers, not from the body.
+    # Charcoal husk with ember eyes. The darkest of the six on purpose -- its
+    # read comes from the embers, not the body -- so `equalize` is dialled DOWN
+    # here alone. Full equalization would push an even eighth of the sprite onto
+    # each ramp step and turn a charred figure into a brightly lit tan one; at
+    # 0.45 the raw's naturally dark distribution survives and the pale steps
+    # stay confined to the few genuinely lit edges.
     "cinder-husk": {
-        "ramp": ["#08080c", "#1c1420", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38"],
-        "accent": "#ff9032", "accent_q": 0.94,
+        "ramp": ["#08080c", "#1c1420", "#2e1e10", "#4a3419",
+                 "#6b4d26", "#8f6c38", "#b08d50", "#cbb277"],
+        "accent": "#ff9032", "accent_q": 0.93, "equalize": 0.45,
     },
-    # Knee-high mushroom-cap critter. Full olive ramp, the bog-foliage family.
+    # Knee-high mushroom-cap critter. The bright yellow-green of the ramp's
+    # foliage end -- the most saturated of the six, and the youngest-looking.
     "sporeling-mite": {
-        "ramp": ["#141a16", "#22380f", "#35511a", "#4c6b28", "#67873c", "#86a750", "#a8c46a"],
+        "ramp": ["#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
+                 "#67873c", "#86a750", "#a8c46a", "#a6ffbe"],
     },
-    # Low six-legged scavenger. Teal/water family -- the one cold creature, and
-    # the palette does have a saturated teal to land on.
+    # Low six-legged scavenger. Teal/water family: the one cold-coloured
+    # creature, so it never reads as a recolour of the two green ones.
+    #
+    # An earlier version put the bioluminescent #3ce0d8 in the top step. It
+    # passed every gate -- the band is one-sided, and being MORE colourful than
+    # the cast cannot fail -- but it measured chroma_p90 164 against a cast
+    # maximum of 87 and looked it: a neon centipede among muted swamp creatures.
+    # Overshooting is a different way to not match. Ending on #7ecbd2 instead
+    # puts it at 84, inside the cast's actual range.
     "mireclaw-stalker": {
-        "ramp": ["#08080c", "#163a3e", "#24565c", "#3a7a80", "#5aa4ae", "#7ecbd2"],
+        "ramp": ["#08080c", "#141a16", "#163a3e", "#24565c",
+                 "#3a7a80", "#5aa4ae", "#7ecbd2", "#a6ffbe"],
     },
-    # Domed shell, tucked legs. Dark olive shell; sits between brute and mite.
+    # Domed shell, tucked legs. Shares the mite's ramp and is separated from it
+    # by VALUE instead of hue: `equalize` 0.55 keeps the raw's darker
+    # distribution, so this reads as a heavy dark-olive shell next to the mite's
+    # bright young yellow-green. The cast already does exactly this with
+    # bog-mutant and frog-settler, two greens told apart by value and silhouette.
+    #
+    # Two rejected alternatives, both worth not repeating:
+    #  - Interleaving teal and olive down the whole ramp measured WORSE than the
+    #    grey original (chroma_p90 67 against the 70 floor). Interpolating
+    #    between two distant hues passes through neutral, so alternating them
+    #    manufactures grey in between. Ramps must be hue-coherent, or turn hue
+    #    once and monotonically -- never zigzag.
+    #  - Ending the ramp on teal scored fine but looked like a blue cap stuck on
+    #    a green dome: a hard-edged patch reading as a second material rather
+    #    than as a highlight.
     "gloom-lurker": {
-        "ramp": ["#08080c", "#22380f", "#35511a", "#4c6b28", "#67873c", "#86a750"],
+        "ramp": ["#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
+                 "#67873c", "#86a750", "#a8c46a", "#a6ffbe"],
+        "equalize": 0.55,
     },
-    # Egg sac with a glowing split seam. Rot-tan sac, bioluminescent seam.
+    # Egg sac with a glowing split seam. Rot-tan sac; the bioluminescent seam is
+    # what tells it apart from the brute's similar tan.
     "brood-sac": {
-        "ramp": ["#1c1420", "#2e1e10", "#4a3419", "#6b4d26", "#b08d50", "#cbb277"],
+        "ramp": ["#1c1420", "#2e1e10", "#4a3419", "#6b4d26",
+                 "#8f6c38", "#b08d50", "#cbb277", "#d8a878"],
         "accent": "#46e078", "accent_q": 0.93,
     },
 }
@@ -194,7 +242,40 @@ def denoise(im: Image.Image, content: int) -> Image.Image:
     return Image.fromarray(a, "RGBA")
 
 
-def build(name: str, px: int, content: int) -> Image.Image:
+def ink_rim(im: Image.Image, colour: str = "#08080c") -> Image.Image:
+    """Paint the outermost ring of opaque pixels with the palette's outline dark.
+
+    Found by measurement, not by eye: every cast sprite in the HI-RES pack scores
+    rim_dark_frac exactly 1.000, and inspecting the pixels shows why -- their
+    entire alpha boundary is literally (8,8,12). The hi-res cast carries a hand
+    1px ink line that the six never got, and since `swampspace-hires` is the
+    DEFAULT theme (src/app/settings.ts) that is the pack players actually see.
+    This is the "bold dark outlines" half of the original complaint, and no
+    amount of recolouring would have produced it.
+
+    Inked INWARD -- recolouring pixels that are already opaque rather than
+    growing the shape outward by one pixel. Same visual result as the cast, whose
+    outline pixels are themselves boundary pixels, but it keeps alpha untouched
+    so the silhouette guarantee still holds.
+
+    NOT applied at 48px. The 48px cast has no such line (its rim luma runs
+    8..210, median 74) and one pixel there is twice the proportional weight it
+    has at 96px, so inking would overshoot a band the six already sit inside.
+    """
+    a = np.asarray(im.convert("RGBA")).copy()
+    opaque = a[..., 3] > 128
+    p = np.pad(opaque, 1, mode="constant", constant_values=False)
+    interior = np.ones_like(opaque, dtype=bool)
+    for dy in (0, 1, 2):
+        for dx in (0, 1, 2):
+            if dy == 1 and dx == 1:
+                continue
+            interior &= p[dy:dy + opaque.shape[0], dx:dx + opaque.shape[1]]
+    a[opaque & ~interior, :3] = rgb(colour)
+    return Image.fromarray(a, "RGBA")
+
+
+def build(name: str, px: int, content: int, ink: bool = False) -> Image.Image:
     """Reproduce post.sprite() for `name`, with the ramp inserted before the
     downscale. Every alpha-affecting step is the original, in the original
     order; only RGB is touched, and only between shadow-strip and k-centroid."""
@@ -208,7 +289,8 @@ def build(name: str, px: int, content: int) -> Image.Image:
     im = P.bbox_crop(src)
     im = denoise(im, content)
 
-    im = ramp_grade(im, spec["ramp"], spec.get("accent"), spec.get("accent_q", 0.94))
+    im = ramp_grade(im, spec["ramp"], spec.get("accent"),
+                    spec.get("accent_q", 0.94), spec.get("equalize", 0.85))
 
     w, h = im.size
     if w >= h:
@@ -219,10 +301,11 @@ def build(name: str, px: int, content: int) -> Image.Image:
 
     out = Image.new("RGBA", (px, px), (0, 0, 0, 0))
     out.paste(im, ((px - tw) // 2, max(0, px - th - 1)))
-    return out
+    return ink_rim(out) if ink else out
 
 
-TARGETS = [("swampspace", 48, 46), ("swampspace-hires", 96, 92)]
+# (theme, canvas, content, ink) -- see ink_rim() for why only hi-res is inked.
+TARGETS = [("swampspace", 48, 46, False), ("swampspace-hires", 96, 92, True)]
 
 
 def main() -> int:
@@ -233,11 +316,11 @@ def main() -> int:
     args = ap.parse_args()
 
     bad_alpha = []
-    for theme, px, content in TARGETS:
+    for theme, px, content, ink in TARGETS:
         outdir = ROOT / "public" / "themes" / theme / "chars"
         for name in RAMPS:
             dst = outdir / f"{name}-s-idle.png"
-            new = build(name, px, content)
+            new = build(name, px, content, ink)
 
             if args.verify_alpha and dst.exists():
                 old_a = np.asarray(Image.open(dst).convert("RGBA"))[..., 3]

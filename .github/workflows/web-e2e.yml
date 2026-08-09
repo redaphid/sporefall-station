@@ -12,6 +12,35 @@ permissions:
   contents: write
 
 jobs:
+  # Deterministic co-op convergence + BLE bandwidth gate. Deliberately its own
+  # job: no browser, no ffmpeg, no video, so it runs on every push in ~a minute
+  # and never queues behind the heavy e2e rig.
+  #
+  # It is seeded and tick-driven (no wall clock), so unlike e2e/net-conditions.mts
+  # it cannot flake under CI load. The self-test step runs FIRST and deliberately
+  # corrupts the wire: if the matrix stays green on a broken wire, the build fails
+  # there rather than handing us a meaningless pass.
+  net-matrix:
+    runs-on: ubuntu-latest
+    name: Co-op convergence + bandwidth matrix
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prove the matrix can fail (corrupted wire must go red)
+        run: pnpm run e2e:net-matrix:self-test
+
+      - name: Co-op convergence + bandwidth matrix
+        run: pnpm run e2e:net-matrix
+
   e2e:
     runs-on: ubuntu-latest
     steps:

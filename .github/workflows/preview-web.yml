@@ -1,0 +1,88 @@
+name: preview-web
+
+# Per-branch PREVIEW deploys, so risky work can be looked at without it reaching
+# the live game. The standing rule this implements: conservative work goes to
+# `main` (deploy-web.yml, which is what phones actually run); anything the owner
+# might want to veto — combat changes, removals, new art — goes here first and he
+# judges it from a URL.
+#
+# This project is Cloudflare WORKERS, not Pages (migrated — see wrangler.jsonc),
+# so there is no Pages per-branch preview to switch on. The Workers equivalent is
+# a VERSION: `wrangler versions upload` builds and uploads a version, gives it its
+# own permanent preview origin, and does NOT shift any traffic. Live stays live.
+#
+# Preview URL shape: https://<version-prefix>-sporefall-station.<subdomain>.workers.dev
+# It is printed in the job summary AND in the "Preview URL" step log.
+#
+# Trigger: push to preview/** (or run it by hand against any branch).
+
+on:
+  push:
+    branches: ['preview/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Previews are per-branch, so only cancel superseded runs of the SAME branch —
+# unlike the deploy workflow, two different previews may build concurrently.
+concurrency:
+  group: preview-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    name: Upload a preview version (no traffic shift)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Same art gate as the real deploy: a stale manifest ships silently-broken
+      # art, and a preview whose art is broken for the WRONG reason wastes the
+      # owner's review.
+      - name: Check theme manifests against assets on disk
+        run: pnpm exec vitest run src/render/themeManifestSync.test.ts
+
+      - name: Build web bundle
+        run: pnpm run build
+        env:
+          CAP_SERVER_URL: ""
+
+      # `versions upload` needs Workers Scripts:Edit, the same token the deploy
+      # workflow already uses. No OTA bundle and no APK here on purpose: a
+      # preview must never publish an OTA manifest, or installed phones would
+      # pull an unreviewed build.
+      - name: Upload preview version
+        id: upload
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --message "preview ${{ github.ref_name }} @ ${{ github.sha }}"
+
+      # wrangler prints the preview URL; surface it somewhere findable rather
+      # than making anyone read the raw log.
+      - name: Preview URL
+        env:
+          OUT: ${{ steps.upload.outputs.command-output }}
+        run: |
+          set -euo pipefail
+          echo "$OUT"
+          URL="$(printf '%s' "$OUT" | grep -oE 'https://[a-z0-9-]+\.workers\.dev' | head -1 || true)"
+          if [ -n "$URL" ]; then
+            echo "Preview: $URL"
+            { echo "### Preview deploy"; echo; echo "Branch \`${{ github.ref_name }}\` is live at:"; echo; echo "$URL"; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Could not parse a preview URL from wrangler output — read the step log above." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -140,6 +140,12 @@ interface ShotResult {
   explosions: number
   frozenAfter: boolean
   brittleWasSet: boolean
+  /** Confounder instrumentation. `healed` is only trustworthy when exactly ONE
+   * bullet landed, the player took ZERO incoming damage, and the window was far
+   * shorter than REGEN_CALM_TICKS (75) so passive regen cannot have started. */
+  bulletsLanded: number
+  incoming: number
+  ticks: number
 }
 
 /** Pre-freeze `arch`, fire until the first blow lands on it, and report what that
@@ -170,15 +176,30 @@ const frozenShot = (mods: string[], ice: 'none' | 'plain' | 'brittle', arch = 'b
   const foeBefore = foe.health.hp
   let explosions = 0
 
+  let bulletsLanded = 0
+  let incoming = 0
+
   for (let t = 0; t < 200; t++) {
     const dx = foe.pos.x - p.pos.x, dy = foe.pos.y - p.pos.y
     const len = Math.hypot(dx, dy) || 1
     tickWorld(w, new Map([[0, { ...emptyInput(), attack: true, aimX: dx / len, aimY: dy / len }]]))
     explosions += w.events.filter((e: { type: string }) => e.type === 'explosion').length
+    // Count what landed on WHOM. An incoming hit on the player would silently
+    // net against the heal and make `healed` meaningless.
+    for (const ev of w.events) {
+      // A SHATTER emits `shatter`, never `hit` — applyDamage returns before the
+      // hit event. Counting only `hit` would report "0 bullets landed" on the
+      // very rows this section exists to measure.
+      if (ev.type === 'shatter' && (ev as { entityId?: number }).entityId === foe.id) bulletsLanded += 1
+      if (ev.type !== 'hit') continue
+      const h = ev as { targetId?: number; amount?: number }
+      if (h.targetId === foe.id) bulletsLanded += 1
+      if (h.targetId === p.id) incoming += h.amount ?? 0
+    }
     const hit = w.events.some((e) => (e.type === 'hit' && (e as { targetId?: number }).targetId === foe.id) || (e.type === 'shatter' && (e as { entityId?: number }).entityId === foe.id))
     if (hit || foe.dead) {
       return {
-        weapon, bulletDamage, brittleWasSet,
+        weapon, bulletDamage, brittleWasSet, bulletsLanded, incoming, ticks: t + 1,
         healed: p.health.hp - hpBefore,
         dealt: foeBefore - (foe.health?.hp ?? 0),
         shattered: foe.shattered === true,
@@ -193,10 +214,14 @@ const frozenShot = (mods: string[], ice: 'none' | 'plain' | 'brittle', arch = 'b
 
 const show = (label: string, r: ShotResult | undefined): void => {
   if (!r) { console.log(`  ${label.padEnd(34)} — no hit resolved`); return }
+  // `clean` is the audit: exactly one bullet, no incoming damage, and a window
+  // far under REGEN_CALM_TICKS (75). If it is false, `healed` is contaminated.
+  const clean = r.bulletsLanded === 1 && r.incoming === 0 && r.ticks < 75
   console.log(
     `  ${label.padEnd(34)} shattered=${String(r.shattered).padEnd(5)} killed=${String(r.killed).padEnd(5)}` +
     ` dealt=${r.dealt.toFixed(1).padStart(6)} healed=${r.healed.toFixed(2).padStart(6)}` +
-    ` boom=${r.explosions} stillFrozen=${r.frozenAfter}`,
+    ` boom=${r.explosions} stillFrozen=${String(r.frozenAfter).padEnd(5)}` +
+    ` | bullets=${r.bulletsLanded} incoming=${r.incoming} ticks=${r.ticks} ${clean ? 'ISOLATED' : '*** CONTAMINATED ***'}`,
   )
 }
 
@@ -252,9 +277,15 @@ for (const arch of ['thug', 'robot', 'brute', 'boss']) {
   )
 }
 
-/** Heal throughput: fire continuously at an unkillable body and count hp gained
- * per second. The owner is held below max so nothing clamps. */
-const healRate = (stacks: number, arch: string, seconds = 8): number | undefined => {
+/** Gross hp GAINED per second while firing at an unkillable body.
+ *
+ * This is deliberately NOT reported raw. Standing still to shoot also earns
+ * PASSIVE REGEN (regen.ts: 75 still+unharmed ticks, then 2hp/6t ≈ 10hp/s), which
+ * lands in the same hp counter as lifesteal. An earlier version of this probe
+ * reported the raw number and was wrong for exactly that reason. The caller
+ * differences this against an identical `stacks = 0` run so regen — which is
+ * present in both — cancels out. */
+const grossGainPerSec = (stacks: number, arch: string, seconds = 8): number | undefined => {
   const w = createWorld(13, 1)
   const sp = w.level.spawn
   const p = spawnPlayer(w, 0, sp.x, sp.y)
@@ -263,7 +294,7 @@ const healRate = (stacks: number, arch: string, seconds = 8): number | undefined
   const foe = placeNear(w, arch, sp.x, sp.y)
   if (!foe?.health) return undefined
   p.health.max = 10_000_000
-  let healed = 0
+  let gained = 0
   for (let t = 0; t < seconds * TPS; t++) {
     foe.health.hp = foe.health.max // unkillable: measure throughput, not TTK
     const before = p.health.hp
@@ -271,21 +302,60 @@ const healRate = (stacks: number, arch: string, seconds = 8): number | undefined
     const len = Math.hypot(dx, dy) || 1
     tickWorld(w, new Map([[0, { ...emptyInput(), attack: true, aimX: dx / len, aimY: dy / len }]]))
     const delta = p.health.hp - before
-    if (delta > 0) healed += delta // gains only; incoming damage is counted separately
+    if (delta > 0) gained += delta
     p.health.hp = 1000 // re-seat well below max so the clamp never bites
   }
-  return healed / seconds
+  return gained / seconds
 }
 
-console.log('\n  (b) heal THROUGHPUT while firing (hp/sec, target unkillable)')
-console.log('  target        1 stack    5 stacks')
+console.log('\n  (b) heal throughput ATTRIBUTABLE TO LIFESTEAL (hp/sec)')
+console.log('  Raw gain includes passive regen, so each row is differenced against an')
+console.log('  identical run with ZERO lifesteal stacks. regen is in both; it cancels.')
+console.log('  target      baseline(0)   1 stack(net)   5 stacks(net)')
 for (const arch of ['thug', 'brute']) {
-  const one = healRate(1, arch)
-  const five = healRate(5, arch)
-  console.log(`  ${arch.padEnd(12)}${(one?.toFixed(2) ?? '  n/a').padStart(8)}    ${(five?.toFixed(2) ?? 'n/a').padStart(8)}`)
+  const base = grossGainPerSec(0, arch)
+  const one = grossGainPerSec(1, arch)
+  const five = grossGainPerSec(5, arch)
+  if (base === undefined || one === undefined || five === undefined) { console.log(`  ${arch} — n/a`); continue }
+  console.log(
+    `  ${arch.padEnd(12)}${base.toFixed(2).padStart(9)}${(one - base).toFixed(2).padStart(15)}${(five - base).toFixed(2).padStart(15)}`,
+  )
 }
-console.log('  Compare against what a body puts back into you: if heal/sec exceeds the')
-console.log('  incoming dps of the things you are shooting, the run cannot be lost.')
+
+// ── 7c. WAS THE "HEALS OFF THE CORPSE" CATASTROPHE EVER REACHABLE? ─────────
+// The decisive question for whether zeroing lifesteal on a shatter is a fix or
+// an overcorrection. If the heal were ever a function of the health pool the
+// execute erased, it would grow with the target's max hp. Hold the bullet
+// constant and vary ONLY the pool.
+console.log('\n  (c) does the heal scale with the POOL the shatter erased?')
+console.log('  Same bullet, same mods, brittle ice, only the target\'s max hp varies.')
+console.log('  target hp    dealt (= pool erased)   healed')
+for (const hp of [95, 320, 5000]) {
+  const w = createWorld(7, 1)
+  const sp = w.level.spawn
+  const p = spawnPlayer(w, 0, sp.x, sp.y)
+  const foe = placeNear(w, 'brute', sp.x, sp.y)
+  if (!p?.health || !foe?.health) continue
+  applyModPickup(p, 'lifesteal')
+  p.health.max = 100_000
+  p.health.hp = 100
+  foe.health = { hp, max: hp, iframes: 0 }
+  addStatus(w, foe, 'frozen', 900, undefined, true)
+  const before = p.health.hp
+  const foeBefore = foe.health.hp
+  for (let t = 0; t < 200; t++) {
+    const dx = foe.pos.x - p.pos.x, dy = foe.pos.y - p.pos.y
+    const len = Math.hypot(dx, dy) || 1
+    tickWorld(w, new Map([[0, { ...emptyInput(), attack: true, aimX: dx / len, aimY: dy / len }]]))
+    if (foe.dead || w.events.some((e) => e.type === 'hit' && (e as { targetId?: number }).targetId === foe.id)) break
+  }
+  console.log(
+    `  ${String(hp).padStart(9)}${(foeBefore - (foe.health?.hp ?? 0)).toFixed(1).padStart(24)}${(p.health.hp - before).toFixed(2).padStart(9)}`,
+  )
+}
+console.log('  A FLAT healed column across a 95hp and a 5000hp pool means the heal never')
+console.log('  read the corpse — so "lifesteal pays out the whole health bar" was never')
+console.log('  reachable, and zeroing it removes a payout that never existed.')
 
 // ── 4. Does lifesteal heal off blocked (i-framed) hits? ────────────────────
 console.log('\n=== 4. LIFESTEAL vs I-FRAMES — does it heal on hits that dealt no damage? ===')

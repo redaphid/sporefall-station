@@ -114,28 +114,74 @@ describe('behavior mods — real fire path', () => {
   // (arbitrarily large) health pool the shatter just erased, or a freeze grenade
   // plus Vampiric would refill the player off any big body in the room.
   //
-  // This guards the SHAPE, not the tuning: lifesteal reads the bullet's damage,
-  // so the heal is identical whether the blow shattered, cracked, or landed
-  // plainly. Measured on this branch: 1.83 hp healed for a 95hp shatter kill.
+  // This is written as a DIFFERENTIAL, deliberately. Asserting a literal number
+  // would encode the current lifesteal tuning (0.15/stack, hyperbolic) and go red
+  // on a harmless balance tweak, while asserting only `healed > 0` would let the
+  // payout grow to the size of the corpse unnoticed. Comparing the three blows to
+  // EACH OTHER encodes the rule itself — an execute grants lethality, not extra
+  // healing — and is immune to retuning.
+  //
+  // It therefore fails in BOTH directions, which is the point:
+  //   • heal scales with the pool erased → shatter row diverges upward
+  //   • heal drops to zero on an execute → shatter row diverges downward
+  //   • the x2.5 crack starts amplifying the heal → crack row diverges
+  //
+  // Measured on this branch: 1.83 hp on all three (14 dmg x 0.130 hyperbolic).
   // NOTE: lifesteal is separately known-broken here — it pays off INTENDED damage
   // rather than damage dealt (projectiles.ts), so it overpays ~3x against armour.
   // That is fixed on another branch; this test deliberately does not encode it.
-  it('lifesteal on a SHATTER pays one bullet, not the health bar it just erased', () => {
-    const p = armed(w, 20, 20, 'pistol', [{ id: 'lifesteal', stacks: 1 }])
-    const t = npc(w, 22, 20)
-    t.health = { hp: 300, max: 300, iframes: 0 } // a big pool for the execute to erase
-    p.health = { hp: 50, max: 5000, iframes: 0 } // room to heal into, nothing clamps
-    addStatus(w, t, 'frozen', 300, undefined, true) // brittle: a thrown freeze grenade
-    const before = p.health.hp
-    fire(w, p)
-    advance(w, 20)
-    // The grenade's execute still works — this is not a test that shatter is gone.
-    expect(t.dead).toBe(true)
-    expect(t.shattered).toBe(true)
-    const healed = p.health!.hp - before
-    expect(healed).toBeGreaterThan(0) // it DOES pay out on an execute
-    // ...but bounded by the bullet, not by the 300hp it just deleted.
-    expect(healed).toBeLessThanOrEqual(WEAPONS.pistol.damage)
+  it('a SHATTER pays lifesteal exactly what a plain hit pays — no more, and not nothing', () => {
+    /** One lifesteal round into a 300hp body; returns what the shooter gained.
+     * Fresh world per run so the three cases cannot interact. `advance` runs only
+     * projectileSystem, so there is no AI and no regen to contaminate the number. */
+    const healFrom = (ice: 'brittle' | 'plain' | 'none', hp = 300) => {
+      const w2 = createWorld(1, 1)
+      const p = armed(w2, 20, 20, 'pistol', [{ id: 'lifesteal', stacks: 1 }])
+      const t = npc(w2, 22, 20, hp) // a big pool for an execute to erase
+      p.health = { hp: 50, max: 500_000, iframes: 0 } // room to heal, nothing clamps
+      if (ice !== 'none') addStatus(w2, t, 'frozen', 300, undefined, ice === 'brittle')
+      const before = p.health.hp
+      fire(w2, p)
+      advance(w2, 20)
+      return { healed: p.health!.hp - before, shattered: t.shattered === true, dealt: hp - (t.health?.hp ?? 0) }
+    }
+
+    const execute = healFrom('brittle')
+    const crack = healFrom('plain')
+    const plain = healFrom('none')
+
+    // Preconditions: each row really is the blow it claims to be.
+    expect(execute.shattered).toBe(true) // the grenade execute still works
+    expect(crack.shattered).toBe(false)
+    expect(crack.dealt).toBeGreaterThan(plain.dealt) // the x2.5 crack landed
+    expect(plain.healed).toBeGreaterThan(0) // lifesteal pays out at all
+
+    // THE RULE: the heal is a function of the BULLET, so erasing a 300hp body
+    // pays exactly what grazing it pays.
+    expect(execute.healed).toBeCloseTo(plain.healed, 5)
+
+    // ── EXPECTED TO GO RED WHEN THE `number | null` CONTRACT MERGES ──────────
+    // This line encodes the CURRENT contract, where lifesteal reads the bullet's
+    // damage and the x2.5 crack therefore cannot amplify it. Once lifesteal pays
+    // off damage ACTUALLY APPLIED, the crack legitimately pays more.
+    // Simulated locally against that contract, on a brute: crack heals 1.57 vs a
+    // plain hit's 0.65 — a 2.4x coupling that does NOT exist today (both 1.83).
+    // Note both numbers DROP versus today, because the payout starts respecting
+    // resist, so this is a relative coupling and not an absolute buff.
+    // When that lands this should become `expect(crack.healed).toBeGreaterThan(
+    // plain.healed)` — a deliberate decision, not a silent adjustment.
+    expect(crack.healed).toBeCloseTo(plain.healed, 5)
+
+    // ...and it must not read the CORPSE either. The comparisons above all use
+    // one 300hp target, so a heal that scaled with the pool would move every row
+    // together and slip through — caught in review by exactly that mutation.
+    // Vary only the pool: a 16x bigger body must pay the same bullet.
+    const huge = healFrom('brittle', 5000)
+    expect(huge.dealt).toBeGreaterThan(execute.dealt * 10) // it really did erase more
+    expect(huge.healed).toBeCloseTo(execute.healed, 5)
+    // Belt and braces: lifestealFrac is a fraction, so one bullet can never heal
+    // more than one bullet's damage regardless of tuning.
+    expect(plain.healed).toBeLessThanOrEqual(WEAPONS.pistol.damage)
   })
 
   it('incendiary: a bullet sets the target burning (element applied)', () => {

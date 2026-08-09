@@ -32,7 +32,7 @@ import type { InputSource } from '../src/input/input'
 import type { RenderView } from '../src/app/session'
 import { NetClientSession } from '../src/app/netClient'
 import { NetHostSession } from '../src/app/netHost'
-import type { PeerId, Transport, TransportEvent } from '../src/net/types'
+import { MsgType, type PeerId, type Transport, type TransportEvent } from '../src/net/types'
 import { ARCHETYPES } from '../src/net/protocol/messages'
 
 /** Archetypes the host actually spawned that do NOT survive the wire registry —
@@ -548,12 +548,18 @@ const main = async (): Promise<void> => {
   // --self-test corrupts the archetype byte of every snapshot entity record,
   // reproducing the ARCHETYPES-index desync. If the harness reports green under
   // this, the harness is worthless and we exit non-zero saying so.
+  // Surgical on purpose: only the FIRST CHUNK of a Snapshot message is touched,
+  // and only inside the entity records. The Hello/Welcome/GameStart handshake is
+  // left intact, so the run still joins and plays — which forces the failure to
+  // come from the world COMPARATOR rather than from a dead connection. A
+  // self-test that merely breaks the handshake would not prove the comparator
+  // can see desync.
   const tamper = selfTest
     ? (b: Uint8Array): Uint8Array => {
+        const isSnapshotHead = b.length > 16 && b[2] === MsgType.Snapshot
+        if (!isSnapshotHead) return b
         const out = new Uint8Array(b)
-        // Blunt but effective: scramble the payload bytes after the frame header
-        // so decoded archetypes/positions differ from the host's truth.
-        for (let i = 8; i < out.length; i += 7) out[i] = (out[i] + 3) & 0xff
+        out[out.length - 3] = (out[out.length - 3] + 7) & 0xff
         return out
       }
     : null

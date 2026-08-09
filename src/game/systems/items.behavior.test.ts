@@ -160,15 +160,20 @@ describe('item behavior — new guns', () => {
   })
 })
 
-describe('item behavior — freeze then shatter (element combo through items)', () => {
+describe('item behavior — freeze then crack (element combo through items)', () => {
   let w: World
   beforeEach(() => {
     w = createWorld(1, 1)
   })
 
-  it('a freeze-ray freeze followed by a melee impact shatters the target', () => {
+  // A WEAPON's freeze (freeze ray, Cryo Rounds) is not brittle: it locks the body
+  // up, and the follow-up blow cracks it for heavy bonus damage. Only a THROWN
+  // freeze grenade encases a body so it shatters — the execute belongs to the
+  // limited consumable, never to something a weapon can do on every other shot.
+  it('a freeze-ray freeze followed by a melee impact CRACKS the ice for bonus damage, not an execute', () => {
     const e = player(w, 20, 20)
     const target = dummy(w, 21, 20)
+    target.health = { hp: 500, max: 500, iframes: 0 } // a pool a x2.5 bat cannot clear
     e.loadout!.inventory = [
       { itemId: 'freezeRay', qty: 6 },
       { itemId: 'bat', qty: 12 },
@@ -179,12 +184,16 @@ describe('item behavior — freeze then shatter (element combo through items)', 
     // Let the freeze-ray's own hit iframes lapse (as ticks pass in-game); the
     // frost lasts far longer, so the body is still frozen when we swing.
     for (let t = 0; t < 6; t++) statusSystem(w)
-    // Switch to the bat and swing: an impact on a frozen body is an instant kill.
+    const before = target.health!.hp
+    // Switch to the bat and swing: the impact cracks the ice rather than executing.
     equipSlot(e, 1)
     e.combat!.cooldown = 0
     combatSystem(w, attack())
-    expect(target.shattered).toBe(true)
-    expect(target.dead).toBe(true)
+    expect(target.shattered).toBeFalsy()
+    expect(target.dead).toBeFalsy()
+    // The ice is spent, and the blow that spent it hit harder than a bare swing.
+    expect(hasStatus(target, 'frozen')).toBe(false)
+    expect(before - target.health!.hp).toBeGreaterThan(WEAPONS.bat.damage)
   })
 })
 

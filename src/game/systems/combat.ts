@@ -5,7 +5,7 @@ import { NPCS } from '../data/npcs'
 import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
-import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
+import { applyStatus, isBrittleFrozen, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { activeStack, equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
@@ -16,6 +16,17 @@ import { spawnSporeBurst } from './spore'
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
+
+/** Damage multiplier for cracking a NON-brittle freeze (Cryo Rounds). Frost's
+ * verb is CONTROL, and this is the payoff the control sets up: freeze, then land
+ * one heavy blow. Deliberately a multiplier applied BEFORE `resistMult`, so the
+ * bonus is still resisted like any other physical damage — a bonus that skipped
+ * resist would just be the shatter bug wearing a smaller number. */
+const FROZEN_HIT_DAMAGE_MULT = 2.5
+
+/** Extra shove on that same blow. Knocking the thawed body back re-opens the gap
+ * frost just bought you, so the follow-up reads as an impact rather than a stat. */
+const FROZEN_HIT_KNOCKBACK = 10
 
 /** Probability a dying NPC drops the weapon it was carrying as a grabbable
  * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
@@ -106,13 +117,29 @@ export const applyDamage = (
   // anti-chain-lock guard in statusFx then grants its usual post-immobilize
   // immunity, so you cannot be instantly re-frozen either.
   //
-  // Enemies still shatter, so freeze remains a genuine execute when YOU throw it.
+  // Enemies shatter only from BRITTLE ice — a thrown freeze grenade. The execute
+  // belongs to a limited consumable you have to find, carry and aim. Cryo Rounds
+  // is a permanent weapon mod firing every other shot; the same rule there made a
+  // 320hp boss die exactly as fast as a 40hp thug, because shatter ignores hp,
+  // resist and archetype completely.
+  //
+  // A NON-brittle freeze cracks instead, for everyone. That is frost's actual
+  // design: its verb is CONTROL, and this is the payoff it sets up — freeze, then
+  // land one heavy blow that hits far harder and shoves the body back. The freeze
+  // is SPENT doing it, and the anti-chain-lock's post-immobilize immunity then
+  // gates the next one, so the loop is freeze → punish → wait, not a stun-lock.
   if (isFrozen(target)) {
-    if (!target.playerCtl) {
+    if (!target.playerCtl && isBrittleFrozen(target)) {
       shatter(w, target)
       return true // a shatter IS a landed blow: on-hit effects and triggers should fire
     }
     removeStatus(target, 'frozen')
+    // The player's own thaw stays a plain hit — being frozen is already punishing
+    // enough when the whole floor is converging on you.
+    if (!target.playerCtl) {
+      amount *= FROZEN_HIT_DAMAGE_MULT
+      knockback += FROZEN_HIT_KNOCKBACK
+    }
   }
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
   // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.

@@ -120,10 +120,16 @@ export const MODS: Record<string, ModDef> = {
   },
 
   // ---- BEHAVIOR: elements (reuse ELEMENTS via onHit) ------------------------
+  // frost's verb is CONTROL, and it is the one element that is not a damage
+  // channel. Its freeze is deliberately NOT `brittle`: brittle ice shatters on
+  // impact (an instant kill that ignores hp, resist and archetype alike), which
+  // is a fair trade for a thrown grenade you have to find and aim, and a broken
+  // one for a permanent mod that fires every other shot. Non-brittle ice cracks
+  // instead, for a heavy bonus-damage shove — see applyDamage.
   frost: {
     id: 'frost', name: 'Cryo Rounds', icon: '❄️', category: 'behavior', rarity: 'rare',
     maxStacks: 1,
-    blurb: 'Freezes what it hits — and a solid hit shatters the ice.',
+    blurb: 'Freezes what it hits — then the next hit cracks the ice, hard.',
     onHit: { status: 'frozen', ticks: 120 },
   },
   incendiary: {

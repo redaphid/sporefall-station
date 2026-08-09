@@ -9,6 +9,12 @@ export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | '
 export interface StatusEntry {
   until: number
   source?: EntityId
+  /** BRITTLE ice: this `frozen` encased the body solid, so a blow SHATTERS it
+   * (an instant kill — see `shatter` in systems/combat.ts). Only a thrown freeze
+   * grenade sets it. A freeze from Cryo Rounds leaves the joints locked but the
+   * body intact, so it is control, not an execute — see the note on `frost` in
+   * data/mods.ts for why that distinction has to exist. */
+  brittle?: boolean
 }
 
 export type Fx = Record<string, StatusEntry>

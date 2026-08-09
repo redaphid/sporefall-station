@@ -78,16 +78,31 @@ describe('a frozen PLAYER is not shattered', () => {
   })
 })
 
-describe('a frozen ENEMY still shatters', () => {
-  it('is executed by a solid impact, so freeze stays a player tool', () => {
+describe('a GRENADE-frozen ENEMY still shatters', () => {
+  it('is executed by a solid impact, so the thrown grenade stays a player tool', () => {
     const w = arena()
     const npc = spawnNpc(w, 'thug', 8.5, 8.5)
     npc.health = { hp: 100, max: 100, iframes: 0 }
-    addStatus(w, npc, 'frozen', 120)
+    addStatus(w, npc, 'frozen', 120, undefined, true) // brittle: a thrown freeze grenade
 
     applyDamage(w, npc, 1, 0, 0, 0, -1) // a single point of damage
 
     expect(npc.health!.hp).toBe(0)
     expect(npc.dead).toBe(true)
+  })
+
+  // The mod must NOT inherit the grenade's execute. This is the regression guard
+  // for the bug that killed a 320hp boss in 0.63s: the execute has to stay tied
+  // to a limited consumable, never to a permanent every-other-shot weapon effect.
+  it('but a CRYO-ROUNDS freeze does not execute — hp still has to be spent', () => {
+    const w = arena()
+    const npc = spawnNpc(w, 'thug', 8.5, 8.5)
+    npc.health = { hp: 100, max: 100, iframes: 0 }
+    addStatus(w, npc, 'frozen', 120) // non-brittle: the frost MOD
+
+    applyDamage(w, npc, 1, 0, 0, 0, -1)
+
+    expect(npc.dead).toBeFalsy()
+    expect(npc.health!.hp).toBeGreaterThan(90)
   })
 })

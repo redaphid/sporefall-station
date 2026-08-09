@@ -16,6 +16,13 @@
  * Exit code is the verdict. Run: npx tsx e2e/framing-loss.mts
  */
 import { frameMessage, StreamReader } from '../src/net/framing/chunkedStream'
+import { MsgType } from '../src/net/types'
+
+// The reader can only tell a real message start from payload bytes if it knows
+// which first-bytes name a message. Both sessions pass this.
+const VALID = new Set<number>(Object.values(MsgType) as number[])
+const isValidStart = (t: number): boolean => VALID.has(t)
+const reader = (): StreamReader => new StreamReader({ isValidStart })
 
 const MAX_PACKET = 180 // bleTransport.ts MAX_PACKET
 
@@ -28,7 +35,7 @@ const check = (cond: boolean, msg: string): void => {
 /** A recognisable message of a given size: first byte is the tag, rest is filler. */
 const msgOf = (tag: number, size: number): Uint8Array => {
   const m = new Uint8Array(size)
-  m[0] = tag
+  m[0] = tag // callers pass real MsgType values so the reader accepts them
   for (let i = 1; i < size; i++) m[i] = (tag * 31 + i) & 0xff
   return m
 }
@@ -56,11 +63,11 @@ console.log(`[framing-loss] BLE packet size ${MAX_PACKET}B\n`)
 // ---------------------------------------------------------------- sanity
 console.log('baseline (no loss)')
 {
-  const msgs = [msgOf(1, 40), msgOf(2, 500), msgOf(3, 40)]
-  const { received } = feed(new StreamReader(), msgs, new Set())
+  const msgs = [msgOf(MsgType.Snapshot, 40), msgOf(MsgType.Input, 500), msgOf(MsgType.Hello, 40)]
+  const { received } = feed(reader(), msgs, new Set())
   check(received.length === 3, 'all three messages arrive when nothing is dropped')
   check(
-    received.length === 3 && received[0][0] === 1 && received[1][0] === 2 && received[2][0] === 3,
+    received.length === 3 && received[0][0] === MsgType.Snapshot && received[1][0] === MsgType.Input && received[2][0] === MsgType.Hello,
     'messages arrive intact and in order',
   )
   check(received.length === 3 && received[1].length === 500, 'the 500B message reassembles from 3 packets')
@@ -70,11 +77,11 @@ console.log('baseline (no loss)')
 console.log('\nA. a whole SINGLE-packet message is lost')
 {
   // Three small messages, each one packet. Drop the middle packet entirely.
-  const msgs = [msgOf(1, 40), msgOf(2, 40), msgOf(3, 40)]
-  const { received } = feed(new StreamReader(), msgs, new Set([1]))
+  const msgs = [msgOf(MsgType.Snapshot, 40), msgOf(MsgType.Input, 40), msgOf(MsgType.Hello, 40)]
+  const { received } = feed(reader(), msgs, new Set([1]))
   check(received.length === 2, 'the two surviving messages still arrive')
   check(
-    received.length === 2 && received[0][0] === 1 && received[1][0] === 3,
+    received.length === 2 && received[0][0] === MsgType.Snapshot && received[1][0] === MsgType.Hello,
     'the stream stays ALIGNED — message 3 is still parsed correctly after the gap',
   )
 }
@@ -84,9 +91,9 @@ console.log('\nB. ONE packet of a MULTI-packet message is lost, then 20 good mes
 {
   // msg1: 500B → 3 packets (idx 0,1,2). Drop packet idx 1 (a middle chunk).
   // Then send 20 perfectly good 40B messages and see if ANY are recovered.
-  const good = Array.from({ length: 20 }, (_, i) => msgOf(100 + i, 40))
-  const msgs = [msgOf(1, 500), ...good]
-  const { received, sent } = feed(new StreamReader(), msgs, new Set([1]))
+  const good = Array.from({ length: 20 }, (_, i) => msgOf(MsgType.Events, 40))
+  const msgs = [msgOf(MsgType.Snapshot, 500), ...good]
+  const { received, sent } = feed(reader(), msgs, new Set([1]))
 
   const goodTags = new Set(good.map((m) => m[0]))
   const recoveredGood = received.filter((m) => m.length === 40 && goodTags.has(m[0]))
@@ -104,10 +111,10 @@ console.log('\nB. ONE packet of a MULTI-packet message is lost, then 20 good mes
 // ------------------------------- B2. how long does a bogus length prefix stall?
 console.log('\nB2. does a misparsed length prefix stall the stream, and for how long?')
 {
-  const reader = new StreamReader()
-  const good = Array.from({ length: 200 }, (_, i) => msgOf(100 + (i % 100), 40))
-  const msgs = [msgOf(1, 500), ...good]
-  const { received } = feed(reader, msgs, new Set([1]))
+  const rd = reader()
+  const good = Array.from({ length: 200 }, (_, i) => msgOf(MsgType.Events, 40))
+  const msgs = [msgOf(MsgType.Snapshot, 500), ...good]
+  const { received } = feed(rd, msgs, new Set([1]))
   const goodTags = new Set(good.map((m) => m[0]))
   const correct = received.filter((m) => m.length === 40 && goodTags.has(m[0])).length
   console.log(`     after 200 further messages (~${((200 * 42) / 1024).toFixed(1)}KB, ~20s of play at 10Hz): ${correct}/200 delivered correctly`)
@@ -117,16 +124,16 @@ console.log('\nB2. does a misparsed length prefix stall the stream, and for how 
 // ------------------------------------------ C. is there any length sanity gate?
 console.log('\nC. a corrupted length prefix')
 {
-  const reader = new StreamReader()
+  const rd = reader()
   // A single packet that claims a 65535-byte message.
   const bogus = new Uint8Array(180)
   bogus[0] = 0xff
   bogus[1] = 0xff
   const received: Uint8Array[] = []
-  reader.push(bogus, (m) => received.push(m))
+  rd.push(bogus, (m) => received.push(m))
   // Now 100 perfectly good messages behind it.
-  for (const m of Array.from({ length: 100 }, (_, i) => msgOf(50 + i, 40))) {
-    for (const p of frameMessage(m, MAX_PACKET)) reader.push(p, (o) => received.push(o))
+  for (const m of Array.from({ length: 100 }, (_, i) => msgOf(MsgType.State, 40))) {
+    for (const p of frameMessage(m, MAX_PACKET)) rd.push(p, (o) => received.push(o))
   }
   console.log(`     reader emitted ${received.length} message(s) after a 65535-byte length claim followed by 100 valid messages`)
   check(received.length > 0, 'a bogus 65535-byte length claim does not swallow every subsequent message')

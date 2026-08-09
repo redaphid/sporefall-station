@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Co-op: no more freezing on a lost packet',
+  'Co-op: your friend sees the real objects',
   'Being frozen no longer means instant death',
   'Grenades and guns look like themselves',
-  'Enemies no longer get stuck in corners',
-  'Objective done? Doors open, station hunts',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

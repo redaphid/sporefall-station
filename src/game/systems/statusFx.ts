@@ -104,15 +104,61 @@ export const hasStatus = (e: Entity, kind: string): boolean => e.fx !== undefine
  * `sleep` and `slip`/`stun` route to the proven legacy per-tick timers (which
  * already immobilize and wake-on-damage); everything else is an fx effect. */
 export const applyStatus = (w: World, e: Entity, status: string, ticks: number, brittle?: boolean): void => {
+  // `sleep` and `stun`/`slip` ride legacy per-tick counters on `e.status` rather
+  // than `fx`, so they never went through `applyImmobilize` and had NO
+  // anti-chain-lock at all — `e.status.stun = ticks` was a flat overwrite that
+  // reset the clock on every hit. They immobilize just as totally as `frozen`
+  // does, so the same perma-lock the guard was written to prevent was wide open
+  // here: a sledgehammer stuns 20 ticks on a 28-tick swing (safe alone), but it
+  // is not archetype-locked — it sits in NPC_ARSENAL, so two ordinary mobs that
+  // both roll one can reset the stun forever while their swings keep landing.
+  // Alert escalation converging a floor on one player is exactly that situation.
+  //
+  // Route them through the SAME lockout bookkeeping. `guardLegacyLock` returns
+  // the ticks this application is actually allowed to grant: 0 while a lock is
+  // already running or during the post-lock immunity, and a diminished grant for
+  // successive locks in one hot chain. Determinism is preserved — it is all
+  // absolute ticks on `e.lockout`, which snapshots like everything else.
   if (status === 'sleep') {
-    if (e.status) e.status.sleep = ticks
+    if (e.status) e.status.sleep = Math.max(e.status.sleep, guardLegacyLock(w, e, 'sleep', ticks))
     return
   }
   if (status === 'slip' || status === 'stun') {
-    if (e.status) e.status.stun = ticks
+    if (e.status) e.status.stun = Math.max(e.status.stun, guardLegacyLock(w, e, 'stun', ticks))
     return
   }
   addStatus(w, e, status, ticks, undefined, brittle)
+}
+
+/**
+ * Anti-chain-lock for the legacy counter-based immobilizes (`stun`/`sleep`).
+ * Mirrors `applyImmobilize`'s three guarantees — no refresh while active, a
+ * post-lock immunity window, and diminishing returns across a hot chain — but
+ * returns a tick GRANT instead of writing `fx`, because these two effects live
+ * on `e.status` counters that other systems decrement directly.
+ */
+const guardLegacyLock = (w: World, e: Entity, kind: string, durationTicks: number): number => {
+  const lockout = (e.lockout ??= {})
+  const track = lockout[kind]
+  const hot = track !== undefined && w.tick < track.chainUntil
+  const lockedNow = track !== undefined && w.tick < (track.activeUntil ?? 0)
+  const immuneNow = track !== undefined && w.tick < track.guardUntil
+  if (lockedNow || immuneNow) {
+    // Not allowed to (re)lock: grant nothing, but keep the chain hot so the next
+    // legal application is still diminished.
+    if (track) track.chainUntil = w.tick + IMMOBILIZE_CHAIN_TICKS
+    return 0
+  }
+  const tier = hot ? track.tier + 1 : 1
+  const grant = diminishedGrant(durationTicks, tier)
+  const endTick = w.tick + Math.max(grant, 0)
+  lockout[kind] = {
+    tier,
+    activeUntil: endTick,
+    guardUntil: endTick + IMMOBILIZE_IMMUNE_TICKS,
+    chainUntil: endTick + IMMOBILIZE_CHAIN_TICKS,
+  }
+  return Math.max(grant, 0)
 }
 
 export const isFrozen = (e: Entity): boolean => hasStatus(e, 'frozen')

@@ -191,15 +191,23 @@ export const projectileSystem = (w: World): void => {
       }
 
       // Normal bullet hit (incl. pierce/split/lifesteal/triggers).
-      applyDamage(w, other, p.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, p.ownerId)
-      if (p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
+      //
+      // EVERY on-hit effect below is gated on the blow actually landing. It used
+      // not to be, and that single omission produced three separate bugs: you
+      // could be stunned by a swing you dodge-rolled through, lifesteal healed
+      // off bullets that i-frames had already voided (measured: +23.5hp healed
+      // for 12 damage dealt — a build that outheals its own output), and mod
+      // triggers fired on hits that never connected. A body's i-frames are 5
+      // ticks, so a multi-pellet volley lands most of its pellets into them.
+      const landed = applyDamage(w, other, p.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, p.ownerId)
+      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
       const killed = !!other.dead || (other.health?.hp ?? 1) <= 0
-      if (p.lifestealFrac) {
+      if (landed && p.lifestealFrac) {
         const owner = w.byId.get(p.ownerId) // may be gone — guard
         if (owner?.health) owner.health.hp = Math.min(owner.health.max, owner.health.hp + p.damage * p.lifestealFrac)
       }
-      runHitTriggers(w, other, p.triggers, p.ownerId, killed)
-      if (p.split) spawnSplit(w, e)
+      if (landed) runHitTriggers(w, other, p.triggers, p.ownerId, killed)
+      if (landed && p.split) spawnSplit(w, e)
 
       if (p.pierceLeft && p.pierceLeft > 0) {
         p.pierceLeft -= 1

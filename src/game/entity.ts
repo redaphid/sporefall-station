@@ -36,6 +36,11 @@ export interface LockoutEntry {
   guardUntil: number
   chainUntil: number
   tier: number
+  /** Only set for the LEGACY counter-based immobilizes (`stun`/`sleep`), which
+   * live on `Entity.status` counters instead of `fx`: with no `fx[kind].until` to
+   * read, this is how the guard knows a lock is still running. Absent for
+   * `frozen`/`electrified`, which read their active window straight off `fx`. */
+  activeUntil?: number
 }
 
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'

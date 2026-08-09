@@ -48,6 +48,18 @@ const shatter = (w: World, target: Entity): void => {
   kill(w, target)
 }
 
+/**
+ * Resolve one blow. Returns whether it actually LANDED.
+ *
+ * The return value is load-bearing, not a convenience. Everything a hit does
+ * BESIDES damage — applying an element, healing the shooter via lifesteal,
+ * firing a mod trigger — used to run unconditionally, because callers had no way
+ * to know this function had bailed out. That made i-frames, the dodge-roll and
+ * the downed state suppress damage ONLY: you could roll through a sledgehammer
+ * swing, take nothing, and still be stunned by it, which defeats the one piece of
+ * counterplay the game offers against being locked down. Callers must gate their
+ * on-hit effects on this result.
+ */
 export const applyDamage = (
   w: World,
   target: Entity,
@@ -56,10 +68,10 @@ export const applyDamage = (
   fromY: number,
   knockback: number,
   attackerId: number,
-): void => {
-  if (!target.health || target.dead || target.health.iframes > 0) return
-  if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
-  if (isRolling(target, w.tick)) return // dodge-roll i-frames: roll THROUGH bullets/melee
+): boolean => {
+  if (!target.health || target.dead || target.health.iframes > 0) return false
+  if (target.playerCtl?.downed) return false // downed players are out of the fight, not a piñata
+  if (isRolling(target, w.tick)) return false // dodge-roll i-frames: roll THROUGH bullets/melee
   // A frozen body shatters on impact — but NOT a player. The shatter rule is an
   // instant kill regardless of the blow's damage, and a player has no answer to
   // it: freeze is applied BY enemies (freeze ray / freeze grenade, 120 ticks =
@@ -85,7 +97,10 @@ export const applyDamage = (
   // is SPENT doing it, and the anti-chain-lock's post-immobilize immunity then
   // gates the next one, so the loop is freeze → punish → wait, not a stun-lock.
   if (isFrozen(target)) {
-    if (!target.playerCtl && isBrittleFrozen(target)) return shatter(w, target)
+    if (!target.playerCtl && isBrittleFrozen(target)) {
+      shatter(w, target)
+      return true
+    }
     removeStatus(target, 'frozen')
     // The player's own thaw stays a plain hit — being frozen is already punishing
     // enough when the whole floor is converging on you.
@@ -100,7 +115,7 @@ export const applyDamage = (
   // #78 damage affinity: armoured bodies shrug off impact, flammable ones don't.
   // Impact/explosion damage is 'physical'; missing table → ×1 (unchanged).
   amount = Math.round(amount * resistMult(target, 'physical'))
-  if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
+  if (resistsDamage(target, amount)) return false // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
   // Stamp the last-hurt tick: passive regen (systems/regen.ts) counts its
@@ -150,6 +165,7 @@ export const applyDamage = (
     if (isObject(target)) destroyObject(w, target, attackerId)
     else kill(w, target)
   }
+  return true
 }
 
 export const kill = (w: World, target: Entity): void => {
@@ -220,8 +236,12 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     if ((adx / alen) * tx + (ady / alen) * ty < -0.2) finalDamage *= 3
     attacker.status.cloakUntil = w.tick // attacking breaks cloak
   }
-  applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
-  return best
+  // Report the target ONLY if the blow actually landed. `fireWeapon`'s melee
+  // branch applies the weapon's element and mod triggers to whatever this
+  // returns, so returning a target whose damage was voided by i-frames, a
+  // dodge-roll or the downed state is what let a sledgehammer stun a player who
+  // had successfully rolled through the swing.
+  return applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id) ? best : null
 }
 
 /** Resolved bullet-behavior spec carried onto a spawned projectile (weapon mods). */

@@ -94,7 +94,24 @@ export const applyDamage = (
   if (!target.health || target.dead || target.health.iframes > 0) return
   if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
   if (isRolling(target, w.tick)) return // dodge-roll i-frames: roll THROUGH bullets/melee
-  if (isFrozen(target)) return shatter(w, target)
+  // A frozen body shatters on impact — but NOT a player. The shatter rule is an
+  // instant kill regardless of the blow's damage, and a player has no answer to
+  // it: freeze is applied BY enemies (freeze ray / freeze grenade, 120 ticks =
+  // four seconds) and immobilizes completely, so the sequence "enemy freezes
+  // you, any enemy touches you, you are downed" is unavoidable and reads as
+  // dying in one hit. Harmless while the station ignored you; lethal now the
+  // alert escalation sends the whole floor at you at once.
+  //
+  // So for a player the impact CRACKS THE ICE instead: the freeze breaks and the
+  // blow lands as ordinary damage. Costs you tempo and a hit, not the run. The
+  // anti-chain-lock guard in statusFx then grants its usual post-immobilize
+  // immunity, so you cannot be instantly re-frozen either.
+  //
+  // Enemies still shatter, so freeze remains a genuine execute when YOU throw it.
+  if (isFrozen(target)) {
+    if (!target.playerCtl) return shatter(w, target)
+    removeStatus(target, 'frozen')
+  }
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
   // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.
   if (amount < 0) amount = 0

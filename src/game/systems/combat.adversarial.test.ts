@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { addStatus } from './statusFx'
+import { addStatus, hasStatus } from './statusFx'
 import { addEntity, createWorld, type World } from '../world'
 import { spawnPlayer } from '../player'
 import { spawnObject } from './objects'
@@ -201,27 +201,48 @@ describe('shatter — frozen bodies gib on impact', () => {
     expect(e.shattered).toBeFalsy()
   })
 
-  it('a FROZEN PLAYER shattering DOWNS them without gib-vanishing: no shattered flag, no ice-gib event, still in the snapshot', () => {
+  // These two previously asserted that a frozen PLAYER shatters — downed by any
+  // impact regardless of damage. That was the shipped behaviour and the owner
+  // reported it as a bug ("I can die in 1-2 hits… it's when I freeze"): enemies
+  // apply the freeze, it lasts 120 ticks, and it removes every counterplay, so
+  // the execute was unavoidable. Players now crack free instead. Rewritten to
+  // assert the new rule rather than deleted, so the player/NPC asymmetry stays
+  // covered in both directions.
+  it('a FROZEN PLAYER is NOT shattered: the impact cracks the ice and deals ordinary damage', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.health!.iframes = 0 // shed spawn grace: this tests the frozen-shatter path
+    p.health!.iframes = 0 // shed spawn grace: this tests the frozen path
+    const before = p.health!.hp
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)
-    expect(p.shattered).toBeFalsy() // NOT gibbed — stays a visible body
-    expect(events(w, 'shatter')).toHaveLength(0) // no ice-gib fx for a player
-    expect(p.dead).toBeFalsy() // player rules win: downed, not dead
-    expect(p.playerCtl!.downed).toBeDefined()
-    expect(buildSnapshot(w).entities.some((s) => s.id === p.id)).toBe(true) // not vanished
+    expect(p.shattered).toBeFalsy()
+    expect(events(w, 'shatter')).toHaveLength(0)
+    expect(p.dead).toBeFalsy()
+    expect(p.playerCtl!.downed).toBeUndefined() // NOT downed by a 1-damage hit
+    expect(p.health!.hp).toBeLessThan(before) // it still hurt…
+    expect(p.health!.hp).toBeGreaterThan(0) // …but nowhere near lethal
+    expect(hasStatus(p, 'frozen')).toBe(false) // the blow freed them
+    expect(buildSnapshot(w).entities.some((s) => s.id === p.id)).toBe(true)
   })
 
-  it('a frozen player who is OUT OF LIVES shatters straight to a real death (still no gib flag)', () => {
+  it('a frozen player OUT OF LIVES still survives a glancing blow — no execute without the damage to earn it', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.health!.iframes = 0 // shed spawn grace: this tests the frozen-shatter path
+    p.health!.iframes = 0
     w.revivesLeft = 0
     addStatus(w, p, 'frozen', 120)
     applyDamage(w, p, 1, 19, 20, 0, 99)
     expect(p.shattered).toBeFalsy()
+    expect(p.dead).toBeFalsy() // was: an instant real death on 1 damage
+    expect(p.health!.hp).toBeGreaterThan(0)
+  })
+
+  it('a frozen player CAN still be killed — leniency is not invulnerability', () => {
+    const p = spawnPlayer(w, 0, 20, 20)
+    p.health!.iframes = 0
+    w.revivesLeft = 0
+    addStatus(w, p, 'frozen', 120)
+    applyDamage(w, p, 10_000, 19, 20, 0, 99) // a genuinely lethal blow
+    expect(p.health!.hp).toBe(0)
     expect(p.dead).toBe(true)
-    expect(p.playerCtl!.downed).toBeUndefined()
   })
 })
 

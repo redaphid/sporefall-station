@@ -52,6 +52,15 @@ const SCAN_STEP = 12
 const SCAN_TURN = 0.9
 /** How far ahead the flee steering probes for a wall before re-aiming. */
 const FLEE_PROBE = 1.2
+/** Ray step for that probe. Must be well under a tile so no tile the body would
+ * cross is skipped; 0.25 gives 4+ samples per tile on the axis-aligned worst
+ * case for 8 directions on only the entities actually fleeing. */
+const FLEE_PROBE_STEP = 0.25
+/** Ticks a fleeing body may make no headway before it stops trying to run and
+ * re-decides. The last-resort net under the probe: a body genuinely boxed in
+ * (a sealed closet, a doorway plugged by the thing chasing it) has no open
+ * direction to find, and without this it grinds into the wall forever. */
+const FLEE_STALL_TICKS = 30
 
 /** Per-tick door context for steering: closed doors split by openability, and
  * the door entity per tile so a walker can shove one open on contact. Built
@@ -415,11 +424,44 @@ const COMPASS: readonly (readonly [number, number])[] = [
  * boxed in on all sides keeps its raw heading (nothing better exists). */
 const openFleeDir = (w: World, ctx: DoorCtx, e: Entity, ax: number, ay: number): { x: number; y: number } => {
   const lw = w.level.w
-  const open = (vx: number, vy: number): boolean => {
-    const tx = Math.floor(e.pos.x + vx * FLEE_PROBE)
-    const ty = Math.floor(e.pos.y + vy * FLEE_PROBE)
+  const blocked = (tx: number, ty: number): boolean => {
     const k = ty * lw + tx
-    return !isSolidTile(w.level, tx, ty) && !ctx.closedDoors.has(k) && !ctx.lockedDoors.has(k)
+    return isSolidTile(w.level, tx, ty) || ctx.closedDoors.has(k) || ctx.lockedDoors.has(k)
+  }
+  // Is the way out along (vx,vy) actually clear?
+  //
+  // This used to sample the SINGLE point `pos + v * FLEE_PROBE`, which was wrong
+  // in two directions at once and is what wedged fleeing bodies in corners:
+  //
+  //   * On a diagonal, FLEE_PROBE (1.2) projects to 0.7071 * 1.2 = 0.849 tiles —
+  //     LESS than one tile. From anywhere in the first ~15% of a tile the probe
+  //     landed back inside the body's OWN tile, read it as open, and reported a
+  //     wall as an escape route. The body then walked into that wall, moved zero,
+  //     and re-picked the identical direction on the next tick, forever. Because
+  //     it depended on sub-tile position it struck "often", not always.
+  //   * Conversely, sampling only the FAR point could skip a solid tile lying
+  //     between here and there, tunnelling through a thin wall.
+  //
+  // So walk the ray instead and test every DISTINCT tile it crosses, starting
+  // past the body's own radius (its own tile is trivially open and tells us
+  // nothing). Small fixed step, integer tile compares, no allocation — and fully
+  // deterministic, which the sim requires.
+  const open = (vx: number, vy: number): boolean => {
+    const from = Math.min(e.radius, FLEE_PROBE * 0.5)
+    let lastTx = Math.floor(e.pos.x)
+    let lastTy = Math.floor(e.pos.y)
+    for (let d = from; d <= FLEE_PROBE + 1e-6; d += FLEE_PROBE_STEP) {
+      const tx = Math.floor(e.pos.x + vx * d)
+      const ty = Math.floor(e.pos.y + vy * d)
+      if (tx === lastTx && ty === lastTy) continue // same tile — nothing new to test
+      if (blocked(tx, ty)) return false
+      lastTx = tx
+      lastTy = ty
+    }
+    // Never report a direction as open when the ray never actually left the
+    // body's tile: that is the degenerate case above, and "no information" must
+    // not read as "clear".
+    return lastTx !== Math.floor(e.pos.x) || lastTy !== Math.floor(e.pos.y)
   }
   if (open(ax, ay)) return { x: ax, y: ay }
   let best: { x: number; y: number } | undefined
@@ -535,6 +577,26 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     // Flight has no destination to route to — steer the away-vector, deflected
     // to the openest compass direction when a wall looms, so a panicked body
     // streams along walls and out of doorless corners instead of grinding.
+    // Last-resort stall guard. The probe above stops the common wedge, but a
+    // body can still be genuinely trapped — a sealed alcove, or the very thing
+    // it is running from standing in the only gap (the probe reads TILES, and a
+    // chaser's body is not a tile). Mirrors the cold-trail bookkeeping the
+    // aggro branch has always had; flight previously had NO equivalent, so
+    // nothing anywhere caught a fleeing body that never moved.
+    if (!ai.progress || Math.hypot(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
+      ai.progress = { x: e.pos.x, y: e.pos.y, tick: w.tick }
+    } else if (w.tick - ai.progress.tick > FLEE_STALL_TICKS) {
+      // Cornered with nowhere to run. Drop the panic and re-arbitrate: a
+      // trapped animal should turn and fight, or give up and calm down —
+      // either is better than jogging into a wall until the player leaves.
+      ai.progress = undefined
+      ai.fleeFrom = undefined
+      ai.mode = 'idle'
+      ai.thinkAt = w.tick
+      e.intent.x = 0
+      e.intent.y = 0
+      return
+    }
     const dir = openFleeDir(w, ctx, e, dx / dist, dy / dist)
     e.intent.x = dir.x
     e.intent.y = dir.y

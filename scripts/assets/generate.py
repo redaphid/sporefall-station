@@ -118,6 +118,12 @@ NEG_BASE = ("photorealistic, 3d render, smooth gradient, soft shading, text, wat
             "several objects side by side, faded ghost copy")
 NEG_FIGURE = ("person, humanoid, figure, character, creature, monster, face, head, "
               "arms, legs, hands, body, standing figure, portrait, silhouette of a person")
+# The recipe's "feet on the ground" invites a painted dirt mound / cast shadow.
+# The background key cannot tell that grey ellipse from the creature, so it welds
+# it into the alpha as a grey SLAB under the sprite — invisible at 1024px, but at
+# 48px it is a third of the sprite's height. Negatived on every ground creature.
+NEG_GROUND = ("ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
+              "cast shadow on the ground, diorama")
 BG_OBJ = "single isolated game object centered on plain flat white background"
 BG_CHAR = "single character centered on plain flat white background, full body, feet on the ground"
 BG_TILE = ("flat texture swatch filling the whole frame edge to edge, no horizon, no sky, "
@@ -384,9 +390,16 @@ def sweep(names, seeds=6, base_seed=414500):
                 print(f"SKIP {name}: curate {spec['init_from_idle']} first "
                       f"(no durable raw — see `generate.py curate`)")
                 continue
+        # The installed rembg node is STRICTLY batch-1: its `tensor2pil` does a
+        # bare `.squeeze()`, so a (B,H,W,C) batch reaches PIL as a 4-D array and
+        # raises "Cannot handle this data type". Worse than the crash is the
+        # near-miss — `pil2tensor` re-`unsqueeze`s to batch 1, so any batch that
+        # DID survive would silently return one image and drop the rest. So an
+        # alpha job is swept one seed at a time; only the un-cut jobs batch.
+        chunk = 1 if spec_alpha(spec) else CHUNK
         done = 0
         while done < seeds:
-            n = min(CHUNK, seeds - done)
+            n = min(chunk, seeds - done)
             g = comfy.build_graph(
                 pos=spec["pos"], neg=spec["neg"], seed=base_seed + done, batch=n,
                 seamless=spec.get("seamless", False), refs=refs or None,

@@ -103,6 +103,73 @@ PROMPTS = {
         "treads, boxy robot, six legs, insect, crab, spider, frog, big round "
         "eyes, campfire, bonfire, torch",
     ),
+    # v4 -- v3 fixed the body plan (quadruped, reliably) but not the BUILD.
+    # "lean", "starved", "thin ... legs" and "whip tail" drew small spindly
+    # CATS across 16 seeds: pretty at 1024 and useless at 48px, where a 1px leg
+    # disappears and the sprite loses all coverage. v4 keeps every geometry
+    # statement that worked and swaps the build words for mass -- short, thick,
+    # dense, barrel-ribbed -- while staying clearly lighter than the brute
+    # (which owns "massive/hulking/humped"). Cat/dog/fox are negatived by name;
+    # negativing "human" alone never stopped the model reaching for a familiar
+    # animal.
+    "v4": (
+        "a burnt-out beast standing on ALL FOURS, its heavy body carried "
+        "HORIZONTALLY low to the ground, the body twice as long as it is tall, "
+        "no upright torso, a deep barrel ribcage slung between four SHORT THICK "
+        "cracked black legs, the blunt wedge-shaped eyeless head held LOW at the "
+        "FRONT of the body level with its shoulders, one burning orange slit for "
+        "an eye, entire surface a crust of cracked black charcoal like burnt "
+        "bark, molten ember-orange light glowing out of the cracks along its "
+        "back and ribs, a short thick stub of a charred tail, ash smoke curling "
+        "off its back, wide solid crouched silhouette, chunky readable shape",
+        "cat, kitten, feline, dog, puppy, wolf, fox, deer, horse, domestic "
+        "animal, pet, cute, thin, slim, slender, spindly, skinny, lanky, "
+        "delicate, long thin legs, stick legs, long whip tail, "
+        "human, person, humanoid, upright, standing biped, two legs, bipedal, "
+        "torso, chest, waist, shoulders, arms, hands, fists, human proportions, "
+        "nude, naked, bare skin, human skin, flesh, skin texture, woman, man, "
+        "breasts, hair, face, nose, mouth, lips, "
+        "massive, hulking, humped back, bone plates, carapace, domed shield "
+        "head, pale bone tan, shaggy fur, mane, spacesuit, helmet, visor, "
+        "orange cap, teal suit, green skin, moss, olive, mushroom, hovering, "
+        "floating, tank treads, boxy robot, six legs, insect, crab, spider, "
+        "frog, big round eyes, campfire, bonfire, torch",
+    ),
+    # v5 -- v4 was a REGRESSION: 9 of 10 seeds came back as upright bipeds.
+    # The mass vocabulary did it. "lean/starved" in v3 was doing double duty --
+    # it was not just describing build, it was holding the model in ANIMAL
+    # territory; swap it for "heavy body / deep barrel ribcage / chunky" and the
+    # nearest heavy thing the model knows in this prompt shape is a bulky biped
+    # (the bog-mutant). Saying "level with its shoulders" reintroduced shoulders
+    # too.
+    #
+    # So v5 is v3 with the smallest possible delta: only the three words that
+    # made the limbs 1px thin are changed (thin legs -> short sturdy legs, whip
+    # tail -> short tail), "shoulders" is gone, and v4's one genuinely good
+    # contribution -- negativing cat/dog/fox/deer BY NAME -- is kept. No mass
+    # vocabulary anywhere.
+    "v5": (
+        "a burnt-out beast running on ALL FOURS, its whole body carried "
+        "HORIZONTALLY low to the ground, longer than it is tall, no upright "
+        "torso, a lean starved ribcage slung between four SHORT STURDY cracked "
+        "black legs, the narrow wedge-shaped eyeless head held LOW at the FRONT "
+        "of the body level with its back, one burning orange slit for an eye, "
+        "entire surface a crust of cracked black charcoal like burnt bark with "
+        "molten ember-orange light glowing out of the cracks, a short charred "
+        "tail, ash smoke curling off its back, wide flat crouched silhouette",
+        "cat, kitten, feline, dog, puppy, wolf, fox, deer, horse, domestic "
+        "animal, pet, cute, spindly, long thin legs, stick legs, long whip "
+        "tail, "
+        "human, person, humanoid, upright, standing, standing biped, two legs, "
+        "bipedal, torso, chest, waist, shoulders, arms, hands, fists, human "
+        "proportions, nude, naked, bare skin, human skin, flesh, skin texture, "
+        "woman, man, breasts, hair, face, nose, mouth, lips, "
+        "hulking muscular, bulky, broad, armor plates, bone plates, carapace, "
+        "domed shield head, pale bone tan, shaggy fur, mane, spacesuit, helmet, "
+        "visor, orange cap, teal suit, green skin, moss, olive, mushroom, "
+        "hovering, floating, tank treads, boxy robot, six legs, insect, crab, "
+        "spider, frog, big round eyes, campfire, bonfire, torch",
+    ),
 }
 
 # ── conditions: (prompt_key, ip_type, ref_kind, ip_weight) ───────────────────
@@ -131,8 +198,13 @@ CONDS = {
     # P adds the no-ground background; Q is the same without it, as the control.
     "P": ("v3", "style transfer", "cast", 0.3),
     "Q": ("v3", "style transfer", "cast", 0.3),
+    # R is the production candidate: shipped config, v4 prompt.
+    "R": ("v4", "style transfer", "cast", 0.3),
+    "S": ("v5", "style transfer", "cast", 0.3),
 }
-# conditions that take the no-ground background
+# conditions that take the no-ground background. Measured: it does NOT remove
+# the diorama base (P and Q both produced them) and it makes the creature
+# spindlier and floatier, so it is not used for the production condition.
 NOGROUND = {"P"}
 
 

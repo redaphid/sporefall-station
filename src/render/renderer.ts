@@ -2,6 +2,7 @@ import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Text
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
+import { flagOn } from '../app/featureFlags'
 import { loadSettings, type ShaderFxMode } from '../app/settings'
 import { createArt, TILE_PX, type ArtRegistry } from './art'
 import { BackbufferPipeline } from './backbuffer'
@@ -116,6 +117,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       await loadSpriteTextures(app.renderer, c),
       { tiles: p.tiles, entities: p.entities },
       resolveAnimTpfs(c),
+      flagOn(loadSettings().flags, 'newEnemyArt'),
     )
   }
   // Facade over the swappable registry so the tilemap/entity/effect layers keep
@@ -346,8 +348,14 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     native,
     (s) => {
       const prevTheme = settings.theme
+      const prevArt = flagOn(settings.flags, 'newEnemyArt')
       settings = s
       if (s.theme !== prevTheme) void setTheme(s.theme)
+      // Creature-art switch: same full asset re-bake as a theme swap, because
+      // which archetypes count as character sprites changes with it. Reuses
+      // setTheme rather than a parallel path so there is one rebuild to keep
+      // correct. Live, no reload.
+      else if (flagOn(s.flags, 'newEnemyArt') !== prevArt) void setTheme(chain[0].id)
       // A `?fx=` URL override pins the mode for the session; otherwise the
       // panel's Shader FX choice applies live (and persists via settings.ts).
       pipeline.setMode(urlFx ?? s.shaderFx)

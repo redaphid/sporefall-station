@@ -14,6 +14,7 @@
  * Binding a button another action owns SWAPS the two (stated in the UI copy).
  */
 
+import { FEATURE_FLAGS } from '../app/featureFlags'
 import { loadSettings, saveSettings, type EffectsQuality, type GameSettings, type ShaderFxMode } from '../app/settings'
 import { createButtonCapture, type ButtonCapture } from '../input/padCapture'
 import { buttonPressed } from '../input/readPad'
@@ -103,6 +104,23 @@ export const createSettingsPanel = (
   // Fullscreen toggle — desktop/web only. The native Capacitor shell is already
   // fullscreen, so the row is hidden there (nothing to toggle). Toggling here is
   // itself a user gesture, so the Fullscreen API request is honoured directly.
+  // FEATURE FLAGS — rendered from the registry (app/featureFlags.ts), never
+  // hand-maintained here. New work ships dark behind a flag routinely now, so
+  // adding one must not require touching this file, and every flag must appear
+  // in ONE findable place with a plain-English label and a line saying what it
+  // actually changes. A flag he cannot find may as well not exist.
+  const flagRows = FEATURE_FLAGS.length
+    ? `<div style="margin-bottom:10px">
+      <div style="opacity:.7;margin-bottom:4px">Try new things</div>
+      ${FEATURE_FLAGS.map(
+        (f) => `
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
+        <input type="checkbox" data-flag="${esc(f.key)}" style="margin-top:3px">
+        <span>${esc(f.label)}<br><span style="opacity:.6;font-size:.85em">${esc(f.description)}</span></span>
+      </label>`,
+      ).join('')}
+    </div>`
+    : ''
   const fullscreenRow = native
     ? ''
     : `
@@ -119,7 +137,7 @@ export const createSettingsPanel = (
     </label>`
     : `<div style="opacity:.6">Vibration: phone only</div>`
 
-  panel.innerHTML = qualityRow + themeRow + fullscreenRow + hapticRows
+  panel.innerHTML = qualityRow + themeRow + flagRows + fullscreenRow + hapticRows
 
   // ---- Controller section: button remapping (remap.ts overlay) ------------
   let map = getButtonMap()
@@ -274,6 +292,13 @@ export const createSettingsPanel = (
   if (th && themes.some((t) => t.id === current.theme)) th.value = current.theme
   const fs = panel.querySelector<HTMLInputElement>('#fs') // null on native
   if (fs) fs.checked = current.fullscreen
+  // Wire every registered flag generically: initial state from settings, and a
+  // change handler that writes back through the same clamped save path.
+  for (const box of panel.querySelectorAll<HTMLInputElement>('input[data-flag]')) {
+    const key = box.dataset.flag!
+    box.checked = current.flags?.[key] === true
+    box.addEventListener('change', () => apply({ flags: { ...current.flags, [key]: box.checked } }))
+  }
   const hen = panel.querySelector<HTMLInputElement>('#hen')
   const hin = panel.querySelector<HTMLInputElement>('#hin')
   if (hen) hen.checked = current.hapticsEnabled

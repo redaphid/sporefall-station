@@ -4,6 +4,7 @@
 // so the wiring — not just the pure helper — is proven.
 
 import { beforeEach, describe, expect, it } from 'vitest'
+import { defaultFlags } from './featureFlags'
 import { defaultSettings, loadSettings, type GameSettings } from './settings'
 
 const NEW_KEY = 'sporefall.settings'
@@ -15,6 +16,9 @@ const nonDefault: GameSettings = {
   effectsQuality: 'low',
   shaderFx: 'reduced',
   theme: 'swampspace',
+  // defaultFlags() rather than a literal: clampSettings fills every registered
+  // flag with its default, so a hardcoded {} would break each time one is added.
+  flags: defaultFlags(),
   fullscreen: false,
 }
 

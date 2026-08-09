@@ -314,5 +314,53 @@
  "extra.chars/spore-drone-s-attack-2.png": {
   "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-2/char-spore-drone-s-attack-2-s414600_00004_.png",
   "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "char.mireclaw-stalker.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.mireclaw-stalker.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "low horizontal six-legged scavenger; only non-upright body in the cast; ground shadow stripped in post"
+ },
+ "char.sporeling-mite.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.sporeling-mite.s-idle.png",
+  "seed": 414500,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "knee-high mushroom-cap critter; smallest silhouette in the cast"
+ },
+ "char.carapace-brute.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.carapace-brute.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 prompt; hunched quadruped - v1 drew 4/4 upright bipeds"
+ },
+ "char.cinder-husk.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.cinder-husk.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 prompt; charcoal husk with ember eyes. WEAKEST of the six - still reads humanoid"
+ },
+ "char.gloom-lurker.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.gloom-lurker.s-idle.png",
+  "seed": 414502,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 prompt; domed shell with tucked legs - v1 drew humanoids, a tree and a gown"
+ },
+ "char.brood-sac.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.brood-sac.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 STATIC_KINDS object recipe; egg sac with glowing seam - v1 drew twig-people"
  }
 }

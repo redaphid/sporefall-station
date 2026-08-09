@@ -4,6 +4,7 @@
  * clamp/parse helpers are pure so they can be unit-tested without a DOM.
  */
 
+import { clampFlags, defaultFlags } from './featureFlags'
 import { migrateLegacyKey } from './storageMigration'
 
 export type EffectsQuality = 'off' | 'low' | 'high'
@@ -25,6 +26,15 @@ export interface GameSettings {
   /** Active visual theme id (public/themes/<id>/). Pure presentation — never
    * touches the sim; peers in a net game may each use a different theme. */
   theme: string
+  /** Opt-in feature flags, keyed by `FEATURE_FLAGS[].key` (see featureFlags.ts).
+   *
+   * A MAP rather than named fields on purpose: new work ships dark behind a flag
+   * routinely now, and one registry the settings panel renders automatically
+   * beats a growing drawer of bespoke booleans he has to discover.
+   *
+   * PURELY LOCAL PRESENTATION, exactly like `theme` — never travels over the
+   * wire. Nothing in `src/game/` or `src/net/` may read this. */
+  flags: Record<string, boolean>
   /** Browser fullscreen on run-start (desktop/web only; the native Capacitor
    * shell is already fullscreen). Requested from the run-start user gesture. */
   fullscreen: boolean
@@ -40,6 +50,7 @@ export const defaultSettings = (): GameSettings => ({
   effectsQuality: 'high',
   shaderFx: 'full',
   theme: 'swampspace-hires',
+  flags: defaultFlags(),
   fullscreen: true,
 })
 
@@ -67,6 +78,7 @@ export const clampSettings = (raw: unknown): GameSettings => {
       ? (r.effectsQuality as EffectsQuality)
       : base.effectsQuality,
     shaderFx: FX_MODES.includes(r.shaderFx as ShaderFxMode) ? (r.shaderFx as ShaderFxMode) : base.shaderFx,
+    flags: clampFlags(r.flags),
     theme:
       typeof r.theme === 'string' && r.theme.length <= 64 && THEME_ID_RE.test(r.theme)
         ? r.theme

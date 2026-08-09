@@ -112,6 +112,59 @@ both compiles.
 > app at a laptop dev server; a static Cloudflare deploy must serve its own
 > bundled `dist/`. The workflow sets `CAP_SERVER_URL: ""` explicitly.
 
+### Previews — do NOT reach for `wrangler versions upload`
+
+> **`workers.dev` is behind Cloudflare Access on this account.** The native
+> `wrangler versions upload` preview route therefore **cannot work here**. A
+> preview version gets a `*.workers.dev` URL that answers with a Cloudflare
+> Access login page instead of the app — `302 → <team>.cloudflareaccess.com`
+> for any signed-out phone, which is exactly the device you wanted to hand the
+> preview to.
+>
+> **The trap is the ordering.** Production runs with `workers_dev: false` and no
+> subdomain of its own, so the failure does not surface until *after* you have
+> flipped `workers_dev` on and **spent a production deploy** doing it. You find
+> out the preview is unreachable at the point where you have already modified
+> production. This cost a full agent run.
+>
+> **A CI workflow built on this route is worse than none**, because it goes
+> green while every URL it advertises is a login page. A per-branch
+> `wrangler versions upload` workflow was written and deliberately **not**
+> merged for this reason; if you are about to add one, this note is why you
+> should not.
+>
+> **Use a separately-named Worker instead.** Deploy with a config whose `name`
+> differs from `sporefall-station` (so it cannot resolve to the production
+> script) and give it a custom hostname on a zone that is *not* Access-gated,
+> so a signed-out phone can load it. Such a config must not read or rewrite
+> production's config, routes or hostname.
+
+### Verifying a deploy — never by loading the root
+
+`wrangler.jsonc` sets `not_found_handling: "single-page-application"`, which means
+**every path returns HTTP 200**, including paths that do not exist. The root URL
+loading, and a `200` status, prove nothing whatsoever: a missing file is served
+`index.html` with a success code.
+
+To actually confirm a build is live, fetch the **hashed JS bundle** and check two
+things:
+
+1. the `content-type` is `application/javascript` — the SPA fallback returns
+   `text/html`, so this alone catches a missing asset;
+2. the body contains a **build-unique string** (the hash in the filename you took
+   from the fresh `dist/`, or a literal you know is new in this build).
+
+```bash
+# take the hashed entry chunk from the build you just made
+asset=$(ls dist/assets/index-*.js | head -1 | xargs basename)
+curl -sSI "https://<origin>/assets/$asset" | grep -i '^content-type'
+# expect: content-type: application/javascript   (text/html = NOT deployed)
+```
+
+Expect a **transient stale edge** for a short window right after a deploy — a
+first check that still shows the old bundle is not automatically a failed deploy;
+re-check before concluding.
+
 ### Secrets summary (web)
 
 | Secret | Where | Scope |

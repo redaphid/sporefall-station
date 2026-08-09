@@ -1,0 +1,55 @@
+{
+  // PREVIEW Worker — a SEPARATE, INDEPENDENT deployment, not a preview *of*
+  // production. Production (`wrangler.jsonc`, Worker `sporefall-station`) is not
+  // read, not modified, and not touched by anything in this file.
+  //
+  //   deploy:  npx wrangler deploy -c wrangler.preview.jsonc
+  //   remove:  npx wrangler delete -c wrangler.preview.jsonc
+  //
+  // Why a second Worker instead of `wrangler versions upload`: uploading a
+  // version to production shifts NO traffic, and production has
+  // `previews_enabled: false` with no workers.dev subdomain of its own, so there
+  // is no origin to serve a preview from — every such URL 404s while CI reports
+  // success. A separate Worker has its own origin and sidesteps that entirely.
+  "$schema": "./node_modules/wrangler/config-schema.json",
+
+  // DIFFERENT NAME = different Worker. This is the whole isolation story: nothing
+  // here can resolve to the `sporefall-station` script.
+  "name": "sporefall-preview",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-04-07",
+
+  // NO `routes`. Deliberate and load-bearing:
+  //   - sporefall.hypnodroid.com stays attached to production, untouched.
+  //   - /ota/check on the custom domain keeps resolving to production, so the
+  //     APK's update channel cannot be intercepted. (`capacitor.config.ts` bakes
+  //     OTA_UPDATE_URL at BUILD time, defaulting to the custom domain, so an
+  //     installed APK never even looks at this Worker's hostname.)
+  // Exposure is the free workers.dev origin only:
+  //     https://sporefall-preview.<account-subdomain>.workers.dev
+  // Setting `workers_dev` on THIS Worker says nothing about production's
+  // exposure — it is a per-Worker setting, and production's stays false.
+  "workers_dev": true,
+
+  // Same Vite build as production. `not_found_handling` means every unknown path
+  // returns index.html with HTTP 200 — so a 200 here is NOT evidence a file
+  // exists. Verify a deploy by fetching the hashed JS bundle and checking the
+  // content-type, never by checking the root's status code.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/ws/*", "/ota/*"]
+  },
+
+  // The Worker entry exports RoomDO, so the binding is required for the script to
+  // load at all. Durable Object namespaces are per-SCRIPT: this creates a fresh,
+  // empty namespace. Preview multiplayer rooms are therefore NOT shared with
+  // production — same room name on both origins is two unrelated rooms.
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "RoomDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO"] }],
+
+  "observability": { "enabled": true }
+}

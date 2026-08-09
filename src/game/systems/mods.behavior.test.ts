@@ -85,18 +85,27 @@ describe('behavior mods — real fire path', () => {
     expect(eventsOf(w, 'explosion').length).toBeGreaterThan(0)
   })
 
-  it('frost then shatter: a frost bullet freezes; a follow-up shot shatters the ice (instant kill)', () => {
+  // Cryo Rounds is CONTROL, not an execute. The freeze sets up; the next shot
+  // cracks the ice for heavy bonus damage. It must never delete a body outright:
+  // shatter ignores hp, resist and archetype, which made this mod kill a 320hp
+  // boss exactly as fast as a 40hp thug.
+  it('frost then crack: a frost bullet freezes; the follow-up shot hits far harder but does NOT execute', () => {
     const p = armed(w, 20, 20, 'pistol', [{ id: 'frost', stacks: 1 }])
     const t = npc(w, 22, 20)
+    t.health = { hp: 400, max: 400, iframes: 0 } // a pool one cracked shot cannot clear
     fire(w, p)
     advance(w, 20)
     expect(isFrozen(t)).toBe(true)
     expect(t.dead).toBeFalsy()
+    const afterFreeze = t.health!.hp
     t.health!.iframes = 0 // iframes lapse between shots (statusSystem decrements them in real ticks)
     fire(w, p)
     advance(w, 20)
-    expect(t.dead).toBe(true)
-    expect(t.shattered).toBe(true)
+    expect(t.dead).toBeFalsy()
+    expect(t.shattered).toBeFalsy()
+    expect(isFrozen(t)).toBe(false) // the freeze was SPENT cracking
+    // The cracking shot landed more than an ordinary pistol round would have.
+    expect(afterFreeze - t.health!.hp).toBeGreaterThan(WEAPONS.pistol.damage)
   })
 
   it('incendiary: a bullet sets the target burning (element applied)', () => {

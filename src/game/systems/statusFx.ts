@@ -52,7 +52,7 @@ const diminishedGrant = (baseTicks: number, tier: number): number =>
   tier <= 1 ? baseTicks : Math.floor(baseTicks / 2 ** (tier - 1))
 
 /** Land an immobilize under the anti-chain-lock rules (see the block comment). */
-const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: number, source?: EntityId): void => {
+const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: number, source?: EntityId, brittle?: boolean): void => {
   const fx = (e.fx ??= {})
   const lockout = (e.lockout ??= {})
   const track = lockout[kind]
@@ -69,7 +69,7 @@ const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: numbe
   const tier = hot ? track.tier + 1 : 1
   const grant = diminishedGrant(durationTicks, tier)
   const endTick = w.tick + Math.max(grant, 0)
-  if (grant > 0) fx[kind] = { until: endTick, source }
+  if (grant > 0) fx[kind] = brittle ? { until: endTick, source, brittle } : { until: endTick, source }
   else delete fx[kind] // a fully-diminished lock is a no-op; leave nothing immobilizing
   lockout[kind] = { tier, guardUntil: endTick + IMMOBILIZE_IMMUNE_TICKS, chainUntil: endTick + IMMOBILIZE_CHAIN_TICKS }
 }
@@ -77,12 +77,21 @@ const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: numbe
 /** Attach `kind` to `e`, expiring `durationTicks` from now. Non-immobilize effects
  * refresh an existing entry; immobilize kinds route through the anti-chain-lock rules
  * (`applyImmobilize`). Dead entities gain nothing; non-positive durations no-op. */
-export const addStatus = (w: World, e: Entity, kind: string, durationTicks: number, source?: EntityId): void => {
+export const addStatus = (
+  w: World,
+  e: Entity,
+  kind: string,
+  durationTicks: number,
+  source?: EntityId,
+  /** Only meaningful for `frozen` — see StatusEntry.brittle. Defaults to false, so
+   * any NEW freeze source is control until it deliberately opts into the execute. */
+  brittle?: boolean,
+): void => {
   if (e.dead) return
   if (!(durationTicks > 0)) return
-  if (IMMOBILIZE_STATUSES.has(kind)) return applyImmobilize(w, e, kind, durationTicks, source)
+  if (IMMOBILIZE_STATUSES.has(kind)) return applyImmobilize(w, e, kind, durationTicks, source, brittle)
   const fx: Fx = (e.fx ??= {})
-  fx[kind] = { until: w.tick + durationTicks, source }
+  fx[kind] = brittle ? { until: w.tick + durationTicks, source, brittle } : { until: w.tick + durationTicks, source }
 }
 
 export const removeStatus = (e: Entity, kind: string): void => {
@@ -94,7 +103,7 @@ export const hasStatus = (e: Entity, kind: string): boolean => e.fx !== undefine
 /** Apply one status to one entity — the single place item/element effects land.
  * `sleep` and `slip`/`stun` route to the proven legacy per-tick timers (which
  * already immobilize and wake-on-damage); everything else is an fx effect. */
-export const applyStatus = (w: World, e: Entity, status: string, ticks: number): void => {
+export const applyStatus = (w: World, e: Entity, status: string, ticks: number, brittle?: boolean): void => {
   if (status === 'sleep') {
     if (e.status) e.status.sleep = ticks
     return
@@ -103,10 +112,15 @@ export const applyStatus = (w: World, e: Entity, status: string, ticks: number):
     if (e.status) e.status.stun = ticks
     return
   }
-  addStatus(w, e, status, ticks)
+  addStatus(w, e, status, ticks, undefined, brittle)
 }
 
 export const isFrozen = (e: Entity): boolean => hasStatus(e, 'frozen')
+
+/** Frozen SOLID by a thrown freeze grenade, so a blow shatters the body outright.
+ * A Cryo Rounds freeze is deliberately NOT brittle — the execute belongs to the
+ * limited consumable, not to a permanent, free, every-other-shot weapon effect. */
+export const isBrittleFrozen = (e: Entity): boolean => e.fx?.frozen?.brittle === true
 
 export const isWet = (e: Entity): boolean => hasStatus(e, 'wet')
 

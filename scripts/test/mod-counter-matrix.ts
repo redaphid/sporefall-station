@@ -107,11 +107,14 @@ const CASES: { arch: string; right: string; wrong: string }[] = [
 ]
 
 // --- The frost sweep -------------------------------------------------------
-// `applyDamage` shatters any FROZEN non-player outright: hp = 0, no HP check, no
-// resist check, no archetype guard. So Cryo Rounds is "shot 1 freezes, shot 2
-// deletes" against literally anything. Sweep the roster to show it ignores HP
-// and resist entirely — if this holds, no HP tuning can matter to a frost run.
-console.log('=== FROST SWEEP — does freeze->shatter ignore the whole stat block? ===')
+// This sweep caught the branch's worst bug and now guards the fix. `applyDamage`
+// used to shatter ANY frozen non-player outright — hp = 0, no HP check, no resist
+// check, no archetype guard — so Cryo Rounds deleted a 320hp boss as fast as a
+// 40hp thug (0.63s both). Shatter is now scoped to BRITTLE ice (a thrown freeze
+// grenade); the mod's freeze cracks for bonus damage instead. The column below
+// must therefore SCALE WITH HP again: if a big pool and a small pool ever read
+// the same number here, an HP-independent effect has come back.
+console.log('=== FROST SWEEP — does the frost payoff respect the stat block? ===')
 console.log('enemy        hp   resist.physical   no mod    frost')
 for (const arch of ['thug', 'cinder', 'robot', 'brute', 'boss']) {
   const def = NPCS[arch]
@@ -130,7 +133,7 @@ for (const { arch, right, wrong } of CASES) {
     ['no mod', []],
     [`wrong mod (${wrong})`, [wrong]],
     [`RIGHT mod (${right})`, [right]],
-    ['frost (freeze->shatter)', ['frost']],
+    ['frost (freeze -> crack)', ['frost']],
   ]
   for (const [label, mods] of rows) {
     const a = medianTtk(arch, orig, mods)

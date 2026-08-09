@@ -35,9 +35,9 @@ describe('frost', () => {
     expect(e.pos.x).toBeGreaterThan(20)
   })
 
-  it('shatters on impact: a frozen entity hit is destroyed outright', () => {
+  it('BRITTLE ice still shatters on impact: a grenade-frozen entity is destroyed outright', () => {
     const e = npc(w, 20, 20)
-    freeze(w, e)
+    freeze(w, e, true) // brittle — what a thrown freeze grenade lays down
     applyDamage(w, e, 1, 25, 20, 0, 99)
     expect(e.health!.hp).toBe(0)
     expect(e.dead).toBe(true)
@@ -50,6 +50,50 @@ describe('frost', () => {
     expect(e.health!.hp).toBe(39)
     expect(e.dead).toBeFalsy()
     expect(e.shattered).toBeFalsy()
+  })
+
+  // ── Cryo Rounds: control, not an execute ─────────────────────────────────
+  // A NON-brittle freeze is what the frost MOD applies. It must not be able to
+  // delete a body regardless of its stat block — that rule made a 320hp boss die
+  // as fast as a 40hp thug. Instead the blow cracks the ice for a heavy hit.
+  describe('non-brittle (Cryo Rounds) freeze', () => {
+    it('does NOT shatter: the body survives a small hit', () => {
+      const e = npc(w, 20, 20)
+      freeze(w, e)
+      applyDamage(w, e, 2, 25, 20, 0, 99)
+      expect(e.dead).toBeFalsy()
+      expect(e.shattered).toBeFalsy()
+    })
+
+    it('cracks for BONUS damage — the payoff the freeze sets up', () => {
+      const e = npc(w, 20, 20)
+      freeze(w, e)
+      applyDamage(w, e, 10, 25, 20, 0, 99) // x2.5 => 25
+      expect(e.health!.hp).toBe(15)
+    })
+
+    it('spends the freeze: the ice is gone after the hit that cracked it', () => {
+      const e = npc(w, 20, 20)
+      freeze(w, e)
+      applyDamage(w, e, 4, 25, 20, 0, 99)
+      expect(e.fx?.frozen).toBeUndefined()
+    })
+
+    it('the bonus is still RESISTED — it must not become a second stat-bypass', () => {
+      const e = npc(w, 20, 20)
+      e.resist = { physical: 0.5 }
+      freeze(w, e)
+      applyDamage(w, e, 10, 25, 20, 0, 99) // 10 * 2.5 * 0.5 = 12.5 -> round 13
+      expect(e.health!.hp).toBe(27)
+    })
+
+    it('CANNOT one-shot a high-hp body the way shatter did', () => {
+      const e = npc(w, 20, 20, 320) // boss-sized pool
+      freeze(w, e)
+      applyDamage(w, e, 18, 25, 20, 0, 99)
+      expect(e.dead).toBeFalsy()
+      expect(e.health!.hp).toBeGreaterThan(250)
+    })
   })
 
   it('fire carve-out: a frozen burning entity dies by DoT without shattering', () => {

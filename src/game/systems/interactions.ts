@@ -31,7 +31,11 @@ const ELEC_DAMAGE = 20
 /** How close two wet bodies must be for the arc to jump between them (tiles). */
 const CHAIN_RADIUS = 1.6
 
-export const freeze = (w: World, e: Entity): void => addStatus(w, e, 'frozen', ELEMENTS.frozen.durationTicks)
+/** Freeze `e`. `brittle` opts into the shatter-on-impact execute and defaults to
+ * OFF, so a new freeze source is control until it deliberately asks to be a kill
+ * button — only the thrown freeze grenade does. See StatusEntry.brittle. */
+export const freeze = (w: World, e: Entity, brittle = false): void =>
+  addStatus(w, e, 'frozen', ELEMENTS.frozen.durationTicks, undefined, brittle)
 
 export const wet = (w: World, e: Entity): void => addStatus(w, e, 'wet', ELEMENTS.wet.durationTicks)
 

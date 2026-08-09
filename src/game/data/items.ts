@@ -14,7 +14,10 @@ export interface StatusApply {
 export type AreaEffect =
   | { kind: 'fire' }
   | { kind: 'explode'; radius: number; damage: number }
-  | { kind: 'status'; status: string; ticks: number; radius: number }
+  /** `brittle` only means anything for `frozen`: it flash-freezes bodies solid so
+   * the next blow shatters them. A LIMITED, thrown resource can carry an execute;
+   * a permanent weapon mod cannot (see `frost` in data/mods.ts). */
+  | { kind: 'status'; status: string; ticks: number; radius: number; brittle?: boolean }
 
 export interface WeaponDef {
   id: string
@@ -160,7 +163,10 @@ export interface ThrowableDef {
 export const THROWABLES: Record<string, ThrowableDef> = {
   molotov: { id: 'molotov', name: 'Molotov', speed: 9, range: 6, damage: 0, onLand: { kind: 'fire' }, cooldownTicks: 20 },
   grenade: { id: 'grenade', name: 'Grenade', speed: 8, range: 6, damage: 0, onLand: { kind: 'explode', radius: 2.2, damage: 40 }, cooldownTicks: 25 },
-  freezeGrenade: { id: 'freezeGrenade', name: 'Freeze Grenade', speed: 9, range: 6, damage: 0, onLand: { kind: 'status', status: 'frozen', ticks: 120, radius: 2 }, cooldownTicks: 20 },
+  // `brittle: true` — the thrown grenade keeps the execute. It is a consumable you
+  // have to find, carry and aim, which is what made "freeze, then shatter" a fair
+  // trade in the first place.
+  freezeGrenade: { id: 'freezeGrenade', name: 'Freeze Grenade', speed: 9, range: 6, damage: 0, onLand: { kind: 'status', status: 'frozen', ticks: 120, radius: 2, brittle: true }, cooldownTicks: 20 },
   chloroform: { id: 'chloroform', name: 'Chloroform', speed: 8, range: 4, damage: 0, onLand: { kind: 'status', status: 'sleep', ticks: 180, radius: 1.8 }, cooldownTicks: 20 },
   banana: { id: 'banana', name: 'Banana Peel', speed: 7, range: 4, damage: 0, onLand: { kind: 'status', status: 'slip', ticks: 45, radius: 1.2 }, cooldownTicks: 15 },
   gasGrenade: { id: 'gasGrenade', name: 'Gas Grenade', speed: 8, range: 5, damage: 0, onLand: { kind: 'status', status: 'poisoned', ticks: 150, radius: 2 }, cooldownTicks: 20 },

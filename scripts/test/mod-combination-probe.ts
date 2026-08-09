@@ -122,11 +122,13 @@ console.log(`  IFRAME window is 5 ticks; a bulk volley lands ${'many'} pellets i
       tickWorld(w, new Map([[0, { ...emptyInput(), attack: true, aimX: dx / len, aimY: dy / len }]]))
     }
     console.log(`  player healed ${(p.health.hp - pBefore).toFixed(1)} hp while dealing ${(foeBefore - foe.health.hp).toFixed(1)} damage`)
-    console.log('  Was 23.5 healed / 12.0 dealt — heal ran on pellets i-frames had voided, so the')
-    console.log('  build outhealed its own output. The heal is now gated on applyDamage landing.')
-    console.log('  RESIDUAL (by design, flagging not fixing): the heal is still a fraction of the')
-    console.log('  bullet\'s INTENDED damage, not the resisted amount, so it overpays against')
-    console.log('  armoured targets. Bounded and small; changing it is a balance decision.')
+    console.log('  Fixed in two steps, both now closed:')
+    console.log('    23.5 / 12.0  original — healed off pellets i-frames had voided, so the')
+    console.log('                 build outhealed its own output entirely.')
+    console.log('     4.7 / 12.0  after gating the heal on the blow actually landing.')
+    console.log('     1.6 / 12.0  after paying out on damage DEALT rather than INTENDED, so')
+    console.log('                 the brute 0.35 plating finally reduces the payout too.')
+    console.log('  Expected == dealt x lifestealFrac. No residual: the two now agree.')
   }
 }
 

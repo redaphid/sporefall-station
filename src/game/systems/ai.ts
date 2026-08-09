@@ -12,7 +12,7 @@ import { isSolidTile } from '../levelgen/level'
 import { findPath } from '../path'
 import { emitFear, type World } from '../world'
 import { ALERT, DRAWN, FLANK, FORMUP, FORTIFY, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, STACK, WORK, decide } from './behaviors'
-import { beginAttack, stepAttack } from './commitment'
+import { beginAttack, isCommitted, stepAttack } from './commitment'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
@@ -475,7 +475,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
           // replaced the old `cooldown += rng.int(0, 10)` volley stagger — so a
           // firing line still breaks lockstep, but now visibly, by shouldering
           // its weapons at slightly different moments.
-          beginAttack(w, e, target)
+          if (!isCommitted(e, w.tick)) beginAttack(w, e, target)
         }
         // Keep spacing: back off if crowded to melee range, else strafe a little
         // (perpendicular, side chosen by id) so a firing line doesn't clump.
@@ -496,7 +496,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // flurry — and `stepAttack` (top of aiSystem) owns it from here until the
       // recovery ends.
       e.facing = Math.atan2(dy, dx)
-      if (e.combat && e.combat.cooldown <= 0) beginAttack(w, e, target)
+      if (e.combat && e.combat.cooldown <= 0 && !isCommitted(e, w.tick)) beginAttack(w, e, target)
       return
     }
     if (seen) {

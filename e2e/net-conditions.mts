@@ -239,8 +239,15 @@ const identityOf = (e: Entity): string => `${e.kind}:${e.archetype}`
 
 interface Divergence {
   code: string
+  /** Stable identity of THIS divergence, so we can tell whether it persists. */
+  key: string
   detail: string
 }
+
+/** Samples are taken every 6 ticks (0.2s). A divergence must survive this many
+ * consecutive samples to count: below it, we are just looking at flight time and
+ * snapshot cadence, which is normal networking, not desync. */
+const PERSIST_SAMPLES = 10 // 2.0s
 
 /**
  * Compare what the two screens show. Interest filtering means the client
@@ -256,26 +263,27 @@ const compareViews = (host: RenderView, client: RenderView, posTolerance: number
   for (const ce of client.entities) {
     const he = hostById.get(ce.id)
     if (!he) {
-      out.push({ code: 'GHOST', detail: `client renders entity ${ce.id} (${identityOf(ce)}) that the host does not have` })
+      out.push({ code: 'GHOST', key: `GHOST:${ce.id}`, detail: `client renders entity ${ce.id} (${identityOf(ce)}) that the host does not have` })
       continue
     }
     if (identityOf(he) !== identityOf(ce)) {
       out.push({
         code: 'IDENTITY',
+        key: `IDENTITY:${ce.id}`,
         detail: `entity ${ce.id}: host shows "${identityOf(he)}", client shows "${identityOf(ce)}"`,
       })
     }
     const d = Math.hypot(he.pos.x - ce.pos.x, he.pos.y - ce.pos.y)
     if (d > posTolerance) {
-      out.push({ code: 'POSITION', detail: `entity ${ce.id} (${identityOf(ce)}) is ${d.toFixed(1)} tiles apart` })
+      out.push({ code: 'POSITION', key: `POSITION:${ce.id}`, detail: `entity ${ce.id} (${identityOf(ce)}) is ${d.toFixed(1)} tiles apart` })
     }
     const hostAlive = (he.health?.hp ?? 1) > 0
     const clientAlive = (ce.health?.hp ?? 1) > 0
     if (hostAlive !== clientAlive) {
-      out.push({ code: 'ALIVE', detail: `entity ${ce.id} (${identityOf(ce)}): host alive=${hostAlive}, client alive=${clientAlive}` })
+      out.push({ code: 'ALIVE', key: `ALIVE:${ce.id}`, detail: `entity ${ce.id} (${identityOf(ce)}): host alive=${hostAlive}, client alive=${clientAlive}` })
     }
     if (he.door && ce.door && he.door.open !== ce.door.open) {
-      out.push({ code: 'DOOR', detail: `door ${ce.id}: host open=${he.door.open}, client open=${ce.door.open}` })
+      out.push({ code: 'DOOR', key: `DOOR:${ce.id}`, detail: `door ${ce.id}: host open=${he.door.open}, client open=${ce.door.open}` })
     }
   }
 
@@ -288,18 +296,18 @@ const compareViews = (host: RenderView, client: RenderView, posTolerance: number
       const inside =
         Math.abs(he.pos.x - avatar.pos.x) < INTEREST_RADIUS - 3 && Math.abs(he.pos.y - avatar.pos.y) < INTEREST_RADIUS - 3
       if (inside && !clientIds.has(he.id)) {
-        out.push({ code: 'MISSING', detail: `host entity ${he.id} (${identityOf(he)}) is in the client's interest box but absent on the client` })
+        out.push({ code: 'MISSING', key: `MISSING:${he.id}`, detail: `host entity ${he.id} (${identityOf(he)}) is in the client's interest box but absent on the client` })
       }
     }
   }
 
   // 3. Globals both screens must agree on.
-  if (host.floor !== client.floor) out.push({ code: 'FLOOR', detail: `host floor ${host.floor}, client floor ${client.floor}` })
+  if (host.floor !== client.floor) out.push({ code: 'FLOOR', key: 'FLOOR', detail: `host floor ${host.floor}, client floor ${client.floor}` })
   if (host.missionComplete !== client.missionComplete)
-    out.push({ code: 'OBJECTIVE', detail: `host missionComplete=${host.missionComplete}, client=${client.missionComplete}` })
+    out.push({ code: 'OBJECTIVE', key: 'OBJECTIVE', detail: `host missionComplete=${host.missionComplete}, client=${client.missionComplete}` })
   if (host.gameOver !== client.gameOver)
-    out.push({ code: 'GAMEOVER', detail: `host gameOver=${host.gameOver}, client=${client.gameOver}` })
-  if (!!host.alert !== !!client.alert) out.push({ code: 'ALERT', detail: `host alert=${host.alert}, client=${client.alert}` })
+    out.push({ code: 'GAMEOVER', key: 'GAMEOVER', detail: `host gameOver=${host.gameOver}, client=${client.gameOver}` })
+  if (!!host.alert !== !!client.alert) out.push({ code: 'ALERT', key: 'ALERT', detail: `host alert=${host.alert}, client=${client.alert}` })
 
   return out
 }
@@ -331,6 +339,7 @@ interface Result {
   stats: LinkStats
   samples: number
   clientPhase: string
+  transient: Map<string, number>
 }
 
 const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | null): Promise<Result> => {
@@ -343,9 +352,22 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
   const c = hub.addClient('FriendPhone', clientInput, { newPeerIdOnReconnect: p.event?.newPeerIdOnReconnect })
 
   const notes: string[] = []
+  /** Divergences that survived PERSIST_SAMPLES consecutive samples. */
   const worst = new Map<string, string>()
+  /** Divergences seen at least once but that healed — normal network lag. */
+  const transient = new Map<string, number>()
+  const streak = new Map<string, number>()
   const record = (ds: Divergence[]): void => {
-    for (const d of ds) if (!worst.has(d.code)) worst.set(d.code, d.detail)
+    const present = new Set(ds.map((d) => d.key))
+    for (const k of [...streak.keys()]) if (!present.has(k)) streak.delete(k)
+    for (const d of ds) {
+      const n = (streak.get(d.key) ?? 0) + 1
+      streak.set(d.key, n)
+      if (n === 1) transient.set(d.code, (transient.get(d.code) ?? 0) + 1)
+      if (n >= PERSIST_SAMPLES && !worst.has(d.code)) {
+        worst.set(d.code, `${d.detail} — persisted ${((n * 6 * TICK_MS) / 1000).toFixed(1)}s+`)
+      }
+    }
   }
 
   await host.start()
@@ -429,7 +451,11 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
         .map((e) => `${e.id}@${e.pos.x.toFixed(1)},${e.pos.y.toFixed(1)}`)
         .sort()
         .join('|')
-      if (sig === lastClientEntitySig) {
+      // Only meaningful while the host is still simulating a live run: once the
+      // host hits game over the world legitimately stops moving.
+      if (hv.gameOver) {
+        staleSamples = 0
+      } else if (sig === lastClientEntitySig) {
         staleSamples++
         maxStale = Math.max(maxStale, staleSamples)
       } else staleSamples = 0
@@ -458,9 +484,19 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
     const cv = c.session.renderView()
     notes.push(`after disruption: client phase='${c.session.phase}', client entities=${cv.entities.length}, host entities=${hv.entities.length}`)
     if (c.session.phase === 'playing') {
-      const post = compareViews(hv, cv, p.posTolerance)
-      record(post)
-      if (post.length === 0) notes.push('world RE-CONVERGED after the disruption')
+      // Sample repeatedly so the persistence filter applies here too.
+      streak.clear()
+      let lastPost: Divergence[] = []
+      for (let i = 0; i < PERSIST_SAMPLES + 6; i++) {
+        for (let k = 0; k < 6; k++) {
+          host.tick()
+          c.session.tick()
+          await sleep(TICK_MS)
+        }
+        lastPost = compareViews(host.renderView(), c.session.renderView(), p.posTolerance)
+        record(lastPost)
+      }
+      if (lastPost.length === 0) notes.push('world RE-CONVERGED after the disruption')
     } else {
       notes.push(`DID NOT RECOVER: client ended in phase '${c.session.phase}' (a player would have to restart)`)
     }
@@ -469,6 +505,7 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
   // Liveness: a wedged StreamReader shows up as the client's entity set going
   // permanently static while the host keeps simulating.
   const staleSec = (maxStale * 6 * TICK_MS) / 1000
+  notes.push(`longest interval with a frozen client world: ${staleSec.toFixed(1)}s`)
   if (staleSec > 2.5) notes.push(`CLIENT STALLED: entity set unchanged for ${staleSec.toFixed(1)}s (possible wedged stream)`)
 
   const gated = (code: string): boolean => worst.has(code) && !ALLOWED.has(code)
@@ -496,6 +533,7 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
     stats: hub.stats,
     samples,
     clientPhase: c.session.phase,
+    transient,
   }
 }
 
@@ -510,6 +548,11 @@ const PROFILES: Profile[] = [
   { name: 'loss-10pct', cond: { ...BLE_BASE, lossPct: 10 }, seconds: 10, posTolerance: 5 },
   { name: 'loss-30pct', cond: { ...BLE_BASE, lossPct: 30 }, seconds: 10, posTolerance: 8 },
   { name: 'congested-slow-link', cond: { ...BLE_BASE, perPacketMs: 30, latencyMs: 80 }, seconds: 10, posTolerance: 6 },
+  // Soaks: does a realistically lossy radio freeze the joining player's screen
+  // for good within a few minutes of play? This is the campfire question.
+  { name: 'soak-loss-1pct-60s', cond: { ...BLE_BASE, lossPct: 1 }, seconds: 60, posTolerance: 5 },
+  { name: 'soak-loss-5pct-60s', cond: { ...BLE_BASE, lossPct: 5 }, seconds: 60, posTolerance: 5 },
+  { name: 'soak-clean-60s', cond: { ...BLE_BASE }, seconds: 60, posTolerance: 4 },
   {
     name: 'out-of-range-3s',
     cond: { ...BLE_BASE },
@@ -586,13 +629,16 @@ const main = async (): Promise<void> => {
         stats: { sent: 0, dropped: 0, delivered: 0, bytes: 0 },
         samples: 0,
         clientPhase: 'n/a',
+        transient: new Map(),
       }
     }
     results.push(r)
     const s = r.stats
     console.log(`    link: ${s.sent} packets sent, ${s.dropped} dropped, ${(s.bytes / 1024).toFixed(1)}KB, ${r.samples} comparison samples, client phase '${r.clientPhase}'`)
     for (const n of r.notes) console.log(`    note: ${n}`)
-    for (const [code, detail] of r.worst) console.log(`    DIVERGENCE[${code}] ${detail}`)
+    const tr = [...r.transient].filter(([c]) => !r.worst.has(c))
+    if (tr.length > 0) console.log(`    transient-only (healed within ${(PERSIST_SAMPLES * 6 * TICK_MS) / 1000}s, i.e. normal lag): ${tr.map(([c, n]) => `${c}x${n}`).join(' ')}`)
+    for (const [code, detail] of r.worst) console.log(`    PERSISTENT DIVERGENCE[${code}] ${detail}`)
     console.log(`    ${r.ok ? 'PASS' : 'FAIL'} ${p.name}`)
   }
 

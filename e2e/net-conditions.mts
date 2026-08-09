@@ -34,6 +34,9 @@ import { NetClientSession } from '../src/app/netClient'
 import { NetHostSession } from '../src/app/netHost'
 import { MsgType, type PeerId, type Transport, type TransportEvent } from '../src/net/types'
 import { ARCHETYPES } from '../src/net/protocol/messages'
+import { StreamReader } from '../src/net/framing/chunkedStream'
+
+const VALID_MSG_TYPES = new Set<number>(Object.values(MsgType).filter((v) => typeof v === 'number') as number[])
 
 /** Archetypes the host actually spawned that do NOT survive the wire registry —
  * they encode as index 0 and arrive as 'player'. Collected across every run. */
@@ -107,6 +110,22 @@ class ConditionedHub {
   private blackhole = false
   /** Per-direction last scheduled delivery time, for in-order delivery. */
   private lastDelivery = new Map<string, number>()
+  /** Packets actually handed to the CLIENT's transport handler. If this keeps
+   * rising while the client's world is frozen, the bytes are arriving and the
+   * framing/decode layer is what is stuck. */
+  h2cDelivered = 0
+  /** A shadow reader fed the exact bytes the client receives, so we can see the
+   * moment the byte stream stops parsing and report what preceded it. */
+  private shadow = new StreamReader()
+  shadowMsgs = 0
+  firstAnomaly: string | null = null
+  private lastGood: string[] = []
+  /** Same shadow, but fed at SEND time (before loss/latency/ordering). If this
+   * one stays aligned while the delivered one does not, the HARNESS is at
+   * fault, not the game. Essential control. */
+  private shadowTx = new StreamReader()
+  txMsgs = 0
+  txAnomaly: string | null = null
   /** Optional wire tamper, used by --self-test to prove the harness can fail. */
   tamper: ((bytes: Uint8Array) => Uint8Array) | null = null
 
@@ -141,6 +160,14 @@ class ConditionedHub {
     this.stats.sent++
     this.stats.bytes += bytes.length
     if (bytes.length > this.cond.maxPacket) throw new Error(`packet ${bytes.length}B exceeds MTU ${this.cond.maxPacket}`)
+    if (dir.startsWith('h2c')) {
+      this.shadowTx.push(new Uint8Array(bytes), (m) => {
+        this.txMsgs++
+        if (!(VALID_MSG_TYPES.has(m[0]) && m.length <= 4096) && this.txAnomaly === null) {
+          this.txAnomaly = `SENT stream misaligned after ${this.txMsgs - 1} good messages: type=${m[0]} len=${m.length}`
+        }
+      })
+    }
     const lost = this.blackhole || this.rnd() * 100 < this.cond.lossPct
     // Copy: SendQueue hands out subarray views over a buffer it may reuse, and
     // a delayed delivery must not observe later mutations.
@@ -157,6 +184,20 @@ class ConditionedHub {
       }
       setTimeout(() => {
         this.stats.delivered++
+        if (dir.startsWith('h2c')) {
+          this.h2cDelivered++
+          this.shadow.push(copy, (m) => {
+            this.shadowMsgs++
+            const t = m[0]
+            const ok = VALID_MSG_TYPES.has(t) && m.length <= 4096
+            if (ok) {
+              this.lastGood.push(`type=${t} len=${m.length}`)
+              if (this.lastGood.length > 4) this.lastGood.shift()
+            } else if (this.firstAnomaly === null) {
+              this.firstAnomaly = `after ${this.shadowMsgs - 1} good messages, the stream produced type=${t} len=${m.length} (valid types: ${[...VALID_MSG_TYPES].join(',')}). Preceding good messages: ${this.lastGood.join(' | ')}`
+            }
+          })
+        }
         deliver(this.tamper ? this.tamper(copy) : copy)
       }, delay)
     } else {
@@ -423,10 +464,13 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
 
   let samples = 0
   let lastClientEntitySig = ''
+  let lastHostEntitySig = ''
   let staleSamples = 0
   let maxStale = 0
   let eventFired = false
   let eventCleared = false
+  let h2cAtFreezeStart = 0
+  let packetsDuringFreeze = 0
 
   const start = Date.now()
   const endAt = start + p.seconds * 1000
@@ -478,12 +522,29 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
         .join('|')
       // Only meaningful while the host is still simulating a live run: once the
       // host hits game over the world legitimately stops moving.
-      if (hv.gameOver) {
+      // Control: if the HOST's view of the same entities is equally static, the
+      // world is simply quiet (players wedged against a wall, nothing nearby) and
+      // a "frozen client" is a false positive.
+      const clientIds = new Set(cv.entities.map((e) => e.id))
+      const hostSig = hv.entities
+        .filter((e) => clientIds.has(e.id))
+        .map((e) => `${e.id}@${e.pos.x.toFixed(1)},${e.pos.y.toFixed(1)}`)
+        .sort()
+        .join('|')
+      const hostMoved = hostSig !== lastHostEntitySig
+      lastHostEntitySig = hostSig
+      if (hv.gameOver || !hostMoved) {
         staleSamples = 0
       } else if (sig === lastClientEntitySig) {
         staleSamples++
-        maxStale = Math.max(maxStale, staleSamples)
-      } else staleSamples = 0
+        if (staleSamples > maxStale) {
+          maxStale = staleSamples
+          packetsDuringFreeze = hub.h2cDelivered - h2cAtFreezeStart
+        }
+      } else {
+        staleSamples = 0
+        h2cAtFreezeStart = hub.h2cDelivered
+      }
       lastClientEntitySig = sig
     }
 
@@ -527,10 +588,21 @@ const runProfile = async (p: Profile, tamper: ((b: Uint8Array) => Uint8Array) | 
     }
   }
 
+  notes.push(
+    hub.txAnomaly
+      ? `SENDER-SIDE: ${hub.txAnomaly} — the host emitted an unparseable byte stream, so this is a GAME bug, not a harness one`
+      : `SENDER-SIDE control: all ${hub.txMsgs} host->client messages were well-framed as sent`,
+  )
+  if (hub.firstAnomaly) notes.push(`STREAM MISALIGNED: ${hub.firstAnomaly}`)
+  else notes.push(`byte stream stayed aligned for all ${hub.shadowMsgs} host->client messages`)
+
   // Liveness: a wedged StreamReader shows up as the client's entity set going
   // permanently static while the host keeps simulating.
   const staleSec = (maxStale * 6 * TICK_MS) / 1000
-  notes.push(`longest interval with a frozen client world: ${staleSec.toFixed(1)}s`)
+  notes.push(
+    `longest interval with a frozen client world: ${staleSec.toFixed(1)}s` +
+      (staleSec > 0 ? ` — while the HOST's view of the same entities WAS changing; packets delivered meanwhile: ${packetsDuringFreeze}` : ' (host-quiet periods excluded)'),
+  )
   if (staleSec > 2.5) notes.push(`CLIENT STALLED: entity set unchanged for ${staleSec.toFixed(1)}s (possible wedged stream)`)
 
   const gated = (code: string): boolean => worst.has(code) && !ALLOWED.has(code)
@@ -587,6 +659,9 @@ const PROFILES: Profile[] = [
   // game-over path, which also stops the world and empties snapshots.
   { name: 'ctl-immortal-clean-60s', cond: { ...BLE_BASE, jitterMs: 40, ordered: true }, seconds: 60, posTolerance: 5, immortal: true },
   { name: 'ctl-immortal-loss1-60s', cond: { ...BLE_BASE, jitterMs: 40, lossPct: 1, ordered: true }, seconds: 60, posTolerance: 5, immortal: true },
+  // Zero jitter: if the delivered stream stays aligned here but not with jitter,
+  // the misalignment was the harness's scheduling, not the game.
+  { name: 'ctl-immortal-nojitter-60s', cond: { ...BLE_BASE, jitterMs: 0, ordered: true }, seconds: 60, posTolerance: 5, immortal: true },
   {
     name: 'out-of-range-3s',
     cond: { ...BLE_BASE },

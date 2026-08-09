@@ -190,6 +190,22 @@ const CHARSET_ALIAS: Record<string, string> = {
   scientist: 'scientist',
   robot: 'robot',
   shopkeeper: 'civilian',
+  // #78 Sporefall threat roster. Membership of THIS map is what `isCharacterSprite`
+  // tests, so until each of these was listed it fell past the character path
+  // entirely and drew as the generic procedural entity blob — six different
+  // enemies rendering as the same grey eyeball in normal play.
+  //
+  // Each maps to ITSELF, not to a borrowed body: they are the creatures the pack
+  // has bespoke art for, and aliasing e.g. brute->thug would just reintroduce the
+  // pixel-identical problem ARCHETYPE_SCALE exists to paper over. If a kind's art
+  // is missing the lookup still falls through to its own procedural set, which is
+  // per-archetype distinct — so a partial art drop degrades, it does not break.
+  brute: 'brute',
+  cinder: 'cinder',
+  sporeling: 'sporeling',
+  stalker: 'stalker',
+  lurker: 'lurker',
+  pod: 'pod',
 }
 
 // World props/furnishings mapped to the closest existing themed prop sprite

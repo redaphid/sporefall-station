@@ -124,14 +124,32 @@ CONDS = {
     "F": ("v3", "composition", "brute", 0.8),
     "G": ("v3", None, None, 0.0),
     "H": ("v3", "style transfer", "brute", 0.3),
+    # Production candidate: the SHIPPED configuration (style transfer, cast
+    # anchor, ipw 0.3) with ONLY the prompt changed -- iteration 1 showed the
+    # reference/mode axis does not move the body plan, so the minimal diff is
+    # the right one and the anchor keeps doing its actual job (style).
+    # P adds the no-ground background; Q is the same without it, as the control.
+    "P": ("v3", "style transfer", "cast", 0.3),
+    "Q": ("v3", "style transfer", "cast", 0.3),
 }
+# conditions that take the no-ground background
+NOGROUND = {"P"}
 
 
-def build_pos_neg(pkey, spec_dir="s"):
+# The pack's BG_CHAR ends "...full body, feet on the ground", which for a
+# quadruped reliably paints a diorama base under the creature -- a lit ground
+# slab that NEG_GROUND does not suppress and strip_ground_shadow() does not
+# remove (it keys a *shadow*, not a lit patch). This drops the invitation.
+BG_NOGROUND = ("single character centered on plain flat white background, "
+               "full body, floating on an empty white background, no ground, "
+               "no floor, no base")
+
+
+def build_pos_neg(pkey, spec_dir="s", bg=None):
     import generate as G
     desc, kneg = PROMPTS[pkey]
     pos = (f"{G.TRIGGER}, full body game character sprite, {desc}, "
-           f"{G.DIRS['s']}, {G.BG_CHAR}, {G.LOOK}")
+           f"{G.DIRS['s']}, {bg or G.BG_CHAR}, {G.LOOK}")
     # NEG_GROUND is not decoration: without it the model paints a cast shadow,
     # which the pre-rembg flat-key welded into the alpha as a grey slab a third
     # of the sprite tall at 48px (art-gen.md). Keep it on every variant.
@@ -178,7 +196,7 @@ def main():
     for cond in a.conds.split(","):
         cond = cond.strip()
         pkey, ip_type, refkind, ipw = CONDS[cond]
-        pos, neg = build_pos_neg(pkey)
+        pos, neg = build_pos_neg(pkey, bg=BG_NOGROUND if cond in NOGROUND else None)
         refs = get_ref(refkind)
         dest = os.path.join(OUT, a.tag, cond)
         for i in range(a.seeds):

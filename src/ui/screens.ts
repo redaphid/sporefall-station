@@ -1,5 +1,7 @@
 import type { RenderView } from '../app/session'
 import { MODS } from '../game/data/mods'
+import { themeDisplayName } from '../render/themeState'
+import { bossBar, bossRevealName, latchBossId } from './bossModel'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
@@ -159,6 +161,68 @@ export const createScreens = (
     toastTimer = setTimeout(() => (toast.style.opacity = '0'), 1800)
   }
 
+  // ---- The BOSS: entrance card + pinned health bar ------------------------
+  // Neither existed. The Alpha wore the thug's sprite and died in under two
+  // seconds, so a player could clear a dozen boss floors and truthfully say
+  // they had never met a boss. The card is the "this is a boss" moment; the bar
+  // is the "and it is still alive" moment that lasts the whole fight.
+  const bossCard = document.createElement('div')
+  bossCard.style.cssText =
+    'position:absolute;top:30%;left:50%;transform:translate(-50%,-50%) scale(.85);color:#c98ae8;' +
+    'font:900 34px system-ui;letter-spacing:.04em;text-shadow:0 0 18px #a05ae0,0 3px 8px #000;pointer-events:none;' +
+    'opacity:0;transition:opacity .35s,transform .35s;text-align:center;white-space:nowrap;z-index:70'
+  mount.appendChild(bossCard)
+  let bossCardTimer: ReturnType<typeof setTimeout> | undefined
+  const showBossCard = (name: string): void => {
+    bossCard.innerHTML = `${name}<div style="font:700 14px system-ui;letter-spacing:.28em;color:#e8d5f5;opacity:.85;margin-top:4px">APEX PREDATOR</div>`
+    bossCard.style.opacity = '1'
+    bossCard.style.transform = 'translate(-50%,-50%) scale(1)'
+    clearTimeout(bossCardTimer)
+    bossCardTimer = setTimeout(() => {
+      bossCard.style.opacity = '0'
+      bossCard.style.transform = 'translate(-50%,-50%) scale(.85)'
+    }, 2600)
+  }
+
+  // Top-centre health bar, clear of the notch and of the top-left player HUD.
+  const bossHud = document.createElement('div')
+  bossHud.style.cssText =
+    'position:absolute;top:calc(env(safe-area-inset-top, 0px) + 10px);left:50%;transform:translateX(-50%);' +
+    'width:min(60vw,340px);display:none;flex-direction:column;align-items:center;gap:2px;pointer-events:none;z-index:66'
+  bossHud.innerHTML = `
+    <div id="bossName" style="font:800 13px system-ui;letter-spacing:.14em;color:#e8d5f5;text-shadow:0 1px 3px #000"></div>
+    <div style="width:100%;height:9px;background:#1a0f22cc;border:1px solid #000;border-radius:4px;overflow:hidden">
+      <div id="bossHp" style="width:100%;height:100%;background:linear-gradient(#c98ae8,#7a34b0);transition:width .18s"></div>
+    </div>
+    <div id="bossPhase" style="font:700 10px system-ui;letter-spacing:.1em;color:#d6b0ee;text-shadow:0 1px 3px #000"></div>
+  `
+  mount.appendChild(bossHud)
+  const bossNameEl = bossHud.querySelector<HTMLElement>('#bossName')!
+  const bossHpEl = bossHud.querySelector<HTMLElement>('#bossHp')!
+  const bossPhaseEl = bossHud.querySelector<HTMLElement>('#bossPhase')!
+  let bossId: number | undefined
+  let lastBossKey = ''
+
+  const updateBoss = (view: RenderView): void => {
+    bossId = latchBossId(bossId, view.events)
+    const bar = bossBar(view, bossId, themeDisplayName('boss'))
+    const key = bar ? `${bar.name}|${bar.hpFrac.toFixed(3)}|${bar.phase}` : ''
+    if (key === lastBossKey) return
+    lastBossKey = key
+    if (!bar) {
+      bossHud.style.display = 'none'
+      return
+    }
+    bossHud.style.display = 'flex'
+    bossNameEl.textContent = bar.name.toUpperCase()
+    bossHpEl.style.width = `${bar.hpFrac * 100}%`
+    // Phase 3 recolours the bar to red — the enrage is visible on the HUD, not
+    // just in the boss's speed.
+    bossHpEl.style.background =
+      bar.phase === 3 ? 'linear-gradient(#e8746a,#a01f14)' : 'linear-gradient(#c98ae8,#7a34b0)'
+    bossPhaseEl.textContent = bar.phaseLabel
+  }
+
   let lastLocator = ''
   const updateLocator = (view: RenderView): void => {
     const cam = cameraSource?.()
@@ -195,6 +259,8 @@ export const createScreens = (
     update(view: RenderView): void {
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
+        const revealed = bossRevealName(view.events, themeDisplayName('boss'))
+        if (revealed !== undefined) showBossCard(revealed)
         for (const ev of view.events) {
           // `stationAlert` lands on the same tick as `missionComplete` and is
           // ordered after it, so the alert banner deliberately overwrites the
@@ -210,6 +276,7 @@ export const createScreens = (
           }
         }
       }
+      updateBoss(view)
       updateLocator(view)
 
       // Restart affordance: up at game-over AND the moment the local player is

@@ -61,6 +61,22 @@ const pretty = (s: string): string =>
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join(' ')
 
+/**
+ * Lore names for the four sim FACTION ids. The ids themselves are load-bearing
+ * (`entity.Faction`, the disposition matrix, the BLE snapshot), so they stay —
+ * this is the player-facing half only. Without it the inspect card printed a
+ * bare `Faction: Gang` on a derelict swamp station, which is exactly the
+ * cops-and-robbers vocabulary the theme has otherwise moved past. Wording is
+ * taken from the shipped manifest so the card agrees with the name plates:
+ * `Rootcult Enforcer`, `Spore Warden`, `Settler`.
+ */
+const FACTION_LABEL: Record<string, string> = {
+  civ: 'Settlers',
+  cop: 'Spore Wardens',
+  gang: 'Rootcult',
+  neutral: 'Unaligned',
+}
+
 /** Human name for whichever weapon/throwable/consumable id we can resolve. */
 const itemName = (id: string): string =>
   id === 'briefcase'
@@ -210,7 +226,8 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
   if (e.ai) {
     card.tagline = aiPhrase(e.ai)
     const def = NPCS[e.archetype]
-    rows.push({ label: 'Faction', value: pretty(e.ai.faction ?? def?.faction ?? 'neutral') })
+    const faction = e.ai.faction ?? def?.faction ?? 'neutral'
+    rows.push({ label: 'Faction', value: FACTION_LABEL[faction] ?? pretty(faction) })
     // Stance toward the local player: this NPC's stored opinion, else the
     // faction-derived opening stance — "will it come after ME?"
     const stance =

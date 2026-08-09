@@ -13,9 +13,15 @@ import type { Entity } from '../entity'
 import type { World } from '../world'
 import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from './behaviors'
 import { fireAt } from './fire'
+import { canSeeEntity } from './goals'
 import { spawnNpc } from '../populate'
 import { hasStatus } from './statusFx'
 import { sporeAt } from './spore'
+
+/** Tiles at which a live player's first unbroken sight of the Alpha counts as
+ * the ENTRANCE — comfortably inside a room, so the reveal fires as the door
+ * swings rather than through a corridor slit half a level away. */
+export const REVEAL_RANGE = 11
 
 /** Ticks between brood summons in phase 1 (~3s at 30tps). */
 export const SUMMON_INTERVAL = 90
@@ -54,6 +60,33 @@ const summonBrood = (w: World, boss: Entity): void => {
   w.events.push({ type: 'aiGoal', entityId: boss.id, goal: 'summon', prev: boss.ai?.goal ?? 'none' })
 }
 
+/** A live player who can actually SEE the boss right now, within reveal range. */
+const witness = (w: World, boss: Entity): Entity | undefined => {
+  for (const e of w.entities) {
+    if (!e.playerCtl || e.dead || e.playerCtl.downed) continue
+    if (Math.hypot(e.pos.x - boss.pos.x, e.pos.y - boss.pos.y) > REVEAL_RANGE) continue
+    if (canSeeEntity(w, e, boss)) return e
+  }
+  return undefined
+}
+
+/**
+ * The ENTRANCE. The first time a live player lays eyes on the Alpha, announce
+ * it: one latched `bossReveal` event carrying its id and max HP, which the UI
+ * turns into a name card and pins a health bar to (ui/bossModel.ts).
+ *
+ * Latched on `mission.bossRevealed` (once per floor, survives serialization) so
+ * walking back out of the room and in again never re-fires it. Deterministic:
+ * a pure read of positions + line of sight, no RNG and no wall-clock.
+ */
+const maybeReveal = (w: World, boss: Entity): boolean => {
+  if (w.mission.bossRevealed) return true
+  if (!witness(w, boss)) return false
+  w.mission.bossRevealed = true
+  w.events.push({ type: 'bossReveal', entityId: boss.id, x: boss.pos.x, y: boss.pos.y, maxHp: boss.health!.max })
+  return true
+}
+
 /** Standing in a spore cloud that is NOT on fire (and not itself burning). */
 const inSafeCloud = (w: World, boss: Entity): boolean => {
   const tx = Math.floor(boss.pos.x)
@@ -64,6 +97,14 @@ const inSafeCloud = (w: World, boss: Entity): boolean => {
 export const mireclawSystem = (w: World): void => {
   for (const boss of w.entities) {
     if (boss.dead || boss.ai?.behavior !== 'mireclaw' || !boss.health) continue
+
+    // Nothing happens until the fight is WITNESSED. Previously the summon
+    // throttle ran from tick 0, so the Alpha filled its 8-brood cap ~10s into
+    // the floor — minutes before anyone walked in. The player then met a static
+    // room of sporelings and never saw a boss summon anything. Now phase 1
+    // spends its brood on screen, at the player.
+    if (!maybeReveal(w, boss)) continue
+
     const frac = boss.health.hp / boss.health.max
 
     if (frac <= MIRECLAW_ENRAGE_FRAC) {

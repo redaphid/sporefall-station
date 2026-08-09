@@ -219,11 +219,19 @@ describe('item data — well-formedness', () => {
     }
   })
 
-  it('every non-fists melee weapon has finite durability', () => {
+  it('every CARRIED melee weapon has finite durability', () => {
     for (const wpn of Object.values(WEAPONS)) {
-      if (wpn.kind !== 'melee' || wpn.id === 'fists') continue
+      // Natural armament (fists, a Mireclaw's claws) is grown, not carried:
+      // there is nothing to wear out, so durability is meaningless for it.
+      if (wpn.kind !== 'melee' || wpn.natural) continue
       expect(wpn.durability, wpn.id).toBeGreaterThan(0)
     }
+  })
+
+  it('natural armament is durability-free and never a held sprite', () => {
+    const natural = Object.values(WEAPONS).filter((w) => w.natural)
+    expect(natural.map((w) => w.id).sort()).toEqual(['claws', 'fists'])
+    for (const wpn of natural) expect(wpn.durability, wpn.id).toBeUndefined()
   })
 
   it('every weapon onHit / throwable onLand names a status the systems can apply', () => {

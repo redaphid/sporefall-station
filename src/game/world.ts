@@ -60,6 +60,11 @@ export interface MissionState {
    * seen — and it is what lets NPCs across the floor keep coming. Refreshing it
    * only every N ticks is what keeps the escape EVADABLE. */
   alertMark?: Vec2
+  /** Latch: a live player has SEEN the Mireclaw Alpha, so its entrance has been
+   * announced and its phases are running (systems/mireclaw.maybeReveal). Also
+   * what keeps the boss dormant — and its brood unspent — until someone walks
+   * in. Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
+  bossRevealed?: boolean
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */

@@ -110,6 +110,11 @@ class ConditionedHub {
   private blackhole = false
   /** Per-direction last scheduled delivery time, for in-order delivery. */
   private lastDelivery = new Map<string, number>()
+  /** Per-direction FIFO drained by ONE timer, so delivery order is guaranteed.
+   * setTimeout alone is not enough: Node buckets timers by duration, so two
+   * packets with different delays but the same expiry can fire out of order. */
+  private wire = new Map<string, { at: number; fn: () => void }[]>()
+  private armed = new Set<string>()
   /** Packets actually handed to the CLIENT's transport handler. If this keeps
    * rising while the client's world is frozen, the bytes are arriving and the
    * framing/decode layer is what is stuck. */
@@ -148,6 +153,28 @@ class ConditionedHub {
     }
   }
 
+  /** Append to the direction's FIFO and make sure the drain timer is running. */
+  private enqueue(dir: string, at: number, fn: () => void): void {
+    const q = this.wire.get(dir) ?? []
+    if (q.length === 0) this.wire.set(dir, q)
+    q.push({ at, fn })
+    this.drain(dir)
+  }
+
+  private drain(dir: string): void {
+    if (this.armed.has(dir)) return
+    const q = this.wire.get(dir)
+    if (!q || q.length === 0) return
+    this.armed.add(dir)
+    const wait = Math.max(0, q[0].at - Date.now())
+    setTimeout(() => {
+      this.armed.delete(dir)
+      const now = Date.now()
+      while (q.length > 0 && q[0].at <= now) q.shift()!.fn()
+      this.drain(dir)
+    }, wait)
+  }
+
   setBlackhole(on: boolean): void {
     this.blackhole = on
   }
@@ -182,7 +209,7 @@ class ConditionedHub {
         this.lastDelivery.set(dir, at)
         delay = Math.max(0, at - Date.now())
       }
-      setTimeout(() => {
+      const fire = (): void => {
         this.stats.delivered++
         if (dir.startsWith('h2c')) {
           this.h2cDelivered++
@@ -199,7 +226,9 @@ class ConditionedHub {
           })
         }
         deliver(this.tamper ? this.tamper(copy) : copy)
-      }, delay)
+      }
+      if (this.cond.ordered === false) setTimeout(fire, delay)
+      else this.enqueue(dir, Date.now() + delay, fire)
     } else {
       this.stats.dropped++
     }

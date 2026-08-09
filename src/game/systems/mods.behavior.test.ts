@@ -14,7 +14,7 @@ import { expectWorldEqual } from '../testkit'
 import { combatSystem } from './combat'
 import { projectileSystem } from './projectiles'
 import { equipSlot } from './inventory'
-import { isFrozen } from './statusFx'
+import { addStatus, isFrozen } from './statusFx'
 
 /** A player holding `weaponId` (slotted, so mods attach) with `mods`. */
 const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMod[]): Entity => {
@@ -106,6 +106,36 @@ describe('behavior mods — real fire path', () => {
     expect(isFrozen(t)).toBe(false) // the freeze was SPENT cracking
     // The cracking shot landed more than an ordinary pistol round would have.
     expect(afterFreeze - t.health!.hp).toBeGreaterThan(WEAPONS.pistol.damage)
+  })
+
+  // A shatter is an instant kill that `applyDamage` reports as a LANDED blow, so
+  // every on-hit effect fires on it — lifesteal included. That is tolerable only
+  // while the payout stays the size of ONE BULLET. It must never scale with the
+  // (arbitrarily large) health pool the shatter just erased, or a freeze grenade
+  // plus Vampiric would refill the player off any big body in the room.
+  //
+  // This guards the SHAPE, not the tuning: lifesteal reads the bullet's damage,
+  // so the heal is identical whether the blow shattered, cracked, or landed
+  // plainly. Measured on this branch: 1.83 hp healed for a 95hp shatter kill.
+  // NOTE: lifesteal is separately known-broken here — it pays off INTENDED damage
+  // rather than damage dealt (projectiles.ts), so it overpays ~3x against armour.
+  // That is fixed on another branch; this test deliberately does not encode it.
+  it('lifesteal on a SHATTER pays one bullet, not the health bar it just erased', () => {
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'lifesteal', stacks: 1 }])
+    const t = npc(w, 22, 20)
+    t.health = { hp: 300, max: 300, iframes: 0 } // a big pool for the execute to erase
+    p.health = { hp: 50, max: 5000, iframes: 0 } // room to heal into, nothing clamps
+    addStatus(w, t, 'frozen', 300, undefined, true) // brittle: a thrown freeze grenade
+    const before = p.health.hp
+    fire(w, p)
+    advance(w, 20)
+    // The grenade's execute still works — this is not a test that shatter is gone.
+    expect(t.dead).toBe(true)
+    expect(t.shattered).toBe(true)
+    const healed = p.health!.hp - before
+    expect(healed).toBeGreaterThan(0) // it DOES pay out on an execute
+    // ...but bounded by the bullet, not by the 300hp it just deleted.
+    expect(healed).toBeLessThanOrEqual(WEAPONS.pistol.damage)
   })
 
   it('incendiary: a bullet sets the target burning (element applied)', () => {

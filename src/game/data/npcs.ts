@@ -7,7 +7,14 @@ export interface NpcDef {
   speed: number // tiles/sec
   weapon: string
   sightRange: number
-  /** Aggro anyone on sight (thugs) vs only criminals (cops) vs never (civs). */
+  /** Innate temperament: aggro anyone on sight (thugs) vs only criminals (cops)
+   * vs never (civs).
+   *
+   * NB this is FLAVOUR, not the targeting rule — the only reader is the inspect
+   * card (`ui/inspectModel.ts`). Actual fight/flee targeting is decided by
+   * `behaviors.isHostileTarget`, which goes by the faction matrix, stored
+   * disposition and `world.hostile`. Keep the two in step by hand; a value here
+   * that contradicts an archetype's behaviour just mislabels it to the player. */
   hostility: 'always' | 'lawful' | 'never'
   fleesOnDamage: boolean
   /** Peaceful until hit, then fights back (bouncers). */
@@ -22,7 +29,9 @@ export interface NpcDef {
    * Absent → neutral to everything (the townsfolk baseline). This is what makes
    * a Sporefall enemy DEMAND a particular tool — no single weapon clears them all. */
   resist?: Record<string, number>
-  /** #68 — spawns INERT until a stimulus wakes it (a sleeping pod/unit). */
+  /** #68 — spawns INERT until a stimulus wakes it (the spore pod, the lurker).
+   * NOT the Derelict Unit: that one spawns awake and merely turns hostile on a
+   * `wakeOn` power-cut, so it sets `wakeOn` WITHOUT `dormant`. */
   dormant?: boolean
   /** #68 — stimulus kinds that wake it (also the Derelict Unit's `'power-cut'`
    * rouse). Copied to `Entity.wakeOn` at spawn. */
@@ -43,16 +52,40 @@ export const NPCS: Record<string, NpcDef> = {
   boss: {
     // #69 Mireclaw Alpha: a phased apex predator, not a fat gangster. Lives in
     // the spore (immune) and uses it as a lifeline in phase 2.
+    //
+    // BALANCE (was hp 80 / bat / no physical resist — measured, not guessed;
+    // see scripts/test/boss-ttk-probe.ts). At 80hp the "apex predator" died in
+    // 1.9s of pistol fire while an ORDINARY brute took 4.2s, so the boss was a
+    // QUARTER of the fight of a rank-and-file enemy. Worse, its own three-phase
+    // brain was unobservable: 80hp is 5 pistol shots, which split 3/2/1 across
+    // summon/regen/enrage — phase 1 lasted 1.4s against a 3.0s summon throttle,
+    // so a player never saw it summon, regenerate or enrage even once.
+    //
+    // 320hp @ physical 0.75 = 427 effective HP = 24 pistol shots = ~10.7s of
+    // perfect fire, 2.5x the brute, and it splits 12/7/5 shots so all three
+    // phases are legible (phase 1 now outlasts the 3s summon throttle).
+    // The resist is deliberately MILD (25% off, vs the brute's 45%):
+    // feat/one-weapon RAISED resist multipliers because heavy ones read as
+    // immunity in a pistol-only world, and this stays inside that budget. Fire
+    // is the counterplay on both axes — 1.25x damage AND it denies the phase-2
+    // cloud regen (systems/mireclaw.inSafeCloud).
+    //
+    // NB the ratio, not the absolute, is the invariant: populate.spawnNpc ramps
+    // every archetype +15% hp per floor, so boss and brute stretch together.
+    //
+    // speed 3.6 -> 3.2 so the 1.4x enrage burst lands at 4.48, a hair under
+    // PLAYER_SPEED (4.5): phase 3 is a chase you can barely win, not an
+    // unavoidable one.
     archetype: 'boss',
     faction: 'gang',
-    hp: 80,
-    speed: 3.6,
-    weapon: 'bat',
-    sightRange: 8,
+    hp: 320,
+    speed: 3.2,
+    weapon: 'claws',
+    sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,
     behavior: 'mireclaw',
-    resist: { spore: 0 },
+    resist: { physical: 0.75, burning: 1.25, poisoned: 0.5, spore: 0 },
   },
   cop: {
     archetype: 'cop',
@@ -160,7 +193,8 @@ export const NPCS: Record<string, NpcDef> = {
     resist: { physical: 0.35, burning: 1.5, poisoned: 1.0 },
   },
   cinder: {
-    // Ash-dweller: fireproof, so a flamethrower/molotov build stalls — shoot it.
+    // Ash-dweller: takes only 20% from fire (resistant, NOT immune), so a
+    // flamethrower/molotov build stalls out on it — shoot it instead.
     archetype: 'cinder',
     faction: 'gang',
     hp: 45,
@@ -222,8 +256,9 @@ export const NPCS: Record<string, NpcDef> = {
   },
   pod: {
     // #68 Spore pod: a dormant egg-sac — inert until a nearby noise, a body that
-    // strays too close, or a hit trips it; then it hatches into a hostile hive
-    // thing. A room of these is a stealth set-piece: tiptoe through, or set it off.
+    // strays too close, a hit, or FIRE trips it (see `wakeOn` below); then it
+    // hatches into a hostile hive thing. A room of these is a stealth set-piece:
+    // tiptoe through, or set it off — a stray molotov wakes the whole nest.
     archetype: 'pod',
     faction: 'neutral',
     hp: 26,

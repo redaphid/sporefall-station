@@ -118,6 +118,12 @@ NEG_BASE = ("photorealistic, 3d render, smooth gradient, soft shading, text, wat
             "several objects side by side, faded ghost copy")
 NEG_FIGURE = ("person, humanoid, figure, character, creature, monster, face, head, "
               "arms, legs, hands, body, standing figure, portrait, silhouette of a person")
+# The recipe's "feet on the ground" invites a painted dirt mound / cast shadow.
+# The background key cannot tell that grey ellipse from the creature, so it welds
+# it into the alpha as a grey SLAB under the sprite — invisible at 1024px, but at
+# 48px it is a third of the sprite's height. Negatived on every ground creature.
+NEG_GROUND = ("ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
+              "cast shadow on the ground, diorama")
 BG_OBJ = "single isolated game object centered on plain flat white background"
 BG_CHAR = "single character centered on plain flat white background, full body, feet on the ground"
 BG_TILE = ("flat texture swatch filling the whole frame edge to edge, no horizon, no sky, "
@@ -173,7 +179,138 @@ CHARS = {
                  "a simple brown rope-belted poncho, webbed feet, half as tall as a human, "
                  "chunky proportions, big head",
                  "human face, spacesuit, helmet, visor, orange cap, teal suit, tall, slim"),
+    # #67 Mireclaw brood scavenger. Diverges from every other kind on BOTH axes
+    # the cast contract cares about: silhouette (the only LOW, HORIZONTAL,
+    # wider-than-tall body — everything else is an upright biped/pod/box) and
+    # dominant color (near-black chitin; olive/teal/tan/gray are all taken).
+    # Violet is a palette ACCENT ("use sparingly"), so it is glow only, not mass.
+    "stalker": ("mireclaw-stalker",
+                "a low-slung six-legged alien scavenger beast shaped like a giant crab-mantis, "
+                "long lean horizontal body carried close to the ground on six splayed insect "
+                "legs, no upright torso, dark brown-black chitin plates with pale bone ridges "
+                "along the spine, two oversized scythe-shaped front claws held low, a narrow "
+                "eyeless wedge head with mandibles jutting FORWARD from the front of the body, "
+                "faint violet bioluminescent glow in the joint seams, "
+                "wide flat crouched silhouette twice as wide as it is tall",
+                # 3 of the first 4 seeds drifted to an UPRIGHT humanoid, and the recipe's
+                # "feet on the ground" invites a painted dirt mound that the background key
+                # then welds into the silhouette as a grey slab. Both are negatived hard.
+                "human, person, humanoid, upright, standing biped, two legs, bipedal, torso, "
+                "wings, spear, weapon in hand, spacesuit, helmet, visor, orange cap, teal suit, "
+                "green skin, moss, olive, tall, slim, hulking muscular, "
+                "ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
+                "cast shadow on the ground, diorama"),
+    # ── #78 Sporefall threat roster ──────────────────────────────────────────
+    # These six archetypes SPAWN IN NORMAL PLAY and every one of them was
+    # rendering as the same grey procedural eyeball. Each new kind has to clear
+    # the same bar the stalker did: diverge from the whole existing cast on BOTH
+    # axes — silhouette AND dominant color — or the pack reads as one creature
+    # in six tints. What is already taken:
+    #   vine-ranger  upright biped   / teal + orange visor
+    #   spore-drone  floating pod    / grey metal
+    #   bog-mutant   hulking biped   / olive green
+    #   mycologist   biped           / pale white-grey
+    #   derelict-bot box on treads   / rust tan-orange
+    #   frog-settler squat + round   / mottled green
+    #   mireclaw     low horizontal  / near-black chitin
+    # v2. v1 said "quadruped ... twice as wide as a person" and drew four upright
+    # armoured BIPEDS out of four seeds. What separates this from the stalker —
+    # which never drifts — is that the stalker states its silhouette as explicit
+    # geometry ("twice as wide as it is tall", "no upright torso") instead of
+    # naming a body plan and hoping. Same treatment here.
+    "brute": ("carapace-brute",
+              "a massive armored beast walking on ALL FOURS, a long heavy body carried "
+              "horizontally on four thick pillar legs, no upright torso, the broad domed "
+              "bone-plate head shield held low at the FRONT of the body at the same "
+              "height as its shoulders like a battering ram, overlapping pale bone-tan "
+              "carapace plates across a humped armored back, tiny deep-set eyes beneath "
+              "the shield, short thick tail behind, wide flat crouched silhouette twice "
+              "as wide as it is tall",
+              # Four legs + a bone shield is the whole idea; the bog-mutant is the
+              # trap this one falls into (both are "big and strong").
+              "human, person, humanoid, upright, standing biped, two legs, bipedal, "
+              "torso, chest, waist, shoulders, arms, hands, fists, human proportions, "
+              "nude, naked, bare skin, human skin, man, woman, "
+              "mech, robot suit, power armor, wings, spacesuit, helmet, visor, orange "
+              "cap, teal suit, olive green skin, moss, hovering, floating, tank treads, "
+              "boxy robot, mushroom, thin, slim, spindly, six legs, insect, crab, frog, "
+              "big round eyes, " + NEG_GROUND),
+    # v2. v1 ("a gaunt smouldering ash husk ... lean and starved") drew four pale
+    # grey NUDE HUMAN FIGURES — no char, no embers. Describing a humanoid at all
+    # lets the cast anchor win, so v2 leads with the material (burnt crust, no
+    # skin) rather than the body, and negatives the human read explicitly.
+    "cinder": ("cinder-husk",
+               "a burnt-out husk monster with NO SKIN anywhere, its entire body a crust "
+               "of cracked black charcoal like burnt bark, molten ember-orange light "
+               "glowing out of every crack across its chest and shoulders, a featureless "
+               "eyeless charcoal skull head with one burning orange slit, long thin "
+               "blackened arms ending in three hooked claws, hunched forward over a "
+               "jagged broken spine, ash smoke curling off its shoulders, charred pitch "
+               "black body with hot orange glowing fissures",
+               "nude, naked, bare skin, human skin, flesh, skin texture, smooth skin, "
+               "pale grey body, woman, man, person, human, breasts, hair, face, eyes, "
+               "nose, mouth, lips, "
+               "hulking muscular, broad shoulders, bulky, armor plates, carapace, "
+               "spacesuit, helmet, visor, orange cap, teal suit, green skin, moss, olive, "
+               "mushroom, hovering, floating, tank treads, boxy robot, six legs, insect, "
+               "crab, frog, big round eyes, campfire, bonfire, torch, " + NEG_GROUND),
+    "sporeling": ("sporeling-mite",
+                  "a tiny scuttling fungal critter, one oversized pale cream mushroom cap "
+                  "dome covering almost its whole body, glowing green gills underneath the "
+                  "cap rim, four stubby little legs poking out below, no arms at all, two "
+                  "pinprick eyes in the shadow under the cap, knee-high, small and round "
+                  "and low to the ground",
+                  "human, person, humanoid, upright, standing biped, tall, large, huge, "
+                  "hulking, muscular, spacesuit, helmet, visor, orange cap, teal suit, "
+                  "arms, hands, weapon, robot, treads, hovering, six legs, crab, claws, "
+                  "frog face, wide mouth, dark chitin, " + NEG_GROUND),
+    # v2. v1 asked for a "tall narrow VERTICAL" body with four folded limbs and
+    # got, from four seeds, two humanoids, a tree and a figure in a ball gown:
+    # tall + vertical + limbs is a person, and the cast anchor is a person too.
+    # v2 gives up the vertical read and describes a closed SHELL — a shape with
+    # no limb count to get wrong. It still diverges from the stalker (a long
+    # sprawling six-legged body) by being smooth, compact and featureless.
+    "lurker": ("gloom-lurker",
+               "an ambush creature coiled up tight inside a smooth armored dome shell, a "
+               "dark teal chitin carapace clamped shut like a closed clam hugging the "
+               "floor, a rim of small glowing violet eyespots around the front edge of the "
+               "shell, short hooked grasping claws just barely tucked out of sight beneath "
+               "the shell rim, no head, no face, no upright body, squat and rounded and "
+               "low to the ground, wider than it is tall",
+               "tall, upright, standing, vertical, human, person, humanoid, figure, biped, "
+               "two legs, torso, arms, hands, nude, naked, bare skin, woman, man, dress, "
+               "gown, robe, tree, trunk, branches, plant, "
+               "wide, broad, bulky, hulking, muscular, spacesuit, helmet, visor, "
+               "orange cap, teal spacesuit, leather straps, gear, olive green skin, moss, "
+               "mushroom cap, hovering, floating, tank treads, boxy robot, six splayed "
+               "legs, long legs, crab, frog, big round eyes, face, mouth, "
+               + NEG_GROUND),
+    # v2. v1 ran through the CHARACTER recipe and drew twig-people: the recipe
+    # says "full body, feet on the ground" and the pose word is "standing", which
+    # a legless egg sac cannot satisfy, so the model supplied a body. It is a prop
+    # that happens to have an archetype — see STATIC_KINDS, which gives it the
+    # object framing and the ENVIRONMENT anchor instead of the humanoid cast one.
+    "pod": ("brood-sac",
+            "a bulbous organic egg sac rooted to the floor, a fat teardrop bulb of taut "
+            "sickly olive-yellow membrane webbed with dark veins, a vertical split seam "
+            "down the front leaking green bioluminescent light, a knot of short fibrous "
+            "roots gripping the floor at its base, no legs, no arms, no head, "
+            "a motionless object, not a creature",
+            "human, person, humanoid, figure, character, face, eyes, mouth, arms, hands, "
+            "legs, feet, walking, standing figure, torso, limbs, twig person, tree, "
+            "spacesuit, helmet, visor, teal suit, robot, treads, "
+            "metal, barrel, crate, box, canister, mushroom cap, insect, crab, six legs, "
+            "hovering, floating, " + NEG_GROUND),
 }
+# Archetypes that are STATIC OBJECTS wearing an archetype, not figures. The
+# character recipe hard-codes "full body, feet on the ground" and a pose word
+# ("standing facing the viewer"), and a legless egg sac cannot satisfy either —
+# so the model invents a body to hang them on. These kinds get the object
+# framing and, per docs §4, the ENVIRONMENT anchor rather than the humanoid cast
+# anchor, which is the same rule props already follow.
+STATIC_KINDS = {"pod"}
+BG_STATIC = ("single isolated game object centered on plain flat white background, "
+             "the whole object in frame, resting on the floor")
 CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
 
 # ---- the rest of the pack ---------------------------------------------------
@@ -282,15 +419,23 @@ def jobs():
                 jname = f"char.{kind}.{d}-{frame}"
                 is_anchor_pose = d == "s" and frame == "idle"
                 neg_parts = [p for p in (DIR_NEG.get(d, ""), kneg) if p]
+                # A static kind has no pose and no facing — it is the same object
+                # from every direction — so it drops the "standing/full body" recipe
+                # and takes the environment anchor that props use.
+                static = arch in STATIC_KINDS
+                subject = ("flat 2D game object sprite" if static
+                           else "full body game character sprite")
+                pose = "seen from the front" if static else dprompt
                 spec = dict(
                     cat="char", arch=arch, kind=kind, dir=d, frame=frame,
                     path=f"chars/{kind}-{d}-{frame}.png", px=CHAR_PX,
-                    pos=f"{TRIGGER}, full body game character sprite, {desc}, {dprompt}, "
-                        f"{BG_CHAR}, {LOOK}",
+                    pos=f"{TRIGGER}, {subject}, {desc}, {pose}, "
+                        f"{BG_STATIC if static else BG_CHAR}, {LOOK}",
                     neg=", ".join(neg_parts + [
                         f"two characters, crowd, cropped, close-up, portrait, {NEG_BASE}"]),
-                    refs="char-cast" if is_anchor_pose else "char-anchor",
-                    ipw=0.3 if is_anchor_pose else DIR_IPW[d],
+                    refs=("env" if static
+                          else "char-cast" if is_anchor_pose else "char-anchor"),
+                    ipw=0.5 if static else (0.3 if is_anchor_pose else DIR_IPW[d]),
                 )
                 if frame == "step":
                     # STEP frames are img2img FROM the direction's curated idle
@@ -316,6 +461,12 @@ def jobs():
 def resolve_refs(spec):
     """Map a spec's symbolic ref group to concrete anchor image paths."""
     kind = spec.get("refs")
+    # Escape hatch for a ComfyUI without ComfyUI_IPAdapter_plus installed: the
+    # IPAdapter branch in comfy.py is gated on `refs`, so dropping them lets the
+    # rest of the recipe (LoRA + locked palette + prompt contract) still run.
+    # Style consistency then rests on the palette lock alone -- GATE THE OUTPUT.
+    if os.environ.get("NO_IPA"):
+        return []
     if kind == "env":
         return [p for p in ENV_ANCHORS if os.path.exists(p)]
     if kind == "char-anchor":  # this character's curated s-idle raw
@@ -325,6 +476,17 @@ def resolve_refs(spec):
         p = os.path.join(ANCHORS, "vine-ranger-s-idle.png")
         return [p] if os.path.exists(p) and spec["kind"] != "vine-ranger" else []
     return []
+
+
+def spec_alpha(spec):
+    """Whether to ask the server to cut the background.
+
+    `NO_REMBG=1` for a ComfyUI without the pack that provides
+    `Image Rembg (Remove Background)` — the raw then comes back on its flat
+    studio backdrop and `post.sprite` keys it locally (`post.flat_key`)."""
+    if os.environ.get("NO_REMBG"):
+        return False
+    return spec.get("alpha", True)
 
 
 def load_curation():
@@ -346,14 +508,21 @@ def sweep(names, seeds=6, base_seed=414500):
                 print(f"SKIP {name}: curate {spec['init_from_idle']} first "
                       f"(no durable raw — see `generate.py curate`)")
                 continue
+        # The installed rembg node is STRICTLY batch-1: its `tensor2pil` does a
+        # bare `.squeeze()`, so a (B,H,W,C) batch reaches PIL as a 4-D array and
+        # raises "Cannot handle this data type". Worse than the crash is the
+        # near-miss — `pil2tensor` re-`unsqueeze`s to batch 1, so any batch that
+        # DID survive would silently return one image and drop the rest. So an
+        # alpha job is swept one seed at a time; only the un-cut jobs batch.
+        chunk = 1 if spec_alpha(spec) else CHUNK
         done = 0
         while done < seeds:
-            n = min(CHUNK, seeds - done)
+            n = min(chunk, seeds - done)
             g = comfy.build_graph(
                 pos=spec["pos"], neg=spec["neg"], seed=base_seed + done, batch=n,
                 seamless=spec.get("seamless", False), refs=refs or None,
                 ip_weight=spec.get("ipw", 0.8), init=init,
-                denoise=spec.get("denoise", 1.0), alpha=spec.get("alpha", True),
+                denoise=spec.get("denoise", 1.0), alpha=spec_alpha(spec),
                 prefix=name.replace(".", "-") + f"-s{base_seed + done}",
             )
             paths = comfy.run(g, dest)
@@ -418,8 +587,26 @@ def final(names, allow_regen=False):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+    # Accept BOTH `--key=value` and `--key value`. The docstring has always shown
+    # the space-separated form, but the parser only matched `--key=`, so a
+    # documented `curate ... --seed 414501 --ckpt anything-xl` recorded NONE of
+    # it — the flag matched nothing and its value fell through into the
+    # positional list, where curate ignores anything past the file. Silently
+    # losing seed/size/ckpt loses the provenance curation.json exists to keep.
+    VALUE_FLAGS = {"--seed", "--index", "--batch", "--size", "--ckpt", "--note", "--seeds"}
+    args, flagmap, rest = [], {}, list(sys.argv[1:])
+    while rest:
+        a = rest.pop(0)
+        if not a.startswith("--"):
+            args.append(a)
+        elif "=" in a:
+            k, v = a.split("=", 1)
+            flagmap[k] = v
+        elif a in VALUE_FLAGS and rest and not rest[0].startswith("--"):
+            flagmap[a] = rest.pop(0)
+        else:
+            flagmap[a] = True
+    flags = list(flagmap)
     J = jobs()
     if "--list" in flags:
         print("\n".join(J))
@@ -427,10 +614,8 @@ if __name__ == "__main__":
     cmd, names = (args[0], args[1:]) if args else (None, [])
 
     def flagval(key, default=None):
-        for f in flags:
-            if f.startswith(key + "="):
-                return f.split("=", 1)[1]
-        return default
+        v = flagmap.get(key, default)
+        return default if v is True else v
 
     if cmd == "curate":
         # curate <job> <file> [--seed N --index I --batch B --size N --ckpt X --note "..."]

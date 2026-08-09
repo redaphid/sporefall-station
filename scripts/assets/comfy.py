@@ -18,7 +18,7 @@ import uuid
 
 HOST = os.environ.get("COMFY", "http://localhost:8188")
 
-CKPT = os.environ.get("CKPT", "AnythingXL_xl.safetensors")
+CKPT = os.environ.get("CKPT", "SDXL1.0\\anything-xl.safetensors")
 LORA = os.environ.get("LORA", "pixel_art_style_by_skormino_v7.05_test_72img.safetensors")
 LORA_W = float(os.environ.get("LORA_W", "1.0"))
 SIZE = int(os.environ.get("SIZE", "1024"))
@@ -170,13 +170,23 @@ def build_graph(
         g["16"] = {"class_type": "VAEDecode", "inputs": {"samples": ["15", 0], "vae": ["1", 2]}}
         out = ["16", 0]
     if alpha:
-        g["11"] = {"class_type": "Image Rembg (Remove Background)",
-                   "inputs": {"images": out, "model": "isnet-general-use",
-                              "transparency": True, "alpha_matting": False,
-                              "alpha_matting_foreground_threshold": 240,
-                              "alpha_matting_background_threshold": 20,
-                              "alpha_matting_erode_size": 4, "post_processing": True,
-                              "only_mask": False, "background_color": "none"}}
+        # Background removal. The node this ORIGINALLY named — "Image Rembg
+        # (Remove Background)", with an `images`/`model`/`transparency` signature
+        # — is not what the rembg pack actually registers, so the graph 400'd on
+        # every alpha run and no sprite was ever cut. What is really installed:
+        #
+        #   Image Remove Background (rembg)      inputs {image}          -> IMAGE
+        #   Image Remove Background Rembg (mtb)  inputs {image, alpha_*}  -> IMAGE, MASK, IMAGE
+        #
+        # The single-input rembg node is used deliberately over the mtb variant:
+        # it returns one unambiguous RGBA IMAGE, whereas the mtb node's three
+        # outputs and `bgcolor` (which defaults to solid black, not transparent)
+        # are easy to wire wrong in a way that only shows up as a black-matted
+        # sprite hundreds of generations later. The alpha-matting knobs that were
+        # being passed here were all at or near their defaults anyway, and
+        # post.py already does the real keying (`post.flat_key`).
+        g["11"] = {"class_type": "Image Remove Background (rembg)",
+                   "inputs": {"image": out}}
         out = ["11", 0]
     g["12"] = {"class_type": "SaveImage", "inputs": {"images": out, "filename_prefix": prefix}}
     return g

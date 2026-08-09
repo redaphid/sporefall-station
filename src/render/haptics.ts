@@ -59,6 +59,10 @@ export const hapticForEvent = (ev: SimEvent, self?: HapticSelf): HapticCmd | nul
       return self != null && ev.byId === self.id ? { key: 'modPickup', style: 'medium', vibrateMs: 45 } : null
     case 'missionComplete':
       return { key: 'mission', style: 'medium', vibrateMs: 90 }
+    case 'stationAlert':
+      // The station just turned on you — the hardest buzz in the game, longer
+      // than a death, because it is the moment the level changes character.
+      return { key: 'stationAlert', style: 'heavy', vibrateMs: 200 }
     case 'floorChange':
       return { key: 'floor', style: 'light' }
     case 'roll':

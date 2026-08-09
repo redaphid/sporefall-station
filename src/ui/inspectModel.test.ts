@@ -35,6 +35,27 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
     })
   }
 
+  // The card used to print a bare `Faction: Gang` — cops-and-robbers wording on
+  // a derelict swamp station, and the same vocabulary the theme names moved
+  // past. The sim ids are unchanged; only the label is lore.
+  it('labels factions with lore names, never the raw sim id', () => {
+    const w = world()
+    const label = (a: string): string => rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction
+    expect(label('thug')).toBe('Rootcult')
+    expect(label('boss')).toBe('Rootcult')
+    expect(label('cop')).toBe('Spore Wardens')
+    expect(label('civilian')).toBe('Settlers')
+    expect(label('stalker')).toBe('Unaligned')
+  })
+
+  it('no NPC card shows a bare faction id', () => {
+    const w = world()
+    const raw = new Set(['Civ', 'Cop', 'Gang', 'Neutral'])
+    for (const a of Object.keys(NPCS)) {
+      expect(raw.has(rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction), a).toBe(false)
+    }
+  })
+
   it('gang NPCs open Hostile toward the player; cops/civilians Neutral', () => {
     const w = world()
     expect(rowMap(buildInfoCard(spawnNpc(w, 'thug', 1, 1)).rows)['Toward you']).toBe('Hostile')

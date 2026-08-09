@@ -34,7 +34,7 @@
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
-import { anyPowerCut, type FearPulse, type World } from '../world'
+import { anyPowerCut, stationAlerted, type FearPulse, type World } from '../world'
 import {
   BATTLE,
   ENGAGE_RANGE,
@@ -73,6 +73,21 @@ export const TIER_AMBIENT = 0
 export const TIER_MEMORY = 1
 export const TIER_THREAT = 2
 export const TIER_PANIC = 3
+
+// ── STATION ALERT tuning (see the `manhunt` consideration below) ───────────
+/** Multiple of sightRange a chase is kept up for while the station is on ALERT,
+ * replacing the ordinary `LEASH` (1.5). Floor-sized on purpose: the point of the
+ * alert is that there is nowhere on this floor you are not being chased to.
+ * Deliberately a leash EXTENSION rather than a leash removal, so the value stays
+ * a single legible dial and a hunter still eventually gives up on a target that
+ * has left the floor entirely. */
+export const ALERT_LEASH = 64
+/** Multiplier on the BATTLE drive (never on flee) while the station is on ALERT.
+ * 1.6 is tuned to move the battle/flee crossover from ~1/3 max hp down to ~1/5:
+ * hunters press a fight they would otherwise break off, without making them
+ * literally unable to flee (a badly outmatched NPC still runs, which keeps the
+ * finale readable rather than a suicide wave). */
+export const ALERT_BATTLE_MULT = 1.6
 
 /** One candidate goal a consideration puts forward. */
 export interface Candidate extends Goal {
@@ -124,6 +139,13 @@ const threat: Consideration = (w, e) => {
   const hp = e.health?.hp ?? 1
   const max = e.health?.max ?? 1
   const out: Candidate[] = []
+  // STATION ALERT: the floor is hunting. Scale the FIGHT drive only — flee is
+  // left untouched — so the battle/flee crossover (normally ~hp = max/3) moves
+  // down and a wounded hunter presses in instead of breaking off. This is the
+  // "committed" half of committed pursuit, and it is a pure reweighting of the
+  // existing score: no new goal, no bypass of arbitration, and a genuinely
+  // outmatched NPC can still flee.
+  const press = stationAlerted(w) ? ALERT_BATTLE_MULT : 1
   // #63: score any Hostile entity, not only players. The player-only scan is
   // the fast path when NPC-vs-NPC is forced off. Perf: naive O(N²) over the
   // cast — fine at current NPC counts; bucket the wide scan if deeper floors
@@ -135,7 +157,7 @@ const threat: Consideration = (w, e) => {
     const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
     if (!perceives(w, e, p)) continue // must actually perceive it (range + LOS, cloak-aware)
     const hate = hateToward(w, e, p.id)
-    const aggress = battleScore(hate, hp, dist)
+    const aggress = battleScore(hate, hp, dist) * press
     if (aggress > WANDER_SCORE)
       out.push({ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: aggress, tier: TIER_THREAT, target: p.id })
     const flee = fleeScore(hate, hp, max, dist)
@@ -191,8 +213,58 @@ const pursueMemory: Consideration = (w, e) => {
   const ai = e.ai!
   if (ai.targetId === undefined || !ai.lastKnownTargetPos) return []
   const t = w.byId.get(ai.targetId)
-  if (!t || t.dead || dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) > ai.sightRange * LEASH) return []
+  // STATION ALERT slips the leash. Normally a chase is abandoned once the quarry
+  // is beyond `sightRange * LEASH` (~15 tiles) — which is precisely why the
+  // pre-existing floor-wide aggro evaporated on the very next think for anyone
+  // across the map. On alert the leash becomes floor-sized, so a chase that
+  // starts is a chase that is seen through.
+  const leash = ai.sightRange * (stationAlerted(w) ? ALERT_LEASH : LEASH)
+  if (!t || t.dead || dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) > leash) return []
   return [{ code: PURSUE, score: MEMORY_SCORE, tier: TIER_MEMORY, target: ai.targetId }]
+}
+
+// ── STATION ALERT: the manhunt ─────────────────────────────────────────────
+// The objective is done, the doors are open, and the station is calling out the
+// intruder's position over the PA (missions.broadcastAlert refreshes
+// `mission.alertMark` every ALERT_BROADCAST_TICKS). This consideration is how a
+// hunter ACTS on that broadcast: it proposes walking to the called-out point.
+//
+// It is a consideration like any other, not a chase hack bolted onto the side:
+//   • it only PROPOSES a candidate — `decide` still arbitrates it against
+//     everything else the NPC wants, with the usual hysteresis;
+//   • it sits at TIER_MEMORY, so any PERCEIVED threat (TIER_THREAT) and any
+//     panic (TIER_PANIC) still outrank it — a hunter that actually sees the
+//     player fights them, and a terrified civilian still runs;
+//   • it beats the ambient tier, which is the whole point: garrisoning your
+//     wing, working your room, walking your patrol beat and idle wandering all
+//     stop mattering when the station is being robbed.
+//
+// Scored just above the other MEMORY-tier drives so a live remembered trail
+// (pursueMemory/hunt, which are better information) still wins over a
+// second-hand broadcast.
+/** Must clear the highest INCUMBENT memory-tier score a hunter can be sitting
+ * on, because `decide` hands the standing goal a `HYSTERESIS_MARGIN` bonus: a
+ * hunter already sweeping (`hunt`'s SEARCH, 1.4) compares at 1.4 * 1.25 = 1.75,
+ * so a broadcast scored at 1.7 would lose and the crew would keep searching an
+ * empty room while the station screamed at them. 1.9 clears that, and still
+ * sits UNDER squad formation-keeping (2.0), so a squad answers the call as a
+ * unit behind its lead instead of dissolving into individual runners. */
+const MANHUNT_SCORE = MEMORY_SCORE + 0.4
+/** Below this distance to the broadcast mark the call adds nothing — the hunter
+ * is already there and should be looking around, not re-walking to the spot. */
+const MANHUNT_ARRIVE = 1.5
+
+const manhunt: Consideration = (w, e) => {
+  if (!stationAlerted(w)) return []
+  const mark = w.mission.alertMark
+  const focusId = w.mission.alertFocusId
+  if (!mark || focusId === undefined) return []
+  const focus = w.byId.get(focusId)
+  if (!focus || focus.dead) return []
+  // Allies of the intruder don't hunt them, and the intruder doesn't hunt itself.
+  if (e.playerCtl) return []
+  if (dist2d(mark.x, mark.y, e.pos.x, e.pos.y) < MANHUNT_ARRIVE) return []
+  return [{ code: PURSUE, score: MANHUNT_SCORE, tier: TIER_MEMORY, target: focusId, at: { x: mark.x, y: mark.y } }]
 }
 
 // A frightened NPC (e.g. a civilian who saw a crime) keeps fleeing its scarer
@@ -812,6 +884,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   alertGuards,
   pursueMemory,
   fleeMemory,
+  manhunt,
   investigate,
   drawnToStimulus,
   patrol,
@@ -833,15 +906,15 @@ export const DEFAULT_BEHAVIOR = 'basic'
 export const BEHAVIORS: Record<string, BehaviorDef> = {
   basic: {
     about: 'fight, flee, catch panic, investigate, hold its turf, wander — the default townsfolk brain',
-    considerations: ['panic', 'contagiousFear', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    considerations: ['panic', 'contagiousFear', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'manhunt', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   patrol: {
     about: 'walks a fixed beat; garrisons the objective wing; still fights and investigates',
-    considerations: ['panic', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'patrol', 'workMyRoom', 'wander'],
+    considerations: ['panic', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'manhunt', 'investigate', 'garrison', 'patrol', 'workMyRoom', 'wander'],
   },
   hunter: {
     about: 'presses a chase to last-known position, then sweeps the area; holds its turf when idle',
-    considerations: ['threat', 'defendMyWing', 'hunt', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    considerations: ['threat', 'defendMyWing', 'hunt', 'fleeMemory', 'manhunt', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   skittish: {
     about: 'flees trouble, catches the crowd’s panic, and runs to the nearest guard to raise the alarm',
@@ -869,7 +942,7 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
   },
   barricader: {
     about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',
-    considerations: ['threat', 'defendMyWing', 'pursueMemory', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],
+    considerations: ['threat', 'defendMyWing', 'pursueMemory', 'manhunt', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],
   },
   lurker: {
     about: 'hides dormant in a dark corner; bursts at whoever trips it — proximity, its door opening, or a hit',
@@ -880,7 +953,7 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     // `garrison` steers the LEAD onto the objective core (followers only ever
     // see their MEMORY-tier marching orders), so a squadded wing still masses
     // on the room the players must breach — as a unit, behind its lead.
-    considerations: ['threat', 'defendMyWing', 'squadFlank', 'hunt', 'squadStack', 'squadFollow', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    considerations: ['threat', 'defendMyWing', 'squadFlank', 'hunt', 'squadStack', 'squadFollow', 'manhunt', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
 }
 

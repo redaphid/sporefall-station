@@ -28,8 +28,13 @@ export interface WeaponDef {
   /** Ranged only. */
   projectileSpeed?: number
   /** Melee: swings before it breaks — the slot's count doubles as durability.
-   * Absent (fists) = innate, never consumed. */
+   * Absent (natural armament) = innate, never consumed. */
   durability?: number
+  /** NATURAL armament — grown, not carried (fists, a Mireclaw's claws). It has
+   * no durability (nothing to break), never drops as loot, and draws no held
+   * sprite (render/weaponArt.hasHeldWeapon). The one flag that distinguishes
+   * "this creature's body" from "a weapon it picked up". */
+  natural?: true
   /** Ranged: pellets fired per shot across `spread` radians (shotgun). */
   pellets?: number
   spread?: number
@@ -38,7 +43,7 @@ export interface WeaponDef {
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
-  fists: { id: 'fists', name: 'Fists', kind: 'melee', damage: 8, range: 1.1, cooldownTicks: 12, knockback: 4 },
+  fists: { id: 'fists', name: 'Fists', kind: 'melee', damage: 8, range: 1.1, cooldownTicks: 12, knockback: 4, natural: true },
   bat: { id: 'bat', name: 'Bat', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
   knife: { id: 'knife', name: 'Knife', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 },
   sledgehammer: {
@@ -52,6 +57,13 @@ export const WEAPONS: Record<string, WeaponDef> = {
     durability: 12,
     onHit: { status: 'stun', ticks: 20 },
   },
+  // The Mireclaw Alpha's natural armament. A baseball bat on an apex swamp
+  // predator was the placeholder that made the boss read as a fat gangster;
+  // claws are innate, so they carry no durability and draw NO held sprite
+  // (render/weaponArt treats them like fists). Roughly bat DPS, but landed in
+  // fewer, heavier, longer-reach blows — a hit you feel and roll away from
+  // rather than a chip you tank.
+  claws: { id: 'claws', name: 'Claws', kind: 'melee', damage: 22, range: 1.5, cooldownTicks: 20, knockback: 12, natural: true },
   // The PLAYER'S ONLY WEAPON. Retuned upward from its old starter numbers
   // (14 dmg / 18 ticks = 23 dps): it used to be the gun you upgraded away from,
   // so it was balanced against finding a shotgun (40 dps) or machinegun (48 dps).

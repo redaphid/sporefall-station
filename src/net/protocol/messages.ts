@@ -30,6 +30,20 @@ export const ARCHETYPES = [
   'pickup.briefcase',
   'gangster',
   'bouncer',
+  // Everything below was spawnable but MISSING from this registry, so
+  // `archetypeIndex.get(...) ?? 0` encoded it as index 0 and the remote client
+  // decoded it back as 'player' — i.e. a spore pod, a lurker or a burning tile
+  // rendered on the other phone as a second Ranger. Append only, never reorder.
+  'scientist',
+  'robot',
+  'brute',
+  'cinder',
+  'sporeling',
+  'stalker',
+  'lurker',
+  'pod',
+  'crate',
+  'fire',
 ] as const
 
 const archetypeIndex = new Map<string, number>(ARCHETYPES.map((a, i) => [a, i]))
@@ -327,6 +341,9 @@ export interface StateMsg {
   missionTargetId?: number
   gameOver: boolean
   alarm: number
+  /** STATION ALERT latched on this floor (objective met, escape run on). Optional
+   * on the wire for back-compat with an older host. */
+  alert?: boolean
   /** Difficulty rules in force (host authoritative). */
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */

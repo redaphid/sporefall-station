@@ -13,7 +13,7 @@ import {
   type ResolvedAnim,
 } from './animState'
 import { composeMotion, IDENTITY_POSE, type MotionPose } from './motion'
-import { CHAR_PX, TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
+import { ARCHETYPE_SCALE, CHAR_PX, TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
 import { weaponStack } from '../game/systems/inventory'
 import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
@@ -347,8 +347,12 @@ export class EntityViews {
       view.facing = e.facing
       view.footX = footX
       view.footY = footY
+      // Per-archetype BULK multiplies the animation pulse: the Mireclaw Alpha
+      // draws at 1.5x so it can never be mistaken for the thug whose sprite it
+      // still borrows (art.ARCHETYPE_SCALE).
       const scale =
-        e.kind === 'fire' ? 1 + Math.sin(t * 0.9) * 0.08 : burning ? 1 + burnPulse(t) * 0.08 : 1
+        (e.kind === 'fire' ? 1 + Math.sin(t * 0.9) * 0.08 : burning ? 1 + burnPulse(t) * 0.08 : 1) *
+        (ARCHETYPE_SCALE[e.archetype] ?? 1)
       // Billboarded characters flip to mirror the west-half facings (directional
       // sets draw s/se/e/ne/n); top-down blobs rotate to their heading;
       // pickups/doors/fire stay upright.

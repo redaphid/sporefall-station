@@ -80,6 +80,9 @@ export type SimEvent =
   | { type: 'hit'; x: number; y: number; targetId: EntityId; amount: number }
   | { type: 'death'; x: number; y: number; entityId: EntityId }
   | { type: 'doorToggle'; entityId: EntityId; open: boolean }
+  /** A close was refused because `byId`'s body is standing in the doorway — a shut
+   * door's tile is solid, so closing it there would entomb them permanently. */
+  | { type: 'doorBlocked'; entityId: EntityId; byId: EntityId }
   /** `byId` began picking `entityId`'s lock: `ticks` is the full channel length
    * so any UI (host or net client) can draw a progress ring from this alone. */
   | { type: 'pickStart'; entityId: EntityId; byId: EntityId; ticks: number }
@@ -116,10 +119,21 @@ export type SimEvent =
    * by the player — a point-of-no-return that turned the whole floor hostile
    * (alarm maxed, every non-allied NPC aggros the party). Fires once per floor. */
   | { type: 'bossDoorBreached'; entityId: EntityId; x: number; y: number }
+  /** THE ENTRANCE. A live player has laid eyes on the Mireclaw Alpha for the
+   * first time this floor: the UI throws its name card and pins the boss health
+   * bar, and the boss's phase machinery starts running. Fires once per floor
+   * (latched on `mission.bossRevealed`). */
+  | { type: 'bossReveal'; entityId: EntityId; x: number; y: number; maxHp: number }
   /** The gateway breach unsealed the whole floor: every other door popped open.
    * One event for the whole release (not one per door) — x/y is the gate. */
   | { type: 'doorsReleased'; count: number; x: number; y: number }
   | { type: 'missionComplete'; description: string }
+  /** STATION ALERT: the floor's objective was met and the station escalated —
+   * every door unsealed and popped open (`doorsOpened`), and every NPC on the
+   * floor is now hunting `focusId` (the intruder who took the prize). Fires once
+   * per floor, on the same tick as `missionComplete`. This is the loud one: the
+   * klaxon, the banner and the alarm wash all hang off it. */
+  | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }
   | { type: 'runOver'; floor: number }

@@ -17,7 +17,7 @@ import { projectileSystem } from './systems/projectiles'
 import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
-import type { Annotation, EntityId, InputCmd, SimEvent } from './types'
+import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
 export interface MissionState {
   /** `steal`/`assassinate`/`reach` are the classic objectives. Sporefall adds:
@@ -44,6 +44,27 @@ export interface MissionState {
   /** Latch: the boss-door aggro escalation has already fired (once per floor).
    * Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
   bossAggroTriggered?: boolean
+  /** STATION ALERT — the absolute tick the floor went to alert (objective met).
+   * Presence IS the state: `undefined` = calm, a number = alerted for the rest of
+   * the floor. An absolute tick (never a countdown) so a snapshot resumes the
+   * escalation exactly where it left off. Optional/omitted when calm, so every
+   * pre-feature snapshot round-trips byte-for-byte. */
+  alertTick?: number
+  /** STATION ALERT — the intruder the manhunt is hunting (the player who took the
+   * prize). The `manhunt` consideration scores against this id. */
+  alertFocusId?: EntityId
+  /** STATION ALERT — the station's last BROADCAST fix on the intruder: a coarse,
+   * periodically-refreshed position (see missions.ALERT_BROADCAST_TICKS), not a
+   * live psychic feed. This is a perception input in the same family as
+   * `noises`/`fear` — the PA//sensor net calling out where the intruder was last
+   * seen — and it is what lets NPCs across the floor keep coming. Refreshing it
+   * only every N ticks is what keeps the escape EVADABLE. */
+  alertMark?: Vec2
+  /** Latch: a live player has SEEN the Mireclaw Alpha, so its entrance has been
+   * announced and its phases are running (systems/mireclaw.maybeReveal). Also
+   * what keeps the boss dormant — and its brood unspent — until someone walks
+   * in. Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
+  bossRevealed?: boolean
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */
@@ -189,6 +210,15 @@ export const anyPowerCut = (w: World): boolean => {
   for (const k in w.powerCut) if (w.powerCut[k]) return true
   return false
 }
+
+/**
+ * Is the station on ALERT — this floor's objective is met and the escape run is
+ * on? Raised once per floor by missions.raiseStationAlert and never lowered
+ * (the next floor gets a fresh `mission`). The single predicate the AI's alert
+ * modifiers read (systems/behaviors.ts). Lives here, beside `anyPowerCut`, so
+ * the scoring layer can consult it without importing the mission system.
+ */
+export const stationAlerted = (w: World): boolean => w.mission.alertTick !== undefined
 
 /** Register a heard disturbance at a point; NPCs nearby will investigate it. */
 export const emitNoise = (w: World, x: number, y: number, ttl = NOISE_TTL): void => {

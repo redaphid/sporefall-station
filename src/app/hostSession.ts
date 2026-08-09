@@ -2,7 +2,7 @@ import type { Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
-import { createWorld, tickWorld, type RunMode, type World } from '../game/world'
+import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import type { CoopSample } from '../input/gamepadCoop'
@@ -159,6 +159,7 @@ export class HostSession implements Session {
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
       gameOver: this.world.gameOver,
+      alert: stationAlerted(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       self: this.self,

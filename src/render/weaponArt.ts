@@ -20,6 +20,7 @@ const MELEE_SHAPE: Record<string, WeaponShape> = {
   bat: 'club',
   knife: 'blade',
   fists: 'rod',
+  claws: 'blade',
 }
 
 /**
@@ -35,9 +36,11 @@ export const weaponShape = (id: string): WeaponShape => {
   return 'rod'
 }
 
-/** Does this weapon draw a held sprite at all? Bare fists do not (empty hands);
- * everything else — including an unknown id (rod fallback) — does. */
-export const hasHeldWeapon = (id: string): boolean => id !== 'fists'
+/** Does this weapon draw a held sprite at all? NATURAL armament does not — bare
+ * fists, or a Mireclaw's claws (a boss swinging a floating blade in its fist was
+ * exactly the tell that it was a reskinned thug). Everything else — including an
+ * unknown id, which falls back to the rod — does. */
+export const hasHeldWeapon = (id: string): boolean => WEAPONS[id]?.natural !== true
 
 /** Is this a swinging (melee) weapon? Unknown ids default to melee so the
  * fallback rod still reads as a swing rather than freezing at a gun's idle hold. */

@@ -2,6 +2,7 @@ import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Text
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
 import type { RenderView } from '../app/session'
+import { flagOn } from '../app/featureFlags'
 import { loadSettings, type ShaderFxMode } from '../app/settings'
 import { createArt, TILE_PX, type ArtRegistry } from './art'
 import { BackbufferPipeline } from './backbuffer'
@@ -16,6 +17,7 @@ import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
   addHitstop,
+  alertWash,
   decayTint,
   decayVignette,
   hitstopForEvent,
@@ -115,6 +117,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       await loadSpriteTextures(app.renderer, c),
       { tiles: p.tiles, entities: p.entities },
       resolveAnimTpfs(c),
+      flagOn(loadSettings().flags, 'newEnemyArt'),
     )
   }
   // Facade over the swappable registry so the tilemap/entity/effect layers keep
@@ -345,8 +348,14 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     native,
     (s) => {
       const prevTheme = settings.theme
+      const prevArt = flagOn(settings.flags, 'newEnemyArt')
       settings = s
       if (s.theme !== prevTheme) void setTheme(s.theme)
+      // Creature-art switch: same full asset re-bake as a theme swap, because
+      // which archetypes count as character sprites changes with it. Reuses
+      // setTheme rather than a parallel path so there is one rebuild to keep
+      // correct. Live, no reload.
+      else if (flagOn(s.flags, 'newEnemyArt') !== prevArt) void setTheme(chain[0].id)
       // A `?fx=` URL override pins the mode for the session; otherwise the
       // panel's Shader FX choice applies live (and persists via settings.ts).
       pipeline.setMode(urlFx ?? s.shaderFx)
@@ -509,7 +518,17 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
               dead: !!self.dead,
             }
           : null
-      const red = juicing ? Math.max(vignette, lowHealthVignette(vitals, view.gameOver, elapsed)) : 0
+      // STATION ALERT wash rides the same red overlay as damage/low-health and
+      // loses to both via `Math.max`, so the alarm can never mask a hit landing
+      // or a critical-health warning. Suppressed at game-over with the rest of
+      // the juice, so a lost run isn't left pulsing under the restart overlay.
+      const red = juicing
+        ? Math.max(
+            vignette,
+            lowHealthVignette(vitals, view.gameOver, elapsed),
+            view.gameOver ? 0 : alertWash(!!view.alert, elapsed),
+          )
+        : 0
       const sw = app.screen.width
       const sh = app.screen.height
       for (const [ov, a] of [

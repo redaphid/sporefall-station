@@ -215,7 +215,37 @@ export const PROP_SPRITE: Record<string, string> = {
 }
 
 // Consumables/weapons that reuse another item's sprite.
-const ITEM_ALIAS: Record<string, string> = { bandage: 'medkit' }
+// Pickup item ids mapped to the closest themed `item.<id>` sprite key. This
+// exists because the sprite keys are ART names while the values here are GAME
+// item ids (`data/items.ts`), and the two vocabularies drifted.
+//
+// It is load-bearing, not cosmetic: the fallback chain ends at `sprites.item`,
+// which resolves to `item.default` — and in every shipped theme `item.default`
+// is the SAME file as `item.medkit` (biogel-kit.png). So an unaliased pickup
+// does not render as a neutral box, it renders as a MEDKIT, and the floor fills
+// with fake healing. Anything droppable therefore needs an entry here or its own
+// art.
+//
+// `grenade` is the sharpest case: `items/spore-grenade.png` ships in both themes
+// and was never once drawn, because the manifest keys it `item.grenade-item`
+// while the entity archetype is `pickup.grenade`.
+const ITEM_ALIAS: Record<string, string> = {
+  bandage: 'medkit',
+  // Thrown explosives — the spore-grenade art was already on disk.
+  grenade: 'grenade-item',
+  freezeGrenade: 'grenade-item',
+  gasGrenade: 'grenade-item',
+  // Thrown flasks share the molotov's bottle silhouette.
+  chloroform: 'molotov',
+  // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
+  machinegun: 'shotgun',
+  flamethrower: 'shotgun',
+  freezeRay: 'shotgun',
+  tranquilizer: 'pistol',
+  stunGun: 'pistol',
+  // Blunt melee wears the root-club.
+  sledgehammer: 'bat',
+}
 
 // Archetypes with a dedicated character sprite; the rest reuse the cop body.
 const SPRITE_ARCHETYPES: Record<string, keyof SpriteTextures> = {

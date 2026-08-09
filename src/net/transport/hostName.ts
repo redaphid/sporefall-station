@@ -14,6 +14,36 @@
  */
 export const ADVERTISE_NAME_MAX = 8
 
+/** Hard limit on a legacy advertisement PDU. Over this, Android answers
+ * ADVERTISE_FAILED_DATA_TOO_LARGE — and does so silently (see advertisementBytes). */
+export const ADVERTISE_PDU_MAX = 31
+
+/** AD-structure overheads, mirroring AOSP BluetoothLeAdvertiser: a mandatory
+ * flags structure in a connectable advert, then 1 length + 1 type byte per field. */
+const FLAGS_FIELD_BYTES = 3
+const OVERHEAD_BYTES_PER_FIELD = 2
+const UUID_128_BYTES = 16
+
+/**
+ * Size in bytes of the legacy advertisement PDU we are asking Android to broadcast.
+ * Mirrors AOSP's BluetoothLeAdvertiser.totalBytes(): exceed ADVERTISE_PDU_MAX and
+ * the stack calls postStartFailure(ADVERTISE_FAILED_DATA_TOO_LARGE) and RETURNS
+ * WITHOUT THROWING — so the capgo plugin's call.resolve() still runs, our await
+ * still succeeds, and the host reports it is advertising while the radio is quiet.
+ * Nothing at runtime will tell us we are over budget, so we measure it here.
+ *
+ * The name is measured as UTF-8, because that is what goes on the air. JS string
+ * length counts UTF-16 code units and under-counts every non-ASCII character —
+ * an emoji is 2 code units but 4 bytes.
+ */
+export const advertisementBytes = (opts: { name?: string | null; serviceUuids?: number }): number => {
+  let size = FLAGS_FIELD_BYTES
+  size += (opts.serviceUuids ?? 0) * (OVERHEAD_BYTES_PER_FIELD + UUID_128_BYTES)
+  const name = opts.name ?? ''
+  if (name) size += OVERHEAD_BYTES_PER_FIELD + new TextEncoder().encode(name).length
+  return size
+}
+
 /**
  * Host side: turn a display name into the short local name we put on the air.
  * Collapses whitespace, truncates to the advertisement budget, and falls back to

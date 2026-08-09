@@ -77,19 +77,37 @@ export class BleHostTransport implements Transport {
       }
       this.emit({ type: 'data', peer: ev.deviceId, bytes: new Uint8Array(ev.value) })
     })
-    // We put the name back IN the advertisement so the join list can label each
-    // host (issue #35). The catch: a 128-bit service UUID (18B) + flags (3B) leaves
-    // only ~8 bytes for the local name in the 31-byte legacy PDU. A longer name
-    // fails Android's advertiser with ADVERTISE_FAILED_DATA_TOO_LARGE — silently,
-    // because the plugin resolves before its async onStartFailure fires. So the
-    // name is already truncated to that budget in the constructor (toAdvertiseName),
-    // and includeName:true fits. Centrals read it via getScanRecord().getDeviceName().
-    // The full player name still arrives after connect, in the lobby.
-    this.log(`host: startAdvertising svc=${BLE_SERVICE_UUID.slice(0, 8)}… name="${this.advertiseName}"`)
+    // The name is deliberately kept OUT of the advertisement. #35 put it in
+    // (includeName:true) to label the join list; that broke discovery outright,
+    // because the budget maths only works in the best case and the best case is
+    // not what ships:
+    //
+    //   flags (3B) + 128-bit service UUID (18B) + name header (2B) = 23B of the
+    //   31-byte legacy PDU, leaving exactly 8 bytes of name. Zero headroom.
+    //
+    // Worse, includeName does not put OUR string on the air. The capgo plugin
+    // implements it as bluetoothAdapter.setName(name) followed immediately by
+    // AdvertiseData.setIncludeDeviceName(true) — and setName returns true when the
+    // rename is ACCEPTED, not when it has taken effect. setIncludeDeviceName makes
+    // the stack substitute the adapter's CURRENT name at PDU-assembly time, so
+    // losing that race puts the phone's real name ("Pixel 8 Pro", 11B) in the
+    // packet and blows the budget.
+    //
+    // Android then answers ADVERTISE_FAILED_DATA_TOO_LARGE *silently*: AOSP's
+    // BluetoothLeAdvertiser calls postStartFailure() and returns WITHOUT throwing,
+    // so the plugin's call.resolve() runs, this await succeeds, onStartFailure
+    // fires later into a handler that only restores the adapter name — and the
+    // host sits on "waiting for a central to join" while nothing is on the air.
+    //
+    // Centrals discover us by service UUID and label hosts from the deviceId
+    // (toHostLabel); the real player name arrives after connect, in the lobby.
+    // Keeping the name off the air also stops hosting from renaming the user's
+    // phone globally, which setName does and only undoes on a clean stopAdvertising.
+    this.log(`host: startAdvertising svc=${BLE_SERVICE_UUID.slice(0, 8)}… (name off adv)`)
     await BluetoothLowEnergy.startAdvertising({
       name: this.advertiseName,
       services: [BLE_SERVICE_UUID],
-      includeName: true,
+      includeName: false,
     })
     this.log('host: advertising — waiting for a central to join')
   }

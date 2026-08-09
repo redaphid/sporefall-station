@@ -200,6 +200,71 @@ CHARS = {
                 "green skin, moss, olive, tall, slim, hulking muscular, "
                 "ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
                 "cast shadow on the ground, diorama"),
+    # ── #78 Sporefall threat roster ──────────────────────────────────────────
+    # These six archetypes SPAWN IN NORMAL PLAY and every one of them was
+    # rendering as the same grey procedural eyeball. Each new kind has to clear
+    # the same bar the stalker did: diverge from the whole existing cast on BOTH
+    # axes — silhouette AND dominant color — or the pack reads as one creature
+    # in six tints. What is already taken:
+    #   vine-ranger  upright biped   / teal + orange visor
+    #   spore-drone  floating pod    / grey metal
+    #   bog-mutant   hulking biped   / olive green
+    #   mycologist   biped           / pale white-grey
+    #   derelict-bot box on treads   / rust tan-orange
+    #   frog-settler squat + round   / mottled green
+    #   mireclaw     low horizontal  / near-black chitin
+    "brute": ("carapace-brute",
+              "a massive armored quadruped siege-beast, four thick pillar legs, a broad "
+              "domed bone-plate head shield lowered like a battering ram, overlapping "
+              "pale bone-tan carapace plates across a heavy humped back, tiny deep-set "
+              "eyes beneath the head shield, short thick tail, built low and heavy and "
+              "twice as wide as a person, chunky proportions",
+              # Four legs + a bone shield is the whole idea; the bog-mutant is the
+              # trap this one falls into (both are "big and strong").
+              "human, person, humanoid, upright, standing biped, two legs, torso, arms, "
+              "hands, fists, spacesuit, helmet, visor, orange cap, teal suit, olive green "
+              "skin, moss, hovering, floating, tank treads, boxy robot, mushroom, thin, "
+              "slim, spindly, six legs, insect, crab, frog, big round eyes, " + NEG_GROUND),
+    "cinder": ("cinder-husk",
+               "a gaunt smouldering ash husk, charred near-black cracked body with molten "
+               "ember-orange light burning out of deep fissures across its chest and "
+               "shoulders, long thin arms ending in clawed hands, hunched narrow shoulders, "
+               "no face at all except a glowing orange slit where the eyes would be, thin "
+               "wisps of ash smoke rising off its back, lean and starved",
+               "hulking muscular, broad shoulders, bulky, armor plates, carapace, "
+               "spacesuit, helmet, visor, orange cap, teal suit, green skin, moss, olive, "
+               "mushroom, hovering, floating, tank treads, boxy robot, six legs, insect, "
+               "crab, frog, big round eyes, campfire, bonfire, torch, " + NEG_GROUND),
+    "sporeling": ("sporeling-mite",
+                  "a tiny scuttling fungal critter, one oversized pale cream mushroom cap "
+                  "dome covering almost its whole body, glowing green gills underneath the "
+                  "cap rim, four stubby little legs poking out below, no arms at all, two "
+                  "pinprick eyes in the shadow under the cap, knee-high, small and round "
+                  "and low to the ground",
+                  "human, person, humanoid, upright, standing biped, tall, large, huge, "
+                  "hulking, muscular, spacesuit, helmet, visor, orange cap, teal suit, "
+                  "arms, hands, weapon, robot, treads, hovering, six legs, crab, claws, "
+                  "frog face, wide mouth, dark chitin, " + NEG_GROUND),
+    "lurker": ("gloom-lurker",
+               "a tall narrow ambusher creature coiled tight and vertical, a thin slab-flat "
+               "dark teal body, four long limbs folded hard against its sides like a closed "
+               "trap ready to spring open, a smooth eyeless head with a cluster of small "
+               "glowing violet eyespots running down one edge, an extremely narrow upright "
+               "silhouette barely wider than a post and taller than a person",
+               "wide, broad, bulky, hulking, muscular, chunky, spacesuit, helmet, visor, "
+               "orange cap, teal spacesuit, leather straps, gear, olive green skin, moss, "
+               "mushroom cap, hovering, floating, tank treads, boxy robot, six splayed "
+               "legs, low horizontal body, crab, frog, big round eyes, face, mouth, "
+               + NEG_GROUND),
+    "pod": ("brood-sac",
+            "a bulbous organic egg sac rooted to the floor, a fat teardrop bulb of taut "
+            "sickly olive-yellow membrane webbed with dark veins, a vertical split seam "
+            "down the front leaking green bioluminescent light, a knot of short fibrous "
+            "roots gripping the floor at its base, no legs, no arms, no head",
+            "human, person, humanoid, figure, character, face, eyes, mouth, arms, hands, "
+            "legs, walking, standing, spacesuit, helmet, visor, teal suit, robot, treads, "
+            "metal, barrel, crate, box, canister, mushroom cap, insect, crab, six legs, "
+            "hovering, floating, " + NEG_GROUND),
 }
 CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
 

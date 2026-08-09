@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Frost freezes; the next hit cracks it hard',
   'Guns fire forever: ammo is gone',
   'Dodge-roll now dodges stuns, not just hits',
   'Co-op: no more freezing on a lost packet',
-  'Co-op: your friend sees the real objects',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

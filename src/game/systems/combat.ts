@@ -82,6 +82,34 @@ const shatter = (w: World, target: Entity): void => {
   kill(w, target)
 }
 
+/**
+ * Resolve one blow. Returns the damage ACTUALLY APPLIED, or `null` if the blow
+ * never landed at all.
+ *
+ * ⚠️ `null` and `0` mean different things, and conflating them breaks real
+ * weapons. `null` = the blow was voided (i-frames, dodge-roll, downed, dead, an
+ * object under its damage threshold) and NOTHING about it should happen. `0` =
+ * it genuinely landed but took no hp — a pure-utility hit such as the freeze
+ * ray, whose entire job is its status. Callers must test `!== null`, never
+ * truthiness, or every 0-damage utility weapon silently stops working.
+ *
+ * The return value is load-bearing, not a convenience. It closes two defects
+ * that were both symptoms of this function returning `void`:
+ *
+ *  - Everything a hit does BESIDES damage — applying an element, healing via
+ *    lifesteal, firing a mod trigger — ran unconditionally, because no caller
+ *    could tell this function had bailed out. i-frames, the dodge-roll and the
+ *    downed state therefore suppressed the DAMAGE only: you could roll through a
+ *    sledgehammer swing, take nothing, and be stunned anyway, which defeats the
+ *    single counterplay the game offers against being locked down.
+ *  - Effects that SCALE with damage had no way to read what was actually dealt,
+ *    so lifesteal paid out on the bullet's INTENDED damage and never saw resist:
+ *    a 0.35-armoured brute absorbed 65% of the blow while the shooter was paid
+ *    in full.
+ *
+ * Returning the applied amount makes any future damage-scaled effect correct by
+ * construction, rather than by remembering to patch it.
+ */
 export const applyDamage = (
   w: World,
   target: Entity,
@@ -90,10 +118,10 @@ export const applyDamage = (
   fromY: number,
   knockback: number,
   attackerId: number,
-): void => {
-  if (!target.health || target.dead || target.health.iframes > 0) return
-  if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
-  if (isRolling(target, w.tick)) return // dodge-roll i-frames: roll THROUGH bullets/melee
+): number | null => {
+  if (!target.health || target.dead || target.health.iframes > 0) return null
+  if (target.playerCtl?.downed) return null // downed players are out of the fight, not a piñata
+  if (isRolling(target, w.tick)) return null // dodge-roll i-frames: roll THROUGH bullets/melee
   // A frozen body shatters on impact — but NOT a player. The shatter rule is an
   // instant kill regardless of the blow's damage, and a player has no answer to
   // it: freeze is applied BY enemies (freeze ray / freeze grenade, 120 ticks =
@@ -109,7 +137,15 @@ export const applyDamage = (
   //
   // Enemies still shatter, so freeze remains a genuine execute when YOU throw it.
   if (isFrozen(target)) {
-    if (!target.playerCtl) return shatter(w, target)
+    if (!target.playerCtl) {
+      shatter(w, target)
+      // Reports 0 DEALT, deliberately: the blow landed, but the ice did the
+      // killing, not the bullet. Reporting the shattered body's whole hp pool
+      // here would let a single lifesteal round heal a 320hp boss's lifebar off
+      // a grenade somebody else threw — a brand-new exploit created by fixing
+      // this one. You are paid for damage you deal, and shatter deals none.
+      return 0
+    }
     removeStatus(target, 'frozen')
   }
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
@@ -118,7 +154,7 @@ export const applyDamage = (
   // #78 damage affinity: armoured bodies shrug off impact, flammable ones don't.
   // Impact/explosion damage is 'physical'; missing table → ×1 (unchanged).
   amount = Math.round(amount * resistMult(target, 'physical'))
-  if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
+  if (resistsDamage(target, amount)) return null // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
   // Stamp the last-hurt tick: passive regen (systems/regen.ts) counts its
@@ -168,6 +204,7 @@ export const applyDamage = (
     if (isObject(target)) destroyObject(w, target, attackerId)
     else kill(w, target)
   }
+  return amount
 }
 
 export const kill = (w: World, target: Entity): void => {
@@ -239,8 +276,17 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     if ((adx / alen) * tx + (ady / alen) * ty < -0.2) finalDamage *= 3
     attacker.status.cloakUntil = w.tick // attacking breaks cloak
   }
-  applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
-  return best
+  // Report the target ONLY if the blow actually landed. `fireWeapon`'s melee
+  // branch applies the weapon's element and its mod triggers to whatever this
+  // returns, so handing back a target whose damage was voided by i-frames, a
+  // dodge-roll or the downed state is what let a sledgehammer stun a player who
+  // had successfully rolled through the swing.
+  //
+  // `!== null`, NOT truthiness: a 0-damage melee weapon lands for 0 and must
+  // still apply its status.
+  return applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id) !== null
+    ? best
+    : null
 }
 
 /** Resolved bullet-behavior spec carried onto a spawned projectile (weapon mods). */

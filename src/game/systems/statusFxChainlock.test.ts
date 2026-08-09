@@ -138,15 +138,32 @@ describe('immobilize anti-chain-lock', () => {
     expect(free).toBeGreaterThan(0)
   })
 
-  it('legacy stun/sleep are untouched — no fx, no lockout tracker', () => {
+  // This test used to assert that stun/sleep create NO lockout tracker, which
+  // documented the HOLE rather than a feature: those two immobilize as totally
+  // as `frozen` but were a flat overwrite, so any two attackers landing hits
+  // closer together than the duration reset the timer forever. A sledgehammer is
+  // 20 ticks on a 28-tick swing and is NOT archetype-locked — it is in
+  // NPC_ARSENAL, so ordinary mobs roll it. They now ride the same guard, on
+  // their own independent tracks.
+  it('legacy stun/sleep keep their own counters but DO get a lockout tracker now', () => {
     const e = victim(w)
     applyStatus(w, e, 'stun', 20)
     expect(e.status!.stun).toBe(20)
-    expect(e.fx?.electrified).toBeUndefined()
-    expect(e.lockout).toBeUndefined() // legacy timers don't create immobilize trackers
+    expect(e.fx?.electrified).toBeUndefined() // still counter-based, not an fx entry
+    expect(e.lockout!.stun).toBeDefined()
     applyStatus(w, e, 'sleep', 150)
     expect(e.status!.sleep).toBe(150)
-    expect(e.lockout).toBeUndefined()
+    expect(e.lockout!.sleep).toBeDefined()
+    expect(e.lockout!.stun).toBeDefined() // independent tracks, not shared
+  })
+
+  it('a second attacker cannot refresh a running stun — the perma-lock is closed', () => {
+    const e = victim(w)
+    applyStatus(w, e, 'stun', 20) // attacker A
+    e.status!.stun = 6 // most of it has ticked away
+    w.tick += 14
+    applyStatus(w, e, 'stun', 20) // attacker B lands mid-lock
+    expect(e.status!.stun).toBe(6) // NOT re-armed to 20
   })
 
   it('does NOT catch non-immobilize statuses — DOTs still refresh on reapply', () => {

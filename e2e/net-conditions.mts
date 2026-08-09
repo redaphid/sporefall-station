@@ -76,6 +76,10 @@ export interface Conditions {
   perPacketMs: number
   /** Transport MTU. 180 = BLE; 65536 = the WS relay. */
   maxPacket: number
+  /** Preserve delivery order, as a single BLE connection does (ATT/L2CAP on one
+   * link never reorders). Set false only to model a reordering link, which BLE
+   * is NOT — keep it true for anything meant to predict phone behaviour. */
+  ordered?: boolean
 }
 
 const BLE_BASE: Conditions = { latencyMs: 25, jitterMs: 5, lossPct: 0, perPacketMs: 4, maxPacket: BLE_MAX_PACKET }
@@ -101,6 +105,8 @@ class ConditionedHub {
   private rnd: () => number
   /** Link is up but delivering nothing — "walked out of range", pre-timeout. */
   private blackhole = false
+  /** Per-direction last scheduled delivery time, for in-order delivery. */
+  private lastDelivery = new Map<string, number>()
   /** Optional wire tamper, used by --self-test to prove the harness can fail. */
   tamper: ((bytes: Uint8Array) => Uint8Array) | null = null
 
@@ -114,7 +120,7 @@ class ConditionedHub {
       maxPacket: cond.maxPacket,
       start: async () => {},
       stop: async () => {},
-      sendPacket: (peer, bytes) => this.transmit(bytes, (b) => this.centrals.get(peer)?.(b)),
+      sendPacket: (peer, bytes) => this.transmit(`h2c:${peer}`, bytes, (b) => this.centrals.get(peer)?.(b)),
       on: (h) => {
         this.hostHandler = h
         return () => {}
@@ -131,7 +137,7 @@ class ConditionedHub {
    * Put one packet on the wire. Resolves after the tx slot is spent (this is
    * what paces SendQueue), while delivery lands later after latency+jitter.
    */
-  private async transmit(bytes: Uint8Array, deliver: (b: Uint8Array) => void): Promise<void> {
+  private async transmit(dir: string, bytes: Uint8Array, deliver: (b: Uint8Array) => void): Promise<void> {
     this.stats.sent++
     this.stats.bytes += bytes.length
     if (bytes.length > this.cond.maxPacket) throw new Error(`packet ${bytes.length}B exceeds MTU ${this.cond.maxPacket}`)
@@ -141,7 +147,14 @@ class ConditionedHub {
     const copy = new Uint8Array(bytes)
     if (!lost) {
       const jitter = (this.rnd() * 2 - 1) * this.cond.jitterMs
-      const delay = Math.max(0, this.cond.latencyMs + jitter)
+      let delay = Math.max(0, this.cond.latencyMs + jitter)
+      if (this.cond.ordered !== false) {
+        // A single BLE connection delivers in order: a jittered packet can be
+        // late but can never overtake the one in front of it.
+        const at = Math.max(Date.now() + delay, (this.lastDelivery.get(dir) ?? 0) + 0.5)
+        this.lastDelivery.set(dir, at)
+        delay = Math.max(0, at - Date.now())
+      }
       setTimeout(() => {
         this.stats.delivered++
         deliver(this.tamper ? this.tamper(copy) : copy)
@@ -179,7 +192,7 @@ class ConditionedHub {
       stop: async () => {},
       sendPacket: (_p, bytes) => {
         if (!this.centrals.has(peer)) throw new Error('link down')
-        return this.transmit(bytes, (b) => this.hostHandler?.({ type: 'data', peer, bytes: b }))
+        return this.transmit(`c2h:${peer}`, bytes, (b) => this.hostHandler?.({ type: 'data', peer, bytes: b }))
       },
       on: (h) => {
         clientHandler = h
@@ -553,6 +566,11 @@ const PROFILES: Profile[] = [
   { name: 'soak-loss-1pct-60s', cond: { ...BLE_BASE, lossPct: 1 }, seconds: 60, posTolerance: 5 },
   { name: 'soak-loss-5pct-60s', cond: { ...BLE_BASE, lossPct: 5 }, seconds: 60, posTolerance: 5 },
   { name: 'soak-clean-60s', cond: { ...BLE_BASE }, seconds: 60, posTolerance: 4 },
+  // Controls: identical but with an explicitly REORDERING link, to separate
+  // "loss wedges the stream" from "my model reordered packets".
+  { name: 'ctl-reordering-clean-60s', cond: { ...BLE_BASE, jitterMs: 40, ordered: false }, seconds: 60, posTolerance: 5 },
+  { name: 'ctl-ordered-clean-60s', cond: { ...BLE_BASE, jitterMs: 40, ordered: true }, seconds: 60, posTolerance: 5 },
+  { name: 'ctl-ordered-loss1-60s', cond: { ...BLE_BASE, jitterMs: 40, lossPct: 1, ordered: true }, seconds: 60, posTolerance: 5 },
   {
     name: 'out-of-range-3s',
     cond: { ...BLE_BASE },

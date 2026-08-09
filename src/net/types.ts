@@ -44,6 +44,12 @@ export const MsgType = {
 } as const
 export type MsgTypeId = (typeof MsgType)[keyof typeof MsgType]
 
+const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))
+
+/** Does this first byte name a real message? The framing layer uses it to tell
+ * a genuine message start from payload bytes that merely parse as a header. */
+export const isKnownMsgType = (t: number): boolean => KNOWN_MSG_TYPES.has(t)
+
 export type TransportEvent =
   | { type: 'peerConnected'; peer: PeerId }
   | { type: 'peerDisconnected'; peer: PeerId; reason: 'remote' | 'local' | 'error' }

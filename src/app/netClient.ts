@@ -20,7 +20,7 @@ import {
   type WelcomeMsg,
   type WireSnapshot,
 } from '../net/protocol/messages'
-import { MsgType, PROTOCOL_VERSION, type Transport } from '../net/types'
+import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type Transport } from '../net/types'
 import type { RenderView, Session } from './session'
 
 const SMOOTH = 0.45 // remote entities chase their snapshot target per tick
@@ -51,7 +51,19 @@ export class NetClientSession implements Session {
   private selfId = -1
   private self?: Entity
   private queue!: SendQueue
-  private reader = new StreamReader()
+  /** Packet loss can desynchronise the framing while the transport link stays
+   * UP, so nothing would ever fire peerDisconnected. The reader detects that
+   * itself and resynchronises in-band; these counters surface it. */
+  streamDesyncs = 0
+  private reader = new StreamReader({
+    isValidStart: isKnownMsgType,
+    onDesync: (reason) => {
+      this.streamDesyncs++
+      this.onStreamDesync?.(reason)
+    },
+  })
+  /** Diagnostics hook (the on-screen co-op debug log wires this up). */
+  onStreamDesync?: (reason: string) => void
   private tickCount = 0
   private inputSeq = 0
   private pendingInputs: { seq: number; cmd: InputCmd }[] = []

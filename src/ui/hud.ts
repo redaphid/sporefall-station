@@ -1,6 +1,6 @@
 import { SPECIAL_NAME } from '../game/player'
 import type { RenderView } from '../app/session'
-import { hotbarSlots } from './hotbarModel'
+import { equippedModBadge, hotbarSlots } from './hotbarModel'
 
 export interface Hud {
   update(view: RenderView): void
@@ -41,8 +41,14 @@ export const createHud = (mount: HTMLElement): Hud => {
       const ability = self.playerCtl ? ` · ${SPECIAL_NAME}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
       const briefcase = self.loadout?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 🧪' : ''
       // No weapon name (one permanent weapon), no ammo, no cash, no bandage
-      // count — the info line is just the ability and the mission item.
-      const text = `${ability}${briefcase}`.replace(/^ · /, '')
+      // count. What DOES stay is the mod badge: mods ride on the weapon stack,
+      // and the hotbar no longer draws the weapon slot, so this is now the only
+      // always-visible readout of the build you have assembled. Dropping it with
+      // the rest of the weapon chrome would hide the run's whole progression
+      // behind the pause screen.
+      const badges = equippedModBadge(self)
+      const mods = badges ? ` · ${badges}` : ''
+      const text = `${mods}${ability}${briefcase}`.replace(/^ · /, '')
       if (text !== lastInfo) {
         lastInfo = text
         info.textContent = text

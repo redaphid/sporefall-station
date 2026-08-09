@@ -1,6 +1,7 @@
 import { CONSUMABLES, THROWABLES, WEAPONS, itemClass } from '../game/data/items'
 import { MODS } from '../game/data/mods'
-import type { ItemStack } from '../game/entity'
+import { weaponStack } from '../game/systems/inventory'
+import type { Entity, ItemStack } from '../game/entity'
 
 /** Human-readable name for any carried item id. */
 export const itemLabel = (itemId: string): string =>
@@ -42,6 +43,22 @@ export const hotbarSlots = (inv: ItemStack[], activeSlot: number): HotbarSlot[] 
   inv
     .map((s, index) => ({ index, itemId: s.itemId, label: itemLabel(s.itemId), qty: s.qty, active: index === activeSlot, mods: modBadge(s) }))
     .filter((s) => SHOWN.has(itemClass(s.itemId)))
+
+/**
+ * The mod-badge string for the player's PERMANENT weapon, for the always-on HUD.
+ *
+ * Load-bearing, and easy to delete by accident: mods live ONLY on the weapon's
+ * `ItemStack` (`weaponStack`), and the hotbar above no longer renders the weapon
+ * slot — correctly, since there is nothing to select. But the weapon slot's badge
+ * used to be the only always-visible mod readout during play. Without this, mods
+ * would be invisible the entire time you are actually fighting, and only appear
+ * when you PAUSE or DIE (the loadout panel) — i.e. the run's whole progression
+ * would be hidden exactly when it matters. The HUD reads this directly instead.
+ */
+export const equippedModBadge = (e: Entity): string => {
+  const stack = weaponStack(e)
+  return stack ? modBadge(stack) : ''
+}
 
 /** Whether the player is carrying anything throwable (grenade/molotov/etc). */
 export const hasThrowable = (inv: ItemStack[]): boolean => inv.some((s) => itemClass(s.itemId) === 'throwable')

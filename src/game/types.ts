@@ -123,6 +123,12 @@ export type SimEvent =
    * One event for the whole release (not one per door) — x/y is the gate. */
   | { type: 'doorsReleased'; count: number; x: number; y: number }
   | { type: 'missionComplete'; description: string }
+  /** STATION ALERT: the floor's objective was met and the station escalated —
+   * every door unsealed and popped open (`doorsOpened`), and every NPC on the
+   * floor is now hunting `focusId` (the intruder who took the prize). Fires once
+   * per floor, on the same tick as `missionComplete`. This is the loud one: the
+   * klaxon, the banner and the alarm wash all hang off it. */
+  | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
   | { type: 'noise'; x: number; y: number }
   | { type: 'runOver'; floor: number }

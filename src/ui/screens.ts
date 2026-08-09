@@ -196,7 +196,12 @@ export const createScreens = (
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
         for (const ev of view.events) {
+          // `stationAlert` lands on the same tick as `missionComplete` and is
+          // ordered after it, so the alert banner deliberately overwrites the
+          // completion banner: "you won" is much less useful right now than
+          // "every door just opened and the floor is coming for you".
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
+          else if (ev.type === 'stationAlert') showBanner('STATION ALERT — GET TO THE LAUNCH BAY')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
           else if (ev.type === 'modPickup' && ev.byId === view.self?.id) {
             const m = MODS[ev.modId]

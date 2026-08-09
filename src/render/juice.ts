@@ -85,6 +85,31 @@ export const lowHealthVignette = (
   return lowHealthPulse(self.hpFrac, tSec)
 }
 
+// --- Station alert wash (the escape run is on) -------------------------------
+
+/** Peak alpha of the alert wash. Deliberately well under `VIGNETTE_MAX` (0.5):
+ * it must read unmistakably as "the station is screaming" without burying the
+ * low-health warning, which shares the same red overlay and wins via `Math.max`. */
+export const ALERT_WASH_MAX = 0.22
+/** Sweeps per second — a slow rotating-beacon rhythm, not a strobe. */
+const ALERT_HZ = 0.8
+/** Floor fraction the wash never drops below while alerted, so the screen stays
+ * visibly tinted between sweeps rather than blinking fully clear. */
+const ALERT_FLOOR = 0.35
+
+/**
+ * Pulsing red wash while the station is on ALERT — the persistent, unmissable
+ * "you are being hunted" cue that lasts the whole escape run, as opposed to the
+ * one-shot klaxon/banner on the triggering event. `tSec` drives the sine so the
+ * caller owns the phase (the renderer passes its own elapsed clock; this is
+ * presentation only and never feeds the sim, so wall-clock here is fine).
+ */
+export const alertWash = (alerted: boolean, tSec: number): number => {
+  if (!alerted) return 0
+  const wave = 0.5 + 0.5 * Math.sin(tSec * ALERT_HZ * Math.PI * 2)
+  return ALERT_WASH_MAX * (ALERT_FLOOR + (1 - ALERT_FLOOR) * wave)
+}
+
 // --- Element post-tint (fire warm / frost cold), intensity 0..1 --------------
 
 const TINT_FADE = 1.2 // intensity/sec

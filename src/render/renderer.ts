@@ -16,6 +16,7 @@ import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
   addHitstop,
+  alertWash,
   decayTint,
   decayVignette,
   hitstopForEvent,
@@ -509,7 +510,17 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
               dead: !!self.dead,
             }
           : null
-      const red = juicing ? Math.max(vignette, lowHealthVignette(vitals, view.gameOver, elapsed)) : 0
+      // STATION ALERT wash rides the same red overlay as damage/low-health and
+      // loses to both via `Math.max`, so the alarm can never mask a hit landing
+      // or a critical-health warning. Suppressed at game-over with the rest of
+      // the juice, so a lost run isn't left pulsing under the restart overlay.
+      const red = juicing
+        ? Math.max(
+            vignette,
+            lowHealthVignette(vitals, view.gameOver, elapsed),
+            view.gameOver ? 0 : alertWash(!!view.alert, elapsed),
+          )
+        : 0
       const sw = app.screen.width
       const sh = app.screen.height
       for (const [ov, a] of [

@@ -339,6 +339,9 @@ export interface StateMsg {
   missionTargetId?: number
   gameOver: boolean
   alarm: number
+  /** STATION ALERT latched on this floor (objective met, escape run on). Optional
+   * on the wire for back-compat with an older host. */
+  alert?: boolean
   /** Difficulty rules in force (host authoritative). */
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */

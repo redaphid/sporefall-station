@@ -26,6 +26,13 @@ NAMES = {
     "shopkeeper": "Barter Frog",
     "scientist": "Mycologist",
     "robot": "Derelict Unit",
+    # #78 Sporefall threat roster.
+    "brute": "Carapace Brute",
+    "cinder": "Cinder Husk",
+    "sporeling": "Spore Mite",
+    "stalker": "Mireclaw Stalker",
+    "lurker": "Gloom Lurker",
+    "pod": "Brood Sac",
     "crate": "Cargo Pod",
     "barrel": "Spore Barrel",
     "atm": "Cryo Terminal",

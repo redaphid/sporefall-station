@@ -314,5 +314,29 @@
  "extra.chars/spore-drone-s-attack-2.png": {
   "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-2/char-spore-drone-s-attack-2-s414600_00004_.png",
   "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "char.mireclaw-stalker.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.mireclaw-stalker.s-idle.png"
+ },
+ "char.sporeling-mite.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.sporeling-mite.s-idle.png"
+ },
+ "char.carapace-brute.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.carapace-brute.s-idle.png"
+ },
+ "char.cinder-husk.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.cinder-husk.s-idle.png"
+ },
+ "char.gloom-lurker.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.gloom-lurker.s-idle.png"
+ },
+ "char.brood-sac.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.brood-sac.s-idle.png"
  }
 }

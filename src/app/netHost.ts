@@ -20,7 +20,7 @@ import {
   type StateMsg,
   type WireEntity,
 } from '../net/protocol/messages'
-import { MsgType, PROTOCOL_VERSION, SNAPSHOT_INTERVAL_TICKS, type PeerId, type Transport } from '../net/types'
+import { isKnownMsgType, MsgType, PROTOCOL_VERSION, SNAPSHOT_INTERVAL_TICKS, type PeerId, type Transport } from '../net/types'
 import type { RenderView, Session } from './session'
 
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
@@ -72,6 +72,8 @@ const REJOIN_GRACE_TICKS = 90 * 30
  */
 export class NetHostSession implements Session {
   world: World
+  /** Client->host framing desyncs recovered in-band (see chunkedStream.ts). */
+  streamDesyncs = 0
   self!: Entity
   readonly peersBySlot = new Map<number, PeerState>()
   private peers = new Map<PeerId, PeerState>()
@@ -292,7 +294,10 @@ export class NetHostSession implements Session {
       name: '',
       token: '',
       queue: new SendQueue(this.transport, peer, () => this.onPeerLost(peer)),
-      reader: new StreamReader(),
+      reader: new StreamReader({
+        isValidStart: isKnownMsgType,
+        onDesync: () => this.streamDesyncs++,
+      }),
       lastInputSeq: 0,
       latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false, roll: false },
       pendingEdges: 0,

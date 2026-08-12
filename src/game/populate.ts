@@ -576,6 +576,18 @@ const SHOP_STOCK = [
   'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit',
 ]
 
+/** Every item id the level generator can lay on the floor as a `pickup.<id>`:
+ * the deepest loot table plus everything a shop can stock. NPC weapon drops add
+ * to this at runtime (see combat.ts `isDroppableWeapon`) and are unioned in by
+ * the caller rather than here, so this stays a pure statement about level gen.
+ *
+ * Exported for `itemArtResolution.test.ts`, which asserts every one of these has
+ * real art. `banana` sat in this list for its whole life with no `ITEM_ALIAS`
+ * entry and silently rendered as a medkit; the test exists so the next id added
+ * here cannot repeat that. Derived from the tables rather than restated, so a
+ * new loot entry is covered automatically. */
+export const LOOT_ITEM_IDS: readonly string[] = [...new Set([...lootTable(Number.MAX_SAFE_INTEGER), ...SHOP_STOCK])]
+
 const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number): void => {
   const e = makeEntity('pickup', `pickup.${itemId}`, x, y, 0.3)
   e.pickup = { itemId, qty }

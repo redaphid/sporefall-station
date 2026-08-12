@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Crates look right; no more fake medkits',
   'Phones can find your game again',
   'Being frozen no longer means instant death',
   'Grenades and guns look like themselves',
-  'Enemies no longer get stuck in corners',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

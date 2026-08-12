@@ -122,11 +122,69 @@ def has_alpha(im: Image.Image) -> bool:
     return bool((a < 250).any())
 
 
+def strip_ground_shadow(im: Image.Image, dark_frac: float = 0.08,
+                        width_mult: float = 1.5, lum_tol: float = 20.0,
+                        sat_max: float = 0.18) -> tuple[Image.Image, int]:
+    """Drop a painted cast shadow that the background key kept as part of the sprite.
+
+    Rembg does NOT save us here: u2net reads the ellipse of shadow under a
+    creature as part of the subject and hands it back at alpha 249-255, so no
+    alpha threshold separates them. Un-removed it survives the downscale as a
+    light grey SLAB under the sprite — a third of the height at 48px.
+
+    The discriminator is the LOOK prompt itself: every real part of the art
+    carries bold dark outlines, and a soft airbrushed shadow carries none. So
+    find the contiguous run of rows at the BOTTOM with essentially no dark
+    pixels, require that the run contains a blob much wider than the sprite's
+    typical row (a shadow spreads, feet do not), then clear only the pixels in
+    that band matching the shadow's own flat, desaturated tone. Working per
+    PIXEL rather than per ROW is what keeps the legs standing in it.
+
+    Conservative by construction: if no such band is found the image is returned
+    untouched, which is what happens for every sprite whose lowest rows are real
+    outlined art.
+    """
+    a = np.asarray(im.convert("RGBA")).astype(np.float32).copy()
+    al = a[..., 3]
+    ys, _xs = np.where(al > 128)
+    if not len(ys):
+        return im, 0
+    y0, y1 = int(ys.min()), int(ys.max())
+    lum = 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
+    rows = range(y0, y1 + 1)
+    n = np.zeros(len(rows)); d = np.ones(len(rows))
+    for i, y in enumerate(rows):
+        m = al[y] > 128
+        c = int(m.sum()); n[i] = c
+        if c:
+            d[i] = float((lum[y][m] < 90).mean())
+    med = float(np.median(n[n > 0]))
+    k = 0
+    for i in range(len(n) - 1, -1, -1):
+        if d[i] < dark_frac:
+            k += 1
+        else:
+            break
+    if k == 0 or n[len(n) - k:].max() <= width_mult * med:
+        return im, 0
+    widest = int(np.argmax(n[len(n) - k:])) + (y1 - k + 1)
+    m = al[widest] > 128
+    shadow_lum = float(np.median(lum[widest][m]))
+    mx = a[..., :3].max(axis=2); mn = a[..., :3].min(axis=2)
+    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1.0), 0.0)
+    band = np.zeros(al.shape, bool)
+    band[y1 - k + 1: y1 + 1] = True
+    kill = band & (al > 0) & (np.abs(lum - shadow_lum) <= lum_tol) & (sat < sat_max)
+    a[..., 3][kill] = 0
+    return Image.fromarray(a.astype(np.uint8), "RGBA"), int(kill.sum())
+
+
 def sprite(src: Image.Image, canvas: int, content: int | None = None,
            anchor: str = "bottom") -> Image.Image:
-    """Full sprite post: (background-key if the raw has no alpha) -> bbox ->
-    k-centroid to fit `content` px -> palette -> place on a transparent `canvas`
-    px square (feet at bottom-center for characters, centered for props/items).
+    """Full sprite post: (background-key if the raw has no alpha) -> strip any
+    painted ground shadow -> bbox -> k-centroid to fit `content` px -> palette ->
+    place on a transparent `canvas` px square (feet at bottom-center for
+    characters, centered for props/items).
 
     The durable character anchor raws are 512px RGB on a BLACK backdrop with no
     alpha; without keying, bbox_crop would keep the whole black frame as a box
@@ -140,6 +198,9 @@ def sprite(src: Image.Image, canvas: int, content: int | None = None,
         # frame opaque, so pick by the sampled corner's brightness.
         bg_lum = float(corner_bg(src) @ np.array([0.299, 0.587, 0.114], np.float32))
         src = flat_key(src) if bg_lum > 128 else black_key(src)
+    # Before bbox: the shadow inflates the bounding box, so leaving it in both
+    # draws the slab AND shrinks the creature to make room for it.
+    src, _killed = strip_ground_shadow(src)
     im = bbox_crop(src)
     w, h = im.size
     if w >= h:

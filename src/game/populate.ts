@@ -1,7 +1,8 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { bunkerLaneKeys, isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
+import { bunkerLaneKeys, isSolidTile, isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
+import { groupProps, planRoom, PROP_PLACEMENT, ROOM_LAYOUT, type FreeTile, type Placement } from './levelgen/furnish'
 import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
 
@@ -264,52 +265,26 @@ const assignSquads = (w: World): void => {
   }
 }
 
-/** Room-type-appropriate interior furnishings. Reuses props that already have
- * art (crate/barrel/tv/toilet/vending/atm) plus the furniture archetypes, so a
- * room reads as WHAT IT IS at a glance: a bedroom holds bunks, a bathroom its
- * toilet, a shop floor its shelves and till, an armory its weapon lockers.
- * Repeats bias the weighting toward the room's signature prop. Everything here
- * is a soft, destructible object — never a solid tile — so it can't wall off a
- * room, block reachability, or trap an occupant. */
-export const ROOM_FURNISH: Record<RoomType, readonly string[]> = {
-  shopfloor: ['shelf', 'shelf', 'shelf', 'vending', 'atm', 'crate'],
-  stockroom: ['crate', 'crate', 'crate', 'shelf', 'barrel'],
-  living: ['tv', 'table', 'table', 'plant'],
-  bedroom: ['bunk', 'bunk', 'cabinet', 'plant'],
-  bathroom: ['toilet', 'cabinet'],
-  lobby: ['desk', 'bench', 'plant', 'vending'],
-  office: ['desk', 'desk', 'desk', 'cabinet', 'plant'],
-  storage: ['crate', 'crate', 'shelf', 'cabinet', 'barrel'],
-  waiting: ['bench', 'bench', 'plant', 'vending', 'tv'],
-  ward: ['bunk', 'bunk', 'cabinet', 'bench'],
-  supply: ['cabinet', 'cabinet', 'shelf', 'crate'],
-  guardpost: ['locker', 'crate', 'table', 'barrel'],
-  armory: ['locker', 'locker', 'locker', 'crate', 'barrel'],
-  barracks: ['bunk', 'bunk', 'locker', 'table'],
-  vault: ['locker', 'crate'],
+/** Which props a room type can hold, DERIVED from how that room type is laid
+ * out (`ROOM_LAYOUT` in levelgen/furnish.ts — the recipes are the source of
+ * truth now, so the palette can never drift out of sync with what is actually
+ * placed). Kept exported because tests, the rooms-tour fixture generator and
+ * mission code all ask "what belongs in a room of this type?".
+ *
+ * A room still reads as WHAT IT IS at a glance — a bedroom holds bunks, a
+ * bathroom its toilet, a shop floor its shelves and till, an armory its weapon
+ * lockers — but the ARRANGEMENT of those props is what stops it looking like
+ * scattered junk, and that lives in ROOM_LAYOUT. Everything here is a soft,
+ * destructible object — never a solid tile — so it can't wall off a room, block
+ * reachability, or trap an occupant. */
+const derivePalettes = (): Record<RoomType, readonly string[]> => {
+  const out = {} as Record<RoomType, readonly string[]>
+  for (const type of Object.keys(ROOM_LAYOUT) as RoomType[]) out[type] = groupProps(ROOM_LAYOUT[type])
+  return out
 }
+export const ROOM_FURNISH: Record<RoomType, readonly string[]> = derivePalettes()
 
-/** Where a prop WANTS to stand, so placement reads like someone arranged the
- * room: shelving/lockers/beds/appliances back against a wall, toilets and
- * planters tucked into corners, tables out in the middle of the room, loose
- * crates anywhere. A preference degrades gracefully (corner → wall → anywhere)
- * when the preferred tiles are taken, so density and safety are unaffected. */
-export const PROP_PLACEMENT: Record<string, 'wall' | 'corner' | 'center' | 'any'> = {
-  shelf: 'wall',
-  cabinet: 'wall',
-  locker: 'wall',
-  bunk: 'wall',
-  tv: 'wall',
-  vending: 'wall',
-  atm: 'wall',
-  bench: 'wall',
-  desk: 'wall',
-  toilet: 'corner',
-  plant: 'corner',
-  barrel: 'corner',
-  table: 'center',
-  crate: 'any',
-}
+export { PROP_PLACEMENT }
 
 /** Hard ceiling on furnishings per room, so a big open hall gets a believable
  * few — not two dozen crates packed shoulder to shoulder. */
@@ -330,42 +305,24 @@ const wallNeighbours = (w: World, tx: number, ty: number): number => {
   return count
 }
 
-/** Free tiles matching a prop's placement preference, degrading gracefully:
- * corner → any wall → anywhere; wall → anywhere; center → anywhere. Always
- * non-empty while `free` is. */
-const placementCandidates = (free: readonly FreeTile[], pref: 'wall' | 'corner' | 'center' | 'any'): FreeTile[] => {
-  if (pref === 'corner') {
-    const corners = free.filter((t) => t.walls >= 2)
-    if (corners.length > 0) return corners
-  }
-  if (pref === 'corner' || pref === 'wall') {
-    const walls = free.filter((t) => t.walls >= 1)
-    if (walls.length > 0) return walls
-  }
-  if (pref === 'center') {
-    const open = free.filter((t) => t.walls === 0)
-    if (open.length > 0) return open
-  }
-  return [...free]
-}
-
-interface FreeTile {
-  x: number
-  y: number
-  /** Orthogonal wall-neighbour count (see wallNeighbours). */
-  walls: number
-}
-
 /** Deterministically furnish every building interior with ROOM-TYPE-appropriate
- * props, arranged how a room of that type would actually be laid out: the
- * bedroom's bunks and the stockroom's shelving back against a wall, the
- * bathroom's toilet in a corner, the living-room table mid-floor. Runs on a
- * DEDICATED `furnish` fork so it neither perturbs nor is perturbed by the
- * loot/AI/mod streams — same seed+floor → the same furniture on every peer, and
- * every pre-existing populate test stays byte-identical. Placement leaves every
- * doorway (and the tile just inside it), the player spawn tile and the exit tile
- * clear, never stacks two props on one tile, and caps density at ~¼ of a room's
- * free floor so rooms stay walkable — even degenerate 2×2 vaults and closets. */
+ * props, ARRANGED the way a room of that type actually would be: the stockroom's
+ * shelving ranked down one wall with the crates heaped in a corner, the office's
+ * desks in a row each with its chair pulled up, the living room's seats drawn up
+ * facing the screen, the bathroom's toilet tucked in a corner.
+ *
+ * The arrangement itself is `planRoom` (levelgen/furnish.ts); this pass decides
+ * WHICH TILES are eligible and how many props a room may hold, then spawns what
+ * the planner decided. Runs on a DEDICATED `furnish` fork so it neither perturbs
+ * nor is perturbed by the loot/AI/mod streams — same seed+floor → the same
+ * furniture on every peer.
+ *
+ * Placement leaves every doorway (and the tile just inside it), the player spawn
+ * tile and the exit tile clear, never stacks two props on one tile, and caps
+ * density at ~¼ of a room's free floor so rooms stay walkable — even degenerate
+ * 2×2 vaults and closets. `populate.reachability.test.ts` proves the stronger
+ * property the arrangement work put at risk: even treating every prop as if it
+ * were solid, every doorway, room and objective stays reachable. */
 const furnishInteriors = (w: World): void => {
   const rng = w.rng.fork('furnish')
   const lw = w.level.w
@@ -373,11 +330,14 @@ const furnishInteriors = (w: World): void => {
   const spawnTy = Math.floor(w.level.spawn.y)
   const exitTx = Math.floor(w.level.exit.x)
   const exitTy = Math.floor(w.level.exit.y)
-  for (const building of w.level.buildings) {
-    // Keep every doorway (and the tile immediately inside it) clear so a
-    // furnishing can never plug the only way in or out of a room.
-    const keepClear = new Set<number>()
-    for (const d of building.doors) {
+  // Keep EVERY doorway on the floor (and the tile immediately inside it) clear,
+  // not just the doorways of the building being furnished. Buildings share walls
+  // and hallway spines, so a room of building A can perfectly well contain the
+  // tile just inside building B's door — and when this set was built per-building
+  // that neighbour's doorway got plugged. Level-wide is the whole fix.
+  const keepClear = new Set<number>()
+  for (const b of w.level.buildings) {
+    for (const d of b.doors) {
       keepClear.add(d.y * lw + d.x)
       for (const [dx, dy] of ORTHO) keepClear.add((d.y + dy) * lw + (d.x + dx))
     }
@@ -385,7 +345,12 @@ const furnishInteriors = (w: World): void => {
     // straight legs — that lane is a promised-open contract, so furniture (a
     // soft body that shoves movers) never sits on it. Shared with the fortify
     // behavior so runtime barricades honor the same lane (bunkerLaneKeys).
-    for (const k of bunkerLaneKeys(building, lw)) keepClear.add(k)
+    for (const k of bunkerLaneKeys(b, lw)) keepClear.add(k)
+  }
+  // Plan every room first, then commit the whole floor through the circulation
+  // guard below — a placement is only safe in the context of every OTHER prop.
+  const planned: Placement[] = []
+  for (const building of w.level.buildings) {
     // generateLevel always fills roomTypes; the fallback covers hand-built
     // Buildings in tests/scenarios (assignRoomTypes is pure and rng-free).
     const types = building.roomTypes ?? assignRoomTypes(building)
@@ -408,18 +373,164 @@ const furnishInteriors = (w: World): void => {
       // A closet with fewer than two free tiles stays bare — nowhere to stand
       // otherwise. Everything roomier gets at least one furnishing.
       if (free.length < 2) continue
-      const palette = ROOM_FURNISH[types[ri]]
       const n = Math.min(FURNISH_MAX_PER_ROOM, Math.max(1, Math.floor(free.length / 4)))
-      for (let i = 0; i < n && free.length > 0; i++) {
-        // Pick WHAT first, then stand it WHERE that kind of prop belongs.
-        const prop = rng.pick(palette)
-        const cands = placementCandidates(free, PROP_PLACEMENT[prop] ?? 'any')
-        const cell = cands[rng.int(0, cands.length - 1)]
-        free.splice(free.indexOf(cell), 1) // remove so no two props ever stack
-        spawnObject(w, prop, cell.x, cell.y)
-      }
+      // Plan the whole room as related GROUPS (levelgen/furnish.ts).
+      const plan = planRoom(free, lw, (x, y) => isWallTile(tileAt(w.level, x, y)), ROOM_LAYOUT[types[ri]], n, rng)
+      for (const p of plan) planned.push(p)
     }
   }
+  commitFurniture(w, planned)
+}
+
+/**
+ * Commit planned furniture, refusing any single piece that would cut the floor.
+ *
+ * Arranging props into ranks and clumps is exactly what makes a layout pass
+ * capable of building a WALL out of furniture: a rank across a narrow room, a
+ * heap of crates grown over a three-wide passage. Props are soft bodies (a
+ * player shoves through one), so this was never fatal — but "you can barge
+ * through it" is a poor answer to "that room looks sealed", and the hazard is
+ * not new: the old scattered placement violated the same property on seed 1,
+ * floor 1 (see populate.reachability.test.ts, which fails on both).
+ *
+ * So each piece is admitted only if, treating every already-admitted prop as
+ * SOLID, it leaves every still-reachable tile reachable — and can itself be
+ * walked up to. Pieces are considered in plan order, so a room's first
+ * (signature) piece is judged against an almost-empty floor and effectively
+ * always lands; only the marginal piece that would seal something is dropped.
+ * Deterministic: it draws no rng at all, so same seed → same admissions.
+ *
+ * COST. The obvious implementation — re-flood the whole floor per piece — is
+ * correct and made level generation ~64× slower (1.2ms → 74ms per floor), which
+ * a phone pays at every floor transition. Almost every piece is decided instead
+ * by a LOCAL cut-vertex test on the eight tiles around it: if all of its open
+ * orthogonal neighbours sit in one connected arc of that ring, they can still
+ * reach each other around the piece, so removing the tile cannot disconnect
+ * anything and no flood is needed. Only the genuinely ambiguous piece (its
+ * neighbours split into separate arcs — a doorway, a corridor pinch) pays for a
+ * flood. Same admissions, a fraction of the work.
+ */
+const commitFurniture = (w: World, planned: readonly Placement[]): void => {
+  const lw = w.level.w
+  const lh = w.level.h
+  const blocked = new Set<number>()
+  const startX = Math.floor(w.level.spawn.x)
+  const startY = Math.floor(w.level.spawn.y)
+  /** Tiles reachable from the player spawn, treating `blocked` as solid. */
+  const reachable = (): Set<number> => {
+    const seen = new Set<number>()
+    const open = (tx: number, ty: number): boolean =>
+      tx >= 0 && ty >= 0 && tx < lw && ty < lh && !isSolidTile(w.level, tx, ty) && !blocked.has(ty * lw + tx)
+    if (!open(startX, startY)) return seen
+    const stack = [startY * lw + startX]
+    seen.add(stack[0])
+    while (stack.length > 0) {
+      const k = stack.pop()!
+      const tx = k % lw
+      const ty = (k - tx) / lw
+      for (const [dx, dy] of ORTHO) {
+        const nk = (ty + dy) * lw + (tx + dx)
+        if (seen.has(nk) || !open(tx + dx, ty + dy)) continue
+        seen.add(nk)
+        stack.push(nk)
+      }
+    }
+    return seen
+  }
+  const walkable = (tx: number, ty: number): boolean =>
+    tx >= 0 && ty >= 0 && tx < lw && ty < lh && !isSolidTile(w.level, tx, ty) && !blocked.has(ty * lw + tx)
+  /** Can a player stand next to the prop on `key` and act on it? */
+  const approachable = (key: number, reach: ReadonlySet<number>): boolean => {
+    const tx = key % lw
+    const ty = (key - tx) / lw
+    return ORTHO.some(([dx, dy]) => reach.has((ty + dy) * lw + (tx + dx)))
+  }
+  // The 8 ring offsets in CYCLIC order, so consecutive entries are themselves
+  // orthogonally adjacent — which is what lets a walk of the ring decide
+  // 4-connected reachability around the middle tile. Even indices are the
+  // orthogonal neighbours (N, E, S, W).
+  const RING = [
+    [0, -1], [1, -1], [1, 0], [1, 1],
+    [0, 1], [-1, 1], [-1, 0], [-1, -1],
+  ] as const
+  /** True when removing (tx,ty) provably cannot disconnect anything: all of its
+   * open orthogonal neighbours lie in ONE connected arc of the surrounding ring,
+   * so each can still reach the others by stepping around this tile. Conservative
+   * — `false` only means "not provable locally", and the caller then floods. */
+  const locallySafe = (tx: number, ty: number): boolean => {
+    const open: boolean[] = []
+    for (const [dx, dy] of RING) open.push(walkable(tx + dx, ty + dy))
+    const orth = [0, 2, 4, 6].filter((i) => open[i])
+    if (orth.length <= 1) return true // a leaf: nothing behind it to cut off
+    if (open.every((o) => o)) return true // wide open floor
+    // Label each open ring cell with the id of its cyclic arc.
+    const arc: number[] = new Array<number>(8).fill(-1)
+    let next = 0
+    for (let i = 0; i < 8; i++) {
+      if (!open[i] || arc[i] !== -1) continue
+      const id = next++
+      for (let k = 0; k < 8 && open[(i + k) % 8]; k++) arc[(i + k) % 8] = id
+    }
+    // Join the arcs that wrap across index 0.
+    if (open[0] && open[7] && arc[0] !== arc[7]) {
+      const from = arc[7]
+      for (let i = 0; i < 8; i++) if (arc[i] === from) arc[i] = arc[0]
+    }
+    return orth.every((i) => arc[i] === arc[orth[0]])
+  }
+  let reach = reachable()
+  for (const p of planned) {
+    const key = p.y * lw + p.x
+    // A tile the floor plan never connected to spawn in the first place is
+    // levelgen's business (a sealed vault chamber); furnishing it changes nothing.
+    if (!reach.has(key)) {
+      spawnPlanned(w, p)
+      continue
+    }
+    blocked.add(key)
+    // `after` is the reachable set once this tile is taken. When the local test
+    // proves nothing can be cut off, that is exactly `reach` minus this tile —
+    // no flood required.
+    let after: Set<number>
+    if (locallySafe(p.x, p.y)) {
+      after = reach
+      after.delete(key)
+    } else {
+      after = reachable()
+      if (after.size !== reach.size - 1) {
+        blocked.delete(key) // this piece would seal something off — leave it bare
+        continue
+      }
+    }
+    // It must be possible to walk up to the piece (to smash, loot or use it) —
+    // and it must not fence in a piece already standing beside it, because a
+    // later prop can steal the ONLY reachable neighbour an earlier one had.
+    let safe = approachable(key, after)
+    if (safe) {
+      for (const [dx, dy] of ORTHO) {
+        const nk = (p.y + dy) * lw + (p.x + dx)
+        if (blocked.has(nk) && nk !== key && !approachable(nk, after)) {
+          safe = false
+          break
+        }
+      }
+    }
+    if (!safe) {
+      blocked.delete(key)
+      if (after === reach) reach.add(key) // undo the in-place delete above
+      continue
+    }
+    reach = after
+    spawnPlanned(w, p)
+  }
+}
+
+const spawnPlanned = (w: World, p: Placement): void => {
+  const e = spawnObject(w, p.prop, p.x, p.y)
+  e.facing = p.facing
+  // A backed prop is drawn nudged into its wall (see render/sprites.ts), so a
+  // rank of shelving kisses the wall instead of floating a half-tile off it.
+  if (p.mounted) e.mount = 'wall'
 }
 
 /** #78 — inject the Sporefall threat roster (brute/cinder/sporeling/robot) into

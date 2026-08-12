@@ -13,7 +13,16 @@ import {
   type ResolvedAnim,
 } from './animState'
 import { composeMotion, IDENTITY_POSE, type MotionPose } from './motion'
-import { ARCHETYPE_SCALE, CHAR_PX, TILE_PX, type ArtRegistry, type CharSet, type DirPose } from './art'
+import {
+  ARCHETYPE_SCALE,
+  CHAR_PX,
+  ROTATES_WITH_FACING,
+  TILE_PX,
+  WALL_MOUNT_NUDGE,
+  type ArtRegistry,
+  type CharSet,
+  type DirPose,
+} from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
 import { weaponStack } from '../game/systems/inventory'
 import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
@@ -343,7 +352,14 @@ export class EntityViews {
       // 48px canvas); everything else centres on its position.
       const footX = x * TILE_PX
       const footY = character ? charFootPx(y, TILE_PX) : y * TILE_PX
-      view.sprite.position.set(footX + motion.dx, footY + motion.dy)
+      // A furnishing that stands against a wall is drawn nudged INTO that wall
+      // (which lies at `facing + π`), so a rank of shelving kisses the wall
+      // instead of hovering a half-tile out in the room. Presentation only — the
+      // entity itself never leaves its tile, so collision, tile ownership and
+      // every reachability guarantee are untouched.
+      const mountX = e.mount === 'wall' ? -Math.cos(e.facing) * WALL_MOUNT_NUDGE * TILE_PX : 0
+      const mountY = e.mount === 'wall' ? -Math.sin(e.facing) * WALL_MOUNT_NUDGE * TILE_PX : 0
+      view.sprite.position.set(footX + motion.dx + mountX, footY + motion.dy + mountY)
       view.facing = e.facing
       view.footX = footX
       view.footY = footY
@@ -375,7 +391,16 @@ export class EntityViews {
           view.sprite.scale.set((flip ? -scale : scale) * motion.sx, scale * motion.sy)
         }
       } else {
-        view.sprite.rotation = e.kind === 'pickup' || e.kind === 'door' || e.kind === 'fire' ? 0 : e.facing
+        // Top-down blobs rotate to their heading; pickups/doors/fire stay
+        // upright. Furnishings turn ONLY when their art is elongated top-down
+        // art that reads correctly turned (art.ROTATES_WITH_FACING) — a vending
+        // machine or a TV keeps its feet on the floor whichever wall it backs.
+        const upright =
+          e.kind === 'pickup' ||
+          e.kind === 'door' ||
+          e.kind === 'fire' ||
+          (e.kind === 'interactable' && !ROTATES_WITH_FACING.has(e.archetype))
+        view.sprite.rotation = upright ? 0 : e.facing
         view.sprite.scale.set(scale)
       }
       // y-sort: grounded entities stack by world y (feet), flames float above

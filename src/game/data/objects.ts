@@ -58,5 +58,11 @@ export const OBJECTS: Record<string, ObjectDef> = {
   bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['bandage', 'gasGrenade'] },
   locker: { id: 'locker', name: 'Weapons Locker', hp: 30, loot: ['knife', 'pistol', 'cash'] },
   table: { id: 'table', name: 'Table', hp: 16, flammable: true },
+  // The thing every table in this game was missing. A chair is placed BY the
+  // layout planner, never alone: pulled up to a desk, ringed round a table, or
+  // drawn up facing a screen — and turned to face whatever it belongs to. Light
+  // and cheap to smash, because its job is to say "someone sits here", not to
+  // be cover.
+  chair: { id: 'chair', name: 'Chair', hp: 10, flammable: true },
   plant: { id: 'plant', name: 'Planter', hp: 10, flammable: true },
 }

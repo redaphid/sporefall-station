@@ -110,6 +110,10 @@ export const ARCHETYPES = [
   'toilet',
   'tv',
   'vending',
+  // PROTOCOL_VERSION 3. APPEND ONLY, at the end — this is a u8 wire index, and
+  // inserting or reordering renumbers every entry after it while both builds
+  // still claim the same version.
+  'chair',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix

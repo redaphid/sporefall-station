@@ -27,10 +27,20 @@ const THROW_COOLDOWN = 20
 export const WEAPON_DROP_CHANCE = 0.25
 
 /** A weapon id a corpse can actually drop: a real slotted melee/ranged weapon in
- * the registry, never innate 'fists' (the unarmed sentinel — dropping "Fists"
- * would be nonsense). Unarmed NPCs return false here and never draw the RNG. */
-const isDroppableWeapon = (weaponId: string): boolean =>
-  weaponId !== 'fists' &&
+ * the registry, never an INNATE one. Unarmed NPCs return false here and never
+ * draw the RNG.
+ *
+ * The test is `natural`, not the literal id 'fists'. It used to be the id, which
+ * expressed the intent ("dropping Fists would be nonsense") but only enforced it
+ * for the one weapon the author happened to think of. `claws` is also
+ * `natural: true`, and the boss (`npcs.ts`, its only carrier) therefore dropped
+ * `pickup.claws` at WEAPON_DROP_CHANCE — an id with no item art, which fell
+ * through `art.ts`'s alias chain to `item.default` and rendered as a MEDKIT. So
+ * killing the boss spawned a fake medkit that swapped your weapon when grabbed.
+ * Natural weapons are body parts: they are not obtainable, so they do not drop.
+ * Exported so the item-art test can enumerate exactly what can become a pickup. */
+export const isDroppableWeapon = (weaponId: string): boolean =>
+  WEAPONS[weaponId]?.natural !== true &&
   (WEAPONS[weaponId]?.kind === 'melee' || WEAPONS[weaponId]?.kind === 'ranged')
 
 /** On an NPC death, occasionally drop its carried weapon as a world pickup the

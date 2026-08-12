@@ -287,7 +287,6 @@
     "char.gangster.ne-step": "chars/bog-mutant-s-step.png",
     "char.gangster.n-idle": "chars/bog-mutant-s-idle.png",
     "char.gangster.n-step": "chars/bog-mutant-s-step.png",
-    "prop.default": "props/cargo-pod.png",
     "prop.barrel": "props/spore-barrel.png",
     "prop.atm": "props/cryo-terminal.png",
     "prop.vending-machine": "props/nutrient-dispenser.png",

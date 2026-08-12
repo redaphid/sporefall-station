@@ -12,12 +12,11 @@ import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { combatSystem, fireWeapon } from './combat'
 import { projectileSystem } from './projectiles'
-import { equipSlot } from './inventory'
 
 const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMod[]): Entity => {
   const p = spawnPlayer(w, 0, x, y)
   p.loadout!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
-  equipSlot(p, 0)
+  p.combat!.weapon = weaponId
   p.facing = 0
   return p
 }

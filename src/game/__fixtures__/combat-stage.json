@@ -3,16 +3,17 @@
   "seed": 7,
   "floor": 1,
   "tick": 0,
-  "nextId": 72,
+  "nextId": 222,
   "alarm": 0,
   "gameOver": false,
   "mission": {
     "template": "steal",
-    "targetEntityId": 42,
+    "targetEntityId": 199,
     "targetBuilding": 6,
     "complete": false,
     "exitUnlocked": false,
-    "description": "Extract the specimen canister from the med-bay"
+    "description": "Extract the specimen canister from the med-bay",
+    "objectiveDoorId": 230
   },
   "noises": [],
   "events": [],
@@ -21,7 +22,7 @@
   "levelChecksum": 2949895550,
   "entities": [
     {
-      "id": 68,
+      "id": 218,
       "kind": "player",
       "archetype": "player",
       "pos": {
@@ -46,7 +47,7 @@
       "health": {
         "hp": 120,
         "max": 120,
-        "iframes": 0
+        "iframes": 90
       },
       "combat": {
         "weapon": "pistol",
@@ -58,24 +59,23 @@
         "hitFlashUntil": 0,
         "cloakUntil": 0
       },
-      "playerCtl": {
-        "playerId": 0,
-        "abilityCooldown": 0,
-        "cash": 0,
-        "crimeUntilTick": 0
-      },
       "loadout": {
         "inventory": [
           {
             "itemId": "pistol",
-            "qty": 200
+            "qty": 1
           }
         ],
-        "activeSlot": 0
+        "activeSlot": -1
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "crimeUntilTick": 0
       }
     },
     {
-      "id": 69,
+      "id": 219,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
@@ -105,6 +105,15 @@
       "combat": {
         "weapon": "bat",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -125,7 +134,7 @@
       }
     },
     {
-      "id": 70,
+      "id": 220,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
@@ -155,6 +164,15 @@
       "combat": {
         "weapon": "bat",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -175,7 +193,7 @@
       }
     },
     {
-      "id": 71,
+      "id": 221,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
@@ -205,6 +223,15 @@
       "combat": {
         "weapon": "bat",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,

@@ -8,10 +8,12 @@ import { populateWorld } from './populate'
 import { Tile, type Building, type Level } from './levelgen/level'
 import { itemClass } from './data/items'
 
-const BASIC = new Set(['bat', 'knife', 'bandage', 'medkit', 'cash'])
-const ELEMENT_WEAPONS = new Set(['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun'])
+// Floor-1 basics. WEAPONS ARE NOT LOOT any more (one permanent pistol), and
+// neither are money or bandages, so the table is throwables + healing.
+const BASIC = new Set(['molotov', 'grenade', 'medkit'])
 const ELEMENT_THROWABLES = new Set(['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade'])
-const isElement = (id: string): boolean => ELEMENT_WEAPONS.has(id) || ELEMENT_THROWABLES.has(id)
+/** The deep-tier throwables — gated behind floor 2, unlike the floor-1 basics. */
+const DEEP_THROWABLES = new Set(['freezeGrenade', 'chloroform', 'banana', 'gasGrenade'])
 
 interface Pickup {
   itemId: string
@@ -59,38 +61,31 @@ describe('loot determinism', () => {
     expect(a).not.toEqual(b)
   })
 
-  it('cash pickups carry a plausible quantity; non-cash carry exactly one', () => {
+  it('every loot pickup carries exactly one (the cash stack was the only exception)', () => {
     for (const s of seeds.slice(0, 12)) {
-      for (const p of loot(s, 3)) {
-        if (p.itemId === 'cash') {
-          expect(p.qty).toBeGreaterThanOrEqual(10)
-          expect(p.qty).toBeLessThanOrEqual(40)
-        } else {
-          expect(p.qty).toBe(1)
-        }
-      }
+      for (const p of loot(s, 3)) expect(p.qty).toBe(1)
     }
   })
 })
 
 describe('depth gating', () => {
   it('floor-1 RANDOM loot (outside shops) is strictly basic', () => {
-    // Any element item on floor 1 must sit inside a shop building; the random
-    // sprinkle table on floor 1 is basics only.
+    // Any DEEP element throwable on floor 1 must sit inside a shop building;
+    // the random sprinkle table on floor 1 is basics only.
     for (const s of seeds) {
       const w = createWorld(s, 1)
       populateWorld(w)
       const shops = w.level.buildings.filter((b) => b.role === 'shop')
       for (const e of w.entities) {
-        if (!e.pickup) continue
-        if (!isElement(e.pickup.itemId)) continue
+        if (!isLootPickup(e) || !e.pickup) continue
+        if (!DEEP_THROWABLES.has(e.pickup.itemId)) continue
         const inAShop = shops.some((b) => inRect(e.pos.x, e.pos.y, b))
         expect(inAShop, `${e.pickup.itemId} at ${e.pos.x},${e.pos.y} on floor 1`).toBe(true)
       }
     }
   })
 
-  it('with every shop removed, floor-1 loot contains no element gear at all', () => {
+  it('with every shop removed, floor-1 loot is only the basics', () => {
     for (const s of seeds.slice(0, 15)) {
       const w = createWorld(s, 1)
       w.level.buildings = w.level.buildings.filter((b) => b.role !== 'shop')
@@ -100,24 +95,36 @@ describe('depth gating', () => {
     }
   })
 
-  it('element weapons only enter random loot from floor 3 (floor 2 = throwables + a couple weapons)', () => {
-    // Remove shops so all loot is from the random table, isolating the gate.
+  it('NO WEAPON is ever random loot, at any depth — the pistol is permanent', () => {
     const randomLoot = (seed: number, floor: number): string[] => {
       const w = createWorld(seed, floor)
       w.level.buildings = w.level.buildings.filter((b) => b.role !== 'shop')
       populateWorld(w)
       return w.entities.filter(isLootPickup).map((e) => e.pickup!.itemId)
     }
-    const floor2 = seeds.flatMap((s) => randomLoot(s, 2))
-    // Floor 2 admits throwables and freezeRay/sledgehammer, but NOT flamethrower/stunGun/tranquilizer.
-    expect(floor2.some((id) => ELEMENT_THROWABLES.has(id))).toBe(true)
-    expect(floor2.every((id) => !['flamethrower', 'stunGun', 'tranquilizer'].includes(id))).toBe(true)
-
-    const floor3 = seeds.flatMap((s) => randomLoot(s, 3))
-    expect(floor3.some((id) => ['flamethrower', 'stunGun', 'tranquilizer'].includes(id))).toBe(true)
+    for (const f of [1, 2, 3, 4, 5]) {
+      const ids = seeds.flatMap((s) => randomLoot(s, f))
+      for (const id of ids) {
+        const c = itemClass(id)
+        expect(c === 'melee' || c === 'ranged', `${id} is a weapon in floor-${f} loot`).toBe(false)
+      }
+    }
   })
 
-  it('shops stock the element pool (weapons AND throwables) across seeds', () => {
+  it('the deep element throwables gate in from floor 2', () => {
+    const randomLoot = (seed: number, floor: number): string[] => {
+      const w = createWorld(seed, floor)
+      w.level.buildings = w.level.buildings.filter((b) => b.role !== 'shop')
+      populateWorld(w)
+      return w.entities.filter(isLootPickup).map((e) => e.pickup!.itemId)
+    }
+    const floor1 = seeds.flatMap((s) => randomLoot(s, 1))
+    expect(floor1.some((id) => DEEP_THROWABLES.has(id))).toBe(false)
+    const floor2 = seeds.flatMap((s) => randomLoot(s, 2))
+    expect(floor2.some((id) => DEEP_THROWABLES.has(id))).toBe(true)
+  })
+
+  it('shops stock throwables and healing — never weapons', () => {
     const shopStock: string[] = []
     for (const s of seeds) {
       const w = createWorld(s, 1)
@@ -128,8 +135,12 @@ describe('depth gating', () => {
         if (isLootPickup(e) && shops.some((b) => inRect(e.pos.x, e.pos.y, b))) shopStock.push(e.pickup!.itemId)
       }
     }
-    expect(shopStock.some((id) => ELEMENT_WEAPONS.has(id))).toBe(true)
     expect(shopStock.some((id) => ELEMENT_THROWABLES.has(id))).toBe(true)
+    expect(shopStock.some((id) => id === 'medkit')).toBe(true)
+    for (const id of shopStock) {
+      const c = itemClass(id)
+      expect(c === 'melee' || c === 'ranged', `${id} stocked in a shop`).toBe(false)
+    }
   })
 
   it('every generated loot id resolves to a real item class (nothing bogus dropped)', () => {

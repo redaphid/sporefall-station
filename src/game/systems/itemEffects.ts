@@ -30,6 +30,6 @@ export const applyAreaEffect = (w: World, x: number, y: number, effect: AreaEffe
   }
   for (const e of w.entities) {
     if (e.dead || !e.health) continue
-    if (within(e.pos.x, e.pos.y, x, y, effect.radius + e.radius)) applyStatus(w, e, effect.status, effect.ticks)
+    if (within(e.pos.x, e.pos.y, x, y, effect.radius + e.radius)) applyStatus(w, e, effect.status, effect.ticks, effect.brittle)
   }
 }

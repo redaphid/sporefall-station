@@ -1,7 +1,7 @@
 // Interactive & destructible world objects — data-driven, grounded in the
 // decompiled ObjectReal hierarchy (ExplodingBarrel, Crate, ATMMachine,
 // vending), authored fresh. Each object has hp and declares what it does when
-// destroyed (spill loot, blast, ignite) and/or when used (dispense cash/item).
+// destroyed (spill loot, blast, ignite) and/or when used (dispense an item).
 
 export interface ObjectDef {
   id: string
@@ -17,19 +17,21 @@ export interface ObjectDef {
   ignite?: boolean
   /** Loot table — one entry spilled as a pickup on destruction (via run PRNG). */
   loot?: string[]
-  /** E-interact: dispense cash or an item id once. */
-  use?: { gives: 'cash' | string; amount?: number }
+  /** E-interact: dispense an item id once. */
+  use?: { gives: string; amount?: number }
   /** Electronics: interactable even without a `use` payout (e.g. generator). */
   hackable?: boolean
 }
 
 export const OBJECTS: Record<string, ObjectDef> = {
-  crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['bat', 'knife', 'bandage', 'molotov', 'cash'] },
+  crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['molotov'] },
   barrel: { id: 'barrel', name: 'Barrel', hp: 15, damageThreshold: 5, flammable: true, explode: { radius: 2.4, damage: 40 }, ignite: true },
-  tv: { id: 'tv', name: 'TV', hp: 12, loot: ['cash'] },
+  tv: { id: 'tv', name: 'TV', hp: 12 },
   toilet: { id: 'toilet', name: 'Toilet', hp: 10 },
-  vending: { id: 'vending', name: 'Vending Machine', hp: 40, loot: ['cash'], use: { gives: 'burger' } },
-  atm: { id: 'atm', name: 'ATM', hp: 50, hackable: true, use: { gives: 'cash', amount: 50 } },
+  vending: { id: 'vending', name: 'Vending Machine', hp: 40, use: { gives: 'burger' } },
+  // Repurposed from the ATM: money is gone, so the wall terminal dispenses a
+  // medkit instead of cash. Still hackable.
+  atm: { id: 'atm', name: 'Supply Terminal', hp: 50, hackable: true, use: { gives: 'medkit' } },
   generator: { id: 'generator', name: 'Generator', hp: 30, hackable: true, explode: { radius: 1.6, damage: 15 }, ignite: true },
   // Sporefall Station power plant — same hackable behavior as `generator`, dressed
   // as the station's Cryo Terminal so a power-cut objective reads in-fiction.
@@ -38,7 +40,7 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // keeps its linked hatches overgrown. Flammable (fire kills it) with real hp
   // (shoot it down), and it spills fungal loot. Its DEATH un-overgrows every
   // hatch whose `door.nodeId` points at it (interaction.sealSystem).
-  sporeNode: { id: 'sporeNode', name: 'Spore Node', hp: 45, flammable: true, ignite: true, loot: ['bandage', 'gasGrenade', 'molotov', 'cash'] },
+  sporeNode: { id: 'sporeNode', name: 'Spore Node', hp: 45, flammable: true, ignite: true, loot: ['gasGrenade', 'molotov'] },
 
   // ── Interior furnishings (feat/levelgen-fill-interiors) ──────────────────
   // Role-appropriate props that make a room read as OCCUPIED and legible rather
@@ -51,12 +53,14 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // body that plugs a doorway approach — shove past it slowly or smash through.
   // Deliberately mundane: no explosion, no fire, no loot; its whole job is hp.
   barricade: { id: 'barricade', name: 'Junk Barricade', hp: 40 },
-  bunk: { id: 'bunk', name: 'Bunk', hp: 25, flammable: true, loot: ['bandage', 'cash'] },
-  desk: { id: 'desk', name: 'Desk', hp: 20, flammable: true, loot: ['cash'] },
-  shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['bandage', 'cash', 'molotov'] },
-  cabinet: { id: 'cabinet', name: 'Supply Cabinet', hp: 22, loot: ['medkit', 'bandage'] },
-  bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['bandage', 'gasGrenade'] },
-  locker: { id: 'locker', name: 'Weapons Locker', hp: 30, loot: ['knife', 'pistol', 'cash'] },
+  bunk: { id: 'bunk', name: 'Bunk', hp: 25, flammable: true },
+  desk: { id: 'desk', name: 'Desk', hp: 20, flammable: true },
+  shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['molotov'] },
+  cabinet: { id: 'cabinet', name: 'Supply Cabinet', hp: 22, loot: ['medkit'] },
+  bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['gasGrenade'] },
+  // Repurposed from the old "Weapons Locker": weapons are no longer lootable
+  // (one permanent pistol), so it stocks throwables and healing instead.
+  locker: { id: 'locker', name: 'Supply Locker', hp: 30, loot: ['grenade', 'medkit'] },
   table: { id: 'table', name: 'Table', hp: 16, flammable: true },
   plant: { id: 'plant', name: 'Planter', hp: 10, flammable: true },
 }

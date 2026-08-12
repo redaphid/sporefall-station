@@ -9,10 +9,9 @@ import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
 import { ELEMENTS } from '../data/elements'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { elementSystem, fireSystem } from './fire'
 import { throwActive } from './inventory'
-import { equipSlot } from './inventory'
 import { projectileSystem } from './projectiles'
 import { statusSystem } from './status'
 import { hasStatus, isImmobilized } from './statusFx'
@@ -22,7 +21,7 @@ const player = (w: World, x = 20, y = 20): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, crimeUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   e.facing = 0
   return e
@@ -56,7 +55,7 @@ describe('item behavior — new guns', () => {
   it('flamethrower sets its target burning (onHit)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     expect(hasStatus(target, 'burning')).toBe(true)
@@ -65,7 +64,7 @@ describe('item behavior — new guns', () => {
   it('flamethrower burn actually chews hp over time (DoT reaches elementSystem)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     const afterHit = target.health!.hp // includes the small impact damage
@@ -79,7 +78,7 @@ describe('item behavior — new guns', () => {
   it('stun gun electrifies and immobilizes its target (onHit)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'stunGun', qty: 4 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'electrified'))
     expect(hasStatus(target, 'electrified')).toBe(true)
@@ -89,27 +88,13 @@ describe('item behavior — new guns', () => {
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
     e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
     expect(target.health!.hp).toBe(60) // swing never landed
   })
 
-  it.runIf(!INFINITE_AMMO)('machine gun empties its whole magazine round by round', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'machinegun', qty: 3 }]
-    equipSlot(e, 0)
-    let shots = 0
-    for (let i = 0; i < 5; i++) {
-      const before = w.entities.filter((x) => x.projectile).length
-      combatSystem(w, attack())
-      if (w.entities.filter((x) => x.projectile).length > before) shots++
-      e.combat!.cooldown = 0
-    }
-    expect(shots).toBe(3) // only three rounds were in the mag
-    expect(e.loadout!.inventory[0].qty).toBe(0)
-  })
 })
 
 describe('item behavior — element throwables', () => {
@@ -182,40 +167,51 @@ describe('item behavior — element throwables', () => {
   })
 })
 
-describe('item behavior — freeze then shatter (element combo through items)', () => {
+describe('item behavior — freeze then crack (element combo through items)', () => {
   let w: World
   beforeEach(() => {
     w = createWorld(1, 1)
   })
 
-  it('a freeze-ray freeze followed by a melee impact shatters the target', () => {
+  // A WEAPON's freeze (freeze ray, Cryo Rounds) is not brittle: it locks the body
+  // up, and the follow-up blow cracks it for heavy bonus damage. Only a THROWN
+  // freeze grenade encases a body so it shatters — the execute belongs to the
+  // limited consumable, never to something a weapon can do on every other shot.
+  it('a freeze-ray freeze followed by a melee impact CRACKS the ice for bonus damage, not an execute', () => {
     const e = player(w, 20, 20)
     const target = dummy(w, 21, 20)
+    target.health = { hp: 500, max: 500, iframes: 0 } // a pool a x2.5 bat cannot clear
     e.loadout!.inventory = [
       { itemId: 'freezeRay', qty: 6 },
       { itemId: 'bat', qty: 12 },
     ]
-    equipSlot(e, 0)
+    e.combat!.weapon = e.loadout!.inventory[0].itemId
     fireUntil(w, () => hasStatus(target, 'frozen'))
     expect(hasStatus(target, 'frozen')).toBe(true)
     // Let the freeze-ray's own hit iframes lapse (as ticks pass in-game); the
     // frost lasts far longer, so the body is still frozen when we swing.
     for (let t = 0; t < 6; t++) statusSystem(w)
-    // Switch to the bat and swing: an impact on a frozen body is an instant kill.
-    equipSlot(e, 1)
+    const before = target.health!.hp
+    e.combat!.weapon = e.loadout!.inventory[1].itemId
     e.combat!.cooldown = 0
     combatSystem(w, attack())
-    expect(target.shattered).toBe(true)
-    expect(target.dead).toBe(true)
+    expect(target.shattered).toBeFalsy()
+    expect(target.dead).toBeFalsy()
+    // The ice is spent, and the blow that spent it hit harder than a bare swing.
+    expect(hasStatus(target, 'frozen')).toBe(false)
+    expect(before - target.health!.hp).toBeGreaterThan(WEAPONS.bat.damage)
   })
 })
 
 describe('item data — well-formedness', () => {
-  it('every ranged weapon has a projectile speed and a magazine', () => {
+  it('every ranged weapon has a projectile speed and NO magazine (ammo is gone)', () => {
     for (const wpn of Object.values(WEAPONS)) {
       if (wpn.kind !== 'ranged') continue
       expect(wpn.projectileSpeed, wpn.id).toBeGreaterThan(0)
-      expect(wpn.magSize, wpn.id).toBeGreaterThan(0)
+      // `magSize`/`ammoPerShot` were removed with the ammo system; a stray one
+      // would silently reintroduce a magazine on a gun that can never reload.
+      expect(wpn, wpn.id).not.toHaveProperty('magSize')
+      expect(wpn, wpn.id).not.toHaveProperty('ammoPerShot')
     }
   })
 

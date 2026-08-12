@@ -1,18 +1,19 @@
-// Feature: FIRE and USE arbitrate off the ACTIVE slot; the dodge-roll fallback
-// lives on the USE button ONLY.
-//  FIRE (attack): usable non-weapon in hand → USE it (no bullet); else fire the
-//    equipped weapon; nothing to fire (empty gun) → a DRY no-op — never a roll.
+// Feature: FIRE and USE are now cleanly separated. The player has ONE permanent
+// weapon, so there is nothing for FIRE to arbitrate:
+//  FIRE (attack): ALWAYS fires/swings the weapon. Never uses the held item,
+//    never rolls. (Overloading FIRE onto the held item would let a player
+//    holding a grenade become permanently unable to shoot.)
 //  USE (throwItem): use the held/active usable item; nothing usable → dodge-roll.
 // Tests set state exactly, run the REAL systems (combatSystem / tickWorld), and
 // assert — adversarial cases included (cooldown gating, full-HP waste, co-op).
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Entity } from '../entity'
-import { spawnPlayer, STARTER_AMMO } from '../player'
+import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { ROLL_COOLDOWN, ROLL_TICKS } from './roll'
 
 /** A one-slot input map with `attack` (the fire button) pressed. */
@@ -34,7 +35,7 @@ const player = (w: World, id = 0): Entity => {
 const projectiles = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'projectile' && !e.dead)
 const bullets = (w: World): Entity[] => projectiles(w).filter((e) => e.archetype === 'projectile')
 
-describe('fire button — a usable ACTIVE item is USED, not fired', () => {
+describe('fire button — the held item is IGNORED; the weapon always fires', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
@@ -43,46 +44,37 @@ describe('fire button — a usable ACTIVE item is USED, not fired', () => {
     p.health = { hp: 50, max: 120, iframes: 0 }
   })
 
-  it('fire with a bandage active → heals, consumes the bandage, spawns NO bullet', () => {
-    p.loadout!.inventory = [{ itemId: 'bandage', qty: 1 }]
-    p.loadout!.activeSlot = 0
-    combatSystem(w, fire())
-    expect(p.health!.hp).toBe(80) // 50 + 30 heal
-    expect(p.loadout!.inventory).toHaveLength(0) // last one consumed → slot gone
-    expect(p.loadout!.activeSlot).toBe(-1)
-    expect(projectiles(w)).toHaveLength(0) // no shot
-    expect(p.playerCtl!.roll).toBeUndefined() // used an item, did NOT roll
-  })
-
-  it('a stacked consumable decrements by one and keeps the slot', () => {
-    p.loadout!.inventory = [{ itemId: 'bandage', qty: 3 }]
-    p.loadout!.activeSlot = 0
-    combatSystem(w, fire())
-    expect(p.loadout!.inventory[0].qty).toBe(2)
-    expect(p.health!.hp).toBe(80)
-  })
-
-  it('fire with a throwable active → lobs it (a throwable projectile), no gun bullet', () => {
-    // Pistol stays in hand (combat.weapon), molotov is the HELD active item.
-    p.loadout!.inventory = [{ itemId: 'pistol', qty: STARTER_AMMO }, { itemId: 'molotov', qty: 2 }]
+  it('fire with a consumable held → shoots anyway; the item is NOT consumed', () => {
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }, { itemId: 'medkit', qty: 1 }]
     p.loadout!.activeSlot = 1
     combatSystem(w, fire())
-    const thrown = projectiles(w).filter((e) => e.archetype === 'molotov')
-    expect(thrown).toHaveLength(1) // the molotov is airborne
-    expect(bullets(w)).toHaveLength(0) // the gun did NOT also fire
-    expect(p.loadout!.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(1)
+    expect(p.health!.hp).toBe(50) // no heal — FIRE does not use items
+    expect(p.loadout!.inventory.find((s) => s.itemId === 'medkit')!.qty).toBe(1)
+    expect(bullets(w)).toHaveLength(1) // the pistol fired
     expect(p.playerCtl!.roll).toBeUndefined()
   })
 
-  it('adversarial: fire a bandage at FULL HP still consumes it (parity with the Use button)', () => {
-    p.health = { hp: 120, max: 120, iframes: 0 }
-    p.loadout!.inventory = [{ itemId: 'bandage', qty: 1 }]
-    p.loadout!.activeSlot = 0
+  it('fire with a throwable held → shoots the gun, does NOT lob the throwable', () => {
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }, { itemId: 'molotov', qty: 2 }]
+    p.loadout!.activeSlot = 1
     combatSystem(w, fire())
-    expect(p.health!.hp).toBe(120)
-    expect(p.loadout!.inventory).toHaveLength(0) // still spent — no bullet, no roll
-    expect(projectiles(w)).toHaveLength(0)
+    expect(projectiles(w).filter((e) => e.archetype === 'molotov')).toHaveLength(0)
+    expect(bullets(w)).toHaveLength(1)
+    expect(p.loadout!.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(2)
     expect(p.playerCtl!.roll).toBeUndefined()
+  })
+
+  it('regression: holding a throwable can never lock the player out of shooting', () => {
+    // The reason the FIRE/USE arbitration had to go. Hold a grenade, mash FIRE
+    // for a while: every cooldown window still produces a bullet.
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }, { itemId: 'grenade', qty: 5 }]
+    p.loadout!.activeSlot = 1
+    for (let i = 0; i < 10; i++) {
+      p.combat!.cooldown = 0
+      combatSystem(w, fire())
+    }
+    expect(bullets(w)).toHaveLength(10)
+    expect(p.loadout!.inventory.find((s) => s.itemId === 'grenade')!.qty).toBe(5)
   })
 })
 
@@ -94,20 +86,18 @@ describe('fire button — a weapon in hand fires as before', () => {
     p = player(w)
   })
 
-  it('active gun with ammo → a bullet spawns and one round is spent, no roll', () => {
-    // Default loadout: pistol at slot 0 with STARTER_AMMO.
+  it('the permanent gun fires and spends nothing, no roll', () => {
+    // Default loadout: the pistol in slot 0, qty 1, no ammo to spend.
     combatSystem(w, fire())
     expect(bullets(w)).toHaveLength(1)
-    // Ammo spend is gated by the INFINITE_AMMO testing toggle: OFF → one round
-    // consumed (normal economy); ON → the mag is untouched (never runs dry).
-    expect(p.loadout!.inventory[0].qty).toBe(INFINITE_AMMO ? STARTER_AMMO : STARTER_AMMO - 1)
+    expect(p.loadout!.inventory[0].qty).toBe(1)
     expect(p.playerCtl!.roll).toBeUndefined()
   })
 
-  it('active melee weapon → swings (sets cooldown), never rolls even with no target', () => {
+  it('a melee weapon in hand → swings (sets cooldown), never rolls even with no target', () => {
     p.combat!.weapon = 'bat'
     p.loadout!.inventory = [{ itemId: 'bat', qty: 16 }]
-    p.loadout!.activeSlot = 0
+    p.loadout!.activeSlot = -1
     combatSystem(w, fire())
     expect(p.combat!.cooldown).toBeGreaterThan(0) // a swing happened
     expect(p.playerCtl!.roll).toBeUndefined()
@@ -126,7 +116,7 @@ describe('fire button — a weapon in hand fires as before', () => {
   })
 })
 
-describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
+describe('fire button — never a roll, whatever is in hand', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
@@ -134,20 +124,13 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
     p = player(w)
   })
 
-  it('an out-of-ammo gun → fire clicks: no roll (the fallback is not on FIRE)', () => {
-    p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }] // empty mag
-    p.loadout!.activeSlot = 0
+  it('the gun cannot run dry, and FIRE never backflips', () => {
     combatSystem(w, fire({ moveX: 1 }))
-    // The load-bearing guarantee holds in BOTH toggle states: FIRE never backflips.
     expect(p.playerCtl!.roll).toBeUndefined()
-    // With INFINITE_AMMO OFF the empty mag is a dry no-op (no bullet); ON, the mag
-    // never reads as empty so it fires anyway — either way, no roll.
-    expect(projectiles(w)).toHaveLength(INFINITE_AMMO ? 1 : 0)
+    expect(projectiles(w)).toHaveLength(1)
   })
 
-  it('holding fire on an empty gun NEVER rolls across a full roll cycle', () => {
-    p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }]
-    p.loadout!.activeSlot = 0
+  it('holding fire NEVER rolls across a full roll cycle, and keeps shooting', () => {
     let rollStarts = 0
     const span = ROLL_TICKS + ROLL_COOLDOWN + 5
     for (let t = 0; t < span; t++) {
@@ -155,10 +138,8 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
       tickWorld(w, fire({ moveX: 1 }))
       rollStarts += w.events.slice(before).filter((ev) => ev.type === 'roll').length
     }
-    expect(rollStarts).toBe(0) // FIRE never rolls, empty gun or not
-    // OFF: an empty gun never fires. ON: depletion is skipped so it keeps firing.
-    if (INFINITE_AMMO) expect(bullets(w).length).toBeGreaterThan(0)
-    else expect(bullets(w)).toHaveLength(0)
+    expect(rollStarts).toBe(0) // FIRE never rolls
+    expect(bullets(w).length).toBeGreaterThan(0) // and never runs dry
   })
 })
 
@@ -181,8 +162,8 @@ describe('use button — nothing usable → dodge-roll (the backflip)', () => {
     expect(projectiles(w)).toHaveLength(0)
   })
 
-  it('an out-of-ammo gun active (not a usable item) → USE rolls', () => {
-    p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }]
+  it('a gun slot active (not a usable item) → USE rolls', () => {
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }]
     p.loadout!.activeSlot = 0
     combatSystem(w, use({ moveX: 1 }))
     expect(p.playerCtl!.roll).toBeDefined()
@@ -201,10 +182,10 @@ describe('use button — nothing usable → dodge-roll (the backflip)', () => {
 
   it('edge case: USE with a usable item HELD always uses it, never rolls', () => {
     p.health = { hp: 50, max: 120, iframes: 0 }
-    p.loadout!.inventory = [{ itemId: 'bandage', qty: 1 }]
+    p.loadout!.inventory = [{ itemId: 'medkit', qty: 1 }]
     p.loadout!.activeSlot = 0
-    combatSystem(w, use({ moveX: 1 })) // moving AND a bandage in hand
-    expect(p.health!.hp).toBe(80) // healed
+    combatSystem(w, use({ moveX: 1 })) // moving AND a medkit in hand
+    expect(p.health!.hp).toBe(120) // healed (100, clamped to max)
     expect(p.playerCtl!.roll).toBeUndefined() // used the item, did NOT roll
     expect(p.loadout!.inventory).toHaveLength(0)
   })
@@ -252,19 +233,18 @@ describe('use→roll fallback — integration through the full tick pipeline', (
   })
 })
 
-describe('fire button — co-op resolves per player independently', () => {
-  it('one player heals off a bandage while the other fires a gun, same tick', () => {
+describe('co-op resolves per player independently', () => {
+  it('FIRE: both players shoot their own permanent gun, same tick', () => {
     const w = createWorld(1, 1)
     const s = w.level.spawn
-    const healer = spawnPlayer(w, 0, s.x, s.y)
-    healer.facing = 0
-    healer.health = { hp: 40, max: 120, iframes: 0 }
-    healer.loadout!.inventory = [{ itemId: 'bandage', qty: 1 }]
-    healer.loadout!.activeSlot = 0
+    const holder = spawnPlayer(w, 0, s.x, s.y)
+    holder.facing = 0
+    holder.health = { hp: 40, max: 120, iframes: 0 }
+    holder.loadout!.inventory.push({ itemId: 'medkit', qty: 1 })
+    holder.loadout!.activeSlot = 1 // holding a medkit — irrelevant to FIRE
 
     const gunner = spawnPlayer(w, 1, s.x + 2, s.y)
     gunner.facing = 0
-    // gunner keeps the default pistol loadout
 
     combatSystem(
       w,
@@ -274,14 +254,13 @@ describe('fire button — co-op resolves per player independently', () => {
       ]),
     )
 
-    expect(healer.health!.hp).toBe(70) // 40 + 30
-    expect(healer.loadout!.inventory).toHaveLength(0)
-    const gunnerBullets = bullets(w).filter((b) => b.projectile!.ownerId === gunner.id)
-    expect(gunnerBullets).toHaveLength(1)
-    expect(bullets(w).filter((b) => b.projectile!.ownerId === healer.id)).toHaveLength(0)
+    expect(holder.health!.hp).toBe(40) // FIRE never used the medkit
+    expect(holder.loadout!.inventory.find((x) => x.itemId === 'medkit')!.qty).toBe(1)
+    expect(bullets(w).filter((b) => b.projectile!.ownerId === gunner.id)).toHaveLength(1)
+    expect(bullets(w).filter((b) => b.projectile!.ownerId === holder.id)).toHaveLength(1)
   })
 
-  it('co-op USE: one player rolls (empty hands) while the other uses a bandage, same tick', () => {
+  it('co-op USE: one player rolls (empty hands) while the other uses a medkit, same tick', () => {
     const w = createWorld(1, 1)
     const s = w.level.spawn
     const roller = spawnPlayer(w, 0, s.x, s.y)
@@ -292,7 +271,7 @@ describe('fire button — co-op resolves per player independently', () => {
     const healer = spawnPlayer(w, 1, s.x + 2, s.y)
     healer.facing = 0
     healer.health = { hp: 40, max: 120, iframes: 0 }
-    healer.loadout!.inventory = [{ itemId: 'bandage', qty: 1 }]
+    healer.loadout!.inventory = [{ itemId: 'medkit', qty: 1 }]
     healer.loadout!.activeSlot = 0
 
     combatSystem(
@@ -304,8 +283,8 @@ describe('fire button — co-op resolves per player independently', () => {
     )
 
     expect(roller.playerCtl!.roll).toBeDefined() // empty-handed use → backflip
-    expect(healer.playerCtl!.roll).toBeUndefined() // used the bandage instead
-    expect(healer.health!.hp).toBe(70)
+    expect(healer.playerCtl!.roll).toBeUndefined() // used the medkit instead
+    expect(healer.health!.hp).toBe(120)
   })
 })
 

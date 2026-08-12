@@ -23,7 +23,6 @@ const player = (weaponId: string, mods?: { id: string; stacks: number }[]): Enti
     playerCtl: {
       playerId: 0,
       abilityCooldown: 0,
-      cash: 0,
       crimeUntilTick: 0,
     },
     loadout: {
@@ -53,7 +52,7 @@ describe('buildLoadout', () => {
     expect(dmg.changed).toBe(false)
     // Ranged-only rows are present.
     expect(m.stats.map((s) => s.key)).toContain('speed')
-    expect(m.stats.map((s) => s.key)).toContain('mag')
+    expect(m.stats.map((s) => s.key)).not.toContain('mag') // no ammo → no magazine row
   })
 
   it('bare fists / unarmed is handled gracefully', () => {

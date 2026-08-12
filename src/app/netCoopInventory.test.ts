@@ -171,41 +171,45 @@ describe('co-op client inventory (issue #57)', () => {
     expect(inv.find((s) => s.itemId === 'bandage')!.qty).toBe(37)
   })
 
-  it('round-trips a client hotbar switch → host equips → client reflects the new active weapon', async () => {
+  it('round-trips a client hotbar switch → host holds the item → client reflects it', async () => {
     const input = makeInput()
     const { host, bob } = await startPair(202, input.source)
     const avatar = avatarOf(host, 1)
-    avatar.loadout!.inventory = richLoadout().inventory
-    avatar.loadout!.activeSlot = 0
+    // The weapon is permanent and is NOT a hotbar slot; the hotbar selects the
+    // HELD item only, so slot 1 here is a throwable.
+    avatar.loadout!.inventory = [
+      { itemId: 'pistol', qty: 1 },
+      { itemId: 'molotov', qty: 2 },
+    ]
+    avatar.loadout!.activeSlot = -1
     avatar.combat!.weapon = 'pistol'
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.loadout!.activeSlot).toBe(0)
+    expect(bob.session.renderView().self!.loadout!.activeSlot).toBe(-1)
 
-    // Client taps hotbar slot 1 (the freeze ray).
+    // Client taps hotbar slot 1 (the molotov).
     input.set({ hotbar: 1 })
     await tickN(host, bob, 2)
     input.set({}) // release the tap
     await tickN(host, bob, 4)
 
-    // Host equipped it authoritatively…
+    // Host held it authoritatively…
     expect(avatar.loadout!.activeSlot).toBe(1)
-    expect(avatar.combat!.weapon).toBe('freezeRay')
+    expect(avatar.combat!.weapon).toBe('pistol') // weapon unchanged — it is permanent
     // …and the change came back to the client.
     const self = bob.session.renderView().self!
     expect(self.loadout!.activeSlot).toBe(1)
-    expect(self.combat!.weapon).toBe('freezeRay')
+    expect(self.combat!.weapon).toBe('pistol')
   })
 
-  it('syncs ammo count to the client as the host spends rounds', async () => {
+  it('syncs a changing stack count to the client (throwables spent on the host)', async () => {
     const { host, bob } = await startPair(203)
     const avatar = avatarOf(host, 1)
-    avatar.loadout!.inventory = [{ itemId: 'pistol', qty: 20 }]
+    avatar.loadout!.inventory = [{ itemId: 'grenade', qty: 20 }]
     avatar.loadout!.activeSlot = 0
-    avatar.combat!.weapon = 'pistol'
     await tickN(host, bob, 4)
     expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(20)
 
-    avatar.loadout!.inventory[0].qty = 12 // host fired 8 rounds
+    avatar.loadout!.inventory[0].qty = 12 // host threw 8
     await tickN(host, bob, 4)
     expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(12)
   })
@@ -287,20 +291,20 @@ describe('co-op client inventory (issue #57)', () => {
     const input = makeInput()
     const { host, bob } = await startPair(207, input.source)
     const avatar = avatarOf(host, 1)
-    avatar.loadout!.inventory = [{ itemId: 'bandage', qty: 3 }]
+    avatar.loadout!.inventory = [{ itemId: 'medkit', qty: 3 }]
     avatar.loadout!.activeSlot = 0
-    avatar.health!.hp = 40 // hurt, so the bandage actually heals
+    avatar.health!.hp = 40 // hurt, so the medkit actually heals
     await tickN(host, bob, 4)
     expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(3)
 
-    input.set({ throwItem: true }) // Use the held bandage
+    input.set({ throwItem: true }) // Use the held medkit
     await tickN(host, bob, 2)
     input.set({})
     await tickN(host, bob, 4)
 
     // Host consumed one and healed authoritatively…
     expect(avatar.loadout!.inventory[0].qty).toBe(2)
-    expect(avatar.health!.hp).toBe(70)
+    expect(avatar.health!.hp).toBe(120) // medkit heals 100, clamped to max
     // …and the client's own inventory reflects the spend.
     expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(2)
   })
@@ -357,16 +361,15 @@ describe('co-op client inventory (issue #57)', () => {
     expect(inv.inventory.find((s) => s.itemId === 'freezeRay')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
   })
 
-  it('serializes an InventoryMsg round-trip losslessly (mods + ammo preserved)', () => {
+  it('serializes an InventoryMsg round-trip losslessly (mods preserved)', () => {
     const msg: InventoryMsg = {
       slot: 3,
       inventory: [
-        { itemId: 'pistol', qty: 17 },
-        { itemId: 'freezeRay', qty: 6, mods: [{ id: 'frost', stacks: 2 }, { id: 'rapid', stacks: 1 }] },
-        { itemId: 'bandage', qty: 37 },
+        { itemId: 'pistol', qty: 1, mods: [{ id: 'frost', stacks: 2 }, { id: 'rapid', stacks: 1 }] },
+        { itemId: 'molotov', qty: 6 },
+        { itemId: 'medkit', qty: 37 },
       ],
       activeSlot: 1,
-      weapon: 'freezeRay',
     }
     const back = decodeJson<InventoryMsg>(encodeJson(MsgType.Inventory, msg))
     expect(back).toEqual(msg)

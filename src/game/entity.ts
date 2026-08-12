@@ -9,6 +9,12 @@ export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | '
 export interface StatusEntry {
   until: number
   source?: EntityId
+  /** BRITTLE ice: this `frozen` encased the body solid, so a blow SHATTERS it
+   * (an instant kill — see `shatter` in systems/combat.ts). Only a thrown freeze
+   * grenade sets it. A freeze from Cryo Rounds leaves the joints locked but the
+   * body intact, so it is control, not an execute — see the note on `frost` in
+   * data/mods.ts for why that distinction has to exist. */
+  brittle?: boolean
 }
 
 export type Fx = Record<string, StatusEntry>
@@ -30,6 +36,11 @@ export interface LockoutEntry {
   guardUntil: number
   chainUntil: number
   tier: number
+  /** Only set for the LEGACY counter-based immobilizes (`stun`/`sleep`), which
+   * live on `Entity.status` counters instead of `fx`: with no `fx[kind].until` to
+   * read, this is how the guard knows a lock is still running. Absent for
+   * `frozen`/`electrified`, which read their active window straight off `fx`. */
+  activeUntil?: number
 }
 
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
@@ -222,7 +233,6 @@ export interface Entity {
   playerCtl?: {
     playerId: number
     abilityCooldown: number
-    cash: number
     crimeUntilTick: number
     /** Passive-regen bookkeeping (systems/regen.ts): consecutive ticks this player
      * has been BOTH completely still and unharmed. Reset to absent the instant they
@@ -257,8 +267,12 @@ export interface Entity {
     pierceLeft?: number
     /** Wall bounces left — reflect off a blocked tile instead of dying (bounce). */
     bounceLeft?: number
-    /** Per-tick turn rate (radians) steering toward the nearest hostile (homing). */
+    /** Per-tick turn rate (radians) steering toward a hostile in front (homing). */
     homing?: number
+    /** LAUNCH heading, fixed at spawn. Homing only acquires targets inside a
+     * cone around THIS, never around the drifting current heading, so a round
+     * can't accumulate small turns into a hook away from where you aimed. */
+    aim?: number
     /** Spawn N damaging children on the first body it strikes (split/multishot). */
     split?: { count: number; damage: number; speed: number; ttl: number }
     /** Shatter into a RADIAL burst of short-range fragments on ANY termination —

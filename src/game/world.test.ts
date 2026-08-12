@@ -61,17 +61,17 @@ describe('sim integration', () => {
     expect(dist).toBeGreaterThan(2)
   })
 
-  it('hurt player heals by walking over a bandage', () => {
+  it('hurt player heals by walking over a medkit', () => {
     const w = createWorld(8, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.health!.hp = 40
-    const drop = makeEntity('pickup', 'pickup.bandage', 11.5, 1.5, 0.3)
-    drop.pickup = { itemId: 'bandage', qty: 1 }
+    const drop = makeEntity('pickup', 'pickup.medkit', 11.5, 1.5, 0.3)
+    drop.pickup = { itemId: 'medkit', qty: 1 }
     addEntity(w, drop)
 
     const right = new Map([[0, { ...emptyInput(), moveX: 1 }]])
     tickN(w, right, 20)
-    expect(player.health!.hp).toBe(70)
+    expect(player.health!.hp).toBe(120) // medkit heals 100, clamped to max
     expect(w.byId.get(drop.id)).toBeUndefined()
   })
 

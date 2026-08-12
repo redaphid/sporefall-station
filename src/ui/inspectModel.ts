@@ -243,7 +243,6 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
   if (e.playerCtl) {
     rows.push({ label: 'Player', value: `P${e.playerCtl.playerId + 1}` })
     if (e.playerCtl.downed) card.tagline = 'Downed — needs a revive'
-    if (e.playerCtl.cash > 0) rows.push({ label: 'Cash', value: `$${e.playerCtl.cash}` })
   }
 
   if (e.door) {
@@ -286,8 +285,6 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
       } else if (con?.heal) {
         rows.push({ label: 'Heal', value: String(con.heal) })
         card.tagline = 'Use it to patch up'
-      } else if (e.pickup.itemId === 'cash') {
-        card.tagline = 'Money — grab it'
       } else if (e.pickup.itemId === 'briefcase') {
         card.tagline = 'The specimen canister — this is what you came for'
       }
@@ -297,7 +294,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
   // Interactive / destructible world object (crate, barrel, ATM, vending, …).
   const obj = OBJECTS[e.archetype]
   if (obj) {
-    if (obj.use) rows.push({ label: 'Dispenses', value: obj.use.gives === 'cash' ? `$${obj.use.amount ?? 0}` : itemName(obj.use.gives) })
+    if (obj.use) rows.push({ label: 'Dispenses', value: itemName(obj.use.gives) })
     if (e.used) rows.push({ label: 'State', value: 'Already used' })
     if (obj.explode) card.tagline = 'Explosive — keep your distance'
     else if (obj.loot) card.tagline ??= 'Might drop something if broken'

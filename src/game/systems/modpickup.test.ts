@@ -18,7 +18,7 @@ const player = (w: World, x = 20, y = 20, playerId = 0): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId, abilityCooldown: 0, crimeUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
@@ -110,7 +110,6 @@ describe('mod pickup — degenerate inputs are safe', () => {
     step(w)
     // The phantom is healed: pistol slotted + equipped, and the mod landed on it.
     expect(weaponStack(p)?.itemId).toBe('pistol')
-    expect(p.loadout!.activeSlot).toBe(0)
     expect(p.combat!.weapon).toBe('pistol')
     expect(mods(p)).toEqual([{ id: 'incendiary', stacks: 1 }])
     expect(w.byId.get(pick.id)).toBeUndefined() // consumed + swept

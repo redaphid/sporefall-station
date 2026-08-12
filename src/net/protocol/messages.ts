@@ -21,6 +21,9 @@ export const ARCHETYPES = [
   'pickup.bat',
   'pickup.knife',
   'pickup.pistol',
+  // RESERVED — bandages and money were removed, but this table is an
+  // append-only u8 index: dropping an entry would renumber every archetype
+  // after it and break the wire format. The ids simply never spawn now.
   'pickup.bandage',
   'pickup.medkit',
   'pickup.cash',
@@ -275,7 +278,6 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
     e.playerCtl ??= {
       playerId: -1,
       abilityCooldown: 0,
-      cash: 0,
       crimeUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
@@ -347,24 +349,23 @@ export interface StateMsg {
   /** Party-shared comebacks left this run (HUD; `normal` only). */
   revivesLeft?: number
   /** Per-slot HUD extras for each player's own display. */
-  huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
+  huds: Record<number, { abilityCd: number; briefcase: boolean }>
 }
 
 /**
  * Host → one client: that client's OWN authoritative inventory. Unlike the
  * per-player HUD summary in `StateMsg.huds` (which stays a lightweight summary
- * for teammates), the local player needs the FULL slot list so weapon switching,
- * item use, mod badges and ammo counts all work as a joiner. Sent on the reliable
- * channel and only when the inventory/activeSlot/weapon actually changes, so it
- * stays BLE-bandwidth-sane rather than riding every snapshot.
+ * for teammates), the local player needs the FULL slot list so item use and mod
+ * badges work as a joiner. There is no `weapon` field: the player's weapon is
+ * permanent (`PLAYER_START_WEAPON`), so it is never streamed. Sent on the
+ * reliable channel and only when the inventory/activeSlot actually changes, so
+ * it stays BLE-bandwidth-sane rather than riding every snapshot.
  */
 export interface InventoryMsg {
   /** The receiving client's own player slot. */
   slot: number
-  /** Full slot list — each stack carries its ammo/durability in `qty` and any `mods`. */
+  /** Full slot list — each stack carries its durability in `qty` and any `mods`. */
   inventory: ItemStack[]
-  /** Equipped/hotbar slot index into `inventory`; -1 = bare fists. */
+  /** Held-item slot index into `inventory`; -1 = nothing held. */
   activeSlot: number
-  /** The currently-swung weapon id (may differ from activeSlot when a throwable/consumable is held). */
-  weapon: string
 }

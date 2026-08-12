@@ -1,7 +1,6 @@
 import { SPECIAL_NAME } from '../game/player'
-import { CONSUMABLES, WEAPONS } from '../game/data/items'
 import type { RenderView } from '../app/session'
-import { hotbarSlots } from './hotbarModel'
+import { equippedModBadge, hotbarSlots } from './hotbarModel'
 
 export interface Hud {
   update(view: RenderView): void
@@ -38,13 +37,18 @@ export const createHud = (mount: HTMLElement): Hud => {
         hpBar.style.width = `${hp * 100}%`
         hpBar.style.background = hp > 0.35 ? 'linear-gradient(#7fd17f,#4a9a4a)' : 'linear-gradient(#d17f7f,#9a4a4a)'
       }
-      const weapon = WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? '—'
-      const cash = self.playerCtl?.cash ?? 0
-      const bandages = self.loadout?.inventory.filter((s) => CONSUMABLES[s.itemId]).reduce((n, s) => n + s.qty, 0) ?? 0
       const cd = self.playerCtl?.abilityCooldown ?? 0
       const ability = self.playerCtl ? ` · ${SPECIAL_NAME}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
       const briefcase = self.loadout?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 🧪' : ''
-      const text = `${weapon} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${briefcase}`
+      // No weapon name (one permanent weapon), no ammo, no cash, no bandage
+      // count. What DOES stay is the mod badge: mods ride on the weapon stack,
+      // and the hotbar no longer draws the weapon slot, so this is now the only
+      // always-visible readout of the build you have assembled. Dropping it with
+      // the rest of the weapon chrome would hide the run's whole progression
+      // behind the pause screen.
+      const badges = equippedModBadge(self)
+      const mods = badges ? ` · ${badges}` : ''
+      const text = `${mods}${ability}${briefcase}`.replace(/^ · /, '')
       if (text !== lastInfo) {
         lastInfo = text
         info.textContent = text

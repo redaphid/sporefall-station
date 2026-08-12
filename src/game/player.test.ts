@@ -1,7 +1,9 @@
 // The starter weapon must be a REAL slotted ItemStack — not a bare
-// `combat.weapon` string with an empty inventory — so it holds ammo and can
-// receive weapon-mods exactly like any picked-up weapon (playtest bug #1: "walk
-// over a diamond, nothing happens"). Strict + adversarial via the real systems.
+// `combat.weapon` string with an empty inventory — so it can receive
+// weapon-mods (playtest bug #1: "walk over a diamond, nothing happens").
+// It is the player's ONLY weapon and carries no ammo, so its qty is a flat 1
+// and `activeSlot` stays -1 (the active slot is the HELD-ITEM cursor now).
+// Strict + adversarial via the real systems.
 
 import { describe, expect, it } from 'vitest'
 import { PLAYER_HP, PLAYER_MELEE_MULT, PLAYER_SPEED, spawnPlayer } from './player'
@@ -9,13 +11,11 @@ import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { addEntity, createWorld, tickWorld, type World } from './world'
 import { emptyInput, type InputCmd } from './types'
 import { serializeWorld, deserializeWorld } from './serialize'
-import { weaponStack, spendAmmo } from './systems/inventory'
+import { weaponStack } from './systems/inventory'
 import { resolveWeapon } from './systems/resolveWeapon'
 import { fireWeapon } from './systems/combat'
 import { spawnNpc } from './populate'
 import { WEAPONS } from './data/items'
-
-const STARTER_AMMO = 200
 
 const step = (w: World): void => tickWorld(w, new Map([[0, emptyInput()]]))
 const tickN = (w: World, inputs: Map<number, InputCmd>, n: number): void => {
@@ -29,12 +29,13 @@ const dropMod = (w: World, modId: string, at: Entity): Entity => {
 }
 
 describe('spawnPlayer — the starter weapon is a proper slotted ItemStack', () => {
-  it('a ranged starter (pistol) is slotted, equipped, and loaded with 40 bullets', () => {
+  it('the permanent pistol is slotted (so mods have a home) with no ammo count', () => {
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 20, 20)
     expect(p.combat!.weapon).toBe('pistol')
-    expect(p.loadout!.activeSlot).toBe(0)
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    // -1: the weapon is NOT a hotbar selection, so nothing is held at spawn.
+    expect(p.loadout!.activeSlot).toBe(-1)
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
     // The mod list resolves through the SAME weaponStack path the fire site uses.
     expect(weaponStack(p)?.itemId).toBe('pistol')
   })
@@ -101,14 +102,15 @@ describe('spawnPlayer — the starter gun holds mods (the #1 fix)', () => {
   })
 })
 
-describe('spawnPlayer — the starter pistol has finite (200-round) ammo', () => {
-  it('spendAmmo decrements and empties after exactly 200 shots', () => {
+describe('the permanent pistol never runs dry', () => {
+  it('firing far more than the old magazine never decrements the slot', () => {
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 20, 20)
-    for (let i = 0; i < STARTER_AMMO; i++) expect(spendAmmo(p)).toBe(true)
-    // 41st pull: empty gun clicks — no shot.
-    expect(spendAmmo(p)).toBe(false)
-    expect(weaponStack(p)?.qty).toBe(0)
+    for (let i = 0; i < 500; i++) {
+      p.combat!.cooldown = 0
+      expect(fireWeapon(w, p)).toBe(true)
+    }
+    expect(weaponStack(p)?.qty).toBe(1)
   })
 })
 
@@ -123,6 +125,6 @@ describe('spawnPlayer — the slotted modded starter round-trips byte-for-byte',
     const restored = deserializeWorld(json)
     const rp = restored.entities.find((e) => e.playerCtl)!
     expect(weaponStack(rp)?.mods).toEqual([{ id: 'lifesteal', stacks: 1 }])
-    expect(weaponStack(rp)?.qty).toBe(STARTER_AMMO)
+    expect(weaponStack(rp)?.qty).toBe(1)
   })
 })

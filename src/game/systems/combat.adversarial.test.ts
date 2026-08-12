@@ -182,9 +182,13 @@ describe('shatter — frozen bodies gib on impact', () => {
     w = createWorld(1, 1)
   })
 
-  it('any impact on a frozen NPC is an instant kill regardless of damage, clearing frost', () => {
+  // The execute is now scoped to BRITTLE ice — a thrown freeze grenade. It used
+  // to fire for ANY freeze, which made the Cryo Rounds mod a permanent, free
+  // delete button: hp, resist and archetype are all ignored by shatter, so a
+  // 320hp boss died exactly as fast as a 40hp thug.
+  it('any impact on a BRITTLE-frozen NPC is an instant kill regardless of damage, clearing frost', () => {
     const e = npc(w, 20, 20)
-    addStatus(w, e, 'frozen', 120)
+    addStatus(w, e, 'frozen', 120, undefined, true)
     applyDamage(w, e, 1, 19, 20, 0, 99)
     expect(e.health!.hp).toBe(0)
     expect(e.dead).toBe(true)
@@ -192,9 +196,18 @@ describe('shatter — frozen bodies gib on impact', () => {
     expect(events(w, 'shatter')).toHaveLength(1)
   })
 
-  it('iframes take priority over shatter: a frozen but iframed target is untouched', () => {
+  it('a NON-brittle freeze does not execute — it cracks for bonus damage instead', () => {
     const e = npc(w, 20, 20)
     addStatus(w, e, 'frozen', 120)
+    applyDamage(w, e, 1, 19, 20, 0, 99)
+    expect(e.dead).toBeFalsy()
+    expect(e.shattered).toBeFalsy()
+    expect(events(w, 'shatter')).toHaveLength(0)
+  })
+
+  it('iframes take priority over shatter: a frozen but iframed target is untouched', () => {
+    const e = npc(w, 20, 20)
+    addStatus(w, e, 'frozen', 120, undefined, true)
     e.health!.iframes = 2
     applyDamage(w, e, 50, 19, 20, 0, 99)
     expect(e.dead).toBeFalsy()

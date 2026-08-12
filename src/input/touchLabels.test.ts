@@ -10,7 +10,6 @@ const player = (abilityCooldown = 0): Entity => {
   p.playerCtl = {
     playerId: 0,
     abilityCooldown,
-    cash: 0,
     crimeUntilTick: 0,
   }
   p.loadout = { inventory: [], activeSlot: -1 }
@@ -39,11 +38,11 @@ describe('computeTouchLabels', () => {
     })
   })
 
-  it('ATK shows the equipped weapon name', () => {
-    expect(computeTouchLabels(view(player())).atk).toBe('Pistol')
+  it('ATK is a static label — one permanent weapon, so the button never names it', () => {
+    expect(computeTouchLabels(view(player())).atk).toBe('ATK')
     const bare = player()
     bare.combat = undefined
-    expect(computeTouchLabels(view(bare)).atk).toBe('Fists')
+    expect(computeTouchLabels(view(bare)).atk).toBe('ATK')
   })
 
   it('USE is disabled and generic when nothing is in range', () => {
@@ -62,7 +61,7 @@ describe('computeTouchLabels', () => {
   it('USE names a usable object', () => {
     const atm = makeEntity('interactable', 'atm', 0.5, 0)
     atm.interact = { verb: 'use', range: 1.3 }
-    expect(computeTouchLabels(view(player(), [atm])).use).toBe('ATM')
+    expect(computeTouchLabels(view(player(), [atm])).use).toBe('Supply Terminal')
   })
 
   it('ignores interactables out of range', () => {

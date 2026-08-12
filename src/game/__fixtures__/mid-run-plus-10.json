@@ -13,6 +13,15 @@
     "description": "Reach the Launch Bay"
   },
   "noises": [],
+  "fear": [
+    {
+      "x": 2.016511608832,
+      "y": 1.5,
+      "expires": 65,
+      "sourceId": 2,
+      "born": 35
+    }
+  ],
   "events": [],
   "rng": -933849113,
   "baseRng": 20260715,
@@ -48,7 +57,7 @@
       },
       "combat": {
         "weapon": "pistol",
-        "cooldown": 14
+        "cooldown": 2
       },
       "status": {
         "stun": 0,
@@ -60,16 +69,15 @@
         "inventory": [
           {
             "itemId": "pistol",
-            "qty": 200
+            "qty": 1
           }
         ],
-        "activeSlot": 0
+        "activeSlot": -1
       },
       "playerCtl": {
         "playerId": 0,
         "abilityCooldown": 0,
-        "cash": 0,
-        "crimeUntilTick": 488
+        "crimeUntilTick": 480
       }
     },
     {
@@ -77,39 +85,39 @@
       "kind": "npc",
       "archetype": "cop",
       "pos": {
-        "x": 2.0322449421653332,
+        "x": 2.7130588514986664,
         "y": 1.5
       },
       "prevPos": {
-        "x": 1.9322449421653334,
+        "x": 2.578045902165333,
         "y": 1.5
       },
       "vel": {
-        "x": 1.7999999999999998,
+        "x": 0.030233087999999984,
         "y": 0
       },
       "intent": {
-        "x": 0,
+        "x": 1,
         "y": 0
       },
       "speed": 4,
       "radius": 0.35,
-      "facing": 3.141592653589793,
+      "facing": 0,
       "health": {
-        "hp": 18,
+        "hp": 6,
         "max": 60,
-        "iframes": 3,
-        "lastHurtTick": 38
+        "iframes": 0,
+        "lastHurtTick": 30
       },
       "combat": {
         "weapon": "bat",
-        "cooldown": 11
+        "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
             "itemId": "bat",
-            "qty": 14
+            "qty": 15
           }
         ],
         "activeSlot": 0
@@ -117,11 +125,11 @@
       "status": {
         "stun": 0,
         "sleep": 0,
-        "hitFlashUntil": 41,
+        "hitFlashUntil": 33,
         "cloakUntil": 0
       },
       "ai": {
-        "mode": "aggro",
+        "mode": "flee",
         "faction": "cop",
         "home": {
           "x": 4.5,
@@ -130,17 +138,23 @@
         "thinkAt": 42,
         "sightRange": 8,
         "lastScores": {
-          "threat": 80.903,
+          "threat": 64.81,
           "pursueMemory": 1.5,
           "wander": 1
         },
-        "goalSince": 0,
-        "goal": "battle",
+        "goalSince": 35,
+        "goal": "flee",
         "targetId": 1,
         "lastKnownTargetPos": {
           "x": 0.35009999999999997,
           "y": 1.5
-        }
+        },
+        "progress": {
+          "x": 2.578045902165333,
+          "y": 1.5,
+          "tick": 39
+        },
+        "fearId": 1
       }
     },
     {
@@ -204,7 +218,15 @@
         },
         "goalSince": 0,
         "goal": "wander",
-        "repathAt": 39
+        "repathAt": 39,
+        "path": {
+          "nodes": [],
+          "i": 0,
+          "goal": {
+            "x": -1.5,
+            "y": 5.5
+          }
+        }
       }
     }
   ]

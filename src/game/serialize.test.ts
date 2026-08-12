@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { spawnNpc } from './populate'
 import { spawnPlayer } from './player'
-import { deserializeWorld, serializeWorld, type WorldJson } from './serialize'
-import { INFINITE_AMMO } from './systems/combat'
+import { deserializeWorld, serializeWorld } from './serialize'
 import { expectWorldEqual, loadFixtureJson, runTicks } from './testkit'
 import { emptyInput, type InputCmd } from './types'
 import { createWorld, tickWorld, type World } from './world'
@@ -58,28 +57,14 @@ describe('serializeWorld / deserializeWorld', () => {
   })
 })
 
-// The player's slotted-gun ammo qty is the one serialized field the INFINITE_AMMO
-// testing toggle (systems/combat.ts) moves: ON skips the fire-time decrement. The
-// checked-in fixture encodes the normal (toggle-OFF) economy, so while the toggle
-// is ON we neutralize that single field on BOTH sides before comparing — every
-// other field must still match byte-for-byte. Flip INFINITE_AMMO off and the
-// fixture is compared verbatim again (this normalization is never reached).
-const zeroPlayerAmmo = (j: WorldJson): WorldJson => ({
-  ...j,
-  entities: j.entities.map((e) => {
-    const ld = e.loadout as { inventory?: { itemId: string; qty: number }[] } | undefined
-    if (!ld?.inventory) return e
-    return { ...e, loadout: { ...ld, inventory: ld.inventory.map((s) => ({ ...s, qty: 0 })) } }
-  }),
-})
-
 describe('fixture-driven test: load JSON → act → assert JSON', () => {
   it('loads mid-run.json, applies 10 ticks of the action, and matches mid-run-plus-10.json', () => {
     const w = deserializeWorld(loadFixtureJson('mid-run'))
     runTicks(w, new Map([[0, { moveX: -1, attack: true }]]), 10)
     const actual = serializeWorld(w)
     const expected = loadFixtureJson('mid-run-plus-10')
-    if (INFINITE_AMMO) expect(zeroPlayerAmmo(actual)).toEqual(zeroPlayerAmmo(expected))
-    else expect(actual).toEqual(expected)
+    // Compared verbatim: with ammo gone there is no longer any field that a
+    // toggle can move, so the fixture is a straight byte-for-byte contract.
+    expect(actual).toEqual(expected)
   })
 })

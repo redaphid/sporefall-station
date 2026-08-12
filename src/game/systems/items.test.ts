@@ -6,7 +6,7 @@ import { WEAPONS } from '../data/items'
 import { combatSystem } from './combat'
 import { fireAt } from './fire'
 import { applyAreaEffect } from './itemEffects'
-import { equipSlot, throwActive, useHeld } from './inventory'
+import { throwActive, useHeld } from './inventory'
 import { projectileSystem } from './projectiles'
 import { hasStatus } from './statusFx'
 
@@ -15,7 +15,7 @@ const player = (w: World, x = 20, y = 20): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, crimeUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   e.facing = 0
   return e
@@ -76,7 +76,7 @@ describe('item breadth', () => {
     it('a shotgun fires its full spread of pellets in one shot, at varied angles', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       combatSystem(w, attack())
       const pellets = w.entities.filter((x) => x.projectile)
       expect(pellets).toHaveLength(WEAPONS.shotgun.pellets!)
@@ -86,7 +86,7 @@ describe('item breadth', () => {
     it('a freeze ray freezes the target it hits', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'freezeRay', qty: 6 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && !hasStatus(target, 'frozen'); t++) projectileSystem(w)
@@ -96,7 +96,7 @@ describe('item breadth', () => {
     it('a tranquilizer puts the target to sleep', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'tranquilizer', qty: 5 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && target.status!.sleep === 0; t++) projectileSystem(w)
@@ -108,7 +108,7 @@ describe('item breadth', () => {
     it('a sledgehammer stuns what it hits', () => {
       const e = player(w)
       e.loadout!.inventory = [{ itemId: 'sledgehammer', qty: 12 }]
-      equipSlot(e, 0)
+      e.combat!.weapon = e.loadout!.inventory[0].itemId
       const target = dummy(w, 21, 20)
       combatSystem(w, attack())
       expect(target.status!.stun).toBeGreaterThan(0)

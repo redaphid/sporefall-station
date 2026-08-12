@@ -31,7 +31,11 @@ const ELEC_DAMAGE = 20
 /** How close two wet bodies must be for the arc to jump between them (tiles). */
 const CHAIN_RADIUS = 1.6
 
-export const freeze = (w: World, e: Entity): void => addStatus(w, e, 'frozen', ELEMENTS.frozen.durationTicks)
+/** Freeze `e`. `brittle` opts into the shatter-on-impact execute and defaults to
+ * OFF, so a new freeze source is control until it deliberately asks to be a kill
+ * button — only the thrown freeze grenade does. See StatusEntry.brittle. */
+export const freeze = (w: World, e: Entity, brittle = false): void =>
+  addStatus(w, e, 'frozen', ELEMENTS.frozen.durationTicks, undefined, brittle)
 
 export const wet = (w: World, e: Entity): void => addStatus(w, e, 'wet', ELEMENTS.wet.durationTicks)
 
@@ -39,7 +43,32 @@ const near = (a: Entity, b: Entity): boolean => Math.hypot(a.pos.x - b.pos.x, a.
 
 /** Zap `origin`: it becomes electrified (immobilized), and if it is wet the
  * shock floods the connected wet cluster — every reachable wet body is
- * electrified and takes electrocution damage. A dry origin is a dead end. */
+ * electrified and takes electrocution damage. A dry origin is a dead end.
+ *
+ * ⚠️ LANDMINE — READ BEFORE WIRING THIS UP TO ANYTHING.
+ *
+ * `ELEC_DAMAGE` below is subtracted straight from `health.hp` with NO
+ * `resistMult` call — it is the only damage site in the game that bypasses
+ * `combat.applyDamage` entirely. That means it ignores armour, archetype and
+ * every damage-affinity rule the roster is built on: 20 flat to a brute is the
+ * same 20 flat to a civilian.
+ *
+ * The ONLY thing making that safe today is that nothing reaches it. `shock()` is
+ * called from `debug.ts` (a `?debug`-gated console verb) and from tests, and
+ * from nowhere else. No weapon, mod, throwable or tile calls it, and its `wet`
+ * precondition is likewise never applied by any live system. That is luck, not
+ * design, and it is recorded here as luck.
+ *
+ * If you add water tiles, a shock grenade, a Tesla weapon or anything else that
+ * calls this: it will LOOK like it works, and it will silently bypass resists
+ * exactly the way the frozen-shatter bug did — an effect whose output is
+ * independent of the target's stat block. Route the damage through
+ * `applyDamage` (which returns whether it landed) before you connect anything to
+ * it, or you will reintroduce that whole class of bug.
+ *
+ * Note also that the `shock` MOD does not come through here: it applies plain
+ * `electrified` via `applyStatus`, so its blurb's promise to "arc through
+ * anything wet" is currently not implemented anywhere in the fire path. */
 export const shock = (w: World, origin: Entity): void => {
   const seen = new Set<Entity>()
   const queue: Entity[] = [origin]

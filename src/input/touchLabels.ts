@@ -1,6 +1,5 @@
 import type { RenderView } from '../app/session'
 import { SPECIAL_NAME } from '../game/player'
-import { WEAPONS } from '../game/data/items'
 import { OBJECTS } from '../game/data/objects'
 import type { Entity } from '../game/entity'
 import { nearestInteractable } from '../game/systems/interaction'
@@ -43,7 +42,8 @@ export const computeTouchLabels = (view: RenderView): TouchLabels => {
   const cd = self.playerCtl?.abilityCooldown ?? 0
   const picking = self.playerCtl?.channel?.kind === 'lockpick'
   return {
-    atk: WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? 'Fists',
+    // Static: the weapon is permanent, so the button never names it.
+    atk: 'ATK',
     use: picking ? 'Picking…' : target ? useLabel(target) : 'USE',
     useEnabled: picking || !!target,
     spc: cd > 0 ? `${SPECIAL_NAME} ${Math.ceil(cd / 30)}s` : SPECIAL_NAME,

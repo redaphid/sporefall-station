@@ -12,9 +12,30 @@ import { weightedModId } from './systems/draft'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 
-/** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
- * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
-export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
+/**
+ * How many weapon-mod pickups a floor puts on the ground. A CORE-LOOP parameter,
+ * not a drop rate: with one permanent weapon, mods are the whole build, so this
+ * number decides how many real decisions a run asks the player to make.
+ *
+ * This replaced a per-ROOM chance (2/3), which was the wrong shape twice over.
+ * It produced roughly TWENTY mods on floor 1 — you ended up holding one of
+ * everything, which is a pile rather than a choice, and it is why every run
+ * converged on the same build. And because floors differ enormously in room
+ * count, it was wildly inconsistent: measured 9.6 mods on floor 4 against 26.6 on
+ * floor 5. A core-loop parameter has to be predictable, so it is now a count.
+ *
+ * Five is chosen off the measured trade-off (scripts/test/mod-scarcity-curve.ts).
+ * Scarcity has its own failure mode — reaching an enemy having never been offered
+ * the thing that answers it — so the number has to sit between "a pile" and "a
+ * dead end". At 5 per floor:
+ *   - 15 picks across a 3-floor run: enough to build with, few enough to weigh.
+ *   - 26% of individual floors offer NO element, which is the tension.
+ *   - but only 1.8% of runs reach floor 3 with no element at all — so being
+ *     genuinely unarmed is a rounding error rather than a lost run.
+ *   - 30% of runs are never offered the single BEST counter, which is the
+ *     run-to-run variety: you improvise with the element you were given.
+ */
+export const MOD_PICKUPS_PER_FLOOR = 5
 
 /** No street-life NPC (or street patrol waypoint) may be placed closer than this
  * to the player spawn. Sized past the LONGEST NPC sight range (8) so that with
@@ -551,28 +572,29 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
   return null
 }
 
-// Loot is tiered by depth: floor 1 stays basic (bat/knife/bandages), then the
-// element arsenal folds in so the frost/fire/shock/sleep/poison systems come
-// online as you descend. Shops always stock element gear (see stockShop), so
-// the interaction combos stay reachable regardless of how the dice fall.
-const BASIC_LOOT = ['bat', 'knife', 'bandage', 'bandage', 'medkit', 'cash']
+// Loot is tiered by depth. WEAPONS ARE NOT LOOT any more: the player carries one
+// permanent pistol and cannot pick a weapon up, so a weapon on the floor would be
+// a dead sparkle. The weapon slots in the table are REPURPOSED to throwables —
+// the remaining offensive pickup — so the floor still rewards exploration and the
+// frost/fire/shock/sleep/poison systems still come online as you descend. Shops
+// always stock element gear (see stockShop), so the combos stay reachable.
+const BASIC_LOOT = ['molotov', 'grenade', 'medkit']
 const ELEMENT_THROWABLES = ['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade']
-const ELEMENT_WEAPONS = ['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun']
-const GUNS = ['shotgun', 'machinegun']
 
-/** The floor's random-loot table: basics everywhere, element throwables and a
- * couple of element weapons from floor 2, the full arsenal from floor 3 on. */
+/** The floor's random-loot table: basics everywhere, the element throwables from
+ * floor 2, weighted up again from floor 3 on. */
 const lootTable = (floor: number): string[] => {
   const table = [...BASIC_LOOT]
-  if (floor >= 2) table.push(...ELEMENT_THROWABLES, 'freezeRay', 'sledgehammer')
-  if (floor >= 3) table.push(...ELEMENT_WEAPONS, ...GUNS, ...ELEMENT_THROWABLES)
+  if (floor >= 2) table.push(...ELEMENT_THROWABLES)
+  if (floor >= 3) table.push(...ELEMENT_THROWABLES)
   return table
 }
 
 /** Element gear a shop can carry — the reliable place to gear up on any floor,
- * so freeze-shatter / fire-spread combos are always within reach. */
+ * so freeze-shatter / fire-spread combos are always within reach. Weapons are
+ * gone from the stock list (the player's pistol is permanent); the shop now
+ * trades purely in throwables and healing. */
 const SHOP_STOCK = [
-  'freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun', 'shotgun',
   'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit',
 ]
 
@@ -582,7 +604,7 @@ const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number)
   addEntity(w, e)
 }
 
-/** Lay out a shop's wares: a handful of element weapons/throwables on the floor
+/** Lay out a shop's wares: a handful of element throwables on the floor
  * for the taking, so every run has somewhere to buy into the element systems. */
 const stockShop = (w: World, rng: Rng, building: Building): void => {
   const n = rng.int(2, 4)
@@ -625,15 +647,23 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
   }
 }
 
+/** Item pickups scattered per floor. Cut from 6–10: with weapons, ammo, money
+ * and bandages all gone, the item table is only healing + throwables, and MODS
+ * are meant to be the bulk of what is worth walking over (see
+ * MOD_PICKUP_ROOM_CHANCE, which doubled to match). Mods keep their own
+ * dedicated placement pass so their one-per-room / never-in-spawn / never-
+ * stacked invariants stay intact. */
+const LOOT_MIN = 3
+const LOOT_MAX = 5
+
 const sprinkleLoot = (w: World, rng: Rng): void => {
   const table = lootTable(w.floor)
-  const n = rng.int(6, 10)
+  const n = rng.int(LOOT_MIN, LOOT_MAX)
   for (let i = 0; i < n; i++) {
     const building = rng.pick(w.level.buildings)
     const spot = building ? randomFloorInBuilding(w, rng, building) : null
     if (!spot) continue
-    const itemId = rng.pick(table)
-    dropPickup(w, itemId, spot.x, spot.y, itemId === 'cash' ? rng.int(10, 40) : 1)
+    dropPickup(w, rng.pick(table), spot.x, spot.y, 1)
   }
 }
 
@@ -648,23 +678,49 @@ const dropModPickup = (w: World, modId: string, x: number, y: number): void => {
   addEntity(w, e)
 }
 
-/** Deterministically sprinkle weapon-mod pickups: ~`MOD_PICKUP_ROOM_CHANCE` of
- * interior rooms get exactly one, the specific mod chosen weighted by rarity. Uses
+/** Deterministically place exactly `MOD_PICKUPS_PER_FLOOR` weapon-mod pickups,
+ * spread across distinct interior rooms, each mod chosen weighted by rarity. Uses
  * a DEDICATED `mod-pickups` fork so it neither perturbs the loot/AI stream nor is
  * perturbed by it — same seed → same rooms get the same mods, on every peer. */
 const scatterModPickups = (w: World): void => {
   const rng = w.rng.fork('mod-pickups')
   const spawnTx = Math.floor(w.level.spawn.x)
   const spawnTy = Math.floor(w.level.spawn.y)
+
+  // Every room that could host one. The spawn room is excluded so a fresh run
+  // doesn't hand you a mod for free.
+  const rooms: Rect[] = []
   for (const building of w.level.buildings) {
     for (const room of building.rooms) {
-      // Skip the spawn room so a fresh run doesn't hand you a mod for free.
       if (rectContains(room, spawnTx, spawnTy)) continue
-      if (!rng.chance(MOD_PICKUP_ROOM_CHANCE)) continue
-      const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
-      if (!spot) continue
-      dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+      rooms.push(room)
     }
+  }
+
+  // Fisher-Yates over the candidate rooms, then walk the shuffled order placing
+  // until the floor's quota is met. Shuffling (rather than rolling per room)
+  // is what makes the COUNT independent of how many rooms a floor happens to
+  // have — floors vary from ~10 to ~27 usable rooms, and the old per-room roll
+  // turned that straight into a 3x swing in how much build a floor handed you.
+  for (let i = rooms.length - 1; i > 0; i--) {
+    const j = rng.int(0, i)
+    ;[rooms[i], rooms[j]] = [rooms[j], rooms[i]]
+  }
+
+  // Adjacent or overlapping rooms can still resolve to the SAME tile, which
+  // stacks two gems in one spot where only one is grabbable — so taken tiles are
+  // tracked and skipped. A skip costs the room, not the quota.
+  const taken = new Set<string>()
+  let placed = 0
+  for (const room of rooms) {
+    if (placed >= MOD_PICKUPS_PER_FLOOR) break
+    const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
+    if (!spot) continue
+    const key = `${Math.floor(spot.x)},${Math.floor(spot.y)}`
+    if (taken.has(key)) continue
+    taken.add(key)
+    dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+    placed++
   }
 }
 
@@ -695,16 +751,16 @@ const randomFloorInRoom = (
 
 /** Build an NPC's slotted loadout so its carried weapon is modelled EXACTLY like
  * a player's — a real `ItemStack` in a real slot, able to hold weapon-mods whose
- * effects fold into its shots at the shared fire site. A ranged weapon slots with
- * a full magazine, a melee weapon with its durability; innate fists (no magSize /
- * durability) get NO loadout — undefined, resolving vanilla exactly as a
+ * effects fold into its shots at the shared fire site. A ranged weapon has no
+ * ammo so it slots at a flat 1, a melee weapon at its durability; innate fists
+ * (no durability) get NO loadout — undefined, resolving vanilla exactly as a
  * weaponless NPC did before this component existed, so DEFAULT behavior is
  * unchanged. `mods` (optional) seeds a MODDED enemy — a pierce/explosive/frost gun
  * a tactically distinct threat. */
 export const npcLoadout = (weaponId: string, mods?: readonly WeaponMod[]): Loadout | undefined => {
   const def = WEAPONS[weaponId]
   if (!def) return undefined
-  const qty = def.kind === 'ranged' ? (def.magSize ?? 1) : def.durability
+  const qty = def.kind === 'ranged' ? 1 : def.durability
   if (qty === undefined) return undefined // fists / no-durability melee: innate, unslotted
   const stack: ItemStack = { itemId: weaponId, qty }
   if (mods && mods.length) stack.mods = mods.map((m) => ({ id: m.id, stacks: m.stacks }))

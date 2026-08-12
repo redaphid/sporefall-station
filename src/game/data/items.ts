@@ -14,7 +14,10 @@ export interface StatusApply {
 export type AreaEffect =
   | { kind: 'fire' }
   | { kind: 'explode'; radius: number; damage: number }
-  | { kind: 'status'; status: string; ticks: number; radius: number }
+  /** `brittle` only means anything for `frozen`: it flash-freezes bodies solid so
+   * the next blow shatters them. A LIMITED, thrown resource can carry an execute;
+   * a permanent weapon mod cannot (see `frost` in data/mods.ts). */
+  | { kind: 'status'; status: string; ticks: number; radius: number; brittle?: boolean }
 
 export interface WeaponDef {
   id: string
@@ -27,9 +30,6 @@ export interface WeaponDef {
   knockback: number
   /** Ranged only. */
   projectileSpeed?: number
-  ammoPerShot?: number
-  /** Ranged: rounds a full slot holds — the slot's count doubles as ammo. */
-  magSize?: number
   /** Melee: swings before it breaks — the slot's count doubles as durability.
    * Absent (natural armament) = innate, never consumed. */
   durability?: number
@@ -67,17 +67,19 @@ export const WEAPONS: Record<string, WeaponDef> = {
   // fewer, heavier, longer-reach blows — a hit you feel and roll away from
   // rather than a chip you tank.
   claws: { id: 'claws', name: 'Claws', kind: 'melee', damage: 22, range: 1.5, cooldownTicks: 20, knockback: 12, natural: true },
+  // The PLAYER'S ONLY WEAPON. Retuned upward from its old starter numbers
+  // (14 dmg / 18 ticks = 23 dps): it used to be the gun you upgraded away from,
+  // so it was balanced against finding a shotgun (40 dps) or machinegun (48 dps).
+  // As the whole arsenal it sits just under those: 18 dmg / 14 ticks = 39 dps.
   pistol: {
     id: 'pistol',
     name: 'Pistol',
     kind: 'ranged',
-    damage: 14,
+    damage: 18,
     range: 10,
-    cooldownTicks: 18,
+    cooldownTicks: 14,
     knockback: 3,
     projectileSpeed: 14,
-    ammoPerShot: 1,
-    magSize: 8,
   },
   shotgun: {
     id: 'shotgun',
@@ -88,7 +90,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 26,
     knockback: 4,
     projectileSpeed: 16,
-    magSize: 6,
     pellets: 5,
     spread: 0.5,
   },
@@ -101,7 +102,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 5,
     knockback: 1,
     projectileSpeed: 16,
-    magSize: 30,
   },
   freezeRay: {
     id: 'freezeRay',
@@ -112,7 +112,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 22,
     knockback: 0,
     projectileSpeed: 13,
-    magSize: 6,
     onHit: { status: 'frozen', ticks: 120 },
   },
   tranquilizer: {
@@ -124,7 +123,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 20,
     knockback: 0,
     projectileSpeed: 13,
-    magSize: 5,
     onHit: { status: 'sleep', ticks: 150 },
   },
   flamethrower: {
@@ -136,7 +134,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 6,
     knockback: 0,
     projectileSpeed: 11,
-    magSize: 40,
     onHit: { status: 'burning', ticks: 240 },
   },
   stunGun: {
@@ -148,7 +145,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 24,
     knockback: 1,
     projectileSpeed: 14,
-    magSize: 4,
     onHit: { status: 'electrified', ticks: 45 },
   },
 }
@@ -167,7 +163,10 @@ export interface ThrowableDef {
 export const THROWABLES: Record<string, ThrowableDef> = {
   molotov: { id: 'molotov', name: 'Molotov', speed: 9, range: 6, damage: 0, onLand: { kind: 'fire' }, cooldownTicks: 20 },
   grenade: { id: 'grenade', name: 'Grenade', speed: 8, range: 6, damage: 0, onLand: { kind: 'explode', radius: 2.2, damage: 40 }, cooldownTicks: 25 },
-  freezeGrenade: { id: 'freezeGrenade', name: 'Freeze Grenade', speed: 9, range: 6, damage: 0, onLand: { kind: 'status', status: 'frozen', ticks: 120, radius: 2 }, cooldownTicks: 20 },
+  // `brittle: true` — the thrown grenade keeps the execute. It is a consumable you
+  // have to find, carry and aim, which is what made "freeze, then shatter" a fair
+  // trade in the first place.
+  freezeGrenade: { id: 'freezeGrenade', name: 'Freeze Grenade', speed: 9, range: 6, damage: 0, onLand: { kind: 'status', status: 'frozen', ticks: 120, radius: 2, brittle: true }, cooldownTicks: 20 },
   chloroform: { id: 'chloroform', name: 'Chloroform', speed: 8, range: 4, damage: 0, onLand: { kind: 'status', status: 'sleep', ticks: 180, radius: 1.8 }, cooldownTicks: 20 },
   banana: { id: 'banana', name: 'Banana Peel', speed: 7, range: 4, damage: 0, onLand: { kind: 'status', status: 'slip', ticks: 45, radius: 1.2 }, cooldownTicks: 15 },
   gasGrenade: { id: 'gasGrenade', name: 'Gas Grenade', speed: 8, range: 5, damage: 0, onLand: { kind: 'status', status: 'poisoned', ticks: 150, radius: 2 }, cooldownTicks: 20 },
@@ -182,23 +181,21 @@ export interface ConsumableDef {
 }
 
 export const CONSUMABLES: Record<string, ConsumableDef> = {
-  bandage: { id: 'bandage', name: 'Bandage', heal: 30 },
+  // No `bandage`: healing is the medkit (and the burger), full stop.
   medkit: { id: 'medkit', name: 'Medkit', heal: 100 },
   burger: { id: 'burger', name: 'Burger', heal: 20 },
   adrenaline: { id: 'adrenaline', name: 'Adrenaline', onUse: { status: 'hasted', ticks: 300 } },
 }
 
-export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'ammo' | 'key' | 'cash' | 'unknown'
+export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' | 'unknown'
 
 /** What kind of thing an item id is — the switch every use-rule dispatches on. */
 export const itemClass = (itemId: string): ItemClass => {
-  if (itemId === 'cash') return 'cash'
   if (itemId === 'briefcase') return 'key'
   // Wing keycards ('keycard' or 'keycard.<wing>'): a key-class item, so they
   // ignore slot limits, survive a down (recover keeps only 'key' items), and
   // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
   if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
-  if (itemId === 'ammo') return 'ammo'
   if (WEAPONS[itemId]) return WEAPONS[itemId].kind
   if (THROWABLES[itemId]) return 'throwable'
   if (CONSUMABLES[itemId]) return 'consumable'

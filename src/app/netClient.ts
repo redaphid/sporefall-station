@@ -21,6 +21,7 @@ import {
   type WireSnapshot,
 } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type Transport } from '../net/types'
+import { PLAYER_START_WEAPON } from '../game/player'
 import type { RenderView, Session } from './session'
 
 const SMOOTH = 0.45 // remote entities chase their snapshot target per tick
@@ -353,29 +354,28 @@ export class NetClientSession implements Session {
     const events = this.eventsOut
     this.eventsOut = []
     const hud = this.state.huds[this.slot]
+    if (this.self?.playerCtl) {
+      // The weapon is permanent, so it is NOT streamed — assert it locally, and
+      // do so unconditionally: waiting on the first StateMsg would leave our own
+      // avatar briefly weaponless (undefined `combat`) right after joining.
+      if (this.self.combat) this.self.combat.weapon = PLAYER_START_WEAPON
+      else this.self.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
+    }
     if (this.self && hud) {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
-      this.self.playerCtl!.cash = hud.cash
       this.self.playerCtl!.abilityCooldown = hud.abilityCd
-      if (this.self.combat) this.self.combat.weapon = hud.weapon
-      else this.self.combat = { weapon: hud.weapon, cooldown: 0 }
     }
     // Our OWN player carries the FULL authoritative inventory the host streams us
-    // (slots / activeSlot / per-weapon mods / ammo) so weapon switching, item use
-    // and mod badges all work as a joiner. Until that first inventory arrives, fall
-    // back to the HUD bandage/briefcase summary so nothing phantom-floods the hotbar.
+    // (slots / activeSlot / weapon mods) so item use and mod badges work as a
+    // joiner. Until that first inventory arrives, fall
+    // back to the HUD briefcase summary so nothing phantom-floods the hotbar.
     if (this.self?.playerCtl) {
       const ld = (this.self.loadout ??= { inventory: [], activeSlot: -1 })
       if (this.localInv) {
         ld.inventory = this.localInv.inventory
         ld.activeSlot = this.localInv.activeSlot
-        if (this.self.combat) this.self.combat.weapon = this.localInv.weapon
-        else this.self.combat = { weapon: this.localInv.weapon, cooldown: 0 }
       } else if (hud) {
-        ld.inventory = [
-          ...(hud.bandages > 0 ? [{ itemId: 'bandage', qty: hud.bandages }] : []),
-          ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
-        ]
+        ld.inventory = hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []
       }
     }
     const missionText =

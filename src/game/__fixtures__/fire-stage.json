@@ -3,16 +3,17 @@
   "seed": 424242,
   "floor": 1,
   "tick": 0,
-  "nextId": 102,
+  "nextId": 312,
   "alarm": 0,
   "gameOver": false,
   "mission": {
     "template": "steal",
-    "targetEntityId": 51,
+    "targetEntityId": 261,
     "targetBuilding": 8,
     "complete": false,
     "exitUnlocked": false,
-    "description": "Extract the specimen canister from the med-bay"
+    "description": "Extract the specimen canister from the med-bay",
+    "objectiveDoorId": 294
   },
   "noises": [],
   "events": [],
@@ -52,6 +53,15 @@
         "weapon": "shotgun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "shotgun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -66,7 +76,12 @@
           "y": 7.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 0,
+          "role": "office"
+        }
       }
     },
     {
@@ -101,6 +116,15 @@
         "weapon": "bat",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -115,7 +139,29 @@
           "y": 4.5
         },
         "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 7,
+        "zone": {
+          "building": 1,
+          "role": "warehouse"
+        },
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 35.5,
+              "y": 4.5
+            },
+            {
+              "x": 26.5,
+              "y": 9.5
+            },
+            {
+              "x": 30.5,
+              "y": 5.5
+            }
+          ]
+        },
+        "patrolIndex": 0
       }
     },
     {
@@ -123,12 +169,12 @@
       "kind": "npc",
       "archetype": "thug",
       "pos": {
-        "x": 26.5,
-        "y": 9.5
+        "x": 38.5,
+        "y": 5.5
       },
       "prevPos": {
-        "x": 26.5,
-        "y": 9.5
+        "x": 38.5,
+        "y": 5.5
       },
       "vel": {
         "x": 0,
@@ -150,6 +196,15 @@
         "weapon": "machinegun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "machinegun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -160,11 +215,15 @@
         "mode": "idle",
         "faction": "gang",
         "home": {
-          "x": 26.5,
-          "y": 9.5
+          "x": 38.5,
+          "y": 5.5
         },
         "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 7,
+        "zone": {
+          "building": 1,
+          "role": "warehouse"
+        }
       }
     },
     {
@@ -172,12 +231,12 @@
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 49.5,
-        "y": 12.5
+        "x": 56.5,
+        "y": 8.5
       },
       "prevPos": {
-        "x": 49.5,
-        "y": 12.5
+        "x": 56.5,
+        "y": 8.5
       },
       "vel": {
         "x": 0,
@@ -199,6 +258,15 @@
         "weapon": "stunGun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "stunGun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -209,11 +277,16 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 49.5,
-          "y": 12.5
+          "x": 56.5,
+          "y": 8.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 2,
+          "role": "clinic"
+        }
       }
     },
     {
@@ -221,12 +294,12 @@
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 13.5,
-        "y": 27.5
+        "x": 48.5,
+        "y": 6.5
       },
       "prevPos": {
-        "x": 13.5,
-        "y": 27.5
+        "x": 48.5,
+        "y": 6.5
       },
       "vel": {
         "x": 0,
@@ -248,6 +321,15 @@
         "weapon": "bat",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -258,24 +340,92 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 13.5,
-          "y": 27.5
+          "x": 48.5,
+          "y": 6.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 2,
+          "role": "clinic"
+        }
       }
     },
     {
       "id": 6,
       "kind": "npc",
-      "archetype": "shopkeeper",
+      "archetype": "civilian",
       "pos": {
-        "x": 26.5,
-        "y": 23.5
+        "x": 6.5,
+        "y": 29.5
       },
       "prevPos": {
-        "x": 26.5,
-        "y": 23.5
+        "x": 6.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.2,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "sledgehammer",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "sledgehammer",
+            "qty": 12
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "civ",
+        "home": {
+          "x": 6.5,
+          "y": 29.5
+        },
+        "thinkAt": 0,
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 3,
+          "role": "clinic"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "kind": "npc",
+      "archetype": "shopkeeper",
+      "pos": {
+        "x": 31.5,
+        "y": 25.5
+      },
+      "prevPos": {
+        "x": 31.5,
+        "y": 25.5
       },
       "vel": {
         "x": 0,
@@ -294,8 +444,17 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "sledgehammer",
+        "weapon": "pistol",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -307,39 +466,15 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 26.5,
-          "y": 23.5
+          "x": 31.5,
+          "y": 25.5
         },
         "thinkAt": 0,
-        "sightRange": 6
-      }
-    },
-    {
-      "id": 7,
-      "kind": "pickup",
-      "archetype": "pickup.molotov",
-      "pos": {
-        "x": 39.5,
-        "y": 28.5
-      },
-      "prevPos": {
-        "x": 39.5,
-        "y": 28.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 0,
-      "radius": 0.3,
-      "facing": 0,
-      "pickup": {
-        "itemId": "molotov",
-        "qty": 1
+        "sightRange": 6,
+        "zone": {
+          "building": 4,
+          "role": "shop"
+        }
       }
     },
     {
@@ -347,12 +482,12 @@
       "kind": "pickup",
       "archetype": "pickup.molotov",
       "pos": {
-        "x": 33.5,
-        "y": 24.5
+        "x": 26.5,
+        "y": 29.5
       },
       "prevPos": {
-        "x": 33.5,
-        "y": 24.5
+        "x": 26.5,
+        "y": 29.5
       },
       "vel": {
         "x": 0,
@@ -372,15 +507,71 @@
     },
     {
       "id": 9,
+      "kind": "pickup",
+      "archetype": "pickup.chloroform",
+      "pos": {
+        "x": 37.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 37.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "chloroform",
+        "qty": 1
+      }
+    },
+    {
+      "id": 10,
+      "kind": "pickup",
+      "archetype": "pickup.freezeGrenade",
+      "pos": {
+        "x": 26.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "freezeGrenade",
+        "qty": 1
+      }
+    },
+    {
+      "id": 11,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 59.5,
-        "y": 21.5
+        "x": 50.5,
+        "y": 26.5
       },
       "prevPos": {
-        "x": 59.5,
-        "y": 21.5
+        "x": 50.5,
+        "y": 26.5
       },
       "vel": {
         "x": 0,
@@ -399,8 +590,17 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "machinegun",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "machinegun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -412,73 +612,29 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 59.5,
-          "y": 21.5
+          "x": 50.5,
+          "y": 26.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 5,
+          "role": "apartment"
+        }
       }
     },
     {
-      "id": 10,
-      "kind": "npc",
-      "archetype": "thug",
-      "pos": {
-        "x": 16.5,
-        "y": 39.5
-      },
-      "prevPos": {
-        "x": 16.5,
-        "y": 39.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 3.4,
-      "radius": 0.35,
-      "facing": 0,
-      "health": {
-        "hp": 40,
-        "max": 40,
-        "iframes": 0
-      },
-      "combat": {
-        "weapon": "machinegun",
-        "cooldown": 0
-      },
-      "status": {
-        "stun": 0,
-        "sleep": 0,
-        "hitFlashUntil": 0,
-        "cloakUntil": 0
-      },
-      "ai": {
-        "mode": "idle",
-        "faction": "gang",
-        "home": {
-          "x": 16.5,
-          "y": 39.5
-        },
-        "thinkAt": 0,
-        "sightRange": 7
-      }
-    },
-    {
-      "id": 11,
+      "id": 12,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
         "x": 6.5,
-        "y": 43.5
+        "y": 38.5
       },
       "prevPos": {
         "x": 6.5,
-        "y": 43.5
+        "y": 38.5
       },
       "vel": {
         "x": 0,
@@ -500,6 +656,15 @@
         "weapon": "shotgun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "shotgun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -511,23 +676,45 @@
         "faction": "gang",
         "home": {
           "x": 6.5,
-          "y": 43.5
+          "y": 38.5
         },
         "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 7,
+        "zone": {
+          "building": 6,
+          "role": "warehouse"
+        },
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 6.5,
+              "y": 38.5
+            },
+            {
+              "x": 10.5,
+              "y": 39.5
+            },
+            {
+              "x": 16.5,
+              "y": 37.5
+            }
+          ]
+        },
+        "patrolIndex": 0
       }
     },
     {
-      "id": 12,
+      "id": 13,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
-        "x": 5.5,
-        "y": 37.5
+        "x": 8.5,
+        "y": 38.5
       },
       "prevPos": {
-        "x": 5.5,
-        "y": 37.5
+        "x": 8.5,
+        "y": 38.5
       },
       "vel": {
         "x": 0,
@@ -549,6 +736,15 @@
         "weapon": "stunGun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "stunGun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -559,24 +755,28 @@
         "mode": "idle",
         "faction": "gang",
         "home": {
-          "x": 5.5,
-          "y": 37.5
+          "x": 8.5,
+          "y": 38.5
         },
         "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 7,
+        "zone": {
+          "building": 6,
+          "role": "warehouse"
+        }
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
-        "x": 27.5,
-        "y": 38.5
+        "x": 25.5,
+        "y": 37.5
       },
       "prevPos": {
-        "x": 27.5,
-        "y": 38.5
+        "x": 25.5,
+        "y": 37.5
       },
       "vel": {
         "x": 0,
@@ -598,6 +798,15 @@
         "weapon": "bat",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -608,24 +817,46 @@
         "mode": "idle",
         "faction": "gang",
         "home": {
-          "x": 27.5,
-          "y": 38.5
+          "x": 25.5,
+          "y": 37.5
         },
         "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 7,
+        "zone": {
+          "building": 7,
+          "role": "warehouse"
+        },
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 25.5,
+              "y": 37.5
+            },
+            {
+              "x": 27.5,
+              "y": 41.5
+            },
+            {
+              "x": 31.5,
+              "y": 41.5
+            }
+          ]
+        },
+        "patrolIndex": 0
       }
     },
     {
-      "id": 14,
+      "id": 15,
       "kind": "npc",
       "archetype": "thug",
       "pos": {
-        "x": 31.5,
-        "y": 39.5
+        "x": 27.5,
+        "y": 41.5
       },
       "prevPos": {
-        "x": 31.5,
-        "y": 39.5
+        "x": 27.5,
+        "y": 41.5
       },
       "vel": {
         "x": 0,
@@ -647,6 +878,15 @@
         "weapon": "flamethrower",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "flamethrower",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -657,24 +897,100 @@
         "mode": "idle",
         "faction": "gang",
         "home": {
-          "x": 31.5,
-          "y": 39.5
+          "x": 27.5,
+          "y": 41.5
         },
         "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 7,
+        "zone": {
+          "building": 7,
+          "role": "warehouse"
+        },
+        "behavior": "squad",
+        "squad": {
+          "id": 1,
+          "role": "lead"
+        }
       }
     },
     {
-      "id": 15,
+      "id": 16,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 36.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 36.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "bat",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 36.5,
+          "y": 43.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "zone": {
+          "building": 7,
+          "role": "warehouse"
+        },
+        "behavior": "squad",
+        "squad": {
+          "id": 1,
+          "role": "flank"
+        }
+      }
+    },
+    {
+      "id": 17,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 47.5,
-        "y": 39.5
+        "x": 57.5,
+        "y": 43.5
       },
       "prevPos": {
-        "x": 47.5,
-        "y": 39.5
+        "x": 57.5,
+        "y": 43.5
       },
       "vel": {
         "x": 0,
@@ -695,6 +1011,15 @@
       "combat": {
         "weapon": "bat",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -706,24 +1031,29 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 47.5,
-          "y": 39.5
+          "x": 57.5,
+          "y": 43.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 8,
+          "role": "clinic"
+        }
       }
     },
     {
-      "id": 16,
+      "id": 18,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
         "x": 49.5,
-        "y": 42.5
+        "y": 43.5
       },
       "prevPos": {
         "x": 49.5,
-        "y": 42.5
+        "y": 43.5
       },
       "vel": {
         "x": 0,
@@ -742,8 +1072,17 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pistol",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -756,121 +1095,28 @@
         "faction": "civ",
         "home": {
           "x": 49.5,
-          "y": 42.5
+          "y": 43.5
         },
         "thinkAt": 0,
-        "sightRange": 6
-      }
-    },
-    {
-      "id": 17,
-      "kind": "npc",
-      "archetype": "thug",
-      "pos": {
-        "x": 5.5,
-        "y": 52.5
-      },
-      "prevPos": {
-        "x": 5.5,
-        "y": 52.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 3.4,
-      "radius": 0.35,
-      "facing": 0,
-      "health": {
-        "hp": 40,
-        "max": 40,
-        "iframes": 0
-      },
-      "combat": {
-        "weapon": "pistol",
-        "cooldown": 0
-      },
-      "status": {
-        "stun": 0,
-        "sleep": 0,
-        "hitFlashUntil": 0,
-        "cloakUntil": 0
-      },
-      "ai": {
-        "mode": "idle",
-        "faction": "gang",
-        "home": {
-          "x": 5.5,
-          "y": 52.5
-        },
-        "thinkAt": 0,
-        "sightRange": 7
-      }
-    },
-    {
-      "id": 18,
-      "kind": "npc",
-      "archetype": "thug",
-      "pos": {
-        "x": 12.5,
-        "y": 55.5
-      },
-      "prevPos": {
-        "x": 12.5,
-        "y": 55.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 3.4,
-      "radius": 0.35,
-      "facing": 0,
-      "health": {
-        "hp": 40,
-        "max": 40,
-        "iframes": 0
-      },
-      "combat": {
-        "weapon": "pistol",
-        "cooldown": 0
-      },
-      "status": {
-        "stun": 0,
-        "sleep": 0,
-        "hitFlashUntil": 0,
-        "cloakUntil": 0
-      },
-      "ai": {
-        "mode": "idle",
-        "faction": "gang",
-        "home": {
-          "x": 12.5,
-          "y": 55.5
-        },
-        "thinkAt": 0,
-        "sightRange": 7
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 8,
+          "role": "clinic"
+        }
       }
     },
     {
       "id": 19,
       "kind": "npc",
-      "archetype": "civilian",
+      "archetype": "thug",
       "pos": {
-        "x": 27.5,
-        "y": 57.5
+        "x": 14.5,
+        "y": 58.5
       },
       "prevPos": {
-        "x": 27.5,
-        "y": 57.5
+        "x": 14.5,
+        "y": 58.5
       },
       "vel": {
         "x": 0,
@@ -880,18 +1126,107 @@
         "x": 0,
         "y": 0
       },
-      "speed": 3.2,
+      "speed": 3.4,
       "radius": 0.35,
       "facing": 0,
       "health": {
-        "hp": 25,
-        "max": 25,
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 14.5,
+          "y": 58.5
+        },
+        "thinkAt": 0,
+        "sightRange": 7,
+        "zone": {
+          "building": 9,
+          "role": "warehouse"
+        },
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 14.5,
+              "y": 58.5
+            },
+            {
+              "x": 9.5,
+              "y": 55.5
+            },
+            {
+              "x": 4.5,
+              "y": 54.5
+            }
+          ]
+        },
+        "patrolIndex": 0
+      }
+    },
+    {
+      "id": 20,
+      "kind": "npc",
+      "archetype": "thug",
+      "pos": {
+        "x": 14.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
         "iframes": 0
       },
       "combat": {
         "weapon": "machinegun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "machinegun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -900,26 +1235,35 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "civ",
+        "faction": "gang",
         "home": {
-          "x": 27.5,
-          "y": 57.5
+          "x": 14.5,
+          "y": 59.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 7,
+        "zone": {
+          "building": 9,
+          "role": "warehouse"
+        },
+        "behavior": "squad",
+        "squad": {
+          "id": 2,
+          "role": "lead"
+        }
       }
     },
     {
-      "id": 20,
+      "id": 21,
       "kind": "npc",
-      "archetype": "civilian",
+      "archetype": "thug",
       "pos": {
-        "x": 36.5,
-        "y": 59.5
+        "x": 10.5,
+        "y": 57.5
       },
       "prevPos": {
-        "x": 36.5,
-        "y": 59.5
+        "x": 10.5,
+        "y": 57.5
       },
       "vel": {
         "x": 0,
@@ -929,17 +1273,26 @@
         "x": 0,
         "y": 0
       },
-      "speed": 3.2,
+      "speed": 3.4,
       "radius": 0.35,
       "facing": 0,
       "health": {
-        "hp": 25,
-        "max": 25,
+        "hp": 40,
+        "max": 40,
         "iframes": 0
       },
       "combat": {
         "weapon": "bat",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -949,26 +1302,35 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "civ",
+        "faction": "gang",
         "home": {
-          "x": 36.5,
-          "y": 59.5
+          "x": 10.5,
+          "y": 57.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 7,
+        "zone": {
+          "building": 9,
+          "role": "warehouse"
+        },
+        "behavior": "squad",
+        "squad": {
+          "id": 2,
+          "role": "flank"
+        }
       }
     },
     {
-      "id": 21,
+      "id": 22,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 34.5,
-        "y": 2.5
+        "x": 39.5,
+        "y": 51.5
       },
       "prevPos": {
-        "x": 34.5,
-        "y": 2.5
+        "x": 39.5,
+        "y": 51.5
       },
       "vel": {
         "x": 0,
@@ -990,6 +1352,15 @@
         "weapon": "knife",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "knife",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1000,24 +1371,29 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 34.5,
-          "y": 2.5
+          "x": 39.5,
+          "y": 51.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 10,
+          "role": "clinic"
+        }
       }
     },
     {
-      "id": 22,
+      "id": 23,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 45.5,
-        "y": 19.5
+        "x": 37.5,
+        "y": 56.5
       },
       "prevPos": {
-        "x": 45.5,
-        "y": 19.5
+        "x": 37.5,
+        "y": 56.5
       },
       "vel": {
         "x": 0,
@@ -1039,6 +1415,15 @@
         "weapon": "pistol",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1049,24 +1434,29 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 45.5,
-          "y": 19.5
+          "x": 37.5,
+          "y": 56.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish",
+        "zone": {
+          "building": 10,
+          "role": "clinic"
+        }
       }
     },
     {
-      "id": 23,
+      "id": 24,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 22.5,
-        "y": 39.5
+        "x": 6.5,
+        "y": 45.5
       },
       "prevPos": {
-        "x": 22.5,
-        "y": 39.5
+        "x": 6.5,
+        "y": 45.5
       },
       "vel": {
         "x": 0,
@@ -1088,6 +1478,15 @@
         "weapon": "freezeRay",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "freezeRay",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1098,24 +1497,25 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 22.5,
-          "y": 39.5
+          "x": 6.5,
+          "y": 45.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish"
       }
     },
     {
-      "id": 24,
+      "id": 25,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 4.5,
-        "y": 18.5
+        "x": 34.5,
+        "y": 14.5
       },
       "prevPos": {
-        "x": 4.5,
-        "y": 18.5
+        "x": 34.5,
+        "y": 14.5
       },
       "vel": {
         "x": 0,
@@ -1137,6 +1537,15 @@
         "weapon": "shotgun",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "shotgun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1147,24 +1556,25 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 4.5,
-          "y": 18.5
+          "x": 34.5,
+          "y": 14.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish"
       }
     },
     {
-      "id": 25,
+      "id": 26,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 7.5,
-        "y": 14.5
+        "x": 47.5,
+        "y": 35.5
       },
       "prevPos": {
-        "x": 7.5,
-        "y": 14.5
+        "x": 47.5,
+        "y": 35.5
       },
       "vel": {
         "x": 0,
@@ -1186,6 +1596,15 @@
         "weapon": "bat",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "bat",
+            "qty": 16
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1196,24 +1615,25 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 7.5,
-          "y": 14.5
+          "x": 47.5,
+          "y": 35.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish"
       }
     },
     {
-      "id": 26,
+      "id": 27,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 22.5,
-        "y": 60.5
+        "x": 3.5,
+        "y": 49.5
       },
       "prevPos": {
-        "x": 22.5,
-        "y": 60.5
+        "x": 3.5,
+        "y": 49.5
       },
       "vel": {
         "x": 0,
@@ -1235,6 +1655,15 @@
         "weapon": "pistol",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1245,24 +1674,25 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 22.5,
-          "y": 60.5
+          "x": 3.5,
+          "y": 49.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish"
       }
     },
     {
-      "id": 27,
+      "id": 28,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
-        "x": 30.5,
-        "y": 14.5
+        "x": 23.5,
+        "y": 35.5
       },
       "prevPos": {
-        "x": 30.5,
-        "y": 14.5
+        "x": 23.5,
+        "y": 35.5
       },
       "vel": {
         "x": 0,
@@ -1284,6 +1714,15 @@
         "weapon": "knife",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "knife",
+            "qty": 20
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1294,24 +1733,25 @@
         "mode": "idle",
         "faction": "civ",
         "home": {
-          "x": 30.5,
-          "y": 14.5
+          "x": 23.5,
+          "y": 35.5
         },
         "thinkAt": 0,
-        "sightRange": 6
+        "sightRange": 6,
+        "behavior": "skittish"
       }
     },
     {
-      "id": 28,
+      "id": 29,
       "kind": "npc",
-      "archetype": "cop",
+      "archetype": "civilian",
       "pos": {
-        "x": 48.5,
-        "y": 47.5
+        "x": 23.5,
+        "y": 2.5
       },
       "prevPos": {
-        "x": 48.5,
-        "y": 47.5
+        "x": 23.5,
+        "y": 2.5
       },
       "vel": {
         "x": 0,
@@ -1321,17 +1761,26 @@
         "x": 0,
         "y": 0
       },
-      "speed": 4,
+      "speed": 3.2,
       "radius": 0.35,
       "facing": 0,
       "health": {
-        "hp": 60,
-        "max": 60,
+        "hp": 25,
+        "max": 25,
         "iframes": 0
       },
       "combat": {
         "weapon": "stunGun",
         "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "stunGun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
       },
       "status": {
         "stun": 0,
@@ -1341,26 +1790,27 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "cop",
+        "faction": "civ",
         "home": {
-          "x": 48.5,
-          "y": 47.5
+          "x": 23.5,
+          "y": 2.5
         },
         "thinkAt": 0,
-        "sightRange": 8
+        "sightRange": 6,
+        "behavior": "scavenger"
       }
     },
     {
-      "id": 29,
+      "id": 30,
       "kind": "npc",
       "archetype": "cop",
       "pos": {
-        "x": 49.3,
-        "y": 47.5
+        "x": 10.5,
+        "y": 1.5
       },
       "prevPos": {
-        "x": 49.3,
-        "y": 47.5
+        "x": 10.5,
+        "y": 1.5
       },
       "vel": {
         "x": 0,
@@ -1382,6 +1832,15 @@
         "weapon": "freezeRay",
         "cooldown": 0
       },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "freezeRay",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
       "status": {
         "stun": 0,
         "sleep": 0,
@@ -1392,52 +1851,42 @@
         "mode": "idle",
         "faction": "cop",
         "home": {
-          "x": 49.3,
-          "y": 47.5
+          "x": 10.5,
+          "y": 1.5
         },
         "thinkAt": 0,
-        "sightRange": 8
-      }
-    },
-    {
-      "id": 30,
-      "kind": "pickup",
-      "archetype": "pickup.medkit",
-      "pos": {
-        "x": 52.5,
-        "y": 37.5
-      },
-      "prevPos": {
-        "x": 52.5,
-        "y": 37.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 0,
-      "radius": 0.3,
-      "facing": 0,
-      "pickup": {
-        "itemId": "medkit",
-        "qty": 1
+        "sightRange": 8,
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 10.5,
+              "y": 1.5
+            },
+            {
+              "x": 44.5,
+              "y": 54.5
+            },
+            {
+              "x": 30.5,
+              "y": 32.5
+            }
+          ]
+        },
+        "patrolIndex": 0
       }
     },
     {
       "id": 31,
-      "kind": "pickup",
-      "archetype": "pickup.medkit",
+      "kind": "npc",
+      "archetype": "cop",
       "pos": {
-        "x": 27.5,
-        "y": 40.5
+        "x": 11.3,
+        "y": 1.5
       },
       "prevPos": {
-        "x": 27.5,
-        "y": 40.5
+        "x": 11.3,
+        "y": 1.5
       },
       "vel": {
         "x": 0,
@@ -1447,25 +1896,73 @@
         "x": 0,
         "y": 0
       },
-      "speed": 0,
-      "radius": 0.3,
+      "speed": 4,
+      "radius": 0.35,
       "facing": 0,
-      "pickup": {
-        "itemId": "medkit",
-        "qty": 1
+      "health": {
+        "hp": 60,
+        "max": 60,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "machinegun",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "machinegun",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "cop",
+        "home": {
+          "x": 11.3,
+          "y": 1.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "patrol",
+        "params": {
+          "waypoints": [
+            {
+              "x": 10.5,
+              "y": 1.5
+            },
+            {
+              "x": 44.5,
+              "y": 54.5
+            },
+            {
+              "x": 30.5,
+              "y": 32.5
+            }
+          ]
+        },
+        "patrolIndex": 0
       }
     },
     {
       "id": 32,
       "kind": "pickup",
-      "archetype": "pickup.bandage",
+      "archetype": "pickup.molotov",
       "pos": {
-        "x": 12.5,
-        "y": 23.5
+        "x": 10.5,
+        "y": 43.5
       },
       "prevPos": {
-        "x": 12.5,
-        "y": 23.5
+        "x": 10.5,
+        "y": 43.5
       },
       "vel": {
         "x": 0,
@@ -1479,21 +1976,21 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bandage",
+        "itemId": "molotov",
         "qty": 1
       }
     },
     {
       "id": 33,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.medkit",
       "pos": {
-        "x": 8.5,
-        "y": 4.5
+        "x": 11.5,
+        "y": 53.5
       },
       "prevPos": {
-        "x": 8.5,
-        "y": 4.5
+        "x": 11.5,
+        "y": 53.5
       },
       "vel": {
         "x": 0,
@@ -1507,21 +2004,21 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "medkit",
         "qty": 1
       }
     },
     {
       "id": 34,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.molotov",
       "pos": {
-        "x": 33.5,
-        "y": 24.5
+        "x": 16.5,
+        "y": 6.5
       },
       "prevPos": {
-        "x": 33.5,
-        "y": 24.5
+        "x": 16.5,
+        "y": 6.5
       },
       "vel": {
         "x": 0,
@@ -1535,21 +2032,21 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "molotov",
         "qty": 1
       }
     },
     {
       "id": 35,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "mod.heavy",
       "pos": {
-        "x": 15.5,
-        "y": 7.5
+        "x": 8.5,
+        "y": 5.5
       },
       "prevPos": {
-        "x": 15.5,
-        "y": 7.5
+        "x": 8.5,
+        "y": 5.5
       },
       "vel": {
         "x": 0,
@@ -1563,40 +2060,12 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "heavy",
         "qty": 1
       }
     },
     {
       "id": 36,
-      "kind": "pickup",
-      "archetype": "mod.rapid",
-      "pos": {
-        "x": 8.5,
-        "y": 5.5
-      },
-      "prevPos": {
-        "x": 8.5,
-        "y": 5.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 0,
-      "radius": 0.3,
-      "facing": 0,
-      "pickup": {
-        "itemId": "rapid",
-        "qty": 1
-      }
-    },
-    {
-      "id": 37,
       "kind": "pickup",
       "archetype": "mod.choke",
       "pos": {
@@ -1624,9 +2093,9 @@
       }
     },
     {
-      "id": 38,
+      "id": 37,
       "kind": "pickup",
-      "archetype": "mod.explosive",
+      "archetype": "mod.split",
       "pos": {
         "x": 16.5,
         "y": 6.5
@@ -1647,20 +2116,48 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "explosive",
+        "itemId": "split",
+        "qty": 1
+      }
+    },
+    {
+      "id": 38,
+      "kind": "pickup",
+      "archetype": "mod.heavy",
+      "pos": {
+        "x": 16.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "heavy",
         "qty": 1
       }
     },
     {
       "id": 39,
       "kind": "pickup",
-      "archetype": "mod.rapid",
+      "archetype": "mod.heavy",
       "pos": {
-        "x": 16.5,
+        "x": 29.5,
         "y": 11.5
       },
       "prevPos": {
-        "x": 16.5,
+        "x": 29.5,
         "y": 11.5
       },
       "vel": {
@@ -1675,21 +2172,21 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "rapid",
+        "itemId": "heavy",
         "qty": 1
       }
     },
     {
       "id": 40,
       "kind": "pickup",
-      "archetype": "mod.rapid",
+      "archetype": "mod.homing",
       "pos": {
-        "x": 29.5,
-        "y": 11.5
+        "x": 38.5,
+        "y": 5.5
       },
       "prevPos": {
-        "x": 29.5,
-        "y": 11.5
+        "x": 38.5,
+        "y": 5.5
       },
       "vel": {
         "x": 0,
@@ -1703,7 +2200,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "rapid",
+        "itemId": "homing",
         "qty": 1
       }
     },
@@ -1712,12 +2209,12 @@
       "kind": "pickup",
       "archetype": "mod.bulk",
       "pos": {
-        "x": 4.5,
-        "y": 22.5
+        "x": 47.5,
+        "y": 11.5
       },
       "prevPos": {
-        "x": 4.5,
-        "y": 22.5
+        "x": 47.5,
+        "y": 11.5
       },
       "vel": {
         "x": 0,
@@ -1738,14 +2235,14 @@
     {
       "id": 42,
       "kind": "pickup",
-      "archetype": "mod.homing",
+      "archetype": "mod.lifesteal",
       "pos": {
-        "x": 26.5,
-        "y": 24.5
+        "x": 4.5,
+        "y": 22.5
       },
       "prevPos": {
-        "x": 26.5,
-        "y": 24.5
+        "x": 4.5,
+        "y": 22.5
       },
       "vel": {
         "x": 0,
@@ -1759,21 +2256,21 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "homing",
+        "itemId": "lifesteal",
         "qty": 1
       }
     },
     {
       "id": 43,
       "kind": "pickup",
-      "archetype": "mod.pierce",
+      "archetype": "mod.bulk",
       "pos": {
-        "x": 49.5,
-        "y": 21.5
+        "x": 14.5,
+        "y": 23.5
       },
       "prevPos": {
-        "x": 49.5,
-        "y": 21.5
+        "x": 14.5,
+        "y": 23.5
       },
       "vel": {
         "x": 0,
@@ -1787,21 +2284,49 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "pierce",
+        "itemId": "bulk",
         "qty": 1
       }
     },
     {
       "id": 44,
       "kind": "pickup",
-      "archetype": "mod.rapid",
+      "archetype": "mod.bulk",
       "pos": {
-        "x": 50.5,
+        "x": 11.5,
         "y": 28.5
       },
       "prevPos": {
-        "x": 50.5,
+        "x": 11.5,
         "y": 28.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "bulk",
+        "qty": 1
+      }
+    },
+    {
+      "id": 45,
+      "kind": "pickup",
+      "archetype": "mod.rapid",
+      "pos": {
+        "x": 32.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 32.5,
+        "y": 29.5
       },
       "vel": {
         "x": 0,
@@ -1820,16 +2345,16 @@
       }
     },
     {
-      "id": 45,
+      "id": 46,
       "kind": "pickup",
-      "archetype": "mod.pierce",
+      "archetype": "mod.bounce",
       "pos": {
-        "x": 6.5,
-        "y": 39.5
+        "x": 50.5,
+        "y": 22.5
       },
       "prevPos": {
-        "x": 6.5,
-        "y": 39.5
+        "x": 50.5,
+        "y": 22.5
       },
       "vel": {
         "x": 0,
@@ -1843,21 +2368,21 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "pierce",
+        "itemId": "bounce",
         "qty": 1
       }
     },
     {
-      "id": 46,
+      "id": 47,
       "kind": "pickup",
       "archetype": "mod.homing",
       "pos": {
-        "x": 32.5,
-        "y": 43.5
+        "x": 57.5,
+        "y": 24.5
       },
       "prevPos": {
-        "x": 32.5,
-        "y": 43.5
+        "x": 57.5,
+        "y": 24.5
       },
       "vel": {
         "x": 0,
@@ -1876,15 +2401,15 @@
       }
     },
     {
-      "id": 47,
+      "id": 48,
       "kind": "pickup",
       "archetype": "mod.bounce",
       "pos": {
-        "x": 48.5,
+        "x": 4.5,
         "y": 40.5
       },
       "prevPos": {
-        "x": 48.5,
+        "x": 4.5,
         "y": 40.5
       },
       "vel": {
@@ -1904,16 +2429,44 @@
       }
     },
     {
-      "id": 48,
+      "id": 49,
+      "kind": "pickup",
+      "archetype": "mod.rapid",
+      "pos": {
+        "x": 8.5,
+        "y": 39.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 39.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "rapid",
+        "qty": 1
+      }
+    },
+    {
+      "id": 50,
       "kind": "pickup",
       "archetype": "mod.incendiary",
       "pos": {
-        "x": 5.5,
-        "y": 51.5
+        "x": 14.5,
+        "y": 42.5
       },
       "prevPos": {
-        "x": 5.5,
-        "y": 51.5
+        "x": 14.5,
+        "y": 42.5
       },
       "vel": {
         "x": 0,
@@ -1932,63 +2485,6283 @@
       }
     },
     {
-      "id": 49,
-      "kind": "pickup",
-      "archetype": "mod.heavy",
-      "pos": {
-        "x": 26.5,
-        "y": 55.5
-      },
-      "prevPos": {
-        "x": 26.5,
-        "y": 55.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 0,
-      "radius": 0.3,
-      "facing": 0,
-      "pickup": {
-        "itemId": "heavy",
-        "qty": 1
-      }
-    },
-    {
-      "id": 50,
-      "kind": "pickup",
-      "archetype": "mod.heavy",
-      "pos": {
-        "x": 35.5,
-        "y": 52.5
-      },
-      "prevPos": {
-        "x": 35.5,
-        "y": 52.5
-      },
-      "vel": {
-        "x": 0,
-        "y": 0
-      },
-      "intent": {
-        "x": 0,
-        "y": 0
-      },
-      "speed": 0,
-      "radius": 0.3,
-      "facing": 0,
-      "pickup": {
-        "itemId": "heavy",
-        "qty": 1
-      }
-    },
-    {
       "id": 51,
+      "kind": "pickup",
+      "archetype": "mod.choke",
+      "pos": {
+        "x": 30.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "choke",
+        "qty": 1
+      }
+    },
+    {
+      "id": 52,
+      "kind": "pickup",
+      "archetype": "mod.choke",
+      "pos": {
+        "x": 36.5,
+        "y": 41.5
+      },
+      "prevPos": {
+        "x": 36.5,
+        "y": 41.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "choke",
+        "qty": 1
+      }
+    },
+    {
+      "id": 53,
+      "kind": "pickup",
+      "archetype": "mod.heavy",
+      "pos": {
+        "x": 59.5,
+        "y": 39.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 39.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "heavy",
+        "qty": 1
+      }
+    },
+    {
+      "id": 54,
+      "kind": "pickup",
+      "archetype": "mod.bounce",
+      "pos": {
+        "x": 4.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "bounce",
+        "qty": 1
+      }
+    },
+    {
+      "id": 55,
+      "kind": "pickup",
+      "archetype": "mod.pierce",
+      "pos": {
+        "x": 10.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "pierce",
+        "qty": 1
+      }
+    },
+    {
+      "id": 56,
+      "kind": "pickup",
+      "archetype": "mod.velocity",
+      "pos": {
+        "x": 9.5,
+        "y": 57.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 57.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "velocity",
+        "qty": 1
+      }
+    },
+    {
+      "id": 57,
+      "kind": "pickup",
+      "archetype": "mod.homing",
+      "pos": {
+        "x": 30.5,
+        "y": 52.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 52.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "homing",
+        "qty": 1
+      }
+    },
+    {
+      "id": 58,
+      "kind": "pickup",
+      "archetype": "mod.choke",
+      "pos": {
+        "x": 39.5,
+        "y": 53.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 53.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.3,
+      "facing": 0,
+      "pickup": {
+        "itemId": "choke",
+        "qty": 1
+      }
+    },
+    {
+      "id": 59,
+      "kind": "npc",
+      "archetype": "cinder",
+      "pos": {
+        "x": 15.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 45,
+        "max": 45,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 1.1,
+        "burning": 0.2
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 15.5,
+          "y": 12.5
+        },
+        "thinkAt": 0,
+        "sightRange": 8,
+        "behavior": "hunter"
+      }
+    },
+    {
+      "id": 60,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 6.5,
+        "y": 58.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 58.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 6.5,
+          "y": 58.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 61,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 7.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 62,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 4.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 63,
+      "kind": "interactable",
+      "archetype": "vending",
+      "pos": {
+        "x": 7.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 40,
+        "max": 40,
+        "iframes": 0
+      },
+      "interact": {
+        "verb": "use",
+        "range": 1.3
+      }
+    },
+    {
+      "id": 64,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 4.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 65,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 9.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 66,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 5.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 67,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 7.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 68,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 4.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 69,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 4.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 70,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 9.5,
+        "y": 10.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 10.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 71,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 13.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 72,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 15.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 73,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 16.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 74,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 11.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 75,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 11.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 76,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 11.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 77,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 16.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 78,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 11.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 79,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 13.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 80,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 14.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 81,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 27.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 82,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 24.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 83,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 27.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 84,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 27.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 85,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 24.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 86,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 26.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 87,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 29.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 88,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 29.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 89,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 29.5,
+        "y": 10.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 10.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 90,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 32.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 32.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 91,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 30.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 92,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 30.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 93,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 34.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 94,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 39.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 95,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 37.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 37.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 96,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 35.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 35.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 97,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 39.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 98,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 37.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 37.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 99,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 34.5,
+        "y": 10.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 10.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 100,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 101,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 35.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 35.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 102,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 36.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 36.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 103,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 50.5,
+        "y": 7.5
+      },
+      "prevPos": {
+        "x": 50.5,
+        "y": 7.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 104,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 48.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 48.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 105,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 49.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 49.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 106,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 50.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 50.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 107,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 49.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 49.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 108,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 47.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 47.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 109,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 53.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 110,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 57.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 57.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 111,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 58.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 58.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 112,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 53.5,
+        "y": 6.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 6.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 113,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 55.5,
+        "y": 4.5
+      },
+      "prevPos": {
+        "x": 55.5,
+        "y": 4.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 114,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 59.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 115,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 59.5,
+        "y": 10.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 10.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 116,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 52.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 52.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 117,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 58.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 58.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 118,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 59.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 119,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 59.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 120,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 7.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 121,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 7.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 122,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 6.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 123,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 7.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 124,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 4.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 125,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 7.5,
+        "y": 27.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 27.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 126,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 5.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 127,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 9.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 128,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 13.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 129,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 15.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 130,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 16.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 131,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 11.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 132,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 16.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 133,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 10.5,
+        "y": 25.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 25.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 134,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 13.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 135,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 13.5,
+        "y": 25.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 25.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 136,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 15.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 137,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 16.5,
+        "y": 27.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 27.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 138,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 9.5,
+        "y": 27.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 27.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 139,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 27.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 140,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 27.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 141,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 26.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 142,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 26.5,
+        "y": 24.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 24.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 143,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 25.5,
+        "y": 27.5
+      },
+      "prevPos": {
+        "x": 25.5,
+        "y": 27.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 144,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 27.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 145,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 27.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 146,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 29.5,
+        "y": 27.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 27.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 147,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 29.5,
+        "y": 28.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 28.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 148,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 34.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 149,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 31.5,
+        "y": 25.5
+      },
+      "prevPos": {
+        "x": 31.5,
+        "y": 25.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 150,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 29.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 151,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 34.5,
+        "y": 21.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 21.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 152,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 38.5,
+        "y": 28.5
+      },
+      "prevPos": {
+        "x": 38.5,
+        "y": 28.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 153,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 36.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 36.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 154,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 39.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 155,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 156,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 37.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 37.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 157,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 158,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 48.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 48.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 159,
+      "kind": "interactable",
+      "archetype": "toilet",
+      "pos": {
+        "x": 50.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 50.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 160,
+      "kind": "interactable",
+      "archetype": "toilet",
+      "pos": {
+        "x": 47.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 47.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 161,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 49.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 49.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 162,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 47.5,
+        "y": 25.5
+      },
+      "prevPos": {
+        "x": 47.5,
+        "y": 25.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 163,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 50.5,
+        "y": 28.5
+      },
+      "prevPos": {
+        "x": 50.5,
+        "y": 28.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 164,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 47.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 47.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 165,
+      "kind": "interactable",
+      "archetype": "table",
+      "pos": {
+        "x": 53.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 16,
+        "max": 16,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 166,
+      "kind": "interactable",
+      "archetype": "table",
+      "pos": {
+        "x": 55.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 55.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 16,
+        "max": 16,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 167,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 52.5,
+        "y": 24.5
+      },
+      "prevPos": {
+        "x": 52.5,
+        "y": 24.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 168,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 58.5,
+        "y": 20.5
+      },
+      "prevPos": {
+        "x": 58.5,
+        "y": 20.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 169,
+      "kind": "interactable",
+      "archetype": "table",
+      "pos": {
+        "x": 56.5,
+        "y": 23.5
+      },
+      "prevPos": {
+        "x": 56.5,
+        "y": 23.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 16,
+        "max": 16,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 170,
+      "kind": "interactable",
+      "archetype": "table",
+      "pos": {
+        "x": 57.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 57.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 16,
+        "max": 16,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 171,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 59.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 172,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 53.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 173,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 59.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 174,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 52.5,
+        "y": 26.5
+      },
+      "prevPos": {
+        "x": 52.5,
+        "y": 26.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 175,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 53.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 176,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 57.5,
+        "y": 29.5
+      },
+      "prevPos": {
+        "x": 57.5,
+        "y": 29.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 177,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 4.5,
+        "y": 40.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 40.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 178,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 5.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 179,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 6.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 6.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 180,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 4.5,
+        "y": 41.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 41.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 181,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 4.5,
+        "y": 38.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 38.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 182,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 10.5,
+        "y": 41.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 41.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 183,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 8.5,
+        "y": 41.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 41.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 184,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 8.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 8.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 185,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 10.5,
+        "y": 42.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 42.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 186,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 14.5,
+        "y": 40.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 40.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 187,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 15.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 188,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 13.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 189,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 15.5,
+        "y": 42.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 42.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 190,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 15.5,
+        "y": 38.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 38.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 191,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 16.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 192,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 27.5,
+        "y": 39.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 39.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 193,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 27.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 194,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 26.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 195,
+      "kind": "interactable",
+      "archetype": "desk",
+      "pos": {
+        "x": 24.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 196,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 24.5,
+        "y": 40.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 40.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 197,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 27.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 27.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 198,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 30.5,
+        "y": 42.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 42.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 199,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 29.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 200,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 33.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 33.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 201,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 29.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 202,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 30.5,
+        "y": 39.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 39.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 203,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 33.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 33.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 204,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 36.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 36.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 205,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 42.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 42.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 206,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 40.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 40.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 207,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 35.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 35.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 208,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 209,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 35.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 35.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 210,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 47.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 47.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 211,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 53.5,
+        "y": 39.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 39.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 212,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 47.5,
+        "y": 42.5
+      },
+      "prevPos": {
+        "x": 47.5,
+        "y": 42.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 213,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 48.5,
+        "y": 43.5
+      },
+      "prevPos": {
+        "x": 48.5,
+        "y": 43.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 214,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 53.5,
+        "y": 38.5
+      },
+      "prevPos": {
+        "x": 53.5,
+        "y": 38.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 215,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 48.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 48.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 216,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 55.5,
+        "y": 40.5
+      },
+      "prevPos": {
+        "x": 55.5,
+        "y": 40.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 217,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 59.5,
+        "y": 40.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 40.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 218,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 59.5,
+        "y": 42.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 42.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 219,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 58.5,
+        "y": 37.5
+      },
+      "prevPos": {
+        "x": 58.5,
+        "y": 37.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 220,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 55.5,
+        "y": 41.5
+      },
+      "prevPos": {
+        "x": 55.5,
+        "y": 41.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 221,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 59.5,
+        "y": 39.5
+      },
+      "prevPos": {
+        "x": 59.5,
+        "y": 39.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 222,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 7.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 223,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 4.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 224,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 4.5,
+        "y": 54.5
+      },
+      "prevPos": {
+        "x": 4.5,
+        "y": 54.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 225,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 5.5,
+        "y": 56.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 56.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 226,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 7.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 7.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 227,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 5.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 5.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 228,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 11.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 229,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 9.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 230,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 12.5,
+        "y": 52.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 52.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 231,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 10.5,
+        "y": 53.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 53.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 232,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 16.5,
+        "y": 53.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 53.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 233,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 11.5,
+        "y": 58.5
+      },
+      "prevPos": {
+        "x": 11.5,
+        "y": 58.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 234,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 16.5,
+        "y": 55.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 55.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 235,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 9.5,
+        "y": 58.5
+      },
+      "prevPos": {
+        "x": 9.5,
+        "y": 58.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 236,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 14.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 14.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 237,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 16.5,
+        "y": 56.5
+      },
+      "prevPos": {
+        "x": 16.5,
+        "y": 56.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 238,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 10.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 10.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 239,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 30.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 30.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 240,
+      "kind": "interactable",
+      "archetype": "plant",
+      "pos": {
+        "x": 24.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 10,
+        "max": 10,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 241,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 26.5,
+        "y": 53.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 53.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 242,
+      "kind": "interactable",
+      "archetype": "tv",
+      "pos": {
+        "x": 25.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 25.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 12,
+        "max": 12,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 243,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 28.5,
+        "y": 53.5
+      },
+      "prevPos": {
+        "x": 28.5,
+        "y": 53.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 244,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 29.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 29.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 245,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 26.5,
+        "y": 55.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 55.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 246,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 28.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 28.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 247,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 24.5,
+        "y": 57.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 57.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 248,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 24.5,
+        "y": 56.5
+      },
+      "prevPos": {
+        "x": 24.5,
+        "y": 56.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 249,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 25.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 25.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 250,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 34.5,
+        "y": 53.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 53.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 251,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 38.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 38.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 252,
+      "kind": "interactable",
+      "archetype": "crate",
+      "pos": {
+        "x": 39.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 20,
+        "max": 20,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 253,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 39.5,
+        "y": 52.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 52.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 254,
+      "kind": "interactable",
+      "archetype": "shelf",
+      "pos": {
+        "x": 33.5,
+        "y": 51.5
+      },
+      "prevPos": {
+        "x": 33.5,
+        "y": 51.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 18,
+        "max": 18,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 255,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 35.5,
+        "y": 55.5
+      },
+      "prevPos": {
+        "x": 35.5,
+        "y": 55.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 256,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 34.5,
+        "y": 55.5
+      },
+      "prevPos": {
+        "x": 34.5,
+        "y": 55.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 257,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 33.5,
+        "y": 57.5
+      },
+      "prevPos": {
+        "x": 33.5,
+        "y": 57.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 258,
+      "kind": "interactable",
+      "archetype": "bunk",
+      "pos": {
+        "x": 37.5,
+        "y": 59.5
+      },
+      "prevPos": {
+        "x": 37.5,
+        "y": 59.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 25,
+        "max": 25,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 259,
+      "kind": "interactable",
+      "archetype": "cabinet",
+      "pos": {
+        "x": 39.5,
+        "y": 56.5
+      },
+      "prevPos": {
+        "x": 39.5,
+        "y": 56.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 260,
+      "kind": "interactable",
+      "archetype": "bench",
+      "pos": {
+        "x": 33.5,
+        "y": 58.5
+      },
+      "prevPos": {
+        "x": 33.5,
+        "y": 58.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 24,
+        "max": 24,
+        "iframes": 0
+      }
+    },
+    {
+      "id": 261,
       "kind": "pickup",
       "archetype": "pickup.briefcase",
       "pos": {
@@ -2016,7 +8789,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 262,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2049,7 +8822,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 263,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2082,7 +8855,7 @@
       }
     },
     {
-      "id": 54,
+      "id": 264,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2115,7 +8888,7 @@
       }
     },
     {
-      "id": 55,
+      "id": 265,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2148,7 +8921,7 @@
       }
     },
     {
-      "id": 56,
+      "id": 266,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2181,7 +8954,7 @@
       }
     },
     {
-      "id": 57,
+      "id": 267,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2214,7 +8987,7 @@
       }
     },
     {
-      "id": 58,
+      "id": 268,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2247,7 +9020,7 @@
       }
     },
     {
-      "id": 59,
+      "id": 269,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2280,7 +9053,7 @@
       }
     },
     {
-      "id": 60,
+      "id": 270,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2313,7 +9086,7 @@
       }
     },
     {
-      "id": 61,
+      "id": 271,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2346,7 +9119,7 @@
       }
     },
     {
-      "id": 62,
+      "id": 272,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2379,7 +9152,7 @@
       }
     },
     {
-      "id": 63,
+      "id": 273,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2412,7 +9185,7 @@
       }
     },
     {
-      "id": 64,
+      "id": 274,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2445,7 +9218,7 @@
       }
     },
     {
-      "id": 65,
+      "id": 275,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2478,7 +9251,7 @@
       }
     },
     {
-      "id": 66,
+      "id": 276,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2511,7 +9284,7 @@
       }
     },
     {
-      "id": 67,
+      "id": 277,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2544,7 +9317,7 @@
       }
     },
     {
-      "id": 68,
+      "id": 278,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2577,7 +9350,7 @@
       }
     },
     {
-      "id": 69,
+      "id": 279,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2610,7 +9383,7 @@
       }
     },
     {
-      "id": 70,
+      "id": 280,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2643,7 +9416,7 @@
       }
     },
     {
-      "id": 71,
+      "id": 281,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2676,7 +9449,7 @@
       }
     },
     {
-      "id": 72,
+      "id": 282,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2709,7 +9482,7 @@
       }
     },
     {
-      "id": 73,
+      "id": 283,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2742,7 +9515,7 @@
       }
     },
     {
-      "id": 74,
+      "id": 284,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2775,7 +9548,7 @@
       }
     },
     {
-      "id": 75,
+      "id": 285,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2808,7 +9581,7 @@
       }
     },
     {
-      "id": 76,
+      "id": 286,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2841,7 +9614,7 @@
       }
     },
     {
-      "id": 77,
+      "id": 287,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2874,7 +9647,7 @@
       }
     },
     {
-      "id": 78,
+      "id": 288,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2907,7 +9680,7 @@
       }
     },
     {
-      "id": 79,
+      "id": 289,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2940,7 +9713,7 @@
       }
     },
     {
-      "id": 80,
+      "id": 290,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -2973,7 +9746,7 @@
       }
     },
     {
-      "id": 81,
+      "id": 291,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3006,7 +9779,7 @@
       }
     },
     {
-      "id": 82,
+      "id": 292,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3039,7 +9812,7 @@
       }
     },
     {
-      "id": 83,
+      "id": 293,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3072,7 +9845,7 @@
       }
     },
     {
-      "id": 84,
+      "id": 294,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3097,7 +9870,8 @@
       "door": {
         "open": false,
         "locked": true,
-        "lockLevel": 1
+        "lockLevel": 1,
+        "objectiveGate": true
       },
       "interact": {
         "verb": "open",
@@ -3105,7 +9879,7 @@
       }
     },
     {
-      "id": 85,
+      "id": 295,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3138,7 +9912,7 @@
       }
     },
     {
-      "id": 86,
+      "id": 296,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3171,7 +9945,7 @@
       }
     },
     {
-      "id": 87,
+      "id": 297,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3204,7 +9978,7 @@
       }
     },
     {
-      "id": 88,
+      "id": 298,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3237,7 +10011,7 @@
       }
     },
     {
-      "id": 89,
+      "id": 299,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3270,7 +10044,7 @@
       }
     },
     {
-      "id": 90,
+      "id": 300,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3303,7 +10077,7 @@
       }
     },
     {
-      "id": 91,
+      "id": 301,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3336,7 +10110,7 @@
       }
     },
     {
-      "id": 92,
+      "id": 302,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3369,7 +10143,7 @@
       }
     },
     {
-      "id": 93,
+      "id": 303,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3402,7 +10176,7 @@
       }
     },
     {
-      "id": 94,
+      "id": 304,
       "kind": "door",
       "archetype": "door",
       "pos": {
@@ -3435,7 +10209,7 @@
       }
     },
     {
-      "id": 95,
+      "id": 305,
       "kind": "player",
       "archetype": "player",
       "pos": {
@@ -3460,7 +10234,7 @@
       "health": {
         "hp": 120,
         "max": 120,
-        "iframes": 0
+        "iframes": 90
       },
       "combat": {
         "weapon": "pistol",
@@ -3472,24 +10246,23 @@
         "hitFlashUntil": 0,
         "cloakUntil": 0
       },
-      "playerCtl": {
-        "playerId": 0,
-        "abilityCooldown": 0,
-        "cash": 0,
-        "crimeUntilTick": 0
-      },
       "loadout": {
         "inventory": [
           {
             "itemId": "pistol",
-            "qty": 200
+            "qty": 1
           }
         ],
-        "activeSlot": 0
+        "activeSlot": -1
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "crimeUntilTick": 0
       }
     },
     {
-      "id": 96,
+      "id": 306,
       "kind": "interactable",
       "archetype": "crate",
       "pos": {
@@ -3519,7 +10292,7 @@
       }
     },
     {
-      "id": 97,
+      "id": 307,
       "kind": "interactable",
       "archetype": "crate",
       "pos": {
@@ -3549,7 +10322,7 @@
       }
     },
     {
-      "id": 98,
+      "id": 308,
       "kind": "interactable",
       "archetype": "crate",
       "pos": {
@@ -3579,7 +10352,7 @@
       }
     },
     {
-      "id": 99,
+      "id": 309,
       "kind": "interactable",
       "archetype": "crate",
       "pos": {
@@ -3609,7 +10382,7 @@
       }
     },
     {
-      "id": 100,
+      "id": 310,
       "kind": "npc",
       "archetype": "civilian",
       "pos": {
@@ -3649,7 +10422,7 @@
       "flammable": true
     },
     {
-      "id": 101,
+      "id": 311,
       "kind": "fire",
       "archetype": "fire",
       "pos": {

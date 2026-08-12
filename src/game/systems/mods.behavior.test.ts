@@ -7,12 +7,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import { emptyInput, type SimEvent } from '../types'
 import { addEntity, createWorld, isBlocked, tickWorld, type World } from '../world'
+import { Tile } from '../levelgen/level'
 import { spawnPlayer } from '../player'
+import { WEAPONS } from '../data/items'
 import { serializeWorld, deserializeWorld } from '../serialize'
 import { expectWorldEqual } from '../testkit'
 import { combatSystem } from './combat'
 import { projectileSystem } from './projectiles'
-import { equipSlot } from './inventory'
 import { isFrozen } from './statusFx'
 
 /** A player holding `weaponId` (slotted, so mods attach) with `mods`. */
@@ -21,7 +22,7 @@ const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMo
   // Replace the slotted starter with the weapon under test (starter is now a real
   // slotted ItemStack, so pushing would leave it in slot 0 and mis-equip).
   p.loadout!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
-  equipSlot(p, 0)
+  p.combat!.weapon = weaponId
   p.facing = 0 // +x
   return p
 }
@@ -59,7 +60,7 @@ describe('behavior mods — real fire path', () => {
     fire(w, p)
     expect(w.entities.filter((e) => e.kind === 'projectile')).toHaveLength(1)
     advance(w, 20)
-    expect(t.health!.hp).toBe(40 - 14)
+    expect(t.health!.hp).toBe(40 - WEAPONS.pistol.damage)
     expect(w.entities.some((e) => e.kind === 'projectile' && !e.dead)).toBe(false)
   })
 
@@ -84,18 +85,27 @@ describe('behavior mods — real fire path', () => {
     expect(eventsOf(w, 'explosion').length).toBeGreaterThan(0)
   })
 
-  it('frost then shatter: a frost bullet freezes; a follow-up shot shatters the ice (instant kill)', () => {
+  // Cryo Rounds is CONTROL, not an execute. The freeze sets up; the next shot
+  // cracks the ice for heavy bonus damage. It must never delete a body outright:
+  // shatter ignores hp, resist and archetype, which made this mod kill a 320hp
+  // boss exactly as fast as a 40hp thug.
+  it('frost then crack: a frost bullet freezes; the follow-up shot hits far harder but does NOT execute', () => {
     const p = armed(w, 20, 20, 'pistol', [{ id: 'frost', stacks: 1 }])
     const t = npc(w, 22, 20)
+    t.health = { hp: 400, max: 400, iframes: 0 } // a pool one cracked shot cannot clear
     fire(w, p)
     advance(w, 20)
     expect(isFrozen(t)).toBe(true)
     expect(t.dead).toBeFalsy()
+    const afterFreeze = t.health!.hp
     t.health!.iframes = 0 // iframes lapse between shots (statusSystem decrements them in real ticks)
     fire(w, p)
     advance(w, 20)
-    expect(t.dead).toBe(true)
-    expect(t.shattered).toBe(true)
+    expect(t.dead).toBeFalsy()
+    expect(t.shattered).toBeFalsy()
+    expect(isFrozen(t)).toBe(false) // the freeze was SPENT cracking
+    // The cracking shot landed more than an ordinary pistol round would have.
+    expect(afterFreeze - t.health!.hp).toBeGreaterThan(WEAPONS.pistol.damage)
   })
 
   it('incendiary: a bullet sets the target burning (element applied)', () => {
@@ -237,14 +247,40 @@ describe('behavior mods — real fire path', () => {
     expect(neighbor.health!.hp).toBeLessThan(40) // caught the detonation
   })
 
-  it('homing: an off-axis bullet steers its velocity toward the target', () => {
+  it('homing: a NEAR-MISS target inside the aim cone pulls the bullet toward it', () => {
     const p = armed(w, 20, 20, 'pistol', [{ id: 'homing', stacks: 3 }])
-    npc(w, 25, 23) // below-and-right of the due-east shot
+    npc(w, 25, 22) // ~22° below the due-east shot — inside the ~28° cone
     fire(w, p)
     const proj = w.entities.find((e) => e.kind === 'projectile')!
     expect(proj.vel.y).toBeCloseTo(0) // starts flying straight east
     advance(w, 5)
-    expect(proj.dead ? 0 : proj.vel.y).toBeGreaterThan(0) // curved downward toward the NPC (or already hit)
+    expect(proj.dead ? 1 : proj.vel.y).toBeGreaterThan(0) // curved toward the NPC (or already hit)
+  })
+
+  it('homing: a target OUTSIDE the aim cone is ignored — the bullet flies straight', () => {
+    // The bug this guards: homing used to grab the nearest body at any angle, so
+    // a shot east would hook onto someone behind you. Aim overrules homing.
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'homing', stacks: 3 }])
+    npc(w, 20, 26) // due SOUTH — 90° off the due-east shot
+    fire(w, p)
+    const proj = w.entities.find((e) => e.kind === 'projectile')!
+    advance(w, 5)
+    expect(proj.dead).toBeFalsy()
+    expect(proj.vel.y).toBeCloseTo(0) // never curved: still flying due east
+  })
+
+  it('homing: never steers toward a body it has no line of sight to', () => {
+    const p = armed(w, 20, 20, 'pistol', [{ id: 'homing', stacks: 3 }])
+    // Wall the target off: a solid tile between the muzzle and the NPC.
+    for (let ty = 20; ty <= 22; ty++) {
+      w.level.tiles[ty * w.level.w + 23] = Tile.Wall
+      w.level.solid[ty * w.level.w + 23] = 1 // isSolidTile reads `solid`, not `tiles`
+    }
+    npc(w, 25, 22) // inside the cone, but behind the wall
+    fire(w, p)
+    const proj = w.entities.find((e) => e.kind === 'projectile')!
+    advance(w, 2) // before the round reaches the wall
+    expect(proj.dead ? 0 : proj.vel.y).toBeCloseTo(0) // no pull through the wall
   })
 
   it('bounce: a ricochet bullet survives a wall impact instead of dying', () => {

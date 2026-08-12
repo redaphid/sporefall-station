@@ -3,7 +3,7 @@
   "seed": 20260715,
   "floor": 1,
   "tick": 30,
-  "nextId": 6,
+  "nextId": 7,
   "alarm": 0,
   "gameOver": false,
   "mission": {
@@ -48,7 +48,7 @@
       },
       "combat": {
         "weapon": "pistol",
-        "cooldown": 6
+        "cooldown": 12
       },
       "status": {
         "stun": 0,
@@ -60,16 +60,15 @@
         "inventory": [
           {
             "itemId": "pistol",
-            "qty": 200
+            "qty": 1
           }
         ],
-        "activeSlot": 0
+        "activeSlot": -1
       },
       "playerCtl": {
         "playerId": 0,
         "abilityCooldown": 0,
-        "cash": 0,
-        "crimeUntilTick": 470
+        "crimeUntilTick": 467
       }
     },
     {
@@ -77,15 +76,15 @@
       "kind": "npc",
       "archetype": "cop",
       "pos": {
-        "x": 1.9302697137493334,
+        "x": 1.9322449421653332,
         "y": 1.5
       },
       "prevPos": {
-        "x": 1.9285900977493333,
+        "x": 1.931882145109333,
         "y": 1.5
       },
       "vel": {
-        "x": 0.030233087999999984,
+        "x": 0,
         "y": 0
       },
       "intent": {
@@ -96,14 +95,14 @@
       "radius": 0.35,
       "facing": 3.141592653589793,
       "health": {
-        "hp": 32,
+        "hp": 24,
         "max": 60,
         "iframes": 0,
-        "lastHurtTick": 20
+        "lastHurtTick": 17
       },
       "combat": {
         "weapon": "bat",
-        "cooldown": 6
+        "cooldown": 8
       },
       "loadout": {
         "inventory": [
@@ -117,7 +116,7 @@
       "status": {
         "stun": 0,
         "sleep": 0,
-        "hitFlashUntil": 23,
+        "hitFlashUntil": 20,
         "cloakUntil": 0
       },
       "ai": {
@@ -130,7 +129,7 @@
         "thinkAt": 35,
         "sightRange": 8,
         "lastScores": {
-          "threat": 81.234,
+          "threat": 60.714,
           "pursueMemory": 1.5,
           "wander": 1
         },
@@ -204,7 +203,44 @@
         },
         "goalSince": 0,
         "goal": "wander",
-        "repathAt": 39
+        "repathAt": 39,
+        "path": {
+          "nodes": [],
+          "i": 0,
+          "goal": {
+            "x": -1.5,
+            "y": 5.5
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "kind": "projectile",
+      "archetype": "projectile",
+      "pos": {
+        "x": 1.2834333333333334,
+        "y": 1.5
+      },
+      "prevPos": {
+        "x": 0.8167666666666666,
+        "y": 1.5
+      },
+      "vel": {
+        "x": 14,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.15,
+      "facing": 0,
+      "projectile": {
+        "ownerId": 1,
+        "damage": 18,
+        "ttl": 20
       }
     }
   ]

@@ -48,7 +48,7 @@ export const destroyObject = (w: World, e: Entity, byId: number): void => {
   if (!def) return
   if (def.loot) {
     const itemId = w.rng.pick(def.loot)
-    spawnPickup(w, itemId, e.pos.x, e.pos.y, itemId === 'cash' ? w.rng.int(10, 40) : 1)
+    spawnPickup(w, itemId, e.pos.x, e.pos.y, 1)
   }
   if (def.ignite) igniteCell(w, Math.floor(e.pos.x), Math.floor(e.pos.y))
   if (def.explode) applyAreaEffect(w, e.pos.x, e.pos.y, { kind: 'explode', radius: def.explode.radius, damage: def.explode.damage }, byId)
@@ -73,7 +73,7 @@ const cutPower = (w: World, wing: string, byId: number): void => {
   w.events.push({ type: 'powerCut', wing, byId })
 }
 
-/** E-interact use: hack a wing's power, or dispense cash/an item once. Returns
+/** E-interact use: hack a wing's power, or dispense an item once. Returns
  * whether it fired. */
 export const useObject = (w: World, agent: Entity, e: Entity): boolean => {
   const def = OBJECTS[e.archetype]
@@ -89,11 +89,7 @@ export const useObject = (w: World, agent: Entity, e: Entity): boolean => {
   }
   if (!def.use || e.used) return false
   e.used = true
-  if (def.use.gives === 'cash') {
-    if (agent.playerCtl) agent.playerCtl.cash += def.use.amount ?? 25
-  } else {
-    spawnPickup(w, def.use.gives, e.pos.x, e.pos.y, def.use.amount ?? 1)
-  }
+  spawnPickup(w, def.use.gives, e.pos.x, e.pos.y, def.use.amount ?? 1)
   w.events.push({ type: 'use', entityId: e.id, byId: agent.id })
   return true
 }

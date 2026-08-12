@@ -187,10 +187,10 @@ export class NetHostSession implements Session {
    * Ship each client its OWN player's full inventory over the RELIABLE channel,
    * but ONLY when it changed since we last sent it. Teammates stay summarized in
    * `StateMsg.huds`; this is exclusively the local player's authoritative slots,
-   * so a joiner can switch weapons, use items, see mods and read ammo counts.
-   * Change-gating (a cheap signature compare) keeps this off the every-tick path
-   * and off the snapshot path — a firefight sends one small reliable packet per
-   * ammo/slot/mod change, not one per tick.
+   * so a joiner can use items and see mods. Change-gating (a cheap signature
+   * compare) keeps this off the every-tick path and off the snapshot path — a
+   * firefight sends one small reliable packet per slot/mod change, not one per
+   * tick.
    */
   private sendInventories(): void {
     for (const p of this.peers.values()) {
@@ -202,9 +202,8 @@ export class NetHostSession implements Session {
         slot: p.slot,
         inventory: ld.inventory,
         activeSlot: ld.activeSlot,
-        weapon: avatar.combat?.weapon ?? 'fists',
       }
-      const sig = JSON.stringify([msg.inventory, msg.activeSlot, msg.weapon])
+      const sig = JSON.stringify([msg.inventory, msg.activeSlot])
       if (sig === p.lastInvSig) continue
       p.lastInvSig = sig
       p.queue.queueReliable(encodeJson(MsgType.Inventory, msg))
@@ -245,10 +244,7 @@ export class NetHostSession implements Session {
     for (const e of this.world.entities) {
       if (!e.playerCtl) continue
       huds[e.playerCtl.playerId] = {
-        cash: e.playerCtl.cash,
-        weapon: e.combat?.weapon ?? 'fists',
         abilityCd: e.playerCtl.abilityCooldown,
-        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
         briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
       }
     }

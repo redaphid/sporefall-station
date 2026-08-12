@@ -3,7 +3,6 @@ import { createWorld } from './world'
 import { populateWorld } from './populate'
 import { itemClass } from './data/items'
 
-const ELEMENT_WEAPONS = new Set(['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun'])
 const ELEMENT_THROWABLES = new Set(['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade'])
 
 const lootIds = (seed: number, floor: number): string[] => {
@@ -25,22 +24,28 @@ describe('populate loot', () => {
     expect(lootIds(7, 3)).toEqual(lootIds(7, 3))
   })
 
-  it('surfaces element weapons AND throwables in deeper-floor loot', () => {
+  it('surfaces element throwables in deeper-floor loot', () => {
     const ids = collect([3, 4, 5], seeds)
-    expect(ids.some((id) => ELEMENT_WEAPONS.has(id))).toBe(true)
     expect(ids.some((id) => ELEMENT_THROWABLES.has(id))).toBe(true)
   })
 
-  it('shops stock element gear even on floor 1 (random loot there is basic)', () => {
-    // Floor-1 random loot is basics only, so any element pickup came from a shop.
-    const ids = collect([1], seeds)
-    expect(ids.some((id) => ELEMENT_WEAPONS.has(id) || ELEMENT_THROWABLES.has(id))).toBe(true)
+  it('NEVER surfaces a weapon — the player has one permanent pistol', () => {
+    const ids = collect([1, 2, 3, 4, 5], seeds)
+    for (const id of ids) {
+      const c = itemClass(id)
+      expect(c === 'melee' || c === 'ranged', `${id} spawned as loot`).toBe(false)
+    }
   })
 
-  it('covers each element item class — melee, ranged and throwable all spawn', () => {
+  it('shops stock element gear even on floor 1 (random loot there is basic)', () => {
+    // Floor-1 random loot is basics only, so any DEEP element pickup came from a shop.
+    const ids = collect([1], seeds)
+    expect(ids.some((id) => ['freezeGrenade', 'chloroform', 'banana', 'gasGrenade'].includes(id))).toBe(true)
+  })
+
+  it('covers the surviving item classes — throwable and consumable both spawn', () => {
     const classes = new Set(collect([1, 2, 3, 4, 5], seeds).map(itemClass))
-    expect(classes.has('ranged')).toBe(true)
-    expect(classes.has('melee')).toBe(true)
     expect(classes.has('throwable')).toBe(true)
+    expect(classes.has('consumable')).toBe(true)
   })
 })

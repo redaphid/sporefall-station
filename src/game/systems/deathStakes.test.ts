@@ -4,7 +4,7 @@
 // interactionSystem, missionSystem) so the rules are pinned independent of the
 // net/session plumbing, plus a few end-to-end passes through tickWorld.
 import { beforeEach, describe, expect, it } from 'vitest'
-import { spawnPlayer, STARTER_AMMO } from '../player'
+import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, REVIVES_PER_RUN, tickWorld, type RunMode, type World } from '../world'
 import { kill } from './combat'
@@ -71,9 +71,8 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     w = createWorld(7, 1)
   })
 
-  it('a lone downed player bleeds the timer down and self-revives at low hp, dropping cash + items', () => {
+  it('a lone downed player bleeds the timer down and self-revives at low hp, dropping items', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.playerCtl!.cash = 120
     p.loadout!.inventory = [{ itemId: 'bat', qty: 8 }]
     p.loadout!.activeSlot = 0
     down(w, p)
@@ -83,11 +82,10 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
-    expect(p.playerCtl!.cash).toBe(0)
     // The carried bat drops, but the comeback re-grants a real slotted starter
     // pistol (no phantom weapon) so mod pickups keep working post-revive.
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
-    expect(p.loadout!.activeSlot).toBe(0)
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
+    expect(p.loadout!.activeSlot).toBe(-1) // nothing HELD; the pistol is permanent, not selected
     expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(REVIVES_PER_RUN - 1) // exactly one comeback spent
   })
@@ -105,25 +103,22 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     // Key item survives; the picked-up pistol drops and is replaced by the
     // re-granted starter pistol slotted ahead of the key.
     expect(p.loadout!.inventory).toEqual([
-      { itemId: 'pistol', qty: STARTER_AMMO },
+      { itemId: 'pistol', qty: 1 },
       { itemId: 'briefcase', qty: 1 },
     ])
   })
 
   it('the penalty lands EXACTLY ONCE — a further interaction tick after recovery does not re-charge', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    p.playerCtl!.cash = 50
     down(w, p)
     p.playerCtl!.downed!.bleedTicks = 1
     settle(p)
     const ids = idle(0)
     interactionSystem(w, ids) // recovers here
     expect(w.revivesLeft).toBe(REVIVES_PER_RUN - 1)
-    p.playerCtl!.cash = 999 // simulate earning cash again after standing up
     interactionSystem(w, ids)
     interactionSystem(w, ids)
     expect(w.revivesLeft).toBe(REVIVES_PER_RUN - 1) // not double-charged
-    expect(p.playerCtl!.cash).toBe(999) // not re-stripped
   })
 
   it('the run is LOSABLE: each down spends a comeback, and the down after the pool empties ends the run', () => {
@@ -227,7 +222,6 @@ describe('casual mode — forgiving (kid mode)', () => {
   it('a down is always survivable (the pool is never consulted) and self-revive costs nothing', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0 // even with an empty pool, casual downs (never a real death)
-    p.playerCtl!.cash = 77
     p.loadout!.inventory = [{ itemId: 'bat', qty: 3 }]
     down(w, p)
     expect(p.dead).toBeFalsy()
@@ -236,7 +230,6 @@ describe('casual mode — forgiving (kid mode)', () => {
     settle(p)
     runUntilResolved(w, p)
     expect(p.playerCtl!.downed).toBeUndefined()
-    expect(p.playerCtl!.cash).toBe(77) // no penalty
     expect(p.loadout!.inventory).toHaveLength(1)
     expect(w.revivesLeft).toBe(0) // pool untouched (stays where it was)
   })
@@ -297,13 +290,11 @@ describe('edge cases & guards', () => {
 })
 
 describe('determinism — same seed + inputs + scripted downs ⇒ identical outcome', () => {
-  const runScenario = (mode: RunMode): { revivesLeft: number; hp: number; cash: number; dead: boolean; gameOver: boolean } => {
+  const runScenario = (mode: RunMode): { revivesLeft: number; hp: number; dead: boolean; gameOver: boolean } => {
     const w = createWorld(99, 1, mode)
     const p = spawnPlayer(w, 0, 20, 20)
-    p.playerCtl!.cash = 200
     // Scripted: down, shorten bleed, resolve — twice.
     for (let i = 0; i < 2; i++) {
-      p.playerCtl!.cash += 40
       down(w, p)
       if (p.playerCtl!.downed) p.playerCtl!.downed.bleedTicks = 3
       settle(p)
@@ -312,7 +303,6 @@ describe('determinism — same seed + inputs + scripted downs ⇒ identical outc
     return {
       revivesLeft: w.revivesLeft,
       hp: p.health!.hp,
-      cash: p.playerCtl!.cash,
       dead: !!p.dead,
       gameOver: w.gameOver,
     }
@@ -327,8 +317,6 @@ describe('determinism — same seed + inputs + scripted downs ⇒ identical outc
     const casual = runScenario('casual')
     expect(normal.revivesLeft).toBe(REVIVES_PER_RUN - 2) // two comebacks spent
     expect(casual.revivesLeft).toBe(REVIVES_PER_RUN) // pool never touched
-    expect(normal.cash).toBe(0) // stripped on each recovery
-    expect(casual.cash).toBeGreaterThan(0) // kept
   })
 
   it('end-to-end via tickWorld: a scripted solo down self-resolves and stays deterministic', () => {

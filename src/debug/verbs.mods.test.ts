@@ -4,14 +4,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createWorld, type World } from '../game/world'
 import { spawnPlayer } from '../game/player'
-import { equipSlot } from '../game/systems/inventory'
 import { runVerb, WRITE_VERBS } from './verbs'
 
 const armedPlayer = (w: World): number => {
   // The player starter is already a slotted, equipped pistol (a real ItemStack
   // that can carry mods) — no extra arming needed.
   const p = spawnPlayer(w, 0, 20, 20)
-  equipSlot(p, 0)
   return p.id
 }
 

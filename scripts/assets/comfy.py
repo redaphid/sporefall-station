@@ -62,6 +62,9 @@ def build_graph(
     alpha: bool = True,
     prefix: str = "swampspace",
     size: int | None = None,
+    ckpt: str | None = None,
+    cfg: float | None = None,
+    steps: int | None = None,
     control: str | None = None,
     controlnet: str | None = None,
     cn_strength: float = 1.0,
@@ -79,7 +82,13 @@ def build_graph(
     "DepthAnythingV2Preprocessor"). `cn_union_type` sets the mode on a union
     controlnet (xinsir/promax)."""
     size = size or SIZE
-    g = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CKPT}}}
+    # Per-CATEGORY overrides. Props needed a different base model than the rest
+    # of the pack and this is how that is expressed without changing the default
+    # for chars/tiles/items, which were all authored against the anime base and
+    # would drift if it moved under them. See PROP_CKPT in exp_props.py for the
+    # measurement that forced it.
+    g = {"1": {"class_type": "CheckpointLoaderSimple",
+               "inputs": {"ckpt_name": ckpt or CKPT}}}
     model, clip = ["1", 0], ["1", 1]
     if LORA:
         g["2"] = {
@@ -150,7 +159,8 @@ def build_graph(
         positive, negative = ["64", 0], ["64", 1]
     g["6"] = {"class_type": "KSampler",
               "inputs": {"model": model, "positive": positive, "negative": negative,
-                         "latent_image": latent, "seed": seed, "steps": STEPS, "cfg": CFG,
+                         "latent_image": latent, "seed": seed,
+                         "steps": steps or STEPS, "cfg": CFG if cfg is None else cfg,
                          "sampler_name": SAMPLER, "scheduler": SCHED, "denoise": denoise}}
     g["7"] = {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}}
     out = ["7", 0]

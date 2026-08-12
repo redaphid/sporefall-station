@@ -10,9 +10,14 @@ export interface Hud {
 export const createHud = (mount: HTMLElement): Hud => {
   const root = document.createElement('div')
   // Offset by the notch/status-bar inset so the health bar clears the OS clock on
-  // notched/foldable phones (Razr Ultra). env() needs viewport-fit=cover, set in index.html.
+  // notched/foldable phones (Razr Ultra). --sf-safe-* are the STAGE-space safe
+  // areas published by ui/orientation.ts: identical to env(safe-area-inset-*)
+  // normally, but re-pointed at the right physical edge when the stage is rotated
+  // for landscape-always (the game's "top" is then the phone's right edge, so a
+  // raw env(safe-area-inset-top) would dodge the wrong side of the screen).
+  // env() needs viewport-fit=cover, set in index.html.
   root.style.cssText =
-    'position:absolute;left:12px;top:calc(env(safe-area-inset-top, 0px) + 10px);color:#eee;font:14px system-ui;text-shadow:0 1px 2px #000;pointer-events:none;'
+    'position:absolute;left:calc(var(--sf-safe-left, 0px) + 12px);top:calc(var(--sf-safe-top, 0px) + 10px);color:#eee;font:14px system-ui;text-shadow:0 1px 2px #000;pointer-events:none;'
   root.innerHTML = `
     <div style="width:160px;height:14px;background:#3338;border:1px solid #000;border-radius:3px;overflow:hidden">
       <div id="hp" style="width:100%;height:100%;background:linear-gradient(#7fd17f,#4a9a4a);transition:width .15s"></div>

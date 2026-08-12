@@ -60,7 +60,9 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
   // only the chip/rows opt back in, so gameplay input is never blocked.
   const root = document.createElement('div')
   root.style.cssText =
-    'position:absolute;top:calc(env(safe-area-inset-top, 0px) + 34px);left:50%;transform:translateX(-50%);' +
+    // --sf-safe-top: stage-space safe area (ui/orientation.ts) — follows the
+    // rotation when the landscape-always fallback turns the stage.
+    'position:absolute;top:calc(var(--sf-safe-top, 0px) + 34px);left:50%;transform:translateX(-50%);' +
     'display:flex;flex-direction:column;align-items:center;gap:6px;z-index:72;pointer-events:none;max-width:min(78vw,340px)'
   mount.appendChild(root)
 

@@ -44,6 +44,7 @@ import { projectToScreen, screenToWorld, type CameraState } from './locatorModel
 import { buildInfoCard, type InfoCard } from './inspectModel'
 import { createPressTracker, LONG_PRESS_MS } from './pressModel'
 import { isUiChrome, markUiChrome } from './chrome'
+import { toStage } from './orientation'
 import { themeDisplayName } from '../render/themeState'
 import type { CameraSource } from './screens'
 
@@ -52,10 +53,12 @@ export type InspectMode = 'chip' | 'card'
 
 export interface Overlay {
   update(view: RenderView): void
-  /** Open the info popup for whatever entity is under screen point (clientX/Y).
-   * The touch input layer calls this AFTER its claiming rules ruled the press
-   * neutral (never a stick, pinch, or button). A miss dismisses any open popup. */
-  inspectAt(mode: InspectMode, clientX: number, clientY: number): void
+  /** Open the info popup for whatever entity is under a STAGE point (see
+   * ui/orientation.ts — rotation-corrected, and identical to clientX/Y when the
+   * stage is not rotated). The touch input layer calls this AFTER its claiming
+   * rules ruled the press neutral (never a stick, pinch, or button), already in
+   * stage space. A miss dismisses any open popup. */
+  inspectAt(mode: InspectMode, stageX: number, stageY: number): void
 }
 
 export interface OverlayOpts {
@@ -177,12 +180,14 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     lastCardKey = ''
   }
 
-  const inspectAt = (mode: InspectMode, clientX: number, clientY: number): void => {
+  const inspectAt = (mode: InspectMode, stageX: number, stageY: number): void => {
     const view = lastView
     const cam = view && camState(view)
     if (!view || !cam) return
-    const rect = mount.getBoundingClientRect()
-    const w = screenToWorld(clientX - rect.left, clientY - rect.top, cam)
+    // Already stage space, which is what the camera projects in — no
+    // getBoundingClientRect: on a rotated stage that box is the element's
+    // axis-aligned bounds, and subtracting it would be silently wrong.
+    const w = screenToWorld(stageX, stageY, cam)
     // Zoom-aware pick reach: pickRadiusAt is pure game-side math — the VIEW
     // passes the current px-per-tile in, so src/game stays camera-free.
     // Projectiles are skipped so a tap lands on the actor/prop the player means;
@@ -211,7 +216,11 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     // Presses on interactive UI chrome (settings gear/panel, …) belong to the
     // chrome, never to inspect (chrome.ts) — structural, not per-widget.
     if (isUiChrome(ev.target)) return
-    press.down(ev.pointerId, ev.clientX, ev.clientY, performance.now())
+    // Stage coordinates at the boundary (ui/orientation.ts), so the press
+    // tracker's origin — which becomes the inspect point — is already correct
+    // on a rotated stage.
+    const p = toStage(ev.clientX, ev.clientY)
+    press.down(ev.pointerId, p.x, p.y, performance.now())
     clearTimeout(pressTimer)
     if (ev.pointerType !== 'mouse') {
       pressTimer = setTimeout(() => {
@@ -220,16 +229,20 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
       }, LONG_PRESS_MS)
     }
   })
-  mount.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
+  mount.addEventListener('pointermove', (ev) => {
+    const p = toStage(ev.clientX, ev.clientY)
+    press.move(ev.pointerId, p.x, p.y)
+  })
   mount.addEventListener('pointerup', (ev) => {
     clearTimeout(pressTimer)
     if (isUiChrome(ev.target)) press.cancel(ev.pointerId) // released over chrome → never inspect
     const outcome = press.up(ev.pointerId, performance.now())
     if (outcome === null) return
+    const p = toStage(ev.clientX, ev.clientY)
     // Desktop click = the full card straight away; a touch tap opens the chip,
     // a threshold-crossing release (late timer) still opens the card.
-    if (ev.pointerType === 'mouse') inspectAt('card', ev.clientX, ev.clientY)
-    else inspectAt(outcome === 'longpress' ? 'card' : 'chip', ev.clientX, ev.clientY)
+    if (ev.pointerType === 'mouse') inspectAt('card', p.x, p.y)
+    else inspectAt(outcome === 'longpress' ? 'card' : 'chip', p.x, p.y)
   })
   mount.addEventListener('pointercancel', (ev) => {
     clearTimeout(pressTimer)

@@ -12,11 +12,13 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 3 — `chair` appended (87 -> 88): the interior layout pass seats chairs at
+ *     desks, round tables and facing screens, so a chair is now spawnable.
  * 2 — 59 archetypes appended (28 -> 87), so every spawnable object is
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 3
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

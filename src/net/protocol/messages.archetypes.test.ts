@@ -3,7 +3,8 @@ import { CONSUMABLES, THROWABLES, WEAPONS } from '../../game/data/items'
 import { MODS } from '../../game/data/mods'
 import { NPCS } from '../../game/data/npcs'
 import { OBJECTS } from '../../game/data/objects'
-import { ARCHETYPES, kindOf, KEYCARD_ARCHETYPE, normalizeArchetype } from './messages'
+import { PROTOCOL_VERSION } from '../types'
+import { ARCHETYPES, kindOf, KEYCARD_ARCHETYPE, normalizeArchetype, WIRE_MODS } from './messages'
 
 /**
  * The wire archetype registry must COVER the game registries.
@@ -72,6 +73,50 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
   it('has no duplicates and fits the u8 index space', () => {
     expect(new Set(ARCHETYPES).size).toBe(ARCHETYPES.length)
     expect(ARCHETYPES.length).toBeLessThanOrEqual(256)
+  })
+
+  /**
+   * THIS TEST IS SUPPOSED TO FAIL WHEN YOU GROW A WIRE TABLE. That is its job.
+   *
+   * Both lists below are append-only indices on the wire, and growing either one
+   * changes what the bytes mean without changing anything a peer can detect:
+   *
+   *   ARCHETYPES — `decodeSnapshot` reads `ARCHETYPES[r.u8()] ?? 'player'`, so an
+   *   older peer maps every unknown index onto the player and draws each new
+   *   object as another Ranger.
+   *
+   *   WIRE_MODS — a 5-bit index read as `WIRE_MODS[(packed >> 3) & 0x1f]` behind
+   *   an `if (id)`, so an older peer silently DROPS a mod it does not know. Less
+   *   lurid than phantom Rangers and just as invisible: the same gun reads as
+   *   differently modded on the two phones.
+   *
+   * In both cases the peers still report the same PROTOCOL_VERSION, the handshake
+   * gate waves them through, and nothing anywhere errors.
+   *
+   * That already happened once: 59 archetypes were appended while the version
+   * stayed at 1, and the only thing between a player and a screen full of phantom
+   * Rangers was remembering to reinstall on both phones. This test exists because
+   * "remember to bump the version" is a convention, and conventions evaporate.
+   *
+   * When this fails: bump PROTOCOL_VERSION in net/types.ts, add a line to its
+   * changelog, then update the number here — in that order. Do NOT simply edit
+   * the number to make it green; that reinstates the exact silent mismatch this
+   * exists to prevent.
+   *
+   * (Capacity is a separate concern and is already covered elsewhere: ARCHETYPES
+   * must fit u8 above, and WIRE_MODS must fit 5 bits in messages.mods.test.ts.
+   * Those catch overflow. This catches divergence.)
+   */
+  it('pins the wire tables to PROTOCOL_VERSION, so growing one cannot ship silently', () => {
+    expect({
+      version: PROTOCOL_VERSION,
+      archetypes: ARCHETYPES.length,
+      mods: WIRE_MODS.length,
+    }).toEqual({
+      version: 2,
+      archetypes: 87,
+      mods: 18,
+    })
   })
 })
 

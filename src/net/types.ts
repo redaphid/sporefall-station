@@ -1,6 +1,22 @@
 export type PeerId = string
 
-export const PROTOCOL_VERSION = 1
+/**
+ * The wire contract between two peers. The host refuses any `Hello` whose `v`
+ * differs (see netHost.ts), and the client surfaces that as the `rejected`
+ * phase — so a mismatch is a clean, explained refusal.
+ *
+ * **Bump this whenever the wire format changes, and appending to `ARCHETYPES`
+ * counts.** That list is an append-only `u8` index, and an index the receiver
+ * does not know decodes as `ARCHETYPES[i] ?? 'player'` (messages.ts). So two
+ * builds that disagree about the table both claim the same version, sail
+ * through the gate, and then the older peer quietly renders every new object
+ * as another copy of the player. Nothing errors; the game just lies.
+ *
+ * 2 — 59 archetypes appended (28 -> 87), so every spawnable object is
+ *     registered rather than only the enemies.
+ * 1 — initial.
+ */
+export const PROTOCOL_VERSION = 2
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

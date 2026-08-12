@@ -112,6 +112,20 @@ TRIGGER = "masterpiece, pixpix, 8-bit, pixel_art"
 LOOK = ("16-bit era palette, bold dark outlines, chunky readable shapes, "
         "dark teal alien jungle overgrowing tan sci-fi metal, olive moss, "
         "bioluminescent green accents, moody")
+# Props use this instead of LOOK. LOOK positively requests "dark teal alien
+# jungle overgrowing tan sci-fi metal, olive moss" -- which is right for tiles
+# and creatures, and is a direct contradiction of the props' own negatives
+# ("covered in moss, moss cap, overgrown, foliage on top"). Asking for moss and
+# forbidding it in the same prompt is how the shipped props became mossy lumps;
+# the prop recipe fixed the negatives but left the positive request in place.
+#
+# Evidence this matters rather than being tidiness: the g2 sweep ran a moss-free
+# LOOK and produced zero moss caps across 15 images, against a shipped set where
+# all six props have one. Manufactured wear is kept -- these are derelict station
+# fittings, not showroom stock -- but as grime and worn paint, not vegetation.
+PROP_LOOK = ("16-bit era palette, bold dark outlines, chunky readable shapes, "
+             "worn tan and teal painted sci-fi metal, scuffed paint, grimy panel seams, "
+             "bioluminescent green indicator lights, moody")
 NEG_BASE = ("photorealistic, 3d render, smooth gradient, soft shading, text, watermark, "
             "signature, blurry, jpeg artifacts, bright cheerful, pastel, "
             "sprite sheet, grid, multiple views, turnaround, duplicate, two copies, "
@@ -529,7 +543,7 @@ def jobs():
                                    pos=f"{TRIGGER}, {subj}, {BG_OBJ}, nothing underneath it, "
                                        f"no shadow and no floor, object fills at least 80% of the "
                                        f"frame height, tightly cropped, centered, upright, "
-                                       f"slight high three-quarter game angle, {LOOK}",
+                                       f"slight high three-quarter game angle, {PROP_LOOK}",
                                    neg=f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, "
                                        f"{NEG_WRONG_READ}, {extra}")
     # Items get NO IPAdapter refs: the environment anchors (mossy barrel + deck

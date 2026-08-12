@@ -2,14 +2,16 @@
 //
 //   /ws/:room  → the RoomDO Durable Object (WebSocket multiplayer relay)
 //   /ota/check → the self-hosted OTA manifest endpoint (handleOta)
+//   /review/*  → review-only before/after images from KV (handleReviewImage)
 //   everything else → the built game in dist/, via the ASSETS binding
 //
-// wrangler.jsonc routes only /ws/* and /ota/* through this Worker
+// wrangler.jsonc routes only /ws/*, /ota/* and /review/* through this Worker
 // (`run_worker_first`); all other paths are served straight from static assets
 // (free, cached, with public/_headers + public/_redirects honored). The ASSETS
 // fallback below is belt-and-suspenders for anything that still reaches here.
 
 import { handleOta } from './ota'
+import { REVIEW_PREFIX, handleReviewImage } from './reviewImages'
 import type { Env } from './env'
 
 // The Durable Object class must be exported from the Worker's entry module so the
@@ -29,6 +31,11 @@ export default {
     }
 
     if (url.pathname === '/ota/check') return handleOta(request, env)
+
+    // /review/* → a before/after image from KV, for embedding in PR bodies.
+    // MUST be handled here and never fall through to ASSETS: the SPA fallback
+    // would answer a missing image with 200 + index.html. See reviewImages.ts.
+    if (url.pathname.startsWith(REVIEW_PREFIX)) return handleReviewImage(request, env)
 
     return env.ASSETS.fetch(request)
   },

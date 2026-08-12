@@ -14,6 +14,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json && vite build",
     "worker:dev": "wrangler dev",
+    "review:image": "node scripts/review-image.mjs",
     "worker:deploy": "wrangler deploy",
     "preview": "vite preview",
     "test": "vitest run",

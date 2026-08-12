@@ -345,6 +345,46 @@ same Cloudflare Pages project as the web deploy.
 
 ---
 
+## D. Review images (before/after shots in PR bodies)
+
+This repo is **private**, and that breaks images in PR bodies: GitHub does **not**
+proxy in-repo image URLs on a private repo, so `![](…/blob/<sha>/shot.png?raw=true)`
+renders as a broken image for every reviewer. A **publicly reachable** URL *is*
+proxied (through `camo.githubusercontent.com`) and does render. So review images
+are served publicly by the Worker at `/review/*`.
+
+**Publishing one** — an upload, not a deploy, so it is live in seconds and works
+for a PR that has **not merged yet** (which is the whole point):
+
+```bash
+pnpm run review:image docs/prop-sweep/winners.png --prefix prop-sweep
+# → ![winners](https://sporefall.hypnodroid.com/review/prop-sweep/winners-c5a9f3f1.png)
+```
+
+Paste that markdown line into the PR body. Keys are content-addressed
+(`…-<sha8>.png`), so a URL's bytes never change and neither cache nor camo can go
+stale; re-uploading identical bytes is a no-op.
+
+- **They never enter the game.** Images live in the `REVIEW_IMAGES` KV namespace,
+  not in `public/` and not in the repo — zero bytes added to the Vite bundle, the
+  OTA zip, or the APK. Keep it that way.
+- **They are public.** Anything published here is world-readable by design (that is
+  what makes it render). Don't publish anything you wouldn't put on the live site.
+- **Only images.** `.png/.jpg/.jpeg/.gif/.webp/.avif`. `.svg` and `.html` are
+  refused on purpose — this path is same-origin with the game and both can script.
+- **Verify by content-type and magic bytes, never by status code.** `assets.
+  not_found_handling` is `single-page-application`, so *every* unknown path answers
+  **200 with the game's index.html**. A broken image URL looks perfectly healthy.
+  `/review/*` is in `run_worker_first` and `src/worker/reviewImages.ts` never falls
+  through to ASSETS: a miss is an honest 404 `text/plain`. `review:image` re-fetches
+  each URL after upload and refuses to print one that isn't real image bytes.
+
+Setup is already done (`kv_namespaces` in `wrangler.jsonc`); the CI token's "Edit
+Cloudflare Workers" template already covers the KV binding, so deploys need no new
+secret.
+
+---
+
 ## Sources
 
 - Cloudflare `pages-action` is deprecated, use `wrangler-action`:

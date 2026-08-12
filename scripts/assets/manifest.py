@@ -158,7 +158,20 @@ def build():
                     if not exists(rel):
                         break  # frames must be contiguous from 0
                     sprites[f"char.{arch}.{d}-{state}-{n}"] = rel
-    put("prop.default", "props/cargo-pod.png")
+    # `prop.default` is not a fallback nobody sees: art.ts routes the `crate`
+    # archetype to `sprites.prop`, and crate is the MOST COMMON object in the
+    # game (23.0 per floor, 19.1% of all props). It pointed at cargo-pod.png —
+    # a grey mossy dome — so every crate in the game was a mossy dome.
+    #
+    # Deliberately pointed at art that does not exist yet. `put` omits a missing
+    # file, so today this emits nothing and `crate` falls through to the
+    # procedural brown slatted crate, which is the better read. The day
+    # cargo-crate.png is generated this starts mapping on its own.
+    #
+    # Do NOT "fix" this back to cargo-pod.png: that is the revert this comment
+    # exists to prevent. Regenerating the manifest was the one action that could
+    # silently undo the crate fix.
+    put("prop.default", "props/cargo-crate.png")
     for eng, ours in PROP_KEYS.items():
         put(f"prop.{eng}", f"props/{ours}.png")
     put("item.default", "items/biogel-kit.png")

@@ -86,16 +86,19 @@ ITEM_KEYS = {  # engine item id -> our themed file (items table key)
 }
 PROP_KEYS = {  # engine prop name -> props table key
     "barrel": "spore-barrel", "atm": "cryo-terminal",
-    "vending-machine": "nutrient-dispenser", "tv": "console-monitor",
+    "vending-machine": "nutrient-dispenser", "tv": "wall-screen",
     "toilet": "hydro-recycler",
-    # Furniture that deliberately REUSES another prop's art (the same reuse
-    # art.ts PROP_SPRITE encodes: a weapons locker wears the cryo-terminal, a
-    # supply cabinet the nutrient dispenser, a desk the console). These were
-    # live in the shipped manifest but missing from this table, so ANY
-    # regeneration silently dropped prop.locker/cabinet/desk and the furniture
-    # fell back to a procedural draw — caught by artResolution.test.ts.
-    "locker": "cryo-terminal", "cabinet": "nutrient-dispenser",
-    "desk": "console-monitor",
+    # Furniture that USED to reuse another prop's art: a weapons locker wore the
+    # cryo-terminal, a supply cabinet the nutrient dispenser, a desk and the TV
+    # both wore the console. Each now has art made for it, so the reuse is gone.
+    #
+    # These entries must agree with the shipped manifest.json. They are the same
+    # silent-revert hazard as prop.default below: this table is what `build()`
+    # writes, so leaving it pointing at the old shared art means the next
+    # regeneration quietly undoes the dedicated sprites and every locker goes
+    # back to being an ATM. Change art here and in the manifest together.
+    "locker": "weapons-locker", "cabinet": "supply-cabinet",
+    "desk": "work-desk",
 }
 
 

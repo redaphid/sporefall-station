@@ -54,97 +54,31 @@ import comfy  # noqa: E402
 import post as P  # noqa: E402
 from PIL import Image  # noqa: E402
 
+# ONE SOURCE OF TRUTH. The prompts used to be duplicated here; they now come from
+# generate.py, which is the shipping pipeline and carries the reviewed recipe
+# (fix/prop-gen-recipe: `tree` and friends in NEG_WRONG_READ, NEG_GROUND on
+# props, refs="env" dropped, cargo-crate added, PROP_LOOK without the moss).
+# A sweep must exercise exactly the recipe that ships, or curating from it proves
+# nothing about what the pipeline will produce later.
+import generate as G  # noqa: E402
+
 OUT = Path(os.environ.get("EXP_OUT", "D:/tmp/props-gen"))
 
-TRIGGER = "masterpiece, pixpix, 8-bit, pixel_art"
-LOOK = ("16-bit era palette, bold dark outlines, chunky readable shapes, "
-        "tan and teal sci-fi metal, bioluminescent green accents, moody")
-BG_OBJ = ("single isolated game object centered on plain flat white background, "
-          "object fills the frame, nothing underneath it")
-
-NEG_BASE = ("photorealistic, 3d render, smooth gradient, soft shading, text, watermark, "
-            "signature, blurry, jpeg artifacts, bright cheerful, pastel, "
-            "sprite sheet, grid, multiple views, turnaround, duplicate, two copies, "
-            "several objects side by side, faded ghost copy")
-NEG_FIGURE = ("person, humanoid, figure, character, creature, monster, face, head, "
-              "arms, legs, hands, body, standing figure, portrait")
-# The slab under the sprite. Same list generate.py applies to every ground
-# creature and never applied to a prop.
-NEG_GROUND = ("ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
-              "plinth, cast shadow on the ground, diorama, puddle, sand, gravel")
-# The wrong reading, named. This is the half the stalker recipe proved matters:
-# it is not enough to describe a locker, you must forbid the tombstone.
-NEG_WRONG_READ = ("gravestone, tombstone, headstone, grave marker, monolith, standing stone, "
-                  "menhir, cairn, boulder, rock, stone, mossy rock, moss ball, mound of moss, "
-                  "shrub, bush, mushroom, organic blob, lump, weathered stone, "
-                  "moss cap, overgrown, covered in moss, vines, foliage on top, cemetery")
-
-# subject -> (manifest filename, explicit geometry, extra negatives)
-#
-# Ranked by measured encounter rate over 1000 generated floors (200 seeds x
-# floors 1-5): desk 13.3/floor, cabinet 11.7, barrel 8.2, tv 4.4, locker 3.3.
-# Together 41 of the ~51 PNG props a player meets per floor.
-SUBJECTS: dict[str, tuple[str, str, str]] = {
-    "work-desk": (
-        "props/work-desk.png",
-        "a low wide sci-fi office work desk, a flat rectangular horizontal desktop surface "
-        "supported on two solid side panels, a keyboard and a small dark angled monitor "
-        "sitting ON TOP of the desktop, a drawer unit under one end, "
-        "WIDE horizontal silhouette twice as wide as it is tall, low to the floor, "
-        "roughly 8 wide by 4 tall",
-        "tall, upright slab, vertical, narrow, cabinet, tower, obelisk, pillar, column",
-    ),
-    "supply-cabinet": (
-        "props/supply-cabinet.png",
-        "a tall narrow sci-fi supply cabinet, a rectangular metal cupboard with TWO hinged "
-        "doors meeting at a vertical seam down the middle, a horizontal handle bar on each "
-        "door, louvred vent slots near the top, four short feet lifting it off the floor, "
-        "flat square top, sharp square corners, roughly 4 wide by 6 tall",
-        "rounded top, dome, arch, curved top, screen, window, glass front, "
-        "extremely tall, thin, sliver, pole",
-    ),
-    # Proportion is stated as a ratio and negatived from the other side, because
-    # the first pass ("straight vertical sides", no ratio) produced a 1:3 tall
-    # canister -- correct geometry, wrong object, and a 10px sliver once posted
-    # to the 32px prop footprint.
-    "spore-barrel": (
-        "props/spore-barrel.png",
-        "a SQUAT cylindrical oil drum barrel standing upright on its flat circular end, "
-        "clearly a CYLINDER with a visible round elliptical rim at the top, two raised "
-        "horizontal ribs banding around the middle, a single yellow hazard warning stripe, "
-        "tan and teal metal, flat circular lid with a bung cap, "
-        "chunky and stout, only slightly taller than it is wide, roughly 4 wide by 5 tall",
-        "dome, hemisphere, egg, sphere, round top, tapered, cone, sack, pot, vase, "
-        "tall, narrow, thin, slender, pillar, column, canister, tube, rocket, pipe",
-    ),
-    "wall-screen": (
-        "props/wall-screen.png",
-        "a wall-mounted sci-fi flat panel display screen, a thin rectangular monitor in a "
-        "slim bezel showing glowing green readout glyphs, mounted flush on a bracket, "
-        "a bundle of cables trailing from one bottom corner, "
-        "flat and thin, wider than it is tall, no stand, no plinth, roughly 7 wide by 5 tall",
-        "stubby stand, pedestal base, on a post, thick body, box, crt, deep cabinet, "
-        "tall, narrow, tower",
-    ),
-    "weapons-locker": (
-        "props/weapons-locker.png",
-        "a tall rectangular steel weapons locker, one full-height vertical door with a "
-        "recessed handle and a small keypad panel, three horizontal louvred vent slits at "
-        "eye height, a stencilled yellow number on the door, riveted edges, "
-        "flat square top, hard square corners, like a school locker, roughly 4 wide by 7 tall",
-        "rounded top, arch, dome, screen, glass, vending machine, shelves, window, "
-        "sliver, pole, obelisk",
-    ),
-}
 
 
 def spec(name: str) -> dict:
-    path, geom, extra = SUBJECTS[name]
-    return dict(
-        path=path,
-        pos=f"{TRIGGER}, {geom}, {BG_OBJ}, upright, slight high three-quarter game angle, {LOOK}",
-        neg=f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, {NEG_WRONG_READ}, {extra}",
-    )
+    """The live `prop.<name>` job from generate.py — not a copy of it."""
+    job = G.jobs().get(f"prop.{name}")
+    if job is None:
+        raise SystemExit(f"no prop job named {name!r} in generate.py")
+    return job
+
+
+# Sweep order is by measured encounter rate, so if a run is cut short the
+# highest-value art already exists: crate 23.0/floor, desk 13.3, cabinet 11.7,
+# barrel 8.2, tv 4.4, locker 3.3. Together ~86% of the PNG props per floor.
+QUEUE = ["cargo-crate", "work-desk", "supply-cabinet", "spore-barrel",
+         "wall-screen", "weapons-locker"]
 
 
 def generate(names: list[str], tag: str, seeds: int, base_seed: int) -> None:
@@ -262,8 +196,10 @@ ROOT_REPO = Path(__file__).resolve().parents[2]
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="g1")
-    ap.add_argument("--subjects", default=",".join(SUBJECTS))
-    ap.add_argument("--seeds", type=int, default=4)
+    ap.add_argument("--subjects", default=",".join(QUEUE))
+    # 8-12, not 3. The g2 sweep ran 3 and its usable rate was 1 in 3; reporting
+    # that as "worked first time" was reading the curated seed as the sweep.
+    ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--base-seed", type=int, default=1000)
     ap.add_argument("--post", action="store_true", help="post existing raws only")
     ap.add_argument("--sheet", action="store_true", help="contact sheets only")
@@ -275,13 +211,15 @@ def main() -> int:
         sheet(a.tag)
         return 0
 
+    known = {k[len("prop."):] for k in G.jobs() if k.startswith("prop.")}
+
     if a.list:
-        for n in SUBJECTS:
+        for n in QUEUE:
             print(f"\n== {n} ==\nPOS: {spec(n)['pos']}\nNEG: {spec(n)['neg']}")
         return 0
 
     names = [n.strip() for n in a.subjects.split(",") if n.strip()]
-    unknown = [n for n in names if n not in SUBJECTS]
+    unknown = [n for n in names if n not in known]
     if unknown:
         print(f"unknown subject(s): {', '.join(unknown)}", file=sys.stderr)
         return 2

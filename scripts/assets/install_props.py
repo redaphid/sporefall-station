@@ -48,32 +48,43 @@ GEN = Path("D:/tmp/props-gen")
 # `value_range` can clear 0.487) and are chosen so a furnished room is told
 # apart by hue: warm tan desk, teal cabinet, rust barrel, olive locker.
 CURATED: dict[str, dict] = {
+    # cargo-crate is new on this branch and is the most-seen prop on a floor
+    # (23.0 per floor, ~19% of every prop he looks at), so it leads the list.
+    # Hue is picked for room-legibility against the other five: desk warm tan,
+    # cabinet teal, barrel rust, locker olive, screen neutral -- so the crate
+    # takes a cooler steel-blue, with the prompt's green status light as accent.
+    "cargo-crate": dict(
+        tag="s2", seed=4010, dst="cargo-crate.png",
+        ramp=["#08080c", "#0f1a26", "#16293d", "#1f3c58", "#2b5375",
+              "#3d6f96", "#5b91b5", "#8ab4d0", "#dce9f2"],
+        accent="#46e078", accent_q=0.985,
+    ),
     "work-desk": dict(
-        tag="g2", seed=2000, dst="work-desk.png",
+        tag="s2", seed=4010, dst="work-desk.png",
         ramp=["#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26",
               "#8f6c38", "#b08d50", "#cbb277", "#f2f6ea"],
         accent="#46e078", accent_q=0.985,
     ),
     "supply-cabinet": dict(
-        tag="g2", seed=2000, dst="supply-cabinet.png",
+        tag="s2", seed=4004, dst="supply-cabinet.png",
         ramp=["#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80",
               "#5aa4ae", "#7ecbd2", "#a2adb4", "#f2f6ea"],
         accent="#46e078", accent_q=0.99,
     ),
     "spore-barrel": dict(
-        tag="g2", seed=2001, dst="spore-barrel.png",
+        tag="s2", seed=4003, dst="spore-barrel.png",
         ramp=["#08080c", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38",
               "#b08d50", "#cbb277", "#a8c46a", "#ffd83e"],
         accent="#ffd83e", accent_q=0.99,
     ),
     "weapons-locker": dict(
-        tag="g2", seed=2000, dst="weapons-locker.png",
+        tag="s2", seed=4003, dst="weapons-locker.png",
         ramp=["#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
               "#67873c", "#86a750", "#a8c46a", "#cbb277"],
         accent="#ffd83e", accent_q=0.99,
     ),
     "wall-screen": dict(
-        tag="g2", seed=2000, dst="wall-screen.png",
+        tag="s2", seed=4002, dst="wall-screen.png",
         ramp=["#08080c", "#141a16", "#23282e", "#3c444d", "#59636d",
               "#7b8791", "#a2adb4", "#7ecbd2", "#f2f6ea"],
         accent="#46e078", accent_q=0.96,

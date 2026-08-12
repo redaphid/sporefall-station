@@ -68,6 +68,13 @@ Gate every merge on `pnpm run build` (typecheck) + `pnpm exec vitest run` + `pnp
 all green, resolve conflicts (watch for *semantic* conflicts, not just textual),
 re-run the full suite after each merge, then `git push origin main`.
 
+**Show your work in the PR body.** Before/after shots belong in the PR — but this
+repo is private, so an in-repo image URL renders **broken** for the reviewer. Publish
+with `pnpm run review:image <file.png>` and paste the markdown it prints; it serves
+the image publicly from the Worker (`/review/*`, KV-backed, never in the game
+bundle) and refuses to hand back a URL it hasn't re-fetched as real image bytes.
+Honest contact sheets — failures included — are the point. See `docs/deploy.md` § D.
+
 **Keep release notes current.** Each merge to `main` should update
 `src/ui/releaseNotes.ts` — prepend a single one-line, player-facing summary of
 the change (punchy, ~40 chars, no internal/tooling churn) and trim to the latest

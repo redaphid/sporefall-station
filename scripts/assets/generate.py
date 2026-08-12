@@ -123,7 +123,20 @@ NEG_FIGURE = ("person, humanoid, figure, character, creature, monster, face, hea
 # it into the alpha as a grey SLAB under the sprite — invisible at 1024px, but at
 # 48px it is a third of the sprite's height. Negatived on every ground creature.
 NEG_GROUND = ("ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
-              "plinth, cast shadow on the ground, diorama, puddle, sand, gravel")
+              "plinth, cast shadow on the ground, diorama, puddle, sand, gravel, "
+              # Second pass. The list above still let two things through on the
+              # last sweep: a teal ground PUDDLE and a hard elliptical DROP
+              # SHADOW. "puddle" and "cast shadow on the ground" were both
+              # already present, so the miss was not a gap in coverage — the
+              # phrasing was too abstract. Name the pictorial form, not the
+              # concept: an "ellipse under the object" is what the model draws.
+              # This matters more for props than for creatures: the background
+              # key cannot tell a grey ellipse from the sprite, so it welds it
+              # into the ALPHA, where no colour pass can ever reach it.
+              "drop shadow, shadow ellipse, contact shadow, dark ellipse under the object, "
+              "shadow blob, reflection, mirrored reflection, wet floor, standing water, "
+              "spilled liquid, water pooling at the base, floor, floor plane, ground plane, "
+              "surface beneath the object, stilts, legs propping it up")
 
 # The WRONG READING, named. Describing a locker is not enough — you must forbid
 # the tombstone, or the model splits the difference and gives you a locker-ish
@@ -513,8 +526,9 @@ def jobs():
     # it. That mound is the tombstone plinth.
     for name, (path, subj, extra) in PROPS.items():
         out[f"prop.{name}"] = dict(cat="prop", path=path, px=PROP_PX,
-                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, object fills at least 80% "
-                                       f"of the frame height, tightly cropped, centered, upright, "
+                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, nothing underneath it, "
+                                       f"no shadow and no floor, object fills at least 80% of the "
+                                       f"frame height, tightly cropped, centered, upright, "
                                        f"slight high three-quarter game angle, {LOOK}",
                                    neg=f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, "
                                        f"{NEG_WRONG_READ}, {extra}")

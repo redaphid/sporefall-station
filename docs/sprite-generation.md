@@ -196,6 +196,51 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
 
 ## 4. Technique playbook (do not relearn these the expensive way)
 
+0. **Change ONE knob at a time, against a FIXED seed set.** This is the most
+   expensive lesson in this file and it outranks every specific fact below it.
+
+   A sweep tells you the *current recipe's yield*. It cannot tell you *which
+   knob is wrong* — and if you sweep a recipe that has never been executed, you
+   spend the whole run learning that, at ~1 usable in 10.
+
+   Worked example, 2026-08. The props kept returning a warehouse, a stack, or a
+   literal 4×3 GRID instead of one object. A night went into negative prompts
+   aimed at exactly that — `NEG_STACK`, an anti-grid trim, a tombstone list,
+   ground-plinth wording. **None of it moved the number.** Then, one knob at a
+   time against a fixed 8-seed set:
+
+   | changed | clean single objects | verdict |
+   |---|---|---|
+   | baseline | 1/8 | control |
+   | CFG 3.5 → 7.0 | 2/8 | kept |
+   | LoRA weight 1.0 → 0.6 | ~1/8, mushy edges | **reverted** |
+   | SIZE 1024 → 768 | same rate, chunkier at 32px | kept |
+   | **CKPT `anything-xl` → `juggernautXL`** | **8/8** | kept |
+
+   …and 8/8 again on eight *fresh* seeds. **The checkpoint was the whole
+   defect**, and no amount of prompt wording was ever going to fix it, because
+   `anything-xl` is an **anime** checkpoint and anime models compose busy,
+   multi-object, sprite-sheet-like scenes. We were describing the symptom back
+   to the model that was causing it.
+
+   Four iterations found what a night of parallel sweeping could not. The fixed
+   seed set is what makes it work: comparing 8 fresh seeds against 8 other fresh
+   seeds measures seed luck, not the change.
+
+   Corollary: **when a subject "refuses" a concept, suspect the base model
+   before you conclude the concept is impossible.** `wall-screen` was 0/12 and
+   written off as "the model refusing to draw a wall panel"; that verdict was
+   reached under the wrong checkpoint and had to be re-tested.
+
+0b. **Judge by eye, at the size the player sees, beside the cast.** Neither the
+   silhouette-consistency harness nor the render suite can do this for you —
+   both passed happily on art that was dismissed as grey blobs in four seconds.
+   A gate that passes bad art is worse than no gate: it manufactures confidence.
+   Composite candidates at their true logical footprint (props 32px, cast 48px)
+   on the floor tint and look at them. Keep a log with the FAILURES in it —
+   `NEG_STACK` was assumed helpful for hours and was only found to be actively
+   harmful once someone wrote the result down.
+
 1. **Reference separation.** IPAdapter refs must be ENVIRONMENT-only for
    props/tiles and CHARACTER-only for figures. Mixing them grows faces on lamp
    posts. In `generate.py` this is the `refs="env" / "char-anchor" /

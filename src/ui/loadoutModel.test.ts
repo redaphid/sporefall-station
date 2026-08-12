@@ -53,7 +53,8 @@ describe('buildLoadout', () => {
     expect(dmg.changed).toBe(false)
     // Ranged-only rows are present.
     expect(m.stats.map((s) => s.key)).toContain('speed')
-    expect(m.stats.map((s) => s.key)).toContain('mag')
+    // No 'mag' row: guns carry no ammo, so there is no magazine to report.
+    expect(m.stats.map((s) => s.key)).not.toContain('mag')
   })
 
   it('bare fists / unarmed is handled gracefully', () => {

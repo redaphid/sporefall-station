@@ -8,11 +8,11 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Entity } from '../entity'
-import { spawnPlayer, STARTER_AMMO } from '../player'
+import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
-import { combatSystem, INFINITE_AMMO } from './combat'
+import { combatSystem } from './combat'
 import { ROLL_COOLDOWN, ROLL_TICKS } from './roll'
 
 /** A one-slot input map with `attack` (the fire button) pressed. */
@@ -64,7 +64,7 @@ describe('fire button — a usable ACTIVE item is USED, not fired', () => {
 
   it('fire with a throwable active → lobs it (a throwable projectile), no gun bullet', () => {
     // Pistol stays in hand (combat.weapon), molotov is the HELD active item.
-    p.loadout!.inventory = [{ itemId: 'pistol', qty: STARTER_AMMO }, { itemId: 'molotov', qty: 2 }]
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }, { itemId: 'molotov', qty: 2 }]
     p.loadout!.activeSlot = 1
     combatSystem(w, fire())
     const thrown = projectiles(w).filter((e) => e.archetype === 'molotov')
@@ -94,13 +94,12 @@ describe('fire button — a weapon in hand fires as before', () => {
     p = player(w)
   })
 
-  it('active gun with ammo → a bullet spawns and one round is spent, no roll', () => {
-    // Default loadout: pistol at slot 0 with STARTER_AMMO.
+  it('active gun → a bullet spawns, nothing is spent, no roll', () => {
     combatSystem(w, fire())
     expect(bullets(w)).toHaveLength(1)
-    // Ammo spend is gated by the INFINITE_AMMO testing toggle: OFF → one round
-    // consumed (normal economy); ON → the mag is untouched (never runs dry).
-    expect(p.loadout!.inventory[0].qty).toBe(INFINITE_AMMO ? STARTER_AMMO : STARTER_AMMO - 1)
+    // There is no ammo: firing costs nothing, so the slot count never moves. The
+    // stack exists to give weapon-mods a home, not to count rounds.
+    expect(p.loadout!.inventory[0].qty).toBe(1)
     expect(p.playerCtl!.roll).toBeUndefined()
   })
 
@@ -135,17 +134,16 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
   })
 
   it('an out-of-ammo gun → fire clicks: no roll (the fallback is not on FIRE)', () => {
-    p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }] // empty mag
+    p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }] // a zero count is meaningless now
     p.loadout!.activeSlot = 0
     combatSystem(w, fire({ moveX: 1 }))
-    // The load-bearing guarantee holds in BOTH toggle states: FIRE never backflips.
+    // The load-bearing guarantee: FIRE never backflips.
     expect(p.playerCtl!.roll).toBeUndefined()
-    // With INFINITE_AMMO OFF the empty mag is a dry no-op (no bullet); ON, the mag
-    // never reads as empty so it fires anyway — either way, no roll.
-    expect(projectiles(w)).toHaveLength(INFINITE_AMMO ? 1 : 0)
+    // A gun can never read as empty — qty is not ammo — so it fires regardless.
+    expect(projectiles(w)).toHaveLength(1)
   })
 
-  it('holding fire on an empty gun NEVER rolls across a full roll cycle', () => {
+  it('holding fire NEVER rolls across a full roll cycle', () => {
     p.loadout!.inventory = [{ itemId: 'pistol', qty: 0 }]
     p.loadout!.activeSlot = 0
     let rollStarts = 0
@@ -155,10 +153,9 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
       tickWorld(w, fire({ moveX: 1 }))
       rollStarts += w.events.slice(before).filter((ev) => ev.type === 'roll').length
     }
-    expect(rollStarts).toBe(0) // FIRE never rolls, empty gun or not
-    // OFF: an empty gun never fires. ON: depletion is skipped so it keeps firing.
-    if (INFINITE_AMMO) expect(bullets(w).length).toBeGreaterThan(0)
-    else expect(bullets(w)).toHaveLength(0)
+    expect(rollStarts).toBe(0) // FIRE never rolls
+    // And it keeps firing: a zero slot count is not an empty magazine.
+    expect(bullets(w).length).toBeGreaterThan(0)
   })
 })
 

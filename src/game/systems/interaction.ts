@@ -327,12 +327,12 @@ export const nearestInteractable = (entities: readonly Entity[], p: Entity): Ent
   return best
 }
 
-/** A picked-up weapon arrives loaded: its slot count starts at a full magazine
- * (ranged) or full durability (melee); anything else keeps its pickup qty. */
+/** A picked-up weapon arrives whole: full durability for melee, and a flat 1 for
+ * a gun, which carries no ammo. Anything else keeps its pickup qty. */
 const startingCount = (itemId: string, qty: number): number => {
   const def = WEAPONS[itemId]
-  if (def?.magSize) return def.magSize
   if (def?.durability) return def.durability
+  if (def?.kind === 'ranged') return 1
   return qty
 }
 
@@ -354,15 +354,6 @@ const collect = (player: Entity, item: Entity): boolean => {
     const heal = CONSUMABLES[itemId].heal ?? 0
     if (player.health && player.health.hp < player.health.max) {
       player.health.hp = Math.min(player.health.max, player.health.hp + heal)
-      return true
-    }
-    return addItem(ld.inventory, itemId, qty)
-  }
-  if (c === 'ammo') {
-    // Rounds top up an existing gun; otherwise stash for the gun you'll find.
-    const gun = ld.inventory.find((s) => itemClass(s.itemId) === 'ranged')
-    if (gun) {
-      gun.qty += qty
       return true
     }
     return addItem(ld.inventory, itemId, qty)

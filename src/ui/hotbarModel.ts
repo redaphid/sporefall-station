@@ -4,7 +4,7 @@ import type { ItemStack } from '../game/entity'
 
 /** Human-readable name for any carried item id. */
 export const itemLabel = (itemId: string): string =>
-  WEAPONS[itemId]?.name ?? THROWABLES[itemId]?.name ?? CONSUMABLES[itemId]?.name ?? (itemId === 'ammo' ? 'Ammo' : itemId)
+  WEAPONS[itemId]?.name ?? THROWABLES[itemId]?.name ?? CONSUMABLES[itemId]?.name ?? itemId
 
 /** The mod-badge string for a slot: each mod's icon, repeated is shown as
  * `icon×N` for a stack. Empty when the slot carries no mods, so a vanilla gun

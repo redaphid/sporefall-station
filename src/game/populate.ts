@@ -695,8 +695,8 @@ const randomFloorInRoom = (
 
 /** Build an NPC's slotted loadout so its carried weapon is modelled EXACTLY like
  * a player's — a real `ItemStack` in a real slot, able to hold weapon-mods whose
- * effects fold into its shots at the shared fire site. A ranged weapon slots with
- * a full magazine, a melee weapon with its durability; innate fists (no magSize /
+ * effects fold into its shots at the shared fire site. A ranged weapon carries no
+ * ammo so it slots at a flat 1, a melee weapon at its durability; innate fists (no
  * durability) get NO loadout — undefined, resolving vanilla exactly as a
  * weaponless NPC did before this component existed, so DEFAULT behavior is
  * unchanged. `mods` (optional) seeds a MODDED enemy — a pierce/explosive/frost gun
@@ -704,7 +704,7 @@ const randomFloorInRoom = (
 export const npcLoadout = (weaponId: string, mods?: readonly WeaponMod[]): Loadout | undefined => {
   const def = WEAPONS[weaponId]
   if (!def) return undefined
-  const qty = def.kind === 'ranged' ? (def.magSize ?? 1) : def.durability
+  const qty = def.kind === 'ranged' ? 1 : def.durability
   if (qty === undefined) return undefined // fists / no-durability melee: innate, unslotted
   const stack: ItemStack = { itemId: weaponId, qty }
   if (mods && mods.length) stack.mods = mods.map((m) => ({ id: m.id, stacks: m.stacks }))

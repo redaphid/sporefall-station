@@ -34,20 +34,16 @@ export const throwGrenade = (w: World, self: Entity): boolean => {
   return true
 }
 
-/** Rounds the starter pistol/gun spawns loaded with — generous so the
- * early game isn't ammo-starved, but FINITE so ammo pickups still matter. */
-export const STARTER_AMMO = 200
-
 /** Build the starter weapon as a real slotted ItemStack so it behaves like any
- * picked-up weapon: it carries ammo/durability in `qty` and can hold weapon-mods
- * on its `mods` list (the fire site + mod pickups read it via `weaponStack`).
- * A ranged starter loads with STARTER_AMMO rounds, a melee starter with its
- * durability. Innate fists (no magSize/durability) stay UNSLOTTED — bare hands
- * with no mod list, resolving vanilla — so the inventory is empty and
- * activeSlot -1, exactly as before. */
+ * picked-up weapon: it carries durability in `qty` and can hold weapon-mods on
+ * its `mods` list (the fire site + mod pickups read it via `weaponStack`).
+ * There is no ammo, so a ranged starter slots at a flat 1 — the stack exists to
+ * give mods a home, not to count rounds. A melee starter slots at its
+ * durability. Innate fists (no durability) stay UNSLOTTED — bare hands with no
+ * mod list, resolving vanilla — so the inventory is empty and activeSlot -1. */
 export const starterLoadout = (startWeapon: string): Loadout => {
   const def = WEAPONS[startWeapon]
-  if (def?.kind === 'ranged') return { inventory: [{ itemId: startWeapon, qty: STARTER_AMMO }], activeSlot: 0 }
+  if (def?.kind === 'ranged') return { inventory: [{ itemId: startWeapon, qty: 1 }], activeSlot: 0 }
   if (def?.durability !== undefined) return { inventory: [{ itemId: startWeapon, qty: def.durability }], activeSlot: 0 }
   return { inventory: [], activeSlot: -1 }
 }

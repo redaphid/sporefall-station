@@ -123,7 +123,26 @@ NEG_FIGURE = ("person, humanoid, figure, character, creature, monster, face, hea
 # it into the alpha as a grey SLAB under the sprite — invisible at 1024px, but at
 # 48px it is a third of the sprite's height. Negatived on every ground creature.
 NEG_GROUND = ("ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
-              "cast shadow on the ground, diorama")
+              "plinth, cast shadow on the ground, diorama, puddle, sand, gravel")
+
+# The WRONG READING, named. Describing a locker is not enough — you must forbid
+# the tombstone, or the model splits the difference and gives you a locker-ish
+# headstone. Every shipped prop before this constant existed came out as a mossy
+# boulder or a grave marker; see _mycel-results/sprite-inventory.md for the
+# contact sheet that made it undeniable.
+#
+# `tree`/`planter` are in this list because of a measured failure, not a hunch:
+# in the g2 sweep two of three spore-barrel seeds grew a TREE out of the barrel
+# (one on stilts in a puddle, one a planter tub). The old list named moss, shrub,
+# bush and foliage — but never `tree`, so the model had an unblocked route to the
+# same silhouette. That single omission is most of the difference between the
+# ~1-in-3 hit rate observed and the 4-in-5 that was reported.
+NEG_WRONG_READ = ("gravestone, tombstone, headstone, grave marker, monolith, standing stone, "
+                  "menhir, cairn, boulder, rock, stone, mossy rock, moss ball, mound of moss, "
+                  "shrub, bush, mushroom, organic blob, lump, weathered stone, "
+                  "moss cap, overgrown, covered in moss, vines, foliage on top, cemetery, "
+                  "tree, potted plant, planter, plant pot, flower pot, tub, trunk, branches, "
+                  "leaves, canopy, topiary, bonsai, terrarium, on stilts, on legs")
 BG_OBJ = "single isolated game object centered on plain flat white background"
 BG_CHAR = "single character centered on plain flat white background, full body, feet on the ground"
 BG_TILE = ("flat texture swatch filling the whole frame edge to edge, no horizon, no sky, "
@@ -325,26 +344,116 @@ TILES = {
                       "olive moss over teal-gray riveted metal panels, every part of the frame "
                       "covered in roots and metal, faint green glow deep between the roots"),
 }
+# name -> (manifest path, EXPLICIT GEOMETRY, extra negatives)
+#
+# Three rules, each earned by a failure:
+#
+# 1. State the SILHOUETTE as geometry, not as a noun. "a barrel" produced a mossy
+#    boulder for the entire life of this pack. "a SQUAT CYLINDER standing on its
+#    flat circular end with a visible elliptical rim" produced a barrel.
+# 2. State PROPORTION as a ratio AND negative the opposite. The first corrected
+#    barrel came out a 1:3 canister — right geometry, wrong object, and a 10px
+#    sliver once posted to the 32px prop footprint.
+# 3. NEVER ASK FOR MOSS. Every prompt here used to request it ("moss on the top
+#    edges", "overgrown with green moss", "moss growing from the dispensing
+#    slot", "small plants sprouting from it"). Combined with the env anchor and
+#    the missing NEG_GROUND, that is the whole recipe for a mossy grave marker.
+#
+# And do not ask for COLOUR. Generation supplies shape; `ramp_grade` keeps only
+# VALUE and discards hue by construction, so a near-white render with clean value
+# structure is the correct input, not a defect.
+#
+# SEED BUDGET: 8-12 per subject, not 3. The g2 sweep ran 3 and hit roughly 1 in 3
+# usable; reporting it as "worked first time" was reading the curated seed as if
+# it were the sweep. Expect to curate, and expect to reject.
+#
+# Ranked by measured encounter rate (200 seeds x floors 1-5, 120,736 objects —
+# see _mycel-results/sprite-inventory.md): crate 23.0/floor, desk 13.3,
+# cabinet 11.7, barrel 8.2, vending 5.0, tv 4.4, locker 3.3, toilet 3.1, atm 2.4.
 PROPS = {
-    "cargo-pod": ("props/cargo-pod.png",
-                  "a battered sci-fi cargo crate pod, tan metal with teal panel accents, moss on "
-                  "the top edges, glowing green status light"),
+    # #1 object in the game. Nothing has ever been generated for it: it was
+    # recorded as an unreachable orphan, so it was never on any queue.
+    "cargo-crate": ("props/cargo-crate.png",
+                    "a sturdy rectangular sci-fi supply crate, a CLOSED BOX with six flat faces "
+                    "and hard square corners, four vertical corner posts and horizontal "
+                    "reinforcing bands strapping the sides, recessed latch clamps on the front "
+                    "face, a stencilled cargo number and a small green status light, tan metal "
+                    "with teal panel accents, a flat square lid, sitting squarely flat on the "
+                    "floor, chunky and boxy, slightly wider than it is tall, roughly 6 wide by "
+                    "5 tall",
+                    "dome, domed top, rounded top, curved, sphere, hemisphere, mound, hill, "
+                    "barrel, cylinder, drum, pod, egg, sack, bag, tarpaulin, cloth, open lid, "
+                    "spilling contents, tall, narrow, pillar, column"),
+    "work-desk": ("props/work-desk.png",
+                  # NOTHING ON TOP is load-bearing twice over: the old prompt asked for a
+                  # monitor on the desktop, so no reseed could ever fix the monitor tower —
+                  # and a desk wearing a monitor is the same object as wall-screen, which
+                  # defeats the split that justifies generating both.
+                  "a low wide sci-fi office work desk, a bare empty flat rectangular horizontal "
+                  "desktop surface with NOTHING ON TOP of it, supported on two solid side "
+                  "panels, a drawer unit under one end, WIDE horizontal silhouette, the desktop "
+                  "is a wide flat plank twice as wide as the whole object is tall, low to the "
+                  "floor, roughly 8 wide by 4 tall",
+                  "monitor, screen, computer, keyboard, tower, clutter, objects on the desk, "
+                  "tall, upright slab, vertical, narrow, cabinet, obelisk, pillar, column"),
+    "supply-cabinet": ("props/supply-cabinet.png",
+                       "a tall narrow sci-fi supply cabinet, a rectangular metal cupboard with "
+                       "TWO hinged doors meeting at a vertical seam down the middle, a "
+                       "horizontal handle bar on each door, louvred vent slots near the top, "
+                       "four short feet lifting it off the floor, flat square top, sharp square "
+                       "corners, roughly 4 wide by 6 tall",
+                       "rounded top, dome, arch, curved top, screen, window, glass front, "
+                       "extremely tall, thin, sliver, pole"),
     "spore-barrel": ("props/spore-barrel.png",
-                     "a sealed biotech barrel pod overgrown with green moss, glowing green spore "
-                     "sacs clustered on its side, tan metal with warning stripes"),
-    "cryo-terminal": ("props/cryo-terminal.png",
-                      "an upright cryo-credit terminal kiosk, gray-teal metal cabinet with a "
-                      "small glowing amber screen, frost at the base, thin vines climbing one side"),
+                     "a SQUAT cylindrical oil drum barrel standing upright on its flat circular "
+                     "end, clearly a CYLINDER with a visible round elliptical rim at the top, "
+                     "two raised horizontal ribs banding around the middle, a single yellow "
+                     "hazard warning stripe, tan and teal metal, flat circular lid with a bung "
+                     "cap, chunky and stout, only slightly taller than it is wide, roughly 4 "
+                     "wide by 5 tall",
+                     "dome, hemisphere, egg, sphere, round top, tapered, cone, sack, pot, vase, "
+                     "tall, narrow, thin, slender, pillar, column, canister, tube, rocket, pipe"),
     "nutrient-dispenser": ("props/nutrient-dispenser.png",
-                           "an upright vending machine nutrient dispenser, teal metal cabinet "
-                           "with glowing green canisters visible behind a cracked window, moss "
-                           "growing from the dispensing slot"),
-    "console-monitor": ("props/console-monitor.png",
-                        "a derelict computer console monitor on a stubby stand, dark screen with "
-                        "flickering green static glyphs, tan-gray casing, moss on top"),
+                           # The ONE prop whose silhouette was already right. Regenerate only if
+                           # the ramp cannot carry it — shape here is not the problem.
+                           "an upright vending machine nutrient dispenser, a tall rectangular "
+                           "metal cabinet with a large glass window front, three horizontal "
+                           "shelves of canisters visible behind the glass, a dispensing slot at "
+                           "the bottom, a keypad beside the window, flat square top, roughly 4 "
+                           "wide by 7 tall",
+                           "rounded top, dome, arch, solid front, no window, doors, "
+                           "sliver, pole, obelisk"),
+    "wall-screen": ("props/wall-screen.png",
+                    "a wall-mounted sci-fi flat panel display screen, a thin rectangular monitor "
+                    "in a slim bezel showing glowing green readout glyphs, mounted flush against "
+                    "a vertical wall on a bracket, a bundle of cables trailing from one bottom "
+                    "corner, flat and thin, wider than it is tall, no floor contact and nothing "
+                    "beneath it, roughly 7 wide by 5 tall",
+                    "stand, post, pole, tripod, base plate, pedestal, feet, stubby stand, "
+                    "desk monitor, on a table, thick body, box, crt, deep cabinet, tall, "
+                    "narrow, tower"),
+    "weapons-locker": ("props/weapons-locker.png",
+                       "a tall rectangular steel weapons locker, one full-height vertical door "
+                       "with a recessed handle and a small keypad panel, three horizontal "
+                       "louvred vent slits at eye height, a stencilled yellow number on the "
+                       "door, riveted edges, flat square top, hard square corners, like a school "
+                       "locker, roughly 4 wide by 7 tall",
+                       "rounded top, arch, dome, screen, glass, vending machine, shelves, "
+                       "window, sliver, pole, obelisk"),
+    "cryo-terminal": ("props/cryo-terminal.png",
+                      "an upright cryo-credit terminal kiosk, a narrow rectangular metal cabinet "
+                      "with a small glowing screen set into an angled head at the top, a card "
+                      "slot and a keypad below it, a flat square top, straight vertical sides, "
+                      "standing flat on the floor, roughly 3 wide by 6 tall",
+                      "rounded top, dome, arch, tapered, obelisk, pillar, headstone, "
+                      "extremely tall, sliver"),
     "hydro-recycler": ("props/hydro-recycler.png",
-                       "a squat hydroponic water recycler unit, a bowl-shaped basin of glowing "
-                       "teal water on a metal base with pipes, small plants sprouting from it"),
+                       "a squat hydroponic water recycler unit, a wide open circular BASIN with "
+                       "a clearly visible elliptical rim holding glowing teal water, sitting on "
+                       "a short cylindrical metal pedestal with two pipes running up one side, "
+                       "wider than it is tall, roughly 6 wide by 4 tall",
+                       "closed top, solid lump, dome, sphere, tall, narrow, pillar, "
+                       "plants, sprouts, foliage"),
 }
 ITEMS = {
     "spore-pistol": ("items/spore-pistol.png",
@@ -392,11 +501,23 @@ def jobs():
                                    pos=f"{TRIGGER}, {subj}, {BG_TILE}, {LOOK}",
                                    neg=f"{NEG_FIGURE}, horizon, sky, depth, isometric, {NEG_BASE}",
                                    seamless=True, alpha=False)
-    for name, (path, subj) in PROPS.items():
+    # Props take NO IPAdapter refs, for the same reason items don't (see the
+    # comment below): `anchors/env-a.png` IS a mossy barrel sitting in a puddle
+    # of grass, and IPAdapter stamped that silhouette onto every prop in the
+    # pack. The items were rescued from this anchor years ago; the props never
+    # were, and every shipped prop is wearing the anchor's shape.
+    #
+    # They also get NEG_GROUND, which every ground CREATURE already got and no
+    # prop ever did. That omission is why each prop has a painted mound welded
+    # into its ALPHA — and because it is in the alpha, no colour pass can reach
+    # it. That mound is the tombstone plinth.
+    for name, (path, subj, extra) in PROPS.items():
         out[f"prop.{name}"] = dict(cat="prop", path=path, px=PROP_PX,
-                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, upright, slight high "
-                                       f"three-quarter game angle, {LOOK}",
-                                   neg=f"{NEG_FIGURE}, {NEG_BASE}", refs="env")
+                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, object fills at least 80% "
+                                       f"of the frame height, tightly cropped, centered, upright, "
+                                       f"slight high three-quarter game angle, {LOOK}",
+                                   neg=f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, "
+                                       f"{NEG_WRONG_READ}, {extra}")
     # Items get NO IPAdapter refs: the environment anchors (mossy barrel + deck
     # tile) turned every weapon into a mushroom. Inventory-icon wording instead;
     # palette lock keeps them cohesive with the pack.

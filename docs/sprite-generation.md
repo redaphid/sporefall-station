@@ -236,6 +236,12 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
 10. **Seed sweeps + human curation.** 4–8 seeds per asset, contact-sheet at
     FINAL sprite size (judging at 512 px lies), pick, record lineage in
     `curation.json`, regenerate any time with `generate.py final`.
+    **Props: budget 8–12, not 3.** A 5-subject × 3-seed prop sweep landed roughly
+    1 usable seed in 3 — two of three `spore-barrel` seeds grew a tree out of the
+    barrel, and `wall-screen` produced the exact reading its negatives forbade.
+    Judging that sweep by its best seed made it look like a 4-in-5 recipe and set
+    the seed budget far too low. **Rate the SWEEP, not the pick** — the pick is
+    curated by definition, so quoting it back as the hit rate is circular.
 11. **Cross-direction anchoring: derive, don't re-imagine.** txt2img per
     direction drifts identity — the first vine-ranger set shipped an `e` with
     a different cap, a bulky grey `ne` and slim `n` frames (width 21→31 px,
@@ -258,6 +264,11 @@ Ollama `qwen3-vl:8b`, majority vote (3 reads, `VOTES=` to change), temp 0.
 Checks per category:
 
 - props/items/tiles/fx: must NOT read as a person/creature (anthropomorphism);
+- props additionally: must NOT read as a **grave marker, boulder or planter**.
+  Anthropomorphism was the only wrong-reading anyone gated for, so the entire
+  prop set shipped as mossy headstones and passed every check we had. Note the
+  VLM gate **times out** and has never actually run — do not record it as passed;
+  read the contact sheet at game size instead;
 - floor tiles: camera must read top-down;
 - characters: `n`/`ne` poses must not show a face, `s` must not face away,
   `e` must read as a profile;

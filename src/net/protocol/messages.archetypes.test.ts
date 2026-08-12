@@ -3,6 +3,7 @@ import { CONSUMABLES, THROWABLES, WEAPONS } from '../../game/data/items'
 import { MODS } from '../../game/data/mods'
 import { NPCS } from '../../game/data/npcs'
 import { OBJECTS } from '../../game/data/objects'
+import { PROTOCOL_VERSION } from '../types'
 import { ARCHETYPES, kindOf, KEYCARD_ARCHETYPE, normalizeArchetype } from './messages'
 
 /**
@@ -72,6 +73,31 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
   it('has no duplicates and fits the u8 index space', () => {
     expect(new Set(ARCHETYPES).size).toBe(ARCHETYPES.length)
     expect(ARCHETYPES.length).toBeLessThanOrEqual(256)
+  })
+
+  /**
+   * THIS TEST IS SUPPOSED TO FAIL WHEN YOU APPEND AN ARCHETYPE. That is its job.
+   *
+   * Appending changes the wire contract: `decodeSnapshot` reads
+   * `ARCHETYPES[r.u8()] ?? 'player'`, so a peer on an older build maps every new
+   * index onto the player and draws each new object as another Ranger. Both
+   * peers still report the same PROTOCOL_VERSION, so the handshake gate waves
+   * them through and nothing, anywhere, errors.
+   *
+   * That already happened: 59 archetypes were appended while the version stayed
+   * at 1, and the only thing between a player and a screen full of phantom
+   * Rangers was remembering to reinstall on both phones.
+   *
+   * When this fails: bump PROTOCOL_VERSION in net/types.ts, add a line to its
+   * changelog, then update the number here — in that order. Do NOT simply edit
+   * the number to make it green; that reinstates the silent mismatch this
+   * exists to prevent.
+   */
+  it('pins the archetype count to PROTOCOL_VERSION, so an append cannot ship silently', () => {
+    expect({ version: PROTOCOL_VERSION, archetypes: ARCHETYPES.length }).toEqual({
+      version: 2,
+      archetypes: 87,
+    })
   })
 })
 

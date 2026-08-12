@@ -104,6 +104,15 @@ describe('furnish interiors — rooms are no longer empty boxes', () => {
         for (let bi = 0; bi < w.level.buildings.length; bi++) {
           const rooms = w.level.buildings[bi].rooms
           for (let ri = 0; ri < rooms.length; ri++) {
+            // A room only ONE tile wide is a corridor, not a room — the office
+            // "lobby" on seed 22 floor 3 is a 1×15 hallway spine. Every tile in
+            // it is the only way past itself, so ANY furnishing plugs the
+            // passage, and the circulation guard (populate.commitFurniture)
+            // rightly refuses all of them. Furnishing those was a bug this test
+            // used to require: see populate.reachability.test.ts, which fails on
+            // main precisely because hallways got props dropped in them.
+            const room = rooms[ri]
+            if (Math.min(room.w, room.h) < 2) continue
             if (freeTiles(w, bi, ri).length < 2) continue
             const inRoom = propsInRoom(w, bi, ri, props)
             expect(inRoom.length, `seed ${s} floor ${f} building ${bi} room ${ri}`).toBeGreaterThanOrEqual(1)

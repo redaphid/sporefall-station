@@ -243,24 +243,43 @@ const setupShowcase = (w: World): void => {
 
 const LANE_Y = 11 // open plaza lane below spawn — the camera frames it without clamping
 
+/**
+ * The id a wiped scripted stage renumbers its players from.
+ *
+ * This is CHOREOGRAPHY, not an arbitrary starting number. Several AI rhythms are
+ * phased by entity id — the think stagger is `id % 5` (systems/ai.ts:107),
+ * repaths are `id % REPATH_STAGGER`, strafe direction is `id % 2` — so the tick
+ * on which each staged thug thinks, routes and sidesteps is a function of the
+ * ids the stage hands out. The scripted demos were tuned with the player landing
+ * on an id ≡ 2 (mod 5), so the stage starts there and every beat keeps the
+ * timing it was recorded at. Change this and the demos re-phase:
+ * src/input/scripted.test.ts is the guard that says so.
+ */
+const STAGE_ID_BASE = 2
+
 const clearStage = (w: World): void => {
   // Scripted stages are hand-choreographed around faction stances (ambient
   // civilians amble, only the gang thugs charge), so opt out of the global
   // "everyone's an enemy" default — hostility here comes from disposition alone.
   w.hostile = false
-  // Mod-pickups (populate.ts) are the LAST entities stocked before the player is
-  // spawned, so they shift the player id + `nextId` up by their count. A scripted
-  // plaza wipes all populate entities anyway, but the AI think-stagger keys off
-  // `id % 5`, so that leftover shift would desync the tuned demo choreography.
-  // Roll the id space back by the mod-pickups we're removing → the scenario's ids
-  // are exactly what they'd be without the feature (a no-op when none spawned).
-  const modShift = w.entities.filter((e) => e.archetype.startsWith('mod.')).length
+  // The player is spawned AFTER populateWorld, so its id — and every stage id
+  // after it — is offset by however many entities populate happened to make.
+  // That matters because the AI think-stagger keys off `id % 5`, so a change in
+  // the population (a new mod-pickup feature, a different furniture count) would
+  // silently re-phase a hand-tuned demo's choreography.
+  //
+  // This used to be patched one feature at a time, by subtracting exactly the
+  // mod-pickups. Renumbering the survivors from the bottom of the id space
+  // instead makes a scripted stage INDEPENDENT of populate altogether: the
+  // plaza is wiped to the players anyway, so they may as well be entity 1..n,
+  // and every stage entity placed after them gets the same id on every run
+  // regardless of what levelgen and populate did upstream.
   const players = w.entities.filter((e) => !!e.playerCtl)
   w.entities = players
   w.byId.clear()
-  w.nextId -= modShift
+  w.nextId = STAGE_ID_BASE
   for (const e of players) {
-    e.id -= modShift
+    e.id = w.nextId++
     w.byId.set(e.id, e)
   }
 }

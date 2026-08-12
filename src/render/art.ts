@@ -362,7 +362,7 @@ const ENTITY_COLORS: Record<string, number> = {
 // drawn as a DISTINCT procedural silhouette (bed, table, shelf, planter, egg
 // pod, slatted crate) — never a generic box and never the character eyeball.
 // A 'box' shape is the last-resort tinted footprint for anything unmapped.
-export type FurnitureShape = 'bunk' | 'table' | 'bench' | 'shelf' | 'plant' | 'crate' | 'pod' | 'box'
+export type FurnitureShape = 'bunk' | 'table' | 'bench' | 'shelf' | 'chair' | 'plant' | 'crate' | 'pod' | 'box'
 
 /** Object archetypes that draw as a bespoke procedural furniture silhouette
  * (rather than a themed prop texture). Exported so art-resolution tests can
@@ -372,6 +372,7 @@ export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
   table: 'table',
   bench: 'bench',
   shelf: 'shelf',
+  chair: 'chair',
   plant: 'plant',
   crate: 'crate',
   pod: 'pod',
@@ -390,6 +391,26 @@ export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
   generator: 'box',
 }
 
+/**
+ * Furnishings whose sprite is ELONGATED and top-down, so turning it to match the
+ * layout planner's `facing` reads correctly: a bunk against a side wall lies
+ * along that wall, a chair looks at the desk it was pulled up to.
+ *
+ * Deliberately an ALLOWLIST, not a blocklist. Most prop art (the vending
+ * machine, the ATM, the TV, the toilet) is drawn as a standing object seen from
+ * above-and-in-front; rotating one of those 180° would stand it on its head. Any
+ * archetype not named here keeps rotation 0 — exactly what shipped before
+ * furniture carried a facing at all — so new prop art can never be silently
+ * rotated into nonsense by a layout change. Add to this set only after LOOKING
+ * at the sprite turned.
+ */
+export const ROTATES_WITH_FACING: ReadonlySet<string> = new Set(['bunk', 'table', 'bench', 'desk', 'chair'])
+
+/** How far into its wall a `mount: 'wall'` prop is drawn, in tiles. Enough that
+ * a rank of shelving visibly touches the wall instead of floating a half-tile
+ * off it; small enough that the prop still clearly occupies its own tile. */
+export const WALL_MOUNT_NUDGE = 0.22
+
 /** Base tint per furniture archetype (theme palette entities can override). */
 const FURNITURE_COLORS: Record<string, number> = {
   bunk: 0x6b7a8f,
@@ -399,6 +420,11 @@ const FURNITURE_COLORS: Record<string, number> = {
   bench: 0xa9b4bb,
   locker: 0x59616b,
   table: 0x9c6b3f,
+  // Moulded slate, NOT wood: a chair sits next to wooden tables, desks and
+  // crates all over this station, and a brown chair beside a brown table just
+  // reads as one lumpy brown mass. The cool tone separates the seating from the
+  // thing it is pulled up to at a glance.
+  chair: 0x8f9aa3,
   plant: 0x2e7d46,
   crate: 0x6b4d26,
   barricade: 0x5a5248, // scrap-grey junk pile, distinct from the loot crate
@@ -758,6 +784,26 @@ export const createArt = (
             g.rect(pad, y - 1, s, 2).fill(dk)
             g.rect(pad, y - 1, s, 1).fill({ color: lt, alpha: colorOverride ? 1 : 0.5 })
           }
+          break
+        }
+        case 'chair': {
+          // Seat pad with a proud BACKREST on the -x side, so the chair "looks"
+          // toward +x — the same convention the character sprites use, which
+          // means the planner's `facing` rotation points it at whatever it was
+          // pulled up to (a desk, a table, a screen). The gap between back and
+          // seat is what makes it read as a chair rather than a small crate at
+          // 32px, and it stays clearly SMALLER than the table it belongs to so a
+          // set reads as one big thing with little ones drawn up to it.
+          const seatW = T * 0.4
+          const seatH = T * 0.44
+          const sx = T * 0.38
+          const sy = (T - seatH) / 2
+          const backW = T * 0.13
+          g.roundRect(sx - backW - T * 0.06, sy - 1, backW, seatH + 2, 2).fill(dk)
+          g.roundRect(sx - backW - T * 0.06, sy - 1, backW, seatH + 2, 2).stroke({ width: 1.5, color: line, alpha: sAlpha })
+          g.roundRect(sx, sy, seatW, seatH, 3).fill(base)
+          g.roundRect(sx, sy, seatW, seatH, 3).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.rect(sx, sy, seatW, 2).fill({ color: lt, alpha: colorOverride ? 1 : 0.7 })
           break
         }
         case 'plant': {

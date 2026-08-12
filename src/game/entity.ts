@@ -193,6 +193,14 @@ export interface Entity {
   radius: number
   facing: number // radians
 
+  /** A furnishing that STANDS AGAINST a wall, facing out of it (so the wall is
+   * at `facing + π`). Purely presentational: the renderer nudges the sprite that
+   * way so a rank of shelving kisses the wall instead of floating a half-tile
+   * off it. The sim treats a mounted prop exactly like any other soft prop —
+   * same tile, same collision, same hp. Absent on everything else, so every
+   * pre-existing snapshot round-trips byte-for-byte. */
+  mount?: 'wall'
+
   health?: {
     hp: number
     max: number

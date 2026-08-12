@@ -53,11 +53,17 @@ CURATED: dict[str, dict] = {
     # Hue is picked for room-legibility against the other five: desk warm tan,
     # cabinet teal, barrel rust, locker olive, screen neutral -- so the crate
     # takes a cooler steel-blue, with the prompt's green status light as accent.
+    # The ramp's top entry is deliberately NOT near-white. At #dce9f2 with
+    # accent_q .985 the crate's lit top face blew out to white speckled with
+    # green and read, at 32px, as SNOW or moss sitting on the lid -- the exact
+    # look the props were being rescued from. Dropping the top two entries and
+    # tightening the accent quantile keeps the green as a status light instead
+    # of scatter. Tested on the same raws, no regeneration needed.
     "cargo-crate": dict(
-        tag="s2", seed=4010, dst="cargo-crate.png",
+        tag="iter/jugg", seed=7006, dst="cargo-crate.png",
         ramp=["#08080c", "#0f1a26", "#16293d", "#1f3c58", "#2b5375",
-              "#3d6f96", "#5b91b5", "#8ab4d0", "#dce9f2"],
-        accent="#46e078", accent_q=0.985,
+              "#3d6f96", "#5b91b5", "#7ea6c2", "#b9d2e2"],
+        accent="#46e078", accent_q=0.995,
     ),
     "work-desk": dict(
         tag="s2", seed=4010, dst="work-desk.png",

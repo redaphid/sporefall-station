@@ -64,6 +64,31 @@ import generate as G  # noqa: E402
 
 OUT = Path(os.environ.get("EXP_OUT", "D:/tmp/props-gen"))
 
+# THE FLOW, and the measurement that set it. Converged one knob at a time on
+# cargo-crate against a FIXED seed set, so each number below is a comparison and
+# not a preference.
+#
+#   THE CHECKPOINT WAS THE WHOLE DEFECT. The pack default is `anything-xl`, an
+#   ANIME model, and anime models compose busy multi-object scenes -- so "a
+#   cargo crate" came back as a warehouse, a stack, or a literal sprite-sheet
+#   GRID of crates in roughly half of all seeds. On a fixed 8-seed set:
+#       anything-xl            1/8 clean single crates
+#       juggernautXL           8/8   <- one change, and 8/8 again on 8 FRESH seeds
+#   Every negative-prompt fix aimed at this (NEG_STACK, an anti-grid trim, the
+#   whole tombstone list) was treating a symptom of the wrong base model. Do not
+#   re-derive them; they cost a night and none of them moved the number.
+#
+#   CFG 3.5 -> 7.0 was worth 1/8 on its own and is still worth the last seed
+#   with juggernaut (8/8 vs 7/8). SIZE 1024 -> 768 does not change the hit rate
+#   but makes the hits chunkier and more readable at the 32px footprint.
+#   LoRA weight 1.0 -> 0.6 was tested and was WORSE (mushy edges); left at 1.0.
+#
+# Scoped to props deliberately: chars/tiles/items were authored against the
+# anime base and would drift if the default moved under them.
+PROP_CKPT = "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
+PROP_CFG = 7.0
+PROP_SIZE = 768
+
 
 
 def spec(name: str) -> dict:
@@ -90,7 +115,8 @@ def generate(names: list[str], tag: str, seeds: int, base_seed: int) -> None:
             seed = base_seed + i
             # refs deliberately omitted -- see module docstring.
             g = comfy.build_graph(pos=s["pos"], neg=s["neg"], seed=seed, batch=1,
-                                  prefix=f"prop-{name}")
+                                  prefix=f"prop-{name}", ckpt=PROP_CKPT,
+                                  cfg=PROP_CFG, size=PROP_SIZE)
             print(f"  {name} seed {seed} ...", flush=True)
             try:
                 got = comfy.run(g, str(dest))

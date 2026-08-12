@@ -53,41 +53,47 @@ CURATED: dict[str, dict] = {
     # Hue is picked for room-legibility against the other five: desk warm tan,
     # cabinet teal, barrel rust, locker olive, screen neutral -- so the crate
     # takes a cooler steel-blue, with the prompt's green status light as accent.
+    # The ramp's top entry is deliberately NOT near-white. At #dce9f2 with
+    # accent_q .985 the crate's lit top face blew out to white speckled with
+    # green and read, at 32px, as SNOW or moss sitting on the lid -- the exact
+    # look the props were being rescued from. Dropping the top two entries and
+    # tightening the accent quantile keeps the green as a status light instead
+    # of scatter. Tested on the same raws, no regeneration needed.
     "cargo-crate": dict(
-        tag="s2", seed=4010, dst="cargo-crate.png",
+        tag="iter/jugg", seed=7006, dst="cargo-crate.png",
         ramp=["#08080c", "#0f1a26", "#16293d", "#1f3c58", "#2b5375",
-              "#3d6f96", "#5b91b5", "#8ab4d0", "#dce9f2"],
-        accent="#46e078", accent_q=0.985,
+              "#3d6f96", "#5b91b5", "#7ea6c2", "#b9d2e2"],
+        accent="#46e078", accent_q=0.995,
     ),
     "work-desk": dict(
-        tag="s2", seed=4010, dst="work-desk.png",
+        tag="j1", seed=7007, dst="work-desk.png",
         ramp=["#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26",
-              "#8f6c38", "#b08d50", "#cbb277", "#f2f6ea"],
-        accent="#46e078", accent_q=0.985,
+              "#8f6c38", "#b08d50", "#cbb277", "#e0d3ae"],
+        accent="#46e078", accent_q=0.995,
     ),
     "supply-cabinet": dict(
-        tag="s2", seed=4004, dst="supply-cabinet.png",
+        tag="j1", seed=7003, dst="supply-cabinet.png",
         ramp=["#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80",
-              "#5aa4ae", "#7ecbd2", "#a2adb4", "#f2f6ea"],
-        accent="#46e078", accent_q=0.99,
+              "#5aa4ae", "#7ecbd2", "#a2adb4", "#c6d6d4"],
+        accent="#46e078", accent_q=0.995,
     ),
     "spore-barrel": dict(
-        tag="s2", seed=4003, dst="spore-barrel.png",
+        tag="j1", seed=7000, dst="spore-barrel.png",
         ramp=["#08080c", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38",
-              "#b08d50", "#cbb277", "#a8c46a", "#ffd83e"],
-        accent="#ffd83e", accent_q=0.99,
+              "#b08d50", "#cbb277", "#a8c46a", "#e8c95a"],
+        accent="#ffd83e", accent_q=0.995,
     ),
     "weapons-locker": dict(
-        tag="s2", seed=4003, dst="weapons-locker.png",
+        tag="j1", seed=7004, dst="weapons-locker.png",
         ramp=["#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
-              "#67873c", "#86a750", "#a8c46a", "#cbb277"],
-        accent="#ffd83e", accent_q=0.99,
+              "#67873c", "#86a750", "#a8c46a", "#c2b184"],
+        accent="#ffd83e", accent_q=0.995,
     ),
     "wall-screen": dict(
-        tag="s2", seed=4002, dst="wall-screen.png",
+        tag="j1", seed=7009, dst="wall-screen.png",
         ramp=["#08080c", "#141a16", "#23282e", "#3c444d", "#59636d",
-              "#7b8791", "#a2adb4", "#7ecbd2", "#f2f6ea"],
-        accent="#46e078", accent_q=0.96,
+              "#7b8791", "#a2adb4", "#7ecbd2", "#cfe0e2"],
+        accent="#46e078", accent_q=0.995,
     ),
 }
 

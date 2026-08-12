@@ -6,7 +6,7 @@ import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { activeStack, equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
+import { activeStack, equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
@@ -16,19 +16,6 @@ import { spawnSporeBurst } from './spore'
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
-
-/**
- * ⚠️ TEMPORARY / TESTING-ONLY — flip to `false` to restore the normal ammo
- * economy exactly. While ON, ranged weapons never deplete and never read as
- * empty/out-of-ammo, so they always fire (effectively infinite ammo). This gates
- * ONLY the depletion in `fireWeapon`; the whole ammo system (spendAmmo, pickups,
- * qty) is left intact, so flipping this to `false` is a byte-exact revert to the
- * finite economy — no other change needed.
- *
- * Deterministic: it draws no RNG and touches no wall-clock — it just skips the
- * `spendAmmo` decrement, so the sim stays a pure function of seed + inputs.
- */
-export const INFINITE_AMMO: boolean = true
 
 /** Probability a dying NPC drops the weapon it was carrying as a grabbable
  * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
@@ -411,11 +398,9 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     }
     return true
   }
-  // Ammo depletion is gated behind INFINITE_AMMO (testing toggle above). When ON,
-  // `spendAmmo` is skipped entirely, so qty never drops and the gun never reads as
-  // empty — it always fires. When OFF this is the original: an empty gun clicks
-  // (no shot, no cooldown) and the dry-fire path stays reachable.
-  if (stack && !INFINITE_AMMO && !spendAmmo(e)) return false
+  // No ammo: a gun always fires. There is no magazine, no depletion and no
+  // dry-fire click — firing costs nothing, so the only thing gating a shot is
+  // the cooldown the caller already checked.
   e.combat.cooldown = rw.cooldownTicks
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {

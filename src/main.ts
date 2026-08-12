@@ -7,6 +7,7 @@ import { pickNewSeed } from './app/newSeed'
 import { createLoadoutPanel, type WeaponThumb } from './ui/loadoutPanel'
 import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
+import { hostFailureMessage } from './app/hostError'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
@@ -397,7 +398,23 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       dbg.log(`host: lobby now ${players.length} player(s)`)
       lobby.setPlayers(players)
     }
-    await session.start()
+    // Hosting could not report its own failure. createSession is awaited at the
+    // call site WITHOUT a catch (the join path has one, this did not), so a
+    // rejected session.start() became an unhandled rejection and the player was
+    // left staring at "Waiting for players…" while nothing was on the air —
+    // indistinguishable from a healthy host that nobody has joined yet.
+    //
+    // That is the difference between a friend saying "it says Bluetooth
+    // permission denied" and "it just doesn't work", which is the difference
+    // between a fixable evening and a ruined one. Show the plugin's own words.
+    try {
+      await session.start()
+    } catch (err) {
+      console.error('host: start failed', err)
+      dbg.log(`host: START FAILED — ${err instanceof Error ? err.message : String(err)}`)
+      lobby.setStatus(hostFailureMessage(err))
+      return null
+    }
     await lobby.waitForStart()
     session.beginGame()
     lobby.close()

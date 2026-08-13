@@ -13,6 +13,7 @@ import {
   decodeSnapshot,
   encodeInput,
   type EventsMsg,
+  type GameStartMsg,
   type GoMsg,
   type InventoryMsg,
   type LobbyStateMsg,
@@ -180,12 +181,20 @@ export class NetClientSession implements Session {
         this.onLobbyChange?.(decodeJson<LobbyStateMsg>(msg))
         break
       case MsgType.GameStart: {
-        const start = decodeJson<{ seed: number; mode?: 'casual' | 'normal' }>(msg)
+        const start = decodeJson<GameStartMsg>(msg)
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
         if (this.phase === 'reconnecting') break // level already live; snapshots resync the floor
-        this.floor = 1
-        this.level = generateLevel(this.seed, 1)
+        // A lobby start is always floor 1, but a LATE join drops us into a run
+        // already in progress. Build the floor the host is actually on, or we
+        // render floor 1's map — and the walls we collide against — until the
+        // first snapshot happens to arrive and correct us. Absent means an older
+        // host that only ever starts from the lobby: floor 1.
+        this.floor = start.floor ?? 1
+        this.level = generateLevel(this.seed, this.floor)
+        // Keep the HUD's floor number honest from the first frame too; otherwise
+        // it reads "1" over a floor-3 map until the next State message.
+        this.state.floor = this.floor
         // Fresh run (initial start OR a host "play again" after game-over): drop
         // the previous run's entities so nothing stale lingers before snapshots.
         this.entities.clear()

@@ -412,6 +412,12 @@ export interface GameStartMsg {
   /** Difficulty rules the host is running; clients adopt it so co-op agrees.
    * Optional on the wire for back-compat — absent means the default (`normal`). */
   mode?: 'casual' | 'normal'
+  /** The floor the host is on RIGHT NOW. Layout never crosses the wire — the
+   * client regenerates it bit-exact from `seed`+`floor` — so this one number is
+   * the whole map. A lobby start is always floor 1, but a LATE joiner drops into
+   * a run already in progress and must not build floor 1's level for a party
+   * standing on floor 3. Optional for back-compat: absent means 1. */
+  floor?: number
 }
 export interface GoMsg {
   startTick: number

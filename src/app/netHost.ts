@@ -118,6 +118,17 @@ export class NetHostSession implements Session {
     return players
   }
 
+  /**
+   * The one place `GameStart` is built. Three sites send it — the lobby Start,
+   * a ghost rejoin and a fresh late join — and they must agree, because `floor`
+   * is read at SEND time. A late joiner's client builds its level from
+   * `seed`+`floor` alone, so a stale or missing floor here is the joiner staring
+   * at the wrong map.
+   */
+  private gameStartMsg(): GameStartMsg {
+    return { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode, floor: this.world.floor }
+  }
+
   /** Host presses Start: build the world, spawn everyone, tell clients. */
   beginGame(): void {
     if (this.started) return
@@ -131,7 +142,7 @@ export class NetHostSession implements Session {
       p.entityId = e.id
       entityIds[p.slot] = e.id
     }
-    const start: GameStartMsg = { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }
+    const start: GameStartMsg = this.gameStartMsg()
     const go: GoMsg = { startTick: this.world.tick, entityIds }
     this.broadcastJson(MsgType.GameStart, start)
     this.broadcastJson(MsgType.Go, go)
@@ -401,7 +412,7 @@ export class NetHostSession implements Session {
         const avatar = this.world.byId.get(ghost.entityId)
         if (avatar?.status) avatar.status.stun = 0
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
-        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(
           encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: ghost.entityId } }),
         )
@@ -413,7 +424,16 @@ export class NetHostSession implements Session {
       // Fresh late-join: the run is already going but a slot is open. Spawn a
       // brand-new avatar into the live world (not a ghost reclaim) and hand the
       // client Welcome+GameStart+Go so it drops straight into the running floor.
-      if (this.started) {
+      //
+      // `started` alone is the wrong gate: it stays true after the party wipes
+      // (only restart() clears it), so a friend who walks up after a game-over
+      // used to be spawned into a dead world and handed a corpse to pilot. Gate
+      // on the run being LIVE. When it isn't, fall through to the lobby path
+      // below — they get a slot and a Welcome and simply wait, and the host's
+      // "play again" (restart → beginGame) spawns them with everyone else.
+      // A ghost REJOIN is deliberately left alone above: that player's avatar is
+      // already in the finished world and they should see the same ending.
+      if (this.started && !this.world.gameOver) {
         const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot), ...this.ghosts.keys()])
         let slot = 1
         while (used.has(slot)) slot++
@@ -428,20 +448,24 @@ export class NetHostSession implements Session {
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
-        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [slot]: avatar.id } }))
         this.onLobbyChange?.(this.lobbyPlayers())
         this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
         return
       }
 
-      if (this.peers.size > MAX_SLOT) {
+      // Lobby admission — pre-start, and also where a post-game-over joiner waits
+      // for "play again". Ghosts count as taken: after a wipe the world can still
+      // hold dropped players' reserved slots, and handing one out twice would put
+      // two peers on one avatar.
+      const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot), ...this.ghosts.keys()])
+      let slot = 1
+      while (used.has(slot)) slot++
+      if (slot > MAX_SLOT) {
         p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
         return
       }
-      const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot)])
-      let slot = 1
-      while (used.has(slot)) slot++
       p.slot = slot
       p.name = hello.name
       p.token = Math.random().toString(36).slice(2, 12)

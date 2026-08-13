@@ -9,6 +9,7 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Teammates no longer vanish in busy rooms',
   'Always plays in landscape',
   'Rooms are furnished, not littered',
   'Crates look right; no more fake medkits',

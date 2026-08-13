@@ -32,6 +32,14 @@ const RECONNECT_ATTEMPTS = 30
 const RECONNECT_SPACING_MS = 2000
 
 /**
+ * A snapshot tick this far BEHIND the newest one we applied is treated as a new
+ * run (the host rebuilt the world at tick 0) rather than a reordered packet.
+ * 600 ticks = 20s at 30Hz — orders of magnitude beyond any plausible reordering
+ * window on an ordered BLE link, so it can only fire on a genuine reset.
+ */
+const SNAPSHOT_RESET_GAP = 600
+
+/**
  * Client: predicts its own avatar with the shared movement code,
  * smooths everyone else toward snapshot targets, renders host state.
  */
@@ -72,6 +80,15 @@ export class NetClientSession implements Session {
    * so a tap between send-ticks isn't dropped — the host applies it as an edge. */
   private pendingHotbar = -1
   private lastAckedSeq = 0
+  /**
+   * Tick of the newest snapshot we have applied. Snapshots are a LATEST-WINS
+   * lane (SendQueue's capacity-1 slot), so one that turns up behind a newer one
+   * carries nothing but stale truth: applying it drags every remote entity back
+   * to where they used to be, winds `lastAckedSeq` backwards so already-acked
+   * inputs get replayed, and — worst — a stale `floor` re-runs `changeFloor`,
+   * regenerating the previous level and wiping every entity on the live one.
+   */
+  private lastSnapshotTick = -1
   /** Our OWN player's authoritative inventory, streamed by the host on change. */
   private localInv?: InventoryMsg
   private eventsOut: SimEvent[] = []
@@ -199,6 +216,11 @@ export class NetClientSession implements Session {
       case MsgType.Go: {
         const go = decodeJson<GoMsg>(msg)
         this.selfId = go.entityIds[this.slot] ?? -1
+        // A Go means a run just (re)started for us. A host "play again" rebuilds
+        // the world at tick 0, so the newest snapshot tick we remember is now in
+        // the FUTURE — clear the stale-snapshot guard or every snapshot of the
+        // new run would be rejected as out of order.
+        this.lastSnapshotTick = -1
         this.setPhase('playing')
         break
       }
@@ -234,6 +256,13 @@ export class NetClientSession implements Session {
   }
 
   private applySnapshot(snap: WireSnapshot): void {
+    // Drop a snapshot older than one already applied. A BIG regression is not a
+    // reordered packet though — a host "play again" rebuilds the world at tick
+    // 0 — so anything further back than SNAPSHOT_RESET_GAP is adopted as a new
+    // run rather than rejected forever. (GameStart clears the guard too; this
+    // is the belt-and-braces path for a client that missed it.)
+    if (snap.tick <= this.lastSnapshotTick && this.lastSnapshotTick - snap.tick < SNAPSHOT_RESET_GAP) return
+    this.lastSnapshotTick = snap.tick
     if (snap.floor !== this.floor) this.changeFloor(snap.floor)
     this.lastAckedSeq = snap.lastInputSeq
     const seen = new Set<number>()

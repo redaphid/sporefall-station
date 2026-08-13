@@ -127,6 +127,14 @@ export class NetHostSession implements Session {
     this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
     const entityIds: Record<number, number> = { 0: this.self.id }
     for (const p of this.peers.values()) {
+      // A peer whose link is up but whose Hello has not landed yet still carries
+      // slot -1. Spawning it would put a PHANTOM avatar (playerId -1) in the
+      // world: absent from the lobby, driven by nobody, shipped in every
+      // snapshot — and, because nothing can ever down it, it permanently blocks
+      // missionSystem's run-over check, so a co-op wipe never ends the run. It
+      // also strands a zombie body once the real Hello finally arrives and takes
+      // a proper slot. Admitted peers only; the late-join path spawns the rest.
+      if (p.slot < 0) continue
       const e = spawnPlayer(this.world, p.slot, this.world.level.spawn.x + p.slot * 0.6, this.world.level.spawn.y)
       p.entityId = e.id
       entityIds[p.slot] = e.id
@@ -380,10 +388,20 @@ export class NetHostSession implements Session {
         return
       }
 
-      // Duplicate Hello from a peer we've already admitted (not a rejoin): ignore
-      // it. Reprocessing would reassign the slot, leak a stale peersBySlot entry,
-      // and — mid-game — spawn a second avatar for the same connection.
-      if (p.slot >= 0 && !hello.rejoin) return
+      // Duplicate Hello from a peer we've already admitted: ignore it.
+      // Reprocessing would reassign the slot, leak a stale peersBySlot entry, and
+      // — mid-game — spawn a second avatar for the same connection.
+      //
+      // This deliberately covers a Hello that carries a `rejoin` block too. A
+      // GENUINE rejoin always arrives on a NEW link, and a new link means a new
+      // PeerState at slot -1 (onPeerLost deletes the old one), so an admitted
+      // peer asking to rejoin is never the legitimate case. Letting it through —
+      // as `!hello.rejoin` used to — meant any rejoin field walked past this
+      // guard: pre-start it re-slotted a peer and orphaned its old peersBySlot
+      // entry (a seat that can never be issued again), and mid-game a live
+      // player holding a leaked token could seize someone else's ghost, ending
+      // up in two slots at once with its own avatar abandoned in the world.
+      if (p.slot >= 0) return
 
       // Mid-game rejoin: reclaim the ghost slot if the token matches.
       if (this.started && hello.rejoin) {
@@ -392,14 +410,28 @@ export class NetHostSession implements Session {
           p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'rejoin window expired' }))
           return
         }
+        // The parked avatar is STUNNED, not invulnerable, so a patrol can finish
+        // it off while its owner is off the air. Handing the seat back anyway
+        // would reply Go with an entityId that no longer exists: the client
+        // enters `playing`, never sees itself in a snapshot, and sits there
+        // forever with no avatar, no movement and nothing on screen to explain
+        // it. Retire the dead ghost and say so — a plain Hello then late-joins
+        // with a working body, the same deal any other newcomer gets.
+        const parked = this.world.byId.get(ghost.entityId)
+        if (!parked || parked.dead) {
+          this.ghosts.delete(ghost.slot)
+          p.queue.queueReliable(
+            encodeJson(MsgType.Reject, { reason: 'your character did not survive — rejoin for a fresh one' }),
+          )
+          return
+        }
         this.ghosts.delete(ghost.slot)
         p.slot = ghost.slot
         p.name = ghost.name
         p.token = ghost.token
         p.entityId = ghost.entityId
         this.peersBySlot.set(p.slot, p)
-        const avatar = this.world.byId.get(ghost.entityId)
-        if (avatar?.status) avatar.status.stun = 0
+        if (parked.status) parked.status.stun = 0
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
         p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
         p.queue.queueReliable(

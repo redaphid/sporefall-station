@@ -181,9 +181,18 @@ export class NetClientSession implements Session {
         break
       case MsgType.GameStart: {
         const start = decodeJson<{ seed: number; mode?: 'casual' | 'normal' }>(msg)
+        const sameRun = start.seed === this.seed
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
-        if (this.phase === 'reconnecting') break // level already live; snapshots resync the floor
+        // A GameStart while we are reconnecting normally replays the run we were
+        // ALREADY in (the host repeats it after a ghost reclaim), so the level is
+        // already live and snapshots resync the floor. But if the SEED changed,
+        // the host is running a DIFFERENT run — its app restarted, or it
+        // re-seeded while we were off the air. Keeping our old level would leave
+        // us walking a map the host is not simulating: we collide with walls that
+        // are not there and never reach an exit, with no error anywhere to
+        // explain it. Fall through and rebuild from the new seed.
+        if (this.phase === 'reconnecting' && sameRun) break
         this.floor = 1
         this.level = generateLevel(this.seed, 1)
         // Fresh run (initial start OR a host "play again" after game-over): drop

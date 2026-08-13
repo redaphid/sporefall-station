@@ -27,6 +27,26 @@ import type { RenderView, Session } from './session'
 const SMOOTH = 0.45 // remote entities chase their snapshot target per tick
 const SNAP_DIST = 2.5
 
+/**
+ * Is `tick` strictly newer than `prev` on the u32 wire counter?
+ *
+ * BLE packet loss desynchronises the framing layer, which resynchronises IN-BAND
+ * (`StreamReader.onDesync`) — and that is exactly how a client is handed a
+ * DUPLICATED or REORDERED frame. Ordering therefore has to be decided from the
+ * payload, not from arrival order.
+ *
+ * `encodeSnapshot` writes the tick as u32 (`ByteWriter.u32` masks with `>>> 0`),
+ * so the counter wraps at 2^32 — ~4.5 years at 30 Hz, but a plain `tick > prev`
+ * would wedge a client FOREVER on the far side of that wrap. Serial-number
+ * comparison (RFC 1982) instead: newer iff the unsigned forward distance is
+ * non-zero and shorter than half the space. Equal ticks are NOT newer, so a
+ * verbatim duplicate is rejected too.
+ */
+export const isNewerTick = (tick: number, prev: number): boolean => {
+  const forward = (tick - prev) >>> 0
+  return forward !== 0 && forward < 0x8000_0000
+}
+
 export type ClientPhase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'reconnecting' | 'ended' | 'rejected'
 
 const RECONNECT_ATTEMPTS = 30
@@ -66,6 +86,10 @@ export class NetClientSession implements Session {
   /** Diagnostics hook (the on-screen co-op debug log wires this up). */
   onStreamDesync?: (reason: string) => void
   private tickCount = 0
+  /** Wire tick of the newest snapshot APPLIED, or -1 before the first one of a
+   * run. Snapshot ticks are u32 on the wire (`encodeSnapshot`), so they are
+   * compared with serial arithmetic rather than `>` — see `isNewerTick`. */
+  private lastSnapTick = -1
   private inputSeq = 0
   private pendingInputs: { seq: number; cmd: InputCmd }[] = []
   private pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
@@ -201,6 +225,11 @@ export class NetClientSession implements Session {
         this.targets.clear()
         this.self = undefined
         this.localInv = undefined // fresh run: wait for the host's authoritative inventory
+        // "Play again" rebuilds the host's world from scratch (netHost.restart →
+        // createWorld), so its tick counter goes back to 0. Re-baseline, or every
+        // snapshot of the new run would look older than the last one of the old
+        // run and be rejected as a replay — a permanently frozen screen.
+        this.lastSnapTick = -1
         this.onLevelChange?.(this.level)
         this.setPhase('starting')
         break
@@ -208,6 +237,14 @@ export class NetClientSession implements Session {
       case MsgType.Go: {
         const go = decodeJson<GoMsg>(msg)
         this.selfId = go.entityIds[this.slot] ?? -1
+        // Go is the last message of every admission — fresh start, late join AND
+        // ghost rejoin — and each one may hand us a host whose tick counter bears
+        // no relation to the previous one's. Deliberately belt-and-braces with the
+        // GameStart reset above (Go always follows it, so either alone covers
+        // "play again" today): a rejoin takes the `reconnecting` early-break out
+        // of GameStart and never reaches that line, and the failure mode this
+        // averts is a client frozen on a dead screen for the rest of the run.
+        this.lastSnapTick = -1
         this.setPhase('playing')
         break
       }
@@ -220,8 +257,13 @@ export class NetClientSession implements Session {
         break
       }
       case MsgType.State: {
-        this.state = decodeJson<StateMsg>(msg)
-        if (this.state.floor !== this.floor) this.changeFloor(this.state.floor)
+        const next = decodeJson<StateMsg>(msg)
+        this.changeFloor(next.floor) // guarded: only a DEEPER floor rebuilds the level
+        // The HUD floor rides this message, and a replayed State would walk the
+        // number back under a map we are no longer allowed to regenerate — map
+        // says 3, HUD says 2. Never let the displayed floor go backwards; a fresh
+        // run resets it above, in GameStart.
+        this.state = { ...next, floor: Math.max(next.floor, this.state.floor) }
         break
       }
       case MsgType.Inventory: {
@@ -233,7 +275,23 @@ export class NetClientSession implements Session {
     }
   }
 
+  /**
+   * Rebuild the level for a floor the host has moved to. Layout never crosses
+   * the wire, so this one number is the whole map — and rebuilding it wipes the
+   * entity set, because those entities belong to the floor we are leaving.
+   *
+   * Inside a run the floor only ever goes UP (`w.floor++`, systems/missions.ts);
+   * a new run arrives as GameStart, which resets `this.floor` directly. So a
+   * floor that is not strictly deeper than the current one can ONLY be a stale
+   * or duplicate delivery, and acting on it regenerates a floor the host has
+   * already left and vanishes every entity on screen. Ignore it.
+   *
+   * A genuinely deeper floor still applies — including a multi-floor jump for a
+   * client that missed the events entirely, which is how a snapshot self-heals
+   * a client onto the right map.
+   */
   private changeFloor(floor: number): void {
+    if (floor <= this.floor) return
     this.floor = floor
     this.level = generateLevel(this.seed, floor)
     this.entities.clear()
@@ -243,7 +301,14 @@ export class NetClientSession implements Session {
   }
 
   private applySnapshot(snap: WireSnapshot): void {
-    if (snap.floor !== this.floor) this.changeFloor(snap.floor)
+    // A replayed snapshot is a time machine: every entity is restored to where it
+    // stood seconds ago, and `reconcile` hauls the PREDICTED avatar back with them
+    // (measured at 5.56 tiles). `lastInputSeq` is stale too, so it would re-arm
+    // inputs the host has long since consumed. Drop anything not strictly newer —
+    // duplicates included — and let the next real snapshot self-heal as before.
+    if (this.lastSnapTick >= 0 && !isNewerTick(snap.tick, this.lastSnapTick)) return
+    this.lastSnapTick = snap.tick
+    this.changeFloor(snap.floor) // guarded: only a DEEPER floor rebuilds the level
     this.lastAckedSeq = snap.lastInputSeq
     const seen = new Set<number>()
     for (const we of snap.entities) {

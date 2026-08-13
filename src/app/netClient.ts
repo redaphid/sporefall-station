@@ -259,8 +259,8 @@ export class NetClientSession implements Session {
     // Drop a snapshot older than one already applied. A BIG regression is not a
     // reordered packet though — a host "play again" rebuilds the world at tick
     // 0 — so anything further back than SNAPSHOT_RESET_GAP is adopted as a new
-    // run rather than rejected forever. (GameStart clears the guard too; this
-    // is the belt-and-braces path for a client that missed it.)
+    // run rather than rejected forever. (`Go` clears the guard outright; this
+    // is the belt-and-braces path for a client that somehow missed it.)
     if (snap.tick <= this.lastSnapshotTick && this.lastSnapshotTick - snap.tick < SNAPSHOT_RESET_GAP) return
     this.lastSnapshotTick = snap.tick
     if (snap.floor !== this.floor) this.changeFloor(snap.floor)

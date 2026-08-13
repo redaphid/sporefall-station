@@ -85,7 +85,19 @@ export class SendQueue {
     this.inflight = true
     try {
       for (let msg = this.takeNext(); msg !== null; msg = this.takeNext()) {
-        for (const packet of frameMessage(msg, this.transport.maxPacket)) {
+        let packets: Uint8Array[]
+        try {
+          packets = frameMessage(msg, this.transport.maxPacket)
+        } catch {
+          // An unframeable message (oversized past MAX_MESSAGE_BYTES) must cost
+          // only ITSELF. `pump` is started as `void this.pump()`, so a throw
+          // escaping here becomes an unhandled promise rejection AND abandons
+          // every message still queued behind it — the peer goes quiet with the
+          // transport still up, which is the one failure mode this queue exists
+          // to prevent. Drop the bad message and keep serving.
+          continue
+        }
+        for (const packet of packets) {
           if (this.stopped) return
           try {
             await this.transport.sendPacket(this.peer, packet)

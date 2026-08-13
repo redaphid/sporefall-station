@@ -219,6 +219,25 @@ const huddleAt = (host: NetHostSession, x: number, y: number): Entity[] => {
   return ps
 }
 
+/**
+ * Turn the floor genuinely BUSY: hostile station, NPCs dragged onto the party.
+ * The point is to drive the REAL event path rather than hand-injecting reliable
+ * traffic — measured, this produces sim events on ~40% of ticks (~12Hz), each
+ * ~167B, which is ~2KB/s of RELIABLE data per peer before a single snapshot.
+ */
+const makeBusy = (host: NetHostSession): void => {
+  const anchor = playersOf(host)[0]
+  host.world.hostile = true
+  let n = 0
+  for (const e of host.world.entities) {
+    if (e.ai && n < 40) {
+      e.pos.x = anchor.pos.x + (n % 7) - 3
+      e.pos.y = anchor.pos.y + Math.floor(n / 7) - 3
+      n++
+    }
+  }
+}
+
 /** Run `n` host ticks, letting the (unthrottled) loopback settle each time. */
 const tickHost = async (host: NetHostSession, n: number): Promise<void> => {
   for (let i = 0; i < n; i++) {
@@ -528,15 +547,15 @@ describe('backpressure — a link slower than the host produces', () => {
     // The host runs 60 ticks; the radio carries a starvation budget of 8
     // packets per tick across ALL 7 peers (a ~48-entity snapshot alone is 25
     // packets at a 20-byte MTU, so this link is deeply oversubscribed).
-    const sent: Uint8Array[] = []
+    // A tagged reliable message EVERY tick, so the FIFO builds a deep backlog
+    // the slow link cannot keep up with. A shallow backlog would let a queue
+    // that silently sheds or reorders its overflow still look correct.
+    const expected: number[] = []
     for (let t = 0; t < 60; t++) {
       host.tick()
-      // A reliable control message every 10 ticks, tagged so we can check order.
-      if (t % 10 === 0) {
-        const msg = encodeJson(MsgType.LobbyState, { players: host.lobbyPlayers(), marker: t })
-        sent.push(msg)
-        for (const p of host.peersBySlot.values()) p.queue.queueReliable(msg)
-      }
+      const msg = encodeJson(MsgType.LobbyState, { players: host.lobbyPlayers(), marker: t })
+      expected.push(t)
+      for (const p of host.peersBySlot.values()) p.queue.queueReliable(msg)
       await flush()
       await hub.release(8)
     }
@@ -549,8 +568,9 @@ describe('backpressure — a link slower than the host produces', () => {
         .filter((m) => m[0] === MsgType.LobbyState)
         .map((m) => (JSON.parse(new TextDecoder().decode(m.subarray(1))) as { marker?: number }).marker)
         .filter((m): m is number => m !== undefined)
-      // Every reliable marker arrived, exactly once, in the order sent.
-      expect(markers, `peer ${c.peer}`).toEqual([0, 10, 20, 30, 40, 50])
+      // Every reliable marker arrived, exactly once, in the order it was sent —
+      // no drops, no duplicates, no reordering, however deep the backlog got.
+      expect(markers, `peer ${c.peer} lost or reordered reliable messages`).toEqual(expected)
     }
   })
 
@@ -636,6 +656,115 @@ describe('backpressure — a link slower than the host produces', () => {
     }
     hub.throttle = false
     await hub.releaseAll()
+  })
+
+  /**
+   * github#34 — "Host stops sending snapshots once a floor gets busy". Measured
+   * in a built-dist e2e run: on floor 3 the lobby-joined client sat at
+   * `lastAckedSeq` 82 with 0 entities and the late joiner never applied a single
+   * snapshot, while the host reported itself perfectly healthy (input seq 1160,
+   * 0 drops, 0 stream desyncs). No `peerDisconnected` ever fires, so the client
+   * never even tries to reconnect: the game looks connected and is frozen.
+   *
+   * This drives the REAL path — actual sim events broadcast reliably by
+   * `NetHostSession.tick` on a genuinely busy floor — rather than hand-fed
+   * reliable traffic, so it fails for the reported reason and not a rigged one.
+   */
+  it('github#34: keeps serving snapshots on a BUSY floor whose real Events traffic outruns the link', async () => {
+    const hub = new ScaleHub(180)
+    const { host, centrals } = await start8(424242, hub, stubInput({ attack: true, moveX: 0.3 }))
+    makeBusy(host)
+    await hub.releaseAll()
+    clearWire(centrals)
+    hub.throttle = true
+
+    // A link that can carry the reliable lane and little else. Every byte here
+    // comes from the host's own tick(): Events (~12Hz on this floor), StateMsg
+    // (2Hz) and Inventory — no synthetic traffic at all.
+    let eventTicks = 0
+    for (let t = 0; t < 150; t++) {
+      host.tick()
+      if (host.world.events.length > 0) eventTicks++
+      await flush()
+      await hub.release(3)
+    }
+
+    // The floor really is busy — otherwise this test proves nothing.
+    expect(eventTicks, 'floor was not busy enough to reproduce the starvation').toBeGreaterThan(20)
+    for (const c of centrals) {
+      expect(
+        c.snapshots.length,
+        `peer ${c.peer} applied NO snapshot across 150 busy ticks — github#34 freeze`,
+      ).toBeGreaterThan(0)
+    }
+    hub.throttle = false
+    await hub.releaseAll()
+  })
+
+  it('github#34: the starvation is permanent — a starved peer never self-heals while the floor stays busy', async () => {
+    const hub = new ScaleHub(180)
+    const { host, centrals } = await start8(424242, hub, stubInput({ attack: true, moveX: 0.3 }))
+    makeBusy(host)
+    await hub.releaseAll()
+    clearWire(centrals)
+    hub.throttle = true
+
+    // Sample in two halves: if the lane is starved rather than merely slow, the
+    // SECOND half is just as empty as the first, forever.
+    const half = (): number[] => centrals.map((c) => c.snapshots.length)
+    for (let t = 0; t < 90; t++) {
+      host.tick()
+      await flush()
+      await hub.release(3)
+    }
+    const firstHalf = half()
+    for (let t = 0; t < 90; t++) {
+      host.tick()
+      await flush()
+      await hub.release(3)
+    }
+    const secondHalf = half()
+
+    for (let i = 0; i < centrals.length; i++) {
+      expect(
+        secondHalf[i] - firstHalf[i],
+        `peer ${centrals[i].peer} received no NEW snapshot in the second 90 ticks — permanently starved`,
+      ).toBeGreaterThan(0)
+    }
+    hub.throttle = false
+    await hub.releaseAll()
+  })
+
+  it('drops only the oversized message when framing rejects one, and keeps serving the peer', async () => {
+    // sendQueue.pump is started as `void this.pump()`, so anything frameMessage
+    // throws escapes as an unhandled rejection and abandons the whole queue.
+    // (test/net-protocol-fuzz makes frameMessage throw on oversized messages;
+    // this must hold whether or not that change is present.)
+    const hub = new ScaleHub(180)
+    const { host, centrals } = await start8(7, hub)
+    clearWire(centrals)
+    const peer = host.peersBySlot.get(1)!
+    const rejections: unknown[] = []
+    const onRejection = (e: PromiseRejectionEvent | unknown): void => void rejections.push(e)
+    process.on('unhandledRejection', onRejection)
+    try {
+      // Way past MAX_MESSAGE_BYTES (16384).
+      peer.queue.queueReliable(encodeJson(MsgType.LobbyState, { pad: 'x'.repeat(40000) }))
+      await flush()
+      // The peer must still be served afterwards.
+      peer.queue.queueReliable(encodeJson(MsgType.LobbyState, { players: host.lobbyPlayers(), marker: 'after' }))
+      await flush()
+      await tickHost(host, SNAPSHOT_INTERVAL_TICKS)
+    } finally {
+      process.off('unhandledRejection', onRejection)
+    }
+    expect(rejections, 'an oversized message produced an unhandled rejection').toEqual([])
+    const c = centrals[0]
+    const sawMarker = c.received.some(
+      (m) => m[0] === MsgType.LobbyState && new TextDecoder().decode(m.subarray(1)).includes('"marker":"after"'),
+    )
+    expect(sawMarker, 'queue stopped serving the peer after an unframeable message').toBe(true)
+    expect(c.snapshots.length, 'snapshots stopped after an unframeable message').toBeGreaterThan(0)
   })
 })
 
@@ -769,21 +898,32 @@ describe('8-player wire budget', () => {
   it('reports and bounds bytes/sec per peer over 30 seconds of 8-player play', async () => {
     const hub = new ScaleHub(180)
     const { host, centrals } = await start8(1, hub, stubInput({ moveX: 1, attack: true }))
+    makeBusy(host)
     clearWire(centrals)
-    const TICKS = 900 // 30s at 30tps
+    // Settle every tick: on a fast link nothing coalesces, so this measures what
+    // the host actually PRODUCES. (Letting the capacity-1 snapshot slot swallow
+    // most snapshots would flatter the number and make the budget insensitive —
+    // snapshots every tick instead of every 3 would still "pass".)
+    const TICKS = 300 // 10s at 30tps
     for (let t = 0; t < TICKS; t++) {
       host.tick()
-      if (t % 30 === 0) await flush()
+      await flush()
     }
-    await flush()
 
     const secs = TICKS / 30
     const perPeer = centrals.map((c) => c.bytes / secs)
     const aggregate = perPeer.reduce((a, b) => a + b, 0)
-    // Recorded so a regression that doubles the wire load trips here rather
-    // than on a phone. Measured ~3.5–4.8 KB/s per peer, ~30 KB/s aggregate.
-    for (const bps of perPeer) expect(bps).toBeLessThan(8000)
-    expect(aggregate).toBeLessThan(56000)
+    // MEASURED, 8 players on a busy floor (host + 7 remote peers):
+    //   per peer   ~8.0-8.9 KB/s      aggregate ~56-63 KB/s
+    //   breakdown  Snapshot ~4.9 KB/s (61%) · State ~1.65 KB/s (21%)
+    //              Events ~1.4 KB/s (17%) · Inventory ~10 B/s
+    //   packets/s per peer: 411 at a 20B MTU, 53 at 180B, 49 at 244B
+    //              (aggregate 2872/s at 20B — far past any BLE radio)
+    // That is well ABOVE what a BLE peripheral serving 7 centrals can carry, so
+    // the link is expected to be oversubscribed in the field; the point of this
+    // bound is to catch a regression that makes it dramatically worse.
+    for (const bps of perPeer) expect(bps).toBeLessThan(11000)
+    expect(aggregate).toBeLessThan(75000)
     expect(Math.min(...perPeer)).toBeGreaterThan(0)
   })
 

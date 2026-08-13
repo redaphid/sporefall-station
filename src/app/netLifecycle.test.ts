@@ -532,6 +532,60 @@ describe('connection lifecycle — rejoin tokens (forged, stale, duplicated)', (
     expect(findMsg<WelcomeMsg>(back.received(), MsgType.Welcome)?.slot).toBe(a.welcome.slot)
   })
 
+  it('does not kick a client whose rejoin Hello is delivered twice', async () => {
+    // BLE stacks can fire peerConnected twice for one link, and the client sends
+    // a Hello on every one of them. The first reclaims the ghost and CONSUMES
+    // it, so a second trip through the rejoin path finds nothing and answers
+    // Reject — kicking a player who had already successfully rejoined, seconds
+    // after their radio came back.
+    const hub = new MockHub()
+    const host = new NetHostSession(26, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    const { slot, token, entityId } = await seedGhost(hub, host)
+
+    const back = hub.addRawCentral()
+    back.connect()
+    await flush()
+    const rejoinHello = encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot, token } })
+    back.send(rejoinHello)
+    await flush()
+    back.send(rejoinHello) // the duplicate
+    await flush()
+
+    expect(findMsg<WelcomeMsg>(back.received(), MsgType.Welcome)?.slot).toBe(slot)
+    expect(findMsg<{ reason: string }>(back.received(), MsgType.Reject)).toBeUndefined()
+    expect(host.peersBySlot.get(slot)?.entityId).toBe(entityId)
+    expect(host.lobbyPlayers()).toHaveLength(2)
+  })
+
+  it('holds one seat steady through a storm of re-Hellos and starts clean', async () => {
+    // Join spam that carries a rejoin block, twenty times over. Each honoured
+    // Hello re-runs the slot scan, and because the peer's OWN slot is part of
+    // the `used` set the assignment ping-pongs (1 -> 2 -> 1 -> …), minting a new
+    // Welcome and a new peersBySlot entry every time. The client is told its
+    // slot changed repeatedly, peersBySlot ends up holding seats the lobby does
+    // not agree exist, and the run starts against whichever slot won the last
+    // round. One connection must mean one seat, no matter how loud it is.
+    const hub = new MockHub()
+    const host = new NetHostSession(27, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    const { raw } = await joinRaw(hub, 'Bob')
+
+    for (let i = 0; i < 20; i++) {
+      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot: 1, token: 'x' } }))
+      await flush()
+    }
+
+    expect(raw.received().filter((m) => m[0] === MsgType.Welcome)).toHaveLength(1)
+    expect([...host.peersBySlot.keys()]).toEqual([1])
+    expect(host.lobbyPlayers().map((p) => p.slot)).toEqual([0, 1])
+    for (const p of host.lobbyPlayers()) expect(p.slot).toBeLessThan(MAX_PLAYERS)
+
+    host.beginGame()
+    await flush()
+    expect(playerIds(host).sort((a, b) => a - b)).toEqual([0, 1])
+  })
+
   it('does not leak a peersBySlot entry when a re-slotted peer finally disconnects', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(25, 'Alice', stubInput(), hub.hostTransport)
@@ -833,7 +887,14 @@ describe('connection lifecycle — a legitimate reclaim keeps the player whole',
       await flush()
       host.tick()
     }
-    expect(host.world.byId.get(entityId)!.pos.x).toBeGreaterThan(startX)
+
+    // The host must be folding the returning peer's commands into the sim. Test
+    // the DISTANCE, not merely "x grew": two player avatars spawn 0.6 tiles
+    // apart and collision separation nudges them apart on its own, so a bare
+    // `> startX` passes even when every input packet is thrown away. Twenty
+    // ticks of held movement is ~3 tiles; separation drift is well under one.
+    expect(host.peersBySlot.get(slot)!.lastInputSeq).toBe(20)
+    expect(host.world.byId.get(entityId)!.pos.x - startX).toBeGreaterThan(1.5)
   })
 })
 

@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Rejoining puts you on the right map',
   'Always plays in landscape',
   'Rooms are furnished, not littered',
   'Crates look right; no more fake medkits',
-  'Co-op: no more freezing on a lost packet',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

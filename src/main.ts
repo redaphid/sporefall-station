@@ -55,6 +55,7 @@ import { createDebugLog } from './ui/debugLog'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 import { createOverlay } from './ui/overlay'
+import { installStage, lockLandscape, toStage } from './ui/orientation'
 import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
@@ -75,10 +76,24 @@ const boot = async (): Promise<void> => {
 
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
+  // ── Landscape always (src/ui/orientation.ts) ──────────────────────────────
+  // Take ownership of the rotating stage BEFORE the renderer exists: pixi sizes
+  // itself from #app (`resizeTo`), and #app fills the stage box, so the stage
+  // must already carry the swapped dimensions when the renderer first measures.
+  // On a phone stuck in portrait (rotation lock on, or iOS Safari where
+  // `screen.orientation.lock` does not exist) this turns the WHOLE presentation
+  // 90° — canvas, HUD, touch controls, menus, overlays — because they all live
+  // inside #stage. Input is corrected at the DOM event boundary rather than per
+  // control; see the orientation.ts header for why that is the safe shape.
+  const stageEl = document.getElementById('stage') ?? mount.parentElement!
+  const stage = installStage(stageEl, detectTouchCaps(navigator, (q) => window.matchMedia(q)))
   // UI chrome (settings gear/panel) mounts on #ui: it must hit-test ABOVE the
   // touch layer's stick zones (also on #ui) — chrome on #app is unreachable by
   // touch (see src/ui/chrome.ts).
   const renderer = await createRenderer(mount, uiMount)
+  // A portrait↔landscape flip changes the stage box; pixi's own resize observer
+  // would catch it a frame later, so nudge it in the same turn as the transform.
+  stage.onChange = (): void => renderer.app.resize()
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
@@ -102,7 +117,17 @@ const boot = async (): Promise<void> => {
       })
     )
       enterFullscreen()
+    lockLandscape() // already-fullscreen case; the listener below covers the rest
   }
+  // `screen.orientation.lock()` only SUCCEEDS in fullscreen, and the request
+  // above resolves asynchronously — so the lock that actually lands is this one,
+  // fired the moment fullscreen arrives. It is a silent no-op on iOS Safari,
+  // which exposes `screen.orientation` but implements no `lock()`; those players
+  // get landscape from the stage rotation instead. The native Android shell
+  // needs none of this (AndroidManifest `screenOrientation="sensorLandscape"`).
+  document.addEventListener('fullscreenchange', () => {
+    if (isFullscreen()) lockLandscape()
+  })
   const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount, requestFullscreenOnGesture))
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
@@ -128,8 +153,11 @@ const boot = async (): Promise<void> => {
   let pointerScreen: { x: number; y: number } | null = null
   window.addEventListener('pointermove', (ev) => {
     if (ev.pointerType === 'touch') return
-    const rect = renderer.app.canvas.getBoundingClientRect()
-    pointerScreen = { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
+    // STAGE coordinates — the same space renderer.worldToScreen reports in
+    // (pixi globals are canvas-local, and the canvas fills the stage). Using
+    // the canvas's bounding rect would be the ROTATED element's axis-aligned
+    // box, which is not the origin we want. See ui/orientation.ts.
+    pointerScreen = toStage(ev.clientX, ev.clientY)
   })
   const readPointerAim = (): Aim | null => {
     if (!pointerScreen) return null

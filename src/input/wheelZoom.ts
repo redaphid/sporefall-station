@@ -1,4 +1,5 @@
 import { wheelZoomFactor, type ZoomSink } from '../render/zoomModel'
+import { toStage } from '../ui/orientation'
 
 /**
  * Desktop scroll-wheel zoom (dev/browser). Wheel over the game canvas zooms,
@@ -20,8 +21,12 @@ export const wireWheelZoom = (canvas: HTMLElement, zoom: ZoomSink): void => {
       if (!overCanvas && !ev.ctrlKey) return
       ev.preventDefault()
       if (!overCanvas) return
-      const rect = canvas.getBoundingClientRect()
-      zoom.set(zoom.get() * wheelZoomFactor(ev.deltaY, ev.deltaMode), ev.clientX - rect.left, ev.clientY - rect.top)
+      // Stage space (ui/orientation.ts). A desktop stage is never rotated, so
+      // this is the identity there — but it is also the correct anchor if the
+      // page is ever rotated, and it removes the getBoundingClientRect that
+      // would silently mean the wrong rectangle on a transformed canvas.
+      const p = toStage(ev.clientX, ev.clientY)
+      zoom.set(zoom.get() * wheelZoomFactor(ev.deltaY, ev.deltaMode), p.x, p.y)
     },
     { passive: false, capture: true },
   )

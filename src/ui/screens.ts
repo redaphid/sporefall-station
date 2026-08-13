@@ -187,7 +187,9 @@ export const createScreens = (
   // Top-centre health bar, clear of the notch and of the top-left player HUD.
   const bossHud = document.createElement('div')
   bossHud.style.cssText =
-    'position:absolute;top:calc(env(safe-area-inset-top, 0px) + 10px);left:50%;transform:translateX(-50%);' +
+    // --sf-safe-top: stage-space safe area (ui/orientation.ts) — follows the
+    // rotation when the landscape-always fallback turns the stage.
+    'position:absolute;top:calc(var(--sf-safe-top, 0px) + 10px);left:50%;transform:translateX(-50%);' +
     'width:min(60vw,340px);display:none;flex-direction:column;align-items:center;gap:2px;pointer-events:none;z-index:66'
   bossHud.innerHTML = `
     <div id="bossName" style="font:800 13px system-ui;letter-spacing:.14em;color:#e8d5f5;text-shadow:0 1px 3px #000"></div>

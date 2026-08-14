@@ -393,3 +393,97 @@ describe('replayed floor changes', () => {
     expect(bob.session.renderView().floor).toBe(4)
   })
 })
+
+/**
+ * SEMANTIC-CONFLICT REGRESSIONS — the integration of seven branches.
+ *
+ * Each fix below is correct on its own; these tests pin the places where two of
+ * them could be JOINTLY wrong. They exist because the merged unit suites all
+ * passed without covering these paths.
+ *
+ * The shared hazard is that "play again" is the one moment when BOTH monotonic
+ * counters the client now keeps must go backwards at once:
+ *   - the snapshot tick (`lastSnapTick`), because `restart()` calls `createWorld`
+ *     and the host's tick counter returns to 0; and
+ *   - the floor, because a run that reached floor 3 restarts on floor 1.
+ * `changeFloor` refuses to go shallower and `applySnapshot` refuses to go older,
+ * so if GameStart did not re-baseline BOTH, a party that pressed "play again"
+ * from deep in a run would get a client stuck on the old floor's map, frozen on
+ * the old run's last snapshot, with the transport still perfectly healthy.
+ */
+describe('play again from deep in a run — both monotonic guards must re-baseline', () => {
+  it('rebuilds floor 1 and keeps applying snapshots after a restart from floor 3', async () => {
+    const { host, bob, selfId } = await startPair(9101)
+    await step(host, bob, 12)
+    await descend(host, bob)
+    await descend(host, bob)
+    expect(host.world.floor).toBe(3)
+    expect(clientLevel(bob)).toBe(levelFor(host.world.seed, 3))
+    await step(host, bob, 10)
+
+    const tickBefore = host.world.tick
+    expect(tickBefore, 'the host must have a tick counter to regress FROM').toBeGreaterThan(20)
+    const seed = host.world.seed
+
+    host.restart() // "play again" — same seed, fresh world at tick 0, floor 1
+    await flush()
+    expect(host.world.tick).toBeLessThan(tickBefore) // the regression really happened
+    expect(host.world.floor).toBe(1)
+
+    // FLOOR re-baselined DOWNWARD, despite changeFloor being monotonic.
+    expect(clientLevel(bob), 'client stuck on the old run\'s floor after play-again').toBe(levelFor(seed, 1))
+    expect(bob.session.renderView().floor).toBe(1)
+
+    // …and the SNAPSHOT lane is live again, despite the tick counter regressing.
+    await step(host, bob, 12)
+    const view = bob.session.renderView()
+    expect(view.entities.length, 'client froze: no snapshot was applied after play-again').toBeGreaterThan(0)
+    expect(view.self, 'client never re-acquired its own avatar after play-again').toBeDefined()
+    expect(view.self!.id).toBe(selfId())
+    expect(clientLevel(bob)).toBe(levelFor(seed, 1))
+  })
+
+  it('follows a re-seeded restart from deep in a run onto the new seed\'s floor 1', async () => {
+    const { host, bob } = await startPair(9102)
+    await step(host, bob, 12)
+    await descend(host, bob)
+    expect(host.world.floor).toBe(2)
+    const oldSeed = host.world.seed
+
+    const newSeed = 0x1234abcd
+    host.restart(newSeed) // "New Seed" with the client still connected
+    await flush()
+    expect(host.world.seed).toBe(newSeed)
+
+    expect(clientLevel(bob)).toBe(levelFor(newSeed, 1))
+    expect(clientLevel(bob)).not.toBe(levelFor(oldSeed, 1))
+    expect(clientLevel(bob)).not.toBe(levelFor(oldSeed, 2))
+
+    await step(host, bob, 12)
+    expect(bob.session.renderView().entities.length, 'client froze after a re-seeded restart').toBeGreaterThan(0)
+    expect(bob.session.renderView().self).toBeDefined()
+  })
+
+  it('can still descend normally AFTER a play-again — the guards are not left latched', async () => {
+    // The nastiest shape of the bug would be a client that survives the restart
+    // but has a poisoned baseline, so the NEXT floor change or snapshot silently
+    // stops applying. Drive a full second run to prove both guards still track.
+    const { host, bob } = await startPair(9103)
+    await step(host, bob, 12)
+    await descend(host, bob)
+    await descend(host, bob)
+    host.restart()
+    await flush()
+    await step(host, bob, 8)
+    expect(clientLevel(bob)).toBe(levelFor(host.world.seed, 1))
+
+    await descend(host, bob)
+    expect(host.world.floor).toBe(2)
+    expect(clientLevel(bob), 'client stopped following floors after a play-again').toBe(
+      levelFor(host.world.seed, 2),
+    )
+    await step(host, bob, 8)
+    expect(bob.session.renderView().entities.length).toBeGreaterThan(0)
+    expect(bob.session.renderView().floor).toBe(2)
+  })
+})

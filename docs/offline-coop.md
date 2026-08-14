@@ -13,8 +13,9 @@ over Bluetooth**.
 
 ## What you need
 
-- **2 to 4 Android phones**, each with the game app installed
-  (`app-debug.apk`).
+- **2 or more Android phones**, each with the game app installed
+  (`app-debug.apk`). The protocol seats up to **8** players (the host plus 7) —
+  see "Range and limits" for what a real radio will actually hold.
 - Bluetooth turned **on** on every phone.
 - The phones within about **10 metres (30 feet)** of each other — closer is
   better and more stable.
@@ -29,8 +30,12 @@ over Bluetooth**.
    **"Host co-op"**. It's now waiting for friends.
 3. Every **other** phone: open the game → pick a character → tap
    **"Join co-op"**. After a moment you'll see a list of **nearby games**.
-4. On each joining phone, **tap the host's name** (it looks like
-   `Spore <name>`). Say **Allow** to any Bluetooth question that pops up.
+4. On each joining phone, **tap the host phone in the list**. It is listed by
+   the host phone's own Bluetooth name (e.g. "Pixel 8 Pro"), or as
+   `Host ABCD` when that name isn't broadcast — *not* by the player's name, and
+   there is no `Spore` prefix. If several phones are listed and you can't tell
+   which is which, the host's is the one that appeared when they tapped Host.
+   Say **Allow** to any Bluetooth question that pops up.
 5. The joining phones now show **"Connected — waiting for host to start."**
 6. Back on the **Host** phone, everyone shows up in the list. Tap
    **"Start game."**
@@ -50,8 +55,12 @@ over Bluetooth**.
    Bluetooth**. Tap **Allow**. (The game can't be found by friends without
    it — it only uses Bluetooth to find the other phones, never your location.)
 4. You'll see a **HOSTING** screen that says *"Waiting for players…"* Leave this
-   screen up and keep the phone **awake** (screen on). Your phone is now
-   broadcasting a game called **`Spore <your name>`**.
+   screen up — the app now holds the screen awake by itself while it is in
+   front, so you don't have to keep tapping it. Your phone is now broadcasting
+   the game. Joiners will see it under **your phone's Bluetooth name** (or
+   `Host ABCD`); the game deliberately does not put your player name on the air,
+   because the advertisement has no room for it. Your name reaches the others
+   once they connect, in the lobby list.
 5. As friends join, their names appear in the list.
 6. When everyone's in, tap the green **Start game** button.
 
@@ -63,7 +72,10 @@ over Bluetooth**.
 3. The **first time**, Android asks for **Nearby devices / Bluetooth**
    permission. Tap **Allow**.
 4. A **NEARBY GAMES** screen appears and scans over Bluetooth. Within a few
-   seconds the host's game (**`Spore <name>`**) shows up as a button.
+   seconds the host's phone shows up as a button, labelled with **its Bluetooth
+   name** (e.g. "Pixel 8 Pro") or as **`Host ABCD`** if it doesn't broadcast one.
+   Only phones running this game are ever listed — the scan filters on the
+   game's service ID, so anything in the list is joinable.
 5. **Tap the host's button.** If Android asks to pair or connect, say **Allow /
    Pair**.
 6. You'll see **LOBBY → "Connected — waiting for host to start."** Now just wait
@@ -90,9 +102,17 @@ Permissions → Nearby devices → Allow**, then reopen the game.
 
 - **Distance:** stay within ~10 m / 30 ft. Through a car it's easy; across a
   house, less reliable.
-- **Players:** the host plus up to **3** friends (4 total).
-- **Keep the host phone awake.** If the host locks its screen, Bluetooth can go
-  quiet and friends may drop.
+- **Players:** the protocol seats **8** (the host plus 7) and refuses further
+  joins with "lobby full". How many phones one host radio will really hold at
+  once is a property of that phone's Bluetooth chipset, not of the game, and it
+  has **not** been measured on hardware — every extra central also shares the
+  same small pipe. If you are demoing, keep it small and add phones one at a
+  time so you can see where it stops being smooth.
+- **Keep the host phone awake.** The app holds the screen on while it is in the
+  foreground, so it will not sleep on its own mid-game. It does **not** keep
+  simulating if you switch apps or lock the phone manually: the whole game loop
+  runs on the browser's animation frames, which the system stops delivering the
+  moment the game is no longer on screen. Leave the host in the game.
 - **Speed:** Bluetooth is a small pipe, so the game sends compact moves rather
   than full pictures. It's tuned for this and feels smooth; expect a tiny bit of
   rubber-banding on other players if someone walks far from the pack.
@@ -114,9 +134,23 @@ Permissions → Nearby devices → Allow**, then reopen the game.
   above).
 - Fully close and reopen the game on the joining phone, then tap Join again.
 
+**"The screen says `Can't host: …` or `Can't join: …`."**
+- Good — that line is the phone telling you exactly what went wrong, and it is
+  worth reading out loud before changing anything. `Bluetooth is off — turn it
+  on and try again` means precisely that. `Permission denied: …` means the
+  Nearby-devices prompt was declined (see Permissions above).
+  `couldn't connect to the host — the host did not answer` means the host phone
+  never completed the handshake: move closer, make sure it is still on the
+  HOSTING screen, and try again.
+- These messages replace the old failure mode, which was a screen that simply
+  never changed. If a phone ever sits on a blank or frozen screen with no
+  message, that is a bug worth reporting — not a phone you should keep waiting on.
+
 **"It found the host but won't connect / drops right away."**
 - Move closer. Thick walls and distance break the link.
 - Have the host tap back out and **Host co-op** again to restart advertising.
+- A refused connection now gives up after about **10 seconds** with a message
+  rather than hanging indefinitely, so wait for the error before retrying.
 
 **"We were playing and my friend froze / disappeared."**
 - They probably went out of range or their screen slept. Get back close; the
@@ -176,6 +210,33 @@ Key files:
 - `src/app/session.ts` (`createSession`) — wires the BLE transport in on native
   Android; keeps the web/BroadcastChannel and Web-Bluetooth paths for dev.
 
+**Keeping the host alive.** The simulation runs entirely inside
+`requestAnimationFrame` (`src/main.ts`), so it advances only while the game is
+actually on screen. `MainActivity` therefore sets
+`FLAG_KEEP_SCREEN_ON`, which stops the display timeout from freezing the
+authoritative world for every player at once.
+
+We deliberately did **not** add a foreground service. It would be the only way
+to keep ticking while backgrounded, but it needs a Service class, a notification
+channel, `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_CONNECTED_DEVICE`
+permissions and a manifest entry — a native change we cannot verify without a
+device. Note that the plugin's `startForegroundService()` is **not** a shortcut:
+its Android implementation is an empty method that calls `call.resolve()`
+without starting anything, so it succeeds while doing nothing. The honest
+current limitation is: **the host must stay in the app, screen on.**
+
+**Radio failure handling.** Every BLE await that can hang has a deadline
+(`src/net/transport/withTimeout.ts`) because the plugin's
+`onConnectionStateChange` resolves a pending connect only on `STATE_CONNECTED` —
+it never rejects on failure and never reads the GATT `status`, so a refused
+connect otherwise waits forever. Connect gets 10s, MTU 5s, and the
+`deviceDisconnected` event can fail an in-flight connect early. When MTU
+negotiation fails the client falls back to a **20-byte** payload (the ATT floor
+of 23 minus the 3-byte header), not to the post-negotiation 180 — writing 180
+onto an unnegotiated link is silently truncated by the stack and corrupts the
+framing permanently. See the `KNOWN GAP` note on `BleHostTransport.maxPacket`
+for the still-unfixed mirror image of this on the host side.
+
 **Permissions.** `@capgo/capacitor-bluetooth-low-energy` merges the required
 entries into the app manifest automatically — confirmed present in the merged
 manifest: `BLUETOOTH_SCAN`, `BLUETOOTH_ADVERTISE`, `BLUETOOTH_CONNECT`,
@@ -207,8 +268,9 @@ hardware:
    truly offline.
 3. Phone A: character → **Host co-op** → Allow Bluetooth → "Waiting for
    players…".
-4. Phone B: character → **Join co-op** → Allow Bluetooth → tap **`Spore …`** in
-   the Nearby Games list → wait in the lobby.
+4. Phone B: character → **Join co-op** → Allow Bluetooth → tap Phone A in the
+   Nearby Games list (listed by its Bluetooth name, or `Host ABCD`) → wait in
+   the lobby.
 5. Phone A: **Start game.** Confirm both phones show the same city and each
    moves its own character; verify the other player's avatar moves on your
    screen.

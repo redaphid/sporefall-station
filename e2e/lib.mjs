@@ -12,6 +12,35 @@ const SHARE = process.env.E2E_SHARE ?? ''
 const SIZE = { width: 1280, height: 720 }
 
 /**
+ * Playwright's per-context webm → a real h264 mp4 in OUT, cleaning up after
+ * itself. Split out of `record()` so the MULTI-PAGE scenarios (co-op needs two
+ * or three pages in one context, which `record()`'s single-page shape cannot
+ * express) still produce their video through exactly this code path rather than
+ * a second, drifting copy of the ffmpeg invocation.
+ *
+ * `videoDir` is a context's `recordVideo.dir`; the first webm found in it wins,
+ * so pass a directory holding only the page you want.
+ *
+ * @param {string} name output basename (`${name}.mp4`)
+ * @param {string} videoDir playwright's recordVideo dir, consumed and removed
+ * @returns {{mp4:string, bytes:number}}
+ */
+export const muxVideo = (name, videoDir) => {
+  mkdirSync(OUT, { recursive: true })
+  const webm = readdirSync(videoDir).find((f) => f.endsWith('.webm'))
+  if (!webm) throw new Error(`${name}: no webm recorded`)
+  const webmPath = join(OUT, `${name}.webm`)
+  const mp4 = join(OUT, `${name}.mp4`)
+  renameSync(join(videoDir, webm), webmPath)
+  execFileSync('ffmpeg', ['-y', '-i', webmPath, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-vf',
+    'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
+    '-movflags', '+faststart', mp4], { stdio: 'ignore' })
+  rmSync(videoDir, { recursive: true, force: true })
+  rmSync(webmPath, { force: true })
+  return { mp4, bytes: statSync(mp4).size }
+}
+
+/**
  * Deterministic e2e recording. Drives the real pixi build with a scripted input
  * timeline (?script=…), snaps labelled stills at fixed SIM TICKS (not wall-clock),
  * asserts on the final world state, then muxes webm→mp4 and verifies it is real.
@@ -66,18 +95,7 @@ export const record = async (spec) => {
   await context.close()
   await browser.close()
 
-  const webm = readdirSync(videoDir).find((f) => f.endsWith('.webm'))
-  if (!webm) throw new Error(`${spec.name}: no webm recorded`)
-  const webmPath = join(OUT, `${spec.name}.webm`)
-  const mp4 = join(OUT, `${spec.name}.mp4`)
-  renameSync(join(videoDir, webm), webmPath)
-  execFileSync('ffmpeg', ['-y', '-i', webmPath, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-vf',
-    'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
-    '-movflags', '+faststart', mp4], { stdio: 'ignore' })
-  rmSync(videoDir, { recursive: true, force: true })
-  rmSync(webmPath, { force: true })
-
-  const bytes = statSync(mp4).size
+  const { mp4, bytes } = muxVideo(spec.name, videoDir)
   const failures = [...spec.expect(state)]
   if (errs.length) failures.push(`page errors: ${errs.join(' | ')}`)
   if (bytes < 100_000) failures.push(`mp4 only ${bytes} bytes`)

@@ -160,6 +160,22 @@ const WIRE_MOD_CAP = 12
 const POS_SCALE = 32 // 1/32-tile precision in u16
 const FACING_SCALE = 256 / (Math.PI * 2)
 
+/** Largest coordinate the u16 position field can carry (2047.96875 tiles). */
+const MAX_WIRE_POS = 0xffff / POS_SCALE
+
+/** Positions ride a u16, which WRAPS on anything outside it: an entity nudged to
+ * x = -0.5 by knockback encoded as 65520 and arrived at x = 2047.5 — the far
+ * corner of a map that is ~100 tiles across. Clamping keeps an out-of-bounds body
+ * pinned at the edge, which reads as a stuck entity instead of a teleport, and
+ * (unlike the wrap) never invents a position on the OPPOSITE side of the level. */
+const clampPos = (v: number): number => (Number.isFinite(v) ? Math.min(MAX_WIRE_POS, Math.max(0, v)) : 0)
+
+/** Entity count is a u8, so 256+ entities wrapped it (300 -> 44) and the decoder
+ * silently returned 44 of them while ignoring 256 records it had no idea were
+ * there. The host caps interest at 48, so this is a guard rail, not a live path —
+ * but it keeps encode and decode agreeing about the same list. */
+const MAX_WIRE_ENTITIES = 255
+
 export interface WireEntity {
   id: number
   archetype: string
@@ -199,14 +215,15 @@ export const kindOf = (archetype: string): Entity['kind'] => {
 }
 
 export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
-  const w = new ByteWriter(16 + s.entities.length * 12)
-  w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(s.entities.length)
-  for (const e of s.entities) {
+  const entities = s.entities.length > MAX_WIRE_ENTITIES ? s.entities.slice(0, MAX_WIRE_ENTITIES) : s.entities
+  const w = new ByteWriter(16 + entities.length * 12)
+  w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(entities.length)
+  for (const e of entities) {
     w.u16(e.id)
     w.u8(archetypeIndex.get(normalizeArchetype(e.archetype)) ?? 0)
     w.u8(e.flags)
-    w.u16(Math.round(e.x * POS_SCALE))
-    w.u16(Math.round(e.y * POS_SCALE))
+    w.u16(Math.round(clampPos(e.x) * POS_SCALE))
+    w.u16(Math.round(clampPos(e.y) * POS_SCALE))
     w.u8(Math.round(((e.facing % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     w.u8(Math.round(e.hpPct * 255))
     // Variable tail, 'projectile' records only: u8 mod count, then one byte per
@@ -412,6 +429,12 @@ export interface GameStartMsg {
   /** Difficulty rules the host is running; clients adopt it so co-op agrees.
    * Optional on the wire for back-compat — absent means the default (`normal`). */
   mode?: 'casual' | 'normal'
+  /** The floor the host is on RIGHT NOW. Layout never crosses the wire — the
+   * client regenerates it bit-exact from `seed`+`floor` — so this one number is
+   * the whole map. A lobby start is always floor 1, but a LATE joiner drops into
+   * a run already in progress and must not build floor 1's level for a party
+   * standing on floor 3. Optional for back-compat: absent means 1. */
+  floor?: number
 }
 export interface GoMsg {
   startTick: number

@@ -526,17 +526,20 @@ describe('divergence hunt — seed mismatch', () => {
     expect(ghosts.size, 'a re-seed must not leave a reclaimable ghost behind').toBe(0)
   })
 
-  it('REPRODUCER: a GameStart whose seed changed during `reconnecting` strands the client on the OLD map forever', async () => {
-    // netClient.handleMessage/GameStart assigns `this.seed = start.seed` and only
-    // THEN takes the `phase === 'reconnecting'` early-out that skips level
-    // regeneration. So a rejoining client adopts a new seed while keeping the old
-    // seed's level. Nothing re-syncs it: `changeFloor` is the only thing that
-    // regenerates a level, and it fires only when a floor NUMBER changes — which
-    // it does not, because the re-seeded run restarts on floor 1 too.
+  it('rebuilds from the NEW seed when a GameStart re-seeds the run during `reconnecting`', async () => {
+    // WAS a reproducer for a defect, now a regression test for its fix.
     //
-    // Currently unreachable (the test above shows a re-seed clears the ghosts, so
-    // this rejoin is refused). This pins the client-side hazard so that if the
-    // rejoin gate is ever relaxed, THIS test goes red instead of a playtest.
+    // The defect: GameStart assigned `this.seed = start.seed` and only THEN took
+    // the `phase === 'reconnecting'` early-out that skips level regeneration, so a
+    // rejoining client adopted a new seed while keeping the OLD seed's level.
+    // Nothing re-synced it: `changeFloor` is the only thing that regenerates a
+    // level, and it fires only on a floor-NUMBER change — which never came,
+    // because a re-seeded run restarts on floor 1 too.
+    //
+    // The fix (test/net-lifecycle-adversarial): the early-out is now conditional
+    // on the seed being UNCHANGED (`reconnecting && sameRun`). A GameStart that
+    // carries a different seed falls through and rebuilds the level, so the client
+    // lands on the map the host is actually simulating.
     const hub = new DesyncHub()
     const host = new NetHostSession(0xa11ce, 'Alice', stubInput(), hub.hostTransport)
     const bob = hub.addClient('Bob', stubInput(), { reconnectable: true })
@@ -586,14 +589,16 @@ describe('divergence hunt — seed mismatch', () => {
     })
     console.log(`[reconnect re-seed] after 40 authoritative snapshots: ${formatDivergence(report)}`)
 
-    // The entity stream is perfectly healthy — the client is tracking every
-    // entity the host sent, at the right positions. ONLY the ground under them
-    // is wrong, which is precisely why this failure mode is invisible in play.
-    expect(atLeast(report, 'major').map((i) => i.kind)).toEqual(['level.map'])
-    expect(report.clientLevelOrigin).toEqual({ seed: oldSeed, floor: 1 })
+    // FLIPPED (was `['level.map']` / `{ seed: oldSeed, floor: 1 }`): the client no
+    // longer keeps the old seed's ground under a correctly-tracked entity stream.
+    // It rebuilt from the new seed, so the map matches the host outright.
+    expect(atLeast(report, 'major').map((i) => i.kind)).toEqual([])
+    expect(report.clientLevelOrigin).toBe('match')
+    expect(levelChecksum(bob.session.renderView().level)).toBe(levelChecksum(generateLevel(newSeed, 1)))
+    expect(levelChecksum(bob.session.renderView().level)).not.toBe(levelChecksum(generateLevel(oldSeed, 1)))
 
-    // …and the seed really WAS adopted, so the client is internally inconsistent:
-    // the next floor change silently teleports it into the new seed's map family.
+    // …and the client is internally CONSISTENT now: it is already in the new
+    // seed's map family, so the next floor change keeps it there.
     bob.injectMessage(encodeJson(MsgType.Events, { tick: 1, events: [{ type: 'floorChange', floor: 2 }] }))
     await flush()
     const after = bob.session.renderView().level
@@ -602,12 +607,14 @@ describe('divergence hunt — seed mismatch', () => {
     bob.session.phase = 'ended' // stop the background reconnect loop
   })
 
-  it('measures the window where a LATE JOINER walks a different map than the host', async () => {
-    // Layout regenerates from seed+floor and GameStart carries only the seed, so
-    // a client joining a run that has already descended builds FLOOR 1 while the
-    // host is deeper. (netClient.ts GameStart → `this.floor = 1`. Another agent
-    // owns adding a `floor` to GameStartMsg; this test measures the exposure that
-    // fix removes, and should flip to a 0-tick window once it lands.)
+  it('gives a LATE JOINER the host\'s map immediately — a zero-tick wrong-map window', async () => {
+    // Layout regenerates from seed+floor. GameStart used to carry only the seed,
+    // so a client joining a run that had already descended built FLOOR 1 while the
+    // host was deeper, and stayed wrong until the next snapshot corrected it.
+    // `GameStartMsg.floor` (feat/late-join-floor-and-gameover) closes that window
+    // outright: the joiner builds the host's floor on the very first frame. This
+    // test was written to MEASURE the exposure and to flip to 0 once the fix
+    // landed — this is that flip.
     const hub = new DesyncHub()
     const host = new NetHostSession(6100, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
@@ -641,9 +648,12 @@ describe('divergence hunt — seed mismatch', () => {
       `[late join onto floor ${host.world.floor}] wrong-map for ${wrongMapTicks} tick(s); ` +
         `worst prediction error ${worstSelfDrift.toFixed(2)} tiles`,
     )
-    // It DOES happen (this is the exposure), and a snapshot closes it fast.
-    expect(wrongMapTicks).toBeGreaterThan(0)
-    expect(wrongMapTicks).toBeLessThanOrEqual(SNAPSHOT_INTERVAL_TICKS)
+    // FLIPPED (was `>0` and `<= SNAPSHOT_INTERVAL_TICKS`): the joiner is never on
+    // the wrong map at all, not even for the one tick before the first snapshot.
+    expect(wrongMapTicks, 'a late joiner built a map the host is not on').toBe(0)
+    // And it really did join deep, so this is not a vacuous pass.
+    expect(host.world.floor).toBe(3)
+    expect(levelChecksum(late.session.renderView().level)).toBe(levelChecksum(generateLevel(6100, 3)))
     const settled = diffHostClient(host.world, late.session.renderView(), {
       selfEntityId: host.peersBySlot.get(late.session.slot)?.entityId,
     })
@@ -717,7 +727,7 @@ describe('divergence hunt — prediction reconciliation', () => {
 })
 
 describe('divergence hunt — out-of-order and duplicated messages', () => {
-  it('rubber-bands but recovers when a STALE snapshot is replayed', async () => {
+  it('IGNORES a replayed STALE snapshot outright — no rubber-band to recover from', async () => {
     const walk = driven()
     const { host, bob, selfId } = await startPair(8001, walk.source)
     walk.set({ moveX: 1 })
@@ -744,14 +754,18 @@ describe('divergence hunt — out-of-order and duplicated messages', () => {
         `immediately after: ${formatDivergence(afterReplay)} | ` +
         `after 12 more ticks: ${formatDivergence(recovered)}`,
     )
-    // The replay DOES disturb the view (a detector that shrugged here would be
-    // useless), and the very next snapshots undo it completely.
-    expect(afterReplay.diverged).toBe(true)
+    // FLIPPED (was `toBe(true)` — "it rubber-bands, then recovers"). The client's
+    // snapshot tick guard (`isNewerTick`, fix/client-replay-guards) drops a
+    // snapshot that is not strictly newer than the last one applied, so the replay
+    // is a no-op: there is no rubber-band and nothing to recover FROM. The
+    // detector is still live — `beforeReplay` above and the soak tests exercise
+    // it, and the control-mutation run below proves it can still go red.
+    expect(afterReplay.diverged, formatDivergence(afterReplay)).toBe(false)
     expect(atLeast(recovered, 'major'), formatDivergence(recovered)).toEqual([])
     expect(recovered.maxDrift).toBeLessThan(2.5)
   })
 
-  it('a REPLAYED floorChange event throws the client onto a stale floor', async () => {
+  it('IGNORES a REPLAYED floorChange event instead of being thrown onto a stale floor', async () => {
     const { host, bob, selfId } = await startPair(8002)
     await step(host, [bob], 12)
     armDescent(host)
@@ -772,14 +786,36 @@ describe('divergence hunt — out-of-order and duplicated messages', () => {
       `[replayed floorChange] host on floor ${floorNow}; client thrown to ` +
         `${JSON.stringify(hit.clientLevelOrigin)}; realigned after ${recoveryTicks} ticks`,
     )
-    // The client applies a floorChange event unconditionally — no tick or
-    // monotonicity guard (netClient.ts handleMessage → changeFloor) — so a
-    // replayed one regenerates a level the host has already left.
-    expect(hit.issues.some((i) => i.kind === 'level.map')).toBe(true)
-    expect(hit.clientLevelOrigin).toEqual({ seed: host.world.seed, floor: floorNow - 1 })
-    // -1 would mean it NEVER came back; that would be top severity.
-    expect(recoveryTicks).toBeGreaterThan(0)
-    expect(recoveryTicks).toBeLessThanOrEqual(SNAPSHOT_INTERVAL_TICKS)
+    // FLIPPED (was: level.map issue present, clientLevelOrigin = the stale floor,
+    // recoveryTicks in 1..SNAPSHOT_INTERVAL_TICKS). `changeFloor` is now guarded
+    // to move strictly DEEPER (fix/client-replay-guards), so a replayed
+    // floorChange for a floor we have already left is ignored and the client is
+    // never thrown off its map. `recoveryTicks === 1` because it was never wrong:
+    // the very first check after one tick already matches.
+    expect(hit.issues.some((i) => i.kind === 'level.map'), formatDivergence(hit)).toBe(false)
+    expect(hit.clientLevelOrigin).toBe('match')
+    expect(recoveryTicks).toBe(1)
+    // Not vacuous: the client really is on the deeper floor the host is on.
+    expect(levelChecksum(bob.session.renderView().level)).toBe(
+      levelChecksum(generateLevel(host.world.seed, floorNow)),
+    )
+  })
+
+  it('still follows a floorChange that goes DEEPER — the guard is monotonic, not a mute button', async () => {
+    // The companion to the test above: proving a replay is ignored is only half
+    // the story. A LEGITIMATE descent event must still rebuild the level, or the
+    // guard would have traded a rare rubber-band for a permanently stuck map.
+    const { host, bob } = await startPair(8003)
+    await step(host, [bob], 12)
+    const before = host.world.floor
+    armDescent(host)
+    await step(host, [bob], 1)
+    await step(host, [bob], 6)
+    expect(host.world.floor).toBe(before + 1)
+    expect(levelChecksum(bob.session.renderView().level)).toBe(
+      levelChecksum(generateLevel(host.world.seed, before + 1)),
+    )
+    expect(check(host, bob, { ignoreStaleState: true }).issues.some((i) => i.kind === 'level.map')).toBe(false)
   })
 })
 

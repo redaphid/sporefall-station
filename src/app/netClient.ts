@@ -86,9 +86,23 @@ export class NetClientSession implements Session {
   /** Diagnostics hook (the on-screen co-op debug log wires this up). */
   onStreamDesync?: (reason: string) => void
   private tickCount = 0
-  /** Wire tick of the newest snapshot APPLIED, or -1 before the first one of a
+  /**
+   * Wire tick of the newest snapshot APPLIED, or -1 before the first one of a
    * run. Snapshot ticks are u32 on the wire (`encodeSnapshot`), so they are
-   * compared with serial arithmetic rather than `>` — see `isNewerTick`. */
+   * compared with serial arithmetic rather than `>` — see `isNewerTick`.
+   *
+   * Snapshots ride a LATEST-WINS lane (SendQueue's capacity-1 slot), so one that
+   * turns up behind a newer one carries nothing but stale truth: applying it
+   * drags every remote entity back to where they used to be, winds `lastAckedSeq`
+   * backwards so already-acked inputs get replayed, and — worst — a stale `floor`
+   * would re-run `changeFloor`, regenerating the previous level and wiping every
+   * entity on the live one. (`changeFloor` is independently guarded against that
+   * last one; this guard stops the other two.)
+   *
+   * Re-baselined to -1 on BOTH `GameStart` and `Go`, which are the only points at
+   * which the host's tick counter may legitimately go backwards (a "play again"
+   * rebuilds its world at tick 0).
+   */
   private lastSnapTick = -1
   private inputSeq = 0
   private pendingInputs: { seq: number; cmd: InputCmd }[] = []

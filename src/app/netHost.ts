@@ -27,6 +27,13 @@ const INTEREST_RADIUS = 14 // tiles around each player's avatar
 const STATE_INTERVAL_TICKS = 15 // 2Hz
 
 /**
+ * Hard ceiling on entities in ONE snapshot. Bounds the packet: 10B header +
+ * 10B/entity = 490B, which is 25 packets at the 20-byte BLE MTU floor and 3 at
+ * 244B. The wire count is a u8, so this can never exceed 255.
+ */
+export const SNAPSHOT_ENTITY_CAP = 48
+
+/**
  * Max simultaneous players in one run (host + clients). Slots run 0..MAX_PLAYERS-1;
  * the host always owns slot 0, so up to MAX_PLAYERS-1 remote clients may join.
  * Raised from 4→8 for large local groups (stress/8-players). NOTE: over BLE the
@@ -233,21 +240,52 @@ export class NetHostSession implements Session {
     }
   }
 
+  /**
+   * Per-peer interest set, in two passes.
+   *
+   * PASS 1 — every live player, unconditionally. The cap is a BANDWIDTH guard,
+   * never a visibility rule. `netClient.applySnapshot` prunes any entity a
+   * snapshot omits, so an avatar squeezed out by the cap is *deleted* on that
+   * client: the player's own sprite and their whole team blink out, prediction
+   * stops being reconciled, and they rubber-band when it returns. The old
+   * single-pass loop capped in `world.entities` order, and `beginGame` runs
+   * `populateWorld` BEFORE `spawnPlayer`, so avatars live at the very END of
+   * that array — on a real floor (50–94 props inside one 14-tile window on
+   * every seed sampled) the cap was reached before the loop ever saw a player,
+   * and snapshots carried ZERO of the 8.
+   *
+   * PASS 2 — spend what is left of the budget on the CLOSEST in-radius entities.
+   * Array order is spawn order, so it favoured whatever the level generator made
+   * first: a thug standing on your toes could be dropped in favour of a table
+   * thirteen tiles away. Nearest-first with an id tiebreak is deterministic and
+   * stable tick to tick, which also stops the selection churning (sprites
+   * popping in and out) while the party stands still.
+   */
   private sendSnapshots(): void {
     for (const p of this.peers.values()) {
       if (p.entityId === undefined) continue
       const avatar = this.world.byId.get(p.entityId)
       const entities: WireEntity[] = []
+      const nearby: { e: Entity; d: number }[] = []
       for (const e of this.world.entities) {
         if (e.dead) continue
-        const isPlayer = e.playerCtl !== undefined
-        const near =
-          avatar !== undefined &&
-          Math.abs(e.pos.x - avatar.pos.x) < INTEREST_RADIUS &&
-          Math.abs(e.pos.y - avatar.pos.y) < INTEREST_RADIUS
-        if (!isPlayer && !near) continue
-        entities.push(toWireEntity(e, this.world.tick))
-        if (entities.length >= 48) break
+        if (e.playerCtl !== undefined) {
+          if (entities.length < SNAPSHOT_ENTITY_CAP) entities.push(toWireEntity(e, this.world.tick))
+          continue
+        }
+        if (avatar === undefined) continue
+        const dx = Math.abs(e.pos.x - avatar.pos.x)
+        const dy = Math.abs(e.pos.y - avatar.pos.y)
+        if (dx >= INTEREST_RADIUS || dy >= INTEREST_RADIUS) continue
+        nearby.push({ e, d: Math.max(dx, dy) })
+      }
+      // Only pay for the ordering when the budget is actually oversubscribed.
+      if (entities.length + nearby.length > SNAPSHOT_ENTITY_CAP) {
+        nearby.sort((a, b) => (a.d === b.d ? a.e.id - b.e.id : a.d - b.d))
+      }
+      for (const n of nearby) {
+        if (entities.length >= SNAPSHOT_ENTITY_CAP) break
+        entities.push(toWireEntity(n.e, this.world.tick))
       }
       p.queue.queueSnapshot(
         encodeSnapshot({

@@ -8,6 +8,7 @@ import { createLoadoutPanel, type WeaponThumb } from './ui/loadoutPanel'
 import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
+import { joinFailureMessage } from './app/joinError'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
@@ -395,6 +396,25 @@ const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> =
   return new BroadcastChannelTransport('client', deps.room)
 }
 
+/**
+ * Hand the radio back when the page goes away.
+ *
+ * `Transport.stop()` existed but had NO call site anywhere in the app, so a
+ * reload (or the OTA updater swapping the bundle) left the BLE advertiser and
+ * the GATT service registered against a dead JS context. The stack keeps
+ * advertising a host nobody is simulating: joiners see the phantom in their
+ * Nearby Games list, connect, and wait forever for a lobby that no longer
+ * exists — and the fresh context's addGattService can collide with the
+ * already-registered service from the old one.
+ *
+ * `pagehide` rather than `unload`: it is the event that actually fires in
+ * mobile WebViews (and it fires for bfcache/backgrounding too, which is the case
+ * that matters on a phone).
+ */
+const stopTransportOnPagehide = (transport: Transport): void => {
+  window.addEventListener('pagehide', () => void transport.stop().catch(() => {}), { once: true })
+}
+
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
     const session = new HostSession(deps.seed, deps.input, deps.coop)
@@ -418,6 +438,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         ? new BleHostTransport(deps.name, dbg.log)
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
+    stopTransportOnPagehide(transport)
     const session = new NetHostSession(deps.seed, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
@@ -453,20 +474,45 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   // join
   dbg.log(`join: mode start, native=${native}`)
   const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
+  stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
+
+  // The lobby is built BEFORE the connect attempt, not after it.
+  //
+  // It owns the only status line the joining player has, so creating it after
+  // connect() meant a failed join had nowhere to put the bad news: the pick-a-host
+  // overlay removed itself the instant you tapped a host, and the next screen was
+  // never created, leaving the player on a dead black rectangle. With the plugin's
+  // connect() also never settling on refusal (see withTimeout), that dead screen
+  // was permanent and indistinguishable from a slow-but-working join.
+  //
+  // Ordering is safe: both are opaque `inset:0` overlays in the same mount, so the
+  // later-appended pick-a-host screen paints ON TOP of this one and hands over to
+  // it when it removes itself.
+  const lobby = createLobbyUi(deps.uiMount, false)
 
   if (transport instanceof BleClientTransport) {
     // BLE needs an explicit pick-a-host step before the lobby.
-    await transport.start()
     const scanCtl: { stop: (() => Promise<void>) | null } = { stop: null }
-    const deviceId = await pickHost(deps.uiMount, (onFound) => {
-      void transport.scan(onFound).then((stop) => (scanCtl.stop = stop))
-    })
-    await scanCtl.stop?.()
-    await transport.connect(deviceId)
+    try {
+      await transport.start() // throws early and legibly if Bluetooth is off
+      const deviceId = await pickHost(deps.uiMount, (onFound) => {
+        void transport.scan(onFound).then((stop) => (scanCtl.stop = stop))
+      })
+      await scanCtl.stop?.()
+      lobby.setStatus('Connecting over Bluetooth…')
+      await transport.connect(deviceId)
+    } catch (err) {
+      console.error('join: start/connect failed', err)
+      dbg.log(`join: JOIN FAILED — ${err instanceof Error ? err.message : String(err)}`)
+      lobby.setStatus(joinFailureMessage(err))
+      // Hand the radio back: a failed join must not leave us scanning forever.
+      await scanCtl.stop?.().catch(() => {})
+      await transport.stop().catch(() => {})
+      return null
+    }
   }
 
-  const lobby = createLobbyUi(deps.uiMount, false)
   if (transport instanceof WebBluetoothClientTransport) {
     // Device was already picked in the gesture handler; now do the GATT
     // connect with the session's handlers registered so peerConnected lands.

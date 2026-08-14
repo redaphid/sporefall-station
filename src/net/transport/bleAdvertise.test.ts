@@ -13,6 +13,10 @@ interface AdvertiseCall {
 
 const mocks = vi.hoisted(() => ({
   requestPermissions: vi.fn(async () => {}),
+  // The host pre-flights the radio before it advertises (bleTransport.ts);
+  // a healthy radio is the precondition for every case in this file.
+  isAvailable: vi.fn(async () => ({ available: true })),
+  isEnabled: vi.fn(async () => ({ enabled: true })),
   initialize: vi.fn(async () => {}),
   addGattService: vi.fn(async () => {}),
   addListener: vi.fn(async () => ({ remove: async () => {} })),

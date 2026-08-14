@@ -206,18 +206,34 @@ export class NetClientSession implements Session {
         break
       case MsgType.GameStart: {
         const start = decodeJson<GameStartMsg>(msg)
+        const sameRun = start.seed === this.seed
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
-        if (this.phase === 'reconnecting') break // level already live; snapshots resync the floor
+        // A GameStart while we are reconnecting normally replays the run we were
+        // ALREADY in (the host repeats it after a ghost reclaim), so the level is
+        // already live and snapshots resync the floor. But if the SEED changed,
+        // the host is running a DIFFERENT run — its app restarted, or it
+        // re-seeded while we were off the air. Keeping our old level would leave
+        // us walking a map the host is not simulating: we collide with walls that
+        // are not there and never reach an exit, with no error anywhere to
+        // explain it. Fall through and rebuild from the new seed.
+        if (this.phase === 'reconnecting' && sameRun) break
         // A lobby start is always floor 1, but a LATE join drops us into a run
         // already in progress. Build the floor the host is actually on, or we
         // render floor 1's map — and the walls we collide against — until the
         // first snapshot happens to arrive and correct us. Absent means an older
         // host that only ever starts from the lobby: floor 1.
+        //
+        // This is a DIRECT assignment, deliberately not `changeFloor`: that is
+        // guarded to move strictly DEEPER, and a new run legitimately restarts at
+        // floor 1 after a party reached floor 5. GameStart is the one message
+        // that re-baselines the floor in either direction.
         this.floor = start.floor ?? 1
         this.level = generateLevel(this.seed, this.floor)
         // Keep the HUD's floor number honest from the first frame too; otherwise
-        // it reads "1" over a floor-3 map until the next State message.
+        // it reads "1" over a floor-3 map until the next State message. This also
+        // resets the monotonic HUD clamp in the `State` handler, so a new run's
+        // floor 1 is not held up at the old run's floor 5.
         this.state.floor = this.floor
         // Fresh run (initial start OR a host "play again" after game-over): drop
         // the previous run's entities so nothing stale lingers before snapshots.

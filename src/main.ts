@@ -9,6 +9,7 @@ import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
 import { joinFailureMessage } from './app/joinError'
+import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
@@ -354,6 +355,14 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
+  // A sleeping screen freezes this player — and if this player is the host, it
+  // freezes the authoritative sim and therefore EVERYONE, which looks like a
+  // crash rather than a phone. Acquired here because this is the point of no
+  // return into gameplay: `runLoop` never returns, game-over swaps the world in
+  // place rather than going back to the menu, so the only way out of a game is a
+  // reload — and the browser releases the lock for us on unload. The handle's
+  // `release()` exists for whenever a real quit-to-menu path arrives.
+  keepScreenAwake()
   runLoop(session, renderer, uiMount, coop, inspect, touch, debug, persister, resumed)
 }
 
@@ -496,8 +505,26 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
     const scanCtl: { stop: (() => Promise<void>) | null } = { stop: null }
     try {
       await transport.start() // throws early and legibly if Bluetooth is off
-      const deviceId = await pickHost(deps.uiMount, (onFound) => {
-        void transport.scan(onFound).then((stop) => (scanCtl.stop = stop))
+      const deviceId = await pickHost(deps.uiMount, (onFound, onError) => {
+        // The one join failure the try/catch below CANNOT see. `scan()` is not
+        // awaited — it is started from inside pickHost and its promise `void`ed —
+        // so a rejection here rejected nothing anybody was waiting on: the outer
+        // `await pickHost(...)` simply never settled and the guest watched
+        // "Scanning over Bluetooth…" until the phone was force-quit. To the player
+        // that is indistinguishable from a room with no host in it.
+        //
+        // The message comes from the same `joinFailureMessage` the catch below
+        // uses, so a scan failure reads exactly like a start/connect failure; only
+        // the surface differs, because the only screen up at this moment is the
+        // pick-a-host overlay.
+        void transport
+          .scan(onFound)
+          .then((stop) => (scanCtl.stop = stop))
+          .catch((err: unknown) => {
+            console.error('join: scan failed', err)
+            dbg.log(`join: SCAN FAILED — ${err instanceof Error ? err.message : String(err)}`)
+            onError(joinFailureMessage(err))
+          })
       })
       await scanCtl.stop?.()
       lobby.setStatus('Connecting over Bluetooth…')

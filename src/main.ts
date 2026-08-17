@@ -475,7 +475,13 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   dbg.log(`join: mode start, native=${native}`)
   const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
   stopTransportOnPagehide(transport)
-  const session = new NetClientSession(deps.name, deps.input, transport)
+  // The rejoin claim rides the same localStorage seam as the save game. Without
+  // it the token lives only in memory, so killing the app (or the OS killing the
+  // webview in the background — routine on Android) turned every reconnect into
+  // a fresh late-join that burned another slot and left another un-driven body.
+  // `browserStore()` returns undefined where storage is unavailable, and the
+  // session then behaves exactly as it did before this existed.
+  const session = new NetClientSession(deps.name, deps.input, transport, { store: browserStore() })
 
   // The lobby is built BEFORE the connect attempt, not after it.
   //

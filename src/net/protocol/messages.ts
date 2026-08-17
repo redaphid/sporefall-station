@@ -408,13 +408,24 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
 export interface HelloMsg {
   v: number
   name: string
-  /** Present when rejoining after a mid-game drop. */
-  rejoin?: { slot: number; token: string }
+  /** Present when rejoining after a mid-game drop — or after an app restart,
+   * since the client now persists this claim (app/rejoinStore.ts).
+   *
+   * `runId` names the HOST SESSION that minted the token. It is what stops a
+   * token that outlived its run from being matched against a live ghost in a
+   * later one; a host that does not recognise it ignores the claim and admits
+   * the player as an ordinary newcomer. Optional for back-compat: an older
+   * client omits it and is checked on the token alone, exactly as before. */
+  rejoin?: { slot: number; token: string; runId?: string }
 }
 export interface WelcomeMsg {
   slot: number
   /** Keep this to rejoin the same avatar if the link drops. */
   token: string
+  /** Identity of the host session that issued the token, echoed back in a later
+   * `rejoin` claim so a cross-run match is impossible. Optional on the wire for
+   * back-compat with an older host (the client then claims unscoped). */
+  runId?: string
 }
 export interface LobbyPlayer {
   slot: number

@@ -8,6 +8,8 @@ import { encodeInput, type GoMsg, type WelcomeMsg } from '../net/protocol/messag
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
 import { NetClientSession } from './netClient'
 import { MAX_PLAYERS, NetHostSession } from './netHost'
+import type { KeyValueStore } from './persistence'
+import { REJOIN_KEY, REJOIN_TTL_MS, readRejoin } from './rejoinStore'
 
 /**
  * Connection-lifecycle harness: one host "peripheral" and N centrals over an
@@ -42,11 +44,13 @@ class MockHub {
     return Promise.resolve().then(() => this.hostHandler?.({ type: 'data', peer, bytes }))
   }
 
-  /** A full NetClientSession. `relink` models the radio coming back after a drop. */
+  /** A full NetClientSession. `relink` models the radio coming back after a drop.
+   * `store` is the phone's localStorage — pass the SAME one to a later
+   * `addClient` and you have modelled an app restart on that phone. */
   addClient(
     name: string,
     input: InputSource,
-    opts: { reconnectable?: boolean } = {},
+    opts: { reconnectable?: boolean; store?: KeyValueStore; now?: () => number } = {},
   ): { session: NetClientSession; connect: () => void; drop: () => void; relink: () => void; peer: PeerId } {
     const peer: PeerId = `central-${++this.n}`
     let clientHandler: ((e: TransportEvent) => void) | null = null
@@ -68,7 +72,10 @@ class MockHub {
       // without one a drop is terminal (see NetClientSession.onDisconnected).
       ...(opts.reconnectable === false ? {} : { reconnect: async () => {} }),
     }
-    const session = new NetClientSession(name, input, clientTransport)
+    const session = new NetClientSession(name, input, clientTransport, {
+      store: opts.store,
+      ...(opts.now ? { now: opts.now } : {}),
+    })
     const connect = (): void => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => clientHandler?.({ type: 'peerConnected', peer: 'host' }))
@@ -169,6 +176,32 @@ const wipeParty = (host: NetHostSession): void => {
     e.health!.hp = 0
     e.playerCtl.downed = { bleedTicks: 900, reviveProgress: 0 }
   }
+}
+
+/** One phone's localStorage. Outlives the NetClientSession that wrote it, which
+ * is the whole point: a NEW session reading the SAME store is an app restart. */
+const memStore = (seed: Record<string, string> = {}): KeyValueStore & { map: Map<string, string> } => {
+  const map = new Map(Object.entries(seed))
+  return {
+    map,
+    getItem: (k: string) => map.get(k) ?? null,
+    setItem: (k: string, v: string) => void map.set(k, v),
+    removeItem: (k: string) => void map.delete(k),
+  }
+}
+
+/** Model an app restart: a brand-new client session on a brand-new link, with
+ * nothing carried over but the phone's storage. Returns once it has settled. */
+const relaunchApp = async (
+  hub: MockHub,
+  store: KeyValueStore,
+  name = 'Flaky',
+  now?: () => number,
+): Promise<ReturnType<MockHub['addClient']>> => {
+  const app = hub.addClient(name, stubInput(), { reconnectable: false, store, ...(now ? { now } : {}) })
+  app.connect()
+  await flush()
+  return app
 }
 
 describe('connection lifecycle — a peer that never finished its handshake', () => {
@@ -695,69 +728,374 @@ describe('connection lifecycle — reconnect storms', () => {
     expect(host.world.byId.get(entityId)).toBeDefined() // same body survived the churn
   })
 
-  it('DOCUMENTED DEFECT: a token-less reconnect storm eats the whole lobby', async () => {
-    // Rejoin tokens are minted with Math.random() and held ONLY in client memory
-    // (netClient.ts), so an app restart — or any client that never got its
-    // Welcome — loses the token. The host then has no way to recognise the
-    // returning player: every cycle is a FRESH late-join that burns a new slot
-    // and spawns a new avatar, while the previous ghost still reserves the old
-    // slot for 90 seconds. One flaky phone can therefore consume all eight seats
-    // by itself inside the grace window and then lock its own owner out.
-    // This test pins the current behaviour so a fix is a visible, deliberate change.
+  // WAS: 'DOCUMENTED DEFECT: a token-less reconnect storm eats the whole lobby'.
+  // Rejoin tokens used to live ONLY in client memory, so an app restart lost
+  // one: the host could not recognise the returning player and every cycle was
+  // a FRESH late-join that burned a new slot and spawned a new avatar, while
+  // the previous ghost still reserved the old seat for 90 s. One flaky phone
+  // measurably ate slots 1→7 by itself and then got `lobby full` — locking its
+  // own owner out — and left seven un-driven bodies standing in the level.
+  // The token is now persisted (rejoinStore.ts), so the storm reuses ONE seat.
+  it('a reconnect storm across nine app restarts reuses ONE slot and ONE body', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(41, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
+    const before = playerCount(host)
 
+    const store = memStore() // the phone's localStorage: it survives every restart
     const slotsIssued: number[] = []
-    let rejected = 0
+    const bodies = new Set<number>()
     for (let round = 0; round < 9; round++) {
-      const raw = hub.addRawCentral()
-      raw.connect()
-      await flush()
-      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Flaky' })) // token lost
-      await flush()
-      const welcome = findMsg<WelcomeMsg>(raw.received(), MsgType.Welcome)
-      if (welcome) slotsIssued.push(welcome.slot)
-      if (findMsg<{ reason: string }>(raw.received(), MsgType.Reject)) rejected++
-      raw.drop()
+      const app = await relaunchApp(hub, store)
+      expect(app.session.phase, `round ${round}`).toBe('playing')
+      slotsIssued.push(app.session.slot)
+      bodies.add(host.peersBySlot.get(app.session.slot)!.entityId!)
+      app.drop()
       await flush()
       host.tick()
     }
 
-    expect(slotsIssued).toEqual([1, 2, 3, 4, 5, 6, 7]) // a new seat every single time
-    expect(rejected).toBe(2) // the 8th and 9th attempts are turned away
-    expect(playerCount(host)).toBe(MAX_PLAYERS) // seven abandoned bodies + the host
+    expect(slotsIssued).toEqual(Array<number>(9).fill(1)) // the SAME seat, every time
+    expect(bodies.size).toBe(1) // and the SAME avatar — nothing new was spawned
+    expect(playerCount(host)).toBe(before + 1) // one flaky phone, one body
+    expect(playerCount(host)).toBeLessThan(MAX_PLAYERS)
   })
 
-  it('DOCUMENTED DEFECT: those abandoned bodies keep the run from ever ending', async () => {
-    // Consequence of the above during a real playtest: the party wipes, but the
-    // seven un-driven avatars parked at spawn are stunned rather than downed, so
-    // missionSystem's run-over check never fires and nobody gets the game-over.
+  // WAS: 'DOCUMENTED DEFECT: those abandoned bodies keep the run from ever
+  // ending'. Seven un-driven avatars parked at spawn were stunned rather than
+  // downed, so missionSystem's run-over check never fired. With the token
+  // persisted there is at most ONE reclaimable body per phone, and it is
+  // reclaimable ON PURPOSE for the 90 s grace — after which it is swept and the
+  // wipe resolves. That residual window is the deliberate remaining behaviour.
+  it('leaves ONE reclaimable body, and the run ends once its grace expires', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(42, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     host.beginGame()
     await flush()
+    const store = memStore()
     for (let round = 0; round < 3; round++) {
-      const raw = hub.addRawCentral()
-      raw.connect()
-      await flush()
-      raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Flaky' }))
-      await flush()
-      raw.drop()
+      const app = await relaunchApp(hub, store)
+      app.drop()
       await flush()
       host.tick()
     }
-    // Down only the players a human is actually driving (the host).
-    const alive = host.world.entities.filter((e) => e.playerCtl && e.playerCtl.playerId === 0)
-    for (const e of alive) {
-      e.health!.hp = 0
-      e.playerCtl!.downed = { bleedTicks: 900, reviveProgress: 0 }
+    // Host + exactly one abandoned body, where three restarts used to leave three.
+    expect(playerCount(host)).toBe(2)
+
+    // Now wipe the only human-driven player OUTRIGHT (dead, not downed — a lone
+    // downed player self-revives, which is a separate documented rule). The
+    // abandoned body is stunned rather than downed, so the run-over check still
+    // cannot fire: that seat is being HELD for someone with 90 s to walk back in.
+    for (const e of host.world.entities) {
+      if (e.playerCtl?.playerId === 0) e.dead = true
     }
+
+    // The block is BOUNDED by the grace and self-heals: the ghost bleeds out, the
+    // body is swept, and the run ends. Nobody is stuck on a wipe screen that
+    // never comes — which is what seven renewing ghosts used to produce.
+    let endedAtTick = -1
+    for (let i = 0; i < REJOIN_GRACE_TICKS + 5 && endedAtTick < 0; i++) {
+      host.tick()
+      if (host.world.gameOver) endedAtTick = i
+    }
+    expect(endedAtTick).toBeGreaterThan(REJOIN_GRACE_TICKS - 60) // held for the whole grace…
+    expect(endedAtTick).toBeLessThanOrEqual(REJOIN_GRACE_TICKS + 2) // …and not one beat longer
+  })
+})
+
+describe('connection lifecycle — a rejoin token that survives an app restart', () => {
+  it('reclaims the same seat and the same avatar after the app is killed and relaunched', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(60, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+
+    const store = memStore()
+    const first = await relaunchApp(hub, store, 'Bob')
+    const slot = first.session.slot
+    const entityId = host.peersBySlot.get(slot)!.entityId!
+    expect(slot).toBeGreaterThan(0)
+    first.drop() // the webview is killed: nothing in memory survives
+    await flush()
     host.tick()
-    expect(host.world.gameOver).toBe(false)
+
+    const second = await relaunchApp(hub, store, 'Bob')
+    expect(second.session.slot).toBe(slot)
+    expect(host.peersBySlot.get(slot)!.entityId).toBe(entityId)
+    expect(second.session.phase).toBe('playing')
+    expect(playerCount(host)).toBe(2) // no second avatar was spawned
+  })
+
+  it('persists the claim scoped to the host session that issued it', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(61, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+    const store = memStore()
+    const app = await relaunchApp(hub, store, 'Bob')
+
+    const rec = readRejoin(store, Date.now())!
+    expect(rec).not.toBeNull()
+    expect(rec.slot).toBe(app.session.slot)
+    expect(rec.token).not.toBe('')
+    expect(rec.runId).toBe(host.runId) // scoped to THIS host session, not just the seed
+  })
+
+  it('refuses a token minted by a PREVIOUS host session and joins cleanly instead', async () => {
+    // The host's app restarted (or it is a different phone entirely). The stored
+    // token names a run that no longer exists; presenting it must not seize a
+    // seat, and must not lock the player out either.
+    const hub = new MockHub()
+    const first = new NetHostSession(62, 'Alice', stubInput(), hub.hostTransport)
+    await first.start()
+    first.beginGame()
+    await flush()
+    const store = memStore()
+    const app = await relaunchApp(hub, store, 'Bob')
+    const stolenToken = readRejoin(store, Date.now())!.token
+    app.drop()
+    await flush()
+
+    // A BRAND-NEW host session on the same radio: new runId, empty ghost table.
+    const hub2 = new MockHub()
+    const second = new NetHostSession(62, 'Alice', stubInput(), hub2.hostTransport)
+    await second.start()
+    second.beginGame()
+    await flush()
+    expect(second.runId).not.toBe(first.runId)
+
+    const back = await relaunchApp(hub2, store, 'Bob')
+    expect(back.session.phase).toBe('playing') // admitted, not rejected
+    expect(back.session.slot).toBeGreaterThan(0)
+    // …and it was a FRESH admission: the new host minted a new token for it.
+    expect(readRejoin(store, Date.now())!.token).not.toBe(stolenToken)
+    expect(readRejoin(store, Date.now())!.runId).toBe(second.runId)
+  })
+
+  it('ignores a claim stamped with a foreign runId rather than matching it to a live ghost', async () => {
+    // The paranoid case the runId exists for: a stale token that happens to name
+    // a slot with a LIVE ghost on it. Without scoping this is the one way a
+    // persisted token could seize somebody else's seat.
+    const hub = new MockHub()
+    const host = new NetHostSession(63, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    const { slot, token, entityId } = await seedGhost(hub, host)
+
+    const raw = hub.addRawCentral()
+    raw.connect()
+    await flush()
+    raw.send(
+      encodeJson(MsgType.Hello, {
+        v: PROTOCOL_VERSION,
+        name: 'Impostor',
+        rejoin: { slot, token, runId: 'some-other-run' },
+      }),
+    )
+    await flush()
+
+    const welcome = findMsg<WelcomeMsg>(raw.received(), MsgType.Welcome)!
+    expect(welcome).toBeDefined() // admitted as an ordinary newcomer…
+    expect(welcome.slot).not.toBe(slot) // …but NOT into the ghost's seat
+    expect(host.peersBySlot.get(welcome.slot)!.entityId).not.toBe(entityId)
+    // The rightful owner can still walk back in.
+    const owner = hub.addRawCentral()
+    owner.connect()
+    await flush()
+    owner.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot, token, runId: host.runId } }))
+    await flush()
+    expect(findMsg<WelcomeMsg>(owner.received(), MsgType.Welcome)?.slot).toBe(slot)
+    expect(host.peersBySlot.get(slot)!.entityId).toBe(entityId)
+  })
+
+  it('gives the SECOND holder of a duplicated token its own seat, never a shared one', async () => {
+    // Two phones with the same persisted claim (a copied profile, a restored
+    // backup). The first one back takes the ghost; the second must not end up
+    // driving the same avatar.
+    const hub = new MockHub()
+    const host = new NetHostSession(64, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+
+    const store = memStore()
+    const original = await relaunchApp(hub, store, 'Bob')
+    const slot = original.session.slot
+    const entityId = host.peersBySlot.get(slot)!.entityId!
+    original.drop()
+    await flush()
+    host.tick()
+
+    const clone = memStore(Object.fromEntries(store.map)) // byte-identical storage
+    const a = await relaunchApp(hub, store, 'Bob')
+    const b = await relaunchApp(hub, clone, 'Clone')
+
+    expect(a.session.slot).toBe(slot)
+    expect(host.peersBySlot.get(slot)!.entityId).toBe(entityId)
+    expect(b.session.phase).toBe('playing')
+    expect(b.session.slot).not.toBe(slot)
+    expect(host.peersBySlot.get(b.session.slot)!.entityId).not.toBe(entityId)
+    expect(playerCount(host)).toBe(3) // host + the reclaimed body + one new body
+  })
+
+  it('late-joins cleanly when the 90s grace has already expired, and forgets the dead token', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(65, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+
+    const store = memStore()
+    const first = await relaunchApp(hub, store, 'Bob')
+    const slot = first.session.slot
+    const entityId = host.peersBySlot.get(slot)!.entityId!
+    const staleToken = readRejoin(store, Date.now())!.token
+    first.drop()
+    await flush()
+    for (let i = 0; i < REJOIN_GRACE_TICKS + 1; i++) host.tick()
+    expect(host.world.byId.get(entityId)).toBeUndefined() // ghost bled out and was swept
+
+    const back = await relaunchApp(hub, store, 'Bob')
+    expect(back.session.phase).toBe('playing') // a clean late-join, NOT a lockout
+    expect(back.session.rejectReason).toBe('')
+    const body = host.peersBySlot.get(back.session.slot)!.entityId!
+    expect(body).not.toBe(entityId) // a brand-new avatar
+    expect(host.world.byId.get(body)).toBeDefined()
+    // The dead token must not be left lying around to mismatch later.
+    const rec = readRejoin(store, Date.now())!
+    expect(rec.token).not.toBe(staleToken)
+    expect(rec.slot).toBe(back.session.slot)
+  })
+
+  it('does not present a claim older than the TTL', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(66, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+
+    let clock = 1_000_000
+    const store = memStore()
+    const first = await relaunchApp(hub, store, 'Bob', () => clock)
+    const slot = first.session.slot
+    first.drop()
+    await flush()
+
+    clock += REJOIN_TTL_MS + 1 // the phone sat in a drawer overnight
+    const back = await relaunchApp(hub, store, 'Bob', () => clock)
+    expect(back.session.phase).toBe('playing')
+    expect(back.session.slot).not.toBe(slot) // a fresh seat, not the reserved ghost
+    expect(store.map.get(REJOIN_KEY)).toBeDefined() // and a fresh claim was stored
+  })
+
+  it('degrades to the old behaviour when storage is corrupt', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(67, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+    const store = memStore({ [REJOIN_KEY]: '{"v":1,"runId":"r","slot":1,"tok' })
+
+    const app = await relaunchApp(hub, store, 'Bob')
+    expect(app.session.phase).toBe('playing')
+    expect(app.session.slot).toBeGreaterThan(0)
+    expect(readRejoin(store, Date.now())).not.toBeNull() // and the slot is usable again
+  })
+
+  it('degrades to the old behaviour when storage throws (private mode / locked webview)', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(68, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+    const hostile: KeyValueStore = {
+      getItem: () => {
+        throw new Error('SecurityError')
+      },
+      setItem: () => {
+        throw new Error('QuotaExceededError')
+      },
+      removeItem: () => {
+        throw new Error('SecurityError')
+      },
+    }
+
+    const app = hub.addClient('Bob', stubInput(), { reconnectable: false, store: hostile })
+    app.connect()
+    await flush()
+    expect(app.session.phase).toBe('playing') // exactly today's behaviour, no crash
+    expect(app.session.slot).toBeGreaterThan(0)
+  })
+
+  it('refreshes the stored claim while playing so a long session cannot expire its own seat', async () => {
+    // The TTL must measure "how long since we were last in this run", not "how
+    // long since we joined it" — otherwise a two-hour session ages its own token
+    // out and the player who finally drops is treated as a stranger.
+    const hub = new MockHub()
+    const host = new NetHostSession(70, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+
+    let clock = 1_000_000
+    const store = memStore()
+    const app = await relaunchApp(hub, store, 'Bob', () => clock)
+    const slot = app.session.slot
+    const joinedAt = readRejoin(store, clock)!.savedAt
+
+    // Play on, with the wall clock running far past the TTL measured from the join.
+    for (let i = 0; i < 450; i++) {
+      clock += 1000
+      app.session.tick()
+    }
+    expect(readRejoin(store, clock)!.savedAt).toBeGreaterThan(joinedAt + REJOIN_TTL_MS)
+
+    app.drop()
+    await flush()
+    const back = await relaunchApp(hub, store, 'Bob', () => clock)
+    expect(back.session.slot).toBe(slot) // the seat is still ours
+  })
+
+  it('a live radio reconnect still reclaims the same seat with no storage involved', async () => {
+    // The in-memory path must keep working untouched: this client has no store
+    // at all, and the drop is a radio flap rather than an app death.
+    const hub = new MockHub()
+    const host = new NetHostSession(71, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
+    await host.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+    const slot = bob.session.slot
+    const entityId = host.peersBySlot.get(slot)!.entityId!
+
+    bob.drop()
+    await flush()
+    expect(bob.session.phase).toBe('reconnecting')
+    bob.relink()
+    await flush()
+
+    expect(bob.session.phase).toBe('playing')
+    expect(bob.session.slot).toBe(slot)
+    expect(host.peersBySlot.get(slot)!.entityId).toBe(entityId)
+    expect(playerCount(host)).toBe(2)
+  })
+
+  it('works with no store at all — persistence is opt-in', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(69, 'Alice', stubInput(), hub.hostTransport)
+    await host.start()
+    host.beginGame()
+    await flush()
+    const app = hub.addClient('Bob', stubInput(), { reconnectable: false })
+    app.connect()
+    await flush()
+    expect(app.session.phase).toBe('playing')
   })
 })
 
@@ -995,9 +1333,16 @@ describe('connection lifecycle — the host restarts or vanishes', () => {
     await flush()
 
     // Bob's ghost died with the old world, so the host refuses the reclaim. What
-    // matters is that Bob LEARNS that, instead of sitting in `reconnecting`.
-    expect(bob.session.phase).toBe('rejected')
-    expect(bob.session.rejectReason).not.toBe('')
+    // matters is that Bob does not sit in `reconnecting` forever.
+    //
+    // He no longer stops at a dead "rejected" screen either: a refused SEAT is
+    // not a refused PLAYER, so the client drops the spent token and asks again
+    // as a newcomer (netClient's Reject handler). Bob lands in the NEW run, on
+    // the NEW seed's map — which is the outcome a player pressing "New Seed"
+    // while a friend's radio is flapping actually wants.
+    expect(bob.session.phase).toBe('playing')
+    expect(bob.session.rejectReason).toBe('')
+    expect(bob.session.renderView().level).toEqual(generateLevel(4242, 1))
   })
 
   it('surfaces a lost host instead of hanging silently (reconnect-capable link)', async () => {

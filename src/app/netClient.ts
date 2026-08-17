@@ -22,6 +22,8 @@ import {
   type WireSnapshot,
 } from '../net/protocol/messages'
 import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type Transport } from '../net/types'
+import type { KeyValueStore } from './persistence'
+import { REJOIN_VERSION, clearRejoin, readRejoin, writeRejoin, type RejoinRecord } from './rejoinStore'
 import type { RenderView, Session } from './session'
 
 const SMOOTH = 0.45 // remote entities chase their snapshot target per tick
@@ -51,6 +53,16 @@ export type ClientPhase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'rec
 
 const RECONNECT_ATTEMPTS = 30
 const RECONNECT_SPACING_MS = 2000
+
+/**
+ * How often (in client ticks, ~30 Hz) the persisted rejoin claim's timestamp is
+ * refreshed while we are in a run. ~5 s: the record is ~100 bytes, so this is
+ * nothing next to the host's own every-1.5 s world save, and it keeps the claim
+ * young enough that the TTL measures "how long since we were last in this run"
+ * rather than "how long since we joined it" — a two-hour session must not age
+ * its own token out from under itself.
+ */
+const REJOIN_TOUCH_TICKS = 150
 
 /**
  * Client: predicts its own avatar with the shared movement code,
@@ -124,17 +136,90 @@ export class NetClientSession implements Session {
   }
 
   private rejoinToken = ''
+  /** Identity of the host session that issued `rejoinToken` (see netHost.runId).
+   * Sent back with a claim so a token can never be matched against a live ghost
+   * belonging to a DIFFERENT run. Empty against a pre-runId host. */
+  private runId = ''
+  /**
+   * A claim recovered from durable storage on a COLD boot — the app was killed
+   * and relaunched, so `rejoinToken`/`slot` are gone but the seat may still be
+   * held for us. Deliberately kept out of `this.slot`: until the host actually
+   * answers we own nothing, and a speculative slot would have the HUD reading
+   * another player's row. Cleared the moment a Welcome (or a refusal) lands.
+   */
+  private storedClaim: RejoinRecord | null = null
+  /** Did the Hello on THIS link carry a seat claim? Only then is a Reject worth
+   * retrying without one. */
+  private claimSent = false
+  /** One retry per link, so a host that refuses everything cannot be looped. */
+  private claimRetried = false
+  private lastRejoinTouchTick = -Infinity
+  private store?: KeyValueStore
+  private now: () => number
 
   constructor(
     private name: string,
     private localInput: InputSource,
     private transport: Transport,
+    /** `store` is durable local storage for the rejoin claim (localStorage in
+     * the app; omitted in tests and anywhere storage is unavailable, in which
+     * case the token lives in memory only and an app restart loses it — exactly
+     * the behaviour that predates this seam). `now` is injected wall clock. */
+    opts: { store?: KeyValueStore; now?: () => number } = {},
   ) {
+    this.store = opts.store
+    this.now = opts.now ?? (() => Date.now())
+    // Read the claim ONCE, at construction: this is the only moment that tells a
+    // relaunch apart from a fresh join, and `readRejoin` drops anything corrupt
+    // or aged out rather than handing us something unusable.
+    if (this.store) this.storedClaim = readRejoin(this.store, this.now())
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onConnected()
       else if (ev.type === 'peerDisconnected') this.onDisconnected()
       else if (ev.type === 'data') this.reader.push(ev.bytes, (m) => this.onMessage(m))
     })
+  }
+
+  /**
+   * The seat we are entitled to ask for, or `undefined` to join as a newcomer.
+   *
+   * Two sources, in priority order. A LIVE reconnect (the radio dropped, the app
+   * never died) still uses the in-memory token — it is authoritative and always
+   * current. A COLD boot has only what survived in storage, and that is the case
+   * this whole feature exists for: without it the host cannot tell a returning
+   * player from a stranger, and hands out a new slot and a new avatar while the
+   * old ghost keeps the previous seat reserved for the rest of its 90 s grace.
+   */
+  private rejoinClaim(): { slot: number; token: string; runId?: string } | undefined {
+    if (this.phase === 'reconnecting' && this.rejoinToken && this.slot >= 0) {
+      return { slot: this.slot, token: this.rejoinToken, ...(this.runId ? { runId: this.runId } : {}) }
+    }
+    const stored = this.storedClaim
+    return stored ? { slot: stored.slot, token: stored.token, runId: stored.runId } : undefined
+  }
+
+  /** Write the current seat down so it survives the app being killed. No-op
+   * without a store, or before the host has admitted us to anything. */
+  private persistRejoin(): void {
+    if (!this.store || !this.rejoinToken || this.slot < 0) return
+    writeRejoin(this.store, {
+      v: REJOIN_VERSION,
+      runId: this.runId,
+      slot: this.slot,
+      token: this.rejoinToken,
+      savedAt: this.now(),
+    })
+    this.lastRejoinTouchTick = this.tickCount
+  }
+
+  /** Throw the claim away, in memory and on disk. Called when the host has told
+   * us the seat is not ours: a token we know to be dead must never be offered
+   * again, or every later join re-runs the same refusal. */
+  private forgetRejoin(): void {
+    this.storedClaim = null
+    this.rejoinToken = ''
+    this.runId = ''
+    if (this.store) clearRejoin(this.store)
   }
 
   private onDisconnected(): void {
@@ -177,12 +262,14 @@ export class NetClientSession implements Session {
 
   private onConnected(): void {
     this.queue = new SendQueue(this.transport, 'host', () => this.onDisconnected())
-    const rejoining = this.phase === 'reconnecting' && this.rejoinToken && this.slot >= 0
+    const claim = this.rejoinClaim()
+    this.claimSent = claim !== undefined
+    this.claimRetried = false // a fresh link gets a fresh retry budget
     this.queue.queueReliable(
       encodeJson(MsgType.Hello, {
         v: PROTOCOL_VERSION,
         name: this.name,
-        ...(rejoining ? { rejoin: { slot: this.slot, token: this.rejoinToken } } : {}),
+        ...(claim ? { rejoin: claim } : {}),
       }),
     )
   }
@@ -207,14 +294,38 @@ export class NetClientSession implements Session {
         const welcome = decodeJson<WelcomeMsg>(msg)
         this.slot = welcome.slot
         this.rejoinToken = welcome.token
+        this.runId = welcome.runId ?? ''
+        // The host has spoken: whatever we asked for, THIS is the seat we hold.
+        // Write it down before anything else can go wrong, so a kill one second
+        // from now still comes back to the same body.
+        this.storedClaim = null
+        this.claimSent = false
+        this.persistRejoin()
         // During a rejoin the host follows up with GameStart+Go; stay out of lobby.
         if (this.phase !== 'reconnecting') this.setPhase('lobby')
         break
       }
-      case MsgType.Reject:
-        this.rejectReason = decodeJson<{ reason: string }>(msg).reason
+      case MsgType.Reject: {
+        const reason = decodeJson<{ reason: string }>(msg).reason
+        // A refused SEAT CLAIM is not a refused PLAYER. Now that the token
+        // outlives the run that minted it, a stale one will be presented sooner
+        // or later — the grace expired while the app was being relaunched, a
+        // teammate got there first, the parked avatar did not survive. Every one
+        // of those used to end here, on a dead "rejected" screen, for someone the
+        // host would happily have admitted as a newcomer one message later.
+        // Drop the dead token and ask again as a stranger, once. The host leaves
+        // a refused peer at slot -1 precisely so a follow-up Hello still works.
+        if (this.claimSent && !this.claimRetried && this.queue) {
+          this.claimRetried = true
+          this.claimSent = false
+          this.forgetRejoin()
+          this.queue.queueReliable(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: this.name }))
+          break
+        }
+        this.rejectReason = reason
         this.setPhase('rejected')
         break
+      }
       case MsgType.LobbyState:
         this.onLobbyChange?.(decodeJson<LobbyStateMsg>(msg))
         break
@@ -408,6 +519,11 @@ export class NetClientSession implements Session {
   tick(): void {
     this.tickCount++
     if (this.phase !== 'playing') return
+
+    // Keep the stored claim young while we are actually in the run — see
+    // REJOIN_TOUCH_TICKS. Without this the TTL would count from the moment we
+    // joined, and a long session would expire its own seat mid-play.
+    if (this.tickCount - this.lastRejoinTouchTick >= REJOIN_TOUCH_TICKS) this.persistRejoin()
 
     const cmd = this.localInput.sample()
     cmd.seq = ++this.inputSeq

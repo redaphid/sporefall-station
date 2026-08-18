@@ -5,7 +5,7 @@ import { addEntity } from '../game/world'
 import type { InputSource } from '../input/input'
 import { encodeJson, decodeJson } from '../net/framing/codec'
 import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
-import { encodeInput, type WelcomeMsg } from '../net/protocol/messages'
+import { encodeInput, type GoMsg, type WelcomeMsg } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
 import { NetClientSession } from './netClient'
 import { NetHostSession } from './netHost'
@@ -423,7 +423,7 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
     expect(findMsg<{ reason: string }>(raw.received(), MsgType.Reject)?.reason).toMatch(/version/i)
   })
 
-  it('ignores duplicate pre-start Hellos (join spam) instead of reassigning the slot', async () => {
+  it('re-answers duplicate pre-start Hellos (join spam) identically instead of reassigning the slot', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(5, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
@@ -436,13 +436,19 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
       await flush()
     }
 
-    // Exactly one slot, one Welcome, and no leaked peersBySlot entry.
-    expect(raw.received().filter((m) => m[0] === MsgType.Welcome)).toHaveLength(1)
+    // A duplicate Hello is now ANSWERED, not dropped — it is how a client whose
+    // Welcome was lost on an unacknowledged link asks again. What must not
+    // change is the ANSWER: one slot, one seat, byte-identical every time.
+    const welcomes = raw.received().filter((m) => m[0] === MsgType.Welcome)
+    expect(welcomes).toHaveLength(5)
+    const decoded = welcomes.map((m) => decodeJson<{ slot: number; token: string }>(m))
+    expect(new Set(decoded.map((w) => `${w.slot}/${w.token}`)).size).toBe(1)
+    expect(decoded[0].slot).toBe(1)
     expect(host.lobbyPlayers()).toHaveLength(2)
     expect([...host.peersBySlot.keys()]).toEqual([1])
   })
 
-  it('ignores a duplicate late-join Hello instead of spawning a second avatar', async () => {
+  it('re-answers a duplicate late-join Hello without spawning a second avatar', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(6, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
@@ -460,7 +466,15 @@ describe('offline co-op — adversarial host (malformed / hostile input)', () =>
 
     expect(host.world.entities.filter((e) => e.playerCtl).length).toBe(before + 1) // only one new avatar
     expect([...host.peersBySlot.keys()]).toEqual([1])
-    expect(raw.received().filter((m) => m[0] === MsgType.Welcome)).toHaveLength(1)
+    // Mid-run the re-answer has to carry the whole admission again (Welcome +
+    // GameStart + Go), because a client that lost any ONE of them is stranded.
+    // Crucially the Go names the SAME entity: re-asking must not re-body you.
+    const welcomes = raw.received().filter((m) => m[0] === MsgType.Welcome)
+    const gos = raw.received().filter((m) => m[0] === MsgType.Go)
+    expect(welcomes).toHaveLength(2)
+    expect(gos).toHaveLength(2)
+    expect(decodeJson<{ slot: number }>(welcomes[0]).slot).toBe(decodeJson<{ slot: number }>(welcomes[1]).slot)
+    expect(decodeJson<GoMsg>(gos[0]).entityIds[1]).toBe(decodeJson<GoMsg>(gos[1]).entityIds[1])
   })
 
   it('accepts a wrapped input seq and rejects stale reordered packets', async () => {

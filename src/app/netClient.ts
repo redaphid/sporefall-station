@@ -83,10 +83,53 @@ export const isNewerTick = (tick: number, prev: number): boolean => {
   return forward !== 0 && forward < 0x8000_0000
 }
 
-export type ClientPhase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'reconnecting' | 'ended' | 'rejected'
+export type ClientPhase =
+  | 'connecting'
+  | 'lobby'
+  | 'starting'
+  | 'playing'
+  | 'reconnecting'
+  | 'ended'
+  | 'rejected'
+  /** Gave up on the join handshake: the link is up but the host never answered. */
+  | 'unreachable'
 
 const RECONNECT_ATTEMPTS = 30
 const RECONNECT_SPACING_MS = 2000
+
+/**
+ * JOIN HANDSHAKE RETRANSMISSION.
+ *
+ * Admission is four messages — Hello up, then Welcome / GameStart / Go down —
+ * and NONE of them is acknowledged. Both BLE transports notify with
+ * `type: 'withoutResponse'` (bleTransport.ts, webBluetoothTransport.ts), and
+ * the "reliable" lane (net/channel/sendQueue.ts) is reliable only in the sense
+ * that it never DROPS a queued message: it retries once on a `sendPacket`
+ * throw and then kills the link. Nothing on the wire ever says "I got that".
+ *
+ * So a single lost packet in either direction used to end the join, silently
+ * and permanently: the client sat on "Looking for a host…" with the BLE link
+ * still healthy, so nothing errored, nothing timed out and nothing retried.
+ * Measured against the real sessions (e2e/net-recovery-probes.mts --probe a),
+ * 2% packet loss failed ~6% of joins and 10% failed ~25% — and not one of them
+ * ever recovered, however long the host kept simulating.
+ *
+ * The fix is the cheapest one that works: ASK AGAIN. The client re-sends the
+ * same Hello on a timer while it is still waiting on a reply, and the host
+ * answers a duplicate Hello idempotently (netHost.ts `reanswerAdmission` — no
+ * new slot, no second avatar, just the same admission replayed). Retries stop
+ * the instant the handshake completes, so a joined client puts ZERO extra
+ * bytes on the wire — there is no keepalive here.
+ *
+ * Bounded on purpose. Retrying forever with nothing on screen is the same
+ * silent hang wearing a different hat, so after `HELLO_MAX_ATTEMPTS` the phase
+ * goes to `unreachable` and main.ts tells the player, in words, that the host
+ * did not answer.
+ */
+const HELLO_FIRST_RETRY_MS = 1000
+const HELLO_RETRY_MS = 2000
+/** 1 initial Hello + 8 retries ≈ 15s before we admit defeat out loud. */
+const HELLO_MAX_ATTEMPTS = 9
 
 /**
  * Client: predicts its own avatar with the shared movement code,
@@ -142,6 +185,18 @@ export class NetClientSession implements Session {
    * rebuilds its world at tick 0).
    */
   private lastSnapTick = -1
+  /** The exact Hello bytes for this link, kept so a retry re-asks identically. */
+  private helloBytes: Uint8Array | null = null
+  private helloAttempts = 0
+  private helloTimer: ReturnType<typeof setTimeout> | null = null
+  /**
+   * A snapshot has landed on this link. It is the only proof a lobby-phase
+   * client gets that the host has ALREADY STARTED — i.e. that our GameStart/Go
+   * was lost, rather than the host simply not having pressed Start yet. Without
+   * it, "still in the lobby" and "silently stranded" look identical and we
+   * would either re-ask forever in a healthy lobby or never re-ask at all.
+   */
+  private sawSnapshot = false
   private inputSeq = 0
   private pendingInputs: { seq: number; cmd: InputCmd }[] = []
   private pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
@@ -210,19 +265,85 @@ export class NetClientSession implements Session {
 
   private setPhase(phase: ClientPhase): void {
     this.phase = phase
+    // Every phase change is a chance to arm the handshake retry (we just moved
+    // into a state that is waiting on the host) or to shut it off for good.
+    this.syncHelloRetry()
     this.onPhaseChange?.(phase)
+  }
+
+  /**
+   * Are we waiting on an admission reply that nothing will ever re-send?
+   *
+   *  • `connecting` — Hello or Welcome was lost.
+   *  • `starting`   — GameStart landed, Go did not. (The commonest failure in
+   *                   the loss probe after a lost Hello.)
+   *  • `lobby` + a snapshot — the run is demonstrably UNDER WAY and we are not
+   *                   in it, so our GameStart/Go went missing. A lobby with no
+   *                   snapshots is a healthy client waiting for the host to
+   *                   press Start; re-asking there would burn bytes for as long
+   *                   as the lobby stays open, so it deliberately does not.
+   *
+   * `reconnecting` is excluded on purpose: `reconnectLoop` already owns a
+   * bounded retry for that path (30 × 2s, then `ended`), and a second state
+   * machine racing it would fight over the phase.
+   */
+  private awaitingAdmission(): boolean {
+    if (this.phase === 'connecting' || this.phase === 'starting') return true
+    return this.phase === 'lobby' && this.sawSnapshot
+  }
+
+  /** Arm the retry iff we are still owed a reply; otherwise make sure it is off. */
+  private syncHelloRetry(): void {
+    if (!this.awaitingAdmission() || !this.helloBytes) {
+      if (this.helloTimer) clearTimeout(this.helloTimer)
+      this.helloTimer = null
+      return
+    }
+    if (this.helloTimer) return // already armed; don't restart the clock
+    this.helloTimer = setTimeout(
+      () => {
+        this.helloTimer = null
+        if (!this.awaitingAdmission()) return
+        if (this.helloAttempts >= HELLO_MAX_ATTEMPTS) {
+          // Out of attempts with the link still up. Say so — a join that keeps
+          // retrying behind a frozen status line is the bug, not the fix.
+          this.setPhase('unreachable')
+          return
+        }
+        this.sendHello()
+      },
+      this.helloAttempts <= 1 ? HELLO_FIRST_RETRY_MS : HELLO_RETRY_MS,
+    )
+  }
+
+  /**
+   * Put the Hello on the wire (again). Byte-identical every time: the host
+   * treats a duplicate as "say it again", and an identical one can never be
+   * mistaken for a second player. Re-framed by the SendQueue each time, so the
+   * 20-byte `maxPacket` floor (bleTransport's MTU fallback, where the handshake
+   * becomes 4+ packets per message and loss compounds) retries as a whole
+   * message, not as whichever fragment went missing.
+   */
+  private sendHello(): void {
+    if (!this.helloBytes || !this.queue) return
+    this.helloAttempts++
+    this.queue.queueReliable(this.helloBytes)
+    this.syncHelloRetry()
   }
 
   private onConnected(): void {
     this.queue = new SendQueue(this.transport, 'host', () => this.onDisconnected())
     const rejoining = this.phase === 'reconnecting' && this.rejoinToken && this.slot >= 0
-    this.queue.queueReliable(
-      encodeJson(MsgType.Hello, {
-        v: PROTOCOL_VERSION,
-        name: this.name,
-        ...(rejoining ? { rejoin: { slot: this.slot, token: this.rejoinToken } } : {}),
-      }),
-    )
+    // A fresh link is a fresh handshake: new bytes, attempts back to zero, and
+    // no stale "we already saw the run running" from the previous connection.
+    this.helloBytes = encodeJson(MsgType.Hello, {
+      v: PROTOCOL_VERSION,
+      name: this.name,
+      ...(rejoining ? { rejoin: { slot: this.slot, token: this.rejoinToken } } : {}),
+    })
+    this.helloAttempts = 0
+    this.sawSnapshot = false
+    this.sendHello()
   }
 
   private onMessage(msg: Uint8Array): void {
@@ -246,7 +367,15 @@ export class NetClientSession implements Session {
         this.slot = welcome.slot
         this.rejoinToken = welcome.token
         // During a rejoin the host follows up with GameStart+Go; stay out of lobby.
-        if (this.phase !== 'reconnecting') this.setPhase('lobby')
+        //
+        // A Welcome can now arrive a SECOND time — the host re-answers a retried
+        // Hello idempotently, and our retry can cross its reply in flight. It
+        // must never drag a client that is already past the lobby back to the
+        // lobby screen: `starting` would lose its GameStart, and `playing` would
+        // put a live player back on "waiting for host to start" mid-run. Only
+        // ever promote FORWARD out of `connecting`; the other exclusions keep
+        // the pre-existing behaviour for every phase that already reached here.
+        if (this.phase !== 'reconnecting' && this.phase !== 'starting' && this.phase !== 'playing') this.setPhase('lobby')
         break
       }
       case MsgType.Reject:
@@ -378,6 +507,14 @@ export class NetClientSession implements Session {
   }
 
   private applySnapshot(snap: WireSnapshot): void {
+    // Snapshots are the host SIMULATING, which means the run has started. If we
+    // are still sitting in the lobby, our GameStart/Go was lost and no one will
+    // send it again unasked — re-open the handshake retry. Set before the
+    // staleness guard below: even a replayed snapshot proves the run is live.
+    if (!this.sawSnapshot) {
+      this.sawSnapshot = true
+      this.syncHelloRetry()
+    }
     // A replayed snapshot is a time machine: every entity is restored to where it
     // stood seconds ago, and `reconcile` hauls the PREDICTED avatar back with them
     // (measured at 5.56 tiles). `lastInputSeq` is stale too, so it would re-arm

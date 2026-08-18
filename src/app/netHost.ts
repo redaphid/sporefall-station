@@ -445,9 +445,9 @@ export class NetHostSession implements Session {
         return
       }
 
-      // Duplicate Hello from a peer we've already admitted: ignore it.
-      // Reprocessing would reassign the slot, leak a stale peersBySlot entry, and
-      // — mid-game — spawn a second avatar for the same connection.
+      // Duplicate Hello from a peer we've already admitted. Never RE-PROCESS it:
+      // that would reassign the slot, leak a stale peersBySlot entry, and —
+      // mid-game — spawn a second avatar for the same connection.
       //
       // This deliberately covers a Hello that carries a `rejoin` block too. A
       // GENUINE rejoin always arrives on a NEW link, and a new link means a new
@@ -458,7 +458,15 @@ export class NetHostSession implements Session {
       // entry (a seat that can never be issued again), and mid-game a live
       // player holding a leaked token could seize someone else's ghost, ending
       // up in two slots at once with its own avatar abandoned in the world.
-      if (p.slot >= 0) return
+      //
+      // It used to be dropped on the floor, though, and THAT was the other half
+      // of the silent-join-hang: nothing on this link is acknowledged, so a
+      // client whose Welcome/GameStart/Go went missing asks again — and got
+      // nothing back, forever. Re-answer instead, idempotently.
+      if (p.slot >= 0) {
+        this.reanswerAdmission(p)
+        return
+      }
 
       // Mid-game rejoin: reclaim the ghost slot if the token matches.
       if (this.started && hello.rejoin) {
@@ -563,5 +571,40 @@ export class NetHostSession implements Session {
     for (const p of this.peers.values()) {
       if (p.slot >= 0) p.queue.queueReliable(bytes)
     }
+  }
+
+  /**
+   * Say the admission again, for a peer that already has a slot.
+   *
+   * The whole join handshake — Hello up, Welcome/GameStart/Go down — rides
+   * unacknowledged BLE notifications (`type: 'withoutResponse'` in both
+   * transports), and the SendQueue's "reliable" lane only promises not to DROP
+   * a queued message; it cannot know whether the radio delivered it. So the
+   * only evidence the host will ever get that its reply was lost is the client
+   * asking a second time, and the only useful response is to answer again.
+   *
+   * Idempotent BY CONSTRUCTION: every value here is read back out of state we
+   * already hold (`p.slot`, `p.token`, `p.entityId`). No slot is allocated, no
+   * avatar is spawned, no ghost is reclaimed — so an arbitrary number of
+   * duplicate Hellos costs a few bytes each and changes nothing else. That is
+   * also why this is WIRE-COMPATIBLE and needs no PROTOCOL_VERSION bump: the
+   * message types, their fields and their meanings are exactly the ones an
+   * unpatched client already parses. An old client simply never asks twice.
+   */
+  private reanswerAdmission(p: PeerState): void {
+    p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
+    p.queue.queueReliable(encodeJson(MsgType.LobbyState, { players: this.lobbyPlayers() }))
+    // Pre-start lobby peers have no avatar yet; `beginGame` will send them the
+    // GameStart/Go. A peer WITH an entityId is in the run and needs both, or it
+    // sits on "Generating city…" watching snapshots it can't join.
+    if (this.started && p.entityId !== undefined) {
+      p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
+      p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: p.entityId } }))
+    }
+    // Whatever else got lost, assume the inventory push did too. It is sent only
+    // on CHANGE (`lastInvSig`), so without this the re-admitted client would
+    // show an empty hotbar until its loadout happened to change — and a client
+    // that re-runs GameStart clears `localInv` on the way through.
+    p.lastInvSig = ''
   }
 }

@@ -1,4 +1,5 @@
 import { spawnPlayer } from '../game/player'
+import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
 import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
@@ -142,7 +143,8 @@ export class NetHostSession implements Session {
     this.started = true
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
+    const hostAt = playerSpawnPoint(this.world.level, 0)
+    this.self = spawnPlayer(this.world, 0, hostAt.x, hostAt.y)
     const entityIds: Record<number, number> = { 0: this.self.id }
     for (const p of this.peers.values()) {
       // A peer whose link is up but whose Hello has not landed yet still carries
@@ -153,7 +155,13 @@ export class NetHostSession implements Session {
       // also strands a zombie body once the real Hello finally arrives and takes
       // a proper slot. Admitted peers only; the late-join path spawns the rest.
       if (p.slot < 0) continue
-      const e = spawnPlayer(this.world, p.slot, this.world.level.spawn.x + p.slot * 0.6, this.world.level.spawn.y)
+      // A COLLISION-CHECKED spot, not a blind offset: the old `spawn.x + slot * 0.6`
+      // put 18.6% of slots inside a solid tile, and a body that starts in a wall can
+      // never step out of it (see game/spawnPlacement.ts). `playerSpawnPoint` is a
+      // pure function of (level, slot), so the late-join branch below re-derives the
+      // SAME point for the same slot and no client can disagree about it.
+      const at = playerSpawnPoint(this.world.level, p.slot)
+      const e = spawnPlayer(this.world, p.slot, at.x, at.y)
       p.entityId = e.id
       entityIds[p.slot] = e.id
     }
@@ -514,7 +522,11 @@ export class NetHostSession implements Session {
         p.slot = slot
         p.name = hello.name
         p.token = Math.random().toString(36).slice(2, 12)
-        const avatar = spawnPlayer(this.world, slot, this.world.level.spawn.x + slot * 0.6, this.world.level.spawn.y)
+        // Same collision-checked placement as the lobby start (beginGame), and the
+        // same function of (level, slot) — a friend who joins mid-run lands where
+        // that slot would have landed had they been there from the beginning.
+        const at = playerSpawnPoint(this.world.level, slot)
+        const avatar = spawnPlayer(this.world, slot, at.x, at.y)
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))

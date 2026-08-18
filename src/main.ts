@@ -54,6 +54,14 @@ import type { ZoomSink } from './render/zoomModel'
 import { wireWheelZoom } from './input/wheelZoom'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
+import {
+  frameErrorBannerText,
+  frameErrorMessage,
+  guardFrame,
+  initialFrameErrors,
+  noteFrameError,
+  noteFrameOk,
+} from './ui/frameErrorModel'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens } from './ui/screens'
 import { createOverlay } from './ui/overlay'
@@ -592,6 +600,39 @@ const createPadHint = (mount: HTMLElement): ((show: boolean) => void) => {
   return (show) => (el.style.display = show ? 'block' : 'none')
 }
 
+/**
+ * The "something in the frame threw" banner. A crash-proof loop that reports
+ * nothing is a client that is quietly broken — which is precisely what made this
+ * class of bug survive a playtest. Tap to dismiss; it comes straight back if the
+ * fault repeats. Console gets the full stack either way.
+ */
+const createFrameErrorBanner = (mount: HTMLElement): ((text: string | null) => void) => {
+  const el = document.createElement('div')
+  markUiChrome(el)
+  el.style.cssText =
+    'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:none;z-index:80;max-width:92%;' +
+    'font:600 12px system-ui;color:#ffdede;background:#7f1d1dee;padding:6px 12px;border-radius:8px;' +
+    'pointer-events:auto;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+  el.title = 'Tap to dismiss'
+  let dismissed = ''
+  el.addEventListener('click', () => {
+    dismissed = el.textContent ?? ''
+    el.style.display = 'none'
+  })
+  mount.appendChild(el)
+  let shown: string | null = null
+  return (text) => {
+    if (text === shown) return // no DOM churn on a fault that repeats every frame
+    shown = text
+    if (text === null) {
+      el.style.display = 'none'
+      return
+    }
+    el.textContent = text
+    if (text !== dismissed) el.style.display = 'block'
+  }
+}
+
 /** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
  * panel and the Resume / New Seed / Run-it-back actions. `onResume` unpauses,
  * `onNewSeed`/`onRestart` are wired only on host/solo (undefined hides the
@@ -816,80 +857,109 @@ const runLoop = (
 
   let acc = 0
   let last = performance.now()
+  const showFrameError = createFrameErrorBanner(uiMount)
+  let frameErrors = initialFrameErrors()
   const frame = (now: number): void => {
-    const dt = Math.min((now - last) / 1000, 0.25)
-    acc += dt
-    last = now
-    while (acc >= SIM_DT) {
-      session.tick()
-      debug?.afterTick() // stream this tick's events + drain queued debug mutations
-      inspect.afterTick() // buffer this tick's events for sporefall.events()
-      acc -= SIM_DT
-    }
-    // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
-    // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
-    if (persister) {
-      const w = hostWorld()
-      if (w) persister.maybeSave(w)
-    }
-    const alpha = acc / SIM_DT
-    const view = session.renderView()
-    inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
-    if (view.level !== currentLevel) {
-      currentLevel = view.level
-      renderer.setLevel(view.level)
-    }
-    if (view.self) {
-      const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
-      const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
-      // Objective focus: while live, the camera glides to the link target and
-      // back (focusPanRate < normal → an animated pan, never a cut). The focus
-      // dies on its own timer, when the player moves, or if the target despawns.
-      const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
-      focus = tickFocus(focus, dt, view.self.pos, focusPos)
-      const rate = focusPanRate(focus)
-      if (focus) {
-        const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
-        renderer.camera.follow(t.x, t.y, dt, rate)
-      } else {
-        renderer.camera.follow(px, py, dt, rate)
-      }
-    }
-    renderer.draw(view, alpha, dt)
-    hud.update(view)
-    const pads = coop.debug()
-    // Twin-stick aim reticles: one per joined pad with a deflected right stick,
-    // anchored to that pad's player entity. Presentation only.
-    const anchors: ReticleAnchor[] = []
-    for (const e of view.entities)
-      if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
-    renderer.setReticles(padAimReticles(pads, anchors))
-    // Exposed-but-unjoined pad: nudge the player that any input joins.
-    showPadHint(pads.some((p) => p.slot === null))
-    vis = stepVisibility(vis, {
-      padJoined: anyPadActive(pads),
-      padActivity: anyPadProducing(pads),
-      touchActivity: touchSeen,
-    })
-    touchSeen = false
-    touch?.setVisible(sticksVisible(vis, caps))
-    touch?.update(view)
-    coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
-    screens.update(view)
-    missionPanel.update(view)
-    commOverlay.update(view)
-    overlay.update(pads)
-    pauseOverlay.update(session.isPaused ?? false, view)
-    const hide = shouldHideCursor({
-      paused: session.isPaused ?? false,
-      gameOver: view.gameOver,
-      selfDead: !!view.self?.dead,
-    })
-    if (hide !== cursorHidden) {
-      canvas.style.cursor = hide ? 'none' : ''
-      cursorHidden = hide
-    }
-    requestAnimationFrame(frame)
+    // THE LOOP MUST NOT BE KILLABLE. This used to re-arm requestAnimationFrame as
+    // its last statement with no try/catch, so a single throw anywhere below did
+    // not drop a frame — it ended rendering for the whole session on that device,
+    // while the host kept simulating and prediction kept the player walking. The
+    // rest of the party looked frozen. The re-arm now lives in `finally`, so the
+    // next frame always comes and the client recovers by itself the moment the
+    // state that caused the throw clears.
+    //
+    // Nothing is swallowed: every failure is counted, reported to the console
+    // (throttled, never muted — see ui/frameErrorModel.ts) and put on screen.
+    guardFrame(
+      () => {
+        const dt = Math.min((now - last) / 1000, 0.25)
+        acc += dt
+        last = now
+        while (acc >= SIM_DT) {
+          session.tick()
+          debug?.afterTick() // stream this tick's events + drain queued debug mutations
+          inspect.afterTick() // buffer this tick's events for sporefall.events()
+          acc -= SIM_DT
+        }
+        // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
+        // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
+        if (persister) {
+          const w = hostWorld()
+          if (w) persister.maybeSave(w)
+        }
+        const alpha = acc / SIM_DT
+        const view = session.renderView()
+        inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
+        if (view.level !== currentLevel) {
+          currentLevel = view.level
+          renderer.setLevel(view.level)
+        }
+        if (view.self) {
+          const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
+          const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
+          // Objective focus: while live, the camera glides to the link target and
+          // back (focusPanRate < normal → an animated pan, never a cut). The focus
+          // dies on its own timer, when the player moves, or if the target despawns.
+          const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
+          focus = tickFocus(focus, dt, view.self.pos, focusPos)
+          const rate = focusPanRate(focus)
+          if (focus) {
+            const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
+            renderer.camera.follow(t.x, t.y, dt, rate)
+          } else {
+            renderer.camera.follow(px, py, dt, rate)
+          }
+        }
+        renderer.draw(view, alpha, dt)
+        hud.update(view)
+        const pads = coop.debug()
+        // Twin-stick aim reticles: one per joined pad with a deflected right stick,
+        // anchored to that pad's player entity. Presentation only.
+        const anchors: ReticleAnchor[] = []
+        for (const e of view.entities)
+          if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
+        renderer.setReticles(padAimReticles(pads, anchors))
+        // Exposed-but-unjoined pad: nudge the player that any input joins.
+        showPadHint(pads.some((p) => p.slot === null))
+        vis = stepVisibility(vis, {
+          padJoined: anyPadActive(pads),
+          padActivity: anyPadProducing(pads),
+          touchActivity: touchSeen,
+        })
+        touchSeen = false
+        touch?.setVisible(sticksVisible(vis, caps))
+        touch?.update(view)
+        coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
+        screens.update(view)
+        missionPanel.update(view)
+        commOverlay.update(view)
+        overlay.update(pads)
+        pauseOverlay.update(session.isPaused ?? false, view)
+        const hide = shouldHideCursor({
+          paused: session.isPaused ?? false,
+          gameOver: view.gameOver,
+          selfDead: !!view.self?.dead,
+        })
+        if (hide !== cursorHidden) {
+          canvas.style.cursor = hide ? 'none' : ''
+          cursorHidden = hide
+        }
+        frameErrors = noteFrameOk(frameErrors)
+      },
+      (err) => {
+        const noted = noteFrameError(frameErrors, frameErrorMessage(err))
+        frameErrors = noted.state
+        if (noted.log) console.error('[frame] uncaught error — the loop keeps running:', err)
+        showFrameError(frameErrorBannerText(frameErrors))
+        // Drop the sim backlog this frame never worked off. `acc` is only spent
+        // inside the fixed-step loop above, so a throw before it drains leaves the
+        // time owed to pile up — and a fault that clears after a few seconds would
+        // then be paid off as one enormous catch-up burst, freezing the device for
+        // real. Losing the skipped time is the cheaper failure.
+        acc = 0
+      },
+      () => requestAnimationFrame(frame),
+    )
   }
   requestAnimationFrame(frame)
 }

@@ -15,6 +15,7 @@
 
 import { HostSession } from '../app/hostSession'
 import { spawnPlayer } from '../game/player'
+import { playerSpawnPoint } from '../game/spawnPlacement'
 import { emptyInput, type InputCmd, type SimEvent } from '../game/types'
 import type { World } from '../game/world'
 import type { InputSource } from '../input/input'
@@ -125,8 +126,11 @@ export class GameHarness {
   }
 
   private spawnBot(bot: Bot): void {
-    const spawn = this.world.level.spawn
-    const e = spawnPlayer(this.world, bot.slot, spawn.x + bot.slot * 0.6, spawn.y)
+    // Same collision-checked placement the real hosts use, so a bot lands where a
+    // human on that slot would (and never inside a wall, which used to make a bot
+    // look "stuck" for reasons that had nothing to do with its behaviour).
+    const at = playerSpawnPoint(this.world.level, bot.slot)
+    const e = spawnPlayer(this.world, bot.slot, at.x, at.y)
     bot.entityId = e.id
   }
 

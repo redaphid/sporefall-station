@@ -254,6 +254,15 @@ export class NetClientSession implements Session {
         this.entities.clear()
         this.targets.clear()
         this.self = undefined
+        // ...AND the id we bind `self` by. This used to be the one thing GameStart
+        // did NOT reset, and it was load-bearing: `Go` is a SEPARATE message, so a
+        // snapshot of the NEW world that lands in between was matched against the
+        // PREVIOUS run's entity id. In the new world that id is whatever the
+        // generator happened to hand it — measured at 1.6% of seed pairs it is a
+        // door — and `self` bound to a non-player made renderView throw, which
+        // (before the frame loop was made crash-proof) ended that phone's rendering
+        // for the whole session. Unbound until Go says otherwise.
+        this.selfId = -1
         this.localInv = undefined // fresh run: wait for the host's authoritative inventory
         // "Play again" rebuilds the host's world from scratch (netHost.restart →
         // createWorld), so its tick counter goes back to 0. Re-baseline, or every
@@ -353,7 +362,11 @@ export class NetClientSession implements Session {
         e.prevPos.y = we.y
         this.entities.set(we.id, e)
       }
-      if (we.id === this.selfId) {
+      // Bind by id AND by "is actually a player". The id reset above closes the
+      // known hole; this closes the CLASS of them — every consumer of `self`
+      // (renderView's HUD merge, stepSelf, reconcile) assumes a playerCtl, so a
+      // mismatched id must leave us unbound rather than piloting the scenery.
+      if (we.id === this.selfId && e.playerCtl) {
         this.self = e
         this.reconcile(we)
       } else {
@@ -469,10 +482,12 @@ export class NetClientSession implements Session {
     const events = this.eventsOut
     this.eventsOut = []
     const hud = this.state.huds[this.slot]
-    if (this.self && hud) {
+    // `playerCtl` is CHECKED, not asserted: rendering must never be the thing
+    // that throws. It is the last frame of the session if it does.
+    if (this.self?.playerCtl && hud) {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
-      this.self.playerCtl!.cash = hud.cash
-      this.self.playerCtl!.abilityCooldown = hud.abilityCd
+      this.self.playerCtl.cash = hud.cash
+      this.self.playerCtl.abilityCooldown = hud.abilityCd
       if (this.self.combat) this.self.combat.weapon = hud.weapon
       else this.self.combat = { weapon: hud.weapon, cooldown: 0 }
     }

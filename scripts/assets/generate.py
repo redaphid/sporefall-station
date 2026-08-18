@@ -493,6 +493,28 @@ PROPS = {
     # then the wrong reading negatived BY NAME. The wrong reading for furniture
     # is the neighbouring piece of furniture -- a bench that comes back with a
     # backrest is a chair, and a table with drawers is the desk we already ship.
+    # THE SHELF IS THE HARD ONE, AND HERE IS THE MEASUREMENT SO NOBODY REPEATS IT.
+    # This wording yields ~2/8 clean single racks on the fixed seed set
+    # 1000-1007 (tag p2) -- the weakest subject in the group, and the one that
+    # matters most at 20.8/floor.
+    #
+    # TRIED AND REJECTED (tag p3, SAME eight seeds, one knob): loading the
+    # shelves. "every shelf PACKED FULL of stacked crates ... solid back panel",
+    # plus anti-duplicate negatives ("two racks, several racks, row of shelving,
+    # aisle, warehouse interior"). The theory was that an open frame is mostly
+    # HOLES and holes are noise at 32px, so solid loaded bands would survive the
+    # downscale better.
+    #
+    # It measured WORSE: ~1/8. Loading the shelves reads to the model as a
+    # WAREHOUSE, and a warehouse is composed as an AISLE -- six of eight seeds
+    # came back as two racks facing each other, which is exactly the duplicate
+    # the negatives named and did not prevent. Same shape as the NEG_STACK
+    # lesson in docs/sprite-generation.md 4.0: naming the defect in the negatives
+    # does not move a compositional tendency of the base model.
+    #
+    # So the next knob to try is NOT more negatives and NOT more loading. It is
+    # the object's own proportions -- a wider, shallower, fewer-levelled unit
+    # that cannot read as aisle racking in the first place.
     "storage-rack": ("props/storage-rack.png",
                      "a tall open shelving rack, an upright metal frame with FOUR separate "
                      "horizontal shelf boards stacked one above another with clear open gaps "

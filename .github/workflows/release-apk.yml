@@ -24,6 +24,11 @@ permissions:
 jobs:
   release-apk:
     runs-on: ubuntu-latest
+    # Cap the job. On 2026-08-18 a `playwright install` step wedged and ran
+    # the full 6h GitHub default, burning ~360 runner-minutes (18% of the
+    # monthly private-repo allowance) before it was killed. A hung job must
+    # fail fast and cheaply, not eat the quota that the deploy needs.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:

@@ -13,6 +13,9 @@ import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
+// Type-only: the implementation is dynamically imported, so nothing from the
+// state-sharing feature reaches a normal player's boot chunk.
+import type { StateReplay } from './app/stateReplay'
 import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
@@ -26,7 +29,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT } from './game/types'
+import { SIM_DT, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -138,7 +141,14 @@ const boot = async (): Promise<void> => {
   document.addEventListener('fullscreenchange', () => {
     if (isFullscreen()) lockLandscape()
   })
-  const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount, requestFullscreenOnGesture))
+  // A `?state=` link IS the intent: someone was sent an exact world to look at,
+  // so boot straight into it rather than making them pick Solo from the menu
+  // first (which would also build a throwaway world before replacing it).
+  // Shared states restore into SINGLE-PLAYER — see the `?state=` block below.
+  const sharedState = params.get('state')
+  const mode =
+    (params.get('mode') as GameMode | null) ??
+    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture))
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
@@ -196,7 +206,8 @@ const boot = async (): Promise<void> => {
   const store = browserStore()
   const persister: Persister | undefined = store && session instanceof HostSession ? createPersister(store) : undefined
   const scenario = params.get('scenario')
-  const explicitWorldOverride = !!scenario || !!params.get('world') || !!params.get('script')
+  const explicitWorldOverride =
+    !!scenario || !!params.get('world') || !!params.get('script') || !!params.get('state')
   let resumed = false
   if (persister && store && session instanceof HostSession && !explicitWorldOverride) {
     const saved = readSave(store) // null on no/corrupt/version-mismatched save → fresh game
@@ -224,14 +235,19 @@ const boot = async (): Promise<void> => {
   // snapshots. Placed before the `?e2e`/`?script=` exposure below so `window.__world`
   // points at the injected world. Absent `?world=`, behavior is unchanged.
   const worldParam = params.get('world')
+  // Shared with `?state=` below: both replace the freshly-built world wholesale.
+  const injectWorld =
+    session instanceof HostSession
+      ? (json: WorldJson): void => {
+          const host = session
+          const restored = deserializeWorld(json)
+          host.world = restored
+          host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
+          renderer.setLevel(restored.level)
+        }
+      : undefined
   if (worldParam && session instanceof HostSession) {
-    const host = session
-    const inject = (json: WorldJson): void => {
-      const restored = deserializeWorld(json)
-      host.world = restored
-      host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
-      renderer.setLevel(restored.level)
-    }
+    const inject = injectWorld!
     if (worldParam === '@inline') {
       await new Promise<void>((resolve) => {
         ;(window as unknown as { __loadWorld: (j: WorldJson) => void }).__loadWorld = (j) => {
@@ -242,6 +258,40 @@ const boot = async (): Promise<void> => {
     } else {
       inject(loadFixtureJson(worldParam))
     }
+  }
+  // `?state=<id>` — a SHAREABLE debug state: the same exact-world injection as
+  // `?world=`, but fetched from the Worker instead of read out of the bundle, so
+  // a link can be sent to someone who does not have the fixture (or the repo).
+  //
+  // Scoped to SINGLE-PLAYER (solo/host owns the authoritative world). Restoring a
+  // multiplayer state onto one machine is a genuinely different problem — peers,
+  // slot ownership and per-client prediction all have to be re-established — and
+  // is deliberately not attempted here. A friend who opens the link plays the
+  // captured world solo, which is what reproducing a bug needs.
+  //
+  // The import is DYNAMIC so the share/compress code never lands in the boot
+  // chunk of a normal player, and any failure is reported loudly rather than
+  // silently dropping the player into a fresh, wrong world.
+  const stateParam = sharedState
+  let stateReplay: StateReplay | undefined
+  if (stateParam && injectWorld && session instanceof HostSession) {
+    const host = session
+    const { fetchState } = await import('./app/stateShare')
+    const { startStateReplay } = await import('./app/stateReplay')
+    const payload = await fetchState(stateParam)
+    // Load the world from ~1 s BEFORE the moment when there is run-up to play,
+    // so the viewer watches the bug happen; the frame loop below drives the
+    // recorded inputs forward and hands control over at the captured frame.
+    // With no rewind (sender had no ring armed) we land on the captured frame.
+    injectWorld(payload.rewind?.world ?? payload.world)
+    stateReplay = startStateReplay(payload, () => host.world, uiMount)
+    const { note, build } = payload.meta
+    console.log(
+      `sporefall: loaded shared state ${stateParam} ` +
+        `(floor ${payload.world.floor}, tick ${payload.world.tick}, ${payload.world.entities.length} entities` +
+        `${payload.rewind ? `, replaying ${payload.rewind.frames.length} ticks of run-up` : ''})` +
+        `${note ? ` — "${note}"` : ''}${build && build !== APP_VERSION ? ` [captured on build ${build}, you are on ${APP_VERSION}]` : ''}`,
+    )
   }
   const zoom = Number(params.get('zoom'))
   if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
@@ -363,6 +413,64 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
+  // Shareable debug states (`?state=`). Under `?debug` only, arm a rolling ring
+  // of the last few seconds of inputs and expose `sporefall.share(note)` in the
+  // console. The ring is what turns "here is the corpse" into "here is the bug
+  // happening": a capture carries 3-6 s of run-up, so `respawned inside a wall`
+  // ships the spawn, not just the aftermath.
+  //
+  // Debug-gated on purpose. The ring costs one `serializeWorld` every 180 ticks
+  // (the same order as the existing throttled autosave) and the module pulls in a
+  // compressor and an uploader — none of which belongs in a normal player's boot.
+  // Dynamic import keeps it in its own chunk. `sporefall.share` simply does not
+  // exist without `?debug`.
+  let stateRing: { afterTick(): void } | undefined
+  if (params.has('debug') && session instanceof HostSession) {
+    const host = session
+    const { StateRing, shareState } = await import('./app/stateShare')
+    let ring = new StateRing(host.world)
+    // ORDER MATTERS, and getting it wrong is exactly the bug this feature is
+    // built to catch. `onTickInputs` fires BEFORE `tickWorld`, so it can only
+    // STASH the composed slot→command map — the ground-truth input the world is
+    // a pure function of. The ring is fed AFTER the tick (see `afterTick` below,
+    // called from the frame loop next to `debug?.afterTick()`), because a
+    // checkpoint taken pre-tick is misaligned by one tick against the inputs
+    // recorded alongside it, and a replay from it drifts. The capture-time
+    // self-check caught precisely that during development.
+    let pending: Map<number, InputCmd> | undefined
+    host.onTickInputs = (inputs) => {
+      pending = new Map([...inputs].map(([slot, cmd]) => [slot, { ...cmd }]))
+    }
+    // New Seed / play-again REPLACES the world object; the buffered history then
+    // belongs to a world that no longer exists, so start the ring over.
+    let seen = host.world
+    const rebindRing = (): void => {
+      if (host.world !== seen) {
+        seen = host.world
+        ring = new StateRing(host.world)
+      }
+    }
+    ;(window as unknown as { sporefallShare: unknown }).sporefallShare = async (note?: string) => {
+      rebindRing()
+      const r = await shareState(host.world, { note }, ring)
+      console.log(
+        `sporefall: shared ${r.url}\n  ${(r.bytes / 1024).toFixed(1)} KiB uploaded ` +
+          `(${(r.rawBytes / 1024).toFixed(1)} KiB raw), ${r.rewindTicks} ticks of run-up`,
+      )
+      return r
+    }
+    // Fed from the frame loop AFTER each tick, so the recorded inputs and the
+    // checkpoint they are replayed from describe the same instant.
+    stateRing = {
+      afterTick: () => {
+        rebindRing()
+        if (!pending) return
+        ring.observe(host.world, pending)
+        pending = undefined
+      },
+    }
+    console.log('sporefall: debug state sharing armed — await sporefallShare("what broke") for a link')
+  }
   // A sleeping screen freezes this player — and if this player is the host, it
   // freezes the authoritative sim and therefore EVERYONE, which looks like a
   // crash rather than a phone. Acquired here because this is the point of no
@@ -371,7 +479,7 @@ const boot = async (): Promise<void> => {
   // reload — and the browser releases the lock for us on unload. The handle's
   // `release()` exists for whenever a real quit-to-menu path arrives.
   keepScreenAwake()
-  runLoop(session, renderer, uiMount, coop, inspect, touch, debug, persister, resumed)
+  runLoop(session, renderer, uiMount, coop, inspect, touch, debug, persister, resumed, stateReplay, stateRing)
 }
 
 /** localStorage as a `KeyValueStore`, or `undefined` where it is unavailable
@@ -722,6 +830,10 @@ const runLoop = (
   debug?: DebugLink,
   persister?: Persister,
   resumed = false,
+  /** Non-undefined only for a `?state=` link: drives the recorded run-up. */
+  stateReplay?: StateReplay,
+  /** Debug-only rewind ring, fed after each live tick. */
+  stateRing?: { afterTick(): void },
 ): void => {
   const hud = createHud(uiMount)
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
@@ -885,7 +997,16 @@ const runLoop = (
         acc += dt
         last = now
         while (acc >= SIM_DT) {
-          session.tick()
+          // A `?state=` link opens by REPLAYING the second before the capture,
+          // on this same fixed timestep so it runs at true gameplay speed. Live
+          // input is ignored until it reconverges on the captured frame; the
+          // banner from stateReplay.ts is what stops the viewer concluding the
+          // game has hung.
+          if (stateReplay?.active) stateReplay.step()
+          else {
+            session.tick()
+            stateRing?.afterTick() // record AFTER the tick — see the arming block
+          }
           debug?.afterTick() // stream this tick's events + drain queued debug mutations
           inspect.afterTick() // buffer this tick's events for sporefall.events()
           acc -= SIM_DT

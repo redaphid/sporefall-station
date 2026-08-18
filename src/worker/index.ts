@@ -10,6 +10,7 @@
 // (free, cached, with public/_headers + public/_redirects honored). The ASSETS
 // fallback below is belt-and-suspenders for anything that still reaches here.
 
+import { STATE_PREFIX, handleDebugState } from './debugState'
 import { handleOta } from './ota'
 import { REVIEW_PREFIX, handleReviewImage } from './reviewImages'
 import type { Env } from './env'
@@ -36,6 +37,13 @@ export default {
     // MUST be handled here and never fall through to ASSETS: the SPA fallback
     // would answer a missing image with 200 + index.html. See reviewImages.ts.
     if (url.pathname.startsWith(REVIEW_PREFIX)) return handleReviewImage(request, env)
+
+    // /state/* → a shared debug-state capture (POST to store, GET to fetch).
+    // Same rule as /review/*: it MUST be handled here, because the SPA fallback
+    // would answer a missing/expired id with 200 + index.html and the game would
+    // try to JSON.parse a page of HTML. See debugState.ts.
+    if (url.pathname === STATE_PREFIX || url.pathname.startsWith(`${STATE_PREFIX}/`))
+      return handleDebugState(request, env)
 
     return env.ASSETS.fetch(request)
   },

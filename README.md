@@ -80,7 +80,10 @@ Client inputs ride write-without-response; state comes back as directed notifica
   `NetHostSession`, `NetClientSession` (own-player prediction via the shared
   `moveAndCollide`, rewind-replay reconciliation, smoothing for remotes).
 - `src/render/` — PixiJS v8, chunk-culled tilemap, sprite pool, DPR capped at 2.
-  All art is generated colored shapes; swap `src/render/art.ts` for a real tileset.
+  Ships **real sprite art**: themes under `public/themes/` (`swampspace-hires` by
+  default) are fetched and baked by `themeLoader.ts`. `art.ts` is the procedural
+  fallback — any sprite a theme fails to supply degrades to a drawn shape rather
+  than crashing. See `docs/themes.md` and `docs/sprite-generation.md`.
 
 ## AI-native ECS
 
@@ -112,13 +115,42 @@ bit-for-bit, which makes the world legible to an AI agent and to rigorous tests.
 ## Tests
 
 ```bash
-pnpm test                              # 550+ unit/sim tests (determinism, netcode, combat, serialize)
+pnpm test                              # 3059 unit/sim tests in 201 files (~3.5 min)
 pnpm exec tsx scripts/test/mp-smoke.ts      # 2-tab co-op end-to-end (needs `pnpm run dev` running)
 pnpm exec tsx scripts/test/dump-level.ts 7  # eyeball a generated city as ASCII
 pnpm run e2e                           # deterministic recorded video + state-assert scenarios
+npx tsx e2e/net-conditions.mts         # co-op over a modelled BLE link (see below)
 ```
 
 Fixtures + exact-state replay live in `src/game/__fixtures__/` and `src/game/testkit.ts`.
+
+> **CI does not run `pnpm test`.** The workflows run a typecheck+build, one single
+> test file, and the `e2e/run.sh` proof. The full suite and `pnpm run lint` are a
+> local gate only — a green tick on GitHub does not mean the tests passed.
+
+### `e2e/net-conditions.mts` — the two-phone test, without two phones
+
+Runs the real `NetHostSession` and `NetClientSession` against each other in one
+Node process, over a link model that reproduces what BLE actually gives you:
+180-byte packets, one packet in flight, added latency, jitter, per-packet loss and
+range dropouts. **20 profiles** — clean, 200 ms latency, heavy jitter, 2/10/30%
+loss, a congested slow link, 60-second soaks, ordered/reordering and immortal
+controls, a 3-second blackout, and hard-drop rejoin with both the same and a new
+peer id. Each asserts that the join completes, entity identity survives the wire,
+entities inside the interest box arrive, positions converge within a
+latency-scaled tolerance, globals converge, and the client never wedges.
+
+```bash
+npx tsx e2e/net-conditions.mts --self-test          # deliberately corrupt the wire; MUST fail
+npx tsx e2e/net-conditions.mts --only loss-10pct    # a single profile
+npx tsx e2e/net-conditions.mts                      # everything, ~11 min of link time
+```
+
+`--self-test` corrupts the archetype byte of every snapshot — leaving the
+handshake intact, so the run still joins and plays and the failure has to come
+from the comparator — and then **inverts the exit gate**: if the harness stays
+green on a broken wire it exits non-zero and tells you every green result was
+meaningless. Nothing in CI runs any of this; invoke it by hand.
 
 ## Reconnect after a drop
 

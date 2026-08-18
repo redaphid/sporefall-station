@@ -256,6 +256,76 @@ paths (version mismatch, join-after-start, lobby full). Run with:
 pnpm test
 ```
 
+That transport is perfect, though — no latency, no loss, no fragmentation. For
+the link a car actually provides, use the harness below.
+
+#### `e2e/net-conditions.mts` — co-op under an adverse link
+
+**The most complete co-op test in the repo, and nothing runs it automatically.**
+There is no `package.json` script for it and no CI job; it is referenced nowhere
+but its own header. Run it by hand before you trust a netcode change.
+
+It drives the real `NetHostSession` and `NetClientSession` against each other in a
+single Node process through a modelled BLE link:
+
+- **180-byte packets** (`bleTransport`'s `MAX_PACKET`), so every snapshot bigger
+  than that fragments and exercises `chunkedStream`'s reassembly — the path that
+  ships on two phones.
+- **One packet in flight.** The model awaits `sendPacket`, so transmit pacing is
+  real backpressure rather than a simulated number.
+- **Latency, jitter, per-packet loss, throughput, and range dropouts**, all seeded
+  from `mulberry32` so a condition set is reproducible.
+- **Ordered delivery by default**, because a single BLE connection (ATT/L2CAP on
+  one link) never reorders. Per-direction FIFOs drained by one timer — plain
+  `setTimeout` is not enough, since Node buckets timers and can fire two packets
+  out of order.
+
+> **`e2e/ws-multiplayer.mjs` is not a substitute.** It pushes whole messages
+> through a 64 KB WebSocket, so it never fragments and never touches the
+> reassembly path. Different transport, different failure modes.
+
+**Per profile it asserts:** the join handshake completes and the client reaches
+`playing`; *identity* — every entity the client renders exists on the host with
+the same archetype (the `ARCHETYPES`-index desync class); *coverage* — entities
+well inside the client's interest box actually arrive; *position* — shared
+entities agree within a latency-scaled tolerance; *globals* —
+floor/missionComplete/gameOver/alert converge; *liveness* — the client keeps
+applying snapshots and no `StreamReader` wedges. It also reports any archetype the
+host spawned that is missing from the wire registry (those arrive as `player`).
+
+**The 20 profiles:** `pristine`, `ble-typical`, `high-latency-200ms`,
+`heavy-jitter`, `loss-2pct`, `loss-10pct`, `loss-30pct`, `congested-slow-link`;
+60-second soaks (`soak-clean-60s`, `soak-loss-1pct-60s`, `soak-loss-5pct-60s`)
+that ask the campfire question — *does a lossy radio freeze the joining player's
+screen for good within a few minutes?*; controls that separate "loss wedges the
+stream" from artefacts of the model itself (`ctl-reordering-clean-60s`,
+`ctl-ordered-clean-60s`, `ctl-ordered-loss1-60s`, three `ctl-immortal-*` runs that
+remove the death/game-over path, and `ctl-immortal-nojitter-60s`); and event
+profiles `out-of-range-3s`, `hard-drop-rejoin-same-id`,
+`hard-drop-rejoin-new-id`.
+
+```bash
+npx tsx e2e/net-conditions.mts --self-test         # prove it can fail (see below)
+npx tsx e2e/net-conditions.mts --only ble-typical  # one profile
+npx tsx e2e/net-conditions.mts                     # all 20, ~11 min of link time
+npx tsx e2e/net-conditions.mts --allow COVERAGE    # drop a code from the exit gate
+```
+
+**It can prove itself, which is the point.** `--self-test` corrupts the archetype
+byte of every snapshot entity record while leaving the Hello/Welcome/GameStart
+handshake intact — so the run still joins and plays, and any failure has to come
+from the world comparator rather than a dead connection. Then it **inverts the
+exit gate**: if no profile fails under a deliberately broken wire, it exits
+non-zero with *"the harness stayed green with a deliberately corrupted wire… treat
+every green result as meaningless."* A green run you have never seen go red is not
+evidence.
+
+`--allow <CODE,…>` removes divergence codes from the exit gate only — they are
+still printed. Suppressing a finding from the gate must never hide it.
+
+Exit codes: `0` pass, `1` a profile failed (or the self-test failed to fail),
+`2` bad arguments or a harness crash.
+
 ### Manual two-device test (needs two real phones)
 
 A real BLE link can't be exercised headlessly, so verify the transport itself on
@@ -264,6 +334,12 @@ hardware:
 1. `pnpm run build:apk` then `pnpm run install:apk` (with a phone on `adb`).
    Install the resulting `android/app/build/outputs/apk/debug/app-debug.apk` on
    a **second** phone too (e.g. `adb install -r`, or copy the APK over).
+
+   > Needs a **JDK 21+ and the Android SDK** locally. The primary Windows dev
+   > machine has neither — the committed Gradle wrapper makes `gradlew.bat` look
+   > runnable, but there is nothing behind it. If you can't build, take the APK
+   > from the `android-apk` workflow artifact or
+   > `https://sporefall.hypnodroid.com/download` instead.
 2. Turn Bluetooth on for both. Disconnect from Wi-Fi/data on both to prove it's
    truly offline.
 3. Phone A: character → **Host co-op** → Allow Bluetooth → "Waiting for

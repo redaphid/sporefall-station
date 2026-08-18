@@ -445,9 +445,11 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   const dbg = createDebugLog(deps.uiMount)
 
   if (mode === 'host') {
-    // Advertise the host's display name so the join list can label this phone
-    // (issue #35). No "Spore " tag: the scan already filters by service UUID, and
-    // the ~8-char advertisement budget is too tight to waste on a prefix.
+    // The display name is passed for the lobby, NOT for the airwaves: nothing
+    // this host broadcasts carries a name at all (#16 took it back off after #35
+    // put it on and killed discovery). Joining phones tag the row 'Sporefall'
+    // themselves — see toHostLabel — which needs no advertisement bytes and works
+    // against hosts running older builds too.
     const wsHost = new URLSearchParams(location.search).get('transport') === 'ws'
     const transport = wsHost
       ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))

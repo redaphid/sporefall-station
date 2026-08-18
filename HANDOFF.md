@@ -83,7 +83,7 @@ unreviewed and unmerged; this is a description, not a statement that it is fixed
 
 | Workflow | Typical | Notes |
 |---|---|---|
-| `deploy-web` | ~1m0s–1m15s | |
+| `deploy-web` | ~55s–1m20s | |
 | `preview-web` | ~50s–1m5s | |
 | `android-apk` | ~4m0s–4m30s | |
 | `web-e2e` | ~12m (PR) – 25m (main) | the long pole; builds, records video, muxes |

@@ -83,6 +83,39 @@ export const isNewerTick = (tick: number, prev: number): boolean => {
   return forward !== 0 && forward < 0x8000_0000
 }
 
+/**
+ * Lift the host's u16 input-ack back into the client's own counter domain.
+ *
+ * THIS IS A UNIT MISMATCH, not a missing wrap-tolerant comparison — which
+ * matters, because the obvious fixes are both wrong.
+ *
+ * `inputSeq` is an unbounded JS counter (`cmd.seq = ++this.inputSeq`, one per
+ * 30 Hz tick, never masked and never reset for the life of the page).
+ * `encodeInput` truncates it on the wire (`.u16(cmd.seq & 0xffff)`), the host
+ * stores that truncated value, and `snapshot.lastInputSeq` hands it back as a
+ * raw u16. So `pendingInputs.filter(p => p.seq > lastAckedSeq)` was comparing
+ * a number that counts to infinity against one that counts to 65535.
+ *
+ * For the first 65536 ticks the two domains happen to coincide and everything
+ * works. 65536 / SIM_RATE(30) = **36.4 minutes** of continuous play in one page
+ * load, and past that point `lastAckedSeq` restarts near 0 while `p.seq` keeps
+ * climbing, so the filter matches EVERYTHING: the backlog pins at its cap of 60
+ * and `reconcile` replays 2.0 seconds of movement — roughly 9 tiles — on every
+ * snapshot at 10 Hz, permanently, until the page is reloaded.
+ *
+ * Masking the counter alone would NOT fix it (the ack would still be a bare
+ * u16 compared against a masked counter that wraps at a different moment), and
+ * a wrap-tolerant `>` would not fix it either (the two operands are in
+ * different units; there is no wrap to be tolerant of). The right move is to
+ * put the ack back into the counter's units: take the distance from our own
+ * counter to the ack THROUGH the u16 window, and subtract it.
+ *
+ * The masked delta is always in [0, 65535], so the result is never above
+ * `inputSeq` — an ack can never claim more than we have sent. And the true gap
+ * can never approach 65536 because `pendingInputs` is capped at 60 entries.
+ */
+export const liftAckedSeq = (inputSeq: number, wireAck: number): number => inputSeq - ((inputSeq - wireAck) & 0xffff)
+
 export type ClientPhase = 'connecting' | 'lobby' | 'starting' | 'playing' | 'reconnecting' | 'ended' | 'rejected'
 
 const RECONNECT_ATTEMPTS = 30
@@ -386,7 +419,9 @@ export class NetClientSession implements Session {
     if (this.lastSnapTick >= 0 && !isNewerTick(snap.tick, this.lastSnapTick)) return
     this.lastSnapTick = snap.tick
     this.changeFloor(snap.floor) // guarded: only a DEEPER floor rebuilds the level
-    this.lastAckedSeq = snap.lastInputSeq
+    // The wire carries a u16; `pendingInputs` holds unbounded counter values.
+    // Lift before comparing, or every input looks unacked after 36 minutes.
+    this.lastAckedSeq = liftAckedSeq(this.inputSeq, snap.lastInputSeq)
     const seen = new Set<number>()
     for (const we of snap.entities) {
       seen.add(we.id)

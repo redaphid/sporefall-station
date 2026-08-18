@@ -8,11 +8,17 @@
 > `main` since the migration**, so the deployed site and phone OTA are frozen at an
 > old build (~324) while `main` is at build 355."*
 >
-> **That has been false since 2026-07-21.** It cost at least one agent real effort
-> routing around a problem that did not exist. `deploy-web` ran **green on 24
-> consecutive pushes** to `main` from 2026-07-21 through 2026-08-18T04:34Z, and the
-> OTA endpoint has been serving current builds throughout. Every item on the old
-> fix-checklist was already complete. The evidence is in the table below.
+> **It stopped being true on the morning of 2026-07-21**, and was never updated.
+> `deploy-web` did fail 8 times that day — every one of them between 01:03Z and
+> 07:43Z, i.e. *before* the Cloudflare secrets were added at 08:23Z/08:47Z. From
+> that moment on it has succeeded on **every** run: **42 successes**, the only two
+> non-successes in a month being one concurrency cancellation (2026-08-12, a
+> superseded run) and the billing block described below (2026-08-18). The OTA
+> endpoint served current builds throughout.
+>
+> So the document described a real ~7-hour outage that had already been fixed by
+> the time anyone read it. It then cost at least one agent real effort routing
+> around a problem that no longer existed.
 >
 > If you are about to work around a broken deploy, **check `gh run list` first.**
 
@@ -26,7 +32,7 @@
 | APK workflows never set `OTA_UPDATE_URL` | Both set it | `android-apk.yml:56`, `release-apk.yml:86,97` |
 | Custom domain not moved | Live and serving | `wrangler.jsonc:13-16` (`custom_domain: true`) |
 | Old repo's fate undecided | Archived | `gh repo view redaphid/mobile-streets-of-rogue` → `isArchived: true` |
-| Deploy broken | 24 consecutive green runs | `gh run list --workflow=deploy-web.yml` |
+| Deploy broken | 42 green runs since the secrets landed | `gh run list --workflow=deploy-web.yml` |
 
 Canonical origin: **`https://sporefall.hypnodroid.com`**. OTA manifest:
 `POST /ota/check` → served by `src/worker/ota.ts`.

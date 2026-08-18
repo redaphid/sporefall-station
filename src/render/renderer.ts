@@ -28,6 +28,7 @@ import {
   VIGNETTE_MAX,
 } from './juice'
 import { createPickTracker } from './pickModel'
+import { PlayerMarkerLayer } from './playerMarkerLayer'
 import { createSettingsPanel } from './settingsPanel'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
@@ -151,6 +152,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // GPU mesh in world space — no per-entity filter — so it rides the camera
   // transform and the backbuffer composite like the bullets do.
   const statusFx = new StatusFxLayer()
+  // Co-op identity: a ring at each player's feet + their name, so a crew is
+  // readable mid-fight and you can find YOURSELF instantly (playerMarkers.ts).
+  const playerMarkers = new PlayerMarkerLayer()
   const effects = new EffectsLayer(art)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
@@ -195,7 +199,19 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   }
   // The pick layer lives INSIDE `world`: it is world-space affordance art, so
   // it rides the camera transform and (deliberately) the distortion field too.
-  world.addChild(tilemap.root, entities.root, statusFx.root, bullets.root, effects.root, reticleLayer, pickLayer)
+  // Player markers sit directly ABOVE the entity layer — so no prop can hide the
+  // ring that says which body is yours — and BELOW status-fx/bullets/effects, so
+  // every threat and every impact still paints over the top of them.
+  world.addChild(
+    tilemap.root,
+    entities.root,
+    playerMarkers.root,
+    statusFx.root,
+    bullets.root,
+    effects.root,
+    reticleLayer,
+    pickLayer,
+  )
 
   // --- Backbuffer weapon-FX pipeline (backbuffer.ts). The world lives inside
   // `sceneRoot`; the pipeline either composites it through the distortion
@@ -336,6 +352,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     if (currentLevel) tilemap.build(currentLevel, art)
     entities.refresh()
     bullets.refresh()
+    playerMarkers.refresh()
   }
 
   const native = Capacitor.isNativePlatform()
@@ -458,6 +475,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
         entities.update(view.entities, alpha, view.tick, view.floor)
+        playerMarkers.update(view.entities, view.self?.id, alpha, view.tick, camera.zoom)
         statusFx.update(view.entities, alpha, view.tick)
         bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)

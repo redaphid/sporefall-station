@@ -1,5 +1,6 @@
 import type { Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
+import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
 import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
@@ -14,8 +15,10 @@ export interface CoopSource {
 }
 
 // Slot 0 (the first pad) shares player 0 with the keyboard so the camera target
-// stays under the primary human; extra pads become players 1, 2, 3.
-const spawnOffset = (slot: number): number => slot * 1.5
+// stays under the primary human; extra pads become players 1, 2, 3. WHERE those
+// extra pads land is `playerSpawnPoint` (game/spawnPlacement.ts) — the fixed
+// `slot * 1.5` offset this used to apply landed 26.3% of local co-op players
+// inside a solid tile, entombed for the rest of the run.
 
 /** Clamp an aim vector to unit magnitude, preserving its angle. Out-of-spec pads
  * (Stadia reads up to ~1.11 on diagonals) would otherwise over-scale the reticle
@@ -103,7 +106,8 @@ export class HostSession implements Session {
     this.world = createWorld(this.seed, 1, this.mode)
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
+    const at = playerSpawnPoint(this.world.level, 0)
+    this.self = spawnPlayer(this.world, 0, at.x, at.y)
   }
 
   /** Play again from a game-over: rebuild the run in place. (Solo has no
@@ -126,8 +130,8 @@ export class HostSession implements Session {
     if (slot === 0) return // player 0 already exists (self)
     if (this.joined.has(slot)) return
     this.joined.add(slot)
-    const spawn = this.world.level.spawn
-    spawnPlayer(this.world, slot, spawn.x + spawnOffset(slot), spawn.y)
+    const at = playerSpawnPoint(this.world.level, slot)
+    spawnPlayer(this.world, slot, at.x, at.y)
   }
 
   tick(): void {

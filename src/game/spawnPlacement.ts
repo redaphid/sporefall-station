@@ -68,6 +68,27 @@ export const bodyFitsAt = (level: Level, x: number, y: number, radius: number = 
 }
 
 /**
+ * Walkable tile centres out from (x, y), nearest first. The ONE traversal every
+ * placement helper here shares — `playerSpawnPoint` takes the slot-th, and
+ * `bodySpawnPoint` takes the first that is also unoccupied. Forking this into a
+ * second copy is how the two would silently drift apart later.
+ */
+function* freeTileCentres(
+  level: Level,
+  x: number,
+  y: number,
+  radius: number,
+): Generator<{ x: number; y: number }> {
+  const tx0 = Math.floor(x)
+  const ty0 = Math.floor(y)
+  for (const { dx, dy } of SEARCH_OFFSETS) {
+    const px = tx0 + dx + 0.5
+    const py = ty0 + dy + 0.5
+    if (bodyFitsAt(level, px, py, radius)) yield { x: px, y: py }
+  }
+}
+
+/**
  * The spawn position for co-op `slot` on `level` — the slot-th walkable tile
  * centre in the nearest-first sweep out from `level.spawn`.
  *
@@ -87,16 +108,44 @@ export const playerSpawnPoint = (
   slot: number,
   radius: number = BODY_RADIUS,
 ): { x: number; y: number } => {
-  const tx0 = Math.floor(level.spawn.x)
-  const ty0 = Math.floor(level.spawn.y)
   const wanted = Math.max(0, Math.floor(slot))
   let free = 0
-  for (const { dx, dy } of SEARCH_OFFSETS) {
-    const x = tx0 + dx + 0.5
-    const y = ty0 + dy + 0.5
-    if (!bodyFitsAt(level, x, y, radius)) continue
-    if (free === wanted) return { x, y }
+  for (const at of freeTileCentres(level, level.spawn.x, level.spawn.y, radius)) {
+    if (free === wanted) return at
     free++
   }
   return { x: level.spawn.x, y: level.spawn.y }
+}
+
+/**
+ * Where a body SPAWNED AT RUNTIME actually goes — the boss's brood, and anything
+ * else that materialises next to a live entity rather than at the level's fixed
+ * spawn.
+ *
+ * `null` means nothing within the search box fits, which leaves the decision to
+ * the caller (the boss falls back to its own footprint — it is standing there,
+ * so a body demonstrably fits).
+ *
+ * `occupied` is an OPTIONAL preference, never a requirement: the first fitting
+ * tile that also passes it wins, otherwise the first fitting tile wins anyway.
+ * That ordering is deliberate. Overlapping a wall is fatal — `moveAndCollide`
+ * rejects every step out of a solid tile, so the body is entombed for the rest
+ * of the floor. Overlapping another BODY is not: entities are absent from
+ * `movementSystem`'s `blocked` set (walls and closed doors only), and the soft
+ * separation pass unstacks a pair over a few ticks. So a spot is never rejected
+ * for being crowded if the alternative is a wall.
+ */
+export const bodySpawnPoint = (
+  level: Level,
+  x: number,
+  y: number,
+  radius: number = BODY_RADIUS,
+  occupied?: (x: number, y: number) => boolean,
+): { x: number; y: number } | null => {
+  let firstFit: { x: number; y: number } | null = null
+  for (const at of freeTileCentres(level, x, y, radius)) {
+    if (firstFit === null) firstFit = at
+    if (occupied === undefined || !occupied(at.x, at.y)) return at
+  }
+  return firstFit
 }

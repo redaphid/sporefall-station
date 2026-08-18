@@ -2,36 +2,36 @@ import { describe, expect, it } from 'vitest'
 import { newStateId, STATE_ID_RE } from '../debug/stateLink'
 import type { Env } from './env'
 import {
-  handleDebugState,
+  handleWorldStore,
   isStorablePayload,
   kvKey,
   MAX_COMPRESSED_BYTES,
   newWorkerStateId,
   resolveStatePath,
-  STATE_TTL_SECONDS,
+  WORLD_TTL_SECONDS,
   WORKER_STATE_ID_RE,
-} from './debugState'
+} from './worldStore'
 
 /** In-memory stand-in for the KV binding, so the REAL handler (gzip, validation,
  * id minting, TTL) is exercised without a Worker runtime. */
 const fakeEnv = (): { env: Env; store: Map<string, ArrayBuffer>; ttls: number[] } => {
   const store = new Map<string, ArrayBuffer>()
   const ttls: number[] = []
-  const DEBUG_STATES = {
+  const WORLDS = {
     get: async (k: string) => store.get(k) ?? null,
     put: async (k: string, v: ArrayBuffer, opts?: { expirationTtl?: number }) => {
       store.set(k, v)
       if (opts?.expirationTtl) ttls.push(opts.expirationTtl)
     },
   }
-  return { env: { DEBUG_STATES } as unknown as Env, store, ttls }
+  return { env: { WORLDS } as unknown as Env, store, ttls }
 }
 
 const gzipBytes = async (text: string): Promise<ArrayBuffer> =>
   new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
 
 const post = async (env: Env, body: ArrayBuffer | string): Promise<Response> =>
-  handleDebugState(new Request('https://sporefall.test/state', { method: 'POST', body }), env)
+  handleWorldStore(new Request('https://sporefall.test/state', { method: 'POST', body }), env)
 
 const validPayload = { v: 1, world: { v: 1, seed: 1, floor: 1, tick: 9, entities: [] }, meta: { note: 'hi' } }
 
@@ -99,9 +99,9 @@ describe('POST /state then GET /state/:id', () => {
     expect(url).toBe(`https://sporefall.test/?state=${id}`)
     // Stored COMPRESSED, under a namespaced key, with an expiry.
     expect(store.has(kvKey(id))).toBe(true)
-    expect(ttls).toEqual([STATE_TTL_SECONDS])
+    expect(ttls).toEqual([WORLD_TTL_SECONDS])
 
-    const got = await handleDebugState(new Request(`https://sporefall.test/state/${id}`), env)
+    const got = await handleWorldStore(new Request(`https://sporefall.test/state/${id}`), env)
     expect(got.status).toBe(200)
     // CONTENT-TYPE is the real check — a 200 alone could be the SPA fallback.
     expect(got.headers.get('content-type')).toMatch(/application\/json/)
@@ -110,7 +110,7 @@ describe('POST /state then GET /state/:id', () => {
 
   it('answers a missing id with a REAL 404 in text/plain, never the SPA shell', async () => {
     const { env } = fakeEnv()
-    const res = await handleDebugState(new Request('https://sporefall.test/state/aaaaaaaaaaaaaaaa'), env)
+    const res = await handleWorldStore(new Request('https://sporefall.test/state/aaaaaaaaaaaaaaaa'), env)
     expect(res.status).toBe(404)
     expect(res.headers.get('content-type')).toMatch(/text\/plain/)
     expect(await res.text()).not.toMatch(/<!doctype|<html/i)
@@ -149,7 +149,7 @@ describe('POST /state then GET /state/:id', () => {
     const huge = new ArrayBuffer(MAX_COMPRESSED_BYTES + 1)
     const req = new Request('https://sporefall.test/state', { method: 'POST', body: huge })
     // Strip the honest content-length so only the real-bytes check can catch it.
-    const res = await handleDebugState(
+    const res = await handleWorldStore(
       new Request(req, { method: 'POST', body: huge, headers: { 'content-length': '10' } }),
       env,
     )
@@ -170,9 +170,9 @@ describe('POST /state then GET /state/:id', () => {
 
   it('rejects the wrong methods', async () => {
     const { env } = fakeEnv()
-    const get = await handleDebugState(new Request('https://sporefall.test/state'), env)
+    const get = await handleWorldStore(new Request('https://sporefall.test/state'), env)
     expect(get.status).toBe(405)
-    const put = await handleDebugState(
+    const put = await handleWorldStore(
       new Request('https://sporefall.test/state/aaaaaaaaaaaaaaaa', { method: 'PUT' }),
       env,
     )
@@ -181,7 +181,7 @@ describe('POST /state then GET /state/:id', () => {
 
   it('answers CORS preflight so a link works from any origin', async () => {
     const { env } = fakeEnv()
-    const res = await handleDebugState(new Request('https://sporefall.test/state', { method: 'OPTIONS' }), env)
+    const res = await handleWorldStore(new Request('https://sporefall.test/state', { method: 'OPTIONS' }), env)
     expect(res.headers.get('access-control-allow-origin')).toBe('*')
   })
 

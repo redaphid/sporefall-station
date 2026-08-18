@@ -141,7 +141,7 @@ identical and then every AI roll, spawn and loot drop differs.
 ### Storage
 
 `POST /state` (gzipped payload) → KV, 30-day TTL, returns a 16-char unguessable
-id; `GET /state/<id>` → JSON. Both in `src/worker/debugState.ts`, and `/state/*`
+id; `GET /state/<id>` → JSON. Both in `src/worker/worldStore.ts`, and `/state/*`
 is in `run_worker_first` so a missing id is a real 404 and never the SPA's
 200 + `index.html`.
 

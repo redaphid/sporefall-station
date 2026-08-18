@@ -57,20 +57,28 @@
   // of the repo, out of dist/, and out of the APK. Publish with
   // `pnpm run review:image <file>` — an upload, not a deploy.
   //
-  // DEBUG_STATES holds shareable debug-state captures (src/worker/debugState.ts):
-  // `?state=<id>` links a player sends a friend to reproduce an exact world.
-  // Separate from REVIEW_IMAGES on purpose — 30-day TTL vs permanent, written by
-  // the running game rather than a local script, and independently purgeable.
+  // WORLDS holds serialized worlds (src/worker/worldStore.ts). Today the only
+  // writer is the `?state=<id>` debug link a player sends a friend to reproduce
+  // an exact world, but the binding is named for the PAYLOAD rather than that one
+  // caller: a saved game or a hand-built level is the same blob behind the same
+  // kind of opaque id. KV keys are `world:<id>`, so a `save:`/`level:` neighbour
+  // could share the namespace without a migration. Separate from REVIEW_IMAGES on
+  // purpose — 30-day TTL vs permanent, written by the running game rather than a
+  // local script, and independently purgeable.
   //
-  // !! THE `id` BELOW IS A PLACEHOLDER — `wrangler dev` simulates KV locally and
-  // ignores it, but a real deploy needs a real namespace. Create it ONCE with
-  //     npx wrangler kv namespace create DEBUG_STATES
-  // and paste the returned id here. Deploying with the placeholder fails loudly
-  // at upload (unknown namespace), which is the safe failure: the feature is
-  // never silently live-but-broken.
+  // The namespace exists on the account titled `sporefall-worlds` (project-scoped,
+  // matching the other namespaces there). The namespace TITLE and this BINDING
+  // name are different things and need not match.
+  //
+  // VERIFIED: `wrangler kv key list --binding WORLDS --remote` resolves this id
+  // against the live account and returns a real (empty) listing. NOT verified: a
+  // remote WRITE — the local OAuth token has no KV write scope, so the first real
+  // put will happen from the deployed Worker. `wrangler dev` never touches any of
+  // this; it simulates KV locally and ignores the id, so a wrong id could only
+  // surface at upload, loudly, as an unknown-namespace error.
   "kv_namespaces": [
     { "binding": "REVIEW_IMAGES", "id": "bf1d248ccc644174b788c6e5ec97c476" },
-    { "binding": "DEBUG_STATES", "id": "PLACEHOLDER_CREATE_WITH_WRANGLER_KV_NAMESPACE_CREATE" },
+    { "binding": "WORLDS", "id": "e58c5059c7484ad28610e093d9870e01" },
   ],
 
   // One Durable Object instance per multiplayer room. SQLite-backed class (the

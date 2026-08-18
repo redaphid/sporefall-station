@@ -1,5 +1,12 @@
-// Debug state links — `POST /state` stores a captured world, `GET /state/<id>`
+// A store for serialized worlds — `POST /state` puts one away, `GET /state/<id>`
 // hands it back, and `?state=<id>` on the game boots into it.
+//
+// NAMED FOR THE PAYLOAD, NOT TODAY'S CALLER. The only thing using it now is
+// shareable debug links, but what it actually holds is a serialized `World`, and
+// a saved game or a hand-built level is the same kind of blob behind the same
+// kind of opaque id. So nothing here is called "debug": the binding is `WORLDS`
+// and the KV keys are `world:<id>`, which leaves room for a `save:`/`level:`
+// neighbour without a migration. This is NOT a promise to build those.
 //
 // STORAGE CHOICE: KV, not a new service and not a Durable Object. A capture is
 // an immutable blob fetched by an opaque key with a TTL — exactly KV's shape.
@@ -52,7 +59,7 @@ export const STATE_ID_BYTES = 16
  * Byte-for-byte equivalent to `newStateId` in `src/debug/stateLink.ts`. The two
  * cannot share a module — `tsconfig.worker.json` compiles `src/worker` alone
  * against workers-types, and `tsconfig.json` excludes `src/worker` from the app
- * — so `debugState.test.ts` pins them together instead.
+ * — so `worldStore.test.ts` pins them together instead.
  */
 export const newWorkerStateId = (randomBytes: Uint8Array): string => {
   let out = ''
@@ -62,12 +69,12 @@ export const newWorkerStateId = (randomBytes: Uint8Array): string => {
 
 /** KV key namespace, so debug states can never collide with another feature's
  * keys if this binding is ever shared. */
-export const kvKey = (id: string): string => `state:${id}`
+export const kvKey = (id: string): string => `world:${id}`
 
 /** Links expire. These are debugging artefacts with a days-long useful life, not
  * archives, and an unbounded public write endpoint that never forgets is how you
  * end up hosting someone else's file storage. */
-export const STATE_TTL_SECONDS = 60 * 60 * 24 * 30 // 30 days
+export const WORLD_TTL_SECONDS = 60 * 60 * 24 * 30 // 30 days
 
 /** Max COMPRESSED upload. A mid-run world is ~6 KiB gzipped and a rewind buffer
  * a few tens of KiB, so this is ~10x headroom while still bounding abuse. */
@@ -137,7 +144,7 @@ const CORS = {
   'access-control-allow-origin': '*',
 }
 
-export const handleDebugState = async (request: Request, env: Env): Promise<Response> => {
+export const handleWorldStore = async (request: Request, env: Env): Promise<Response> => {
   const url = new URL(request.url)
   const route = resolveStatePath(url.pathname)
   if (!route) return fail('not a debug-state path', 404)
@@ -178,9 +185,9 @@ export const handleDebugState = async (request: Request, env: Env): Promise<Resp
     const id = newWorkerStateId(crypto.getRandomValues(new Uint8Array(STATE_ID_BYTES)))
 
     // Store the COMPRESSED bytes: KV bills and caps on stored size.
-    await env.DEBUG_STATES.put(kvKey(id), body, { expirationTtl: STATE_TTL_SECONDS })
+    await env.WORLDS.put(kvKey(id), body, { expirationTtl: WORLD_TTL_SECONDS })
 
-    return new Response(JSON.stringify({ id, url: `${url.origin}/?state=${id}`, expiresInSeconds: STATE_TTL_SECONDS }), {
+    return new Response(JSON.stringify({ id, url: `${url.origin}/?state=${id}`, expiresInSeconds: WORLD_TTL_SECONDS }), {
       status: 201,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS },
     })
@@ -188,7 +195,7 @@ export const handleDebugState = async (request: Request, env: Env): Promise<Resp
 
   if (request.method !== 'GET' && request.method !== 'HEAD') return fail('method not allowed', 405)
 
-  const stored = await env.DEBUG_STATES.get(kvKey(route.id), { type: 'arrayBuffer' })
+  const stored = await env.WORLDS.get(kvKey(route.id), { type: 'arrayBuffer' })
   // A genuine 404 with content-type text/plain — never the SPA's 200 + HTML.
   if (stored === null) return fail(`no debug state at ${route.id} (expired, or never existed)`, 404)
 
@@ -204,7 +211,7 @@ export const handleDebugState = async (request: Request, env: Env): Promise<Resp
     headers: {
       'content-type': 'application/json; charset=utf-8',
       // Immutable: an id is random and its bytes never change.
-      'cache-control': `public, max-age=${STATE_TTL_SECONDS}, immutable`,
+      'cache-control': `public, max-age=${WORLD_TTL_SECONDS}, immutable`,
       'x-content-type-options': 'nosniff',
       ...CORS,
     },

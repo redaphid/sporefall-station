@@ -233,7 +233,7 @@ export const STATE_ID_LENGTH = 16
 export const STATE_ID_RE = /^[0-9a-hjkmnp-tv-z]{16}$/
 
 /** Reference implementation of the id format, pinned against the Worker's copy
- * (`newWorkerStateId`) by `debugState.test.ts`. The Worker is what actually
+ * (`newWorkerStateId`) by `worldStore.test.ts`. The Worker is what actually
  * mints ids in production — a client-chosen id could squat on someone else's. */
 export const newStateId = (randomBytes: Uint8Array): string => {
   if (randomBytes.length < STATE_ID_LENGTH) throw new Error(`need ${STATE_ID_LENGTH} random bytes`)

@@ -24,8 +24,44 @@ import {
 import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type Transport } from '../net/types'
 import type { RenderView, Session } from './session'
 
-const SMOOTH = 0.45 // remote entities chase their snapshot target per tick
+/**
+ * Remote entities ease toward the last position a snapshot gave them. Snapshots
+ * are 10 Hz against a 30 Hz sim (`SNAPSHOT_INTERVAL_TICKS = 3`), so that target
+ * is stale by up to a full interval: the error being chased GROWS for three
+ * ticks and collapses when the next snapshot lands. Easing a fixed fraction of
+ * a sawtooth error draws a sawtooth SPEED. Measured on a clean link with ZERO
+ * packet loss, a teammate walking at a constant 4.50 tiles/s was drawn at
+ * 7.16 -> 3.94 -> 2.17 -> 7.16 tiles/s, a 3.3x pulse repeating at 10 Hz for as
+ * long as they walked. Packet loss then compounds it: against a target that
+ * stopped updating, the entity coasts to a near standstill (0.38 tiles/s) and
+ * then darts at 12.44 tiles/s when the next snapshot arrives.
+ *
+ * So aim at where the entity is GOING, not where it last was: project the target
+ * forward along the velocity the last two snapshots imply. That velocity is
+ * inferred HERE rather than sent — deliberately. Two bytes per entity on a 10B
+ * record takes a typical snapshot from 2 BLE packets to 3, and losing any one
+ * fragment loses the whole message, so whole-snapshot loss at 5% packet loss
+ * would rise 9.75% -> 14.3%: it would manufacture more of the very gaps it is
+ * meant to cover.
+ */
+const SMOOTH = 0.3 // fraction of the remaining error a remote entity closes per tick
+/**
+ * Projectiles keep the OLD, tighter, unprojected chase. They fly at 7-9 tiles/s
+ * (`data/items.ts`), so a 400 ms gap already carries them 3.6 tiles — past
+ * `SNAP_DIST` — and they honestly teleport. Projecting them would instead slide
+ * them fast PAST the impact point, on the one entity class whose exact position
+ * is about to matter, and they are too short-lived for a two-snapshot velocity
+ * estimate to be worth much anyway.
+ */
+const SMOOTH_PROJECTILE = 0.45
 const SNAP_DIST = 2.5
+/**
+ * Ceiling on how far ahead of its last snapshot a target may be projected:
+ * 150 ms at 30 Hz. Past this the projection freezes, so a link that stops
+ * delivering degrades to "the sprite stands still" — never "the sprite keeps
+ * walking off through a wall forever".
+ */
+const PROJECT_CAP_TICKS = 4.5
 
 /**
  * Is `tick` strictly newer than `prev` on the u32 wire counter?
@@ -68,7 +104,9 @@ export class NetClientSession implements Session {
   private seed = 0
   private floor = 1
   private entities = new Map<number, Entity>()
-  private targets = new Map<number, { x: number; y: number }>()
+  /** Per remote entity: the newest snapshot position, the one before it, and the
+   * client ticks each landed on — everything client-side velocity inference needs. */
+  private targets = new Map<number, { x: number; y: number; px: number; py: number; t: number; pt: number }>()
   private selfId = -1
   private self?: Entity
   private queue!: SendQueue
@@ -370,7 +408,17 @@ export class NetClientSession implements Session {
         this.self = e
         this.reconcile(we)
       } else {
-        this.targets.set(we.id, { x: we.x, y: we.y })
+        const prev = this.targets.get(we.id)
+        this.targets.set(we.id, {
+          x: we.x,
+          y: we.y,
+          // First sighting: previous == current, so the span below is 0 and
+          // nothing is projected until a SECOND snapshot has measured a velocity.
+          px: prev?.x ?? we.x,
+          py: prev?.y ?? we.y,
+          t: this.tickCount,
+          pt: prev?.t ?? this.tickCount,
+        })
       }
     }
     for (const id of this.entities.keys()) {
@@ -460,20 +508,37 @@ export class NetClientSession implements Session {
     this.pendingInputs.push({ seq: cmd.seq, cmd })
     if (this.pendingInputs.length > 60) this.pendingInputs.shift()
 
-    // Everyone else eases toward their snapshot target
+    // Everyone else eases toward their snapshot target, projected forward along
+    // the velocity the last two snapshots imply so it is not a stale one.
     for (const [id, target] of this.targets) {
       const e = this.entities.get(id)
       if (!e || id === this.selfId) continue
-      const dx = target.x - e.pos.x
-      const dy = target.y - e.pos.y
+      const stepX = target.x - target.px
+      const stepY = target.y - target.py
+      const span = target.t - target.pt
+      // A step longer than SNAP_DIST was a TELEPORT (respawn, floor change, a
+      // host-side shove), not motion. Inferring a velocity from it would fling
+      // the sprite across the room at the speed of the teleport.
+      const projectable =
+        span > 0 && e.kind !== 'projectile' && Math.hypot(stepX, stepY) <= SNAP_DIST
+      let tx = target.x
+      let ty = target.y
+      if (projectable) {
+        const ahead = Math.min(Math.max(0, this.tickCount - target.t), PROJECT_CAP_TICKS)
+        tx += (stepX / span) * ahead
+        ty += (stepY / span) * ahead
+      }
+      const dx = tx - e.pos.x
+      const dy = ty - e.pos.y
       if (Math.hypot(dx, dy) > SNAP_DIST) {
-        e.pos.x = target.x
-        e.pos.y = target.y
-        e.prevPos.x = target.x
-        e.prevPos.y = target.y
+        e.pos.x = tx
+        e.pos.y = ty
+        e.prevPos.x = tx
+        e.prevPos.y = ty
       } else {
-        e.pos.x += dx * SMOOTH
-        e.pos.y += dy * SMOOTH
+        const k = e.kind === 'projectile' ? SMOOTH_PROJECTILE : SMOOTH
+        e.pos.x += dx * k
+        e.pos.y += dy * k
       }
     }
   }

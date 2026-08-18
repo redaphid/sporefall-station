@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Teammates move smoothly, not in stutters',
   'No more spawning stuck inside a wall',
   'A glitch can no longer freeze your screen',
   'Teammates no longer vanish in busy rooms',
-  'Dropped packets no longer rewind the game',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

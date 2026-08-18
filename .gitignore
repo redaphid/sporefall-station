@@ -33,3 +33,7 @@ __pycache__/
 tools/tween/baseline/
 tools/tween/*.csv
 tools/tween/figure.svg
+
+# Throwaway candidate-review theme packs (scripts/assets/build_review_themes.py).
+# Rebuildable from a sweep; never shipped.
+public/themes/_review-*/

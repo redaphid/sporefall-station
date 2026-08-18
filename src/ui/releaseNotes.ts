@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Restart the app, keep your character',
   'Teammates no longer vanish in busy rooms',
   'Dropped packets no longer rewind the game',
   'Join a game in progress, on the right floor',
-  'Co-op tells you why it failed to connect',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

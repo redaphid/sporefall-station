@@ -74,6 +74,25 @@ interface Ghost {
 const REJOIN_GRACE_TICKS = 90 * 30
 
 /**
+ * Identity of ONE host session, minted at construction and handed out with every
+ * Welcome so a client can stamp its persisted rejoin claim with it.
+ *
+ * Scope is the `NetHostSession` INSTANCE, deliberately — not the world and not
+ * the seed. That is exactly the lifetime over which slots and peer tokens mean
+ * anything: `restart(seed)` rebuilds the world but keeps every connected peer's
+ * slot and token, so re-minting there would invalidate claims the host itself
+ * still honours. A host app restart makes a new session, and every token from
+ * the old one correctly stops matching.
+ *
+ * `Math.random()` is legal here: this is `src/app/`, off the sim path, and the
+ * eslint determinism rule covers `src/game/` only. ~51 bits of entropy is far
+ * more than is needed to tell apart the handful of host sessions one phone will
+ * ever see, and a collision would only fall back to the token check that
+ * guarded this before.
+ */
+const mintRunId = (): string => Math.random().toString(36).slice(2, 12)
+
+/**
  * Authoritative host: runs the sim, accepts joins pre-start,
  * fans out per-peer snapshots, applies remote inputs.
  */
@@ -86,6 +105,9 @@ export class NetHostSession implements Session {
   private peers = new Map<PeerId, PeerState>()
   private ghosts = new Map<number, Ghost>()
   private inputs = new Map<number, InputCmd>()
+  /** Identity of THIS host session (see `mintRunId`). Shipped in every Welcome;
+   * clients stamp their persisted rejoin claim with it. */
+  readonly runId = mintRunId()
   started = false
   onLobbyChange?: (players: LobbyPlayer[]) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
@@ -452,10 +474,27 @@ export class NetHostSession implements Session {
       // up in two slots at once with its own avatar abandoned in the world.
       if (p.slot >= 0) return
 
+      // A rejoin claim now SURVIVES the client's app restart (app/rejoinStore.ts),
+      // which is the whole point — but it means a token minted by some OTHER run
+      // will eventually be presented to this one: the host's own previous
+      // session, a "New Seed", the friend's phone you played on last week. Such a
+      // claim names a seat the bearer cannot possibly own, and the only thing
+      // standing between it and a live ghost would be a token comparison.
+      //
+      // So scope it: honour a claim only when it is stamped with THIS session's
+      // runId. A foreign one is not rejected — it is simply not a rejoin, and
+      // falls through to the ordinary join paths below, where the bearer gets a
+      // clean seat of their own. Refusing outright would turn a stale token into
+      // a lockout, which is strictly worse than the defect being fixed.
+      //
+      // An ABSENT runId is an older client that never learned one: check it on
+      // the token alone, exactly as before, so a mixed-version party still works.
+      const claim = hello.rejoin?.runId === undefined || hello.rejoin.runId === this.runId ? hello.rejoin : undefined
+
       // Mid-game rejoin: reclaim the ghost slot if the token matches.
-      if (this.started && hello.rejoin) {
-        const ghost = this.ghosts.get(hello.rejoin.slot)
-        if (!ghost || ghost.token !== hello.rejoin.token) {
+      if (this.started && claim) {
+        const ghost = this.ghosts.get(claim.slot)
+        if (!ghost || ghost.token !== claim.token) {
           p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'rejoin window expired' }))
           return
         }
@@ -481,7 +520,7 @@ export class NetHostSession implements Session {
         p.entityId = ghost.entityId
         this.peersBySlot.set(p.slot, p)
         if (parked.status) parked.status.stun = 0
-        p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
+        p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token, runId: this.runId }))
         p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(
           encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: ghost.entityId } }),
@@ -517,7 +556,7 @@ export class NetHostSession implements Session {
         const avatar = spawnPlayer(this.world, slot, this.world.level.spawn.x + slot * 0.6, this.world.level.spawn.y)
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
-        p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
+        p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token, runId: this.runId }))
         p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [slot]: avatar.id } }))
         this.onLobbyChange?.(this.lobbyPlayers())
@@ -540,7 +579,7 @@ export class NetHostSession implements Session {
       p.name = hello.name
       p.token = Math.random().toString(36).slice(2, 12)
       this.peersBySlot.set(slot, p)
-      p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
+      p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token, runId: this.runId }))
       this.onLobbyChange?.(this.lobbyPlayers())
       this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
     }

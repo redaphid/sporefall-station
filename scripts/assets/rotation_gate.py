@@ -104,6 +104,16 @@ def main() -> int:
             continue
         rows.append((f"{arch}  ({p.name})", Image.open(p).convert("RGBA")))
 
+    if not rotates:
+        # An EMPTY allowlist is a real answer, not a broken run: nothing is
+        # rotated at runtime, so no sprite can be turned upside down. Say that,
+        # rather than printing an empty sheet that reads as a pass.
+        print("ROTATES_WITH_FACING is EMPTY — the renderer turns no furnishing at all.")
+        print("Nothing can be photographed turned, because nothing is turned. This is a")
+        print("real pass by construction, not a vacuous one: see art.ts for why the set")
+        print("is empty (three-quarter prop art cannot be rotated by a heading).")
+        return 0
+
     print(f"rotating archetypes in art.ts: {', '.join(rotates)}")
     for m in missing:
         print(f"  no texture yet, not photographed: {m}")

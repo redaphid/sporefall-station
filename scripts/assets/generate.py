@@ -481,6 +481,57 @@ PROPS = {
                        "wider than it is tall, roughly 6 wide by 4 tall",
                        "closed top, solid lump, dome, sphere, tall, narrow, pillar, "
                        "plants, sprouts, foliage"),
+    # ---- the furnishings that never had art ---------------------------------
+    # These six archetypes are placed by the room planner (levelgen/furnish.ts)
+    # and have ALWAYS drawn as hand-coded PixiJS vector shapes (render/art.ts
+    # FURNITURE_SHAPE) rather than pack art. Together they are 51% of every
+    # furnishing the game spawns and 56% of what is inside a house -- `shelf`
+    # alone is the single most common object in the game at 20.8 per floor,
+    # ahead of the crate. They are listed here in encounter-rate order.
+    #
+    # Same recipe as the six above: geometry stated with explicit proportions,
+    # then the wrong reading negatived BY NAME. The wrong reading for furniture
+    # is the neighbouring piece of furniture -- a bench that comes back with a
+    # backrest is a chair, and a table with drawers is the desk we already ship.
+    "storage-rack": ("props/storage-rack.png",
+                     "a tall open shelving rack, an upright metal frame with FOUR separate "
+                     "horizontal shelf boards stacked one above another with clear open gaps "
+                     "between them, a vertical corner post at each end, completely OPEN at the "
+                     "front with no doors and no glass, a few small crates and canisters resting "
+                     "on the shelves, flat square top, roughly 6 wide by 7 tall",
+                     "cabinet, cupboard, closed doors, solid front panel, glass front, window, "
+                     "one single shelf, table, desk, workbench, wardrobe, dome, rounded top, "
+                     "books, bookcase"),
+    "mess-chair": ("props/mess-chair.png",
+                   "a single simple metal chair, ONE square seat pad on four thin straight legs "
+                   "with a low upright backrest rising behind the seat, slim tubular frame, "
+                   "seen from a slightly high game angle, roughly 4 wide by 5 tall",
+                   "armchair, sofa, couch, loveseat, throne, recliner, cushioned lounge, "
+                   "stool, table, desk, bench, long, wide, two chairs, several chairs, "
+                   "row of seats, armrests"),
+    "crew-bunk": ("props/crew-bunk.png",
+                  "a low single crew bed seen from a high angle looking down at it, ONE long "
+                  "rectangular mattress lying flat on a low metal frame, a pale pillow at one "
+                  "end and a folded blanket across the other end, four short stubby legs, LONG "
+                  "horizontal silhouette twice as long as it is wide, low to the floor, "
+                  "roughly 8 wide by 4 tall",
+                  "bunk beds, stacked beds, two levels, upper bunk, ladder, tall headboard, "
+                  "upright, vertical, sofa, couch, chair, table, person, sleeping figure, "
+                  "canopy, four poster"),
+    "transit-bench": ("props/transit-bench.png",
+                      "a long backless waiting bench, ONE single long flat horizontal plank "
+                      "seat carried on two solid end supports, completely open underneath, NO "
+                      "backrest of any kind, LONG low horizontal silhouette three times as wide "
+                      "as it is tall, roughly 9 wide by 3 tall",
+                      "backrest, back panel, back rail, chair, armchair, armrests, sofa, "
+                      "table, desk, tall, upright, cushions, pillows, several benches"),
+    "mess-table": ("props/mess-table.png",
+                   "a square mess-hall table, ONE flat square tabletop with NOTHING ON TOP of "
+                   "it, held up by four straight legs at the corners, open underneath, seen "
+                   "from a slightly high game angle, roughly 7 wide by 5 tall",
+                   "desk, drawers, drawer unit, side panels, cabinet, objects on the table, "
+                   "plates, cups, food, clutter, chairs, stools, round tabletop, circular, "
+                   "tall, narrow"),
 }
 ITEMS = {
     "spore-pistol": ("items/spore-pistol.png",

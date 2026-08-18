@@ -37,3 +37,8 @@ tools/tween/figure.svg
 # Throwaway candidate-review theme packs (scripts/assets/build_review_themes.py).
 # Rebuildable from a sweep; never shipped.
 public/themes/_review-*/
+# Packs are named `review-*`, NOT `_review-*`: a theme id must match
+# /^[a-z0-9][a-z0-9-]*$/, so a leading underscore makes the id invalid and the
+# loader silently serves the DEFAULT pack instead of the candidate. The old
+# `_review-*` line stays so leftover dirs from that era remain ignored.
+public/themes/review-*/

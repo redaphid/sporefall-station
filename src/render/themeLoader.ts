@@ -87,6 +87,14 @@ export const fetchTheme = async (id: string): Promise<LoadedTheme | undefined> =
  * fails). The default hi-res pack thus resolves as [swampspace-hires,
  * swampspace] — any key it doesn't map falls back to the base pack. */
 export const loadThemeChain = async (id: string): Promise<ThemeChain> => {
+  // SAY SO when an id is rejected. This fell back silently, and silence cost a
+  // whole review cycle: throwaway candidate packs were named `_review-A`, the
+  // leading underscore fails THEME_ID_RE, and every one of them loaded the
+  // DEFAULT pack instead. Eight candidate sprites photographed in a room came
+  // back byte-identical and looked like a generation failure rather than a
+  // loader fallback. A prop-art comparison is worthless if the pack under test
+  // can quietly not be the pack on screen.
+  if (!isValidThemeId(id)) console.warn(`[theme] invalid theme id "${id}", falling back to ${DEFAULT_THEME_ID}`)
   const wanted = isValidThemeId(id) ? id : DEFAULT_THEME_ID
   const base = await fetchTheme(BASE_THEME_ID)
   const active = wanted === BASE_THEME_ID ? undefined : await fetchTheme(wanted)

@@ -14,12 +14,12 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnPlayer } from '../../src/game/player'
 import { spawnObject } from '../../src/game/systems/objects'
-import { populateWorld } from '../../src/game/populate'
+import { populateWorld, spawnNpc } from '../../src/game/populate'
 import { serializeWorld } from '../../src/game/serialize'
 import { setupFloor } from '../../src/game/systems/missions'
 import { Tile, type Building } from '../../src/game/levelgen/level'
 import { createWorld, type World } from '../../src/game/world'
-import type { Annotation } from '../../src/game/types'
+import type { Annotation, Entity } from '../../src/game/types'
 
 const OUT = process.argv[2] ?? 'e2e/output/prop-rooms'
 mkdirSync(OUT, { recursive: true })
@@ -102,6 +102,20 @@ const park = (w: World, x: number, y: number): void => {
   } else spawnPlayer(w, 0, x + 0.5, y + 0.5)
 }
 
+/** Stand an NPC still. These fixtures are STILLS: if the one entity with legs
+ * paths toward the player between the theme bake and the shutter, then two packs
+ * differ by more than the sprite under test, and the whole hold-everything-else
+ * -still discipline is wasted. Dormant is the engine's own "spawn inert" flag
+ * (populate.ts), so this is the sim's normal quiet state, not a render hack. */
+const freeze = (e: Entity): Entity => {
+  if (e.ai) {
+    e.ai.dormant = true
+    e.ai.behavior = 'idle'
+    e.ai.mode = 'idle'
+  }
+  return e
+}
+
 // ---------------------------------------------------------------------------
 // 1. CREW QUARTERS -- the five archetypes that have never had art (shelf, chair,
 //    bunk, bench, table) arranged among three that always did (crate, cabinet,
@@ -146,5 +160,47 @@ const park = (w: World, x: number, y: number): void => {
   if (!p) spawnPlayer(w, 0, r.x + r.w / 2, r.y + r.h / 2)
   else park(w, r.x + Math.floor(r.w / 2), r.y + Math.floor(r.h / 2))
   write('as-generated', w, r, [])
+}
+// 4. THE CHAIR PROOF -- ONE prop under test, in a room, beside the two things it
+//    actually competes with for the player's eye.
+//
+//    The primary defect (#42 section 1) is not "the chair is ugly", it is "a
+//    chair is the brightest thing on screen after the HUD, so the eye goes to
+//    furniture instead of to a threat". That is a GAMEPLAY cost, and it is
+//    invisible on a swatch and invisible in a lineup -- it only shows when an
+//    ACCEPTED pack sprite and a THREAT are in the same frame at the same zoom.
+//    So this scene holds all three at once: candidate chairs, four props whose
+//    art was accepted, and a bog-mutant standing among them.
+//
+//    Shot once per pack: `swampspace` draws the chairs as the engine vector
+//    placeholder (the control), each `_review-*` pack draws a candidate.
+{
+  const { w, b, r } = findRoom(9, 7)
+  clearBuilding(w, b)
+  // COMPOSITION IS PART OF THE INSTRUMENT. The camera centres on the player, so
+  // where the player is parked decides what is in frame. Parked at the room's
+  // edge, the first cut of this scene pushed the room into the left 40% of a
+  // landscape phone frame, clipped the accepted-art rank behind the HUD and cut
+  // the threat in half on the top edge -- a shot that cannot answer the question
+  // it was taken to answer. Player low and central; two ranks close above it.
+  const plan: [string, number, number][] = [
+    // Rank 1 -- accepted pack art, the value reference. `desk` is here
+    // deliberately: it is the one furnishing in this group that already has real
+    // generated art, so it is the closest thing to a target.
+    ['crate', 2, 2], ['cabinet', 3, 2], ['barrel', 4, 2], ['desk', 6, 2], ['tv', 7, 2],
+    // Rank 2 -- the subject: chairs pulled up to a table, the arrangement the
+    // room planner actually builds.
+    ['table', 4, 4], ['chair', 3, 4], ['chair', 5, 4], ['chair', 4, 5], ['chair', 2, 4],
+  ]
+  const notes = furnish(w, r, plan)
+  // The threat stands in rank 2, level with the chairs, so the eye has to choose
+  // between them at the same screen height. That choice IS the defect.
+  freeze(spawnNpc(w, 'thug', r.x + 6.5, r.y + 4.5))
+  // Parked LEVEL with rank 2, not below it. The camera centres on the player, so
+  // parking it two ranks down pushed rank 1 into the mission banner and the shot
+  // lost its own value reference. Level, the subject rank lands mid-frame and the
+  // accepted-art rank sits a comfortable two tiles above it, clear of the HUD.
+  park(w, r.x + 8, r.y + 4)
+  write('chair-proof', w, r, notes)
 }
 console.log(`prop-room fixtures in ${OUT}`)

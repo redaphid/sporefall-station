@@ -496,7 +496,7 @@ export class NetClientSession implements Session {
     }
     const missionText =
       this.phase === 'reconnecting'
-        ? 'Bluetooth dropped — reconnecting…'
+        ? 'Connection dropped — reconnecting…'
         : this.phase === 'ended' && this.selfId >= 0
           ? 'Connection lost'
           : this.state.missionText

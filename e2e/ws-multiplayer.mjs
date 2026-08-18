@@ -21,6 +21,7 @@ import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { advanceHostFloor } from './lib.mjs'
 import { startWrangler } from './ws-lib.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -98,6 +99,71 @@ const main = async () => {
     check(hs.entities > 0, 'host world has entities')
     check(cs.entities > 0, 'client world has entities (mirrored from host)')
     check(Math.abs(hs.tick - cs.tick) < 200, 'client tick tracks the host tick (not diverged/stalled)')
+
+    // ── The three things that make it a GAME, not just a live connection ────
+    // Everything above proves the link came up and snapshots flow. These prove
+    // the protocol actually CARRIES PLAY over it, in both directions.
+
+    // 1. MOVEMENT, client → host. The client holds "right"; the HOST's
+    // authoritative world must move that player. Input therefore travelled
+    // client → relay → host and was simulated. This is the opposite direction
+    // from the snapshot flow proven above, and it is the direction with no
+    // natural symptom when broken: snapshots keep arriving, the world keeps
+    // ticking, everything LOOKS connected — the remote player just never moves.
+    console.log('[ws-mp] driving movement from the client…')
+    const clientPlayerId = await client.evaluate(() => globalThis.sporefall?.player()?.id ?? -1)
+    check(clientPlayerId > 0, `client knows its own player entity (id ${clientPlayerId})`)
+    const hostSeesX = () =>
+      host.evaluate((id) => globalThis.world?.entities?.find((e) => e.id === id)?.pos?.x ?? null, clientPlayerId)
+    const x0 = await hostSeesX()
+    check(x0 !== null, "the client's player exists in the host's authoritative world")
+    await client.keyboard.down('KeyD')
+    await sleep(1200)
+    await client.keyboard.up('KeyD')
+    await sleep(400)
+    const x1 = await hostSeesX()
+    console.log(`[ws-mp] client player x, as the host sees it: ${x0} -> ${x1}`)
+    check(x0 !== null && x1 !== null && x1 - x0 > 0.25, `client input moves its own player in the host sim (x ${x0} -> ${x1})`)
+
+    // …and the host's authoritative answer comes BACK: the client's own view of
+    // itself has to track it, or the two have silently diverged.
+    const cx = await client.evaluate(
+      (id) => globalThis.world?.entities?.find((e) => e.id === id)?.pos?.x ?? null,
+      clientPlayerId,
+    )
+    check(cx !== null && x1 !== null && Math.abs(cx - x1) < 3, `client's own view tracks the host (client ${cx} vs host ${x1})`)
+
+    // 2. EVENTS — the reliable, never-dropped lane. A different code path from
+    // snapshots (which are droppable and replaceable), and what carries hits,
+    // pickups and mission beats. Counted across the floor change below, which is
+    // guaranteed to emit some.
+    const eventsBefore = await client.evaluate(() => globalThis.sporefall?.events()?.length ?? 0)
+
+    // 3. FLOOR CHANGE — the biggest state transition there is: the host throws
+    // the level away and generates a new one, and every client must land on the
+    // SAME floor. Taken the way the game takes it (see advanceHostFloor).
+    console.log('[ws-mp] taking the stairs on the host…')
+    const floorBefore = await host.evaluate(() => globalThis.world?.floor ?? 0)
+    const floorAfter = await advanceHostFloor(host)
+    check(floorAfter > floorBefore, `host advances a floor (${floorBefore} -> ${floorAfter})`)
+
+    let clientFloor = 0
+    const floorDeadline = Date.now() + 20000
+    while (Date.now() < floorDeadline) {
+      clientFloor = await client.evaluate(() => globalThis.world?.floor ?? 0)
+      if (clientFloor === floorAfter) break
+      await sleep(200)
+    }
+    check(clientFloor === floorAfter, `client follows the host to floor ${floorAfter} (saw ${clientFloor})`)
+
+    const eventsAfter = await client.evaluate(() => globalThis.sporefall?.events()?.length ?? 0)
+    check(eventsAfter > eventsBefore, `client receives sim events over the relay (${eventsBefore} -> ${eventsAfter})`)
+
+    // Still alive and simulating after all of it — not merely last-state-frozen.
+    const tickA = await client.evaluate(() => globalThis.world?.tick ?? 0)
+    await sleep(1000)
+    const tickB = await client.evaluate(() => globalThis.world?.tick ?? 0)
+    check(tickB > tickA, `client keeps ticking after the floor change (${tickA} -> ${tickB})`)
 
     await host.screenshot({ path: join(OUT, 'ws-mp-host-play.png') })
     await client.screenshot({ path: join(OUT, 'ws-mp-client-play.png') })

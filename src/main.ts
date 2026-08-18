@@ -473,7 +473,18 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
 
   // join
   dbg.log(`join: mode start, native=${native}`)
-  const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
+  // `?transport=ws` is honored BEFORE the native check, exactly as the host path
+  // above does it. Testing `native` first (as this did) meant the APK — the one
+  // build that most needs online play, because it is the build your friends
+  // actually install — silently ignored `?transport=ws` and always opened the
+  // radio. Hosting over the relay worked there while joining it was unreachable,
+  // so the two halves of the same feature disagreed on a phone and nowhere else.
+  const wsJoin = new URLSearchParams(location.search).get('transport') === 'ws'
+  const transport = wsJoin
+    ? new WsTransport('client', deps.room, resolveWsBaseUrl(location.search))
+    : native
+      ? new BleClientTransport(dbg.log)
+      : await pickBrowserJoinTransport(deps)
   stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
 

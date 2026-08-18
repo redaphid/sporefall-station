@@ -32,7 +32,7 @@ import { createReadStream, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname, extname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { muxVideo } from './lib.mjs'
+import { advanceHostFloor, muxVideo } from './lib.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..', 'dist')
@@ -103,42 +103,6 @@ const until = async (page, fn, ms = 20000, step = 200) => {
     await sleep(step)
   }
   return false
-}
-
-/**
- * Take the stairs, the way the game does: unlock the exit and stand a live
- * player on the exit tile, then let the host's own missionSystem call nextFloor.
- * No test-only backdoor — this is the real transition, so the floor the late
- * joiner has to match is a floor the sim genuinely produced.
- *
- * Re-applied every poll because the movement systems keep running underneath.
- */
-const advanceHostFloor = async (page, ms = 20000) => {
-  const before = await page.evaluate(() => globalThis.world?.floor ?? 0)
-  const deadline = Date.now() + ms
-  while (Date.now() < deadline) {
-    const now = await page.evaluate((from) => {
-      const w = globalThis.world
-      if (!w) return 0
-      // Once we HAVE moved on, touch nothing: re-unlocking the new floor's exit
-      // and re-teleporting onto it would immediately take a second staircase and
-      // overshoot (floor 2 → 4 instead of 3).
-      if (w.floor !== from) return w.floor
-      w.mission.exitUnlocked = true
-      for (const e of w.entities) {
-        if (!e.playerCtl || e.dead || e.playerCtl.downed) continue
-        e.pos.x = w.level.exit.x + 0.5
-        e.pos.y = w.level.exit.y + 0.5
-        e.prevPos.x = e.pos.x
-        e.prevPos.y = e.pos.y
-        break
-      }
-      return w.floor
-    }, before)
-    if (now > before) return now
-    await sleep(100)
-  }
-  return before
 }
 
 const main = async () => {

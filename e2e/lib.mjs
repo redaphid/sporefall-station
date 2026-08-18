@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { setTimeout as sleep } from 'node:timers/promises'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 export const BASE = process.env.BASE_URL ?? 'http://localhost:4173'
@@ -115,4 +116,48 @@ export const record = async (spec) => {
   }
   console.log(`[${spec.name}] OK — all asserts passed`)
   return true
+}
+
+/**
+ * Take the stairs, the way the game does: unlock the exit and stand a live
+ * player on the exit tile, then let the HOST's own missionSystem call nextFloor.
+ * No test-only backdoor — the transition is one the sim genuinely produced, so
+ * the floor a client has to match is a real floor.
+ *
+ * Shared because a floor change is the biggest state transition in the game and
+ * every multiplayer proof needs to trigger one: offline-coop.mjs (BLE-shaped,
+ * over BroadcastChannel) and ws-multiplayer.mjs (the relay) must exercise the SAME
+ * transition, or the two transports are being judged against different games.
+ *
+ * Re-applied every poll because the movement systems keep running underneath;
+ * once the floor HAS changed we touch nothing, since re-unlocking the new
+ * floor's exit would immediately take a second staircase and overshoot.
+ *
+ * @param {import('playwright').Page} page a page running an authoritative world
+ * @param {number} ms give-up budget
+ * @returns {Promise<number>} the floor now (unchanged if it never advanced)
+ */
+export const advanceHostFloor = async (page, ms = 20000) => {
+  const before = await page.evaluate(() => globalThis.world?.floor ?? 0)
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    const now = await page.evaluate((from) => {
+      const w = globalThis.world
+      if (!w) return 0
+      if (w.floor !== from) return w.floor
+      w.mission.exitUnlocked = true
+      for (const e of w.entities) {
+        if (!e.playerCtl || e.dead || e.playerCtl.downed) continue
+        e.pos.x = w.level.exit.x + 0.5
+        e.pos.y = w.level.exit.y + 0.5
+        e.prevPos.x = e.pos.x
+        e.prevPos.y = e.pos.y
+        break
+      }
+      return w.floor
+    }, before)
+    if (now > before) return now
+    await sleep(100)
+  }
+  return before
 }

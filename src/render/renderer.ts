@@ -206,11 +206,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   //
   // SINKING THIS LAYER BELOW `entities` LOOKS RIGHT AND IS NOT. The entity layer
   // is y-sorted, so anything standing one tile south of a player — a desk, a
-  // crate, an enemy — spans `foot-16 … foot+32` in world px and swallows that
-  // player's ring (`ry ≈ 7.6px` about the foot) and their name whole. A downed
-  // teammate behind furniture would show no red ring, no X and no "P2 DOWN":
-  // the revive cue, gone. Markers are kept from covering the character by being
-  // SMALL and QUIET, which is tuning, not by being buried, which is a regression.
+  // crate, an enemy — spans `foot-16 … foot+32` in world px and swallows a
+  // player's ring whole. A downed teammate behind furniture would show no red
+  // ring and no X at all: the revive cue, gone. Markers are kept from covering
+  // the character by being TINY, which is tuning, not by being buried, which
+  // is a regression.
   // Mounted BY the pinned order (worldLayers.ts) rather than alongside it, so
   // the test that guards the order guards what actually paints.
   const worldLayers: Record<WorldLayerName, Container> = {
@@ -487,7 +487,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
         entities.update(view.entities, alpha, view.tick, view.floor)
-        playerMarkers.update(view.entities, view.self?.id, alpha, view.tick, camera.zoom)
+        playerMarkers.update(view.entities, view.self?.id, alpha, view.tick)
         statusFx.update(view.entities, alpha, view.tick)
         bullets.update(view.entities, alpha, view.tick)
         effects.update(view.tick, alpha)

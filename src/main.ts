@@ -575,6 +575,13 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       } else if (phase === 'ended') {
         lobby.setStatus('Host disconnected')
         resolve(false)
+      } else if (phase === 'unreachable') {
+        // The join handshake is retried now (netClient.ts), but a retry that
+        // never lands must still END somewhere the player can see. This is the
+        // Bluetooth link being up while the host never answers — the case that
+        // used to sit on "Looking for a host…" until the phone was force-quit.
+        lobby.setStatus('Host never answered — move closer and reload to retry')
+        resolve(false)
       }
     }
   })

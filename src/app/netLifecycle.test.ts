@@ -469,15 +469,19 @@ describe('connection lifecycle — rejoin tokens (forged, stale, duplicated)', (
     expect(findMsg<WelcomeMsg>(stale.received(), MsgType.Welcome)).toBeUndefined()
   })
 
-  it('ignores a second Hello carrying a rejoin block from an already-admitted peer', async () => {
+  it('never RE-PROCESSES a second Hello carrying a rejoin block from an already-admitted peer', async () => {
     // netCoop.test.ts covers duplicate Hellos WITHOUT a rejoin block. The guard
     // is `p.slot >= 0 && !hello.rejoin`, so ANY rejoin field walks straight past
     // it: the peer is re-slotted and its old peersBySlot entry is orphaned —
     // a slot that can never be issued again and a lobby that disagrees with it.
+    //
+    // A duplicate Hello is now re-ANSWERED (the handshake has no acks, so it is
+    // how a client says "I never heard you"), but it must still never be
+    // RE-PROCESSED: no re-slotting, and the rejoin block must stay inert.
     const hub = new MockHub()
     const host = new NetHostSession(23, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
-    const { raw } = await joinRaw(hub, 'Bob')
+    const { raw, welcome } = await joinRaw(hub, 'Bob')
     expect([...host.peersBySlot.keys()]).toEqual([1])
 
     raw.send(encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Bob', rejoin: { slot: 1, token: 'anything' } }))
@@ -486,7 +490,11 @@ describe('connection lifecycle — rejoin tokens (forged, stale, duplicated)', (
     expect([...host.peersBySlot.keys()]).toEqual([1])
     expect(host.peersBySlot.get(1)?.slot).toBe(1)
     expect(host.lobbyPlayers().map((p) => p.slot)).toEqual([0, 1])
-    expect(raw.received().filter((m) => m[0] === MsgType.Welcome)).toHaveLength(1)
+    // Re-answered, but with the SAME seat and the SAME token — the forged
+    // rejoin block bought nothing.
+    const welcomes = raw.received().filter((m) => m[0] === MsgType.Welcome).map((m) => decodeJson<WelcomeMsg>(m))
+    expect(welcomes).toHaveLength(2)
+    expect(welcomes[1]).toEqual({ slot: welcome.slot, token: welcome.token })
   })
 
   it('will not let a live player take over another player’s ghost with a leaked token', async () => {
@@ -576,7 +584,12 @@ describe('connection lifecycle — rejoin tokens (forged, stale, duplicated)', (
       await flush()
     }
 
-    expect(raw.received().filter((m) => m[0] === MsgType.Welcome)).toHaveLength(1)
+    // Twenty-one answers (the join plus twenty re-asks) but ONE seat: every
+    // Welcome must name the same slot and the same token. The re-answer is
+    // deliberately chatty and deliberately inert.
+    const welcomes = raw.received().filter((m) => m[0] === MsgType.Welcome).map((m) => decodeJson<WelcomeMsg>(m))
+    expect(welcomes).toHaveLength(21)
+    expect(new Set(welcomes.map((w) => `${w.slot}/${w.token}`)).size).toBe(1)
     expect([...host.peersBySlot.keys()]).toEqual([1])
     expect(host.lobbyPlayers().map((p) => p.slot)).toEqual([0, 1])
     for (const p of host.lobbyPlayers()) expect(p.slot).toBeLessThan(MAX_PLAYERS)

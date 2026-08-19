@@ -75,12 +75,15 @@ the image publicly from the Worker (`/review/*`, KV-backed, never in the game
 bundle) and refuses to hand back a URL it hasn't re-fetched as real image bytes.
 Honest contact sheets — failures included — are the point. See `docs/deploy.md` § D.
 
-**Keep release notes current.** Each merge to `main` should update
-`src/ui/releaseNotes.ts` — prepend a single one-line, player-facing summary of
-the change (punchy, ~40 chars, no internal/tooling churn) and trim to the latest
-few. That file is the source of truth for the "what's new" line under the version
-number on the start menu, so the menu always reflects recent builds. Skip it only
-for pure internals with nothing a player would notice.
+**Keep release notes current.** Each PR with a player-visible change should add
+one file under `src/ui/releaseNotes/` — `YYYY-MM-DD-short-slug.ts` exporting a
+single one-line, player-facing summary as `default` (punchy, ~40 chars, no
+internal/tooling churn). `src/ui/releaseNotes.ts` loads every file in that
+directory and shows the newest few under the version number on the start menu
+— **add a file, never edit an existing one**: that is what lets two PRs land a
+release note in the same afternoon without conflicting on each other's line
+(see the comment atop `releaseNotes.ts` for why this is a directory and not an
+array). Skip it only for pure internals with nothing a player would notice.
 
 ## Map of the codebase
 

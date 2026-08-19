@@ -199,13 +199,15 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   }
   // The pick layer lives INSIDE `world`: it is world-space affordance art, so
   // it rides the camera transform and (deliberately) the distortion field too.
-  // Player markers sit directly ABOVE the entity layer — so no prop can hide the
-  // ring that says which body is yours — and BELOW status-fx/bullets/effects, so
-  // every threat and every impact still paints over the top of them.
+  // Player markers sit directly BELOW the entity layer — so a character's own
+  // sprite always paints over its ring/label rather than the other way round;
+  // the marker is a floor decal you glance down at, never a thing sitting on
+  // top of the body it names. It is still ABOVE the tilemap, and BELOW
+  // status-fx/bullets/effects, so every threat and every impact paints over it.
   world.addChild(
     tilemap.root,
-    entities.root,
     playerMarkers.root,
+    entities.root,
     statusFx.root,
     bullets.root,
     effects.root,

@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Player markers toned down, no more clutter',
   'Find yourself: YOU ring, named teammates',
   'Desks no longer hang from the ceiling',
   'Teammates move smoothly, not in stutters',
-  'No more spawning stuck inside a wall',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

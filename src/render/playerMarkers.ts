@@ -44,15 +44,19 @@ export const PULSE_TICKS = 48
 /** Ground rings are squashed to read as lying ON the floor, not as a halo. */
 export const GROUND_SQUASH = 0.52
 
-/** Ring radii in TILES. Yours is larger as well as differently shaped. */
-export const SELF_RADIUS = 0.62
-export const MATE_RADIUS = 0.42
+/** Ring radii in TILES. Yours is larger as well as differently shaped. Kept
+ * small enough to sit at the feet without eating into the character art above
+ * it — a marker that covers the thing it marks has failed at its one job. */
+export const SELF_RADIUS = 0.46
+export const MATE_RADIUS = 0.32
 /** The local player's inner rim, in your own slot hue, so you still learn which
  * colour is "you" — that is what the off-screen teammate arrows speak in. */
-export const SELF_INNER_RADIUS = 0.4
+export const SELF_INNER_RADIUS = 0.3
 
-/** How far the local player's ring swells at the top of its breath (fraction). */
-export const PULSE_AMPLITUDE = 0.08
+/** How far the local player's ring swells at the top of its breath (fraction).
+ * Small: enough to read as "alive", not enough to visibly balloon over the
+ * sprite it sits under every second. */
+export const PULSE_AMPLITUDE = 0.05
 
 /**
  * World-pixels the name sits ABOVE the feet — i.e. hard up against the top of
@@ -144,8 +148,8 @@ export const markerStyle = (s: MarkerSubject, t: number): MarkerStyle => {
       labelColor: s.downed ? DOWNED_LABEL_COLOR : 0xffffff,
       label: s.downed ? `${SELF_LABEL} DOWN` : SELF_LABEL,
       radius: SELF_RADIUS * swell,
-      width: 3,
-      alpha: 0.95,
+      width: 2,
+      alpha: 0.8,
       reticle: true,
       innerRadius: SELF_INNER_RADIUS * swell,
       innerColor: s.downed ? DOWNED_COLOR_INT : slotColor,
@@ -157,10 +161,10 @@ export const markerStyle = (s: MarkerSubject, t: number): MarkerStyle => {
     labelColor: s.downed ? DOWNED_LABEL_COLOR : slotColor,
     label: s.downed ? `${playerLabel(s.slot)} DOWN` : playerLabel(s.slot),
     radius: MATE_RADIUS,
-    width: 2.5,
+    width: 1.75,
     // A downed teammate is an emergency, so that ring alone is allowed to be
     // as loud as yours; an upright one stays quiet.
-    alpha: s.downed ? 0.95 : 0.7,
+    alpha: s.downed ? 0.9 : 0.45,
     reticle: false,
     innerRadius: 0,
     innerColor: slotColor,

@@ -17,11 +17,14 @@ import {
  * player's feet plus their name above their head. World-space, so it rides the
  * camera exactly like the sprites do and needs no projection maths of its own.
  *
- * MOUNTING MATTERS. renderer.ts adds this layer directly ABOVE the entity layer
+ * MOUNTING MATTERS. renderer.ts adds this layer directly BELOW the entity layer
  * and BELOW status-fx / bullets / explosions:
  *
- *   - above entities → a marker is never swallowed by the furniture standing in
- *     front of it, which is the failure mode that makes a marker useless;
+ *   - below entities → a marker is a floor decal, not a sticker on the body: the
+ *     character's own sprite always paints over its ring and name, so the thing
+ *     the marker is labelling stays fully visible instead of getting obscured by
+ *     its own label. A ring that hides the character it marks has failed at the
+ *     one job it has;
  *   - below the combat layers → bullets, blood, fire and hit flashes all paint
  *     over it, so the markers cannot out-shout the things trying to kill you.
  *
@@ -33,16 +36,17 @@ import {
 
 const labelStyle = (fill: number): TextStyleOptions => ({
   fontFamily: 'monospace',
-  fontSize: 13,
+  fontSize: 11,
   fontWeight: 'bold',
   fill,
-  // A fat black outline is what keeps a name readable over both a dark floor
-  // and a pale one, without turning the fill into a brighter colour.
-  stroke: { color: 0x000000, width: 4 },
+  // A black outline is what keeps a name readable over both a dark floor and a
+  // pale one, without turning the fill into a brighter colour — kept thin so
+  // the name doesn't outweigh the character it labels.
+  stroke: { color: 0x000000, width: 2.5 },
 })
 
 /** A dark backing stroke under every ring: contrast from VALUE, not saturation. */
-const SHADOW = { color: 0x000000, alpha: 0.55 } as const
+const SHADOW = { color: 0x000000, alpha: 0.4 } as const
 
 interface LabelView {
   text: Text
@@ -105,14 +109,14 @@ export class PlayerMarkerLayer {
 
       const rx = style.radius * TILE_PX
       const ry = rx * GROUND_SQUASH
-      this.g.ellipse(cx, cy, rx, ry).stroke({ ...SHADOW, width: style.width + 3, alpha: SHADOW.alpha * a })
+      this.g.ellipse(cx, cy, rx, ry).stroke({ ...SHADOW, width: style.width + 1.5, alpha: SHADOW.alpha * a })
       this.g.ellipse(cx, cy, rx, ry).stroke({ color: style.color, width: style.width, alpha: a })
 
       if (style.reticle) {
         const irx = style.innerRadius * TILE_PX
         this.g.ellipse(cx, cy, irx, irx * GROUND_SQUASH).stroke({ color: style.innerColor, width: 2, alpha: a })
         for (const s2 of reticleTicks(cx, cy, style.radius, TILE_PX)) {
-          this.g.moveTo(s2.x1, s2.y1).lineTo(s2.x2, s2.y2).stroke({ ...SHADOW, width: style.width + 3, alpha: SHADOW.alpha * a })
+          this.g.moveTo(s2.x1, s2.y1).lineTo(s2.x2, s2.y2).stroke({ ...SHADOW, width: style.width + 1.5, alpha: SHADOW.alpha * a })
           this.g.moveTo(s2.x1, s2.y1).lineTo(s2.x2, s2.y2).stroke({ color: style.color, width: style.width, alpha: a })
         }
       }

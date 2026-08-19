@@ -9,18 +9,12 @@ import { appliedCenter } from '../render/cameraModel'
  * through here; there is deliberately no other projection or compass path.
  */
 
-/** Stable per-slot caret colours; teammates keep the same hue all game.
- * Eight distinct hues so an 8-player run (slots 0..7) has no colour collisions. */
-const SLOT_COLORS = ['#5aa9ff', '#7fd17f', '#ffd76a', '#d17fd1', '#ff9a5a', '#6ad1c8', '#c98cff', '#ff7fa8'] as const
-/** Downed teammates override their slot colour with a loud red — rush to revive. */
-export const DOWNED_COLOR = '#ff4d4d'
-
-/** Stable caret colour for a player slot (playerId). Wraps past the palette. */
-export const playerColor = (playerId: number): string =>
-  SLOT_COLORS[((playerId % SLOT_COLORS.length) + SLOT_COLORS.length) % SLOT_COLORS.length]
-
-/** Short stable label for a player slot: P1, P2, … (1-based, human-facing). */
-export const playerLabel = (playerId: number): string => `P${playerId + 1}`
+// Identity colour/label is ONE table for the whole game (render/playerIdentity.ts)
+// — the off-screen arrow here and the feet ring drawn in world space must agree,
+// or "follow the teal arrow" leads you to the wrong body. Re-exported so the
+// existing DOM call sites keep importing it from the locator.
+export { DOWNED_COLOR, playerColor, playerLabel } from '../render/playerIdentity'
+import { DOWNED_COLOR, playerColor, playerLabel } from '../render/playerIdentity'
 
 /** A teammate as the locator sees them — a player entity that is not `self`. */
 export interface Teammate {

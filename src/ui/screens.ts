@@ -245,7 +245,16 @@ export const createScreens = (
       }
       return
     }
-    const markers = locatorMarkers(view.self.pos, teammates, { ...cam, levelW: view.level.w, levelH: view.level.h })
+    // OFF-SCREEN ONLY. A visible teammate is now marked in world space by the
+    // ring at their feet (render/playerMarkerLayer.ts), which — unlike this DOM
+    // caret, which was centred on the body — does not cover the character art it
+    // is labelling. Keeping both would double-mark every visible player. The
+    // edge arrow is still the right tool for someone you cannot see.
+    const markers = locatorMarkers(view.self.pos, teammates, {
+      ...cam,
+      levelW: view.level.w,
+      levelH: view.level.h,
+    }).filter((m) => !m.onScreen)
     // Cheap change-detection (like the HUD): skip DOM writes when nothing moved.
     const key = markers
       .map((m) => `${m.playerId}:${m.onScreen ? 'o' : 'e'}${Math.round(m.sx)},${Math.round(m.sy)}:${m.angle.toFixed(2)}:${m.dist}:${m.color}`)
@@ -330,9 +339,11 @@ const makeLocatorEl = (): LocatorEl => {
 
 /**
  * Reconcile the pooled marker elements against the computed markers: create for
- * new teammates, drop for departed ones, and (re)position/paint the rest. On-
- * screen teammates show just a coloured name caret; off-screen ones show the
- * rotating ➤ and a distance readout, edge-pinned by screens.ts's projection.
+ * new teammates, drop for departed ones, and (re)position/paint the rest.
+ *
+ * These are OFF-SCREEN teammates only (the caller filters): a rotating ➤ with a
+ * live distance readout, edge-pinned by screens.ts's projection. Teammates you
+ * can actually see wear a world-space ring at their feet instead.
  */
 const positionMarkers = (container: HTMLElement, pool: Map<number, LocatorEl>, markers: readonly LocatorMarker[]): void => {
   const live = new Set<number>()
@@ -348,17 +359,10 @@ const positionMarkers = (container: HTMLElement, pool: Map<number, LocatorEl>, m
     el.root.style.zIndex = m.downed ? '2' : '1'
     // Centre the marker on its anchor point (translate off its own half-size).
     el.root.style.transform = `translate(${m.sx}px, ${m.sy}px) translate(-50%, -50%)`
-    if (m.onScreen) {
-      // Visible: a downward caret + name so co-op players stay distinguishable.
-      el.arrow.textContent = m.downed ? '✖' : '▼'
-      el.arrow.style.transform = 'none'
-      el.tag.textContent = m.downed ? `${m.label} DOWN` : m.label
-    } else {
-      // Off-screen: rotate the ➤ toward them with a live world-distance readout.
-      el.arrow.textContent = '➤'
-      el.arrow.style.transform = `rotate(${m.angle}rad)`
-      el.tag.textContent = `${m.label}${m.downed ? ' DOWN' : ''} · ${m.dist}m`
-    }
+    // Rotate the ➤ toward them with a live world-distance readout.
+    el.arrow.textContent = '➤'
+    el.arrow.style.transform = `rotate(${m.angle}rad)`
+    el.tag.textContent = `${m.label}${m.downed ? ' DOWN' : ''} · ${m.dist}m`
   }
   for (const [id, el] of pool) {
     if (!live.has(id)) {

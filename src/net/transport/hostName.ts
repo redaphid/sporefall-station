@@ -60,14 +60,49 @@ export const toAdvertiseName = (raw: string | null | undefined): string => {
 }
 
 /**
- * Scan side: the label shown for a host in the join list. Prefer the advertised
- * name; when a host advertised no usable name, derive a stable short code from its
- * deviceId so two nameless hosts stay distinguishable instead of both reading
- * 'Unknown host'.
+ * The word we put in front of every host in the join list.
+ *
+ * This is deliberately NOT on the air, and it cannot be. See the budget note at
+ * the top of this file: with our 128-bit service UUID in the advertisement there
+ * are 8 bytes left for a local name, and 'Sporefall' is 9 — it does not fit by
+ * one byte, and 'Sporefall Station' (17) misses by nine. Android offers no way to
+ * advertise an arbitrary name in any case: AdvertiseData can only
+ * setIncludeDeviceName(true), which broadcasts the ADAPTER's name, so the capgo
+ * plugin implements our `name` option as bluetoothAdapter.setName() — a global,
+ * persistent rename of the player's phone that it only undoes on a clean
+ * stopAdvertising. Hosting a game must not rename someone's phone for their car
+ * and their headphones, and a lost rename race silently blows the 31-byte budget
+ * and takes the host off the air entirely (that was #35, fixed in #16).
+ *
+ * None of which we need, because the label is a CLIENT-side decision. The scan
+ * filters on BLE_SERVICE_UUID, so every device that reaches this list is by
+ * construction a phone running Sporefall — saying so costs zero advertisement
+ * bytes and works against hosts running any build, including the older APKs
+ * already in the wild.
+ */
+export const HOST_LABEL_PREFIX = 'Sporefall'
+
+/**
+ * Scan side: the label shown for a host in the join list.
+ *
+ * Every row is tagged with the game (see HOST_LABEL_PREFIX) and then made
+ * distinguishable, because "which of these two phones is Dave's" is the actual
+ * question at a playtest:
+ *
+ *   'Sporefall · Pixel 8 Pro'  — Android had a cached GAP name for the phone
+ *   'Sporefall · EEFF'         — it did not; use a short code off the deviceId
+ *
+ * The first case is worth stressing: `device.name` here is NOT our advertisement
+ * (we broadcast none) — it is BluetoothDevice.getName(), the remote name Android
+ * has cached from an earlier pairing. So before this, a host could appear in
+ * NEARBY GAMES as the bare string 'Pixel 8 Pro', with nothing marking it as the
+ * game at all.
  */
 export const toHostLabel = (name: string | null | undefined, deviceId: string): string => {
   const clean = (name ?? '').trim()
-  if (clean) return clean
+  if (clean) return `${HOST_LABEL_PREFIX} · ${clean}`
   const tail = (deviceId ?? '').replace(/[^0-9a-zA-Z]/g, '').slice(-4).toUpperCase()
-  return tail ? `Host ${tail}` : 'Unknown host'
+  // No name and no usable deviceId: nothing exists to tell two of these apart,
+  // but such a host cannot be connected to either, so there is nothing to lose.
+  return tail ? `${HOST_LABEL_PREFIX} · ${tail}` : `${HOST_LABEL_PREFIX} host`
 }

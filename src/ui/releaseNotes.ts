@@ -9,10 +9,10 @@
 
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
 export const RELEASE_NOTES: readonly string[] = [
+  'Nearby games now say Sporefall by name',
   'Long sessions no longer make you warp',
   'Joining now retries instead of hanging',
   'Find yourself: YOU ring, named teammates',
-  'Desks no longer hang from the ceiling',
 ]
 
 /** Tuning for how many notes show and how long each line may be. */

@@ -5,6 +5,7 @@ import type { RenderView } from '../app/session'
 import { flagOn } from '../app/featureFlags'
 import { loadSettings, type ShaderFxMode } from '../app/settings'
 import { createArt, TILE_PX, type ArtRegistry } from './art'
+import { WORLD_LAYER_ORDER, type WorldLayerName } from './worldLayers'
 import { BackbufferPipeline } from './backbuffer'
 import { BulletLayer } from './bullets'
 import { DistortionPool, packPrims, specsForEvents, sustainedSpecs, type UvProjector } from './distortion'
@@ -202,16 +203,27 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // Player markers sit directly ABOVE the entity layer — so no prop can hide the
   // ring that says which body is yours — and BELOW status-fx/bullets/effects, so
   // every threat and every impact still paints over the top of them.
-  world.addChild(
-    tilemap.root,
-    entities.root,
-    playerMarkers.root,
-    statusFx.root,
-    bullets.root,
-    effects.root,
-    reticleLayer,
-    pickLayer,
-  )
+  //
+  // SINKING THIS LAYER BELOW `entities` LOOKS RIGHT AND IS NOT. The entity layer
+  // is y-sorted, so anything standing one tile south of a player — a desk, a
+  // crate, an enemy — spans `foot-16 … foot+32` in world px and swallows that
+  // player's ring (`ry ≈ 7.6px` about the foot) and their name whole. A downed
+  // teammate behind furniture would show no red ring, no X and no "P2 DOWN":
+  // the revive cue, gone. Markers are kept from covering the character by being
+  // SMALL and QUIET, which is tuning, not by being buried, which is a regression.
+  // Mounted BY the pinned order (worldLayers.ts) rather than alongside it, so
+  // the test that guards the order guards what actually paints.
+  const worldLayers: Record<WorldLayerName, Container> = {
+    tilemap: tilemap.root,
+    entities: entities.root,
+    playerMarkers: playerMarkers.root,
+    statusFx: statusFx.root,
+    bullets: bullets.root,
+    effects: effects.root,
+    reticle: reticleLayer,
+    pick: pickLayer,
+  }
+  world.addChild(...WORLD_LAYER_ORDER.map((name) => worldLayers[name]))
 
   // --- Backbuffer weapon-FX pipeline (backbuffer.ts). The world lives inside
   // `sceneRoot`; the pipeline either composites it through the distortion

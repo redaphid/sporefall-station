@@ -235,3 +235,57 @@ describe('markerOrder', () => {
     expect(markerOrder([])).toEqual([])
   })
 })
+
+// --- Absolute magnitudes. The relative invariants above (self > mate, downed
+// loudest) all still hold when every marker is toned down to nothing, so they
+// pass while the feature quietly disappears on screen. These pin the floor.
+//
+// ZOOM_MIN is 0.5 (zoomModel.ts), so one world px is half a CSS px in the
+// zoomed-out "where is my crew" view — which is exactly the view the markers
+// exist for, and the one that goes sub-pixel first.
+describe('toned down, not toned out', () => {
+  const ZOOM_MIN = 0.5
+  const TILE_PX = 32
+
+  it('keeps a teammate ring visible even when zoomed out AND cloaked', () => {
+    const mateAlpha = markerStyle(mate(1), 0).alpha
+    // Cloak multiplies the marker alpha by itself (~0.45), so an already-faint
+    // ring compounds to nothing. 0.45 x 0.45 = 0.2 was the shipped low.
+    expect(mateAlpha).toBeGreaterThanOrEqual(0.55)
+    expect(mateAlpha * 0.45).toBeGreaterThan(0.25)
+  })
+
+  it('keeps a teammate stroke above a CSS pixel at ZOOM_MIN', () => {
+    expect(markerStyle(mate(1), 0).width * ZOOM_MIN).toBeGreaterThanOrEqual(0.85)
+  })
+
+  it('never lets a downed teammate outshout YOU - that inverts "which one is me"', () => {
+    const self = markerStyle(me(0), 0).alpha
+    const downedMate = markerStyle(mate(1, true), 0).alpha
+    // "As loud as yours" means EQUAL. Louder is a different bug wearing the
+    // same words, and the alpha drives the name and shadow as well as the ring.
+    expect(downedMate).toBeLessThanOrEqual(self)
+    expect(downedMate).toBe(self)
+  })
+
+  it('keeps a downed teammate as loud as YOU, still louder than an upright one', () => {
+    expect(markerStyle(mate(1, true), 0).alpha).toBeGreaterThan(markerStyle(mate(1), 0).alpha)
+  })
+
+  it('keeps the breathe SWELL perceptible, not merely non-zero', () => {
+    // The swell is a fraction OF the radius, so shrinking the ring shrinks the
+    // pulse too; cutting both at once left ~0.2 CSS px of movement, which reads
+    // as a still marker. Guard the world-px travel, not just high > low.
+    const low = markerStyle(me(0), 0).radius
+    const high = markerStyle(me(0), PULSE_TICKS / 2).radius
+    expect((high - low) * TILE_PX).toBeGreaterThanOrEqual(1)
+  })
+
+  it('does NOT drag the name down into the chest as the ring shrinks', () => {
+    // The rise is measured from the FEET, so a smaller ring lowers the name.
+    // The torso is drawn foot-28 .. foot-9: a name whose baseline falls much
+    // below ~13px up is laid across the character it labels.
+    expect(labelRisePx(markerStyle(me(0), 0), TILE_PX)).toBeGreaterThanOrEqual(13)
+    expect(labelRisePx(markerStyle(mate(1), 0), TILE_PX)).toBeGreaterThanOrEqual(11)
+  })
+})

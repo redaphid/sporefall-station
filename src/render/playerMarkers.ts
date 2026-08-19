@@ -44,15 +44,25 @@ export const PULSE_TICKS = 48
 /** Ground rings are squashed to read as lying ON the floor, not as a halo. */
 export const GROUND_SQUASH = 0.52
 
-/** Ring radii in TILES. Yours is larger as well as differently shaped. */
-export const SELF_RADIUS = 0.62
-export const MATE_RADIUS = 0.42
+/** Ring radii in TILES. Yours is larger as well as differently shaped. Kept
+ * small enough to sit at the feet without eating into the character art above
+ * it — a marker that covers the thing it marks has failed at its one job. */
+export const SELF_RADIUS = 0.46
+export const MATE_RADIUS = 0.32
 /** The local player's inner rim, in your own slot hue, so you still learn which
  * colour is "you" — that is what the off-screen teammate arrows speak in. */
-export const SELF_INNER_RADIUS = 0.4
+export const SELF_INNER_RADIUS = 0.3
 
-/** How far the local player's ring swells at the top of its breath (fraction). */
-export const PULSE_AMPLITUDE = 0.08
+/**
+ * How far the local player's ring swells at the top of its breath (fraction).
+ *
+ * This is a fraction OF THE RADIUS, so shrinking the ring already shrinks the
+ * swell — cutting both at once is what makes the breathe vanish. 0.09 of the
+ * 0.46-tile ring is ~1.3 world px of x-radius, near the ~1.6px the 0.62-tile
+ * ring gave at 0.08, which keeps "exactly one marker on screen is moving and
+ * it's yours" legible at ZOOM_MIN instead of it becoming ~0.2 CSS px.
+ */
+export const PULSE_AMPLITUDE = 0.09
 
 /**
  * World-pixels the name sits ABOVE the feet — i.e. hard up against the top of
@@ -65,9 +75,19 @@ export const PULSE_AMPLITUDE = 0.08
  * as a label FOR the enemy. Sitting the name on its ring makes ownership
  * unambiguous: the only thing it touches is the shins of the player it names,
  * and shins carry no information.
+ *
+ * The clearance is a CONSTANT added to the ring's own half-height, and it grew
+ * from 3 to 6 when the rings shrank. That is not fine-tuning: the rise is
+ * measured from the feet, so a smaller ring drags the name DOWN into the
+ * torso (drawn `foot-28 … foot-9`), and the name — anchored at its bottom,
+ * up to 1.6x scale — ends up laid across the chest of the character it labels.
+ * 6 puts the baseline back at ~13.6px, where the 0.62-tile ring had it, so the
+ * ring gets smaller without the name climbing onto the body.
  */
+const LABEL_CLEARANCE_PX = 6
+
 export const labelRisePx = (style: MarkerStyle, tilePx: number): number =>
-  style.radius * tilePx * GROUND_SQUASH + 3
+  style.radius * tilePx * GROUND_SQUASH + LABEL_CLEARANCE_PX
 
 /** Everything the model needs about one player to style their marker. */
 export interface MarkerSubject {
@@ -144,8 +164,8 @@ export const markerStyle = (s: MarkerSubject, t: number): MarkerStyle => {
       labelColor: s.downed ? DOWNED_LABEL_COLOR : 0xffffff,
       label: s.downed ? `${SELF_LABEL} DOWN` : SELF_LABEL,
       radius: SELF_RADIUS * swell,
-      width: 3,
-      alpha: 0.95,
+      width: 2,
+      alpha: 0.85,
       reticle: true,
       innerRadius: SELF_INNER_RADIUS * swell,
       innerColor: s.downed ? DOWNED_COLOR_INT : slotColor,
@@ -157,10 +177,15 @@ export const markerStyle = (s: MarkerSubject, t: number): MarkerStyle => {
     labelColor: s.downed ? DOWNED_LABEL_COLOR : slotColor,
     label: s.downed ? `${playerLabel(s.slot)} DOWN` : playerLabel(s.slot),
     radius: MATE_RADIUS,
-    width: 2.5,
+    width: 1.75,
     // A downed teammate is an emergency, so that ring alone is allowed to be
-    // as loud as yours; an upright one stays quiet.
-    alpha: s.downed ? 0.95 : 0.7,
+    // as loud as yours — EQUAL to it, never above: this alpha also drives the
+    // name and the backing shadow, and a teammate louder than you inverts the
+    // whole "which one is me" hierarchy. An upright one stays quiet, but not
+    // silent: 0.45 put a 1.75px stroke at ZOOM_MIN below half a CSS pixel, and
+    // a cloaked mate compounded to 0.2 — nothing on screen in exactly the
+    // zoomed-out "where is my crew" view the marker exists for.
+    alpha: s.downed ? 0.85 : 0.6,
     reticle: false,
     innerRadius: 0,
     innerColor: slotColor,

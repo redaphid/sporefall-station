@@ -21,7 +21,11 @@ import {
  * and BELOW status-fx / bullets / explosions:
  *
  *   - above entities → a marker is never swallowed by the furniture standing in
- *     front of it, which is the failure mode that makes a marker useless;
+ *     front of it, which is the failure mode that makes a marker useless. Sinking
+ *     it below entities to stop a marker covering its own character trades that
+ *     for a worse bug: the y-sorted entity layer then hides a downed teammate's
+ *     ring behind any desk to their south. Keep the marker off the character by
+ *     keeping it SMALL and QUIET instead;
  *   - below the combat layers → bullets, blood, fire and hit flashes all paint
  *     over it, so the markers cannot out-shout the things trying to kill you.
  *
@@ -33,16 +37,32 @@ import {
 
 const labelStyle = (fill: number): TextStyleOptions => ({
   fontFamily: 'monospace',
-  fontSize: 13,
+  // 12, not 11: `labelScale` caps compensation at 1.6x, so at ZOOM_MIN (0.5) an
+  // 11px name lands at 8.8 CSS px on the 915x412 phone target — under the floor
+  // for a semi-transparent bold monospace numeral.
+  fontSize: 12,
   fontWeight: 'bold',
   fill,
-  // A fat black outline is what keeps a name readable over both a dark floor
-  // and a pale one, without turning the fill into a brighter colour.
-  stroke: { color: 0x000000, width: 4 },
+  // A black outline is what keeps a name readable over both a dark floor and a
+  // pale one, without turning the fill into a brighter colour — trimmed a little
+  // so the name doesn't outweigh the character it labels, but not below 3: the
+  // outline is the whole reason the name survives a pale floor.
+  stroke: { color: 0x000000, width: 3 },
 })
 
 /** A dark backing stroke under every ring: contrast from VALUE, not saturation. */
-const SHADOW = { color: 0x000000, alpha: 0.55 } as const
+const SHADOW = { color: 0x000000, alpha: 0.5 } as const
+
+/**
+ * World-px the backing stroke extends past the ring on each side, doubled to
+ * get the stroke-width delta.
+ *
+ * Held at 1.25 rather than shrunk with the ring: at `ZOOM_MIN` (0.5) a 0.75px
+ * overhang renders as 0.375 CSS px — sub-pixel, i.e. the value-contrast this
+ * file relies on quietly stops existing at exactly the zoom where the ring is
+ * thinnest and needs it most.
+ */
+const SHADOW_OVERHANG = 1.25
 
 interface LabelView {
   text: Text
@@ -105,14 +125,14 @@ export class PlayerMarkerLayer {
 
       const rx = style.radius * TILE_PX
       const ry = rx * GROUND_SQUASH
-      this.g.ellipse(cx, cy, rx, ry).stroke({ ...SHADOW, width: style.width + 3, alpha: SHADOW.alpha * a })
+      this.g.ellipse(cx, cy, rx, ry).stroke({ ...SHADOW, width: style.width + SHADOW_OVERHANG * 2, alpha: SHADOW.alpha * a })
       this.g.ellipse(cx, cy, rx, ry).stroke({ color: style.color, width: style.width, alpha: a })
 
       if (style.reticle) {
         const irx = style.innerRadius * TILE_PX
         this.g.ellipse(cx, cy, irx, irx * GROUND_SQUASH).stroke({ color: style.innerColor, width: 2, alpha: a })
         for (const s2 of reticleTicks(cx, cy, style.radius, TILE_PX)) {
-          this.g.moveTo(s2.x1, s2.y1).lineTo(s2.x2, s2.y2).stroke({ ...SHADOW, width: style.width + 3, alpha: SHADOW.alpha * a })
+          this.g.moveTo(s2.x1, s2.y1).lineTo(s2.x2, s2.y2).stroke({ ...SHADOW, width: style.width + SHADOW_OVERHANG * 2, alpha: SHADOW.alpha * a })
           this.g.moveTo(s2.x1, s2.y1).lineTo(s2.x2, s2.y2).stroke({ color: style.color, width: style.width, alpha: a })
         }
       }

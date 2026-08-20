@@ -18,15 +18,28 @@ import { clampFlags, defaultFlags, flagOn, FEATURE_FLAGS } from '../app/featureF
 import { clampSettings, defaultSettings } from '../app/settings'
 
 describe('newEnemyArt — the default', () => {
-  it('is OFF, so landing the art is visually inert until it is chosen', () => {
-    expect(flagOn(defaultSettings().flags, 'newEnemyArt')).toBe(false)
+  it('is ON, so the six draw their real art without anyone finding the setting', () => {
+    // Flipped deliberately. Off-by-default was correct while the art was
+    // unreviewed; it became wrong once the art shipped, because the six then
+    // rendered as generic blobs tinted 0xcccccc and read as "white circles" —
+    // reported as a bug, not recognised as an un-ticked switch.
+    expect(flagOn(defaultSettings().flags, 'newEnemyArt')).toBe(true)
   })
 
-  it('stays off for a player whose stored settings predate the flag', () => {
+  it('opts in a player whose stored settings predate the flag', () => {
     // The exact shape someone would have in localStorage from before this
-    // existed. It must not silently opt them in.
+    // existed. Since the default is now ON, an existing install that never
+    // opened the panel MUST pick the new art up on next load — otherwise the
+    // people most likely to have hit the bug are the ones who keep it.
     const legacy = { hapticsEnabled: true, hapticsIntensity: 0.7, effectsQuality: 'high', theme: 'swampspace-hires' }
-    expect(flagOn(clampSettings(legacy).flags, 'newEnemyArt')).toBe(false)
+    expect(flagOn(clampSettings(legacy).flags, 'newEnemyArt')).toBe(true)
+  })
+
+  it('still lets an explicit opt-OUT stick', () => {
+    // The escape hatch is the whole reason the flag survives its own flip: a
+    // stored `false` is a real boolean and must beat the new default.
+    const optedOut = { ...defaultSettings(), flags: { newEnemyArt: false } }
+    expect(flagOn(clampSettings(JSON.parse(JSON.stringify(optedOut))).flags, 'newEnemyArt')).toBe(false)
   })
 
   it('survives a round-trip through storage in both positions', () => {
@@ -36,12 +49,17 @@ describe('newEnemyArt — the default', () => {
     }
   })
 
-  it('rejects a corrupt value rather than coercing it truthy', () => {
-    // 'true' the STRING must not enable it — a truthiness bug here would opt
-    // people in silently, which is the one outcome the default exists to avoid.
-    for (const junk of ['true', 1, {}, [], null]) {
-      expect(flagOn(clampFlags({ newEnemyArt: junk }), 'newEnemyArt')).toBe(false)
+  it('ignores a corrupt value rather than coercing it, in either direction', () => {
+    // Only a real boolean is honoured. With the default ON the dangerous
+    // coercion has inverted: `''`/`0`/`null` must NOT read as a deliberate
+    // opt-out, and `'true'`/`1` must not be mistaken for a deliberate opt-in.
+    // Both cases resolve the same way — corrupt input falls back to the default.
+    for (const junk of ['true', 'false', 1, 0, '', {}, [], null]) {
+      expect(flagOn(clampFlags({ newEnemyArt: junk }), 'newEnemyArt')).toBe(true)
     }
+    // ...and a genuine boolean is still obeyed, both ways.
+    expect(flagOn(clampFlags({ newEnemyArt: false }), 'newEnemyArt')).toBe(false)
+    expect(flagOn(clampFlags({ newEnemyArt: true }), 'newEnemyArt')).toBe(true)
   })
 })
 
@@ -95,8 +113,25 @@ describe('the flag registry itself', () => {
     }
   })
 
-  it('defaults every flag OFF, so new work ships dark until he opts in', () => {
-    for (const f of FEATURE_FLAGS) expect(f.defaultOn, `${f.key} should ship off`).toBe(false)
+  it('pins every flag default explicitly, so a flip is always a deliberate edit', () => {
+    // This USED to assert every flag defaults OFF. That blanket rule died the
+    // day `newEnemyArt` flipped, and a rule that gets deleted the first time it
+    // is inconvenient was never protecting anything. What actually needs
+    // protecting is narrower and survives the flip: no default changes by
+    // accident. A flag added here without a considered default fails; a default
+    // edited without touching this table fails.
+    const EXPECTED_DEFAULTS: Record<string, boolean> = {
+      newEnemyArt: true,
+    }
+    expect(Object.fromEntries(FEATURE_FLAGS.map((f) => [f.key, f.defaultOn]))).toEqual(EXPECTED_DEFAULTS)
+  })
+
+  it('makes any ON-by-default flag say so in its retire note', () => {
+    // Rule 2 ("off is the untouched path") is load-bearing, so a flag that opts
+    // everyone in by default owes an explanation of how it stops being a flag.
+    for (const f of FEATURE_FLAGS.filter((f) => f.defaultOn)) {
+      expect(f.retire.toLowerCase(), `${f.key} defaults ON and must justify it`).toContain('default')
+    }
   })
 
   it('has no duplicate keys', () => {

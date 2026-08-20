@@ -205,12 +205,18 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
 /** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
  * map on purpose.
  *
- * The `newEnemyArt` setting is OFF by default, and the point of an off-by-default
- * flag is that a player who never touches it is PROVABLY unaffected. So the
- * default path is the original `CHARSET_ALIAS_BASE`, byte-for-byte what shipped
- * before this art existed — not a second branch that reconstructs it and merely
- * looks the same. Turning the setting on ADDS these entries; turning it off does
- * not subtract anything, because nothing was ever added.
+ * The `newEnemyArt` setting is now ON by default, but the SHAPE of this code is
+ * unchanged and deliberately so: the flag still only ever ADDS these entries,
+ * and switching it off still yields `CHARSET_ALIAS_BASE` byte-for-byte — what
+ * shipped before this art existed — rather than a second branch that
+ * reconstructs it and merely looks the same. So "off" remains a real, provable
+ * escape hatch now that it is no longer the default.
+ *
+ * Why it flipped: with it off, these six are absent from CHARSET_ALIAS, so
+ * `isCharacterSprite` is false for them and they miss the character path
+ * entirely, falling to the generic blob draw tinted `entityColors.default`
+ * (0xcccccc). That is what "the enemies the boss spawns are white circles" was —
+ * the boss's brood is `sporeling`, and the art had been shipping all along.
  *
  * Each maps to ITSELF, not a borrowed body: aliasing e.g. brute->thug would just
  * reintroduce the pixel-identical problem. A missing file still falls through to

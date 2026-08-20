@@ -1,93 +1,44 @@
 /**
- * Player marker MODEL — pure geometry and style for the feet rings that make a
- * co-op crew readable. DOM-free and pixi-free so all of it is unit-tested;
- * `playerMarkerLayer.ts` is a thin pixi draw on top.
+ * Player marker MODEL — pure geometry and style for the tiny feet rings that
+ * make a co-op crew readable. DOM-free and pixi-free so all of it is
+ * unit-tested; `playerMarkerLayer.ts` is a thin pixi draw on top.
  *
- * ── THE TWO QUESTIONS ───────────────────────────────────────────────────────
+ * ── TINY CIRCLES, NOTHING ELSE ───────────────────────────────────────────────
  *
- * A player in a fight asks two different things, and they are NOT equally
- * urgent, so they deliberately do not get equal treatment:
+ * Earlier versions of this marker grew a second rim, four cardinal ticks, a
+ * breathing pulse and a floating name label — each addition individually
+ * justified, but the sum sat on top of the character it was supposed to be
+ * labelling. This version is deliberately minimal: a small ring at the feet,
+ * colour-coded, nothing that grows, animates, or adds a second shape EXCEPT
+ * the downed X below — kept because it is the one shape a bleeding-out
+ * teammate's life may depend on reading correctly with no colour vision.
  *
- *   1. "who is that?"     → teammates: a thin slot-coloured ring + their numeral.
- *   2. "which one is ME?" → you: a categorically DIFFERENT MARKER FORM — a
- *                           double ring with four cardinal ticks, breathing,
- *                           with a white outer rim and the word YOU.
- *
- * (2) is the one that loses fights, so it wins the eye contest against (1) by
- * FORM, not merely by being brighter: even in a greyscale screenshot, with
- * every hue stripped, exactly one marker on screen has ticks and two rims.
+ *   - "who is that?"     → a teammate's own slot colour, thin and quiet.
+ *   - "which one is ME?" → white, and very slightly bigger — the only two
+ *                          differences from a teammate ring. No second rim,
+ *                          no ticks, no motion.
+ *   - "who is DOWN?"     → the ring turns the alarm red AND gets a struck
+ *                          X — the one place this file still pairs colour
+ *                          with a shape, because red-on-red-floor is a real,
+ *                          measured colourblind failure (see DOWNED_COLOR_INT
+ *                          in playerIdentity.ts).
  *
  * ── WHY A RING AT THE FEET ──────────────────────────────────────────────────
  *
- * The pre-existing on-screen caret was centred on the body, so it covered the
- * character art it was labelling — eight players meant eight glyphs sitting on
- * eight sprites. A ring drawn at the FEET is anchored to the thing it marks,
- * scales with the camera, and leaves the whole sprite visible.
- *
- * ── AND WHY IT MUST NOT SHOUT ───────────────────────────────────────────────
- *
- * Props already render as the brightest thing on screen after the HUD. Markers
- * have to beat the furniture without beating the THREATS, so:
- *   - teammate rings are thin and part-transparent — present, not loud;
- *   - every ring gets a dark backing stroke, which buys contrast against a pale
- *     floor from VALUE rather than from saturation (saturation is what competes
- *     with enemies and with hit flashes);
- *   - the layer is mounted UNDER the status-fx / bullet / explosion layers, so
- *     anything actually trying to kill you paints over the top of it.
+ * A marker centred on the body covers the character art it labels. A ring at
+ * the FEET is anchored to the thing it marks, scales with the camera, and
+ * — as long as it stays small — leaves the sprite fully visible above it.
  */
 
-import { DOWNED_COLOR_INT, playerColorInt, playerLabel, SELF_LABEL } from './playerIdentity'
-
-/** Ticks for one full breathe of the local player's ring (30 ticks = 1s). */
-export const PULSE_TICKS = 48
+import { DOWNED_COLOR_INT, playerColorInt } from './playerIdentity'
 
 /** Ground rings are squashed to read as lying ON the floor, not as a halo. */
 export const GROUND_SQUASH = 0.52
 
-/** Ring radii in TILES. Yours is larger as well as differently shaped. Kept
- * small enough to sit at the feet without eating into the character art above
- * it — a marker that covers the thing it marks has failed at its one job. */
-export const SELF_RADIUS = 0.46
-export const MATE_RADIUS = 0.32
-/** The local player's inner rim, in your own slot hue, so you still learn which
- * colour is "you" — that is what the off-screen teammate arrows speak in. */
-export const SELF_INNER_RADIUS = 0.3
-
-/**
- * How far the local player's ring swells at the top of its breath (fraction).
- *
- * This is a fraction OF THE RADIUS, so shrinking the ring already shrinks the
- * swell — cutting both at once is what makes the breathe vanish. 0.09 of the
- * 0.46-tile ring is ~1.3 world px of x-radius, near the ~1.6px the 0.62-tile
- * ring gave at 0.08, which keeps "exactly one marker on screen is moving and
- * it's yours" legible at ZOOM_MIN instead of it becoming ~0.2 CSS px.
- */
-export const PULSE_AMPLITUDE = 0.09
-
-/**
- * World-pixels the name sits ABOVE the feet — i.e. hard up against the top of
- * its own ring, NOT floating over the head.
- *
- * Overhead names were tried first and are wrong here. Characters are drawn 48px
- * tall on 32px tiles while players huddle a single tile apart, so a name lifted
- * clear of its own head lands squarely on the head of whoever is standing
- * behind — and in the first render `P3` came to rest beside an enemy, reading
- * as a label FOR the enemy. Sitting the name on its ring makes ownership
- * unambiguous: the only thing it touches is the shins of the player it names,
- * and shins carry no information.
- *
- * The clearance is a CONSTANT added to the ring's own half-height, and it grew
- * from 3 to 6 when the rings shrank. That is not fine-tuning: the rise is
- * measured from the feet, so a smaller ring drags the name DOWN into the
- * torso (drawn `foot-28 … foot-9`), and the name — anchored at its bottom,
- * up to 1.6x scale — ends up laid across the chest of the character it labels.
- * 6 puts the baseline back at ~13.6px, where the 0.62-tile ring had it, so the
- * ring gets smaller without the name climbing onto the body.
- */
-const LABEL_CLEARANCE_PX = 6
-
-export const labelRisePx = (style: MarkerStyle, tilePx: number): number =>
-  style.radius * tilePx * GROUND_SQUASH + LABEL_CLEARANCE_PX
+/** Ring radii in TILES — deliberately tiny: a mark at the shoes, not a halo
+ * around the shins. Yours is only slightly bigger than a teammate's. */
+export const SELF_RADIUS = 0.22
+export const MATE_RADIUS = 0.16
 
 /** Everything the model needs about one player to style their marker. */
 export interface MarkerSubject {
@@ -99,118 +50,32 @@ export interface MarkerSubject {
   downed: boolean
 }
 
-/**
- * A pale alarm-red for the DOWNED name, rather than the ring's saturated red.
- *
- * Verified against a full-greyscale render (`e2e/crew-identity.mjs --grey`):
- * `#ff4d4d` has almost exactly the luminance of this game's lit floor tiles, so
- * with the hue taken away the most urgent label on screen was the hardest one to
- * read. Lifting the VALUE keeps it legible for a player with no colour vision
- * while it still reads as "red, something is wrong" for everyone else. The ring
- * and its struck-through X stay the loud saturated red.
- */
-export const DOWNED_LABEL_COLOR = 0xffd6d6
-
-/**
- * Scale for the name text, cancelling the camera zoom so a name stays readable
- * when the player pinches out — CLAMPED, because a fully constant on-screen size
- * means that at minimum zoom the rings have halved while the names have not, and
- * eight names collide into a single stripe. Capping the compensation trades a
- * little size for legible spacing exactly where crowding starts.
- */
-export const labelScale = (zoom: number): number => (zoom > 0 ? Math.min(1 / zoom, 1.6) : 1)
-
 /** A fully resolved marker, in world tiles / world pixels. */
 export interface MarkerStyle {
   color: number
-  /** Name colour — not always the ring colour (see DOWNED_LABEL_COLOR). */
-  labelColor: number
-  label: string
   /** Ring radius in tiles (x); multiply by GROUND_SQUASH for y. */
   radius: number
   /** Stroke width in world pixels. */
   width: number
   alpha: number
-  /** Second, inner rim + four cardinal ticks — the local player only. */
-  reticle: boolean
-  /** Inner rim radius in tiles (only meaningful when `reticle`). */
-  innerRadius: number
-  /** Inner rim colour: your slot hue, so you can still learn "you are teal". */
-  innerColor: number
-  /** Struck-through X — the shape half of the downed cue. */
+  /** Struck-through X — downed only, the one non-colour cue this file keeps. */
   cross: boolean
 }
 
-/**
- * A 0..1 triangle-free breathe from the render tick. Deterministic (tick-driven,
- * never `Date.now()`), continuous, and period-exact so the pulse never jitters
- * when the frame rate does. `t` may be fractional (tick + interpolation alpha).
- */
-export const breathe = (t: number): number => 0.5 - 0.5 * Math.cos((t / PULSE_TICKS) * Math.PI * 2)
-
-/**
- * Resolve one player's marker. `t` is the continuous render tick and only
- * affects the local player's pulse — teammate rings are deliberately static, so
- * a crowded screen has exactly ONE moving marker on it and that one is yours.
- */
-export const markerStyle = (s: MarkerSubject, t: number): MarkerStyle => {
+/** Resolve one player's marker. Static — nothing here reads the clock or the
+ * render tick, so there is nothing to animate and nothing to keep in sync. */
+export const markerStyle = (s: MarkerSubject): MarkerStyle => {
   const slotColor = playerColorInt(s.slot)
+  const radius = s.self ? SELF_RADIUS : MATE_RADIUS
+  if (s.downed) {
+    return { color: DOWNED_COLOR_INT, radius, width: s.self ? 2 : 1.5, alpha: 0.85, cross: true }
+  }
   if (s.self) {
-    const swell = 1 + PULSE_AMPLITUDE * breathe(t)
-    return {
-      // A white rim, not a saturated one: it wins on VALUE against the brown/
-      // green palette without adding another loud hue to a busy fight.
-      color: s.downed ? DOWNED_COLOR_INT : 0xffffff,
-      labelColor: s.downed ? DOWNED_LABEL_COLOR : 0xffffff,
-      label: s.downed ? `${SELF_LABEL} DOWN` : SELF_LABEL,
-      radius: SELF_RADIUS * swell,
-      width: 2,
-      alpha: 0.85,
-      reticle: true,
-      innerRadius: SELF_INNER_RADIUS * swell,
-      innerColor: s.downed ? DOWNED_COLOR_INT : slotColor,
-      cross: s.downed,
-    }
+    // White, not a saturated hue: it wins on VALUE against the brown/green
+    // palette without adding another loud colour to a busy fight.
+    return { color: 0xffffff, radius, width: 1.5, alpha: 0.8, cross: false }
   }
-  return {
-    color: s.downed ? DOWNED_COLOR_INT : slotColor,
-    labelColor: s.downed ? DOWNED_LABEL_COLOR : slotColor,
-    label: s.downed ? `${playerLabel(s.slot)} DOWN` : playerLabel(s.slot),
-    radius: MATE_RADIUS,
-    width: 1.75,
-    // A downed teammate is an emergency, so that ring alone is allowed to be
-    // as loud as yours — EQUAL to it, never above: this alpha also drives the
-    // name and the backing shadow, and a teammate louder than you inverts the
-    // whole "which one is me" hierarchy. An upright one stays quiet, but not
-    // silent: 0.45 put a 1.75px stroke at ZOOM_MIN below half a CSS pixel, and
-    // a cloaked mate compounded to 0.2 — nothing on screen in exactly the
-    // zoomed-out "where is my crew" view the marker exists for.
-    alpha: s.downed ? 0.85 : 0.6,
-    reticle: false,
-    innerRadius: 0,
-    innerColor: slotColor,
-    cross: s.downed,
-  }
-}
-
-/** The four cardinal tick marks of the local player's reticle, as world-pixel
- * segments around a centre. Cardinal (not diagonal) so they read as a compass
- * rose rather than as sparkle, and so they survive the ground squash legibly. */
-export const reticleTicks = (
-  cx: number,
-  cy: number,
-  radius: number,
-  tilePx: number,
-): { x1: number; y1: number; x2: number; y2: number }[] => {
-  const rx = radius * tilePx
-  const ry = rx * GROUND_SQUASH
-  const len = tilePx * 0.14
-  return [
-    { x1: cx - rx, y1: cy, x2: cx - rx - len, y2: cy },
-    { x1: cx + rx, y1: cy, x2: cx + rx + len, y2: cy },
-    { x1: cx, y1: cy - ry, x2: cx, y2: cy - ry - len },
-    { x1: cx, y1: cy + ry, x2: cx, y2: cy + ry + len },
-  ]
+  return { color: slotColor, radius, width: 1.25, alpha: 0.55, cross: false }
 }
 
 /** Draw order for the markers: downed LAST so the emergency paints on top, then

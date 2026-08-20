@@ -44,22 +44,23 @@ export const addItem = (slots: ItemStack[], itemId: string, qty: number): boolea
   return true
 }
 
-/** Equip the weapon in slot `index` — sets it as the active hotbar slot and the
- * entity's swung weapon. Only melee/ranged slots can be equipped. */
-const USABLE = new Set(['melee', 'ranged', 'throwable', 'consumable'])
+/** Item classes that can be HELD — i.e. put in the active slot for the Use/Throw
+ * button. Weapons are deliberately absent: the player's weapon is PERMANENT, so
+ * a weapon slot is never selectable and `activeSlot` is purely the held-item
+ * cursor. */
+const HELDABLE = new Set(['throwable', 'consumable'])
 
-/** Select slot `index` as the active/hotbar slot. Equipping a weapon also makes
- * it the swung weapon; a throwable/consumable just becomes the held item (the
- * one the Use/Throw key acts on) and leaves the current weapon in hand. */
+/** Select slot `index` as the active/held slot — the one the Use/Throw button
+ * acts on. Only throwables and consumables qualify: a weapon slot exists ONLY to
+ * give weapon-mods a home, and can never be selected or swapped to, so this
+ * never changes `combat.weapon`. The entity keeps the weapon it was born with. */
 export const equipSlot = (e: Entity, index: number): boolean => {
   const ld = e.loadout
   if (!ld) return false
   const slot = ld.inventory[index]
   if (!slot) return false
-  const c = itemClass(slot.itemId)
-  if (!USABLE.has(c)) return false
+  if (!HELDABLE.has(itemClass(slot.itemId))) return false
   ld.activeSlot = index
-  if (e.combat && (c === 'melee' || c === 'ranged')) e.combat.weapon = slot.itemId
   return true
 }
 
@@ -129,7 +130,9 @@ const materializeHeldWeapon = (e: Entity): ItemStack | undefined => {
   if (ld.inventory.length >= MAX_SLOTS) return undefined
   const stack: ItemStack = { itemId: wid, qty: freshWeaponCount(def) }
   ld.inventory.push(stack)
-  equipSlot(e, ld.inventory.length - 1)
+  // NOT equipped: a weapon slot is never selectable (`equipSlot` refuses one).
+  // `weaponStack` finds it by matching `combat.weapon` against the slot's item
+  // id, so the mod still lands — the slot is a home for mods, not a selection.
   return stack
 }
 
@@ -166,8 +169,13 @@ const removeSlot = (e: Entity, index: number): void => {
 }
 
 /** A melee swing wears the swung weapon down; at zero durability it breaks and
- * the entity drops to fists. Innate fists (weapon not slotted) never wear. */
+ * the entity drops to fists. Innate fists (weapon not slotted) never wear.
+ *
+ * A PLAYER's weapon is permanent — it is the only one they will ever carry, and
+ * there is no replacement to pick up — so it never wears and never breaks.
+ * NPC melee is untouched: enemy bats and sledgehammers still wear down and snap. */
 export const wearMelee = (e: Entity): void => {
+  if (e.playerCtl) return
   const index = weaponSlotIndex(e)
   if (index < 0) return
   const stack = e.loadout!.inventory[index]

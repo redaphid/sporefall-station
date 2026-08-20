@@ -253,6 +253,11 @@ export const PROP_SPRITE: Record<string, string> = {
   locker: 'locker',
   cabinet: 'cabinet',
   desk: 'desk',
+  // The mess chair now has art of its own, so it stops drawing procedurally.
+  // FURNITURE_SHAPE.chair stays exactly where it is: the sprite wins when the
+  // theme ships one, and the bespoke silhouette is still the right fallback for
+  // packs (city, test) that do not.
+  chair: 'chair',
   // Station machinery reuses the terminal/console art (previously fell through
   // to the character eyeball). The Cryo Terminal object is literally that art.
   cryoTerminal: 'atm',

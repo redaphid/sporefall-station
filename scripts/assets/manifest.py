@@ -99,6 +99,11 @@ PROP_KEYS = {  # engine prop name -> props table key
     # back to being an ATM. Change art here and in the manifest together.
     "locker": "weapons-locker", "cabinet": "supply-cabinet",
     "desk": "work-desk",
+    # The mess chair. Same hazard as the line above: the `chair` archetype only
+    # stops drawing procedurally because prop.chair is in the shipped manifest,
+    # so it has to be in THIS table as well or the next regeneration drops the
+    # key and every chair silently reverts to the drawn silhouette.
+    "chair": "chair",
 }
 
 

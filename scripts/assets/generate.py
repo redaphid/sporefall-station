@@ -524,13 +524,67 @@ PROPS = {
                      "cabinet, cupboard, closed doors, solid front panel, glass front, window, "
                      "one single shelf, table, desk, workbench, wardrobe, dome, rounded top, "
                      "books, bookcase"),
+    # VALUE IS A GAMEPLAY CONSTRAINT ON THIS SUBJECT, not a matter of taste, and
+    # it is stated in the prompt because that is the only place it can be fixed.
+    # Measured against the SHIPPED default pack (`swampspace-hires`): its floor
+    # sits at luminance 82 and the bog-mutant threat at 53 -- the threat reads
+    # precisely BECAUSE it is darker than the floor. Accepted pack props occupy
+    # 67-99. The first sweep off the old wording put 7 of 8 chairs between 95 and
+    # 151, i.e. brighter than every accepted prop and up to +69 over the floor,
+    # so the eye went to the furniture instead of to the thing trying to kill
+    # you. That is #42's primary defect, reproduced.
+    #
+    # The cause was "slim tubular frame" + "thin straight legs": tubular metal
+    # renders as polished chrome, and chrome at 32px is four white lines. Only
+    # seed 1005 landed in band (78), and it did so by coming back with a painted
+    # teal seat instead of a bare metal one -- so the fix is to ASK for what that
+    # seed found by luck. Material and value are wording the model obeys well;
+    # this is not the negatives-vs-composition trap of the shelf reroll (sec. 6
+    # of #42), where naming a defect failed to move a compositional habit.
+    # SECOND KNOB: BLOCKIER. Stating the material got the value into band (the
+    # sweep moved from 95-151 to 56-82) but produced a WIRE chair -- thin legs,
+    # delicate frame -- and dark plus thin is the worst of both: it sits down in
+    # the value hierarchy correctly and then cannot be read at all. Two of eight
+    # stopped reading as chairs in the room shot.
+    #
+    # "Easier to see" is therefore solved as LEGIBILITY OF FORM, never as
+    # brightness -- brightness is the defect that started this. The levers are
+    # mass (thick square members instead of tubes), a solid back panel instead of
+    # an open frame, and the pack's heavy black outline, none of which raise mean
+    # luminance. `crate, box, cube, cabinet` are negatived because that is the
+    # near-miss this direction invites: a blocky chair over-simplified is the
+    # crate that the top-down sweep already failed as (sec. 3d of #42).
     "mess-chair": ("props/mess-chair.png",
-                   "a single simple metal chair, ONE square seat pad on four thin straight legs "
-                   "with a low upright backrest rising behind the seat, slim tubular frame, "
-                   "seen from a slightly high game angle, roughly 4 wide by 5 tall",
+                   "a single BLOCKY chunky mess-hall chair, bold simple geometric shapes, ONE "
+                   "thick solid rectangular seat slab carried on four THICK SQUARE post legs, a "
+                   "solid rectangular backrest panel standing up behind the seat, heavy chunky "
+                   "members with real thickness, the seat slab the SAME worn dark teal as the "
+                   "backrest, bare painted metal seat with nothing resting on it, "
+                   "the seat and backrest PAINTED worn dark teal, "
+                   "the legs and frame DARK gunmetal grey, matte unpolished metal, dark overall, "
+                   "a thick black outline around the whole object, the backrest facing the "
+                   "viewer squarely, roughly 4 wide by 5 tall",
                    "armchair, sofa, couch, loveseat, throne, recliner, cushioned lounge, "
                    "stool, table, desk, bench, long, wide, two chairs, several chairs, "
-                   "row of seats, armrests"),
+                   "row of seats, armrests, "
+                   # The white-spindle failure, named as material rather than as
+                   # a shape -- the legs were never the wrong SHAPE.
+                   "chrome, polished steel, shiny metal, mirror finish, glossy, "
+                   "bright white highlights, white plastic, pale wood, cream, ivory, "
+                   "brightly lit, overexposed, "
+                   # The wire-chair failure from the previous sweep.
+                   "thin, spindly, wiry, delicate, hairline legs, thin wire legs, wire frame, "
+                   "folding chair, skeletal, flimsy, ornate, curved tubing, spokes, slats, "
+                   "openwork lattice, office chair, wheels, "
+                   # ...and the failure that over-correcting toward mass invites.
+                   "crate, box, cube, cabinet, solid block, featureless slab, "
+                   # The two best-FACING candidates of the previous sweep both put
+                   # a bright white pad on the seat -- a value spike in the middle
+                   # of the sprite, which is the very defect this subject is being
+                   # regenerated to fix. Named as the objects it renders as.
+                   "white cushion, pale cushion, seat pad, white upholstery, sheet of paper, "
+                   "folded towel, cloth on the seat, book, tray, object resting on the seat, "
+                   "bright white patch, white highlight on the seat"),
     "crew-bunk": ("props/crew-bunk.png",
                   "a low single crew bed seen from a high angle looking down at it, ONE long "
                   "rectangular mattress lying flat on a low metal frame, a pale pillow at one "

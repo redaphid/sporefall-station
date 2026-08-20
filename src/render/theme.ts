@@ -64,7 +64,8 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
 export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod'] as const
 export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
-export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk'] as const
+export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
+  'chair'] as const
 const UNIT_SINGLES = ['player', 'cop'] as const
 const UNIT_WALKERS = ['thug', 'scientist', 'robot'] as const
 

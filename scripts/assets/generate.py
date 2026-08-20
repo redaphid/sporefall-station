@@ -646,6 +646,82 @@ FX = {
 TILE_PX, CHAR_PX, PROP_PX, ITEM_PX, FLAME_PX, FX_PX = 32, 48, 32, 32, 48, 64
 ENV_ANCHORS = [os.path.join(ANCHORS, f) for f in ("env-a.png", "env-b.png")]
 
+# ---------------------------------------------------------------------------
+# BASE MODEL PER CATEGORY.
+#
+# This table exists because the documented path was silently wrong. `sweep
+# prop.<name>` never passed a checkpoint, so it fell through to comfy.CKPT --
+# `anything-xl`, an ANIME model -- while the only code that knew better was
+# exp_props.py, an experiment script nobody is told to run. The measurement, on
+# a fixed 8-seed set (see exp_props.py and docs/sprite-generation.md 6):
+#
+#     anything-xl     1/8 clean single props
+#     juggernautXL    8/8      <- one change, and 8/8 again on 8 FRESH seeds
+#
+# Reproduced again later: 0/12 on anything-xl (a winged cat on a stool, two
+# humanoids) against 12/12 on juggernautXL, same recipe. Anime bases compose
+# busy multi-object scenes, so "a cargo crate" comes back as a warehouse, a
+# stack, or a sprite-sheet grid. Every negative-prompt fix aimed at this cost a
+# night and none of them moved the number. The base model was the whole defect.
+#
+# CFG and SIZE travel WITH the checkpoint because they were measured together:
+# CFG 3.5 -> 7.0 is worth the last seed (8/8 vs 7/8), and SIZE 1024 -> 768 does
+# not change the hit rate but makes the hits chunkier at the 32px footprint.
+# Threading the checkpoint alone would leave the documented path still unable to
+# reproduce the art that was actually approved.
+PROP_CKPT = "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
+PROP_CFG = 7.0
+PROP_SIZE = 768
+
+# `None` means "whatever comfy.py resolves -- its default, or $CKPT". For
+# chars/tiles/items that is a RECORDED DECISION, not an omission: they were all
+# authored against the anime base and would drift if it moved under them, and
+# the documented low-VRAM escape hatch
+# (`CKPT=dreamshaper_8.safetensors LORA= SIZE=512 ... sweep item.root-club`)
+# only works because these categories leave the choice to the environment.
+# Pinning them here would silently break that flag.
+PACK_DEFAULT = None
+
+CAT_MODEL = {
+    "prop": {"ckpt": PROP_CKPT, "cfg": PROP_CFG, "size": PROP_SIZE},
+    "char": {"ckpt": PACK_DEFAULT},
+    "tile": {"ckpt": PACK_DEFAULT},
+    "item": {"ckpt": PACK_DEFAULT},
+    # `fx` (flames, spore bursts) is easy to forget -- it has no table of its own
+    # up top, it is expanded out of FX further down, and it was missed on the
+    # first pass of this very table. The guard below caught it. Same reasoning as
+    # chars/tiles/items: authored against the anime base, left there on purpose.
+    "fx": {"ckpt": PACK_DEFAULT},
+}
+
+
+def model_args(name, spec):
+    """Base-model kwargs for a job, or DIE.
+
+    Deliberately has no fallback. A missing entry raises instead of quietly
+    handing the job to comfy.CKPT, because that exact silent fallback is the bug
+    this table exists to fix: the run still succeeds, the images still look
+    confident and well-formed, and they are entirely wrong. A new category must
+    make its own choice here -- `PACK_DEFAULT` is how you say "the anime base is
+    correct for this one", and saying it costs one line.
+    """
+    cat = spec.get("cat")
+    if cat not in CAT_MODEL:
+        raise SystemExit(
+            f"{name}: no base-model decision recorded for category {cat!r}.\n"
+            f"  Add {cat!r} to CAT_MODEL in generate.py. Use PACK_DEFAULT if the\n"
+            f"  pack default (anything-xl / $CKPT) is right for it, or pin a\n"
+            f"  checkpoint the way 'prop' does. Refusing to guess: guessing here\n"
+            f"  is what rendered every prop on an anime model for months.")
+    profile = CAT_MODEL[cat]
+    if "ckpt" not in profile:
+        raise SystemExit(
+            f"{name}: CAT_MODEL[{cat!r}] records no 'ckpt' key. Set it to\n"
+            f"  PACK_DEFAULT explicitly rather than leaving it out.")
+    # A None ckpt is the recorded "use the pack default" case; drop it so
+    # build_graph applies comfy.CKPT (and therefore $CKPT) as it always has.
+    return {k: v for k, v in profile.items() if v is not None}
+
 
 def jobs():
     """Expand the tables into a flat {name: spec} job dict."""
@@ -800,6 +876,7 @@ def sweep(names, seeds=6, base_seed=414500):
                 ip_weight=spec.get("ipw", 0.8), init=init,
                 denoise=spec.get("denoise", 1.0), alpha=spec_alpha(spec),
                 prefix=name.replace(".", "-") + f"-s{base_seed + done}",
+                **model_args(name, spec),
             )
             paths = comfy.run(g, dest)
             done += n
@@ -843,6 +920,7 @@ def final(names, allow_regen=False):
                 refs=resolve_refs(spec) or None, ip_weight=spec.get("ipw", 0.8),
                 init=init, denoise=spec.get("denoise", 1.0),
                 alpha=spec.get("alpha", True), prefix="final-" + name.replace(".", "-"),
+                **model_args(name, spec),
             )
             paths = comfy.run(g, os.path.join(STAGE, "final", name))
             raw = paths[pick.get("index", 0)]

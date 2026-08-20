@@ -524,13 +524,67 @@ PROPS = {
                      "cabinet, cupboard, closed doors, solid front panel, glass front, window, "
                      "one single shelf, table, desk, workbench, wardrobe, dome, rounded top, "
                      "books, bookcase"),
+    # VALUE IS A GAMEPLAY CONSTRAINT ON THIS SUBJECT, not a matter of taste, and
+    # it is stated in the prompt because that is the only place it can be fixed.
+    # Measured against the SHIPPED default pack (`swampspace-hires`): its floor
+    # sits at luminance 82 and the bog-mutant threat at 53 -- the threat reads
+    # precisely BECAUSE it is darker than the floor. Accepted pack props occupy
+    # 67-99. The first sweep off the old wording put 7 of 8 chairs between 95 and
+    # 151, i.e. brighter than every accepted prop and up to +69 over the floor,
+    # so the eye went to the furniture instead of to the thing trying to kill
+    # you. That is #42's primary defect, reproduced.
+    #
+    # The cause was "slim tubular frame" + "thin straight legs": tubular metal
+    # renders as polished chrome, and chrome at 32px is four white lines. Only
+    # seed 1005 landed in band (78), and it did so by coming back with a painted
+    # teal seat instead of a bare metal one -- so the fix is to ASK for what that
+    # seed found by luck. Material and value are wording the model obeys well;
+    # this is not the negatives-vs-composition trap of the shelf reroll (sec. 6
+    # of #42), where naming a defect failed to move a compositional habit.
+    # SECOND KNOB: BLOCKIER. Stating the material got the value into band (the
+    # sweep moved from 95-151 to 56-82) but produced a WIRE chair -- thin legs,
+    # delicate frame -- and dark plus thin is the worst of both: it sits down in
+    # the value hierarchy correctly and then cannot be read at all. Two of eight
+    # stopped reading as chairs in the room shot.
+    #
+    # "Easier to see" is therefore solved as LEGIBILITY OF FORM, never as
+    # brightness -- brightness is the defect that started this. The levers are
+    # mass (thick square members instead of tubes), a solid back panel instead of
+    # an open frame, and the pack's heavy black outline, none of which raise mean
+    # luminance. `crate, box, cube, cabinet` are negatived because that is the
+    # near-miss this direction invites: a blocky chair over-simplified is the
+    # crate that the top-down sweep already failed as (sec. 3d of #42).
     "mess-chair": ("props/mess-chair.png",
-                   "a single simple metal chair, ONE square seat pad on four thin straight legs "
-                   "with a low upright backrest rising behind the seat, slim tubular frame, "
-                   "seen from a slightly high game angle, roughly 4 wide by 5 tall",
+                   "a single BLOCKY chunky mess-hall chair, bold simple geometric shapes, ONE "
+                   "thick solid rectangular seat slab carried on four THICK SQUARE post legs, a "
+                   "solid rectangular backrest panel standing up behind the seat, heavy chunky "
+                   "members with real thickness, the seat slab the SAME worn dark teal as the "
+                   "backrest, bare painted metal seat with nothing resting on it, "
+                   "the seat and backrest PAINTED worn dark teal, "
+                   "the legs and frame DARK gunmetal grey, matte unpolished metal, dark overall, "
+                   "a thick black outline around the whole object, the backrest facing the "
+                   "viewer squarely, roughly 4 wide by 5 tall",
                    "armchair, sofa, couch, loveseat, throne, recliner, cushioned lounge, "
                    "stool, table, desk, bench, long, wide, two chairs, several chairs, "
-                   "row of seats, armrests"),
+                   "row of seats, armrests, "
+                   # The white-spindle failure, named as material rather than as
+                   # a shape -- the legs were never the wrong SHAPE.
+                   "chrome, polished steel, shiny metal, mirror finish, glossy, "
+                   "bright white highlights, white plastic, pale wood, cream, ivory, "
+                   "brightly lit, overexposed, "
+                   # The wire-chair failure from the previous sweep.
+                   "thin, spindly, wiry, delicate, hairline legs, thin wire legs, wire frame, "
+                   "folding chair, skeletal, flimsy, ornate, curved tubing, spokes, slats, "
+                   "openwork lattice, office chair, wheels, "
+                   # ...and the failure that over-correcting toward mass invites.
+                   "crate, box, cube, cabinet, solid block, featureless slab, "
+                   # The two best-FACING candidates of the previous sweep both put
+                   # a bright white pad on the seat -- a value spike in the middle
+                   # of the sprite, which is the very defect this subject is being
+                   # regenerated to fix. Named as the objects it renders as.
+                   "white cushion, pale cushion, seat pad, white upholstery, sheet of paper, "
+                   "folded towel, cloth on the seat, book, tray, object resting on the seat, "
+                   "bright white patch, white highlight on the seat"),
     "crew-bunk": ("props/crew-bunk.png",
                   "a low single crew bed seen from a high angle looking down at it, ONE long "
                   "rectangular mattress lying flat on a low metal frame, a pale pillow at one "
@@ -591,6 +645,82 @@ FX = {
 
 TILE_PX, CHAR_PX, PROP_PX, ITEM_PX, FLAME_PX, FX_PX = 32, 48, 32, 32, 48, 64
 ENV_ANCHORS = [os.path.join(ANCHORS, f) for f in ("env-a.png", "env-b.png")]
+
+# ---------------------------------------------------------------------------
+# BASE MODEL PER CATEGORY.
+#
+# This table exists because the documented path was silently wrong. `sweep
+# prop.<name>` never passed a checkpoint, so it fell through to comfy.CKPT --
+# `anything-xl`, an ANIME model -- while the only code that knew better was
+# exp_props.py, an experiment script nobody is told to run. The measurement, on
+# a fixed 8-seed set (see exp_props.py and docs/sprite-generation.md 6):
+#
+#     anything-xl     1/8 clean single props
+#     juggernautXL    8/8      <- one change, and 8/8 again on 8 FRESH seeds
+#
+# Reproduced again later: 0/12 on anything-xl (a winged cat on a stool, two
+# humanoids) against 12/12 on juggernautXL, same recipe. Anime bases compose
+# busy multi-object scenes, so "a cargo crate" comes back as a warehouse, a
+# stack, or a sprite-sheet grid. Every negative-prompt fix aimed at this cost a
+# night and none of them moved the number. The base model was the whole defect.
+#
+# CFG and SIZE travel WITH the checkpoint because they were measured together:
+# CFG 3.5 -> 7.0 is worth the last seed (8/8 vs 7/8), and SIZE 1024 -> 768 does
+# not change the hit rate but makes the hits chunkier at the 32px footprint.
+# Threading the checkpoint alone would leave the documented path still unable to
+# reproduce the art that was actually approved.
+PROP_CKPT = "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
+PROP_CFG = 7.0
+PROP_SIZE = 768
+
+# `None` means "whatever comfy.py resolves -- its default, or $CKPT". For
+# chars/tiles/items that is a RECORDED DECISION, not an omission: they were all
+# authored against the anime base and would drift if it moved under them, and
+# the documented low-VRAM escape hatch
+# (`CKPT=dreamshaper_8.safetensors LORA= SIZE=512 ... sweep item.root-club`)
+# only works because these categories leave the choice to the environment.
+# Pinning them here would silently break that flag.
+PACK_DEFAULT = None
+
+CAT_MODEL = {
+    "prop": {"ckpt": PROP_CKPT, "cfg": PROP_CFG, "size": PROP_SIZE},
+    "char": {"ckpt": PACK_DEFAULT},
+    "tile": {"ckpt": PACK_DEFAULT},
+    "item": {"ckpt": PACK_DEFAULT},
+    # `fx` (flames, spore bursts) is easy to forget -- it has no table of its own
+    # up top, it is expanded out of FX further down, and it was missed on the
+    # first pass of this very table. The guard below caught it. Same reasoning as
+    # chars/tiles/items: authored against the anime base, left there on purpose.
+    "fx": {"ckpt": PACK_DEFAULT},
+}
+
+
+def model_args(name, spec):
+    """Base-model kwargs for a job, or DIE.
+
+    Deliberately has no fallback. A missing entry raises instead of quietly
+    handing the job to comfy.CKPT, because that exact silent fallback is the bug
+    this table exists to fix: the run still succeeds, the images still look
+    confident and well-formed, and they are entirely wrong. A new category must
+    make its own choice here -- `PACK_DEFAULT` is how you say "the anime base is
+    correct for this one", and saying it costs one line.
+    """
+    cat = spec.get("cat")
+    if cat not in CAT_MODEL:
+        raise SystemExit(
+            f"{name}: no base-model decision recorded for category {cat!r}.\n"
+            f"  Add {cat!r} to CAT_MODEL in generate.py. Use PACK_DEFAULT if the\n"
+            f"  pack default (anything-xl / $CKPT) is right for it, or pin a\n"
+            f"  checkpoint the way 'prop' does. Refusing to guess: guessing here\n"
+            f"  is what rendered every prop on an anime model for months.")
+    profile = CAT_MODEL[cat]
+    if "ckpt" not in profile:
+        raise SystemExit(
+            f"{name}: CAT_MODEL[{cat!r}] records no 'ckpt' key. Set it to\n"
+            f"  PACK_DEFAULT explicitly rather than leaving it out.")
+    # A None ckpt is the recorded "use the pack default" case; drop it so
+    # build_graph applies comfy.CKPT (and therefore $CKPT) as it always has.
+    return {k: v for k, v in profile.items() if v is not None}
 
 
 def jobs():
@@ -746,6 +876,7 @@ def sweep(names, seeds=6, base_seed=414500):
                 ip_weight=spec.get("ipw", 0.8), init=init,
                 denoise=spec.get("denoise", 1.0), alpha=spec_alpha(spec),
                 prefix=name.replace(".", "-") + f"-s{base_seed + done}",
+                **model_args(name, spec),
             )
             paths = comfy.run(g, dest)
             done += n
@@ -789,6 +920,7 @@ def final(names, allow_regen=False):
                 refs=resolve_refs(spec) or None, ip_weight=spec.get("ipw", 0.8),
                 init=init, denoise=spec.get("denoise", 1.0),
                 alpha=spec.get("alpha", True), prefix="final-" + name.replace(".", "-"),
+                **model_args(name, spec),
             )
             paths = comfy.run(g, os.path.join(STAGE, "final", name))
             raw = paths[pick.get("index", 0)]

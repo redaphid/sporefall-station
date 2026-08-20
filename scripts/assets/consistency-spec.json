@@ -226,5 +226,24 @@
    "cx": 2.5,
    "foot_y": 1
   }
+ },
+ "mireclaw-alpha": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 44,
+   "head_h": 30,
+   "mass": 916,
+   "cx": -0.22,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
  }
 }

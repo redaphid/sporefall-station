@@ -95,10 +95,19 @@ CURATED: dict[str, dict] = {
               "#7b8791", "#a2adb4", "#7ecbd2", "#cfe0e2"],
         accent="#46e078", accent_q=0.995,
     ),
-    # The mess chair, off the p8 sweep (the BLOCKY reroll -- see the recipe note
-    # in generate.py). Seed 1002 is the curated pick: it cleared the facing gate
-    # at 0.695 (vs 0.547 for the runner-up), sat in the value band, and stayed
-    # legible at game size.
+    # The mess chair. THE OWNER PICKED THIS ONE, by tapping "Chair 2 -- chunkiest,
+    # tall rounded back, teal frame" in the relay picker on 2026-08-20. It
+    # REPLACES the p8 seed 1002 this branch shipped first: that was an agent's
+    # curation, this is his, and his wins.
+    #
+    # Provenance matters here because the picker only ever showed him a 512px
+    # PREVIEW with the floor baked in -- no alpha, not a usable source. The four
+    # previews were built from the chair-jugg sweep (juggernautXL, seeds
+    # 1000-1011, rendered 21:28-21:53Z, ranked in chair-gen-report.md). "Chair 2"
+    # is that sweep's rank 1, SEED 1006, recovered by matching the preview back
+    # against all twelve candidates on silhouette IoU and per-pixel error, then
+    # confirmed by eye: a SOLID rounded-top back panel, which is what rules out
+    # the slatted-spindle s01004.
     #
     # Hue is SLATE-TEAL, deliberately duller than supply-cabinet's cyan. The
     # recipe asks for "worn dark teal" seat and "dark gunmetal grey" legs, and
@@ -110,13 +119,21 @@ CURATED: dict[str, dict] = {
     # a chair has no light, and a bright speck on the seat is precisely the
     # "white patch on the seat" defect the p8 negatives were written to kill.
     "mess-chair": dict(
-        tag="p8", seed=1002, dst="chair.png",
+        tag="chair-jugg", seed=1006, dst="chair.png",
         # A first, greyer cut of this ramp measured chroma_p90 exactly 70 -- the
         # cast floor, with zero margin, and the weakest in the pack (every other
         # prop scores 84-96). Deepening the mid entries instead of brightening
         # them buys 84 while keeping mean luminance down.
         ramp=["#08080c", "#0e181c", "#153035", "#1c4750", "#245f6b",
               "#2f7d8b", "#4a9dab", "#83b8bf", "#bcd4d8"],
+        # Seed 1006 has a slightly narrower value histogram than the p8 render
+        # this replaced, so at the 32px footprint one ramp level collapsed into
+        # its neighbour and `palette_n` came in at 8 against the cast floor of 9.
+        # Spreading the histogram a little further across the SAME ramp buys the
+        # 9th level back (measured: 8 -> 9) and leaves chroma, value_range and the
+        # hue untouched. Deliberately 0.90, not 1.0: full equalisation also lifts
+        # the hi-res value_range to 0.676 and starts washing the seat pad out.
+        equalize=0.90,
     ),
 }
 

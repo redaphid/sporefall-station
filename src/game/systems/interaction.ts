@@ -1,11 +1,11 @@
 import { PLAYER_START_WEAPON, SPECIAL_COOLDOWN_TICKS, starterLoadout } from '../player'
-import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
+import { CONSUMABLES, itemClass } from '../data/items'
 import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
-import { addItem, applyModPickup, equipSlot } from './inventory'
+import { addItem, applyModPickup } from './inventory'
 import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
@@ -327,15 +327,6 @@ export const nearestInteractable = (entities: readonly Entity[], p: Entity): Ent
   return best
 }
 
-/** A picked-up weapon arrives whole: full durability for melee, and a flat 1 for
- * a gun, which carries no ammo. Anything else keeps its pickup qty. */
-const startingCount = (itemId: string, qty: number): number => {
-  const def = WEAPONS[itemId]
-  if (def?.durability) return def.durability
-  if (def?.kind === 'ranged') return 1
-  return qty
-}
-
 const collect = (player: Entity, item: Entity): boolean => {
   const { itemId, qty } = item.pickup!
   const ctl = player.playerCtl!
@@ -358,8 +349,11 @@ const collect = (player: Entity, item: Entity): boolean => {
     }
     return addItem(ld.inventory, itemId, qty)
   }
-  // Weapons and throwables take a slot; auto-equip the first weapon you grab.
-  const added = addItem(ld.inventory, itemId, startingCount(itemId, qty))
-  if (added && (c === 'melee' || c === 'ranged') && ld.activeSlot < 0) equipSlot(player, ld.inventory.length - 1)
-  return added
+  // THE one-weapon rule, enforced at the door: a player carries exactly one
+  // permanent weapon, so a weapon can never enter their inventory. Nothing in
+  // level gen or on a corpse puts one on the floor any more, so this is defence
+  // in depth — refuse it and leave it lying there rather than silently eating it.
+  if (c === 'melee' || c === 'ranged') return false
+  // Throwables take a slot.
+  return addItem(ld.inventory, itemId, qty)
 }

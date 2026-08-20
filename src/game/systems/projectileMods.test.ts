@@ -12,12 +12,15 @@ import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { combatSystem, fireWeapon } from './combat'
 import { projectileSystem } from './projectiles'
-import { equipSlot } from './inventory'
+import { arm } from '../testkit'
 
 const armed = (w: World, x: number, y: number, weaponId: string, mods?: WeaponMod[]): Entity => {
   const p = spawnPlayer(w, 0, x, y)
-  p.loadout!.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]
-  equipSlot(p, 0)
+  // The weapon is permanent and unselectable, so it is set at build time rather
+  // than equipped; its slot is still where the mods live.
+  p.loadout!.inventory = []
+  const stack = arm(p, weaponId)
+  if (mods) stack.mods = mods
   p.facing = 0
   return p
 }

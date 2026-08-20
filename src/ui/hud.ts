@@ -1,7 +1,7 @@
 import { SPECIAL_NAME } from '../game/player'
 import { CONSUMABLES, WEAPONS } from '../game/data/items'
 import type { RenderView } from '../app/session'
-import { hotbarSlots } from './hotbarModel'
+import { hotbarSlots, modBadge } from './hotbarModel'
 
 export interface Hud {
   update(view: RenderView): void
@@ -43,13 +43,20 @@ export const createHud = (mount: HTMLElement): Hud => {
         hpBar.style.width = `${hp * 100}%`
         hpBar.style.background = hp > 0.35 ? 'linear-gradient(#7fd17f,#4a9a4a)' : 'linear-gradient(#d17f7f,#9a4a4a)'
       }
-      const weapon = WEAPONS[self.combat?.weapon ?? 'fists']?.name ?? '—'
+      const weaponId = self.combat?.weapon ?? 'fists'
+      const weapon = WEAPONS[weaponId]?.name ?? '—'
+      // The permanent weapon has no hotbar slot any more (hotbarSlots hides
+      // weapons), so its MOD badge would have nowhere to show. Mods are the whole
+      // progression — hang the badge off the weapon name here instead, which is
+      // the one place the weapon is still named.
+      const weaponSlot = self.loadout?.inventory.find((s) => s.itemId === weaponId)
+      const weaponMods = weaponSlot ? modBadge(weaponSlot) : ''
       const cash = self.playerCtl?.cash ?? 0
       const bandages = self.loadout?.inventory.filter((s) => CONSUMABLES[s.itemId]).reduce((n, s) => n + s.qty, 0) ?? 0
       const cd = self.playerCtl?.abilityCooldown ?? 0
       const ability = self.playerCtl ? ` · ${SPECIAL_NAME}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
       const briefcase = self.loadout?.inventory.some((s) => s.itemId === 'briefcase') ? ' · 🧪' : ''
-      const text = `${weapon} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${briefcase}`
+      const text = `${weapon}${weaponMods ? ` ${weaponMods}` : ''} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${briefcase}`
       if (text !== lastInfo) {
         lastInfo = text
         info.textContent = text

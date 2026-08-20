@@ -26,16 +26,26 @@ export interface HotbarSlot {
   mods: string
 }
 
+/** Slots the hotbar must never show: the briefcase (a mission item, not
+ * equippable) and WEAPONS. The player's weapon is permanent and cannot be
+ * swapped, so its slot exists only to hold weapon-mods — showing it would offer
+ * a switch that does nothing, and gamepad cycling walks exactly this list. */
+const hidden = (itemId: string): boolean => {
+  if (itemId === 'briefcase') return true
+  const c = itemClass(itemId)
+  return c === 'melee' || c === 'ranged'
+}
+
 /**
- * Display slots for the hotbar: every carried item except the briefcase (a
- * mission item, not equippable), each tagged with its true inventory index.
- * The briefcase filter shifts display order, so a tapped strip position must map
- * back through `index` — never assume display position equals inventory slot.
+ * Display slots for the hotbar: every carried HELD item (throwables and
+ * consumables), each tagged with its true inventory index. The filter shifts
+ * display order, so a tapped strip position must map back through `index` —
+ * never assume display position equals inventory slot.
  */
 export const hotbarSlots = (inv: ItemStack[], activeSlot: number): HotbarSlot[] =>
   inv
     .map((s, index) => ({ index, itemId: s.itemId, label: itemLabel(s.itemId), qty: s.qty, active: index === activeSlot, mods: modBadge(s) }))
-    .filter((s) => s.itemId !== 'briefcase')
+    .filter((s) => !hidden(s.itemId))
 
 /** Whether the player is carrying anything throwable (grenade/molotov/etc). */
 export const hasThrowable = (inv: ItemStack[]): boolean => inv.some((s) => itemClass(s.itemId) === 'throwable')

@@ -1,12 +1,12 @@
 import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
-import { WEAPONS, itemClass, type StatusApply } from '../data/items'
+import { WEAPONS, type StatusApply } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { activeStack, equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
+import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
@@ -17,47 +17,11 @@ const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
 
-/** Probability a dying NPC drops the weapon it was carrying as a grabbable
- * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
- * single death site, mirroring the codebase's per-system-constant convention
- * (IFRAME_TICKS above, PICK_TICKS in interaction.ts). Any lethal death routes
- * through `kill`, so an NPC felled by a player, a fire tick, or an explosion all
- * roll identically. The roll draws from the world RNG (`w.rng`) so it is a pure
- * function of seed + inputs — a test predicts every drop from the seed. */
-export const WEAPON_DROP_CHANCE = 0.25
-
-/** A weapon id a corpse can actually drop: a real slotted melee/ranged weapon in
- * the registry, never an INNATE one. Unarmed NPCs return false here and never
- * draw the RNG.
- *
- * The test is `natural`, not the literal id 'fists'. It used to be the id, which
- * expressed the intent ("dropping Fists would be nonsense") but only enforced it
- * for the one weapon the author happened to think of. `claws` is also
- * `natural: true`, and the boss (`npcs.ts`, its only carrier) therefore dropped
- * `pickup.claws` at WEAPON_DROP_CHANCE — an id with no item art, which fell
- * through `art.ts`'s alias chain to `item.default` and rendered as a MEDKIT. So
- * killing the boss spawned a fake medkit that swapped your weapon when grabbed.
- * Natural weapons are body parts: they are not obtainable, so they do not drop.
- * Exported so the item-art test can enumerate exactly what can become a pickup. */
-export const isDroppableWeapon = (weaponId: string): boolean =>
-  WEAPONS[weaponId]?.natural !== true &&
-  (WEAPONS[weaponId]?.kind === 'melee' || WEAPONS[weaponId]?.kind === 'ranged')
-
-/** On an NPC death, occasionally drop its carried weapon as a world pickup the
- * player can grab — reusing the `pickup.<itemId>` archetype + `collect` path
- * (interaction.ts), so a dropped gun equips exactly like any floor weapon. The
- * roll draws from `w.rng` ONLY when there is a real weapon to drop, so unarmed
- * deaths never perturb the shared stream. NPC loadouts are innate (no inventory,
- * no mods), so the weapon id is the whole of the carried state to preserve. */
-const rollWeaponDrop = (w: World, victim: Entity): void => {
-  const weaponId = victim.combat?.weapon
-  if (!weaponId || !isDroppableWeapon(weaponId)) return
-  if (!w.rng.chance(WEAPON_DROP_CHANCE)) return
-  const drop = makeEntity('pickup', `pickup.${weaponId}`, victim.pos.x, victim.pos.y, 0.3)
-  drop.pickup = { itemId: weaponId, qty: 1 }
-  addEntity(w, drop)
-  w.events.push({ type: 'weaponDrop', entityId: drop.id, fromId: victim.id, itemId: weaponId, x: victim.pos.x, y: victim.pos.y })
-}
+// NPC corpses no longer drop their weapon. The player carries ONE permanent
+// weapon and cannot pick another up, so a dropped gun would be a dead sparkle
+// the player walks over forever. Enemies keep their own arsenal (NPC_ARSENAL in
+// populate.ts) — this removes only what the corpse leaves BEHIND, and with it
+// the `w.rng.chance` draw that used to happen inside `kill`.
 
 /** Interaction-matrix rule: a solid IMPACT on a frozen body shatters it — an
  * instant kill regardless of the blow's damage, clearing the frost. Only impact
@@ -252,10 +216,7 @@ export const kill = (w: World, target: Entity): void => {
   // NPC death: a body dropping throws off a fear pulse (#65) — nearby crew see
   // it fall and stampede, even with no sight of the killer.
   if (target.ai) emitFear(w, target)
-  // Mark dead, then roll for a weapon drop. Ordering the roll AFTER `dead = true`
-  // keeps the spawned pickup from ever re-entering this same kill.
   target.dead = true
-  rollWeaponDrop(w, target)
 }
 
 /** Swing at the nearest live target inside range and a 90° arc around facing. */
@@ -473,15 +434,6 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   return true
 }
 
-/** Item classes the FIRE button diverts to item-USE instead of a weapon shot:
- * a consumable (bandage/medkit → heal, adrenaline → buff) or a throwable (lobbed).
- * When the active slot holds one of these, "shooting" uses it via the same
- * item-effect path as the dedicated Use button — no bullet is spawned. */
-const isUsableItem = (itemId: string): boolean => {
-  const c = itemClass(itemId)
-  return c === 'consumable' || c === 'throwable'
-}
-
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
@@ -511,18 +463,13 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     }
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
-    // FIRE button arbitration off the ACTIVE slot:
-    //  1. a usable non-weapon in hand (bandage/consumable → heal, throwable →
-    //     lob) is USED via the same item-effect path as the Use button — the
-    //     "shooting uses my equipped item" rule. No bullet, no swing.
-    //  2. otherwise fire the equipped weapon (gun/melee/fists) — unchanged.
-    // Nothing to fire (an out-of-ammo gun) is a dry no-op: the dodge-roll fallback
-    // lives on the USE button above, never on FIRE.
-    const active = activeStack(e)
-    if (active && isUsableItem(active.itemId)) {
-      if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
-      continue
-    }
+    // FIRE ALWAYS FIRES THE WEAPON. The old arbitration ("a usable item in the
+    // active slot makes FIRE use it instead") existed only because weapons and
+    // items shared one hotbar, so you could always cycle back to the gun. With a
+    // single permanent weapon that is no longer selectable, `activeSlot` is purely
+    // the held-item cursor and there is nothing to cycle back TO — that rule would
+    // leave a player holding a grenade permanently unable to shoot. Items go on
+    // the USE/Throw button above, which is where they now exclusively live.
     fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
   }
 }

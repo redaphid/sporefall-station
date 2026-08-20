@@ -3,7 +3,8 @@ import { makeEntity, type Entity } from '../entity'
 import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { combatSystem } from './combat'
-import { addItem, equipSlot, MAX_SLOTS, throwActive } from './inventory'
+import { addItem, equipSlot, MAX_SLOTS, throwActive, wearMelee } from './inventory'
+import { arm } from '../testkit'
 
 const player = (w: World): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', 20, 20))
@@ -41,26 +42,51 @@ describe('inventory', () => {
     expect(addItem(slots, 'overflow', 1)).toBe(false)
   })
 
-  it('equipping a weapon slot changes the active weapon', () => {
+  it('a weapon slot can NEVER be equipped — the weapon is permanent', () => {
     const e = player(w)
     e.loadout!.inventory = [
       { itemId: 'bat', qty: 12 },
-      { itemId: 'pistol', qty: 8 },
+      { itemId: 'pistol', qty: 1 },
     ]
-    expect(equipSlot(e, 1)).toBe(true)
-    expect(e.loadout!.activeSlot).toBe(1)
-    expect(e.combat!.weapon).toBe('pistol')
+    expect(equipSlot(e, 0)).toBe(false)
+    expect(equipSlot(e, 1)).toBe(false)
+    expect(e.loadout!.activeSlot).toBe(-1) // still nothing HELD
+    expect(e.combat!.weapon).toBe('fists') // and the swung weapon never changed
   })
 
-  it('a melee weapon breaks when its durability runs out', () => {
+  it('equipping a throwable holds it without touching the swung weapon', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'knife', qty: 2 }]
-    equipSlot(e, 0)
-    combatSystem(w, attack())
-    e.combat!.cooldown = 0
-    combatSystem(w, attack())
-    expect(e.loadout!.inventory).toHaveLength(0)
-    expect(e.combat!.weapon).toBe('fists')
+    arm(e, 'bat')
+    e.loadout!.inventory.push({ itemId: 'molotov', qty: 2 })
+    expect(equipSlot(e, 1)).toBe(true)
+    expect(e.loadout!.activeSlot).toBe(1)
+    expect(e.combat!.weapon).toBe('bat')
+  })
+
+  it("a PLAYER's melee weapon never wears out — it is the only one they get", () => {
+    const e = player(w)
+    arm(e, 'knife')
+    const stack = e.loadout!.inventory[0]
+    stack.qty = 2
+    for (let i = 0; i < 5; i++) {
+      e.combat!.cooldown = 0
+      combatSystem(w, attack())
+    }
+    expect(e.loadout!.inventory).toHaveLength(1)
+    expect(e.combat!.weapon).toBe('knife')
+    expect(stack.qty).toBe(2) // untouched: no durability is spent
+  })
+
+  it("an NPC's melee weapon still breaks when its durability runs out", () => {
+    // Enemy gear is unchanged — only the PLAYER's weapon is permanent.
+    const npc = addEntity(w, makeEntity('npc', 'thug', 20, 20))
+    npc.combat = { weapon: 'knife', cooldown: 0 }
+    npc.loadout = { inventory: [{ itemId: 'knife', qty: 2 }], activeSlot: 0 }
+    wearMelee(npc)
+    expect(npc.loadout.inventory[0].qty).toBe(1)
+    wearMelee(npc)
+    expect(npc.loadout.inventory).toHaveLength(0)
+    expect(npc.combat.weapon).toBe('fists')
   })
 
   it('throwing spawns a projectile and removes it from the inventory', () => {

@@ -162,12 +162,17 @@ export interface ArtPalette {
 /**
  * Per-archetype sprite BULK — a multiplier on the drawn billboard only.
  *
- * The Mireclaw Alpha borrows the thug's directional set (see CHARSET_ALIAS
- * below) and was therefore PIXEL-IDENTICAL to the commonest enemy in the game:
- * same body, same palette, same size. Until it gets its own art (see
- * docs/assets/boss-art-brief.md) this is the cheap half of the fix — an Alpha
- * that is half again the size of its own brood reads as a different creature at
- * a glance, and the size difference survives whatever art lands later.
+ * The Mireclaw Alpha USED TO borrow the thug's directional set (see
+ * CHARSET_ALIAS below) and was therefore PIXEL-IDENTICAL to the commonest enemy
+ * in the game: same body, same palette, same size. It now has art of its own — a
+ * violet armoured crab, see docs/assets/boss-art-brief.md — which fixes the body
+ * and the palette.
+ *
+ * This stays at 1.5 anyway, and that is deliberate, not a leftover. It is the
+ * ONLY size lever there is: post.sprite normalises every sprite onto one 48x48
+ * canvas, so the Alpha cannot simply be drawn bigger than its brood. An Alpha
+ * half again the size of the creatures it spawns reads as a different creature
+ * at a glance. Do NOT trim this to 'compensate' for the art having landed.
  *
  * Deliberately NOT the collision radius: entity radius stays 0.35 so the boss
  * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the bat's
@@ -185,6 +190,13 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   gangster: 'gangster',
   bouncer: 'cop',
   thug: 'thug',
+  // FALLBACK ONLY, and it must stay. The pack now ships char.boss.* files, and
+  // characterSet() below tries sprites.chars[archetype] BEFORE sprites.chars[alias]
+  // — so the Alpha already uses its own set with no change on this line. Pointing
+  // this at 'boss' instead would gain nothing and would cost the graceful
+  // degradation: packs without the Alpha art (city, test) fall back to the thug
+  // body here rather than to a procedural blob. Membership of this map is also
+  // what isCharacterSprite() tests, so the key cannot simply be removed.
   boss: 'thug',
   civilian: 'civilian',
   scientist: 'scientist',
@@ -262,6 +274,25 @@ export const PROP_SPRITE: Record<string, string> = {
   // to the character eyeball). The Cryo Terminal object is literally that art.
   cryoTerminal: 'atm',
   generator: 'tv',
+  // `crate` is not new art: public/themes/swampspace/props/cargo-crate.png has
+  // shipped since the pack landed, but `crate` was never a registered sprite
+  // key, so every crate in the game drew the procedural slatted silhouette
+  // while its own texture sat unused behind prop.default. This is the same
+  // desk -> work-desk indirection: archetype on the left, ART name on the
+  // right, filename in the theme manifest.
+  crate: 'crate',
+  // The sporeforge furnishings. Each of these has a FURNITURE_SHAPE entry
+  // directly below and KEEPS it: the sprite wins wherever a theme ships one,
+  // and the drawn silhouette stays the fallback for the packs (city, test)
+  // that do not. Deleting those would regress every theme without prop art.
+  shelf: 'shelf',
+  bunk: 'bunk',
+  bench: 'bench',
+  table: 'table',
+  plant: 'plant',
+  // The archetype is camelCase `sporeNode` (it is what OBJECTS and the
+  // renderer look up); the ART name is kebab-case like every other prop key.
+  sporeNode: 'spore-node',
 }
 
 // Consumables/weapons that reuse another item's sprite.
@@ -280,21 +311,18 @@ export const PROP_SPRITE: Record<string, string> = {
 // and was never once drawn, because the manifest keys it `item.grenade-item`
 // while the entity archetype is `pickup.grenade`.
 export const ITEM_ALIAS: Record<string, string> = {
-  bandage: 'medkit',
+  // The aliases for the culled items are GONE, not repointed: bandage→medkit,
+  // freezeGrenade/gasGrenade/banana→grenade-item and chloroform→molotov all
+  // named item ids that no longer exist, and an alias for a dead id is a
+  // promise about art that nothing can ever ask for.
+  //
+  // The ART is deliberately untouched. `item.medkit` is the same file every
+  // theme uses for `item.default`, so deleting it would break the fallback for
+  // EVERY unaliased pickup; `item.molotov` and `item.grenade-item` still ship
+  // in both theme manifests. Nothing here removes a sprite another key shares.
+  //
   // Thrown explosives — the spore-grenade art was already on disk.
   grenade: 'grenade-item',
-  freezeGrenade: 'grenade-item',
-  gasGrenade: 'grenade-item',
-  // The banana peel is a THROWABLE and had no entry here at all, so it fell
-  // through to `sprites.item` — i.e. `item.default`, which every shipped theme
-  // maps to the same file as `item.medkit`. It is in the floor-2+ loot table and
-  // in SHOP_STOCK, so ~1 fake medkit per floor was guaranteed. Wearing the
-  // grenade's pod is still not ITS art, but it is at least honest about the
-  // CATEGORY: you can see it is something you throw, not something you heal
-  // with. Bespoke art is queued (see _mycel-results/sprite-inventory.md).
-  banana: 'grenade-item',
-  // Thrown flasks share the molotov's bottle silhouette.
-  chloroform: 'molotov',
   // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
   machinegun: 'shotgun',
   flamethrower: 'shotgun',

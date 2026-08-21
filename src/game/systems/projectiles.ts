@@ -197,7 +197,7 @@ export const projectileSystem = (w: World): void => {
   }
 }
 
-/** A thrown item applies its area effect where it lands (molotov → fire, freeze
+/** A thrown item applies its area effect where it lands (grenade → explode, freeze
  * grenade → frozen burst, grenade → blast). */
 const land = (w: World, e: { pos: { x: number; y: number }; projectile?: { ownerId: number; onLand?: import('../data/items').AreaEffect } }): void => {
   if (e.projectile?.onLand) applyAreaEffect(w, e.pos.x, e.pos.y, e.projectile.onLand, e.projectile.ownerId)

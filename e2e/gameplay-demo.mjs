@@ -23,7 +23,7 @@ await record({
   },
   expect: (s) => [
     !s.doorOpen && 'door never opened',
-    s.bag < 1 && 'medkit pickup missed',
+    s.bag < 1 && 'floor pickup missed',
     s.thugs !== 0 && `${s.thugs} thug(s) left alive`,
     (s.gameOver || !(s.hp > 0)) && 'player did not survive',
   ].filter(Boolean),

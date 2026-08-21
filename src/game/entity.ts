@@ -184,7 +184,7 @@ export interface Loadout {
 export interface Entity {
   id: EntityId
   kind: EntityKind
-  /** Key into data/ definitions: 'thug', 'cop', 'player', 'medkit', 'door.wood', ... */
+  /** Key into data/ definitions: 'thug', 'cop', 'player', 'grenade', 'door.wood', ... */
   archetype: string
   pos: Vec2
   /** Position at the previous tick — used for render interpolation. */
@@ -261,7 +261,7 @@ export interface Entity {
     ttl: number
     /** Grenades: AoE on fuse-end or impact instead of point damage. */
     explode?: { radius: number; damage: number }
-    /** Thrown items: the area effect applied where it lands (molotov → fire). */
+    /** Thrown items: the area effect applied where it lands (grenade → explode). */
     onLand?: import('./data/items').AreaEffect
     /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
     onHit?: import('./data/items').StatusApply

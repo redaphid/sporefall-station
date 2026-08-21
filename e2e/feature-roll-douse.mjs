@@ -1,7 +1,7 @@
 // #roll-douses-fire — STOP, DROP, AND ROLL headline video (exact world state).
 // Injects the committed `combat-stage` snapshot with the crowd cleared and the
 // player parked on the open lane, ALREADY ABLAZE with a fresh 240-tick weapon
-// burn (the molotov/incendiary ignition). Two runs off the SAME world:
+// burn (barrel/`incendiary` ignition; the molotov was culled). Two runs off the SAME world:
 //   • stopDropRoll    : burn for a beat, then roll twice — roll 1 (tick 30)
 //                       smothers 150 ticks, roll 2 (tick 75) kills the rest.
 //                       Burn ends at tick 75; exactly 18 hp lost (9 DOT ticks, tick 0 included).

@@ -13,6 +13,10 @@ import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
+// Type-only: the implementations are dynamically imported, so neither the
+// replay nor the upload code reaches the initial boot chunk.
+import type { StateReplay } from './app/stateReplay'
+import type { ShareResult } from './app/stateShare'
 import { loadFixtureJson } from './game/fixtures'
 import { applyScenario } from './game/scenarios'
 import { deserializeWorld, type WorldJson } from './game/serialize'
@@ -26,7 +30,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT } from './game/types'
+import { SIM_DT, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -63,6 +67,18 @@ import {
   noteFrameError,
   noteFrameOk,
 } from './ui/frameErrorModel'
+import {
+  initialShare,
+  shareAction,
+  shareButtonLabel,
+  shareCopyRetried,
+  shareFailed,
+  shareStarted,
+  shareStatusText,
+  shareSucceeded,
+  shareUrl,
+  type ShareState,
+} from './ui/shareModel'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
@@ -74,6 +90,17 @@ import { projectToScreen } from './ui/locatorModel'
 import { createDraftScreen } from './ui/draftScreen'
 import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
 import { weaponStack } from './game/systems/inventory'
+
+/** The rewind ring, plus the single action the pause menu needs from it. Both
+ * live on one object because they are one feature: the ring is only worth
+ * running because something can capture it, and a capture is only worth having
+ * because the ring gave it run-up. */
+interface StateSharing {
+  /** Called from the frame loop after every live tick. */
+  afterTick(): void
+  /** Capture → self-check → upload. Rejects with the real reason. */
+  share(note?: string): Promise<ShareResult>
+}
 
 const boot = async (): Promise<void> => {
   // Confirm this bundle booted so the native OTA layer keeps it (and applies any
@@ -145,7 +172,14 @@ const boot = async (): Promise<void> => {
   // Sitting at the picker is the cheapest possible moment to swap in a new
   // build: no run exists yet. If one is already downloaded, it applies here.
   updates.reportMoment('modePicker', 0)
-  const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount, requestFullscreenOnGesture))
+  // A `?state=` link IS the intent: someone was sent an exact world to look at,
+  // so boot straight into it rather than making them pick Solo from the menu
+  // first (which would also build a throwaway world before replacing it).
+  // Shared states restore into SINGLE-PLAYER — see the `?state=` block below.
+  const sharedState = params.get('state')
+  const mode =
+    (params.get('mode') as GameMode | null) ??
+    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture))
   // Past the picker, nothing between here and the frame loop can honestly
   // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
   // conservative one until the loop starts reporting real ones.
@@ -207,7 +241,8 @@ const boot = async (): Promise<void> => {
   const store = browserStore()
   const persister: Persister | undefined = store && session instanceof HostSession ? createPersister(store) : undefined
   const scenario = params.get('scenario')
-  const explicitWorldOverride = !!scenario || !!params.get('world') || !!params.get('script')
+  const explicitWorldOverride =
+    !!scenario || !!params.get('world') || !!params.get('script') || !!params.get('state')
   let resumed = false
   if (persister && store && session instanceof HostSession && !explicitWorldOverride) {
     const saved = readSave(store) // null on no/corrupt/version-mismatched save → fresh game
@@ -235,14 +270,19 @@ const boot = async (): Promise<void> => {
   // snapshots. Placed before the `?e2e`/`?script=` exposure below so `window.__world`
   // points at the injected world. Absent `?world=`, behavior is unchanged.
   const worldParam = params.get('world')
+  // Shared with `?state=` below: both replace the freshly-built world wholesale.
+  const injectWorld =
+    session instanceof HostSession
+      ? (json: WorldJson): void => {
+          const host = session
+          const restored = deserializeWorld(json)
+          host.world = restored
+          host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
+          renderer.setLevel(restored.level)
+        }
+      : undefined
   if (worldParam && session instanceof HostSession) {
-    const host = session
-    const inject = (json: WorldJson): void => {
-      const restored = deserializeWorld(json)
-      host.world = restored
-      host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
-      renderer.setLevel(restored.level)
-    }
+    const inject = injectWorld!
     if (worldParam === '@inline') {
       await new Promise<void>((resolve) => {
         ;(window as unknown as { __loadWorld: (j: WorldJson) => void }).__loadWorld = (j) => {
@@ -253,6 +293,40 @@ const boot = async (): Promise<void> => {
     } else {
       inject(loadFixtureJson(worldParam))
     }
+  }
+  // `?state=<id>` — a SHAREABLE debug state: the same exact-world injection as
+  // `?world=`, but fetched from the Worker instead of read out of the bundle, so
+  // a link can be sent to someone who does not have the fixture (or the repo).
+  //
+  // Scoped to SINGLE-PLAYER (solo/host owns the authoritative world). Restoring a
+  // multiplayer state onto one machine is a genuinely different problem — peers,
+  // slot ownership and per-client prediction all have to be re-established — and
+  // is deliberately not attempted here. A friend who opens the link plays the
+  // captured world solo, which is what reproducing a bug needs.
+  //
+  // The import is DYNAMIC so the share/compress code never lands in the boot
+  // chunk of a normal player, and any failure is reported loudly rather than
+  // silently dropping the player into a fresh, wrong world.
+  const stateParam = sharedState
+  let stateReplay: StateReplay | undefined
+  if (stateParam && injectWorld && session instanceof HostSession) {
+    const host = session
+    const { fetchState } = await import('./app/stateShare')
+    const { startStateReplay } = await import('./app/stateReplay')
+    const payload = await fetchState(stateParam)
+    // Load the world from ~1 s BEFORE the moment when there is run-up to play,
+    // so the viewer watches the bug happen; the frame loop below drives the
+    // recorded inputs forward and hands control over at the captured frame.
+    // With no rewind (sender had no ring armed) we land on the captured frame.
+    injectWorld(payload.rewind?.world ?? payload.world)
+    stateReplay = startStateReplay(payload, () => host.world, uiMount)
+    const { note, build } = payload.meta
+    console.log(
+      `sporefall: loaded shared state ${stateParam} ` +
+        `(floor ${payload.world.floor}, tick ${payload.world.tick}, ${payload.world.entities.length} entities` +
+        `${payload.rewind ? `, replaying ${payload.rewind.frames.length} ticks of run-up` : ''})` +
+        `${note ? ` — "${note}"` : ''}${build && build !== APP_VERSION ? ` [captured on build ${build}, you are on ${APP_VERSION}]` : ''}`,
+    )
   }
   const zoom = Number(params.get('zoom'))
   if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
@@ -374,6 +448,87 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
+  // Shareable states (`?state=`). Arm a rolling ring of the last second or two
+  // of inputs, and expose one-tap capture: the pause menu's Share button
+  // (createPauseOverlay, below) and `sporefallShare(note)` in the console are
+  // the same call. The ring is what turns "here is the corpse" into "here is the
+  // bug happening": a capture carries 1-2 s of run-up, so `respawned inside a
+  // wall` ships the spawn, not just the aftermath.
+  //
+  // NOT `?debug`-GATED, and that is the whole point of the button. The person
+  // who needs to report a bug is on a phone: he cannot open a console and he
+  // cannot add `?debug` to a URL mid-run. A capture path only reachable by
+  // someone who already opted in reports nothing, which is exactly the wall
+  // being removed here. This matches the existing split rather than breaking it
+  // — the read-only `window.sporefall` surface already ships in every build,
+  // while `sporefall.verb(...)` MUTATION stays `?debug`-only. Capturing and
+  // uploading a snapshot is a read.
+  //
+  // Armed always rather than lazily on first tap, and the cost is why that is
+  // affordable: one `serializeWorld` per 30 ticks (1 s) against the autosave's
+  // existing one per 45 — the same order as a cost every device already pays —
+  // plus two `WorldJson` held in memory and, per tick, two ints and a clone of a
+  // small input map. Arming on first tap would have been cheaper still, but it
+  // hands the FIRST share — the one taken seconds after the bug, the only one
+  // that matters — zero run-up. The module is still a DYNAMIC import, so the
+  // compressor/uploader stay out of the initial parse.
+  //
+  // Host/solo only: `NetClientSession` does not own the world it would upload,
+  // and (like the pause menu itself) has nowhere to put the button.
+  let stateRing: StateSharing | undefined
+  if (session instanceof HostSession) {
+    const host = session
+    const { StateRing, shareState } = await import('./app/stateShare')
+    let ring = new StateRing(host.world)
+    // ORDER MATTERS, and getting it wrong is exactly the bug this feature is
+    // built to catch. `onTickInputs` fires BEFORE `tickWorld`, so it can only
+    // STASH the composed slot→command map — the ground-truth input the world is
+    // a pure function of. The ring is fed AFTER the tick (see `afterTick` below,
+    // called from the frame loop next to `debug?.afterTick()`), because a
+    // checkpoint taken pre-tick is misaligned by one tick against the inputs
+    // recorded alongside it, and a replay from it drifts. The capture-time
+    // self-check caught precisely that during development.
+    let pending: Map<number, InputCmd> | undefined
+    host.onTickInputs = (inputs) => {
+      pending = new Map([...inputs].map(([slot, cmd]) => [slot, { ...cmd }]))
+    }
+    // New Seed / play-again REPLACES the world object; the buffered history then
+    // belongs to a world that no longer exists, so start the ring over.
+    let seen = host.world
+    const rebindRing = (): void => {
+      if (host.world !== seen) {
+        seen = host.world
+        ring = new StateRing(host.world)
+      }
+    }
+    // The one capture path. The button and the console verb both land here, so
+    // there is nothing to keep in sync and no second implementation to drift.
+    const share = async (note?: string): Promise<ShareResult> => {
+      rebindRing()
+      return shareState(host.world, { note }, ring)
+    }
+    ;(window as unknown as { sporefallShare: unknown }).sporefallShare = async (note?: string) => {
+      const r = await share(note)
+      console.log(
+        `sporefall: shared ${r.url}\n  ${(r.bytes / 1024).toFixed(1)} KiB uploaded ` +
+          `(${(r.rawBytes / 1024).toFixed(1)} KiB raw), ${r.rewindTicks} ticks of run-up`,
+      )
+      return r
+    }
+    // Fed from the frame loop AFTER each tick, so the recorded inputs and the
+    // checkpoint they are replayed from describe the same instant.
+    stateRing = {
+      afterTick: () => {
+        rebindRing()
+        if (!pending) return
+        ring.observe(host.world, pending)
+        pending = undefined
+      },
+      share,
+    }
+    if (params.has('debug'))
+      console.log('sporefall: state sharing armed — await sporefallShare("what broke"), or use the pause menu')
+  }
   // A sleeping screen freezes this player — and if this player is the host, it
   // freezes the authoritative sim and therefore EVERYONE, which looks like a
   // crash rather than a phone. Acquired here because this is the point of no
@@ -382,7 +537,7 @@ const boot = async (): Promise<void> => {
   // reload — and the browser releases the lock for us on unload. The handle's
   // `release()` exists for whenever a real quit-to-menu path arrives.
   keepScreenAwake()
-  runLoop(session, renderer, uiMount, coop, inspect, updates, touch, debug, persister, resumed)
+  runLoop(session, renderer, uiMount, coop, inspect, updates, touch, debug, persister, resumed, stateReplay, stateRing)
 }
 
 /** localStorage as a `KeyValueStore`, or `undefined` where it is unavailable
@@ -653,16 +808,40 @@ const createFrameErrorBanner = (mount: HTMLElement): ((text: string | null) => v
   }
 }
 
+/**
+ * Best-effort clipboard write. Reports whether it actually landed instead of
+ * swallowing the rejection, because the caller shows a different (and honest)
+ * screen when it did not — see ui/shareModel.ts. Fails legitimately in an
+ * insecure context, in a WebView that withholds the permission, and possibly
+ * after a slow await has outlived the tap's transient user activation.
+ */
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false // `navigator.clipboard` may not even exist; the catch covers both
+  }
+}
+
 /** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
- * panel and the Resume / New Seed / Run-it-back actions. `onResume` unpauses,
- * `onNewSeed`/`onRestart` are wired only on host/solo (undefined hides the
- * button). Reachable via Escape (main.ts) or the pad's Start button. */
+ * panel and the Resume / New Seed / Run-it-back / Share-state actions.
+ * `onResume` unpauses, `onNewSeed`/`onRestart`/`onShare` are wired only on
+ * host/solo (undefined hides the button). Reachable via Escape, the pad's
+ * Start button, or the ⏸ chrome button (main.ts — the only one of the three a
+ * phone has). */
 interface PauseOverlay {
   update(paused: boolean, view: RenderView): void
 }
 const createPauseOverlay = (
   mount: HTMLElement,
-  actions: { onResume: () => void; onNewSeed?: () => void; onRestart?: () => void; weaponThumb?: WeaponThumb },
+  actions: {
+    onResume: () => void
+    onNewSeed?: () => void
+    onRestart?: () => void
+    onShare?: (note?: string) => Promise<ShareResult>
+    weaponThumb?: WeaponThumb
+  },
 ): PauseOverlay => {
   const el = document.createElement('div')
   markUiChrome(el)
@@ -696,6 +875,91 @@ const createPauseOverlay = (
     row.appendChild(rbBtn)
   }
   el.appendChild(row)
+  // ── Share state ───────────────────────────────────────────────────────────
+  // One tap: snapshot the live world (with the ring's run-up), verify it replays
+  // to itself, upload it, put the URL on the clipboard. The state machine and
+  // every word on screen are in ui/shareModel.ts, unit-tested, so this block is
+  // only DOM. Nothing here can paint a success that did not happen.
+  //
+  // KNOWN, AND DELIBERATE: the last link SURVIVES a New Seed / Run it back, so
+  // reopening the menu after a restart still shows it. It is not stale — an
+  // uploaded snapshot stays valid whatever the live world does next — and
+  // clearing it would throw away a link he may not have finished sending. The
+  // cost is that after a restart the link describes the PREVIOUS run.
+  const onShare = actions.onShare
+  if (onShare) {
+    const shareBtn = btn('🔗 Share state', false)
+    row.appendChild(shareBtn)
+    let share = initialShare()
+    const status = document.createElement('div')
+    status.dataset.role = 'share-status'
+    status.style.cssText = 'font:500 13px system-ui;color:#cfd3e0;max-width:min(92vw,540px);display:none'
+    // A READ-ONLY INPUT, not a <div>: on Android a long-press on plain text in a
+    // full-screen overlay does not reliably raise the selection handles, and the
+    // fallback path is worthless if it cannot actually be copied. An input gives
+    // the native select-all/copy affordance, and tapping it selects the lot so
+    // the long-press only has to hit "Copy".
+    const link = document.createElement('input')
+    link.readOnly = true
+    link.dataset.role = 'share-url'
+    link.setAttribute('aria-label', 'Shared state link')
+    link.style.cssText =
+      'font:500 13px ui-monospace,SFMono-Regular,Menlo,monospace;padding:9px 10px;border-radius:8px;' +
+      'border:1px solid #4a4f60;background:#11131b;color:#ffd76a;width:min(92vw,540px);display:none;' +
+      'text-align:center;box-sizing:border-box;pointer-events:auto'
+    const selectAll = (): void => link.select()
+    link.addEventListener('focus', selectAll)
+    link.addEventListener('click', selectAll)
+
+    const paint = (): void => {
+      shareBtn.textContent = shareButtonLabel(share)
+      const busy = shareAction(share) === 'none'
+      shareBtn.disabled = busy
+      shareBtn.style.opacity = busy ? '0.6' : '1'
+      const text = shareStatusText(share)
+      status.textContent = text ?? ''
+      status.style.display = text === null ? 'none' : 'block'
+      status.style.color = share.phase === 'failed' ? '#ff9a9a' : '#cfd3e0'
+      const url = shareUrl(share)
+      link.value = url ?? ''
+      link.style.display = url === null ? 'none' : 'block'
+    }
+
+    const set = (next: ShareState): void => {
+      share = next
+      paint()
+    }
+
+    shareBtn.addEventListener('click', () => {
+      const action = shareAction(share)
+      if (action === 'none') return
+      if (action === 'copy') {
+        // Retry inside a FRESH gesture — the whole reason this is a second tap
+        // rather than an automatic retry. No re-upload: same URL, same world.
+        const url = shareUrl(share)
+        const before = share
+        if (url !== null) void copyToClipboard(url).then((copied) => set(shareCopyRetried(before, copied)))
+        return
+      }
+      set(shareStarted())
+      // Fire-and-forget on purpose: the handler must return at once so the tap
+      // feels answered, and the pending state is what says "still working".
+      // Capture + a full replay self-check + gzip + upload is seconds, not
+      // milliseconds, which is also why the clipboard write below may find the
+      // tap's user activation expired — handled, not assumed away.
+      void (async () => {
+        try {
+          const r = await onShare('shared from the pause menu')
+          set(shareSucceeded(r.url, r.rewindTicks, await copyToClipboard(r.url)))
+        } catch (err) {
+          set(shareFailed(err))
+        }
+      })()
+    })
+    el.appendChild(status)
+    el.appendChild(link)
+    paint()
+  }
   mount.appendChild(el)
   let wasPaused = false
   return {
@@ -734,6 +998,10 @@ const runLoop = (
   debug?: DebugLink,
   persister?: Persister,
   resumed = false,
+  /** Non-undefined only for a `?state=` link: drives the recorded run-up. */
+  stateReplay?: StateReplay,
+  /** Rewind ring + capture, fed after each live tick. Host/solo only. */
+  stateRing?: StateSharing,
 ): void => {
   const hud = createHud(uiMount)
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
@@ -838,16 +1106,22 @@ const runLoop = (
   touch?.setInspectHandler((mode, x, y) => commOverlay.inspectAt(mode === 'tap' ? 'chip' : 'card', x, y))
   const overlay = createControllersOverlay(uiMount)
   // Pause overlay carries the shared gun+mods panel and the Resume / New Seed /
-  // Run-it-back actions. Solo/host can toggle pause with Escape (app-layer flip
-  // of session.isPaused — never touches the sim); the pad's Start also pauses.
+  // Run-it-back / Share-state actions. Solo/host can toggle pause with Escape
+  // (app-layer flip of session.isPaused — never touches the sim); the pad's
+  // Start also pauses (hostSession.ts), and the ⏸ button below is the touch
+  // equivalent.
   const canPause = session instanceof HostSession
   const setPaused = (p: boolean): void => {
     if (session instanceof HostSession) session.isPaused = p
   }
+  // `const` (not the parameter) so TypeScript keeps the narrowing inside the
+  // closure below.
+  const sharing = stateRing
   const pauseOverlay = createPauseOverlay(uiMount, {
     onResume: () => setPaused(false),
     onNewSeed,
     onRestart,
+    onShare: sharing ? (note) => sharing.share(note) : undefined,
     weaponThumb: renderer.weaponThumb,
   })
   if (canPause)
@@ -857,6 +1131,34 @@ const runLoop = (
       if (view.gameOver || view.self?.dead) return // death screen owns the moment
       setPaused(!(session.isPaused ?? false))
     })
+  // ⏸ — THE ONLY WAY INTO THE PAUSE MENU FROM A PHONE.
+  //
+  // Pause had exactly two triggers, Escape and the pad's Start, and a phone has
+  // neither: on touch the pause menu was unreachable, so everything living on it
+  // (loadout, New Seed, Run it back, and now Share state) was desktop/controller
+  // only. Share state is specifically for the person holding a phone, so this
+  // gap had to close for the button to mean anything.
+  //
+  // UI CHROME, so the same two rules as the settings gear apply and are the
+  // reason it is tappable at all: it mounts on #ui (the touch layer's
+  // full-screen stick zones live there too, and chrome on #app would be under
+  // them in the hit test) and it is marked data-ui-chrome so the tap never
+  // enters the stick/inspect press classification. It sits left of the gear.
+  // Hidden while paused — the overlay's own Resume owns that moment — and on
+  // the death/game-over screens, matching the overlay's visibility rule.
+  const pauseBtn = document.createElement('button')
+  if (canPause) {
+    pauseBtn.textContent = '⏸'
+    pauseBtn.setAttribute('aria-label', 'Pause')
+    pauseBtn.dataset.role = 'pause-button'
+    markUiChrome(pauseBtn)
+    pauseBtn.style.cssText =
+      'position:absolute;right:52px;top:10px;z-index:70;width:34px;height:34px;border-radius:8px;' +
+      'border:1px solid #0008;background:#222c;color:#eee;font-size:16px;cursor:pointer;pointer-events:auto;' +
+      'touch-action:manipulation'
+    pauseBtn.addEventListener('click', () => setPaused(true))
+    uiMount.appendChild(pauseBtn)
+  }
   const showPadHint = createPadHint(uiMount)
   let currentLevel = session.renderView().level
 
@@ -904,7 +1206,16 @@ const runLoop = (
         acc += dt
         last = now
         while (acc >= SIM_DT) {
-          session.tick()
+          // A `?state=` link opens by REPLAYING the second before the capture,
+          // on this same fixed timestep so it runs at true gameplay speed. Live
+          // input is ignored until it reconverges on the captured frame; the
+          // banner from stateReplay.ts is what stops the viewer concluding the
+          // game has hung.
+          if (stateReplay?.active) stateReplay.step()
+          else {
+            session.tick()
+            stateRing?.afterTick() // record AFTER the tick — see the arming block
+          }
           debug?.afterTick() // stream this tick's events + drain queued debug mutations
           inspect.afterTick() // buffer this tick's events for sporefall.events()
           acc -= SIM_DT
@@ -962,7 +1273,11 @@ const runLoop = (
         missionPanel.update(view)
         commOverlay.update(view)
         overlay.update(pads)
-        pauseOverlay.update(session.isPaused ?? false, view)
+        const paused = session.isPaused ?? false
+        pauseOverlay.update(paused, view)
+        // Same visibility rule as the overlay itself: gone while the pause menu
+        // is up (Resume owns that), gone on death/game-over (that screen does).
+        if (canPause) pauseBtn.style.display = paused || view.gameOver || view.self?.dead ? 'none' : 'block'
         // Tell the updater where the player is, so a downloaded build can swap
         // itself in at a moment that costs nothing (src/app/updatePolicy.ts). The
         // floor-change window is held open for the length of the "FLOOR n" banner
@@ -979,15 +1294,11 @@ const runLoop = (
           momentOf({
             runOver: restartAffordance(view).visible,
             floorChanging: floorFrames > 0,
-            paused: session.isPaused ?? false,
+            paused,
           }),
           networked ? Math.max(0, anchors.length - 1) : 0,
         )
-        const hide = shouldHideCursor({
-          paused: session.isPaused ?? false,
-          gameOver: view.gameOver,
-          selfDead: !!view.self?.dead,
-        })
+        const hide = shouldHideCursor({ paused, gameOver: view.gameOver, selfDead: !!view.self?.dead })
         if (hide !== cursorHidden) {
           canvas.style.cursor = hide ? 'none' : ''
           cursorHidden = hide

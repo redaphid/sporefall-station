@@ -1,7 +1,8 @@
 // @ts-check
 // Parity M6 proof: drives the item-breadth loadout in a real browser with real
 // KEYBOARD input and asserts, per category, that a representative item produces
-// its effect: freeze grenade ⇒ frozen NPC, chloroform ⇒ sleeping NPC, molotov ⇒
+// its effect: grenade ⇒ blast damage, shotgun ⇒ pellet spread. (The freeze
+// grenade / chloroform / molotov legs were removed with the nine-item cull —
 // fire on the ground, shotgun ⇒ a spread of pellets. Each item runs from a fresh
 // scenario load. Records a video + a screenshot per item.
 import { chromium } from 'playwright-core'
@@ -98,32 +99,20 @@ const main = async () => {
     if (m.type() === 'error') log('console.error:', m.text())
   })
 
-  // FREEZE GRENADE ⇒ frozen NPC
+  // GRENADE ⇒ blast damage on a nearby NPC. The freezeGrenade / chloroform /
+  // molotov legs that used to sit here were culled along with those items; the
+  // grenade is the only throwable left, so it is the whole throw leg now.
+  // (The freeze and sleep STATUSES still exist — they come off the freezeRay and
+  // tranquilizer, which weapons-session covers.)
   await ready(page, 'items')
-  await equip(page, 'freezeGrenade')
-  await page.keyboard.press('KeyQ')
-  await sleep(900)
-  let st = await world(page)
-  await screenshot(page, 'freeze-grenade')
-  check(st.npcs.some((n) => n.frozen), 'freeze grenade freezes an NPC')
-
-  // CHLOROFORM ⇒ sleeping NPC
-  await ready(page, 'items')
-  await equip(page, 'chloroform')
-  await page.keyboard.press('KeyQ')
-  await sleep(900)
-  st = await world(page)
-  await screenshot(page, 'chloroform')
-  check(st.npcs.some((n) => n.sleep > 0), 'chloroform puts an NPC to sleep')
-
-  // MOLOTOV ⇒ fire on the ground
-  await ready(page, 'items')
-  await equip(page, 'molotov')
+  await equip(page, 'grenade')
+  const beforeThrow = await world(page)
   await page.keyboard.press('KeyQ')
   await sleep(1000)
-  st = await world(page)
-  await screenshot(page, 'molotov-fire')
-  check(st.fires > 0, 'molotov starts a fire on the target tile')
+  let st = await world(page)
+  await screenshot(page, 'grenade-blast')
+  const hurt = (a, b) => b.npcs.some((n, i) => a.npcs[i] && n.hp < a.npcs[i].hp)
+  check(hurt(beforeThrow, st), 'a thrown grenade blasts a nearby NPC')
 
   // SHOTGUN ⇒ spread of pellets. Sample fast right after firing and grab the
   // peak count / a frame with the fan mid-flight (pellets are small and quick).
@@ -162,7 +151,7 @@ const main = async () => {
     log('FAILURES:', failures.join('; '))
     process.exit(1)
   }
-  log('SUCCESS: freeze + chloroform + molotov + shotgun verified, zero page errors')
+  log('SUCCESS: grenade + shotgun verified, zero page errors')
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

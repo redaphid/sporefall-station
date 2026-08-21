@@ -868,7 +868,7 @@ describe('inventory change-gating at 8 players', () => {
     // state the client must see. A gate that only compares against the last
     // SENT signature is correct here; one that compared against the last TICK's
     // would swallow the pair and leave the client showing a phantom item.
-    avatar.loadout!.inventory = [...original, { itemId: 'bandage', qty: 3 }]
+    avatar.loadout!.inventory = [...original, { itemId: 'grenade', qty: 3 }]
     await tickHost(host, 1)
     expect(host.debugInventorySends).toBe(before + 1)
     avatar.loadout!.inventory = original
@@ -886,7 +886,7 @@ describe('inventory change-gating at 8 players', () => {
     await tickHost(host, 4)
     const before = host.debugInventorySends
     const avatar = host.world.byId.get(host.peersBySlot.get(3)!.entityId!)!
-    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'medkit', qty: 1 }]
+    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'briefcase', qty: 1 }]
     await tickHost(host, 2)
     expect(host.debugInventorySends).toBe(before + 1)
   })

@@ -9,7 +9,38 @@ import { emptyInput } from '../../game/types'
 import { ByteReader, ByteWriter } from '../framing/codec'
 import { MsgType } from '../types'
 
-/** Fixed archetype registry — u8 index over the wire. Append only. */
+/**
+ * Fixed archetype registry — u8 index over the wire. Append only.
+ *
+ * ## `// RETIRED` entries are TOMBSTONES. Do not compact this list.
+ *
+ * Fourteen entries are marked `// RETIRED`: the nine culled items in every form
+ * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
+ * the floor). They name content that no longer exists, and a dead-code tool
+ * will call them unused. They are CLAIMED, not unused — the same argument as
+ * `BLE_LOBBY_INFO_UUID`'s `@protocolReservation` in net/types.ts.
+ *
+ * The index IS the wire format. `encodeSnapshot` writes the position
+ * (`archetypeIndex.get(a) ?? 0`) and `decodeSnapshot` reads it back positionally
+ * (`ARCHETYPES[r.u8()] ?? 'player'`). Deleting `'banana'` at index 55 does not
+ * remove a meaning, it SHIFTS every meaning after it down by one — so a phone on
+ * the old bundle and a phone on the new one would agree they are both
+ * PROTOCOL_VERSION 3, sail through the handshake gate, and then silently
+ * disagree about what all 32 following entries mean. Furniture would arrive as
+ * mods, pickups as furniture, and the tail of the list would decode past the end
+ * as `'player'` — a screen full of phantom Rangers, the exact bug the second
+ * sweep below was written to fix.
+ *
+ * A HOLE IS THE CORRECT OUTCOME. Leaving the strings in place keeps all 88
+ * indices meaning exactly what they meant before the cull, which is what lets
+ * PROTOCOL_VERSION stay at 3 honestly: the two builds really are compatible.
+ * A pre-cull peer can still send `pickup.medkit`; a post-cull peer decodes the
+ * name correctly, draws it (the art keys are untouched), and treats the item as
+ * inert because `itemClass` returns 'unknown' — degraded, never desynced.
+ *
+ * Retiring costs one byte of nothing. Compacting costs a silent desync. Only
+ * ever append.
+ */
 export const ARCHETYPES = [
   'player',
   'thug',
@@ -23,8 +54,8 @@ export const ARCHETYPES = [
   'pickup.bat',
   'pickup.knife',
   'pickup.pistol',
-  'pickup.bandage',
-  'pickup.medkit',
+  'pickup.bandage', // RETIRED
+  'pickup.medkit', // RETIRED
   'pickup.cash',
   'pickup.briefcase',
   'gangster',
@@ -52,17 +83,17 @@ export const ARCHETYPES = [
   // which now fails if any registry grows without this list growing with it.
   // Appended alphabetically in one block. APPEND ONLY, NEVER REORDER.
   'atm',
-  'banana',
+  'banana', // RETIRED
   'barrel',
   'barricade',
   'bench',
   'bunk',
   'cabinet',
-  'chloroform',
+  'chloroform', // RETIRED
   'cryoTerminal',
   'desk',
-  'freezeGrenade',
-  'gasGrenade',
+  'freezeGrenade', // RETIRED
+  'gasGrenade', // RETIRED
   'generator',
   'locker',
   'mod.bounce',
@@ -83,21 +114,21 @@ export const ARCHETYPES = [
   'mod.splinterShot',
   'mod.split',
   'mod.velocity',
-  'molotov',
-  'pickup.adrenaline',
-  'pickup.banana',
-  'pickup.burger',
-  'pickup.chloroform',
+  'molotov', // RETIRED
+  'pickup.adrenaline', // RETIRED
+  'pickup.banana', // RETIRED
+  'pickup.burger', // RETIRED
+  'pickup.chloroform', // RETIRED
   'pickup.claws',
   'pickup.fists',
   'pickup.flamethrower',
-  'pickup.freezeGrenade',
+  'pickup.freezeGrenade', // RETIRED
   'pickup.freezeRay',
-  'pickup.gasGrenade',
+  'pickup.gasGrenade', // RETIRED
   'pickup.grenade',
   'pickup.keycard',
   'pickup.machinegun',
-  'pickup.molotov',
+  'pickup.molotov', // RETIRED
   'pickup.shotgun',
   'pickup.sledgehammer',
   'pickup.stunGun',
@@ -461,7 +492,14 @@ export interface StateMsg {
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */
   revivesLeft?: number
-  /** Per-slot HUD extras for each player's own display. */
+  /** Per-slot HUD extras for each player's own display.
+   *
+   * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
+   * with the total quantity of every carried stack except the briefcase, which
+   * is what it always was. Bandages themselves were culled. The field survives
+   * the cull because renaming or dropping it would change the shape of a JSON
+   * message that peers on an older bundle still send and read, for no gain —
+   * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
 }
 

@@ -38,8 +38,20 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  * breaking change lands in the envelope shape or in how a WorldJson must be
  * interpreted. Independent of `WorldJson.v` (which serialize.ts owns): a version
  * mismatch here discards the save and starts a fresh run rather than crashing.
+ *
+ * 2 — the nine-item cull (banana/burger/chloroform/adrenaline/molotov/
+ *     freezeGrenade/gasGrenade/bandage/medkit). A save written before it can
+ *     hold those ids in a player's `loadout.inventory` and as `pickup.<id>`
+ *     entities on the floor. Nothing CRASHES on them — the id simply classes as
+ *     'unknown' (data/items `itemClass`), so `consumeActive` returns false and
+ *     `collect` stashes it instead of indexing the consumable table — but the
+ *     restored run would hand the player dead weight in the hotbar it can never
+ *     spend, in slots it cannot free. Discarding is the honest outcome, and it
+ *     is exactly what this counter exists for: a change in how a WorldJson must
+ *     be interpreted, not in its shape.
+ * 1 — initial.
  */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 /** Versioned on-disk wrapper around a WorldJson snapshot. */
 export interface SaveEnvelope {

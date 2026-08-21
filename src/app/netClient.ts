@@ -740,10 +740,14 @@ export class NetClientSession implements Session {
         if (this.self.combat) this.self.combat.weapon = this.localInv.weapon
         else this.self.combat = { weapon: this.localInv.weapon, cooldown: 0 }
       } else if (hud) {
-        ld.inventory = [
-          ...(hud.bandages > 0 ? [{ itemId: 'bandage', qty: hud.bandages }] : []),
-          ...(hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []),
-        ]
+        // `hud.bandages` is NOT read here any more. Bandages were culled, so
+        // synthesizing `{ itemId: 'bandage' }` from that count would put an item
+        // in the joiner's hotbar that no longer exists in any registry — inert,
+        // unusable, and labelled with its raw id because no name lookup resolves
+        // it. The count itself stays on the wire (see StateMsg.huds); it is the
+        // total carried-item tally, not a bandage tally, and dropping the FIELD
+        // would change the shape of a message an older host still sends.
+        ld.inventory = hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []
       }
     }
     const missionText =

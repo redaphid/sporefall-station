@@ -95,10 +95,19 @@ CURATED: dict[str, dict] = {
               "#7b8791", "#a2adb4", "#7ecbd2", "#cfe0e2"],
         accent="#46e078", accent_q=0.995,
     ),
-    # The mess chair, off the p8 sweep (the BLOCKY reroll -- see the recipe note
-    # in generate.py). Seed 1002 is the curated pick: it cleared the facing gate
-    # at 0.695 (vs 0.547 for the runner-up), sat in the value band, and stayed
-    # legible at game size.
+    # The mess chair. THE OWNER PICKED THIS ONE, by tapping "Chair 2 -- chunkiest,
+    # tall rounded back, teal frame" in the relay picker on 2026-08-20. It
+    # REPLACES the p8 seed 1002 this branch shipped first: that was an agent's
+    # curation, this is his, and his wins.
+    #
+    # Provenance matters here because the picker only ever showed him a 512px
+    # PREVIEW with the floor baked in -- no alpha, not a usable source. The four
+    # previews were built from the chair-jugg sweep (juggernautXL, seeds
+    # 1000-1011, rendered 21:28-21:53Z, ranked in chair-gen-report.md). "Chair 2"
+    # is that sweep's rank 1, SEED 1006, recovered by matching the preview back
+    # against all twelve candidates on silhouette IoU and per-pixel error, then
+    # confirmed by eye: a SOLID rounded-top back panel, which is what rules out
+    # the slatted-spindle s01004.
     #
     # Hue is SLATE-TEAL, deliberately duller than supply-cabinet's cyan. The
     # recipe asks for "worn dark teal" seat and "dark gunmetal grey" legs, and
@@ -110,13 +119,101 @@ CURATED: dict[str, dict] = {
     # a chair has no light, and a bright speck on the seat is precisely the
     # "white patch on the seat" defect the p8 negatives were written to kill.
     "mess-chair": dict(
-        tag="p8", seed=1002, dst="chair.png",
+        tag="chair-jugg", seed=1006, dst="chair.png",
         # A first, greyer cut of this ramp measured chroma_p90 exactly 70 -- the
         # cast floor, with zero margin, and the weakest in the pack (every other
         # prop scores 84-96). Deepening the mid entries instead of brightening
         # them buys 84 while keeping mean luminance down.
         ramp=["#08080c", "#0e181c", "#153035", "#1c4750", "#245f6b",
               "#2f7d8b", "#4a9dab", "#83b8bf", "#bcd4d8"],
+        # Seed 1006 has a slightly narrower value histogram than the p8 render
+        # this replaced, so at the 32px footprint one ramp level collapsed into
+        # its neighbour and `palette_n` came in at 8 against the cast floor of 9.
+        # Spreading the histogram a little further across the SAME ramp buys the
+        # 9th level back (measured: 8 -> 9) and leaves chroma, value_range and the
+        # hue untouched. Deliberately 0.90, not 1.0: full equalisation also lifts
+        # the hi-res value_range to 0.676 and starts washing the seat pad out.
+        equalize=0.90,
+    ),
+    # --- sporeforge "blocky" sweep, 88 renders on juggernautXL -------------
+    # Six interior furnishings that until now drew as procedural silhouettes.
+    # Each pick is the highest-scoring ACCEPT for its prop in
+    # _scratch/sporeforge/props-candidates.json.
+    #
+    # HUE, and why these reuse families rather than inventing new ones: the
+    # locked palette (scripts/assets/palette.py) has exactly four ramp families
+    # -- warm tan, teal, olive-green and neutral steel -- plus single-colour
+    # accents. There is no violet or indigo RAMP, only the boss's #a05ae0, so a
+    # ramp written in a hue the palette does not carry snaps to grey and the
+    # sprite lands under the cast's chroma floor. (Measured: an indigo bunk ramp
+    # scored sat_frac 0.000, chroma 40.) Reuse across families is already the
+    # pack's norm -- crate and screen are both neutral, cabinet and chair both
+    # teal, desk and barrel both warm -- and silhouette, not hue, is what tells
+    # a furnished room apart. Every ramp below is built from EXACT palette
+    # entries in ascending luminance, which is what keeps palette_n >= 9.
+    # DELIBERATE DEVIATION from the highest-scoring accept. shelf-s01000 scores
+    # 0.991 (vs 0.976 here) and is the only shelf with a 3-vote VLM read, but it
+    # is a THIN five-tier rack: at 32px it reads as a faint wireframe, and at the
+    # 64px footprint it fails three of the four cast floors under any ramp
+    # (sat_frac 0.001-0.048, chroma_p90 12-18, value_range 0.348-0.373 vs a 0.487
+    # floor) because there is not enough solid material left to carry a value
+    # structure. s01202 is the sweep's "chunkiest shelf, three thick teal slabs
+    # on dark posts" and clears all four floors at BOTH footprints. Chunk beats
+    # score at 32px.
+    "storage-rack": dict(
+        tag="blocky", subject="shelf-v3", seed=1202, dst="storage-rack.png",
+        ramp=["#08080c", "#141a16", "#1c1420", "#163a3e", "#24565c",
+              "#3a7a80", "#5aa4ae", "#d8a878", "#7ecbd2"],
+        accent="#46e078", accent_q=0.995,
+    ),
+    "crew-bunk": dict(
+        tag="blocky", subject="bunk", seed=1007, dst="crew-bunk.png",
+        # The raw is a tan mattress in a dark teal frame, so the ramp puts teal
+        # in the shadows and warm tan in the lit half -- the frame reads cool,
+        # the bedding reads warm, off one monotonic value ramp.
+        # The two top entries are what carry value_range over the cast floor:
+        # ending the ramp at #cbb277 measured 0.474 against a 0.487 floor.
+        ramp=["#08080c", "#1c1420", "#2e1e10", "#163a3e", "#24565c",
+              "#6b4d26", "#8f6c38", "#b08d50", "#d8a878", "#a6ffbe"],
+    ),
+    "mess-bench": dict(
+        tag="blocky", subject="bench", seed=1009, dst="mess-bench.png",
+        # Tan plank on chunky teal end blocks (the raw's own description).
+        ramp=["#08080c", "#141a16", "#2e1e10", "#24565c", "#6b4d26",
+              "#8f6c38", "#b08d50", "#d8a878", "#cbb277"],
+    ),
+    # Came out of a SHELF sweep and was relabelled a table on inspection; the
+    # 3-vote qwen3-vl read answered "table" unprompted, which is why the
+    # relabel is trusted. Deeper than mess-bench so the two read as a mess-hall
+    # SET without being the same swatch.
+    "mess-table": dict(
+        tag="blocky", subject="shelf-v3", seed=1201, dst="mess-table.png",
+        ramp=["#08080c", "#141a16", "#1c1420", "#2e1e10", "#4a3419",
+              "#6b4d26", "#8f6c38", "#b08d50", "#cbb277"],
+    ),
+    # DELIBERATE DEVIATION, small: plant-v2-s01105 scores marginally higher
+    # (0.943 vs 0.937) but its blades are narrow and its planter face is broken
+    # up; s01107 has broad, well-separated blades that survive the downscale, is
+    # the sweep note's own "BEST plant", and holds more value_range at 32px
+    # (0.662 vs 0.623). Judged at game size, as the brief asks.
+    "bio-planter": dict(
+        tag="blocky", subject="plant-v2", seed=1107, dst="bio-planter.png",
+        # Olive-green foliage over the planter, with the uiAccent green as the
+        # blade highlight rather than a machine's status LED.
+        ramp=["#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
+              "#67873c", "#86a750", "#a8c46a", "#cbb277"],
+        accent="#46e078", accent_q=0.99,
+    ),
+    # The raw has a tan shell with teal ribs and twin glowing slit vents; the
+    # accent quantile lands on the vents, which is the one accent in the pack
+    # that is an organism's glow and not a powered machine's status light.
+    "spore-node": dict(
+        tag="blocky", subject="sporeNode", seed=1007, dst="spore-node.png",
+        # Tan shell rather than teal, so the node does not read as another
+        # storage-rack; the glowing vent survives as a green slit.
+        ramp=["#08080c", "#141a16", "#1c1420", "#2e1e10", "#163a3e",
+              "#6b4d26", "#8f6c38", "#b08d50", "#cbb277", "#a6ffbe"],
+        accent="#46e078", accent_q=0.995,
     ),
 }
 
@@ -134,7 +231,12 @@ def build(name: str, spec: dict, px: int, content: int, ink: bool) -> Image.Imag
     quantized levels. restyle_props.py had to work the other way round (no raws
     existed) and paid for it with a `palette_n` regression; these have raws.
     """
-    src = GEN / spec["tag"] / name / f"seed{spec['seed']:05d}.png"
+    # `subject` names the RAW sweep directory when it differs from the CURATED
+    # key. The blocky sweep's dirs are sweep names ("shelf-v3", "plant-v2"),
+    # not sprite names, and one of them (shelf-v3 seed 1201) produced the
+    # curated TABLE. Without this the key would have to be the sweep name and
+    # the table entry would read as a shelf.
+    src = GEN / spec["tag"] / spec.get("subject", name) / f"seed{spec['seed']:05d}.png"
     if not src.exists():
         raise SystemExit(f"missing raw: {src}")
     im = Image.open(src)
@@ -197,7 +299,7 @@ def main() -> int:
         raws = Path(__file__).resolve().parent / "raws"
         for name in names:
             spec = CURATED[name]
-            src = GEN / spec["tag"] / name / f"seed{spec['seed']:05d}.png"
+            src = GEN / spec["tag"] / spec.get("subject", name) / f"seed{spec['seed']:05d}.png"
             shutil.copy2(src, raws / f"prop.{Path(spec['dst']).stem}.png")
         print(f"\n  archived {len(names)} raws into scripts/assets/raws/")
     return 0

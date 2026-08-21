@@ -55,7 +55,7 @@ const readWorld = (page) =>
       if (e.kind === 'pickup') pickups.push({ itemId: e.pickup.itemId, x: e.pos.x })
       if (e.kind === 'npc' && e.ai && e.ai.faction === 'civ') civs.push({ id: e.id, x: e.pos.x, hp: e.health ? e.health.hp : null })
     }
-    return { self, barrels, crate, fires, pickups, civs }
+    return { self, barrels, crate, fires, pickups, civs, cash: v.self.playerCtl ? v.self.playerCtl.cash : 0 }
   })
 
 const shoot = async (page, n, gap = 300) => {
@@ -99,13 +99,16 @@ const main = async () => {
   await screenshot(page, 'scene')
   check(start.barrels === 3 && start.crate, 'scene has 3 barrels and a crate')
 
-  // USE: the vending machine (adjacent west) dispenses a burger — an item that
-  // never appears in the level's own loot, so its presence is unambiguous.
+  // USE: the vending machine (adjacent west) returns change. It dispensed a
+  // BURGER until the item cull removed every consumable; it now pays cash like
+  // the ATM, so the observable effect moved from a new pickup on the floor to
+  // the player's cash going up.
+  const cashBefore = start.cash
   await page.keyboard.press('KeyE')
   await sleep(300)
   const afterUse = await readWorld(page)
   await screenshot(page, 'vending-used')
-  check(afterUse.pickups.some((p) => p.itemId === 'burger'), 'using the vending machine dispensed a burger')
+  check(afterUse.cash > cashBefore, 'using the vending machine paid out change')
 
   // BREAK: shoot the crate (nearest thing east) — it drops loot.
   const pickupsBeforeCrate = afterUse.pickups.length

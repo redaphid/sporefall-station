@@ -670,8 +670,15 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
 // online. Offence on floor 1 now comes from the shop (which stocks throwables on
 // every floor, see stockShop) and from the scattered weapon-MODS, which are the
 // real progression now that the weapon itself is fixed.
-const BASIC_LOOT = ['bandage', 'bandage', 'medkit', 'cash']
-const ELEMENT_THROWABLES = ['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade']
+// The healing items (bandage/medkit) were culled along with the element
+// throwables, so the basic table is cash alone — floor 1 pays you, it does not
+// patch you up. Healing is passive regen + the `lifesteal` mod now.
+const BASIC_LOOT = ['cash']
+// Was molotov/freezeGrenade/chloroform/banana/gasGrenade + grenade. The five
+// element throwables were culled; the grenade is the survivor, so the depth
+// gate below still means "something to throw appears from floor 2" — there is
+// just one of them instead of six.
+const ELEMENT_THROWABLES = ['grenade']
 
 /** The floor's random-loot table: basics everywhere, the element throwables from
  * floor 2, weighted up again from floor 3 on. */
@@ -682,12 +689,14 @@ const lootTable = (floor: number): string[] => {
   return table
 }
 
-/** Element gear a shop can carry — the reliable place to gear up on any floor,
- * so freeze-shatter / fire-spread combos are always within reach. Weapons are
- * gone from the stock list (the player's weapon is permanent), so the shop
- * trades purely in throwables and healing. */
+/** What a shop can carry — the reliable place to gear up on any floor, so a
+ * throwable is always within reach even on floor 1 (the random table gates them
+ * behind floor 2). Weapons left this list when the player's weapon became
+ * permanent; healing left it with the item cull. Grenades are the whole trade
+ * now, so this is a one-entry list ON PURPOSE — it is still a table, and a new
+ * throwable joins the shop by being added here. */
 const SHOP_STOCK = [
-  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit', 'bandage',
+  'grenade',
 ]
 
 /** Every item id the level generator can lay on the floor as a `pickup.<id>`:
@@ -696,9 +705,11 @@ const SHOP_STOCK = [
  *
  * Exported for `itemArtResolution.test.ts`, which asserts every one of these has
  * real art. `banana` sat in this list for its whole life with no `ITEM_ALIAS`
- * entry and silently rendered as a medkit; the test exists so the next id added
- * here cannot repeat that. Derived from the tables rather than restated, so a
- * new loot entry is covered automatically. */
+ * entry and silently rendered as a medkit; banana has since been culled, but the
+ * test outlives it — the guard is about the FALLBACK (an unaliased pickup lands
+ * on `item.default`, which is the medkit file), not about that one item, so the
+ * next id added here still cannot repeat it. Derived from the tables rather than
+ * restated, so a new loot entry is covered automatically. */
 export const LOOT_ITEM_IDS: readonly string[] = [...new Set([...lootTable(Number.MAX_SAFE_INTEGER), ...SHOP_STOCK])]
 
 const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number): void => {

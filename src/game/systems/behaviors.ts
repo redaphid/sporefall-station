@@ -57,6 +57,7 @@ import { infectionActive } from './infection'
 import { spawnObject } from './objects'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 import { strongestStimulus } from './stimulus'
+import { vlen } from '../simMath'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
 export const PATROL = 'patrol'
@@ -97,7 +98,7 @@ export interface Candidate extends Goal {
 
 export type Consideration = (w: World, e: Entity) => Candidate[]
 
-const dist2d = (ax: number, ay: number, bx: number, by: number): number => Math.hypot(ax - bx, ay - by)
+const dist2d = (ax: number, ay: number, bx: number, by: number): number => vlen(ax - bx, ay - by)
 
 /** #63 — is `target` an enemy `e` should fight/flee? The one hostility predicate
  * the `threat` scan uses. Players keep the exact pre-#63 rule. NPC-vs-NPC (ON by
@@ -621,7 +622,7 @@ const squadFlank: Consideration = (w, e) => {
   const lxv = lead.pos.x - t.pos.x
   const lyv = lead.pos.y - t.pos.y
   if (sxv * lxv + syv * lyv <= 0) return [] // already opposite the lead
-  const ld = Math.hypot(lxv, lyv) || 1
+  const ld = vlen(lxv, lyv) || 1
   const at = { x: t.pos.x - (lxv / ld) * FLANK_STANDOFF, y: t.pos.y - (lyv / ld) * FLANK_STANDOFF }
   const score = battleScore(hateToward(w, e, t.id), e.health?.hp ?? 1, Math.max(1, dist)) + 1
   return [{ code: FLANK, score, tier: TIER_THREAT, target: t.id, at }]

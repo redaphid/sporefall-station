@@ -2,6 +2,7 @@ import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import type { World } from '../world'
 import { hasStatus, isImmobilized, removeStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 // Dodge-roll tuning (Enter-the-Gungeon flavour). Ticks are absolute-tick windows,
 // so the whole mechanic is a pure function of world tick + input — no timers.
@@ -57,7 +58,7 @@ export const tryStartRoll = (w: World, e: Entity, dirX: number, dirY: number): b
   // Roll in the desired direction; fall back to facing when the stick is centred.
   let dx = dirX
   let dy = dirY
-  const len = Math.hypot(dx, dy)
+  const len = vlen(dx, dy)
   if (len > 0.01) {
     dx /= len
     dy /= len

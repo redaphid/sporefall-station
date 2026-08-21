@@ -4,6 +4,7 @@ import { SIM_DT, type InputCmd } from '../types'
 import type { World } from '../world'
 import { isRolling, ROLL_SPEED } from './roll'
 import { isImmobilized } from './statusFx'
+import { vlen } from '../simMath'
 
 const FRICTION = 12 // knockback velocity decay per second
 
@@ -130,7 +131,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
         e.intent.x = 0
         e.intent.y = 0
         if (cmd) {
-          const len = Math.hypot(cmd.moveX, cmd.moveY)
+          const len = vlen(cmd.moveX, cmd.moveY)
           if (len > 0.01) {
             const norm = len > 1 ? 1 / len : 1
             e.intent.x = cmd.moveX * norm
@@ -141,7 +142,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
       // Facing follows the aim vector (aim stick, or aim-where-you-move; see
       // selectAim). A centred aim leaves facing untouched so you keep pointing
       // where you last aimed instead of snapping to a default direction.
-      if (cmd && Math.hypot(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
+      if (cmd && vlen(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
     } else if (e.playerCtl?.downed) {
       // A downed body has no self-driven movement. Intent is only rewritten for
       // upright players (the branch above), so without this a player downed

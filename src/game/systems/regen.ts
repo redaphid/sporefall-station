@@ -1,5 +1,6 @@
 import type { Entity } from '../entity'
 import type { World } from '../world'
+import { vlen } from '../simMath'
 
 // Passive "rest" regeneration. Hold a player COMPLETELY still (no movement intent
 // and no residual knockback velocity) AND keep them unharmed for a sustained
@@ -33,8 +34,8 @@ export const REGEN_HP_PER_INTERVAL = 2
 
 /** Completely still: no movement intent this tick and (near-)zero velocity. */
 const isStill = (e: Entity): boolean =>
-  Math.hypot(e.intent.x, e.intent.y) < REGEN_STILL_EPS &&
-  Math.hypot(e.vel.x, e.vel.y) < REGEN_STILL_EPS
+  vlen(e.intent.x, e.intent.y) < REGEN_STILL_EPS &&
+  vlen(e.vel.x, e.vel.y) < REGEN_STILL_EPS
 
 /**
  * Passive regen tick. Runs AFTER every damage source (combat/projectiles/fire/

@@ -19,6 +19,7 @@ import { ELEMENTS } from '../data/elements'
 import type { Entity } from '../entity'
 import type { World } from '../world'
 import { addStatus, hasStatus, removeStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OWNER TUNING — every lever for the outbreak lives here.
@@ -100,7 +101,7 @@ export const infectionSystem = (w: World): void => {
     for (const t of w.entities) {
       if (t === src || t.dead || !t.health || t.infected) continue
       if (!t.ai && !t.playerCtl) continue
-      const d = Math.hypot(t.pos.x - src.pos.x, t.pos.y - src.pos.y)
+      const d = vlen(t.pos.x - src.pos.x, t.pos.y - src.pos.y)
       if (d <= CONTACT_RADIUS + t.radius + src.radius) addStatus(w, t, 'spore', CONTACT_DOSE)
     }
   }

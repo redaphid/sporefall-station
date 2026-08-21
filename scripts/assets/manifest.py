@@ -104,6 +104,15 @@ PROP_KEYS = {  # engine prop name -> props table key
     # so it has to be in THIS table as well or the next regeneration drops the
     # key and every chair silently reverts to the drawn silhouette.
     "chair": "chair",
+    # The sporeforge furnishings, plus `crate` -- which needed no new art, only
+    # a key: cargo-crate.png was already shipping as prop.default. Same
+    # silent-revert hazard as every line above: this table is what build()
+    # writes, so a missing entry means the next regeneration drops the key and
+    # the archetype reverts to its procedural silhouette.
+    "crate": "cargo-crate",
+    "shelf": "storage-rack", "bunk": "crew-bunk",
+    "bench": "mess-bench", "table": "mess-table",
+    "plant": "bio-planter", "spore-node": "spore-node",
 }
 
 

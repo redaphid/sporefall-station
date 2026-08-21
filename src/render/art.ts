@@ -162,12 +162,17 @@ export interface ArtPalette {
 /**
  * Per-archetype sprite BULK — a multiplier on the drawn billboard only.
  *
- * The Mireclaw Alpha borrows the thug's directional set (see CHARSET_ALIAS
- * below) and was therefore PIXEL-IDENTICAL to the commonest enemy in the game:
- * same body, same palette, same size. Until it gets its own art (see
- * docs/assets/boss-art-brief.md) this is the cheap half of the fix — an Alpha
- * that is half again the size of its own brood reads as a different creature at
- * a glance, and the size difference survives whatever art lands later.
+ * The Mireclaw Alpha USED TO borrow the thug's directional set (see
+ * CHARSET_ALIAS below) and was therefore PIXEL-IDENTICAL to the commonest enemy
+ * in the game: same body, same palette, same size. It now has art of its own — a
+ * violet armoured crab, see docs/assets/boss-art-brief.md — which fixes the body
+ * and the palette.
+ *
+ * This stays at 1.5 anyway, and that is deliberate, not a leftover. It is the
+ * ONLY size lever there is: post.sprite normalises every sprite onto one 48x48
+ * canvas, so the Alpha cannot simply be drawn bigger than its brood. An Alpha
+ * half again the size of the creatures it spawns reads as a different creature
+ * at a glance. Do NOT trim this to 'compensate' for the art having landed.
  *
  * Deliberately NOT the collision radius: entity radius stays 0.35 so the boss
  * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the bat's
@@ -185,6 +190,13 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   gangster: 'gangster',
   bouncer: 'cop',
   thug: 'thug',
+  // FALLBACK ONLY, and it must stay. The pack now ships char.boss.* files, and
+  // characterSet() below tries sprites.chars[archetype] BEFORE sprites.chars[alias]
+  // — so the Alpha already uses its own set with no change on this line. Pointing
+  // this at 'boss' instead would gain nothing and would cost the graceful
+  // degradation: packs without the Alpha art (city, test) fall back to the thug
+  // body here rather than to a procedural blob. Membership of this map is also
+  // what isCharacterSprite() tests, so the key cannot simply be removed.
   boss: 'thug',
   civilian: 'civilian',
   scientist: 'scientist',

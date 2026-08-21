@@ -78,6 +78,19 @@ ANIM_SECTION = {"walk": 4}
 CHAR_FILES = {arch: kind for arch, (kind, *_rest) in G.CHARS.items()}
 CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
                    if t in CHAR_FILES and arch in ("gangster",)})
+# The Mireclaw Alpha has its own body now, so it is listed EXPLICITLY rather
+# than through CHAR_ALIASES. It cannot come from the alias update above: that
+# line resolves an alias to the TARGET's files, and CHAR_ALIASES maps
+# boss -> thug, so the Alpha would silently be handed the bog-mutant art again
+# -- the pixel-identical bug ARCHETYPE_SCALE exists to paper over.
+#
+# Same silent-revert hazard as PROP_KEYS below: char.boss.* only reaches the
+# shipped manifest because this table names it, so omitting it here means the
+# next regeneration drops all ten keys and the boss falls back to the thug.
+#
+# Only s-idle and s-step exist; the per-direction BORROW below fills se/e/ne/n
+# from the s art, which is exactly what every other non-player NPC does.
+CHAR_FILES["boss"] = "mireclaw-alpha"
 
 ITEM_KEYS = {  # engine item id -> our themed file (items table key)
     "pistol": "spore-pistol", "bat": "root-club", "knife": "shard-knife",

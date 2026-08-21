@@ -49,14 +49,37 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/ws/*", "/ota/*", "/review/*"]
+    "run_worker_first": ["/ws/*", "/ota/*", "/review/*", "/state", "/state/*"]
   },
 
   // Before/after images referenced from PR bodies (src/worker/reviewImages.ts).
   // A separate namespace on purpose: these are review artefacts, so they stay out
   // of the repo, out of dist/, and out of the APK. Publish with
   // `pnpm run review:image <file>` — an upload, not a deploy.
-  "kv_namespaces": [{ "binding": "REVIEW_IMAGES", "id": "bf1d248ccc644174b788c6e5ec97c476" }],
+  //
+  // WORLDS holds serialized worlds (src/worker/worldStore.ts). Today the only
+  // writer is the `?state=<id>` debug link a player sends a friend to reproduce
+  // an exact world, but the binding is named for the PAYLOAD rather than that one
+  // caller: a saved game or a hand-built level is the same blob behind the same
+  // kind of opaque id. KV keys are `world:<id>`, so a `save:`/`level:` neighbour
+  // could share the namespace without a migration. Separate from REVIEW_IMAGES on
+  // purpose — 30-day TTL vs permanent, written by the running game rather than a
+  // local script, and independently purgeable.
+  //
+  // The namespace exists on the account titled `sporefall-worlds` (project-scoped,
+  // matching the other namespaces there). The namespace TITLE and this BINDING
+  // name are different things and need not match.
+  //
+  // VERIFIED: `wrangler kv key list --binding WORLDS --remote` resolves this id
+  // against the live account and returns a real (empty) listing. NOT verified: a
+  // remote WRITE — the local OAuth token has no KV write scope, so the first real
+  // put will happen from the deployed Worker. `wrangler dev` never touches any of
+  // this; it simulates KV locally and ignores the id, so a wrong id could only
+  // surface at upload, loudly, as an unknown-namespace error.
+  "kv_namespaces": [
+    { "binding": "REVIEW_IMAGES", "id": "bf1d248ccc644174b788c6e5ec97c476" },
+    { "binding": "WORLDS", "id": "e58c5059c7484ad28610e093d9870e01" },
+  ],
 
   // One Durable Object instance per multiplayer room. SQLite-backed class (the
   // current default for new DOs); the relay itself stores nothing, but SQLite

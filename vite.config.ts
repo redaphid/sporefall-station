@@ -1,6 +1,16 @@
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+// The caching plan lives in src/ as plain data so it can be unit-tested — three
+// of its rules are load-bearing and silently breakable (swConfig.test.ts).
+import {
+  SW_CLEANUP_OUTDATED_CACHES,
+  SW_GLOB_PATTERNS,
+  SW_NAVIGATE_FALLBACK,
+  SW_NAVIGATE_FALLBACK_DENYLIST,
+  SW_RUNTIME_CACHING,
+  SW_TAKEOVER,
+} from './src/app/swConfig'
 
 // Baked into the bundle at build time so the running CODE can show its own
 // version. A simple INCREMENTING INTEGER (the git commit count) so it's obvious
@@ -29,7 +39,11 @@ export default defineConfig({
     // so it can be skipped on native, where a SW would cache the old web bundle
     // and fight the OTA updater.
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': the browser must NOT activate a new worker
+      // on its own. src/app/webUpdate.ts downloads in the background and swaps
+      // at a safe moment (src/app/updatePolicy.ts) — the player still never
+      // taps anything, it just doesn't happen mid-fight. See SW_TAKEOVER.
+      registerType: 'prompt',
       injectRegister: null,
       // index.html/manifest/icons already live in the repo; don't let the plugin
       // synthesize a second manifest that would fight public/manifest.webmanifest.
@@ -39,47 +53,18 @@ export default defineConfig({
         // That keeps the cache-control story to a single rule: exactly one file
         // must stay revalidated so a new deploy is discoverable (public/_headers).
         inlineWorkboxRuntime: true,
-        // The app shell + hashed JS/CSS + icons, plus the DEFAULT theme chain
-        // (swampspace-hires falls back to swampspace, so offline play needs
-        // both). Deliberately EXCLUDES public/sprites/** — 7.1 MB used only by
-        // the legacy `city` theme and the dev asset-showcase page; it is picked
-        // up on demand by the runtime cache below instead of bloating install.
         globDirectory: 'dist',
-        globPatterns: [
-          'index.html',
-          'manifest.webmanifest',
-          'assets/**/*.{js,css}',
-          'icons/**/*.{png,svg,ico}',
-          'themes/index.json',
-          'themes/swampspace-hires/**/*.{json,png,webp}',
-          'themes/swampspace/**/*.{json,png,webp}',
-        ],
-        // Deep links (`/?mode=solo&seed=7`) and home-screen launches are
-        // navigations — serve the precached shell for them when offline.
-        navigateFallback: 'index.html',
-        // ...but NEVER for the Worker routes or the self-hosted APK: /download
-        // is a real navigation that must reach the network, and swallowing it
-        // would hand people index.html instead of the .apk.
-        navigateFallbackDenylist: [/^\/ws\//, /^\/ota\//, /^\/download/, /^\/get$/, /^\/asset-showcase/],
-        // A new deploy must be able to reach an installed client: take over as
-        // soon as the new SW installs, and drop every previous cache version.
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-          {
-            // Non-default themes and the legacy sprite pack: cached the first
-            // time they're actually used, then available offline.
-            urlPattern: ({ url, sameOrigin }) =>
-              sameOrigin && (url.pathname.startsWith('/sprites/') || url.pathname.startsWith('/themes/')),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'sporefall-art-on-demand',
-              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // Every value below is defined and unit-tested in src/app/swConfig.ts.
+        // `skipWaiting`/`clientsClaim` are BOTH false in SW_TAKEOVER: a new
+        // worker installs completely, then waits for the app to swap it in at a
+        // safe moment. That is what makes the update atomic from the page's
+        // point of view — read the note on SW_TAKEOVER before changing it.
+        globPatterns: [...SW_GLOB_PATTERNS],
+        navigateFallback: SW_NAVIGATE_FALLBACK,
+        navigateFallbackDenylist: [...SW_NAVIGATE_FALLBACK_DENYLIST],
+        ...SW_TAKEOVER,
+        cleanupOutdatedCaches: SW_CLEANUP_OUTDATED_CACHES,
+        runtimeCaching: [...SW_RUNTIME_CACHING],
       },
       devOptions: {
         // Keep `pnpm run dev` a plain, cache-free Vite server — a SW in dev

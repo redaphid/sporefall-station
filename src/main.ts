@@ -47,7 +47,8 @@ import { createTouch, mergeInputs, type TouchInput } from './input/touch'
 import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { notifyOtaReady } from './app/ota'
-import { registerPwa } from './app/pwa'
+import { FLOOR_TRANSITION_FRAMES, momentOf } from './app/updatePolicy'
+import { startUpdates, type Updates } from './app/updates'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
@@ -79,7 +80,7 @@ import {
   type ShareState,
 } from './ui/shareModel'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
-import { createScreens } from './ui/screens'
+import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
 import { installStage, lockLandscape, toStage } from './ui/orientation'
 import { createMissionPanel } from './ui/missionPanel'
@@ -106,10 +107,13 @@ const boot = async (): Promise<void> => {
   // newer bundle it fetched). Non-blocking; no-op on web / dev live-reload.
   void notifyOtaReady()
 
-  // Install the offline service worker (web only — no-op inside the APK, where
-  // the bundled dist/ + OTA already provide offline). This is what makes the
-  // browser / home-screen install boot with the radio off.
-  registerPwa()
+  // Offline-first + stay-up-to-date. On the web this installs the service
+  // worker (what makes the browser / home-screen install boot with the radio
+  // off); inside the APK the bundled dist/ + Capgo already provide offline and
+  // this drives the OTA swap instead. Either way: downloads happen in the
+  // background, and the swap lands at a moment where a reload costs nothing —
+  // the player never taps anything. See src/app/updatePolicy.ts.
+  const updates = startUpdates()
 
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
@@ -165,6 +169,9 @@ const boot = async (): Promise<void> => {
   document.addEventListener('fullscreenchange', () => {
     if (isFullscreen()) lockLandscape()
   })
+  // Sitting at the picker is the cheapest possible moment to swap in a new
+  // build: no run exists yet. If one is already downloaded, it applies here.
+  updates.reportMoment('modePicker', 0)
   // A `?state=` link IS the intent: someone was sent an exact world to look at,
   // so boot straight into it rather than making them pick Solo from the menu
   // first (which would also build a throwaway world before replacing it).
@@ -173,6 +180,10 @@ const boot = async (): Promise<void> => {
   const mode =
     (params.get('mode') as GameMode | null) ??
     (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture))
+  // Past the picker, nothing between here and the frame loop can honestly
+  // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
+  // conservative one until the loop starts reporting real ones.
+  updates.reportMoment('inRun', 0)
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
@@ -526,7 +537,7 @@ const boot = async (): Promise<void> => {
   // reload — and the browser releases the lock for us on unload. The handle's
   // `release()` exists for whenever a real quit-to-menu path arrives.
   keepScreenAwake()
-  runLoop(session, renderer, uiMount, coop, inspect, touch, debug, persister, resumed, stateReplay, stateRing)
+  runLoop(session, renderer, uiMount, coop, inspect, updates, touch, debug, persister, resumed, stateReplay, stateRing)
 }
 
 /** localStorage as a `KeyValueStore`, or `undefined` where it is unavailable
@@ -982,6 +993,7 @@ const runLoop = (
   uiMount: HTMLElement,
   coop: ReturnType<typeof createGamepadCoop>,
   inspect: Inspect,
+  updates: Updates,
   touch?: TouchInput,
   debug?: DebugLink,
   persister?: Persister,
@@ -1166,6 +1178,13 @@ const runLoop = (
     { capture: true, passive: true },
   )
 
+  // Update-moment tracking (see the reportMoment call at the end of the frame).
+  // A networked session is one where a reload would drop OTHER players, not
+  // just us — couch co-op on one device shares a single local run, so it isn't.
+  const networked = session instanceof NetHostSession || session instanceof NetClientSession
+  let lastFloor: number | undefined
+  let floorFrames = 0
+
   let acc = 0
   let last = performance.now()
   const showFrameError = createFrameErrorBanner(uiMount)
@@ -1259,6 +1278,26 @@ const runLoop = (
         // Same visibility rule as the overlay itself: gone while the pause menu
         // is up (Resume owns that), gone on death/game-over (that screen does).
         if (canPause) pauseBtn.style.display = paused || view.gameOver || view.self?.dead ? 'none' : 'block'
+        // Tell the updater where the player is, so a downloaded build can swap
+        // itself in at a moment that costs nothing (src/app/updatePolicy.ts). The
+        // floor-change window is held open for the length of the "FLOOR n" banner
+        // rather than a single frame, so a download that lands mid-floor doesn't
+        // have to wait for the next one. `anchors` is the player list this frame
+        // already built for the aim reticles — peers only count on a networked
+        // session, where reloading would take the others down with us.
+        if (lastFloor === undefined) lastFloor = view.floor
+        else if (view.floor !== lastFloor) {
+          lastFloor = view.floor
+          floorFrames = FLOOR_TRANSITION_FRAMES
+        } else if (floorFrames > 0) floorFrames--
+        updates.reportMoment(
+          momentOf({
+            runOver: restartAffordance(view).visible,
+            floorChanging: floorFrames > 0,
+            paused,
+          }),
+          networked ? Math.max(0, anchors.length - 1) : 0,
+        )
         const hide = shouldHideCursor({ paused, gameOver: view.gameOver, selfDead: !!view.self?.dead })
         if (hide !== cursorHidden) {
           canvas.style.cursor = hide ? 'none' : ''

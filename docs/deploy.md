@@ -60,11 +60,45 @@ Three rules that are easy to break:
    `/download` is a real navigation to the APK — if the SW answered it with
    `index.html`, the APK download would hand people the game page instead.
 
-Update path: the SW uses `skipWaiting` + `clientsClaim` + `cleanupOutdatedCaches`,
-so a new deploy installs and drops old caches as soon as it's seen, and boots on
-the next launch. A long-lived tab re-checks hourly and on every re-focus. The page
-is deliberately *not* force-reloaded — yanking someone out of a run mid-game is
-worse than being one version behind until the next launch.
+### Update path (browser AND app): automatic, atomic, at a natural break
+
+Both platforms now run the **same** policy, so "up to date" means one thing
+everywhere and the player never taps anything.
+
+- **One version endpoint.** `GET /ota/check` (`src/worker/ota.ts`) is the single
+  source of truth. The browser reads it; the installed APK POSTs to it. The
+  number is the git commit count — `vite.config.ts` bakes it into the bundle and
+  `deploy-web.yml` writes the same value into `dist/ota/version.json`.
+- **Download in the background, atomically.** On the web that is the service
+  worker's `install`: it precaches *every* shell URL, and if any single fetch
+  fails the worker is discarded and the old one keeps serving its own complete
+  cache. On Android the Capgo plugin downloads and verifies the whole zip.
+- **Swap only at a safe moment.** `src/app/updatePolicy.ts` holds the one
+  enumerated list — mode picker, lobby, floor transition, run-over — plus a
+  much shorter list while other players are on the link. Everything else waits.
+  `updatePolicy.test.ts` asserts the *negative*: a reload can never fire outside
+  that list.
+
+Three rules here are load-bearing and easy to break silently, so they are now
+unit-tested as data in `src/app/swConfig.ts` (see `swConfig.test.ts`):
+
+- **`skipWaiting` and `clientsClaim` are both `false`, deliberately.** They used
+  to be `true`, which let the browser activate a new worker the instant it
+  installed and seize the open page — leaving a tab running OLD code against a
+  NEW precache whose predecessor `cleanupOutdatedCaches` had just deleted. That
+  is the half-old/half-new state offline-first makes permanent. Turning them
+  back on re-opens it.
+- **`/ota/*` must never be cached by the SW** (no precache glob, no runtime rule,
+  and on the navigation denylist) or a client can never observe a new version.
+- **Content is checked, never status.** `not_found_handling:
+  "single-page-application"` means every path returns 200, so a missing file
+  arrives as `index.html`. The version check requires a JSON content-type and
+  the documented shape; before swapping, `verifyPrecacheIntegrity` confirms no
+  critical asset was cached with the wrong content-type (i.e. the SPA fallback
+  stored under an `/assets/*.js` URL, which `install` would happily accept).
+
+A long-lived tab re-checks hourly and on every re-focus. Offline, the check just
+fails and nothing is said — offline is the expected case, not an error.
 
 **Rolling the service worker back is NOT just a revert.** Reverting the commit (or
 `wrangler rollback`) makes `/sw.js` 404 into the SPA fallback — browsers that
@@ -311,8 +345,8 @@ same Cloudflare Pages project as the web deploy.
 
 - Plugin: [`@capgo/capacitor-updater`](https://github.com/Cap-go/capacitor-updater)
   (MIT, self-hostable), configured in `capacitor.config.ts` with
-  `autoUpdate: true` + `autoUpdateUrl` and `statsUrl: ''`. The plugin config is
-  only added when `CAP_SERVER_URL` is **unset**, so dev live-reload is never
+  `autoUpdate: 'onlyDownload'` + `updateUrl` and `statsUrl: ''`. The plugin config
+  is only added when `CAP_SERVER_URL` is **unset**, so dev live-reload is never
   affected.
 - On each launch (when online) the native app POSTs to `/ota/check`, a Cloudflare
   **Pages Function** (`functions/ota/check.ts`). It reads the published version
@@ -320,9 +354,17 @@ same Cloudflare Pages project as the web deploy.
   is older, else `{ message: 'up-to-date' }`.
 - `deploy-web.yml` builds the app, zips it to `dist/ota/<version>.zip`, and writes
   `dist/ota/version.json`, then deploys everything. Version = git tag or short SHA.
-- The app downloads a newer bundle in the background and swaps it in on the next
-  launch. `src/app/ota.ts` calls `notifyAppReady()` so the native side keeps the
-  new bundle (and auto-rolls-back if a bundle fails to boot).
+- The app downloads a newer bundle in the background and then **installs it
+  itself**. `autoUpdate: 'onlyDownload'` means the plugin downloads, emits
+  `updateAvailable`, and deliberately never stages a next bundle — so
+  `src/app/ota.ts` is the ONLY installer: it captures the bundle id off that
+  event and calls `set({ id })` at the next safe moment
+  (`src/app/updatePolicy.ts` — the same list the browser uses), so a player never
+  has to relaunch. **The config and ota.ts are one change**: with nothing staged
+  natively, a bare `reload()` would re-render the bundle already running and
+  resolve successfully, installing nothing. `src/app/ota.test.ts` fails if either
+  half is reverted alone. `notifyAppReady()` keeps the new bundle (and
+  auto-rolls-back if a bundle fails to boot).
 - **Offline-safe:** if the check or download fails, the installed bundle just
   keeps running — no user-visible delay, no crash.
 

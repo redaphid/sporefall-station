@@ -345,8 +345,8 @@ same Cloudflare Pages project as the web deploy.
 
 - Plugin: [`@capgo/capacitor-updater`](https://github.com/Cap-go/capacitor-updater)
   (MIT, self-hostable), configured in `capacitor.config.ts` with
-  `autoUpdate: true` + `autoUpdateUrl` and `statsUrl: ''`. The plugin config is
-  only added when `CAP_SERVER_URL` is **unset**, so dev live-reload is never
+  `autoUpdate: 'onlyDownload'` + `updateUrl` and `statsUrl: ''`. The plugin config
+  is only added when `CAP_SERVER_URL` is **unset**, so dev live-reload is never
   affected.
 - On each launch (when online) the native app POSTs to `/ota/check`, a Cloudflare
   **Pages Function** (`functions/ota/check.ts`). It reads the published version
@@ -354,13 +354,17 @@ same Cloudflare Pages project as the web deploy.
   is older, else `{ message: 'up-to-date' }`.
 - `deploy-web.yml` builds the app, zips it to `dist/ota/<version>.zip`, and writes
   `dist/ota/version.json`, then deploys everything. Version = git tag or short SHA.
-- The app downloads a newer bundle in the background. `src/app/ota.ts` then
-  swaps it in at the next safe moment (`src/app/updatePolicy.ts` — the same list
-  the browser uses), so a player no longer has to relaunch to get an update. If
-  that path never fires, the plugin's own "apply on next background" behaviour
-  is untouched and still applies it, so this can only ever make updates land
-  sooner. `notifyAppReady()` keeps the new bundle (and auto-rolls-back if a
-  bundle fails to boot).
+- The app downloads a newer bundle in the background and then **installs it
+  itself**. `autoUpdate: 'onlyDownload'` means the plugin downloads, emits
+  `updateAvailable`, and deliberately never stages a next bundle — so
+  `src/app/ota.ts` is the ONLY installer: it captures the bundle id off that
+  event and calls `set({ id })` at the next safe moment
+  (`src/app/updatePolicy.ts` — the same list the browser uses), so a player never
+  has to relaunch. **The config and ota.ts are one change**: with nothing staged
+  natively, a bare `reload()` would re-render the bundle already running and
+  resolve successfully, installing nothing. `src/app/ota.test.ts` fails if either
+  half is reverted alone. `notifyAppReady()` keeps the new bundle (and
+  auto-rolls-back if a bundle fails to boot).
 - **Offline-safe:** if the check or download fails, the installed bundle just
   keeps running — no user-visible delay, no crash.
 

@@ -11,6 +11,7 @@ import {
   SW_RUNTIME_CACHING,
   SW_TAKEOVER,
 } from './src/app/swConfig'
+import { SITE_ORIGIN } from './capacitor.config'
 
 // Baked into the bundle at build time so the running CODE can show its own
 // version. A simple INCREMENTING INTEGER (the git commit count) so it's obvious
@@ -30,7 +31,15 @@ const appVersion = (() => {
 })()
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(appVersion) },
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    // The origin this bundle is DEPLOYED to. The browser rarely needs it
+    // (`location.origin` is already the site), but the native Android
+    // webview serves the bundled dist/ from Capacitor's `https://localhost`,
+    // so anything that must reach the Worker has to be told the real host at
+    // build time. Single-sourced from capacitor.config.ts's OTA URL.
+    __SITE_ORIGIN__: JSON.stringify(SITE_ORIGIN),
+  },
   plugins: [
     // Offline-first on the WEB. The Android APK gets its offline story from the
     // bundled dist/ inside the app + Capgo OTA; the browser/home-screen install

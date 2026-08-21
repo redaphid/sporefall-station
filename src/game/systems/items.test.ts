@@ -6,7 +6,8 @@ import { WEAPONS } from '../data/items'
 import { combatSystem } from './combat'
 import { fireAt } from './fire'
 import { applyAreaEffect } from './itemEffects'
-import { equipSlot, throwActive, useHeld } from './inventory'
+import { throwActive, useHeld } from './inventory'
+import { arm } from '../testkit'
 import { projectileSystem } from './projectiles'
 import { hasStatus } from './statusFx'
 
@@ -75,8 +76,7 @@ describe('item breadth', () => {
   describe('ranged weapons', () => {
     it('a shotgun fires its full spread of pellets in one shot, at varied angles', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
-      equipSlot(e, 0)
+      arm(e, 'shotgun')
       combatSystem(w, attack())
       const pellets = w.entities.filter((x) => x.projectile)
       expect(pellets).toHaveLength(WEAPONS.shotgun.pellets!)
@@ -85,8 +85,7 @@ describe('item breadth', () => {
 
     it('a freeze ray freezes the target it hits', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'freezeRay', qty: 6 }]
-      equipSlot(e, 0)
+      arm(e, 'freezeRay')
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && !hasStatus(target, 'frozen'); t++) projectileSystem(w)
@@ -95,8 +94,7 @@ describe('item breadth', () => {
 
     it('a tranquilizer puts the target to sleep', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'tranquilizer', qty: 5 }]
-      equipSlot(e, 0)
+      arm(e, 'tranquilizer')
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && target.status!.sleep === 0; t++) projectileSystem(w)
@@ -107,8 +105,7 @@ describe('item breadth', () => {
   describe('melee onHit', () => {
     it('a sledgehammer stuns what it hits', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'sledgehammer', qty: 12 }]
-      equipSlot(e, 0)
+      arm(e, 'sledgehammer')
       const target = dummy(w, 21, 20)
       combatSystem(w, attack())
       expect(target.status!.stun).toBeGreaterThan(0)

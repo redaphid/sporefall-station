@@ -126,7 +126,7 @@ export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Pr
 /** BLE join: list hosts as they're discovered; resolves with the chosen deviceId. */
 export const pickHost = (
   mount: HTMLElement,
-  startScan: (onFound: (h: { deviceId: string; name: string }) => void) => void,
+  startScan: (onFound: (h: { deviceId: string; name: string }) => void, onError: (message: string) => void) => void,
 ): Promise<string> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
@@ -135,27 +135,51 @@ export const pickHost = (
       'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
       'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
     overlay.innerHTML = `<div style="font:800 22px system-ui">NEARBY GAMES</div>
-      <div style="opacity:.7">Scanning over Bluetooth…</div>
+      <div id="scan-status" style="opacity:.7;max-width:min(320px,80vw);text-align:center">Scanning over Bluetooth…</div>
       <div id="hosts" style="display:flex;flex-direction:column;gap:8px;min-width:min(300px,75vw)"></div>`
     const hostsEl = overlay.querySelector<HTMLElement>('#hosts')!
+    const statusEl = overlay.querySelector<HTMLElement>('#scan-status')!
     mount.appendChild(overlay)
     const seen = new Set<string>()
     const stopNav = installGamepadMenuNav(() => Array.from(hostsEl.querySelectorAll('button')))
-    startScan((h) => {
-      if (seen.has(h.deviceId)) return
-      seen.add(h.deviceId)
-      const b = document.createElement('button')
-      b.textContent = h.name
-      b.style.cssText =
-        'font:600 16px system-ui;padding:12px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
-        'background:#ffffff10;color:#eee;cursor:pointer'
-      b.addEventListener('click', () => {
-        stopNav()
-        overlay.remove()
-        resolve(h.deviceId)
-      })
-      hostsEl.appendChild(b)
-    })
+    startScan(
+      (h) => {
+        if (seen.has(h.deviceId)) return
+        seen.add(h.deviceId)
+        const b = document.createElement('button')
+        b.textContent = h.name
+        b.style.cssText =
+          'font:600 16px system-ui;padding:12px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
+          'background:#ffffff10;color:#eee;cursor:pointer'
+        b.addEventListener('click', () => {
+          stopNav()
+          overlay.remove()
+          resolve(h.deviceId)
+        })
+        hostsEl.appendChild(b)
+      },
+      // A scan that rejects used to go nowhere, so this overlay said "Scanning
+      // over Bluetooth…" until the phone was force-quit — which to anyone watching
+      // looks like the GAME is broken, not a setting. This is the only screen up
+      // at that moment (the lobby is behind it), so the bad news goes here.
+      //
+      // Reload is the honest way back: this promise can no longer resolve, and a
+      // reload re-runs the permission request and the BLE init from scratch and
+      // lands on the start menu.
+      (message) => {
+        statusEl.textContent = message
+        statusEl.style.opacity = '1'
+        if (hostsEl.querySelector('#scan-back')) return
+        const back = document.createElement('button')
+        back.id = 'scan-back'
+        back.textContent = 'Back to menu'
+        back.style.cssText =
+          'font:600 16px system-ui;padding:12px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
+          'background:#ffffff10;color:#eee;cursor:pointer'
+        back.addEventListener('click', () => location.reload())
+        hostsEl.appendChild(back)
+      },
+    )
   })
 
 export interface LobbyUi {

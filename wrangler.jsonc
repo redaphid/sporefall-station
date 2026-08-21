@@ -37,16 +37,26 @@
   // it is deliberately left for the owner rather than done from a branch.
   "preview_urls": true,
 
-  // Serve the Vite build. Only /ws/* and /ota/* run the Worker; every other path
-  // is served straight from these assets (free, cached). public/_headers and
-  // public/_redirects (copied into dist/ by Vite) are honored, including the SPA
+  // Serve the Vite build. Only /ws/*, /ota/* and /review/* run the Worker; every
+  // other path is served straight from these assets (free, cached). public/_headers
+  // and public/_redirects (copied into dist/ by Vite) are honored, including the SPA
   // fallback and the /download APK short-links.
+  //
+  // /review/* MUST stay in run_worker_first: `not_found_handling` below answers any
+  // other unknown path with 200 + index.html, which would turn a missing review
+  // image into a healthy-looking 200 that still renders broken.
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/ws/*", "/ota/*"]
+    "run_worker_first": ["/ws/*", "/ota/*", "/review/*"]
   },
+
+  // Before/after images referenced from PR bodies (src/worker/reviewImages.ts).
+  // A separate namespace on purpose: these are review artefacts, so they stay out
+  // of the repo, out of dist/, and out of the APK. Publish with
+  // `pnpm run review:image <file>` — an upload, not a deploy.
+  "kv_namespaces": [{ "binding": "REVIEW_IMAGES", "id": "bf1d248ccc644174b788c6e5ec97c476" }],
 
   // One Durable Object instance per multiplayer room. SQLite-backed class (the
   // current default for new DOs); the relay itself stores nothing, but SQLite

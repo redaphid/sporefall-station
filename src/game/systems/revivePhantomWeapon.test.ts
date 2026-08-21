@@ -131,7 +131,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
     return e
   }
 
-  it('a phantom RANGED weapon (combat.weapon set, empty inventory) is slotted + equipped, then modded', () => {
+  it('a phantom RANGED weapon (combat.weapon set, empty inventory) is slotted, then modded', () => {
     const p = bareEntity()
     p.combat!.weapon = 'machinegun' // legacy-save phantom: named but unslotted
     const res = applyModPickup(p, 'bounce')
@@ -140,7 +140,10 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
     expect(stack).toBeDefined()
     expect(stack!.itemId).toBe('machinegun')
     expect(stack!.qty).toBe(1) // no ammo: a gun materializes at a flat 1, as a home for mods
-    expect(p.loadout!.activeSlot).toBe(0)
+    // Slotted but NOT equipped: a weapon slot is never selectable (the weapon is
+    // permanent), so activeSlot stays the held-item cursor. What matters is that
+    // `weaponStack` reaches the slot, which is where the mod lands.
+    expect(p.loadout!.activeSlot).toBe(-1)
     expect(p.combat!.weapon).toBe('machinegun')
     expect(stack!.mods).toEqual([{ id: 'bounce', stacks: 1 }])
   })

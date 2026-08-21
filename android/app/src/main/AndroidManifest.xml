@@ -7,7 +7,25 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+        <!--
+            The game always PRESENTS landscape. On the installed app this is the
+            absolute lever: an activity's requested orientation wins over the
+            user's auto-rotate/rotation-lock setting, so the OS simply cannot
+            put us in portrait and no web-side fallback is ever needed here.
+
+            sensorLandscape (not landscape) so the player may hold the phone
+            either way round and the picture follows — we are forcing the
+            ASPECT, not one handedness. `orientation|screenSize` are already in
+            configChanges, so the flip never recreates the activity or reloads
+            the webview mid-run.
+
+            The browser/PWA equivalents live in public/manifest.webmanifest
+            ("orientation": "landscape") and src/ui/orientation.ts (the
+            screen.orientation.lock attempt plus the render-rotation fallback
+            for iOS Safari, which has no lock() at all).
+        -->
         <activity
+            android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"

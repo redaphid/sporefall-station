@@ -25,14 +25,31 @@
         user-select: none;
         font-family: system-ui, sans-serif;
       }
-      #app { position: fixed; inset: 0; }
+      /* The rotating stage. Everything the player sees lives inside it, so the
+         landscape-always fallback (src/ui/orientation.ts) is ONE transform on
+         ONE element rather than a rotation per layer. JS owns width/height/
+         transform; the values here are just the un-rotated resting state so the
+         first paint is right before installStage() runs. */
+      #stage {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        transform-origin: 0 0;
+        overflow: hidden;
+      }
+      /* Absolute (not fixed) so they fill the STAGE box, rotated or not. */
+      #app { position: absolute; inset: 0; }
       #app canvas { display: block; }
-      #ui { position: fixed; inset: 0; pointer-events: none; }
+      #ui { position: absolute; inset: 0; pointer-events: none; }
     </style>
   </head>
   <body>
-    <div id="app"></div>
-    <div id="ui"></div>
+    <div id="stage">
+      <div id="app"></div>
+      <div id="ui"></div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

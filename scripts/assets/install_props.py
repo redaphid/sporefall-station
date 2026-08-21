@@ -95,6 +95,29 @@ CURATED: dict[str, dict] = {
               "#7b8791", "#a2adb4", "#7ecbd2", "#cfe0e2"],
         accent="#46e078", accent_q=0.995,
     ),
+    # The mess chair, off the p8 sweep (the BLOCKY reroll -- see the recipe note
+    # in generate.py). Seed 1002 is the curated pick: it cleared the facing gate
+    # at 0.695 (vs 0.547 for the runner-up), sat in the value band, and stayed
+    # legible at game size.
+    #
+    # Hue is SLATE-TEAL, deliberately duller than supply-cabinet's cyan. The
+    # recipe asks for "worn dark teal" seat and "dark gunmetal grey" legs, and
+    # those are one hue family apart only in saturation -- so the ramp greys the
+    # mid entries rather than pushing a second, competing colour into a room that
+    # already has warm tan, cyan, rust, olive, steel-blue and neutral.
+    #
+    # No accent. Every other prop's accent is a status LIGHT (a powered machine);
+    # a chair has no light, and a bright speck on the seat is precisely the
+    # "white patch on the seat" defect the p8 negatives were written to kill.
+    "mess-chair": dict(
+        tag="p8", seed=1002, dst="chair.png",
+        # A first, greyer cut of this ramp measured chroma_p90 exactly 70 -- the
+        # cast floor, with zero margin, and the weakest in the pack (every other
+        # prop scores 84-96). Deepening the mid entries instead of brightening
+        # them buys 84 while keeping mean luminance down.
+        ramp=["#08080c", "#0e181c", "#153035", "#1c4750", "#245f6b",
+              "#2f7d8b", "#4a9dab", "#83b8bf", "#bcd4d8"],
+    ),
 }
 
 # (theme, canvas px, content px, ink the rim) -- props bake to TILE_PX 32

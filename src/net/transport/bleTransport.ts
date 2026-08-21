@@ -8,8 +8,54 @@ import {
   type TransportEvent,
 } from '../types'
 import { toAdvertiseName, toHostLabel } from './hostName'
+import { withTimeout } from './withTimeout'
 
 const MAX_PACKET = 180 // conservative: fits the 185-byte floor after MTU negotiation
+
+/**
+ * The payload a link is guaranteed to carry when MTU negotiation has NOT
+ * happened: the BLE spec's mandatory ATT_MTU floor is 23 bytes, of which 3 are
+ * the ATT opcode + handle, leaving 20 for us.
+ *
+ * This is the fallback when `requestMtu` fails, and getting it wrong is
+ * invisible until it is fatal. The old fallback was 180 — the value we use after
+ * a SUCCESSFUL negotiation — which has the logic exactly backwards: the whole
+ * meaning of a failed negotiation is that the link is still at 23. Writing 180
+ * bytes into a 20-byte window does not throw; Android silently truncates the
+ * write to ATT_MTU-3. Our framing then loses bytes out of the middle of every
+ * packet, permanently, and the run dies as protocol corruption rather than as
+ * the legible "MTU refused" it actually was.
+ */
+const MIN_PACKET = 20
+
+/** How long to wait for a GATT connect before declaring the host unreachable.
+ * Android's own GATT connect timeout is ~30s, far past a player's patience. */
+export const CONNECT_TIMEOUT_MS = 10_000
+
+/** MTU negotiation is a single round trip; if it has not answered in 5s the
+ * peer is not going to. We keep the link and fall back to the 20-byte floor. */
+export const MTU_TIMEOUT_MS = 5_000
+
+/**
+ * Pre-flight: is there a radio, and is it switched on?
+ *
+ * The plugin has exposed `isAvailable()`/`isEnabled()` all along and nothing
+ * called them, so "Bluetooth is off" surfaced as whatever the first real call
+ * happened to reject with — for hosting that is "Bluetooth is not available on
+ * this device", which reads like a broken phone rather than a flipped switch,
+ * and for joining it was an empty scan list that never fills and never explains.
+ *
+ * Called AFTER requestPermissions() on purpose: on Android 12+ `isEnabled()` is
+ * annotated @RequiresPermission(BLUETOOTH_CONNECT) and throws SecurityException
+ * without it, which would turn a helpful check into a new crash. `isAvailable()`
+ * is safe at any time — the plugin reads the adapter in load(), at app start.
+ */
+const assertRadioReady = async (): Promise<void> => {
+  const { available } = await BluetoothLowEnergy.isAvailable()
+  if (!available) throw new Error('this phone has no Bluetooth radio')
+  const { enabled } = await BluetoothLowEnergy.isEnabled()
+  if (!enabled) throw new Error('Bluetooth is off — turn it on and try again')
+}
 
 const noProps = {
   broadcast: false,
@@ -28,6 +74,24 @@ const noProps = {
  */
 export class BleHostTransport implements Transport {
   readonly role = 'host' as const
+  /**
+   * KNOWN GAP — the host never learns the real MTU, so this is a bet, not a fact.
+   *
+   * ATT_MTU is negotiated once per LINK, so when the joining central's
+   * requestMtu succeeds (the normal case) 180-byte notifications are genuinely
+   * safe. When it does NOT, the link stays at the 23-byte floor and every
+   * notification we send is silently truncated to 20 bytes by the stack — the
+   * same corruption the client's MIN_PACKET fallback now avoids in the c2h
+   * direction, still unfixed in the h2c direction.
+   *
+   * We cannot detect it from here: Android surfaces the negotiated value to a
+   * peripheral through BluetoothGattServerCallback.onMtuChanged, and the plugin's
+   * gattServerCallback does not implement that method (it has only
+   * onConnectionStateChange, onCharacteristicRead/WriteRequest and
+   * onDescriptorWriteRequest), so the value never reaches JS at all. Fixing it
+   * means patching the plugin or carrying the client's negotiated maxPacket in
+   * the Hello message — deliberately out of scope here.
+   */
   readonly maxPacket = MAX_PACKET
   private handlers = new Set<(e: TransportEvent) => void>()
   private connected = new Set<PeerId>()
@@ -48,6 +112,7 @@ export class BleHostTransport implements Transport {
   async start(): Promise<void> {
     this.log('host: requesting BLE permissions')
     await BluetoothLowEnergy.requestPermissions()
+    await assertRadioReady() // fails with words the player can act on, before anything else
     this.log('host: initialize(peripheral)')
     await BluetoothLowEnergy.initialize({ mode: 'peripheral' })
     this.log('host: addGattService')
@@ -173,8 +238,11 @@ export class BleClientTransport implements Transport {
     this.startedOnce = true
     this.log('join: requesting BLE permissions')
     await BluetoothLowEnergy.requestPermissions()
+    await assertRadioReady() // fails with words the player can act on, before anything else
     this.log('join: initialize(central)')
     await BluetoothLowEnergy.initialize({ mode: 'central' })
+    // Listeners go up here, before any connect can be attempted — see connect().
+    await this.ensureListeners()
   }
 
   /** Scan for hosts advertising the game service. */
@@ -194,32 +262,85 @@ export class BleClientTransport implements Transport {
 
   private lastDeviceId: string | null = null
   private listenersAdded = false
+  /** Rejector for a connect that is in flight right now, so the disconnect
+   * event can fail it. Null whenever no connect is outstanding. */
+  private pendingConnect: { deviceId: string; fail: (err: Error) => void } | null = null
+
+  /**
+   * Register the GATT event listeners exactly once.
+   *
+   * Split out of connect() and called from start() as well, because the
+   * `deviceDisconnected` listener has to exist BEFORE a connect is attempted to
+   * be of any use — and because of the ordering bug below it was useless even
+   * when it did exist.
+   */
+  private async ensureListeners(): Promise<void> {
+    if (this.listenersAdded) return
+    this.listenersAdded = true
+    await BluetoothLowEnergy.addListener('deviceDisconnected', (ev) => {
+      // A FAILED connect is reported as a disconnect — that is the only signal
+      // Android gives us, since the plugin never rejects the connect call.
+      // This handler used to be gated on `ev.deviceId === this.hostDeviceId`,
+      // but hostDeviceId is assigned only after a connect fully succeeds, so
+      // during a failing connect it is still null and the one event that could
+      // have told us the truth was discarded. Check the in-flight connect first.
+      const pending = this.pendingConnect
+      if (pending && ev.deviceId === pending.deviceId) {
+        this.log(`join: host refused/dropped the connection ${ev.deviceId}`)
+        pending.fail(new Error('the host refused the connection'))
+        return
+      }
+      if (ev.deviceId === this.hostDeviceId) {
+        this.log(`join: host disconnected ${ev.deviceId}`)
+        this.hostDeviceId = null
+        this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
+      }
+    })
+    await BluetoothLowEnergy.addListener('characteristicChanged', (ev) => {
+      if (ev.characteristic.toLowerCase() !== BLE_DATA_H2C_UUID.toLowerCase()) return
+      this.emit({ type: 'data', peer: 'host', bytes: new Uint8Array(ev.value) })
+    })
+  }
 
   async connect(deviceId: string): Promise<void> {
     this.lastDeviceId = deviceId
-    if (!this.listenersAdded) {
-      this.listenersAdded = true
-      await BluetoothLowEnergy.addListener('deviceDisconnected', (ev) => {
-        if (ev.deviceId === this.hostDeviceId) {
-          this.log(`join: host disconnected ${ev.deviceId}`)
-          this.hostDeviceId = null
-          this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
-        }
-      })
-      await BluetoothLowEnergy.addListener('characteristicChanged', (ev) => {
-        if (ev.characteristic.toLowerCase() !== BLE_DATA_H2C_UUID.toLowerCase()) return
-        this.emit({ type: 'data', peer: 'host', bytes: new Uint8Array(ev.value) })
-      })
-    }
+    await this.ensureListeners()
     this.log(`join: connect ${deviceId}`)
-    await BluetoothLowEnergy.connect({ deviceId })
+    // Two independent ways out of a connect that would otherwise hang forever:
+    // the disconnect event (fast, and carries the real cause) and the deadline
+    // (the backstop for when the radio says nothing at all).
+    const refused = new Promise<never>((_, reject) => {
+      this.pendingConnect = { deviceId, fail: reject }
+    })
     try {
-      const { mtu } = await BluetoothLowEnergy.requestMtu({ deviceId, mtu: 512 })
-      this.maxPacket = Math.max(20, Math.min(mtu - 3, 244))
+      await withTimeout(
+        Promise.race([BluetoothLowEnergy.connect({ deviceId }), refused]),
+        CONNECT_TIMEOUT_MS,
+        'the host did not answer',
+      )
+    } catch (err) {
+      // Leave no half-open GATT client behind: Android keeps the connection
+      // attempt alive and will silently refuse the next one otherwise.
+      await BluetoothLowEnergy.disconnect({ deviceId }).catch(() => {})
+      const reason = err instanceof Error ? err.message : String(err)
+      throw new Error(`couldn't connect to the host — ${reason}`, { cause: err })
+    } finally {
+      this.pendingConnect = null
+    }
+    try {
+      const { mtu } = await withTimeout(
+        BluetoothLowEnergy.requestMtu({ deviceId, mtu: 512 }),
+        MTU_TIMEOUT_MS,
+        'MTU request timed out',
+      )
+      this.maxPacket = Math.max(MIN_PACKET, Math.min(mtu - 3, 244))
       this.log(`join: MTU ${mtu} → maxPacket ${this.maxPacket}`)
     } catch {
-      this.maxPacket = MAX_PACKET // stack refused; the 182-byte floor still works
-      this.log(`join: MTU refused → maxPacket ${this.maxPacket}`)
+      // Negotiation failed, so ATT_MTU is still the 23-byte spec floor and the
+      // most we may put in one write is 20. The old fallback of 180 here was
+      // backwards and silently corrupted the stream — see MIN_PACKET.
+      this.maxPacket = MIN_PACKET
+      this.log(`join: MTU refused → maxPacket ${this.maxPacket} (ATT floor)`)
     }
     this.log('join: discoverServices')
     await BluetoothLowEnergy.discoverServices({ deviceId })

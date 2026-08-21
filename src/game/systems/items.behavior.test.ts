@@ -11,8 +11,9 @@ import { CONSUMABLES, itemClass, THROWABLES, WEAPONS } from '../data/items'
 import { ELEMENTS } from '../data/elements'
 import { combatSystem } from './combat'
 import { elementSystem, fireSystem } from './fire'
+import { applyAreaEffect } from './itemEffects'
 import { throwActive } from './inventory'
-import { equipSlot } from './inventory'
+import { arm } from '../testkit'
 import { projectileSystem } from './projectiles'
 import { statusSystem } from './status'
 import { hasStatus, isImmobilized } from './statusFx'
@@ -55,8 +56,7 @@ describe('item behavior — new guns', () => {
 
   it('flamethrower sets its target burning (onHit)', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
-    equipSlot(e, 0)
+    arm(e, 'flamethrower')
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     expect(hasStatus(target, 'burning')).toBe(true)
@@ -64,8 +64,7 @@ describe('item behavior — new guns', () => {
 
   it('flamethrower burn actually chews hp over time (DoT reaches elementSystem)', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'flamethrower', qty: 40 }]
-    equipSlot(e, 0)
+    arm(e, 'flamethrower')
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'burning'))
     const afterHit = target.health!.hp // includes the small impact damage
@@ -78,8 +77,7 @@ describe('item behavior — new guns', () => {
 
   it('stun gun electrifies and immobilizes its target (onHit)', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'stunGun', qty: 4 }]
-    equipSlot(e, 0)
+    arm(e, 'stunGun')
     const target = dummy(w, 22, 20)
     fireUntil(w, () => hasStatus(target, 'electrified'))
     expect(hasStatus(target, 'electrified')).toBe(true)
@@ -88,8 +86,7 @@ describe('item behavior — new guns', () => {
 
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'bat', qty: 12 }]
-    equipSlot(e, 0)
+    arm(e, 'bat')
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
@@ -166,21 +163,23 @@ describe('item behavior — freeze then shatter (element combo through items)', 
     w = createWorld(1, 1)
   })
 
-  it('a freeze-ray freeze followed by a melee impact shatters the target', () => {
+  it('a thrown freeze followed by an impact from the permanent weapon shatters the target', () => {
+    // Retargeted for ONE PERMANENT WEAPON. This used to freeze with a freeze RAY
+    // and then swap to a bat — two carried weapons, which a player can no longer
+    // have. The combo itself is unchanged and still reachable: the freeze comes
+    // from the THROWN item (freezeGrenade's own `onLand`, applied exactly as
+    // landing applies it), and the shattering impact comes from the one weapon
+    // the player carries all run.
     const e = player(w, 20, 20)
-    const target = dummy(w, 21, 20)
-    e.loadout!.inventory = [
-      { itemId: 'freezeRay', qty: 6 },
-      { itemId: 'bat', qty: 12 },
-    ]
-    equipSlot(e, 0)
-    fireUntil(w, () => hasStatus(target, 'frozen'))
+    const target = dummy(w, 26, 20)
+    arm(e, 'bat')
+    // Thrown from a safe distance — the blast radius would freeze the thrower
+    // too — then the player closes in and swings.
+    applyAreaEffect(w, target.pos.x, target.pos.y, THROWABLES.freezeGrenade.onLand!, e.id)
     expect(hasStatus(target, 'frozen')).toBe(true)
-    // Let the freeze-ray's own hit iframes lapse (as ticks pass in-game); the
-    // frost lasts far longer, so the body is still frozen when we swing.
+    expect(hasStatus(e, 'frozen')).toBe(false) // the thrower stayed clear
     for (let t = 0; t < 6; t++) statusSystem(w)
-    // Switch to the bat and swing: an impact on a frozen body is an instant kill.
-    equipSlot(e, 1)
+    e.pos = { x: 25, y: 20 }
     e.combat!.cooldown = 0
     combatSystem(w, attack())
     expect(target.shattered).toBe(true)

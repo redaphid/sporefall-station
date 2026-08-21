@@ -1,19 +1,74 @@
 // Single source of truth for the brief, player-facing "what's new" notes shown
-// under the version number on the start menu. This is a CURATED, maintained
-// list — keep it short and punchy (one line each, ~40 chars), player-facing
-// only (no internal/tooling churn). Each merge to `main` should prepend a
-// one-line summary and trim to the latest few (see CLAUDE.md → Release workflow).
+// under the version number on the start menu.
+//
+// EACH NOTE IS ITS OWN FILE under `./releaseNotes/`, one per player-facing
+// change — deliberately NOT one shared array. A shared array meant every PR
+// edited the same handful of lines at the top of the same file, so any two
+// PRs open around the same time collided there on nothing but unrelated
+// release-note text (#45/#46/#47 all conflicted here the same afternoon, none
+// of them touching the same game code). Landing a note is now purely
+// additive: drop in a new file, touch nothing that already exists, and a
+// sibling PR doing the same thing can never conflict with you.
+//
+// To add a note for your change, create
+// `./releaseNotes/YYYY-MM-DD-short-slug.ts` exporting the one-line string as
+// `default`. Notes are loaded with Vite's `import.meta.glob` — the same
+// isomorphic, build-time mechanism `game/fixtures.ts` uses for fixture JSON —
+// and sorted by filename, newest first, so the date prefix IS the ordering:
+// nothing to reorder, nothing to rebase. Keep it short and punchy (~40 chars),
+// player-facing only (no internal/tooling churn).
+//
+// RELEASE_NOTES is capped to the newest few automatically; older files are
+// left in place as an inert history rather than deleted, since nothing ever
+// needs to touch them again.
 //
 // The module is pure/DOM-free so the formatting is unit-tested exhaustively and
 // the menu just paints the result (see releaseNotes.test.ts).
 
+// Typed as `unknown` on purpose: the glob is a directory contract, not a
+// checked one, so a malformed note file must be inert rather than fatal —
+// `selectNotes` drops anything that is not a usable string.
+const noteModules = import.meta.glob('./releaseNotes/*.ts', { eager: true, import: 'default' }) as Record<
+  string,
+  unknown
+>
+
+/** How many of the newest note files make it into the curated list below. */
+const VISIBLE_NOTE_COUNT = 4
+
+/**
+ * A note file, and ONLY a note file: `YYYY-MM-DD-slug.ts`.
+ *
+ * The date prefix is the sort key, so an undated filename is not merely
+ * untidy — it sorts above every dated one ('h' > '2') and would pin itself to
+ * the top of the menu forever, silently evicting the genuinely newest note.
+ * Anything else in the directory (a helper, a stray test) is ignored instead.
+ */
+const NOTE_FILE = /\/\d{4}-\d{2}-\d{2}-[^/]+\.ts$/
+
+/**
+ * The newest `count` notes from a glob result, newest first. Pure, and kept
+ * separate from the glob so the ordering and the guards are directly testable.
+ *
+ * Ordering is by filename descending, which resolves to the date prefix; two
+ * notes sharing a date fall back to reverse-alphabetical slug, which is
+ * arbitrary but stable. Use the MERGE date, not the authoring date — a
+ * stale-dated note lands below newer ones and may never be seen.
+ *
+ * Unusable entries are dropped BEFORE the cap, so a malformed or empty note
+ * costs the player a stale slot rather than a blank bullet or a crash.
+ */
+export const selectNotes = (modules: Record<string, unknown>, count: number = VISIBLE_NOTE_COUNT): string[] =>
+  Object.keys(modules)
+    .filter((path) => NOTE_FILE.test(path))
+    .sort()
+    .reverse()
+    .map((path) => modules[path])
+    .filter((note): note is string => typeof note === 'string' && note.trim().length > 0)
+    .slice(0, Math.max(0, count))
+
 /** The current build's brief highlights, newest first. Keep tiny and punchy. */
-export const RELEASE_NOTES: readonly string[] = [
-  'Updates install themselves between runs',
-  'Rooms are furnished, not littered',
-  'Crates look right; no more fake medkits',
-  'Co-op: no more freezing on a lost packet',
-]
+export const RELEASE_NOTES: readonly string[] = selectNotes(noteModules)
 
 /** Tuning for how many notes show and how long each line may be. */
 export interface ReleaseNotesOptions {

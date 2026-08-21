@@ -30,6 +30,11 @@ export interface LockoutEntry {
   guardUntil: number
   chainUntil: number
   tier: number
+  /** Only set for the LEGACY counter-based immobilizes (`stun`/`sleep`), which
+   * live on `Entity.status` counters instead of `fx`: with no `fx[kind].until` to
+   * read, this is how the guard knows a lock is still running. Absent for
+   * `frozen`/`electrified`, which read their active window straight off `fx`. */
+  activeUntil?: number
 }
 
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
@@ -375,13 +380,21 @@ export interface Entity {
  * `player.ts` and `systems/missions.ts` can import without a cycle. */
 export const SPAWN_GRACE_TICKS = 90
 
+/** Default body radius for a walking entity (players and most NPCs). Named and
+ * exported so SPAWN PLACEMENT can test the same circle the collision resolver
+ * will (game/spawnPlacement.ts): a hard-coded copy that drifted from this would
+ * put bodies where they cannot stand, which is unrecoverable — see the entombment
+ * note there. Smaller than half a tile, so a body centred on a tile centre always
+ * fits inside that one tile. */
+export const BODY_RADIUS = 0.35
+
 /** Bare entity with no id — World.addEntity assigns ids so worlds stay self-contained. */
 export const makeEntity = (
   kind: EntityKind,
   archetype: string,
   x: number,
   y: number,
-  radius = 0.35,
+  radius = BODY_RADIUS,
 ): Entity => ({
   id: 0,
   kind,

@@ -5,4 +5,7 @@ export interface Env {
   ASSETS: Fetcher
   /** One Durable Object instance per multiplayer room (RoomDO). */
   ROOM: DurableObjectNamespace
+  /** Review-only before/after images served at /review/* — see reviewImages.ts.
+   * Kept OUT of the game bundle on purpose: they are PR artefacts, not assets. */
+  REVIEW_IMAGES: KVNamespace
 }

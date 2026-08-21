@@ -9,12 +9,13 @@
 // Deterministic: HP-band thresholds, tick-counter throttles, spawn positions from
 // the world RNG. No Date/Math.random.
 
-import type { Entity } from '../entity'
+import { BODY_RADIUS, type Entity } from '../entity'
 import type { World } from '../world'
 import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from './behaviors'
 import { fireAt } from './fire'
 import { canSeeEntity } from './goals'
 import { spawnNpc } from '../populate'
+import { bodySpawnPoint } from '../spawnPlacement'
 import { hasStatus } from './statusFx'
 import { sporeAt } from './spore'
 
@@ -47,14 +48,47 @@ const broodCount = (w: World, boss: Entity): number => {
   return n
 }
 
+/**
+ * Is a live body already standing on this candidate spot? A PREFERENCE for brood
+ * placement, not a veto — see `bodySpawnPoint`. Props and movers both count
+ * (a sporeling budding out of a crate is exactly what this fix is about);
+ * projectiles and corpses do not, because they are not bodies you can bump into.
+ */
+const bodyAt = (w: World, x: number, y: number): boolean => {
+  for (const e of w.entities) {
+    if (e.dead || e.projectile) continue
+    const rr = e.radius + BODY_RADIUS
+    const dx = e.pos.x - x
+    const dy = e.pos.y - y
+    if (dx * dx + dy * dy < rr * rr) return true
+  }
+  return false
+}
+
 const summonBrood = (w: World, boss: Entity): void => {
   if (broodCount(w, boss) >= MAX_BROOD) return
   for (let i = 0; i < SUMMON_COUNT; i++) {
+    // DETERMINISM: these two draws are unchanged in count, order and meaning —
+    // still exactly `w.rng.next()` twice per add, at the same point in the tick.
+    // `w.rng` is the whole sim's stream, so consuming one extra value here would
+    // re-roll every loot drop, patrol and weapon roll for the rest of the run and
+    // break replay (debug/record.ts). Everything below is a PURE function of the
+    // two values already drawn plus world state that a replay reproduces
+    // identically, so the stream stays byte-for-byte the same.
     const ang = w.rng.next() * Math.PI * 2
     const r = 1.5 + w.rng.next() * 2
     const x = boss.pos.x + Math.cos(ang) * r
     const y = boss.pos.y + Math.sin(ang) * r
-    const add = spawnNpc(w, 'sporeling', x, y)
+    // The drawn point is an INTENT, not a position: a polar offset around the
+    // boss lands in whatever happens to be there, and 23.7% of the time that was
+    // a solid tile — where `canStand` then refuses every step out, so the add was
+    // entombed for the rest of the floor and never reached anyone. Resolve the
+    // intent to somewhere a body genuinely fits, preferring an unoccupied spot so
+    // adds stop budding out of crates, shelves and each other (36.5% did).
+    // Nothing fits at all -> the boss's own footprint, which fits by construction
+    // because the boss is standing in it.
+    const at = bodySpawnPoint(w.level, x, y, BODY_RADIUS, (px, py) => bodyAt(w, px, py)) ?? boss.pos
+    const add = spawnNpc(w, 'sporeling', at.x, at.y)
     add.ai!.mode = 'aggro'
   }
   w.events.push({ type: 'aiGoal', entityId: boss.id, goal: 'summon', prev: boss.ai?.goal ?? 'none' })

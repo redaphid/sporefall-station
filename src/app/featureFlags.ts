@@ -55,9 +55,16 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
     label: 'New creature art',
     description:
       'Draws bespoke sprites for the six Sporefall threats (brute, cinder, sporeling, stalker, lurker, pod) instead of the generic blobs.',
-    defaultOn: false,
+    // FLIPPED TO ON (owner's call). The trigger was a bug report — "the enemies
+    // the boss spawns are white circles" — which was this flag being off: with
+    // it off, `sporeling` is absent from CHARSET_ALIAS, so the boss's brood
+    // misses the character path entirely and falls to the generic blob draw,
+    // tinted `entityColors.default` (0xcccccc). The art was shipping the whole
+    // time; only the switch was down. Off-by-default was the right ship state
+    // for unreviewed art and the wrong one for art that had been reviewed.
+    defaultOn: true,
     retire:
-      'Delete the flag and fold the six into CHARSET_ALIAS_BASE once the colour pass lands and the sprites no longer read grey beside the existing cast.',
+      'Default flipped ON. Remaining step: delete the flag and fold the six into CHARSET_ALIAS_BASE once the colour pass lands and each of the six has more than the single south-facing idle frame it reuses for all five facings.',
     since: 400,
   },
 ]

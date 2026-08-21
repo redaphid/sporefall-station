@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BLE_SERVICE_UUID } from '../types'
-import { ADVERTISE_PDU_MAX, advertisementBytes, toAdvertiseName } from './hostName'
+import { ADVERTISE_PDU_MAX, HOST_LABEL_PREFIX, advertisementBytes, toAdvertiseName } from './hostName'
 
 // The BLE plugin is a native bridge; mock it so we can assert on exactly what the
 // host ASKS Android to broadcast. This is the only part of discovery that can be
@@ -13,6 +13,10 @@ interface AdvertiseCall {
 
 const mocks = vi.hoisted(() => ({
   requestPermissions: vi.fn(async () => {}),
+  // The host pre-flights the radio before it advertises (bleTransport.ts);
+  // a healthy radio is the precondition for every case in this file.
+  isAvailable: vi.fn(async () => ({ available: true })),
+  isEnabled: vi.fn(async () => ({ enabled: true })),
   initialize: vi.fn(async () => {}),
   addGattService: vi.fn(async () => {}),
   addListener: vi.fn(async () => ({ remove: async () => {} })),
@@ -91,6 +95,41 @@ describe('advertisementBytes', () => {
     // 'ab' is 2 code units and 2 bytes; '🎮' is 2 code units but 4 bytes.
     expect(advertisementBytes({ name: 'ab', serviceUuids: 1 })).toBe(25)
     expect(advertisementBytes({ name: '🎮', serviceUuids: 1 })).toBe(27)
+  })
+})
+
+describe("why the game's name is NOT the broadcast name", () => {
+  // The obvious request is "make the host advertise 'Sporefall'". It does not fit,
+  // and this is the arithmetic that says so. flags(3) + 128-bit service UUID(18)
+  // = 21, plus 2 bytes of local-name header = 23, leaving 8 of the 31-byte PDU.
+  it("cannot fit 'Sporefall' — 9 bytes into an 8-byte hole", () => {
+    expect(advertisementBytes({ name: 'Sporefall', serviceUuids: 1 })).toBe(32) // one over
+    expect(advertisementBytes({ name: 'Sporefall', serviceUuids: 1 })).toBeGreaterThan(ADVERTISE_PDU_MAX)
+  })
+
+  it("cannot fit 'Sporefall Station' either — 17 bytes, missing by nine", () => {
+    expect(advertisementBytes({ name: 'Sporefall Station', serviceUuids: 1 })).toBe(40)
+  })
+
+  it('has room for exactly 8 bytes of name, and the 9th overflows', () => {
+    expect(advertisementBytes({ name: '12345678', serviceUuids: 1 })).toBe(ADVERTISE_PDU_MAX)
+    expect(advertisementBytes({ name: '123456789', serviceUuids: 1 })).toBeGreaterThan(ADVERTISE_PDU_MAX)
+  })
+
+  it('drops the service UUID if we spent the space on a name — which would break discovery outright', () => {
+    // The only way 'Sporefall' fits is by giving up the one field centrals
+    // actually match on (startScan({services}) / requestDevice({filters})).
+    // Stated as a test so nobody re-derives it as a good idea.
+    expect(advertisementBytes({ name: 'Sporefall', serviceUuids: 0 })).toBeLessThanOrEqual(ADVERTISE_PDU_MAX)
+  })
+
+  it('keeps the join-list tag off the air entirely', async () => {
+    // 'Sporefall' reaches the player through toHostLabel on the SCANNING phone,
+    // never through the advertiser. If this ever shows up in an advertise call,
+    // the budget above is blown and the host goes silently off the air.
+    const call = await advertiseOptionsFor('Player-42')
+    expect(call.includeName).toBe(false)
+    expect(call.name).not.toContain(HOST_LABEL_PREFIX)
   })
 })
 

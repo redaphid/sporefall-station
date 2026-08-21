@@ -7,6 +7,7 @@ import type { InputSource } from './input'
 import { createPinchTracker } from './pinch'
 import { createPressTracker, LONG_PRESS_MS } from '../ui/pressModel'
 import { isUiChrome } from '../ui/chrome'
+import { toStage } from '../ui/orientation'
 import { computeTouchLabels } from './touchLabels'
 
 // Re-exported from the shared, DOM-free aim module so existing importers
@@ -25,10 +26,11 @@ export interface TouchInput extends InputSource {
    * display:none, so nothing here hit-tests, and any in-flight stick drag or
    * pinch is cancelled cleanly (vectors zeroed, captures released). */
   setVisible(visible: boolean): void
-  /** Receive neutral tap / long-press gestures for tap-to-inspect (screen
-   * client px). Only presses the claiming rules ruled NEUTRAL arrive here —
-   * a press that became a stick, pinch, or button never does (pressModel.ts). */
-  setInspectHandler(cb: (mode: 'tap' | 'longpress', clientX: number, clientY: number) => void): void
+  /** Receive neutral tap / long-press gestures for tap-to-inspect (STAGE px —
+   * ui/orientation.ts, already rotation-corrected). Only presses the claiming
+   * rules ruled NEUTRAL arrive here — a press that became a stick, pinch, or
+   * button never does (pressModel.ts). */
+  setInspectHandler(cb: (mode: 'tap' | 'longpress', stageX: number, stageY: number) => void): void
 }
 
 /**
@@ -71,11 +73,15 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
   const stickRegs: { pointerId(): number | null; cancel(): void }[] = []
   let pinchStartZoom = 1
   controls.addEventListener('pointermove', (ev) => {
-    const st = tracker.move(ev.pointerId, ev.clientX, ev.clientY)
-    if (st && zoom) {
-      const rect = controls.getBoundingClientRect()
-      zoom.set(pinchZoom(pinchStartZoom, st.startDist, st.dist), st.midX - rect.left, st.midY - rect.top)
-    }
+    // STAGE coordinates, not viewport ones — see ui/orientation.ts. The stage may
+    // be rotated 90° (landscape-always fallback), in which case a raw clientX/Y
+    // is 90° out from what the player sees. Converting at the boundary makes the
+    // pinch midpoint a stage point, so it is already the right anchor for zoom
+    // and needs no getBoundingClientRect (whose box is the ROTATED element's
+    // axis-aligned bounds — the wrong rectangle to subtract).
+    const p = toStage(ev.clientX, ev.clientY)
+    const st = tracker.move(ev.pointerId, p.x, p.y)
+    if (st && zoom) zoom.set(pinchZoom(pinchStartZoom, st.startDist, st.dist), st.midX, st.midY)
   })
   const pinchUp = (ev: PointerEvent): void => {
     if (tracker.up(ev.pointerId, performance.now()).resetTap) zoom?.reset()
@@ -92,7 +98,7 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
   // a clean 400ms hold long-presses. The stick claim is never cancelled, so
   // inspect steals no input in either direction.
   let press = createPressTracker() // recreated on hide (see setVisible)
-  let inspectCb: ((mode: 'tap' | 'longpress', clientX: number, clientY: number) => void) | undefined
+  let inspectCb: ((mode: 'tap' | 'longpress', stageX: number, stageY: number) => void) | undefined
   let pressTimer: ReturnType<typeof setTimeout> | undefined
   controls.addEventListener('pointerdown', (ev) => {
     // Interactive UI chrome (data-ui-chrome — settings gear, panels, …) owns
@@ -102,20 +108,29 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     if (!(ev.target instanceof HTMLElement) || ev.target.dataset.stickZone === undefined) return
     // Register EVERY zone press (even one the pinch just consumed): the
     // tracker's join rule is what disqualifies the other finger of a pinch.
-    press.down(ev.pointerId, ev.clientX, ev.clientY, performance.now())
+    // Stage coordinates throughout, so the tap point handed to inspectAt below
+    // is already in the space the overlay projects from (ui/orientation.ts).
+    const p = toStage(ev.clientX, ev.clientY)
+    press.down(ev.pointerId, p.x, p.y, performance.now())
     clearTimeout(pressTimer)
     pressTimer = setTimeout(() => {
       const at = press.origin()
       if (at && press.poll(performance.now()) === 'longpress') inspectCb?.('longpress', at.x, at.y)
     }, LONG_PRESS_MS + 10)
   })
-  controls.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
+  controls.addEventListener('pointermove', (ev) => {
+    const p = toStage(ev.clientX, ev.clientY)
+    press.move(ev.pointerId, p.x, p.y)
+  })
   controls.addEventListener('pointerup', (ev) => {
     // A press RELEASED over chrome (finger drifted onto the gear/panel) is the
     // chrome's business too — drop it instead of classifying (chrome.ts).
     if (isUiChrome(ev.target)) press.cancel(ev.pointerId)
     const out = press.up(ev.pointerId, performance.now())
-    if (out !== null) inspectCb?.(out, ev.clientX, ev.clientY)
+    if (out !== null) {
+      const p = toStage(ev.clientX, ev.clientY)
+      inspectCb?.(out, p.x, p.y)
+    }
   })
   controls.addEventListener('pointercancel', (ev) => {
     press.cancel(ev.pointerId)
@@ -164,9 +179,14 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     })
     zone.addEventListener('pointerdown', (ev) => {
       const willClaim = pointer === null
-      // Register with the pinch tracker FIRST: it may claim this touch (and a
-      // fresh earlier one) for a pinch instead of the stick.
-      const consumedIds = tracker.down(ev.pointerId, ev.clientX, ev.clientY, side, willClaim, performance.now())
+      // STAGE coordinates (ui/orientation.ts). Everything below — the claim
+      // origin, the deflection vector, and the stick art's own left/top inside
+      // the rotated stage — is then in one consistent space. THIS is what keeps
+      // "press left" meaning left when the stage is rotated 90°: the origin and
+      // the moving point are both converted, so their difference carries the
+      // rotation with no separate vector maths to forget.
+      const at = toStage(ev.clientX, ev.clientY)
+      const consumedIds = tracker.down(ev.pointerId, at.x, at.y, side, willClaim, performance.now())
       if (consumedIds.length > 0) {
         for (const reg of stickRegs) {
           const p = reg.pointerId()
@@ -182,8 +202,8 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
       } catch {
         /* synthetic events (tests) have no active pointer to capture */
       }
-      ox = ev.clientX
-      oy = ev.clientY
+      ox = at.x
+      oy = at.y
       base.style.display = 'block'
       nub.style.display = 'block'
       base.style.left = `${ox - 55}px`
@@ -193,8 +213,9 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     })
     zone.addEventListener('pointermove', (ev) => {
       if (ev.pointerId !== pointer) return
-      const dx = ev.clientX - ox
-      const dy = ev.clientY - oy
+      const p = toStage(ev.clientX, ev.clientY)
+      const dx = p.x - ox
+      const dy = p.y - oy
       const len = Math.hypot(dx, dy)
       const clamped = Math.min(len, STICK_RADIUS)
       const nx = len > 0 ? (dx / len) * clamped : 0
@@ -222,6 +243,28 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     aimY = y
   })
 
+  // Safe-area frame for the EDGE-ANCHORED controls (action cluster + hotbar).
+  // Created after the stick zones so those interactive controls still sit ON TOP
+  // and capture their own taps (see makeStick's ordering note).
+  //
+  // Why a wrapper rather than an offset per control: `--sf-safe-*` are the
+  // STAGE-space safe-area insets published by ui/orientation.ts. They already
+  // matter unrotated (an iPhone's home indicator sits under a `bottom:12px`
+  // hotbar in landscape), and they matter MORE once the landscape-always
+  // fallback turns the stage, because the game's bottom/right edges are then
+  // physically the phone's left/bottom. Insetting one frame keeps every child on
+  // plain pixel offsets and puts the orientation knowledge in exactly one place.
+  //
+  // Deliberately NOT applied to the stick zones: those should keep covering the
+  // full half-screen, including under a notch, so a thumb planted at the very
+  // edge still drives the stick.
+  const safe = document.createElement('div')
+  safe.dataset.role = 'touch-safe-area'
+  safe.style.cssText =
+    'position:absolute;pointer-events:none;touch-action:none;' +
+    'inset:var(--sf-safe-top, 0px) var(--sf-safe-right, 0px) var(--sf-safe-bottom, 0px) var(--sf-safe-left, 0px)'
+  controls.appendChild(safe)
+
   // --- action buttons: a compact 2×2 cluster tucked into the bottom-right,
   // thumb-reachable and small (BTN px), with the most-used verb (USE) lowest.
   // Grid pitch (PITCH) leaves a clear gap so none overlap each other, the hotbar
@@ -240,6 +283,7 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     b.textContent = label
     // Ghost buttons: visible enough to find with a thumb, dim enough that the
     // world stays the subject (they brighten on press for feedback).
+    // Offsets are plain px against `safe` (below), which carries the inset.
     b.style.cssText =
       `position:absolute;right:${right}px;bottom:${bottom}px;width:${BTN}px;height:${BTN}px;border-radius:50%;` +
       'background:#ffffff10;border:1px solid #ffffff2a;color:#ffffffb8;display:flex;align-items:center;' +
@@ -255,7 +299,7 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
     }
     b.addEventListener('pointerup', up)
     b.addEventListener('pointercancel', up)
-    controls.appendChild(b)
+    safe.appendChild(b)
     return b
   }
 
@@ -271,7 +315,7 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
   hotbar.style.cssText =
     'position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;' +
     'pointer-events:none;touch-action:none' // container passes taps through; slots opt back in
-  controls.appendChild(hotbar)
+  safe.appendChild(hotbar)
 
   // Rewrite a label/dim only when it changes — same lastX guard the HUD uses.
   let lastUse = ''

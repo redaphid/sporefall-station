@@ -21,7 +21,8 @@ Required models (exact filenames, in ComfyUI's `models/` tree):
 
 | Kind | File | Used for |
 |---|---|---|
-| checkpoint | `AnythingXL_xl.safetensors` (SDXL) | hero/env/character-anchor generation with the pixel-art LoRA |
+| checkpoint | `AnythingXL_xl.safetensors` (SDXL) | chars, tiles, items, fx — with the pixel-art LoRA. **Not props** (see the row below) |
+| checkpoint | `juggernautXL_juggXIByRundiffusion.safetensors` (SDXL) | **props, always.** An anime base composes busy multi-object scenes, so props came back as warehouses, stacks and sprite-sheet grids: 1/8 clean on `anything-xl` vs 8/8 on this, and later 0/12 vs 12/12 on the same recipe. `generate.py` pins it per-category (`CAT_MODEL`); you do not pass it by hand |
 | checkpoint | `dreamshaper_8.safetensors` (SD1.5) | low-VRAM fallback path; step-frame img2img; NPC sweeps |
 | lora | `pixel_art_style_by_skormino_v7.05_test_72img.safetensors` | pixel-art style. **This LoRA is Illustrious/SDXL** — with an SD1.5 checkpoint it silently no-ops (an earlier pack made exactly this mistake). Triggers: `masterpiece, pixpix, 8-bit, pixel_art`; CFG 3–4, euler, 28+ steps |
 | ipadapter | `ip-adapter-plus_sdxl_vit-h.safetensors`, `ip-adapter-plus_sd15.bin` | style anchoring (loaded automatically by IPAdapterUnifiedLoader preset "PLUS (high strength)") |
@@ -80,8 +81,8 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 
 | Script | Role |
 |---|---|
-| `comfy.py` | HTTP driver + graph builder. Env knobs: `COMFY`, `CKPT`, `LORA`, `LORA_W`, `SIZE`. Sampler recipe lives here (CFG 3.5, euler, 28 steps). |
-| `generate.py` | **The job table** — every asset's subject prompt, negatives, category, target px — plus the `sweep` / `final` CLI. |
+| `comfy.py` | HTTP driver + graph builder. Env knobs: `COMFY`, `CKPT`, `LORA`, `LORA_W`, `SIZE`. Sampler recipe lives here (CFG 3.5, euler, 28 steps). `CKPT` is the pack default and is **not** what props use. |
+| `generate.py` | **The job table** — every asset's subject prompt, negatives, category, target px — plus the `sweep` / `final` CLI. Also `CAT_MODEL`, the per-category base model: props are pinned to `juggernautXL` at CFG 7.0 / 768px; everything else takes the pack default. A category with no entry there is a hard error, never a silent fallback. |
 | `post.py` | Post-processing: content bbox crop → k-centroid downscale → palette quantize (no dither) → hard alpha → canvas placement; `tile()`, `sprite()`, `luma_sprite()`, `derive_step()`, `seam_energy()`, `contact_sheet()`. |
 | `palette.py` | The locked theme palette (34 colors for swampspace). Run it to emit a swatch sheet. |
 | `verify.py` | VLM gate (§5): per-asset checks, `--pairs`, `--same`, `--style`. |
@@ -103,7 +104,9 @@ export SWAMPSPACE_STAGE=/tmp/swampspace-stage    # raw sweeps live here, never c
 python3 generate.py --list                       # every job name
 python3 generate.py sweep prop.spore-barrel --seeds=8    # one asset sweep
 python3 generate.py sweep char.bog-mutant.s-idle --seeds=8   # one character pose
-# low-VRAM / fallback path:
+# low-VRAM / fallback path. NB this only reaches chars/tiles/items/fx: props
+# ignore $CKPT by design and stay on juggernautXL (CAT_MODEL in generate.py),
+# because a prop on the anime base is the 1/8-vs-8/8 defect, not a preference.
 CKPT=dreamshaper_8.safetensors LORA= SIZE=512 python3 generate.py sweep item.root-club --seeds=4
 
 # after curating (recording the pick in curation.json):
@@ -231,6 +234,17 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
    before you conclude the concept is impossible.** `wall-screen` was 0/12 and
    written off as "the model refusing to draw a wall panel"; that verdict was
    reached under the wrong checkpoint and had to be re-tested.
+
+   **This finding is now enforced, not just recorded.** For a long time it lived
+   only in `exp_props.py` — an experiment script nobody is told to run — while
+   the documented path here, `generate.py sweep prop.<name>`, passed no
+   checkpoint at all and fell through to the anime default. The lesson was
+   written down and the tool still did the wrong thing. `CAT_MODEL` in
+   `generate.py` now pins the base model per category and **raises** for a
+   category it has no decision for, because the failure mode is not a crash: the
+   run succeeds, the images look confident and well-formed, and they are
+   entirely wrong. A silent fallback to a wrong-but-plausible default is the
+   most expensive kind of bug in this pipeline.
 
 0b. **Judge by eye, at the size the player sees, beside the cast.** Neither the
    silhouette-consistency harness nor the render suite can do this for you —

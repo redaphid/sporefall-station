@@ -85,9 +85,15 @@ OUT = Path(os.environ.get("EXP_OUT", "D:/tmp/props-gen"))
 #
 # Scoped to props deliberately: chars/tiles/items were authored against the
 # anime base and would drift if the default moved under them.
-PROP_CKPT = "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
-PROP_CFG = 7.0
-PROP_SIZE = 768
+#
+# These now live in generate.py's CAT_MODEL and are RE-EXPORTED here, not
+# redefined. They were duplicated for exactly as long as it took to notice that
+# the documented path (`generate.py sweep prop.<name>`) never read them at all
+# and rendered every prop on the anime base. Two copies of a number that is the
+# difference between 1/8 and 8/8 is one copy too many.
+PROP_CKPT = G.PROP_CKPT
+PROP_CFG = G.PROP_CFG
+PROP_SIZE = G.PROP_SIZE
 
 
 

@@ -387,16 +387,25 @@ describe('createGamepadCoop', () => {
     })
   })
 
-  describe('weapon switch: cycle prev/next resolves to an absolute hotbar slot', () => {
+  describe('item switch: cycle prev/next resolves to an absolute hotbar slot', () => {
     beforeEach(() => {
       pads = [pad(0, { buttons: press(0) })]
       coop.sample()
-      // Player 0 carries two weapons, slot 0 active.
-      coop.update(viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'bat', qty: 1 }], activeSlot: 0 }]))
+      // Player 0: the permanent weapon in slot 0 (never cyclable) plus two held
+      // items; the grenade at slot 1 is the active one.
+      coop.update(
+        viewWith([
+          {
+            playerId: 0,
+            inventory: [{ itemId: 'pistol', qty: 1 }, { itemId: 'grenade', qty: 2 }, { itemId: 'molotov', qty: 1 }],
+            activeSlot: 1,
+          },
+        ]),
+      )
     })
     it('cycles to the next slot on the next-button edge', () => {
       pads = [pad(0, { buttons: press(STD.hotbarNext[0]) })]
-      expect(coop.sample().inputs.get(0)!.hotbar).toBe(1)
+      expect(coop.sample().inputs.get(0)!.hotbar).toBe(2)
     })
     it('fires the switch once per press (edge), not while held', () => {
       pads = [pad(0, { buttons: press(STD.hotbarNext[0]) })]
@@ -404,9 +413,27 @@ describe('createGamepadCoop', () => {
       pads = [pad(0, { buttons: press(STD.hotbarNext[0]) })]
       expect(coop.sample().inputs.get(0)!.hotbar).toBe(-1)
     })
-    it('wraps to the last slot on the prev-button edge from slot 0', () => {
+    it('wraps to the last item slot on the prev-button edge from the first item', () => {
       pads = [pad(0, { buttons: press(STD.hotbarPrev[0]) })]
-      expect(coop.sample().inputs.get(0)!.hotbar).toBe(1)
+      expect(coop.sample().inputs.get(0)!.hotbar).toBe(2)
+    })
+    it('never resolves to the permanent weapon in slot 0', () => {
+      for (const button of [STD.hotbarNext[0], STD.hotbarPrev[0]]) {
+        const fresh = createGamepadCoop(() => pads)
+        pads = [pad(0, { buttons: press(0) })]
+        fresh.sample()
+        fresh.update(
+          viewWith([
+            {
+              playerId: 0,
+              inventory: [{ itemId: 'pistol', qty: 1 }, { itemId: 'grenade', qty: 2 }],
+              activeSlot: 1,
+            },
+          ]),
+        )
+        pads = [pad(0, { buttons: press(button) })]
+        expect(fresh.sample().inputs.get(0)!.hotbar).not.toBe(0)
+      }
     })
     it('leaves hotbar at -1 when no cycle button is pressed', () => {
       pads = [pad(0, { axes: [0.5, 0] })]
@@ -422,29 +449,48 @@ describe('createGamepadCoop', () => {
   })
 
   describe('cycleHotbar (pure)', () => {
-    const inv = [{ itemId: 'pistol', qty: 1 }, { itemId: 'bat', qty: 1 }, { itemId: 'grenade', qty: 2 }]
+    // Slot 0 is the permanent weapon: present in the inventory (mods live there)
+    // but never a cycle destination. The held items are slots 1..3.
+    const inv = [
+      { itemId: 'pistol', qty: 1 },
+      { itemId: 'grenade', qty: 2 },
+      { itemId: 'bandage', qty: 3 },
+      { itemId: 'molotov', qty: 1 },
+    ]
     it('advances to the next slot', () => {
-      expect(cycleHotbar(inv, 0, 1)).toBe(1)
+      expect(cycleHotbar(inv, 1, 1)).toBe(2)
     })
     it('wraps forward off the end', () => {
-      expect(cycleHotbar(inv, 2, 1)).toBe(0)
+      expect(cycleHotbar(inv, 3, 1)).toBe(1)
     })
     it('wraps backward off the start', () => {
-      expect(cycleHotbar(inv, 0, -1)).toBe(2)
+      expect(cycleHotbar(inv, 1, -1)).toBe(3)
     })
     it('returns -1 with an empty inventory', () => {
       expect(cycleHotbar([], -1, 1)).toBe(-1)
     })
+    it('NEVER cycles onto a weapon, in either direction, from anywhere', () => {
+      // The soft-lock this prevents: a selectable weapon slot with FIRE-always-
+      // fires semantics is a dead stop in the cycle.
+      for (const from of [-1, 0, 1, 2, 3]) {
+        expect(cycleHotbar(inv, from, 1)).not.toBe(0)
+        expect(cycleHotbar(inv, from, -1)).not.toBe(0)
+      }
+    })
+    it('returns -1 when the player carries nothing but their weapon', () => {
+      expect(cycleHotbar([{ itemId: 'pistol', qty: 1 }], 0, 1)).toBe(-1)
+      expect(cycleHotbar([{ itemId: 'pistol', qty: 1 }], 0, -1)).toBe(-1)
+    })
     it('skips the non-equippable briefcase in display order', () => {
-      const withCase = [{ itemId: 'briefcase', qty: 1 }, { itemId: 'pistol', qty: 1 }, { itemId: 'bat', qty: 1 }]
-      // display order is [pistol@1, bat@2]; next from pistol(1) -> bat(2)
+      const withCase = [{ itemId: 'briefcase', qty: 1 }, { itemId: 'grenade', qty: 1 }, { itemId: 'bandage', qty: 1 }]
+      // display order is [grenade@1, bandage@2]; next from grenade(1) -> bandage(2)
       expect(cycleHotbar(withCase, 1, 1)).toBe(2)
       // and next from the last wraps back to the first real slot, never the briefcase
       expect(cycleHotbar(withCase, 2, 1)).toBe(1)
     })
-    it('starts from the first slot when nothing is active (fists)', () => {
-      expect(cycleHotbar(inv, -1, 1)).toBe(0)
-      expect(cycleHotbar(inv, -1, -1)).toBe(2)
+    it('starts from the first item slot when nothing is held', () => {
+      expect(cycleHotbar(inv, -1, 1)).toBe(1)
+      expect(cycleHotbar(inv, -1, -1)).toBe(3)
     })
   })
 

@@ -296,6 +296,7 @@
     "prop.locker": "props/weapons-locker.png",
     "prop.cabinet": "props/supply-cabinet.png",
     "prop.desk": "props/work-desk.png",
+    "prop.chair": "props/chair.png",
     "item.default": "items/biogel-kit.png",
     "item.pistol": "items/spore-pistol.png",
     "item.bat": "items/root-club.png",

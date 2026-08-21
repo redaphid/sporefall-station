@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { spawnPlayer } from '../player'
+import { PLAYER_START_WEAPON, spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { addEntity, createWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
@@ -423,13 +423,18 @@ describe('auto-pickup', () => {
     expect(cash.dead).toBe(true)
   })
 
-  it('a weapon pickup is grabbed and auto-equipped (first weapon)', () => {
+  it('a weapon pickup is REFUSED and left lying on the ground', () => {
+    // The player's weapon is permanent, so no weapon can enter the inventory.
+    // Refused rather than swallowed: the entity survives, so nothing vanishes.
     const p = spawnPlayer(w, 0, 20, 20)
-    pickup('bat', 20, 20)
+    const before = p.loadout!.inventory.length
+    const bat = pickup('bat', 20, 20)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
-    expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(p.loadout!.inventory).toHaveLength(before)
+    expect(p.combat!.weapon).toBe(PLAYER_START_WEAPON)
+    expect(bat.dead).toBeFalsy()
   })
 
   it('a consumable auto-heals a hurt player instead of taking a slot', () => {

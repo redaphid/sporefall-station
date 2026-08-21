@@ -24,7 +24,7 @@ export interface ObjectDef {
 }
 
 export const OBJECTS: Record<string, ObjectDef> = {
-  crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['bat', 'knife', 'bandage', 'molotov', 'cash'] },
+  crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['bandage', 'molotov', 'cash'] },
   barrel: { id: 'barrel', name: 'Barrel', hp: 15, damageThreshold: 5, flammable: true, explode: { radius: 2.4, damage: 40 }, ignite: true },
   tv: { id: 'tv', name: 'TV', hp: 12, loot: ['cash'] },
   toilet: { id: 'toilet', name: 'Toilet', hp: 10 },
@@ -56,7 +56,9 @@ export const OBJECTS: Record<string, ObjectDef> = {
   shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['bandage', 'cash', 'molotov'] },
   cabinet: { id: 'cabinet', name: 'Supply Cabinet', hp: 22, loot: ['medkit', 'bandage'] },
   bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['bandage', 'gasGrenade'] },
-  locker: { id: 'locker', name: 'Weapons Locker', hp: 30, loot: ['knife', 'pistol', 'cash'] },
+  // Repurposed from the old "Weapons Locker": weapons are no longer lootable
+  // (one permanent weapon), so it stocks throwables and healing instead.
+  locker: { id: 'locker', name: 'Supply Locker', hp: 30, loot: ['grenade', 'medkit', 'cash'] },
   table: { id: 'table', name: 'Table', hp: 16, flammable: true },
   // The thing every table in this game was missing. A chair is placed BY the
   // layout planner, never alone: pulled up to a desk, ringed round a table, or

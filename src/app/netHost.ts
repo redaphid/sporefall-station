@@ -1,4 +1,5 @@
 import { spawnPlayer } from '../game/player'
+import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
 import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
@@ -25,6 +26,13 @@ import type { RenderView, Session } from './session'
 
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
 const STATE_INTERVAL_TICKS = 15 // 2Hz
+
+/**
+ * Hard ceiling on entities in ONE snapshot. Bounds the packet: 10B header +
+ * 10B/entity = 490B, which is 25 packets at the 20-byte BLE MTU floor and 3 at
+ * 244B. The wire count is a u8, so this can never exceed 255.
+ */
+export const SNAPSHOT_ENTITY_CAP = 48
 
 /**
  * Max simultaneous players in one run (host + clients). Slots run 0..MAX_PLAYERS-1;
@@ -118,20 +126,46 @@ export class NetHostSession implements Session {
     return players
   }
 
+  /**
+   * The one place `GameStart` is built. Three sites send it — the lobby Start,
+   * a ghost rejoin and a fresh late join — and they must agree, because `floor`
+   * is read at SEND time. A late joiner's client builds its level from
+   * `seed`+`floor` alone, so a stale or missing floor here is the joiner staring
+   * at the wrong map.
+   */
+  private gameStartMsg(): GameStartMsg {
+    return { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode, floor: this.world.floor }
+  }
+
   /** Host presses Start: build the world, spawn everyone, tell clients. */
   beginGame(): void {
     if (this.started) return
     this.started = true
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
+    const hostAt = playerSpawnPoint(this.world.level, 0)
+    this.self = spawnPlayer(this.world, 0, hostAt.x, hostAt.y)
     const entityIds: Record<number, number> = { 0: this.self.id }
     for (const p of this.peers.values()) {
-      const e = spawnPlayer(this.world, p.slot, this.world.level.spawn.x + p.slot * 0.6, this.world.level.spawn.y)
+      // A peer whose link is up but whose Hello has not landed yet still carries
+      // slot -1. Spawning it would put a PHANTOM avatar (playerId -1) in the
+      // world: absent from the lobby, driven by nobody, shipped in every
+      // snapshot — and, because nothing can ever down it, it permanently blocks
+      // missionSystem's run-over check, so a co-op wipe never ends the run. It
+      // also strands a zombie body once the real Hello finally arrives and takes
+      // a proper slot. Admitted peers only; the late-join path spawns the rest.
+      if (p.slot < 0) continue
+      // A COLLISION-CHECKED spot, not a blind offset: the old `spawn.x + slot * 0.6`
+      // put 18.6% of slots inside a solid tile, and a body that starts in a wall can
+      // never step out of it (see game/spawnPlacement.ts). `playerSpawnPoint` is a
+      // pure function of (level, slot), so the late-join branch below re-derives the
+      // SAME point for the same slot and no client can disagree about it.
+      const at = playerSpawnPoint(this.world.level, p.slot)
+      const e = spawnPlayer(this.world, p.slot, at.x, at.y)
       p.entityId = e.id
       entityIds[p.slot] = e.id
     }
-    const start: GameStartMsg = { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }
+    const start: GameStartMsg = this.gameStartMsg()
     const go: GoMsg = { startTick: this.world.tick, entityIds }
     this.broadcastJson(MsgType.GameStart, start)
     this.broadcastJson(MsgType.Go, go)
@@ -214,21 +248,52 @@ export class NetHostSession implements Session {
     }
   }
 
+  /**
+   * Per-peer interest set, in two passes.
+   *
+   * PASS 1 — every live player, unconditionally. The cap is a BANDWIDTH guard,
+   * never a visibility rule. `netClient.applySnapshot` prunes any entity a
+   * snapshot omits, so an avatar squeezed out by the cap is *deleted* on that
+   * client: the player's own sprite and their whole team blink out, prediction
+   * stops being reconciled, and they rubber-band when it returns. The old
+   * single-pass loop capped in `world.entities` order, and `beginGame` runs
+   * `populateWorld` BEFORE `spawnPlayer`, so avatars live at the very END of
+   * that array — on a real floor (50–94 props inside one 14-tile window on
+   * every seed sampled) the cap was reached before the loop ever saw a player,
+   * and snapshots carried ZERO of the 8.
+   *
+   * PASS 2 — spend what is left of the budget on the CLOSEST in-radius entities.
+   * Array order is spawn order, so it favoured whatever the level generator made
+   * first: a thug standing on your toes could be dropped in favour of a table
+   * thirteen tiles away. Nearest-first with an id tiebreak is deterministic and
+   * stable tick to tick, which also stops the selection churning (sprites
+   * popping in and out) while the party stands still.
+   */
   private sendSnapshots(): void {
     for (const p of this.peers.values()) {
       if (p.entityId === undefined) continue
       const avatar = this.world.byId.get(p.entityId)
       const entities: WireEntity[] = []
+      const nearby: { e: Entity; d: number }[] = []
       for (const e of this.world.entities) {
         if (e.dead) continue
-        const isPlayer = e.playerCtl !== undefined
-        const near =
-          avatar !== undefined &&
-          Math.abs(e.pos.x - avatar.pos.x) < INTEREST_RADIUS &&
-          Math.abs(e.pos.y - avatar.pos.y) < INTEREST_RADIUS
-        if (!isPlayer && !near) continue
-        entities.push(toWireEntity(e, this.world.tick))
-        if (entities.length >= 48) break
+        if (e.playerCtl !== undefined) {
+          if (entities.length < SNAPSHOT_ENTITY_CAP) entities.push(toWireEntity(e, this.world.tick))
+          continue
+        }
+        if (avatar === undefined) continue
+        const dx = Math.abs(e.pos.x - avatar.pos.x)
+        const dy = Math.abs(e.pos.y - avatar.pos.y)
+        if (dx >= INTEREST_RADIUS || dy >= INTEREST_RADIUS) continue
+        nearby.push({ e, d: Math.max(dx, dy) })
+      }
+      // Only pay for the ordering when the budget is actually oversubscribed.
+      if (entities.length + nearby.length > SNAPSHOT_ENTITY_CAP) {
+        nearby.sort((a, b) => (a.d === b.d ? a.e.id - b.e.id : a.d - b.d))
+      }
+      for (const n of nearby) {
+        if (entities.length >= SNAPSHOT_ENTITY_CAP) break
+        entities.push(toWireEntity(n.e, this.world.tick))
       }
       p.queue.queueSnapshot(
         encodeSnapshot({
@@ -380,10 +445,28 @@ export class NetHostSession implements Session {
         return
       }
 
-      // Duplicate Hello from a peer we've already admitted (not a rejoin): ignore
-      // it. Reprocessing would reassign the slot, leak a stale peersBySlot entry,
-      // and — mid-game — spawn a second avatar for the same connection.
-      if (p.slot >= 0 && !hello.rejoin) return
+      // Duplicate Hello from a peer we've already admitted. Never RE-PROCESS it:
+      // that would reassign the slot, leak a stale peersBySlot entry, and —
+      // mid-game — spawn a second avatar for the same connection.
+      //
+      // This deliberately covers a Hello that carries a `rejoin` block too. A
+      // GENUINE rejoin always arrives on a NEW link, and a new link means a new
+      // PeerState at slot -1 (onPeerLost deletes the old one), so an admitted
+      // peer asking to rejoin is never the legitimate case. Letting it through —
+      // as `!hello.rejoin` used to — meant any rejoin field walked past this
+      // guard: pre-start it re-slotted a peer and orphaned its old peersBySlot
+      // entry (a seat that can never be issued again), and mid-game a live
+      // player holding a leaked token could seize someone else's ghost, ending
+      // up in two slots at once with its own avatar abandoned in the world.
+      //
+      // It used to be dropped on the floor, though, and THAT was the other half
+      // of the silent-join-hang: nothing on this link is acknowledged, so a
+      // client whose Welcome/GameStart/Go went missing asks again — and got
+      // nothing back, forever. Re-answer instead, idempotently.
+      if (p.slot >= 0) {
+        this.reanswerAdmission(p)
+        return
+      }
 
       // Mid-game rejoin: reclaim the ghost slot if the token matches.
       if (this.started && hello.rejoin) {
@@ -392,16 +475,30 @@ export class NetHostSession implements Session {
           p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'rejoin window expired' }))
           return
         }
+        // The parked avatar is STUNNED, not invulnerable, so a patrol can finish
+        // it off while its owner is off the air. Handing the seat back anyway
+        // would reply Go with an entityId that no longer exists: the client
+        // enters `playing`, never sees itself in a snapshot, and sits there
+        // forever with no avatar, no movement and nothing on screen to explain
+        // it. Retire the dead ghost and say so — a plain Hello then late-joins
+        // with a working body, the same deal any other newcomer gets.
+        const parked = this.world.byId.get(ghost.entityId)
+        if (!parked || parked.dead) {
+          this.ghosts.delete(ghost.slot)
+          p.queue.queueReliable(
+            encodeJson(MsgType.Reject, { reason: 'your character did not survive — rejoin for a fresh one' }),
+          )
+          return
+        }
         this.ghosts.delete(ghost.slot)
         p.slot = ghost.slot
         p.name = ghost.name
         p.token = ghost.token
         p.entityId = ghost.entityId
         this.peersBySlot.set(p.slot, p)
-        const avatar = this.world.byId.get(ghost.entityId)
-        if (avatar?.status) avatar.status.stun = 0
+        if (parked.status) parked.status.stun = 0
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
-        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(
           encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: ghost.entityId } }),
         )
@@ -413,7 +510,16 @@ export class NetHostSession implements Session {
       // Fresh late-join: the run is already going but a slot is open. Spawn a
       // brand-new avatar into the live world (not a ghost reclaim) and hand the
       // client Welcome+GameStart+Go so it drops straight into the running floor.
-      if (this.started) {
+      //
+      // `started` alone is the wrong gate: it stays true after the party wipes
+      // (only restart() clears it), so a friend who walks up after a game-over
+      // used to be spawned into a dead world and handed a corpse to pilot. Gate
+      // on the run being LIVE. When it isn't, fall through to the lobby path
+      // below — they get a slot and a Welcome and simply wait, and the host's
+      // "play again" (restart → beginGame) spawns them with everyone else.
+      // A ghost REJOIN is deliberately left alone above: that player's avatar is
+      // already in the finished world and they should see the same ending.
+      if (this.started && !this.world.gameOver) {
         const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot), ...this.ghosts.keys()])
         let slot = 1
         while (used.has(slot)) slot++
@@ -424,24 +530,32 @@ export class NetHostSession implements Session {
         p.slot = slot
         p.name = hello.name
         p.token = Math.random().toString(36).slice(2, 12)
-        const avatar = spawnPlayer(this.world, slot, this.world.level.spawn.x + slot * 0.6, this.world.level.spawn.y)
+        // Same collision-checked placement as the lobby start (beginGame), and the
+        // same function of (level, slot) — a friend who joins mid-run lands where
+        // that slot would have landed had they been there from the beginning.
+        const at = playerSpawnPoint(this.world.level, slot)
+        const avatar = spawnPlayer(this.world, slot, at.x, at.y)
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
-        p.queue.queueReliable(encodeJson(MsgType.GameStart, { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode }))
+        p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [slot]: avatar.id } }))
         this.onLobbyChange?.(this.lobbyPlayers())
         this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
         return
       }
 
-      if (this.peers.size > MAX_SLOT) {
+      // Lobby admission — pre-start, and also where a post-game-over joiner waits
+      // for "play again". Ghosts count as taken: after a wipe the world can still
+      // hold dropped players' reserved slots, and handing one out twice would put
+      // two peers on one avatar.
+      const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot), ...this.ghosts.keys()])
+      let slot = 1
+      while (used.has(slot)) slot++
+      if (slot > MAX_SLOT) {
         p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
         return
       }
-      const used = new Set([0, ...[...this.peers.values()].map((q) => q.slot)])
-      let slot = 1
-      while (used.has(slot)) slot++
       p.slot = slot
       p.name = hello.name
       p.token = Math.random().toString(36).slice(2, 12)
@@ -457,5 +571,40 @@ export class NetHostSession implements Session {
     for (const p of this.peers.values()) {
       if (p.slot >= 0) p.queue.queueReliable(bytes)
     }
+  }
+
+  /**
+   * Say the admission again, for a peer that already has a slot.
+   *
+   * The whole join handshake — Hello up, Welcome/GameStart/Go down — rides
+   * unacknowledged BLE notifications (`type: 'withoutResponse'` in both
+   * transports), and the SendQueue's "reliable" lane only promises not to DROP
+   * a queued message; it cannot know whether the radio delivered it. So the
+   * only evidence the host will ever get that its reply was lost is the client
+   * asking a second time, and the only useful response is to answer again.
+   *
+   * Idempotent BY CONSTRUCTION: every value here is read back out of state we
+   * already hold (`p.slot`, `p.token`, `p.entityId`). No slot is allocated, no
+   * avatar is spawned, no ghost is reclaimed — so an arbitrary number of
+   * duplicate Hellos costs a few bytes each and changes nothing else. That is
+   * also why this is WIRE-COMPATIBLE and needs no PROTOCOL_VERSION bump: the
+   * message types, their fields and their meanings are exactly the ones an
+   * unpatched client already parses. An old client simply never asks twice.
+   */
+  private reanswerAdmission(p: PeerState): void {
+    p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot: p.slot, token: p.token }))
+    p.queue.queueReliable(encodeJson(MsgType.LobbyState, { players: this.lobbyPlayers() }))
+    // Pre-start lobby peers have no avatar yet; `beginGame` will send them the
+    // GameStart/Go. A peer WITH an entityId is in the run and needs both, or it
+    // sits on "Generating city…" watching snapshots it can't join.
+    if (this.started && p.entityId !== undefined) {
+      p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
+      p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: p.entityId } }))
+    }
+    // Whatever else got lost, assume the inventory push did too. It is sent only
+    // on CHANGE (`lastInvSig`), so without this the re-admitted client would
+    // show an empty hotbar until its loadout happened to change — and a client
+    // that re-runs GameStart clears `localInv` on the way through.
+    p.lastInvSig = ''
   }
 }

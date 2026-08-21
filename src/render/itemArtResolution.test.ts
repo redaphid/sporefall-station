@@ -19,7 +19,6 @@ import { describe, expect, it } from 'vitest'
 import { ITEM_ALIAS } from './art'
 import { ITEM_IDS } from './theme'
 import { LOOT_ITEM_IDS } from '../game/populate'
-import { isDroppableWeapon } from '../game/systems/combat'
 import { CONSUMABLES, WEAPONS } from '../game/data/items'
 import { NPCS } from '../game/data/npcs'
 
@@ -33,11 +32,11 @@ const artKeyFor = (id: string): string | undefined =>
   DECLARED.includes(id) ? id : (ITEM_ALIAS[id] as string | undefined)
 
 /** Every id that can become a `pickup.<id>` entity in a real run: everything the
- * level generator lays down, plus every weapon a corpse can drop. Derived, never
- * restated — a new loot entry or a new weapon is covered the day it is added. */
-const REACHABLE: readonly string[] = [
-  ...new Set([...LOOT_ITEM_IDS, ...Object.keys(WEAPONS).filter(isDroppableWeapon)]),
-]
+ * level generator lays down, and nothing else. Corpses no longer drop weapons
+ * (the player's weapon is permanent), so the loot tables are now the WHOLE
+ * reachable set. Derived, never restated — a new loot entry is covered the day
+ * it is added. */
+const REACHABLE: readonly string[] = [...new Set(LOOT_ITEM_IDS)]
 
 describe('item / pickup art resolution', () => {
   it('every pickup the game can spawn has real art (never the item.default fallback)', () => {
@@ -71,12 +70,11 @@ describe('item / pickup art resolution', () => {
   })
 
   it('innate body weapons never drop, so they never need art', () => {
-    // Regression pin for the boss. `natural` is the test, not the id: checking
-    // for 'fists' expressed the intent but enforced it for one weapon only.
+    // Regression pin for the boss. `natural` is the flag the HELD-sprite logic
+    // reads (weaponArt.hasHeldWeapon), so it still matters even though nothing
+    // drops any more.
     expect(WEAPONS.fists.natural).toBe(true)
     expect(WEAPONS.claws.natural).toBe(true)
-    expect(isDroppableWeapon('fists')).toBe(false)
-    expect(isDroppableWeapon('claws')).toBe(false)
     // The boss is the only claws carrier — the drop that produced a fake medkit.
     expect(NPCS.boss.weapon).toBe('claws')
     expect(REACHABLE).not.toContain('claws')
@@ -89,10 +87,12 @@ describe('item / pickup art resolution', () => {
     expect(artKeyFor('banana')).not.toBe('medkit')
   })
 
-  it('a real weapon that CAN drop still resolves (the alias table is not over-tight)', () => {
-    for (const id of ['pistol', 'shotgun', 'machinegun', 'sledgehammer', 'stunGun', 'flamethrower']) {
-      expect(isDroppableWeapon(id), `${id} should be droppable`).toBe(true)
-      expect(artKeyFor(id), `pickup.${id} must have art`).toBeDefined()
+  it('NO weapon is reachable as a pickup — the player carries one permanent weapon', () => {
+    // The one-weapon rule, pinned at the art layer: if a weapon ever creeps back
+    // into a loot table it shows up here as well as in the sim suites. Enemies
+    // still CARRY these (NPC_ARSENAL) — they are just never lying on the floor.
+    for (const id of Object.keys(WEAPONS)) {
+      expect(REACHABLE, `${id} is a weapon and must not be lootable`).not.toContain(id)
     }
   })
 })

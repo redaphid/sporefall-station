@@ -205,12 +205,18 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
 /** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
  * map on purpose.
  *
- * The `newEnemyArt` setting is OFF by default, and the point of an off-by-default
- * flag is that a player who never touches it is PROVABLY unaffected. So the
- * default path is the original `CHARSET_ALIAS_BASE`, byte-for-byte what shipped
- * before this art existed — not a second branch that reconstructs it and merely
- * looks the same. Turning the setting on ADDS these entries; turning it off does
- * not subtract anything, because nothing was ever added.
+ * The `newEnemyArt` setting is now ON by default, but the SHAPE of this code is
+ * unchanged and deliberately so: the flag still only ever ADDS these entries,
+ * and switching it off still yields `CHARSET_ALIAS_BASE` byte-for-byte — what
+ * shipped before this art existed — rather than a second branch that
+ * reconstructs it and merely looks the same. So "off" remains a real, provable
+ * escape hatch now that it is no longer the default.
+ *
+ * Why it flipped: with it off, these six are absent from CHARSET_ALIAS, so
+ * `isCharacterSprite` is false for them and they miss the character path
+ * entirely, falling to the generic blob draw tinted `entityColors.default`
+ * (0xcccccc). That is what "the enemies the boss spawns are white circles" was —
+ * the boss's brood is `sporeling`, and the art had been shipping all along.
  *
  * Each maps to ITSELF, not a borrowed body: aliasing e.g. brute->thug would just
  * reintroduce the pixel-identical problem. A missing file still falls through to
@@ -247,6 +253,11 @@ export const PROP_SPRITE: Record<string, string> = {
   locker: 'locker',
   cabinet: 'cabinet',
   desk: 'desk',
+  // The mess chair now has art of its own, so it stops drawing procedurally.
+  // FURNITURE_SHAPE.chair stays exactly where it is: the sprite wins when the
+  // theme ships one, and the bespoke silhouette is still the right fallback for
+  // packs (city, test) that do not.
+  chair: 'chair',
   // Station machinery reuses the terminal/console art (previously fell through
   // to the character eyeball). The Cryo Terminal object is literally that art.
   cryoTerminal: 'atm',
@@ -392,19 +403,34 @@ export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
 }
 
 /**
- * Furnishings whose sprite is ELONGATED and top-down, so turning it to match the
- * layout planner's `facing` reads correctly: a bunk against a side wall lies
- * along that wall, a chair looks at the desk it was pulled up to.
+ * Furnishings whose sprite is turned to match the layout planner's `facing`.
  *
- * Deliberately an ALLOWLIST, not a blocklist. Most prop art (the vending
- * machine, the ATM, the TV, the toilet) is drawn as a standing object seen from
- * above-and-in-front; rotating one of those 180° would stand it on its head. Any
- * archetype not named here keeps rotation 0 — exactly what shipped before
- * furniture carried a facing at all — so new prop art can never be silently
- * rotated into nonsense by a layout change. Add to this set only after LOOKING
- * at the sprite turned.
+ * EMPTY, AND THAT IS THE ANSWER, not an oversight. It once held bunk, table,
+ * bench, desk and chair, on the theory that their art was ELONGATED and
+ * top-down, so turning it would read correctly. The art settled the theory:
+ * every prop texture this game ships is drawn in THREE-QUARTER projection —
+ * seen from above-and-in-front, with a front face, a near edge and legs that
+ * stand on the floor. Nothing drawn that way survives being turned by a
+ * heading; at `facing = π` a desk hangs from the ceiling by its legs.
+ *
+ * That is not hypothetical. `work-desk.png` shipped upside down on main for six
+ * days (#42): the three-quarter desk art landed in #29 at 14:54 and `desk` was
+ * added to this set in #28 at 14:57 — two PRs that were each right on their own
+ * and wrong together. `table` carried the identical defect and only looked fine
+ * because no layout ever turned one. The owner chose to keep the three-quarter
+ * art and stop turning it, at a real cost: a chair no longer visibly faces the
+ * desk it was pulled up to. Turning it again means top-down art first.
+ *
+ * Deliberately an ALLOWLIST, not a blocklist. Any archetype not named here
+ * keeps rotation 0 — exactly what shipped before furniture carried a facing at
+ * all — so new prop art can never be silently rotated into nonsense by a layout
+ * change. `facing` itself stays live and serialized: a `mount: 'wall'` prop
+ * still reads it to nudge into the wall it backs (WALL_MOUNT_NUDGE, sprites.ts).
+ *
+ * Add to this set only after LOOKING at the sprite turned — that look is
+ * `scripts/assets/rotation_gate.py`, which parses this very literal.
  */
-export const ROTATES_WITH_FACING: ReadonlySet<string> = new Set(['bunk', 'table', 'bench', 'desk', 'chair'])
+export const ROTATES_WITH_FACING: ReadonlySet<string> = new Set([])
 
 /** How far into its wall a `mount: 'wall'` prop is drawn, in tiles. Enough that
  * a rank of shelving visibly touches the wall instead of floating a half-tile

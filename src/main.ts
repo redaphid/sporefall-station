@@ -8,6 +8,8 @@ import { createLoadoutPanel, type WeaponThumb } from './ui/loadoutPanel'
 import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
+import { joinFailureMessage } from './app/joinError'
+import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
@@ -53,9 +55,18 @@ import type { ZoomSink } from './render/zoomModel'
 import { wireWheelZoom } from './input/wheelZoom'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
+import {
+  frameErrorBannerText,
+  frameErrorMessage,
+  guardFrame,
+  initialFrameErrors,
+  noteFrameError,
+  noteFrameOk,
+} from './ui/frameErrorModel'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
 import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
+import { installStage, lockLandscape, toStage } from './ui/orientation'
 import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
@@ -79,10 +90,24 @@ const boot = async (): Promise<void> => {
 
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
+  // ── Landscape always (src/ui/orientation.ts) ──────────────────────────────
+  // Take ownership of the rotating stage BEFORE the renderer exists: pixi sizes
+  // itself from #app (`resizeTo`), and #app fills the stage box, so the stage
+  // must already carry the swapped dimensions when the renderer first measures.
+  // On a phone stuck in portrait (rotation lock on, or iOS Safari where
+  // `screen.orientation.lock` does not exist) this turns the WHOLE presentation
+  // 90° — canvas, HUD, touch controls, menus, overlays — because they all live
+  // inside #stage. Input is corrected at the DOM event boundary rather than per
+  // control; see the orientation.ts header for why that is the safe shape.
+  const stageEl = document.getElementById('stage') ?? mount.parentElement!
+  const stage = installStage(stageEl, detectTouchCaps(navigator, (q) => window.matchMedia(q)))
   // UI chrome (settings gear/panel) mounts on #ui: it must hit-test ABOVE the
   // touch layer's stick zones (also on #ui) — chrome on #app is unreachable by
   // touch (see src/ui/chrome.ts).
   const renderer = await createRenderer(mount, uiMount)
+  // A portrait↔landscape flip changes the stage box; pixi's own resize observer
+  // would catch it a frame later, so nudge it in the same turn as the transform.
+  stage.onChange = (): void => renderer.app.resize()
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
@@ -106,7 +131,17 @@ const boot = async (): Promise<void> => {
       })
     )
       enterFullscreen()
+    lockLandscape() // already-fullscreen case; the listener below covers the rest
   }
+  // `screen.orientation.lock()` only SUCCEEDS in fullscreen, and the request
+  // above resolves asynchronously — so the lock that actually lands is this one,
+  // fired the moment fullscreen arrives. It is a silent no-op on iOS Safari,
+  // which exposes `screen.orientation` but implements no `lock()`; those players
+  // get landscape from the stage rotation instead. The native Android shell
+  // needs none of this (AndroidManifest `screenOrientation="sensorLandscape"`).
+  document.addEventListener('fullscreenchange', () => {
+    if (isFullscreen()) lockLandscape()
+  })
   // Sitting at the picker is the cheapest possible moment to swap in a new
   // build: no run exists yet. If one is already downloaded, it applies here.
   updates.reportMoment('modePicker', 0)
@@ -139,8 +174,11 @@ const boot = async (): Promise<void> => {
   let pointerScreen: { x: number; y: number } | null = null
   window.addEventListener('pointermove', (ev) => {
     if (ev.pointerType === 'touch') return
-    const rect = renderer.app.canvas.getBoundingClientRect()
-    pointerScreen = { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
+    // STAGE coordinates — the same space renderer.worldToScreen reports in
+    // (pixi globals are canvas-local, and the canvas fills the stage). Using
+    // the canvas's bounding rect would be the ROTATED element's axis-aligned
+    // box, which is not the origin we want. See ui/orientation.ts.
+    pointerScreen = toStage(ev.clientX, ev.clientY)
   })
   const readPointerAim = (): Aim | null => {
     if (!pointerScreen) return null
@@ -336,6 +374,14 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
+  // A sleeping screen freezes this player — and if this player is the host, it
+  // freezes the authoritative sim and therefore EVERYONE, which looks like a
+  // crash rather than a phone. Acquired here because this is the point of no
+  // return into gameplay: `runLoop` never returns, game-over swaps the world in
+  // place rather than going back to the menu, so the only way out of a game is a
+  // reload — and the browser releases the lock for us on unload. The handle's
+  // `release()` exists for whenever a real quit-to-menu path arrives.
+  keepScreenAwake()
   runLoop(session, renderer, uiMount, coop, inspect, updates, touch, debug, persister, resumed)
 }
 
@@ -378,6 +424,25 @@ const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> =
   return new BroadcastChannelTransport('client', deps.room)
 }
 
+/**
+ * Hand the radio back when the page goes away.
+ *
+ * `Transport.stop()` existed but had NO call site anywhere in the app, so a
+ * reload (or the OTA updater swapping the bundle) left the BLE advertiser and
+ * the GATT service registered against a dead JS context. The stack keeps
+ * advertising a host nobody is simulating: joiners see the phantom in their
+ * Nearby Games list, connect, and wait forever for a lobby that no longer
+ * exists — and the fresh context's addGattService can collide with the
+ * already-registered service from the old one.
+ *
+ * `pagehide` rather than `unload`: it is the event that actually fires in
+ * mobile WebViews (and it fires for bfcache/backgrounding too, which is the case
+ * that matters on a phone).
+ */
+const stopTransportOnPagehide = (transport: Transport): void => {
+  window.addEventListener('pagehide', () => void transport.stop().catch(() => {}), { once: true })
+}
+
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
     const session = new HostSession(deps.seed, deps.input, deps.coop)
@@ -391,9 +456,11 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   const dbg = createDebugLog(deps.uiMount)
 
   if (mode === 'host') {
-    // Advertise the host's display name so the join list can label this phone
-    // (issue #35). No "Spore " tag: the scan already filters by service UUID, and
-    // the ~8-char advertisement budget is too tight to waste on a prefix.
+    // The display name is passed for the lobby, NOT for the airwaves: nothing
+    // this host broadcasts carries a name at all (#16 took it back off after #35
+    // put it on and killed discovery). Joining phones tag the row 'Sporefall'
+    // themselves — see toHostLabel — which needs no advertisement bytes and works
+    // against hosts running older builds too.
     const wsHost = new URLSearchParams(location.search).get('transport') === 'ws'
     const transport = wsHost
       ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
@@ -401,6 +468,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         ? new BleHostTransport(deps.name, dbg.log)
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
+    stopTransportOnPagehide(transport)
     const session = new NetHostSession(deps.seed, deps.name, deps.input, transport)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
@@ -436,20 +504,63 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   // join
   dbg.log(`join: mode start, native=${native}`)
   const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
+  stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
+
+  // The lobby is built BEFORE the connect attempt, not after it.
+  //
+  // It owns the only status line the joining player has, so creating it after
+  // connect() meant a failed join had nowhere to put the bad news: the pick-a-host
+  // overlay removed itself the instant you tapped a host, and the next screen was
+  // never created, leaving the player on a dead black rectangle. With the plugin's
+  // connect() also never settling on refusal (see withTimeout), that dead screen
+  // was permanent and indistinguishable from a slow-but-working join.
+  //
+  // Ordering is safe: both are opaque `inset:0` overlays in the same mount, so the
+  // later-appended pick-a-host screen paints ON TOP of this one and hands over to
+  // it when it removes itself.
+  const lobby = createLobbyUi(deps.uiMount, false)
 
   if (transport instanceof BleClientTransport) {
     // BLE needs an explicit pick-a-host step before the lobby.
-    await transport.start()
     const scanCtl: { stop: (() => Promise<void>) | null } = { stop: null }
-    const deviceId = await pickHost(deps.uiMount, (onFound) => {
-      void transport.scan(onFound).then((stop) => (scanCtl.stop = stop))
-    })
-    await scanCtl.stop?.()
-    await transport.connect(deviceId)
+    try {
+      await transport.start() // throws early and legibly if Bluetooth is off
+      const deviceId = await pickHost(deps.uiMount, (onFound, onError) => {
+        // The one join failure the try/catch below CANNOT see. `scan()` is not
+        // awaited — it is started from inside pickHost and its promise `void`ed —
+        // so a rejection here rejected nothing anybody was waiting on: the outer
+        // `await pickHost(...)` simply never settled and the guest watched
+        // "Scanning over Bluetooth…" until the phone was force-quit. To the player
+        // that is indistinguishable from a room with no host in it.
+        //
+        // The message comes from the same `joinFailureMessage` the catch below
+        // uses, so a scan failure reads exactly like a start/connect failure; only
+        // the surface differs, because the only screen up at this moment is the
+        // pick-a-host overlay.
+        void transport
+          .scan(onFound)
+          .then((stop) => (scanCtl.stop = stop))
+          .catch((err: unknown) => {
+            console.error('join: scan failed', err)
+            dbg.log(`join: SCAN FAILED — ${err instanceof Error ? err.message : String(err)}`)
+            onError(joinFailureMessage(err))
+          })
+      })
+      await scanCtl.stop?.()
+      lobby.setStatus('Connecting over Bluetooth…')
+      await transport.connect(deviceId)
+    } catch (err) {
+      console.error('join: start/connect failed', err)
+      dbg.log(`join: JOIN FAILED — ${err instanceof Error ? err.message : String(err)}`)
+      lobby.setStatus(joinFailureMessage(err))
+      // Hand the radio back: a failed join must not leave us scanning forever.
+      await scanCtl.stop?.().catch(() => {})
+      await transport.stop().catch(() => {})
+      return null
+    }
   }
 
-  const lobby = createLobbyUi(deps.uiMount, false)
   if (transport instanceof WebBluetoothClientTransport) {
     // Device was already picked in the gesture handler; now do the GATT
     // connect with the session's handlers registered so peerConnected lands.
@@ -477,6 +588,13 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       } else if (phase === 'ended') {
         lobby.setStatus('Host disconnected')
         resolve(false)
+      } else if (phase === 'unreachable') {
+        // The join handshake is retried now (netClient.ts), but a retry that
+        // never lands must still END somewhere the player can see. This is the
+        // Bluetooth link being up while the host never answers — the case that
+        // used to sit on "Looking for a host…" until the phone was force-quit.
+        lobby.setStatus('Host never answered — move closer and reload to retry')
+        resolve(false)
       }
     }
   })
@@ -500,6 +618,39 @@ const createPadHint = (mount: HTMLElement): ((show: boolean) => void) => {
     'pointer-events:none;white-space:nowrap'
   mount.appendChild(el)
   return (show) => (el.style.display = show ? 'block' : 'none')
+}
+
+/**
+ * The "something in the frame threw" banner. A crash-proof loop that reports
+ * nothing is a client that is quietly broken — which is precisely what made this
+ * class of bug survive a playtest. Tap to dismiss; it comes straight back if the
+ * fault repeats. Console gets the full stack either way.
+ */
+const createFrameErrorBanner = (mount: HTMLElement): ((text: string | null) => void) => {
+  const el = document.createElement('div')
+  markUiChrome(el)
+  el.style.cssText =
+    'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:none;z-index:80;max-width:92%;' +
+    'font:600 12px system-ui;color:#ffdede;background:#7f1d1dee;padding:6px 12px;border-radius:8px;' +
+    'pointer-events:auto;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+  el.title = 'Tap to dismiss'
+  let dismissed = ''
+  el.addEventListener('click', () => {
+    dismissed = el.textContent ?? ''
+    el.style.display = 'none'
+  })
+  mount.appendChild(el)
+  let shown: string | null = null
+  return (text) => {
+    if (text === shown) return // no DOM churn on a fault that repeats every frame
+    shown = text
+    if (text === null) {
+      el.style.display = 'none'
+      return
+    }
+    el.textContent = text
+    if (text !== dismissed) el.style.display = 'block'
+  }
 }
 
 /** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
@@ -734,100 +885,129 @@ const runLoop = (
 
   let acc = 0
   let last = performance.now()
+  const showFrameError = createFrameErrorBanner(uiMount)
+  let frameErrors = initialFrameErrors()
   const frame = (now: number): void => {
-    const dt = Math.min((now - last) / 1000, 0.25)
-    acc += dt
-    last = now
-    while (acc >= SIM_DT) {
-      session.tick()
-      debug?.afterTick() // stream this tick's events + drain queued debug mutations
-      inspect.afterTick() // buffer this tick's events for sporefall.events()
-      acc -= SIM_DT
-    }
-    // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
-    // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
-    if (persister) {
-      const w = hostWorld()
-      if (w) persister.maybeSave(w)
-    }
-    const alpha = acc / SIM_DT
-    const view = session.renderView()
-    inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
-    if (view.level !== currentLevel) {
-      currentLevel = view.level
-      renderer.setLevel(view.level)
-    }
-    if (view.self) {
-      const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
-      const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
-      // Objective focus: while live, the camera glides to the link target and
-      // back (focusPanRate < normal → an animated pan, never a cut). The focus
-      // dies on its own timer, when the player moves, or if the target despawns.
-      const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
-      focus = tickFocus(focus, dt, view.self.pos, focusPos)
-      const rate = focusPanRate(focus)
-      if (focus) {
-        const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
-        renderer.camera.follow(t.x, t.y, dt, rate)
-      } else {
-        renderer.camera.follow(px, py, dt, rate)
-      }
-    }
-    renderer.draw(view, alpha, dt)
-    hud.update(view)
-    const pads = coop.debug()
-    // Twin-stick aim reticles: one per joined pad with a deflected right stick,
-    // anchored to that pad's player entity. Presentation only.
-    const anchors: ReticleAnchor[] = []
-    for (const e of view.entities)
-      if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
-    renderer.setReticles(padAimReticles(pads, anchors))
-    // Exposed-but-unjoined pad: nudge the player that any input joins.
-    showPadHint(pads.some((p) => p.slot === null))
-    vis = stepVisibility(vis, {
-      padJoined: anyPadActive(pads),
-      padActivity: anyPadProducing(pads),
-      touchActivity: touchSeen,
-    })
-    touchSeen = false
-    touch?.setVisible(sticksVisible(vis, caps))
-    touch?.update(view)
-    coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
-    screens.update(view)
-    missionPanel.update(view)
-    commOverlay.update(view)
-    overlay.update(pads)
-    pauseOverlay.update(session.isPaused ?? false, view)
-    // Tell the updater where the player is, so a downloaded build can swap
-    // itself in at a moment that costs nothing (src/app/updatePolicy.ts). The
-    // floor-change window is held open for the length of the "FLOOR n" banner
-    // rather than a single frame, so a download that lands mid-floor doesn't
-    // have to wait for the next one. `anchors` is the player list this frame
-    // already built for the aim reticles — peers only count on a networked
-    // session, where reloading would take the others down with us.
-    if (lastFloor === undefined) lastFloor = view.floor
-    else if (view.floor !== lastFloor) {
-      lastFloor = view.floor
-      floorFrames = FLOOR_TRANSITION_FRAMES
-    } else if (floorFrames > 0) floorFrames--
-    updates.reportMoment(
-      momentOf({
-        runOver: restartAffordance(view).visible,
-        floorChanging: floorFrames > 0,
-        paused: session.isPaused ?? false,
-      }),
-      networked ? Math.max(0, anchors.length - 1) : 0,
+    // THE LOOP MUST NOT BE KILLABLE. This used to re-arm requestAnimationFrame as
+    // its last statement with no try/catch, so a single throw anywhere below did
+    // not drop a frame — it ended rendering for the whole session on that device,
+    // while the host kept simulating and prediction kept the player walking. The
+    // rest of the party looked frozen. The re-arm now lives in `finally`, so the
+    // next frame always comes and the client recovers by itself the moment the
+    // state that caused the throw clears.
+    //
+    // Nothing is swallowed: every failure is counted, reported to the console
+    // (throttled, never muted — see ui/frameErrorModel.ts) and put on screen.
+    guardFrame(
+      () => {
+        const dt = Math.min((now - last) / 1000, 0.25)
+        acc += dt
+        last = now
+        while (acc >= SIM_DT) {
+          session.tick()
+          debug?.afterTick() // stream this tick's events + drain queued debug mutations
+          inspect.afterTick() // buffer this tick's events for sporefall.events()
+          acc -= SIM_DT
+        }
+        // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
+        // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
+        if (persister) {
+          const w = hostWorld()
+          if (w) persister.maybeSave(w)
+        }
+        const alpha = acc / SIM_DT
+        const view = session.renderView()
+        inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
+        if (view.level !== currentLevel) {
+          currentLevel = view.level
+          renderer.setLevel(view.level)
+        }
+        if (view.self) {
+          const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
+          const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
+          // Objective focus: while live, the camera glides to the link target and
+          // back (focusPanRate < normal → an animated pan, never a cut). The focus
+          // dies on its own timer, when the player moves, or if the target despawns.
+          const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
+          focus = tickFocus(focus, dt, view.self.pos, focusPos)
+          const rate = focusPanRate(focus)
+          if (focus) {
+            const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
+            renderer.camera.follow(t.x, t.y, dt, rate)
+          } else {
+            renderer.camera.follow(px, py, dt, rate)
+          }
+        }
+        renderer.draw(view, alpha, dt)
+        hud.update(view)
+        const pads = coop.debug()
+        // Twin-stick aim reticles: one per joined pad with a deflected right stick,
+        // anchored to that pad's player entity. Presentation only.
+        const anchors: ReticleAnchor[] = []
+        for (const e of view.entities)
+          if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
+        renderer.setReticles(padAimReticles(pads, anchors))
+        // Exposed-but-unjoined pad: nudge the player that any input joins.
+        showPadHint(pads.some((p) => p.slot === null))
+        vis = stepVisibility(vis, {
+          padJoined: anyPadActive(pads),
+          padActivity: anyPadProducing(pads),
+          touchActivity: touchSeen,
+        })
+        touchSeen = false
+        touch?.setVisible(sticksVisible(vis, caps))
+        touch?.update(view)
+        coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
+        screens.update(view)
+        missionPanel.update(view)
+        commOverlay.update(view)
+        overlay.update(pads)
+        pauseOverlay.update(session.isPaused ?? false, view)
+        // Tell the updater where the player is, so a downloaded build can swap
+        // itself in at a moment that costs nothing (src/app/updatePolicy.ts). The
+        // floor-change window is held open for the length of the "FLOOR n" banner
+        // rather than a single frame, so a download that lands mid-floor doesn't
+        // have to wait for the next one. `anchors` is the player list this frame
+        // already built for the aim reticles — peers only count on a networked
+        // session, where reloading would take the others down with us.
+        if (lastFloor === undefined) lastFloor = view.floor
+        else if (view.floor !== lastFloor) {
+          lastFloor = view.floor
+          floorFrames = FLOOR_TRANSITION_FRAMES
+        } else if (floorFrames > 0) floorFrames--
+        updates.reportMoment(
+          momentOf({
+            runOver: restartAffordance(view).visible,
+            floorChanging: floorFrames > 0,
+            paused: session.isPaused ?? false,
+          }),
+          networked ? Math.max(0, anchors.length - 1) : 0,
+        )
+        const hide = shouldHideCursor({
+          paused: session.isPaused ?? false,
+          gameOver: view.gameOver,
+          selfDead: !!view.self?.dead,
+        })
+        if (hide !== cursorHidden) {
+          canvas.style.cursor = hide ? 'none' : ''
+          cursorHidden = hide
+        }
+        frameErrors = noteFrameOk(frameErrors)
+      },
+      (err) => {
+        const noted = noteFrameError(frameErrors, frameErrorMessage(err))
+        frameErrors = noted.state
+        if (noted.log) console.error('[frame] uncaught error — the loop keeps running:', err)
+        showFrameError(frameErrorBannerText(frameErrors))
+        // Drop the sim backlog this frame never worked off. `acc` is only spent
+        // inside the fixed-step loop above, so a throw before it drains leaves the
+        // time owed to pile up — and a fault that clears after a few seconds would
+        // then be paid off as one enormous catch-up burst, freezing the device for
+        // real. Losing the skipped time is the cheaper failure.
+        acc = 0
+      },
+      () => requestAnimationFrame(frame),
     )
-    const hide = shouldHideCursor({
-      paused: session.isPaused ?? false,
-      gameOver: view.gameOver,
-      selfDead: !!view.self?.dead,
-    })
-    if (hide !== cursorHidden) {
-      canvas.style.cursor = hide ? 'none' : ''
-      cursorHidden = hide
-    }
-    requestAnimationFrame(frame)
   }
   requestAnimationFrame(frame)
 }

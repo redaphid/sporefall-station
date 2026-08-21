@@ -29,11 +29,11 @@ describe('inventory', () => {
 
   it('stacks stackable items into one slot but gives weapons their own slot', () => {
     const slots: { itemId: string; qty: number }[] = []
-    addItem(slots, 'molotov', 1)
-    addItem(slots, 'molotov', 2)
+    addItem(slots, 'grenade', 1)
+    addItem(slots, 'grenade', 2)
     addItem(slots, 'pistol', 8)
     expect(slots).toHaveLength(2)
-    expect(slots.find((s) => s.itemId === 'molotov')!.qty).toBe(3)
+    expect(slots.find((s) => s.itemId === 'grenade')!.qty).toBe(3)
   })
 
   it('refuses new slots past the cap', () => {
@@ -57,7 +57,7 @@ describe('inventory', () => {
   it('equipping a throwable holds it without touching the swung weapon', () => {
     const e = player(w)
     arm(e, 'bat')
-    e.loadout!.inventory.push({ itemId: 'molotov', qty: 2 })
+    e.loadout!.inventory.push({ itemId: 'grenade', qty: 2 })
     expect(equipSlot(e, 1)).toBe(true)
     expect(e.loadout!.activeSlot).toBe(1)
     expect(e.combat!.weapon).toBe('bat')
@@ -91,7 +91,7 @@ describe('inventory', () => {
 
   it('throwing spawns a projectile and removes it from the inventory', () => {
     const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
+    e.loadout!.inventory = [{ itemId: 'grenade', qty: 1 }]
     e.loadout!.activeSlot = 0
     expect(throwActive(w, e)).toBe(true)
     expect(w.entities.some((x) => x.projectile)).toBe(true)

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
 import { PLAYER_START_WEAPON, spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
+import { CONSUMABLES } from '../data/items'
 import { addEntity, createWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { applyDamage, detonate } from './combat'
@@ -437,14 +438,35 @@ describe('auto-pickup', () => {
     expect(bat.dead).toBeFalsy()
   })
 
+  // `collect`'s auto-heal branch (itemClass === 'consumable' → top up instead of
+  // taking a slot) has no live content behind it after the item cull emptied the
+  // consumable class, but the branch is deliberately retained. Registering a test
+  // consumable keeps it under test rather than letting it rot untested until
+  // someone adds the next one.
   it('a consumable auto-heals a hurt player instead of taking a slot', () => {
+    CONSUMABLES.testStim = { id: 'testStim', name: 'Test Stim', heal: 30 }
+    try {
+      const p = spawnPlayer(w, 0, 20, 20)
+      p.health!.hp = 10
+      pickup('testStim', 20, 20) // heals 30
+      settle(p)
+      interactionSystem(w, idleFor(0))
+      expect(p.health!.hp).toBe(40)
+      expect(p.loadout!.inventory.some((s) => s.itemId === 'testStim')).toBe(false)
+    } finally {
+      delete CONSUMABLES.testStim
+    }
+  })
+
+  it('a pickup whose item id no longer exists is stashed, not crashed on', () => {
+    // The old-save / older-peer case: `collect` must not index the consumable
+    // table for an id that classes as 'unknown'. It takes a slot and sits inert.
     const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 10
-    pickup('bandage', 20, 20) // heals 30
+    pickup('medkit', 20, 20) // culled — no longer in any registry
     settle(p)
-    interactionSystem(w, idleFor(0))
-    expect(p.health!.hp).toBe(40)
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(false)
+    expect(() => interactionSystem(w, idleFor(0))).not.toThrow()
+    expect(p.health!.hp).toBe(10) // definitely did not heal
   })
 
   it('an out-of-reach pickup is left alone', () => {

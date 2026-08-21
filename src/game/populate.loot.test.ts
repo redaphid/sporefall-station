@@ -8,10 +8,18 @@ import { populateWorld } from './populate'
 import { Tile, type Building, type Level } from './levelgen/level'
 import { itemClass } from './data/items'
 
-// The basic table lost its bat/knife when weapons stopped being loot; the depth
-// gate is otherwise unchanged (floor 1 basic, elements from floor 2).
-const BASIC = new Set(['bandage', 'medkit', 'cash'])
-const ELEMENT_THROWABLES = new Set(['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade'])
+// The basic table lost its bat/knife when weapons stopped being loot, then lost
+// bandage/medkit to the nine-item cull — so "basic" is now cash alone. The depth
+// gate itself is unchanged (floor 1 basic, elements from floor 2); the element
+// pool is just down to the one throwable that survived.
+//
+// These mirror `populate.ts` deliberately rather than importing it, so that a
+// change to the real tables has to be restated here on purpose. Keeping the
+// culled ids in these sets would have been the quiet failure: every assertion
+// below still passed with them listed, and a bandage creeping back into
+// BASIC_LOOT would have sailed through unnoticed.
+const BASIC = new Set(['cash'])
+const ELEMENT_THROWABLES = new Set(['grenade'])
 const isElement = (id: string): boolean => ELEMENT_THROWABLES.has(id)
 
 interface Pickup {

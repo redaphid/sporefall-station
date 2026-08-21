@@ -271,7 +271,7 @@
     {
       "id": 6,
       "kind": "pickup",
-      "archetype": "medkit",
+      "archetype": "pickup.grenade",
       "pos": {
         "x": 17,
         "y": 13
@@ -292,7 +292,7 @@
       "radius": 0.35,
       "facing": 0,
       "pickup": {
-        "itemId": "medkit",
+        "itemId": "grenade",
         "qty": 1
       },
       "interact": {

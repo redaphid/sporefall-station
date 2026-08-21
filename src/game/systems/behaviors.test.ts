@@ -312,11 +312,11 @@ describe('scavenger', () => {
   it('walks to a visible pickup, collects it into its stash, and emits the pickup event', () => {
     const w = arena()
     const s = scavenger(w, 20.5, 20.5)
-    const loot = pickupAt(w, 'medkit', 24.5, 20.5)
+    const loot = pickupAt(w, 'grenade', 24.5, 20.5)
     const events = runCollecting(w, 300, () => !w.byId.has(loot.id))
     expect(w.byId.has(loot.id)).toBe(false) // taken off the floor
-    expect(s.ai!.stash).toEqual(['medkit'])
-    expect(events).toContainEqual({ type: 'pickup', entityId: loot.id, byId: s.id, itemId: 'medkit' })
+    expect(s.ai!.stash).toEqual(['grenade'])
+    expect(events).toContainEqual({ type: 'pickup', entityId: loot.id, byId: s.id, itemId: 'grenade' })
   })
 
   it('two scavengers contesting one pickup: exactly one wins, the loser re-decides cleanly', () => {
@@ -420,7 +420,7 @@ describe('determinism (the sacred invariant)', () => {
       spawnNpc(w, 'civilian', 15.5, 24.5)
       const s = spawnNpc(w, 'civilian', 30.5, 20.5)
       s.ai!.behavior = 'scavenger'
-      pickupAt(w, 'bandage', 33.5, 20.5)
+      pickupAt(w, 'grenade', 33.5, 20.5)
       assignPatrol(spawnNpc(w, 'cop', 40.5, 20.5), [
         { x: 40.5, y: 20.5 },
         { x: 45.5, y: 20.5 },

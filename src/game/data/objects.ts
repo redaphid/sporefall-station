@@ -24,11 +24,20 @@ export interface ObjectDef {
 }
 
 export const OBJECTS: Record<string, ObjectDef> = {
-  crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['bandage', 'molotov', 'cash'] },
+  // Smashable containers used to spill bandages and molotovs; both were culled,
+  // so cash is what is left in them. A loot table of one is still a table — it
+  // is the hook a future spillable item hangs on.
+  crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['cash'] },
   barrel: { id: 'barrel', name: 'Barrel', hp: 15, damageThreshold: 5, flammable: true, explode: { radius: 2.4, damage: 40 }, ignite: true },
   tv: { id: 'tv', name: 'TV', hp: 12, loot: ['cash'] },
   toilet: { id: 'toilet', name: 'Toilet', hp: 10 },
-  vending: { id: 'vending', name: 'Vending Machine', hp: 40, loot: ['cash'], use: { gives: 'burger' } },
+  // The burger was this machine's ONLY payout, and the cull took it. Rather than
+  // delete the E-interact — which would quietly turn the one usable furnishing
+  // on the floor into scenery, a player-facing loss the cull never asked for —
+  // it now pays out its change: a small `cash` dispense, the ATM's behaviour at
+  // a fraction of the amount. FLAGGED for review: this is the one substitution
+  // in the cull rather than a straight deletion.
+  vending: { id: 'vending', name: 'Vending Machine', hp: 40, loot: ['cash'], use: { gives: 'cash', amount: 10 } },
   atm: { id: 'atm', name: 'ATM', hp: 50, hackable: true, use: { gives: 'cash', amount: 50 } },
   generator: { id: 'generator', name: 'Generator', hp: 30, hackable: true, explode: { radius: 1.6, damage: 15 }, ignite: true },
   // Sporefall Station power plant — same hackable behavior as `generator`, dressed
@@ -38,7 +47,7 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // keeps its linked hatches overgrown. Flammable (fire kills it) with real hp
   // (shoot it down), and it spills fungal loot. Its DEATH un-overgrows every
   // hatch whose `door.nodeId` points at it (interaction.sealSystem).
-  sporeNode: { id: 'sporeNode', name: 'Spore Node', hp: 45, flammable: true, ignite: true, loot: ['bandage', 'gasGrenade', 'molotov', 'cash'] },
+  sporeNode: { id: 'sporeNode', name: 'Spore Node', hp: 45, flammable: true, ignite: true, loot: ['cash'] },
 
   // ── Interior furnishings (feat/levelgen-fill-interiors) ──────────────────
   // Role-appropriate props that make a room read as OCCUPIED and legible rather
@@ -51,14 +60,15 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // body that plugs a doorway approach — shove past it slowly or smash through.
   // Deliberately mundane: no explosion, no fire, no loot; its whole job is hp.
   barricade: { id: 'barricade', name: 'Junk Barricade', hp: 40 },
-  bunk: { id: 'bunk', name: 'Bunk', hp: 25, flammable: true, loot: ['bandage', 'cash'] },
+  bunk: { id: 'bunk', name: 'Bunk', hp: 25, flammable: true, loot: ['cash'] },
   desk: { id: 'desk', name: 'Desk', hp: 20, flammable: true, loot: ['cash'] },
-  shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['bandage', 'cash', 'molotov'] },
-  cabinet: { id: 'cabinet', name: 'Supply Cabinet', hp: 22, loot: ['medkit', 'bandage'] },
-  bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['bandage', 'gasGrenade'] },
+  shelf: { id: 'shelf', name: 'Shelving', hp: 18, flammable: true, loot: ['cash'] },
+  cabinet: { id: 'cabinet', name: 'Supply Cabinet', hp: 22, loot: ['cash'] },
+  bench: { id: 'bench', name: 'Lab Bench', hp: 24, loot: ['cash'] },
   // Repurposed from the old "Weapons Locker": weapons are no longer lootable
-  // (one permanent weapon), so it stocks throwables and healing instead.
-  locker: { id: 'locker', name: 'Supply Locker', hp: 30, loot: ['grenade', 'medkit', 'cash'] },
+  // (one permanent weapon), and the healing items have since been culled, so
+  // what it stocks is the grenade — the last remaining throwable.
+  locker: { id: 'locker', name: 'Supply Locker', hp: 30, loot: ['grenade', 'cash'] },
   table: { id: 'table', name: 'Table', hp: 16, flammable: true },
   // The thing every table in this game was missing. A chair is placed BY the
   // layout planner, never alone: pulled up to a desk, ringed round a table, or

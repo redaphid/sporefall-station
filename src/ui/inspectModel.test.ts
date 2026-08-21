@@ -307,10 +307,13 @@ describe('buildInfoCard — world objects (every OBJECTS entry)', () => {
     })
   }
 
-  it('an ATM says what it dispenses; a vending machine names the snack', () => {
+  // The vending machine named a Burger until the item cull took it; it now
+  // returns change, so both dispensers state a cash amount. The row itself is
+  // what matters — a dispenser must always say what it pays out.
+  it('both dispensers say what they dispense', () => {
     const w = world()
     expect(rowMap(buildInfoCard(spawnObject(w, 'atm', 1, 1)).rows).Dispenses).toBe('$50')
-    expect(rowMap(buildInfoCard(spawnObject(w, 'vending', 2, 2)).rows).Dispenses).toBe('Burger')
+    expect(rowMap(buildInfoCard(spawnObject(w, 'vending', 2, 2)).rows).Dispenses).toBe('$10')
   })
 
   it('explosive props warn; a used dispenser says so', () => {

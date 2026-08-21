@@ -58,7 +58,7 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
 }
 
 // 30 ticks = 1s. Player moves ~0.15 tiles/tick. Tuned against the `demo`
-// scenario (spawn 1.5,1.5; lane y=11; medkit x5.5; civilians x8/9; door x12;
+// scenario (spawn 1.5,1.5; lane y=11; grenade pickup x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
@@ -91,7 +91,7 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 50 }, // settle on spawn
     { ticks: 64, y: 1 }, // drop down into the plaza lane
     { ticks: 45 }, // look around
-    { ticks: 30, x: 1 }, // walk right, scooping up the medkit at x=5.5
+    { ticks: 30, x: 1 }, // walk right, scooping up the pickup at x=5.5
     { ticks: 45 }, // pause over the pickup
     { ticks: 20, x: 1 }, // continue toward the civilians (~x9)
     { ticks: 80 }, // mingle with the civilians
@@ -173,13 +173,16 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Control for the dodge-roll video: never roll — the same bullet connects.
   dodgeControl: [{ ticks: 60 }],
 
-  // Fire-uses-active-item headline: a wounded player holds a bandage in the active
-  // slot and presses FIRE — instead of a gun shot, the bandage is USED (heals) and
-  // spent. No bullet leaves the barrel. Backs feature-fire-item-roll.
+  // Fire-uses-active-item headline: the player holds a GRENADE in the active slot
+  // and presses FIRE — instead of a gun shot, the active item is USED (thrown) and
+  // spent. No bullet leaves the barrel. This staged a bandage-heal until the item
+  // cull removed every consumable; the RULE under test is unchanged (FIRE routes
+  // to `useHeld` when the active slot is not a weapon), only the item is.
+  // Backs feature-fire-item-roll.
   fireUseItem: [
-    { ticks: 20 }, // establish: wounded, bandage in hand
-    { ticks: 1, attack: true }, // FIRE → uses the bandage, hp jumps
-    { ticks: 49 }, // stand healed; nothing was fired
+    { ticks: 20 }, // establish: grenade in hand
+    { ticks: 1, attack: true }, // FIRE → uses the grenade, it leaves the hand
+    { ticks: 49 }, // watch it land; no bullet was fired
   ],
 
   // Use→dodge-roll fallback headline: hands hold nothing usable (an out-of-ammo

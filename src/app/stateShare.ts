@@ -20,12 +20,51 @@ import {
   type StateLinkPayload,
 } from '../debug/stateLink'
 import type { World } from '../game/world'
-import { APP_VERSION } from './version'
+import { APP_VERSION, SITE_ORIGIN } from './version'
 
-/** Where the Worker serves `/state`. Same origin in every real deployment; the
- * override exists for `vite dev` (port 5173) talking to `wrangler dev` (8787). */
-export const stateOrigin = (search: string, origin: string): string =>
-  new URLSearchParams(search).get('stateOrigin') ?? origin
+/** Hostnames that only ever mean "this machine". */
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+
+/**
+ * Is this page being served by a NATIVE SHELL out of its own bundled assets,
+ * rather than by the site?
+ *
+ * The Android APK is the case that matters. `capacitor.config.ts` sets no
+ * `androidScheme`, so Capacitor's default applies and the webview serves the
+ * bundled `dist/` from `https://localhost` -- a real origin, with a real
+ * successful `fetch`, that resolves to files inside the APK. A request built
+ * from `location.origin` there never reaches the Worker; it hits the app's own
+ * SPA fallback and comes back as 200 + index.html.
+ *
+ * PORTLESS ON PURPOSE. `vite dev` (localhost:5173) and `wrangler dev`
+ * (localhost:8787) are localhost too, and they must keep resolving to
+ * THEMSELVES: wrangler genuinely serves `/state`, and vite has the
+ * `?stateOrigin=` override below. Only a portless localhost -- plus
+ * `capacitor://localhost` and a `file://` document, whose origin is the literal
+ * string `"null"` -- is a native shell.
+ */
+const isNativeShellOrigin = (origin: string): boolean => {
+  if (!origin || origin === 'null') return true
+  try {
+    const url = new URL(origin)
+    return LOCAL_HOSTS.has(url.hostname) && url.port === ''
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Where the Worker serves `/state`.
+ *
+ * Same origin as the page in a browser. Inside the native shell there is no
+ * useful page origin, so fall back to the origin the bundle was BUILT for
+ * (`SITE_ORIGIN`, baked in by Vite from capacitor.config.ts's OTA URL).
+ *
+ * The explicit `?stateOrigin=` override still wins over both, which is what
+ * keeps `vite dev` (5173) able to point at `wrangler dev` (8787).
+ */
+export const stateOrigin = (search: string, origin: string, siteOrigin: string = SITE_ORIGIN): string =>
+  new URLSearchParams(search).get('stateOrigin') ?? (siteOrigin && isNativeShellOrigin(origin) ? siteOrigin : origin)
 
 const gzip = async (text: string): Promise<Blob> =>
   new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).blob()
@@ -68,6 +107,20 @@ export const shareState = async (
     body,
   })
   if (!res.ok) throw new Error(`upload failed: ${res.status} ${(await res.text()).trim()}`)
+
+  // CHECKS CONTENT-TYPE, NOT JUST STATUS -- the same guard as `fetchState`
+  // below, and for the same reason. A 200 is not proof the Worker answered:
+  // an SPA fallback (the deployed site's, or the APK's own bundled assets when
+  // `origin` wrongly points at the phone) replies 200 with index.html, sails
+  // past `res.ok`, and then detonates inside `res.json()` as an unreadable
+  // complaint about `<!doctype`. Naming the origin here is most of the
+  // diagnosis: it says WHERE the upload actually went.
+  const type = res.headers.get('content-type') ?? ''
+  if (!type.includes('application/json'))
+    throw new Error(
+      `upload to ${origin}/state returned ${type || 'no content-type'} instead of JSON — ` +
+        `the POST never reached the Worker (an SPA fallback answered with the app shell).`,
+    )
 
   const { id, url } = (await res.json()) as { id: string; url: string }
   return { id, url, bytes: body.size, rawBytes: json.length, rewindTicks: check.rewindTicks }

@@ -16,6 +16,17 @@ const serverUrl = process.env.CAP_SERVER_URL
 const otaUpdateUrl =
   process.env.OTA_UPDATE_URL ?? 'https://sporefall.hypnodroid.com/ota/check'
 
+// The canonical public origin of the deployed site, derived from the OTA
+// endpoint above so the hostname is written down in EXACTLY ONE place. Two
+// copies of a hostname is a future outage: one gets updated, the other keeps
+// pointing at a domain nobody serves any more.
+//
+// vite.config.ts bakes this into the web bundle as `__SITE_ORIGIN__` (read via
+// src/app/version.ts). It is needed there because inside the Android webview
+// the app is served from Capacitor's own origin, so `location.origin` names the
+// APK's bundled assets rather than the server -- see src/app/stateShare.ts.
+export const SITE_ORIGIN = new URL(otaUpdateUrl).origin
+
 const config: CapacitorConfig = {
   appId: 'com.hypnodroid.backseat',
   appName: 'Sporefall Station',

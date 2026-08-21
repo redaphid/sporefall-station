@@ -47,7 +47,8 @@
     "e2e:feature:combat": "bash e2e/run-features.sh combat",
     "e2e:feature:fire": "bash e2e/run-features.sh fire",
     "gen:fixtures": "tsx scripts/test/gen-serialize-fixtures.mts && tsx scripts/test/gen-feature-fixtures.mts",
-    "e2e:state": "node e2e/state-link-roundtrip.mjs"
+    "e2e:state": "node e2e/state-link-roundtrip.mjs",
+    "e2e:share": "bash e2e/run-share-button.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

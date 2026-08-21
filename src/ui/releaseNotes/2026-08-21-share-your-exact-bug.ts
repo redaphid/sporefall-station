@@ -1,1 +1,1 @@
-export default 'Share a link that replays your exact bug'
+export default 'Pause → Share state: link your exact bug'

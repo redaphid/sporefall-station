@@ -262,6 +262,25 @@ export const PROP_SPRITE: Record<string, string> = {
   // to the character eyeball). The Cryo Terminal object is literally that art.
   cryoTerminal: 'atm',
   generator: 'tv',
+  // `crate` is not new art: public/themes/swampspace/props/cargo-crate.png has
+  // shipped since the pack landed, but `crate` was never a registered sprite
+  // key, so every crate in the game drew the procedural slatted silhouette
+  // while its own texture sat unused behind prop.default. This is the same
+  // desk -> work-desk indirection: archetype on the left, ART name on the
+  // right, filename in the theme manifest.
+  crate: 'crate',
+  // The sporeforge furnishings. Each of these has a FURNITURE_SHAPE entry
+  // directly below and KEEPS it: the sprite wins wherever a theme ships one,
+  // and the drawn silhouette stays the fallback for the packs (city, test)
+  // that do not. Deleting those would regress every theme without prop art.
+  shelf: 'shelf',
+  bunk: 'bunk',
+  bench: 'bench',
+  table: 'table',
+  plant: 'plant',
+  // The archetype is camelCase `sporeNode` (it is what OBJECTS and the
+  // renderer look up); the ART name is kebab-case like every other prop key.
+  sporeNode: 'spore-node',
 }
 
 // Consumables/weapons that reuse another item's sprite.

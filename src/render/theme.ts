@@ -64,8 +64,14 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
 export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod'] as const
 export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
+// The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
+// `crate` are canonical for the same reason `boss` is above: a prop key that is
+// not listed here is not canonical, so validateManifest DROPS the mapping and
+// the PNG is silently discarded however correct the file is. `crate` needed no
+// new art at all -- cargo-crate.png has shipped since the pack landed and was
+// only ever reachable as prop.default.
 export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
-  'chair'] as const
+  'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node'] as const
 const UNIT_SINGLES = ['player', 'cop'] as const
 const UNIT_WALKERS = ['thug', 'scientist', 'robot'] as const
 

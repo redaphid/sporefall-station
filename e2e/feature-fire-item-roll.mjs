@@ -1,7 +1,9 @@
 // FIRE/USE arbitration headline (feat/fire-use-roll): FIRE uses a usable active
 // item or fires the weapon; the dodge-roll fallback lives on the USE button.
-//   • fire-uses-item : a wounded player holding a bandage presses FIRE → the
-//                      bandage is USED (heals) and spent; NO bullet is fired.
+//   • fire-uses-item : a player holding a GRENADE presses FIRE → the item is
+//                      USED (thrown) and spent; NO bullet is fired. This staged a
+//                      bandage-heal until the item cull removed every consumable;
+//                      the RULE is unchanged, only the item that demonstrates it.
 //   • use-rolls      : hands hold nothing usable (an empty gun), so pressing USE
 //                      dodge-rolls through an inbound bullet — hp UNCHANGED.
 // Both effects are asserted on the post-run world. Built on the committed
@@ -34,17 +36,17 @@ const readState = () => {
     rolling: !!pl?.playerCtl?.roll,
     downed: !!pl?.playerCtl?.downed,
     bullets: w.entities.filter((e) => e.kind === 'projectile' && e.archetype === 'projectile' && !e.dead).length,
-    hasBandage: (pl?.playerCtl?.inventory ?? []).some((s) => s.itemId === 'bandage'),
+    hasHeldItem: (pl?.playerCtl?.inventory ?? []).some((s) => s.itemId === 'grenade'),
+    thrown: w.entities.filter((e) => e.kind === 'projectile' && e.archetype === 'grenade' && !e.dead).length,
   }
 }
 
 let ok = true
 
-// 1) Fire a bandage → heal, no shot. Wounded (hp 40/120), bandage active.
+// 1) Fire a grenade → it is thrown, no shot. The held item is what FIRE spends.
 {
   const { w, p } = clearedStage()
-  p.health = { hp: 40, max: p.health.max, iframes: 0 }
-  p.playerCtl.inventory = [{ itemId: 'bandage', qty: 1 }]
+  p.playerCtl.inventory = [{ itemId: 'grenade', qty: 1 }]
   p.playerCtl.activeSlot = 0
   ok =
     (await recordFeature({
@@ -52,14 +54,13 @@ let ok = true
       world: w,
       script: 'fireUseItem',
       stills: [
-        { tick: 10, label: '01-wounded-bandage-in-hand' },
-        { tick: 25, label: '02-fired-bandage-healed' },
-        { tick: 55, label: '03-standing-healed' },
+        { tick: 10, label: '01-grenade-in-hand' },
+        { tick: 25, label: '02-fired-grenade-thrown' },
+        { tick: 55, label: '03-grenade-landed' },
       ],
       readState,
       expect: (s) => [
-        s.playerHp <= 40 && `bandage did not heal (hp ${s.playerHp}/${s.playerMax})`,
-        s.hasBandage && 'bandage was not consumed',
+        s.hasHeldItem && 'the held grenade was not consumed',
         s.bullets > 0 && `a bullet was fired (${s.bullets}) — fire should have used the item`,
       ],
     })) && ok

@@ -312,9 +312,9 @@ describe('projectiles are exempt from projection', () => {
    */
   it('draws a thrown item exactly as the old fixed-0.45 ease did', async () => {
     const r = await rig()
-    const per = 9 / SIM_HZ // molotov speed
+    const per = 8 / SIM_HZ // grenade speed (data/items THROWABLES.grenade)
     let x = 20
-    await r.send(3, [wire(REMOTE, x, 20, 'molotov')])
+    await r.send(3, [wire(REMOTE, x, 20, 'grenade')])
     r.run(3)
     // Reference model: the pre-fix filter, written out longhand. It must chase
     // the QUANTISED target — positions ride a u16 at 1/32-tile precision
@@ -325,7 +325,7 @@ describe('projectiles are exempt from projection', () => {
     const drawn: { x: number; y: number }[] = []
     for (let s = 2; s <= 6; s++) {
       x += per * 3
-      await r.send(s * 3, [wire(REMOTE, x, 20, 'molotov')])
+      await r.send(s * 3, [wire(REMOTE, x, 20, 'grenade')])
       for (let i = 0; i < 3; i++) {
         ref += (q(x) - ref) * 0.45
         refPath.push(ref)
@@ -338,9 +338,9 @@ describe('projectiles are exempt from projection', () => {
   /** A thrown item really does arrive as kind 'projectile' even though its
    * archetype is the bare item id — the exemption keys off `kind`, so if that
    * mapping ever changed the exemption would silently stop applying. */
-  it('a molotov arrives as kind projectile, which is what the exemption keys off', async () => {
+  it('a thrown grenade arrives as kind projectile, which is what the exemption keys off', async () => {
     const r = await rig()
-    await r.send(3, [wire(REMOTE, 20, 20, 'molotov')])
+    await r.send(3, [wire(REMOTE, 20, 20, 'grenade')])
     const e = r.bob.session.renderView().entities.find((x) => x.id === REMOTE)
     expect(e?.kind).toBe('projectile')
   })

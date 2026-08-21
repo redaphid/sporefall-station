@@ -54,7 +54,7 @@ const run = async () => {
   const ids = await page.evaluate(() => {
     const byArch = {}
     for (const e of window.__world.entities) (byArch[e.archetype] ??= []).push(e.id)
-    return { cop: byArch.cop[0], thugA: byArch.thug[0], thugB: byArch.thug[1], gangster: byArch.gangster[0], medkit: byArch.medkit[0] }
+    return { cop: byArch.cop[0], thugA: byArch.thug[0], thugB: byArch.thug[1], gangster: byArch.gangster[0], pickup: byArch['pickup.grenade'][0] }
   })
 
   const annotate = (arr) => page.evaluate((json) => window.__annotate(json), JSON.stringify(arr))
@@ -70,7 +70,7 @@ const run = async () => {
   const perKind = {
     text: [{ kind: 'text', text: 'Claude: sweep this room left to right', color: '#ffd76a' }],
     label: [{ kind: 'label', targetId: ids.cop, text: 'Cop — lawful, hits back' }],
-    pin: [{ kind: 'pin', targetId: ids.medkit, text: 'Medkit — grab it' }],
+    pin: [{ kind: 'pin', targetId: ids.pickup, text: 'Grenade — grab it' }],
     arrow: [{ kind: 'arrow', x: 26, y: 6, x2: 20, y2: 11, text: 'go here', color: '#7fd17f' }],
     circle: [{ kind: 'circle', x: 20, y: 9, radius: 2.6, text: 'danger zone', color: '#ff6b6b' }],
   }
@@ -89,7 +89,7 @@ const run = async () => {
     { kind: 'label', targetId: ids.thugA, text: 'Thug — hostile' },
     { kind: 'label', targetId: ids.thugB, text: 'Thug — flank' },
     { kind: 'label', targetId: ids.gangster, text: 'Gangster — pistol' },
-    { kind: 'pin', targetId: ids.medkit, text: 'Medkit — grab it' },
+    { kind: 'pin', targetId: ids.pickup, text: 'Grenade — grab it' },
     { kind: 'circle', x: 20, y: 9, radius: 2.6, text: 'danger zone', color: '#ff6b6b' },
     { kind: 'arrow', x: 26, y: 6, x2: 20, y2: 11, text: 'go here', color: '#7fd17f' },
   ]

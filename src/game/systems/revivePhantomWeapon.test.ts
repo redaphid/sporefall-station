@@ -179,7 +179,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
   it('a full inventory cannot be over-stuffed by materialization (leaves the mod on the ground)', () => {
     const p = bareEntity()
     p.combat!.weapon = 'pistol'
-    p.loadout!.inventory = Array.from({ length: 6 }, () => ({ itemId: 'bandage', qty: 1 }))
+    p.loadout!.inventory = Array.from({ length: 6 }, () => ({ itemId: 'grenade', qty: 1 }))
     const res = applyModPickup(p, 'frost')
     expect(res).toBeNull()
     expect(p.loadout!.inventory).toHaveLength(6) // MAX_SLOTS respected

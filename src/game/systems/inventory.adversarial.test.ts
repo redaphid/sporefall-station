@@ -4,7 +4,29 @@ import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
 import { combatSystem } from './combat'
 import { addItem, activeStack, equipSlot, MAX_SLOTS, throwActive, useHeld, wearMelee } from './inventory'
+import { CONSUMABLES } from '../data/items'
 import { arm } from '../testkit'
+
+/**
+ * The nine-item cull emptied the CONSUMABLE class outright — bandage, medkit,
+ * burger and adrenaline were all of it. The machinery is deliberately kept
+ * (`itemClass` → 'consumable', HELDABLE, isStackable, consumeActive's heal/onUse),
+ * so a few cases here still need a consumable to exist in order to assert that
+ * the class behaves differently from a throwable. Rather than weaken them into
+ * throwable duplicates, they register one for the length of the test and remove
+ * it again — no shared state escapes, and the day someone adds a real consumable
+ * these are the tests that already prove it will work.
+ *
+ * Cases that only need SOME held item use the grenade, which really ships.
+ */
+const withTempConsumable = (fn: (id: string) => void): void => {
+  CONSUMABLES.testStim = { id: 'testStim', name: 'Test Stim', heal: 30 }
+  try {
+    fn('testStim')
+  } finally {
+    delete CONSUMABLES.testStim
+  }
+}
 
 const player = (w: World, x = 20, y = 20): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', x, y))
@@ -63,14 +85,16 @@ describe('inventory — adversarial', () => {
     })
 
     it('equipping a consumable holds it without changing the swung weapon', () => {
-      const e = player(w)
-      arm(e, 'bat')
-      e.loadout!.inventory.push({ itemId: 'bandage', qty: 2 })
-      expect(e.combat!.weapon).toBe('bat')
-      expect(equipSlot(e, 1)).toBe(true)
-      expect(e.loadout!.activeSlot).toBe(1)
-      // A consumable is "held" for Use; the bat stays in hand for swinging.
-      expect(e.combat!.weapon).toBe('bat')
+      withTempConsumable((id) => {
+        const e = player(w)
+        arm(e, 'bat')
+        e.loadout!.inventory.push({ itemId: id, qty: 2 })
+        expect(e.combat!.weapon).toBe('bat')
+        expect(equipSlot(e, 1)).toBe(true)
+        expect(e.loadout!.activeSlot).toBe(1)
+        // A consumable is "held" for Use; the bat stays in hand for swinging.
+        expect(e.combat!.weapon).toBe('bat')
+      })
     })
 
     it('REFUSES a weapon slot outright — the weapon is permanent and unselectable', () => {
@@ -100,7 +124,7 @@ describe('inventory — adversarial', () => {
 
     it('throwing the last throwable empties the slot; a second throw returns false', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
+      e.loadout!.inventory = [{ itemId: 'grenade', qty: 1 }]
       e.loadout!.activeSlot = 0
       expect(throwActive(w, e)).toBe(true)
       expect(e.loadout!.inventory).toHaveLength(0)
@@ -144,17 +168,24 @@ describe('inventory — adversarial', () => {
     })
 
     it('removing a slot below the active slot shifts activeSlot down and keeps the weapon', () => {
-      const e = player(w)
-      // The reachable shape now: the permanent weapon in slot 0, a throwable in
-      // slot 1, and a HELD consumable above it in slot 2.
-      arm(e, 'pistol')
-      e.loadout!.inventory.push({ itemId: 'molotov', qty: 1 }, { itemId: 'bandage', qty: 2 })
-      expect(equipSlot(e, 2)).toBe(true) // hold the bandage
-      throwActive(w, e) // throws the molotov at slot 1, removeSlot(1)
-      expect(e.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'bandage'])
-      expect(e.loadout!.activeSlot).toBe(1) // shifted down, still the bandage
-      expect(activeStack(e)!.itemId).toBe('bandage')
-      expect(e.combat!.weapon).toBe('pistol')
+      // Needs TWO different heldable classes: `throwActive` prefers the active
+      // slot when it is itself a throwable (firstThrowableSlot), so two grenades
+      // would throw the held one and never exercise the shift. A consumable in
+      // the upper slot is the only shape that removes a slot BELOW the active
+      // one — hence the temporary registration.
+      withTempConsumable((id) => {
+        const e = player(w)
+        // The permanent weapon in slot 0, a throwable in slot 1, a HELD
+        // consumable above it in slot 2.
+        arm(e, 'pistol')
+        e.loadout!.inventory.push({ itemId: 'grenade', qty: 1 }, { itemId: id, qty: 2 })
+        expect(equipSlot(e, 2)).toBe(true) // hold the consumable
+        throwActive(w, e) // throws the grenade at slot 1, removeSlot(1)
+        expect(e.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', id])
+        expect(e.loadout!.activeSlot).toBe(1) // shifted down, still the consumable
+        expect(activeStack(e)!.itemId).toBe(id)
+        expect(e.combat!.weapon).toBe('pistol')
+      })
     })
   })
 
@@ -162,23 +193,23 @@ describe('inventory — adversarial', () => {
     it('refuses a fresh slot past the cap but still stacks into an existing stackable', () => {
       const slots: ItemStack[] = []
       for (let i = 0; i < MAX_SLOTS - 1; i++) addItem(slots, `weapon${i}`, 1)
-      addItem(slots, 'bandage', 1) // fills the last slot
+      addItem(slots, 'grenade', 1) // fills the last slot
       expect(slots).toHaveLength(MAX_SLOTS)
       expect(addItem(slots, 'freezeRay', 1)).toBe(false) // full, new slot refused
-      expect(addItem(slots, 'bandage', 5)).toBe(true) // stacks into existing
-      expect(slots.find((s) => s.itemId === 'bandage')!.qty).toBe(6)
+      expect(addItem(slots, 'grenade', 5)).toBe(true) // stacks into existing
+      expect(slots.find((s) => s.itemId === 'grenade')!.qty).toBe(6)
     })
 
     it('does not crash on a huge quantity and preserves it', () => {
       const slots: ItemStack[] = []
-      expect(addItem(slots, 'bandage', 1_000_000)).toBe(true)
-      addItem(slots, 'bandage', 1_000_000)
+      expect(addItem(slots, 'grenade', 1_000_000)).toBe(true)
+      addItem(slots, 'grenade', 1_000_000)
       expect(slots[0].qty).toBe(2_000_000)
     })
 
     it('does not crash on a negative quantity', () => {
       const slots: ItemStack[] = []
-      expect(() => addItem(slots, 'bandage', -5)).not.toThrow()
+      expect(() => addItem(slots, 'grenade', -5)).not.toThrow()
       expect(slots[0].qty).toBe(-5)
     })
   })
@@ -197,68 +228,72 @@ describe('inventory — adversarial', () => {
       npc.loadout = {
         inventory: [
           { itemId: 'bat', qty: 5 },
-          { itemId: 'molotov', qty: 1 },
+          { itemId: 'grenade', qty: 1 },
         ],
         activeSlot: 1, // active slot is NOT the weapon
       }
       wearMelee(npc)
       expect(npc.loadout.inventory.find((s) => s.itemId === 'bat')!.qty).toBe(4)
-      expect(npc.loadout.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(1)
+      expect(npc.loadout.inventory.find((s) => s.itemId === 'grenade')!.qty).toBe(1)
     })
 
     it('firing spends nothing from the weapon or the held throwable', () => {
       const e = player(w)
       arm(e, 'pistol')
-      e.loadout!.inventory.push({ itemId: 'molotov', qty: 3 })
-      equipSlot(e, 1) // hold the molotov; weapon still pistol
+      e.loadout!.inventory.push({ itemId: 'grenade', qty: 3 })
+      equipSlot(e, 1) // hold the grenade; weapon still pistol
       // Firing spends nothing now, so holding a throwable cannot drain the gun
       // (nor the throwable) — the counts simply stand still.
       expect(e.loadout!.inventory.find((s) => s.itemId === 'pistol')!.qty).toBe(1)
-      expect(e.loadout!.inventory.find((s) => s.itemId === 'molotov')!.qty).toBe(3)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'grenade')!.qty).toBe(3)
     })
 
     it('throwing the held throwable keeps the permanent weapon in hand (not reset to fists)', () => {
       const e = player(w)
       arm(e, 'bat')
-      e.loadout!.inventory.push({ itemId: 'molotov', qty: 1 })
-      equipSlot(e, 1) // hold the molotov
-      throwActive(w, e) // spends the molotov, empties slot 1
+      e.loadout!.inventory.push({ itemId: 'grenade', qty: 1 })
+      equipSlot(e, 1) // hold the grenade
+      throwActive(w, e) // spends the grenade, empties slot 1
       expect(e.combat!.weapon).toBe('bat')
       expect(e.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
     })
 
-    it('through combatSystem: FIRE swings the weapon even with a bandage HELD', () => {
+    it('through combatSystem: FIRE swings the weapon even with a CONSUMABLE HELD', () => {
       // The one-weapon rule changed this. FIRE used to divert to a usable active
       // item; with an unselectable permanent weapon there is nothing to cycle
       // back to, so that rule would leave a player holding an item permanently
       // unable to attack. FIRE now always fires; items live on the USE button.
-      const e = player(w)
-      e.health!.hp = 60
-      const target = dummy(w, 21, 20)
-      arm(e, 'bat')
-      e.loadout!.inventory.push({ itemId: 'bandage', qty: 1 })
-      equipSlot(e, 1) // hold the bandage as the active item
-      combatSystem(w, attack())
-      expect(target.health!.hp).toBeLessThan(40) // the bat SWUNG
-      expect(e.health!.hp).toBe(60) // no heal — the bandage was not used
-      expect(e.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(true) // not spent
-      expect(e.combat!.weapon).toBe('bat')
+      withTempConsumable((id) => {
+        const e = player(w)
+        e.health!.hp = 60
+        const target = dummy(w, 21, 20)
+        arm(e, 'bat')
+        e.loadout!.inventory.push({ itemId: id, qty: 1 })
+        equipSlot(e, 1) // hold the consumable as the active item
+        combatSystem(w, attack())
+        expect(target.health!.hp).toBeLessThan(40) // the bat SWUNG
+        expect(e.health!.hp).toBe(60) // no heal — the item was not used
+        expect(e.loadout!.inventory.some((s) => s.itemId === id)).toBe(true) // not spent
+        expect(e.combat!.weapon).toBe('bat')
+      })
     })
 
-    it('through combatSystem: the USE button is what spends the held bandage', () => {
-      const e = player(w)
-      e.health!.hp = 60
-      const target = dummy(w, 21, 20)
-      arm(e, 'bat')
-      e.loadout!.inventory.push({ itemId: 'bandage', qty: 1 })
-      equipSlot(e, 1)
-      const cmd = emptyInput()
-      cmd.throwItem = true
-      combatSystem(w, new Map([[0, cmd]]))
-      expect(e.health!.hp).toBe(90) // 60 + 30 heal → the bandage was USED
-      expect(e.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(false) // spent
-      expect(target.health!.hp).toBe(40) // and the bat did NOT swing
-      expect(e.combat!.weapon).toBe('bat')
+    it('through combatSystem: the USE button is what spends the held consumable', () => {
+      withTempConsumable((id) => {
+        const e = player(w)
+        e.health!.hp = 60
+        const target = dummy(w, 21, 20)
+        arm(e, 'bat')
+        e.loadout!.inventory.push({ itemId: id, qty: 1 })
+        equipSlot(e, 1)
+        const cmd = emptyInput()
+        cmd.throwItem = true
+        combatSystem(w, new Map([[0, cmd]]))
+        expect(e.health!.hp).toBe(90) // 60 + 30 heal → the item was USED
+        expect(e.loadout!.inventory.some((s) => s.itemId === id)).toBe(false) // spent
+        expect(target.health!.hp).toBe(40) // and the bat did NOT swing
+        expect(e.combat!.weapon).toBe('bat')
+      })
     })
   })
 })

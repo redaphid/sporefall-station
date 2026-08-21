@@ -48,7 +48,7 @@ const viewSrc = (over = {}) => ({
     combat: { weapon: 'pistol', cooldown: 0 },
     playerCtl: {
       playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0, activeSlot: 0,
-      inventory: [{ itemId: 'pistol', qty: 40 }, { itemId: 'molotov', qty: 2 }],
+      inventory: [{ itemId: 'pistol', qty: 40 }, { itemId: 'grenade', qty: 2 }],
     },
   },
   ...over,

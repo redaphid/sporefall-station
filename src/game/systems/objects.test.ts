@@ -4,6 +4,7 @@ import { addEntity, createWorld, type World } from '../world'
 import { applyDamage } from './combat'
 import { fireAt } from './fire'
 import { destroyObject, spawnObject, useObject } from './objects'
+import { OBJECTS } from '../data/objects'
 
 const player = (w: World, x = 10, y = 10): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', x, y))
@@ -74,11 +75,34 @@ describe('interactive objects', () => {
     expect(useObject(w, p, atm)).toBe(false)
   })
 
-  it('a vending machine dispenses an item pickup when used', () => {
+  // Was 'dispenses an item pickup': the machine's only payout was a burger, and
+  // the item cull removed it. It now returns change instead of being demoted to
+  // scenery, so the assertion follows the payout from a spawned pickup to cash.
+  it('a vending machine returns change when used, once', () => {
     const p = player(w)
+    const before = p.playerCtl!.cash
     const vending = spawnObject(w, 'vending', 11, 10)
     expect(useObject(w, p, vending)).toBe(true)
-    expect(w.entities.some((e) => e.pickup && !e.dead)).toBe(true)
+    expect(p.playerCtl!.cash).toBe(before + 10)
+    // Second use is empty — the once-only rule the ATM has.
+    expect(useObject(w, p, vending)).toBe(false)
+    expect(p.playerCtl!.cash).toBe(before + 10)
+  })
+
+  // The `use.gives = <item id>` branch of useObject has no DATA behind it now
+  // that the burger is gone (every remaining dispenser pays cash). Keeping it
+  // exercised means the cull did not quietly leave an untested limb in the
+  // object system for the next dispenser item to fall off.
+  it('a dispenser that gives an ITEM still spawns that item as a pickup', () => {
+    const p = player(w)
+    const e = spawnObject(w, 'vending', 12, 10)
+    OBJECTS.vending.use = { gives: 'grenade' }
+    try {
+      expect(useObject(w, p, e)).toBe(true)
+      expect(w.entities.some((x) => x.pickup?.itemId === 'grenade' && !x.dead)).toBe(true)
+    } finally {
+      OBJECTS.vending.use = { gives: 'cash', amount: 10 }
+    }
   })
 
   it('destroyObject marks the object dead before its own blast so it never re-hits itself', () => {

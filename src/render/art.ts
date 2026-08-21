@@ -280,21 +280,18 @@ export const PROP_SPRITE: Record<string, string> = {
 // and was never once drawn, because the manifest keys it `item.grenade-item`
 // while the entity archetype is `pickup.grenade`.
 export const ITEM_ALIAS: Record<string, string> = {
-  bandage: 'medkit',
+  // The aliases for the culled items are GONE, not repointed: bandage→medkit,
+  // freezeGrenade/gasGrenade/banana→grenade-item and chloroform→molotov all
+  // named item ids that no longer exist, and an alias for a dead id is a
+  // promise about art that nothing can ever ask for.
+  //
+  // The ART is deliberately untouched. `item.medkit` is the same file every
+  // theme uses for `item.default`, so deleting it would break the fallback for
+  // EVERY unaliased pickup; `item.molotov` and `item.grenade-item` still ship
+  // in both theme manifests. Nothing here removes a sprite another key shares.
+  //
   // Thrown explosives — the spore-grenade art was already on disk.
   grenade: 'grenade-item',
-  freezeGrenade: 'grenade-item',
-  gasGrenade: 'grenade-item',
-  // The banana peel is a THROWABLE and had no entry here at all, so it fell
-  // through to `sprites.item` — i.e. `item.default`, which every shipped theme
-  // maps to the same file as `item.medkit`. It is in the floor-2+ loot table and
-  // in SHOP_STOCK, so ~1 fake medkit per floor was guaranteed. Wearing the
-  // grenade's pod is still not ITS art, but it is at least honest about the
-  // CATEGORY: you can see it is something you throw, not something you heal
-  // with. Bespoke art is queued (see _mycel-results/sprite-inventory.md).
-  banana: 'grenade-item',
-  // Thrown flasks share the molotov's bottle silhouette.
-  chloroform: 'molotov',
   // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
   machinegun: 'shotgun',
   flamethrower: 'shotgun',

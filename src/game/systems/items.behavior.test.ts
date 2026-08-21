@@ -1,7 +1,19 @@
 // Exhaustive item-behavior coverage: every declarative onHit / onLand / onUse
 // must actually reach a system and produce its effect. Complements items.test.ts
-// (which covers shotgun/freezeRay/tranq/sledgehammer/freezeGrenade/chloroform)
-// by driving the remaining element items and the two new guns end to end.
+// (which covers shotgun/freezeRay/tranq/sledgehammer and the grenade) by driving
+// the remaining element items and the two new guns end to end.
+//
+// The nine-item cull took molotov, banana and gasGrenade out of this file. Their
+// EFFECTS did not all go with them, so the tests are re-pointed at whatever
+// still produces each effect rather than deleted:
+//   * fire — the molotov was one source, not the only one. Barrels/`ignite`
+//     objects and the `incendiary` mod still start fires, so the hazard and the
+//     SPREAD stay covered, lit from a surviving source.
+//   * poisoned / slip — gasGrenade and banana were the ONLY producers of these
+//     two, so nothing in the game applies them today. The element table and the
+//     status routing are deliberately left standing (a mod or a future item is
+//     one line away), so the coverage becomes "still correct when asked", which
+//     is the honest claim now.
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
@@ -12,6 +24,7 @@ import { ELEMENTS } from '../data/elements'
 import { combatSystem } from './combat'
 import { elementSystem, fireSystem } from './fire'
 import { applyAreaEffect } from './itemEffects'
+import { destroyObject, spawnObject } from './objects'
 import { throwActive } from './inventory'
 import { arm } from '../testkit'
 import { projectileSystem } from './projectiles'
@@ -93,26 +106,26 @@ describe('item behavior — new guns', () => {
     expect(target.health!.hp).toBe(60) // swing never landed
   })
 
-  it('molotov lands a fire hazard (onLand: fire)', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
-    e.loadout!.activeSlot = 0
-    dummy(w, 22, 20) // give it something to land on nearby
-    throwActive(w, e)
-    for (let t = 0; t < 40 && !w.entities.some((x) => x.fire); t++) projectileSystem(w)
+  // Was 'molotov lands a fire hazard'. The molotov was culled; a destroyed
+  // barrel is the surviving in-world source of a fire, so the hazard is asserted
+  // from there. Had fire ONLY ever come from the molotov, this is the test that
+  // would prove the cull killed the fire system outright — it does not.
+  it('a destroyed barrel still lands a fire hazard (ignite)', () => {
+    const barrel = spawnObject(w, 'barrel', 22, 20)
+    destroyObject(w, barrel, 1)
     expect(w.entities.some((x) => x.fire && !x.dead)).toBe(true)
   })
 
-  it('molotov fire spreads to an adjacent flammable object', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
-    e.loadout!.activeSlot = 0
+  // Was 'molotov fire spreads…'. Only the IGNITION SOURCE changed: the tile is
+  // lit through the same `onLand: fire` area effect the molotov used to deliver,
+  // so what is under test — fireSystem propagating to an adjacent flammable
+  // body — is untouched.
+  it('fire spreads to an adjacent flammable object', () => {
     const crate = addEntity(w, makeEntity('interactable', 'crate', 23, 20, 0.4))
     crate.health = { hp: 20, max: 20, iframes: 0 }
     crate.flammable = true
-    throwActive(w, e)
+    applyAreaEffect(w, 23, 20, { kind: 'fire' }, 0)
     for (let t = 0; t < 200; t++) {
-      projectileSystem(w)
       fireSystem(w)
       w.tick++
       if (hasStatus(crate, 'burning')) break
@@ -130,23 +143,22 @@ describe('item behavior — new guns', () => {
     expect(victim.health!.hp).toBeLessThan(60)
   })
 
-  it('banana peel makes a nearby actor slip (onLand: slip -> stun timer)', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'banana', qty: 1 }]
-    e.loadout!.activeSlot = 0
+  // banana (slip) and gasGrenade (poisoned) were culled, and each was the ONLY
+  // thing in the game producing its status — so neither can be driven from an
+  // item any more. They are NOT deleted: the routing and the poison DoT are live
+  // code a mod or a future item will reach for, and an orphaned effect that
+  // silently stopped working would be found by whoever adds that item rather
+  // than by this suite. Driven through the same `applyAreaEffect` entry point
+  // the thrown item used to call.
+  it('slip still routes to the legacy stun timer when something applies it', () => {
     const victim = dummy(w, 21, 20)
-    throwActive(w, e)
-    for (let t = 0; t < 40 && victim.status!.stun === 0; t++) projectileSystem(w)
+    applyAreaEffect(w, 21, 20, { kind: 'status', status: 'slip', ticks: 45, radius: 1.2 }, 0)
     expect(victim.status!.stun).toBeGreaterThan(0)
   })
 
-  it('gas grenade poisons and the poison damages over time', () => {
-    const e = player(w)
-    e.loadout!.inventory = [{ itemId: 'gasGrenade', qty: 1 }]
-    e.loadout!.activeSlot = 0
+  it('poison still applies and damages over time when something applies it', () => {
     const victim = dummy(w, 22, 20)
-    throwActive(w, e)
-    for (let t = 0; t < 40 && !hasStatus(victim, 'poisoned'); t++) projectileSystem(w)
+    applyAreaEffect(w, 22, 20, { kind: 'status', status: 'poisoned', ticks: 150, radius: 2 }, 0)
     expect(hasStatus(victim, 'poisoned')).toBe(true)
     const before = victim.health!.hp
     for (let t = 0; t < ELEMENTS.poisoned.interval * 3; t++) {
@@ -154,6 +166,16 @@ describe('item behavior — new guns', () => {
       w.tick++
     }
     expect(victim.health!.hp).toBeLessThan(before)
+  })
+
+  it('no item produces slip or poison any more — they are orphaned by the cull', () => {
+    // Pins the finding above so it is a stated fact rather than a silent gap. If
+    // a new item brings either status back, this fails and the note is updated.
+    const fromThrowables = Object.values(THROWABLES).flatMap((t) => (t.onLand.kind === 'status' ? [t.onLand.status] : []))
+    const fromWeapons = Object.values(WEAPONS).flatMap((wp) => (wp.onHit ? [wp.onHit.status] : []))
+    const produced = [...fromThrowables, ...fromWeapons]
+    expect(produced).not.toContain('slip')
+    expect(produced).not.toContain('poisoned')
   })
 })
 
@@ -164,18 +186,24 @@ describe('item behavior — freeze then shatter (element combo through items)', 
   })
 
   it('a thrown freeze followed by an impact from the permanent weapon shatters the target', () => {
-    // Retargeted for ONE PERMANENT WEAPON. This used to freeze with a freeze RAY
-    // and then swap to a bat — two carried weapons, which a player can no longer
-    // have. The combo itself is unchanged and still reachable: the freeze comes
-    // from the THROWN item (freezeGrenade's own `onLand`, applied exactly as
-    // landing applies it), and the shattering impact comes from the one weapon
-    // the player carries all run.
+    // Retargeted TWICE. First for ONE PERMANENT WEAPON: this used to freeze with
+    // a freeze RAY and then swap to a bat — two carried weapons, which a player
+    // can no longer have. Then for the item cull, which took freezeGrenade and
+    // with it the thrown source of `frozen` this used as its stand-in.
+    //
+    // The combo is still fully reachable in play: `frozen` now comes from the
+    // freezeRay's `onHit` or the `frost` mod, and the shattering impact from the
+    // one weapon the player carries all run. The freeze is applied here as an
+    // area effect (exactly as landing applied it) so the test still exercises
+    // the status→shatter path rather than the gun's aiming; the assertion below
+    // ties the literal back to a source the game really has.
     const e = player(w, 20, 20)
     const target = dummy(w, 26, 20)
     arm(e, 'bat')
-    // Thrown from a safe distance — the blast radius would freeze the thrower
-    // too — then the player closes in and swings.
-    applyAreaEffect(w, target.pos.x, target.pos.y, THROWABLES.freezeGrenade.onLand!, e.id)
+    expect(WEAPONS.freezeRay.onHit!.status).toBe('frozen') // a real, surviving source
+    // Applied from a distance — a blast radius would freeze the thrower too —
+    // then the player closes in and swings.
+    applyAreaEffect(w, target.pos.x, target.pos.y, { kind: 'status', status: 'frozen', ticks: 120, radius: 2 }, e.id)
     expect(hasStatus(target, 'frozen')).toBe(true)
     expect(hasStatus(e, 'frozen')).toBe(false) // the thrower stayed clear
     for (let t = 0; t < 6; t++) statusSystem(w)

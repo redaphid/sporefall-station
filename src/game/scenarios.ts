@@ -98,8 +98,10 @@ const setupWetElectric = (w: World): void => {
   placePlayer(w, x + 2, y)
 }
 
-/** A loaded loadout (bat / pistol / molotovs) and flammable targets downrange:
- * equip the gun and fire it dry, then throw a molotov to set the crates ablaze. */
+/** A loaded loadout (bat / pistol / grenades) and destructible targets downrange:
+ * equip the gun and fire it dry, then throw a grenade to blow the crates apart.
+ * The molotov this staged before the item cull is gone; fire is still reachable
+ * here by shooting a barrel or with the `incendiary` mod. */
 const setupInventory = (w: World): void => {
   const { x, y } = findStage(w, 8)
   const player = w.entities.find((e) => e.playerCtl)
@@ -110,7 +112,7 @@ const setupInventory = (w: World): void => {
     player.loadout!.inventory = [
       { itemId: 'bat', qty: WEAPONS.bat.durability! },
       { itemId: 'pistol', qty: 3 },
-      { itemId: 'molotov', qty: 2 },
+      { itemId: 'grenade', qty: 2 },
     ]
     player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'bat'
@@ -119,9 +121,11 @@ const setupInventory = (w: World): void => {
   crate(w, x + 5, y)
 }
 
-/** A broad loadout of the new item breadth (shotgun / freeze grenade /
- * chloroform / molotov / sledgehammer / adrenaline) with a bystander and crate
- * downrange to use them on. */
+/** A loadout spanning what a player can still carry after the item cull
+ * (shotgun / grenade / sledgehammer) with a bystander and crate downrange to use
+ * them on. Four of this stage's six original slots — freezeGrenade, chloroform,
+ * molotov and adrenaline — were culled items; the stage now shows the real
+ * breadth rather than staging things you can no longer find. */
 const setupItems = (w: World): void => {
   const { x, y } = findStage(w, 10)
   const player = w.entities.find((e) => e.playerCtl)
@@ -131,11 +135,8 @@ const setupItems = (w: World): void => {
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
       { itemId: 'shotgun', qty: 6 },
-      { itemId: 'freezeGrenade', qty: 2 },
-      { itemId: 'chloroform', qty: 2 },
-      { itemId: 'molotov', qty: 2 },
+      { itemId: 'grenade', qty: 2 },
       { itemId: 'sledgehammer', qty: WEAPONS.sledgehammer.durability! },
-      { itemId: 'adrenaline', qty: 1 },
     ]
     player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'shotgun'
@@ -307,9 +308,11 @@ const stageDoor = (w: World, x: number, y: number, locked: boolean): void => {
 // move -> meet NPCs + grab a pickup -> open a door -> win a grenade+pistol battle
 const stageDemo = (w: World): void => {
   clearStage(w)
-  const medkit = makeEntity('pickup', 'pickup.medkit', 5.5, LANE_Y, 0.3)
-  medkit.pickup = { itemId: 'medkit', qty: 1 }
-  addEntity(w, medkit)
+  // Was a medkit before the item cull; a grenade is the pickup that still goes
+  // INTO the hotbar (cash would only tick a counter), so the demo beat reads.
+  const pick = makeEntity('pickup', 'pickup.grenade', 5.5, LANE_Y, 0.3)
+  pick.pickup = { itemId: 'grenade', qty: 1 }
+  addEntity(w, pick)
   stageWanderer(w, 8, LANE_Y - 0.6)
   stageWanderer(w, 9, LANE_Y + 1)
   const door = makeEntity('door', 'door', 12, LANE_Y, 0.5)
@@ -504,9 +507,11 @@ const setupNpcAi = (w: World): void => {
     e.pickup = { itemId, qty: 1 }
     addEntity(w, e)
   }
-  drop('bandage', cx - 15.5, cy - 3.5)
+  // Loose loot for the scavenger to be drawn to. bandage/medkit were culled, so
+  // the bait is the two pickup kinds that still exist.
+  drop('grenade', cx - 15.5, cy - 3.5)
   drop('cash', cx - 14.5, cy - 0.5)
-  drop('medkit', cx - 15.5, cy - 6.5)
+  drop('cash', cx - 15.5, cy - 6.5)
 }
 
 /** The deliberate-AI showcase (feat/npc-ai-deliberate): three tactical moments

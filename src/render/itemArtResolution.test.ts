@@ -15,6 +15,12 @@
 // The failure mode is silent by construction: the fallback is a REAL texture, so
 // nothing throws, nothing warns, and the render suite stays green. Only an
 // assertion about MEANING catches it. Hence this file.
+//
+// `banana` has since been CULLED, so the impostor that prompted this file is
+// gone — but the trap it fell into belongs to the FALLBACK CHAIN, not to that
+// item, and it is still armed for every id in the loot tables today. The guards
+// below are kept and re-aimed at the survivors, plus a pin that the nine culled
+// ids stay out of the loot tables.
 import { describe, expect, it } from 'vitest'
 import { ITEM_ALIAS } from './art'
 import { ITEM_IDS } from './theme'
@@ -80,11 +86,32 @@ describe('item / pickup art resolution', () => {
     expect(REACHABLE).not.toContain('claws')
   })
 
-  it('the banana peel is a throwable, not a medkit', () => {
-    // The specific bug: guaranteed in the floor-2+ loot table, ~0.97/floor.
-    expect(LOOT_ITEM_IDS).toContain('banana')
-    expect(artKeyFor('banana')).toBe('grenade-item')
-    expect(artKeyFor('banana')).not.toBe('medkit')
+  // The banana peel — the impostor this file was written for — has since been
+  // CULLED, along with eight other items. The guard above it is unchanged and
+  // still does the real work (every REACHABLE id must resolve to real art), but
+  // the specific assertion "banana is a throwable, not a medkit" cannot be kept
+  // as written: it asserted `LOOT_ITEM_IDS` CONTAINS banana. So it inverts into
+  // the pin for the removal itself — if any of the nine ever creeps back into a
+  // loot table, that is a content decision being silently reversed, and it lands
+  // here as well as in the populate suites.
+  const CULLED = ['banana', 'burger', 'chloroform', 'adrenaline', 'molotov', 'freezeGrenade', 'gasGrenade', 'bandage', 'medkit'] as const
+
+  it('no culled item is reachable as loot any more', () => {
+    for (const id of CULLED) {
+      expect(REACHABLE, `${id} was culled but is back in a loot table`).not.toContain(id)
+    }
+  })
+
+  it('the culled items keep NO art alias — an alias for a dead id promises art nothing can ask for', () => {
+    for (const id of CULLED) expect(ITEM_ALIAS, `ITEM_ALIAS still aliases culled '${id}'`).not.toHaveProperty(id)
+  })
+
+  it('the grenade — deliberately KEPT — still resolves to the spore-grenade art, not the medkit', () => {
+    // The survivor of the throwable cull, and the one id that used to share its
+    // alias target with banana. Removing banana must not have disturbed it.
+    expect(LOOT_ITEM_IDS).toContain('grenade')
+    expect(artKeyFor('grenade')).toBe('grenade-item')
+    expect(artKeyFor('grenade')).not.toBe('medkit')
   })
 
   it('NO weapon is reachable as a pickup — the player carries one permanent weapon', () => {

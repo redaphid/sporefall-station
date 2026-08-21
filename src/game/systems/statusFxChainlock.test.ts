@@ -22,7 +22,7 @@ import {
 
 const STUN_GUN_BASE = 45 // stunGun onHit ticks
 const STUN_GUN_CADENCE = 24 // stunGun cooldownTicks
-const FREEZE_BASE = 120 // freezeRay / freezeGrenade ticks
+const FREEZE_BASE = 120 // freezeRay ticks (freezeGrenade was culled)
 
 const victim = (w: World, x = 20, y = 20): Entity => {
   const e = addEntity(w, makeEntity('npc', 'civilian', x, y))

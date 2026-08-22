@@ -4,6 +4,7 @@ import { addEntity, isBlocked, type World } from '../world'
 import { applyDamage, detonate, runHitTriggers } from './combat'
 import { applyAreaEffect } from './itemEffects'
 import { applyStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 /** Steer a homing projectile: rotate its velocity toward the nearest hostile
  * body by at most `homing` radians this tick, preserving speed. Deterministic —
@@ -14,14 +15,14 @@ const homeToward = (w: World, e: Entity): void => {
   let bestDist = Infinity
   for (const o of w.entities) {
     if (o.id === p.ownerId || o.dead || !o.health || o.kind === 'projectile' || o.kind === 'player') continue
-    const d = Math.hypot(o.pos.x - e.pos.x, o.pos.y - e.pos.y)
+    const d = vlen(o.pos.x - e.pos.x, o.pos.y - e.pos.y)
     if (d < bestDist) {
       best = o
       bestDist = d
     }
   }
   if (!best) return
-  const speed = Math.hypot(e.vel.x, e.vel.y) || 1
+  const speed = vlen(e.vel.x, e.vel.y) || 1
   const cur = Math.atan2(e.vel.y, e.vel.x)
   const want = Math.atan2(best.pos.y - e.pos.y, best.pos.x - e.pos.x)
   let diff = want - cur

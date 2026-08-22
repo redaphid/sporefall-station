@@ -10,6 +10,7 @@
 // source for dormancy (#68).
 
 import type { World } from '../world'
+import { vlen } from '../simMath'
 
 export type StimulusKind = 'noise' | 'fire' | 'spore'
 
@@ -45,7 +46,7 @@ export const gatherStimuli = (w: World): Stimulus[] => {
 /** Distance-attenuated pull of a stimulus at (x,y): louder/brighter beats
  * closer, but a distant whisper loses. */
 export const stimulusPull = (s: Stimulus, x: number, y: number): number =>
-  s.intensity / (1 + Math.hypot(s.x - x, s.y - y) * DRAW_FALLOFF)
+  s.intensity / (1 + vlen(s.x - x, s.y - y) * DRAW_FALLOFF)
 
 /** The strongest stimulus within `range` of (x,y) — the point a hive member with
  * no direct target drifts toward. Ties break to the first in gather order. */
@@ -53,7 +54,7 @@ export const strongestStimulus = (w: World, x: number, y: number, range: number)
   let best: Stimulus | undefined
   let bestPull = 0
   for (const s of gatherStimuli(w)) {
-    if (Math.hypot(s.x - x, s.y - y) > range) continue
+    if (vlen(s.x - x, s.y - y) > range) continue
     const pull = stimulusPull(s, x, y)
     if (pull > bestPull) {
       bestPull = pull

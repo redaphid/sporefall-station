@@ -23,6 +23,7 @@ import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
 import { anyPowerCut, doorClosedAt, type World } from '../world'
 import { initialPlayerHate } from './relationships'
+import { vlen } from '../simMath'
 
 export const WANDER = 'wander'
 export const BATTLE = 'battle'
@@ -72,7 +73,7 @@ export const canSeeEntity = (w: World, a: Entity, b: Entity): boolean =>
 export const perceives = (w: World, a: Entity, b: Entity): boolean => {
   const sight = a.ai?.sightRange ?? 0
   const range = b.status && b.status.cloakUntil > w.tick ? sight * 0.5 : sight
-  if (Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y) > range) return false
+  if (vlen(b.pos.x - a.pos.x, b.pos.y - a.pos.y) > range) return false
   return canSeeEntity(w, a, b)
 }
 
@@ -96,7 +97,7 @@ export const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {
   let best: Vec2 | undefined
   let bestDist = HEAR_RANGE
   for (const n of w.noises) {
-    const d = Math.hypot(n.x - e.pos.x, n.y - e.pos.y)
+    const d = vlen(n.x - e.pos.x, n.y - e.pos.y)
     if (d > bestDist) continue
     bestDist = d
     best = { x: n.x, y: n.y }

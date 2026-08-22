@@ -12,6 +12,7 @@ import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { spawnSporeBurst } from './spore'
+import { vlen } from '../simMath'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -146,7 +147,7 @@ export const applyDamage = (
   }
   const dx = target.pos.x - fromX
   const dy = target.pos.y - fromY
-  const len = Math.hypot(dx, dy) || 1
+  const len = vlen(dx, dy) || 1
   target.vel.x += (dx / len) * knockback
   target.vel.y += (dy / len) * knockback
   w.events.push({ type: 'hit', x: target.pos.x, y: target.pos.y, targetId: target.id, amount })
@@ -229,7 +230,7 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     if (e === attacker || e.dead || !e.health) continue
     const dx = e.pos.x - attacker.pos.x
     const dy = e.pos.y - attacker.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     // Weapon range is edge-to-edge: include both bodies' radii.
     if (dist > range + attacker.radius + e.radius) continue
     // Within 90° of facing (or point-blank)
@@ -247,7 +248,7 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     const ty = Math.sin(best.facing)
     const adx = attacker.pos.x - best.pos.x
     const ady = attacker.pos.y - best.pos.y
-    const alen = Math.hypot(adx, ady) || 1
+    const alen = vlen(adx, ady) || 1
     if ((adx / alen) * tx + (ady / alen) * ty < -0.2) finalDamage *= 3
     attacker.status.cloakUntil = w.tick // attacking breaks cloak
   }
@@ -328,7 +329,7 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   emitNoise(w, x, y)
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
-    const dist = Math.hypot(other.pos.x - x, other.pos.y - y)
+    const dist = vlen(other.pos.x - x, other.pos.y - y)
     if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
   }
   // Breach: a blast centred close enough blows a door open, locked or not —
@@ -338,7 +339,7 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   // one grenade can't take both bunker airlock doors (2 tiles apart) at once.
   for (const d of w.entities) {
     if (d.dead || !d.door || d.door.open) continue
-    if (Math.hypot(d.pos.x - x, d.pos.y - y) > radius) continue
+    if (vlen(d.pos.x - x, d.pos.y - y) > radius) continue
     const door = d.door
     const wasOvergrown = door.overgrown === true
     // A biolock or bog seal breached is LOUD: the always-available fallback that

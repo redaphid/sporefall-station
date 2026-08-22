@@ -18,6 +18,7 @@ import { spawnNpc } from '../populate'
 import { bodySpawnPoint } from '../spawnPlacement'
 import { hasStatus } from './statusFx'
 import { sporeAt } from './spore'
+import { vlen } from '../simMath'
 
 /** Tiles at which a live player's first unbroken sight of the Alpha counts as
  * the ENTRANCE — comfortably inside a room, so the reveal fires as the door
@@ -43,7 +44,7 @@ const broodCount = (w: World, boss: Entity): number => {
   let n = 0
   for (const e of w.entities) {
     if (e.dead || e === boss || e.archetype !== 'sporeling') continue
-    if (Math.hypot(e.pos.x - boss.pos.x, e.pos.y - boss.pos.y) <= BROOD_RADIUS) n++
+    if (vlen(e.pos.x - boss.pos.x, e.pos.y - boss.pos.y) <= BROOD_RADIUS) n++
   }
   return n
 }
@@ -98,7 +99,7 @@ const summonBrood = (w: World, boss: Entity): void => {
 const witness = (w: World, boss: Entity): Entity | undefined => {
   for (const e of w.entities) {
     if (!e.playerCtl || e.dead || e.playerCtl.downed) continue
-    if (Math.hypot(e.pos.x - boss.pos.x, e.pos.y - boss.pos.y) > REVEAL_RANGE) continue
+    if (vlen(e.pos.x - boss.pos.x, e.pos.y - boss.pos.y) > REVEAL_RANGE) continue
     if (canSeeEntity(w, e, boss)) return e
   }
   return undefined

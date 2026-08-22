@@ -12,6 +12,7 @@ import type { Rng } from './rng'
 import { weightedModId } from './systems/draft'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
+import { vlen } from './simMath'
 
 /** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
@@ -195,7 +196,7 @@ const lurkerHideTile = (w: World, b: Building, ri: number): { x: number; y: numb
       const walls = wallNeighbours(w, tx, ty)
       if (walls === 0) continue // it hides AGAINST something, never mid-floor
       let dmin = Infinity
-      for (const d of b.doors) dmin = Math.min(dmin, Math.hypot(d.x - tx, d.y - ty))
+      for (const d of b.doors) dmin = Math.min(dmin, vlen(d.x - tx, d.y - ty))
       const score = dmin + walls * 0.25 // far from doors first, cornered second
       if (score > bestScore) {
         bestScore = score
@@ -916,7 +917,7 @@ const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: num
     if (w.level.tiles[ty * w.level.w + tx] !== tile) continue
     const x = tx + 0.5
     const y = ty + 0.5
-    if (Math.hypot(x - w.level.spawn.x, y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (vlen(x - w.level.spawn.x, y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
     return { x, y }
   }
   return null

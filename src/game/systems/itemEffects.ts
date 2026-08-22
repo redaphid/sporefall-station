@@ -9,9 +9,10 @@ import type { World } from '../world'
 import { applyDamage } from './combat'
 import { igniteCell } from './fire'
 import { applyStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 const within = (ax: number, ay: number, bx: number, by: number, r: number): boolean =>
-  Math.hypot(ax - bx, ay - by) <= r
+  vlen(ax - bx, ay - by) <= r
 
 /** Resolve an area effect at a landing point: ignite the tile, blast a radius,
  * or wash a status over the actors standing in it. */

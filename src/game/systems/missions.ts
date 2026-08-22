@@ -7,6 +7,7 @@ import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
 import { raiseFloorAggro } from './relationships'
 import { addEntity, type World } from '../world'
+import { vlen } from '../simMath'
 
 export const setupFloor = (w: World): void => {
   // Mission first — door locking depends on which building it targets.
@@ -214,7 +215,7 @@ const objectiveGateDoor = (w: World, building: Building): Entity | undefined => 
   const cx = room.x + room.w / 2
   const cy = room.y + room.h / 2
   return doors.reduce((best, d) =>
-    Math.hypot(d.pos.x - cx, d.pos.y - cy) < Math.hypot(best.pos.x - cx, best.pos.y - cy) ? d : best,
+    vlen(d.pos.x - cx, d.pos.y - cy) < vlen(best.pos.x - cx, best.pos.y - cy) ? d : best,
   )
 }
 
@@ -276,7 +277,7 @@ const farthestBuilding = (w: World): Building | null => {
   for (const b of w.level.buildings) {
     const cx = b.rect.x + b.rect.w / 2
     const cy = b.rect.y + b.rect.h / 2
-    const d = Math.hypot(cx - w.level.spawn.x, cy - w.level.spawn.y)
+    const d = vlen(cx - w.level.spawn.x, cy - w.level.spawn.y)
     if (d > bestDist) {
       best = b
       bestDist = d
@@ -302,7 +303,7 @@ const nearestPlayer = (w: World, x: number, y: number): Entity | undefined => {
   let bestD = Infinity
   for (const e of w.entities) {
     if (!e.playerCtl || e.dead) continue
-    const d = Math.hypot(e.pos.x - x, e.pos.y - y)
+    const d = vlen(e.pos.x - x, e.pos.y - y)
     if (d < bestD) {
       bestD = d
       best = e

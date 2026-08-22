@@ -9,6 +9,7 @@ import { addItem, applyModPickup } from './inventory'
 import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
+import { vlen } from '../simMath'
 
 const INTERACT_RANGE = 1.3
 /** How far a channeling picker may drift from the door before the pick drops. */
@@ -242,9 +243,9 @@ const runChannel = (w: World, p: Entity, cmd: InputCmd | undefined): void => {
   const door = w.byId.get(channel.targetId)
   if (!door?.door || !door.door.locked) return cancel('gone')
   // Walking off (stick input), being blasted away, or ending up out of reach.
-  if (cmd && Math.hypot(cmd.moveX, cmd.moveY) > PICK_MOVE_DEADZONE) return cancel('moved')
-  if (Math.hypot(p.pos.x - p.prevPos.x, p.pos.y - p.prevPos.y) > PICK_DRIFT_CANCEL) return cancel('moved')
-  if (Math.hypot(p.pos.x - door.pos.x, p.pos.y - door.pos.y) > PICK_BREAK_RANGE) return cancel('moved')
+  if (cmd && vlen(cmd.moveX, cmd.moveY) > PICK_MOVE_DEADZONE) return cancel('moved')
+  if (vlen(p.pos.x - p.prevPos.x, p.pos.y - p.prevPos.y) > PICK_DRIFT_CANCEL) return cancel('moved')
+  if (vlen(p.pos.x - door.pos.x, p.pos.y - door.pos.y) > PICK_BREAK_RANGE) return cancel('moved')
   if (--channel.ticksLeft > 0) return
   ctl.channel = undefined
   door.door.locked = false
@@ -260,7 +261,7 @@ const bleedAndRevive = (w: World, p: Entity): void => {
       e.playerCtl &&
       !e.playerCtl.downed &&
       !e.dead &&
-      Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
+      vlen(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
   )
   if (helper) {
     // Teammate revive: a standing ally hauls them up — the co-op window is kept.
@@ -318,7 +319,7 @@ export const nearestInteractable = (entities: readonly Entity[], p: Entity): Ent
   let bestDist = Infinity
   for (const e of entities) {
     if (!e.interact || e.dead) continue
-    const dist = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y)
+    const dist = vlen(e.pos.x - p.pos.x, e.pos.y - p.pos.y)
     if (dist <= (e.interact.range ?? INTERACT_RANGE) && dist < bestDist) {
       best = e
       bestDist = dist

@@ -16,6 +16,7 @@ import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
+import { vlen } from '../simMath'
 
 const THINK_INTERVAL = 5 // ~6Hz per NPC at 30Hz sim, phase-spread by id
 const WANDER_RADIUS = 4
@@ -315,7 +316,7 @@ const moveToward = (
   const ai = e.ai!
   const dx = gx - e.pos.x
   const dy = gy - e.pos.y
-  const dist = Math.hypot(dx, dy)
+  const dist = vlen(dx, dy)
   if (dist < 0.05) {
     ai.path = undefined
     return 'arrived'
@@ -347,7 +348,7 @@ const moveToward = (
   // Line blocked → route. Recompute only inside this entity's repath window so
   // route queries stay staggered across the crowd (deterministic per id).
   const cached = ai.path
-  const sameGoal = cached !== undefined && Math.hypot(cached.goal.x - gx, cached.goal.y - gy) <= GOAL_DRIFT
+  const sameGoal = cached !== undefined && vlen(cached.goal.x - gx, cached.goal.y - gy) <= GOAL_DRIFT
   const noRoute = sameGoal && cached.nodes.length === 0 // the cached "unroutable" verdict
   const spent = sameGoal && !noRoute && cached.i >= cached.nodes.length // walked a partial route to its end
   if (!sameGoal || noRoute || spent) {
@@ -372,7 +373,7 @@ const moveToward = (
     ai.path = { nodes, i: 0, goal: { x: gx, y: gy } }
   }
   const p = ai.path!
-  while (p.i < p.nodes.length && Math.hypot(p.nodes[p.i].x - e.pos.x, p.nodes[p.i].y - e.pos.y) < NODE_ARRIVE) p.i++
+  while (p.i < p.nodes.length && vlen(p.nodes[p.i].x - e.pos.x, p.nodes[p.i].y - e.pos.y) < NODE_ARRIVE) p.i++
   if (p.i >= p.nodes.length) {
     // Route walked out. A FULL route ended on the goal tile — close the last
     // stretch straight. A PARTIAL (best-effort) route ended as near as the map
@@ -389,7 +390,7 @@ const moveToward = (
   // A closed door on the node ahead: open it the moment it is in arm's reach —
   // the walker never phases through; it breaches, visibly, then walks in.
   const nKey = Math.floor(node.y) * lw + Math.floor(node.x)
-  if (ctx.closedDoors.has(nKey) && Math.hypot(node.x - e.pos.x, node.y - e.pos.y) <= DOOR_OPEN_RANGE) {
+  if (ctx.closedDoors.has(nKey) && vlen(node.x - e.pos.x, node.y - e.pos.y) <= DOOR_OPEN_RANGE) {
     const d = ctx.doorByTile.get(nKey)
     if (d?.door) {
       d.door.open = true
@@ -399,7 +400,7 @@ const moveToward = (
   }
   const ndx = node.x - e.pos.x
   const ndy = node.y - e.pos.y
-  const nd = Math.hypot(ndx, ndy) || 1
+  const nd = vlen(ndx, ndy) || 1
   e.intent.x = (ndx / nd) * pace
   e.intent.y = (ndy / nd) * pace
   e.facing = Math.atan2(ndy, ndx)
@@ -502,7 +503,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     if (!goal) return
     const dx = goal.x - e.pos.x
     const dy = goal.y - e.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     const weapon = WEAPONS[e.combat?.weapon ?? 'fists']
 
     if (weapon.kind === 'ranged') {
@@ -534,7 +535,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     }
     if (seen) {
       ai.progress = undefined // live pursuit — stall bookkeeping is for cold trails
-    } else if (!ai.progress || Math.hypot(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
+    } else if (!ai.progress || vlen(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
       ai.progress = { x: e.pos.x, y: e.pos.y, tick: w.tick } // moved — mark fresh progress
     } else if (w.tick - ai.progress.tick > STALL_TICKS) {
       // Wedged against geometry chasing a memory: declare the trail cold so the
@@ -573,7 +574,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     if (!from) return
     const dx = e.pos.x - from.x
     const dy = e.pos.y - from.y
-    const dist = Math.hypot(dx, dy) || 1
+    const dist = vlen(dx, dy) || 1
     // Flight has no destination to route to — steer the away-vector, deflected
     // to the openest compass direction when a wall looms, so a panicked body
     // streams along walls and out of doorless corners instead of grinding.
@@ -583,7 +584,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     // chaser's body is not a tile). Mirrors the cold-trail bookkeeping the
     // aggro branch has always had; flight previously had NO equivalent, so
     // nothing anywhere caught a fleeing body that never moved.
-    if (!ai.progress || Math.hypot(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
+    if (!ai.progress || vlen(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
       ai.progress = { x: e.pos.x, y: e.pos.y, tick: w.tick }
     } else if (w.tick - ai.progress.tick > FLEE_STALL_TICKS) {
       // Cornered with nowhere to run. Drop the panic and re-arbitrate: a
@@ -621,7 +622,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     }
     const dx = target.pos.x - e.pos.x
     const dy = target.pos.y - e.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     if (ai.goal === ALERT && dist <= ALERT_REACH) return performAlert(w, e, target)
     if (ai.goal === SCAVENGE && dist <= SCAVENGE_REACH) return collectPickup(w, e, target)
     if (dist > 0.2) {
@@ -648,7 +649,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
   if ((ai.mode === 'wander' || ai.mode === 'patrol') && ai.waypoint) {
     const dx = ai.waypoint.x - e.pos.x
     const dy = ai.waypoint.y - e.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     if (dist < 0.4) {
       ai.waypoint = undefined
       ai.mode = 'idle'

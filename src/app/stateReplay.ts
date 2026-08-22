@@ -20,7 +20,9 @@
 // shows something plausible and wrong is worse than none — so it turns red and
 // names the tick and the field.
 
-import { firstDifference, type StateLinkCheck, type StateLinkPayload } from '../debug/stateLink'
+import { type StateLinkCheck, type StateLinkPayload } from '../debug/stateLink'
+import { compareWorlds } from '../debug/worldCompare'
+import { APP_VERSION } from './version'
 import { serializeWorld } from '../game/serialize'
 import { SIM_RATE, type InputCmd } from '../game/types'
 import { tickWorld, type World } from '../game/world'
@@ -67,17 +69,43 @@ export const startStateReplay = (
   const total = frames.length
   const el = banner(mount)
   let i = 0
+  // The first replayed tick whose per-tick signature disagreed with the
+  // sender's. Those signatures (`StateFrame.sig` = [rng cursor, entity count])
+  // are recorded on every capture and were, until now, thrown away on the LOAD
+  // path — so a diverging link could say WHICH FIELD ended up wrong but never
+  // WHEN it started going wrong. The tick is most of the diagnosis: tick 3 of
+  // 60 means the restore itself is incomplete, tick 58 means something late and
+  // situational. Two integer compares per tick, so it stays armed for free.
+  let divergedAtTick: number | undefined
 
   const finish = (): void => {
     // Compare the world we actually PLAYED against the frame that was captured.
+    //
+    // TOLERANT, not bit-exact — and only here. `Math.sin`/`cos`/`atan2`/`hypot`
+    // are not required to be correctly rounded, so a link captured on a phone
+    // and opened on a laptop can land a fraction of an ULP away on some
+    // positions. Refusing to show the bug over that is the worse failure.
+    // Everything that could make the world BEHAVE differently — the PRNG
+    // cursors, the entity set, ids, tick, seed, floor and every integer
+    // quantity — is still compared exactly; see `worldCompare.ts`.
+    //
+    // Within tolerance is SILENT. Not a softer banner, not a console.warn: a
+    // difference in the last bits of a double is not information, and saying
+    // anything about it trains the viewer to ignore the message that matters.
     const played = serializeWorld(getWorld())
-    const difference = firstDifference(payload.world, played)
+    const difference = compareWorlds(payload.world, played)
     const check: StateLinkCheck = difference
       ? {
           ok: false,
           rewindTicks: total,
           difference,
-          reason: `replay did not reconverge; first difference at ${difference.path}: expected ${difference.expected}, got ${difference.actual}`,
+          ...(divergedAtTick !== undefined ? { divergedAtTick } : {}),
+          // `difference.reason` already names the field, BOTH values, and how
+          // far apart they are versus how far apart they were allowed to be —
+          // which is what separates "last-bit noise" from "the sim is wrong".
+          reason:
+            `replay did not reconverge` +
+            `${divergedAtTick !== undefined ? ` from tick ${divergedAtTick}` : ''}; ${difference.reason}`,
         }
       : { ok: true, rewindTicks: total }
 
@@ -100,11 +128,33 @@ export const startStateReplay = (
     } else {
       // Deliberately persistent and red: this link does NOT reproduce what the
       // sender saw, and silently continuing would waste the viewer's time.
+      // The MAGNITUDE line is the point of the whole feature. Anything that
+      // reaches here is already past the float tolerance, so the reader's next
+      // question is "past it by a hair, or by a mile?" — a position out by
+      // 1e-11 means the tolerance wants widening; one out by 3 means the sim is
+      // wrong. Telling those apart is the judgement this check exists to serve.
+      const scale =
+        difference!.kind === 'float'
+          ? `off by ${difference!.delta!.toExponential(2)} · relative ${difference!.relative!.toExponential(2)} · tolerance ${difference!.tolerance!.toExponential(0)}`
+          : `${difference!.kind} field — always compared exactly, never with tolerance`
+      // BUILD SKEW IS THE FIRST THING TO SUSPECT, so say it on the banner
+      // rather than burying it in the console line main.ts already logs. A link
+      // captured on a different build replays against different sim CODE, which
+      // is not a determinism failure at all — it is the expected outcome, and a
+      // viewer who does not know that will go hunting for a bug that is not
+      // there.
+      const skew =
+        payload.meta.build && payload.meta.build !== APP_VERSION
+          ? `\ncaptured on build ${payload.meta.build}, you are on ${APP_VERSION} — likely the cause`
+          : ''
       show(
         el,
         `⚠ REPLAY DIVERGED — this link does not reproduce the sender's state\n` +
+          `${divergedAtTick !== undefined ? `first drifted at tick ${divergedAtTick}\n` : ''}` +
           `first difference: ${difference!.path}\n` +
-          `expected ${difference!.expected} · got ${difference!.actual}`,
+          `expected ${difference!.expected} · got ${difference!.actual}\n` +
+          scale +
+          skew,
         'rgba(160,30,30,.95)',
       )
       console.error(`sporefall: ${check.reason}`)
@@ -116,7 +166,14 @@ export const startStateReplay = (
     const frame = frames[i]
     if (!frame) return
     i++
-    tickWorld(getWorld(), new Map(frame.inputs.map(([slot, cmd]: [number, InputCmd]) => [slot, { ...cmd }])))
+    const world = getWorld()
+    tickWorld(world, new Map(frame.inputs.map(([slot, cmd]: [number, InputCmd]) => [slot, { ...cmd }])))
+    // Signature check, deliberately EXACT: both halves are integers (a PRNG
+    // cursor and an entity count), and neither is subject to float noise.
+    if (divergedAtTick === undefined && frame.sig) {
+      const [rng, entityCount] = frame.sig
+      if (world.rng.state() !== rng || world.entities.length !== entityCount) divergedAtTick = world.tick
+    }
     const left = ((total - i) / SIM_RATE).toFixed(1)
     show(el, `⏵ REPLAY  ${i}/${total} ticks  ·  ${left}s to live`, 'rgba(30,30,40,.88)', '#ffd479')
     if (i >= total) finish()

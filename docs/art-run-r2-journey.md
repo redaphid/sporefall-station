@@ -224,6 +224,51 @@ check that cannot distinguish those two will report health right up until you
 look at the output directory and find nothing new for eight minutes. Watch the
 artefact count, not the process list.
 
+## The shadowed pack: every check passed and the outcome was still wrong
+
+*(observed, and the clearest instance of this file's recurring theme.)*
+
+Nine regenerated sprites were written into `public/themes/swampspace`. The game
+defaults to **`swampspace-hires`**, and theme resolution answers from the **first
+manifest that MENTIONS a key**. So all nine were shadowed by August art.
+
+The merge was correct. The deploy was green. The gates were green. The browser
+was fresh. **He saw nothing, and nothing had failed.**
+
+Worse, the standing CI tripwire could never have caught it: `charConsistency`
+reads only `public/themes/swampspace/chars` — **the pack the game does not
+load**. The gate can pass, in full, on art no player will ever see.
+
+**This is the third impostor-shaped failure in one night**, and naming the shape
+is the point of writing it down:
+
+1. `consistency.py` reporting **"0 violations"** about a directory it never
+   opened, because it hardcodes its path and silently discards `--` flags.
+2. A first fix for the edge bleed that was **byte-identical** to no fix at all,
+   correct-looking and completely inert.
+3. Art written to a pack that something else shadows — **invisible, with every
+   signal green.**
+
+In all three the system did not go quiet. It produced a confident, well-formed,
+*wrong* answer. **The absence of a failure is not evidence of success**, and a
+green light is worth exactly as much as your confidence that the check was
+pointed at the thing you care about.
+
+**The fixes** (both in `scripts/assets/`):
+
+- `packs.py` reads `DEFAULT_THEME_ID` **out of `theme.ts`** rather than
+  duplicating it — a copied constant is how this recurs — and `assert_writable`
+  **raises**, naming the shadowing pack and the exact command to fix it. It
+  refuses *before* a run rather than after two hours of invisible output.
+- `themePackParity.test.ts` asserts in CI that the default pack carries every
+  character key the base pack does, that every referenced file exists, and that
+  each pack's art matches the size its `artScale` claims.
+
+**Still open**, and stated so nobody reads the above as complete: neither check
+proves the two packs depict the *same character*. Stale-but-present art in the
+default pack would still pass. That needs silhouette comparison across the 2x
+scale.
+
 ## If you are starting a run
 
 1. `start.ps1`, then confirm ComfyUI sees ~76 checkpoints.
@@ -236,3 +281,5 @@ artefact count, not the process list.
 6. **Do not run the VLM gate concurrently with generation.** 24 GiB does not fit
    both, and the failure mode is a silent 1500x slowdown, not an error.
 7. Track progress by **artefacts produced**, never by "the process is still up".
+8. **Post to the pack the game actually loads**, and let `packs.assert_writable`
+   refuse the run if you got it wrong.

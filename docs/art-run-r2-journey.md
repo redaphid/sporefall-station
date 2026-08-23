@@ -269,6 +269,36 @@ proves the two packs depict the *same character*. Stale-but-present art in the
 default pack would still pass. That needs silhouette comparison across the 2x
 scale.
 
+## How it actually finished
+
+Attempt three completed the cast — **12 characters, 8 seeds each, 96
+candidates** — in **289 seconds** of generation. The two attempts before it died
+without finishing, on the same hardware, with the same models and the same
+prompts.
+
+Nothing about the art changed. **Every difference was procedural**, which is the
+argument for writing the procedure down rather than the anecdote:
+
+| guard | what it prevented |
+|---|---|
+| VLM unloaded, VRAM confirmed with `nvidia-smi` | the 20.4 GiB squeeze that made SDXL 1500x slower while erroring nowhere |
+| generation run with `--no-vlm` | the gate starving the run it exists to judge |
+| gating as a **separate pass** afterwards | the same, from the other direction |
+| launched **detached** | dying the instant its parent agent went quiet |
+| orphan check by command line before starting | becoming the third concurrent run |
+| resume driven by the state file | redoing 90 finished candidates |
+
+Worth noting one of these caught something live: during the pre-flight, `ollama`
+**reloaded a model on its own** between the unload call and the check. The unload
+was not enough; *verifying* it was. Trusting the call would have started the run
+into a squeezed card again.
+
+**It did not come out perfectly clean, and the gate said so — exit 1.** Eleven of
+twelve anchor their feet at row 45; **cinder-husk sits at 43** and floats against
+everything else. That is the same defect it was held back for earlier and it
+survived regeneration. A complete cast is not automatically a correct one, and
+the value of the gate is that it refused to round 11/12 up to done.
+
 ## If you are starting a run
 
 1. `start.ps1`, then confirm ComfyUI sees ~76 checkpoints.

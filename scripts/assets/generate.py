@@ -893,6 +893,28 @@ def final(names, allow_regen=False):
     import comfy
     from PIL import Image
     import post as P
+    import packs
+
+    # PREFLIGHT: refuse to spend a run producing art the player cannot see.
+    # THEME is the 48px base pack, but the game loads `swampspace-hires` first
+    # and theme resolution answers from the FIRST manifest that MENTIONS a key.
+    # On 2026-08-23 nine sprites went in here and were shadowed by August art:
+    # correct merge, green deploy, green gates, fresh browser, nothing visible.
+    # Nothing failed, which is exactly why this has to.
+    target = os.path.basename(THEME)
+    chars = [n for n in names if jobs().get(n, {}).get("cat") == "char"]
+    if chars and target != packs.default_pack():
+        keys = packs.sprite_keys(packs.default_pack())
+        shadowed = sorted(k for k in keys if k.startswith("char."))
+        if shadowed and os.environ.get("ALLOW_SHADOWED") != "1":
+            raise packs.ShadowedWrite(
+                f"'{target}' is not the pack the game loads ({packs.default_pack()}), "
+                f"which already mentions {len(shadowed)} char keys and therefore "
+                f"answers first. Character art written here will be INVISIBLE.\n"
+                f"  Fix: after this, run "
+                f"`python hires_chars.py {' '.join(chars[:3])}` (or --all-curated) "
+                f"to post the same picks into {packs.default_pack()}.\n"
+                f"  Override for a deliberate base-only write: ALLOW_SHADOWED=1")
 
     cur = load_curation()
     for name in names:

@@ -188,10 +188,19 @@ export const createScreens = (
     bossCard.style.opacity = '1'
     bossCard.style.transform = 'translate(-50%,-50%) scale(1)'
     clearTimeout(bossCardTimer)
-    bossCardTimer = setTimeout(() => {
-      bossCard.style.opacity = '0'
-      bossCard.style.transform = 'translate(-50%,-50%) scale(.85)'
-    }, 2600)
+    bossCardTimer = setTimeout(hideBossCard, 2600)
+  }
+  /** Drop the card NOW, cancelling its dwell timer.
+   *
+   * Not merely the timeout's body: the card lives 2.6s, so dying just after the
+   * entrance leaves it hanging over the death screen (z-index:70 vs the
+   * overlay's none) where it collides with YOU DIED into unreadable mush.
+   * Suppressing the *reveal* is not enough — a card that is ALREADY up has to be
+   * taken down. */
+  const hideBossCard = (): void => {
+    clearTimeout(bossCardTimer)
+    bossCard.style.opacity = '0'
+    bossCard.style.transform = 'translate(-50%,-50%) scale(.85)'
   }
 
   // Top-centre health bar, clear of the notch and of the top-left player HUD.
@@ -219,6 +228,8 @@ export const createScreens = (
     // the latch must not survive it (bossModel.isRunReset).
     if (isRunReset(lastBossTick, view.tick)) bossId = undefined
     lastBossTick = view.tick
+    // Take down an entrance card that was already up when the player went down.
+    if (playerOutOfFight(view) && bossCard.style.opacity !== '0') hideBossCard()
     bossId = latchBossId(bossId, view.events)
     const bar = bossBar(view, bossId, themeDisplayName('boss'))
     const key = bar ? `${bar.name}|${bar.hpFrac.toFixed(3)}|${bar.phase}` : ''

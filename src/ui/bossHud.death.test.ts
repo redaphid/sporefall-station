@@ -161,6 +161,42 @@ describe('the boss health bar and the death screen', () => {
     expect(visible(mount)).toBe(false)
   })
 
+  // -------------------------------------------------------------------------
+  // The entrance card (z-index:70), caught by the before/after screenshot and
+  // not by the first cut of this fix. Gating the REVEAL is not enough: the card
+  // dwells for 2.6s, so dying just after the entrance leaves it hanging over
+  // YOU DIED, where the two headlines overprint into unreadable mush.
+  // -------------------------------------------------------------------------
+
+  /** The entrance card: the mount's own child sitting at z-index 70. */
+  const card = (): HTMLElement => {
+    const el = [...mount.children].find((c) => (c as HTMLElement).style.zIndex === '70')
+    if (!el) throw new Error('boss entrance card not found — createScreens changed shape')
+    return el as HTMLElement
+  }
+
+  it('REGRESSION: takes down an entrance card that was ALREADY up when the player died', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
+    expect(card().style.opacity).toBe('1') // the entrance is playing
+
+    screens.update(view({ tick: 11, entities: [boss()], self: player({ dead: true }) }))
+
+    expect(card().style.opacity).toBe('0')
+  })
+
+  it('never raises a card at all for a reveal that fires while the player is down', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, self: player({ dead: true }), entities: [boss()], events: [reveal()] }))
+    expect(card().style.opacity).toBe('0')
+  })
+
+  it('control: the card DOES play for a reveal while the player is up', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
+    expect(card().style.opacity).toBe('1')
+  })
+
   it('does not drop the bar merely because the tick repeats or stalls', () => {
     const screens = engageBoss()
     screens.update(view({ tick: 11, entities: [boss(200)] }))

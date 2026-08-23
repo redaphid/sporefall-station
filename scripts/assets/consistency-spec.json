@@ -2,12 +2,12 @@
  "vine-ranger": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 26,
-   "head_h": 31,
-   "mass": 707,
-   "cx": -0.13,
-   "foot_y": 45
+   "height": 41,
+   "width": 21,
+   "head_h": 26,
+   "mass": 544,
+   "cx": -0.43,
+   "foot_y": 43
   },
   "tol": {
    "height": 3,
@@ -22,10 +22,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 39,
-   "head_h": 36,
-   "mass": 941,
-   "cx": -0.32,
+   "width": 40,
+   "head_h": 33,
+   "mass": 997,
+   "cx": 0.85,
    "foot_y": 45
   },
   "tol": {
@@ -41,10 +41,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 37,
-   "head_h": 34,
-   "mass": 775,
-   "cx": -0.57,
+   "width": 28,
+   "head_h": 12,
+   "mass": 414,
+   "cx": 0.6,
    "foot_y": 45
   },
   "tol": {
@@ -61,9 +61,9 @@
   "ref": {
    "height": 44,
    "width": 38,
-   "head_h": 33,
-   "mass": 893,
-   "cx": -0.55,
+   "head_h": 36,
+   "mass": 782,
+   "cx": 0.05,
    "foot_y": 45
   },
   "tol": {
@@ -78,11 +78,11 @@
  "frog-settler": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 29,
-   "head_h": 36,
-   "mass": 842,
-   "cx": -0.46,
+   "height": 39,
+   "width": 44,
+   "head_h": 38,
+   "mass": 737,
+   "cx": -0.38,
    "foot_y": 45
   },
   "tol": {
@@ -98,10 +98,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 24,
-   "head_h": 36,
-   "mass": 704,
-   "cx": 0.2,
+   "width": 23,
+   "head_h": 35,
+   "mass": 541,
+   "cx": -2.24,
    "foot_y": 45
   },
   "tol": {
@@ -116,12 +116,12 @@
  "mireclaw-stalker": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
+   "height": 32,
    "width": 43,
-   "head_h": 22,
-   "mass": 737,
-   "cx": 1.42,
-   "foot_y": 45
+   "head_h": 6,
+   "mass": 374,
+   "cx": 1.78,
+   "foot_y": 44
   },
   "tol": {
    "height": 2,
@@ -136,10 +136,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 34,
-   "head_h": 20,
-   "mass": 850,
-   "cx": 0.13,
+   "width": 26,
+   "head_h": 36,
+   "mass": 754,
+   "cx": 0.03,
    "foot_y": 45
   },
   "tol": {
@@ -154,12 +154,12 @@
  "carapace-brute": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 43,
-   "width": 43,
+   "height": 42,
+   "width": 40,
    "head_h": 32,
-   "mass": 1011,
-   "cx": -0.53,
-   "foot_y": 45
+   "mass": 1000,
+   "cx": -2.84,
+   "foot_y": 44
   },
   "tol": {
    "height": 2,

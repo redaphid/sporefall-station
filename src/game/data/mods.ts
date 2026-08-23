@@ -153,7 +153,10 @@ export const MODS: Record<string, ModDef> = {
   homing: {
     id: 'homing', name: 'Homing', icon: '🧲', category: 'behavior', rarity: 'rare',
     maxStacks: 3,
-    blurb: 'Bullets curve toward the nearest enemy.',
+    // Reworked (playtest: "it mostly just curves bullets into walls"): a round
+    // only chases enemies it can SEE, ahead of it — see projectiles.homeToward.
+    // Stacks sharpen the turn AND widen the seek cone.
+    blurb: 'Smart bullets — they chase enemies they can see.',
     behavior: { homing: 0.10 },
   },
   explosive: {

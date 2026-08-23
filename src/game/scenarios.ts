@@ -336,6 +336,41 @@ const stageShooting = (w: World): void => {
   for (const x of [12, 15, 18]) stageThug(w, x, LANE_Y).speed = 0
 }
 
+/**
+ * The HOMING-rework proof stage (playtest: "it mostly just curves the bullets
+ * into walls"), driven by the `shooting` script. A wall shields a NEARER thug
+ * north of the lane — the old global-nearest homing's bait, which it would
+ * chase into the wall — while two visible thugs stand in the open: one dead
+ * ahead down the lane, one off-axis south-east. The reworked seeker must kill
+ * both visible thugs (the off-axis one via a real curve) and leave the
+ * bunkered one untouched, every round flying straight past his cover.
+ */
+const stageHomingDemo = (w: World): void => {
+  clearStage(w)
+  // Open plaza under the whole stage (both layers — collision reads `solid`),
+  // so the tuned walk and firing lane never depend on the seed's architecture.
+  for (let y = 1; y <= 16; y++) {
+    for (let x = 1; x <= 22; x++) {
+      w.level.tiles[y * w.level.w + x] = Tile.Floor
+      w.level.solid[y * w.level.w + x] = 0
+    }
+  }
+  // The cover: a wall strip just north of the lane…
+  for (let x = 10; x <= 17; x++) {
+    w.level.tiles[10 * w.level.w + x] = Tile.Wall
+    w.level.solid[10 * w.level.w + x] = 1
+  }
+  // …with the bait thug bunkered behind it (nearest to the firing spot).
+  stageThug(w, 14.5, 8.5).speed = 0
+  // The visible marks: dead ahead down the lane, and off-axis south-east.
+  stageThug(w, 18, LANE_Y).speed = 0
+  stageThug(w, 15.5, 13.5).speed = 0
+  // The player's permanent pistol carries the mod under test.
+  const player = w.entities.find((e) => e.playerCtl)
+  const stack = player?.loadout?.inventory.find((s) => s.itemId === player.combat?.weapon)
+  if (stack) stack.mods = [{ id: 'homing', stacks: 2 }]
+}
+
 // a real steal mission: grab the briefcase (objective done) then reach the exit
 const stageMission = (w: World): void => {
   clearStage(w)
@@ -658,6 +693,7 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'demo') stageDemo(w)
   if (name === 'doors') stageDoors(w)
   if (name === 'shooting') stageShooting(w)
+  if (name === 'homing-demo') stageHomingDemo(w)
   if (name === 'mission') stageMission(w)
   if (name === 'ai-goals') setupAiGoals(w)
   if (name === 'npc-ai') setupNpcAi(w)

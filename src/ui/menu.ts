@@ -5,10 +5,27 @@ import { installGamepadMenuNav } from './gamepadMenu'
 
 export type GameMode = 'solo' | 'host' | 'join'
 
+/** The settings panel, as the start menu drives it (renderer.settingsUi):
+ * `open` shows it with controller navigation armed; `isOpen` lets the menu's
+ * own navigator stand down while the panel owns the pad. */
+export interface SettingsControl {
+  open(): void
+  close(): void
+  isOpen(): boolean
+}
+
 /** Solo / Host / Join picker shown at boot. `onPick` fires SYNCHRONOUSLY inside
  * the button's click handler (before resolve) so the caller can run gesture-only
- * browser APIs — e.g. requesting fullscreen — while the user activation is live. */
-export const pickMode = (mount: HTMLElement, onPick?: (mode: GameMode) => void): Promise<GameMode> =>
+ * browser APIs — e.g. requesting fullscreen — while the user activation is live.
+ * `settings` adds a fourth entry that opens the settings panel OVER the menu
+ * (never resolving the promise) — the controller-only player's route to button
+ * remapping; while the panel is open, the menu's pad navigation is suppressed
+ * so exactly one navigator reacts. */
+export const pickMode = (
+  mount: HTMLElement,
+  onPick?: (mode: GameMode) => void,
+  settings?: SettingsControl,
+): Promise<GameMode> =>
   new Promise((resolve) => {
     const overlay = document.createElement('div')
     markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
@@ -22,23 +39,38 @@ export const pickMode = (mount: HTMLElement, onPick?: (mode: GameMode) => void):
     ]
     const navButtons: HTMLButtonElement[] = []
     let stopNav: () => void = () => {}
-    for (const [mode, label, blurb] of options) {
+    const menuButton = (html: string): HTMLButtonElement => {
       const b = document.createElement('button')
       b.style.cssText =
         'font:600 17px system-ui;padding:14px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
         'background:#ffffff10;color:#eee;cursor:pointer;width:min(320px,80vw);text-align:left'
-      b.innerHTML = `${label} <span style="opacity:.6;font-weight:400;font-size:13px"><br>${blurb}</span>`
-      b.addEventListener('click', () => {
+      b.innerHTML = html
+      navButtons.push(b)
+      overlay.appendChild(b)
+      return b
+    }
+    const blurbed = (label: string, blurb: string): string =>
+      `${label} <span style="opacity:.6;font-weight:400;font-size:13px"><br>${blurb}</span>`
+    for (const [mode, label, blurb] of options) {
+      menuButton(blurbed(label, blurb)).addEventListener('click', () => {
         stopNav()
+        settings?.close() // never carry the panel (and its navigator) into the lobby
         onPick?.(mode) // gesture-live: fullscreen request happens here
         overlay.remove()
         resolve(mode)
       })
-      navButtons.push(b)
-      overlay.appendChild(b)
+    }
+    if (settings) {
+      // Opens the panel over the menu; deliberately does NOT resolve the mode
+      // promise — closing the panel lands the player back on this menu.
+      const b = menuButton(blurbed('Settings', 'Controls, theme, effects'))
+      b.dataset.role = 'menu-settings'
+      b.addEventListener('click', () => settings.open())
     }
     // Controller support: a gamepad-only player can move focus + confirm here.
-    stopNav = installGamepadMenuNav(() => navButtons)
+    // Suppressed while the settings panel is open — the panel runs its own
+    // navigator, and two live navigators would both react to every press.
+    stopNav = installGamepadMenuNav(() => navButtons, { suppress: () => settings?.isOpen() ?? false })
     // Big version readout under the mode picker so you can tell at a glance which
     // build a phone is on (esp. after an OTA update) before starting a game.
     const ver = document.createElement('div')

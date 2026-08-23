@@ -24,6 +24,7 @@ import {
   bindingLabel,
   defaultButtonMap,
   getButtonMap,
+  isPadCaptureActive,
   PAD_ACTIONS,
   resetAction,
   setButtonMap,
@@ -32,9 +33,17 @@ import {
 } from '../input/remap'
 import { markUiChrome } from '../ui/chrome'
 import { enterFullscreen, exitFullscreen } from '../ui/fullscreenModel'
+import { installGamepadMenuNav, type GamepadMenuNavOptions, type MenuNavControl } from '../ui/gamepadMenu'
 
 export interface SettingsPanel {
   settings(): GameSettings
+  /** Open the panel with CONTROLLER NAVIGATION armed — the start-menu path
+   * (ui/menu.ts), where a pad-only player has no other way in. The in-game gear
+   * keeps its touch-only behavior: during play the pad belongs to gameplay, and
+   * a nav layer there would click settings on every attack press. */
+  openForPad(): void
+  close(): void
+  isOpen(): boolean
 }
 
 export interface ThemeOption {
@@ -49,6 +58,8 @@ export const createSettingsPanel = (
   themes: ThemeOption[] = [],
   // Injectable for tests; the default is the same live surface gamepadCoop polls.
   getPads: () => readonly (Gamepad | null)[] = () => navigator.getGamepads?.() ?? [],
+  // Scheduler injection for the panel's own gamepad navigation (tests).
+  navOptions: GamepadMenuNavOptions = {},
 ): SettingsPanel => {
   let current = loadSettings()
 
@@ -266,6 +277,17 @@ export const createSettingsPanel = (
   renderRows()
   panel.appendChild(ctl)
 
+  // A visible way OUT. The gear toggle is fine for touch, but a controller-only
+  // player navigating the panel needs a focusable control that closes it — and
+  // it doubles as an obvious exit for everyone.
+  const closeBtn = document.createElement('button')
+  closeBtn.dataset.role = 'settings-close'
+  closeBtn.textContent = 'Close'
+  closeBtn.style.cssText =
+    'width:100%;margin-top:12px;background:#2a3140;color:#ffd76a;border:1px solid #ffd76a55;border-radius:6px;' +
+    'padding:6px;cursor:pointer;font:600 13px system-ui;touch-action:manipulation'
+  panel.appendChild(closeBtn)
+
   // Cancel paths beyond timeout: Esc, and a tap/click anywhere that is not the
   // capturing row. The listeners live as long as the panel does (it is never
   // torn down in the app), but they guard on isConnected so a REPLACED panel
@@ -310,9 +332,51 @@ export const createSettingsPanel = (
     onChange(current)
   }
 
-  gear.addEventListener('click', () => {
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none'
-    if (panel.style.display === 'none') stopCapture() // closing the panel always ends capture
+  // ---- Open/close + controller navigation --------------------------------
+  // `padNav` arms the panel's own gamepad navigator. It is set ONLY by
+  // openForPad() (the start-menu Settings entry) and cleared on every close:
+  // the gear path stays touch-only because during gameplay the pad's face
+  // buttons belong to combat, and a live navigator here would click settings
+  // rows on every attack press.
+  let padNav = false
+  const isOpen = (): boolean => panel.style.display !== 'none'
+  const setOpen = (open: boolean): void => {
+    panel.style.display = open ? 'block' : 'none'
+    if (!open) {
+      stopCapture() // closing the panel always ends capture
+      padNav = false
+    }
+  }
+  gear.addEventListener('click', () => setOpen(!isOpen()))
+  closeBtn.addEventListener('click', () => setOpen(false))
+
+  // Every control the pad can land on, in DOM order: the selects/checkboxes,
+  // then each remap bind + reset row, Reset to defaults, and Close. Sliders
+  // (haptics strength, native-only) are deliberately skipped — a confirm press
+  // cannot drive a range, and the native panel is touch-first anyway.
+  const navControls = (): MenuNavControl[] =>
+    Array.from(panel.querySelectorAll<MenuNavControl>('button, select, input[type="checkbox"]'))
+  // Suppressed unless armed AND open — and ALWAYS while a bind capture is
+  // live: the press being captured must bind, not confirm-click whatever row
+  // holds the nav cursor. The capture flag stays up until the captured button
+  // is RELEASED (the drain in captureTick), and the navigator re-baselines its
+  // edge memory when suppression lifts, so the binding press can never leak
+  // into navigation. Installed once; the panel lives as long as the app.
+  installGamepadMenuNav(navControls, {
+    ...navOptions,
+    suppress: () => !padNav || !isOpen() || isPadCaptureActive(),
+    activate: (el) => {
+      // A synthetic click cannot open a <select>'s native dropdown, so confirm
+      // CYCLES it instead: each press advances to the next option and fires
+      // the same change event the mouse path uses.
+      if (el instanceof HTMLSelectElement) {
+        if (el.options.length === 0) return
+        el.selectedIndex = (el.selectedIndex + 1) % el.options.length
+        el.dispatchEvent(new Event('change'))
+      } else {
+        el.click()
+      }
+    },
   })
   q.addEventListener('change', () => apply({ effectsQuality: q.value as EffectsQuality }))
   fx.addEventListener('change', () => apply({ shaderFx: fx.value as ShaderFxMode }))
@@ -328,5 +392,13 @@ export const createSettingsPanel = (
   hen?.addEventListener('change', () => apply({ hapticsEnabled: hen.checked }))
   hin?.addEventListener('input', () => apply({ hapticsIntensity: Number(hin.value) }))
 
-  return { settings: () => current }
+  return {
+    settings: () => current,
+    openForPad: () => {
+      setOpen(true)
+      padNav = true
+    },
+    close: () => setOpen(false),
+    isOpen,
+  }
 }

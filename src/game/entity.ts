@@ -270,7 +270,10 @@ export interface Entity {
     pierceLeft?: number
     /** Wall bounces left — reflect off a blocked tile instead of dying (bounce). */
     bounceLeft?: number
-    /** Per-tick turn rate (radians) steering toward the nearest hostile (homing). */
+    /** Per-tick turn rate (radians) of the homing seeker head. Steering is
+     * line-of-sight-gated and cone-limited (see projectiles.homeToward): the
+     * round chases only VISIBLE enemies of its owner ahead of it, and flies
+     * straight otherwise — it never curves at something behind a wall. */
     homing?: number
     /** Spawn N damaging children on the first body it strikes (split/multishot). */
     split?: { count: number; damage: number; speed: number; ttl: number }

@@ -151,6 +151,14 @@ export const defaultButtons = () => ({
   throw: [...BUTTONS.throw],
   hotbarPrev: [...BUTTONS.hotbarPrev],
   hotbarNext: [...BUTTONS.hotbarNext],
+  // Camera zoom in/out — VIEW-ONLY actions, deliberately absent from BUTTONS
+  // and from PadProfile: they never enter the InputCmd or the sim. They are
+  // read straight off the user map each render frame (input/padZoom.ts), so
+  // they exist only in the remappable slice. UNBOUND by default because every
+  // standard button 0-15 already drives a gameplay action; the player opts in
+  // by binding them in the settings panel (the swap rule frees the button).
+  zoomIn: [] as number[],
+  zoomOut: [] as number[],
 })
 
 const STANDARD: PadProfile = {

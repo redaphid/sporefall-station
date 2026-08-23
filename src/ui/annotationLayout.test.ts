@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  annotationScale,
   cardAnchor,
   clampToViewport,
   deOverlap,
@@ -10,6 +11,29 @@ import {
   MAX_LABEL_LINES,
   type Rect,
 } from './annotationLayout'
+
+describe('annotationScale — viewport-proportional text scaling', () => {
+  it('is 1× at phone widths (≤760px) — mobile rendering unchanged', () => {
+    expect(annotationScale(760)).toBe(1)
+    expect(annotationScale(640)).toBe(1)
+    expect(annotationScale(360)).toBe(1)
+  })
+
+  it('never shrinks below 1× on degenerate/zero widths', () => {
+    expect(annotationScale(0)).toBe(1)
+    expect(annotationScale(-100)).toBe(1)
+  })
+
+  it('scales up smoothly on desktop widths', () => {
+    expect(annotationScale(1140)).toBeCloseTo(1.5, 5)
+    expect(annotationScale(1520)).toBe(2)
+  })
+
+  it('caps at 2× on very wide viewports', () => {
+    expect(annotationScale(1521)).toBe(2)
+    expect(annotationScale(3840)).toBe(2)
+  })
+})
 
 describe('wrapLabel — word-boundary wrapping, bounded lines', () => {
   it('keeps short text on a single line', () => {

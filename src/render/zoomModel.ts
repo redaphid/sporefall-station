@@ -33,6 +33,24 @@ export const wheelZoomFactor = (deltaY: number, deltaMode = 0): number => {
   return Math.exp(-px * WHEEL_SENSITIVITY)
 }
 
+/** Held-pad-button zoom speed: e^RATE per second of hold. 1.04 ≈ ln(8)/2 —
+ * half the full ZOOM_MIN→ZOOM_MAX range (×8) per second, so a full sweep is a
+ * comfortable ~2 s hold. Multiplicative like the wheel, so in/out are exact
+ * inverses and holding both directions cancels to a no-op. */
+export const PAD_ZOOM_RATE = 1.04
+
+/**
+ * Per-frame multiplicative zoom factor for the pad's held zoom buttons
+ * (view-only — polled in the render loop, never part of InputCmd). Both or
+ * neither held → 1 (no-op). Degenerate dt (NaN/negative/∞) → 1, never NaN.
+ */
+export const padZoomFactor = (zoomInHeld: boolean, zoomOutHeld: boolean, dt: number): number => {
+  if (zoomInHeld === zoomOutHeld) return 1
+  if (!Number.isFinite(dt) || dt <= 0) return 1
+  const f = Math.exp(PAD_ZOOM_RATE * dt)
+  return zoomInHeld ? f : 1 / f
+}
+
 /**
  * Map a pinch gesture to a zoom level: the zoom scales by the same ratio the
  * finger distance did, from the zoom captured when the pinch formed. Clamped;

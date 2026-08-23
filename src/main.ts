@@ -56,7 +56,9 @@ import { resolveWsBaseUrl, WsTransport } from './net/transport/wsTransport'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import type { ZoomSink } from './render/zoomModel'
+import { loadZoom, persistZoomSink } from './render/zoomPersist'
 import { wireWheelZoom } from './input/wheelZoom'
+import { createPadZoom, type PadZoom } from './input/padZoom'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
 import {
@@ -179,7 +181,10 @@ const boot = async (): Promise<void> => {
   const sharedState = params.get('state')
   const mode =
     (params.get('mode') as GameMode | null) ??
-    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture))
+    // The third argument adds the Settings entry (opens the panel over the menu
+    // with controller navigation armed) — the pad-only player's route to button
+    // remapping, e.g. binding the zoom buttons.
+    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
   // Past the picker, nothing between here and the frame loop can honestly
   // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
   // conservative one until the loop starts reporting real ones.
@@ -189,14 +194,26 @@ const boot = async (): Promise<void> => {
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
   // A `?script=` deterministic input timeline replaces live input for e2e videos.
   const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
-  // View-only zoom control: pinch (touch) + scrollwheel (desktop), both routed
-  // through the camera's smooth, anchored zoom target. Zero effect on the sim.
-  const zoomSink: ZoomSink = {
+  // View-only zoom control: pinch (touch) + scrollwheel (desktop) + held pad
+  // buttons (padZoom, below), all routed through the camera's smooth, anchored
+  // zoom target. Zero effect on the sim. The player's zoom is restored from the
+  // last session before any input wiring (snapZoom: no animated glide at boot)
+  // — the explicit `?zoom=` param, applied further down, still wins over the
+  // restore — and every change through the sink saves it back, debounced.
+  renderer.camera.snapZoom(loadZoom())
+  const zoomSink: ZoomSink = persistZoomSink({
     get: () => renderer.camera.zoomTarget,
     set: (z, ax, ay) => renderer.camera.setZoom(z, ax, ay),
     reset: () => renderer.camera.resetZoom(),
-  }
+  })
   wireWheelZoom(renderer.app.canvas, zoomSink)
+  // Controller zoom: hold the (settings-bound) zoomIn/zoomOut buttons to zoom,
+  // anchored on the screen centre — no cursor exists on a pad. Polled from the
+  // frame loop; inert while the settings panel is capturing a bind.
+  const padZoom = createPadZoom(zoomSink, () => ({
+    x: renderer.app.screen.width / 2,
+    y: renderer.app.screen.height / 2,
+  }))
   // Mouse aim (desktop/keyboard): track the cursor in canvas space and hand the
   // keyboard a provider that turns it into a CONTINUOUS aim vector from the local
   // player toward the cursor — so a keyboard player's bullet follows the mouse to
@@ -537,7 +554,21 @@ const boot = async (): Promise<void> => {
   // reload — and the browser releases the lock for us on unload. The handle's
   // `release()` exists for whenever a real quit-to-menu path arrives.
   keepScreenAwake()
-  runLoop(session, renderer, uiMount, coop, inspect, updates, touch, debug, persister, resumed, stateReplay, stateRing)
+  runLoop(
+    session,
+    renderer,
+    uiMount,
+    coop,
+    inspect,
+    updates,
+    touch,
+    debug,
+    persister,
+    resumed,
+    stateReplay,
+    stateRing,
+    padZoom,
+  )
 }
 
 /** localStorage as a `KeyValueStore`, or `undefined` where it is unavailable
@@ -1002,6 +1033,8 @@ const runLoop = (
   stateReplay?: StateReplay,
   /** Rewind ring + capture, fed after each live tick. Host/solo only. */
   stateRing?: StateSharing,
+  /** Controller zoom poller (view-only) — stepped once per render frame. */
+  padZoom?: PadZoom,
 ): void => {
   const hud = createHud(uiMount)
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
@@ -1249,6 +1282,10 @@ const runLoop = (
             renderer.camera.follow(px, py, dt, rate)
           }
         }
+        // Controller zoom: held zoom buttons multiply the zoom target (view-only,
+        // centre-anchored). Before draw so this frame's camera already eases
+        // toward the new target.
+        padZoom?.update(dt)
         renderer.draw(view, alpha, dt)
         hud.update(view)
         const pads = coop.debug()

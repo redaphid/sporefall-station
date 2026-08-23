@@ -9,6 +9,11 @@ A deterministic ECS sim with a live WebSocket debug bridge. Everything runs via
 `npx tsx` (no build step). Reference: `docs/ecs-debugging.md` (contract +
 determinism) and `docs/ecs-debug-harness.md` (transport + harness verbs).
 
+**If a human is watching/playing the live game while you work:** keep them in the
+loop through the game UI, not just the terminal — post short, `ttlTick`-limited
+`annotate` banners for presence and notable findings (see the `observer` skill's
+"talk to the player THROUGH THE GAME UI" rule).
+
 Ports: **hub 7810**, **MCP 7811**. The debug surface is dev-only (behind
 `?debug`) and never in a release build.
 

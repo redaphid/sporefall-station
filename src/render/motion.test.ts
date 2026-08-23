@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { STATE_TICKS, type AnimStateName } from './animState'
-import { composeMotion, IDENTITY_POSE, MOTION, type MotionInput, type MotionPose } from './motion'
+import {
+  composeMotion,
+  IDENTITY_POSE,
+  locomotionFor,
+  MOTION,
+  type MotionInput,
+  type MotionPose,
+} from './motion'
 
 const base = (over: Partial<MotionInput>): MotionInput => ({
   state: 'idle',
@@ -181,5 +188,97 @@ describe('idle breathe', () => {
     for (const p of poses) expect(Math.abs(p.sy - 1)).toBeLessThanOrEqual(MOTION.breathe.amp + 1e-9)
     const distinct = new Set(poses.map((p) => p.sy.toFixed(6)))
     expect(distinct.size).toBeGreaterThan(1)
+  })
+})
+
+describe('locomotion styles — non-bipedal bodies', () => {
+  const AMBULATORY: AnimStateName[] = ['idle', 'walk']
+  const OTHER: AnimStateName[] = ['attack', 'hurt', 'death']
+
+  it('defaults to stride: omitting style is byte-identical to asking for it', () => {
+    for (const state of STATES) {
+      const implicit = composeMotion(base({ state, start: 95, t: 103.5, vx: 2 }))
+      const explicit = composeMotion(base({ state, start: 95, t: 103.5, vx: 2, style: 'stride' }))
+      expect(implicit).toEqual(explicit)
+    }
+  })
+
+  it('locomotionFor: unknown archetypes stride, so a new character never silently changes', () => {
+    expect(locomotionFor('vine-ranger')).toBe('stride')
+    expect(locomotionFor('not-a-real-character')).toBe('stride')
+    expect(locomotionFor('')).toBe('stride')
+    expect(locomotionFor('spore-drone')).toBe('hover')
+    expect(locomotionFor('brood-sac')).toBe('pulse')
+  })
+
+  it('HOVER lifts off the floor in idle AND walk — the planted invariant is for bodies with feet', () => {
+    const lifted = AMBULATORY.map((state) =>
+      // t chosen off a zero crossing so the sine is unambiguously non-zero
+      composeMotion(base({ state, style: 'hover', id: 0, t: 104.2, moving: state === 'walk' })),
+    )
+    for (const p of lifted) expect(Math.abs(p.dy)).toBeGreaterThan(0)
+  })
+
+  it('HOVER stays within its amplitude even at maximum gain', () => {
+    const cap = MOTION.hover.amp * MOTION.hover.movingScale + 1e-9
+    for (let t = 100; t < 160; t += 0.37) {
+      const p = composeMotion(base({ state: 'walk', style: 'hover', moving: true, t }))
+      expect(Math.abs(p.dy)).toBeLessThanOrEqual(cap)
+    }
+  })
+
+  it('HOVER does not lean — leaning implies feet to lean against', () => {
+    const p = composeMotion(base({ state: 'walk', style: 'hover', moving: true, vx: 99, t: 104.2 }))
+    expect(p.rot).toBe(0)
+  })
+
+  it('PULSE never moves dy in ANY state — a grounded sac stays grounded', () => {
+    for (const state of AMBULATORY) {
+      for (let t = 100; t < 140; t += 0.29) {
+        const p = composeMotion(base({ state, style: 'pulse', moving: state === 'walk', t }))
+        expect(p.dy).toBe(0)
+      }
+    }
+  })
+
+  it('PULSE widens as it flattens, so the footprint does not drift', () => {
+    let sawBoth = false
+    for (let t = 100; t < 140; t += 0.23) {
+      const p = composeMotion(base({ state: 'idle', style: 'pulse', t }))
+      // sx and sy move in opposite directions around 1
+      expect((p.sx - 1) * (p.sy - 1)).toBeLessThanOrEqual(1e-12)
+      if (Math.abs(p.sx - 1) > 1e-6) sawBoth = true
+    }
+    expect(sawBoth).toBe(true)
+  })
+
+  it('moving amplifies rather than changing gait, for both styles', () => {
+    for (const style of ['hover', 'pulse'] as const) {
+      const still = composeMotion(base({ state: 'idle', style, moving: false, t: 104.2 }))
+      const going = composeMotion(base({ state: 'walk', style, moving: true, t: 104.2 }))
+      const mag = (p: MotionPose): number => (style === 'hover' ? Math.abs(p.dy) : Math.abs(p.sx - 1))
+      expect(mag(going)).toBeGreaterThan(mag(still))
+    }
+  })
+
+  it('style does NOT touch attack, hurt or death — those are body-plan agnostic', () => {
+    for (const state of OTHER) {
+      const stride = composeMotion(base({ state, start: 100, t: 102.5, facing: 0.7 }))
+      for (const style of ['hover', 'pulse'] as const) {
+        expect(composeMotion(base({ state, start: 100, t: 102.5, facing: 0.7, style }))).toEqual(stride)
+      }
+    }
+  })
+
+  it('is deterministic and phase-shifted per entity, so a swarm never pulses in unison', () => {
+    for (const style of ['hover', 'pulse'] as const) {
+      const a = composeMotion(base({ state: 'idle', style, id: 3, t: 111.1 }))
+      expect(composeMotion(base({ state: 'idle', style, id: 3, t: 111.1 }))).toEqual(a)
+      const readings = [0, 1, 2, 3, 4].map((id) => {
+        const p = composeMotion(base({ state: 'idle', style, id, t: 111.1 }))
+        return (style === 'hover' ? p.dy : p.sx).toFixed(6)
+      })
+      expect(new Set(readings).size).toBeGreaterThan(1)
+    }
   })
 })

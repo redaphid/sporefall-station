@@ -12,7 +12,7 @@ import {
   STATE_TICKS,
   type ResolvedAnim,
 } from './animState'
-import { composeMotion, IDENTITY_POSE, type MotionPose } from './motion'
+import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
 import {
   ARCHETYPE_SCALE,
   CHAR_PX,
@@ -326,6 +326,7 @@ export class EntityViews {
               vx: e.vel.x,
               moving,
               rollUntil: roll?.untilTick,
+              style: locomotionFor(e.archetype),
             })
           : IDENTITY_POSE
 

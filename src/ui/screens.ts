@@ -1,7 +1,7 @@
 import type { RenderView } from '../app/session'
 import { MODS } from '../game/data/mods'
 import { themeDisplayName } from '../render/themeState'
-import { bossBar, bossRevealName, latchBossId } from './bossModel'
+import { bossBar, bossRevealName, isRunReset, latchBossId, playerOutOfFight } from './bossModel'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
@@ -68,6 +68,16 @@ export const createScreens = (
 
   const overlay = document.createElement('div')
   markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
+  // KNOWN HAZARD — this overlay carries NO z-index, so it stacks at 0 while the
+  // in-game HUD layers sit at 55..72 (pad hint 55, pause 60, locator 65, boss
+  // bar 66, inspect card 69, boss card 70, mission chip 72). Every one of them
+  // therefore paints ON TOP of the YOU DIED scrim. The boss bar and entrance
+  // card are gated off in code below (bossModel.playerOutOfFight), which is what
+  // fixes the reported bug; the REST of that list is still unguarded, and the
+  // next HUD element added will inherit the same fault by default.
+  // Raising this to ~80 is the general fix and is deliberately NOT done here:
+  // it would also put the death screen above the PAUSE overlay (60), which is a
+  // separate interaction to think through and test. Do it in its own change.
   overlay.style.cssText =
     'position:absolute;inset:0;background:#000a;display:none;flex-direction:column;align-items:center;' +
     'justify-content:center;color:#eee;font:16px system-ui;pointer-events:auto;text-align:center;gap:12px'
@@ -202,8 +212,13 @@ export const createScreens = (
   const bossPhaseEl = bossHud.querySelector<HTMLElement>('#bossPhase')!
   let bossId: number | undefined
   let lastBossKey = ''
+  let lastBossTick: number | undefined
 
   const updateBoss = (view: RenderView): void => {
+    // A restart rebuilds the world in place and recycles entity ids from 1, so
+    // the latch must not survive it (bossModel.isRunReset).
+    if (isRunReset(lastBossTick, view.tick)) bossId = undefined
+    lastBossTick = view.tick
     bossId = latchBossId(bossId, view.events)
     const bar = bossBar(view, bossId, themeDisplayName('boss'))
     const key = bar ? `${bar.name}|${bar.hpFrac.toFixed(3)}|${bar.phase}` : ''
@@ -259,8 +274,11 @@ export const createScreens = (
     update(view: RenderView): void {
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
+        // Suppressed while the local player is out of the fight: in co-op a
+        // teammate can trigger the entrance AFTER you go down, and the card
+        // (z-index:70) would flash across your YOU DIED overlay.
         const revealed = bossRevealName(view.events, themeDisplayName('boss'))
-        if (revealed !== undefined) showBossCard(revealed)
+        if (revealed !== undefined && !playerOutOfFight(view)) showBossCard(revealed)
         for (const ev of view.events) {
           // `stationAlert` lands on the same tick as `missionComplete` and is
           // ordered after it, so the alert banner deliberately overwrites the

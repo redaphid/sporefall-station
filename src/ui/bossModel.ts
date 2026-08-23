@@ -17,7 +17,23 @@ import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from '../game/systems/beh
 export interface BossViewLike {
   entities: readonly Entity[]
   events: readonly SimEvent[]
+  /** The entity this device controls. Absent on a spectator/pre-spawn frame. */
+  self?: Entity
+  /** The run is over. */
+  gameOver?: boolean
 }
+
+/**
+ * True while the LOCAL player is out of the fight — dead, bleeding out, or the
+ * run is over.
+ *
+ * This is the same condition that raises the restart overlay
+ * (`screens.restartAffordance`), and `bossModel.equivalence.test.ts` pins the
+ * two together so they cannot drift apart. It is stated here rather than
+ * imported from `screens.ts` because `screens.ts` imports *this* module.
+ */
+export const playerOutOfFight = (view: BossViewLike): boolean =>
+  !!view.gameOver || !!view.self?.dead || !!view.self?.playerCtl?.downed
 
 /** What to draw. `null` from `bossBar` means: draw nothing at all. */
 export interface BossBar {
@@ -67,6 +83,21 @@ export const latchBossId = (prev: number | undefined, events: readonly SimEvent[
   return id
 }
 
+/**
+ * True when this frame belongs to a NEW run rather than the one we were just
+ * watching.
+ *
+ * `screens.ts` is built once (main.ts) and never rebuilt, but "Run it back" /
+ * "New Seed" rebuild the world in place (`app/hostSession.buildRun`) — which
+ * resets the tick to 0 **and restarts entity ids at 1**
+ * (`game/world.createWorld`). A latch carried across that boundary therefore
+ * does not merely go stale: the dead boss's id is handed straight back out to
+ * an unrelated floor-1 enemy, and the Alpha's name plate reappears over a thug
+ * that never announced itself. A tick that fails to advance is a new world.
+ */
+export const isRunReset = (prevTick: number | undefined, tick: number): boolean =>
+  prevTick !== undefined && tick < prevTick
+
 /** The entrance card text for a reveal event, or undefined if this frame has none. */
 export const bossRevealName = (events: readonly SimEvent[], name: string): string | undefined => {
   for (const ev of events) if (ev.type === 'bossReveal') return name
@@ -83,6 +114,11 @@ export const bossRevealName = (events: readonly SimEvent[], name: string): strin
  * same way).
  */
 export const bossBar = (view: BossViewLike, bossId: number | undefined, name: string): BossBar | null => {
+  // The player is down / dead / the run is over: the restart overlay owns the
+  // screen now. The bar is not merely redundant here, it is a rendering fault —
+  // the HUD carries `z-index:66` and the overlay carries none, so the bar paints
+  // ON TOP of the YOU DIED scrim instead of behind it (screens.ts).
+  if (playerOutOfFight(view)) return null
   if (bossId === undefined) return null
   const boss = view.entities.find((e) => e.id === bossId)
   if (!boss || boss.dead || !boss.health || boss.health.max <= 0) return null

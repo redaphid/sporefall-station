@@ -42,7 +42,27 @@ export const PAD_ACTIONS: readonly PadAction[] = [
   'hotbarPrev',
   'hotbarNext',
   'pause',
+  'zoomIn',
+  'zoomOut',
 ]
+
+/**
+ * Actions added AFTER the v1 map schema shipped. A map persisted by an older
+ * build has no entry for these, and the all-or-nothing rule would nuke the
+ * player's whole remap to defaults over their mere absence — silently undoing
+ * every binding they made. Instead their absence is BACKFILLED with their
+ * defaults, and the schema stays v1 on purpose:
+ *   - Safe: every later action defaults to UNBOUND ([]), which owns no buttons
+ *     and therefore cannot recreate the multi-action conflicts the
+ *     all-or-nothing rule exists to prevent. (Any later action with non-empty
+ *     defaults would need a real look before landing here.)
+ *   - v1, not v2: an older build reading the map ignores keys it doesn't know,
+ *     so the file stays forward- AND backward-compatible; a version bump would
+ *     make the older build see "wrong version" and wipe the remap on downgrade.
+ * A PRESENT-but-invalid entry for these still voids the map — only genuine
+ * absence (an old file) gets the backfill.
+ */
+const LATER_ACTIONS: readonly PadAction[] = ['zoomIn', 'zoomOut']
 
 export const ACTION_LABELS: Record<PadAction, string> = {
   attack: 'Attack',
@@ -53,6 +73,8 @@ export const ACTION_LABELS: Record<PadAction, string> = {
   hotbarPrev: 'Weapon prev',
   hotbarNext: 'Weapon next',
   pause: 'Pause',
+  zoomIn: 'Zoom in',
+  zoomOut: 'Zoom out',
 }
 
 export const defaultButtonMap = (): ButtonMap => defaultButtons()
@@ -99,7 +121,10 @@ const validButtons = (v: unknown): number[] | null => {
 }
 
 /** Parse persisted (or arbitrary) data into a valid ButtonMap. All-or-nothing:
- * wrong version, missing action, or any invalid entry → full defaults. */
+ * wrong version, missing action, or any invalid entry → full defaults — except
+ * a LATER_ACTIONS entry that is genuinely ABSENT (a map saved by an older
+ * build), which is backfilled with its default instead (see LATER_ACTIONS for
+ * why that cannot recreate a conflict). */
 export const clampButtonMap = (raw: unknown): ButtonMap => {
   const base = defaultButtonMap()
   if (typeof raw !== 'object' || raw === null) return base
@@ -108,6 +133,10 @@ export const clampButtonMap = (raw: unknown): ButtonMap => {
   const m = r.map as Record<string, unknown>
   const out = {} as ButtonMap
   for (const a of PAD_ACTIONS) {
+    if (m[a] === undefined && LATER_ACTIONS.includes(a)) {
+      out[a] = base[a]
+      continue
+    }
     const v = validButtons(m[a])
     if (v === null) return base
     out[a] = v

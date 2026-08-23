@@ -26,6 +26,12 @@ export const MIN_FONT_PX = 13
 
 const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
 
+/** Annotation text scale for a given viewport width: 1× at phone widths (≤760px,
+ * where MIN_FONT_PX was calibrated) growing linearly to 2× at ≥1520px, so desktop
+ * players can read banners/labels from couch distance. The overlay multiplies
+ * font size, line height, and MAX_LABEL_WIDTH by this each frame. */
+export const annotationScale = (viewportW: number): number => clamp(viewportW / 760, 1, 2)
+
 /**
  * Word-wrap `text` into at most `maxLines` lines of at most `maxChars` chars,
  * breaking ONLY at word boundaries. A single word longer than `maxChars` is

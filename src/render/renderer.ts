@@ -76,6 +76,11 @@ export interface GameRenderer {
    * (computed by input/aim.padAimReticles). Pass [] to clear. Presentation
    * only — the sim never sees them. */
   setReticles(reticles: readonly { x: number; y: number }[]): void
+  /** The settings panel, for the start menu's Settings entry: `open` shows the
+   * panel with CONTROLLER NAVIGATION armed (a pad-only player's way in);
+   * `close`/`isOpen` let the menu keep exactly one gamepad navigator live at a
+   * time. The in-game gear keeps its touch-only behavior. */
+  settingsUi: { open(): void; close(): void; isOpen(): boolean }
 }
 
 /** Canvas clear color when no theme palette provides one. */
@@ -372,7 +377,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // haptics + the effects-quality gate pick them up without a reload. A theme
   // change from the panel hot-swaps the renderer's assets.
   const themeList = await listThemes()
-  let settings = createSettingsPanel(
+  const settingsPanel = createSettingsPanel(
     chromeMount,
     native,
     (s) => {
@@ -390,7 +395,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       pipeline.setMode(urlFx ?? s.shaderFx)
     },
     themeList,
-  ).settings()
+  )
+  let settings = settingsPanel.settings()
   const haptics = createHaptics(nativeHapticDriver(), () => settings)
 
   const viewRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -411,6 +417,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     setTheme,
     entityThumb,
     weaponThumb,
+    settingsUi: {
+      open: () => settingsPanel.openForPad(),
+      close: () => settingsPanel.close(),
+      isOpen: () => settingsPanel.isOpen(),
+    },
     worldToScreen(wx: number, wy: number): { x: number; y: number } {
       // The live container transform — the rendered truth, no re-derived math.
       const p = world.toGlobal({ x: wx * TILE_PX, y: wy * TILE_PX })

@@ -50,13 +50,13 @@ beforeEach(() => {
 describe('the action list', () => {
   it('enumerates exactly the remappable actions from the real map (no join, no dpad)', () => {
     expect([...PAD_ACTIONS].sort()).toEqual(
-      ['attack', 'hotbarNext', 'hotbarPrev', 'interact', 'pause', 'roll', 'special', 'throw'].sort(),
+      ['attack', 'hotbarNext', 'hotbarPrev', 'interact', 'pause', 'roll', 'special', 'throw', 'zoomIn', 'zoomOut'].sort(),
     )
   })
   it('every action has a UI label', () => {
     for (const a of PAD_ACTIONS) expect(ACTION_LABELS[a]).toBeTruthy()
   })
-  it('defaults mirror the documented layout (A/RB/L2/R2 attack, B interact, Start pause, …)', () => {
+  it('defaults mirror the documented layout (A/RB/L2/R2 attack, B interact, Start pause, zoom unbound, …)', () => {
     expect(defaultButtonMap()).toEqual({
       attack: [0, 5, 6, 7],
       interact: [1],
@@ -66,6 +66,10 @@ describe('the action list', () => {
       throw: [8],
       hotbarPrev: [10],
       hotbarNext: [11],
+      // View-only camera zoom: every standard button already has a job, so the
+      // player binds these themselves in the settings panel.
+      zoomIn: [],
+      zoomOut: [],
     })
   })
   it('defaultButtonMap returns fresh copies (mutating one cannot poison the source)', () => {
@@ -213,6 +217,85 @@ describe('clampButtonMap — hostile persisted data', () => {
     const m = clampButtonMap({ v: 1, map: { ...defaultButtonMap(), aimAxes: [2, 3], moveAxes: [0, 1] } })
     expect('aimAxes' in m).toBe(false)
     expect('moveAxes' in m).toBe(false)
+  })
+})
+
+describe('clampButtonMap — maps stored before the zoom actions existed', () => {
+  /** The exact shape an older build persisted: v1, the eight original actions,
+   * no zoomIn/zoomOut keys at all. */
+  const oldShapeMap = (over: Partial<ButtonMap> = {}): Record<string, number[]> => {
+    const full: Record<string, number[]> = { ...defaultButtonMap(), ...over }
+    delete full.zoomIn
+    delete full.zoomOut
+    return full
+  }
+
+  it("an old-shape map SURVIVES with the user's bindings intact — absence of the new actions must not wipe a remap", () => {
+    // The regression this guards: all-or-nothing validation would see the
+    // missing zoom keys and silently reset every binding the player made.
+    const remapped = oldShapeMap({ attack: [1], interact: [0, 5, 6, 7], roll: [17] })
+    const m = clampButtonMap({ v: 1, map: remapped })
+    expect(m.attack).toEqual([1])
+    expect(m.interact).toEqual([0, 5, 6, 7])
+    expect(m.roll).toEqual([17])
+    expect(m.zoomIn).toEqual([]) // backfilled with their (unbound) defaults
+    expect(m.zoomOut).toEqual([])
+  })
+
+  it('loadButtonMap round-trips an old-shape file from localStorage the same way', () => {
+    const remapped = oldShapeMap({ pause: [63], throw: [9] })
+    localStorage.setItem('sporefall.padmap', JSON.stringify({ v: 1, map: remapped }))
+    const m = loadButtonMap()
+    expect(m.pause).toEqual([63])
+    expect(m.throw).toEqual([9])
+    expect(m.zoomIn).toEqual([])
+    expect(m.zoomOut).toEqual([])
+  })
+
+  it('a PRESENT-but-invalid zoom entry still voids the whole map (all-or-nothing holds for real values)', () => {
+    expect(clampButtonMap({ v: 1, map: { ...oldShapeMap(), zoomIn: 'B' } })).toEqual(defaultButtonMap())
+    expect(clampButtonMap({ v: 1, map: { ...defaultButtonMap(), zoomOut: [1.5] } })).toEqual(defaultButtonMap())
+  })
+
+  it('a missing ORIGINAL action still voids the map — the backfill is only for the later actions', () => {
+    const m = oldShapeMap() as Partial<Record<string, number[]>>
+    delete m.attack
+    expect(clampButtonMap({ v: 1, map: m })).toEqual(defaultButtonMap())
+  })
+
+  it('the schema stays v1 (a downgrade to an older build must not read "wrong version" and wipe the remap)', () => {
+    setButtonMap(bindButton(defaultButtonMap(), 'zoomIn', 4))
+    const raw = JSON.parse(localStorage.getItem('sporefall.padmap')!)
+    expect(raw.v).toBe(1)
+  })
+})
+
+describe('the zoom actions in the swap rule', () => {
+  it('binding zoomIn to a taken button swaps: the displaced action inherits zoomIn’s (empty) set — visibly unbound', () => {
+    const m = bindButton(defaultButtonMap(), 'zoomIn', 4) // LB is roll's
+    expect(m.zoomIn).toEqual([4])
+    expect(m.roll).toEqual([]) // the deliberate cost of freeing a button; its reset restores it
+  })
+  it('binding zoomOut to an exotic (free) button displaces nothing', () => {
+    const m = bindButton(defaultButtonMap(), 'zoomOut', 17)
+    expect(m.zoomOut).toEqual([17])
+    for (const a of PAD_ACTIONS) if (a !== 'zoomOut') expect(m[a]).toEqual(defaultButtonMap()[a])
+  })
+  it('zoomIn and zoomOut can displace each other like any two actions', () => {
+    let m = bindButton(defaultButtonMap(), 'zoomIn', 20)
+    m = bindButton(m, 'zoomOut', 20) // steal it: zoomIn inherits zoomOut's old (empty) set
+    expect(m.zoomOut).toEqual([20])
+    expect(m.zoomIn).toEqual([])
+  })
+  it('resetAction on a zoom action returns it to unbound', () => {
+    const m = resetAction(bindButton(defaultButtonMap(), 'zoomIn', 21), 'zoomIn')
+    expect(m.zoomIn).toEqual([])
+  })
+  it('remapProfile never grows zoom fields — zoom stays out of the gameplay read path entirely', () => {
+    setButtonMap(bindButton(defaultButtonMap(), 'zoomIn', 21)) // dirty map → overlay path
+    const p = remapProfile(STD)
+    expect('zoomIn' in p).toBe(false)
+    expect('zoomOut' in p).toBe(false)
   })
 })
 

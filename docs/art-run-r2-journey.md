@@ -188,6 +188,42 @@ wastes the answer**, and this one had already survived one agent's death still
 unanswered. Check the premise before you escalate the question — one `Counter()`
 over the sprite's pixels would have caught it at any point.
 
+## The stall that ended the run: the gate starved the generator
+
+*(observed, and the single most important thing in this file.)*
+
+The second sweep stopped dead — 77 frames flat for about eight minutes,
+gloom-lurker stuck at 3 of 8. **ComfyUI was never wedged.** It was **VRAM
+starved**:
+
+- ollama `qwen3-vl:8b` was holding **20.4 GiB of the 24 GiB card**
+- SDXL sampling collapsed from **~0.5 s/step to ~775 s/step**
+
+It was working the whole time — roughly **1500x too slow to look alive**. Every
+liveness check said "running", because it *was* running.
+
+**The design problem, stated plainly: the VLM that GATES sprite quality starves
+the SDXL generation it is gating.** They cannot share 24 GiB concurrently.
+Anyone resuming this must **sequence them** — unload the VLM before generating,
+or run curation as a separate pass after generation finishes. Running both at
+once does not degrade gracefully; it stops, while continuing to look busy.
+
+Two smaller notes from the same wind-down:
+
+- **Two sweeps were running, not one.** One was an **orphan** whose parent had
+  died at 18:51 and which kept going unnoticed. When you kill a run, enumerate
+  by command line and kill every match — do not assume the pid you started is
+  the only one.
+- A queued job for `carapace-brute-s880000` was **wasted work**: that character
+  had already been picked. The resume logic skips finished characters at the
+  *pick* level, not the *queue* level.
+
+**Generalising the lesson, because it is the same shape as everything else in
+this file: "the process is alive" is not "the work is progressing."** A liveness
+check that cannot distinguish those two will report health right up until you
+look at the output directory and find nothing new for eight minutes. Watch the
+artefact count, not the process list.
+
 ## If you are starting a run
 
 1. `start.ps1`, then confirm ComfyUI sees ~76 checkpoints.
@@ -197,3 +233,6 @@ over the sprite's pixels would have caught it at any point.
 4. Gate from **inside** the checkout under test, and **prove the gate can fail**
    before trusting a pass.
 5. Measure before and after every fix. A fix you did not measure is a hypothesis.
+6. **Do not run the VLM gate concurrently with generation.** 24 GiB does not fit
+   both, and the failure mode is a silent 1500x slowdown, not an error.
+7. Track progress by **artefacts produced**, never by "the process is still up".

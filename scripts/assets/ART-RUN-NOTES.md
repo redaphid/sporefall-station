@@ -5,7 +5,7 @@ every agent died mid-flight with no handoff. This file exists so the next agent
 can resume **from this file alone**, without the one who wrote it. Update it as
 you go, not at the end.
 
-Last updated: **2026-08-23 ~02:00Z** by Artgate2.
+Last updated: **2026-08-23 ~04:30Z** by Artgate2. **The cast is COMPLETE.**
 
 ---
 
@@ -88,11 +88,45 @@ Phases, in order: `idles` → `dirs` (the 5 facings) → `steps` → `deliver.py
 | chain log | `resume-chain.log` |
 | walk frames (fixed) | `D:\tmp\sprite-stage-0822\roto\out\` — 40 files, done |
 
-As of this writing: **6 of 12 idles picked** (vine-ranger, spore-drone,
-bog-mutant, mycologist, derelict-bot, frog-settler), mireclaw-stalker rendering.
-**Facings and step frames have not started and do not exist** — that is still
-the biggest gap, since every non-player currently reuses its front sprite for
-all five directions.
+As of this writing: **12 of 12 idles picked, every character at 8/8 seeds**
+(96 candidates, verified per character rather than by total — 96 could have
+hidden a gap, and frog-settler and carapace-brute had both previously been
+marked done on incomplete 5-of-8 sets).
+
+**One known defect survives:** cinder-husk anchors its feet at row **43**
+while the other eleven sit at **45**, so it floats. Regenerate it with the
+feet anchored before shipping it.
+
+**Still not generated at all:** the four non-south facings and step frames
+for the whole cast. That remains the biggest gap.
+
+## THE RECIPE THAT WORKED — use this, not the narrative
+
+Attempts one and two died. Attempt three finished the whole cast in **289
+seconds** of generation. The difference was entirely procedural, so it is
+written here as steps rather than as a story:
+
+1. **Check for an orphan run first.** Enumerate by command line, not by the pid
+   you remember. Two runs were live earlier tonight; one was an orphan whose
+   parent had died hours before and which nobody had noticed.
+2. **Unload the VLM, then confirm with `nvidia-smi` that VRAM is actually free.**
+   Do not trust the unload call — `ollama` reloaded a model on its own during
+   this very check. `qwen3-vl:8b` holds **20.4 of 24 GiB** and drags SDXL from
+   0.5 s/step to **775 s/step**, which errors nowhere and reads as a hang.
+3. **Generate with the VLM OFF** (`--no-vlm`). Generation must never share the
+   card with the thing that judges it.
+4. **Gate in a SEPARATE pass, after generation has drained.** This is the whole
+   fix for the deadlock, and it costs nothing: gating 12 characters took ~6 min
+   on its own.
+5. **Launch detached** (`Start-Process`), never as a child of an agent turn.
+6. **Let the state file do the resuming.** `cast.py` skips anything already in
+   `picks.json` and skips seeds whose `px` file exists, so a re-run costs only
+   the missing work. To force a top-up, delete that character's entry.
+7. **Watch artefact counts, not the process list.** Progress is files appearing.
+   A live process proves nothing — that is exactly how eight minutes of stall
+   looked healthy.
+8. **Post each character to the thread as it lands**, with the character name as
+   the `alt`. A count is not a picture.
 
 ## If you are picking this up after a crash
 

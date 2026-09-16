@@ -1,1 +1,1 @@
-export default 'Drones hover and sacs pulse instead of standing still'
+export default 'Drones hover and spore sacs pulse'

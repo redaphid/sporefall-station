@@ -84,8 +84,22 @@ export const NPCS: Record<string, NpcDef> = {
     sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,
+    // `frozen: 0` is NOT flavour — it closes a one-button instant kill.
+    // `combat.applyDamage` executes any frozen NPC outright (`shatter`),
+    // regardless of hp, and the freeze ray deals 0 damage while applying
+    // `frozen` for 120 ticks. So freeze the Alpha, tap it once, and 320hp
+    // evaporated. Immunity (honoured by statusFx.applyImmobilize since this
+    // change) means the freeze never lands, so the execute has nothing to fire
+    // on. An apex predator grown in a cold bog shrugging off frost is also the
+    // reading the fiction wants.
+    //
+    // Deliberately NOT `electrified: 0`. That status carries no execute rule —
+    // it is an ordinary lockdown with the anti-chain-lock already governing it —
+    // so the stun gun stays a real tool against a boss. Blanket immobilize
+    // immunity would delete a whole weapon class from the fight to fix a bug
+    // that only ever involved frost.
     behavior: 'mireclaw',
-    resist: { physical: 0.75, burning: 1.25, poisoned: 0.5, spore: 0 },
+    resist: { physical: 0.75, burning: 1.25, poisoned: 0.5, spore: 0, frozen: 0 },
   },
   cop: {
     archetype: 'cop',

@@ -4,7 +4,7 @@
 // never a mutable countdown — so expiry is a pure function of world.tick and a
 // mid-effect snapshot restores with nothing to fix up. Mirrors brain's `fx`.
 
-import type { Entity, Fx } from '../entity'
+import { resistMult, type Entity, type Fx } from '../entity'
 import type { EntityId } from '../types'
 import type { World } from '../world'
 
@@ -53,6 +53,27 @@ const diminishedGrant = (baseTicks: number, tier: number): number =>
 
 /** Land an immobilize under the anti-chain-lock rules (see the block comment). */
 const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: number, source?: EntityId): void => {
+  // IMMUNITY, and it has to live HERE rather than in the damage path.
+  //
+  // `resist[kind] === 0` means IMMUNE. That is the meaning `data/npcs.ts` has
+  // documented for this table since #78 — "1 neutral, <1 resist, 0 immune, >1
+  // weak" — but until now the ONLY reader that honoured it was the DOT tick in
+  // `elementSystem`, which scales damage. An immobilize does no damage, so it
+  // sailed straight past the table and a `resist.frozen = 0` body froze solid
+  // anyway. The field documented a promise the engine only half-kept.
+  //
+  // Why that mattered: `combat.applyDamage` executes a frozen NPC outright
+  // (`shatter`), ignoring hp. Freeze ray (0 damage, 120 ticks of `frozen`) plus
+  // any one tap therefore deleted a 320hp boss. Making the declared immunity
+  // real is the fix, and it closes the hole at its source — the freeze never
+  // lands, so there is no frozen body for the execute rule to find.
+  //
+  // Scoped to immobilize kinds only (this function is reached from `addStatus`
+  // solely for IMMOBILIZE_STATUSES). DOTs deliberately keep their existing
+  // behaviour, where a 0-resist status still ATTACHES and merely does no harm —
+  // `elementSystem` comments that contract, and `hasStatus(e, 'spore')` is read
+  // elsewhere (infection), so refusing to attach it would change more than damage.
+  if (resistMult(e, kind) === 0) return
   const fx = (e.fx ??= {})
   const lockout = (e.lockout ??= {})
   const track = lockout[kind]

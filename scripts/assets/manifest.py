@@ -33,6 +33,17 @@ NAMES = {
     "stalker": "Mireclaw Stalker",
     "lurker": "Gloom Lurker",
     "pod": "Brood Sac",
+    # The three bosses that landed after the Alpha. They are ALREADY named in
+    # both shipped manifest.json files -- the boss branches wrote those in by
+    # hand -- but they were never added here, so the next `python3 manifest.py`
+    # would have regenerated the base pack WITHOUT them and turned the suite
+    # red: theme.test.ts asserts every spawnable NPC in data/npcs.ts carries a
+    # themed name, and that the name is not just the archetype id title-cased.
+    # Same silent-revert hazard as CHAR_FILES and PROP_KEYS below -- this table
+    # is what build() writes, so an omission here is an omission in the pack.
+    "vigil": "The Vigil",
+    "echo": "Subject Echo",
+    "sealkeeper": "The Sealkeeper",
     "crate": "Cargo Pod",
     "barrel": "Spore Barrel",
     "atm": "Cryo Terminal",
@@ -91,6 +102,27 @@ CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
 # Only s-idle and s-step exist; the per-direction BORROW below fills se/e/ne/n
 # from the s art, which is exactly what every other non-player NPC does.
 CHAR_FILES["boss"] = "mireclaw-alpha"
+
+# The file stem ("kind") each of the three newer bosses ships its art under.
+# Derived from the themed names above by the same rule that produced every other
+# kind in this pack -- "Mireclaw Alpha" -> mireclaw-alpha, "Gloom Lurker" ->
+# gloom-lurker -- so nothing here is invented: it is the display name, kebab-cased.
+#
+# LISTED AHEAD OF THE ART, DELIBERATELY, and it is safe: build() only emits a
+# char key whose file actually exists(), so until the PNGs land this table prints
+# "(no art at all: char.vigil.s-idle)" on stderr and emits nothing. The
+# alternative -- adding these on the day the art arrives -- is precisely the
+# silent revert the CHAR_FILES["boss"] note above describes, one regeneration away.
+#
+# install_boss_art.py imports this table, so the filenames that script WRITES and
+# the filenames a regeneration LOOKS FOR are one declaration instead of two that
+# have to be kept in step by hand.
+BOSS_KINDS = {
+    "vigil": "the-vigil",
+    "echo": "subject-echo",
+    "sealkeeper": "the-sealkeeper",
+}
+CHAR_FILES.update(BOSS_KINDS)
 
 ITEM_KEYS = {  # engine item id -> our themed file (items table key)
     "pistol": "spore-pistol", "bat": "root-club", "knife": "shard-knife",

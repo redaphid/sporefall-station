@@ -12,7 +12,9 @@ import { StreamReader } from '../net/framing/chunkedStream'
 import {
   encodeSnapshot,
   decodeInput,
+  toWireAnnotations,
   toWireEntity,
+  type AnnotationsMsg,
   type GameStartMsg,
   type GoMsg,
   type HelloMsg,
@@ -91,6 +93,14 @@ export class NetHostSession implements Session {
   onLobbyChange?: (players: LobbyPlayer[]) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
   debugInventorySends = 0
+  /** Test/telemetry counter: Annotations messages QUEUED (one broadcast counts
+   * once, plus one per late-joiner catch-up). Change-gated, so on a floor whose
+   * annotations never change this stays where it started. */
+  debugAnnotationSends = 0
+  /** Signature of the last annotation set we put on the wire — the change gate.
+   * An EMPTY set signs as '', which is also the initial value, so a run that
+   * never annotates anything never sends a single byte of this. */
+  private lastAnnSig = ''
 
   constructor(
     /** Mutable so "New Seed" (restart(seed)) can re-seed the run in place; the
@@ -185,6 +195,12 @@ export class NetHostSession implements Session {
     // Force a fresh inventory push after respawn: the new loadout must reach every
     // client even if it happens to hash-match the pre-restart one.
     for (const p of this.peers.values()) p.lastInvSig = ''
+    // The new world's annotation list starts empty, and every client clears its
+    // own on the GameStart this restart is about to send — so the two sides
+    // already agree and there is nothing to announce. Re-baselining the gate
+    // (rather than leaving the old run's signature in it) keeps that true: a
+    // fresh run that annotates the same thing again still counts as a change.
+    this.lastAnnSig = ''
     this.started = false
     this.beginGame()
   }
@@ -217,6 +233,64 @@ export class NetHostSession implements Session {
     if (this.world.tick % SNAPSHOT_INTERVAL_TICKS === 0) this.sendSnapshots()
     if (this.world.tick % STATE_INTERVAL_TICKS === 0) this.sendState()
     this.sendInventories()
+    this.sendAnnotations()
+  }
+
+  /** The annotation set as it stands RIGHT NOW, projected for the wire. */
+  private annotationsMsg(): AnnotationsMsg {
+    return {
+      floor: this.world.floor,
+      annotations: toWireAnnotations(this.world.annotations, this.world.tick, (id) => {
+        // Drop marks pinned to something the world no longer has — a killed
+        // boss, or every entity on the floor the party just left (`nextFloor`
+        // rebuilds `entities`/`byId` and does not touch `w.annotations`). The
+        // host's own overlay already refuses to draw those (`anchorOf` finds no
+        // entity), so this only keeps the two screens saying the same thing.
+        const e = this.world.byId.get(id)
+        return e !== undefined && !e.dead
+      }),
+    }
+  }
+
+  /**
+   * Broadcast the annotation set — but ONLY when it actually changed.
+   *
+   * This is the same change-gate discipline as `sendInventories`, and for the
+   * same reason: BLE is the binding constraint. The Vigil rewrites its meter
+   * label only when the text changes (`systems/vigil.ts` `annotate`), which over
+   * a whole fight is a handful of rewrites, so a per-tick or even per-second
+   * push would spend ~30-60x the bytes to say nothing. An unchanged set costs
+   * one string compare and ZERO packets.
+   *
+   * The floor is part of the signature: the same list on a NEW floor is a
+   * different set (the client tags what it draws by floor), and that case is
+   * real — a free-floating x/y mark survives `nextFloor` untouched.
+   */
+  private sendAnnotations(): void {
+    const msg = this.annotationsMsg()
+    const sig = msg.annotations.length === 0 ? '' : `${msg.floor}|${JSON.stringify(msg.annotations)}`
+    if (sig === this.lastAnnSig) return
+    this.lastAnnSig = sig
+    this.broadcastJson(MsgType.Annotations, msg)
+    this.debugAnnotationSends++
+  }
+
+  /**
+   * Hand ONE peer the set that is live right now.
+   *
+   * A joiner needs this or the change-gate locks them out: the host sends on
+   * change, and the change that put the Vigil's meter on screen happened before
+   * they arrived. Someone who joins mid-fight would watch a boss with no meter
+   * until the text next happened to move — and the meter is the fight.
+   *
+   * Empty set → nothing sent, so the common case (a floor with no annotations)
+   * adds nothing to the admission burst.
+   */
+  private sendAnnotationsTo(p: PeerState): void {
+    const msg = this.annotationsMsg()
+    if (msg.annotations.length === 0) return
+    p.queue.queueReliable(encodeJson(MsgType.Annotations, msg))
+    this.debugAnnotationSends++
   }
 
   /**
@@ -349,6 +423,10 @@ export class NetHostSession implements Session {
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       self: this.self,
+      // The HOSTING device draws the same overlay as everyone else. `HostSession`
+      // (solo) always did; this one did not, so a co-op host was as blind to its
+      // own Vigil meter as its joiners were — the same defect, one layer up.
+      annotations: this.world.annotations,
     }
   }
 
@@ -502,6 +580,7 @@ export class NetHostSession implements Session {
         p.queue.queueReliable(
           encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: ghost.entityId } }),
         )
+        this.sendAnnotationsTo(p) // the fight they dropped out of may already be annotated
         this.onLobbyChange?.(this.lobbyPlayers())
         this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
         return
@@ -540,6 +619,7 @@ export class NetHostSession implements Session {
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))
         p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
         p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [slot]: avatar.id } }))
+        this.sendAnnotationsTo(p) // joining mid-fight must not mean joining mid-fight BLIND
         this.onLobbyChange?.(this.lobbyPlayers())
         this.broadcastJson(MsgType.LobbyState, { players: this.lobbyPlayers() })
         return
@@ -606,5 +686,8 @@ export class NetHostSession implements Session {
     // show an empty hotbar until its loadout happened to change — and a client
     // that re-runs GameStart clears `localInv` on the way through.
     p.lastInvSig = ''
+    // Same argument for the annotation set, which is change-gated identically
+    // and which a re-run GameStart also clears on the client.
+    if (this.started && p.entityId !== undefined) this.sendAnnotationsTo(p)
   }
 }

@@ -57,28 +57,49 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
   }
 }
 
+/**
+ * A PACED burst: `shots` single-tick trigger pulls, `gap` ticks apart. Expands
+ * to `shots * 2` ordinary segments, so everything downstream (scriptTicks, the
+ * showcase test's `at(n)` windows) keeps working unchanged.
+ *
+ * This exists because CADENCE is a thing a timeline has to be able to say. A
+ * segment's `attack` is held for every tick of that segment and the sim gates it
+ * on the weapon cooldown, so `{ ticks: n, attack: true }` can only ever mean
+ * MAXIMUM RATE. Spacing the trigger pulls is the other half of the Vigil's
+ * fight, and it is not expressible any other way.
+ */
+const paced = (shots: number, gap: number): ScriptStep[] =>
+  Array.from({ length: shots }, (): ScriptStep[] => [{ ticks: 1, attack: true }, { ticks: gap - 1 }]).flat()
+
 // 30 ticks = 1s. Player moves ~0.15 tiles/tick. Tuned against the `demo`
 // scenario (spawn 1.5,1.5; lane y=11; grenade pickup x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
-  // §4.1 THE VIGIL (scenario `vigil`, stage centre 32,32): the noise budget,
-  // narrated. The player holds a knife (silent) and the grenade special (loud),
-  // so both halves of the fight play out without a weapon switch this timeline
-  // cannot express. Each beat is a fixed tick window the e2e reads live state
-  // inside — see e2e/vigil.mjs, which asserts the four claims off `__world`.
+  // §4.1 THE VIGIL (scenario `vigil`, stage centre 32,32; the player stands 5
+  // tiles west of the boss with the STARTER PISTOL and nothing else): the noise
+  // budget, narrated.
+  //
+  // The verb is CADENCE, not weapon choice — a player carries exactly one
+  // permanent weapon and cannot swap, so this timeline plays the SAME GUN twice
+  // and lets the boss answer differently to each. Paced fire kills it in its
+  // sleep; the trigger held down wakes it; the grenade wakes it outright. Each
+  // beat is a fixed tick window the e2e reads live state inside — see
+  // e2e/vigil.mjs, which asserts every claim off `__world`.
   vigil: [
     { ticks: 40 }, // establish: revealed on sight, meter pinned, ASLEEP [·····]
-    { ticks: 26, x: 1 }, // close to knife range (the boss is 5 tiles east)
-    { ticks: 90, x: 1, attack: true }, // BEAT 1 — knife a sleeping boss: damage lands at 1.5x…
-    { ticks: 1, special: true, x: 1 }, // …and it never stirs. Now be LOUD: grenade.
-    { ticks: 34, x: 1 }, // the boom's noise fills the meter (~18 ticks) → it WAKES
-    { ticks: 90, x: 1, attack: true }, // BEAT 2 — the same knife, awake: 0.15x, ~10x less
-    { ticks: 60, x: -1 }, // BEAT 3 — back off west; it lumbers after at speed 2.0
-    { ticks: 60 }, // hold quiet: wake 1 (150 ticks) expires → it SETTLES, soft again
-    { ticks: 1, special: true, x: 1 }, // grenade 2 (the 240-tick special cooldown clears here)
-    { ticks: 30, x: 1 }, // second boom → wake 2
+    // BEAT 1 — DISCIPLINE (10 segments). Five shots 45 ticks apart, comfortably
+    // above the ~38-tick break-even: 21 damage each into a sleeping boss, and
+    // the meter decays back to zero between every one of them. It never stirs.
+    ...paced(5, 45),
+    { ticks: 160, attack: true }, // BEAT 2 — GREED: hold it down. 8 shots / 135 ticks in, it WAKES
+    { ticks: 90, attack: true }, // BEAT 3 — the same gun on an awake boss: 0.15x, ~10x less per shot
+    { ticks: 60, x: -1 }, // BEAT 4 — back off west; it lumbers after at speed 2.0…
+    { ticks: 90 }, // …and hold fire: wake 1 (150 ticks) expires → it SETTLES, soft again
+    { ticks: 20, x: 1 }, // face east again — aim follows movement (input/aim.ts selectAim)
+    { ticks: 1, special: true, x: 1 }, // BEAT 5 — the loud option is unchanged: GRENADE
+    { ticks: 60 }, // the boom's noise crosses the meter in ~16 ticks → wake 2
     { ticks: 60, x: -1 }, // back off again, exactly as before…
-    { ticks: 280 }, // …but BEAT 4: this wake runs 300 ticks, not 150. Twice the first.
+    { ticks: 300 }, // …but this wake runs 300 ticks, not 150. Twice the first.
     { ticks: 40 }, // settled beat: meter back to ASLEEP, resist back to 1.5
   ],
 

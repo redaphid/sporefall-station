@@ -2,33 +2,96 @@ import { makeEntity, type Entity } from '../entity'
 import { SIM_DT } from '../types'
 import { addEntity, isBlocked, type World } from '../world'
 import { applyDamage, detonate, runHitTriggers } from './combat'
+import { canSeeEntity, hateToward } from './goals'
 import { applyAreaEffect } from './itemEffects'
+import { CRIME_HATE, initialFactionHate } from './relationships'
 import { applyStatus } from './statusFx'
 import { vlen } from '../simMath'
 
-/** Steer a homing projectile: rotate its velocity toward the nearest hostile
- * body by at most `homing` radians this tick, preserving speed. Deterministic —
- * nearest wins, ties broken by ascending id, no RNG. */
+// ── Homing (reworked after playtest: "it mostly just curves bullets into walls").
+// A homing round is a SEEKER HEAD, not a map-wide magnet: it only chases what it
+// can actually SEE, inside a forward cone, and only genuine enemies of whoever
+// fired it. No visible prey → it flies dead straight.
+
+/** Acquisition radius (tiles) — beyond this a round doesn't even look. */
+const HOMING_RANGE = 10
+/** Base half-angle (radians) of the forward seek cone around the heading. */
+const HOMING_CONE = 1.0
+/** Extra cone half-angle per radian/tick of turn rate — so stacking the mod
+ * widens the seek cone at the same time as it sharpens the turn. */
+const HOMING_CONE_PER_TURN = 2
+
+const wrapAngle = (a: number): number => {
+  while (a > Math.PI) a -= 2 * Math.PI
+  while (a < -Math.PI) a += 2 * Math.PI
+  return a
+}
+
+/** Is `t` a body a round fired by `owner` should hunt? Combatant bodies only —
+ * npc/player, never doors, furniture, pickups or other bullets — never the owner
+ * itself, and only when genuinely hostile to the owner's side:
+ *  - player-owned rounds seek NPCs whose disposition toward that player is
+ *    Hostile (stored grudge, faction opener, the `w.hostile` floor, infection —
+ *    all via `hateToward`). Never players: co-op allies are not prey. In a
+ *    peaceful world a Neutral civilian is not prey either — homing must never
+ *    auto-commit a crime the player didn't aim.
+ *  - NPC-owned rounds seek players the NPC hates (the enemy-fire symmetry the
+ *    old global-nearest scan got backwards: it excluded players outright, so an
+ *    enemy's homing gun chased its own allies), and NPCs it holds a Hostile
+ *    stance toward (stored rel, else the faction matrix — cop vs gang).
+ * Downed players are out of the fight (their hits void anyway) — skipped. */
+const isHomingPrey = (w: World, owner: Entity, t: Entity): boolean => {
+  if (t.id === owner.id || t.dead || !t.health) return false
+  if (t.kind === 'player') {
+    if (!owner.ai || t.playerCtl?.downed) return false
+    return hateToward(w, owner, t.id) >= CRIME_HATE
+  }
+  if (t.kind !== 'npc') return false
+  if (owner.playerCtl) return hateToward(w, t, owner.id) >= CRIME_HATE
+  const stored = owner.ai?.rel?.[t.id]?.hate
+  const hate = stored ?? initialFactionHate(owner.ai?.faction ?? 'neutral', t.ai?.faction ?? 'neutral')
+  return hate >= CRIME_HATE
+}
+
+/** Steer a homing projectile. Candidates are live enemy bodies (`isHomingPrey`)
+ * within HOMING_RANGE and inside the forward cone — never a target behind the
+ * round, so it can't yank itself backwards — and, the load-bearing rule, only
+ * ones the round can SEE (tile raycast via `canSeeEntity`; walls and closed
+ * doors block). A target behind cover simply isn't there: with no visible
+ * candidate the round flies straight, which is what kills the old
+ * curve-into-the-wall failure. Among candidates the straightest-ahead wins
+ * (smallest angular deviation; nearer breaks a dev tie; earliest in entity
+ * order — ascending id — breaks that), then the velocity rotates toward it by
+ * at most `homing` radians this tick, preserving speed. Re-evaluated every
+ * tick, so breaking LOS mid-flight stops the steering that instant.
+ * Deterministic: pure world-state reads, stable iteration order, no RNG. */
 const homeToward = (w: World, e: Entity): void => {
   const p = e.projectile!
+  const owner = w.byId.get(p.ownerId)
+  if (!owner) return // an orphaned round has no side to fight for — fly straight
+  const cur = Math.atan2(e.vel.y, e.vel.x)
+  const halfCone = HOMING_CONE + p.homing! * HOMING_CONE_PER_TURN
   let best: Entity | null = null
+  let bestDev = Infinity
   let bestDist = Infinity
   for (const o of w.entities) {
-    if (o.id === p.ownerId || o.dead || !o.health || o.kind === 'projectile' || o.kind === 'player') continue
-    const d = vlen(o.pos.x - e.pos.x, o.pos.y - e.pos.y)
-    if (d < bestDist) {
-      best = o
-      bestDist = d
-    }
+    if (!isHomingPrey(w, owner, o)) continue
+    const dx = o.pos.x - e.pos.x
+    const dy = o.pos.y - e.pos.y
+    const d = vlen(dx, dy)
+    if (d > HOMING_RANGE) continue
+    const dev = Math.abs(wrapAngle(Math.atan2(dy, dx) - cur))
+    if (dev > halfCone) continue
+    if (dev > bestDev || (dev === bestDev && d >= bestDist)) continue // keep-first ⇒ lowest id on a full tie
+    if (!canSeeEntity(w, e, o)) continue // the LOS gate: what it can't see, it won't chase
+    best = o
+    bestDev = dev
+    bestDist = d
   }
   if (!best) return
   const speed = vlen(e.vel.x, e.vel.y) || 1
-  const cur = Math.atan2(e.vel.y, e.vel.x)
   const want = Math.atan2(best.pos.y - e.pos.y, best.pos.x - e.pos.x)
-  let diff = want - cur
-  while (diff > Math.PI) diff -= 2 * Math.PI
-  while (diff < -Math.PI) diff += 2 * Math.PI
-  const turn = Math.max(-p.homing!, Math.min(p.homing!, diff))
+  const turn = Math.max(-p.homing!, Math.min(p.homing!, wrapAngle(want - cur)))
   const na = cur + turn
   e.vel.x = Math.cos(na) * speed
   e.vel.y = Math.sin(na) * speed

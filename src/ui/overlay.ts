@@ -31,6 +31,7 @@ import { visibleAnnotations } from '../game/annotations'
 import { pickNearestEntity, pickRadiusAt, clearSelection, setSelected, selectedEntities } from '../game/select'
 import { TILE_PX } from '../render/art'
 import {
+  annotationScale,
   cardAnchor,
   clampToViewport,
   deOverlap,
@@ -38,6 +39,7 @@ import {
   wrapLabel,
   LABEL_LINE_HEIGHT,
   MAX_LABEL_WIDTH,
+  MIN_FONT_PX,
   type Rect,
 } from './annotationLayout'
 import { projectToScreen, screenToWorld, type CameraState } from './locatorModel'
@@ -420,6 +422,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
       const vh = mount.clientHeight
       const anns = visibleAnnotations(view.annotations ?? [], view.tick)
       const T = TILE_PX * (cam?.zoom ?? 1)
+      const aScale = annotationScale(vw)
 
       // Resolve an annotation's screen anchor: entity-anchored reads the LIVE
       // entity position (so the mark follows it); else the world point; text banners
@@ -439,7 +442,9 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
           const p = projectToScreen(a.x, a.y, cam)
           return { ...p, onScreen: p.x >= 0 && p.x <= vw && p.y >= 0 && p.y <= vh }
         }
-        return { x: vw / 2, y: 24, onScreen: true } // bannerless text default
+        // Bannerless text default: below the mission banner (which owns the very
+        // top-center strip), pushed further down as the text itself scales up.
+        return { x: vw / 2, y: 24 + Math.round(26 * aScale), onScreen: true }
       }
 
       // ---- shapes (pin / circle / arrow), each an inert SVG-free DOM glyph.
@@ -494,7 +499,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
         textEls.set(it.key, te)
         if (it.targetId !== undefined) te.root.dataset.target = String(it.targetId)
         else delete te.root.dataset.target
-        setText(te.root, it.text, it.color)
+        setText(te.root, it.text, it.color, aScale)
         const w = te.root.offsetWidth
         const h = te.root.offsetHeight
         let x: number
@@ -572,7 +577,7 @@ const mkText = (parent: HTMLElement, key: string): TextEl => {
 
 /** Set the caption to pre-wrapped ≤3 nowrap lines so width/height stay bounded and
  * text never clips (scrollWidth==clientWidth). */
-const setText = (el: HTMLElement, text: string, color: string): void => {
+const setText = (el: HTMLElement, text: string, color: string, scale = 1): void => {
   const lines = wrapLabel(text)
   el.replaceChildren(
     ...lines.map((ln) => {
@@ -583,7 +588,10 @@ const setText = (el: HTMLElement, text: string, color: string): void => {
     }),
   )
   el.style.color = color
-  el.style.maxWidth = `${MAX_LABEL_WIDTH}px`
+  // Scale font + line height + width cap together (before the caller measures),
+  // so wrapped lines keep the same character budget at every scale.
+  el.style.font = `600 ${Math.round(MIN_FONT_PX * scale)}px/${Math.round(LABEL_LINE_HEIGHT * scale)}px system-ui`
+  el.style.maxWidth = `${Math.round(MAX_LABEL_WIDTH * scale)}px`
 }
 
 const mkShape = (parent: HTMLElement, key: string): HTMLElement => {

@@ -179,6 +179,17 @@ export interface ArtPalette {
  * 1.3) is what makes the extra bulk felt in the fight.
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
+  // Subject Echo (§4.2): 1.6. Bigger than the Alpha's 1.5 but well under the
+  // Vigil's 2.25, and the gap is the point — Echo is a LAB SUBJECT that kept
+  // adapting, not a thing grown monstrous. It reads as a person-shaped body
+  // that has been added to, so it needs to clear the thug decisively while
+  // still looking like something that was once on a gurney.
+  echo: 1.6,
+  // The Sealkeeper (§4.3): 1.9. Heavier than Echo, under the Vigil, because it
+  // is bulkhead HARDWARE that outlived its function — a maintenance unit built
+  // to move doors, so mass is its whole silhouette. It must read as able to
+  // shove a hatch shut on you, which is the one thing the fight is about.
+  sealkeeper: 1.9,
   boss: 1.5,
   // The Vigil (§4.1): 1.5 APPLIED TWICE. It stands half again over the Alpha
   // exactly as the Alpha stands half again over the thug — one more rung up the

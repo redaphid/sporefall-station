@@ -99,6 +99,28 @@ runs the tests, and writes `e2e/output/feature-<name>.mp4` (+ labeled stills).
 (`pnpm exec vitest run` stays green without a browser). Wire it into CI as a separate
 job that has Chromium + ffmpeg available.
 
+### Which ffmpeg (and what happens without one)
+
+`muxVideo` in `e2e/lib.mjs` picks its binary in this order: **`$FFMPEG_PATH` →
+`ffmpeg` on PATH → playwright's own bundled copy** (resolved via
+`playwright-core/browsers.json`, so a playwright upgrade that bumps the revision
+directory keeps working). PATH comes first because CI installs a full system
+ffmpeg with apt (`.github/workflows/web-e2e.yml`) and that is the build these
+recordings are specified against.
+
+Playwright's bundled ffmpeg is **not** a substitute for it. It is compiled
+`--disable-everything` with just enough to write the screencast webm it records
+(libvpx/VP8 + the webm muxer) — **no libx264 and no mp4 muxer at all**. So on a
+dev box with no system ffmpeg the mux is skipped and the **raw `.webm`
+playwright already wrote is kept** as the deliverable: a real video of the real
+run, not remuxed. `muxVideo` returns `{ video, format, bytes }` (plus `mp4` only
+when an actual mp4 exists) and prints a note saying which happened.
+
+That degrade is deliberate — the alternative is an ENOENT crash that destroys
+the recording a passing test just produced, turning "this box cannot transcode"
+into "there is no proof". Install system ffmpeg (`apt-get install -y ffmpeg`) if
+you need the h264 mp4 for a PR body.
+
 ## The two backfilled features
 
 | Test | Fixture | Drives | Adversarial final-state assertions |

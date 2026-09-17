@@ -97,6 +97,12 @@ export interface AiState {
   /** §4.1 The Vigil — how many times it has woken. Each wake is longer than the
    * last and the final one never ends, so this is the escalation counter. */
   wakes?: number
+  /** §4.2 Echo (systems/echo.ts) — damage taken THIS TICK, keyed by damage kind.
+   * A one-tick ledger, not a running total: the three damage sites accumulate
+   * into it and `echoSystem` folds it into `resist` and DELETES it every tick,
+   * so an Echo that took no damage carries no field and snapshots stay minimal.
+   * Never holds an immobilize kind — see the guards in systems/echo.ts. */
+  echoHits?: Record<string, number>
   /** #68 — INERT until a stimulus wakes it: no move, no target, minimal
    * perception (the awakeningSystem flips it false and emits `woke`). A sleeping
    * pod / dormant unit the player can tiptoe past — or trip. */

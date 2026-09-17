@@ -696,6 +696,35 @@ const stageArtCompare = (w: World): void => {
   stageThug(w, 19, LANE_Y)
 }
 
+// §4.2 Echo — the adaptive-resist proof (e2e/echo.mjs drives this with the
+// `echo-adapt` script). A blank lane, a pistol, and the boss downrange: the
+// script holds the trigger until the meter fills and the damage visibly falls
+// off, backs off while it decays, then opens up again to show the gun working.
+//
+// Deliberately does NOT pre-set `mission.bossRevealed`: the recording should
+// show the real entrance firing on first sight, because the reveal gate is part
+// of the feature (nothing is learned from a room nobody is in).
+//
+// The player is given a deep health pool because Echo closes to claw range and
+// the clip must survive to its third beat. Everything under test is the resist
+// map, not the player's survival, so the hp is scaffolding rather than balance.
+const setupEchoAdapt = (w: World): void => {
+  clearStage(w)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.playerCtl) {
+    player.pos = { x: 6 + 0.5, y: LANE_Y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // aimed east, straight down the lane at the boss
+    player.health = { hp: 2000, max: 2000, iframes: 0 }
+    player.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }]
+    player.loadout!.activeSlot = 0
+    if (player.combat) player.combat.weapon = 'pistol'
+  }
+  // 8 tiles out: inside REVEAL_RANGE (11) so the entrance fires almost at once,
+  // and inside the pistol's 10-tile range so the first beat is all shooting.
+  spawnNpc(w, 'echo', 14 + 0.5, LANE_Y + 0.5)
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'artcompare') stageArtCompare(w)
   if (name === 'npc-combat') setupNpcCombat(w)
@@ -715,4 +744,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'npc-ai') setupNpcAi(w)
   if (name === 'npc-deliberate') setupNpcDeliberate(w)
   if (name === 'vigil') setupVigil(w)
+  if (name === 'echo-adapt') setupEchoAdapt(w)
 }

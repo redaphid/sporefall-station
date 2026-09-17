@@ -82,6 +82,20 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 40 }, // settled beat: meter back to ASLEEP, resist back to 1.5
   ],
 
+  // §4.2 Echo's adaptive resist (scenario `echo-adapt`, lane y=11, boss at x=14.5).
+  // Three beats, and the whole boss is legible from the middle one:
+  //   1. HOLD THE TRIGGER — the meter fills, each shot lands for less.
+  //   2. BREAK OFF — stop firing and watch the resistance decay back.
+  //   3. OPEN UP AGAIN — the gun works again, which is the lesson.
+  // Timings are in ticks at 30/s; the lull is ~12s because a full baseline
+  // recovery takes ~300 ticks at ECHO_DECAY.
+  'echo-adapt': [
+    { ticks: 40 }, // establish: the entrance fires, the meter reads the rule
+    { ticks: 300, attack: true }, // beat 1: sustained fire — the cliff
+    { ticks: 60, x: -1 }, // break off west, out of the claws
+    { ticks: 360 }, // beat 2: the lull — it forgets
+    { ticks: 200, attack: true }, // beat 3: back on the gun, landing hard again
+  ],
   // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
   // the player only strolls and stands — every beat on stage is the AI's own.
   // Establish the cast, walk south INTO the lurker pocket (the proximity trip

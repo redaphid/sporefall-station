@@ -255,6 +255,18 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   // asserts every referenced file exists on disk and that the packs validate
   // with ZERO warnings, so declaring art that does not exist would fail both.
   vigil: 'vigil',
+  // §4.2 Echo — same reasoning as the Vigil directly above, same graceful path:
+  // mapped to ITSELF so `isCharacterSprite` is true and it draws as its own
+  // distinct procedural character set tinted by its ENTITY_COLORS entry, rather
+  // than falling past the character path to the grey `entityColors.default`
+  // blob. And emphatically NOT aliased to 'thug' — making the game's third boss
+  // pixel-identical to its commonest enemy is the single failure
+  // docs/assets/boss-art-brief.md exists to stop repeating.
+  //
+  // NB no `char.echo.*` keys go in the theme manifests: none of that art exists,
+  // and theme.test.ts asserts every referenced file is really on disk and that
+  // both packs validate with ZERO warnings.
+  echo: 'echo',
 }
 
 /** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
@@ -439,6 +451,12 @@ export const ENTITY_COLORS: Record<string, number> = {
   // bosses must not read as the same creature at a glance, which is the exact
   // failure docs/assets/boss-art-brief.md records for the Alpha vs the thug.
   vigil: 0x4e7d8c,
+  // Acid chartreuse: a lab subject that kept the part of the job that involved
+  // adapting — chemical, cultured, wrong for a bog. Chosen for maximum distance
+  // from the other two bosses at a glance (the Alpha's hot red 0xe0483f and the
+  // Vigil's cold slate-teal 0x4e7d8c) and from the desaturated tan of a
+  // civilian (0xd1c47f), which is the nearest hue in the palette.
+  echo: 0xc2e04a,
 
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,

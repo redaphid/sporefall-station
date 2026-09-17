@@ -6,6 +6,7 @@ import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
 import { vigilSystem } from './systems/vigil'
+import { echoSystem } from './systems/echo'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
@@ -291,6 +292,13 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   // fireSystem/sporeSystem above) and this tick's live projectiles, so the
   // loudness it measures is the room as it finally ended up, not mid-update.
   vigilSystem(w)
+  // §4.2 Echo folds this tick's damage ledger into its resist map. MUST run
+  // after every system that can remove hp this tick — combat, projectiles and
+  // above all `elementSystem`, whose DOT tick is one of the three sites that
+  // feed the ledger. Running it earlier would defer each tick's element damage
+  // to the next fold, so fire would appear to teach it a tick late and the
+  // learn/forget decision (exactly one per kind per tick) would race itself.
+  echoSystem(w)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so
   // stillness reflects the settled position/velocity), before mission/sweep.

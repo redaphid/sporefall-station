@@ -958,6 +958,21 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     about: '§4.1 The Vigil — inert until NOISE wakes it (never a hit); awake it simply hunts',
     considerations: ['threat', 'hunt', 'wander'],
   },
+  echo: {
+    // §4.2 Echo. NO NEW CONSIDERATION, for the same reason the Vigil needed
+    // none: its whole fight lives on the DAMAGE axis, not the movement one.
+    // `systems/echo.ts` owns the adaptive resist map; what the body does in the
+    // meantime is simply what any predator does — go for what it can see, then
+    // for what it last saw. `threat`/`hunt`/`wander` are exactly that, and are
+    // the same three functions a common thug composes.
+    //
+    // Resisting the urge to add a bespoke consideration is the point. A movement
+    // gimmick here would give the player a second thing to read at the same time
+    // as the resist meter, and the one lesson this boss has to teach — rotate
+    // your damage — is the thing that would get lost.
+    about: '§4.2 Echo — adapts to repeated damage kinds (systems/echo.ts); the body just hunts',
+    considerations: ['threat', 'hunt', 'wander'],
+  },
   barricader: {
     about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',
     considerations: ['threat', 'defendMyWing', 'pursueMemory', 'manhunt', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],

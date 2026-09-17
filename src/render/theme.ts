@@ -61,8 +61,26 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
 // all spawn in normal play. They are canonical char keys for the same reason
 // `boss` is: without them `char.brute.*` is not canonical, so validateManifest
 // DROPS the mapping and the art can never load however many files ship.
+//
+// `vigil`, `echo` and `sealkeeper` — the three bosses that joined the Alpha —
+// are listed for that same reason, and DELIBERATELY AHEAD OF THEIR ART. Real
+// 96×96 sprites are being generated for all three; when they land, the only
+// thing standing between a correct PNG and a boss that still draws as a
+// procedural blob is membership of this list. Adding a name is inert on its own
+// (a canonical key no manifest maps resolves to procedural art exactly as
+// before), it is the one half of the job the asset pipeline CANNOT do for
+// itself, and it is what the Alpha needed before its art could land at all — so
+// it goes in first, separately, while it is cheap.
+//
+// Note the asymmetry with the manifests: the NAME is safe to add early, the
+// manifest KEYS are not. theme.test.ts asserts every path a pack references
+// exists on disk and that both packs validate with zero warnings, so declaring
+// `char.vigil.*` before the file exists fails the suite. That is why
+// scripts/assets/install_boss_art.py writes the keys and the PNGs together, and
+// refuses to run for an archetype that is missing from this list.
 export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
-  'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod'] as const
+  'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
+  'vigil', 'echo', 'sealkeeper'] as const
 export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
 // The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
 // `crate` are canonical for the same reason `boss` is above: a prop key that is

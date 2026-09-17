@@ -281,12 +281,14 @@ export const NPCS: Record<string, NpcDef> = {
   },
 
   // ── The Vigil — the boss you are trying not to fight (design §4.1) ─────────
-  // Player verb: BE QUIET. Something enormous fused into the reactor bulkhead,
-  // which has not moved in years and does not need to. It is VULNERABLE ONLY
-  // WHILE DORMANT and near-immune awake, so the fight is a noise budget: do
-  // damage in silence, back off before the meter trips. Killing it with a knife
-  // is slow and possible; killing it with a grenade is impossible, because the
-  // grenade is what wakes it.
+  // Player verb: FIRE ON A CADENCE. Something enormous fused into the reactor
+  // bulkhead, which has not moved in years and does not need to. It is
+  // VULNERABLE ONLY WHILE DORMANT and near-immune awake, so the fight is a noise
+  // budget: paced shots from the one gun every player carries work it all the
+  // way down in its sleep, a HELD TRIGGER wakes it, and a grenade wakes it
+  // outright. (It previously claimed a knife was the quiet option. A player can
+  // never hold a knife — see the one-weapon rule in `systems/interaction.ts` —
+  // and that fiction is why the boss shipped unwinnable. See systems/vigil.ts.)
   //
   // ⚠️ `wakeOn` IS DELIBERATELY ABSENT, and that is the whole design.
   //

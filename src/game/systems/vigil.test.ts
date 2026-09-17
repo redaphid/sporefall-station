@@ -6,11 +6,12 @@
 // find later — so it is the first test in the file.
 
 import { describe, expect, it } from 'vitest'
+import { WEAPONS } from '../data/items'
+import { NPCS } from '../data/npcs'
 import { Tile } from '../levelgen/level'
 import { spawnNpc } from '../populate'
-import { spawnPlayer } from '../player'
+import { PLAYER_HP, PLAYER_START_WEAPON, spawnPlayer, starterLoadout } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { arm } from '../testkit'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, emitNoise, tickWorld, type World } from '../world'
 import { applyDamage, detonate } from './combat'
@@ -18,6 +19,7 @@ import { igniteCell } from './fire'
 import {
   VIGIL_ASLEEP_RESIST,
   VIGIL_AWAKE_RESIST,
+  VIGIL_GUNSHOT_EARSHOT,
   VIGIL_WAKE_TICKS,
   vigilAwake,
   wakeThreshold,
@@ -145,16 +147,64 @@ describe('every loud tool wakes it', () => {
     expect(fireTicks).toBeLessThan(noiseTicks)
   })
 
-  it('GUNFIRE wakes it — a real player really shooting, through tickWorld', () => {
+  it('A HELD TRIGGER wakes it — the real starter pistol, through tickWorld', () => {
+    // Note what is NOT here: no `arm()`. The player fires the gun spawnPlayer
+    // gave them, because that is the only gun any player will ever have.
     const { w, cx, cy } = arena()
     const v = vigil(w, cx, cy)
     const p = spawnPlayer(w, 0, cx - 5, cy)
     p.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    arm(p, 'machinegun')
     p.facing = 0 // aimed at the Vigil
     const firing = new Map([[0, { ...emptyInput(), attack: true }]])
     let woke = -1
-    for (let t = 0; t < 200 && woke < 0; t++) {
+    for (let t = 0; t < 400 && woke < 0; t++) {
+      p.facing = 0
+      tickWorld(w, firing)
+      if (vigilAwake(v)) woke = t
+    }
+    expect(woke).toBeGreaterThanOrEqual(0)
+
+    // ── THE BUG THIS BOSS SHIPPED WITH, pinned as a number ──────────────────
+    // The old meter billed every LIVE PROJECTILE every tick, so one pistol
+    // bullet rang up 5 per tick for its whole 22-tick flight and crossed a
+    // 45 threshold in ~13 ticks — sooner than a shot fired at max range takes
+    // to ARRIVE. The Vigil therefore woke before the player's first bullet
+    // could land, every time, and the fight was unwinnable. Waking must cost a
+    // SUSTAINED trigger; it can never cost less than a bullet's time of flight.
+    const flightTicks = Math.ceil((WEAPONS.pistol.range / WEAPONS.pistol.projectileSpeed!) * 30)
+    expect(woke).toBeGreaterThan(flightTicks)
+  })
+
+  it('ONE POT-SHOT is free — a bullet is billed once, not once per tick of flight', () => {
+    const { w, cx, cy } = arena()
+    const v = vigil(w, cx, cy)
+    const p = spawnPlayer(w, 0, cx - 9.5, cy) // near max range: the longest flight the pistol has
+    p.facing = 0
+    tickWorld(w, new Map([[0, { ...emptyInput(), attack: true }]])) // exactly one trigger pull
+    let peak = 0
+    for (let t = 0; t < 120; t++) {
+      tickWorld(w, idle())
+      peak = Math.max(peak, v.ai!.noise ?? 0)
+    }
+    expect(peak).toBeGreaterThan(0) // it DID hear the shot…
+    expect(peak).toBeLessThan(wakeThreshold(w) / 4) // …and a quarter of the budget is the ceiling
+    expect(vigilAwake(v)).toBe(false)
+    expect(v.ai!.noise).toBeUndefined() // and the charge decayed all the way back to nothing
+  })
+
+  it('you cannot out-range its ears — it hears gunfire further than the pistol shoots', () => {
+    // Otherwise the counterplay collapses into a POSITIONING puzzle: park at max
+    // range, hold the trigger, win. The fight has to stay about cadence.
+    expect(VIGIL_GUNSHOT_EARSHOT).toBeGreaterThan(WEAPONS.pistol.range)
+    const { w, cx, cy } = arena()
+    const v = vigil(w, cx, cy)
+    const p = spawnPlayer(w, 0, cx - WEAPONS.pistol.range, cy) // at its reach, PAST the 9-tile hearing
+    p.health = { hp: 1e6, max: 1e6, iframes: 0 }
+    p.facing = 0
+    const firing = new Map([[0, { ...emptyInput(), attack: true }]])
+    let woke = -1
+    for (let t = 0; t < 400 && woke < 0; t++) {
+      p.facing = 0
       tickWorld(w, firing)
       if (vigilAwake(v)) woke = t
     }
@@ -188,26 +238,87 @@ describe('every loud tool wakes it', () => {
 })
 
 // ───────────────────────────────────────────────────────────────────────────
-describe('the quiet kill — solo must stay winnable', () => {
-  it('a solo player hitting it with a KNIFE forever never wakes it', () => {
-    // The fight's promise. Melee emits no noise and spawns no projectile, so a
-    // patient solo player can work it down in silence.
+describe('the quiet kill — solo must be winnable with the ONE weapon a player owns', () => {
+  // ⚠️  READ THIS BEFORE ADDING A TEST TO THIS FILE.
+  //
+  // The Vigil shipped UNWINNABLE and this suite was green, because the fight's
+  // counterplay was a KNIFE and both the scenario and the test wrote one into
+  // `player.loadout` by hand. No player can do that:
+  //   - `PLAYER_START_WEAPON` is a pistol, handed out by `starterLoadout`;
+  //   - `interaction.ts` refuses EVERY melee/ranged pickup at the door;
+  //   - `wearMelee` returns early for a player, so the one weapon never breaks;
+  //   - "a gun always fires" — no magazine, no depletion, no dry-fire;
+  //   - `InputCmd` has no drop/holster field, so you cannot even choose to be
+  //     unarmed, which is why the `fists` fallbacks are unreachable for a player.
+  // So the old test proved something about a world the game cannot produce, and
+  // the real fight — pistol only — woke the boss before the first bullet landed.
+  //
+  // Every test below takes its weapon from `spawnPlayer` and NEVER assigns one.
+  // If a Vigil test ever needs `arm()`, the fight has stopped being about
+  // anything a player can actually do.
+
+  /** Ticks between shots. `systems/vigil.ts` derives the break-even cadence at
+   * ~38; 45 is the comfortable side of it, and the number the showcase uses. */
+  const PACED = 45
+
+  it('a fresh player carries the pistol and nothing else — there IS no silent option', () => {
+    const { w, cx, cy } = arena()
+    const p = spawnPlayer(w, 0, cx - 6, cy)
+    expect(p.combat!.weapon).toBe(PLAYER_START_WEAPON)
+    expect(p.loadout).toEqual(starterLoadout(PLAYER_START_WEAPON))
+    expect(WEAPONS[p.combat!.weapon].kind).toBe('ranged')
+  })
+
+  it('KILLS IT with paced pistol fire alone — solo, through the real tickWorld', () => {
+    // THE TEST THAT WOULD HAVE CAUGHT THE SHIPPED BUG. A solo player carrying
+    // exactly what the game gives them, firing the only gun they have on a
+    // cadence, works a full-health Vigil all the way down without ever waking
+    // it. If this cannot pass, the boss is not beatable and no amount of
+    // retuning the meter is the answer.
     const { w, cx, cy } = arena()
     const v = vigil(w, cx, cy)
-    const p = spawnPlayer(w, 0, cx - 0.9, cy)
-    p.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    arm(p, 'knife')
-    p.facing = 0
-    const attacking = new Map([[0, { ...emptyInput(), attack: true }]])
-    const before = v.health!.hp
-    for (let t = 0; t < 600; t++) {
-      p.facing = 0
-      v.health!.iframes = 0
-      tickWorld(w, attacking)
+    const p = spawnPlayer(w, 0, cx - 6, cy) // nothing added, nothing swapped
+    const pool = v.health!.max
+    let peak = 0
+    let everAwake = false
+    let killedAt = -1
+    for (let t = 0; t < 1500 && killedAt < 0; t++) {
+      p.facing = 0 // standing still and aiming east; a centred stick holds facing
+      tickWorld(w, new Map([[0, { ...emptyInput(), attack: t % PACED === 0 }]]))
+      peak = Math.max(peak, v.ai!.noise ?? 0)
+      everAwake ||= vigilAwake(v)
+      if (v.dead || v.health!.hp <= 0) killedAt = t
     }
+    expect(killedAt).toBeGreaterThan(0)
+    expect(v.health!.hp).toBeLessThanOrEqual(0)
+    // The pool it really spawns with: the shipped NPCS row (260), scaled up by
+    // `spawnNpc` for the floor — 299 here. Asserted against the data row rather
+    // than a literal so a rebalance moves it, but it can never quietly become
+    // the showcase scenario's inflated 2000.
+    expect(pool).toBeGreaterThanOrEqual(NPCS.vigil.hp)
+    expect(pool).toBeLessThan(NPCS.vigil.hp * 2)
+    expect(everAwake).toBe(false) // it slept through its own death
+    expect(peak).toBeLessThan(wakeThreshold(w) / 4) // and was never close to waking
+    // Untouched, because a dormant Vigil cannot fight back — so this is a real
+    // solo win rather than a trade the player survived on scaffolded hp.
+    expect(p.health!.hp).toBe(PLAYER_HP)
+  })
+
+  it('the meter returns to ZERO between paced shots — that is why it is sustainable', () => {
+    const { w, cx, cy } = arena()
+    const v = vigil(w, cx, cy)
+    const p = spawnPlayer(w, 0, cx - 6, cy)
+    let sawCharge = false
+    let sawEmpty = false
+    for (let t = 0; t < PACED * 4; t++) {
+      p.facing = 0
+      tickWorld(w, new Map([[0, { ...emptyInput(), attack: t % PACED === 0 }]]))
+      if ((v.ai!.noise ?? 0) > 0) sawCharge = true
+      else if (sawCharge) sawEmpty = true // it came back down again, between shots
+    }
+    expect(sawCharge).toBe(true)
+    expect(sawEmpty).toBe(true)
     expect(vigilAwake(v)).toBe(false)
-    expect(v.ai!.dormant).toBe(true)
-    expect(v.health!.hp).toBeLessThan(before) // real, silent progress
   })
 
   it('the meter DECAYS when the room goes quiet — backing off actually buys you it', () => {

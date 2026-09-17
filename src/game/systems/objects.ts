@@ -58,8 +58,12 @@ export const destroyObject = (w: World, e: Entity, byId: number): void => {
  * the outage (alarm ticks up) and its Derelict Units power back on — every
  * sleeper wakes. The flag itself (World.powerCut) auto-unseals that wing's
  * `'power'` biolocks (interaction.sealSystem) and keeps robots hostile while it
- * lasts (behaviors.ts). One documented, deterministic trade-off. */
-const cutPower = (w: World, wing: string, byId: number): void => {
+ * lasts (behaviors.ts). One documented, deterministic trade-off.
+ *
+ * `byId` is just an agent id — nothing here assumes a PLAYER pulled the lever,
+ * which is what lets §4.3's Sealkeeper kill its own wing's grid through the
+ * same one documented path (systems/sealkeeper.ts) instead of a boss-only copy. */
+export const cutPower = (w: World, wing: string, byId: number): void => {
   w.powerCut[wing] = true
   w.alarm = Math.min(3, w.alarm + 1)
   for (const e of w.entities) {

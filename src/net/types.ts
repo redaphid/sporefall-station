@@ -12,6 +12,26 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 5 — `Annotations` (MsgType 20) added: sim-authored on-screen annotations now
+ *     reach clients instead of existing only on the host's screen.
+ *
+ *     A NEW MESSAGE TYPE IS NOT AN ADDITIVE CHANGE ON THIS LINK, which is the
+ *     whole reason this is a bump rather than a quiet extension of 4. The
+ *     framing layer hands `isKnownMsgType` to `StreamReader.isValidStart`
+ *     (netClient.ts:194, netHost.ts:363) so it can tell a real message start
+ *     from payload bytes that merely parse as a length. A peer that does not
+ *     know type 20 therefore does not ignore the message: it calls it
+ *     `unknown message type 20`, DESYNCS, and then discards whole packets until
+ *     something looks like a start again — so it also loses the snapshots and
+ *     events queued behind it, repeatedly, for as long as the meter keeps
+ *     changing. Two builds that disagree about this table are genuinely
+ *     incompatible, which is exactly what the version gate is for.
+ *     (`netAnnotations.test.ts` § "why this cost a PROTOCOL_VERSION bump"
+ *     proves the desync rather than asserting it.)
+ *
+ *     Free to do now: 4 has NOT shipped — it was added on this same unreleased
+ *     boss-foundation branch — so nothing in the field claims 4 and no phone
+ *     pays a second reinstall for this.
  * 4 — six boss archetypes appended (88 -> 94): `vigil`, `echo`, `sealkeeper`,
  *     `mirefather`, `choirmaster`, `herald`. Only `vigil` is implemented; the
  *     rest are BOOKED AHEAD so the four queued boss PRs cannot each demand
@@ -25,7 +45,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 4
+export const PROTOCOL_VERSION = 5
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'
@@ -66,6 +86,11 @@ export const MsgType = {
   /** Host → one client: that client's OWN full authoritative inventory
    * (slots/activeSlot/mods/ammo). Reliable, sent only on change. */
   Inventory: 19,
+  /** Host → clients: the inert on-screen annotation set (game/types.ts
+   * `Annotation`) for the floor being played. Reliable, a FULL REPLACEMENT of
+   * the previous set, and sent ONLY when that set changes — steady state is
+   * zero bytes. See `AnnotationsMsg` in protocol/messages.ts. */
+  Annotations: 20,
 } as const
 export type MsgTypeId = (typeof MsgType)[keyof typeof MsgType]
 

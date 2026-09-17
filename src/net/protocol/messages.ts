@@ -4,8 +4,9 @@ import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
-import type { InputCmd } from '../../game/types'
+import type { Annotation, AnnotationKind, InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
+import { sanitizeAnnotation, visibleAnnotations } from '../../game/annotations'
 import { ByteReader, ByteWriter } from '../framing/codec'
 import { MsgType } from '../types'
 
@@ -549,4 +550,159 @@ export interface InventoryMsg {
   activeSlot: number
   /** The currently-swung weapon id (may differ from activeSlot when a throwable/consumable is held). */
   weapon: string
+}
+
+// --- Annotations: host-authored screen furniture, presentation only ---------
+
+/**
+ * Host → clients: the inert on-screen annotation set (`game/types.ts`
+ * `Annotation`) — entity-pinned labels, pins, arrows, circles, banners.
+ *
+ * WHY IT IS ON THE WIRE AT ALL. Annotations are how a system TALKS TO THE
+ * PLAYER: The Vigil (`game/systems/vigil.ts`) publishes its noise meter this
+ * way, and its whole fairness argument is that the meter is visible — stealth
+ * you cannot read is a coin flip. Before this message the set existed only in
+ * `HostSession.renderView()`, so on a joiner's phone the meter simply did not
+ * exist while the host could see it. That is a co-op defect, not a nicety.
+ *
+ * WHY A JSON MESSAGE AND NOT THE SNAPSHOT. The binary snapshot is the hot path
+ * (10 Hz per peer, 25 BLE packets at the 20-byte MTU floor for 48 entities) and
+ * every byte added to it is paid on every tick by every peer forever. An
+ * annotation changes a handful of times per FIGHT. So this rides the same cold
+ * JSON lane the events/inventory traffic already uses, change-gated like
+ * `InventoryMsg`: the steady-state cost of an unchanged set is exactly ZERO
+ * bytes, not one byte.
+ *
+ * FULL REPLACEMENT, NOT A DIFF. The set is small and capped, and a replacement
+ * makes removal (`vigil.clearMeter` on death) the same code path as addition —
+ * no add/remove bookkeeping to drift out of sync, and no way for a client to
+ * accumulate marks the host has dropped. The reliable lane is FIFO and never
+ * drops or reorders, so the newest set a client has applied is always the
+ * newest one sent; there is no ordering guard to carry (unlike snapshots, which
+ * ride a latest-wins slot and need `isNewerTick`).
+ *
+ * INERT BY CONSTRUCTION. Nothing in the sim reads annotations (`world.ts`), the
+ * client stores them beside the view rather than in any simulated state, and
+ * the values that could affect a client's behaviour are never present: `ttlTick`
+ * is resolved HOST-side (below) rather than shipped, because a client's `tick`
+ * is its own local frame counter and would expire marks at the wrong moment.
+ */
+export interface AnnotationsMsg {
+  /**
+   * The floor this set describes. Annotations are per-floor furniture (a boss
+   * meter belongs to the boss's floor), and a client can learn about a floor
+   * change from three different messages at three different moments. Tagging
+   * the set means the client never has to guess: it draws the set only while
+   * the tag matches the floor it is on, so a stale set cannot bleed onto the
+   * next floor and a set that arrives just BEFORE the floor change it belongs
+   * to is not thrown away either.
+   */
+  floor: number
+  annotations: WireAnnotation[]
+}
+
+/** One annotation as it crosses the wire. Deliberately a subset of `Annotation`:
+ * `ttlTick` is resolved by the host and never sent (see `toWireAnnotations`). */
+export interface WireAnnotation {
+  id: number | string
+  kind: AnnotationKind
+  text?: string
+  x?: number
+  y?: number
+  x2?: number
+  y2?: number
+  radius?: number
+  targetId?: number
+  color?: string
+}
+
+/**
+ * Hard ceiling on annotations in ONE message. The sim's own list is unbounded
+ * (a debug agent can add hundreds — `game/annotations.ts`), and the wire is a
+ * BLE link where a 490-byte snapshot is already 25 packets. 12 marks of 48
+ * characters is ~1KB worst case, which is under `MAX_MESSAGE_BYTES` (16KB) and
+ * comparable to one snapshot — and it is only ever paid on CHANGE.
+ *
+ * Twelve is also a legibility bound, not only a bandwidth one: the overlay
+ * de-overlaps and clamps every label on-screen (`ui/annotationLayout.ts`), so
+ * far fewer than twelve simultaneous marks are readable on a phone anyway.
+ */
+export const MAX_WIRE_ANNOTATIONS = 12
+/** Characters of `text` per annotation on the wire. The Vigil's meter is 18
+ * ("ASLEEP [||···]" and "AWAKE — BACK OFF"); the sim allows 240. */
+export const MAX_WIRE_ANNOTATION_TEXT = 48
+
+const round2 = (v: number): number => Math.round(v * 100) / 100
+
+/**
+ * Project the host's live annotation list onto the wire (host side).
+ *
+ * Three things happen here, all of them cheap and all of them deliberate:
+ *
+ *  - TTL IS RESOLVED NOW. `ttlTick` is an absolute tick in the HOST's clock and
+ *    a client's `tick` is its own local frame counter, so forwarding the field
+ *    would expire marks at an unrelated moment on each phone. Expired marks are
+ *    simply not sent, and the field never crosses.
+ *  - MARKS WITH A DEAD/ABSENT TARGET ARE DROPPED. `isDrawable` is asked about
+ *    the HOST's world, not the peer's interest set: interest culling is
+ *    per-peer and flaps as entities cross the 14-tile boundary, so gating on it
+ *    would churn this message (and its bytes) every few ticks for a mark the
+ *    player is about to see again. A mark whose target the client has not been
+ *    sent is harmless — the overlay's `anchorOf` finds no entity and draws
+ *    nothing, then draws it the moment the entity arrives.
+ *  - UNTRUSTED SIZES ARE CLAMPED. Count and text length both, so no amount of
+ *    annotating can produce a message the framing layer has to refuse.
+ */
+export const toWireAnnotations = (
+  annotations: readonly Annotation[],
+  tick: number,
+  isDrawable: (targetId: number) => boolean,
+): WireAnnotation[] => {
+  const out: WireAnnotation[] = []
+  for (const a of visibleAnnotations(annotations, tick)) {
+    if (out.length >= MAX_WIRE_ANNOTATIONS) break
+    if (a.targetId !== undefined && !isDrawable(a.targetId)) continue
+    const w: WireAnnotation = { id: a.id, kind: a.kind }
+    if (typeof a.text === 'string') w.text = a.text.slice(0, MAX_WIRE_ANNOTATION_TEXT)
+    if (typeof a.color === 'string') w.color = a.color.slice(0, 32)
+    if (a.targetId !== undefined) w.targetId = a.targetId
+    if (a.x !== undefined) w.x = round2(a.x)
+    if (a.y !== undefined) w.y = round2(a.y)
+    if (a.x2 !== undefined) w.x2 = round2(a.x2)
+    if (a.y2 !== undefined) w.y2 = round2(a.y2)
+    if (a.radius !== undefined) w.radius = round2(a.radius)
+    out.push(w)
+  }
+  return out
+}
+
+/**
+ * Validate one received annotation set (client side).
+ *
+ * The host is not trusted here for the same reason `handleMessage` wraps every
+ * decode in a try/catch: the bytes came off a radio, and a peer on a different
+ * build (or a hostile one) can say anything. Each mark goes through the SIM's
+ * own `sanitizeAnnotation`, which reads only whitelisted fields — so a
+ * `__proto__` key can never reach a prototype — and a malformed one costs only
+ * ITSELF rather than the whole set. Count and text are clamped again on the way
+ * in, because a cap enforced only by the sender is not a cap.
+ */
+export const fromWireAnnotations = (raw: unknown): Annotation[] => {
+  if (!Array.isArray(raw)) return []
+  const out: Annotation[] = []
+  let seq = 0
+  for (const item of raw.slice(0, MAX_WIRE_ANNOTATIONS)) {
+    try {
+      // Truncate before validating: over-long text from a peer that forgot to
+      // clamp should arrive SHORTENED, not vanish.
+      const trimmed =
+        item !== null && typeof item === 'object' && typeof (item as { text?: unknown }).text === 'string'
+          ? { ...(item as object), text: (item as { text: string }).text.slice(0, MAX_WIRE_ANNOTATION_TEXT) }
+          : item
+      out.push(sanitizeAnnotation(trimmed, () => ++seq))
+    } catch {
+      // One malformed mark costs only itself; the rest of the set still draws.
+    }
+  }
+  return out
 }

@@ -1,6 +1,7 @@
 import { mulberry32, type Rng } from '../rng'
 import { LEVEL_H, LEVEL_W } from '../types'
 import { carveBunker } from './bunker'
+import { carveComplex, isComplexFloor } from './complex'
 import { carveCompound } from './compound'
 import { applyCornerCuts } from './corners'
 import { carveHallways } from './corridors'
@@ -14,7 +15,39 @@ const PLAZA_CHANCE = 0.3
 
 const CLASSIC_ROLES: readonly BuildingRole[] = ['shop', 'apartment', 'office', 'warehouse', 'clinic']
 
-export const generateLevel = (seed: number, floor: number): Level => {
+export const generateLevel = (seed: number, floor: number): Level =>
+  isComplexFloor(floor) ? generateComplexLevel(seed, floor) : generateCityLevel(seed, floor)
+
+/** The indoor station complex (levelgen/complex.ts) — what floors 3+ use. */
+export const generateComplexLevel = (seed: number, floor: number): Level => {
+  const rng = mulberry32(seed).fork(`levelgen:${floor}`)
+  const w = LEVEL_W
+  const h = LEVEL_H
+  const tiles = new Uint8Array(w * h).fill(Tile.Street)
+  const grid = new TileGrid(w, h, tiles)
+  const plan = carveComplex(rng.fork('complex'), grid, floor)
+  const level: Level = {
+    w,
+    h,
+    tiles,
+    solid: buildSolid(tiles),
+    buildings: plan.buildings,
+    spawn: plan.spawn,
+    exit: plan.exit,
+    theme: themeForFloor(floor).name,
+    complex: plan.complex,
+  }
+  for (const b of level.buildings) b.roomTypes = assignRoomTypes(b)
+  return level
+}
+
+/**
+ * The sunken-streets city generator (themed lots, bunkers, courtyards, vaults).
+ * `generateLevel` uses it for floors 1-2; it stays exported for ANY floor so the
+ * city set-pieces remain testable (and re-enableable) now that floors 3+ build
+ * the indoor complex instead.
+ */
+export const generateCityLevel = (seed: number, floor: number): Level => {
   const rng = mulberry32(seed).fork(`levelgen:${floor}`)
   const w = LEVEL_W
   const h = LEVEL_H

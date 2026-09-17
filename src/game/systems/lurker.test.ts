@@ -157,7 +157,7 @@ describe('populate seeding', () => {
           expect(ri).toBeGreaterThanOrEqual(0)
           if (b.role === 'bunker') expect(ri).not.toBe(0) // never the patrol band
           const types = b.roomTypes ?? assignRoomTypes(b)
-          expect(['stockroom', 'guardpost', 'bathroom', 'storage']).toContain(types[ri])
+          expect(['stockroom', 'guardpost', 'bathroom', 'storage', 'washroom', 'depot']).toContain(types[ri])
           // Wall-hugging: at least one orthogonal wall neighbour.
           const walls = [
             [1, 0],

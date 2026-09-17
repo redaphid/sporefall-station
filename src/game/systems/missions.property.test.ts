@@ -14,9 +14,11 @@
 // replacing "last room in the array") must keep every placement byte-identical
 // — floor 1 especially, whose layout+demos are frozen.
 import { describe, expect, it } from 'vitest'
-import { isWallTile, Tile, tileAt } from '../levelgen/level'
+import { isComplexFloor } from '../levelgen/complex'
+import { isFloorTile, isWallTile, Tile, tileAt } from '../levelgen/level'
 import { populateWorld } from '../populate'
 import { emptyInput } from '../types'
+import { createCityWorld } from '../testkit'
 import { createWorld, tickWorld, type World } from '../world'
 import { setupFloor } from './missions'
 
@@ -25,6 +27,13 @@ const FLOORS = [1, 2, 3]
 
 const buildFloor = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)
+  populateWorld(w)
+  setupFloor(w)
+  return w
+}
+
+const buildCityFloor = (seed: number, floor: number): World => {
+  const w = createCityWorld(seed, floor)
   populateWorld(w)
   setupFloor(w)
   return w
@@ -94,7 +103,7 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
         }
 
         // On a real Floor tile — never a wall, street, or courtyard pit.
-        expect(tileAt(w.level, tx, ty), `${ctx}: target tile not Floor (poi=${b.poi ?? 'plain'})`).toBe(Tile.Floor)
+        expect(isFloorTile(tileAt(w.level, tx, ty)), `${ctx}: target tile not Floor (poi=${b.poi ?? 'plain'})`).toBe(true)
 
         // Reachable on foot from the spawn.
         const seen = reachableFrom(w)
@@ -119,7 +128,7 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
           // The room's centre tile — where missions drop the target — is Floor.
           const cx = Math.floor(r.x + r.w / 2)
           const cy = Math.floor(r.y + r.h / 2)
-          expect(tileAt(w.level, cx, cy), `${ctx}: objectiveRoom centre (${cx},${cy}) is not Floor`).toBe(Tile.Floor)
+          expect(isFloorTile(tileAt(w.level, cx, cy)), `${ctx}: objectiveRoom centre (${cx},${cy}) is not Floor`).toBe(true)
         }
       }
     }
@@ -216,7 +225,9 @@ const PINNED: { seed: number; floor: number; tpl: string; bld: number; pos: [num
 describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor table)', () => {
   it('reproduces every pinned mission placement byte-identically', () => {
     for (const row of PINNED) {
-      const w = buildFloor(row.seed, row.floor)
+      // Floors 3+ now build the indoor complex; these rows pin the CITY
+      // generator's placements, so replay them on a city world.
+      const w = isComplexFloor(row.floor) ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
       expect(w.mission.template, ctx).toBe(row.tpl)
       expect(w.mission.targetBuilding, ctx).toBe(row.bld)

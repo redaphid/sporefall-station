@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from '../levelgen/generate'
+import { generateCityLevel } from '../levelgen/generate'
 import type { Building } from '../levelgen/level'
-import { createWorld } from '../world'
+import { createCityWorld } from '../testkit'
 import { setupFloor } from './missions'
 
 /**
@@ -12,7 +12,7 @@ import { setupFloor } from './missions'
  */
 
 /** Mirror of missions.ts farthestBuilding, on the raw level. */
-const farthest = (level: ReturnType<typeof generateLevel>): Building | null => {
+const farthest = (level: ReturnType<typeof generateCityLevel>): Building | null => {
   let best: Building | null = null
   let bestDist = -1
   for (const b of level.buildings) {
@@ -31,7 +31,7 @@ const bunkerMissionCases = (): { seed: number; floor: number }[] => {
   const cases: { seed: number; floor: number }[] = []
   for (let seed = 1; seed <= 300 && cases.length < 6; seed++) {
     for (let floor = 2; floor <= 4 && cases.length < 6; floor++) {
-      const level = generateLevel(seed, floor)
+      const level = generateCityLevel(seed, floor)
       if (farthest(level)?.poi === 'bunker') cases.push({ seed, floor })
     }
   }
@@ -44,7 +44,7 @@ describe('bunker mission placement', () => {
     // If this ever hits 0 the search bound is too small or bunkers vanished.
     expect(cases.length).toBeGreaterThan(0)
     for (const { seed, floor } of cases) {
-      const w = createWorld(seed, floor)
+      const w = createCityWorld(seed, floor)
       setupFloor(w)
       const tag = `seed ${seed} floor ${floor}`
       expect(w.mission.template, tag).not.toBe('reach')

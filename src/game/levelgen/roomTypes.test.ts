@@ -9,7 +9,7 @@
 // and without it.
 
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from './generate'
+import { generateCityLevel, generateLevel } from './generate'
 import { levelChecksum, type Building, type RoomType } from './level'
 import { assignRoomTypes, roomOwningTile } from './roomTypes'
 
@@ -174,7 +174,7 @@ describe('room types — role anatomy invariants (adversarial seed sweep)', () =
     let sawVault = false
     for (let s = 1; s <= 60; s++) {
       for (const f of [1, 2, 3, 4]) {
-        for (const b of generateLevel(s, f).buildings) {
+        for (const b of generateCityLevel(s, f).buildings) {
           if (b.poi !== 'vault' || !b.objectiveRoom) continue
           sawVault = true
           const vi = b.rooms.findIndex((r) => r === b.objectiveRoom)

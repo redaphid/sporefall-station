@@ -139,3 +139,14 @@ export type SimEvent =
   /** A barricader plugged a chokepoint: destructible `barricade` object
    * `entityId` now stands beside a doorway at x,y, built by `byId`. */
   | { type: 'barricade'; entityId: EntityId; byId: EntityId; x: number; y: number }
+  /** Complex director (floors 3+): a vent grate at x,y burst and `count`
+   * sporelings crawled out hunting `targetId`. */
+  | { type: 'ventSwarm'; x: number; y: number; count: number; targetId: EntityId }
+  /** Complex director: a player stepped into crew quarters `building` and its
+   * `count` dormant sleepers rose at once (room centre x,y). */
+  | { type: 'ambush'; building: number; count: number; x: number; y: number }
+  /** Complex director: wing `wing` (tile rect x,y,w,h) lost power until tick
+   * `until`. The rect rides along so a renderer needs no level lookup. */
+  | { type: 'lightsOut'; wing: number; until: number; x: number; y: number; w: number; h: number }
+  /** Complex director: the dark wing's power came back. */
+  | { type: 'lightsOn'; wing: number }

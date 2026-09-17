@@ -7,12 +7,13 @@
 
 import { describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { generateLevel } from '../levelgen/generate'
+import { generateCityLevel } from '../levelgen/generate'
 import { Tile } from '../levelgen/level'
 import { spawnPlayer } from '../player'
 import { populateWorld, spawnNpc } from '../populate'
 import { serializeWorld } from '../serialize'
 import { emptyInput } from '../types'
+import { createCityWorld } from '../testkit'
 import { addEntity, createWorld, tickWorld, type World } from '../world'
 
 const carve = (w: World, x0: number, y0: number, x1: number, y1: number): void => {
@@ -200,14 +201,14 @@ describe('populate wiring', () => {
   const findFloorWith = (role: 'warehouse' | 'bunker'): { seed: number; floor: number } => {
     for (let seed = 1; seed <= 60; seed++) {
       for (let floor = 2; floor <= 4; floor++) {
-        if (generateLevel(seed, floor).buildings.some((b) => b.role === role)) return { seed, floor }
+        if (generateCityLevel(seed, floor).buildings.some((b) => b.role === role)) return { seed, floor }
       }
     }
     throw new Error(`no ${role} in search bound`)
   }
 
   const populated = (seed: number, floor: number): World => {
-    const w = createWorld(seed, floor)
+    const w = createCityWorld(seed, floor)
     populateWorld(w)
     return w
   }

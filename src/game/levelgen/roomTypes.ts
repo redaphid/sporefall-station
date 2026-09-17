@@ -1,4 +1,4 @@
-import type { Building, RoomType } from './level'
+import type { Building, BuildingRole, RoomType } from './level'
 import type { Rect } from './rooms'
 
 /**
@@ -54,7 +54,22 @@ const entryRooms = (b: Building): Set<number> => {
   return entries
 }
 
+/** Indoor-complex modules are single-purpose: every room in one IS the role. */
+export const COMPLEX_ROOM_TYPE: Partial<Record<BuildingRole, RoomType>> = {
+  mess: 'messhall',
+  galley: 'galley',
+  quarters: 'bunkroom',
+  washroom: 'washroom',
+  lab: 'lab',
+  medbay: 'medbay',
+  reactor: 'reactor',
+  depot: 'depot',
+  security: 'security',
+}
+
 export const assignRoomTypes = (b: Building): RoomType[] => {
+  const moduleType = COMPLEX_ROOM_TYPE[b.role]
+  if (moduleType) return b.rooms.map(() => moduleType)
   const rooms = b.rooms
   const n = rooms.length
   const area = (i: number): number => rooms[i].w * rooms[i].h

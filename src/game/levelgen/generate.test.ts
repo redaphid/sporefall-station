@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from './generate'
-import { isWallTile, levelChecksum, Tile, TileGrid } from './level'
+import { generateCityLevel, generateLevel } from './generate'
+import { isFloorTile, isWallTile, levelChecksum, Tile, TileGrid } from './level'
 
 describe('generateLevel', () => {
   it('is bit-exact deterministic for the same seed and floor', () => {
@@ -48,7 +48,9 @@ describe('generateLevel', () => {
     const pois = new Set<string>()
     for (let seed = 1; seed <= 30; seed++) {
       for (let floor = 1; floor <= 4; floor++) {
-        for (const b of generateLevel(seed, floor).buildings) {
+        // City set-pieces: floors 3+ build the indoor complex in play, so drive
+        // the city generator directly to keep its courtyards/vaults covered.
+        for (const b of generateCityLevel(seed, floor).buildings) {
           if (b.poi) pois.add(b.poi)
         }
       }
@@ -96,7 +98,7 @@ describe('generateLevel', () => {
             let anyReachable = false
             for (let y = room.y; y < room.y + room.h && !anyReachable; y++) {
               for (let x = room.x; x < room.x + room.w && !anyReachable; x++) {
-                if (grid.get(x, y) === Tile.Floor && reachable[y * level.w + x]) anyReachable = true
+                if (isFloorTile(grid.get(x, y)) && reachable[y * level.w + x]) anyReachable = true
               }
             }
             expect(anyReachable, `room ${room.x},${room.y} in building ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).toBe(true)

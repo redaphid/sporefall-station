@@ -1,7 +1,7 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { bunkerLaneKeys, isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
+import { bunkerLaneKeys, isFloorTile, isWallTile, Tile, tileAt, type Building, type Corridor, type RoomType } from './levelgen/level'
 import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
 
@@ -112,7 +112,10 @@ export const populateWorld = (w: World): void => {
   for (let i = 0; i < w.level.buildings.length; i++) {
     populateBuilding(w, rng, wrng, w.level.buildings[i], i)
   }
-  spawnStreetLife(w, rng, wrng)
+  // Indoor complex floors have no streets: the corridors get crew and
+  // security beats instead (same `populate` stream position, own logic).
+  if (w.level.complex) spawnCorridorLife(w, rng, wrng)
+  else spawnStreetLife(w, rng, wrng)
   sprinkleLoot(w, rng)
   scatterModPickups(w)
   // #78 follow-up: seed the resist-differentiated Sporefall roster into normal
@@ -132,10 +135,13 @@ export const populateWorld = (w: World): void => {
   assignBarricaders(w)
   assignSquads(w)
   spawnLurkers(w)
+  // Indoor complex only: sleepers in the bunk rooms (the director's ambush
+  // rooms). Own `sleepers` fork, appended last — city floors never draw it.
+  if (w.level.complex) spawnComplexSleepers(w)
 }
 
 /** Room types a lurker haunts — dark back-of-house corners, never the front. */
-const LURKER_ROOMS: readonly RoomType[] = ['stockroom', 'guardpost', 'bathroom', 'storage']
+const LURKER_ROOMS: readonly RoomType[] = ['stockroom', 'guardpost', 'bathroom', 'storage', 'washroom', 'depot']
 
 /** Seed dormant lurkers (the jump-scare ambusher, data/npcs.ts) sparingly into
  * preferred back rooms — deeper floors haunt more, floor 1 stays clean. Own
@@ -186,7 +192,7 @@ const lurkerHideTile = (w: World, b: Building, ri: number): { x: number; y: numb
   let bestScore = -Infinity
   for (let ty = room.y; ty < room.y + room.h; ty++) {
     for (let tx = room.x; tx < room.x + room.w; tx++) {
-      if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+      if (!isFloorTile(w.level.tiles[ty * lw + tx])) continue
       if (roomOwningTile(b.rooms, tx, ty) !== ri) continue
       if (taken.has(ty * lw + tx)) continue
       if (tx === spawnTx && ty === spawnTy) continue
@@ -245,7 +251,7 @@ const assignSquads = (w: World): void => {
   let nextSquad = 1
   for (let bi = 0; bi < w.level.buildings.length; bi++) {
     const b = w.level.buildings[bi]
-    if (b.role !== 'warehouse' && b.role !== 'bunker') continue
+    if (b.role !== 'warehouse' && b.role !== 'bunker' && b.role !== 'reactor' && b.role !== 'security') continue
     const pack = w.entities.filter(
       (e) =>
         e.kind === 'npc' &&
@@ -287,6 +293,16 @@ export const ROOM_FURNISH: Record<RoomType, readonly string[]> = {
   armory: ['locker', 'locker', 'locker', 'crate', 'barrel'],
   barracks: ['bunk', 'bunk', 'locker', 'table'],
   vault: ['locker', 'crate'],
+  // Indoor complex rooms (floors 3+).
+  messhall: ['table', 'table', 'table', 'bench', 'bench', 'vending'],
+  galley: ['cabinet', 'cabinet', 'vending', 'barrel', 'crate'],
+  bunkroom: ['bunk', 'bunk', 'bunk', 'locker', 'cabinet'],
+  washroom: ['toilet', 'toilet', 'cabinet'],
+  lab: ['bench', 'bench', 'desk', 'cabinet', 'tv'],
+  medbay: ['bunk', 'bunk', 'cabinet', 'cabinet', 'bench'],
+  reactor: ['barrel', 'barrel', 'locker', 'crate', 'cabinet'],
+  depot: ['crate', 'crate', 'crate', 'shelf', 'shelf', 'barrel'],
+  security: ['locker', 'locker', 'desk', 'tv', 'crate'],
 }
 
 /** Where a prop WANTS to stand, so placement reads like someone arranged the
@@ -397,7 +413,7 @@ const furnishInteriors = (w: World): void => {
       const free: FreeTile[] = []
       for (let ty = room.y; ty < room.y + room.h; ty++) {
         for (let tx = room.x; tx < room.x + room.w; tx++) {
-          if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+          if (!isFloorTile(w.level.tiles[ty * lw + tx])) continue
           if (keepClear.has(ty * lw + tx)) continue
           if (tx === spawnTx && ty === spawnTy) continue
           if (tx === exitTx && ty === exitTy) continue
@@ -432,6 +448,10 @@ const spawnEncounters = (w: World, erng: Rng): void => {
   const theme = w.level.theme
   const floor = w.floor
   for (const b of w.level.buildings) {
+    // A complex floor is ~3x as many (single-room) modules as a city floor has
+    // buildings, so only a share of modules roll encounters at all — keeps the
+    // floor's threat budget in the same band as the city's.
+    if (w.level.complex && !erng.chance(COMPLEX_ENCOUNTER_SHARE)) continue
     // Spore-vermin: a swarm that thickens with depth (and where blooms grow).
     let sporelings = 0
     if (erng.chance(floor >= 2 ? 0.45 : 0.2)) sporelings += erng.int(1, 1 + Math.min(3, floor))
@@ -469,6 +489,9 @@ const spawnEncounters = (w: World, erng: Rng): void => {
   }
 }
 
+/** Share of complex modules that roll the Sporefall encounter table. */
+export const COMPLEX_ENCOUNTER_SHARE = 0.35
+
 const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number, number] }[]> = {
   shop: [
     { archetype: 'shopkeeper', count: [1, 1] },
@@ -485,6 +508,30 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   bunker: [
     { archetype: 'thug', count: [1, 2] },
     { archetype: 'gangster', count: [1, 2] },
+  ],
+  // Indoor complex modules (floors 3+). The essence-echoes of the crew still
+  // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
+  // swarms are layered on separately (spawnComplexSleepers, complexDirector).
+  mess: [
+    { archetype: 'civilian', count: [1, 2] },
+    { archetype: 'thug', count: [0, 1] },
+  ],
+  galley: [{ archetype: 'thug', count: [0, 1] }],
+  quarters: [{ archetype: 'civilian', count: [0, 1] }],
+  washroom: [],
+  lab: [
+    { archetype: 'scientist', count: [1, 2] },
+    { archetype: 'robot', count: [0, 1] },
+  ],
+  medbay: [{ archetype: 'scientist', count: [0, 1] }],
+  reactor: [
+    { archetype: 'robot', count: [1, 1] },
+    { archetype: 'thug', count: [1, 2] },
+  ],
+  depot: [{ archetype: 'thug', count: [1, 2] }],
+  security: [
+    { archetype: 'cop', count: [1, 2] },
+    { archetype: 'gangster', count: [0, 1] },
   ],
 }
 
@@ -625,6 +672,98 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
   }
 }
 
+/** Crew wanderers per complex floor (on corridor deck, outside the spawn-safe radius). */
+const CORRIDOR_WANDERERS: [number, number] = [2, 4]
+
+/** Corridor centreline as a two-point beat, inset one tile from each end. Every
+ * tile along it is carved corridor (walkable; no furniture is ever placed in a
+ * corridor), so the straight-line patrol steering can never snag. */
+export const corridorBeat = (c: Corridor): { x: number; y: number }[] => {
+  if (c.axis === 'h') {
+    const y = c.rect.y + Math.floor(c.rect.h / 2) + 0.5
+    return [
+      { x: c.rect.x + 1.5, y },
+      { x: c.rect.x + c.rect.w - 1.5, y },
+    ]
+  }
+  const x = c.rect.x + Math.floor(c.rect.w / 2) + 0.5
+  return [
+    { x, y: c.rect.y + 1.5 },
+    { x, y: c.rect.y + c.rect.h - 1.5 },
+  ]
+}
+
+/** Distance from point p to segment ab. */
+const distToSegment = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number => {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+/** Indoor-complex replacement for street life: a few crew echoes drifting the
+ * corridors, and station-security pairs walking corridor beats. A beat is only
+ * eligible when its WHOLE centreline stays outside the spawn-safe radius, so a
+ * patrol never marches through the landing zone. */
+const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
+  const wanderers = rng.int(CORRIDOR_WANDERERS[0], CORRIDOR_WANDERERS[1])
+  for (let i = 0; i < wanderers; i++) {
+    const spot = randomStreetSpot(w, rng, Tile.Hall)
+    if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
+  }
+  const beats = (w.level.complex?.corridors ?? [])
+    .map(corridorBeat)
+    .filter(([a, b]) => Math.hypot(b.x - a.x, b.y - a.y) >= 10 && distToSegment(w.level.spawn, a, b) >= SPAWN_SAFE_RADIUS)
+  const pairs = Math.min(beats.length, 1 + Math.floor(w.floor / 3))
+  for (let i = 0; i < pairs; i++) {
+    const beat = beats.splice(rng.int(0, beats.length - 1), 1)[0]
+    const along = beat[0].x === beat[1].x ? { x: 0, y: 0.8 } : { x: 0.8, y: 0 }
+    const a = spawnNpc(w, 'cop', beat[0].x, beat[0].y, wrng)
+    const b = spawnNpc(w, 'cop', beat[0].x + along.x, beat[0].y + along.y, wrng)
+    assignPatrol(a, beat)
+    assignPatrol(b, beat)
+  }
+}
+
+/** Chance a complex bunk room holds sleepers, by floor (capped). */
+export const sleeperChance = (floor: number): number => Math.min(0.6, 0.2 + 0.06 * floor)
+
+/** Seed DORMANT sleepers into complex bunk rooms: 2-3 crew echoes lying among
+ * the bunks, woken by a hit or a loud noise — or all at once by the complex
+ * director's room ambush when a player walks in (systems/complexDirector.ts).
+ * Own `sleepers` fork; stands only on free deck tiles (no prop, not a doorway). */
+const spawnComplexSleepers = (w: World): void => {
+  const rng = w.rng.fork('sleepers')
+  const lw = w.level.w
+  const taken = new Set<number>()
+  for (const e of w.entities) if (!e.dead) taken.add(Math.floor(e.pos.y) * lw + Math.floor(e.pos.x))
+  for (let bi = 0; bi < w.level.buildings.length; bi++) {
+    const b = w.level.buildings[bi]
+    if (b.role !== 'quarters') continue
+    if (!rng.chance(sleeperChance(w.floor))) continue
+    const room = b.rooms[0]
+    const doorNear = (tx: number, ty: number): boolean => b.doors.some((d) => Math.abs(d.x - tx) + Math.abs(d.y - ty) <= 1)
+    const free: { x: number; y: number }[] = []
+    for (let ty = room.y; ty < room.y + room.h; ty++) {
+      for (let tx = room.x; tx < room.x + room.w; tx++) {
+        if (!isFloorTile(w.level.tiles[ty * lw + tx]) || taken.has(ty * lw + tx) || doorNear(tx, ty)) continue
+        free.push({ x: tx, y: ty })
+      }
+    }
+    const n = Math.min(free.length, rng.int(2, 3))
+    for (let i = 0; i < n; i++) {
+      const t = free.splice(rng.int(0, free.length - 1), 1)[0]
+      taken.add(t.y * lw + t.x)
+      const npc = spawnNpc(w, 'thug', t.x + 0.5, t.y + 0.5)
+      npc.ai!.zone = { building: bi, role: b.role }
+      npc.ai!.dormant = true
+      npc.ai!.wakeOn = ['damage', 'noise']
+      npc.ai!.guard = true
+    }
+  }
+}
+
 const sprinkleLoot = (w: World, rng: Rng): void => {
   const table = lootTable(w.floor)
   const n = rng.int(6, 10)
@@ -685,7 +824,7 @@ const randomFloorInRoom = (
   for (let attempt = 0; attempt < 16; attempt++) {
     const tx = rng.int(room.x, room.x + room.w - 1)
     const ty = rng.int(room.y, room.y + room.h - 1)
-    if (w.level.tiles[ty * w.level.w + tx] !== Tile.Floor) continue
+    if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
     if (tx === spawnTx && ty === spawnTy) continue
     if (tx === exitTx && ty === exitTy) continue
     return { x: tx + 0.5, y: ty + 0.5 }
@@ -765,7 +904,7 @@ const randomFloorInBuilding = (
   for (let attempt = 0; attempt < 12; attempt++) {
     const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
     const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
-    if (w.level.tiles[ty * w.level.w + tx] === Tile.Floor) return { x: tx + 0.5, y: ty + 0.5 }
+    if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null
 }

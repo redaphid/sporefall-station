@@ -223,6 +223,14 @@ const TILE_ID_BY_NAME: Record<string, number> = {
   wall: Tile.Wall,
   grass: Tile.Grass,
   exit: Tile.Exit,
+  // Indoor complex decks (floors 3+). A theme may ship `tiles.hall` etc. art;
+  // until one does they draw procedurally below.
+  hall: Tile.Hall,
+  grate: Tile.Grate,
+  tiled: Tile.Tiled,
+  plating: Tile.Plating,
+  hull: Tile.Hull,
+  bog: Tile.Bog,
 }
 
 const TILE_COLORS: Record<number, number> = {
@@ -232,6 +240,12 @@ const TILE_COLORS: Record<number, number> = {
   [Tile.Wall]: 0x1b1b24,
   [Tile.Grass]: 0x2e5d3a,
   [Tile.Exit]: 0xd4af37,
+  [Tile.Hall]: 0x3d4650,
+  [Tile.Grate]: 0x2c3238,
+  [Tile.Tiled]: 0x8c9a9c,
+  [Tile.Plating]: 0x565c62,
+  [Tile.Hull]: 0x14181e,
+  [Tile.Bog]: 0x2f4a3a,
 }
 
 /** For each bevelled wall corner variant, the polygon of the KEPT wall area
@@ -408,6 +422,69 @@ export const createArt = (
           const y = hash2(variant * 5, i * 7) * T
           g.rect(x, y, 2, 2).fill({ color: 0x1e4227, alpha: 0.7 })
         }
+        break
+      }
+      case Tile.Hall: {
+        // Corridor deck plating: panel seams + a worn hazard stripe on the edge.
+        g.rect(0, 0, T, 1).fill({ color: 0x000000, alpha: 0.35 })
+        g.rect(0, 0, 1, T).fill({ color: 0x000000, alpha: 0.25 })
+        g.rect(T / 2, 0, 1, T).fill({ color: 0x000000, alpha: 0.12 })
+        for (const [cx, cy] of [
+          [3, 3],
+          [T - 4, 3],
+          [3, T - 4],
+          [T - 4, T - 4],
+        ])
+          g.rect(cx, cy, 1.5, 1.5).fill({ color: 0xffffff, alpha: 0.12 })
+        if (variant % 3 === 0) g.rect(0, T - 3, T, 2).fill({ color: 0xc9a227, alpha: 0.18 })
+        break
+      }
+      case Tile.Grate: {
+        // Vent grate: dark recess, slats, a sickly glow from below.
+        g.rect(2, 2, T - 4, T - 4).fill(0x101418)
+        g.rect(4, 4, T - 8, T - 8).fill({ color: 0x5fd068, alpha: 0.12 })
+        for (let i = 0; i < 5; i++) g.rect(3, 4 + i * ((T - 8) / 5), T - 6, 2).fill(0x4a525a)
+        g.rect(2, 2, T - 4, T - 4).stroke({ width: 1, color: 0x6a737c, alpha: 0.7 })
+        break
+      }
+      case Tile.Tiled: {
+        // Scrubbed ceramic: a 4x4 grout grid, one tile stained per variant.
+        for (let i = 0; i < 4; i++) {
+          g.rect(0, i * (T / 4), T, 1).fill({ color: 0x000000, alpha: 0.2 })
+          g.rect(i * (T / 4), 0, 1, T).fill({ color: 0x000000, alpha: 0.2 })
+        }
+        const sx = Math.floor(hash2(variant, 3) * 4) * (T / 4)
+        const sy = Math.floor(hash2(5, variant) * 4) * (T / 4)
+        g.rect(sx + 1, sy + 1, T / 4 - 1, T / 4 - 1).fill({ color: 0x000000, alpha: 0.08 })
+        break
+      }
+      case Tile.Plating: {
+        // Diamond tread plate.
+        for (let y = 0; y < 4; y++) {
+          for (let x = 0; x < 4; x++) {
+            const cx = (x + (y % 2) * 0.5 + 0.25) * (T / 4)
+            const cy = (y + 0.5) * (T / 4)
+            g.rect(cx - 2, cy - 0.5, 4, 1).fill({ color: 0xffffff, alpha: 0.1 })
+          }
+        }
+        g.rect(0, 0, T, T).stroke({ width: 1, color: 0x000000, alpha: 0.3 })
+        break
+      }
+      case Tile.Hull: {
+        // Outer pressure hull: heavy riveted bands.
+        g.rect(0, T / 2 - 2, T, 4).fill({ color: 0x000000, alpha: 0.4 })
+        for (let i = 0; i < 3; i++) g.rect(4 + i * (T / 3), T / 2 - 1, 2, 2).fill({ color: 0xffffff, alpha: 0.12 })
+        g.rect(0, 0, T, 3).fill(0x222831)
+        break
+      }
+      case Tile.Bog: {
+        // Swamp seep over the deck: murky water with ripples.
+        for (let i = 0; i < 3; i++) {
+          const x = hash2(i * 5, variant * 7) * (T - 10) + 2
+          const y = hash2(variant * 3, i * 11) * (T - 6) + 2
+          g.ellipse(x + 4, y + 2, 5, 2).stroke({ width: 1, color: 0x9fd8a8, alpha: 0.2 })
+        }
+        g.rect(0, 0, T, T).fill({ color: 0x0a1a10, alpha: 0.15 })
         break
       }
       case Tile.Exit: {

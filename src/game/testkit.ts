@@ -4,9 +4,10 @@
 // another fixture. This module is imported only by tests — never by the app.
 
 import { expect } from 'vitest'
+import { generateCityLevel } from './levelgen/generate'
 import { serializeWorld } from './serialize'
 import { emptyInput, type InputCmd } from './types'
-import { tickWorld, type World } from './world'
+import { createWorld, tickWorld, type RunMode, type World } from './world'
 
 // The fixture loaders live in the vitest-free `./fixtures.ts` (the app's
 // `?world=` boot hook imports them too); re-export so tests keep one import site.
@@ -18,6 +19,16 @@ export const runTicks = (w: World, inputs: Map<number, Partial<InputCmd>>, n: nu
   for (let i = 0; i < n; i++) {
     tickWorld(w, new Map([...inputs].map(([slot, cmd]) => [slot, { ...emptyInput(), ...cmd }])))
   }
+  return w
+}
+
+/** A world on the sunken-streets CITY generator for any floor. Floors 3+ build
+ * the indoor complex in play; tests of the city set-pieces (bunkers, courtyard
+ * compounds, vaults, industrial squads) use this to keep them covered. Not
+ * deserializable (its level checksum is the city one, not seed+floor's). */
+export const createCityWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
+  const w = createWorld(seed, floor, mode, hostile)
+  w.level = generateCityLevel(seed, floor)
   return w
 }
 

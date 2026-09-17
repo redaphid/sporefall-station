@@ -6,6 +6,7 @@ import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
 import { combatSystem } from './systems/combat'
+import { complexDirectorSystem, type DirectorState } from './systems/complexDirector'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
 import { infectionActive, infectionSystem } from './systems/infection'
@@ -150,6 +151,10 @@ export interface World {
    * touches determinism — it just serializes/replays with the world (see types.ts
    * `Annotation`). Default `[]`. */
   annotations: Annotation[]
+  /** Indoor-complex event director schedule (systems/complexDirector.ts).
+   * Present only on complex floors (3+) once the director has run; serialized
+   * only when present so city-floor snapshots stay byte-identical. */
+  director?: DirectorState
 }
 
 export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
@@ -232,6 +237,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
+  complexDirectorSystem(w) // floors 3+: vent swarms, bunk ambushes, lights-out
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)

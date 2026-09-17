@@ -3,6 +3,7 @@ import { spawnPlayer } from '../player'
 import { populateWorld, spawnNpc } from '../populate'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
+import { BOSSES } from '../data/bosses'
 import { missionSystem, setupFloor } from './missions'
 
 const makeRun = (seed: number): { w: World; playerId: number } => {
@@ -58,12 +59,20 @@ describe('roguelite loop', () => {
   it('mission descriptions are themed to the Sporefall fiction (no off-theme words)', () => {
     // Themed templates per generated mission type — the description must match its
     // template's phrasing and never leak the old earthbound vocabulary.
+    // The boss name is no longer a literal: the floor picks its boss from the
+    // registry and the description names whichever one spawned. Built FROM the
+    // registry rather than loosened to `.*`, so this stays as strict as it was
+    // — an unregistered or misspelled boss name still fails — while extending
+    // itself automatically as bosses are added.
+    const BOSS = `(?:${Object.values(BOSSES)
+      .map((b) => b.missionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('|')})`
     const THEMED: Record<string, RegExp> = {
       steal: /^Extract the specimen canister from the /,
-      assassinate: /^Purge the Mireclaw Alpha in the /,
+      assassinate: new RegExp(`^Purge ${BOSS} in the `),
       reach: /^Reach the Launch Bay$/,
       contain: /^Burn back the Spore Node in the .* before it blooms$/,
-      infiltrate: /^Breach the biolock and purge the Mireclaw Alpha in the /,
+      infiltrate: new RegExp(`^Breach the biolock and purge ${BOSS} in the `),
     }
     const OFF_THEME = /briefcase|\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
     const seen = new Set<string>()

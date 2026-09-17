@@ -624,6 +624,58 @@ const setupNpcDeliberate = (w: World): void => {
   lurker.ai!.guard = true
 }
 
+// ── §4.1 THE VIGIL showcase — the boss whose verb is invisible ──────────────
+// A bare arena, one Vigil, one player holding a KNIFE. That casting IS the
+// scenario: the knife is the only silent damage in the game, and the grenade
+// special (free, no inventory, 8s cooldown) is the loudest thing a player
+// carries — so one scripted player demonstrates both halves of the noise budget
+// without ever switching weapons, which the input timeline cannot express.
+//
+// Backs the `vigil` script + e2e/vigil.mjs, which assert the four claims from
+// LIVE world state: it is vulnerable while dormant and being hit does NOT wake
+// it; being LOUD does, and awake it is near-immune; backing off settles it;
+// each wake outlasts the last.
+const setupVigil = (w: World): void => {
+  const cx = 32
+  const cy = 32
+  // Blank sealed clearing — the meter must answer to the script's noise and
+  // nothing else, so no ambient crowd, no fire, no wandering stimulus.
+  for (let y = cy - 12; y <= cy + 12; y++) {
+    for (let x = cx - 14; x <= cx + 14; x++) {
+      w.level.tiles[y * w.level.w + x] = Tile.Floor
+      w.level.solid[y * w.level.w + x] = 0
+    }
+  }
+  const players = w.entities.filter((e) => !!e.playerCtl)
+  w.entities = players
+  w.byId.clear()
+  for (const e of players) w.byId.set(e.id, e)
+  w.hostile = true
+
+  const player = players[0]
+  if (player) {
+    player.pos = { x: cx - 4.5, y: cy + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // the Vigil is due east, inside REVEAL_RANGE from tick 0
+    // Tanky: the clip must outlive its own grenades and a woken boss's claws.
+    if (player.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
+    // A KNIFE, not the starter pistol: bullets are projectiles, and a live
+    // projectile in earshot is loudness to vigil.ts. The pistol would wake it
+    // during the very beat that exists to prove damage does NOT wake it.
+    player.loadout!.inventory = [{ itemId: 'knife', qty: 999 }]
+    player.loadout!.activeSlot = 0
+    if (player.combat) player.combat.weapon = 'knife'
+  }
+
+  const boss = spawnNpc(w, 'vigil', cx + 0.5, cy + 0.5)
+  // A SHOWCASE POOL, not a rebalance. The shipped 260 hp is a knife beat and a
+  // half — at `resist.physical` 1.5 a dormant Vigil dies before it can be woken
+  // twice, which is the fight working exactly as designed and a clip that ends
+  // before its own point. The e2e measures DAMAGE PER BEAT (asleep vs awake),
+  // never time-to-kill, so a deeper pool changes nothing it asserts.
+  boss.health = { hp: 2000, max: 2000, iframes: 0 }
+}
+
 // Hero-art showcase (art-cn1 review): a blank plaza with the player on the lane
 // and a small thug pair far east. The `artcompare` script walks a full compass
 // circle in place (showing every drawn facing), then marches east and swings —
@@ -662,4 +714,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'ai-goals') setupAiGoals(w)
   if (name === 'npc-ai') setupNpcAi(w)
   if (name === 'npc-deliberate') setupNpcDeliberate(w)
+  if (name === 'vigil') setupVigil(w)
 }

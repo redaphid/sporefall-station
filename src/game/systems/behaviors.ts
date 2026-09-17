@@ -31,6 +31,7 @@
 // transitions emit an `aiGoal` world event — so "why did this NPC do that?" is
 // answerable from the entity's own JSON (debug verbs `ai`, `behaviors`).
 
+import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from '../data/bosses'
 import { NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
 import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
@@ -805,10 +806,12 @@ const packAvoid: Consideration = (w, e) => {
 // Movement/targeting is gated on its own HP; the world-mutating side (summoning
 // brood, regenerating in the cloud, the enrage speed burst) lives in
 // systems/mireclaw.ts. Phase 1 (healthy) just pressures via `threat`/`hunt`. ───
-/** Below this HP fraction the boss retreats to the spore cloud to regenerate. */
-export const MIRECLAW_RETREAT_FRAC = 0.5
-/** Below this HP fraction it ENRAGES — drops all self-preservation, goes faster. */
-export const MIRECLAW_ENRAGE_FRAC = 0.2
+// The two phase thresholds moved to `data/bosses.ts`, so they sit beside the
+// phase TABLE the HUD renders from: the bands the sim runs on and the bands the
+// player is SHOWN are now one declaration instead of two kept in step by hand.
+// Re-exported from here because `systems/mireclaw.ts` and `ui/bossModel.ts`
+// import them from this module — the move is meant to be invisible to both.
+export { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC }
 export const RETREAT = 'retreat'
 
 const nearestPlayer = (w: World, e: Entity): Entity | undefined => {

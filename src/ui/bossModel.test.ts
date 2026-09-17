@@ -11,9 +11,21 @@ import type { SimEvent } from '../game/types'
 import { bossBar, bossPhase, bossRevealName, latchBossId } from './bossModel'
 
 const NAME = 'Mireclaw Alpha'
+/** The name RESOLVER the model now takes (archetype → display name). In the app
+ * this is `themeDisplayName`; here it stands in for the swampspace pack, which
+ * names `boss` "Mireclaw Alpha" and `vigil` "The Vigil". */
+const THEMED: Record<string, string> = { boss: NAME, vigil: 'The Vigil' }
+const name = (archetype: string): string => THEMED[archetype] ?? archetype
 
 const bossEntity = (id: number, hp: number, max = 320): Entity => {
   const e = makeEntity('npc', 'boss', 5, 5)
+  e.id = id
+  e.health = { hp, max, iframes: 0 }
+  return e
+}
+/** A SECOND boss archetype — the thing the old hardcoded model could not draw. */
+const vigilEntity = (id: number, hp: number, max = 300): Entity => {
+  const e = makeEntity('npc', 'vigil', 5, 5)
   e.id = id
   e.health = { hp, max, iframes: 0 }
   return e
@@ -50,9 +62,23 @@ describe('latchBossId', () => {
 
 describe('bossRevealName', () => {
   it('returns the themed name on the frame the entrance fires, and nothing otherwise', () => {
-    expect(bossRevealName([reveal(1)], NAME)).toBe(NAME)
-    expect(bossRevealName([], NAME)).toBeUndefined()
-    expect(bossRevealName([{ type: 'floorChange', floor: 2 }], NAME)).toBeUndefined()
+    expect(bossRevealName(view([bossEntity(1, 320)], [reveal(1)]), name)).toBe(NAME)
+    expect(bossRevealName(view([bossEntity(1, 320)]), name)).toBeUndefined()
+    expect(bossRevealName(view([bossEntity(1, 320)], [{ type: 'floorChange', floor: 2 }]), name)).toBeUndefined()
+  })
+
+  it('names the boss that was ACTUALLY revealed, not a hardcoded Mireclaw', () => {
+    // The regression this generalisation exists to prevent: `ui/screens.ts`
+    // called `themeDisplayName('boss')`, so every boss entrance card in the
+    // game would have read "MIRECLAW ALPHA" regardless of what walked in.
+    const v = view([vigilEntity(3, 300)], [reveal(3)])
+    expect(bossRevealName(v, name)).toBe('The Vigil')
+  })
+
+  it('degrades to the default boss name when the reveal outruns the snapshot', () => {
+    // A BLE client can see the event before the entity arrives in a snapshot.
+    // An entrance card with no name is worse than a slightly wrong one.
+    expect(bossRevealName(view([], [reveal(9)]), name)).toBe(NAME)
   })
 })
 
@@ -69,53 +95,119 @@ describe('bossPhase', () => {
 
 describe('bossBar', () => {
   it('draws nothing until a boss has been revealed', () => {
-    expect(bossBar(view([bossEntity(1, 320)]), undefined, NAME)).toBeNull()
+    expect(bossBar(view([bossEntity(1, 320)]), undefined, name)).toBeNull()
   })
 
   it('reports name, fraction and phase once latched', () => {
-    const bar = bossBar(view([bossEntity(1, 320)]), 1, NAME)
-    expect(bar).toEqual({ name: NAME, hpFrac: 1, hp: 320, maxHp: 320, phase: 1, phaseLabel: 'SUMMONING BROOD' })
+    const bar = bossBar(view([bossEntity(1, 320)]), 1, name)
+    expect(bar).toEqual({
+      name: NAME,
+      hpFrac: 1,
+      hp: 320,
+      maxHp: 320,
+      phase: 1,
+      phaseLabel: 'SUMMONING BROOD',
+      danger: false,
+    })
   })
 
   it('phase 2 names the counterplay out loud — the regen was previously invisible', () => {
-    expect(bossBar(view([bossEntity(1, 128)]), 1, NAME)?.phaseLabel).toBe('REGENERATING — BURN THE SPORES')
+    expect(bossBar(view([bossEntity(1, 128)]), 1, name)?.phaseLabel).toBe('REGENERATING — BURN THE SPORES')
   })
 
   it('phase 3 reads ENRAGED', () => {
-    expect(bossBar(view([bossEntity(1, 32)]), 1, NAME)?.phaseLabel).toBe('ENRAGED')
+    expect(bossBar(view([bossEntity(1, 32)]), 1, name)?.phaseLabel).toBe('ENRAGED')
   })
 
   it('drops the bar the instant the boss dies', () => {
     const dead = bossEntity(1, 0)
     dead.dead = true
-    expect(bossBar(view([dead]), 1, NAME)).toBeNull()
+    expect(bossBar(view([dead]), 1, name)).toBeNull()
   })
 
   it('drops the bar at 0 hp even before the death flag lands', () => {
-    expect(bossBar(view([bossEntity(1, 0)]), 1, NAME)).toBeNull()
+    expect(bossBar(view([bossEntity(1, 0)]), 1, name)).toBeNull()
   })
 
   it('drops the bar if the latched entity left the world (floor swap, desync)', () => {
-    expect(bossBar(view([]), 1, NAME)).toBeNull()
+    expect(bossBar(view([]), 1, name)).toBeNull()
   })
 
   it('survives a boss with no health component rather than throwing', () => {
     const e = makeEntity('npc', 'boss', 5, 5)
     e.id = 1
-    expect(bossBar(view([e]), 1, NAME)).toBeNull()
+    expect(bossBar(view([e]), 1, name)).toBeNull()
   })
 
   it('clamps overheal — a regenerating Alpha never overflows the bar', () => {
-    expect(bossBar(view([bossEntity(1, 400, 320)]), 1, NAME)?.hpFrac).toBe(1)
+    expect(bossBar(view([bossEntity(1, 400, 320)]), 1, name)?.hpFrac).toBe(1)
   })
 
   it('ignores a max of 0 instead of dividing by zero', () => {
-    expect(bossBar(view([bossEntity(1, 10, 0)]), 1, NAME)).toBeNull()
+    expect(bossBar(view([bossEntity(1, 10, 0)]), 1, name)).toBeNull()
   })
 
   it('picks the LATCHED boss, not merely the first boss-looking entity', () => {
     const other = bossEntity(9, 320)
     const mine = bossEntity(1, 160)
-    expect(bossBar(view([other, mine]), 1, NAME)?.hp).toBe(160)
+    expect(bossBar(view([other, mine]), 1, name)?.hp).toBe(160)
+  })
+})
+
+// ── design/boss-variety.md §3.2: the HUD was hardcoded to Mireclaw ──────────
+// Everything above pins that Mireclaw's bar is UNCHANGED by the generalisation.
+// Everything below pins that a second boss can now exist at all.
+describe('a SECOND boss wears its own identity', () => {
+  it('shows the Vigil’s name and the Vigil’s phase label, never Mireclaw’s', () => {
+    const bar = bossBar(view([vigilEntity(1, 300)]), 1, name)
+    expect(bar?.name).toBe('The Vigil')
+    expect(bar?.phaseLabel).toBe('VULNERABLE ONLY ASLEEP — BE QUIET')
+  })
+
+  it('resolves the phase table from the boss’s OWN archetype, at its own thresholds', () => {
+    // The same hp FRACTION on two bosses must read differently. 0.2 is Mireclaw's
+    // enrage line; on the Vigil it is that boss's own final band. Before this,
+    // one global ladder answered for every boss in the game.
+    expect(bossBar(view([vigilEntity(1, 60, 300)]), 1, name)?.phaseLabel).toBe('NEARLY SILENCED — FINISH IT')
+    expect(bossBar(view([bossEntity(1, 64, 320)]), 1, name)?.phaseLabel).toBe('ENRAGED')
+  })
+
+  it('supports a boss with a DIFFERENT NUMBER of phases', () => {
+    // The old model returned a `1 | 2 | 3` union off one global ladder, so a
+    // two-phase boss was not merely mislabelled — it was unrepresentable.
+    expect(bossBar(view([vigilEntity(1, 300)]), 1, name)?.phase).toBe(1)
+    expect(bossBar(view([vigilEntity(1, 60, 300)]), 1, name)?.phase).toBe(2)
+  })
+
+  it('danger is per-boss DATA, not the hardcoded “phase === 3”', () => {
+    expect(bossBar(view([bossEntity(1, 320)]), 1, name)?.danger).toBe(false)
+    expect(bossBar(view([bossEntity(1, 32)]), 1, name)?.danger).toBe(true) // enraged
+    // The Vigil declares NO danger band: a low health bar means you have been
+    // quiet long enough, which is the opposite of "this is going badly". Its
+    // final phase must therefore NOT recolour the bar — something `phase === 3`
+    // decided globally and got wrong for every boss but one.
+    const nearlyDead = bossBar(view([vigilEntity(1, 60, 300)]), 1, name)
+    expect(nearlyDead?.phase).toBe(2)
+    expect(nearlyDead?.danger).toBe(false)
+  })
+
+  it('an UNREGISTERED archetype degrades to the reference table instead of throwing', () => {
+    // The latched id comes off an event, which on a BLE client is whatever that
+    // phone's bundle decoded. A wrong label beats a crashed HUD.
+    const e = makeEntity('npc', 'mysterious.new.boss', 5, 5)
+    e.id = 1
+    e.health = { hp: 50, max: 100, iframes: 0 }
+    const bar = bossBar(view([e]), 1, name)
+    expect(bar).not.toBeNull()
+    expect(bar?.phaseLabel).toBe('REGENERATING — BURN THE SPORES')
+  })
+
+  it('passes the ARCHETYPE to the resolver, so theme packs name each boss themselves', () => {
+    const seen: string[] = []
+    bossBar(view([vigilEntity(1, 300)]), 1, (a) => {
+      seen.push(a)
+      return a
+    })
+    expect(seen).toEqual(['vigil']) // emphatically not 'boss'
   })
 })

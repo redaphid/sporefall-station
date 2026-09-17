@@ -490,7 +490,7 @@ const spawnEncounters = (w: World, erng: Rng): void => {
 }
 
 /** Share of complex modules that roll the Sporefall encounter table. */
-export const COMPLEX_ENCOUNTER_SHARE = 0.35
+export const COMPLEX_ENCOUNTER_SHARE = 0.25
 
 const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number, number] }[]> = {
   shop: [
@@ -512,25 +512,28 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   // Indoor complex modules (floors 3+). The essence-echoes of the crew still
   // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
   // swarms are layered on separately (spawnComplexSleepers, complexDirector).
+  // A complex has ~3x as many (single-room) modules as a city floor has
+  // buildings, so each module is lightly crewed: the floor total stays near a
+  // city floor's, and the director's swarms/ambushes supply the pressure.
   mess: [
-    { archetype: 'civilian', count: [1, 2] },
+    { archetype: 'civilian', count: [0, 2] },
     { archetype: 'thug', count: [0, 1] },
   ],
   galley: [{ archetype: 'thug', count: [0, 1] }],
   quarters: [{ archetype: 'civilian', count: [0, 1] }],
   washroom: [],
   lab: [
-    { archetype: 'scientist', count: [1, 2] },
+    { archetype: 'scientist', count: [0, 1] },
     { archetype: 'robot', count: [0, 1] },
   ],
   medbay: [{ archetype: 'scientist', count: [0, 1] }],
   reactor: [
-    { archetype: 'robot', count: [1, 1] },
-    { archetype: 'thug', count: [1, 2] },
+    { archetype: 'robot', count: [0, 1] },
+    { archetype: 'thug', count: [0, 1] },
   ],
-  depot: [{ archetype: 'thug', count: [1, 2] }],
+  depot: [{ archetype: 'thug', count: [0, 1] }],
   security: [
-    { archetype: 'cop', count: [1, 2] },
+    { archetype: 'cop', count: [1, 1] },
     { archetype: 'gangster', count: [0, 1] },
   ],
 }
@@ -726,6 +729,11 @@ const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
   }
 }
 
+/** Most bunk rooms that may hold sleepers on a floor — a complex has a LOT of
+ * bunk rooms, so without a cap the dormant crew alone outnumbered a city
+ * floor's whole garrison. 2 on floor 3, one more every other floor, max 4. */
+export const maxSleeperRooms = (floor: number): number => Math.min(4, 1 + Math.floor(floor / 2))
+
 /** Chance a complex bunk room holds sleepers, by floor (capped). */
 export const sleeperChance = (floor: number): number => Math.min(0.6, 0.2 + 0.06 * floor)
 
@@ -738,10 +746,13 @@ const spawnComplexSleepers = (w: World): void => {
   const lw = w.level.w
   const taken = new Set<number>()
   for (const e of w.entities) if (!e.dead) taken.add(Math.floor(e.pos.y) * lw + Math.floor(e.pos.x))
+  let rooms = 0
   for (let bi = 0; bi < w.level.buildings.length; bi++) {
     const b = w.level.buildings[bi]
     if (b.role !== 'quarters') continue
+    if (rooms >= maxSleeperRooms(w.floor)) break
     if (!rng.chance(sleeperChance(w.floor))) continue
+    rooms++
     const room = b.rooms[0]
     const doorNear = (tx: number, ty: number): boolean => b.doors.some((d) => Math.abs(d.x - tx) + Math.abs(d.y - ty) <= 1)
     const free: { x: number; y: number }[] = []

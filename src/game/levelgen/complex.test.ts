@@ -7,6 +7,7 @@ import { populateWorld } from '../populate'
 import { mulberry32 } from '../rng'
 import { setupFloor } from '../systems/missions'
 import { LEVEL_H, LEVEL_W } from '../types'
+import { createCityWorld } from '../testkit'
 import { createWorld } from '../world'
 import { BIOME_DEFS, BIOMES, biomeForFloor, carveComplex, COMPLEX_MIN_FLOOR, isComplexFloor } from './complex'
 import { generateComplexLevel, generateLevel } from './generate'
@@ -411,6 +412,23 @@ describe('complex floors populate like a station', () => {
       }
     }
     expect(patrols).toBeGreaterThan(30)
+  })
+
+  it('keeps the floor population in the city band (many modules must not mean many more bodies)', () => {
+    for (const floor of [3, 4, 5]) {
+      let complex = 0
+      let city = 0
+      for (let seed = 1; seed <= 10; seed++) {
+        const a = createWorld(seed, floor)
+        populateWorld(a)
+        complex += a.entities.filter((e) => e.kind === 'npc').length
+        const b = createCityWorld(seed, floor)
+        populateWorld(b)
+        city += b.entities.filter((e) => e.kind === 'npc').length
+      }
+      expect(complex, `floor ${floor}: complex ${complex / 10} vs city ${city / 10} npcs/floor`).toBeLessThanOrEqual(city * 1.25)
+      expect(complex, `floor ${floor}: complex floors feel empty`).toBeGreaterThanOrEqual(city * 0.75)
+    }
   })
 
   it('the mission targets a real module on every complex floor', () => {

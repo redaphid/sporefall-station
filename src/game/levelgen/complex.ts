@@ -81,7 +81,7 @@ export const BIOME_DEFS: Record<BiomeName, BiomeDef> = {
   // The crew ring: bunks, wash blocks and the infirmary; scrubbed tile decks.
   habitation: {
     roles: [
-      ['quarters', 6],
+      ['quarters', 4],
       ['washroom', 2],
       ['medbay', 2],
       ['depot', 2],
@@ -485,8 +485,9 @@ export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPl
         break
       }
     }
-    // A wash block is a closet, never a hall; a big room becomes quarters.
-    if (role === 'washroom' && area(p) > 24) role = 'quarters'
+    // A wash block is a closet, never a hall; a big one takes the biome's
+    // signature module instead (bunks, stores or labs).
+    if (role === 'washroom' && area(p) > 24) role = def.roles[0][0]
     p.role = role
   })
 

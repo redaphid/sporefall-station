@@ -180,6 +180,31 @@ export interface ArtPalette {
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
   boss: 1.5,
+  // The Vigil (§4.1): 1.5 APPLIED TWICE. It stands half again over the Alpha
+  // exactly as the Alpha stands half again over the thug — one more rung up the
+  // SAME ladder, which is the only way a second boss reads as bigger without
+  // inventing a second sizing scheme nobody else obeys.
+  //
+  // The number follows from what the creature IS. Per data/bosses.ts and
+  // systems/vigil.ts it is something enormous fused into a reactor bulkhead
+  // that has not moved in years — "more wall than animal", as its ENTITY_COLORS
+  // note below puts it. A thing the player is meant to creep around and NOT
+  // wake has to look immovable at a glance, before the noise meter has taught
+  // anyone anything. At CHAR_PX 48 on TILE_PX 32 this draws ~3.4 tiles tall: it
+  // FILLS a doorway rather than standing in one.
+  //
+  // WITHOUT THIS LINE IT INHERITS 1 — thug size, the game's commonest enemy.
+  // That is not hypothetical. docs/assets/boss-art-brief.md records the Alpha
+  // being pixel-identical to the thug as "the single largest reason the owner
+  // cleared roughly six boss floors and reported never having met a boss". The
+  // Vigil ships with no `char.vigil.*` art either (it draws the per-archetype
+  // procedural body), so scale and colour carry its whole silhouette alone —
+  // precisely the position the Alpha was in when that playtest happened.
+  //
+  // Collision is deliberately NOT scaled: entity radius stays 0.35, so a woken
+  // Vigil still fits the one-tile hatch it has to chase you through. The bulk
+  // is a draw-time lie, and bossArt.test.ts pins that EVERY boss tells it.
+  vigil: 2.25,
 }
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
@@ -397,7 +422,9 @@ const WALL_CUT_POLY: Record<number, number[]> = {
   [Tile.WallCutSW]: [0, 0, 1, 0, 1, 1, CUT, 1, 0, 1 - CUT],
 }
 
-const ENTITY_COLORS: Record<string, number> = {
+/** Exported so `bossArt.test.ts` can assert every registered boss has an entry
+ * here (and a distinct one) rather than falling to the 0xcccccc default. */
+export const ENTITY_COLORS: Record<string, number> = {
   player: 0x7fd17f,
   thug: 0xd17f7f,
   boss: 0xe0483f,

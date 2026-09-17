@@ -61,6 +61,27 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
 // scenario (spawn 1.5,1.5; lane y=11; grenade pickup x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
+  // §4.1 THE VIGIL (scenario `vigil`, stage centre 32,32): the noise budget,
+  // narrated. The player holds a knife (silent) and the grenade special (loud),
+  // so both halves of the fight play out without a weapon switch this timeline
+  // cannot express. Each beat is a fixed tick window the e2e reads live state
+  // inside — see e2e/vigil.mjs, which asserts the four claims off `__world`.
+  vigil: [
+    { ticks: 40 }, // establish: revealed on sight, meter pinned, ASLEEP [·····]
+    { ticks: 26, x: 1 }, // close to knife range (the boss is 5 tiles east)
+    { ticks: 90, x: 1, attack: true }, // BEAT 1 — knife a sleeping boss: damage lands at 1.5x…
+    { ticks: 1, special: true, x: 1 }, // …and it never stirs. Now be LOUD: grenade.
+    { ticks: 34, x: 1 }, // the boom's noise fills the meter (~18 ticks) → it WAKES
+    { ticks: 90, x: 1, attack: true }, // BEAT 2 — the same knife, awake: 0.15x, ~10x less
+    { ticks: 60, x: -1 }, // BEAT 3 — back off west; it lumbers after at speed 2.0
+    { ticks: 60 }, // hold quiet: wake 1 (150 ticks) expires → it SETTLES, soft again
+    { ticks: 1, special: true, x: 1 }, // grenade 2 (the 240-tick special cooldown clears here)
+    { ticks: 30, x: 1 }, // second boom → wake 2
+    { ticks: 60, x: -1 }, // back off again, exactly as before…
+    { ticks: 280 }, // …but BEAT 4: this wake runs 300 ticks, not 150. Twice the first.
+    { ticks: 40 }, // settled beat: meter back to ASLEEP, resist back to 1.5
+  ],
+
   // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
   // the player only strolls and stands — every beat on stage is the AI's own.
   // Establish the cast, walk south INTO the lurker pocket (the proximity trip

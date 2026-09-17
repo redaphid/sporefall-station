@@ -57,82 +57,10 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
   }
 }
 
-/**
- * A PACED burst: `shots` single-tick trigger pulls, `gap` ticks apart. Expands
- * to `shots * 2` ordinary segments, so everything downstream (scriptTicks, the
- * showcase test's `at(n)` windows) keeps working unchanged.
- *
- * This exists because CADENCE is a thing a timeline has to be able to say. A
- * segment's `attack` is held for every tick of that segment and the sim gates it
- * on the weapon cooldown, so `{ ticks: n, attack: true }` can only ever mean
- * MAXIMUM RATE. Spacing the trigger pulls is the other half of the Vigil's
- * fight, and it is not expressible any other way.
- */
-const paced = (shots: number, gap: number): ScriptStep[] =>
-  Array.from({ length: shots }, (): ScriptStep[] => [{ ticks: 1, attack: true }, { ticks: gap - 1 }]).flat()
-
 // 30 ticks = 1s. Player moves ~0.15 tiles/tick. Tuned against the `demo`
 // scenario (spawn 1.5,1.5; lane y=11; grenade pickup x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
-  // §4.1 THE VIGIL (scenario `vigil`, stage centre 32,32; the player stands 5
-  // tiles west of the boss with the STARTER PISTOL and nothing else): the noise
-  // budget, narrated.
-  //
-  // The verb is CADENCE, not weapon choice — a player carries exactly one
-  // permanent weapon and cannot swap, so this timeline plays the SAME GUN twice
-  // and lets the boss answer differently to each. Paced fire kills it in its
-  // sleep; the trigger held down wakes it; the grenade wakes it outright. Each
-  // beat is a fixed tick window the e2e reads live state inside — see
-  // e2e/vigil.mjs, which asserts every claim off `__world`.
-  vigil: [
-    { ticks: 40 }, // establish: revealed on sight, meter pinned, ASLEEP [·····]
-    // BEAT 1 — DISCIPLINE (10 segments). Five shots 45 ticks apart, comfortably
-    // above the ~38-tick break-even: 21 damage each into a sleeping boss, and
-    // the meter decays back to zero between every one of them. It never stirs.
-    ...paced(5, 45),
-    { ticks: 160, attack: true }, // BEAT 2 — GREED: hold it down. 8 shots / 135 ticks in, it WAKES
-    { ticks: 90, attack: true }, // BEAT 3 — the same gun on an awake boss: 0.15x, ~10x less per shot
-    { ticks: 60, x: -1 }, // BEAT 4 — back off west; it lumbers after at speed 2.0…
-    { ticks: 90 }, // …and hold fire: wake 1 (150 ticks) expires → it SETTLES, soft again
-    { ticks: 20, x: 1 }, // face east again — aim follows movement (input/aim.ts selectAim)
-    { ticks: 1, special: true, x: 1 }, // BEAT 5 — the loud option is unchanged: GRENADE
-    { ticks: 60 }, // the boom's noise crosses the meter in ~16 ticks → wake 2
-    { ticks: 60, x: -1 }, // back off again, exactly as before…
-    { ticks: 300 }, // …but this wake runs 300 ticks, not 150. Twice the first.
-    { ticks: 40 }, // settled beat: meter back to ASLEEP, resist back to 1.5
-  ],
-
-  // §4.2 Echo's adaptive resist (scenario `echo-adapt`, lane y=11, boss at x=14.5).
-  // Three beats, and the whole boss is legible from the middle one:
-  //   1. HOLD THE TRIGGER — the meter fills, each shot lands for less.
-  //   2. BREAK OFF — stop firing and watch the resistance decay back.
-  //   3. OPEN UP AGAIN — the gun works again, which is the lesson.
-  // Timings are in ticks at 30/s; the lull is ~12s because a full baseline
-  // recovery takes ~300 ticks at ECHO_DECAY.
-  'echo-adapt': [
-    { ticks: 40 }, // establish: the entrance fires, the meter reads the rule
-    { ticks: 300, attack: true }, // beat 1: sustained fire — the cliff
-    { ticks: 60, x: -1 }, // break off west, out of the claws
-    { ticks: 360 }, // beat 2: the lull — it forgets
-    { ticks: 200, attack: true }, // beat 3: back on the gun, landing hard again
-  ],
-  // §4.3 The Sealkeeper showcase (scenario `sealkeeper`, lane y=11, wall x=16
-  // with its one doorway at (16,11); player starts west at x=6, boss east).
-  // The clip is the fight's whole thesis in four beats: WATCH it take the lane
-  // (it shuts and re-locks the only door), WALK to the sealed door and find it
-  // locked, BLOW IT OPEN with the special (the grenade stops being a weapon and
-  // becomes a tool), then walk through the hole it made.
-  sealkeeper: [
-    { ticks: 60 }, // establish: the boss backs through the doorway and seals it
-    { ticks: 70, x: 1 }, // march east up the lane to the sealed door
-    { ticks: 40 }, // stand at it — locked, and shooting it does nothing
-    { ticks: 1, special: true }, // BREACH: lob the grenade at the door
-    { ticks: 60 }, // the blast breaches it (combat.detonate)
-    { ticks: 60, x: 1 }, // walk through the hole
-    { ticks: 60 }, // final beat
-  ],
-
   // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
   // the player only strolls and stands — every beat on stage is the AI's own.
   // Establish the cast, walk south INTO the lurker pocket (the proximity trip

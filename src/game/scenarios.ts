@@ -4,7 +4,6 @@
 import { WEAPONS } from './data/items'
 import { makeEntity, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
-import { PLAYER_START_WEAPON, starterLoadout } from './player'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { freeze, wet } from './systems/interactions'
@@ -660,71 +659,6 @@ const setupNpcDeliberate = (w: World): void => {
   lurker.ai!.guard = true
 }
 
-// ── §4.1 THE VIGIL showcase — the boss whose verb is invisible ──────────────
-// A bare arena, one Vigil, and a player carrying EXACTLY WHAT THE GAME GIVES
-// THEM: the starter pistol, built by `starterLoadout(PLAYER_START_WEAPON)` — the
-// same call `spawnPlayer` makes — plus the grenade special (free, no inventory,
-// 8s cooldown). Both halves of the noise budget are reachable from one timeline,
-// because the difference between them is CADENCE rather than a weapon switch the
-// input model cannot express.
-//
-// THE ARMING IS THE POINT, and it is why this scenario is written this way. It
-// used to hand the player a KNIFE by direct assignment into `loadout`, which no
-// reachable input sequence can produce: `interaction.ts` refuses to let any
-// melee or ranged item enter a player's inventory, and there is no drop/holster
-// command. So every test that passed here passed against a world the game cannot
-// build, and the boss shipped UNWINNABLE underneath them — its counterplay was a
-// weapon the player could never hold. Never hand-assign a weapon in a scenario;
-// go through the door the player goes through.
-//
-// Backs the `vigil` script + e2e/vigil.mjs, which assert the fight from LIVE
-// world state: paced fire hurts it while it sleeps and never wakes it; spraying
-// or a grenade does wake it, and awake it is near-immune; backing off settles
-// it; each wake outlasts the last.
-const setupVigil = (w: World): void => {
-  const cx = 32
-  const cy = 32
-  // Blank sealed clearing — the meter must answer to the script's noise and
-  // nothing else, so no ambient crowd, no fire, no wandering stimulus.
-  for (let y = cy - 12; y <= cy + 12; y++) {
-    for (let x = cx - 14; x <= cx + 14; x++) {
-      w.level.tiles[y * w.level.w + x] = Tile.Floor
-      w.level.solid[y * w.level.w + x] = 0
-    }
-  }
-  const players = w.entities.filter((e) => !!e.playerCtl)
-  w.entities = players
-  w.byId.clear()
-  for (const e of players) w.byId.set(e.id, e)
-  w.hostile = true
-
-  const player = players[0]
-  if (player) {
-    player.pos = { x: cx - 4.5, y: cy + 0.5 }
-    player.prevPos = { x: player.pos.x, y: player.pos.y }
-    player.facing = 0 // the Vigil is due east, inside REVEAL_RANGE from tick 0
-    // Tanky: the clip must outlive its own grenades and a woken boss's claws.
-    if (player.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
-    // THE STARTER PISTOL, through the game's own constructor. Restated rather
-    // than left implicit from `spawnPlayer` so the one thing this scenario must
-    // never get wrong is visible at the point it happens — and so
-    // `scenarios.oneWeapon.test.ts` has something to compare against.
-    player.loadout = starterLoadout(PLAYER_START_WEAPON)
-    if (player.combat) player.combat.weapon = PLAYER_START_WEAPON
-  }
-
-  const boss = spawnNpc(w, 'vigil', cx + 0.5, cy + 0.5)
-  // A SHOWCASE POOL, not a rebalance — and the size of it is the good news. At
-  // `resist.physical` 1.5 a paced pistol shot takes round(14 × 1.5) = 21 off a
-  // dormant Vigil, so the shipped 260 hp row dies to THIRTEEN disciplined shots
-  // (fifteen at the 299 a floor-2 spawn actually carries):
-  // the fight is winnable solo with nothing but the starter gun, and a clip
-  // pitched at 260 would end during its first beat. The e2e measures DAMAGE PER
-  // BEAT (asleep vs awake), never time-to-kill, so a deeper pool changes nothing
-  // it asserts — `vigil.test.ts` kills the real 260 hp boss instead.
-  boss.health = { hp: 2000, max: 2000, iframes: 0 }
-}
-
 // Hero-art showcase (art-cn1 review): a blank plaza with the player on the lane
 // and a small thug pair far east. The `artcompare` script walks a full compass
 // circle in place (showing every drawn facing), then marches east and swings —
@@ -743,88 +677,6 @@ const stageArtCompare = (w: World): void => {
   }
   stageThug(w, 18, LANE_Y)
   stageThug(w, 19, LANE_Y)
-}
-
-// §4.2 Echo — the adaptive-resist proof (e2e/echo.mjs drives this with the
-// `echo-adapt` script). A blank lane, a pistol, and the boss downrange: the
-// script holds the trigger until the meter fills and the damage visibly falls
-// off, backs off while it decays, then opens up again to show the gun working.
-//
-// Deliberately does NOT pre-set `mission.bossRevealed`: the recording should
-// show the real entrance firing on first sight, because the reveal gate is part
-// of the feature (nothing is learned from a room nobody is in).
-//
-// The player is given a deep health pool because Echo closes to claw range and
-// the clip must survive to its third beat. Everything under test is the resist
-// map, not the player's survival, so the hp is scaffolding rather than balance.
-const setupEchoAdapt = (w: World): void => {
-  clearStage(w)
-  const player = w.entities.find((e) => e.playerCtl)
-  if (player?.playerCtl) {
-    player.pos = { x: 6 + 0.5, y: LANE_Y + 0.5 }
-    player.prevPos = { x: player.pos.x, y: player.pos.y }
-    player.facing = 0 // aimed east, straight down the lane at the boss
-    player.health = { hp: 2000, max: 2000, iframes: 0 }
-    player.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }]
-    player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'pistol'
-  }
-  // 8 tiles out: inside REVEAL_RANGE (11) so the entrance fires almost at once,
-  // and inside the pistol's 10-tile range so the first beat is all shooting.
-  spawnNpc(w, 'echo', 14 + 0.5, LANE_Y + 0.5)
-}
-
-/**
- * §4.3 The Sealkeeper set-piece: ONE lane, ONE doorway, and a boss that takes it.
- *
- * Deliberately the most stripped-down stage in this file, because the fight's
- * thesis is architectural and any second route would destroy it: a wall across
- * the lane with exactly one gap, the player west of it, the Sealkeeper east. It
- * backs to the doorway, shuts and re-locks the only way through, and the clip's
- * whole point is that the answer is a grenade rather than a gun.
- *
- * Geometry is pinned here and mirrored in e2e/sealkeeper.mjs — lane y=LANE_Y,
- * wall plane x=SEAL_WALL_X, doorway at (SEAL_WALL_X, LANE_Y).
- */
-const SEAL_WALL_X = 16
-
-const setupSealkeeper = (w: World): void => {
-  clearStage(w)
-  const lw = w.level.w
-  const solidify = (x: number, y: number): void => {
-    w.level.tiles[y * lw + x] = Tile.Wall
-    w.level.solid[y * lw + x] = 1
-  }
-  const carve = (x: number, y: number): void => {
-    w.level.tiles[y * lw + x] = Tile.Floor
-    w.level.solid[y * lw + x] = 0
-  }
-  // A clear hall either side of the wall, so the camera frames the lane.
-  for (let y = LANE_Y - 5; y <= LANE_Y + 5; y++) for (let x = 2; x <= 30; x++) carve(x, y)
-  // The wall, with exactly ONE gap in it.
-  for (let y = LANE_Y - 5; y <= LANE_Y + 5; y++) solidify(SEAL_WALL_X, y)
-  carve(SEAL_WALL_X, LANE_Y)
-
-  // The door, OPEN — the boss has to be seen TAKING it, not starting with it.
-  const d = makeEntity('door', 'door', SEAL_WALL_X + 0.5, LANE_Y + 0.5, 0.5)
-  d.door = { open: true, locked: false, lockLevel: 0 }
-  d.interact = { verb: 'open', range: 1.3 }
-  addEntity(w, d)
-
-  const player = w.entities.find((e) => e.playerCtl)
-  if (player) {
-    player.pos = { x: 6.5, y: LANE_Y + 0.5 }
-    player.prevPos = { x: player.pos.x, y: player.pos.y }
-    player.facing = 0 // facing east, down the lane at the doorway
-    player.health = { hp: 500, max: 500, iframes: 0 } // survive the whole clip
-  }
-
-  // East of the gap, far enough that it visibly BACKS INTO the doorway rather
-  // than starting on top of it. Revealed up front so the clip opens on the act:
-  // the entrance latch has its own coverage in sealkeeper.test.ts.
-  const boss = spawnNpc(w, 'sealkeeper', SEAL_WALL_X + 4.5, LANE_Y + 0.5)
-  boss.ai!.home = { x: boss.pos.x, y: boss.pos.y }
-  w.mission.bossRevealed = true
 }
 
 export const applyScenario = (w: World, name: string): void => {
@@ -846,7 +698,4 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'ai-goals') setupAiGoals(w)
   if (name === 'npc-ai') setupNpcAi(w)
   if (name === 'npc-deliberate') setupNpcDeliberate(w)
-  if (name === 'vigil') setupVigil(w)
-  if (name === 'echo-adapt') setupEchoAdapt(w)
-  if (name === 'sealkeeper') setupSealkeeper(w)
 }

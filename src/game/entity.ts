@@ -87,34 +87,6 @@ export interface AiState {
   summonAt?: number
   /** #69 Mireclaw boss — phase-3 enrage latched (one-time speed boost applied). */
   enraged?: boolean
-  /** §4.1 The Vigil (systems/vigil.ts) — its decaying NOISE budget. Absent while
-   * the room is silent, and DELETED once it decays back to 0, so a Vigil nobody
-   * has been loud near serializes exactly as it spawned. */
-  noise?: number
-  /** §4.1 The Vigil — absolute tick it settles back to dormant. PRESENCE IS THE
-   * STATE: absent = asleep and soft, a number = awake and near-immune. */
-  wakeUntil?: number
-  /** §4.1 The Vigil — how many times it has woken. Each wake is longer than the
-   * last and the final one never ends, so this is the escalation counter. */
-  wakes?: number
-  /** §4.2 Echo (systems/echo.ts) — damage taken THIS TICK, keyed by damage kind.
-   * A one-tick ledger, not a running total: the three damage sites accumulate
-   * into it and `echoSystem` folds it into `resist` and DELETES it every tick,
-   * so an Echo that took no damage carries no field and snapshots stay minimal.
-   * Never holds an immobilize kind — see the guards in systems/echo.ts. */
-  echoHits?: Record<string, number>
-  /** §4.3 The Sealkeeper (systems/sealkeeper.ts) — next tick it may shut and
-   * re-lock a doorway. The seal THROTTLE: without it the boss would slam every
-   * door it brushed past on the same tick. Absent until its first seal. */
-  sealAt?: number
-  /** §4.3 The Sealkeeper — how many doorways it has sealed. This is the fight's
-   * legible clock (it drives the pinned meter), not decoration. Omitted at 0 so
-   * a Sealkeeper nobody has met serializes exactly as it spawned. */
-  sealed?: number
-  /** §4.3 The Sealkeeper — latch: it has already cut its wing's grid, a
-   * ONE-TIME act. Omitted until it fires, so the field is absent on every
-   * snapshot taken before the boss is wounded. */
-  gridCut?: boolean
   /** #68 — INERT until a stimulus wakes it: no move, no target, minimal
    * perception (the awakeningSystem flips it false and emits `woke`). A sleeping
    * pod / dormant unit the player can tiptoe past — or trip. */
@@ -381,14 +353,6 @@ export interface Entity {
   flammable?: boolean
   /** A fire hazard occupying this cell — kind 'fire'. `fuel` burns down 1/tick. */
   fire?: { fuel: number }
-  /** STANDING WATER occupying this cell — kind 'fire' (the non-colliding
-   * ground-hazard kind), archetype 'water'. `fuel` dries down 1/tick; while it
-   * lasts it lays the `wet` element on bodies in the cell, quenches any fire
-   * sharing the cell, and CONDUCTS — a shock floods through connected water and
-   * electrocutes everything standing in it (systems/water.ts, interactions.ts).
-   * Absent on everything else, so every pre-existing snapshot round-trips
-   * byte-for-byte (same optional-field discipline as `mods`/`annotations`). */
-  water?: { fuel: number }
   /** Destroyed by shattering a frozen body — an ice gib, not a corpse. */
   shattered?: boolean
   /** A usable object (ATM/vending) that has already dispensed once. */

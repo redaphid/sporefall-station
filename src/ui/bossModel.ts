@@ -8,36 +8,16 @@
 // The bar is LATCHED by the `bossReveal` event rather than by proximity, so it
 // works identically on the host and on a BLE client (events are JSON pass-
 // through over the wire) and never flickers when the boss steps behind a wall.
-//
-// ── Generalised beyond Mireclaw (design/boss-variety.md §3.2) ───────────────
-// This module used to import Mireclaw's two HP fractions from
-// `game/systems/behaviors` and map them onto three hardcoded labels. A second
-// boss would have shown "SUMMONING BROOD" over its own health bar while doing
-// nothing of the kind, and `ui/screens.ts` would have NAMED it "Mireclaw Alpha"
-// (it called `themeDisplayName('boss')` — the archetype, spelled out).
-//
-// Both are now resolved from the REVEALED BOSS'S OWN ARCHETYPE: the phase table
-// comes from `game/data/bosses.ts`, and the display name from a resolver the
-// caller threads in. Mireclaw's on-screen behaviour is unchanged — its registry
-// row carries the same three labels at the same thresholds.
 
-import { bossDef, bossPhaseAt, DEFAULT_BOSS, type BossDef } from '../game/data/bosses'
 import type { Entity } from '../game/entity'
 import type { SimEvent } from '../game/types'
+import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from '../game/systems/behaviors'
 
 /** The subset of RenderView the boss bar reads. */
 export interface BossViewLike {
   entities: readonly Entity[]
   events: readonly SimEvent[]
 }
-
-/**
- * Archetype → display name. Threaded in by the caller rather than imported, so
- * this module stays free of the render/theme layer (the same way `overlay.ts`
- * threads `themeDisplayName`). In the app this IS `themeDisplayName`, so a boss
- * is named by the active theme pack; in tests it is a stub.
- */
-export type BossNameResolver = (archetype: string) => string
 
 /** What to draw. `null` from `bossBar` means: draw nothing at all. */
 export interface BossBar {
@@ -46,24 +26,27 @@ export interface BossBar {
   hpFrac: number
   hp: number
   maxHp: number
-  /** 1-based, counted from the healthiest band. Mireclaw still reads 1/2/3.
-   * A `number`, not a 1|2|3 union: phase COUNT is per-boss data now. */
-  phase: number
+  /** 1 = brooding, 2 = regenerating, 3 = enraged. Mirrors systems/mireclaw. */
+  phase: 1 | 2 | 3
   /** Short, all-caps phase read-out that also TEACHES the counterplay. */
   phaseLabel: string
-  /** This band recolours the bar red. Was `phase === 3`, which silently meant
-   * "Mireclaw's enrage"; it is now a per-boss data flag, so a boss whose
-   * dangerous band is not its last one can still say so. */
-  danger: boolean
 }
 
-/**
- * HP fraction → phase number, against a boss's own table.
- *
- * `def` defaults to the Mireclaw registry row, which is exactly the ladder this
- * function hardcoded before — so every existing caller and test is unaffected.
- */
-export const bossPhase = (hpFrac: number, def: BossDef = DEFAULT_BOSS): number => bossPhaseAt(def, hpFrac).phase
+/** Phase copy. Phase 2 names the counter out loud: the Alpha heals in an
+ * unburnt spore cloud (systems/mireclaw.inSafeCloud), so fire is the answer —
+ * a mechanic that was previously invisible because phase 2 lasted ~0.9s. */
+const PHASE_LABEL: Record<1 | 2 | 3, string> = {
+  1: 'SUMMONING BROOD',
+  2: 'REGENERATING — BURN THE SPORES',
+  3: 'ENRAGED',
+}
+
+/** HP fraction → phase, using the SAME thresholds the sim runs on. */
+export const bossPhase = (hpFrac: number): 1 | 2 | 3 => {
+  if (hpFrac <= MIRECLAW_ENRAGE_FRAC) return 3
+  if (hpFrac <= MIRECLAW_RETREAT_FRAC) return 2
+  return 1
+}
 
 /**
  * Pure reducer for the latched boss id, folded over one frame's events.
@@ -84,22 +67,9 @@ export const latchBossId = (prev: number | undefined, events: readonly SimEvent[
   return id
 }
 
-/**
- * The entrance card text for a reveal event, or undefined if this frame has none.
- *
- * Takes the whole view (not just the events) because the name now depends on
- * WHICH boss was revealed: the event carries an `entityId`, and the archetype
- * behind it decides the name. A reveal for an entity the view has not got —
- * possible on a BLE client whose snapshot has not caught up with the event —
- * degrades to the default boss's themed name rather than showing nothing, since
- * an entrance card with no name is worse than a slightly wrong one.
- */
-export const bossRevealName = (view: BossViewLike, resolveName: BossNameResolver): string | undefined => {
-  for (const ev of view.events) {
-    if (ev.type !== 'bossReveal') continue
-    const boss = view.entities.find((e) => e.id === ev.entityId)
-    return resolveName(boss?.archetype ?? DEFAULT_BOSS.archetype)
-  }
+/** The entrance card text for a reveal event, or undefined if this frame has none. */
+export const bossRevealName = (events: readonly SimEvent[], name: string): string | undefined => {
+  for (const ev of events) if (ev.type === 'bossReveal') return name
   return undefined
 }
 
@@ -108,32 +78,17 @@ export const bossRevealName = (view: BossViewLike, resolveName: BossNameResolver
  * been revealed, when the latched entity has left the world, or when it is dead
  * (the kill is the cue to drop the bar — MISSION COMPLETE takes the screen).
  *
- * Both the NAME and the PHASE TABLE are resolved from the latched boss's own
- * archetype, so a second boss can never wear the first one's identity.
+ * `name` is passed in rather than resolved here so this module stays free of
+ * the render/theme layer (see overlay.ts, which threads `themeDisplayName` the
+ * same way).
  */
-export const bossBar = (
-  view: BossViewLike,
-  bossId: number | undefined,
-  resolveName: BossNameResolver,
-): BossBar | null => {
+export const bossBar = (view: BossViewLike, bossId: number | undefined, name: string): BossBar | null => {
   if (bossId === undefined) return null
   const boss = view.entities.find((e) => e.id === bossId)
   if (!boss || boss.dead || !boss.health || boss.health.max <= 0) return null
   const hp = Math.max(0, boss.health.hp)
   if (hp <= 0) return null
   const hpFrac = Math.min(1, hp / boss.health.max)
-  // An unregistered archetype falls back to the Mireclaw table rather than
-  // throwing: the id came off an event, which on a client is whatever that
-  // phone's bundle decoded, and a wrong label beats a crashed HUD.
-  const def = bossDef(boss.archetype)
-  const { phase, label, danger } = bossPhaseAt(def, hpFrac)
-  return {
-    name: resolveName(boss.archetype),
-    hpFrac,
-    hp,
-    maxHp: boss.health.max,
-    phase,
-    phaseLabel: label,
-    danger,
-  }
+  const phase = bossPhase(hpFrac)
+  return { name, hpFrac, hp, maxHp: boss.health.max, phase, phaseLabel: PHASE_LABEL[phase] }
 }

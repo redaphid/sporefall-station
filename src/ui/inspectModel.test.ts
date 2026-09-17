@@ -334,19 +334,6 @@ describe('buildInfoCard — hazards, mission targets, death, theming, fallback',
     expect(card.tagline).toMatch(/[Bb]urning/)
   })
 
-  it('standing water names the DANGER, not the puddle — the tap-to-inspect telegraph', () => {
-    // Conduction is symmetric (systems/interactions.ts): the puddle you are
-    // standing in electrocutes you too. So the card has to say what the water
-    // will DO, which is one of the three ways a player can read the hazard
-    // before it kills them (the others: the puddle entity, and the blue `wet`
-    // status shader the soaking puts on their body).
-    const p = makeEntity('fire', 'water', 2, 2)
-    p.water = { fuel: 450 }
-    const card = buildInfoCard(p)
-    expect(rowMap(card.rows).Water).toBe('450')
-    expect(card.tagline).toMatch(/conducts/i)
-  })
-
   it('a projectile reads its damage', () => {
     const b = makeEntity('projectile', 'projectile', 2, 2)
     b.projectile = { ownerId: 1, damage: 12, ttl: 30 }

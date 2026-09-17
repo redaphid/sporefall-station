@@ -145,14 +145,8 @@ const autoPickup = (w: World, p: Entity): void => {
  * i.e. exactly the players and NPCs that walk under their own steam and would be
  * entombed by a closing door. The door itself has no `health`, so it never counts
  * as its own occupant. Iterates in array order, so the choice is deterministic.
- *
- * EXPORTED because the safety case is not the player's alone. §4.3's Sealkeeper
- * shuts doors under its own steam (systems/sealkeeper.ts), and an NPC that skips
- * this check entombs whoever is standing in the frame exactly as one press of E
- * once did. Sharing the predicate — rather than re-deriving it — is what keeps
- * the two paths from drifting apart.
  */
-export const doorwayOccupant = (w: World, d: Entity): Entity | undefined => {
+const doorwayOccupant = (w: World, d: Entity): Entity | undefined => {
   const tx = Math.floor(d.pos.x)
   const ty = Math.floor(d.pos.y)
   for (const e of w.entities) {

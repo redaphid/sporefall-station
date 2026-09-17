@@ -332,14 +332,8 @@ const main = async () => {
           await sleep(250)
         }
       }
-      // `video`/`format` rather than `mp4`: with no libx264-capable ffmpeg the
-      // mux is skipped and the raw webm is kept, so `mp4` is deliberately unset
-      // on that path (see muxVideo in lib.mjs). Reading it here would log
-      // `undefined` on exactly the dev boxes the fallback exists for, while
-      // staying green on CI, which installs ffmpeg with apt.
-      const { video, format, bytes, note } = muxVideo('offline-late-join', stageDir)
-      if (note) console.log(`[offline] NOTE: ${note}`)
-      console.log(`[offline] late-join video: ${video} (${(bytes / 1024).toFixed(0)} KB, ${format})`)
+      const { mp4, bytes } = muxVideo('offline-late-join', stageDir)
+      console.log(`[offline] late-join video: ${mp4} (${(bytes / 1024).toFixed(0)} KB)`)
       check(bytes > 20_000, `late-join video is a real recording (${bytes} bytes)`)
     } catch (e) {
       check(false, `late-join video failed to mux: ${e.message}`)

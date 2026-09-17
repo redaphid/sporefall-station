@@ -309,17 +309,6 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
     card.tagline = 'Burning — stay clear'
   }
 
-  // Standing water. The tagline names the DANGER, not the substance: conduction
-  // is symmetric (your own shot into the puddle you are standing in comes back
-  // for you), so the card has to say what the puddle will do rather than that it
-  // is wet. This is one of the three ways a player can tell they are standing in
-  // water before it kills them — the others being the puddle entity itself and
-  // the blue `wet` status shader the soaking puts on their body.
-  if (e.water) {
-    rows.push({ label: 'Water', value: String(e.water.fuel) })
-    card.tagline = 'Standing water — conducts shocks'
-  }
-
   if (e.projectile) {
     rows.push({ label: 'Damage', value: String(e.projectile.damage) })
     card.tagline ??= 'Incoming fire'

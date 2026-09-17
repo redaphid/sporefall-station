@@ -5,13 +5,9 @@ import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
-import { vigilSystem } from './systems/vigil'
-import { echoSystem } from './systems/echo'
-import { sealkeeperSystem } from './systems/sealkeeper'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
-import { waterSystem } from './systems/water'
 import { infectionActive, infectionSystem } from './systems/infection'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
@@ -275,10 +271,6 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   interactionSystem(w, inputs)
   fireSystem(w)
   sporeSystem(w)
-  // Water runs LAST of the three hazard cells, and that ORDER is the rule that
-  // settles fire-meets-water: a fire lit or spread into a puddle this tick is
-  // quenched here, before elementSystem below can charge anyone for it.
-  waterSystem(w)
   // #64 spore contagion — gated OFF by default (systems/infection.ts
   // INFECTION_ENABLED); when active, exposed crew turn into Infected hosts. Runs
   // after sporeSystem/fireSystem so this tick's spore + burning are already set
@@ -288,24 +280,6 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   statusSystem(w)
   statusFxSystem(w)
   mireclawSystem(w) // #69 boss phases: summon / regen-in-cloud / enrage (after HP + spore/fire settle)
-  // §4.1 The Vigil's noise budget. Sits beside mireclawSystem for the same
-  // reason: it reads THIS tick's settled hazards (fire/spore cells placed by
-  // fireSystem/sporeSystem above) and this tick's live projectiles, so the
-  // loudness it measures is the room as it finally ended up, not mid-update.
-  vigilSystem(w)
-  // §4.2 Echo folds this tick's damage ledger into its resist map. MUST run
-  // after every system that can remove hp this tick — combat, projectiles and
-  // above all `elementSystem`, whose DOT tick is one of the three sites that
-  // feed the ledger. Running it earlier would defer each tick's element damage
-  // to the next fold, so fire would appear to teach it a tick late and the
-  // learn/forget decision (exactly one per kind per tick) would race itself.
-  echoSystem(w)
-  // §4.3 The Sealkeeper shuts and re-locks doorways, plugs chokepoints and cuts
-  // the wing's grid. It runs HERE, after interaction/movement have settled, for
-  // one specific reason: it must decide whether a doorway is clear from the
-  // FINAL positions of this tick. Sealing earlier would let a body walk into the
-  // frame after the check and be entombed by a door that had already shut.
-  sealkeeperSystem(w)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so
   // stillness reflects the settled position/velocity), before mission/sweep.

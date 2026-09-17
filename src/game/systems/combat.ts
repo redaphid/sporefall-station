@@ -6,7 +6,6 @@ import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { echoRecordDamage } from './echo'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
@@ -123,13 +122,6 @@ export const applyDamage = (
       //     one now pays less, which is the intended resist fix, not a
       //     regression.
       const dealt = Math.max(0, Math.round(amount * resistMult(target, 'physical')))
-      // §4.2 Echo adapts to what actually hurt it. UNREACHABLE for an Echo by
-      // construction — it carries `resist.frozen: 0`, so `applyImmobilize`
-      // refuses the freeze and there is never a frozen Echo for this branch to
-      // find. The tap is here anyway so that every site computing resisted
-      // damage routes through the one adapt function: if a later change ever
-      // makes this path reachable, it adapts correctly instead of silently not.
-      echoRecordDamage(target, 'physical', dealt)
       shatter(w, target)
       return dealt
     }
@@ -143,12 +135,6 @@ export const applyDamage = (
   amount = Math.round(amount * resistMult(target, 'physical'))
   if (resistsDamage(target, amount)) return null // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
-  // §4.2 Echo learns from IMPACT. Recorded here — after the resist multiply and
-  // after the hp actually came off — so what it learns from is damage DEALT, not
-  // damage intended: adaptation driven by the attacker's raw number would keep
-  // accelerating as the boss got tougher and the equilibrium the decay rate is
-  // tuned against would not exist. Inert for everything that is not an Echo.
-  echoRecordDamage(target, 'physical', amount)
   target.health.iframes = IFRAME_TICKS
   // Stamp the last-hurt tick: passive regen (systems/regen.ts) counts its
   // "unharmed" window from here, so any landed blow (even a clamped 0-damage one)

@@ -13,7 +13,6 @@ import { makeEntity, resistMult, type Entity } from '../entity'
 import { addEntity, type World } from '../world'
 import { kill } from './combat'
 import { addStatus } from './statusFx'
-import { echoRecordDamage } from './echo'
 
 /** Ticks a freshly-lit cell burns before guttering out (~12s at 30tps). */
 const FUEL = 360
@@ -114,10 +113,6 @@ export const elementSystem = (w: World): void => {
       const dmg = Math.round(def.dot * resistMult(e, kind))
       if (dmg <= 0) continue // immune (mult 0) — the status lingers but does no harm
       e.health.hp -= dmg
-      // §4.2 Echo learns from ELEMENTS too — the third and last damage site.
-      // This is what makes fire a genuine second axis: burn it long enough and
-      // the burn stops working, exactly as bullets do. Inert for non-Echoes.
-      echoRecordDamage(e, kind, dmg)
       w.events.push({ type: 'hit', x: e.pos.x, y: e.pos.y, targetId: e.id, amount: dmg })
       if (e.health.hp <= 0) {
         kill(w, e)

@@ -179,43 +179,7 @@ export interface ArtPalette {
  * 1.3) is what makes the extra bulk felt in the fight.
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
-  // Subject Echo (§4.2): 1.6. Bigger than the Alpha's 1.5 but well under the
-  // Vigil's 2.25, and the gap is the point — Echo is a LAB SUBJECT that kept
-  // adapting, not a thing grown monstrous. It reads as a person-shaped body
-  // that has been added to, so it needs to clear the thug decisively while
-  // still looking like something that was once on a gurney.
-  echo: 1.6,
-  // The Sealkeeper (§4.3): 1.9. Heavier than Echo, under the Vigil, because it
-  // is bulkhead HARDWARE that outlived its function — a maintenance unit built
-  // to move doors, so mass is its whole silhouette. It must read as able to
-  // shove a hatch shut on you, which is the one thing the fight is about.
-  sealkeeper: 1.9,
   boss: 1.5,
-  // The Vigil (§4.1): 1.5 APPLIED TWICE. It stands half again over the Alpha
-  // exactly as the Alpha stands half again over the thug — one more rung up the
-  // SAME ladder, which is the only way a second boss reads as bigger without
-  // inventing a second sizing scheme nobody else obeys.
-  //
-  // The number follows from what the creature IS. Per data/bosses.ts and
-  // systems/vigil.ts it is something enormous fused into a reactor bulkhead
-  // that has not moved in years — "more wall than animal", as its ENTITY_COLORS
-  // note below puts it. A thing the player is meant to creep around and NOT
-  // wake has to look immovable at a glance, before the noise meter has taught
-  // anyone anything. At CHAR_PX 48 on TILE_PX 32 this draws ~3.4 tiles tall: it
-  // FILLS a doorway rather than standing in one.
-  //
-  // WITHOUT THIS LINE IT INHERITS 1 — thug size, the game's commonest enemy.
-  // That is not hypothetical. docs/assets/boss-art-brief.md records the Alpha
-  // being pixel-identical to the thug as "the single largest reason the owner
-  // cleared roughly six boss floors and reported never having met a boss". The
-  // Vigil ships with no `char.vigil.*` art either (it draws the per-archetype
-  // procedural body), so scale and colour carry its whole silhouette alone —
-  // precisely the position the Alpha was in when that playtest happened.
-  //
-  // Collision is deliberately NOT scaled: entity radius stays 0.35, so a woken
-  // Vigil still fits the one-tile hatch it has to chase you through. The bulk
-  // is a draw-time lie, and bossArt.test.ts pins that EVERY boss tells it.
-  vigil: 2.25,
 }
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
@@ -248,46 +212,6 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   // pixel-identical problem ARCHETYPE_SCALE exists to paper over. If a kind's art
   // is missing the lookup still falls through to its own procedural set, which is
   // per-archetype distinct — so a partial art drop degrades, it does not break.
-  //
-  // The Vigil. MEMBERSHIP OF THIS MAP IS THE WHOLE POINT: `isCharacterSprite`
-  // tests it, and an archetype missing from here falls past the character path
-  // and draws as the generic procedural blob tinted `entityColors.default`
-  // (0xcccccc) — the "boss spawns white circles" bug, shipped once already.
-  //
-  // Mapped to ITSELF even though no pack ships `char.vigil.*` art yet. That is
-  // the graceful path, not an oversight: `characterSet` falls through to the
-  // PER-ARCHETYPE procedural set, which is distinct per key and tinted by the
-  // ENTITY_COLORS entry above. Aliasing it to 'thug' for a "real" body would
-  // make the game's second boss pixel-identical to its commonest enemy, which is
-  // the single failure the boss art brief exists to stop repeating. When art
-  // lands, `characterSet` prefers the archetype's own set with no change here.
-  //
-  // NB no `char.vigil.*` keys are added to the theme manifests: theme.test.ts
-  // asserts every referenced file exists on disk and that the packs validate
-  // with ZERO warnings, so declaring art that does not exist would fail both.
-  vigil: 'vigil',
-  // §4.2 Echo — same reasoning as the Vigil directly above, same graceful path:
-  // mapped to ITSELF so `isCharacterSprite` is true and it draws as its own
-  // distinct procedural character set tinted by its ENTITY_COLORS entry, rather
-  // than falling past the character path to the grey `entityColors.default`
-  // blob. And emphatically NOT aliased to 'thug' — making the game's third boss
-  // pixel-identical to its commonest enemy is the single failure
-  // docs/assets/boss-art-brief.md exists to stop repeating.
-  //
-  // NB no `char.echo.*` keys go in the theme manifests: none of that art exists,
-  // and theme.test.ts asserts every referenced file is really on disk and that
-  // both packs validate with ZERO warnings.
-  echo: 'echo',
-  // The Sealkeeper, listed for exactly the same reason and with exactly the
-  // same caveat: membership here is what `isCharacterSprite` tests, and no pack
-  // ships `char.sealkeeper.*` art, so it maps to ITSELF and falls through to the
-  // per-archetype procedural set tinted by its ENTITY_COLORS entry. Aliasing it
-  // to 'thug' would hand the game's third boss the body of its commonest enemy.
-  //
-  // NB no `char.sealkeeper.*` keys go in the theme manifests: theme.test.ts
-  // asserts every referenced file exists on disk AND that the packs validate
-  // with ZERO warnings, so declaring art that does not exist fails both.
-  sealkeeper: 'sealkeeper',
 }
 
 /** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
@@ -455,9 +379,7 @@ const WALL_CUT_POLY: Record<number, number[]> = {
   [Tile.WallCutSW]: [0, 0, 1, 0, 1, 1, CUT, 1, 0, 1 - CUT],
 }
 
-/** Exported so `bossArt.test.ts` can assert every registered boss has an entry
- * here (and a distinct one) rather than falling to the 0xcccccc default. */
-export const ENTITY_COLORS: Record<string, number> = {
+const ENTITY_COLORS: Record<string, number> = {
   player: 0x7fd17f,
   thug: 0xd17f7f,
   boss: 0xe0483f,
@@ -467,21 +389,6 @@ export const ENTITY_COLORS: Record<string, number> = {
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
   lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
-  // Cold slate-teal: something fused into the bulkhead for years, more wall than
-  // animal. Deliberately far from the Alpha's hot red (0xe0483f) — the two
-  // bosses must not read as the same creature at a glance, which is the exact
-  // failure docs/assets/boss-art-brief.md records for the Alpha vs the thug.
-  vigil: 0x4e7d8c,
-  // Acid chartreuse: a lab subject that kept the part of the job that involved
-  // adapting — chemical, cultured, wrong for a bog. Chosen for maximum distance
-  // from the other two bosses at a glance (the Alpha's hot red 0xe0483f and the
-  // Vigil's cold slate-teal 0x4e7d8c) and from the desaturated tan of a
-  // civilian (0xd1c47f), which is the nearest hue in the palette.
-  echo: 0xc2e04a,
-  // Oxidised brass-amber: bulkhead hardware, a maintenance thing that outlived
-  // its crew. Kept clear of the Alpha's hot red (0xe0483f) and the Vigil's cold
-  // teal (0x4e7d8c) so the three bosses never read as one creature at a glance.
-  sealkeeper: 0xb8863f,
 
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,

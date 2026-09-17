@@ -207,12 +207,8 @@ export const createScreens = (
 
   const updateBoss = (view: RenderView): void => {
     bossId = latchBossId(bossId, view.events)
-    // `themeDisplayName` is threaded in as a RESOLVER, not called here with a
-    // literal archetype. It used to read `themeDisplayName('boss')`, which named
-    // every boss in the game "Mireclaw Alpha" — the model now asks it for the
-    // archetype of whichever boss was actually revealed.
-    const bar = bossBar(view, bossId, themeDisplayName)
-    const key = bar ? `${bar.name}|${bar.hpFrac.toFixed(3)}|${bar.phase}|${bar.danger}` : ''
+    const bar = bossBar(view, bossId, themeDisplayName('boss'))
+    const key = bar ? `${bar.name}|${bar.hpFrac.toFixed(3)}|${bar.phase}` : ''
     if (key === lastBossKey) return
     lastBossKey = key
     if (!bar) {
@@ -222,12 +218,10 @@ export const createScreens = (
     bossHud.style.display = 'flex'
     bossNameEl.textContent = bar.name.toUpperCase()
     bossHpEl.style.width = `${bar.hpFrac * 100}%`
-    // The boss's DANGER band recolours the bar to red. This was `phase === 3`,
-    // which silently meant "Mireclaw's enrage" and would have mis-coloured any
-    // boss with a different number of phases; it is now a per-boss data flag.
-    bossHpEl.style.background = bar.danger
-      ? 'linear-gradient(#e8746a,#a01f14)'
-      : 'linear-gradient(#c98ae8,#7a34b0)'
+    // Phase 3 recolours the bar to red — the enrage is visible on the HUD, not
+    // just in the boss's speed.
+    bossHpEl.style.background =
+      bar.phase === 3 ? 'linear-gradient(#e8746a,#a01f14)' : 'linear-gradient(#c98ae8,#7a34b0)'
     bossPhaseEl.textContent = bar.phaseLabel
   }
 
@@ -276,7 +270,7 @@ export const createScreens = (
     update(view: RenderView): void {
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
-        const revealed = bossRevealName(view, themeDisplayName)
+        const revealed = bossRevealName(view.events, themeDisplayName('boss'))
         if (revealed !== undefined) showBossCard(revealed)
         for (const ev of view.events) {
           // `stationAlert` lands on the same tick as `missionComplete` and is

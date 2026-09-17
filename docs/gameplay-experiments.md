@@ -110,11 +110,6 @@ fully real system behavior.
 - **Sleep takedown** — chloroform → `status.sleep`; sleeping NPCs skip AI.
 - **Wet + shock chain** — soak a huddle (`wet`), zap one (`shock`) → charge floods
   every connected wet body.
-- **Electrified water** — flood cells (`water.floodCell`), then shock the GROUND
-  (`interactions.shockCell`) → the charge runs the whole connected pool and
-  electrocutes everything standing in it, chained bodies or not. Conduction is
-  SYMMETRIC: a player standing in the puddle they are shooting into goes down
-  with the target. Water also quenches any fire sharing its cell.
 - **Deep freeze** — `freeze(id)` immobilizes a guard (no chase, no alarm).
 
 Add to this catalog as you discover more.

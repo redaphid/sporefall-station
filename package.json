@@ -41,17 +41,14 @@
     "test:e2e:ai": "bash e2e/run-ai.sh",
     "test:e2e:npc-ai": "bash e2e/run-npc-ai.sh",
     "test:e2e:obj": "bash e2e/run-obj.sh",
-    "test:e2e:echo": "bash e2e/run-echo.sh",
     "e2e:features": "bash e2e/run-features.sh",
     "e2e:comm-ui": "bash e2e/run-comm-ui.sh",
     "e2e:ai-inspect": "bash e2e/run-ai-inspection.sh",
     "e2e:feature:combat": "bash e2e/run-features.sh combat",
     "e2e:feature:fire": "bash e2e/run-features.sh fire",
     "gen:fixtures": "tsx scripts/test/gen-serialize-fixtures.mts && tsx scripts/test/gen-feature-fixtures.mts",
-    "e2e:vigil": "bash e2e/run-vigil.sh",
     "e2e:state": "node e2e/state-link-roundtrip.mjs",
-    "e2e:share": "bash e2e/run-share-button.sh",
-    "e2e:sealkeeper": "bash e2e/run-sealkeeper.sh"
+    "e2e:share": "bash e2e/run-share-button.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

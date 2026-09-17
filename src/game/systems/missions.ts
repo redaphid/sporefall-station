@@ -1,4 +1,3 @@
-import { pickBoss, type BossDef } from '../data/bosses'
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { generateLevel } from '../levelgen/generate'
 import { Tile, type Building, type BuildingRole } from '../levelgen/level'
@@ -65,39 +64,6 @@ const spawnDoors = (w: World): void => {
   }
 }
 
-/**
- * Spawn THIS FLOOR'S boss, chosen from the registry, and hand back the def so
- * the mission text can name whatever actually walked in.
- *
- * Both mission generators used to call `spawnNpc(w, 'boss', …)` and then write
- * "Purge the Mireclaw Alpha" as a string literal. The 2026-08-23 playtest
- * recorded the result: six runs, "Purge the Mireclaw Alpha" four times. There
- * was only ever one boss to draw.
- *
- * ⚠️ DETERMINISM — THE FIRST THING TO CHECK WHEN REVIEWING THIS FILE.
- *
- * The choice is drawn from a DEDICATED `boss` fork, never from `w.rng` or from
- * the `mission` stream. `Rng.fork(label)` derives a fresh stream from its
- * parent's SEED (`mulberry32(hashLabel(baseSeed, label))`) and advances the
- * parent's counter by NOTHING — so selecting a boss consumes zero values from
- * the streams that lay out missions, loot and patrols.
- *
- * That is what this whole design rests on. `levelgen/floor1.frozen.test.ts`
- * pins floor-1 checksums, every committed world fixture embeds a
- * `levelChecksum` that `deserializeWorld` refuses to load past, and
- * `missions.property.test.ts` pins an exact steal/assassinate placement table
- * by seed. One extra draw from `w.rng` here would re-roll every one of them.
- *
- * `pickBoss` additionally skips the draw entirely when only one boss is
- * eligible, so the shallow-floor path does not even take a value out of the
- * dedicated fork. See systems/missions.bossSelect.test.ts, which asserts the
- * non-consumption directly rather than trusting this comment.
- */
-const spawnFloorBoss = (w: World, x: number, y: number): { boss: Entity; def: BossDef } => {
-  const def = pickBoss(w.floor, w.rng.fork('boss'))
-  return { boss: spawnNpc(w, def.archetype, x, y), def }
-}
-
 const generateMission = (w: World): void => {
   const rng = w.rng.fork('mission')
   const building = farthestBuilding(w)
@@ -130,14 +96,14 @@ const generateMission = (w: World): void => {
     }
   } else {
     const spot = roomCenter(building)
-    const { boss, def } = spawnFloorBoss(w, spot.x, spot.y)
+    const boss = spawnNpc(w, 'boss', spot.x, spot.y)
     w.mission = {
       template: 'assassinate',
       targetEntityId: boss.id,
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Purge ${def.missionName} in the ${wingName(building.role)}`,
+      description: `Purge the Mireclaw Alpha in the ${wingName(building.role)}`,
     }
   }
 }
@@ -161,14 +127,14 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       bloomTick: w.tick + BLOOM_TICKS,
     }
   } else {
-    const { boss, def } = spawnFloorBoss(w, spot.x, spot.y)
+    const boss = spawnNpc(w, 'boss', spot.x, spot.y)
     w.mission = {
       template: 'infiltrate',
       targetEntityId: boss.id,
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Breach the biolock and purge ${def.missionName} in the ${wingName(building.role)}`,
+      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingName(building.role)}`,
     }
   }
   return true

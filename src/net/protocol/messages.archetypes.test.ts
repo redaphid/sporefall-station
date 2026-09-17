@@ -56,7 +56,7 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
   })
 
   it('registers the fixed archetypes', () => {
-    for (const a of ['player', 'projectile', 'grenade', 'door', 'fire', 'spore', 'water']) {
+    for (const a of ['player', 'projectile', 'grenade', 'door', 'fire', 'spore']) {
       expectRegistered(a, 'hardcoded spawn site')
     }
   })
@@ -113,24 +113,8 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
       archetypes: ARCHETYPES.length,
       mods: WIRE_MODS.length,
     }).toEqual({
-      version: 5,
-      // 95: `water` appended for the water hazard cell (systems/water.ts), on
-      // top of the six boss archetypes (88 -> 94) minted earlier on this same
-      // integration branch.
-      //
-      // VERSION 5 — AND EVERY CHANGE HERE RIDES ONE UNSHIPPED FLAG DAY.
-      // Neither the boss block nor the `water` append bumped the version by
-      // itself, and that was deliberate: v4 was minted on this branch so the
-      // queued PRs cutting from it share a SINGLE flag day instead of each
-      // demanding a reinstall. The bump to 5 came from a different change
-      // entirely -- MsgType.Annotations (see net/types.ts changelog) -- which a
-      // peer genuinely CANNOT ignore, because the framing layer desyncs on an
-      // unknown message type rather than skipping it.
-      //
-      // So nothing in the field has ever spoken 4 or 5, and no peer can
-      // disagree about index 94 or 95. The moment 5 actually ships, the next
-      // append must bump again and add its own changelog line.
-      archetypes: 95,
+      version: 3,
+      archetypes: 88,
       mods: 18,
     })
   })

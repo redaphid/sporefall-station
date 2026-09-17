@@ -113,7 +113,7 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
       archetypes: ARCHETYPES.length,
       mods: WIRE_MODS.length,
     }).toEqual({
-      version: 4,
+      version: 5,
       archetypes: 94,
       mods: 18,
     })

@@ -6,6 +6,7 @@ import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
 import { vigilSystem } from './systems/vigil'
+import { sealkeeperSystem } from './systems/sealkeeper'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
@@ -286,6 +287,12 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   // fireSystem/sporeSystem above) and this tick's live projectiles, so the
   // loudness it measures is the room as it finally ended up, not mid-update.
   vigilSystem(w)
+  // §4.3 The Sealkeeper shuts and re-locks doorways, plugs chokepoints and cuts
+  // the wing's grid. It runs HERE, after interaction/movement have settled, for
+  // one specific reason: it must decide whether a doorway is clear from the
+  // FINAL positions of this tick. Sealing earlier would let a body walk into the
+  // frame after the check and be entombed by a door that had already shut.
+  sealkeeperSystem(w)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so
   // stillness reflects the settled position/velocity), before mission/sweep.

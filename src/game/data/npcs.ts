@@ -320,4 +320,36 @@ export const NPCS: Record<string, NpcDef> = {
     dormant: true,
     resist: { physical: 1.5, frozen: 0, poisoned: 0.5, spore: 0 },
   },
+  // §4.3 THE SEALKEEPER — the boss that fights the architecture.
+  //
+  // It does not want to kill you; it wants the wing sealed, and you are inside
+  // it. So the numbers are tuned AGAINST A PLAYER CAPABILITY, the way the
+  // Alpha's 3.2 was: speed 4.0 is deliberately under PLAYER_SPEED (4.5), so a
+  // party that commits to the chase ALWAYS catches it. That matters because the
+  // fight's thesis is that chasing is the wrong move — the lesson has to be a
+  // choice you regret, not a race the engine rigged.
+  //
+  // `physical: 0.6` makes it tanky rather than immortal: standing and shooting
+  // works eventually, and losing to the seals first is the point.
+  //
+  // `frozen: 0` is NOT flavour — same one-button execute the Alpha carries it
+  // for (combat.applyDamage shatters any frozen NPC outright, and the freeze ray
+  // deals 0 damage while applying `frozen` for 120 ticks). `electrified` is left
+  // alone deliberately, exactly as on the Alpha: the stun gun stays a real tool.
+  //
+  // NO `dormant` / `wakeOn`. The Sealkeeper is awake from the off; what gates it
+  // is the shared boss ENTRANCE latch (systems/bossReveal.ts), so it cannot
+  // spend its seals on an empty wing the way the Alpha once spent its brood.
+  sealkeeper: {
+    archetype: 'sealkeeper',
+    faction: 'gang',
+    hp: 300,
+    speed: 4.0,
+    weapon: 'claws',
+    sightRange: 11,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'sealkeeper',
+    resist: { physical: 0.6, frozen: 0, poisoned: 0.5, spore: 0 },
+  },
 }

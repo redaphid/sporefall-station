@@ -129,11 +129,36 @@ const VIGIL: BossDef = {
   ],
 }
 
+// ── The Sealkeeper (§4.3) — the boss that fights the architecture ───────────
+// Player verb: DEMOLISH. It barely engages; it retreats, shuts and re-locks
+// doors behind it, plugs the chokepoints with barricades, and finally kills the
+// wing's grid. Your grenades stop being a weapon and become a TOOL.
+//
+// The labels name the COUNTERPLAY rather than the monster's mood, because this
+// is the one fight where the obvious action is the losing one: standing still
+// and shooting is how you end up sealed in a dead room. "BLOW THE DOORS" has to
+// be on screen before the player has worked that out for themselves.
+//
+// The `danger` band is the LAST one, and it is earned: by then the grid is cut,
+// the wing's sleepers are awake, and the party is fighting through its own
+// exits. Contrast the Vigil, which deliberately has no danger band at all.
+const SEALKEEPER: BossDef = {
+  archetype: 'sealkeeper',
+  name: 'The Sealkeeper',
+  missionName: 'the Sealkeeper',
+  minFloor: 2,
+  phases: [
+    { atOrBelow: 0.25, label: 'LAST BULKHEAD — BREACH AND FINISH IT', danger: true },
+    { atOrBelow: 0.5, label: 'GRID CUT — THE WING IS AWAKE' },
+    { atOrBelow: 1, label: 'SEALING THE WING — BLOW THE DOORS' },
+  ],
+}
+
 /**
  * Every boss the game can field, keyed by archetype.
  *
- * APPEND a row to add a boss. The four still on the design doc's list (Echo,
- * the Sealkeeper, Mirefather, the Hollow Choir) are NOT here yet: a row here
+ * APPEND a row to add a boss. The three still on the design doc's list (Echo,
+ * Mirefather, the Hollow Choir) are NOT here yet: a row here
  * makes a boss selectable by `pickBoss`, so registering one before its NPCS row
  * and system exist would spawn an archetype with no definition. Their wire
  * indices are already reserved in `net/protocol/messages.ts` — that list is
@@ -142,6 +167,7 @@ const VIGIL: BossDef = {
 export const BOSSES: Record<string, BossDef> = {
   [MIRECLAW.archetype]: MIRECLAW,
   [VIGIL.archetype]: VIGIL,
+  [SEALKEEPER.archetype]: SEALKEEPER,
 }
 
 /** The reference boss — the fallback whenever an archetype is unknown, so a

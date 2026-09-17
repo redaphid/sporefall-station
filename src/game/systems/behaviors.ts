@@ -56,6 +56,7 @@ import {
 } from './goals'
 import { infectionActive } from './infection'
 import { spawnObject } from './objects'
+import { SEAL_SEEK_RANGE, isSealable, sealStandoff } from './sealkeeper'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 import { strongestStimulus } from './stimulus'
 import { vlen } from '../simMath'
@@ -866,6 +867,45 @@ const retreatToSpore: Consideration = (w, e) => {
   return [{ code: RETREAT, score: 6, tier: TIER_PANIC, at: { x: spore.pos.x, y: spore.pos.y } }]
 }
 
+// ── §4.3 The Sealkeeper: go shut the doorway between me and the party ──────
+//
+// The one genuinely new steer this boss needed. Everything else it does is
+// either a shipped consideration (`fortify`, `threat`) or lives in its own
+// system — but "retreat THROUGH the next doorway and stand on the far side of
+// it" is a movement intent nothing in the game expressed.
+//
+// TIER_PANIC, like every other boss steer, so nothing can outbid it: the
+// Sealkeeper abandons a fight it is winning to go shut a door, which is the
+// whole characterisation. Being shot at must not talk it out of its job.
+//
+// It reuses the RETREAT goal code rather than minting a new one. `ai.applyGoal`
+// already routes RETREAT to "walk to a world-derived point and settle on
+// arrival", which is exactly the behaviour wanted — a new code would have meant
+// editing the shared goal switch in ai.ts for no behavioural difference.
+const SEAL_SCORE = 12
+
+const sealLane: Consideration = (w, e) => {
+  const p = nearestPlayer(w, e)
+  if (!p) return []
+  let best: Entity | undefined
+  let bestD = SEAL_SEEK_RANGE
+  for (const d of w.entities) {
+    // Steered by the SAME predicate the act uses (systems/sealkeeper.ts), so it
+    // can never walk to a doorway it will then refuse to touch.
+    if (!isSealable(d)) continue
+    const toBoss = dist2d(d.pos.x, d.pos.y, e.pos.x, e.pos.y)
+    if (toBoss > bestD) continue
+    // "Between me and the party", made cheap and total: only a doorway it
+    // reaches BEFORE they do. Without this it would run PAST the party to slam a
+    // door behind them, which seals them in with the exit rather than away from it.
+    if (dist2d(d.pos.x, d.pos.y, p.pos.x, p.pos.y) <= toBoss) continue
+    bestD = toBoss
+    best = d
+  }
+  if (!best) return []
+  return [{ code: RETREAT, score: SEAL_SCORE, tier: TIER_PANIC, at: sealStandoff(best, p.pos) }]
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -884,6 +924,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   stalkWeakest,
   enrage,
   retreatToSpore,
+  sealLane,
   hunt,
   alertGuards,
   pursueMemory,
@@ -957,6 +998,25 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     // second place for the wake state to be interpreted.
     about: '§4.1 The Vigil — inert until NOISE wakes it (never a hit); awake it simply hunts',
     considerations: ['threat', 'hunt', 'wander'],
+  },
+  sealkeeper: {
+    // §4.3 The Sealkeeper. The ORDER of this list is the design.
+    //
+    // `sealLane` is PANIC-tier, so sealing always wins while there is a doorway
+    // worth sealing. `threat` (TIER_THREAT) is what is left when there is not —
+    // cornered with nothing to shut, it turns and fights rather than standing
+    // there. `fortify` is the shipped barricade-builder and sits at TIER_AMBIENT,
+    // so it only runs once the party is OUT OF SIGHT: it has fled through a door,
+    // shut it, and now plugs the chokepoint behind it. That is precisely the
+    // fantasy, and it falls out of the tier ladder rather than being scripted.
+    //
+    // `hunt` is DELIBERATELY ABSENT, and this is the one line to re-check if the
+    // boss ever stops barricading. `hunt` scores at TIER_MEMORY, which outranks
+    // TIER_AMBIENT — so a Sealkeeper that remembered a target would chase the
+    // memory forever and never lay a single barricade. It also simply is not
+    // this boss: it does not pursue you, it locks up and leaves.
+    about: '§4.3 The Sealkeeper — seals the wing behind it: doorways first, then barricades; barely fights',
+    considerations: ['sealLane', 'threat', 'fortify', 'wander'],
   },
   barricader: {
     about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',

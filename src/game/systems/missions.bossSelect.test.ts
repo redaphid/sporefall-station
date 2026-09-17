@@ -155,7 +155,7 @@ describe('variety — the playtest complaint this feature answers', () => {
         if (boss) seen.add(boss.archetype)
       }
     }
-    expect([...seen].sort()).toEqual(['boss', 'vigil'])
+    expect([...seen].sort()).toEqual(['boss', 'sealkeeper', 'vigil'])
   })
 
   it('the same seed and floor always field the same boss', () => {

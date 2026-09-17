@@ -230,6 +230,16 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   // asserts every referenced file exists on disk and that the packs validate
   // with ZERO warnings, so declaring art that does not exist would fail both.
   vigil: 'vigil',
+  // The Sealkeeper, listed for exactly the same reason and with exactly the
+  // same caveat: membership here is what `isCharacterSprite` tests, and no pack
+  // ships `char.sealkeeper.*` art, so it maps to ITSELF and falls through to the
+  // per-archetype procedural set tinted by its ENTITY_COLORS entry. Aliasing it
+  // to 'thug' would hand the game's third boss the body of its commonest enemy.
+  //
+  // NB no `char.sealkeeper.*` keys go in the theme manifests: theme.test.ts
+  // asserts every referenced file exists on disk AND that the packs validate
+  // with ZERO warnings, so declaring art that does not exist fails both.
+  sealkeeper: 'sealkeeper',
 }
 
 /** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
@@ -412,6 +422,10 @@ const ENTITY_COLORS: Record<string, number> = {
   // bosses must not read as the same creature at a glance, which is the exact
   // failure docs/assets/boss-art-brief.md records for the Alpha vs the thug.
   vigil: 0x4e7d8c,
+  // Oxidised brass-amber: bulkhead hardware, a maintenance thing that outlived
+  // its crew. Kept clear of the Alpha's hot red (0xe0483f) and the Vigil's cold
+  // teal (0x4e7d8c) so the three bosses never read as one creature at a glance.
+  sealkeeper: 0xb8863f,
 
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,

@@ -3,7 +3,7 @@ import { generateLevel } from '../game/levelgen/generate'
 import type { Level } from '../game/levelgen/level'
 import { isSolidTile } from '../game/levelgen/level'
 import { moveAndCollide } from '../game/systems/movement'
-import { SIM_DT, type InputCmd, type SimEvent } from '../game/types'
+import { SIM_DT, type Annotation, type InputCmd, type SimEvent } from '../game/types'
 import type { InputSource } from '../input/input'
 import { SendQueue } from '../net/channel/sendQueue'
 import { decodeJson, encodeJson } from '../net/framing/codec'
@@ -12,6 +12,8 @@ import {
   applyWireEntity,
   decodeSnapshot,
   encodeInput,
+  fromWireAnnotations,
+  type AnnotationsMsg,
   type EventsMsg,
   type GameStartMsg,
   type GoMsg,
@@ -62,6 +64,9 @@ const SNAP_DIST = 2.5
  * walking off through a wall forever".
  */
 const PROJECT_CAP_TICKS = 4.5
+
+/** Shared empty set, so a client with nothing to draw allocates nothing per frame. */
+const NO_ANNOTATIONS: readonly Annotation[] = []
 
 /**
  * Is `tick` strictly newer than `prev` on the u32 wire counter?
@@ -239,6 +244,15 @@ export class NetClientSession implements Session {
   private lastAckedSeq = 0
   /** Our OWN player's authoritative inventory, streamed by the host on change. */
   private localInv?: InventoryMsg
+  /**
+   * The host's inert on-screen annotation set, and the floor the host tagged it
+   * with. PRESENTATION ONLY: nothing here is simulated, predicted, reconciled or
+   * read by any other code path — it is handed to the overlay and nowhere else,
+   * exactly as on the host. A client that receives these can therefore not
+   * desync because of them.
+   */
+  private annotations: readonly Annotation[] = NO_ANNOTATIONS
+  private annotationsFloor = -1
   private eventsOut: SimEvent[] = []
   private state: StateMsg = {
     floor: 1,
@@ -464,6 +478,11 @@ export class NetClientSession implements Session {
         // for the whole session. Unbound until Go says otherwise.
         this.selfId = -1
         this.localInv = undefined // fresh run: wait for the host's authoritative inventory
+        // Annotations belong to the run that authored them. A fresh start or a
+        // "play again" wipes the overlay until the host's set arrives — and the
+        // host re-baselines its own change-gate on restart, so the two agree.
+        this.annotations = NO_ANNOTATIONS
+        this.annotationsFloor = -1
         // "Play again" rebuilds the host's world from scratch (netHost.restart →
         // createWorld), so its tick counter goes back to 0. Re-baseline, or every
         // snapshot of the new run would look older than the last one of the old
@@ -509,6 +528,19 @@ export class NetClientSession implements Session {
         const inv = decodeJson<InventoryMsg>(msg)
         // The host only ships us our own, but guard the slot defensively.
         if (inv.slot === this.slot) this.localInv = inv
+        break
+      }
+      case MsgType.Annotations: {
+        const ann = decodeJson<AnnotationsMsg>(msg)
+        // FULL REPLACEMENT — the host sends the whole (capped) set on change, so
+        // removal needs no separate message and a client can never accumulate
+        // marks the host has dropped. Re-validated on the way in: the bytes came
+        // off a radio (see fromWireAnnotations).
+        this.annotations = fromWireAnnotations(ann.annotations)
+        // TAG, don't gate. A set for a floor we have not reached YET is kept and
+        // starts drawing when we get there: the host sends on change, so a set
+        // discarded for arriving early would never be re-sent.
+        this.annotationsFloor = typeof ann.floor === 'number' ? ann.floor : this.floor
         break
       }
     }
@@ -770,6 +802,11 @@ export class NetClientSession implements Session {
       mode: this.state.mode,
       revivesLeft: this.state.revivesLeft,
       self: this.self,
+      // Drawn only while the set belongs to the floor underfoot. A client learns
+      // about a floor change from an event, a State or a snapshot — three
+      // different moments — so comparing tags is the only way the overlay can
+      // never show the previous floor's furniture over this floor's map.
+      annotations: this.annotationsFloor === this.floor ? this.annotations : NO_ANNOTATIONS,
     }
   }
 }

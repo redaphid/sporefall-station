@@ -29,7 +29,13 @@ export interface RenderView {
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
   /** Inert on-screen annotations to draw over the scene (see game/types.ts).
-   * Empty/omitted on sessions that don't surface them (clients mirror host state). */
+   *
+   * Host truth, mirrored by clients: the host broadcasts the set on CHANGE
+   * (`MsgType.Annotations`, net/protocol/messages.ts `AnnotationsMsg`) and a
+   * client surfaces exactly what it was sent, so the overlay draws the same
+   * marks on every phone. That is load-bearing for any system that talks to the
+   * player this way — The Vigil's noise meter is only fair if the joiner can
+   * read it too. Still OPTIONAL: a session that surfaces none simply omits it. */
   annotations?: readonly Annotation[]
 }
 

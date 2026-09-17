@@ -320,4 +320,50 @@ export const NPCS: Record<string, NpcDef> = {
     dormant: true,
     resist: { physical: 1.5, frozen: 0, poisoned: 0.5, spore: 0 },
   },
+
+  // ── Echo — the boss that learns (design §4.2) ──────────────────────────────
+  // Player verb: NEVER HIT IT THE SAME WAY TWICE. A research subject that kept
+  // the part of the job that involved adapting. Its `resist` table below is a
+  // STARTING POSITION, not a fixed profile: `systems/echo.ts` mutates it at
+  // runtime, lowering the multiplier for whatever kind just hurt it and letting
+  // unused kinds decay back here. Hold one trigger and your damage collapses;
+  // rotate and it never settles.
+  //
+  // ⚠️ `frozen: 0` IS NOT FLAVOUR AND IS NOT OPTIONAL — see `boss` above for the
+  // full reasoning. `combat.applyDamage` executes any frozen NPC outright via
+  // `shatter()` regardless of hp, and the freeze ray deals 0 damage while
+  // applying `frozen` for 120 ticks. Immunity (honoured by
+  // `statusFx.applyImmobilize`) is what stops one tap deleting the whole fight.
+  //
+  // For Echo specifically that immunity has to survive an ADAPTIVE resist map,
+  // which is a sharper problem than it is for any other boss: an adaptation that
+  // moved this key in EITHER direction — learning it down, or decaying it back
+  // up toward some baseline — re-opens the exploit. `systems/echo.ts` keeps
+  // `frozen` out of its allow-list entirely and refuses every immobilize key at
+  // its single resist writer, so this 0 is a constant for the whole fight.
+  //
+  // Deliberately NO `electrified` key, matching the Alpha: that status carries
+  // no execute rule, so the stun gun stays a real tool against this boss.
+  //
+  // The other four keys open at 1 (neutral) BECAUSE the fight is the movement
+  // away from them. A boss that starts resistant would read as "armoured" and
+  // the drop would be invisible; starting at parity is what makes the first
+  // clip of ammo feel normal and the third feel wrong. They are pinned against
+  // `ECHO_BASE_RESIST` by systems/echo.test.ts so sim and data cannot drift.
+  //
+  // NB `spore: 1` breaks with the two bog-native bosses (both `spore: 0`). Echo
+  // is a lab subject, not a swamp thing — and it is the only reason a
+  // spore-flooded room is a third damage axis rather than scenery.
+  echo: {
+    archetype: 'echo',
+    faction: 'gang',
+    hp: 300,
+    speed: 3.4, // under PLAYER_SPEED 4.5, and it has no enrage burst: always outrunnable
+    weapon: 'claws',
+    sightRange: 10,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'echo',
+    resist: { physical: 1, burning: 1, poisoned: 1, spore: 1, frozen: 0 },
+  },
 }

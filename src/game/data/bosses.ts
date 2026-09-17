@@ -129,19 +129,59 @@ const VIGIL: BossDef = {
   ],
 }
 
+// ── Echo (§4.2) — the boss that learns ──────────────────────────────────────
+// Player verb: NEVER HIT IT THE SAME WAY TWICE. Its `resist` map mutates at
+// runtime (systems/echo.ts): each damage kind it takes raises its resistance to
+// that kind, and unused kinds decay back down.
+//
+// The labels TEACH THE VERB, because this is the boss most likely to be misread
+// as a bug. "My gun stopped working" is the single worst thing a player can
+// conclude, and they will conclude it unless the game says otherwise in the one
+// place they are already looking — the health bar they are trying to empty. So
+// neither label narrates hp; both name the rule. The live per-kind detail (which
+// kind has gone stale, and by how much) is too wide for a phase line and lives
+// on the annotation meter systems/echo.ts pins to its body.
+//
+// `danger` on the wounded band is honest here in a way it is not for the Vigil:
+// Echo has learned the most by the time it is nearly dead, so its last quarter
+// genuinely is its hardest — the red bar means "it has your number now".
+//
+// NAMING. Three separate tests constrain these strings and it is worth stating
+// why none of them can be satisfied by the obvious answer, "Echo":
+//   - `bosses.test.ts` rejects a `name` equal to its archetype id, so `name`
+//     cannot be 'Echo' (archetype 'echo');
+//   - `render/theme.test.ts` rejects a themed name equal to `prettyArchetype`,
+//     which for 'echo' is also 'Echo', so the manifests cannot say it either;
+//   - the mission line is `Purge ${missionName} in the …`, so a `missionName` of
+//     'the Echo' would read "Purge the Echo" — the exact article bug the
+//     separate `missionName` field exists to prevent.
+// "Subject Echo" satisfies all three and reads correctly mid-sentence with no
+// article at all: "Purge Subject Echo in the reactor core".
+const ECHO: BossDef = {
+  archetype: 'echo',
+  name: 'Subject Echo',
+  missionName: 'Subject Echo',
+  minFloor: 2,
+  phases: [
+    { atOrBelow: 0.35, label: 'IT HAS YOUR NUMBER — SWITCH AGAIN', danger: true },
+    { atOrBelow: 1, label: 'ADAPTS TO REPEATED DAMAGE — ROTATE' },
+  ],
+}
+
 /**
  * Every boss the game can field, keyed by archetype.
  *
- * APPEND a row to add a boss. The four still on the design doc's list (Echo,
- * the Sealkeeper, Mirefather, the Hollow Choir) are NOT here yet: a row here
- * makes a boss selectable by `pickBoss`, so registering one before its NPCS row
- * and system exist would spawn an archetype with no definition. Their wire
- * indices are already reserved in `net/protocol/messages.ts` — that list is
- * append-only and must be booked ahead; this one must not be.
+ * APPEND a row to add a boss. The three still on the design doc's list (the
+ * Sealkeeper, Mirefather, the Hollow Choir) are NOT here yet: a row here makes a
+ * boss selectable by `pickBoss`, so registering one before its NPCS row and
+ * system exist would spawn an archetype with no definition. Their wire indices
+ * are already reserved in `net/protocol/messages.ts` — that list is append-only
+ * and must be booked ahead; this one must not be.
  */
 export const BOSSES: Record<string, BossDef> = {
   [MIRECLAW.archetype]: MIRECLAW,
   [VIGIL.archetype]: VIGIL,
+  [ECHO.archetype]: ECHO,
 }
 
 /** The reference boss — the fallback whenever an archetype is unknown, so a

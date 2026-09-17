@@ -129,6 +129,7 @@ describe('Mireclaw parity — the generalisation must change nothing on screen',
   it('isBoss recognises registered archetypes only', () => {
     expect(isBoss('boss')).toBe(true)
     expect(isBoss('vigil')).toBe(true)
+    expect(isBoss('echo')).toBe(true)
     expect(isBoss('thug')).toBe(false)
   })
 })
@@ -141,8 +142,8 @@ describe('per-floor eligibility and selection', () => {
   })
 
   it('deeper floors field the wider pool', () => {
-    expect(eligibleBosses(2).map((b) => b.archetype)).toEqual(['boss', 'vigil'])
-    expect(eligibleBosses(9).map((b) => b.archetype)).toEqual(['boss', 'vigil'])
+    expect(eligibleBosses(2).map((b) => b.archetype)).toEqual(['boss', 'vigil', 'echo'])
+    expect(eligibleBosses(9).map((b) => b.archetype)).toEqual(['boss', 'vigil', 'echo'])
   })
 
   it('draws NOTHING from the stream when only one boss is eligible', () => {
@@ -172,7 +173,7 @@ describe('per-floor eligibility and selection', () => {
     // every other test in this file.
     const seen = new Set<string>()
     for (let seed = 1; seed <= 200; seed++) seen.add(pickBoss(5, mulberry32(seed).fork('boss')).archetype)
-    expect([...seen].sort()).toEqual(['boss', 'vigil'])
+    expect([...seen].sort()).toEqual(['boss', 'echo', 'vigil'])
   })
 
   it('never returns an unspawnable boss, at any floor', () => {

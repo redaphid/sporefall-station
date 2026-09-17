@@ -1,8 +1,13 @@
 // @ts-check
 // §4.1 THE VIGIL proof: drive the `vigil` scenario + script in a real browser
-// and assert the whole fight from LIVE world state — it is VULNERABLE while
-// dormant and being hit does not wake it; being LOUD does, and awake it is
-// near-immune; backing off lets it SETTLE; and each wake outlasts the last.
+// and assert the whole fight from LIVE world state — PACED pistol fire hurts it
+// while it sleeps and never wakes it; a HELD TRIGGER does, and awake it is
+// near-immune; backing off lets it SETTLE; the grenade wakes it outright; and
+// each wake outlasts the last.
+//
+// The player carries the starter pistol and nothing else, because that is all
+// any player can carry. The fight's verb is CADENCE — the same gun fired two
+// different ways — so the clip plays it both ways and lets the boss answer.
 //
 // WHY THIS ONE NEEDS A VIDEO MORE THAN MOST. The Vigil's verb is invisible:
 // nothing on screen moves differently when the fight is going right, because
@@ -29,11 +34,14 @@ const SIZE = { width: 1280, height: 720 }
 // file is plain .mjs and the timeline is TypeScript; src/game/vigilShowcase.test.ts
 // asserts the same beats against the real array, so a drift between the two
 // fails there.
-const SEGMENTS = [40, 26, 90, 1, 34, 90, 60, 60, 1, 30, 60, 280, 40]
+// The paced beat is five single-tick trigger pulls 45 ticks apart, which is why
+// the first eleven entries look like that: `paced(5, 45)` in the TypeScript.
+const SEGMENTS = [40, 1, 44, 1, 44, 1, 44, 1, 44, 1, 44, 160, 90, 60, 90, 20, 1, 60, 60, 300, 40]
 const at = (n) => SEGMENTS.slice(0, n).reduce((a, b) => a + b, 0)
-const BEAT1 = { from: at(2), to: at(3) } // knife vs a DORMANT boss
-const BEAT2 = { from: at(5), to: at(6) } // the same knife vs an AWAKE boss
-const GRENADE1 = at(3)
+const PACED = { from: at(1), to: at(11) } // five SPACED shots vs a DORMANT boss
+const SPRAY = { from: at(11), to: at(12) } // the trigger held down — this is what wakes it
+const AWAKE = { from: at(12), to: at(13) } // the same held trigger vs an AWAKE boss
+const GRENADE = at(16)
 const TOTAL = at(SEGMENTS.length)
 
 // systems/vigil.ts — the numbers the fight runs on, pinned so a retune that
@@ -137,8 +145,8 @@ const main = async () => {
     revealedEarly: false,
     dormantAtStart: false,
     hpAt: new Map(), // tick -> hp, sampled every poll
-    wokeDuringBeat1: false,
-    damagedDuringBeat1: false,
+    wokeDuringPaced: false,
+    damagedDuringPaced: false,
     wakes: [], // tick of each dormant→awake transition
     settles: [], // tick of each awake→dormant transition
     resistAsleep: new Set(),
@@ -159,11 +167,11 @@ const main = async () => {
   }
   const SHOTS = [
     [30, 'dormant-and-revealed'],
-    [at(3) - 5, 'knifing-it-in-its-sleep'],
-    [at(5) - 2, 'the-grenade-wakes-it'],
-    [at(6) - 5, 'the-same-knife-bounces-off'],
-    [at(8) - 5, 'backed-off-and-settled'],
-    [at(10) + 10, 'woken-a-second-time'],
+    [at(11) - 5, 'paced-fire-lands-while-it-sleeps'],
+    [at(12) - 2, 'the-held-trigger-woke-it'],
+    [at(13) - 5, 'the-same-gun-bounces-off'],
+    [at(15) - 5, 'backed-off-and-settled'],
+    [at(17) + 40, 'the-grenade-woke-it-again'],
     [TOTAL - 10, 'settled-again-after-a-longer-wake'],
   ]
   let nextShot = 0
@@ -186,8 +194,8 @@ const main = async () => {
     if (s.boss.awake && !wasAwake) saw.wakes.push(tick)
     if (!s.boss.awake && wasAwake) saw.settles.push(tick)
     wasAwake = s.boss.awake
-    if (tick <= BEAT1.to && s.boss.awake) saw.wokeDuringBeat1 = true
-    if (tick <= BEAT1.to && s.boss.hp < s.boss.max) saw.damagedDuringBeat1 = true
+    if (tick <= PACED.to && s.boss.awake) saw.wokeDuringPaced = true
+    if (tick <= PACED.to && s.boss.hp < s.boss.max) saw.damagedDuringPaced = true
     if (s.meter && s.meter.includes('ASLEEP')) saw.meterAsleep = true
     if (s.meter && s.meter.includes('|')) saw.meterFilling = true
     if (s.meter && s.meter.includes('AWAKE')) saw.meterAwake = true
@@ -207,7 +215,9 @@ const main = async () => {
   }
   await sleep(400)
 
-  // Damage across the two equal-length knife beats: the resist swap, measured.
+  // Damage across the two firing beats: the resist swap, measured. The AWAKE
+  // beat holds the trigger and so lands MORE shots than the paced beat does —
+  // and still does a fraction of the damage. Only the resist swap does that.
   const hpNear = (t) => {
     let best
     let bestD = Infinity
@@ -220,20 +230,23 @@ const main = async () => {
     }
     return best
   }
-  const beat1Damage = hpNear(BEAT1.from) - hpNear(BEAT1.to)
-  const beat2Damage = hpNear(BEAT2.from) - hpNear(BEAT2.to)
-  log('beat damage — dormant:', beat1Damage, 'awake:', beat2Damage)
+  const pacedDamage = hpNear(PACED.from) - hpNear(PACED.to)
+  const awakeDamage = hpNear(AWAKE.from) - hpNear(AWAKE.to)
+  log('beat damage — paced/dormant:', pacedDamage, 'held/awake:', awakeDamage)
   log('wakes at', saw.wakes, 'settles at', saw.settles, 'noise peak', saw.noisePeak.toFixed(1))
 
   check(saw.revealedEarly, 'the Vigil announced itself on sight (the entrance fired)')
   check(saw.dormantAtStart, 'it starts DORMANT — the fight opens with it asleep')
-  check(saw.damagedDuringBeat1, 'the knife really hurt it while it slept')
-  check(beat1Damage > 0, `damage landed on the dormant boss (${beat1Damage} hp)`)
-  check(!saw.wokeDuringBeat1, 'being hit that hard did NOT wake it — damage is silent to it')
-  check(saw.wakes.length >= 1, 'the GRENADE woke it — loudness, not injury')
-  check(saw.wakes.length >= 1 && saw.wakes[0] > GRENADE1, `it woke AFTER the grenade (tick ${saw.wakes[0]}, grenade ${GRENADE1})`)
+  check(saw.damagedDuringPaced, 'paced pistol fire really hurt it while it slept')
+  check(pacedDamage > 0, `damage landed on the dormant boss (${pacedDamage} hp)`)
+  check(!saw.wokeDuringPaced, 'five SPACED shots did NOT wake it — the cadence is the counterplay')
+  check(saw.wakes.length >= 1, 'HOLDING THE TRIGGER woke it — cadence, not injury')
+  check(
+    saw.wakes.length >= 1 && saw.wakes[0] > SPRAY.from && saw.wakes[0] <= SPRAY.to,
+    `it woke DURING the held trigger (tick ${saw.wakes[0]}, window ${SPRAY.from}–${SPRAY.to})`,
+  )
   check(saw.noisePeak > 0, `the noise meter visibly filled (peak ${saw.noisePeak.toFixed(1)})`)
-  check(beat2Damage >= 0 && beat1Damage > beat2Damage * 5, `awake it is near-immune: ${beat1Damage} hp asleep vs ${beat2Damage} awake`)
+  check(awakeDamage >= 0 && pacedDamage > awakeDamage * 5, `awake it is near-immune: ${pacedDamage} hp asleep vs ${awakeDamage} awake`)
   check([...saw.resistAsleep].every((r) => r === ASLEEP_RESIST), `dormant resist is ${ASLEEP_RESIST} (saw ${[...saw.resistAsleep]})`)
   check(
     saw.resistAwake.size > 0 && [...saw.resistAwake].every((r) => r === AWAKE_RESIST),
@@ -244,7 +257,11 @@ const main = async () => {
     const first = saw.settles[0] - saw.wakes[0]
     check(Math.abs(first - WAKE_TICKS[0]) <= 8, `the first wake ran ~${WAKE_TICKS[0]} ticks (measured ${first})`)
   }
-  check(saw.wakes.length >= 2, 'a second noise woke it again')
+  check(saw.wakes.length >= 2, 'the GRENADE woke it a second time — the loud option is unchanged')
+  check(
+    saw.wakes.length >= 2 && saw.wakes[1] > GRENADE,
+    `the second wake followed the grenade (tick ${saw.wakes[1]}, grenade ${GRENADE})`,
+  )
   if (saw.wakes.length >= 2 && saw.settles.length >= 2) {
     const first = saw.settles[0] - saw.wakes[0]
     const second = saw.settles[1] - saw.wakes[1]
@@ -269,7 +286,7 @@ const main = async () => {
     log('FAILURES:', failures.join('; '))
     process.exit(1)
   }
-  log('SUCCESS: vulnerable asleep · loud wakes it · quiet settles it · each wake longer — all verified live')
+  log('SUCCESS: paced fire lands · a held trigger wakes it · quiet settles it · each wake longer — all verified live')
 }
 
 main().catch((e) => {

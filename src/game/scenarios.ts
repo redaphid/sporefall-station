@@ -4,6 +4,7 @@
 import { WEAPONS } from './data/items'
 import { makeEntity, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
+import { PLAYER_START_WEAPON, starterLoadout } from './player'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { freeze, wet } from './systems/interactions'
@@ -625,16 +626,26 @@ const setupNpcDeliberate = (w: World): void => {
 }
 
 // ── §4.1 THE VIGIL showcase — the boss whose verb is invisible ──────────────
-// A bare arena, one Vigil, one player holding a KNIFE. That casting IS the
-// scenario: the knife is the only silent damage in the game, and the grenade
-// special (free, no inventory, 8s cooldown) is the loudest thing a player
-// carries — so one scripted player demonstrates both halves of the noise budget
-// without ever switching weapons, which the input timeline cannot express.
+// A bare arena, one Vigil, and a player carrying EXACTLY WHAT THE GAME GIVES
+// THEM: the starter pistol, built by `starterLoadout(PLAYER_START_WEAPON)` — the
+// same call `spawnPlayer` makes — plus the grenade special (free, no inventory,
+// 8s cooldown). Both halves of the noise budget are reachable from one timeline,
+// because the difference between them is CADENCE rather than a weapon switch the
+// input model cannot express.
 //
-// Backs the `vigil` script + e2e/vigil.mjs, which assert the four claims from
-// LIVE world state: it is vulnerable while dormant and being hit does NOT wake
-// it; being LOUD does, and awake it is near-immune; backing off settles it;
-// each wake outlasts the last.
+// THE ARMING IS THE POINT, and it is why this scenario is written this way. It
+// used to hand the player a KNIFE by direct assignment into `loadout`, which no
+// reachable input sequence can produce: `interaction.ts` refuses to let any
+// melee or ranged item enter a player's inventory, and there is no drop/holster
+// command. So every test that passed here passed against a world the game cannot
+// build, and the boss shipped UNWINNABLE underneath them — its counterplay was a
+// weapon the player could never hold. Never hand-assign a weapon in a scenario;
+// go through the door the player goes through.
+//
+// Backs the `vigil` script + e2e/vigil.mjs, which assert the fight from LIVE
+// world state: paced fire hurts it while it sleeps and never wakes it; spraying
+// or a grenade does wake it, and awake it is near-immune; backing off settles
+// it; each wake outlasts the last.
 const setupVigil = (w: World): void => {
   const cx = 32
   const cy = 32
@@ -659,20 +670,23 @@ const setupVigil = (w: World): void => {
     player.facing = 0 // the Vigil is due east, inside REVEAL_RANGE from tick 0
     // Tanky: the clip must outlive its own grenades and a woken boss's claws.
     if (player.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
-    // A KNIFE, not the starter pistol: bullets are projectiles, and a live
-    // projectile in earshot is loudness to vigil.ts. The pistol would wake it
-    // during the very beat that exists to prove damage does NOT wake it.
-    player.loadout!.inventory = [{ itemId: 'knife', qty: 999 }]
-    player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'knife'
+    // THE STARTER PISTOL, through the game's own constructor. Restated rather
+    // than left implicit from `spawnPlayer` so the one thing this scenario must
+    // never get wrong is visible at the point it happens — and so
+    // `scenarios.oneWeapon.test.ts` has something to compare against.
+    player.loadout = starterLoadout(PLAYER_START_WEAPON)
+    if (player.combat) player.combat.weapon = PLAYER_START_WEAPON
   }
 
   const boss = spawnNpc(w, 'vigil', cx + 0.5, cy + 0.5)
-  // A SHOWCASE POOL, not a rebalance. The shipped 260 hp is a knife beat and a
-  // half — at `resist.physical` 1.5 a dormant Vigil dies before it can be woken
-  // twice, which is the fight working exactly as designed and a clip that ends
-  // before its own point. The e2e measures DAMAGE PER BEAT (asleep vs awake),
-  // never time-to-kill, so a deeper pool changes nothing it asserts.
+  // A SHOWCASE POOL, not a rebalance — and the size of it is the good news. At
+  // `resist.physical` 1.5 a paced pistol shot takes round(14 × 1.5) = 21 off a
+  // dormant Vigil, so the shipped 260 hp row dies to THIRTEEN disciplined shots
+  // (fifteen at the 299 a floor-2 spawn actually carries):
+  // the fight is winnable solo with nothing but the starter gun, and a clip
+  // pitched at 260 would end during its first beat. The e2e measures DAMAGE PER
+  // BEAT (asleep vs awake), never time-to-kill, so a deeper pool changes nothing
+  // it asserts — `vigil.test.ts` kills the real 260 hp boss instead.
   boss.health = { hp: 2000, max: 2000, iframes: 0 }
 }
 

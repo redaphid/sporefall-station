@@ -61,6 +61,22 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
 // scenario (spawn 1.5,1.5; lane y=11; grenade pickup x5.5; civilians x8/9; door x12;
 // thugs x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
+  // §4.3 The Sealkeeper showcase (scenario `sealkeeper`, lane y=11, wall x=16
+  // with its one doorway at (16,11); player starts west at x=6, boss east).
+  // The clip is the fight's whole thesis in four beats: WATCH it take the lane
+  // (it shuts and re-locks the only door), WALK to the sealed door and find it
+  // locked, BLOW IT OPEN with the special (the grenade stops being a weapon and
+  // becomes a tool), then walk through the hole it made.
+  sealkeeper: [
+    { ticks: 60 }, // establish: the boss backs through the doorway and seals it
+    { ticks: 70, x: 1 }, // march east up the lane to the sealed door
+    { ticks: 40 }, // stand at it — locked, and shooting it does nothing
+    { ticks: 1, special: true }, // BREACH: lob the grenade at the door
+    { ticks: 60 }, // the blast breaches it (combat.detonate)
+    { ticks: 60, x: 1 }, // walk through the hole
+    { ticks: 60 }, // final beat
+  ],
+
   // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
   // the player only strolls and stands — every beat on stage is the AI's own.
   // Establish the cast, walk south INTO the lurker pocket (the proximity trip

@@ -644,6 +644,59 @@ const stageArtCompare = (w: World): void => {
   stageThug(w, 19, LANE_Y)
 }
 
+/**
+ * §4.3 The Sealkeeper set-piece: ONE lane, ONE doorway, and a boss that takes it.
+ *
+ * Deliberately the most stripped-down stage in this file, because the fight's
+ * thesis is architectural and any second route would destroy it: a wall across
+ * the lane with exactly one gap, the player west of it, the Sealkeeper east. It
+ * backs to the doorway, shuts and re-locks the only way through, and the clip's
+ * whole point is that the answer is a grenade rather than a gun.
+ *
+ * Geometry is pinned here and mirrored in e2e/sealkeeper.mjs — lane y=LANE_Y,
+ * wall plane x=SEAL_WALL_X, doorway at (SEAL_WALL_X, LANE_Y).
+ */
+const SEAL_WALL_X = 16
+
+const setupSealkeeper = (w: World): void => {
+  clearStage(w)
+  const lw = w.level.w
+  const solidify = (x: number, y: number): void => {
+    w.level.tiles[y * lw + x] = Tile.Wall
+    w.level.solid[y * lw + x] = 1
+  }
+  const carve = (x: number, y: number): void => {
+    w.level.tiles[y * lw + x] = Tile.Floor
+    w.level.solid[y * lw + x] = 0
+  }
+  // A clear hall either side of the wall, so the camera frames the lane.
+  for (let y = LANE_Y - 5; y <= LANE_Y + 5; y++) for (let x = 2; x <= 30; x++) carve(x, y)
+  // The wall, with exactly ONE gap in it.
+  for (let y = LANE_Y - 5; y <= LANE_Y + 5; y++) solidify(SEAL_WALL_X, y)
+  carve(SEAL_WALL_X, LANE_Y)
+
+  // The door, OPEN — the boss has to be seen TAKING it, not starting with it.
+  const d = makeEntity('door', 'door', SEAL_WALL_X + 0.5, LANE_Y + 0.5, 0.5)
+  d.door = { open: true, locked: false, lockLevel: 0 }
+  d.interact = { verb: 'open', range: 1.3 }
+  addEntity(w, d)
+
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player) {
+    player.pos = { x: 6.5, y: LANE_Y + 0.5 }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    player.facing = 0 // facing east, down the lane at the doorway
+    player.health = { hp: 500, max: 500, iframes: 0 } // survive the whole clip
+  }
+
+  // East of the gap, far enough that it visibly BACKS INTO the doorway rather
+  // than starting on top of it. Revealed up front so the clip opens on the act:
+  // the entrance latch has its own coverage in sealkeeper.test.ts.
+  const boss = spawnNpc(w, 'sealkeeper', SEAL_WALL_X + 4.5, LANE_Y + 0.5)
+  boss.ai!.home = { x: boss.pos.x, y: boss.pos.y }
+  w.mission.bossRevealed = true
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'artcompare') stageArtCompare(w)
   if (name === 'npc-combat') setupNpcCombat(w)
@@ -662,4 +715,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'ai-goals') setupAiGoals(w)
   if (name === 'npc-ai') setupNpcAi(w)
   if (name === 'npc-deliberate') setupNpcDeliberate(w)
+  if (name === 'sealkeeper') setupSealkeeper(w)
 }

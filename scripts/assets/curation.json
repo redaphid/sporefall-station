@@ -362,5 +362,21 @@
   "size": 1024,
   "ckpt": "anything-xl",
   "note": "v2 STATIC_KINDS object recipe; egg sac with glowing seam - v1 drew twig-people"
+ },
+ "char.the-sealkeeper.s-idle": {
+  "seed": 910032,
+  "index": 0,
+  "raw": "raws/char.the-sealkeeper.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\anything-xl.safetensors",
+  "note": "squat wide tracked chassis, single crane arm, brass-amber; anything-xl via the ckpt lever"
+ },
+ "char.subject-echo.s-idle": {
+  "seed": 910022,
+  "index": 0,
+  "raw": "raws/char.subject-echo.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\anything-xl.safetensors",
+  "note": "hunched restrained lab subject, chartreuse growth over bandaged plating; anything-xl"
  }
 }

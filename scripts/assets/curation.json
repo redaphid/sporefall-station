@@ -378,5 +378,13 @@
   "size": 768,
   "ckpt": "SDXL1.0\\anything-xl.safetensors",
   "note": "hunched restrained lab subject, chartreuse growth over bandaged plating; anything-xl"
+ },
+ "char.the-vigil.s-idle": {
+  "seed": 920005,
+  "index": 0,
+  "raw": "raws/char.the-vigil.s-idle.png",
+  "size": 1152,
+  "ckpt": "SDXL1.0\\anything-xl.safetensors",
+  "note": "wall-shaped legless immovable mass, w/h 1.69; TRUE fusion into a bulkhead is unreachable through the keyable-backdrop contract (a bulkhead is scenery); chroma under cast floor, see commit"
  }
 }

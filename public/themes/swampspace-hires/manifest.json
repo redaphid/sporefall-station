@@ -406,7 +406,17 @@
   "char.echo.ne-idle": "chars/subject-echo-s-idle.png",
   "char.echo.ne-step": "chars/subject-echo-s-step.png",
   "char.echo.n-idle": "chars/subject-echo-s-idle.png",
-  "char.echo.n-step": "chars/subject-echo-s-step.png"
+  "char.echo.n-step": "chars/subject-echo-s-step.png",
+  "char.vigil.s-idle": "chars/the-vigil-s-idle.png",
+  "char.vigil.s-step": "chars/the-vigil-s-step.png",
+  "char.vigil.se-idle": "chars/the-vigil-s-idle.png",
+  "char.vigil.se-step": "chars/the-vigil-s-step.png",
+  "char.vigil.e-idle": "chars/the-vigil-s-idle.png",
+  "char.vigil.e-step": "chars/the-vigil-s-step.png",
+  "char.vigil.ne-idle": "chars/the-vigil-s-idle.png",
+  "char.vigil.ne-step": "chars/the-vigil-s-step.png",
+  "char.vigil.n-idle": "chars/the-vigil-s-idle.png",
+  "char.vigil.n-step": "chars/the-vigil-s-step.png"
  },
  "anim": {
   "walk": 4

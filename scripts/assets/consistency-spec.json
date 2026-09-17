@@ -285,5 +285,25 @@
    "foot_y": 1
   },
   "tol_note": "head_h is degenerate on a headless chassis (head_h/height ~0.98): the scan terminates deep in the body, so derive_step's 1px torso lean swings it ~17px while height/width/mass/foot_y stay in band. Tolerance widened for THIS character only, as vine-ranger (15) does."
+ },
+ "the-vigil": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 26,
+   "width": 44,
+   "head_h": 25,
+   "mass": 942,
+   "cx": 0.8,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 20,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  },
+  "tol_note": "head_h is degenerate on a headless wall-shaped mass (head_h/height ~0.96): consistency.py's scan keeps going until occupancy first REACHES HEAD_CUT*head_peak, so it terminates deep in the body and derive_step's 1px torso lean re-orders which row crosses first. Same treatment as the-sealkeeper/subject-echo; vine-ranger (15) sets the precedent."
  }
 }

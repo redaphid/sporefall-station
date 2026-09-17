@@ -279,4 +279,45 @@ export const NPCS: Record<string, NpcDef> = {
     wakeOn: ['noise', 'proximity', 'damage', 'fire'],
     resist: { spore: 0, poisoned: 0.3, burning: 1.4 },
   },
+
+  // ── The Vigil — the boss you are trying not to fight (design §4.1) ─────────
+  // Player verb: BE QUIET. Something enormous fused into the reactor bulkhead,
+  // which has not moved in years and does not need to. It is VULNERABLE ONLY
+  // WHILE DORMANT and near-immune awake, so the fight is a noise budget: do
+  // damage in silence, back off before the meter trips. Killing it with a knife
+  // is slow and possible; killing it with a grenade is impossible, because the
+  // grenade is what wakes it.
+  //
+  // ⚠️ `wakeOn` IS DELIBERATELY ABSENT, and that is the whole design.
+  //
+  // `systems/dormancy.ts` implements a binary trigger vocabulary, and one of its
+  // triggers is `'damage'` — ANY hit within 20 ticks wakes a sleeper. A boss
+  // whose pitch is "hurt it while it sleeps" would therefore have woken on the
+  // player's FIRST shot, every time, making the entire fight unreachable. The
+  // design contradicts itself unless this is handled explicitly.
+  //
+  // So the Vigil opts OUT of that vocabulary entirely: `wakeTrigger` returns
+  // undefined immediately for an empty/absent `wakeOn`, so `awakeningSystem`
+  // can never wake it. Waking is owned solely by `systems/vigil.ts`, which
+  // accumulates a decaying NOISE budget. Being hit is silent; being LOUD is
+  // what costs you. Omitted rather than written as `[]` so the entity carries
+  // no extra field and snapshots stay minimal (the repo's optional-field rule).
+  //
+  // `physical: 1.5` is its DORMANT value — a sleeping thing is soft. vigil.ts
+  // swaps it to ~0.15 while awake and back on settle; the swap is the fight.
+  // `frozen: 0` for the same reason every boss carries it (see `boss` above):
+  // a frozen NPC is executed outright by combat.applyDamage regardless of hp.
+  vigil: {
+    archetype: 'vigil',
+    faction: 'gang',
+    hp: 260,
+    speed: 2.0, // far under PLAYER_SPEED 4.5: you can always walk away from it
+    weapon: 'claws',
+    sightRange: 9,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'vigil',
+    dormant: true,
+    resist: { physical: 1.5, frozen: 0, poisoned: 0.5, spore: 0 },
+  },
 }

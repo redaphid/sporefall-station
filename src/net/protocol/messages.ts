@@ -145,6 +145,35 @@ export const ARCHETYPES = [
   // inserting or reordering renumbers every entry after it while both builds
   // still claim the same version.
   'chair',
+  // PROTOCOL_VERSION 4 — the five planned bosses, BOOKED AHEAD OF THEIR CODE.
+  //
+  // Only `vigil` is implemented right now. The other five ids are registered
+  // anyway, deliberately, and this is the one table where booking ahead is the
+  // correct call rather than speculative generality:
+  //
+  //   - The index IS the wire format. Appending later means ANOTHER version
+  //     bump, and every phone in the field must be reinstalled at each one.
+  //     Reserving the whole planned set costs six bytes of nothing and buys a
+  //     single flag day instead of five.
+  //   - Four more boss PRs are queued behind this one (Echo, the Sealkeeper,
+  //     Mirefather, the Hollow Choir). If each appends its own archetype, two
+  //     landing in the same afternoon append in whichever order they merge —
+  //     and the index silently means something different on each branch. That
+  //     is precisely the "both builds claim the same version and disagree about
+  //     the table" failure this list's header warns about, except self-inflicted
+  //     by our own merge order.
+  //   - An archetype registered with no NPCS row is explicitly fine:
+  //     messages.archetypes.test.ts asserts NPCS ⊆ ARCHETYPES, never the
+  //     converse. An id nothing spawns is simply never encoded.
+  //
+  // `choirmaster` + `herald` are the Hollow Choir's two bodies (a core plus its
+  // three heralds), which is why five bosses need six ids.
+  'vigil',
+  'echo',
+  'sealkeeper',
+  'mirefather',
+  'choirmaster',
+  'herald',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix

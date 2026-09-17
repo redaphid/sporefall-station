@@ -212,6 +212,24 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   // pixel-identical problem ARCHETYPE_SCALE exists to paper over. If a kind's art
   // is missing the lookup still falls through to its own procedural set, which is
   // per-archetype distinct — so a partial art drop degrades, it does not break.
+  //
+  // The Vigil. MEMBERSHIP OF THIS MAP IS THE WHOLE POINT: `isCharacterSprite`
+  // tests it, and an archetype missing from here falls past the character path
+  // and draws as the generic procedural blob tinted `entityColors.default`
+  // (0xcccccc) — the "boss spawns white circles" bug, shipped once already.
+  //
+  // Mapped to ITSELF even though no pack ships `char.vigil.*` art yet. That is
+  // the graceful path, not an oversight: `characterSet` falls through to the
+  // PER-ARCHETYPE procedural set, which is distinct per key and tinted by the
+  // ENTITY_COLORS entry above. Aliasing it to 'thug' for a "real" body would
+  // make the game's second boss pixel-identical to its commonest enemy, which is
+  // the single failure the boss art brief exists to stop repeating. When art
+  // lands, `characterSet` prefers the archetype's own set with no change here.
+  //
+  // NB no `char.vigil.*` keys are added to the theme manifests: theme.test.ts
+  // asserts every referenced file exists on disk and that the packs validate
+  // with ZERO warnings, so declaring art that does not exist would fail both.
+  vigil: 'vigil',
 }
 
 /** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
@@ -389,6 +407,11 @@ const ENTITY_COLORS: Record<string, number> = {
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
   lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
+  // Cold slate-teal: something fused into the bulkhead for years, more wall than
+  // animal. Deliberately far from the Alpha's hot red (0xe0483f) — the two
+  // bosses must not read as the same creature at a glance, which is the exact
+  // failure docs/assets/boss-art-brief.md records for the Alpha vs the thug.
+  vigil: 0x4e7d8c,
 
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,

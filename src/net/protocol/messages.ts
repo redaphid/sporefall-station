@@ -174,6 +174,10 @@ export const ARCHETYPES = [
   'mirefather',
   'choirmaster',
   'herald',
+  // A WATER hazard cell (systems/water.ts) — a spawnable entity like `fire` and
+  // `spore` before it, so it needs a wire index or a flooded room decodes on the
+  // other phone as a crowd of Rangers. Appended at the very end, never reordered.
+  'water',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix
@@ -268,7 +272,11 @@ export const kindOf = (archetype: string): Entity['kind'] => {
   if (archetype === 'player') return 'player'
   if (archetype === 'door') return 'door'
   if (archetype === 'projectile' || THROWN_ARCHETYPES.has(archetype)) return 'projectile'
-  if (archetype === 'fire' || archetype === 'spore') return 'fire'
+  // 'fire' is the non-colliding GROUND-HAZARD kind, not just flames: fire, spore
+  // clouds and standing water are all cells of it. Without `water` here a puddle
+  // is registered on the wire yet still arrives with the wrong kind, and the two
+  // screens agree it is water while disagreeing that it is a hazard cell.
+  if (archetype === 'fire' || archetype === 'spore' || archetype === 'water') return 'fire'
   if (archetype.startsWith('pickup.') || archetype.startsWith('mod.')) return 'pickup'
   if (OBJECT_ARCHETYPES.has(archetype)) return 'interactable'
   return 'npc'

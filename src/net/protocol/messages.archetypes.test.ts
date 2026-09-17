@@ -56,7 +56,7 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
   })
 
   it('registers the fixed archetypes', () => {
-    for (const a of ['player', 'projectile', 'grenade', 'door', 'fire', 'spore']) {
+    for (const a of ['player', 'projectile', 'grenade', 'door', 'fire', 'spore', 'water']) {
       expectRegistered(a, 'hardcoded spawn site')
     }
   })
@@ -114,7 +114,20 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
       mods: WIRE_MODS.length,
     }).toEqual({
       version: 4,
-      archetypes: 94,
+      // 95: `water` appended for the water hazard cell (systems/water.ts).
+      // ⚠️ PROTOCOL_VERSION IS DELIBERATELY *NOT* BUMPED HERE, and this is the
+      // one case where updating the count alone is not the silent-mismatch this
+      // test exists to catch. Version 4 is UNRELEASED — it was minted on this
+      // same integration branch (net/types.ts changelog: "six boss archetypes
+      // appended, 88 -> 94") precisely so the queued PRs cutting from this base
+      // share ONE flag day instead of demanding a reinstall each. `water` joins
+      // that same unshipped flag day. No phone in the field has ever spoken v4,
+      // so no peer can disagree about index 94.
+      //
+      // The moment v4 actually ships, this reasoning expires: the next append
+      // must bump to 5 and add a changelog line. The integrator owns that call —
+      // see this branch's report.
+      archetypes: 95,
       mods: 18,
     })
   })

@@ -360,6 +360,14 @@ export interface Entity {
   flammable?: boolean
   /** A fire hazard occupying this cell — kind 'fire'. `fuel` burns down 1/tick. */
   fire?: { fuel: number }
+  /** STANDING WATER occupying this cell — kind 'fire' (the non-colliding
+   * ground-hazard kind), archetype 'water'. `fuel` dries down 1/tick; while it
+   * lasts it lays the `wet` element on bodies in the cell, quenches any fire
+   * sharing the cell, and CONDUCTS — a shock floods through connected water and
+   * electrocutes everything standing in it (systems/water.ts, interactions.ts).
+   * Absent on everything else, so every pre-existing snapshot round-trips
+   * byte-for-byte (same optional-field discipline as `mods`/`annotations`). */
+  water?: { fuel: number }
   /** Destroyed by shattering a frozen body — an ice gib, not a corpse. */
   shattered?: boolean
   /** A usable object (ATM/vending) that has already dispensed once. */

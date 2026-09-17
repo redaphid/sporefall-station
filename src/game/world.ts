@@ -9,6 +9,7 @@ import { vigilSystem } from './systems/vigil'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
+import { waterSystem } from './systems/water'
 import { infectionActive, infectionSystem } from './systems/infection'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
@@ -272,6 +273,10 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   interactionSystem(w, inputs)
   fireSystem(w)
   sporeSystem(w)
+  // Water runs LAST of the three hazard cells, and that ORDER is the rule that
+  // settles fire-meets-water: a fire lit or spread into a puddle this tick is
+  // quenched here, before elementSystem below can charge anyone for it.
+  waterSystem(w)
   // #64 spore contagion — gated OFF by default (systems/infection.ts
   // INFECTION_ENABLED); when active, exposed crew turn into Infected hosts. Runs
   // after sporeSystem/fireSystem so this tick's spore + burning are already set

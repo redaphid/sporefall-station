@@ -678,3 +678,97 @@ theme manifests already carry `char.boss.<dir>-idle/step` slots and a `names`
 table (`swampspace/manifest.json` names the boss "Mireclaw Alpha"), so each new
 boss needs a name entry there as well as a data row. But the pipeline is blocked
 on a human decision, and that decision gates whether any of this is *visible*.
+
+---
+
+## CORRECTIONS (verified against source)
+
+Added while implementing §3.1, §3.2 and §4.1 on branch `feat/boss-foundation`.
+Everything below was checked against the engine at `8c6c6c3` — the same commit
+this document was costed against — rather than re-read off the document. The
+design's *reasoning* holds in every case; three of its factual claims do not.
+
+### C1. §3.1's proposed fix does not work (`resist.frozen = 0` alone is inert)
+
+The exploit §3.1 describes is **real and worse than stated**: `combat.ts:101`
+executes any frozen NPC via `shatter()`, which zeroes hp regardless of the blow's
+damage, and `freezeRay` deals 0 damage while applying `frozen` for 120 ticks.
+
+But the prescribed fix — *"Every boss in this document needs `resist.frozen = 0`"*
+— **would have changed nothing on its own.** `addStatus` (`statusFx.ts:83`) routes
+every kind in `IMMOBILIZE_STATUSES` to `applyImmobilize`, which **never consulted
+`resistMult`**. Until this branch, `resist` was read in exactly one place: the DOT
+tick in `elementSystem` (`fire.ts:113`), where it scales damage. An immobilize
+does no damage, so it sailed straight past the table. The boss would still have
+frozen, and still have shattered.
+
+`resist` documented a promise (`npcs.ts`: *"1 neutral, <1 resist, 0 immune, >1
+weak"*) that the engine only half-kept.
+
+**Implemented instead:** `resist[kind] === 0` now means genuine immunity for
+immobilize statuses, checked at the top of `applyImmobilize`. The data row §3.1
+asked for then works as written. Scoped to immobilize kinds only — DOTs keep the
+existing contract where a 0-resist status still *attaches* and merely does no
+harm, because `hasStatus(e,'spore')` is read outside the damage path.
+
+Blast radius was measured, not assumed: `IMMOBILIZE_STATUSES` is
+`{frozen, electrified}`, and **no shipped archetype sets either to 0** — every
+`resist: 0` in the roster is `spore` or `poisoned`. The change is a provable
+no-op on the existing roster.
+
+### C2. §4.1 is wrong that `fireWeapon` emits noise — gunfire is SILENT
+
+§4.1 states: *"`emitNoise` is already called by `fireWeapon` and by `detonate` —
+the grenade already announces itself."* The grenade half is right. The
+`fireWeapon` half is not.
+
+`emitNoise` has exactly **two** callers in the whole engine: `combat.ts:329`
+(inside `detonate`) and a debug verb. `fireWeapon` does not call it. **Gunfire
+does not exist to the noise system**, which also means it currently cannot wake a
+spore pod whose `wakeOn` includes `'noise'`.
+
+This matters for the Vigil specifically, whose pitch is that *every* loud tool
+wakes it. Making `fireWeapon` emit noise would be a systemic change touching
+every dormant sleeper, every `investigate` goal and the whole hive stimulus
+field, to serve one boss — so it was rejected as out of scope.
+
+**Implemented instead:** `systems/vigil.ts` does its own hearing, locally — the
+shared stimulus field (grenades, fire, spore, already graded and distance-
+attenuated) **plus live projectiles in earshot**, which is what makes gunfire
+loud for this boss and for nothing else. No existing behaviour changes.
+
+Anyone later wanting gunfire to be globally audible should treat it as its own
+systemic PR, with the dormancy and investigate suites as the blast radius.
+
+### C3. §3.2 omits the boss HUD's actual NAME callers
+
+§3.2 correctly identifies `ui/bossModel.ts` as hardcoded to Mireclaw's phases,
+but stops there. The **display name** is hardcoded separately, in a file §3.2
+does not mention: **`src/ui/screens.ts:210` and `:273`** both call
+`themeDisplayName('boss')` — the archetype spelled out as a string literal — for
+the health bar and the entrance card respectively.
+
+Generalising `bossModel.ts` alone would therefore have produced a second boss
+with correct phase text and the name **"MIRECLAW ALPHA"** over it. Both call
+sites now thread `themeDisplayName` as a *resolver* and the model resolves the
+name from the revealed boss's own archetype.
+
+Also in §3.2: the `1 | 2 | 3` phase type meant a boss with a different number of
+phases was not merely mislabelled but unrepresentable. `BossBar.phase` is now a
+`number`, and the `phase === 3` red-bar rule became a per-boss `danger` flag.
+
+### C4. Line numbers throughout have drifted
+
+Several citations are a few dozen lines off at `8c6c6c3` — e.g. §3.1 cites
+`combat.ts:136-164` with `shatter` at `:67-80`, where `shatter` is actually at
+`:32-45` and the frozen branch at `:101-129`; §3.2 cites `PHASE_LABEL` at `:54`,
+which was `:38`. The *symbols* named are correct in every case. Grep for the
+identifier rather than trusting the line.
+
+### Still-unverified claims
+
+This branch touched §3.1, §3.2, §4.1 and §5's mission-variety constraint. The
+engine claims in §3.3 (no telegraph system), §3.4 (the 48-entity snapshot cap),
+§3.5 (the sim never mutates tiles) and §§4.2–4.5 were **not** re-checked against
+source. Given three of the four claims that were checked turned out to be wrong
+in some load-bearing detail, treat the rest as unverified until someone greps.

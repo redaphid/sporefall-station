@@ -50,7 +50,8 @@
     "gen:fixtures": "tsx scripts/test/gen-serialize-fixtures.mts && tsx scripts/test/gen-feature-fixtures.mts",
     "e2e:vigil": "bash e2e/run-vigil.sh",
     "e2e:state": "node e2e/state-link-roundtrip.mjs",
-    "e2e:share": "bash e2e/run-share-button.sh"
+    "e2e:share": "bash e2e/run-share-button.sh",
+    "e2e:sealkeeper": "bash e2e/run-sealkeeper.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

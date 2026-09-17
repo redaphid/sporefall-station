@@ -820,10 +820,70 @@ field (so adaptation needs no new component), and there really are exactly three
 damage sites that route through it — the physical multiply in
 `combat.applyDamage`, the `dealt` computation on its frozen/shatter branch, and
 the DOT tick in `fire.elementSystem`. All three are now tapped.
+### C6. §4.3's "restore the power" counterplay DOES NOT EXIST
+
+§4.3 pitches the Sealkeeper's counterplay as three verbs — *"breach the door it
+locked, destroy the barricades, **restore power**"* — and leans on `sealSystem`
+to argue the outage is *"already a TWO-WAY lever"*.
+
+The `sealSystem` half is real: it genuinely re-seals a `'power'` biolock if power
+comes back (`interaction.ts`). **But nothing in the sim can ever bring power
+back.** Grepping every write to `World.powerCut` across `src/` finds exactly
+three: `objects.cutPower` sets a wing `true`, `serialize` restores the map
+wholesale, and `missions.nextFloor` clears it with `w.powerCut = {}` — *"a fresh
+floor is fully powered again"*. There is no generator re-hack, no switch, no
+restore verb, and `useObject` latches its hackable on `e.used` so the SAME
+terminal cannot even be toggled back.
+
+So within a floor the lever is **strictly one-way**, and "restore the power" is
+not a player verb that exists. The Sealkeeper as built therefore cuts the grid as
+a pure cost the party absorbs (alarm maxed, sleepers roused, Derelict Units
+hostile) — and the thing that makes it an honest trade instead of a flat tax is
+that the outage **pops open that wing's own `'power'` biolocks**, which is a
+genuine two-way consequence of the single available direction.
+
+Building a restore path is a real feature (a re-hackable generator, plus deciding
+what re-sealing does to a party stood behind the biolock), not a detail — so it
+was left out of scope rather than half-built.
+
+### C7. §4.3 is wrong that `fortify` can simply be reused by a boss
+
+§4.3 says barricade-building *"is done"* and the shipped `fortify` consideration
+can be reused as-is. It cannot, and the failure is SILENT.
+
+`fortify` finds its building through `buildingOf`, which reads **`e.ai.zone`** —
+stamped by `populate` on the crew it places. A boss is spawned by
+`missions.spawnFloorBoss` → `spawnNpc`, which stamps **no zone at all**. So
+`buildingOf` returns undefined, `fortify` returns no candidates, and the boss
+lays zero barricades forever — with no error, no event and nothing in the goal
+trail to show why.
+
+**Implemented instead:** `systems/sealkeeper.ts` claims its wing on reveal
+(`buildingAt(w.level, …)` → `ai.zone`), after which the shipped `fortify` works
+unmodified. Any future boss reusing a territory-scored consideration
+(`fortify`, `garrison`, `workMyRoom`, `defendMyWing`) needs the same claim.
+
+### C8. Tier composition: `hunt` starves `fortify`
+
+Not in the document, but it bites any boss whose list mixes them. `fortify`
+scores at `TIER_AMBIENT` (0); `hunt` scores at `TIER_MEMORY` (1) and fires
+whenever `ai.targetId` is set, which for a boss is ~always. Since `decide` takes
+the highest TIER before it ever compares scores, a behaviour list containing both
+will never barricade. The Sealkeeper's list omits `hunt` deliberately for this
+reason — it is the first line to re-check if it ever stops building.
+
+### Verified-correct claims (§4.3)
+
+Checked while implementing, and true as written: `detonate` really does breach
+every door within its radius (`combat.ts`), so the counterplay ships ahead of the
+threat; barricades really are never solid, so BFS reachability survives by
+construction; `cutPower` really does take any agent and assume nothing about
+players; and §3.5's "the sim never mutates tiles" holds — the Sealkeeper is
+entirely entity-based and `levelgen`'s frozen checksums did not move.
 
 ### Still-unverified claims
 
-This branch touched §3.1, §3.2, §4.1 and §5's mission-variety constraint. The
+This branch touched §3.1, §3.2, §4.1, §4.3 and §5's mission-variety constraint. The
 engine claims in §3.3 (no telegraph system), §3.4 (the 48-entity snapshot cap),
 §3.5 (the sim never mutates tiles) and §§4.2–4.5 were **not** re-checked against
 source. Given three of the four claims that were checked turned out to be wrong

@@ -103,6 +103,18 @@ export interface AiState {
    * so an Echo that took no damage carries no field and snapshots stay minimal.
    * Never holds an immobilize kind — see the guards in systems/echo.ts. */
   echoHits?: Record<string, number>
+  /** §4.3 The Sealkeeper (systems/sealkeeper.ts) — next tick it may shut and
+   * re-lock a doorway. The seal THROTTLE: without it the boss would slam every
+   * door it brushed past on the same tick. Absent until its first seal. */
+  sealAt?: number
+  /** §4.3 The Sealkeeper — how many doorways it has sealed. This is the fight's
+   * legible clock (it drives the pinned meter), not decoration. Omitted at 0 so
+   * a Sealkeeper nobody has met serializes exactly as it spawned. */
+  sealed?: number
+  /** §4.3 The Sealkeeper — latch: it has already cut its wing's grid, a
+   * ONE-TIME act. Omitted until it fires, so the field is absent on every
+   * snapshot taken before the boss is wounded. */
+  gridCut?: boolean
   /** #68 — INERT until a stimulus wakes it: no move, no target, minimal
    * perception (the awakeningSystem flips it false and emits `woke`). A sleeping
    * pod / dormant unit the player can tiptoe past — or trip. */

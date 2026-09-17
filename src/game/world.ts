@@ -7,6 +7,7 @@ import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
 import { vigilSystem } from './systems/vigil'
 import { echoSystem } from './systems/echo'
+import { sealkeeperSystem } from './systems/sealkeeper'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
@@ -299,6 +300,12 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   // to the next fold, so fire would appear to teach it a tick late and the
   // learn/forget decision (exactly one per kind per tick) would race itself.
   echoSystem(w)
+  // §4.3 The Sealkeeper shuts and re-locks doorways, plugs chokepoints and cuts
+  // the wing's grid. It runs HERE, after interaction/movement have settled, for
+  // one specific reason: it must decide whether a doorway is clear from the
+  // FINAL positions of this tick. Sealing earlier would let a body walk into the
+  // frame after the check and be entombed by a door that had already shut.
+  sealkeeperSystem(w)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so
   // stillness reflects the settled position/velocity), before mission/sweep.

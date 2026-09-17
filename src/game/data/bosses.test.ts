@@ -142,8 +142,9 @@ describe('per-floor eligibility and selection', () => {
   })
 
   it('deeper floors field the wider pool', () => {
-    expect(eligibleBosses(2).map((b) => b.archetype)).toEqual(['boss', 'vigil', 'echo'])
-    expect(eligibleBosses(9).map((b) => b.archetype)).toEqual(['boss', 'vigil', 'echo'])
+    // Registry ORDER, not sorted — eligibleBosses preserves BOSSES insertion.
+    expect(eligibleBosses(2).map((b) => b.archetype)).toEqual(['boss', 'vigil', 'echo', 'sealkeeper'])
+    expect(eligibleBosses(9).map((b) => b.archetype)).toEqual(['boss', 'vigil', 'echo', 'sealkeeper'])
   })
 
   it('draws NOTHING from the stream when only one boss is eligible', () => {
@@ -173,7 +174,7 @@ describe('per-floor eligibility and selection', () => {
     // every other test in this file.
     const seen = new Set<string>()
     for (let seed = 1; seed <= 200; seed++) seen.add(pickBoss(5, mulberry32(seed).fork('boss')).archetype)
-    expect([...seen].sort()).toEqual(['boss', 'echo', 'vigil'])
+    expect([...seen].sort()).toEqual(['boss', 'echo', 'sealkeeper', 'vigil'])
   })
 
   it('never returns an unspawnable boss, at any floor', () => {

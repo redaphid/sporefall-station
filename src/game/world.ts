@@ -5,6 +5,7 @@ import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
+import { vigilSystem } from './systems/vigil'
 import { combatSystem } from './systems/combat'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
@@ -280,6 +281,11 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   statusSystem(w)
   statusFxSystem(w)
   mireclawSystem(w) // #69 boss phases: summon / regen-in-cloud / enrage (after HP + spore/fire settle)
+  // §4.1 The Vigil's noise budget. Sits beside mireclawSystem for the same
+  // reason: it reads THIS tick's settled hazards (fire/spore cells placed by
+  // fireSystem/sporeSystem above) and this tick's live projectiles, so the
+  // loudness it measures is the room as it finally ended up, not mid-update.
+  vigilSystem(w)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so
   // stillness reflects the settled position/velocity), before mission/sweep.

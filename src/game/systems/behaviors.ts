@@ -944,6 +944,20 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     about: '#69 Mireclaw Alpha boss — phased: pressure & summon, retreat-to-spore-regen, then enrage',
     considerations: ['enrage', 'retreatToSpore', 'threat', 'hunt', 'wander'],
   },
+  vigil: {
+    // §4.1 The Vigil. NO NEW CONSIDERATION FUNCTION, and that is not laziness —
+    // its entire fight is the dormant/awake swap, which `systems/vigil.ts` owns
+    // and `aiSystem` already honours (a dormant entity is skipped outright: no
+    // think, no move). So while asleep this list is never consulted, and while
+    // awake the Vigil simply wants what any woken predator wants: whatever it
+    // can see, then whatever it last saw. `threat`/`hunt`/`wander` say exactly
+    // that and are the same functions a thug uses.
+    //
+    // Adding a bespoke consideration here would have bought nothing and cost a
+    // second place for the wake state to be interpreted.
+    about: '§4.1 The Vigil — inert until NOISE wakes it (never a hit); awake it simply hunts',
+    considerations: ['threat', 'hunt', 'wander'],
+  },
   barricader: {
     about: 'a defender that plugs its wing’s doorways with junk barricades, then holds its turf',
     considerations: ['threat', 'defendMyWing', 'pursueMemory', 'manhunt', 'investigate', 'fortify', 'garrison', 'workMyRoom', 'wander'],

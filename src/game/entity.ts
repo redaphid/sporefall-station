@@ -87,6 +87,16 @@ export interface AiState {
   summonAt?: number
   /** #69 Mireclaw boss — phase-3 enrage latched (one-time speed boost applied). */
   enraged?: boolean
+  /** §4.1 The Vigil (systems/vigil.ts) — its decaying NOISE budget. Absent while
+   * the room is silent, and DELETED once it decays back to 0, so a Vigil nobody
+   * has been loud near serializes exactly as it spawned. */
+  noise?: number
+  /** §4.1 The Vigil — absolute tick it settles back to dormant. PRESENCE IS THE
+   * STATE: absent = asleep and soft, a number = awake and near-immune. */
+  wakeUntil?: number
+  /** §4.1 The Vigil — how many times it has woken. Each wake is longer than the
+   * last and the final one never ends, so this is the escalation counter. */
+  wakes?: number
   /** #68 — INERT until a stimulus wakes it: no move, no target, minimal
    * perception (the awakeningSystem flips it false and emits `woke`). A sleeping
    * pod / dormant unit the player can tiptoe past — or trip. */

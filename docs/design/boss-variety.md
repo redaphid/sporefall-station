@@ -765,6 +765,62 @@ Several citations are a few dozen lines off at `8c6c6c3` — e.g. §3.1 cites
 which was `:38`. The *symbols* named are correct in every case. Grep for the
 identifier rather than trusting the line.
 
+### C5. §4.2's "six elements to rotate through" is wrong twice over
+
+Added while implementing §4.2 (Echo) on branch `feat/boss-echo`. §4.2 says there
+are *"**six elements** to rotate through (`data/elements.ts`): `burning · frozen ·
+wet · electrified · poisoned · spore` — and the weapons to deliver them already
+exist"*. Checked against source, **at most three of the six can ever be an
+adaptation axis, and only one of those has live player delivery.**
+
+**Three of the six deal no damage at all.** `frozen`, `wet` and `electrified` all
+carry `dot: 0` in `data/elements.ts`. `elementSystem` computes
+`Math.round(def.dot * resistMult(e, kind))` and bails on `dmg <= 0`, so these
+statuses remove zero hp by construction. There is nothing for an adaptive boss to
+learn from them — a resistance track for a kind that never deals damage could
+never move. This also disposes of the doc's own example rotation: `shock` /
+`stunGun` deliver `electrified`, which is a lockdown, not damage.
+
+**`poisoned` has no deliverer left anywhere in the engine.** Grep it: the id
+appears only in the `ELEMENTS` table that defines it. The two items that applied
+it — `gasGrenade` and `chloroform` — are `// RETIRED` tombstones in
+`net/protocol/messages.ts`, culled with the rest of the throwables. §4.2 lists
+`gasGrenade` as live delivery; it is not.
+
+**`spore` is live but environmental.** It is applied by spore hazard cells
+(`systems/spore.ts`) and by infection contact — never by a weapon.
+
+**So the real rotation is `physical` ↔ `burning`**, with `spore` as a situational
+third in a flooded room. Note also that melee and bullets are BOTH `physical`, so
+the doc's four-step rotation ("pistol, then incendiary, then shock, then melee")
+is in engine terms two kinds, not four.
+
+**A deeper consequence the doc does not anticipate: element tracks can barely be
+driven down at all.** Element DOTs are 1–2 hp per tick against impact damage of
+8–26, and both sites round. Burning's `dot: 2` means `round(2 × mult)` stays at 2
+until `mult` drops below 0.75, so the damage an element deals is almost flat
+across most of the resistance range and its own adaptation stalls against the
+decay long before the floor. Echo's adaptation is therefore, in practice, a
+**physical-axis mechanic with elements as a near-unadaptable relief valve**.
+
+That is not a defect, and it was left as-is deliberately: it makes the intended
+loop — *shoot until it adapts, burn while it forgets, shoot again* — strictly
+better than either tool alone, with no degenerate strategy. Fire alone is ~6.7
+hp/s against a 345hp boss (≈51s and no cover); bullets alone settle at roughly
+×0.39 resistance. Rotating beats both. What the doc *promises* (a six-way element
+carousel) is not reachable on this engine; what it is actually *for* (never hit it
+the same way twice) is, and that is what shipped.
+
+`ECHO_ADAPT_KINDS` still carries `poisoned` even though nothing delivers it,
+because adaptation is per-kind and costs nothing: the day a poison weapon ships,
+Echo adapts to it with no change to `systems/echo.ts`.
+
+Verified correct in §4.2, for the record: `resistMult` really is a per-entity
+field (so adaptation needs no new component), and there really are exactly three
+damage sites that route through it — the physical multiply in
+`combat.applyDamage`, the `dealt` computation on its frozen/shatter branch, and
+the DOT tick in `fire.elementSystem`. All three are now tapped.
+
 ### Still-unverified claims
 
 This branch touched §3.1, §3.2, §4.1 and §5's mission-variety constraint. The

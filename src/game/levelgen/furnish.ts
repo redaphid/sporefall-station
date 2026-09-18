@@ -449,6 +449,13 @@ const placeBlock = (pool: Pool, out: Placement[], rng: Rng, g: Extract<FurnishGr
     }
     if (nbrs.length === 0) break
     const top = Math.max(...nbrs.map((t) => t.walls))
+    // A prop with a standing preference never spills off it to finish its
+    // heap (a corner barrel does not creep along the wall, a wall prop does
+    // not step out onto open floor): the heap just stays smaller. Once rooms
+    // stopped being plain boxes (chamfers, notches, L-shapes) the spill got
+    // common enough to break the placement contract.
+    const pref = PROP_PLACEMENT[g.prop]
+    if (top < (pref === 'corner' ? 2 : pref === 'wall' ? 1 : 0)) break
     const next = pickOne(rng, nbrs.filter((t) => t.walls === top))
     putBacked(pool, out, next, g.prop)
     placed.push(next)

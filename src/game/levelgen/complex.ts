@@ -1,6 +1,20 @@
 import type { Rng } from '../rng'
 import { vlen } from '../simMath'
 import {
+  frameOf,
+  layoutBand,
+  layoutSkeleton,
+  layoutZone,
+  lrectToGrid,
+  toGrid,
+  type LRect,
+  type Palette,
+  type RoomStyle,
+  type Skeleton,
+  type Vec,
+  type ZoneKind,
+} from './complexLayout'
+import {
   isWallTile,
   Tile,
   TileGrid,
@@ -17,25 +31,34 @@ import type { Rect } from './rooms'
 /**
  * INDOOR COMPLEX generator — floors 3, 5, 7… leave the sunken streets and dive into
  * the station ring itself: a pressure hull packed with modules (mess hall,
- * bunk rooms, galley, labs, infirmary, reactor hall, stores, security) hung
- * off a network of corridors.
+ * bunk rooms, galley, labs, infirmary, reactor hall, stores, security) laid
+ * out like a real facility floorplan.
  *
  * Construction, in order (every stage on its OWN named rng fork, so tuning one
  * stage never reshuffles another):
- *   1. Cut each axis into blocks separated by 2-3 wide corridor lines.
- *   2. Build the corridor graph (intersections + segments). A random spanning
- *      tree over the intersections is ALWAYS kept, so the corridor network is
- *      connected by construction; spare loops and dead-end stubs may be
- *      dropped, and a dropped segment MERGES its two blocks into one big wing
- *      (that is where the long mess halls come from).
- *   3. Partition each wing into a strip (or back-to-back pair of strips) of
- *      rooms with 1-tile walls; each room is its own `Building` (a module).
- *   4. Doors: every room gets a door onto an adjacent corridor where one
- *      exists, else an interior door into a neighbour; a BFS repair pass then
- *      punches through any room still unreachable — reachability is guaranteed.
- *   5. Spawn/exit near opposite hull corners (their corridor stubs are pinned
- *      so the two are always far apart), then roles by distance/size/biome,
- *      per-role deck tiles, vents and biome dressing.
+ *   1. SKELETON (complexLayout.ts): the primary circulation — a main spine, a
+ *      tee/cross, a ladder of two spines, or a ring round a central core —
+ *      oriented by a random flip/transpose, with the spawn at an airlock stub.
+ *   2. BANDS → ZONES: the strips beside each spine are cut into zones (the
+ *      lights-out wings) separated by shared walls or 2-wide secondary
+ *      corridors (dead-end service halls, or rungs between spines). Zone
+ *      depths are ragged and end zones may be left out, so the hull outline
+ *      steps and notches.
+ *   3. ZONING: the zone nearest the airlock is the entry (security post), the
+ *      biggest is the commons (the mess hall with its galley), reactor floors
+ *      get engineering halls, the rest are weighted by biome.
+ *   4. ZONE INTERIORS (complexLayout.layoutZone): pillared great halls with an
+ *      annex off a serving arch, bunk suites wrapped round wash closets, and
+ *      staggered tiers of rooms merged into L/T shapes, with the odd chamfered
+ *      corner or duct notch. A module may therefore be several rects.
+ *   5. DOORS: recipe links (closet doors, serving arches) first, then a door
+ *      onto the corridor at a sensible spot along the wall (halls get a second
+ *      door or double doors), then an interior door for any room with no
+ *      corridor frontage, then a BFS repair pass that punches through until
+ *      every room is reachable — reachability is guaranteed.
+ *   6. Exit at the hall tile farthest from the spawn; roles (objective
+ *      deepest, mess + galley, security by the entrance, the rest from each
+ *      zone's palette); per-role deck tiles; vents and biome dressing.
  *
  * A pure function of (rng, floor): the layout regenerates bit-exact from
  * seed+floor on every peer, like every other level.
@@ -71,12 +94,16 @@ export const biomeForFloor = (floor: number): BiomeName =>
   BIOMES[((complexOrdinal(floor) % BIOMES.length) + BIOMES.length) % BIOMES.length]
 
 interface BiomeDef {
-  /** Role weights for ordinary (non-mess, non-objective) modules. */
-  roles: readonly [BuildingRole, number][]
+  /** Weights for the purpose of an ordinary zone (after entry and commons). */
+  zones: readonly [ZoneKind, number][]
+  /** Engineering halls this biome always gets (beyond the chance of one more). */
+  engineering: number
   /** What the deepest module (the mission's target) can be. */
   objective: readonly BuildingRole[]
   /** Per-role deck tile; roles absent use `Tile.Floor`. */
   deck: Partial<Record<BuildingRole, TileId>>
+  /** Deck of the ring template's open atrium, when the core is one. */
+  atrium: TileId
   /** Chance each corridor run carries a vent grate (per ~8 tiles of run). */
   ventChance: number
   /** Bog-seep puddles laid over the deck. */
@@ -96,144 +123,93 @@ const TILED: Partial<Record<BuildingRole, TileId>> = {
 }
 
 export const BIOME_DEFS: Record<BiomeName, BiomeDef> = {
-  // The crew ring: bunks, wash blocks and the infirmary; scrubbed tile decks.
+  // The crew ring: bunk suites, wash blocks and the infirmary; scrubbed decks.
   habitation: {
-    roles: [
-      ['quarters', 4],
-      ['washroom', 2],
-      ['medbay', 2],
-      ['depot', 2],
-      ['lab', 1],
-      ['security', 1],
+    zones: [
+      ['habitation', 5],
+      ['science', 2],
+      ['stores', 2],
     ],
+    engineering: 0,
     objective: ['security', 'medbay', 'lab'],
     deck: TILED,
+    atrium: Tile.Tiled,
     ventChance: 0.35,
     puddles: [0, 1],
     moss: [0, 0],
   },
   // The low ring the swamp is reclaiming: bog water pools across the deck.
   flooded: {
-    roles: [
-      ['depot', 3],
-      ['quarters', 3],
-      ['washroom', 2],
-      ['lab', 2],
-      ['medbay', 1],
-      ['security', 1],
+    zones: [
+      ['stores', 3],
+      ['habitation', 3],
+      ['science', 2],
     ],
+    engineering: 0,
     objective: ['lab', 'reactor'],
     deck: TILED,
+    atrium: Tile.Bog,
     ventChance: 0.4,
     puddles: [9, 14],
     moss: [0, 2],
   },
-  // Engineering: plated decks, stores and the humming reactor hall.
+  // Engineering: plated decks, stores and the humming reactor halls.
   reactor: {
-    roles: [
-      ['depot', 3],
-      ['reactor', 2],
-      ['security', 2],
-      ['quarters', 2],
-      ['lab', 1],
-      ['washroom', 1],
+    zones: [
+      ['stores', 3],
+      ['habitation', 2],
+      ['engineering', 1],
+      ['science', 1],
     ],
+    engineering: 1,
     objective: ['reactor'],
     deck: { ...TILED, lab: Tile.Plating, security: Tile.Plating, quarters: Tile.Plating },
+    atrium: Tile.Plating,
     ventChance: 0.45,
     puddles: [0, 2],
     moss: [0, 0],
   },
   // Where the sporefall got in: vents everywhere, moss over the plating.
   overgrown: {
-    roles: [
-      ['lab', 3],
-      ['medbay', 2],
-      ['quarters', 2],
-      ['depot', 2],
-      ['washroom', 1],
+    zones: [
+      ['science', 4],
+      ['habitation', 2],
+      ['stores', 1],
     ],
+    engineering: 0,
     objective: ['lab', 'medbay'],
     deck: TILED,
+    atrium: Tile.Grass,
     ventChance: 0.7,
     puddles: [2, 4],
     moss: [8, 13],
   },
 }
 
-/** Smallest block edge (walls included) — keeps every room at least 3 wide. */
-const MIN_BLOCK = 9
-/** Hull thickness at the map edge. */
-const HULL = 1
-
-interface Band {
-  start: number
-  size: number
-}
-
-/** Cut one axis into alternating blocks and corridor lines (block first/last). */
-const cutAxis = (rng: Rng, total: number): { blocks: Band[]; corridors: Band[] } => {
-  const len = total - 2 * HULL
-  const k = rng.int(2, 3)
-  const widths = Array.from({ length: k }, () => rng.int(2, 3))
-  const space = len - widths.reduce((a, b) => a + b, 0)
-  const n = k + 1
-  const base = Math.floor(space / n)
-  const sizes = Array.from({ length: n }, (_, i) => base + (i < space - base * n ? 1 : 0))
-  for (let i = 0; i < n - 1; i++) {
-    const d = rng.int(-3, 3)
-    if (sizes[i] + d >= MIN_BLOCK && sizes[i + 1] - d >= MIN_BLOCK) {
-      sizes[i] += d
-      sizes[i + 1] -= d
-    }
-  }
-  const blocks: Band[] = []
-  const corridors: Band[] = []
-  let pos = HULL
-  for (let i = 0; i < n; i++) {
-    blocks.push({ start: pos, size: sizes[i] })
-    pos += sizes[i]
-    if (i < k) {
-      corridors.push({ start: pos, size: widths[i] })
-      pos += widths[i]
-    }
-  }
-  return { blocks, corridors }
-}
-
-/** A corridor segment: part of corridor line `line` spanning block band `span`. */
-interface Segment {
-  axis: 'v' | 'h'
-  line: number
-  span: number
-  kept: boolean
-}
-
-const segKey = (s: { axis: 'v' | 'h'; line: number; span: number }): string => `${s.axis}${s.line}:${s.span}`
-
-const find = (parent: number[], i: number): number => {
-  while (parent[i] !== i) {
-    parent[i] = parent[parent[i]]
-    i = parent[i]
-  }
-  return i
-}
-
-const shuffle = <T>(rng: Rng, items: T[]): T[] => {
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = rng.int(0, i)
-    const t = items[i]
-    items[i] = items[j]
-    items[j] = t
-  }
-  return items
+/** A zone as the generator reasons about it: a wing of the station. */
+interface Zone {
+  /** Grid rect, walls included (neighbours sharing a wall overlap by one). */
+  rect: Rect
+  /** Inner-local (u, v) → grid. */
+  at: (u: number, v: number) => Vec
+  iw: number
+  id: number
+  label: string
+  core: boolean
+  atrium: boolean
+  kind: ZoneKind
 }
 
 /** A room as the generator reasons about it before it becomes a Building. */
 interface RoomPlan {
-  rect: Rect
-  wing: number
+  rects: Rect[]
+  zone: number
+  style: RoomStyle
+  palette: Palette
+  noCorridor: boolean
   doors: { x: number; y: number }[]
+  /** Open archways onto another room: each is the other room + its tiles. */
+  arches: { other: number; tiles: { x: number; y: number }[] }[]
   role: BuildingRole
 }
 
@@ -244,6 +220,41 @@ export interface ComplexPlan {
   complex: ComplexInfo
 }
 
+/** Biggest room a security post takes (bigger ones are stores). */
+const POST_MAX = 48
+
+/** Must match systems/complexDirector LIGHTS_WING_REACH: every corridor tile
+ * lies within this many tiles of a wing (asserted by its sweep test). */
+const WING_REACH = 4
+
+const ORTHO = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const
+
+const area = (p: RoomPlan): number => p.rects.reduce((s, r) => s + r.w * r.h, 0)
+
+/** Bounding box of a room's rects plus its 1-tile wall ring. */
+const ringRect = (rects: Rect[]): Rect => {
+  const x0 = Math.min(...rects.map((r) => r.x))
+  const y0 = Math.min(...rects.map((r) => r.y))
+  const x1 = Math.max(...rects.map((r) => r.x + r.w))
+  const y1 = Math.max(...rects.map((r) => r.y + r.h))
+  return { x: x0 - 1, y: y0 - 1, w: x1 - x0 + 2, h: y1 - y0 + 2 }
+}
+
+const pickWeighted = <T>(rng: Rng, items: readonly (readonly [T, number])[]): T => {
+  const total = items.reduce((s, [, wt]) => s + wt, 0)
+  let roll = rng.next() * total
+  for (const [item, wt] of items) {
+    roll -= wt
+    if (roll < 0) return item
+  }
+  return items[items.length - 1][0]
+}
+
 /** Carve the whole indoor complex into `grid` (which it overwrites entirely). */
 export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPlan => {
   const w = grid.w
@@ -252,131 +263,191 @@ export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPl
   const def = BIOME_DEFS[biome]
   grid.fillRect(0, 0, w, h, Tile.Hull)
 
-  const cols = cutAxis(rng.fork('cols'), w)
-  const rows = cutAxis(rng.fork('rows'), h)
-  const kx = cols.corridors.length
-  const ky = rows.corridors.length
+  // ── 1. Skeleton: the main spines. ─────────────────────────────────────────
+  const sk: Skeleton = layoutSkeleton(rng.fork('skeleton'), Math.min(w, h))
+  const corridors: Corridor[] = [...sk.corridors]
 
-  // ── Spawn/exit corners first: their corridor stubs are pinned open. ───────
-  const srng = rng.fork('spawn')
-  const corner = srng.int(0, 3) // 0=TL 1=TR 2=BR 3=BL
-  const pinned = new Set<string>()
-  for (const c of [corner, (corner + 2) % 4]) {
-    const right = c === 1 || c === 2
-    const bottom = c === 2 || c === 3
-    pinned.add(segKey({ axis: 'v', line: right ? kx - 1 : 0, span: bottom ? ky : 0 }))
-    pinned.add(segKey({ axis: 'h', line: bottom ? ky - 1 : 0, span: right ? kx : 0 }))
-  }
-
-  // ── Corridor graph: spanning tree kept, loops/stubs may drop + merge. ─────
-  const nrng = rng.fork('net')
-  const segments: Segment[] = []
-  for (let i = 0; i < kx; i++) for (let j = 0; j <= ky; j++) segments.push({ axis: 'v', line: i, span: j, kept: true })
-  for (let j = 0; j < ky; j++) for (let i = 0; i <= kx; i++) segments.push({ axis: 'h', line: j, span: i, kept: true })
-  const node = (i: number, j: number): number => j * kx + i
-  const parent = Array.from({ length: kx * ky }, (_, i) => i)
-  const inner = segments.filter((s) => (s.axis === 'v' ? s.span > 0 && s.span < ky : s.span > 0 && s.span < kx))
-  const stubs = segments.filter((s) => !inner.includes(s))
-  const spare: Segment[] = []
-  for (const s of shuffle(nrng, [...inner])) {
-    const a = s.axis === 'v' ? node(s.line, s.span - 1) : node(s.span - 1, s.line)
-    const b = s.axis === 'v' ? node(s.line, s.span) : node(s.span, s.line)
-    const ra = find(parent, a)
-    const rb = find(parent, b)
-    if (ra !== rb) parent[ra] = rb // tree edge: always kept
-    else spare.push(s)
-  }
-  // Blocks: (kx+1) x (ky+1); `mergedWith` pairs a block with its merge partner.
-  const bw = kx + 1
-  const blockIdx = (bx: number, by: number): number => by * bw + bx
-  const mergedWith = new Map<number, number>()
-  const tryDrop = (s: Segment, p: number): void => {
-    if (pinned.has(segKey(s)) || !nrng.chance(p)) return
-    // A vertical segment on line i spanning row j separates blocks (i,j)/(i+1,j).
-    const a = s.axis === 'v' ? blockIdx(s.line, s.span) : blockIdx(s.span, s.line)
-    const b = s.axis === 'v' ? blockIdx(s.line + 1, s.span) : blockIdx(s.span, s.line + 1)
-    if (mergedWith.has(a) || mergedWith.has(b)) return // merges stay rectangular
-    s.kept = false
-    mergedWith.set(a, b)
-    mergedWith.set(b, a)
-  }
-  for (const s of spare) tryDrop(s, 0.5)
-  for (const s of stubs) tryDrop(s, 0.35)
-
-  // ── Carve corridors (kept segments + every intersection). ──────────────────
-  const segRect = (s: Segment): Rect =>
-    s.axis === 'v'
-      ? { x: cols.corridors[s.line].start, y: rows.blocks[s.span].start, w: cols.corridors[s.line].size, h: rows.blocks[s.span].size }
-      : { x: cols.blocks[s.span].start, y: rows.corridors[s.line].start, w: cols.blocks[s.span].size, h: rows.corridors[s.line].size }
-  for (const s of segments) {
-    if (!s.kept) continue
-    const r = segRect(s)
-    grid.fillRect(r.x, r.y, r.w, r.h, Tile.Hall)
-  }
-  for (const c of cols.corridors) for (const r of rows.corridors) grid.fillRect(c.start, r.start, c.size, r.size, Tile.Hall)
-
-  // Straight corridor runs: maximal carved stretches along each line.
-  const corridors: Corridor[] = []
-  const runs = (axis: 'v' | 'h', line: number, band: Band, along: { blocks: Band[]; corridors: Band[] }): void => {
-    let from = -1
-    let to = -1
-    const flush = (): void => {
-      if (from < 0) return
-      corridors.push({
-        axis,
-        rect: axis === 'v' ? { x: band.start, y: from, w: band.size, h: to - from } : { x: from, y: band.start, w: to - from, h: band.size },
+  // ── 2. Bands → zones + secondary corridors. ───────────────────────────────
+  const zones: Zone[] = []
+  for (const band of sk.bands) {
+    const f = frameOf(band.rect, band.face)
+    const lay = layoutBand(rng.fork(`band:${band.label}`), f.len, f.depth, band.full, band.voidEnds, {
+      start: band.keepStart,
+      end: band.keepEnd,
+      flat: band.flat,
+    })
+    for (const b of lay.branches) {
+      if (b.len < 2) continue
+      corridors.push({ axis: band.face.y !== 0 ? 'v' : 'h', rect: lrectToGrid(f, { u: b.u0, v: 0, w: 2, h: b.len }) })
+    }
+    lay.zones.forEach((z, zi) => {
+      zones.push({
+        rect: lrectToGrid(f, { u: z.u0, v: 0, w: z.w, h: z.d }),
+        at: (u, v) => toGrid(f, z.u0 + 1 + u, 1 + v),
+        iw: z.w - 2,
+        id: z.d - 2,
+        label: `${band.label}:${zi}`,
+        core: false,
+        atrium: false,
+        kind: 'stores',
       })
-      from = -1
-    }
-    for (let span = 0; span < along.blocks.length; span++) {
-      const seg = segments.find((s) => s.axis === axis && s.line === line && s.span === span)!
-      const b = along.blocks[span]
-      if (seg.kept) {
-        if (from < 0) from = b.start
-        to = b.start + b.size
-      } else flush()
-      const c = along.corridors[span]
-      if (c) {
-        if (from < 0) from = c.start
-        to = c.start + c.size
-      }
-    }
-    flush()
+    })
   }
-  cols.corridors.forEach((band, i) => runs('v', i, band, rows))
-  rows.corridors.forEach((band, j) => runs('h', j, band, cols))
-
-  // ── Wings (blocks, merged pairs as one) → rooms. ───────────────────────────
-  const rrng = rng.fork('rooms')
-  const wingRects: Rect[] = []
-  for (let by = 0; by <= ky; by++) {
-    for (let bx = 0; bx <= kx; bx++) {
-      const idx = blockIdx(bx, by)
-      const partner = mergedWith.get(idx)
-      if (partner !== undefined && partner < idx) continue // emitted with its partner
-      const r: Rect = { x: cols.blocks[bx].start, y: rows.blocks[by].start, w: cols.blocks[bx].size, h: rows.blocks[by].size }
-      if (partner !== undefined) {
-        const px = partner % bw
-        const py = Math.floor(partner / bw)
-        const x2 = cols.blocks[px].start + cols.blocks[px].size
-        const y2 = rows.blocks[py].start + rows.blocks[py].size
-        r.w = x2 - r.x
-        r.h = y2 - r.y
-      }
-      wingRects.push(r)
-    }
+  for (const c of sk.cores) {
+    const f = frameOf(c.rect, c.face)
+    zones.push({
+      rect: c.rect,
+      at: (u, v) => toGrid(f, 1 + u, 1 + v),
+      iw: f.len - 2,
+      id: f.depth - 2,
+      label: c.label,
+      core: true,
+      atrium: c.atrium,
+      kind: 'commons',
+    })
   }
 
+  // ── 3. Zoning. ─────────────────────────────────────────────────────────────
+  const zrng = rng.fork('zoning')
+  const zcenter = (z: Zone): Vec => ({ x: z.rect.x + z.rect.w / 2, y: z.rect.y + z.rect.h / 2 })
+  const zdist = (z: Zone): number => vlen(zcenter(z).x - sk.spawn.x, zcenter(z).y - sk.spawn.y)
+  const assigned = new Set<number>()
+  const hallable = (z: Zone): boolean => z.iw >= 8 && z.id >= 6 && !z.atrium
+  const biggest = (ok: (z: Zone) => boolean): number => {
+    let best = -1
+    zones.forEach((z, i) => {
+      if (assigned.has(i) || !ok(z)) return
+      if (best < 0 || z.iw * z.id > zones[best].iw * zones[best].id) best = i
+    })
+    return best
+  }
+  let entry = -1
+  zones.forEach((z, i) => {
+    if (z.core) return
+    if (entry < 0 || zdist(z) < zdist(zones[entry])) entry = i
+  })
+  if (entry >= 0) {
+    zones[entry].kind = 'entry'
+    assigned.add(entry)
+  }
+  const coreIdx = zones.findIndex((z) => z.core)
+  if (coreIdx >= 0) {
+    assigned.add(coreIdx)
+    zones[coreIdx].kind = zones[coreIdx].atrium ? 'stores' : biome === 'reactor' && zrng.chance(0.5) ? 'engineering' : 'commons'
+  }
+  if (!zones.some((z) => z.kind === 'commons' && !z.atrium && assigned.has(zones.indexOf(z)))) {
+    const c = biggest(hallable)
+    if (c >= 0) {
+      zones[c].kind = 'commons'
+      assigned.add(c)
+    }
+  }
+  const engineering = def.engineering + (zrng.chance(biome === 'reactor' ? 0.4 : 0.3) ? 1 : 0)
+  for (let i = 0; i < engineering; i++) {
+    const e = biggest(hallable)
+    if (e < 0) break
+    zones[e].kind = 'engineering'
+    assigned.add(e)
+  }
+  zones.forEach((z, i) => {
+    if (assigned.has(i)) return
+    z.kind = pickWeighted(zrng, def.zones)
+  })
+  // Symmetric plans: a mirrored zone takes its twin's purpose (not the one-offs).
+  const firstByLabel = new Map<string, number>()
+  zones.forEach((z, i) => {
+    const twin = firstByLabel.get(z.label)
+    if (twin === undefined) {
+      firstByLabel.set(z.label, i)
+      return
+    }
+    const unique = (k: ZoneKind): boolean => k === 'entry' || k === 'commons'
+    if (!unique(z.kind) && !unique(zones[twin].kind)) z.kind = zones[twin].kind
+  })
+  // Everyone sleeps somewhere.
+  if (!zones.some((z) => z.kind === 'habitation')) {
+    const spare = zones.findIndex((z) => (z.kind === 'stores' || z.kind === 'science') && !z.atrium)
+    if (spare >= 0) zones[spare].kind = 'habitation'
+  }
+
+  // ── 4. Carve corridors, then zone interiors. ──────────────────────────────
+  // A corridor tail left beside a missing end zone would be out of every
+  // wing's reach (lights-out keys off the wing the lead player is near), so
+  // spine and hall ends are trimmed back until each end cross-section is
+  // within WING_REACH of a wing. The airlock stub simply comes out shorter.
+  const wingRects = zones.map((z) => z.rect)
+  const nearWing = (x: number, y: number): boolean =>
+    wingRects.some((r) => vlen(Math.max(r.x - x, 0, x - (r.x + r.w)), Math.max(r.y - y, 0, y - (r.y + r.h))) <= WING_REACH)
+  for (const c of corridors) {
+    const r = c.rect
+    const v = c.axis === 'v'
+    const len = (): number => (v ? r.h : r.w)
+    const sectionOk = (i: number): boolean => {
+      for (let k = 0; k < (v ? r.w : r.h); k++) {
+        const x = v ? r.x + k : r.x + i
+        const y = v ? r.y + i : r.y + k
+        if (!nearWing(x + 0.5, y + 0.5)) return false
+      }
+      return true
+    }
+    while (len() > 3 && !sectionOk(0)) {
+      if (v) {
+        r.y++
+        r.h--
+      } else {
+        r.x++
+        r.w--
+      }
+    }
+    while (len() > 3 && !sectionOk(len() - 1)) {
+      if (v) r.h--
+      else r.w--
+    }
+  }
+  for (const c of corridors) grid.fillRect(c.rect.x, c.rect.y, c.rect.w, c.rect.h, Tile.Hall)
   const plans: RoomPlan[] = []
-  wingRects.forEach((wr, wi) => {
-    grid.fillRect(wr.x, wr.y, wr.w, wr.h, Tile.Wall)
-    const inner: Rect = { x: wr.x + 1, y: wr.y + 1, w: wr.w - 2, h: wr.h - 2 }
-    grid.fillRect(inner.x, inner.y, inner.w, inner.h, Tile.Floor)
-    for (const room of splitWing(rrng, grid, inner)) plans.push({ rect: room, wing: wi, doors: [], role: 'quarters' })
+  const pendingLinks: { a: number; b: number; tiles: { x: number; y: number }[]; arch: boolean }[] = []
+  const atriumOpenings: { x: number; y: number }[] = []
+  zones.forEach((z, zi) => {
+    grid.fillRect(z.rect.x, z.rect.y, z.rect.w, z.rect.h, Tile.Wall)
+    if (z.atrium) {
+      carveAtrium(grid, z, def.atrium, atriumOpenings)
+      return
+    }
+    const lay = layoutZone(rng.fork(`zone:${z.label}`), z.kind, z.iw, z.id, z.core)
+    for (let v = 0; v < z.id; v++) {
+      for (let u = 0; u < z.iw; u++) {
+        const p = z.at(u, v)
+        grid.set(p.x, p.y, lay.wall[v * z.iw + u] ? Tile.Wall : Tile.Floor)
+      }
+    }
+    const base = plans.length
+    const toRect = (l: LRect): Rect => {
+      const a = z.at(l.u, l.v)
+      const b = z.at(l.u + l.w - 1, l.v + l.h - 1)
+      return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x) + 1, h: Math.abs(a.y - b.y) + 1 }
+    }
+    for (const r of lay.rooms) {
+      plans.push({
+        rects: r.rects.map(toRect),
+        zone: zi,
+        style: r.style,
+        palette: r.palette,
+        noCorridor: r.noCorridor ?? false,
+        doors: [],
+        arches: [],
+        role: r.palette[0][0],
+      })
+    }
+    for (const l of lay.links) pendingLinks.push({ a: base + l.a, b: base + l.b, tiles: l.tiles.map((t) => z.at(t.u, t.v)), arch: l.arch })
   })
 
-  // ── Doors. ─────────────────────────────────────────────────────────────────
+  // ── 5. Doors. ──────────────────────────────────────────────────────────────
   const drng = rng.fork('doors')
+  const roomAt = new Int32Array(w * h).fill(-1)
+  plans.forEach((p, pi) => {
+    for (const r of p.rects) for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) roomAt[y * w + x] = pi
+  })
   const walkable = (x: number, y: number): boolean => grid.inBounds(x, y) && !isWallTile(grid.get(x, y))
   const doorOwners = new Map<number, number[]>() // tile key → plan indices sharing it
   const addDoor = (pi: number, x: number, y: number): void => {
@@ -386,147 +457,253 @@ export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPl
     if (!owners.includes(pi)) owners.push(pi)
     doorOwners.set(key, owners)
   }
-  const planAt = (x: number, y: number): number => plans.findIndex((p) => inRect(p.rect, x, y))
-  plans.forEach((p, pi) => {
-    // Corridor-facing sides: wall tile beyond the room edge with Hall beyond it.
-    const sides = ringSides(p.rect)
-    const corridorSides = sides
-      .map((side) => side.filter((t) => grid.get(t.ox, t.oy) === Tile.Hall))
-      .filter((c) => c.length > 0)
-    shuffle(drng, corridorSides)
-    corridorSides.forEach((cands, i) => {
-      if (i === 0 || (i === 1 && drng.chance(0.35))) {
-        const t = cands[drng.int(0, cands.length - 1)]
-        addDoor(pi, t.x, t.y)
-      }
-    })
-    if (corridorSides.length === 0) {
-      // Interior door into a neighbour room (prefer one that has corridor access).
-      const cands = sides.flat().filter((t) => walkable(t.ox, t.oy) && planAt(t.ox, t.oy) >= 0)
-      if (cands.length > 0) {
-        const t = cands[drng.int(0, cands.length - 1)]
-        addDoor(pi, t.x, t.y)
-        addDoor(planAt(t.ox, t.oy), t.x, t.y)
+  for (const l of pendingLinks) {
+    if (l.arch) {
+      for (const t of l.tiles) grid.set(t.x, t.y, Tile.Floor)
+      plans[l.a].arches.push({ other: l.b, tiles: l.tiles })
+      plans[l.b].arches.push({ other: l.a, tiles: l.tiles })
+    } else {
+      for (const t of l.tiles) {
+        addDoor(l.a, t.x, t.y)
+        addDoor(l.b, t.x, t.y)
       }
     }
-  })
+  }
 
-  // ── Spawn/exit: Hall tiles nearest the two pinned corners. ─────────────────
-  const cornerPt = (c: number): { x: number; y: number } => ({
-    x: c === 1 || c === 2 ? w - 1 : 0,
-    y: c === 2 || c === 3 ? h - 1 : 0,
-  })
-  const nearestHall = (pt: { x: number; y: number }): { x: number; y: number } => {
-    let best = { x: 0, y: 0 }
-    let bestD = Infinity
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        if (grid.get(x, y) !== Tile.Hall) continue
-        const d = vlen(x - pt.x, y - pt.y)
-        if (d < bestD) {
-          bestD = d
-          best = { x, y }
+  /** Wall tiles a door could go in: a straight stretch of wall line (not a
+   * junction, not inside any room) with walkable room deck on the inside and
+   * walkable ground beyond. Grouped into runs along one wall line. */
+  const doorRuns = (pi: number, accept: (ox: number, oy: number) => boolean): Cand[][] => {
+    const seen = new Set<number>()
+    const runs = new Map<string, Cand[]>()
+    for (const r of plans[pi].rects) {
+      for (let y = r.y; y < r.y + r.h; y++) {
+        for (let x = r.x; x < r.x + r.w; x++) {
+          if (!walkable(x, y)) continue
+          for (const [dx, dy] of ORTHO) {
+            const wx = x + dx
+            const wy = y + dy
+            const key = wy * w + wx
+            if (seen.has(key) || !grid.inBounds(wx, wy) || roomAt[key] >= 0 || grid.get(wx, wy) !== Tile.Wall) continue
+            const ox = wx + dx
+            const oy = wy + dy
+            if (!walkable(ox, oy) || !accept(ox, oy)) continue
+            // Straight wall: both side neighbours of the door tile are wall.
+            if (walkable(wx + dy, wy + dx) || walkable(wx - dy, wy - dx)) continue
+            seen.add(key)
+            const line = `${dx},${dy}:${dx !== 0 ? wx : wy}`
+            const run = runs.get(line) ?? []
+            run.push({ x: wx, y: wy, ox, oy, along: dx !== 0 ? wy : wx })
+            runs.set(line, run)
+          }
         }
       }
     }
-    return best
+    return [...runs.values()].map((run) => run.sort((a, b) => a.along - b.along))
   }
-  const spawnTile = nearestHall(cornerPt(corner))
-  const exit = nearestHall(cornerPt((corner + 2) % 4))
+  /** A door position a builder would pick: mid-wall, or tucked one in from an end. */
+  const spot = (run: Cand[]): number => {
+    if (run.length <= 2) return 0
+    const choice = drng.int(0, 2)
+    return choice === 0 ? Math.floor(run.length / 2) : choice === 1 ? 1 : run.length - 2
+  }
+  const isCorridor = (x: number, y: number): boolean => grid.get(x, y) === Tile.Hall
+  plans.forEach((p, pi) => {
+    if (p.noCorridor) return
+    const runs = doorRuns(pi, isCorridor)
+    if (runs.length === 0) return
+    const order = runs.map((_, i) => i)
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = drng.int(0, i)
+      ;[order[i], order[j]] = [order[j], order[i]]
+    }
+    const first = runs[order[0]]
+    const i0 = spot(first)
+    addDoor(pi, first[i0].x, first[i0].y)
+    const hall = p.style === 'hall'
+    // Great halls take double doors now and then (a wide opening).
+    if (hall && drng.chance(0.4) && i0 + 1 < first.length && first[i0 + 1].along === first[i0].along + 1) {
+      addDoor(pi, first[i0 + 1].x, first[i0 + 1].y)
+    }
+    if (order.length > 1 && drng.chance(hall ? 0.75 : 0.15)) {
+      const second = runs[order[1]]
+      const i1 = spot(second)
+      addDoor(pi, second[i1].x, second[i1].y)
+    }
+  })
+  const hasAccess = (pi: number): boolean => plans[pi].arches.length > 0 || [...doorOwners.values()].some((o) => o.includes(pi))
+  plans.forEach((_, pi) => {
+    if (hasAccess(pi)) return
+    // No corridor frontage: open into a neighbour, preferring one that
+    // already has a way out (a back office through the front office).
+    const runs = doorRuns(pi, (ox, oy) => roomAt[oy * w + ox] >= 0)
+    if (runs.length === 0) return
+    const score = (run: Cand[]): number => (hasAccess(roomAt[run[0].oy * w + run[0].ox]) ? 1 : 0)
+    const best = Math.max(...runs.map(score))
+    const pool = runs.filter((r) => score(r) === best)
+    const run = pool[drng.int(0, pool.length - 1)]
+    const c = run[Math.floor(run.length / 2)]
+    addDoor(pi, c.x, c.y)
+    addDoor(roomAt[c.oy * w + c.ox], c.x, c.y)
+  })
+
+  // ── Spawn at the airlock; exit at the farthest corridor deck. ─────────────
+  // The airlock is the spine's end — wherever the trim above left it.
+  let spawnTile = sk.spawn
+  if (grid.get(spawnTile.x, spawnTile.y) !== Tile.Hall) {
+    let best = Infinity
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (grid.get(x, y) !== Tile.Hall) continue
+        const d = vlen(x - sk.spawn.x, y - sk.spawn.y)
+        if (d < best) {
+          best = d
+          spawnTile = { x, y }
+        }
+      }
+    }
+  }
+  let exit = { x: spawnTile.x, y: spawnTile.y }
+  let exitD = -1
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (grid.get(x, y) !== Tile.Hall) continue
+      const d = vlen(x - spawnTile.x, y - spawnTile.y)
+      if (d > exitD) {
+        exitD = d
+        exit = { x, y }
+      }
+    }
+  }
 
   // ── Connectivity repair: punch through until every room is reachable. ──────
   for (let pass = 0; pass < plans.length + 1; pass++) {
     const reach = bfs(grid, spawnTile.x, spawnTile.y)
-    const stranded = plans.map((p, i) => ({ p, i })).filter(({ p }) => !reach[p.rect.y * w + p.rect.x])
-    if (stranded.length === 0) break
+    const stranded = plans.map((p, i) => ({ p, i })).filter(({ p }) => !reached(p, reach, w))
+    const pockets = zones.some((z) => z.atrium && !reach[z.at(0, 0).y * w + z.at(0, 0).x])
+    if (stranded.length === 0 && !pockets) break
     let punched = false
-    for (const { p, i } of stranded) {
-      const cand = ringSides(p.rect)
-        .flat()
-        .find((t) => grid.inBounds(t.ox, t.oy) && reach[t.oy * w + t.ox] === 1)
-      if (!cand) continue
-      addDoor(i, cand.x, cand.y)
-      const other = planAt(cand.ox, cand.oy)
-      if (other >= 0) addDoor(other, cand.x, cand.y)
+    for (const { i } of stranded) {
+      const runs = doorRuns(i, (ox, oy) => reach[oy * w + ox] === 1)
+      if (runs.length === 0) continue
+      const c = runs[0][Math.floor(runs[0].length / 2)]
+      addDoor(i, c.x, c.y)
+      const other = roomAt[c.oy * w + c.ox]
+      if (other >= 0) addDoor(other, c.x, c.y)
       punched = true
     }
     if (!punched) break
   }
-  for (const [key, owners] of doorOwners) {
-    for (const pi of owners) plans[pi].doors.push({ x: key % w, y: Math.floor(key / w) })
-  }
 
-  // ── Roles: objective deepest, mess hall biggest, galley beside it. ─────────
+  // ── 6. Roles: objective deepest, mess + galley, security at the airlock. ───
   const orng = rng.fork('roles')
-  const rectOf = (p: RoomPlan): Rect => ({ x: p.rect.x - 1, y: p.rect.y - 1, w: p.rect.w + 2, h: p.rect.h + 2 })
+  const planRect = (p: RoomPlan): Rect => ringRect(p.rects)
   // Same metric + tie-break as missions.farthestBuilding, so the module named
   // as the objective IS the one the mission targets.
   let objective = -1
   let bestDist = -1
   plans.forEach((p, i) => {
-    const r = rectOf(p)
+    const r = planRect(p)
     const d = vlen(r.x + r.w / 2 - (spawnTile.x + 0.5), r.y + r.h / 2 - (spawnTile.y + 0.5))
     if (d > bestDist) {
       bestDist = d
       objective = i
     }
   })
-  const area = (p: RoomPlan): number => p.rect.w * p.rect.h
-  const assigned = new Set<number>()
+  const roleSet = new Set<number>()
   if (objective >= 0) {
     plans[objective].role = orng.pick(def.objective)
-    assigned.add(objective)
+    roleSet.add(objective)
+    // The target is behind a LOCKED door: an open arch into it would bypass the
+    // lock, so its arches close down to a single door.
+    for (const a of plans[objective].arches) {
+      const mid = a.tiles[Math.floor(a.tiles.length / 2)]
+      for (const t of a.tiles) if (t !== mid) grid.set(t.x, t.y, Tile.Wall)
+      addDoor(objective, mid.x, mid.y)
+      addDoor(a.other, mid.x, mid.y)
+      plans[a.other].arches = plans[a.other].arches.filter((b) => b.other !== objective)
+    }
+    plans[objective].arches = []
   }
-  let mess = -1
-  plans.forEach((p, i) => {
-    if (assigned.has(i) || area(p) < 30) return
-    if (mess < 0 || area(p) > area(plans[mess])) mess = i
-  })
+  let mess = plans.findIndex((p, i) => !roleSet.has(i) && p.style === 'hall' && zones[p.zone].kind === 'commons')
+  if (mess < 0) {
+    plans.forEach((p, i) => {
+      if (roleSet.has(i) || area(p) < 30) return
+      if (mess < 0 || area(p) > area(plans[mess])) mess = i
+    })
+  }
   if (mess >= 0) {
     plans[mess].role = 'mess'
-    assigned.add(mess)
-    const galley = plans.findIndex((p, i) => !assigned.has(i) && p.wing === plans[mess].wing && sharesWall(p.rect, plans[mess].rect))
+    roleSet.add(mess)
+    let galley = plans[mess].arches.map((a) => a.other).find((o) => !roleSet.has(o)) ?? -1
+    if (galley < 0) {
+      galley = plans.findIndex(
+        (p, i) => !roleSet.has(i) && p.zone === plans[mess].zone && p.rects.some((a) => plans[mess].rects.some((b) => sharesWall(a, b))),
+      )
+    }
     if (galley >= 0) {
       plans[galley].role = 'galley'
-      assigned.add(galley)
+      roleSet.add(galley)
     }
   }
-  const total = def.roles.reduce((s, [, wt]) => s + wt, 0)
+  // The security post is the booth-sized module nearest the airlock.
+  let guard = -1
+  let guardD = Infinity
   plans.forEach((p, i) => {
-    if (assigned.has(i)) return
-    let roll = orng.int(1, total)
-    let role = def.roles[0][0]
-    for (const [r, wt] of def.roles) {
-      roll -= wt
-      if (roll <= 0) {
-        role = r
-        break
-      }
+    if (roleSet.has(i) || area(p) > POST_MAX) return
+    const r = planRect(p)
+    const d = vlen(r.x + r.w / 2 - spawnTile.x, r.y + r.h / 2 - spawnTile.y)
+    if (d < guardD) {
+      guardD = d
+      guard = i
     }
-    // A wash block is a closet, never a hall; a big one takes the biome's
-    // signature module instead (bunks, stores or labs).
-    if (role === 'washroom' && area(p) > 24) role = def.roles[0][0]
+  })
+  if (guard >= 0) {
+    plans[guard].role = 'security'
+    roleSet.add(guard)
+  }
+  plans.forEach((p, i) => {
+    if (roleSet.has(i)) return
+    let role = pickWeighted(orng, p.palette)
+    // A second mess hall is never a thing: extra great halls are stores.
+    if (role === 'mess') role = 'depot'
+    // A wash block is a closet, never a hall.
+    if (role === 'washroom' && area(p) > 24) role = zones[p.zone].kind === 'habitation' ? 'quarters' : 'depot'
+    // A guard post is a booth, not a barracks hall.
+    if (role === 'security' && area(p) > POST_MAX) role = 'depot'
     p.role = role
   })
+  // Everyone sleeps somewhere: failing a bunk room, the roomiest store becomes one.
+  if (!plans.some((p) => p.role === 'quarters')) {
+    let dorm = -1
+    plans.forEach((p, i) => {
+      if (roleSet.has(i) || p.role !== 'depot') return
+      if (dorm < 0 || area(p) > area(plans[dorm])) dorm = i
+    })
+    if (dorm >= 0) plans[dorm].role = 'quarters'
+  }
 
-  // ── Deck tiles per role (doors keep the plain threshold). ──────────────────
+  // ── Deck tiles per role (doors and arches keep the plain threshold). ───────
   for (const p of plans) {
     const deck = def.deck[p.role]
     if (deck === undefined) continue
-    for (let y = p.rect.y; y < p.rect.y + p.rect.h; y++) {
-      for (let x = p.rect.x; x < p.rect.x + p.rect.w; x++) if (grid.get(x, y) === Tile.Floor) grid.set(x, y, deck)
+    for (const r of p.rects) {
+      for (let y = r.y; y < r.y + r.h; y++) {
+        for (let x = r.x; x < r.x + r.w; x++) if (grid.get(x, y) === Tile.Floor) grid.set(x, y, deck)
+      }
     }
   }
 
   // ── Dressing: vents, bog seeps, moss — never on a door, spawn or exit. ─────
   const xrng = rng.fork('decor')
   const reserved = new Set<number>([spawnTile.y * w + spawnTile.x, exit.y * w + exit.x])
-  for (const key of doorOwners.keys()) {
-    const dx = key % w
-    const dy = Math.floor(key / w)
-    reserved.add(key)
-    for (const [ox, oy] of ORTHO) reserved.add((dy + oy) * w + dx + ox)
+  const reserve = (x: number, y: number): void => {
+    reserved.add(y * w + x)
+    for (const [ox, oy] of ORTHO) reserved.add((y + oy) * w + x + ox)
   }
+  for (const key of doorOwners.keys()) reserve(key % w, Math.floor(key / w))
+  for (const p of plans) for (const a of p.arches) for (const t of a.tiles) reserve(t.x, t.y)
+  for (const t of atriumOpenings) reserve(t.x, t.y)
   const vents: { x: number; y: number }[] = []
   for (const c of corridors) {
     const length = c.axis === 'v' ? c.rect.h : c.rect.w
@@ -563,19 +740,31 @@ export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPl
   splash(def.moss, Tile.Grass)
   grid.set(exit.x, exit.y, Tile.Exit)
 
-  // ── Emit buildings (one module per room) and wings. ────────────────────────
-  const buildings: Building[] = plans.map((p) => ({
-    rect: rectOf(p),
-    rooms: [p.rect],
-    doors: p.doors,
-    role: p.role,
-    poi: 'module',
-    objectiveRoom: p.rect,
-  }))
-  const wings: Wing[] = wingRects.map((rect, wi) => ({
-    rect,
-    buildings: plans.flatMap((p, i) => (p.wing === wi ? [i] : [])),
-  }))
+  // ── Emit buildings (one module per room) and wings (one per zone). ────────
+  for (const [key, owners] of doorOwners) {
+    for (const pi of owners) plans[pi].doors.push({ x: key % w, y: Math.floor(key / w) })
+  }
+  const buildings: Building[] = plans.map((p) => {
+    let main = p.rects[0]
+    for (const r of p.rects) if (r.w * r.h > main.w * main.h) main = r
+    return {
+      rect: ringRect(p.rects),
+      rooms: p.rects,
+      doors: p.doors,
+      role: p.role,
+      poi: 'module',
+      objectiveRoom: main,
+    }
+  })
+  // The atrium is a wing too (lights-out can black out the court), listed last.
+  const wings: Wing[] = []
+  const wingOf = (zi: number): Wing => ({ rect: zones[zi].rect, buildings: plans.flatMap((p, i) => (p.zone === zi ? [i] : [])) })
+  zones.forEach((z, zi) => {
+    if (!z.atrium) wings.push(wingOf(zi))
+  })
+  zones.forEach((z, zi) => {
+    if (z.atrium) wings.push(wingOf(zi))
+  })
   return {
     buildings,
     spawn: { x: spawnTile.x + 0.5, y: spawnTile.y + 0.5 },
@@ -584,14 +773,62 @@ export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPl
   }
 }
 
-const ORTHO = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-] as const
+interface Cand {
+  x: number
+  y: number
+  ox: number
+  oy: number
+  along: number
+}
 
-const inRect = (r: Rect, x: number, y: number): boolean => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h
+/** The ring template's open core: an atrium court (biome deck, pillars round
+ * the edge, a planter/pool heart) opening onto every corridor round it through
+ * wide gaps. Not a module — circulation space, like the corridors. */
+const carveAtrium = (grid: TileGrid, z: Zone, deck: TileId, openings: { x: number; y: number }[]): void => {
+  for (let v = 0; v < z.id; v++) {
+    for (let u = 0; u < z.iw; u++) {
+      const p = z.at(u, v)
+      const edge = u < 2 || v < 2 || u >= z.iw - 2 || v >= z.id - 2
+      grid.set(p.x, p.y, edge ? Tile.Hall : deck)
+    }
+  }
+  // Pillars ring the court, two in from the walls.
+  for (let u = 1; u < z.iw - 1; u += 3) {
+    for (const v of [1, z.id - 2]) {
+      const p = z.at(u, v)
+      grid.set(p.x, p.y, Tile.Wall)
+    }
+  }
+  for (let v = 4; v < z.id - 2; v += 3) {
+    for (const u of [1, z.iw - 2]) {
+      const p = z.at(u, v)
+      grid.set(p.x, p.y, Tile.Wall)
+    }
+  }
+  // A 3-wide opening mid-way along each wall (where a corridor lies beyond).
+  const open = (u: number, v: number, du: number, dv: number): void => {
+    for (let k = -1; k <= 1; k++) {
+      const p = z.at(u + du * k, v + dv * k)
+      grid.set(p.x, p.y, Tile.Hall)
+      openings.push(p)
+    }
+  }
+  const mu = Math.floor(z.iw / 2)
+  const mv = Math.floor(z.id / 2)
+  // The wall ring sits at local -1 / iw / id; clear the pillars beside each gap.
+  for (const [u, v, du, dv, pu, pv] of [
+    [mu, -1, 1, 0, mu, 1],
+    [mu, z.id, 1, 0, mu, z.id - 2],
+    [-1, mv, 0, 1, 1, mv],
+    [z.iw, mv, 0, 1, z.iw - 2, mv],
+  ] as const) {
+    open(u, v, du, dv)
+    for (let k = -1; k <= 1; k++) {
+      const p = z.at(pu + du * k, pv + dv * k)
+      if (grid.get(p.x, p.y) === Tile.Wall) grid.set(p.x, p.y, Tile.Hall)
+    }
+  }
+}
 
 /** Two room interiors separated by exactly one shared wall line. */
 const sharesWall = (a: Rect, b: Rect): boolean => {
@@ -600,65 +837,6 @@ const sharesWall = (a: Rect, b: Rect): boolean => {
   const gapX = a.x + a.w + 1 === b.x || b.x + b.w + 1 === a.x
   const gapY = a.y + a.h + 1 === b.y || b.y + b.h + 1 === a.y
   return (gapX && overlapY > 0) || (gapY && overlapX > 0)
-}
-
-/** Wall tiles one step outside each room edge (corners excluded), with the tile
- * one further out (`ox`,`oy`) — what a door there would open onto. */
-const ringSides = (r: Rect): { x: number; y: number; ox: number; oy: number }[][] => {
-  const top: { x: number; y: number; ox: number; oy: number }[] = []
-  const bottom: typeof top = []
-  const left: typeof top = []
-  const right: typeof top = []
-  for (let x = r.x; x < r.x + r.w; x++) {
-    top.push({ x, y: r.y - 1, ox: x, oy: r.y - 2 })
-    bottom.push({ x, y: r.y + r.h, ox: x, oy: r.y + r.h + 1 })
-  }
-  for (let y = r.y; y < r.y + r.h; y++) {
-    left.push({ x: r.x - 1, y, ox: r.x - 2, oy: y })
-    right.push({ x: r.x + r.w, y, ox: r.x + r.w + 1, oy: y })
-  }
-  return [top, bottom, left, right]
-}
-
-/**
- * Partition a wing's interior into rooms: one strip of rooms along the wing's
- * long axis, or two back-to-back strips when the wing is deep enough. Walls are
- * 1 tile. Every room is at least 3 x 4.
- */
-const splitWing = (rng: Rng, grid: TileGrid, inner: Rect): Rect[] => {
-  const horizontal = inner.w >= inner.h // strips run along x
-  const long = horizontal ? inner.w : inner.h
-  const short = horizontal ? inner.h : inner.w
-  const strips: [number, number][] = [] // [offset, depth] along the short axis
-  if (short >= 11) {
-    const d0 = rng.int(5, short - 6)
-    strips.push([0, d0], [d0 + 1, short - d0 - 1])
-    const wallAt = d0
-    if (horizontal) grid.fillRect(inner.x, inner.y + wallAt, inner.w, 1, Tile.Wall)
-    else grid.fillRect(inner.x + wallAt, inner.y, 1, inner.h, Tile.Wall)
-  } else {
-    strips.push([0, short])
-  }
-  const rooms: Rect[] = []
-  for (const [off, depth] of strips) {
-    let pos = 0
-    while (pos < long) {
-      const remaining = long - pos
-      const len = remaining <= 12 ? remaining : rng.int(4, Math.min(12, remaining - 5))
-      rooms.push(
-        horizontal
-          ? { x: inner.x + pos, y: inner.y + off, w: len, h: depth }
-          : { x: inner.x + off, y: inner.y + pos, w: depth, h: len },
-      )
-      pos += len
-      if (pos < long) {
-        if (horizontal) grid.fillRect(inner.x + pos, inner.y + off, 1, depth, Tile.Wall)
-        else grid.fillRect(inner.x + off, inner.y + pos, depth, 1, Tile.Wall)
-        pos += 1
-      }
-    }
-  }
-  return rooms
 }
 
 const bfs = (grid: TileGrid, sx: number, sy: number): Uint8Array => {
@@ -682,3 +860,10 @@ const bfs = (grid: TileGrid, sx: number, sy: number): Uint8Array => {
   }
   return reach
 }
+
+/** Does the flood reach any tile of this room? */
+const reached = (p: RoomPlan, reach: Uint8Array, w: number): boolean =>
+  p.rects.some((r) => {
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (reach[y * w + x]) return true
+    return false
+  })

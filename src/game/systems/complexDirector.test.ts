@@ -336,8 +336,19 @@ describe('lights out', () => {
     const wings = level.complex!.wings
     for (let i = 0; i < wings.length; i++) {
       const r = wings[i].rect
-      expect(wingForPoint(level, r.x + 0.5, r.y + 0.5)).toBe(i)
-      expect(wingForPoint(level, r.x + r.w - 0.5, r.y + r.h - 0.5)).toBe(i)
+      // Neighbouring wings share their dividing wall, so a corner tile may
+      // belong to the earlier one — but always to a wing CONTAINING it; the
+      // wing's centre is unambiguously its own.
+      for (const [x, y] of [
+        [r.x + 0.5, r.y + 0.5],
+        [r.x + r.w - 0.5, r.y + r.h - 0.5],
+      ]) {
+        const got = wingForPoint(level, x, y)
+        expect(got).toBeGreaterThanOrEqual(0)
+        const g = wings[got].rect
+        expect(x >= g.x && y >= g.y && x < g.x + g.w && y < g.y + g.h).toBe(true)
+      }
+      expect(wingForPoint(level, r.x + r.w / 2, r.y + r.h / 2)).toBe(i)
     }
     const c = level.complex!.corridors[0].rect
     const wi = wingForPoint(level, c.x + c.w / 2, c.y + c.h / 2)

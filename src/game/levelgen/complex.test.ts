@@ -63,6 +63,38 @@ const farthestModule = (level: Level): number => {
   return best
 }
 
+const ORTHO = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const
+
+/** Index of the module whose room contains the tile, or -1. */
+const inAnyRoom = (level: Level, x: number, y: number): number => level.buildings.findIndex((b) => b.rooms.some((r) => inRect(r, x, y)))
+
+/** Total deck area of a module (all its rects). */
+const roomArea = (b: Level['buildings'][number]): number => b.rooms.reduce((s, r) => s + r.w * r.h, 0)
+
+/** Open archway tiles of module `bi`: walkable wall-line tiles (in no room, not
+ * a door) with this module's deck on one side and another module's on the other. */
+const archways = (level: Level, bi: number): { x: number; y: number }[] => {
+  const doors = new Set(level.buildings.flatMap((b) => b.doors.map((d) => d.y * level.w + d.x)))
+  const out: { x: number; y: number }[] = []
+  const b = level.buildings[bi]
+  for (let y = b.rect.y; y < b.rect.y + b.rect.h; y++) {
+    for (let x = b.rect.x; x < b.rect.x + b.rect.w; x++) {
+      if (level.solid[y * level.w + x] || doors.has(y * level.w + x) || inAnyRoom(level, x, y) >= 0) continue
+      for (const [dx, dy] of ORTHO) {
+        const a = inAnyRoom(level, x + dx, y + dy)
+        const c = inAnyRoom(level, x - dx, y - dy)
+        if (a === bi && c >= 0 && c !== bi) out.push({ x, y })
+      }
+    }
+  }
+  return out
+}
+
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
 /** seeds x complex floors 3, 5, 7, 9 — one full lap of the four biomes. */
@@ -199,7 +231,7 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
   it('corridors are open deck along their whole rect, inside the hull', () => {
     for (const { level, tag } of sweep(60)) {
       const { corridors } = level.complex!
-      expect(corridors.length, tag).toBeGreaterThanOrEqual(4)
+      expect(corridors.length, tag).toBeGreaterThanOrEqual(3)
       for (const c of corridors) {
         expect(c.rect.x, tag).toBeGreaterThanOrEqual(1)
         expect(c.rect.y, tag).toBeGreaterThanOrEqual(1)
@@ -234,40 +266,62 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
     expect(total).toBeGreaterThan(200)
   })
 
-  it('every module is one sane room with a door, typed by its role', () => {
+  it('every module is a sane room (one or more rects) with a way in, typed by its role', () => {
     for (const { level, tag } of sweep(60)) {
       expect(level.buildings.length, tag).toBeGreaterThanOrEqual(15)
-      for (const b of level.buildings) {
+      const objective = farthestModule(level)
+      level.buildings.forEach((b, bi) => {
         expect(b.poi, tag).toBe('module')
-        expect(b.rooms.length, tag).toBe(1)
-        const room = b.rooms[0]
-        expect(Math.min(room.w, room.h), `${tag}: room too thin`).toBeGreaterThanOrEqual(3)
-        expect(b.objectiveRoom, tag).toEqual(room)
-        // The building rect is the room plus its 1-tile wall ring.
-        expect(b.rect, tag).toEqual({ x: room.x - 1, y: room.y - 1, w: room.w + 2, h: room.h + 2 })
-        expect(b.roomTypes, tag).toEqual([COMPLEX_ROOM_TYPE[b.role]])
-        expect(b.doors.length, `${tag}: doorless module`).toBeGreaterThanOrEqual(1)
+        expect(b.rooms.length, tag).toBeGreaterThanOrEqual(1)
+        // The objective room is the module's biggest rect and a real room.
+        const main = b.objectiveRoom!
+        expect(b.rooms, tag).toContainEqual(main)
+        for (const r of b.rooms) expect(r.w * r.h, tag).toBeLessThanOrEqual(main.w * main.h)
+        expect(Math.min(main.w, main.h), `${tag}: room too thin`).toBeGreaterThanOrEqual(3)
+        // The building rect is the rooms' bounding box plus its 1-tile wall ring.
+        const x0 = Math.min(...b.rooms.map((r) => r.x))
+        const y0 = Math.min(...b.rooms.map((r) => r.y))
+        const x1 = Math.max(...b.rooms.map((r) => r.x + r.w))
+        const y1 = Math.max(...b.rooms.map((r) => r.y + r.h))
+        expect(b.rect, tag).toEqual({ x: x0 - 1, y: y0 - 1, w: x1 - x0 + 2, h: y1 - y0 + 2 })
+        expect(b.roomTypes, tag).toEqual(b.rooms.map(() => COMPLEX_ROOM_TYPE[b.role]))
+        // A way in: a door, or an open archway onto a neighbour (a galley off
+        // its mess hall). The objective is ALWAYS behind a real (lockable) door.
+        expect(b.doors.length + archways(level, bi).length, `${tag}: sealed ${b.role}`).toBeGreaterThanOrEqual(1)
+        if (bi === objective) {
+          expect(b.doors.length, `${tag}: objective has no door`).toBeGreaterThanOrEqual(1)
+          expect(archways(level, bi), `${tag}: an open arch bypasses the objective lock`).toEqual([])
+        }
         for (const d of b.doors) {
           expect(isWallTile(tile(level, d.x, d.y)), `${tag}: door in wall`).toBe(false)
-          // A door sits in the wall ring (not a corner): orthogonally adjacent to the room.
-          const onRing = inRect(b.rect, d.x, d.y) && !inRect(room, d.x, d.y)
-          const corner = (d.x === b.rect.x || d.x === b.rect.x + b.rect.w - 1) && (d.y === b.rect.y || d.y === b.rect.y + b.rect.h - 1)
-          expect(onRing && !corner, `${tag}: door ${d.x},${d.y} not on the wall ring`).toBe(true)
+          expect(inAnyRoom(level, d.x, d.y), `${tag}: door ${d.x},${d.y} inside a room`).toBe(-1)
+          // A door sits in the wall line, orthogonally against its own room's deck.
+          const touches = ORTHO.some(([dx, dy]) => b.rooms.some((r) => inRect(r, d.x + dx, d.y + dy)) && !isWallTile(tile(level, d.x + dx, d.y + dy)))
+          expect(touches, `${tag}: door ${d.x},${d.y} not on its room's wall`).toBe(true)
         }
-        // Deck: every interior tile is floor-family (or the rare exit pad).
-        for (let y = room.y; y < room.y + room.h; y++) {
-          for (let x = room.x; x < room.x + room.w; x++) {
-            const t = tile(level, x, y)
-            expect(isFloorTile(t) || t === Tile.Grass || t === Tile.Exit, `${tag}: bad deck ${t} at ${x},${y}`).toBe(true)
+        // Deck: interior tiles are floor-family (or the rare exit pad); the only
+        // walls inside a room are features (pillars, chamfers, duct notches),
+        // and they never eat more than a fifth of it.
+        let walls = 0
+        let tiles = 0
+        for (const r of b.rooms) {
+          for (let y = r.y; y < r.y + r.h; y++) {
+            for (let x = r.x; x < r.x + r.w; x++) {
+              const t = tile(level, x, y)
+              tiles++
+              if (isWallTile(t)) walls++
+              else expect(isFloorTile(t) || t === Tile.Grass || t === Tile.Exit, `${tag}: bad deck ${t} at ${x},${y}`).toBe(true)
+            }
           }
         }
-      }
+        expect(walls / tiles, `${tag}: ${b.role} mostly wall`).toBeLessThanOrEqual(0.2)
+      })
     }
   })
 
   it('rooms never overlap and every module belongs to exactly one wing', () => {
     for (const { level, tag } of sweep(40)) {
-      const rooms = level.buildings.map((b) => b.rooms[0])
+      const rooms = level.buildings.flatMap((b) => b.rooms)
       for (let i = 0; i < rooms.length; i++) {
         for (let j = i + 1; j < rooms.length; j++) expect(overlaps(rooms[i], rooms[j]), `${tag}: rooms ${i}/${j}`).toBe(false)
       }
@@ -286,7 +340,7 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
 })
 
 describe('complex generator: the station reads like a station', () => {
-  it('ships a mess hall (the biggest room) with a galley next door, bunk rooms, and a mix of modules', () => {
+  it('ships a mess hall with a galley next door, bunk rooms, and a mix of modules', () => {
     const roles = new Map<string, number>()
     let messes = 0
     let galleys = 0
@@ -299,18 +353,22 @@ describe('complex generator: the station reads like a station', () => {
       const mess = level.buildings.find((b) => b.role === 'mess')
       if (mess) {
         messes++
-        const area = (r: Rect): number => r.w * r.h
-        expect(area(mess.rooms[0]), tag).toBeGreaterThanOrEqual(30)
+        expect(roomArea(mess), tag).toBeGreaterThanOrEqual(30)
+        // The dining hall is a HALL: well over the typical module, and bigger
+        // than its galley, every wash closet and every security post (a reactor
+        // hall, a big lab or a dormitory may rival it).
+        const sizes = level.buildings.map(roomArea).sort((a, b) => a - b)
+        expect(roomArea(mess), `${tag}: a pokey mess hall`).toBeGreaterThanOrEqual(1.5 * sizes[Math.floor(sizes.length / 2)])
         const objective = level.buildings[farthestModule(level)]
         for (const b of level.buildings) {
-          if (b === mess || b === objective) continue
-          expect(area(b.rooms[0]), `${tag}: a ${b.role} outsizes the mess hall`).toBeLessThanOrEqual(area(mess.rooms[0]))
+          if (b !== objective && ['washroom', 'galley', 'security'].includes(b.role)) {
+            expect(roomArea(b), `${tag}: a ${b.role} outsizes the mess hall`).toBeLessThanOrEqual(roomArea(mess))
+          }
         }
-        const galley = level.buildings.find((b) => b.role === 'galley')
-        if (galley) galleys++
+        if (level.buildings.some((b) => b.role === 'galley')) galleys++
       }
       // Washrooms are closets, never halls.
-      for (const b of level.buildings) if (b.role === 'washroom') expect(b.rooms[0].w * b.rooms[0].h, tag).toBeLessThanOrEqual(24)
+      for (const b of level.buildings) if (b.role === 'washroom') expect(roomArea(b), tag).toBeLessThanOrEqual(24)
     }
     expect(messes).toBeGreaterThan(150) // nearly every floor has its dining hall
     expect(galleys).toBeGreaterThan(messes * 0.8)
@@ -342,6 +400,168 @@ describe('complex generator: the station reads like a station', () => {
     for (const { level, tag } of sweep(40)) {
       expect(BIOME_DEFS[level.complex!.biome].objective, tag).toContain(level.buildings[farthestModule(level)].role)
     }
+  })
+})
+
+/** Is this module something other than one plain box? (several rects — an L,
+ * T or wrap-round — or feature walls inside it: pillars, chamfers, notches.) */
+const nonRectangular = (level: Level, b: Level['buildings'][number]): boolean =>
+  b.rooms.length > 1 || b.rooms.some((r) => {
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) if (level.solid[y * level.w + x]) return true
+    return false
+  })
+
+/** Best mirror match of the solid layer about any horizontal or vertical axis
+ * (fraction of mirrored tile pairs that agree, over a mostly-overlapping span). */
+const mirrorScore = (level: Level): number => {
+  let best = 0
+  for (const vert of [false, true]) {
+    for (let a2 = 20; a2 <= 2 * level.w - 22; a2++) {
+      let same = 0
+      let n = 0
+      for (let y = 0; y < level.h; y++) {
+        for (let x = 0; x < level.w; x++) {
+          const mx = vert ? a2 - x : x
+          const my = vert ? y : a2 - y
+          if (mx < 0 || my < 0 || mx >= level.w || my >= level.h) continue
+          n++
+          if (level.solid[y * level.w + x] === level.solid[my * level.w + mx]) same++
+        }
+      }
+      if (n > level.w * level.h * 0.6) best = Math.max(best, same / n)
+    }
+  }
+  return best
+}
+
+describe('complex generator: floorplans, not graph paper', () => {
+  it('a real share of modules are not plain boxes, on every floor', () => {
+    let odd = 0
+    let total = 0
+    let multi = 0
+    for (const { level, tag } of sweep(40)) {
+      const n = level.buildings.filter((b) => nonRectangular(level, b)).length
+      expect(n, `${tag}: every room a box`).toBeGreaterThanOrEqual(4)
+      odd += n
+      total += level.buildings.length
+      multi += level.buildings.filter((b) => b.rooms.length > 1).length
+    }
+    expect(odd / total, 'non-rectangular share').toBeGreaterThan(0.25)
+    expect(multi / total, 'L / T / wrap-round share').toBeGreaterThan(0.12)
+  })
+
+  it('circulation is a hierarchy: 3-wide main spines, 2-wide secondary halls, dead ends', () => {
+    let secondary = 0
+    let deadEnds = 0
+    const floors = [...sweep(40)]
+    for (const { level, tag } of floors) {
+      const { corridors } = level.complex!
+      const across = (c: (typeof corridors)[number]): number => (c.axis === 'h' ? c.rect.h : c.rect.w)
+      expect(corridors.some((c) => across(c) === 3), `${tag}: no main spine`).toBe(true)
+      if (corridors.some((c) => across(c) === 2)) secondary++
+      // A dead end: a corridor whose far end-cap is solid all the way across.
+      const capped = corridors.some((c) => {
+        const r = c.rect
+        const ends = c.axis === 'v' ? [r.y - 1, r.y + r.h] : [r.x - 1, r.x + r.w]
+        return ends.some((e) => {
+          for (let k = 0; k < across(c); k++) {
+            const x = c.axis === 'v' ? r.x + k : e
+            const y = c.axis === 'v' ? e : r.y + k
+            if (!level.solid[y * level.w + x]) return false
+          }
+          return true
+        })
+      })
+      if (capped) deadEnds++
+    }
+    expect(secondary / floors.length).toBeGreaterThan(0.9)
+    expect(deadEnds / floors.length).toBeGreaterThan(0.6)
+  })
+
+  it('the hull is not a square: wings step in and out, some leave notches', () => {
+    let ragged = 0
+    const floors = [...sweep(40)]
+    for (const { level } of floors) {
+      // Hull tiles off the map edge = outside space inside the footprint.
+      let outside = 0
+      for (let y = 1; y < level.h - 1; y++) for (let x = 1; x < level.w - 1; x++) if (level.tiles[y * level.w + x] === Tile.Hull) outside++
+      if (outside > 60) ragged++
+    }
+    expect(ragged / floors.length).toBeGreaterThan(0.85)
+  })
+
+  it('layouts vary in kind: several spine arrangements, symmetric sometimes, asymmetric mostly', () => {
+    const mains = new Set<number>()
+    let symmetric = 0
+    for (let seed = 1; seed <= 40; seed++) {
+      const level = generateLevel(seed, 3)
+      mains.add(level.complex!.corridors.filter((c) => (c.axis === 'h' ? c.rect.h : c.rect.w) === 3).length)
+      if (mirrorScore(level) > 0.87) symmetric++
+    }
+    expect(mains.size, 'every floor has the same spine count').toBeGreaterThanOrEqual(3)
+    expect(symmetric, 'never symmetric').toBeGreaterThanOrEqual(2)
+    expect(symmetric, 'always symmetric').toBeLessThanOrEqual(20)
+  })
+
+  it('rooms open into rooms: galleys off the mess through an arch, wash closets inside bunk suites, back rooms through front rooms', () => {
+    let arches = 0
+    let suites = 0
+    let passThrough = 0
+    for (const { level } of sweep(40)) {
+      const mess = level.buildings.findIndex((b) => b.role === 'mess')
+      if (mess >= 0 && archways(level, mess).some((t) => ORTHO.some(([dx, dy]) => level.buildings[inAnyRoom(level, t.x + dx, t.y + dy)]?.role === 'galley'))) arches++
+      for (const b of level.buildings) {
+        if (b.role !== 'washroom' || b.doors.length !== 1) continue
+        const d = b.doors[0]
+        if (ORTHO.some(([dx, dy]) => level.buildings[inAnyRoom(level, d.x + dx, d.y + dy)]?.role === 'quarters')) suites++
+      }
+      // A module none of whose doors touch a corridor: reached through another room.
+      for (const b of level.buildings) {
+        const onHall = b.doors.some((d) => ORTHO.some(([dx, dy]) => [Tile.Hall, Tile.Grate].includes(tile(level, d.x + dx, d.y + dy) as 10 | 11)))
+        if (!onHall) passThrough++
+      }
+    }
+    expect(arches, 'no serving arches').toBeGreaterThan(60)
+    expect(suites, 'no en-suite wash closets').toBeGreaterThan(100)
+    expect(passThrough, 'every room opens on a corridor').toBeGreaterThan(160)
+  })
+
+  it('big halls stand on pillars', () => {
+    let pillared = 0
+    for (const { level } of sweep(40)) {
+      const pillar = level.buildings.some((b) =>
+        b.rooms.some((r) => {
+          for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+            for (let x = r.x + 1; x < r.x + r.w - 1; x++) {
+              if (!level.solid[y * level.w + x]) continue
+              if (ORTHO.every(([dx, dy]) => !level.solid[(y + dy) * level.w + x + dx])) return true
+            }
+          }
+          return false
+        }),
+      )
+      if (pillar) pillared++
+    }
+    expect(pillared).toBeGreaterThan(50)
+  })
+
+  it('zoning: the security post stands by the airlock', () => {
+    let guarded = 0
+    const floors = [...sweep(40)]
+    for (const { level } of floors) {
+      // A security post within a short walk of the landing.
+      const near = level.buildings.some(
+        (b) => b.role === 'security' && Math.hypot(b.rect.x + b.rect.w / 2 - level.spawn.x, b.rect.y + b.rect.h / 2 - level.spawn.y) < 16,
+      )
+      if (near) guarded++
+    }
+    expect(guarded / floors.length).toBeGreaterThan(0.85)
+  })
+
+  it('generation stays cheap (a phone pays it at every floor change)', () => {
+    const t0 = performance.now()
+    for (let seed = 1; seed <= 40; seed++) generateLevel(seed, 3 + 2 * (seed % 4))
+    expect((performance.now() - t0) / 40).toBeLessThan(25)
   })
 })
 

@@ -318,6 +318,11 @@ export const rectCenter = (r: Rect): { x: number; y: number } => ({ x: r.x + r.w
 export const buildingAt = (level: Level, x: number, y: number): number => {
   const tx = Math.floor(x)
   const ty = Math.floor(y)
+  // Rooms first: an L-shaped complex module's bounding rect takes in a
+  // corner of its neighbour, whose own ROOM is the truer answer there.
+  for (let i = 0; i < level.buildings.length; i++) {
+    if (level.buildings[i].rooms.some((r) => rectContains(r, tx, ty))) return i
+  }
   for (let i = 0; i < level.buildings.length; i++) {
     if (rectContains(level.buildings[i].rect, tx, ty)) return i
   }

@@ -4,7 +4,7 @@
 // sleepers, security patrols) and the director's vents. A pure-node PNG
 // encoder (zlib) so it needs neither WebGL nor ffmpeg.
 //
-//   pnpm exec tsx scripts/test/render-complex-maps.mts [outDir]
+//   pnpm exec tsx scripts/test/render-complex-maps.mts [outDir] [seed:floor,seed:floor,...]
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
@@ -124,13 +124,16 @@ const render = (seed: number, floor: number): { file: string; buf: Buffer; W: nu
   writeFileSync(file, png(W, H, buf))
   const roles = new Map<string, number>()
   for (const b of L.buildings) roles.set(b.role, (roles.get(b.role) ?? 0) + 1)
-  console.log(`${file}: ${L.buildings.length} modules ${JSON.stringify(Object.fromEntries(roles))}, ${L.complex!.vents.length} vents, ${w.entities.filter((e) => e.kind === 'npc' && !e.dead).length} npcs`)
+  console.log(`${file}: ${L.complex!.archetype ?? '?'}, ${L.buildings.length} modules ${JSON.stringify(Object.fromEntries(roles))}, ${L.complex!.vents.length} vents, ${w.entities.filter((e) => e.kind === 'npc' && !e.dead).length} npcs`)
   return { file, buf, W, H }
 }
 
 // Complex floors only (3, 5, 7, 9 = one lap of the four biomes), then one
 // contact sheet of them all (4 across) for a before/after at a glance.
-const shots = [[3, 3], [3, 5], [3, 7], [3, 9], [11, 3], [7, 7], [21, 5], [42, 9]].map(([seed, floor]) => render(seed, floor))
+const pairs = process.argv[3]
+  ? process.argv[3].split(',').map((p) => p.split(':').map(Number))
+  : [[3, 3], [3, 5], [3, 7], [3, 9], [11, 3], [7, 7], [21, 5], [42, 9]]
+const shots = pairs.map(([seed, floor]) => render(seed, floor))
 const COLS = 4
 const GAP = 12
 const cw = shots[0].W

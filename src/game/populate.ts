@@ -584,7 +584,7 @@ const spawnEncounters = (w: World, erng: Rng): void => {
       ['pod', pods],
     ] as const) {
       for (let i = 0; i < n; i++) {
-        const spot = randomFloorInBuilding(w, erng, b)
+        const spot = randomFloorInBuilding(w, erng, b, true)
         if (spot) spawnNpc(w, arch, spot.x, spot.y)
       }
     }
@@ -649,7 +649,7 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
   for (const spec of specs) {
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
-      const spot = randomFloorInBuilding(w, rng, building)
+      const spot = randomFloorInBuilding(w, rng, building, true)
       if (!spot) continue
       // The new-archetype patrol beats (bunker band, courtyard pit) are FIXED
       // rectangles of provably-open tiles — patrol steering is straight-line
@@ -1038,6 +1038,9 @@ const randomFloorInBuilding = (
   w: World,
   rng: Rng,
   building: Building,
+  /** An occupant: on a complex floor the gatehouse rooms sit right by the
+   * airlock, so keep the spawn-safe radius clear (as street life does). */
+  occupant = false,
 ): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 12; attempt++) {
     const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
@@ -1045,6 +1048,7 @@ const randomFloorInBuilding = (
     // A complex module may be L-shaped: its bounding rect then takes in a
     // neighbour's floor, so only a tile of one of its OWN rooms counts.
     if (w.level.complex && !building.rooms.some((r) => rectContains(r, tx, ty))) continue
+    if (occupant && w.level.complex && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
     if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null

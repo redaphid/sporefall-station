@@ -480,7 +480,11 @@
    "tiles/bog-accent-0.png",
    "tiles/bog-accent-1.png",
    "tiles/bog-accent-2.png"
-  ]
+  ],
+  "tile.wall.cap": "tiles/wall-cap.png",
+  "tile.wall.cap.inner": "tiles/wall-cap-inner.png",
+  "tile.hull.cap": "tiles/hull-cap.png",
+  "tile.hull.cap.inner": "tiles/hull-cap-inner.png"
  },
  "anim": {
   "walk": 4

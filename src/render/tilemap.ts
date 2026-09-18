@@ -2,6 +2,7 @@ import { Container, Sprite } from 'pixi.js'
 import { isWallTile, Tile, WALL_CUT_OUTSIDE, type Level } from '../game/levelgen/level'
 import { TILE_PX, type ArtRegistry, type OverlaySide } from './art'
 import { coordHash, planTileOverlays, type OverlayPlacement } from './tileSelect'
+import { CAP_QUARTER_TURNS, CORNER_QUARTER_TURNS, planWallCaps } from './wallCaps'
 
 const CHUNK = 8 // tiles per chunk side
 
@@ -128,6 +129,23 @@ export class TilemapView {
                   seam.position.set(px, py)
                   container.addChild(seam)
                 }
+              }
+            } else {
+              // ---- Wall caps: the lit top strip on every edge facing open
+              // ground (rotated there), nubs in concave corners — one
+              // continuous line along runs, corners and T-junctions.
+              const caps = art.wallCap(tileId)
+              const plan = caps && planWallCaps(level, tx, ty)
+              if (caps && plan) {
+                const lay = (tex: typeof caps.edge, quarterTurns: number): void => {
+                  const piece = new Sprite(tex)
+                  piece.anchor.set(0.5)
+                  piece.position.set(px + TILE_PX / 2, py + TILE_PX / 2)
+                  piece.rotation = (quarterTurns * Math.PI) / 2
+                  container.addChild(piece)
+                }
+                for (const side of plan.sides) lay(caps.edge, CAP_QUARTER_TURNS[side])
+                for (const corner of plan.inner) lay(caps.inner, CORNER_QUARTER_TURNS[corner])
               }
             }
           }

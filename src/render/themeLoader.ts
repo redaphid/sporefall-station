@@ -18,11 +18,12 @@ import {
   resolveMacroTiles,
   resolveSpritePaths,
   TILE_NAMES,
+  WALL_CAP_NAMES,
   validateManifest,
   type LoadedTheme,
   type ThemeChain,
 } from './theme'
-import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type SpriteTextures } from './art'
+import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type SpriteTextures, type WallCapTextures } from './art'
 import { ANIM_STATES, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
 const BASE = import.meta.env.BASE_URL
@@ -195,14 +196,28 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     return out
   }
 
+  // Wall-cap pieces (edge strip + concave nub) per wall family; a family is
+  // kept only when BOTH pieces load, so the tilemap never lays half a cap.
+  const tileCapPairs = async (): Promise<Record<string, WallCapTextures>> => {
+    const pairs = await Promise.all(
+      WALL_CAP_NAMES.map((n) => Promise.all([one(`tile.${n}.cap`, TILE_PX), one(`tile.${n}.cap.inner`, TILE_PX)])),
+    )
+    const out: Record<string, WallCapTextures> = {}
+    WALL_CAP_NAMES.forEach((n, i) => {
+      const [edge, inner] = pairs[i]
+      if (edge && inner) out[n] = { edge, inner }
+    })
+    return out
+  }
+
   const [
-    tiles, tileAccents, tileOverlays, player, cop, item, prop,
+    tiles, tileAccents, tileOverlays, tileCaps, player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood,
     charSets, items, props,
   ] = await Promise.all([
-    tilePools(''), tilePools('.accent'), tilePools('.overlay'),
+    tilePools(''), tilePools('.accent'), tilePools('.overlay'), tileCapPairs(),
     one('unit.player', CHAR_CANVAS_PX), one('unit.cop', CHAR_CANVAS_PX),
     one('item.default', ITEM_PX), one('prop.default', TILE_PX),
     one('unit.thug.idle', CHAR_CANVAS_PX), one('unit.scientist.idle', CHAR_CANVAS_PX), one('unit.robot.idle', CHAR_CANVAS_PX),
@@ -225,7 +240,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   })
 
   return {
-    tiles, tileAccents, tileOverlays, tileMacro: resolveMacroTiles(chain), player, cop, item, prop,
+    tiles, tileAccents, tileOverlays, tileCaps, tileMacro: resolveMacroTiles(chain), player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood, chars, items, props,

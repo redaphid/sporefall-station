@@ -1,10 +1,11 @@
-import { Container, Graphics, Sprite, Texture, type Renderer } from 'pixi.js'
-import { Tile } from '../game/levelgen/level'
+import { Container, Graphics, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js'
+import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
 import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
+import { CAP_QUARTER_TURNS, cutCapSides } from './wallCaps'
 
 // These are LOGICAL sizes. The default swampspace-hires pack reads crisp at
 // 32/48 because its manifest declares `artScale: 2` — themeLoader bakes its art
@@ -54,6 +55,13 @@ export interface ArtRegistry {
    * strongest below a wall (side 'n' — the wall stands to the tile's north),
    * subtle on the flanks. Overlay-blended by the tilemap. */
   wallShadow(side: OverlaySide): Texture
+  /** The lit cap strip of a wall-family tile (wallCaps.ts): `edge` runs along
+   * the tile's NORTH edge and `inner` is the concave-corner nub in its NW
+   * corner, both on a transparent full-tile canvas — the tilemap rotates them
+   * to whichever edges/corners face open ground. Undefined for non-wall tiles
+   * and for themes whose wall art carries no cap. Bevelled corners bake their
+   * own caps into `tile()`. */
+  wallCap(tileId: number): WallCapTextures | undefined
   /** Soft seam strip for a boundary where a LOWER surface (street water) meets
    * a higher one (deck/grass) — drawn on the lower tile's edge. */
   groundSeam(side: OverlaySide): Texture
@@ -110,6 +118,12 @@ export interface DirPose {
  * neighbor via DIR_FALLBACK when the renderer picks a pose. */
 export type CharSet = Partial<Record<Dir5, DirPose>>
 
+/** A wall family's cap pieces — see ArtRegistry.wallCap. */
+export interface WallCapTextures {
+  edge: Texture
+  inner: Texture
+}
+
 export interface SpriteTextures {
   /** Themed tile art, keyed by tile NAME (street/sidewalk/floor/wall/grass/
    * exit): each entry is a non-empty variant pool the tilemap alternates by
@@ -119,6 +133,8 @@ export interface SpriteTextures {
   tileAccents?: Record<string, Texture[]>
   /** Context-placed RGBA decal pools per tile name (`tile.<name>.overlay`). */
   tileOverlays?: Record<string, Texture[]>
+  /** Wall-cap pieces per wall-family tile name (`tile.<name>.cap` + `.cap.inner`). */
+  tileCaps?: Record<string, WallCapTextures>
   /** Macro-slicing declarations per tile name (manifest `macroTiles`). */
   tileMacro?: Record<string, number>
   player?: Texture
@@ -542,23 +558,6 @@ export const createArt = (
 
   const drawTile = (tileId: number, variant: number): Texture => {
     const T = TILE_PX
-    // Bevelled wall corner: transparent canvas, wall-coloured polygon with the
-    // outside triangle cut away (the tilemap layers ground art underneath).
-    const cutPoly = WALL_CUT_POLY[tileId]
-    if (cutPoly) {
-      const wall = tileColors[Tile.Wall] ?? 0x1b1b24
-      const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
-      const pts = cutPoly.map((v) => v * T)
-      g.poly(pts).fill(wall)
-      g.poly(pts).stroke({ width: 2, color: 0x000000, alpha: 0.3 })
-      // Same top highlight the square wall carries, clipped to the kept width.
-      const topY = 0
-      const xs = cutPoly.filter((_, i) => i % 2 === 0 && cutPoly[i + 1] === 0).map((v) => v * T)
-      if (xs.length >= 2) g.rect(Math.min(...xs), topY, Math.max(...xs) - Math.min(...xs), 3).fill(0x2a2a36)
-      const tex = renderer.generateTexture(g)
-      g.destroy()
-      return tex
-    }
     const color = tileColors[tileId] ?? 0xff00ff
     const g = new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill(color)
     switch (tileId) {
@@ -570,7 +569,8 @@ export const createArt = (
           const offset = row % 2 === 0 ? T / 3 : T * 0.66
           g.rect(offset, y, 1, T / 4).fill({ color: 0x000000, alpha: 0.3 })
         }
-        g.rect(0, 0, T, 3).fill(0x2a2a36)
+        // No cap here: the lit top strip is a separate autotiled layer
+        // (wallCap / wallCaps.ts), laid on whichever edges face open ground.
         break
       }
       case Tile.Floor: {
@@ -657,7 +657,6 @@ export const createArt = (
         // Outer pressure hull: heavy riveted bands.
         g.rect(0, T / 2 - 2, T, 4).fill({ color: 0x000000, alpha: 0.4 })
         for (let i = 0; i < 3; i++) g.rect(4 + i * (T / 3), T / 2 - 1, 2, 2).fill({ color: 0xffffff, alpha: 0.12 })
-        g.rect(0, 0, T, 3).fill(0x222831)
         break
       }
       case Tile.Bog: {
@@ -682,24 +681,95 @@ export const createArt = (
     return tex
   }
 
-  /** Themed wall art clipped to a bevel-cut polygon, cached per cut tile id —
-   * so corner cuts wear the same dressed wall the straight runs do. */
-  const themedCutCache = new Map<number, Texture>()
-  const themedCut = (tileId: number, wallTex: Texture): Texture => {
-    let tex = themedCutCache.get(tileId)
+  // ---- Wall caps (the lit top strip, autotiled by wallCaps.ts) -------------
+  // Procedural cap for a procedural wall body: a flat strip in the colour the
+  // square wall used to bake along its top.
+  const PROC_CAP: Record<string, number> = { wall: 0x2a2a36, hull: 0x222831 }
+  const PROC_CAP_PX = 3
+  const procCapCache = new Map<string, WallCapTextures>()
+  const procCap = (family: string): WallCapTextures => {
+    let caps = procCapCache.get(family)
+    if (!caps) {
+      const T = TILE_PX
+      const color = PROC_CAP[family] ?? PROC_CAP.wall
+      const piece = (w: number): Texture => {
+        const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+        g.rect(0, 0, w, PROC_CAP_PX).fill(color)
+        g.rect(0, PROC_CAP_PX, w, 1).fill({ color: 0x000000, alpha: 0.35 })
+        const tex = renderer.generateTexture(g)
+        g.destroy()
+        return tex
+      }
+      caps = { edge: piece(T), inner: piece(PROC_CAP_PX + 1) }
+      procCapCache.set(family, caps)
+    }
+    return caps
+  }
+
+  /** Cap pieces for a wall-family tile: the theme's `tile.<name>.cap` pair
+   * when it ships one; the procedural strip when the BODY is procedural too;
+   * none when the theme dresses the wall but authored no cap (its art is then
+   * drawn exactly as shipped). Bevelled corners share the plain wall's. */
+  const wallCap = (tileId: number): WallCapTextures | undefined => {
+    if (!isWallTile(tileId)) return undefined
+    const family = tileId === Tile.Hull ? 'hull' : 'wall'
+    const themed = sprites.tileCaps?.[family]
+    if (themed) return themed
+    const body = sprites.tiles?.[family]
+    return body && body.length > 0 ? undefined : procCap(family)
+  }
+
+  /** Bevelled wall corner: the wall body (themed variant 0, else the
+   * procedural brick) clipped to the kept polygon, with its caps baked in —
+   * the strip along both exposed edges AND along the 45° cut, so the cap line
+   * wraps the bevel. Cached per cut tile id. The tilemap lays the ground the
+   * cut exposes underneath. */
+  const DIAG_CAP_ROT: Record<number, number> = {
+    [Tile.WallCutNW]: -Math.PI / 4,
+    [Tile.WallCutNE]: Math.PI / 4,
+    [Tile.WallCutSE]: (3 * Math.PI) / 4,
+    [Tile.WallCutSW]: (-3 * Math.PI) / 4,
+  }
+  const cutCache = new Map<number, Texture>()
+  const cutTile = (tileId: number): Texture => {
+    let tex = cutCache.get(tileId)
     if (!tex) {
+      const T = TILE_PX
+      const poly = WALL_CUT_POLY[tileId]
       const holder = new Container()
       // Transparent backer pins bounds to the full tile.
-      holder.addChild(new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill({ color: 0, alpha: 0 }))
-      const spr = new Sprite(wallTex)
-      spr.width = TILE_PX
-      spr.height = TILE_PX
-      const mask = new Graphics().poly(WALL_CUT_POLY[tileId].map((v) => v * TILE_PX)).fill(0xffffff)
-      spr.mask = mask
-      holder.addChild(spr, mask)
-      tex = renderer.generateTexture(holder)
+      holder.addChild(new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 }))
+      const kept = new Container()
+      const themedWall = sprites.tiles?.wall
+      const body = new Sprite(themedWall && themedWall.length > 0 ? themedWall[0] : drawTile(Tile.Wall, 0))
+      body.width = T
+      body.height = T
+      kept.addChild(body)
+      const caps = wallCap(tileId)
+      if (caps) {
+        for (const side of cutCapSides(tileId)) {
+          const strip = new Sprite(caps.edge)
+          strip.anchor.set(0.5)
+          strip.position.set(T / 2, T / 2)
+          strip.rotation = (CAP_QUARTER_TURNS[side] * Math.PI) / 2
+          kept.addChild(strip)
+        }
+        // Along the cut: top edge of the strip on the hypotenuse, strip inward.
+        const diag = new Sprite(caps.edge)
+        diag.anchor.set(0.5, 0)
+        // Midpoint of the cut's long side: a quarter tile in from the outside corner.
+        const cut = WALL_CUT_OUTSIDE[tileId]
+        diag.position.set((cut.dx < 0 ? 0.25 : 0.75) * T, (cut.dy < 0 ? 0.25 : 0.75) * T)
+        diag.rotation = DIAG_CAP_ROT[tileId]
+        kept.addChild(diag)
+      }
+      const mask = new Graphics().poly(poly.map((v) => v * T)).fill(0xffffff)
+      kept.mask = mask
+      holder.addChild(kept, mask)
+      // Explicit frame: the diagonal strip overhangs the tile before masking.
+      tex = renderer.generateTexture({ target: holder, frame: new Rectangle(0, 0, T, T) })
       holder.destroy({ children: true })
-      themedCutCache.set(tileId, tex)
+      cutCache.set(tileId, tex)
     }
     return tex
   }
@@ -720,11 +790,8 @@ export const createArt = (
       const macro = tx !== undefined && ty !== undefined ? sprites.tileMacro?.[name] : undefined
       return variants[pickTileVariant(variants.length, macro, tx ?? 0, ty ?? 0, hash)]
     }
-    // Bevelled corners wear the themed wall art (clipped) when the theme ships one.
-    const themedWall = sprites.tiles?.wall
-    if (WALL_CUT_POLY[tileId] && themedWall && themedWall.length > 0) {
-      return themedCut(tileId, themedWall[0])
-    }
+    // Bevelled corners wear the plain wall's body (clipped) + baked caps.
+    if (WALL_CUT_POLY[tileId]) return cutTile(tileId)
     const key = tileId * TILE_VARIANTS + (hash % TILE_VARIANTS)
     let tex = tileCache.get(key)
     if (!tex) {
@@ -1317,6 +1384,7 @@ export const createArt = (
     tileOverlayPool,
     tileMacro: tileMacroFor,
     wallShadow,
+    wallCap,
     groundSeam,
     entity,
     entityFlash,

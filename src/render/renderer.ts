@@ -136,6 +136,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     tileOverlayPool: (id) => inner.tileOverlayPool(id),
     tileMacro: (id) => inner.tileMacro(id),
     wallShadow: (s) => inner.wallShadow(s),
+    wallCap: (id) => inner.wallCap(id),
     groundSeam: (s) => inner.groundSeam(s),
     entity: (a) => inner.entity(a),
     entityFlash: (a, d) => inner.entityFlash(a, d),

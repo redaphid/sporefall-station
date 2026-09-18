@@ -98,6 +98,14 @@ export const TILE_NAMES = [
   'bog',
 ] as const
 
+/** Wall-family tile names that take an autotiled cap (render/wallCaps.ts):
+ * `tile.<name>.cap` is the lit top strip authored along the tile's NORTH edge
+ * (RGBA, transparent below it) and `tile.<name>.cap.inner` the matching nub in
+ * the NW corner for concave corners. The tilemap rotates both to whichever
+ * edges face open ground, so the cap line runs continuously; the wall body
+ * art itself must then carry no cap. */
+export const WALL_CAP_NAMES = ['wall', 'hull'] as const
+
 /** tile.* sprite keys accept a single path OR an array: the array's entries are
  * VARIANTS the tilemap alternates deterministically by tile coordinate, so big
  * surfaces read as texture instead of one repeated stamp. `tile.<name>.accent`
@@ -115,6 +123,10 @@ const buildSpriteKeys = (): Set<string> => {
     keys.add(`tile.${t}`)
     keys.add(`tile.${t}.accent`)
     keys.add(`tile.${t}.overlay`)
+  }
+  for (const t of WALL_CAP_NAMES) {
+    keys.add(`tile.${t}.cap`)
+    keys.add(`tile.${t}.cap.inner`)
   }
   for (const c of CHAR_NAMES) for (const d of DIRS5) for (const f of ['idle', 'step']) keys.add(`char.${c}.${d}-${f}`)
   // Animation-state frames (docs/themes.md "Animation states"):

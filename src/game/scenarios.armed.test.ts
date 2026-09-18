@@ -1,0 +1,113 @@
+// `?scenario=armed&floor=N`: a solo run dropped straight onto a station
+// complex floor with a survival loadout. The level must be the REAL complex for
+// that floor (not a floor-1 city with the number changed), the player must be
+// kitted out, and the exit must be reachable from where they land.
+
+import { describe, expect, it } from 'vitest'
+import { biomeForFloor, isComplexFloor } from './levelgen/complex'
+import { layoutSkeleton } from './levelgen/complexLayout'
+import { generateLevel } from './levelgen/generate'
+import { levelChecksum, type Level } from './levelgen/level'
+import { populateWorld } from './populate'
+import { spawnPlayer } from './player'
+import { mulberry32 } from './rng'
+import { ARMED_DEFAULT_FLOOR, ARMED_GRENADES, ARMED_HP, applyScenario } from './scenarios'
+import { playerSpawnPoint } from './spawnPlacement'
+import { setupFloor } from './systems/missions'
+import { expectWorldEqual, runTicks } from './testkit'
+import { LEVEL_H, LEVEL_W } from './types'
+import { createWorld, type World } from './world'
+
+/** A fresh solo run exactly as HostSession.buildRun makes one, then the scenario. */
+const armedRun = (seed: number, floor?: number): World => {
+  const w = createWorld(seed, 1)
+  populateWorld(w)
+  setupFloor(w)
+  const at = playerSpawnPoint(w.level, 0)
+  spawnPlayer(w, 0, at.x, at.y)
+  applyScenario(w, 'armed', { floor })
+  return w
+}
+
+const reachFrom = (level: Level, sx: number, sy: number): Uint8Array => {
+  const { w, h } = level
+  const reach = new Uint8Array(w * h)
+  const queue = [sy * w + sx]
+  reach[queue[0]] = 1
+  while (queue.length > 0) {
+    const i = queue.pop()!
+    const x = i % w
+    const y = (i / w) | 0
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = x + dx
+      const ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+      const n = ny * w + nx
+      if (reach[n] || level.solid[n]) continue
+      reach[n] = 1
+      queue.push(n)
+    }
+  }
+  return reach
+}
+
+// The showcase links handed to the owner: seed/floor → the layout they promise.
+const SHOWCASE = [
+  { seed: 18, floor: 3, template: 'ring', atrium: true }, // habitation ring atrium
+  { seed: 4, floor: 5, template: 'ladder', atrium: undefined }, // flooded ladder
+  { seed: 45, floor: 7, template: 'ring', atrium: false }, // reactor pillared great hall
+] as const
+
+describe('armed scenario', () => {
+  for (const { seed, floor } of SHOWCASE) {
+    it(`seed ${seed} floor ${floor}: lands on the real complex, armed, with the exit reachable`, () => {
+      const w = armedRun(seed, floor)
+      expect(w.floor).toBe(floor)
+      expect(isComplexFloor(floor)).toBe(true)
+      expect(w.level.complex?.biome).toBe(biomeForFloor(floor))
+      // Bit-identical to the level a run reaching this floor generates.
+      expect(levelChecksum(w.level)).toBe(levelChecksum(generateLevel(seed, floor)))
+      expect(w.mission.template).toBeDefined()
+
+      const players = w.entities.filter((e) => e.playerCtl)
+      expect(players).toHaveLength(1)
+      const p = players[0]
+      expect(p.dead).toBeFalsy()
+      expect(p.health).toMatchObject({ hp: ARMED_HP, max: ARMED_HP })
+      expect(p.combat?.weapon).toBe('machinegun')
+      const gun = p.loadout!.inventory.find((s) => s.itemId === 'machinegun')
+      expect(gun?.mods?.length).toBeGreaterThanOrEqual(4)
+      expect(p.loadout!.inventory.find((s) => s.itemId === 'grenade')?.qty).toBe(ARMED_GRENADES)
+
+      const px = Math.floor(p.pos.x)
+      const py = Math.floor(p.pos.y)
+      expect(w.level.solid[py * w.level.w + px]).toBeFalsy()
+      const reach = reachFrom(w.level, px, py)
+      expect(reach[Math.floor(w.level.exit.y) * w.level.w + Math.floor(w.level.exit.x)]).toBe(1)
+
+      // It plays: a couple of seconds of sim with the player standing still.
+      runTicks(w, new Map([[0, {}]]), 60)
+      expect(p.dead).toBeFalsy()
+    })
+  }
+
+  it('the showcase seeds carry the layouts their links promise', () => {
+    for (const { seed, floor, template, atrium } of SHOWCASE) {
+      const sk = layoutSkeleton(mulberry32(seed).fork(`levelgen:${floor}`).fork('complex').fork('skeleton'), Math.min(LEVEL_W, LEVEL_H))
+      expect(sk.template).toBe(template)
+      expect(sk.cores[0]?.atrium).toBe(atrium)
+    }
+  })
+
+  it('defaults to the first complex floor and is deterministic', () => {
+    const a = armedRun(7)
+    expect(a.floor).toBe(ARMED_DEFAULT_FLOOR)
+    expect(a.level.complex).toBeDefined()
+    expectWorldEqual(a, armedRun(7))
+  })
+})

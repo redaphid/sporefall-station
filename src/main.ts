@@ -273,7 +273,7 @@ const boot = async (): Promise<void> => {
   }
 
   if (scenario && session instanceof HostSession) {
-    applyScenario(session.world, scenario)
+    applyScenario(session.world, scenario, { floor: Number(params.get('floor')) || undefined })
     // Scenarios may carve/build tiles (stages, walls) — re-bake the tilemap so
     // the render matches the sim's level, not the pre-scenario one.
     renderer.setLevel(session.world.level)

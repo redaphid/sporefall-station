@@ -2,10 +2,11 @@
 // proper: a scenario just seeds entities into a fresh world before play starts.
 
 import { WEAPONS } from './data/items'
-import { makeEntity, type Entity } from './entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
+import { nextFloor } from './systems/missions'
 import { freeze, wet } from './systems/interactions'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
@@ -679,7 +680,61 @@ const stageArtCompare = (w: World): void => {
   stageThug(w, 19, LANE_Y)
 }
 
-export const applyScenario = (w: World, name: string): void => {
+/** Floor `?scenario=armed` lands on when no `&floor=` is given: the first
+ * indoor complex. */
+export const ARMED_DEFAULT_FLOOR = 3
+/** Doubled player HP. There is no armor system, so extra max HP stands in for it. */
+export const ARMED_HP = 240
+/** How many grenades to carry (throwables stack into one slot). */
+export const ARMED_GRENADES = 30
+
+/** `?scenario=armed[&floor=N]` drops a solo run straight onto floor N (default
+ * 3, the first station complex), kitted out to survive it. The floor is built
+ * by the real floor transition (`nextFloor` from N-1), so the level is exactly
+ * what a run reaching N gets: complex floors 3, 5, 7… come out as the indoor
+ * complex with their biome, populated and with the floor's mission set. No
+ * randomness of its own: the level and population come from the world's rng.
+ *
+ * The one-weapon rule holds (a player carries one permanent gun and cannot
+ * swap), so "well armed" means one heavily modded machine gun (guns carry no
+ * ammo, so it never runs dry), a big grenade stack held ready to throw, and
+ * double HP at full health. */
+const setupArmed = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
+  const target = Math.max(1, Math.floor(floor))
+  if (target !== w.floor) {
+    w.floor = target - 1
+    nextFloor(w)
+  }
+  const player = w.entities.find((e) => e.playerCtl)
+  if (!player) return
+  player.health = { hp: ARMED_HP, max: ARMED_HP, iframes: Math.max(player.health?.iframes ?? 0, SPAWN_GRACE_TICKS) }
+  player.loadout = {
+    inventory: [
+      {
+        itemId: 'machinegun',
+        qty: 1,
+        mods: [
+          { id: 'heavy', stacks: 2 },
+          { id: 'homing', stacks: 1 },
+          { id: 'lifesteal', stacks: 2 },
+          { id: 'pierce', stacks: 2 },
+          { id: 'rapid', stacks: 1 },
+        ],
+      },
+      { itemId: 'grenade', qty: ARMED_GRENADES },
+    ],
+    activeSlot: 1, // grenades held on the Use/Throw button; the gun fires regardless
+  }
+  if (player.combat) player.combat.weapon = 'machinegun'
+}
+
+export interface ScenarioOpts {
+  /** `?floor=`: the floor the `armed` scenario starts on. */
+  floor?: number
+}
+
+export const applyScenario = (w: World, name: string, opts: ScenarioOpts = {}): void => {
+  if (name === 'armed') setupArmed(w, opts.floor)
   if (name === 'artcompare') stageArtCompare(w)
   if (name === 'npc-combat') setupNpcCombat(w)
   if (name === 'objects') setupObjects(w)

@@ -75,6 +75,28 @@ the image publicly from the Worker (`/review/*`, KV-backed, never in the game
 bundle) and refuses to hand back a URL it hasn't re-fetched as real image bytes.
 Honest contact sheets — failures included — are the point. See `docs/deploy.md` § D.
 
+**Link the owner to interesting situations.** Every finished feature ships with
+2-5 `?state=<id>` links: playable replays of moments that show the feature off,
+such as the squad breaking when its leader dies, or the player walking into the pillared hall.
+Each link gets a one-line label. Put them **in the PR body and in your report
+to the owner**. A screenshot shows him the feature; a link lets him play it.
+
+- Capture **after merge + deploy, against the live site**. A state link replays
+  the recorded inputs against whatever code the site is serving, so a link captured on
+  a branch build diverges or breaks once live code differs. Edit the PR
+  body after deploy to add them.
+- Procedure: open `https://sporefall.hypnodroid.com/?debug`, set the situation
+  up with the debug verbs (`sporefall.verb(...)`: seed/floor, teleport, spawn),
+  let it run a few seconds, then `await sporefallShare('<label>')`. That returns
+  `{ id, url }`. The snapshot holds ~1 s of rewind, so start the capture just
+  *after* the interesting beat.
+- Confirm each link: load it and check `window.__stateReplay` is green. A red
+  verdict means the snapshot missed state; don't hand it over.
+- While building, write the scenarios down as reproducible setups (seed,
+  floor, coords, spawns, what to watch), so the post-deploy capture is
+  mechanical. Details of the mechanic are in `docs/testing-video.md` §
+  "`?state=<id>` — shareable debug links".
+
 **Keep release notes current.** Each PR with a player-visible change should add
 one file under `src/ui/releaseNotes/` — `YYYY-MM-DD-short-slug.ts` exporting a
 single one-line, player-facing summary as `default` (punchy, ~40 chars, no

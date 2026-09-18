@@ -10,7 +10,13 @@
    "floor": "#2a3626",
    "wall": "#141a16",
    "grass": "#35511a",
-   "exit": "#46e078"
+   "exit": "#46e078",
+   "hall": "#4a535c",
+   "grate": "#2e343b",
+   "tiled": "#bcc5c8",
+   "plating": "#59636d",
+   "hull": "#141a16",
+   "bog": "#163a3e"
   },
   "entities": {
    "boss": "#a05ae0",
@@ -383,7 +389,98 @@
   "char.boss.ne-idle": "chars/mireclaw-alpha-s-idle.png",
   "char.boss.ne-step": "chars/mireclaw-alpha-s-step.png",
   "char.boss.n-idle": "chars/mireclaw-alpha-s-idle.png",
-  "char.boss.n-step": "chars/mireclaw-alpha-s-step.png"
+  "char.boss.n-step": "chars/mireclaw-alpha-s-step.png",
+  "tile.hall": [
+   "tiles/hall-0.png",
+   "tiles/hall-1.png",
+   "tiles/hall-2.png",
+   "tiles/hall-3.png",
+   "tiles/hall-4.png",
+   "tiles/hall-5.png",
+   "tiles/hall-6.png",
+   "tiles/hall-7.png",
+   "tiles/hall-8.png",
+   "tiles/hall-9.png",
+   "tiles/hall-10.png",
+   "tiles/hall-11.png",
+   "tiles/hall-12.png",
+   "tiles/hall-13.png",
+   "tiles/hall-14.png",
+   "tiles/hall-15.png"
+  ],
+  "tile.hall.accent": [
+   "tiles/hall-accent-0.png",
+   "tiles/hall-accent-1.png",
+   "tiles/hall-accent-2.png"
+  ],
+  "tile.grate": [
+   "tiles/grate-0.png",
+   "tiles/grate-1.png",
+   "tiles/grate-2.png"
+  ],
+  "tile.tiled": [
+   "tiles/tiled-0.png",
+   "tiles/tiled-1.png",
+   "tiles/tiled-2.png",
+   "tiles/tiled-3.png",
+   "tiles/tiled-4.png",
+   "tiles/tiled-5.png"
+  ],
+  "tile.tiled.accent": [
+   "tiles/tiled-accent-0.png",
+   "tiles/tiled-accent-1.png"
+  ],
+  "tile.plating": [
+   "tiles/plating-0.png",
+   "tiles/plating-1.png",
+   "tiles/plating-2.png",
+   "tiles/plating-3.png",
+   "tiles/plating-4.png",
+   "tiles/plating-5.png",
+   "tiles/plating-6.png",
+   "tiles/plating-7.png",
+   "tiles/plating-8.png",
+   "tiles/plating-9.png",
+   "tiles/plating-10.png",
+   "tiles/plating-11.png",
+   "tiles/plating-12.png",
+   "tiles/plating-13.png",
+   "tiles/plating-14.png",
+   "tiles/plating-15.png"
+  ],
+  "tile.plating.accent": [
+   "tiles/plating-accent-0.png",
+   "tiles/plating-accent-1.png",
+   "tiles/plating-accent-2.png"
+  ],
+  "tile.hull": [
+   "tiles/hull-0.png",
+   "tiles/hull-1.png",
+   "tiles/hull-2.png"
+  ],
+  "tile.hull.accent": [
+   "tiles/hull-accent-0.png",
+   "tiles/hull-accent-1.png"
+  ],
+  "tile.bog": [
+   "tiles/bog-0.png",
+   "tiles/bog-1.png",
+   "tiles/bog-2.png",
+   "tiles/bog-3.png",
+   "tiles/bog-4.png",
+   "tiles/bog-5.png",
+   "tiles/bog-6.png",
+   "tiles/bog-7.png",
+   "tiles/bog-8.png",
+   "tiles/bog-9.png",
+   "tiles/bog-10.png",
+   "tiles/bog-11.png"
+  ],
+  "tile.bog.accent": [
+   "tiles/bog-accent-0.png",
+   "tiles/bog-accent-1.png",
+   "tiles/bog-accent-2.png"
+  ]
  },
  "anim": {
   "walk": 4
@@ -391,7 +488,10 @@
  "macroTiles": {
   "floor": 2,
   "street": 2,
-  "grass": 4
+  "grass": 4,
+  "hall": 2,
+  "plating": 2,
+  "bog": 2
  },
  "artScale": 2
 }

@@ -80,8 +80,23 @@ export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.e
 
 /** Tile names addressable from palette.tiles and tile.* sprite keys (mirrors the
  * Tile enum by name — the render layer maps them back to ids; the pure layer
- * stays game-free). */
-export const TILE_NAMES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit'] as const
+ * stays game-free). The last six are the indoor-complex decks (floors 3+):
+ * corridor `hall`, vent `grate`, ceramic `tiled`, tread `plating`, the outer
+ * pressure `hull` (wall family) and the `bog` seep flooding the deck. */
+export const TILE_NAMES = [
+  'street',
+  'sidewalk',
+  'floor',
+  'wall',
+  'grass',
+  'exit',
+  'hall',
+  'grate',
+  'tiled',
+  'plating',
+  'hull',
+  'bog',
+] as const
 
 /** tile.* sprite keys accept a single path OR an array: the array's entries are
  * VARIANTS the tilemap alternates deterministically by tile coordinate, so big

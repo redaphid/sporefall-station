@@ -23,7 +23,8 @@ POOLS = [
     ("tile.{n}.accent", "{n}-accent-*.png"),
     ("tile.{n}.overlay", "{n}-overlay-*.png"),
 ]
-SURFACES = ["street", "sidewalk", "floor", "wall", "grass", "exit"]
+SURFACES = ["street", "sidewalk", "floor", "wall", "grass", "exit",
+            "hall", "grate", "tiled", "plating", "hull", "bog"]  # + indoor complex
 
 
 def num(path):

@@ -1042,6 +1042,9 @@ const randomFloorInBuilding = (
   for (let attempt = 0; attempt < 12; attempt++) {
     const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
     const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
+    // A complex module may be L-shaped: its bounding rect then takes in a
+    // neighbour's floor, so only a tile of one of its OWN rooms counts.
+    if (w.level.complex && !building.rooms.some((r) => rectContains(r, tx, ty))) continue
     if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null

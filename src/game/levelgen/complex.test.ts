@@ -1,4 +1,4 @@
-// Indoor complex generator (floors 3+) — strict, adversarial property tests.
+// Indoor complex generator (floors 3, 5, 7…) — strict, adversarial property tests.
 // Every invariant runs over MANY seeds x every biome, because a generator bug
 // is a needle: one seed in fifty strands a bunk room behind a solid wall.
 
@@ -9,7 +9,7 @@ import { setupFloor } from '../systems/missions'
 import { LEVEL_H, LEVEL_W } from '../types'
 import { createCityWorld } from '../testkit'
 import { createWorld } from '../world'
-import { BIOME_DEFS, BIOMES, biomeForFloor, carveComplex, COMPLEX_MIN_FLOOR, isComplexFloor } from './complex'
+import { BIOME_DEFS, BIOMES, biomeForFloor, carveComplex, cityFloorOrdinal, COMPLEX_MIN_FLOOR, isComplexFloor } from './complex'
 import { generateComplexLevel, generateLevel } from './generate'
 import { isFloorTile, isWallTile, levelChecksum, Tile, TileGrid, type Level } from './level'
 import { COMPLEX_ROOM_TYPE } from './roomTypes'
@@ -65,32 +65,46 @@ const farthestModule = (level: Level): number => {
 
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-/** seeds x floors 3..6 — one full lap of the four biomes. */
+/** seeds x complex floors 3, 5, 7, 9 — one full lap of the four biomes. */
 const sweep = function* (seeds: number): Generator<{ seed: number; floor: number; level: Level; tag: string }> {
   for (let seed = 1; seed <= seeds; seed++) {
-    for (let floor = 3; floor <= 6; floor++) {
+    for (let floor = 3; floor <= 9; floor += 2) {
       yield { seed, floor, level: generateLevel(seed, floor), tag: `seed ${seed} floor ${floor}` }
     }
   }
 }
 
 describe('complex floor switch + biomes', () => {
-  it('floors 1-2 stay city; every floor from 3 up is a complex', () => {
+  it('floors 1-2 stay city; from floor 3 complex and city alternate (3, 5, 7… complex; 4, 6, 8… city)', () => {
     expect(COMPLEX_MIN_FLOOR).toBe(3)
-    expect(isComplexFloor(1)).toBe(false)
-    expect(isComplexFloor(2)).toBe(false)
-    for (const f of [3, 4, 5, 9, 50, 999]) expect(isComplexFloor(f)).toBe(true)
+    for (const f of [-3, 0, 1, 2]) expect(isComplexFloor(f), `floor ${f}`).toBe(false)
+    for (const f of [3, 5, 7, 9, 51, 999]) expect(isComplexFloor(f), `floor ${f}`).toBe(true)
+    for (const f of [4, 6, 8, 50, 1000]) expect(isComplexFloor(f), `floor ${f}`).toBe(false)
+    // Strict alternation: no two adjacent floors from 3 up share a generator.
+    for (let f = 3; f < 60; f++) expect(isComplexFloor(f + 1)).toBe(!isComplexFloor(f))
     for (let seed = 1; seed <= 10; seed++) {
-      expect(generateLevel(seed, 1).complex).toBeUndefined()
-      expect(generateLevel(seed, 2).complex).toBeUndefined()
-      expect(generateLevel(seed, 3).complex).toBeDefined()
+      for (let f = 1; f <= 8; f++) {
+        const level = generateLevel(seed, f)
+        if (isComplexFloor(f)) expect(level.complex, `seed ${seed} floor ${f}`).toBeDefined()
+        else expect(level.complex, `seed ${seed} floor ${f}`).toBeUndefined()
+      }
     }
   })
 
-  it('biomes cycle so consecutive complex floors never share one, and every biome shows up', () => {
+  it('city floors between complexes cycle every district theme, never repeating back to back', () => {
+    const cityFloors = [1, 2, 4, 6, 8, 10, 12]
+    expect(cityFloors.map(cityFloorOrdinal)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    const themes = cityFloors.map((f) => generateLevel(7, f).theme)
+    for (let i = 1; i < themes.length; i++) expect(themes[i], `city floor ${cityFloors[i]}`).not.toBe(themes[i - 1])
+    expect(new Set(themes).size).toBe(4)
+  })
+
+  it('biomes cycle across complex floors so consecutive complex floors never share one, and every biome shows up', () => {
     const seen = new Set<string>()
-    for (let f = 3; f < 40; f++) {
-      expect(biomeForFloor(f)).not.toBe(biomeForFloor(f + 1))
+    const complexFloors = Array.from({ length: 20 }, (_, i) => 3 + 2 * i)
+    expect(complexFloors.slice(0, 4).map(biomeForFloor)).toEqual([...BIOMES])
+    for (const f of complexFloors) {
+      expect(biomeForFloor(f)).not.toBe(biomeForFloor(f + 2))
       seen.add(biomeForFloor(f))
       expect(generateLevel(7, f).complex!.biome).toBe(biomeForFloor(f))
     }
@@ -106,7 +120,7 @@ describe('complex generator: determinism', () => {
   it('is bit-exact for the same seed+floor (tiles, buildings, corridors, vents, wings)', () => {
     for (const [seed, floor] of [
       [1, 3],
-      [0xdeadbeef, 4],
+      [0xdeadbeef, 5],
       [42, 9],
     ]) {
       const a = generateLevel(seed, floor)
@@ -123,7 +137,7 @@ describe('complex generator: determinism', () => {
     const sums = new Set<number>()
     for (let seed = 1; seed <= 20; seed++) sums.add(levelChecksum(generateLevel(seed, 3)))
     expect(sums.size).toBe(20)
-    expect(levelChecksum(generateLevel(5, 3))).not.toBe(levelChecksum(generateLevel(5, 4)))
+    expect(levelChecksum(generateLevel(5, 3))).not.toBe(levelChecksum(generateLevel(5, 5)))
   })
 
   it('generateLevel on a complex floor IS generateComplexLevel', () => {
@@ -311,17 +325,17 @@ describe('complex generator: the station reads like a station', () => {
     let overgrown = 0
     let habitationMoss = 0
     for (let seed = 1; seed <= 30; seed++) {
-      flooded += count(generateLevel(seed, 4), Tile.Bog)
-      overgrown += count(generateLevel(seed, 6), Tile.Grass)
+      flooded += count(generateLevel(seed, 5), Tile.Bog)
+      overgrown += count(generateLevel(seed, 9), Tile.Grass)
       habitationMoss += count(generateLevel(seed, 3), Tile.Grass)
-      expect(generateLevel(seed, 4).complex!.biome).toBe('flooded')
-      expect(generateLevel(seed, 6).complex!.biome).toBe('overgrown')
+      expect(generateLevel(seed, 5).complex!.biome).toBe('flooded')
+      expect(generateLevel(seed, 9).complex!.biome).toBe('overgrown')
     }
     expect(flooded / 30).toBeGreaterThan(40)
     expect(overgrown / 30).toBeGreaterThan(40)
     expect(habitationMoss).toBe(0)
     // Reactor floors plate their engineering decks.
-    expect(generateLevel(1, 5).tiles.filter((x) => x === Tile.Plating).length).toBeGreaterThan(100)
+    expect(generateLevel(1, 7).tiles.filter((x) => x === Tile.Plating).length).toBeGreaterThan(100)
   })
 
   it('the objective module (farthest from spawn) takes a biome objective role', () => {
@@ -334,7 +348,7 @@ describe('complex generator: the station reads like a station', () => {
 describe('complex generator: adversarial inputs', () => {
   it('extreme seeds and very deep floors still build a fully connected complex', () => {
     for (const seed of [0, -1, 1, 0x7fffffff, 0xffffffff, 2 ** 31, 123456789]) {
-      for (const floor of [3, 7, 64, 999]) {
+      for (const floor of [3, 7, 65, 999]) {
         const level = generateLevel(seed, floor)
         const reach = spawnReach(level)
         expect(reach[level.exit.y * level.w + level.exit.x], `seed ${seed} floor ${floor}`).toBe(1)
@@ -369,7 +383,7 @@ describe('complex floors populate like a station', () => {
   it('corridors stay clear of furniture (patrols and swarms can always run them)', () => {
     let props = 0
     for (let seed = 1; seed <= 25; seed++) {
-      for (const floor of [3, 4, 5, 6]) {
+      for (const floor of [3, 5, 7, 9]) {
         const w = world(seed, floor)
         for (const e of w.entities) {
           if (e.kind !== 'interactable') continue
@@ -415,7 +429,7 @@ describe('complex floors populate like a station', () => {
   })
 
   it('keeps the floor population in the city band (many modules must not mean many more bodies)', () => {
-    for (const floor of [3, 4, 5]) {
+    for (const floor of [3, 5]) {
       let complex = 0
       let city = 0
       for (let seed = 1; seed <= 10; seed++) {
@@ -433,7 +447,7 @@ describe('complex floors populate like a station', () => {
 
   it('the mission targets a real module on every complex floor', () => {
     for (let seed = 1; seed <= 30; seed++) {
-      for (const floor of [3, 4, 5, 6]) {
+      for (const floor of [3, 5, 7, 9]) {
         const w = world(seed, floor)
         if (w.mission.targetBuilding === undefined) continue
         const b = w.level.buildings[w.mission.targetBuilding]

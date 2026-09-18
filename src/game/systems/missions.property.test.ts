@@ -14,7 +14,7 @@
 // replacing "last room in the array") must keep every placement byte-identical
 // — floor 1 especially, whose layout+demos are frozen.
 import { describe, expect, it } from 'vitest'
-import { isComplexFloor } from '../levelgen/complex'
+import { COMPLEX_MIN_FLOOR } from '../levelgen/complex'
 import { isFloorTile, isWallTile, Tile, tileAt } from '../levelgen/level'
 import { populateWorld } from '../populate'
 import { emptyInput } from '../types'
@@ -225,9 +225,10 @@ const PINNED: { seed: number; floor: number; tpl: string; bld: number; pos: [num
 describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor table)', () => {
   it('reproduces every pinned mission placement byte-identically', () => {
     for (const row of PINNED) {
-      // Floors 3+ now build the indoor complex; these rows pin the CITY
-      // generator's placements, so replay them on a city world.
-      const w = isComplexFloor(row.floor) ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
+      // Floors 3+ now alternate complex and city (city themes cycling over city
+      // floors only); these rows pin the raw-floor-themed CITY generator's
+      // placements, so replay floors 3+ on that city world.
+      const w = row.floor >= COMPLEX_MIN_FLOOR ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
       expect(w.mission.template, ctx).toBe(row.tpl)
       expect(w.mission.targetBuilding, ctx).toBe(row.bld)

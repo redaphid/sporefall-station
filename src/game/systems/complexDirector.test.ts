@@ -1,4 +1,4 @@
-// Complex director (indoor event AI, floors 3+): vent swarms, bunk ambushes and
+// Complex director (indoor event AI, complex floors 3, 5, 7…): vent swarms, bunk ambushes and
 // wing lights-out. Every test sets world state exactly, runs the REAL systems
 // (complexDirectorSystem directly, or the whole tickWorld pipeline) and asserts
 // on the resulting world + events. Adversarial: city floors, no players, dead
@@ -350,7 +350,7 @@ describe('lights out', () => {
 
 describe('integration: the real tick pipeline', () => {
   const populated = (): World => {
-    const w = createWorld(SEED, 4)
+    const w = createWorld(SEED, 5)
     populateWorld(w)
     setupFloor(w)
     spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
@@ -398,7 +398,7 @@ describe('integration: the real tick pipeline', () => {
 describe('wingForPoint over every corridor tile (adversarial sweep)', () => {
   it('every corridor tile of every complex floor maps to some wing, so lights-out can always find the lead', () => {
     for (let seed = 1; seed <= 25; seed++) {
-      for (const floor of [3, 4, 5, 6]) {
+      for (const floor of [3, 5, 7, 9]) {
         const level = createWorld(seed, floor).level
         for (const c of level.complex!.corridors) {
           for (let y = c.rect.y; y < c.rect.y + c.rect.h; y++) {

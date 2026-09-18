@@ -20,9 +20,10 @@ describe('generateLevel', () => {
     expect(levelChecksum(a)).not.toBe(levelChecksum(c))
   })
 
-  it('cycles themes so consecutive floors look different', () => {
-    const themes = Array.from({ length: 5 }, (_, i) => generateLevel(7, i + 1).theme)
-    // Every adjacent floor pair uses a different district theme.
+  it('cycles themes so consecutive city floors look different', () => {
+    // Floors 3, 5, 7… are indoor complexes; the city floors are 1, 2, 4, 6, 8.
+    const themes = [1, 2, 4, 6, 8].map((f) => generateLevel(7, f).theme)
+    // Every adjacent city-floor pair uses a different district theme.
     for (let i = 1; i < themes.length; i++) {
       expect(themes[i]).not.toBe(themes[i - 1])
     }

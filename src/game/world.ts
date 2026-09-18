@@ -237,7 +237,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
-  complexDirectorSystem(w) // floors 3+: vent swarms, bunk ambushes, lights-out
+  complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)

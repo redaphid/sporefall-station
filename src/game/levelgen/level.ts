@@ -17,7 +17,7 @@ export const Tile = {
   WallCutNE: 7,
   WallCutSE: 8,
   WallCutSW: 9,
-  // ── Indoor complex (floors 3+, levelgen/complex.ts) ─────────────────────────
+  // ── Indoor complex (floors 3, 5, 7…, levelgen/complex.ts) ─────────────────────────
   // Appended after the cut corners for the same reason: ids never renumber.
   /** Corridor deck plating — the station's hallways. Walkable. */
   Hall: 10,
@@ -63,7 +63,7 @@ export type BuildingRole =
   | 'warehouse'
   | 'clinic'
   | 'bunker'
-  // Indoor complex modules (floors 3+): one room per module, named for what the
+  // Indoor complex modules (floors 3, 5, 7…): one room per module, named for what the
   // colony used it for — see levelgen/complex.ts and COMPLEX_ROOM_TYPE.
   | 'mess'
   | 'galley'
@@ -97,7 +97,7 @@ export type RoomType =
   | 'armory' // bunker core: weapon lockers
   | 'barracks' // bunker sleeping quarters
   | 'vault' // sealed reward chamber
-  // Indoor complex rooms (floors 3+)
+  // Indoor complex rooms (floors 3, 5, 7…)
   | 'messhall' // the crew dining hall: long tables and benches
   | 'galley' // the kitchen behind the mess: counters, dispensers
   | 'bunkroom' // crew sleeping quarters: rows of bunks and lockers

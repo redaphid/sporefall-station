@@ -223,7 +223,7 @@ const TILE_ID_BY_NAME: Record<string, number> = {
   wall: Tile.Wall,
   grass: Tile.Grass,
   exit: Tile.Exit,
-  // Indoor complex decks (floors 3+). A theme may ship `tiles.hall` etc. art;
+  // Indoor complex decks (floors 3, 5, 7…). A theme may ship `tiles.hall` etc. art;
   // until one does they draw procedurally below.
   hall: Tile.Hall,
   grate: Tile.Grate,

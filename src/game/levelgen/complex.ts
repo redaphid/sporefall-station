@@ -14,7 +14,7 @@ import {
 import type { Rect } from './rooms'
 
 /**
- * INDOOR COMPLEX generator — floors 3+ leave the sunken streets and dive into
+ * INDOOR COMPLEX generator — floors 3, 5, 7… leave the sunken streets and dive into
  * the station ring itself: a pressure hull packed with modules (mess hall,
  * bunk rooms, galley, labs, infirmary, reactor hall, stores, security) hung
  * off a network of corridors.
@@ -43,14 +43,31 @@ import type { Rect } from './rooms'
 /** First floor built as an indoor complex. Floors below keep the city. */
 export const COMPLEX_MIN_FLOOR = 3
 
-/** Does this floor use the indoor-complex generator? */
-export const isComplexFloor = (floor: number): boolean => floor >= COMPLEX_MIN_FLOOR
+/**
+ * Does this floor use the indoor-complex generator? From floor 3 the run
+ * ALTERNATES station complex and sunken city: 3, 5, 7… are complexes, 4, 6, 8…
+ * stay city (so bunkers, courtyards, vaults and every district theme keep
+ * turning up deep into a run).
+ */
+export const isComplexFloor = (floor: number): boolean =>
+  floor >= COMPLEX_MIN_FLOOR && (floor - COMPLEX_MIN_FLOOR) % 2 === 0
 
-/** Biomes cycle floor by floor, so consecutive complex floors never match. */
+/** 0-based position of a complex floor among complex floors (3 -> 0, 5 -> 1, …). */
+const complexOrdinal = (floor: number): number => Math.floor((floor - COMPLEX_MIN_FLOOR) / 2)
+
+/**
+ * 1-based position of a city floor among CITY floors only (1 -> 1, 2 -> 2,
+ * 4 -> 3, 6 -> 4, …). The city's district theme cycles on this, so the
+ * alternation never starves a theme (cycling on the raw floor would only ever
+ * land city floors on half of the themes).
+ */
+export const cityFloorOrdinal = (floor: number): number => (floor < COMPLEX_MIN_FLOOR ? floor : Math.floor(floor / 2) + 1)
+
+/** Biomes cycle across COMPLEX floors, so consecutive complex floors never match. */
 export const BIOMES: readonly BiomeName[] = ['habitation', 'flooded', 'reactor', 'overgrown']
 
 export const biomeForFloor = (floor: number): BiomeName =>
-  BIOMES[(((floor - COMPLEX_MIN_FLOOR) % BIOMES.length) + BIOMES.length) % BIOMES.length]
+  BIOMES[((complexOrdinal(floor) % BIOMES.length) + BIOMES.length) % BIOMES.length]
 
 interface BiomeDef {
   /** Role weights for ordinary (non-mess, non-objective) modules. */

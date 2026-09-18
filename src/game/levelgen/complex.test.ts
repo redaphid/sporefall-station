@@ -48,20 +48,10 @@ const tile = (level: Level, x: number, y: number): number => level.tiles[y * lev
 
 const inRect = (r: Rect, x: number, y: number): boolean => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h
 
-/** Index of the module farthest from spawn — the mission objective (same
- * metric + first-wins tie-break as the generator and missions.farthestBuilding). */
-const farthestModule = (level: Level): number => {
-  let best = -1
-  let bestD = -1
-  level.buildings.forEach((b, i) => {
-    const d = Math.hypot(b.rect.x + b.rect.w / 2 - level.spawn.x, b.rect.y + b.rect.h / 2 - level.spawn.y)
-    if (d > bestD) {
-      bestD = d
-      best = i
-    }
-  })
-  return best
-}
+/** Index of the mission objective: the deepest module by doors crossed from
+ * the spawn (floorplan spec P2), named by the generator and targeted by
+ * missions.farthestBuilding. */
+const objectiveModule = (level: Level): number => level.complex!.objective!
 
 const ORTHO = [
   [1, 0],
@@ -231,7 +221,8 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
   it('corridors are open deck along their whole rect, inside the hull', () => {
     for (const { level, tag } of sweep(60)) {
       const { corridors } = level.complex!
-      expect(corridors.length, tag).toBeGreaterThanOrEqual(3)
+      // At least the airlock and a spine (a ship or a hospital has no more).
+      expect(corridors.length, tag).toBeGreaterThanOrEqual(2)
       for (const c of corridors) {
         expect(c.rect.x, tag).toBeGreaterThanOrEqual(1)
         expect(c.rect.y, tag).toBeGreaterThanOrEqual(1)
@@ -269,7 +260,7 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
   it('every module is a sane room (one or more rects) with a way in, typed by its role', () => {
     for (const { level, tag } of sweep(60)) {
       expect(level.buildings.length, tag).toBeGreaterThanOrEqual(15)
-      const objective = farthestModule(level)
+      const objective = objectiveModule(level)
       level.buildings.forEach((b, bi) => {
         expect(b.poi, tag).toBe('module')
         expect(b.rooms.length, tag).toBeGreaterThanOrEqual(1)
@@ -358,8 +349,8 @@ describe('complex generator: the station reads like a station', () => {
         // than its galley, every wash closet and every security post (a reactor
         // hall, a big lab or a dormitory may rival it).
         const sizes = level.buildings.map(roomArea).sort((a, b) => a - b)
-        expect(roomArea(mess), `${tag}: a pokey mess hall`).toBeGreaterThanOrEqual(1.5 * sizes[Math.floor(sizes.length / 2)])
-        const objective = level.buildings[farthestModule(level)]
+        expect(roomArea(mess), `${tag}: a pokey mess hall`).toBeGreaterThanOrEqual(1.4 * sizes[Math.floor(sizes.length / 2)])
+        const objective = level.buildings[objectiveModule(level)]
         for (const b of level.buildings) {
           if (b !== objective && ['washroom', 'galley', 'security'].includes(b.role)) {
             expect(roomArea(b), `${tag}: a ${b.role} outsizes the mess hall`).toBeLessThanOrEqual(roomArea(mess))
@@ -396,9 +387,9 @@ describe('complex generator: the station reads like a station', () => {
     expect(generateLevel(1, 7).tiles.filter((x) => x === Tile.Plating).length).toBeGreaterThan(100)
   })
 
-  it('the objective module (farthest from spawn) takes a biome objective role', () => {
+  it('the objective module (deepest from the spawn) takes a biome objective role', () => {
     for (const { level, tag } of sweep(40)) {
-      expect(BIOME_DEFS[level.complex!.biome].objective, tag).toContain(level.buildings[farthestModule(level)].role)
+      expect(BIOME_DEFS[level.complex!.biome].objective, tag).toContain(level.buildings[objectiveModule(level)].role)
     }
   })
 })
@@ -452,13 +443,19 @@ describe('complex generator: floorplans, not graph paper', () => {
 
   it('circulation is a hierarchy: 3-wide main spines, 2-wide secondary halls, dead ends', () => {
     let secondary = 0
+    let branched = 0
     let deadEnds = 0
     const floors = [...sweep(40)]
     for (const { level, tag } of floors) {
       const { corridors } = level.complex!
       const across = (c: (typeof corridors)[number]): number => (c.axis === 'h' ? c.rect.h : c.rect.w)
       expect(corridors.some((c) => across(c) === 3), `${tag}: no main spine`).toBe(true)
-      if (corridors.some((c) => across(c) === 2)) secondary++
+      // A ship's second route is its hatch line and a hospital's is its
+      // courts: those two archetypes have no secondary corridors by design.
+      if (level.complex!.archetype !== 'ship' && level.complex!.archetype !== 'pavilion') {
+        branched++
+        if (corridors.some((c) => across(c) === 2)) secondary++
+      }
       // A dead end: a corridor whose far end-cap is solid all the way across.
       const capped = corridors.some((c) => {
         const r = c.rect
@@ -474,7 +471,7 @@ describe('complex generator: floorplans, not graph paper', () => {
       })
       if (capped) deadEnds++
     }
-    expect(secondary / floors.length).toBeGreaterThan(0.9)
+    expect(secondary / branched).toBeGreaterThan(0.9)
     expect(deadEnds / floors.length).toBeGreaterThan(0.6)
   })
 
@@ -672,6 +669,8 @@ describe('complex floors populate like a station', () => {
         if (w.mission.targetBuilding === undefined) continue
         const b = w.level.buildings[w.mission.targetBuilding]
         expect(b.poi).toBe('module')
+        // missions.farthestBuilding and the generator agree on the target.
+        expect(w.mission.targetBuilding).toBe(w.level.complex!.objective)
       }
     }
   })

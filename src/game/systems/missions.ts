@@ -281,6 +281,11 @@ const placeSporeNode = (w: World, building: Building, rng: Rng): Entity | null =
 }
 
 const farthestBuilding = (w: World): Building | null => {
+  // Complex floors name their objective: the DEEPEST module by doors crossed
+  // from the spawn (levelgen/complex.ts, floorplan spec P2), which is not
+  // always the one farthest as the crow flies.
+  const named = w.level.complex?.objective
+  if (named !== undefined && named >= 0 && named < w.level.buildings.length) return w.level.buildings[named]
   let best: Building | null = null
   let bestDist = -1
   for (const b of w.level.buildings) {

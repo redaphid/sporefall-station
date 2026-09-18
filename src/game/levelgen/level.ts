@@ -270,6 +270,13 @@ export interface ComplexInfo {
   /** Vent grate tile positions (director swarm spawn points). */
   vents: { x: number; y: number }[]
   wings: Wing[]
+  /** The floorplan archetype (palladian, cloister, pavilion, ship, or a
+   * generic spine / tee / ladder / ring). */
+  archetype?: string
+  /** Index into `level.buildings` of the mission objective: the deepest
+   * module by doors crossed from the spawn (floorplan spec P2). This is what
+   * missions.farthestBuilding targets on a complex floor. */
+  objective?: number
 }
 
 /** Mutable view over a tile buffer during generation. */

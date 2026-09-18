@@ -196,6 +196,10 @@ export interface ArtPalette {
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
   boss: 1.5,
+  // A rooted hive spire towers over the sporelings it buds; the officer stands a
+  // head above its raid, which is what makes it findable in a crowd.
+  hivespire: 1.3,
+  bellwether: 1.15,
 }
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
@@ -263,6 +267,15 @@ const NEW_ENEMY_CHARSET: Record<string, string> = {
   stalker: 'stalker',
   lurker: 'lurker',
   pod: 'pod',
+  // The group roster (raids, hound packs, hive spires — systems/groups.ts).
+  // Same rule: each maps to itself; missing art falls to its own procedural set.
+  drowner: 'drowner',
+  bellwether: 'bellwether',
+  mender: 'mender',
+  breacher: 'breacher',
+  lobber: 'lobber',
+  gloamhound: 'gloamhound',
+  hivespire: 'hivespire',
 }
 
 // World props/furnishings mapped to the closest existing themed prop sprite
@@ -419,6 +432,15 @@ const ENTITY_COLORS: Record<string, number> = {
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
   lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
+  // The group roster's procedural fallbacks: distinct hues so a raid with no art
+  // shipped still reads as officer / medic / sapper / gun / grunt at a glance.
+  drowner: 0x59636d, // waterlogged slate
+  bellwether: 0xcbb277, // brass
+  mender: 0x8f6c38, // rust apron (its green tank is the art's job)
+  breacher: 0xff9032, // the caged charge
+  lobber: 0xa05ae0, // spore-violet
+  gloamhound: 0xb08d50, // mangy ochre
+  hivespire: 0xe04a2a, // raw flesh
 
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,

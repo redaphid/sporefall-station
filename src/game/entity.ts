@@ -145,7 +145,30 @@ export interface AiState {
   /** Squad membership (behavior 'squad'): shared squad id + this member's role
    * in the stack. Assigned by populate for gangster packs. */
   squad?: { id: number; role: 'lead' | 'flank' | 'rear' }
+  /** Group membership (systems/groups.ts): the id of a `World.groups` entry —
+   * a raid ("tide") or a hound pack — plus this member's role in it. The group
+   * layer owns the shared state (phase, target, rally point); every member reads
+   * it through its considerations. Absent on everything else → snapshot-stable. */
+  group?: { id: number; role: GroupRole }
+  /** RALLIED by a live leader within earshot until this absolute tick: faster
+   * and harder to hurt (systems/groupFx.ts). Refreshed every tick by the group
+   * layer while in range, so it lapses a moment after the leader falls. */
+  rallyUntil?: number
+  /** MANHUNTER until this absolute tick (hound pack rage): faster, never flees,
+   * tracks the aggressor (systems/groups.ts). */
+  rageUntil?: number
+  /** Latched retreat-to-heal: set below the retreat threshold while the group
+   * has a live medic, cleared once patched back up (systems/groups.ts). */
+  healing?: boolean
+  /** A player that hurt this body since the group layer last looked — the
+   * manhunter trigger. Stamped by combat.applyDamage, consumed by groups.ts. */
+  provokedBy?: EntityId
+  /** Lobber (siege gun): next absolute tick it may fire a shell. */
+  lobAt?: number
 }
+
+/** A member's job inside its group (systems/groups.ts). */
+export type GroupRole = 'leader' | 'grunt' | 'medic' | 'sapper' | 'artillery' | 'hound'
 
 /** One applied weapon modifier: a registry id (`data/mods.ts`) plus a
  * deterministic stack count. Pure JSON — no functions/closures — so a modded
@@ -294,6 +317,10 @@ export interface Entity {
      * look from its mods, Nova-Drift style. Absent = vanilla shot, so every
      * pre-feature world/fixture serializes byte-for-byte unchanged. */
     mods?: WeaponMod[]
+    /** A LOBBED shell (the siege gun's): it arcs OVER bodies and walls and
+     * only resolves where it comes down, at ttl — never on the first thing in
+     * its path. Absent on every ordinary projectile → snapshot-stable. */
+    arc?: boolean
   }
   pickup?: { itemId: string; qty: number }
   /**
@@ -342,6 +369,9 @@ export interface Entity {
    * colliding ground hazard). `fuel` burns down 1/tick; while it lasts it lays
    * the `spore` element on bodies standing in the cell (see systems/spore.ts). */
   spore?: { fuel: number }
+  /** A HIVE SPIRE's infestation clock (systems/groups.ts): absolute ticks for its
+   * next bud and next spread, plus the live buds it has spawned (capped). */
+  hive?: { nextSpawnAt: number; nextSpreadAt: number; children: EntityId[] }
   status?: { stun: number; sleep: number; hitFlashUntil: number; cloakUntil: number }
   /** Active status/element effects, keyed by kind ('burning', ...). */
   fx?: Fx

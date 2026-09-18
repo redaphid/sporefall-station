@@ -6,6 +6,7 @@ import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
+import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
@@ -132,7 +133,8 @@ export const applyDamage = (
   if (amount < 0) amount = 0
   // #78 damage affinity: armoured bodies shrug off impact, flammable ones don't.
   // Impact/explosion damage is 'physical'; missing table → ×1 (unchanged).
-  amount = Math.round(amount * resistMult(target, 'physical'))
+  // A RALLIED raider (a live leader in earshot) shrugs off a quarter of it.
+  amount = Math.round(amount * resistMult(target, 'physical') * groupDamageMult(target, w.tick))
   if (resistsDamage(target, amount)) return null // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
@@ -161,6 +163,9 @@ export const applyDamage = (
 
   // Civilians panic when hurt; bouncers take it personally
   if (target.ai) {
+    // A PLAYER's landed blow on a group member is remembered for the group layer
+    // (systems/groups.ts): it is what turns a hound pack manhunter.
+    if (target.ai.group && w.byId.get(attackerId)?.playerCtl) target.ai.provokedBy = attackerId
     const def = NPCS[target.archetype]
     if (def?.fleesOnDamage) {
       target.ai.mode = 'flee'

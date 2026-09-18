@@ -362,5 +362,61 @@
   "size": 1024,
   "ckpt": "anything-xl",
   "note": "v2 STATIC_KINDS object recipe; egg sac with glowing seam - v1 drew twig-people"
+ },
+ "char.bog-mender.s-idle": {
+  "seed": 414506,
+  "index": 0,
+  "raw": "raws/char.bog-mender.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; beaked plague-doctor medic with syringe - anything-xl drew anime girls 15/16"
+ },
+ "char.blast-diver.s-idle": {
+  "seed": 414503,
+  "index": 0,
+  "raw": "raws/char.blast-diver.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; squat iron diver under a glowing orange charge-dome - anything-xl drew sleek power armour 16/16"
+ },
+ "char.bellwether.s-idle": {
+  "seed": 414500,
+  "index": 0,
+  "raw": "raws/char.bellwether.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; brass bell for a head, bubble charms, officer coat - anything-xl never drew the bell"
+ },
+ "char.drowned-diver.s-idle": {
+  "seed": 414506,
+  "index": 0,
+  "raw": "raws/char.drowned-diver.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; porthole diving helmet, harpoon gun"
+ },
+ "char.gloam-hound.s-idle": {
+  "seed": 414505,
+  "index": 0,
+  "raw": "raws/char.gloam-hound.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 checkpoint; mangy snarling quadruped, bony back spines - anything-xl drew the silhouette but grey"
+ },
+ "char.spore-mortar.s-idle": {
+  "seed": 414502,
+  "index": 0,
+  "raw": "raws/char.spore-mortar.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 checkpoint; a hulking spore-ogre hauling a fleshy mortar tube on its shoulders. Juggernaut drifted the 4-legged beast to a biped (8/8); kept for style match over the grey anything-xl quadruped"
+ },
+ "char.hive-spire.s-idle": {
+  "seed": 414505,
+  "index": 0,
+  "raw": "raws/char.hive-spire.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 checkpoint; tall moss-chitin spire. COMPROMISE: every seed drew an isometric plinth; this one has the smallest"
  }
 }

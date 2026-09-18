@@ -11,6 +11,7 @@ import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
 import { hashLabel, mulberry32 } from './rng'
 import type { DirectorState } from './systems/complexDirector'
+import type { GroupsState } from './systems/groups'
 import type { Annotation, SimEvent } from './types'
 import {
   createWorld,
@@ -70,6 +71,8 @@ export interface WorldJson {
   annotations?: Annotation[]
   /** Complex director schedule (World.director). Omitted when absent. */
   director?: DirectorState
+  /** Group layer (World.groups). Omitted when absent. */
+  groups?: GroupsState
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -110,6 +113,8 @@ export const serializeWorld = (w: World): WorldJson => ({
   ...(w.annotations.length ? { annotations: clone(w.annotations) } : {}),
   // Only complex floors ever carry a director; city snapshots stay unchanged.
   ...(w.director ? { director: clone(w.director) } : {}),
+  // Only floors that muster raids/packs carry groups; every other snapshot is unchanged.
+  ...(w.groups ? { groups: clone(w.groups) } : {}),
 })
 
 /** Rebuild a fresh, standalone world from a snapshot — byte-identical on every
@@ -142,5 +147,6 @@ export const deserializeWorld = (j: WorldJson): World => {
   // Annotations are inert presentation data; default to none for older snapshots.
   w.annotations = j.annotations ? clone(j.annotations) : []
   if (j.director) w.director = clone(j.director)
+  if (j.groups) w.groups = clone(j.groups)
   return w
 }

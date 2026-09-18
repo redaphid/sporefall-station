@@ -11,7 +11,28 @@ import { hasLineOfSight } from '../los'
 import { isSolidTile } from '../levelgen/level'
 import { findPath } from '../path'
 import { emitFear, type World } from '../world'
-import { ALERT, DRAWN, FLANK, FORMUP, FORTIFY, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, STACK, WORK, decide } from './behaviors'
+import {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+  decide,
+} from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
@@ -34,6 +55,15 @@ const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
 const STALL_TICKS = 45
 /** Movement below this distance across STALL_TICKS counts as no progress. */
 const STALL_DIST = 0.5
+/** Group-layer placement goals (systems/groups.ts): tactical moves, not strolls.
+ * They walk at full pace and skip the arrive-and-look-around beat, exactly as
+ * squad formation already did — a raider taking its muster slot, a hound its
+ * ring slot or a sapper its door does not stop to admire the view. */
+const TACTICAL = new Set([FORMUP, FLANK, STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+/** The group layer's own moves (not the squad's): these also steer with the
+ * strict swept-circle line check — see `sweptClear`. */
+const GROUP_MOVES = new Set([STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+const isGroupMove = (goal: string | undefined): boolean => goal !== undefined && GROUP_MOVES.has(goal)
 
 // ── Routing (path.ts) tuning ───────────────────────────────────────────────
 /** Ticks between route recomputes per NPC (+ id stagger, so repaths spread). */
@@ -189,7 +219,13 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     goal.code === DRAWN ||
     goal.code === RETREAT ||
     goal.code === FORMUP ||
-    goal.code === FORTIFY
+    goal.code === FORTIFY ||
+    goal.code === STAGE ||
+    goal.code === GUARD ||
+    goal.code === EMPLACE ||
+    goal.code === BREACH ||
+    goal.code === FALLBACK ||
+    goal.code === TEND
   ) {
     // #77 territory / #66 hive draw / #69 boss retreat-to-spore / squad
     // formation slot / barricade site: steer toward a world-derived point
@@ -203,7 +239,7 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     if (goal.at) ai.waypoint = { x: goal.at.x, y: goal.at.y }
     return
   }
-  if (goal.code === FLANK) {
+  if (goal.code === FLANK || goal.code === RING) {
     // Squad flanking: MOVE like a wander-to-point (around the target's far
     // side) but KEEP the engagement bookkeeping — the flanker still knows who
     // the fight is about, so `threat` takes over seamlessly on arrival.
@@ -312,6 +348,7 @@ const moveToward = (
   gy: number,
   pace: number,
   bestEffort = false,
+  strictLine = false,
 ): 'arrived' | 'moving' | 'blocked' => {
   const ai = e.ai!
   const dx = gx - e.pos.x
@@ -339,7 +376,8 @@ const moveToward = (
   if (
     hasLineOfSight(w.level, e.pos.x, e.pos.y, gx, gy, doorBlocked) &&
     hasLineOfSight(w.level, e.pos.x + px, e.pos.y + py, gx, gy, doorBlocked) &&
-    hasLineOfSight(w.level, e.pos.x - px, e.pos.y - py, gx, gy, doorBlocked)
+    hasLineOfSight(w.level, e.pos.x - px, e.pos.y - py, gx, gy, doorBlocked) &&
+    (!strictLine || sweptClear(w, e.pos.x, e.pos.y, gx, gy, e.radius, doorBlocked))
   ) {
     ai.path = undefined
     steerStraight()
@@ -405,6 +443,47 @@ const moveToward = (
   e.intent.y = (ndy / nd) * pace
   e.facing = Math.atan2(ndy, ndx)
   return 'moving'
+}
+
+/** Does a body of radius `r` sweep from (x0,y0) to (x1,y1) without its circle
+ * touching a blocked tile? Samples the path every quarter tile and tests the
+ * circle's eight rim points. The three-line check above threads a doorway the
+ * body then clips on its frame corner (a sapper was measured wedged on one for
+ * the whole clip: centre line through the open door tile, rim over the jamb).
+ * Used only for the group layer's tactical moves (`strictLine`), so every
+ * pre-existing walker keeps its exact steering. */
+const RIM: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [0.7071, 0.7071],
+  [-0.7071, 0.7071],
+  [0.7071, -0.7071],
+  [-0.7071, -0.7071],
+]
+const sweptClear = (
+  w: World,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  r: number,
+  doorBlocked: (tx: number, ty: number) => boolean,
+): boolean => {
+  const dist = vlen(x1 - x0, y1 - y0)
+  const steps = Math.max(1, Math.ceil(dist / 0.25))
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const cx = x0 + (x1 - x0) * t
+    const cy = y0 + (y1 - y0) * t
+    for (const [ox, oy] of RIM) {
+      const tx = Math.floor(cx + ox * r)
+      const ty = Math.floor(cy + oy * r)
+      if (isSolidTile(w.level, tx, ty) || doorBlocked(tx, ty)) return false
+    }
+  }
+  return true
 }
 
 /** The 8 compass directions (unit vectors), fixed order = deterministic ties. */
@@ -657,13 +736,15 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // Arrived on purpose → pause and look around before the next errand.
       // Squad positioning (formation slots, flank runs) skips the beat: those
       // arrivals are tactical placement, and a fidgeting stack reads wrong.
-      if (ai.goal !== FORMUP && ai.goal !== FLANK) ai.scanUntil = w.tick + SCAN_TICKS
+      if (!TACTICAL.has(ai.goal ?? '')) ai.scanUntil = w.tick + SCAN_TICKS
       return
     }
-    const pace = ai.mode === 'patrol' ? 0.85 : 0.6 // a beat is brisker than an amble
+    // A beat is brisker than an amble; a group-layer move is a run. (Squad
+    // formation/flank keep their historical amble — only the new codes run.)
+    const pace = ai.mode === 'patrol' ? 0.85 : isGroupMove(ai.goal) ? 1 : 0.6
     // Waypoint errands run BEST-EFFORT: a garrison whose core is sealed masses
     // on its locked door (the nearest reachable approach) instead of shrugging.
-    const res = moveToward(w, e, ctx, ai.waypoint.x, ai.waypoint.y, pace, true)
+    const res = moveToward(w, e, ctx, ai.waypoint.x, ai.waypoint.y, pace, true, isGroupMove(ai.goal))
     if (res === 'blocked') {
       // As close as the map allows (or nowhere to go at all): settle here and
       // re-decide instead of wall-grinding or oscillating.

@@ -53,6 +53,17 @@ import {
   perceives,
   type Goal,
 } from './goals'
+import {
+  HEAL_RANGE,
+  LOB_MAX,
+  LOB_MIN,
+  centroid,
+  groupOf,
+  livePlayers,
+  membersOf,
+  ringSlot,
+  roleOf,
+} from './groups'
 import { infectionActive } from './infection'
 import { spawnObject } from './objects'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
@@ -863,6 +874,277 @@ const retreatToSpore: Consideration = (w, e) => {
   return [{ code: RETREAT, score: 6, tier: TIER_PANIC, at: { x: spore.pos.x, y: spore.pos.y } }]
 }
 
+// ── The group layer's brains (systems/groups.ts owns the shared state) ──────
+// Every consideration below READS a group — phase, target, rally point, the
+// raid's intel mark — and proposes a goal for this one member. None of them
+// mutates the group: phase changes, heals, shells and charges all happen in
+// the group system, so arbitration stays a pure scoring pass like the rest.
+export const STAGE = 'stage'
+export const GUARD = 'guard'
+export const EMPLACE = 'emplace'
+export const BREACH = 'breach'
+export const FALLBACK = 'fallback'
+export const TEND = 'tend'
+export const RING = 'ring'
+
+/** Gathering at the staging point: above every hunt/formation memory, so a
+ * staging raider walks to the muster instead of freelancing — but at MEMORY
+ * tier, so a raider that actually SEES a player still fights (and the group
+ * system turns that sighting into the whole raid attacking). */
+const STAGE_SCORE = 3
+/** Siege escort / sapper escort holding station on its specialist. */
+const ESCORT_SCORE = 2.6
+/** The raid's shared intel on its target: above hunt (1.6), the station-alert
+ * manhunt (1.9) and formation (2) — a raid answers its own orders first. */
+const RAID_PURSUE_SCORE = 2.2
+/** Specialist jobs that must not be abandoned for a fistfight (PANIC tier). */
+const JOB_SCORE = 6
+/** Routing beats everything a raider wants except nothing: it is over. */
+const ROUT_SCORE = 8
+const FALLBACK_SCORE = 3
+/** A medic tending the wounded outranks its own (non-existent) fight. */
+const TEND_SCORE = 6
+const HANG_BACK_SCORE = 2.4
+/** Taking a ring slot — PANIC tier so nothing short of rage breaks the circle. */
+const RING_SCORE = 12
+const RAGE_SCORE = 20
+/** How far behind the line a medic with nobody to patch hangs back. */
+const MEDIC_HANG_BACK = 3
+/** The siege gun's firing band (holds inside it, walks to LOB_IDEAL outside it).
+ * The far edge sits INSIDE the gun's own sight (lobber sightRange 11): a battery
+ * that parks just past what it can see has no spotter and never fires — which is
+ * exactly what the first cut of this did, holding at 11.8 tiles in silence. */
+const LOB_HOLD_MIN = LOB_MIN + 3
+const LOB_HOLD_MAX = Math.min(LOB_MAX - 2, 10)
+const LOB_IDEAL = (LOB_HOLD_MIN + LOB_HOLD_MAX) / 2
+/** How far a sapper backs off its planted charge. */
+const SAPPER_CLEAR = 3.5
+
+const here = (e: Entity): { x: number; y: number } => ({ x: e.pos.x, y: e.pos.y })
+
+/** The walkable tile beside `door` nearest `e` — the side of the frame `e` is on. */
+const doorFace = (w: World, door: Entity, e: Entity): { x: number; y: number } => {
+  const dx = Math.floor(door.pos.x)
+  const dy = Math.floor(door.pos.y)
+  let best = { x: door.pos.x, y: door.pos.y }
+  let bd = Infinity
+  for (const [ox, oy] of ORTHO) {
+    if (isSolidTile(w.level, dx + ox, dy + oy)) continue
+    const c = { x: dx + ox + 0.5, y: dy + oy + 0.5 }
+    const d = dist2d(c.x, c.y, e.pos.x, e.pos.y)
+    if (d < bd) {
+      bd = d
+      best = c
+    }
+  }
+  return best
+}
+
+/** Unit vector from b to a (or +x when they coincide). */
+const away = (a: { x: number; y: number }, b: { x: number; y: number }): { x: number; y: number } => {
+  const dx = a.x - b.x
+  const dy = a.y - b.y
+  const d = vlen(dx, dy)
+  return d > 1e-6 ? { x: dx / d, y: dy / d } : { x: 1, y: 0 }
+}
+
+// A ROUTED raid runs from the nearest player. PANIC tier: the nerve is gone.
+const rout: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g || g.phase !== 'routed') return []
+  let best: Entity | undefined
+  let bd = Infinity
+  for (const p of livePlayers(w)) {
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d < bd) {
+      bd = d
+      best = p
+    }
+  }
+  if (!best) return []
+  return [{ code: FLEE, score: ROUT_SCORE, tier: TIER_PANIC, target: best.id }]
+}
+
+// A wounded raider (latched `ai.healing`, set by the group system while a medic
+// lives) falls back to the medic and holds beside it until patched up.
+const fallBack: Consideration = (w, e) => {
+  if (!e.ai!.healing) return []
+  const g = groupOf(w, e)
+  if (!g) return []
+  const medic = membersOf(w, g.id).find((m) => m !== e && roleOf(m) === 'medic')
+  if (!medic) return []
+  const d = dist2d(medic.pos.x, medic.pos.y, e.pos.x, e.pos.y)
+  const at = d <= HEAL_RANGE * 0.6 ? here(e) : here(medic)
+  return [{ code: FALLBACK, score: FALLBACK_SCORE, tier: TIER_PANIC, at }]
+}
+
+// The raid's ORDERS for an ordinary member, by phase: gather at the staging
+// point; guard the siege gun; follow the sapper to its door (the sapper itself
+// walks to the door, plants, and clears the blast); or, once the assault is
+// on, close on the raid's intel mark on its target.
+const raidOrders: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g || g.kind !== 'raid' || g.phase === 'routed' || e.ai!.healing) return []
+  const role = roleOf(e)
+  const members = membersOf(w, g.id)
+  if (g.phase === 'staging') {
+    const k = Math.max(0, members.indexOf(e))
+    const ang = (2 * Math.PI * k) / Math.max(1, members.length)
+    const r = k === 0 ? 0 : 1.4
+    const at = { x: g.rally.x + Math.cos(ang) * r, y: g.rally.y + Math.sin(ang) * r }
+    return [{ code: STAGE, score: STAGE_SCORE, tier: TIER_MEMORY, at }]
+  }
+  if (g.phase === 'siege') {
+    if (role === 'artillery') return []
+    const gun = members.find((m) => roleOf(m) === 'artillery')
+    if (!gun) return []
+    const k = Math.max(0, members.indexOf(e))
+    const ang = (2 * Math.PI * k) / Math.max(1, members.length)
+    const at = { x: gun.pos.x + Math.cos(ang) * 2, y: gun.pos.y + Math.sin(ang) * 2 }
+    return [{ code: GUARD, score: ESCORT_SCORE, tier: TIER_MEMORY, at }]
+  }
+  if (g.phase === 'sapping') {
+    const door = g.doorId !== undefined ? w.byId.get(g.doorId) : undefined
+    const sapper = members.find((m) => roleOf(m) === 'sapper')
+    if (role === 'sapper') {
+      if (!door) return []
+      // Walk up to the frame from OUR side: the last route tile before the door
+      // (the group layer recorded it). Nearest-by-distance is not "our side" — a
+      // sealed room's inside face is often the closer one, and routing to it
+      // wedged the sapper against the very door it had come to blow.
+      const face = g.face ?? doorFace(w, door, e)
+      if (g.chargeAt === undefined) return [{ code: BREACH, score: JOB_SCORE, tier: TIER_PANIC, at: face }]
+      // Fuse burning: back straight off the frame, clear of the blast.
+      const u = away(face, door.pos)
+      return [{ code: BREACH, score: JOB_SCORE, tier: TIER_PANIC, at: { x: face.x + u.x * SAPPER_CLEAR, y: face.y + u.y * SAPPER_CLEAR } }]
+    }
+    if (!sapper) return []
+    // Stack up BEHIND the sapper (on the far side from its door), clear of the
+    // blast, fanned sideways by member index. The fan is not cosmetic: slots
+    // straight down the sapper's line put an escort mustered on the door side
+    // head-on against the sapper walking the other way, and two bodies pushing
+    // exactly along the line between them never slide past (pushApart only ever
+    // separates along that line) — the sapper was measured wedged for 9 seconds.
+    const ref = door ? door.pos : g.mark ?? sapper.pos
+    const u = away(sapper.pos, ref)
+    const back = g.chargeAt !== undefined ? SAPPER_CLEAR + 1.5 : 2
+    const k = Math.max(0, members.indexOf(e))
+    const lat = ((k % 3) - 1) * 1.4 || 0.7
+    const at = { x: sapper.pos.x + u.x * back - u.y * lat, y: sapper.pos.y + u.y * back + u.x * lat }
+    if (door && g.chargeAt !== undefined && dist2d(e.pos.x, e.pos.y, door.pos.x, door.pos.y) < SAPPER_CLEAR) {
+      // Too close to a lit charge: clearing it is not optional.
+      return [{ code: BREACH, score: JOB_SCORE, tier: TIER_PANIC, at }]
+    }
+    return [{ code: GUARD, score: ESCORT_SCORE, tier: TIER_MEMORY, at }]
+  }
+  // attack
+  const mark = g.mark
+  if (g.targetId === undefined || !mark) return []
+  const t = w.byId.get(g.targetId)
+  if (!t || t.dead) return []
+  if (dist2d(mark.x, mark.y, e.pos.x, e.pos.y) < 1.5) return [] // on the mark: hunt/search take it from here
+  return [{ code: PURSUE, score: RAID_PURSUE_SCORE, tier: TIER_MEMORY, target: t.id, at: { x: mark.x, y: mark.y } }]
+}
+
+// The SIEGE GUN keeps its distance: inside the firing band it plants (the group
+// system does the firing), outside it walks the line to the ideal range — away
+// from a player who closes in, toward one out of reach. PANIC tier so it never
+// wades into a brawl; only when something is right on top of it does this step
+// aside and let `threat` swing.
+const siegeGun: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g || g.kind !== 'raid' || g.phase === 'routed' || !g.mark) return []
+  const t = g.targetId !== undefined ? w.byId.get(g.targetId) : undefined
+  if (t && !t.dead && dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) < 1.6) return [] // cornered: bite
+  const d = dist2d(g.mark.x, g.mark.y, e.pos.x, e.pos.y)
+  if (d >= LOB_HOLD_MIN && d <= LOB_HOLD_MAX) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
+  const u = away(e.pos, g.mark)
+  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * LOB_IDEAL, y: g.mark.y + u.y * LOB_IDEAL } }]
+}
+
+// The MEDIC walks to whoever is hurt worst (the retreating first), and with
+// nobody to patch hangs back behind the line, on the far side from the target.
+const tend: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g || g.kind !== 'raid' || g.phase === 'routed') return []
+  const members = membersOf(w, g.id)
+  let best: Entity | undefined
+  let bestKey = Infinity
+  for (const m of members) {
+    if (m === e || !m.health) continue
+    const frac = m.health.hp / m.health.max
+    if (frac >= 0.9) continue
+    const key = frac - (m.ai!.healing ? 1 : 0) // the retreating come first
+    if (key < bestKey) {
+      bestKey = key
+      best = m
+    }
+  }
+  if (best) {
+    const d = dist2d(best.pos.x, best.pos.y, e.pos.x, e.pos.y)
+    return [{ code: TEND, score: TEND_SCORE, tier: TIER_THREAT, at: d <= HEAL_RANGE * 0.7 ? here(e) : here(best) }]
+  }
+  if (g.phase === 'staging' || !g.mark) return [] // stage with everyone else
+  const others = members.filter((m) => m !== e)
+  if (others.length === 0) return []
+  const c = centroid(others)
+  const u = away(c, g.mark)
+  return [{ code: TEND, score: HANG_BACK_SCORE, tier: TIER_MEMORY, at: { x: c.x + u.x * MEDIC_HANG_BACK, y: c.y + u.y * MEDIC_HANG_BACK } }]
+}
+
+// A MANHUNTER hound tracks the one who hurt its pack and goes straight in —
+// no ring, no fear, no leash, for as long as the rage lasts.
+const rage: Consideration = (w, e) => {
+  const until = e.ai!.rageUntil
+  if (until === undefined || w.tick >= until) return []
+  const g = groupOf(w, e)
+  const t = g?.targetId !== undefined ? w.byId.get(g.targetId) : undefined
+  if (!t || t.dead || t.playerCtl?.downed) return []
+  const d = dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y)
+  return [{ code: d <= ENGAGE_RANGE ? BATTLE : PURSUE, score: RAGE_SCORE, tier: TIER_PANIC, target: t.id, at: here(t) }]
+}
+
+// ENCIRCLEMENT: while the pack is circling, each hound takes its own slot on a
+// ring round the prey instead of charging the near face; the group system
+// closes the ring (everyone in place, or out of time) and `threat` takes over.
+const encircle: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g || g.kind !== 'pack' || g.phase !== 'encircle' || g.targetId === undefined) return []
+  const t = w.byId.get(g.targetId)
+  if (!t || t.dead) return []
+  const slot = ringSlot(w, g, membersOf(w, g.id), e, t)
+  return [{ code: RING, score: RING_SCORE, tier: TIER_PANIC, target: t.id, at: slot }]
+}
+
+// A prowling pack keeps together: hounds trail the pack's first member, which
+// ambles round the den (its `home`).
+const packFollow: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g || g.kind !== 'pack' || g.phase !== 'prowl') return []
+  const members = membersOf(w, g.id)
+  const lead = members[0]
+  if (!lead || lead === e) return []
+  const k = members.indexOf(e)
+  const ang = k * 2.1
+  const at = { x: lead.pos.x + Math.cos(ang) * 1.6, y: lead.pos.y + Math.sin(ang) * 1.6 }
+  return [{ code: FORMUP, score: FORM_SCORE, tier: TIER_MEMORY, at }]
+}
+
+// A ROOTED body (the hive spire) only lashes at what is within reach — it never
+// chases, so it never routes a path it could not walk anyway.
+const rooted: Consideration = (w, e) => {
+  let best: Entity | undefined
+  let bd = Infinity
+  for (const p of w.entities) {
+    if (p === e || p.dead || !p.health || !isHostileTarget(w, e, p)) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d > 1.6 + p.radius || d >= bd) continue
+    bd = d
+    best = p
+  }
+  return best ? [{ code: BATTLE, score: 5, tier: TIER_THREAT, target: best.id }] : []
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -881,6 +1163,15 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   stalkWeakest,
   enrage,
   retreatToSpore,
+  rout,
+  fallBack,
+  raidOrders,
+  siegeGun,
+  tend,
+  rage,
+  encircle,
+  packFollow,
+  rooted,
   hunt,
   alertGuards,
   pursueMemory,
@@ -955,6 +1246,27 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     // see their MEMORY-tier marching orders), so a squadded wing still masses
     // on the room the players must breach — as a unit, behind its lead.
     considerations: ['threat', 'defendMyWing', 'squadFlank', 'hunt', 'squadStack', 'squadFollow', 'manhunt', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+  },
+  // ── The group layer (systems/groups.ts, docs/design/enemy-groups.md) ──
+  raider: {
+    about: 'a tide member: follows its raid’s orders (stage, guard, breach, assault), rallies to its leader, falls back to the medic when hurt, routs when the raid breaks',
+    considerations: ['rout', 'fallBack', 'threat', 'raidOrders', 'hunt', 'manhunt', 'investigate', 'wander'],
+  },
+  mender: {
+    about: 'a raid’s medic: walks to the worst-wounded member and patches it, else hangs back behind the line; routs with the raid',
+    considerations: ['rout', 'tend', 'raidOrders', 'wander'],
+  },
+  mortar: {
+    about: 'a siege gun: keeps to its firing band from the raid’s target and lobs shells (fired by the group system); bites only when cornered',
+    considerations: ['rout', 'siegeGun', 'threat', 'raidOrders', 'wander'],
+  },
+  hound: {
+    about: 'pack fauna: prowls with its pack, ENCIRCLES prey before closing, and goes manhunter when any packmate is hurt',
+    considerations: ['rage', 'encircle', 'threat', 'packFollow', 'drawnToStimulus', 'wander'],
+  },
+  hive: {
+    about: 'a rooted hive spire: lashes at whatever is in reach; its budding and spreading run in the group system',
+    considerations: ['rooted', 'wander'],
   },
 }
 

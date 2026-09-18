@@ -6,6 +6,14 @@ import { makeEntity, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
+import {
+  findArrival,
+  groupRng,
+  spawnHive,
+  spawnPack,
+  spawnRaid,
+  type RaidStrategy,
+} from './systems/groups'
 import { freeze, wet } from './systems/interactions'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
@@ -679,6 +687,112 @@ const stageArtCompare = (w: World): void => {
   stageThug(w, 19, LANE_Y)
 }
 
+// ── The group layer's set-pieces (systems/groups.ts, docs/design/enemy-groups.md)
+//
+// Unlike the carved stages above, these NEVER touch a tile: they run on the
+// seed's own generated level, so a moment captured from one with
+// `sporefallShare()` restores through `?state=` (deserializeWorld regenerates the
+// level from seed+floor and refuses a checksum drift — a carved stage cannot be
+// shared). They clear the random cast (NPCs only — doors and furniture stay, the
+// sapper needs its door), make the player a tank so the clip never ends on a
+// down, and stage one group against it through the same spawners play uses.
+// Placement is a pure function of the seed (findArrival + a scenario fork), so
+// `?seed=N&scenario=<name>` reproduces the same moment every time.
+
+/** Clear the cast (NPCs, projectiles, groups), keep the map furniture, and make
+ * the first player an unkillable, passive-friendly tank. */
+const clearCast = (w: World): Entity | undefined => {
+  w.entities = w.entities.filter((e) => !e.ai && !e.projectile)
+  w.byId.clear()
+  for (const e of w.entities) w.byId.set(e.id, e)
+  w.groups = undefined
+  w.hostile = true
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
+  return player
+}
+
+/** Stage one raid of `strategy` with an explicit muster against the player. */
+const stageTide = (w: World, strategy: RaidStrategy, roster: Parameters<typeof spawnRaid>[4], name: string): void => {
+  const player = clearCast(w)
+  if (!player) return
+  const at = findArrival(w, strategy, player, groupRng(w, `scenario:${name}`))
+  if (at) spawnRaid(w, strategy, at, player, roster)
+}
+
+/** Seal a building for the sapper scenario: the building with the fewest
+ * doorways gets a LOCKED door in every one (an existing door is locked; an open
+ * doorway gets a new door entity — entities only, the tiles are untouched, so the
+ * moment stays shareable). Returns a standing spot inside, or null. */
+const sealBuilding = (w: World): { x: number; y: number } | null => {
+  let best: (typeof w.level.buildings)[number] | undefined
+  for (const b of w.level.buildings) {
+    if (b.doors.length === 0) continue
+    const room = b.rooms[0] ?? b.rect
+    if (isSolidTile(w.level, Math.floor(room.x + room.w / 2), Math.floor(room.y + room.h / 2))) continue
+    if (!best || b.doors.length < best.doors.length) best = b
+  }
+  if (!best) return null
+  for (const d of best.doors) {
+    let door = w.entities.find((e) => e.door && !e.dead && Math.floor(e.pos.x) === d.x && Math.floor(e.pos.y) === d.y)
+    if (!door) {
+      door = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
+      door.interact = { verb: 'open', range: 1.3 }
+      addEntity(w, door)
+    }
+    door.door = { open: false, locked: true, lockLevel: 3 }
+  }
+  const room = best.rooms[0] ?? best.rect
+  return { x: Math.floor(room.x + room.w / 2) + 0.5, y: Math.floor(room.y + room.h / 2) + 0.5 }
+}
+
+export const GROUP_SCENARIOS: Record<string, (w: World) => void> = {
+  /** An officer-led tide musters out of sight, then commits as one. Shoot the
+   * Bellwether (the tall brass-headed one) and watch the raid rout. */
+  'tide-staging': (w) => stageTide(w, 'staging', ['leader', 'medic', 'grunt', 'grunt', 'grunt'], 'tide-staging'),
+  /** A mortar battery sets up at range and shells the player over the walls;
+   * escorts guard it. Rush the gun to break the siege. */
+  'tide-siege': (w) => stageTide(w, 'siege', ['artillery', 'leader', 'grunt', 'grunt'], 'tide-siege'),
+  /** A wounded muster with a medic: the hurt fall back to the Bog Mender, are
+   * patched up, and return to the assault. */
+  'tide-medic': (w) => {
+    stageTide(w, 'assault', ['medic', 'grunt', 'grunt', 'grunt'], 'tide-medic')
+    for (const m of w.entities) {
+      if (m.ai?.group?.role === 'grunt' && m.health) m.health.hp = Math.max(1, Math.round(m.health.max * 0.3))
+    }
+  },
+  /** The player is sealed inside a building (every doorway LOCKED); a sapper
+   * tide arrives outside, the Blast Diver plants a charge, backs off, and blows it. */
+  'tide-sappers': (w) => {
+    const player = clearCast(w)
+    const inside = player ? sealBuilding(w) : null
+    if (!player || !inside) return
+    player.pos = { x: inside.x, y: inside.y }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    const at = findArrival(w, 'sappers', player, groupRng(w, 'scenario:tide-sappers'))
+    if (at) spawnRaid(w, 'sappers', at, player, ['sapper', 'grunt', 'grunt', 'grunt'])
+  },
+  /** Two hound packs: the near one spots the player and ENCIRCLES before
+   * closing. Shoot any hound and both packs go manhunter (the howl carries). */
+  'hound-ring': (w) => {
+    const player = clearCast(w)
+    if (!player) return
+    const r = groupRng(w, 'scenario:hound-ring')
+    const near = findArrival(w, 'assault', player, r)
+    if (near) spawnPack(w, near, 4)
+    const far = findArrival(w, 'staging', player, r)
+    if (far) spawnPack(w, far, 3)
+  },
+  /** A hive spire in sight of the player: it buds sporelings at them, and 30s
+   * in, if it still stands, it roots a second spire nearby. Burn it early. */
+  'hive-spread': (w) => {
+    const player = clearCast(w)
+    if (!player) return
+    const at = findArrival(w, 'assault', player, groupRng(w, 'scenario:hive-spread'))
+    if (at) spawnHive(w, at.x, at.y)
+  },
+}
+
 export const applyScenario = (w: World, name: string): void => {
   if (name === 'artcompare') stageArtCompare(w)
   if (name === 'npc-combat') setupNpcCombat(w)
@@ -698,4 +812,5 @@ export const applyScenario = (w: World, name: string): void => {
   if (name === 'ai-goals') setupAiGoals(w)
   if (name === 'npc-ai') setupNpcAi(w)
   if (name === 'npc-deliberate') setupNpcDeliberate(w)
+  GROUP_SCENARIOS[name]?.(w)
 }

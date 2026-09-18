@@ -10,6 +10,7 @@ import type { Rect } from './levelgen/rooms'
 export { roomOwningTile }
 import type { Rng } from './rng'
 import { weightedModId } from './systems/draft'
+import { populateGroups } from './systems/groups'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 import { vlen } from './simMath'
@@ -140,6 +141,9 @@ export const populateWorld = (w: World): void => {
   // Indoor complex only: sleepers in the bunk rooms (the director's ambush
   // rooms). Own `sleepers` fork, appended last — city floors never draw it.
   if (w.level.complex) spawnComplexSleepers(w)
+  // The group layer (floors 2+): hound packs, hive spires and the raid schedule.
+  // Own `groups` fork, appended last — nothing above moves.
+  populateGroups(w)
 }
 
 /** Room types a lurker haunts — dark back-of-house corners, never the front. */

@@ -245,5 +245,138 @@
    "cx": 2.5,
    "foot_y": 1
   }
+ },
+ "drowned-diver": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 30,
+   "head_h": 36,
+   "mass": 672,
+   "cx": 2.65,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "bellwether": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 19,
+   "head_h": 18,
+   "mass": 473,
+   "cx": 0.47,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "bog-mender": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 28,
+   "head_h": 35,
+   "mass": 553,
+   "cx": 4.72,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "blast-diver": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 34,
+   "head_h": 31,
+   "mass": 956,
+   "cx": -0.12,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "spore-mortar": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 41,
+   "head_h": 18,
+   "mass": 1095,
+   "cx": -1.03,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "gloam-hound": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 44,
+   "head_h": 23,
+   "mass": 972,
+   "cx": -2.0,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
+ },
+ "hive-spire": {
+  "ref_frame": "s-idle",
+  "ref": {
+   "height": 44,
+   "width": 34,
+   "head_h": 43,
+   "mass": 612,
+   "cx": 0.15,
+   "foot_y": 45
+  },
+  "tol": {
+   "height": 2,
+   "width": 3,
+   "head_h": 2,
+   "mass_frac": 0.22,
+   "cx": 2.5,
+   "foot_y": 1
+  }
  }
 }

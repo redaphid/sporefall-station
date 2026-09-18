@@ -76,3 +76,46 @@ describe('pickMode — the Settings entry', () => {
     expect(root.querySelector('button')).toBeNull() // overlay gone
   })
 })
+
+// Layout contract for phones (the visual proof is e2e/start-menu-fit.mjs, which
+// measures real boxes at phone viewports). These pin the pieces that proof
+// depends on, so a refactor back to a fixed, viewport-queried column fails here.
+describe('pickMode — fits a phone', () => {
+  const css = (): string => document.getElementById('sf-start-menu-style')?.textContent ?? ''
+
+  it('the overlay is the size container, scrolls instead of clipping, and holds every button', () => {
+    const root = mount()
+    void pickMode(root, undefined, fakeSettings())
+    const overlay = root.querySelector<HTMLElement>('[data-role="start-menu"]')!
+    expect(overlay).not.toBeNull()
+    expect(overlay.classList.contains('sf-start')).toBe(true)
+    expect(Array.from(overlay.querySelectorAll('button'))).toHaveLength(4)
+    expect(css()).toMatch(/\.sf-start\{[^}]*container-type:size/)
+    expect(css()).toMatch(/\.sf-start\{[^}]*overflow-y:auto/)
+    // Centring must not be on the scroller itself: a centred flex overflow is
+    // unreachable at the top. The min-height:100% child centres instead.
+    expect(css()).not.toMatch(/\.sf-start\{[^}]*justify-content/)
+    expect(css()).toMatch(/\.sf-start__inner\{[^}]*min-height:100%/)
+  })
+
+  it('queries the CONTAINER, never the viewport (the stage is rotated on portrait phones)', () => {
+    void pickMode(mount())
+    expect(css()).toContain('@container')
+    expect(css()).not.toContain('@media')
+    expect(css()).not.toMatch(/\d(vw|vh)\b/)
+  })
+
+  it('respects every stage-space safe-area inset and keeps buttons >= 44px', () => {
+    void pickMode(mount())
+    for (const edge of ['top', 'right', 'bottom', 'left']) expect(css()).toContain(`var(--sf-safe-${edge},0px)`)
+    const minH = /\.sf-start__btn\{[^}]*min-height:(\d+)px/.exec(css())
+    expect(Number(minH?.[1])).toBeGreaterThanOrEqual(44)
+    expect(css()).toMatch(/\.sf-start__btn\{[^}]*font:600 clamp\(/)
+  })
+
+  it('installs the stylesheet once however many times the menu is shown', () => {
+    void pickMode(mount())
+    void pickMode(mount())
+    expect(document.querySelectorAll('#sf-start-menu-style')).toHaveLength(1)
+  })
+})

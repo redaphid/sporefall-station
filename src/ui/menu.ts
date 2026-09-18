@@ -14,6 +14,60 @@ export interface SettingsControl {
   isOpen(): boolean
 }
 
+/**
+ * Start-menu layout. A stylesheet rather than inline styles because it needs
+ * container queries, which inline styles cannot express.
+ *
+ * WHY CONTAINER QUERIES, NOT MEDIA QUERIES: on a phone held in portrait the
+ * whole stage is rotated to landscape (orientation.ts), so a 360x640 viewport
+ * lays this menu out in a 640x360 box. A media query would read the VIEWPORT
+ * (tall) and pick the tall layout for a short box. The overlay is the size
+ * container, so `cqh`/`@container` always see the box the player actually sees.
+ *
+ * The old menu was a fixed ~450px centred column; in a ~360px landscape box it
+ * overflowed at BOTH ends, and a centred flex overflow at the top can never be
+ * scrolled back, so "Solo run" was simply gone. Now:
+ *   • sizes scale with box height (clamp + cqh), buttons never under 48px;
+ *   • a short, wide box puts the buttons in a 2x2 grid;
+ *   • padding respects the stage-space safe-area insets (--sf-safe-*,
+ *     orientation.ts), so a notch on either physical edge is honoured;
+ *   • if it STILL doesn't fit (tiny box, huge font setting) the overlay scrolls,
+ *     and the centring is done with `margin:auto` on a min-height:100% child so
+ *     overflow always extends downwards, never off the unreachable top.
+ * Covered by e2e/start-menu-fit.mjs across phone viewports + desktop.
+ */
+const START_MENU_CSS = `
+.sf-start{position:absolute;inset:0;container-type:size;overflow-x:hidden;overflow-y:auto;
+  overscroll-behavior:contain;touch-action:pan-y;pointer-events:auto;background:#0b0b12;color:#eee;font:16px system-ui}
+.sf-start__inner{box-sizing:border-box;min-height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:clamp(4px,1.6cqh,8px);
+  padding:max(clamp(8px,3cqh,20px),var(--sf-safe-top,0px)) max(16px,var(--sf-safe-right,0px))
+    max(clamp(8px,3cqh,20px),var(--sf-safe-bottom,0px)) max(16px,var(--sf-safe-left,0px))}
+.sf-start__buttons{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(6px,2cqh,10px);width:min(320px,100%)}
+.sf-start__btn{box-sizing:border-box;width:100%;min-height:48px;margin:0;text-align:left;cursor:pointer;
+  font:600 clamp(15px,4.4cqh,17px)/1.2 system-ui;padding:clamp(7px,2.6cqh,14px) clamp(12px,3cqw,18px);
+  border-radius:10px;border:2px solid #ffffff2e;background:#ffffff10;color:#eee;touch-action:manipulation}
+.sf-start__blurb{display:block;opacity:.6;font-weight:400;font-size:clamp(11px,3.4cqh,13px)}
+.sf-start__ver{margin-top:clamp(4px,4.5cqh,26px);font:800 clamp(16px,5.5cqh,22px) system-ui;letter-spacing:1px;
+  color:#7fd17f;text-align:center;overflow-wrap:anywhere}
+.sf-start__notes{display:flex;flex-direction:column;align-items:center;gap:2px;max-width:min(320px,100%);
+  font:400 clamp(11px,3.2cqh,12px)/1.35 system-ui;color:#ffffff80;text-align:center}
+@container (max-height:560px) and (min-width:480px){
+  .sf-start__buttons{grid-template-columns:repeat(2,minmax(0,1fr));width:min(520px,100%)}
+  .sf-start__notes{max-width:min(520px,100%)}
+}
+`
+
+const START_MENU_STYLE_ID = 'sf-start-menu-style'
+
+const installStartMenuStyle = (): void => {
+  if (document.getElementById(START_MENU_STYLE_ID)) return
+  const style = document.createElement('style')
+  style.id = START_MENU_STYLE_ID
+  style.textContent = START_MENU_CSS
+  document.head.appendChild(style)
+}
+
 /** Solo / Host / Join picker shown at boot. `onPick` fires SYNCHRONOUSLY inside
  * the button's click handler (before resolve) so the caller can run gesture-only
  * browser APIs — e.g. requesting fullscreen — while the user activation is live.
@@ -27,11 +81,17 @@ export const pickMode = (
   settings?: SettingsControl,
 ): Promise<GameMode> =>
   new Promise((resolve) => {
+    installStartMenuStyle()
     const overlay = document.createElement('div')
     markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
-    overlay.style.cssText =
-      'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
-      'justify-content:center;gap:10px;pointer-events:auto;color:#eee;font:16px system-ui'
+    overlay.className = 'sf-start'
+    overlay.dataset.role = 'start-menu'
+    const inner = document.createElement('div')
+    inner.className = 'sf-start__inner'
+    const buttonsBox = document.createElement('div')
+    buttonsBox.className = 'sf-start__buttons'
+    inner.appendChild(buttonsBox)
+    overlay.appendChild(inner)
     const options: [GameMode, string, string][] = [
       ['solo', 'Solo run', 'Just you vs the spores'],
       ['host', 'Host co-op', 'Others join your game'],
@@ -41,16 +101,14 @@ export const pickMode = (
     let stopNav: () => void = () => {}
     const menuButton = (html: string): HTMLButtonElement => {
       const b = document.createElement('button')
-      b.style.cssText =
-        'font:600 17px system-ui;padding:14px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
-        'background:#ffffff10;color:#eee;cursor:pointer;width:min(320px,80vw);text-align:left'
+      b.className = 'sf-start__btn'
       b.innerHTML = html
       navButtons.push(b)
-      overlay.appendChild(b)
+      buttonsBox.appendChild(b)
       return b
     }
     const blurbed = (label: string, blurb: string): string =>
-      `${label} <span style="opacity:.6;font-weight:400;font-size:13px"><br>${blurb}</span>`
+      `${label} <span class="sf-start__blurb">${blurb}</span>`
     for (const [mode, label, blurb] of options) {
       menuButton(blurbed(label, blurb)).addEventListener('click', () => {
         stopNav()
@@ -74,9 +132,9 @@ export const pickMode = (
     // Big version readout under the mode picker so you can tell at a glance which
     // build a phone is on (esp. after an OTA update) before starting a game.
     const ver = document.createElement('div')
-    ver.style.cssText = 'margin-top:26px;font:800 22px system-ui;letter-spacing:1px;color:#7fd17f'
+    ver.className = 'sf-start__ver'
     ver.textContent = APP_VERSION
-    overlay.appendChild(ver)
+    inner.appendChild(ver)
     void otaBundleVersion().then((b) => {
       if (b && b !== APP_VERSION) ver.textContent = `${APP_VERSION} · ota ${b}`
     })
@@ -86,15 +144,13 @@ export const pickMode = (
     const notes = formatReleaseNotes()
     if (notes.length > 0) {
       const notesBox = document.createElement('div')
-      notesBox.style.cssText =
-        'margin-top:8px;display:flex;flex-direction:column;align-items:center;gap:2px;' +
-        'font:400 12px system-ui;line-height:1.35;color:#ffffff80;text-align:center;max-width:min(320px,80vw)'
+      notesBox.className = 'sf-start__notes'
       for (const line of notes) {
         const row = document.createElement('div')
         row.textContent = line
         notesBox.appendChild(row)
       }
-      overlay.appendChild(notesBox)
+      inner.appendChild(notesBox)
     }
     mount.appendChild(overlay)
   })

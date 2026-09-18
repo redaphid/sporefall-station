@@ -23,6 +23,12 @@ const GROUND_RANK: Record<number, number> = {
   [Tile.Sidewalk]: 2,
   [Tile.Floor]: 3,
   [Tile.Exit]: 3,
+  // Indoor complex: bog seep sits lowest, corridors below the room decks.
+  [Tile.Bog]: 0,
+  [Tile.Hall]: 2,
+  [Tile.Grate]: 2,
+  [Tile.Tiled]: 3,
+  [Tile.Plating]: 3,
 }
 
 const SIDES: readonly { side: OverlaySide; dx: number; dy: number }[] = [

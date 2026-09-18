@@ -10,6 +10,7 @@ import { serializeEntity } from '../debug/verbs'
 import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
 import { hashLabel, mulberry32 } from './rng'
+import type { DirectorState } from './systems/complexDirector'
 import type { Annotation, SimEvent } from './types'
 import {
   createWorld,
@@ -67,6 +68,8 @@ export interface WorldJson {
    * restored as `[]`. Entity SELECTION needs no field here: `Entity.selected`
    * rides along in each entity's verbatim JSON above. */
   annotations?: Annotation[]
+  /** Complex director schedule (World.director). Omitted when absent. */
+  director?: DirectorState
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -105,6 +108,8 @@ export const serializeWorld = (w: World): WorldJson => ({
   // Omit when empty so pre-existing snapshots stay byte-for-byte unchanged (a
   // fresh world with no annotations serializes exactly as before this feature).
   ...(w.annotations.length ? { annotations: clone(w.annotations) } : {}),
+  // Only complex floors ever carry a director; city snapshots stay unchanged.
+  ...(w.director ? { director: clone(w.director) } : {}),
 })
 
 /** Rebuild a fresh, standalone world from a snapshot — byte-identical on every
@@ -136,5 +141,6 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.byId = new Map(w.entities.map((e) => [e.id, e]))
   // Annotations are inert presentation data; default to none for older snapshots.
   w.annotations = j.annotations ? clone(j.annotations) : []
+  if (j.director) w.director = clone(j.director)
   return w
 }

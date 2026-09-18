@@ -13,6 +13,7 @@ import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
 import { setActiveThemeChain } from './themeState'
 import { Camera } from './camera'
+import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './complexLook'
 import { EffectsLayer } from './effects'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
@@ -218,6 +219,13 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // is a regression.
   // Mounted BY the pinned order (worldLayers.ts) rather than alongside it, so
   // the test that guards the order guards what actually paints.
+  //
+  // Indoor complex lights-out: `dark` is a dimming rect over the blacked-out
+  // wing, above the actors (they vanish into the dark) but under the
+  // affordance layers.
+  const darkLayer = new Graphics()
+  darkLayer.eventMode = 'none'
+  let darkWing: DarkWing | null = null
   const worldLayers: Record<WorldLayerName, Container> = {
     tilemap: tilemap.root,
     entities: entities.root,
@@ -225,6 +233,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     statusFx: statusFx.root,
     bullets: bullets.root,
     effects: effects.root,
+    dark: darkLayer,
     reticle: reticleLayer,
     pick: pickLayer,
   }
@@ -292,6 +301,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     })
   }
 
+  let currentLevel: Level | undefined
+  let themeFloorTint = 0xffffff
   const applyThemePalette = (c: ThemeChain): void => {
     const p = resolvePalette(c)
     app.renderer.background.color = p.background ?? DEFAULT_BACKGROUND
@@ -299,7 +310,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     // The fractal pass stays palette-coherent: its tint ramp derives from the
     // active theme's background + accent, not hardcoded hues.
     pipeline.setPalette(p.background ?? DEFAULT_BACKGROUND, p.uiAccent ?? 0xffe066)
-    tilemap.root.tint = p.floorTint ?? 0xffffff
+    themeFloorTint = p.floorTint ?? 0xffffff
+    tilemap.root.tint = floorTintFor(currentLevel, themeFloorTint)
     if (p.uiAccent !== undefined)
       document.documentElement.style.setProperty('--theme-accent', `#${p.uiAccent.toString(16).padStart(6, '0')}`)
     else document.documentElement.style.removeProperty('--theme-accent')
@@ -326,7 +338,6 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const coldOverlay = overlay('add', 0x3aa0ff)
   const grade = new ColorMatrixFilter()
 
-  let currentLevel: Level | undefined
   // Inspect-card thumbnails: art key → data URL, extracted lazily from the live
   // registry. Theme-keyed implicitly — the cache empties on every theme swap.
   const thumbs = new Map<string, string | undefined>()
@@ -433,6 +444,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     setLevel(level: Level): void {
       currentLevel = level
       tilemap.build(level, art)
+      tilemap.root.tint = floorTintFor(level, themeFloorTint)
+      darkWing = null
       levelW = level.w
       levelH = level.h
       camera.snapTo(level.spawn.x, level.spawn.y)
@@ -468,6 +481,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
             // Stop-drop-and-roll steam puff: a pale quench flash where the burn
             // was smothered, so the shortened/killed burn reads as CAUSED by the roll.
             effects.spawn('hit', ev.x, ev.y, view.tick, STEAM_TINT)
+          } else if (ev.type === 'ventSwarm') {
+            // The grate bursts: a spore-green spray where the swarm crawls out.
+            effects.spawn('explosion', ev.x, ev.y, view.tick, 0x7fd65a)
+          } else if (ev.type === 'ambush') {
+            effects.spawn('hit', ev.x, ev.y, view.tick, 0xd17f7f)
           } else if (ev.type === 'pickup' || ev.type === 'modPickup') {
             const by = view.entities.find((e) => e.id === ev.byId)
             if (by) effects.spawn('pickup', by.pos.x, by.pos.y, view.tick)
@@ -480,6 +498,12 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
             cold = Math.min(1, cold + t.cold)
             if (selfHurt) vignette = Math.min(VIGNETTE_MAX, vignette + 0.35)
           }
+        }
+        darkWing = updateDarkWing(darkWing, view.events, view.tick)
+        darkLayer.clear()
+        if (darkWing) {
+          const r = darkWing.rect
+          darkLayer.rect(r.x * TILE_PX, r.y * TILE_PX, r.w * TILE_PX, r.h * TILE_PX).fill({ color: 0x02040a, alpha: DARK_ALPHA })
         }
         sound.handle(view.events)
         haptics.handle(view.events, view.self)

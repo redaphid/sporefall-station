@@ -17,11 +17,35 @@ export const Tile = {
   WallCutNE: 7,
   WallCutSE: 8,
   WallCutSW: 9,
+  // ── Indoor complex (floors 3, 5, 7…, levelgen/complex.ts) ─────────────────────────
+  // Appended after the cut corners for the same reason: ids never renumber.
+  /** Corridor deck plating — the station's hallways. Walkable. */
+  Hall: 10,
+  /** Ventilation grate set into the deck — walkable, and where the complex
+   * director's vent swarms crawl out (systems/complexDirector.ts). */
+  Grate: 11,
+  /** Scrubbed ceramic tile — mess hall, galley, washroom, med-bay. Walkable. */
+  Tiled: 12,
+  /** Diamond-tread engineering plate — reactor hall and stores. Walkable. */
+  Plating: 13,
+  /** The station's outer pressure hull: a wall-family tile, fully solid. */
+  Hull: 14,
+  /** Bog seep — swamp water that has found its way onto the deck (the station
+   * is sinking). Walkable shallows; the flooded biome's signature. */
+  Bog: 15,
 } as const
 export type TileId = (typeof Tile)[keyof typeof Tile]
 
 /** Every wall-family tile (plain wall + the 4 bevelled corner variants). */
-export const isWallTile = (t: number): boolean => t === Tile.Wall || (t >= Tile.WallCutNW && t <= Tile.WallCutSW)
+export const isWallTile = (t: number): boolean =>
+  t === Tile.Wall || (t >= Tile.WallCutNW && t <= Tile.WallCutSW) || t === Tile.Hull
+
+/** Every INTERIOR floor-family tile — a tile inside a room/corridor that a body
+ * can stand on and furniture/loot/spawns may occupy. The classic city only ever
+ * lays `Tile.Floor`; the indoor complex adds its deck variants. Streets,
+ * sidewalks, grass and the exit pad are ground, not interior floor. */
+export const isFloorTile = (t: number): boolean =>
+  t === Tile.Floor || t === Tile.Tiled || t === Tile.Plating || t === Tile.Hall || t === Tile.Grate || t === Tile.Bog
 
 /** For each cut-corner variant, the diagonal offset toward the OUTSIDE ground
  * tile the bevel exposes — the renderer draws that neighbour underneath. */
@@ -32,7 +56,24 @@ export const WALL_CUT_OUTSIDE: Record<number, { dx: number; dy: number }> = {
   [Tile.WallCutSW]: { dx: -1, dy: 1 },
 }
 
-export type BuildingRole = 'shop' | 'apartment' | 'office' | 'warehouse' | 'clinic' | 'bunker'
+export type BuildingRole =
+  | 'shop'
+  | 'apartment'
+  | 'office'
+  | 'warehouse'
+  | 'clinic'
+  | 'bunker'
+  // Indoor complex modules (floors 3, 5, 7…): one room per module, named for what the
+  // colony used it for — see levelgen/complex.ts and COMPLEX_ROOM_TYPE.
+  | 'mess'
+  | 'galley'
+  | 'quarters'
+  | 'washroom'
+  | 'lab'
+  | 'medbay'
+  | 'reactor'
+  | 'depot'
+  | 'security'
 
 /** What a single room IS, within its building's fiction — drives which
  * furniture it gets and where that furniture sits (populate.furnishInteriors),
@@ -56,9 +97,19 @@ export type RoomType =
   | 'armory' // bunker core: weapon lockers
   | 'barracks' // bunker sleeping quarters
   | 'vault' // sealed reward chamber
+  // Indoor complex rooms (floors 3, 5, 7…)
+  | 'messhall' // the crew dining hall: long tables and benches
+  | 'galley' // the kitchen behind the mess: counters, dispensers
+  | 'bunkroom' // crew sleeping quarters: rows of bunks and lockers
+  | 'washroom' // wash block: stalls and cabinets
+  | 'lab' // essence lab: benches, consoles, specimen pods
+  | 'medbay' // station infirmary: cots and med cabinets
+  | 'reactor' // the reactor hall: generators and heavy plant
+  | 'depot' // station stores: crates and shelving
+  | 'security' // security post: lockers and a desk
 
 /** Layout set-piece a building can carry (beyond a plain box of rooms). */
-export type BuildingPoi = 'courtyard' | 'vault' | 'hallway' | 'bunker'
+export type BuildingPoi = 'courtyard' | 'vault' | 'hallway' | 'bunker' | 'module'
 
 export interface Building {
   rect: Rect
@@ -189,6 +240,36 @@ export interface Level {
   /** Open plaza lots (themed floors): paved squares with a green heart. Not
    * serialized — the level regenerates from seed+floor like everything else. */
   plazas?: Rect[]
+  /** Present ONLY on indoor-complex floors (3+): the corridor network, vents,
+   * wings and biome the complex generator laid down. Its presence is THE
+   * switch the complex-aware systems (populate, complexDirector, render) key
+   * off. Regenerated from seed+floor, never serialized. */
+  complex?: ComplexInfo
+}
+
+/** Indoor biome — how a complex floor looks and what crawls out of its vents. */
+export type BiomeName = 'habitation' | 'flooded' | 'reactor' | 'overgrown'
+
+/** A straight corridor run: its full tile rect and the axis it runs along. */
+export interface Corridor {
+  rect: Rect
+  axis: 'h' | 'v'
+}
+
+/** A wing: one block of modules between corridors. Lights-out hits a wing. */
+export interface Wing {
+  rect: Rect
+  /** Indices into `level.buildings` of the modules in this wing. */
+  buildings: number[]
+}
+
+export interface ComplexInfo {
+  biome: BiomeName
+  /** Every carved straight corridor run (intersections included in both axes). */
+  corridors: Corridor[]
+  /** Vent grate tile positions (director swarm spawn points). */
+  vents: { x: number; y: number }[]
+  wings: Wing[]
 }
 
 /** Mutable view over a tile buffer during generation. */

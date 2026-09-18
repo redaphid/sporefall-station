@@ -1,6 +1,6 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { generateLevel } from '../levelgen/generate'
-import { Tile, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { spawnObject } from './objects'
@@ -33,6 +33,15 @@ const WING_NAMES: Record<BuildingRole, string> = {
   warehouse: 'cargo hold',
   clinic: 'med-bay',
   bunker: 'reactor core',
+  mess: 'mess hall',
+  galley: 'galley',
+  quarters: 'crew quarters',
+  washroom: 'wash block',
+  lab: 'essence lab',
+  medbay: 'infirmary',
+  reactor: 'reactor hall',
+  depot: 'stores depot',
+  security: 'security post',
 }
 
 /** Themed module name for a building role (falls back to the raw role, defensively). */
@@ -238,7 +247,7 @@ const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; 
   for (let attempt = 0; attempt < 24; attempt++) {
     const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
     const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
-    if (w.level.tiles[ty * w.level.w + tx] !== Tile.Floor) continue
+    if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
     if (tx === sx && ty === sy) continue
     if (tx === w.level.exit.x && ty === w.level.exit.y) continue
     return { tx, ty }
@@ -573,6 +582,7 @@ export const nextFloor = (w: World): void => {
   }
   w.alarm = 0
   w.powerCut = {} // a fresh floor is fully powered again
+  w.director = undefined // the complex director re-plans per floor
   populateWorld(w)
   setupFloor(w)
   w.events.push({ type: 'floorChange', floor: w.floor })

@@ -15,6 +15,15 @@ describe('world layer order', () => {
     }
   })
 
+  it('puts the lights-out dark layer over the actors but under the aim and pick affordances', () => {
+    for (const actor of ['entities', 'playerMarkers', 'statusFx', 'bullets', 'effects']) {
+      expect(paintsUnder(actor, 'dark')).toBe(true)
+    }
+    for (const affordance of ['reticle', 'pick']) {
+      expect(paintsUnder('dark', affordance)).toBe(true)
+    }
+  })
+
   it('keeps the tilemap at the bottom — it is the floor', () => {
     expect(layerDepth('tilemap')).toBe(0)
     for (const above of WORLD_LAYER_ORDER.slice(1)) {

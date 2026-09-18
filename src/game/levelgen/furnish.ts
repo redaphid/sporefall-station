@@ -210,6 +210,60 @@ export const ROOM_LAYOUT: Record<RoomType, readonly FurnishGroup[]> = {
     { g: 'one', prop: 'locker' },
     { g: 'block', prop: 'crate', min: 1, max: 2 },
   ],
+  // ── Indoor complex rooms (floors 3, 5, 7…) ──────────────────────────────────
+  // The crew eats together: tables with chairs round them, benches along the
+  // wall, a machine.
+  messhall: [
+    { g: 'set', anchor: 'table', seat: 'chair', min: 2, max: 3 },
+    { g: 'set', anchor: 'table', seat: 'chair', min: 1, max: 2 },
+    { g: 'run', prop: 'bench', min: 1, max: 2 },
+    { g: 'one', prop: 'vending' },
+  ],
+  galley: [
+    { g: 'run', prop: 'cabinet', min: 2, max: 3 },
+    { g: 'one', prop: 'vending' },
+    { g: 'one', prop: 'barrel' },
+    { g: 'block', prop: 'crate', min: 1, max: 2 },
+  ],
+  bunkroom: [
+    { g: 'run', prop: 'bunk', min: 2, max: 4 },
+    { g: 'run', prop: 'locker', min: 1, max: 2 },
+    { g: 'one', prop: 'cabinet' },
+  ],
+  washroom: [
+    { g: 'one', prop: 'toilet' },
+    { g: 'one', prop: 'toilet' },
+    { g: 'one', prop: 'cabinet' },
+  ],
+  // Benches ranked along the wall, a desk with its chair, a screen of readouts.
+  lab: [
+    { g: 'run', prop: 'bench', min: 1, max: 2 },
+    { g: 'run', prop: 'desk', min: 1, max: 1, seat: 'chair' },
+    { g: 'one', prop: 'cabinet' },
+    { g: 'one', prop: 'tv' },
+  ],
+  medbay: [
+    { g: 'run', prop: 'bunk', min: 2, max: 3 },
+    { g: 'run', prop: 'cabinet', min: 1, max: 2 },
+    { g: 'one', prop: 'bench' },
+  ],
+  reactor: [
+    { g: 'block', prop: 'barrel', min: 2, max: 3 },
+    { g: 'one', prop: 'locker' },
+    { g: 'one', prop: 'cabinet' },
+    { g: 'one', prop: 'crate' },
+  ],
+  depot: [
+    { g: 'run', prop: 'shelf', min: 2, max: 3 },
+    { g: 'block', prop: 'crate', min: 2, max: 4 },
+    { g: 'one', prop: 'barrel' },
+  ],
+  security: [
+    { g: 'run', prop: 'locker', min: 2, max: 3 },
+    { g: 'run', prop: 'desk', min: 1, max: 1, seat: 'chair' },
+    { g: 'one', prop: 'tv' },
+    { g: 'one', prop: 'crate' },
+  ],
 }
 
 /** The live tile pool for one room being planned. Tiles are consumed as props

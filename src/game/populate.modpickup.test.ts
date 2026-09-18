@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { createWorld } from './world'
 import { MOD_PICKUP_ROOM_CHANCE, populateWorld } from './populate'
 import { deserializeWorld, serializeWorld } from './serialize'
-import { Tile } from './levelgen/level'
+import { isFloorTile } from './levelgen/level'
 import { MODS, isModId } from './data/mods'
 import type { Entity } from './entity'
 import type { Rect } from './levelgen/rooms'
@@ -116,7 +116,7 @@ describe('mod-pickup placement — determinism & invariants', () => {
         for (const e of modPickups(w)) {
           const tx = Math.floor(e.pos.x)
           const ty = Math.floor(e.pos.y)
-          expect(w.level.tiles[ty * w.level.w + tx]).toBe(Tile.Floor)
+          expect(isFloorTile(w.level.tiles[ty * w.level.w + tx])).toBe(true)
           expect(tx === exitTx && ty === exitTy).toBe(false)
           expect(tx === spawnTx && ty === spawnTy).toBe(false)
         }

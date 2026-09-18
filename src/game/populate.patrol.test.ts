@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from './levelgen/generate'
+import { generateCityLevel } from './levelgen/generate'
 import type { Building } from './levelgen/level'
 import { populateWorld } from './populate'
 import { setupFloor } from './systems/missions'
-import { createWorld, tickWorld, type World } from './world'
+import { createCityWorld } from './testkit'
+import { tickWorld, type World } from './world'
 import type { Entity } from './entity'
 import type { Rect } from './levelgen/rooms'
 
@@ -17,7 +18,7 @@ import type { Rect } from './levelgen/rooms'
 const findCase = (poi: Building['poi']): { seed: number; floor: number } => {
   for (let seed = 1; seed <= 100; seed++) {
     for (let floor = 2; floor <= 4; floor++) {
-      if (generateLevel(seed, floor).buildings.some((b) => b.poi === poi)) return { seed, floor }
+      if (generateCityLevel(seed, floor).buildings.some((b) => b.poi === poi)) return { seed, floor }
     }
   }
   throw new Error(`no ${poi} found in search bound`)
@@ -29,7 +30,7 @@ const findCase = (poi: Building['poi']): { seed: number; floor: number } => {
  * predator that corners the patroller pins it mid-beat by body contact — so
  * cull predators too: this test isolates patrol STEERING, not creature brawls. */
 const buildWorld = (seed: number, floor: number): World => {
-  const w = createWorld(seed, floor, 'normal', false)
+  const w = createCityWorld(seed, floor, 'normal', false)
   populateWorld(w)
   setupFloor(w)
   for (const e of w.entities) if (e.ai?.behavior === 'predator') e.dead = true

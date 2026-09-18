@@ -856,6 +856,11 @@ describe('divergence hunt — long-run co-op soak', () => {
       const phase = t % 120
       walkA.set({ moveX: Math.sin(phase / 19), moveY: Math.cos(phase / 23), attack: phase % 17 === 0 })
       walkB.set({ moveX: Math.cos(phase / 13), moveY: Math.sin(phase / 29), attack: phase % 11 === 0 })
+      // Keep the party standing: this soak measures NET divergence, not combat.
+      // Floor 3 is an indoor complex (vent swarms, ambushes) that can wipe a
+      // random-walking pair, and a co-op wipe ends the run before the scripted
+      // descents finish. Iframes stop damage without touching movement or sync.
+      for (const p of host.world.entities) if (p.playerCtl && p.health) p.health.iframes = Math.max(p.health.iframes, 2)
       // Push the party down a floor a few times over the run.
       if (t % 700 === 0) {
         armDescent(host)

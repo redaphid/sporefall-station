@@ -1,6 +1,7 @@
 import { mulberry32, type Rng } from '../rng'
 import { LEVEL_H, LEVEL_W } from '../types'
 import { carveBunker } from './bunker'
+import { carveComplex, cityFloorOrdinal, isComplexFloor } from './complex'
 import { carveCompound } from './compound'
 import { applyCornerCuts } from './corners'
 import { carveHallways } from './corridors'
@@ -14,13 +15,48 @@ const PLAZA_CHANCE = 0.3
 
 const CLASSIC_ROLES: readonly BuildingRole[] = ['shop', 'apartment', 'office', 'warehouse', 'clinic']
 
-export const generateLevel = (seed: number, floor: number): Level => {
+export const generateLevel = (seed: number, floor: number): Level =>
+  isComplexFloor(floor)
+    ? generateComplexLevel(seed, floor)
+    : generateCityLevel(seed, floor, themeForFloor(cityFloorOrdinal(floor)))
+
+/** The indoor station complex (levelgen/complex.ts) — what floors 3, 5, 7… use. */
+export const generateComplexLevel = (seed: number, floor: number): Level => {
   const rng = mulberry32(seed).fork(`levelgen:${floor}`)
   const w = LEVEL_W
   const h = LEVEL_H
   const tiles = new Uint8Array(w * h).fill(Tile.Street)
   const grid = new TileGrid(w, h, tiles)
-  const theme = themeForFloor(floor)
+  const plan = carveComplex(rng.fork('complex'), grid, floor)
+  const level: Level = {
+    w,
+    h,
+    tiles,
+    solid: buildSolid(tiles),
+    buildings: plan.buildings,
+    spawn: plan.spawn,
+    exit: plan.exit,
+    theme: themeForFloor(floor).name,
+    complex: plan.complex,
+  }
+  for (const b of level.buildings) b.roomTypes = assignRoomTypes(b)
+  return level
+}
+
+/**
+ * The sunken-streets city generator (themed lots, bunkers, courtyards, vaults).
+ * `generateLevel` uses it for floors 1, 2, 4, 6, 8… (the city floors between
+ * complexes), passing a theme that cycles over city floors only. With no theme
+ * it themes on the raw floor; it stays exported for ANY floor so the
+ * city set-pieces remain testable on every floor, including the odd floors that
+ * build the indoor complex in play.
+ */
+export const generateCityLevel = (seed: number, floor: number, theme: Theme = themeForFloor(floor)): Level => {
+  const rng = mulberry32(seed).fork(`levelgen:${floor}`)
+  const w = LEVEL_W
+  const h = LEVEL_H
+  const tiles = new Uint8Array(w * h).fill(Tile.Street)
+  const grid = new TileGrid(w, h, tiles)
 
   // Floor 1 is the familiar surface city, kept byte-for-byte with the original
   // generator so the scripted-demo regression guards (which replay fixed inputs

@@ -14,6 +14,9 @@
  *     red ring, no X and no "P2 DOWN", and the revive cue is gone.
  *   - `playerMarkers` BELOW `statusFx`/`bullets`/`effects`, so the markers can
  *     never out-shout the things trying to kill you.
+ *   - `dark` (indoor-complex lights-out) ABOVE every actor/combat layer, so the
+ *     blacked-out wing really hides what is in it, but BELOW `reticle`/`pick`,
+ *     so the player's own aim and affordances stay readable in the dark.
  */
 export const WORLD_LAYER_ORDER = [
   'tilemap',
@@ -22,6 +25,7 @@ export const WORLD_LAYER_ORDER = [
   'statusFx',
   'bullets',
   'effects',
+  'dark',
   'reticle',
   'pick',
 ] as const

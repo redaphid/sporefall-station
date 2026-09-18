@@ -347,6 +347,97 @@ CHARS = {
             "spacesuit, helmet, visor, teal suit, robot, treads, "
             "metal, barrel, crate, box, canister, mushroom cap, insect, crab, six legs, "
             "hovering, floating, " + NEG_GROUND),
+    # ── Tides: the raid roster (docs/design/enemy-groups.md) ─────────────────
+    # Seven more kinds, and the same bar as #78: each must diverge from the whole
+    # cast above on silhouette AND dominant colour. The upright ones are the risk
+    # (upright biped is what the ranger, mutant and mycologist already are), so
+    # each leads with one unmistakable prop that changes the OUTLINE -- a bell for
+    # a head, a cage on the back, a tank on the back, a porthole helmet -- rather
+    # than with a body description the cast anchor can win.
+    "drowner": ("drowned-diver",
+                "a drowned colony diver, a slumped waterlogged figure in an old heavy canvas "
+                "diving suit stained dark slate-grey, a big round dull pewter diving helmet with "
+                "one round porthole window full of murky green water and no face visible, long "
+                "strands of black swamp weed trailing from the shoulders, a rusty harpoon gun "
+                "held across the body in both hands, heavy weighted boots, hunched, "
+                "chunky proportions, big helmet, short legs",
+                "teal suit, orange visor, orange cap, face, eyes, mouth, bare skin, muscular, "
+                "olive green skin, moss-crusted skin, hovering, floating, tank treads, "
+                "bright colors, " + NEG_GROUND),
+    # v2 (all three). v1 of each is recorded because each failed differently:
+    #  bellwether  8/8 drew a hooded officer -- the coat landed, the BELL never
+    #              did; "its head is a bell" reads as a hat to the model. v2 names
+    #              the object first and the body second, and bans the hood.
+    #  mender      7/8 drew an anime girl in a short dress: "stooped thin figure
+    #              ... thin crooked legs" is exactly the pose vocabulary of that
+    #              genre on this base. v2 is a beaked, fully-wrapped figure with
+    #              no skin anywhere, and negatives the genre by name.
+    #  breacher    8/8 drew a sleek power-armour suit and not one caged charge;
+    #              the charge was the whole silhouette idea. v2 leads with it.
+    "bellwether": ("bellwether",
+                   "a huge heavy bronze church bell worn as a helmet covering the whole head "
+                   "and shoulders, a hot orange glow shining out from under the rim of the bell, "
+                   "beneath it a tall figure in a long tattered dark brown officer's greatcoat "
+                   "with gold buttons and gold epaulettes, holding a tall banner pole hung with "
+                   "small glowing glass bubbles, standing straight and proud, no face",
+                   "hood, hooded, cloak hood, teal suit, orange visor, orange cap, face, eyes, "
+                   "mouth, human head, hair, skull, green skin, moss, olive skin, hovering, "
+                   "tank treads, crown, wings, spear tip, " + NEG_GROUND),
+    "mender": ("bog-mender",
+               "a hunched faceless swamp medic wrapped head to toe in stained rust-brown "
+               "oilcloth, a long curved leather plague doctor beak mask with two round dark "
+               "goggle eyes, a big round glass tank of glowing bright green fluid strapped on "
+               "its hunched back and sticking up above its head, rubber hoses running from the "
+               "tank to a long brass syringe held in one gloved hand, crooked bent posture, "
+               "heavy boots, no skin visible",
+               "girl, woman, female, anime, cute, young, pretty face, dress, skirt, bare legs, "
+               "thighs, bare skin, hair, white suit, hazmat suit, faceplate, teal suit, orange "
+               "visor, orange cap, muscular, armor, hovering, tank treads, mushroom, "
+               + NEG_GROUND),
+    "breacher": ("blast-diver",
+                 "a huge glowing orange-red round bomb sphere strapped on the back inside a "
+                 "black iron cage, the cage sticking up high above the shoulders, carried by a "
+                 "short squat stocky dwarf-like demolition diver in thick dark iron riveted "
+                 "diving armor, a heavy round riveted iron diving helmet with a narrow yellow "
+                 "slit, yellow and black hazard stripes on the shoulder pads, huge gauntlets, "
+                 "wide stance, as wide as it is tall",
+                 "slim, sleek, tall, female, woman, curvy, power armor, space marine, samus, "
+                 "teal suit, orange cap, face, eyes, mouth, bare skin, green skin, moss, olive, "
+                 "claws, monster, hovering, floating, tank treads, " + NEG_GROUND),
+    "lobber": ("spore-mortar",
+               "a squat siege beast shaped like a living mortar cannon, a low wide bulbous "
+               "body of warty dark purple-grey hide carried on four short thick stumpy legs, "
+               "one wide fleshy chimney tube rising from its back and angled upward like a "
+               "cannon barrel, glowing violet spore globs packed inside the mouth of the "
+               "tube, no head, two tiny eyes low at the front, wide flat silhouette wider "
+               "than it is tall",
+               "human, person, humanoid, upright, standing biped, two legs, bipedal, torso, "
+               "arms, hands, spacesuit, helmet, visor, orange cap, teal suit, olive green "
+               "skin, moss, frog, frog face, big round eyes, wide mouth, six legs, insect, "
+               "crab, bone plates, hovering, floating, tank treads, metal cannon, "
+               + NEG_GROUND),
+    "gloamhound": ("gloam-hound",
+                   "a gaunt swamp hound beast standing on all fours, a lean wolf-like "
+                   "quadruped with long thin legs, mangy ochre-yellow hide with dark brown "
+                   "stripes stretched over visible ribs, a long narrow snout full of needle "
+                   "teeth, small glowing pale green eyes, a ridge of bony spines along its "
+                   "back, low hunting crouch, four legs",
+                   "human, person, humanoid, upright, standing biped, two legs, bipedal, "
+                   "torso, arms, hands, spacesuit, helmet, visor, orange cap, teal suit, "
+                   "six legs, insect, crab, carapace plates, bone shield, mushroom, "
+                   "hovering, floating, tank treads, fat, bulky, cute, puppy, "
+                   + NEG_GROUND),
+    "hivespire": ("hive-spire",
+                  "a tall organic hive spire rooted into the floor, a narrow twisted tower of "
+                  "fused fleshy chitin tubes with pale bone ridges, dark red living flesh "
+                  "between the tubes, dozens of small round pores glowing bright green, "
+                  "dripping ooze, a spiky open crown at the top, much taller than it is wide, "
+                  "no legs, no arms, no head, a motionless object, not a creature",
+                  "human, person, humanoid, figure, character, face, eyes, mouth, arms, "
+                  "hands, legs, feet, walking, torso, limbs, twig person, tree, trunk, "
+                  "branches, leaves, egg, teardrop, round bulb, sac, spacesuit, helmet, "
+                  "visor, robot, treads, metal, barrel, crate, mushroom cap, insect, crab, "
+                  "hovering, floating, " + NEG_GROUND),
 }
 # Archetypes that are STATIC OBJECTS wearing an archetype, not figures. The
 # character recipe hard-codes "full body, feet on the ground" and a pose word
@@ -354,7 +445,24 @@ CHARS = {
 # so the model invents a body to hang them on. These kinds get the object
 # framing and, per docs §4, the ENVIRONMENT anchor rather than the humanoid cast
 # anchor, which is the same rule props already follow.
-STATIC_KINDS = {"pod"}
+STATIC_KINDS = {"pod", "hivespire"}
+# The r2 CHUNK treatment for upright bipeds — the recipe the 96px hi-res cast was
+# actually drawn with (scripts/assets/ART-RUN-NOTES.md "Recipe: juggernautXL at
+# 768, CFG 3.5, chunky-proportion prompt on bipeds only"; it lived in the staging
+# driver D:/tmp/sprite-stage-0822/tools/cast.py and is copied here verbatim so the
+# repo can reproduce it). ONLY bipeds: every other kind states its silhouette as
+# explicit geometry, which "4 heads tall, wide planted stance" would fight.
+# Sweep these with `CKPT='SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors'
+# SIZE=768` — on the anime base the same prompts drew anime girls (the mender, 15
+# of 16 across two prompt versions).
+CHUNKY_BIPEDS = {"drowner", "bellwether", "mender", "breacher"}
+BG_CHUNKY = ("single character centered on plain flat white background, full body, "
+             "feet on the ground, stocky chibi videogame proportions, only 4 heads tall, "
+             "oversized head, short thick legs, broad heavy shoulders, wide planted stance, "
+             "thick sturdy limbs, bulky wide silhouette")
+NEG_THIN = ("elongated, slender, lanky, skinny, thin limbs, spindly, long legs, "
+            "tall thin figure, realistic human proportions, 8 heads tall, "
+            "fashion model, willowy, narrow shoulders, stretched, anorexic")
 BG_STATIC = ("single isolated game object centered on plain flat white background, "
              "the whole object in frame, resting on the floor")
 CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
@@ -775,6 +883,7 @@ def jobs():
                 # from every direction — so it drops the "standing/full body" recipe
                 # and takes the environment anchor that props use.
                 static = arch in STATIC_KINDS
+                chunky = arch in CHUNKY_BIPEDS
                 subject = ("flat 2D game object sprite" if static
                            else "full body game character sprite")
                 pose = "seen from the front" if static else dprompt
@@ -782,8 +891,8 @@ def jobs():
                     cat="char", arch=arch, kind=kind, dir=d, frame=frame,
                     path=f"chars/{kind}-{d}-{frame}.png", px=CHAR_PX,
                     pos=f"{TRIGGER}, {subject}, {desc}, {pose}, "
-                        f"{BG_STATIC if static else BG_CHAR}, {LOOK}",
-                    neg=", ".join(neg_parts + [
+                        f"{BG_STATIC if static else BG_CHUNKY if chunky else BG_CHAR}, {LOOK}",
+                    neg=", ".join(neg_parts + ([NEG_THIN] if chunky else []) + [
                         f"two characters, crowd, cropped, close-up, portrait, {NEG_BASE}"]),
                     refs=("env" if static
                           else "char-cast" if is_anchor_pose else "char-anchor"),

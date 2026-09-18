@@ -7,6 +7,7 @@ import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
 import { combatSystem } from './systems/combat'
 import { complexDirectorSystem, type DirectorState } from './systems/complexDirector'
+import { groupSystem, type GroupsState } from './systems/groups'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
 import { infectionActive, infectionSystem } from './systems/infection'
@@ -176,6 +177,11 @@ export interface World {
    * Present only on complex floors (3+) once the director has run; serialized
    * only when present so city-floor snapshots stay byte-identical. */
   director?: DirectorState
+  /** The group layer (systems/groups.ts): live raids and hound packs, the id
+   * sequence, and this floor's raid ("tide") schedule. Created by populate on
+   * floors that field groups; absent otherwise and serialized only when
+   * present, so every group-free snapshot is byte-identical. */
+  groups?: GroupsState
 }
 
 export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
@@ -268,6 +274,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
     e.prevPos.y = e.pos.y
   }
   complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
+  groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)

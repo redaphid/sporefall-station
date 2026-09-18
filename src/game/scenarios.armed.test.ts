@@ -5,12 +5,10 @@
 
 import { describe, expect, it } from 'vitest'
 import { biomeForFloor, isComplexFloor } from './levelgen/complex'
-import { layoutSkeleton } from './levelgen/complexLayout'
 import { generateLevel } from './levelgen/generate'
 import { levelChecksum, type Level } from './levelgen/level'
 import { populateWorld } from './populate'
 import { spawnPlayer } from './player'
-import { mulberry32 } from './rng'
 import {
   ARMED_DEFAULT_FLOOR,
   ARMED_GRENADES,
@@ -22,7 +20,6 @@ import {
 import { playerSpawnPoint } from './spawnPlacement'
 import { setupFloor } from './systems/missions'
 import { expectWorldEqual, runTicks } from './testkit'
-import { LEVEL_H, LEVEL_W } from './types'
 import { createWorld, type World } from './world'
 
 /** A fresh solo run exactly as HostSession.buildRun makes one, then the scenario. */
@@ -65,9 +62,10 @@ const reachFrom = (level: Level, sx: number, sy: number): Uint8Array => {
 
 // The showcase links handed to the owner: seed/floor → the layout they promise.
 const SHOWCASE = [
-  { seed: 18, floor: 3, template: 'ring', atrium: true }, // habitation ring atrium
-  { seed: 4, floor: 5, template: 'ladder', atrium: undefined }, // flooded ladder
-  { seed: 45, floor: 7, template: 'ring', atrium: false }, // reactor pillared great hall
+  { seed: 16, floor: 3, archetype: 'palladian' }, // habitation: symmetric grand axis, gatehouse to great hall
+  { seed: 5, floor: 5, archetype: 'cloister' }, // flooded: a court ringed by its cloister walk
+  { seed: 1, floor: 7, archetype: 'ship' }, // reactor: one long keel corridor, decks either side
+  { seed: 8, floor: 9, archetype: 'pavilion' }, // overgrown: hospital pavilions round garden courts
 ] as const
 
 describe('armed scenario', () => {
@@ -103,11 +101,9 @@ describe('armed scenario', () => {
     })
   }
 
-  it('the showcase seeds carry the layouts their links promise', () => {
-    for (const { seed, floor, template, atrium } of SHOWCASE) {
-      const sk = layoutSkeleton(mulberry32(seed).fork(`levelgen:${floor}`).fork('complex').fork('skeleton'), Math.min(LEVEL_W, LEVEL_H))
-      expect(sk.template).toBe(template)
-      expect(sk.cores[0]?.atrium).toBe(atrium)
+  it('the showcase seeds carry the archetypes their links promise', () => {
+    for (const { seed, floor, archetype } of SHOWCASE) {
+      expect(generateLevel(seed, floor).complex?.archetype, `seed ${seed} floor ${floor}`).toBe(archetype)
     }
   })
 

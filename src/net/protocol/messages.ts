@@ -145,6 +145,15 @@ export const ARCHETYPES = [
   // inserting or reordering renumbers every entry after it while both builds
   // still claim the same version.
   'chair',
+  // PROTOCOL_VERSION 4 — the group roster (systems/groups.ts): raid members,
+  // pack fauna and the hive spire. APPEND ONLY, at the end.
+  'drowner',
+  'bellwether',
+  'mender',
+  'breacher',
+  'lobber',
+  'gloamhound',
+  'hivespire',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix

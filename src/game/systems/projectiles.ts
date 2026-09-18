@@ -188,6 +188,10 @@ export const projectileSystem = (w: World): void => {
       e.dead = true
       continue
     }
+    // A lobbed shell is in the AIR until its ttl runs out: it sails over walls
+    // and heads alike and comes down only where it was aimed (the siege gun,
+    // systems/groups.ts). Nothing below — wall stop, body hit — applies to it.
+    if (p.arc) continue
     if (isBlocked(w, Math.floor(e.pos.x), Math.floor(e.pos.y))) {
       if (bounceOffWall(w, e)) continue // ricochet — stays alive
       if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)

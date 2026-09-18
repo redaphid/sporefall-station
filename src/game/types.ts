@@ -164,3 +164,30 @@ export type SimEvent =
   | { type: 'lightsOut'; wing: number; until: number; x: number; y: number; w: number; h: number }
   /** Complex director: the dark wing's power came back. */
   | { type: 'lightsOn'; wing: number }
+  // ── Group layer (systems/groups.ts) ──
+  /** A tide arrived: raid `groupId` of `count` members, running `strategy`,
+   * mustered at x,y and hunting `targetId`. */
+  | { type: 'raidArrive'; groupId: number; strategy: string; x: number; y: number; count: number; targetId: EntityId }
+  /** Group `groupId` moved from phase `prev` to `phase` (staging→attack, …). */
+  | { type: 'groupPhase'; groupId: number; phase: string; prev: string }
+  /** A raid's nerve broke (`leader` fell, or `casualties` passed the line):
+   * its `count` survivors rout from around x,y. */
+  | { type: 'raidRouted'; groupId: number; reason: 'leader' | 'casualties'; x: number; y: number; count: number }
+  /** A routed raider slipped out of sight and popped back into the swamp — no drop. */
+  | { type: 'dissolve'; entityId: EntityId; x: number; y: number }
+  /** A medic (`byId`) patched `entityId` for `amount` hp. */
+  | { type: 'heal'; entityId: EntityId; byId: EntityId; amount: number }
+  /** A siege gun lobbed a shell from x,y that comes down at tx,ty in `ticks`. */
+  | { type: 'lob'; entityId: EntityId; x: number; y: number; tx: number; ty: number; ticks: number }
+  /** A sapper planted a charge on door `doorId` (at x,y) that blows in `fuse` ticks. */
+  | { type: 'sapperCharge'; entityId: EntityId; doorId: EntityId; x: number; y: number; fuse: number }
+  /** A hound pack spotted `targetId` and began to encircle it. */
+  | { type: 'packHunt'; groupId: number; targetId: EntityId; count: number }
+  /** A pack's ring closed (or timed out) on `targetId` — now it goes in. */
+  | { type: 'packClose'; groupId: number; targetId: EntityId; closed: boolean }
+  /** A pack went MANHUNTER on `targetId` (someone hurt one of them, or a howl carried). */
+  | { type: 'packRage'; groupId: number; targetId: EntityId; x: number; y: number; count: number }
+  /** A hive spire (`byId`) budded sporeling `entityId`. */
+  | { type: 'hiveSpawn'; entityId: EntityId; byId: EntityId }
+  /** A hive spire (`byId`) rooted a NEW spire `entityId` at x,y — the infestation spreads. */
+  | { type: 'hiveSpread'; entityId: EntityId; byId: EntityId; x: number; y: number }

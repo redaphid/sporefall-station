@@ -733,24 +733,41 @@ export interface ScenarioOpts {
   floor?: number
 }
 
-export const applyScenario = (w: World, name: string, opts: ScenarioOpts = {}): void => {
-  if (name === 'armed') setupArmed(w, opts.floor)
-  if (name === 'artcompare') stageArtCompare(w)
-  if (name === 'npc-combat') setupNpcCombat(w)
-  if (name === 'objects') setupObjects(w)
-  if (name === 'fire') setupFire(w)
-  if (name === 'frost') setupFrost(w)
-  if (name === 'wet-electric') setupWetElectric(w)
-  if (name === 'inventory') setupInventory(w)
-  if (name === 'items') setupItems(w)
-  if (name === 'relationships') setupRelationships(w)
-  if (name === 'showcase') setupShowcase(w)
-  if (name === 'demo') stageDemo(w)
-  if (name === 'doors') stageDoors(w)
-  if (name === 'shooting') stageShooting(w)
-  if (name === 'homing-demo') stageHomingDemo(w)
-  if (name === 'mission') stageMission(w)
-  if (name === 'ai-goals') setupAiGoals(w)
-  if (name === 'npc-ai') setupNpcAi(w)
-  if (name === 'npc-deliberate') setupNpcDeliberate(w)
+/** Every `?scenario=` name this build knows, and what it does to the world.
+ * A name missing from here is NOT silently ignored: main.ts treats it as a
+ * possible stale bundle (see src/app/deepLink.ts) and, failing that, shows an
+ * error rather than handing the player an ordinary run that looks like theirs. */
+const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>> = {
+  armed: (w, opts) => setupArmed(w, opts.floor),
+  artcompare: stageArtCompare,
+  'npc-combat': setupNpcCombat,
+  objects: setupObjects,
+  fire: setupFire,
+  frost: setupFrost,
+  'wet-electric': setupWetElectric,
+  inventory: setupInventory,
+  items: setupItems,
+  relationships: setupRelationships,
+  showcase: setupShowcase,
+  demo: stageDemo,
+  doors: stageDoors,
+  shooting: stageShooting,
+  'homing-demo': stageHomingDemo,
+  mission: stageMission,
+  'ai-goals': setupAiGoals,
+  'npc-ai': setupNpcAi,
+  'npc-deliberate': setupNpcDeliberate,
+}
+
+/** The scenario names this build can apply, for error messages. */
+export const SCENARIO_NAMES: readonly string[] = Object.keys(SCENARIOS)
+
+export const isKnownScenario = (name: string): boolean => Object.hasOwn(SCENARIOS, name)
+
+/** Apply a named scenario. Returns false — and leaves the world untouched —
+ * for a name this build does not know. */
+export const applyScenario = (w: World, name: string, opts: ScenarioOpts = {}): boolean => {
+  if (!isKnownScenario(name)) return false
+  SCENARIOS[name]!(w, opts)
+  return true
 }

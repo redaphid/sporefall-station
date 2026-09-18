@@ -11,7 +11,14 @@ import { levelChecksum, type Level } from './levelgen/level'
 import { populateWorld } from './populate'
 import { spawnPlayer } from './player'
 import { mulberry32 } from './rng'
-import { ARMED_DEFAULT_FLOOR, ARMED_GRENADES, ARMED_HP, applyScenario } from './scenarios'
+import {
+  ARMED_DEFAULT_FLOOR,
+  ARMED_GRENADES,
+  ARMED_HP,
+  applyScenario,
+  isKnownScenario,
+  SCENARIO_NAMES,
+} from './scenarios'
 import { playerSpawnPoint } from './spawnPlacement'
 import { setupFloor } from './systems/missions'
 import { expectWorldEqual, runTicks } from './testkit'
@@ -109,5 +116,34 @@ describe('armed scenario', () => {
     expect(a.floor).toBe(ARMED_DEFAULT_FLOOR)
     expect(a.level.complex).toBeDefined()
     expectWorldEqual(a, armedRun(7))
+  })
+})
+
+// An unknown name used to be a silent no-op, which on a stale build turned
+// `?scenario=armed` into an ordinary floor-1 run that looked like the player's
+// own game. Now it is reported, and the world is left exactly as it was.
+describe('unknown scenario names', () => {
+  it('are reported, not silently ignored, and leave the world untouched', () => {
+    const w = createWorld(18, 1)
+    populateWorld(w)
+    setupFloor(w)
+    const at = playerSpawnPoint(w.level, 0)
+    spawnPlayer(w, 0, at.x, at.y)
+    const before = levelChecksum(w.level)
+    const entities = w.entities.length
+    expect(isKnownScenario('armd')).toBe(false)
+    expect(applyScenario(w, 'armd', { floor: 3 })).toBe(false)
+    expect(w.floor).toBe(1)
+    expect(levelChecksum(w.level)).toBe(before)
+    expect(w.entities.length).toBe(entities)
+  })
+
+  it('every listed scenario is known and applies', () => {
+    expect(SCENARIO_NAMES).toContain('armed')
+    for (const name of SCENARIO_NAMES) expect(isKnownScenario(name)).toBe(true)
+    expect(applyScenario(armedRun(18, 3), 'armed', { floor: 3 })).toBe(true)
+    // Prototype keys are not scenarios.
+    expect(isKnownScenario('toString')).toBe(false)
+    expect(isKnownScenario('__proto__')).toBe(false)
   })
 })

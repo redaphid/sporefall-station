@@ -430,3 +430,57 @@ describe('createWebUpdater — the swap, once everything is verified', () => {
     expect(entries).toHaveBeenCalledTimes(1)
   })
 })
+
+// A deep link with `?mode=` skips the picker — the only safe moment a boot used
+// to offer — so on a stale service-worker bundle the new build downloaded in
+// the background and was never applied: the link ran on the build before it.
+describe('createWebUpdater.freshen — a deep link runs on the current build', () => {
+  it('hands the staged update over at boot, before any run exists', async () => {
+    const h = harness()
+    const updater = createWebUpdater(h.deps)
+    updater.reportMoment('modePicker', 0)
+    expect(await updater.freshen(1000)).toBe('staged')
+    expect(h.worker.messages).toEqual([{ type: 'SKIP_WAITING' }])
+    updater.onControllerChange()
+    expect(h.reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for a download that is still in flight, then applies it', async () => {
+    let installed = false
+    const h = harness({ waiting: () => (installed ? worker : null) })
+    const worker = h.worker
+    const updater = createWebUpdater(h.deps)
+    updater.reportMoment('modePicker', 0)
+    const pending = updater.freshen(10_000)
+    await Promise.resolve()
+    installed = true
+    await updater.onWorkerInstalled()
+    expect(await pending).toBe('staged')
+    expect(worker.messages).toEqual([{ type: 'SKIP_WAITING' }])
+  })
+
+  it('gives up after the timeout and leaves the running build alone', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = harness({ installed: false })
+      const updater = createWebUpdater(h.deps)
+      updater.reportMoment('modePicker', 0)
+      const pending = updater.freshen(5000)
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(await pending).toBe('timeout')
+      expectOldVersionIntact(h)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('resolves at once when already current, offline, or the set is bad', async () => {
+    const current = harness({ probe: async () => JSON_OK(manifest('899')) })
+    expect(await createWebUpdater(current.deps).freshen(60_000)).toBe('up-to-date')
+    const offline = harness({ probe: () => Promise.reject(new Error('offline')) })
+    expect(await createWebUpdater(offline.deps).freshen(60_000)).toBe('unavailable')
+    const bad = harness({ precacheEntries: async () => [] })
+    expect(await createWebUpdater(bad.deps).freshen(60_000)).toBe('incomplete')
+    expectOldVersionIntact(bad)
+  })
+})

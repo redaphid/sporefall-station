@@ -49,7 +49,8 @@
     "gen:fixtures": "tsx scripts/test/gen-serialize-fixtures.mts && tsx scripts/test/gen-feature-fixtures.mts",
     "e2e:state": "node e2e/state-link-roundtrip.mjs",
     "e2e:share": "bash e2e/run-share-button.sh",
-    "test:e2e:start-menu": "bash e2e/run-start-menu-fit.sh"
+    "test:e2e:start-menu": "bash e2e/run-start-menu-fit.sh",
+    "test:e2e:deep-link": "bash e2e/run-deep-link-wins.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

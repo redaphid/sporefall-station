@@ -18,7 +18,16 @@ import type { DebugLink } from './debug/channel'
 import type { StateReplay } from './app/stateReplay'
 import type { ShareResult } from './app/stateShare'
 import { loadFixtureJson } from './game/fixtures'
-import { applyScenario } from './game/scenarios'
+import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './game/scenarios'
+import {
+  DEEP_LINK_FRESHEN_MS,
+  DEEP_LINK_RELOAD_GRACE_MS,
+  persistsRun,
+  readDeepLink,
+  resumesSave,
+  unknownScenarioMessage,
+  wantsFreshBuild,
+} from './app/deepLink'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
@@ -174,6 +183,32 @@ const boot = async (): Promise<void> => {
   // Sitting at the picker is the cheapest possible moment to swap in a new
   // build: no run exists yet. If one is already downloaded, it applies here.
   updates.reportMoment('modePicker', 0)
+  // ── Deep links always win (src/app/deepLink.ts) ───────────────────────────
+  // A link naming a scenario / shared state / world is honoured on the CURRENT
+  // build: the service worker may have served the previous one, and `?mode=`
+  // skips the picker, which is otherwise the only moment an update applies. The
+  // moment is still `modePicker` here (no run exists), so a staged update is
+  // handed over as soon as it verifies and the page reloads with the same URL.
+  const link = readDeepLink(params)
+  if (wantsFreshBuild(link)) {
+    const note = showBootNote(uiMount, 'Loading the latest build…', 600)
+    const fresh = await updates.freshen(DEEP_LINK_FRESHEN_MS)
+    if (fresh === 'staged') {
+      note.show('Updating to the latest build…')
+      // The reload is on its way. If the swap never lands, carry on with this
+      // build rather than hang: the checks below still refuse a bad link.
+      await new Promise((resolve) => setTimeout(resolve, DEEP_LINK_RELOAD_GRACE_MS))
+    }
+    note.remove()
+  }
+  if (link.scenario !== null && !isKnownScenario(link.scenario)) {
+    // Never fall back to an ordinary run (or to the save): that is what made a
+    // stale build look like "it just took me to my existing game".
+    const msg = unknownScenarioMessage(link.scenario, SCENARIO_NAMES, APP_VERSION)
+    console.error(`sporefall: ${msg}`)
+    showBootError(uiMount, msg)
+    return
+  }
   // A `?state=` link IS the intent: someone was sent an exact world to look at,
   // so boot straight into it rather than making them pick Solo from the menu
   // first (which would also build a throwaway world before replacing it).
@@ -253,15 +288,16 @@ const boot = async (): Promise<void> => {
   // Persist the AUTHORITATIVE world to localStorage so a full-page reload
   // seamlessly rejoins the in-progress run. SOLO/host only (HostSession owns the
   // authoritative world); a NetClient rejoins via the host, and we never persist
-  // a client-predicted world as authoritative. Explicit dev world-injection flows
-  // (`?world=`, `?scenario=`, `?script=`) take precedence over auto-resume.
+  // a client-predicted world as authoritative. A link that names the world
+  // (`?scenario=`, `?state=`, `?world=`, `?script=`) takes precedence over the
+  // save AND never writes to it: no persister at all, so neither the autosave
+  // nor a restart/death `clear()` can touch the player's real run.
   const store = browserStore()
-  const persister: Persister | undefined = store && session instanceof HostSession ? createPersister(store) : undefined
-  const scenario = params.get('scenario')
-  const explicitWorldOverride =
-    !!scenario || !!params.get('world') || !!params.get('script') || !!params.get('state')
+  const persister: Persister | undefined =
+    store && session instanceof HostSession && persistsRun(link) ? createPersister(store) : undefined
+  const scenario = link.scenario
   let resumed = false
-  if (persister && store && session instanceof HostSession && !explicitWorldOverride) {
+  if (persister && store && session instanceof HostSession && resumesSave(link)) {
     const saved = readSave(store) // null on no/corrupt/version-mismatched save → fresh game
     if (saved) {
       session.world = saved
@@ -1002,6 +1038,57 @@ const createPauseOverlay = (
       el.style.display = show ? 'flex' : 'none'
     },
   }
+}
+
+/** A centred status line during boot ("Loading the latest build…"). Appears
+ * only after `delayMs`, so the usual sub-second version check never flashes it. */
+const showBootNote = (
+  mount: HTMLElement,
+  text: string,
+  delayMs: number,
+): { show(text: string): void; remove(): void } => {
+  const el = document.createElement('div')
+  el.dataset.role = 'boot-note'
+  el.style.cssText =
+    'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;' +
+    'font:600 15px system-ui;color:#fff;background:#000c;padding:10px 18px;border-radius:10px;' +
+    'pointer-events:none;white-space:nowrap'
+  const show = (t: string): void => {
+    el.textContent = t
+    if (!el.isConnected) mount.appendChild(el)
+  }
+  const timer = setTimeout(() => show(text), delayMs)
+  return {
+    show: (t) => {
+      clearTimeout(timer)
+      show(t)
+    },
+    remove: () => {
+      clearTimeout(timer)
+      el.remove()
+    },
+  }
+}
+
+/** A blocking, visible boot error (e.g. an unknown `?scenario=`). No run is
+ * started behind it, so there is nothing to fall back to by accident. */
+const showBootError = (mount: HTMLElement, text: string): void => {
+  const el = document.createElement('div')
+  el.dataset.role = 'boot-error'
+  el.setAttribute('role', 'alert')
+  el.style.cssText =
+    'position:absolute;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;gap:14px;padding:24px;box-sizing:border-box;background:#0b0b12;color:#fff;' +
+    'font:500 15px/1.45 system-ui;text-align:center'
+  const msg = document.createElement('div')
+  msg.style.maxWidth = '640px'
+  msg.textContent = text
+  const home = document.createElement('a')
+  home.href = '/'
+  home.textContent = 'Go to the main menu'
+  home.style.cssText = 'color:#8fd;font-weight:700;font-size:16px;padding:10px 16px'
+  el.append(msg, home)
+  mount.appendChild(el)
 }
 
 /** Subtle, self-dismissing "resumed" confirmation shown once when an

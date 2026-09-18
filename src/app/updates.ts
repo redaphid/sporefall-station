@@ -13,10 +13,18 @@
 import { startNativeUpdates } from './ota'
 import { registerPwa } from './pwa'
 import type { UpdateMoment } from './updatePolicy'
+import type { CheckOutcome } from './webUpdate'
 
 export interface Updates {
   /** Tell the updater where the player is. Cheap; safe to call every frame. */
   reportMoment(moment: UpdateMoment, peers: number): void
+  /**
+   * Deep links only: make sure this is the current build before honouring the
+   * link (see `WebUpdater.freshen`). `'staged'` means a reload onto the new
+   * build is on its way. The native app has no deep-link entry point (no
+   * intent filter for the site), so there it resolves `'unavailable'` at once.
+   */
+  freshen(timeoutMs: number): Promise<CheckOutcome | 'timeout'>
 }
 
 /**
@@ -34,5 +42,6 @@ export const startUpdates = (): Updates => {
       web?.reportMoment(moment, peers)
       native?.reportMoment(moment, peers)
     },
+    freshen: (timeoutMs) => web?.freshen(timeoutMs) ?? Promise.resolve('unavailable'),
   }
 }

@@ -277,6 +277,20 @@ export interface WebUpdater {
   onWorkerInstalled(): Promise<CheckOutcome>
   /** Wire to `controllerchange`: the swap landed, so now the reload is real. */
   onControllerChange(): void
+  /**
+   * For a deep link (`?scenario=` / `?state=` / `?world=`): find out NOW
+   * whether this bundle is stale and, if it is, wait (at most `timeoutMs`) for
+   * the new one to finish downloading. Resolves `'staged'` once a verified
+   * update is ready — at which point, if the app is still at the `modePicker`
+   * moment, the swap has already been handed over and a reload is coming.
+   *
+   * Exists because a deep link that names `?mode=` skips the picker, which was
+   * the ONLY safe moment a boot ever offered: the service worker served the
+   * previous build, the new one downloaded in the background, and nothing ever
+   * applied it. A link to a feature from the latest deploy therefore ran on the
+   * build before it.
+   */
+  freshen(timeoutMs: number): Promise<CheckOutcome | 'timeout'>
 }
 
 /**
@@ -294,6 +308,8 @@ export const createWebUpdater = (deps: WebUpdaterDeps): WebUpdater => {
   // where the player actually is.
   let moment: UpdateMoment = 'inRun'
   let peers = 0
+  /** `freshen()` callers waiting for a download to land and verify. */
+  const stagedWaiters: (() => void)[] = []
 
   /**
    * Try to swap. Called both when the app reports a new moment and when an
@@ -328,6 +344,7 @@ export const createWebUpdater = (deps: WebUpdaterDeps): WebUpdater => {
     if (!verifyPrecacheIntegrity(entries).ok) return 'incomplete'
 
     staged = true
+    for (const wake of stagedWaiters.splice(0)) wake()
     applyIfAllowed()
     return 'staged'
   }
@@ -369,6 +386,21 @@ export const createWebUpdater = (deps: WebUpdaterDeps): WebUpdater => {
       // Only reload for a swap WE asked for. A controller change we did not
       // initiate must never yank the page.
       if (applied) deps.reload()
+    },
+    async freshen(timeoutMs: number): Promise<CheckOutcome | 'timeout'> {
+      const first = await check()
+      if (first === 'staged' || first === 'already-staged') return 'staged'
+      // Only a download in flight is worth waiting for. Offline, up to date or
+      // a set that failed verification all resolve at once: the caller boots
+      // this build, exactly as before.
+      if (first !== 'downloading') return first
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve('timeout'), timeoutMs)
+        stagedWaiters.push(() => {
+          clearTimeout(timer)
+          resolve('staged')
+        })
+      })
     },
   }
 }

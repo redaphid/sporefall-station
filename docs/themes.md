@@ -55,8 +55,8 @@ still loadable by id without an index entry).
     "uiAccent":  "#7fd17f",      // exposed as CSS var --theme-accent on <html>
     "floorTint": "#c8ffc8",      // multiplied over the whole tile layer
     "tiles": {                   // procedural tile colors (used when a tile has
-      "street":   "#1e2a1e",     //   no sprite); keys are exactly these six:
-      "sidewalk": "#2a3a2a",     //   street sidewalk floor wall grass exit
+      "street":   "#1e2a1e",     //   no sprite); keys: the six below plus
+      "sidewalk": "#2a3a2a",     //   hall grate tiled plating hull bog
       "floor":    "#3a4a2a",
       "wall":     "#101a10",
       "grass":    "#2e5d3a",
@@ -109,7 +109,7 @@ the console and in `validateManifest` unit tests.
 
 | Key | What / notes |
 |---|---|
-| `tile.<name>` | ground/wall tile art, `<name>` ∈ `street sidewalk floor wall grass exit`. A single path OR an **array of variant paths** — the tilemap alternates variants by a deterministic per-coordinate hash, so big surfaces read as texture instead of one repeated stamp (same seed → same ground on every device). Should tile seamlessly. The wall's first variant is also clipped onto the bevelled corner-cut tiles. |
+| `tile.<name>` | ground/wall tile art, `<name>` ∈ `street sidewalk floor wall grass exit` plus the indoor-complex decks `hall grate tiled plating hull bog` (floors 3+; `hull` is wall-family). A single path OR an **array of variant paths** — the tilemap alternates variants by a deterministic per-coordinate hash, so big surfaces read as texture instead of one repeated stamp (same seed → same ground on every device). Should tile seamlessly. The wall's first variant is also clipped onto the bevelled corner-cut tiles. |
 | `tile.<name>.accent` | OPTIONAL rare-detail pool for that surface (root cluster, vent grate, glowing spore patch…). One accent replaces the base variant on ~1/17 tiles, picked on the same coordinate hash. Array or single path. |
 | `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player cop thug civilian scientist gangster robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |

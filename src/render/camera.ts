@@ -97,7 +97,7 @@ export class Camera {
   }
 
   /** Position the world container so the camera point sits at screen center. */
-  apply(world: Container, screenW: number, screenH: number, levelW: number, levelH: number): void {
+  apply(world: Container, screenW: number, screenH: number, levelW: number, levelH: number, levelX0 = 0, levelY0 = 0): void {
     // Step the zoom interpolation here (screen dims are needed for anchoring).
     if (this.zoom !== this.target) {
       const z1 = smoothZoom(this.zoom, this.target, this.zoomDt)
@@ -112,7 +112,7 @@ export class Camera {
     if (world.scale.x !== this.zoom) world.scale.set(this.zoom)
     // Soft edge clamp — the SHARED definition (cameraModel.appliedCenter), also
     // used by every DOM-overlay projection, so markers always match the render.
-    const { x: cx, y: cy } = appliedCenter(this.x, this.y, T, screenW, screenH, levelW, levelH)
+    const { x: cx, y: cy } = appliedCenter(this.x, this.y, T, screenW, screenH, levelW, levelH, levelX0, levelY0)
     this.appliedX = cx
     this.appliedY = cy
     // Carry the EXACT sub-pixel camera transform on the container — do NOT snap

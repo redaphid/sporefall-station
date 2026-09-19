@@ -8,6 +8,7 @@
 // and everything round-trips through serialize/deserialize.
 
 import { describe, expect, it } from 'vitest'
+import { storeyOf } from './stairs'
 import { FURNISH_MAX_PER_ROOM, PROP_PLACEMENT, ROOM_FURNISH, populateWorld, roomOwningTile } from './populate'
 import { OBJECTS } from './data/objects'
 import type { Entity } from './entity'
@@ -20,7 +21,9 @@ const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
 
 /** After populateWorld the ONLY interactable entities are furnishings, so this
  * uniquely identifies them. */
-const furniture = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'interactable')
+// Room furniture lives on the ground storey; a loft's cache crate is loot
+// (populate stockLofts), not a room's furnishing.
+const furniture = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'interactable' && storeyOf(e.pos.x) === 0)
 
 const populated = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)

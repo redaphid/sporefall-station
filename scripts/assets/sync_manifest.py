@@ -24,7 +24,8 @@ POOLS = [
     ("tile.{n}.overlay", "{n}-overlay-*.png"),
 ]
 SURFACES = ["street", "sidewalk", "floor", "wall", "grass", "exit",
-            "hall", "grate", "tiled", "plating", "hull", "bog"]  # + indoor complex
+            "hall", "grate", "tiled", "plating", "hull", "bog",  # + indoor complex
+            "stair_up", "stair_down", "landing"]  # + stairs between storeys
 
 
 def num(path):

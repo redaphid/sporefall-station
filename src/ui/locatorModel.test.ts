@@ -278,3 +278,17 @@ describe('pointMarker (mission-objective / generic point locator)', () => {
     expect(m.dist).toBe(0)
   })
 })
+
+describe('locator — teammates on another storey (stairs)', () => {
+  const cam = { x: 32, y: 32, zoom: 1, screenW: 800, screenH: 600, levelW: 64, levelH: 64 }
+  it('carries a ▲/▼ storey badge in the label and the storey offset', () => {
+    const [up] = locatorMarkers({ x: 32, y: 32 }, [{ playerId: 2, x: 40, y: 30, downed: false, dz: 1 }], cam)
+    expect(up.label).toMatch(/▲1$/)
+    expect(up.dz).toBe(1)
+    const [down] = locatorMarkers({ x: 32, y: 32 }, [{ playerId: 2, x: 40, y: 30, downed: true, dz: -1 }], cam)
+    expect(down.label).toMatch(/▼1$/)
+    const [same] = locatorMarkers({ x: 32, y: 32 }, [{ playerId: 2, x: 40, y: 30, downed: false }], cam)
+    expect(same.label).not.toMatch(/[▲▼]/)
+    expect(same.dz).toBe(0)
+  })
+})

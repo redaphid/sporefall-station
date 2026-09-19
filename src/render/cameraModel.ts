@@ -18,6 +18,10 @@ const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > 
  * (follow-target) centre `(x, y)`: soft-clamped to the level with OVERSCAN_FRAC
  * slack per axis, or locked to the level centre when the whole level fits on
  * screen. `T` is the tile size in screen px (TILE_PX * zoom).
+ *
+ * On a multi-storey floor the "level" is the viewer's STOREY rect, not the
+ * whole atlas (stairs.ts `storeyBounds`): `x0`/`y0` are its origin, so the
+ * camera never slides into the gutter or the storey next door.
  */
 export const appliedCenter = (
   x: number,
@@ -27,13 +31,15 @@ export const appliedCenter = (
   screenH: number,
   levelW: number,
   levelH: number,
+  x0 = 0,
+  y0 = 0,
 ): { x: number; y: number } => {
   const halfW = screenW / 2 / T
   const halfH = screenH / 2 / T
   const mX = halfW * OVERSCAN_FRAC
   const mY = halfH * OVERSCAN_FRAC
   return {
-    x: levelW * T > screenW ? clamp(x, halfW - mX, levelW - halfW + mX) : levelW / 2,
-    y: levelH * T > screenH ? clamp(y, halfH - mY, levelH - halfH + mY) : levelH / 2,
+    x: levelW * T > screenW ? clamp(x, x0 + halfW - mX, x0 + levelW - halfW + mX) : x0 + levelW / 2,
+    y: levelH * T > screenH ? clamp(y, y0 + halfH - mY, y0 + levelH - halfH + mY) : y0 + levelH / 2,
   }
 }

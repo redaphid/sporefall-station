@@ -19,6 +19,7 @@ import {
 } from './scenarios'
 import { playerSpawnPoint } from './spawnPlacement'
 import { setupFloor } from './systems/missions'
+import { floodLinked, storeyOf } from './stairs'
 import { expectWorldEqual, runTicks } from './testkit'
 import { createWorld, type World } from './world'
 
@@ -141,5 +142,60 @@ describe('unknown scenario names', () => {
     // Prototype keys are not scenarios.
     expect(isKnownScenario('toString')).toBe(false)
     expect(isKnownScenario('__proto__')).toBe(false)
+  })
+})
+
+// Stairs links handed to the owner (docs/design/stairs-and-storeys.md): the
+// `armed` link must land on a floor that HAS a loft, and `stairs-demo` must
+// stand the player right at the stair so walking forward climbs.
+const STAIRS_ARMED_LINK = { seed: 18, floor: 5 } as const
+const STAIRS_DEMO_LINKS = [
+  { seed: 1, floor: 3 },
+  { seed: 42, floor: 3 },
+] as const
+
+describe('stairs links', () => {
+  it(`?scenario=armed&seed=${STAIRS_ARMED_LINK.seed}&floor=${STAIRS_ARMED_LINK.floor} lands on a floor with a loft, reachable from the player`, () => {
+    const w = armedRun(STAIRS_ARMED_LINK.seed, STAIRS_ARMED_LINK.floor)
+    expect(w.floor).toBe(STAIRS_ARMED_LINK.floor)
+    expect(w.level.storeys?.map((s) => s.z)).toEqual([0, 1])
+    const p = w.entities.find((e) => e.playerCtl)!
+    const reach = floodLinked(w.level, Math.floor(p.pos.y) * w.level.w + Math.floor(p.pos.x))
+    const up = w.level.stairs!.find((l) => l.from.x < 80)!
+    expect(reach[up.landing.y * w.level.w + up.landing.x]).toBe(1)
+  })
+
+  for (const { seed, floor } of STAIRS_DEMO_LINKS) {
+    it(`stairs-demo seed ${seed} floor ${floor}: the player starts at the stair, walks forward and climbs into the loft`, () => {
+      const w = createWorld(seed, 1)
+      populateWorld(w)
+      setupFloor(w)
+      const at = playerSpawnPoint(w.level, 0)
+      spawnPlayer(w, 0, at.x, at.y)
+      expect(applyScenario(w, 'stairs-demo', { floor })).toBe(true)
+      expect(w.floor).toBe(floor)
+      const p = w.entities.find((e) => e.playerCtl)!
+      const up = w.level.stairs!.find((l) => l.from.x < 80)!
+      expect(Math.hypot(p.pos.x - (up.from.x + 0.5), p.pos.y - (up.from.y + 0.5))).toBeLessThanOrEqual(3.01)
+      const toward = { moveX: Math.round(Math.cos(p.facing)), moveY: Math.round(Math.sin(p.facing)) }
+      runTicks(w, new Map([[0, toward]]), 45)
+      expect(storeyOf(p.pos.x)).toBe(1)
+      expect(p.dead).toBeFalsy()
+      // The loft is stocked: the cache crate stands upstairs.
+      expect(w.entities.some((e) => e.archetype === 'crate' && storeyOf(e.pos.x) === 1)).toBe(true)
+    })
+  }
+
+  it('stairs-demo is deterministic and known', () => {
+    expect(isKnownScenario('stairs-demo')).toBe(true)
+    const make = (): World => {
+      const w = createWorld(1, 1)
+      populateWorld(w)
+      setupFloor(w)
+      spawnPlayer(w, 0, playerSpawnPoint(w.level, 0).x, playerSpawnPoint(w.level, 0).y)
+      applyScenario(w, 'stairs-demo', { floor: 3 })
+      return w
+    }
+    expectWorldEqual(make(), make())
   })
 })

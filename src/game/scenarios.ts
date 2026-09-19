@@ -899,8 +899,34 @@ const setupArmed = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
   if (player.combat) player.combat.weapon = 'machinegun'
 }
 
+/** `?scenario=stairs-demo[&floor=N]`: the `armed` kit on floor N (default 3),
+ * with the player standing two tiles in front of the loft stair, facing it —
+ * walk forward to climb. If floor N has no loft (the structural rule allowed
+ * none), the next complex floor that does is used instead. */
+const setupStairsDemo = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
+  setupArmed(w, floor)
+  for (let tries = 0; tries < 6 && !w.level.stairs; tries++) {
+    // Skip ahead to the next complex floor (odd floors from 3).
+    w.floor += w.floor % 2 === 1 ? 1 : 0
+    nextFloor(w)
+    setupArmed(w, w.floor)
+  }
+  const up = w.level.stairs?.find((l) => l.from.x < l.to.x) // the ground StairUp link
+  const player = w.entities.find((e) => e.playerCtl)
+  if (!up || !player) return
+  const d = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] }[up.dir]
+  // The ground landing is the landing of the reverse link.
+  const back = w.level.stairs!.find((l) => l.from.x === up.to.x && l.from.y === up.to.y)!
+  const lx = back.landing.x
+  const ly = back.landing.y
+  const stand = !isSolidTile(w.level, lx + d[0], ly + d[1]) ? { x: lx + d[0], y: ly + d[1] } : { x: lx, y: ly }
+  player.pos = { x: stand.x + 0.5, y: stand.y + 0.5 }
+  player.prevPos = { x: player.pos.x, y: player.pos.y }
+  player.facing = Math.atan2(-d[1], -d[0]) // looking at the stair
+}
+
 export interface ScenarioOpts {
-  /** `?floor=`: the floor the `armed` scenario starts on. */
+  /** `?floor=`: the floor the `armed` / `stairs-demo` scenarios start on. */
   floor?: number
 }
 
@@ -910,6 +936,7 @@ export interface ScenarioOpts {
  * error rather than handing the player an ordinary run that looks like theirs. */
 const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>> = {
   armed: (w, opts) => setupArmed(w, opts.floor),
+  'stairs-demo': (w, opts) => setupStairsDemo(w, opts.floor),
   artcompare: stageArtCompare,
   'npc-combat': setupNpcCombat,
   objects: setupObjects,

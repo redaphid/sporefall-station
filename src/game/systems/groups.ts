@@ -31,6 +31,8 @@
 // test fixtures) have no `w.groups` at all and never enter this module.
 
 import { BODY_RADIUS, makeEntity, type Entity, type GroupRole } from '../entity'
+import { stairReservedKeys, storeyOf } from '../stairs'
+import { STOREY_SIZE } from '../levelgen/level'
 import { isSolidTile } from '../levelgen/level'
 import { hasLineOfSight } from '../los'
 import { findPath } from '../path'
@@ -172,8 +174,11 @@ const d2 = (a: Vec2, b: Vec2): number => vlen(a.x - b.x, a.y - b.y)
  * Never `w.rng` — the sim stream must not move because a raid exists. */
 export const groupRng = (w: World, label: string): Rng => mulberry32(hashLabel(w.seed, `groups:${w.floor}:${label}`))
 
+/** Live, standing players a group can hunt. Phase 1 storeys hold no enemies,
+ * so a player upstairs (storey slot ≠ 0) is off the groups' map: a raid never
+ * musters in a loft and a pack never tracks through a floor slab. */
 export const livePlayers = (w: World): Entity[] =>
-  w.entities.filter((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)
+  w.entities.filter((e) => e.playerCtl && !e.dead && !e.playerCtl.downed && storeyOf(e.pos.x) === 0)
 
 const nearestOf = (list: Entity[], at: Vec2): Entity | undefined => {
   let best: Entity | undefined
@@ -243,7 +248,14 @@ const bodyAt = (w: World, x: number, y: number): boolean => {
 
 /** Somewhere a body really fits near (x,y), preferring an unoccupied spot. */
 export const standAt = (w: World, x: number, y: number): Vec2 | null =>
-  bodySpawnPoint(w.level, x, y, BODY_RADIUS, (px, py) => bodyAt(w, px, py))
+  bodySpawnPoint(
+    w.level,
+    x,
+    y,
+    BODY_RADIUS,
+    // Occupied: a body stands there, or it is a stair's kept-clear approach.
+    (px, py) => bodyAt(w, px, py) || stairReservedKeys(w.level).has(Math.floor(py) * w.level.w + Math.floor(px)),
+  )
 
 /** Fixed fan-out around a muster point — a table, not trig, so peers agree. */
 const FAN: readonly [number, number][] = [
@@ -947,10 +959,12 @@ const openSpot = (w: World, r: Rng, clear: number, indoors: boolean): Vec2 | nul
       tx = r.int(room.x, room.x + room.w - 1)
       ty = r.int(room.y, room.y + room.h - 1)
     } else {
-      tx = r.int(1, level.w - 2)
+      // The ground storey only: a den or spire never roots in a loft.
+      tx = r.int(1, Math.min(level.w, STOREY_SIZE) - 2)
       ty = r.int(1, level.h - 2)
     }
     if (isSolidTile(level, tx, ty) || (tx === ex && ty === ey)) continue
+    if (stairReservedKeys(level).has(ty * level.w + tx)) continue
     const x = tx + 0.5
     const y = ty + 0.5
     if (vlen(x - level.spawn.x, y - level.spawn.y) < clear) continue

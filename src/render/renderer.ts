@@ -1,6 +1,7 @@
 import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Texture, type TextStyleOptions } from 'pixi.js'
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
+import { storeyBounds, storeyOf } from '../game/stairs'
 import type { RenderView } from '../app/session'
 import { flagOn } from '../app/featureFlags'
 import { loadSettings, type ShaderFxMode } from '../app/settings'
@@ -135,6 +136,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const art: ArtRegistry = {
     tile: (id, v, tx, ty) => inner.tile(id, v, tx, ty),
     tileOverlayPool: (id) => inner.tileOverlayPool(id),
+    landingOverlay: (h) => inner.landingOverlay(h),
     tileMacro: (id) => inner.tileMacro(id),
     wallShadow: (s) => inner.wallShadow(s),
     wallCap: (id) => inner.wallCap(id),
@@ -342,6 +344,12 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const damageOverlay = overlay('normal', 0xd11a1a)
   const warmOverlay = overlay('add', 0xff7a1a)
   const coldOverlay = overlay('add', 0x3aa0ff)
+  // Storey change: a short fade up from black as the view flips storeys.
+  const storeyFadeOverlay = overlay('normal', 0x000000)
+  const STOREY_FADE_S = 0.15
+  let storeyFade = 0
+  /** The storey slot the view shows (-1 = not yet known). */
+  let viewSlot = -1
   const grade = new ColorMatrixFilter()
 
   // Inspect-card thumbnails: art key → data URL, extracted lazily from the live
@@ -455,9 +463,25 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       levelW = level.w
       levelH = level.h
       camera.snapTo(level.spawn.x, level.spawn.y)
+      viewSlot = -1
     },
     draw(view: RenderView, alpha: number, dt: number): void {
       elapsed += dt
+      // ---- Storeys: show only the viewer's storey (stairs spec §3.5). The
+      // viewer is the local player; the storey is a function of x alone.
+      const multi = !!currentLevel?.storeys
+      const slot = multi ? storeyOf(view.self?.pos.x ?? camera.x) : 0
+      if (slot !== viewSlot) {
+        // A climb is an 80-tile teleport: cut the camera, don't pan it.
+        if (viewSlot !== -1 && view.self) {
+          camera.snapTo(view.self.pos.x, view.self.pos.y)
+          storeyFade = 1
+        }
+        viewSlot = slot
+      }
+      const onStorey = (x: number): boolean => !multi || storeyOf(x) === slot
+      const shown = multi ? view.entities.filter((e) => onStorey(e.pos.x)) : view.entities
+      const bounds = currentLevel ? storeyBounds(currentLevel, view.self?.pos.x ?? camera.x) : undefined
       const fx = settings.effectsQuality
       const juicing = fx !== 'off'
       // Event-driven juice: sparks/gibs, camera shake, hitstop, element tint, and
@@ -466,6 +490,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
         for (const ev of view.events) {
+          // Another storey's sparks and shakes are not ours to see.
+          if (multi && 'x' in ev && typeof ev.x === 'number' && !onStorey(ev.x)) continue
           const isSelf =
             view.self != null &&
             (('targetId' in ev && ev.targetId === view.self.id) ||
@@ -533,19 +559,20 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (frozen) hitstop = tickHitstop(hitstop)
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
-        entities.update(view.entities, alpha, view.tick, view.floor)
-        playerMarkers.update(view.entities, view.self?.id, alpha, view.tick)
-        statusFx.update(view.entities, alpha, view.tick)
-        bullets.update(view.entities, alpha, view.tick)
+        entities.update(shown, alpha, view.tick, view.floor)
+        playerMarkers.update(shown, view.self?.id, alpha, view.tick)
+        statusFx.update(shown, alpha, view.tick)
+        bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)
       }
       // Outside the hitstop freeze: the tracker must see every tick's events.
       groupFx.update(view, elapsed)
       drawReticles()
       drawPickUi(view)
-      camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
+      if (bounds) camera.apply(world, app.screen.width, app.screen.height, bounds.w, bounds.h, bounds.x0, bounds.y0)
+      else camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
-      tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)
+      tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h, slot)
 
       // --- Backbuffer composite: pack the live distortion prims into the
       // shader's uniform arrays (screen-uv space via the REAL world transform —
@@ -567,7 +594,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           radiusToUv: (r) => (r * pxPerTile) / sh2,
         }
         // Exit-portal idle flourish: anchored on the level's exit tile.
-        if (currentLevel) {
+        if (currentLevel && onStorey(currentLevel.exit.x)) {
           const e = proj.toUv(currentLevel.exit.x + 0.5, currentLevel.exit.y + 0.5)
           pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))
         } else {
@@ -610,7 +637,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         : 0
       const sw = app.screen.width
       const sh = app.screen.height
+      storeyFade = Math.max(0, storeyFade - dt / STOREY_FADE_S)
       for (const [ov, a] of [
+        [storeyFadeOverlay, storeyFade],
         [damageOverlay, red],
         [warmOverlay, warm * 0.35],
         [coldOverlay, cold * 0.3],

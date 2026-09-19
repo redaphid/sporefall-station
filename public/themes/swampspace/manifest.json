@@ -124,6 +124,20 @@
     "tile.exit": [
       "tiles/exit-0.png"
     ],
+    "tile.stair_up": [
+      "tiles/stair_up-0.png",
+      "tiles/stair_up-1.png",
+      "tiles/stair_up-2.png"
+    ],
+    "tile.stair_down": [
+      "tiles/stair_down-0.png",
+      "tiles/stair_down-1.png",
+      "tiles/stair_down-2.png"
+    ],
+    "tile.landing.overlay": [
+      "tiles/landing-overlay-0.png",
+      "tiles/landing-overlay-1.png"
+    ],
     "char.player.s-idle": "chars/vine-ranger-s-idle.png",
     "char.player.s-step": "chars/vine-ranger-s-step.png",
     "char.player.s-walk-0": "chars/vine-ranger-s-walk-0.png",

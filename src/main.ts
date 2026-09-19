@@ -1,4 +1,5 @@
 import { HostSession } from './app/hostSession'
+import { cameraRect } from './game/stairs'
 import { createInspect, installInspect, type Inspect } from './app/inspect'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
@@ -465,8 +466,7 @@ const boot = async (): Promise<void> => {
           zoom: renderer.camera.zoom,
           screenW: renderer.app.screen.width,
           screenH: renderer.app.screen.height,
-          levelW: hostWorld.level.w,
-          levelH: hostWorld.level.h,
+          ...cameraRect(hostWorld.level, hostWorld.entities.find((e) => e.playerCtl)?.pos.x ?? renderer.camera.x),
         })
       // GROUND TRUTH projection: where the world container ACTUALLY drew a
       // world point this frame (post edge-clamp + shake). e2es assert the DOM

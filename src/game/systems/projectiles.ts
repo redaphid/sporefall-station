@@ -201,8 +201,15 @@ export const projectileSystem = (w: World): void => {
       continue
     }
 
+    // A group fights as one body: a member's round passes through its own
+    // group mates. Without this a tide shooting down a corridor or through a
+    // breached doorway gunned down its own front rank, so the wounded never
+    // lived to reach the Bog Mender and a sapper raid routed itself on the
+    // threshold it had just blown.
+    const squad = w.byId.get(p.ownerId)?.ai?.group?.id
     for (const other of w.entities) {
       if (other.id === p.ownerId || other.dead || !other.health) continue
+      if (squad !== undefined && other.ai?.group?.id === squad) continue
       if (p.hitIds && p.hitIds.includes(other.id)) continue // pierce: don't re-hit a body
       const dx = other.pos.x - e.pos.x
       const dy = other.pos.y - e.pos.y

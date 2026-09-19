@@ -1085,8 +1085,13 @@ const tend: Consideration = (w, e) => {
     }
   }
   if (best) {
+    // One falling back is coming TO the medic: hold and let it arrive, rather
+    // than walking out to meet it at the front (where both get shot). The
+    // retreat is the thing the player should see; the medic walks only to the
+    // hurt who are still fighting.
     const d = dist2d(best.pos.x, best.pos.y, e.pos.x, e.pos.y)
-    return [{ code: TEND, score: TEND_SCORE, tier: TIER_THREAT, at: d <= HEAL_RANGE * 0.7 ? here(e) : here(best) }]
+    const hold = !!best.ai!.healing || d <= HEAL_RANGE * 0.7
+    return [{ code: TEND, score: TEND_SCORE, tier: TIER_THREAT, at: hold ? here(e) : here(best) }]
   }
   if (g.phase === 'staging' || !g.mark) return [] // stage with everyone else
   const others = members.filter((m) => m !== e)

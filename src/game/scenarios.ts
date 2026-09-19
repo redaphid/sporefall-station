@@ -7,12 +7,18 @@ import { isSolidTile, Tile } from './levelgen/level'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { nextFloor } from './systems/missions'
+import { findPath } from './path'
+import { vlen } from './simMath'
 import {
   findArrival,
   groupRng,
+  healAmount,
+  RETREAT_FRAC,
+  RETURN_FRAC,
   spawnHive,
   spawnPack,
   spawnRaid,
+  standAt,
   type RaidStrategy,
 } from './systems/groups'
 import { freeze, wet } from './systems/interactions'
@@ -708,6 +714,16 @@ const clearCast = (w: World): Entity | undefined => {
   for (const e of w.entities) w.byId.set(e.id, e)
   w.groups = undefined
   w.hostile = true
+  // Stand the floor's heist down. A real run's floor has a mission (setupFloor),
+  // and every way it completes throws EVERY door on the floor open (the station
+  // alert / gate-breach release): the prize picked up, or the target "gone" —
+  // and clearing the cast above deletes an assassinate/infiltrate boss outright.
+  // On seed 3 the sapper scenario seals the player into the prize room, so the
+  // player picked the briefcase up on tick 1 and the locked doors the Blast
+  // Diver came to blow were all open before it arrived. The set-piece is the
+  // raid, not the heist: the mission reads as done (like floor 10's `reach`), so
+  // nothing in missionSystem can unseal the map under it.
+  w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Hold out against the tide' }
   const player = w.entities.find((e) => e.playerCtl)
   if (player?.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
   return player
@@ -720,6 +736,52 @@ const stageTide = (w: World, strategy: RaidStrategy, roster: Parameters<typeof s
   const at = findArrival(w, strategy, player, groupRng(w, `scenario:${name}`))
   if (at) spawnRaid(w, strategy, at, player, roster)
 }
+
+/** The medic set-piece. The Bog Mender stands back, just past the reach of the
+ * player's pistol (MEDIC_BAND); its grunts start FORWARD of it, where the walk
+ * from the medic to the player comes within MEDIC_FRONT tiles of the player,
+ * already wounded below the retreat line. So the first thing they do is turn
+ * and run back to the medic, take its heal beam, and walk back in: the whole
+ * beat inside ~10s, and a player who shoots can catch a straggler but not
+ * the medic's patch-up itself.
+ *
+ * It used to drop all four in one knot at the assault drop point (6-9 tiles,
+ * point-blank for the pistol) at 30% hp. The grunts spawned beside the medic,
+ * so there was no fall-back to see; three of them queued for one-a-second
+ * heals and stood still for ~9s; the raid's own harpoons (friendly fire, fixed
+ * in projectiles.ts) killed the wounded as they walked back in; and a player
+ * who fought killed the lot in the first three seconds. Their hp is picked so
+ * two heal pulses cross the return line, which keeps the queue short. */
+const stageMedic = (w: World): void => {
+  const player = clearCast(w)
+  if (!player) return
+  const r = groupRng(w, 'scenario:tide-medic')
+  const at = findArrival(w, 'assault', player, r, MEDIC_BAND) ?? findArrival(w, 'assault', player, r)
+  if (!at) return
+  const g = spawnRaid(w, 'assault', at, player, ['medic', 'grunt', 'grunt', 'grunt'])
+  const medic = w.entities.find((m) => m.ai?.group?.id === g.id && m.ai.group.role === 'medic')
+  if (medic) {
+    // The fan put it beside the drop point; it holds exactly there.
+    medic.pos = { x: at.x, y: at.y }
+    medic.prevPos = { x: at.x, y: at.y }
+  }
+  const route = findPath(w.level, at.x, at.y, player.pos.x, player.pos.y) ?? []
+  const front = route.find((n) => vlen(n.x - player.pos.x, n.y - player.pos.y) <= MEDIC_FRONT) ?? at
+  const hurt = (max: number): number =>
+    Math.min(Math.ceil(max * RETREAT_FRAC) - 1, Math.max(1, Math.ceil(max * RETURN_FRAC) - 2 * healAmount(w.floor)))
+  for (const m of w.entities) {
+    if (m.ai?.group?.id !== g.id || m.ai.group.role !== 'grunt' || !m.health) continue
+    m.health.hp = hurt(m.health.max)
+    const spot = standAt(w, Math.floor(front.x) + 0.5, Math.floor(front.y) + 0.5)
+    if (!spot) continue
+    m.pos = { x: spot.x, y: spot.y }
+    m.prevPos = { x: spot.x, y: spot.y }
+  }
+}
+/** Where the Bog Mender waits: just past the starter pistol's 10-tile reach. */
+const MEDIC_BAND: [number, number] = [10.5, 13]
+/** How close to the player the wounded grunts start (tiles). */
+const MEDIC_FRONT = 6.5
 
 /** Seal a building for the sapper scenario: the building with the fewest
  * doorways gets a LOCKED door in every one (an existing door is locked; an open
@@ -756,12 +818,7 @@ export const GROUP_SCENARIOS: Record<string, (w: World) => void> = {
   'tide-siege': (w) => stageTide(w, 'siege', ['artillery', 'leader', 'grunt', 'grunt'], 'tide-siege'),
   /** A wounded muster with a medic: the hurt fall back to the Bog Mender, are
    * patched up, and return to the assault. */
-  'tide-medic': (w) => {
-    stageTide(w, 'assault', ['medic', 'grunt', 'grunt', 'grunt'], 'tide-medic')
-    for (const m of w.entities) {
-      if (m.ai?.group?.role === 'grunt' && m.health) m.health.hp = Math.max(1, Math.round(m.health.max * 0.3))
-    }
-  },
+  'tide-medic': (w) => stageMedic(w),
   /** The player is sealed inside a building (every doorway LOCKED); a sapper
    * tide arrives outside, the Blast Diver plants a charge, backs off, and blows it. */
   'tide-sappers': (w) => {

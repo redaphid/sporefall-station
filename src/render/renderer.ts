@@ -16,6 +16,7 @@ import { setActiveThemeChain } from './themeState'
 import { Camera } from './camera'
 import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './complexLook'
 import { EffectsLayer } from './effects'
+import { GroupFxLayer } from './groupFx'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
@@ -166,6 +167,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // readable mid-fight and you can find YOURSELF instantly (playerMarkers.ts).
   const playerMarkers = new PlayerMarkerLayer()
   const effects = new EffectsLayer(art)
+  // Raid tells (sapper charge + countdown, breach shockwave, medic heal beam,
+  // retreat cross): drawn over the effects sprites, inside the same layer.
+  const groupFx = new GroupFxLayer()
+  effects.root.addChild(groupFx.root)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
@@ -513,6 +518,12 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
             effects.spawn('explosion', ev.x, ev.y, view.tick, 0x7fd65a)
           } else if (ev.type === 'ambush') {
             effects.spawn('hit', ev.x, ev.y, view.tick, 0xd17f7f)
+          } else if (ev.type === 'heal') {
+            // The Bog Mender's patch lands: a green sparkle on the healed body.
+            const to = view.entities.find((e) => e.id === ev.entityId)
+            if (to) effects.spawn('pickup', to.pos.x, to.pos.y, view.tick, 0x6dff8a)
+          } else if (ev.type === 'sapperCharge') {
+            effects.spawn('hit', ev.x, ev.y, view.tick, 0xffb02e)
           } else if (ev.type === 'pickup' || ev.type === 'modPickup') {
             const by = view.entities.find((e) => e.id === ev.byId)
             if (by) effects.spawn('pickup', by.pos.x, by.pos.y, view.tick)
@@ -554,6 +565,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)
       }
+      // Outside the hitstop freeze: the tracker must see every tick's events.
+      groupFx.update(view, elapsed)
       drawReticles()
       drawPickUi(view)
       if (bounds) camera.apply(world, app.screen.width, app.screen.height, bounds.w, bounds.h, bounds.x0, bounds.y0)

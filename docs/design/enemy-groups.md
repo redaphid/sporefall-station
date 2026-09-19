@@ -76,8 +76,14 @@ out of sight for 6s dissolve back into the swamp with no drop. Verb: **decapitat
 
 **3. Retreat to heal.** Below 40% hp, a raider with a living medic falls back to
 it (PANIC tier) and holds until healed to 80%, then rejoins. The medic heals the
-worst-hurt member within 2.2 tiles every second. Verb: **kill the medic, or catch
-the wounded on the way back**.
+worst-hurt member within 2.2 tiles every second. It walks out to the hurt who
+are still fighting, but holds its ground for one that is falling back to it.
+Verb: **kill the medic, or catch the wounded on the way back**.
+
+A raid's rounds pass through its own members (`projectiles.ts`). Before that, a
+muster firing down a corridor or through a breached doorway shot its own front
+rank, killing the wounded on their way back to the medic and routing a sapper
+raid on the threshold it had just blown.
 
 **4. Encirclement.** A pack that spots prey fixes an approach bearing and each hound
 takes an evenly spaced slot on a 3-tile ring. The ring closes when everyone is in
@@ -139,8 +145,20 @@ in `curation.json` with durable raws in `scripts/assets/raws/`. Contact sheet:
 
 Each one runs on the seed's own generated level (no tile carving), so a
 `sporefallShare()` capture restores. `src/game/groupScenarios.test.ts` asserts on
-seed 3 that every one stays shareable and that its moment happens.
-Open `/?seed=3&scenario=<name>&debug` (solo). The player is made unkillable.
+seed 3 that every one stays shareable and that its moment happens. The test
+stages them the way the app does (`setupFloor`, then the free spawn tile),
+and runs the sapper and medic beats against an idle player and one who moves
+and shoots. `e2e/group-scenarios.mjs` checks the same beats in a browser.
+Open `/?mode=solo&seed=3&scenario=<name>`. The player is made unkillable, and
+the floor's mission is stood down to a completed `reach`. Completing a real
+mission opens every door on the floor. On seed 3 the sapper scenario seals the
+player into the prize room, so on the live build the player picked up the
+briefcase on tick 1 and the station alert unsealed the building.
+
+On screen (`src/render/groupFx.ts`): the planted charge blinks faster as its
+fuse burns and shows a countdown and its blast ring, and the breach throws a
+shockwave. The medic stands on a green ring. A raider falling back wears a
+green cross, and each heal draws a beam from the medic to the raider it heals.
 
 | scenario | what to watch | when (seed 3) |
 |---|---|---|
@@ -149,7 +167,7 @@ Open `/?seed=3&scenario=<name>&debug` (solo). The player is made unkillable.
 | `tide-sappers` | the player is sealed in a building with every doorway locked. The Blast Diver walks to a door, plants, backs off, and blows it | charge ~10s, breach ~11.7s |
 | `hound-ring` | the near pack fans out around the player before it closes. Shoot a hound and both packs go manhunter | ring closes ~2s |
 | `hive-spread` | the spire buds sporelings at the player, and 30s in it roots a second spire | bud ~2s, spread 30s |
-| `tide-medic` | wounded raiders fall back to the Bog Mender, get healed, and return | heals from ~0s |
+| `tide-medic` | three grunts at 15/38 hp start ~6 tiles out. They run ~5 tiles back to the Bog Mender, which waits just past pistol range. Each is healed back over 80% and walks back in | first heal ~1s, all three back in by ~8s |
 
 Seed 3 on floor 1 spawns the player in a map corner (1.5, 1.5). That is fine for
 most of these, but the hound ring there is a half ring against the walls.

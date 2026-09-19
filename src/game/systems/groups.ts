@@ -247,7 +247,7 @@ const bodyAt = (w: World, x: number, y: number): boolean => {
 }
 
 /** Somewhere a body really fits near (x,y), preferring an unoccupied spot. */
-const standAt = (w: World, x: number, y: number): Vec2 | null =>
+export const standAt = (w: World, x: number, y: number): Vec2 | null =>
   bodySpawnPoint(
     w.level,
     x,
@@ -358,9 +358,16 @@ const flood = (w: World, tx: number, ty: number, maxSteps: number, throughLocked
 /** Pick where a raid arrives: a walkable tile in the strategy's distance band
  * that the raid can actually walk to the target from, preferring one the target
  * cannot see (and, for sappers, one sealed off behind a locked hatch — the whole
- * point of bringing a breacher). Null when the floor offers nowhere. */
-export const findArrival = (w: World, strategy: RaidStrategy, target: Entity, rng: Rng): Vec2 | null => {
-  const [lo, hi] = ARRIVAL_BAND[strategy]
+ * point of bringing a breacher). Null when the floor offers nowhere. `band`
+ * overrides the strategy's distance band (a staged set-piece placing a body). */
+export const findArrival = (
+  w: World,
+  strategy: RaidStrategy,
+  target: Entity,
+  rng: Rng,
+  band: readonly [number, number] = ARRIVAL_BAND[strategy],
+): Vec2 | null => {
+  const [lo, hi] = band
   const lw = w.level.w
   const tx = Math.floor(target.pos.x)
   const ty = Math.floor(target.pos.y)

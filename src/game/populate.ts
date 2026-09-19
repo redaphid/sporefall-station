@@ -1,7 +1,7 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { bunkerLaneKeys, isFloorTile, isSolidTile, isWallTile, Tile, tileAt, type Building, type Corridor, type RoomType } from './levelgen/level'
+import { bunkerLaneKeys, isFloorTile, isSolidTile, isWallTile, STOREY_SIZE, Tile, tileAt, type Building, type Corridor, type RoomType } from './levelgen/level'
 import { groupProps, planRoom, PROP_PLACEMENT, ROOM_LAYOUT, type FreeTile, type Placement } from './levelgen/furnish'
 import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
@@ -14,6 +14,7 @@ import { populateGroups } from './systems/groups'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 import { vlen } from './simMath'
+import { floodLinked, stairReservedKeys } from './stairs'
 
 /** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
@@ -144,6 +145,8 @@ export const populateWorld = (w: World): void => {
   // The group layer (floors 2+): hound packs, hive spires and the raid schedule.
   // Own `groups` fork, appended last — nothing above moves.
   populateGroups(w)
+  // Storeys (Phase 1): stock each loft with its loot cache. Own fork, last.
+  stockLofts(w)
 }
 
 /** Room types a lurker haunts — dark back-of-house corners, never the front. */
@@ -201,6 +204,7 @@ const lurkerHideTile = (w: World, b: Building, ri: number): { x: number; y: numb
       if (!isFloorTile(w.level.tiles[ty * lw + tx])) continue
       if (roomOwningTile(b.rooms, tx, ty) !== ri) continue
       if (taken.has(ty * lw + tx)) continue
+      if (stairReservedKeys(w.level).has(ty * lw + tx)) continue
       if (tx === spawnTx && ty === spawnTy) continue
       if (tx === exitTx && ty === exitTy) continue
       const walls = wallNeighbours(w, tx, ty)
@@ -358,6 +362,8 @@ const furnishInteriors = (w: World): void => {
     // behavior so runtime barricades honor the same lane (bunkerLaneKeys).
     for (const k of bunkerLaneKeys(b, lw)) keepClear.add(k)
   }
+  // The stair shafts' landings stay open deck (stairs.ts clearance).
+  for (const k of stairReservedKeys(w.level)) keepClear.add(k)
   // Plan every room first, then commit the whole floor through the circulation
   // guard below — a placement is only safe in the context of every OTHER prop.
   const planned: Placement[] = []
@@ -428,24 +434,12 @@ const commitFurniture = (w: World, planned: readonly Placement[]): void => {
   const startX = Math.floor(w.level.spawn.x)
   const startY = Math.floor(w.level.spawn.y)
   /** Tiles reachable from the player spawn, treating `blocked` as solid. */
+  // Stairs count as a way through (stairs.ts floodLinked): a loft reached
+  // only by its stair is reachable, so furniture never seals one off.
   const reachable = (): Set<number> => {
     const seen = new Set<number>()
-    const open = (tx: number, ty: number): boolean =>
-      tx >= 0 && ty >= 0 && tx < lw && ty < lh && !isSolidTile(w.level, tx, ty) && !blocked.has(ty * lw + tx)
-    if (!open(startX, startY)) return seen
-    const stack = [startY * lw + startX]
-    seen.add(stack[0])
-    while (stack.length > 0) {
-      const k = stack.pop()!
-      const tx = k % lw
-      const ty = (k - tx) / lw
-      for (const [dx, dy] of ORTHO) {
-        const nk = (ty + dy) * lw + (tx + dx)
-        if (seen.has(nk) || !open(tx + dx, ty + dy)) continue
-        seen.add(nk)
-        stack.push(nk)
-      }
-    }
+    const mask = floodLinked(w.level, startY * lw + startX, (k) => blocked.has(k))
+    for (let k = 0; k < mask.length; k++) if (mask[k]) seen.add(k)
     return seen
   }
   const walkable = (tx: number, ty: number): boolean =>
@@ -890,6 +884,7 @@ const spawnComplexSleepers = (w: World): void => {
     for (let ty = room.y; ty < room.y + room.h; ty++) {
       for (let tx = room.x; tx < room.x + room.w; tx++) {
         if (!isFloorTile(w.level.tiles[ty * lw + tx]) || taken.has(ty * lw + tx) || doorNear(tx, ty)) continue
+        if (stairReservedKeys(w.level).has(ty * lw + tx)) continue
         free.push({ x: tx, y: ty })
       }
     }
@@ -969,6 +964,7 @@ const randomFloorInRoom = (
     if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
     if (tx === spawnTx && ty === spawnTy) continue
     if (tx === exitTx && ty === exitTy) continue
+    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null
@@ -1053,6 +1049,7 @@ const randomFloorInBuilding = (
     // neighbour's floor, so only a tile of one of its OWN rooms counts.
     if (w.level.complex && !building.rooms.some((r) => rectContains(r, tx, ty))) continue
     if (occupant && w.level.complex && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null
@@ -1072,4 +1069,39 @@ const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: num
     return { x, y }
   }
   return null
+}
+
+/** The loft cache (Phase 1, docs/design/stairs-and-storeys.md §5): every upper
+ * storey holds loot only — a smashable crate, a weapon-mod and one pickup from
+ * the floor's loot table — and never an enemy. Own `lofts` fork, appended
+ * last, so every other populate stream stays byte-identical per seed. */
+const stockLofts = (w: World): void => {
+  const level = w.level
+  if (!level.storeys || !level.stairs) return
+  const rng = w.rng.fork('lofts')
+  const reserved = stairReservedKeys(level)
+  for (const storey of level.storeys) {
+    if (storey.z === 0) continue
+    const free: { x: number; y: number }[] = []
+    for (let ty = 0; ty < level.h; ty++)
+      for (let tx = storey.ox; tx < storey.ox + STOREY_SIZE && tx < level.w; tx++) {
+        const k = ty * level.w + tx
+        if (!isFloorTile(level.tiles[k]) || reserved.has(k)) continue
+        free.push({ x: tx, y: ty })
+      }
+    // The crate against a wall (it reads as stored, not dropped), the loot mid-floor.
+    const walled = free.filter((t) => wallNeighbours(w, t.x, t.y) > 0)
+    const crateAt = (walled.length > 0 ? walled : free).at(rng.int(0, Math.max(0, (walled.length > 0 ? walled : free).length - 1)))
+    if (!crateAt) continue
+    spawnObject(w, 'crate', crateAt.x, crateAt.y)
+    const rest = free.filter((t) => t.x !== crateAt.x || t.y !== crateAt.y)
+    const pick = (): { x: number; y: number } | undefined => (rest.length > 0 ? rest.splice(rng.int(0, rest.length - 1), 1)[0] : undefined)
+    const modAt = pick()
+    if (modAt) dropModPickup(w, weightedModId(rng), modAt.x + 0.5, modAt.y + 0.5)
+    const lootAt = pick()
+    if (lootAt) {
+      const itemId = rng.pick(lootTable(w.floor))
+      dropPickup(w, itemId, lootAt.x + 0.5, lootAt.y + 0.5, itemId === 'cash' ? rng.int(10, 40) : 1)
+    }
+  }
 }

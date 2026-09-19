@@ -21,6 +21,7 @@
 // City floors never create it and never draw from the rng here.
 
 import type { Entity } from '../entity'
+import { storeyOf } from '../stairs'
 import type { Level, Wing } from '../levelgen/level'
 import { spawnNpc } from '../populate'
 import { vlen } from '../simMath'
@@ -66,7 +67,10 @@ export const swarmSize = (floor: number): number => Math.min(5, 2 + Math.floor((
 /** Live director spawns allowed before vents stay shut. */
 export const swarmCap = (floor: number): number => 4 + floor
 
-const livingPlayers = (w: World): Entity[] => w.entities.filter((e) => e.playerCtl && !e.dead)
+/** Players the director plays against. Only the ground storey: vents, bunk
+ * ambushes and wing blackouts are all ground-storey machinery (Phase 1 lofts
+ * hold no enemies), so a player upstairs is left alone. */
+const livingPlayers = (w: World): Entity[] => w.entities.filter((e) => e.playerCtl && !e.dead && storeyOf(e.pos.x) === 0)
 
 const inRect = (r: { x: number; y: number; w: number; h: number }, x: number, y: number): boolean =>
   x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h

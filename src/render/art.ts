@@ -48,6 +48,9 @@ export interface ArtRegistry {
   /** Context-placed RGBA decal pool for a surface (`tile.<name>.overlay`) —
    * empty when the theme ships none. Placement: tileSelect.planTileOverlays. */
   tileOverlayPool(tileId: number): readonly Texture[]
+  /** The chevron decal for a stair's landing tile, authored pointing NORTH at
+   * the stair (the tilemap rotates it with the shaft). */
+  landingOverlay(hash?: number): Texture
   /** Macro side (N of an N×N sliced pool) the active theme declares for a
    * surface, if any — the tilemap feeds it back into variant/overlay planning. */
   tileMacro(tileId: number): number | undefined
@@ -394,6 +397,8 @@ const TILE_ID_BY_NAME: Record<string, number> = {
   plating: Tile.Plating,
   hull: Tile.Hull,
   bog: Tile.Bog,
+  stair_up: Tile.StairUp,
+  stair_down: Tile.StairDown,
 }
 
 const TILE_COLORS: Record<number, number> = {
@@ -409,6 +414,8 @@ const TILE_COLORS: Record<number, number> = {
   [Tile.Plating]: 0x565c62,
   [Tile.Hull]: 0x14181e,
   [Tile.Bog]: 0x2f4a3a,
+  [Tile.StairUp]: 0x59636d,
+  [Tile.StairDown]: 0x23282e,
 }
 
 /** For each bevelled wall corner variant, the polygon of the KEPT wall area
@@ -689,6 +696,27 @@ export const createArt = (
           g.ellipse(x + 4, y + 2, 5, 2).stroke({ width: 1, color: 0x9fd8a8, alpha: 0.2 })
         }
         g.rect(0, 0, T, T).fill({ color: 0x0a1a10, alpha: 0.15 })
+        break
+      }
+      case Tile.StairUp:
+      case Tile.StairDown: {
+        // Authored facing NORTH (niche at the top, open to the south); the
+        // tilemap rotates it per shaft. Up: treads brighten as they rise.
+        // Down: treads fall away into shadow at the far edge.
+        const up = tileId === Tile.StairUp
+        const steps = 6
+        for (let i = 0; i < steps; i++) {
+          const y = (i * T) / steps
+          const k = up ? 1 - i / steps : i / steps
+          const lit = up ? 0xa2adb4 : 0x7b8791
+          g.rect(4, y, T - 8, T / steps).fill({ color: up ? lit : 0x08080c, alpha: up ? 0.15 + 0.5 * (1 - k) : 0.15 + 0.7 * (1 - k) })
+          g.rect(4, y, T - 8, 1).fill({ color: 0xffffff, alpha: up ? 0.35 * (1 - k) + 0.1 : 0.25 * k + 0.05 })
+        }
+        // Handrails both sides.
+        g.rect(1, 0, 3, T).fill(0x3c444d)
+        g.rect(T - 4, 0, 3, T).fill(0x3c444d)
+        g.rect(2, 0, 1, T).fill({ color: 0xffffff, alpha: 0.25 })
+        g.rect(T - 3, 0, 1, T).fill({ color: 0xffffff, alpha: 0.25 })
         break
       }
       case Tile.Exit: {
@@ -1391,6 +1419,28 @@ export const createArt = (
     return tex
   }
 
+  // The chevron decal on a stair's landing, pointing NORTH (at the stair);
+  // the tilemap rotates it with the shaft. Themed pool when the pack ships
+  // `tile.landing.overlay`, else a procedural pair of hazard chevrons.
+  let procLanding: Texture | undefined
+  const landingOverlay = (hash = 0): Texture => {
+    const pool = sprites.tileOverlays?.landing
+    if (pool && pool.length > 0) return pool[hash % pool.length]
+    if (!procLanding) {
+      const T = TILE_PX
+      const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+      for (const cy of [T * 0.35, T * 0.62]) {
+        g.poly([T * 0.25, cy + 5, T * 0.5, cy - 3, T * 0.75, cy + 5, T * 0.75, cy + 8, T * 0.5, cy, T * 0.25, cy + 8]).fill({
+          color: 0xc9a227,
+          alpha: 0.55,
+        })
+      }
+      procLanding = renderer.generateTexture(g)
+      g.destroy()
+    }
+    return procLanding
+  }
+
   const EMPTY_POOL: readonly Texture[] = []
   const tileOverlayPool = (tileId: number): readonly Texture[] => {
     const name = TILE_NAME_BY_ID[tileId]
@@ -1403,6 +1453,7 @@ export const createArt = (
 
   return {
     tile,
+    landingOverlay,
     tileOverlayPool,
     tileMacro: tileMacroFor,
     wallShadow,

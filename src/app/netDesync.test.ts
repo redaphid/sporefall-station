@@ -931,3 +931,108 @@ describe('divergence hunt — long-run co-op soak', () => {
     expect(formatDivergence(check(host, bob))).toBe(`no divergence at tick ${host.world.tick}`)
   }, 180_000)
 })
+
+// ---------------------------------------------------------------------------
+// STAIRS (docs/design/stairs-and-storeys.md §3.4). A climb is an 80-tile jump
+// across the storey atlas: if host and client ever disagree about it the avatar
+// rubber-bands the whole width of the map. Host and client both run
+// stairs.ts `stairStep`, and reconcile replays through it from the acked lock.
+// ---------------------------------------------------------------------------
+
+const STAIR_SEED = 5101
+
+/** A pair already on floor 3 (the first complex floor), via the real descent. */
+const pairOnComplex = async (input: InputSource): Promise<Awaited<ReturnType<typeof startPair>>> => {
+  const pair = await startPair(STAIR_SEED, input)
+  await step(pair.host, [pair.bob], 12)
+  for (let descents = 0; descents < 2; descents++) {
+    armDescent(pair.host)
+    await step(pair.host, [pair.bob], 18)
+  }
+  expect(pair.host.world.floor).toBe(3)
+  return pair
+}
+
+describe('divergence hunt — stairs', () => {
+  it('the fixture floor has a loft (or every test below proves nothing)', () => {
+    expect(generateLevel(STAIR_SEED, 3).stairs).toHaveLength(2)
+  })
+
+  it('the client predicts the climb and is never pulled back down by a later snapshot', async () => {
+    const walk = driven()
+    const { host, bob, selfId } = await pairOnComplex(walk.source)
+    const level = host.world.level
+    const up = level.stairs!.find((l) => l.from.x < 80)!
+    const down = level.stairs!.find((l) => l.from.x === up.to.x)!
+    const d = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] }[up.dir]
+    // Stand Bob two tiles in front of the stair on the HOST, and let the client settle there.
+    const avatar = host.world.byId.get(selfId())!
+    avatar.pos = { x: down.landing.x + 2 * d[0] + 0.5, y: down.landing.y + 2 * d[1] + 0.5 }
+    avatar.prevPos = { ...avatar.pos }
+    await step(host, [bob], 12)
+    expect(Math.floor(bob.session.renderView().self!.pos.x)).toBeLessThan(64)
+
+    walk.set({ moveX: -d[0], moveY: -d[1] })
+    let clientUpAt = -1
+    let hostUpAt = -1
+    let pulledBack = 0
+    for (let i = 0; i < 90; i++) {
+      await step(host, [bob], 1)
+      const cx = bob.session.renderView().self!.pos.x
+      if (clientUpAt < 0 && cx >= 80) clientUpAt = i
+      if (hostUpAt < 0 && avatar.pos.x >= 80) hostUpAt = i
+      if (clientUpAt >= 0 && cx < 80) pulledBack++
+    }
+    expect(clientUpAt, 'client never climbed').toBeGreaterThanOrEqual(0)
+    expect(hostUpAt, 'host never climbed').toBeGreaterThanOrEqual(0)
+    // Prediction leads (or meets) authority, never trails it by a round trip.
+    expect(clientUpAt).toBeLessThanOrEqual(hostUpAt)
+    expect(pulledBack, 'the client rubber-banded back down after predicting the climb').toBe(0)
+
+    walk.set({})
+    await step(host, [bob], 30)
+    const report = check(host, bob, { selfEntityId: selfId(), ignoreStaleState: true })
+    expect(report.selfDrift).toBeLessThan(0.5)
+    expect(report.issues.filter((x) => x.kind === 'self.position')).toEqual([])
+  })
+
+  it('holding forward after the climb does not ping-pong on either side', async () => {
+    const walk = driven()
+    const { host, bob, selfId } = await pairOnComplex(walk.source)
+    const level = host.world.level
+    const up = level.stairs!.find((l) => l.from.x < 80)!
+    const down = level.stairs!.find((l) => l.from.x === up.to.x)!
+    const d = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] }[up.dir]
+    const avatar = host.world.byId.get(selfId())!
+    avatar.pos = { x: down.landing.x + 2 * d[0] + 0.5, y: down.landing.y + 2 * d[1] + 0.5 }
+    avatar.prevPos = { ...avatar.pos }
+    await step(host, [bob], 12)
+    walk.set({ moveX: -d[0], moveY: -d[1] })
+    await step(host, [bob], 40)
+    let flips = 0
+    let last = avatar.pos.x >= 80
+    for (let i = 0; i < 90; i++) {
+      await step(host, [bob], 1)
+      const now = avatar.pos.x >= 80
+      if (now !== last) flips++
+      last = now
+      expect(bob.session.renderView().self!.pos.x).toBeGreaterThanOrEqual(80)
+    }
+    expect(flips).toBe(0)
+    expect(avatar.pos.x).toBeGreaterThanOrEqual(80)
+  })
+
+  it('RED PROOF: a storey mismatch shows up as a position divergence (self and others)', async () => {
+    const { host, bob, selfId } = await pairOnComplex(stubInput())
+    await step(host, [bob], 18)
+    const view = bob.session.renderView()
+    const real = view.self!
+    // The same local spot, one storey up: an 80-tile disagreement.
+    const upstairs = patch(view, { self: { ...real, pos: { x: real.pos.x + 80, y: real.pos.y } } })
+    const report = diffHostClient(host.world, upstairs, { selfEntityId: selfId() })
+    expectFires(report, 'self.position')
+    expect(report.selfDrift).toBeGreaterThanOrEqual(79)
+    // …and GREEN: the untouched view does not fire.
+    expect(check(host, bob, { selfEntityId: selfId(), ignoreStaleState: true }).issues.filter((x) => x.kind === 'self.position')).toEqual([])
+  })
+})

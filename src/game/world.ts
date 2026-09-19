@@ -19,6 +19,7 @@ import { projectileSystem } from './systems/projectiles'
 import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
+import { stairSystem } from './systems/stairs'
 import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
 export interface MissionState {
@@ -279,6 +280,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   aiSystem(w)
   rollSystem(w, inputs)
   movementSystem(w, inputs)
+  stairSystem(w) // a player who stepped onto a stair climbs (or descends) now
   combatSystem(w, inputs)
   projectileSystem(w)
   interactionSystem(w, inputs)

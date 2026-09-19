@@ -2,6 +2,7 @@ import type { Entity } from '../game/entity'
 import { generateLevel } from '../game/levelgen/generate'
 import type { Level } from '../game/levelgen/level'
 import { isSolidTile } from '../game/levelgen/level'
+import { stairStep } from '../game/stairs'
 import { moveAndCollide } from '../game/systems/movement'
 import { SIM_DT, type InputCmd, type SimEvent } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -231,7 +232,14 @@ export class NetClientSession implements Session {
    */
   private sawSnapshot = false
   private inputSeq = 0
-  private pendingInputs: { seq: number; cmd: InputCmd }[] = []
+  /** Unacked inputs, each with the predicted stair lock AFTER it ran — so a
+   * reconcile can resume the lock exactly where the acked input left it. */
+  private pendingInputs: { seq: number; cmd: InputCmd; lock: boolean }[] = []
+  /** Predicted stair hysteresis for our own avatar (host twin: Entity.stairLock,
+   * both driven by stairs.ts `stairStep`). */
+  private stairLock = false
+  /** The predicted lock as of the last input the host has acknowledged. */
+  private ackedLock = false
   private pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
   /** Hotbar slot tapped since the last input packet went out (-1 = none). Latched
    * so a tap between send-ticks isn't dropped — the host applies it as an edge. */
@@ -536,6 +544,8 @@ export class NetClientSession implements Session {
     this.entities.clear()
     this.targets.clear()
     this.self = undefined
+    this.stairLock = false
+    this.ackedLock = false
     this.onLevelChange?.(this.level)
   }
 
@@ -604,13 +614,19 @@ export class NetClientSession implements Session {
   /** Rewind to the authoritative position and replay unacked inputs. */
   private reconcile(we: { x: number; y: number }): void {
     const self = this.self!
+    for (const p of this.pendingInputs) if (p.seq <= this.lastAckedSeq) this.ackedLock = p.lock
     this.pendingInputs = this.pendingInputs.filter((p) => p.seq > this.lastAckedSeq)
     const px = self.pos.x
     const py = self.pos.y
     self.pos.x = we.x
     self.pos.y = we.y
+    // Replay from the acked lock through the SAME stairStep the host runs, so a
+    // snapshot from before a climb re-predicts the climb instead of hauling us
+    // back down, and one from after it never climbs twice.
+    this.stairLock = this.ackedLock
     for (const pending of this.pendingInputs) {
       this.stepSelf(pending.cmd)
+      pending.lock = this.stairLock
     }
     // If the replayed result is close to where we already were, keep the smooth version.
     if (Math.hypot(self.pos.x - px, self.pos.y - py) < 0.5) {
@@ -636,6 +652,14 @@ export class NetClientSession implements Session {
     const speed = 4.5 // class speeds vary ±1; mispredictions get reconciled
     self.facing = Math.atan2(cmd.moveY * norm, cmd.moveX * norm)
     moveAndCollide(self, cmd.moveX * norm * speed * SIM_DT, cmd.moveY * norm * speed * SIM_DT, this.blocked)
+    const r = stairStep(this.level, self.pos.x, self.pos.y, this.stairLock)
+    this.stairLock = r.locked
+    if (r.link) {
+      self.pos.x = r.x
+      self.pos.y = r.y
+      self.prevPos.x = r.x
+      self.prevPos.y = r.y
+    }
   }
 
   tick(): void {
@@ -677,7 +701,7 @@ export class NetClientSession implements Session {
       e.prevPos.y = e.pos.y
     }
     this.stepSelf(cmd)
-    this.pendingInputs.push({ seq: cmd.seq, cmd })
+    this.pendingInputs.push({ seq: cmd.seq, cmd, lock: this.stairLock })
     if (this.pendingInputs.length > 60) this.pendingInputs.shift()
 
     // Everyone else eases toward their snapshot target, projected forward along

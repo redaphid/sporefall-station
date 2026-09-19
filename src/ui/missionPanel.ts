@@ -18,6 +18,7 @@
 //     None of it accepts pointer events — gameplay input is never blocked.
 
 import type { RenderView } from '../app/session'
+import { cameraRect, onViewerStorey, storeyBadge } from '../game/stairs'
 import { missionObjectives, missionChipText, resolveLink, type Objective, type ObjectiveLink } from './missionModel'
 import { pointMarker, type CameraState } from './locatorModel'
 import { markUiChrome } from './chrome'
@@ -173,8 +174,8 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
   // currently-focused link (entity OR point) gets the pulsing ring.
   const updateMarkers = (view: RenderView): void => {
     const camRaw = opts.cameraSource?.()
-    const cam: CameraState | undefined = camRaw ? { ...camRaw, levelW: view.level.w, levelH: view.level.h } : undefined
     const self = view.self
+    const cam: CameraState | undefined = camRaw ? { ...camRaw, ...cameraRect(view.level, self?.pos.x ?? camRaw.x) } : undefined
 
     // Persistent objective locator — the FIRST active linked row: the mission
     // target while the objective is live (entity link), then the exit once it
@@ -183,10 +184,15 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
     // gets the same on-target caret / canvas-bounds edge arrow as any target.
     const objective = rows.find((o) => o.state === 'active' && o.link)
     const isExit = objective?.key === 'exit'
-    const target = objective?.link && resolveLink(objective.link, view.entities)
+    const raw = objective?.link && resolveLink(objective.link, view.entities)
+    // An objective on another storey is marked where it stands in plan, with
+    // a ▲/▼ badge (stairs.ts onViewerStorey) — never out in the gutter.
+    const on = raw && self ? onViewerStorey(view.level, self.pos.x, raw) : undefined
+    const target = on ? { x: on.x, y: on.y } : raw
+    const badge = on ? storeyBadge(on.dz) : ''
     const m = target && self && cam ? pointMarker(self.pos, target, cam) : undefined
     if (m && m.onScreen) {
-      caret.textContent = isExit ? '🏁' : '🎯'
+      caret.textContent = `${badge}${isExit ? '🏁' : '🎯'}`
       caret.style.display = 'block'
       caret.style.left = `${Math.round(m.sx)}px`
       caret.style.top = `${Math.round(m.sy - 18)}px`
@@ -197,7 +203,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
       edge.style.display = 'flex'
       edge.style.transform = `translate(${Math.round(m.sx)}px, ${Math.round(m.sy)}px) translate(-50%,-50%)`
       edgeArrow.style.transform = `rotate(${m.angle}rad)`
-      edgeLabel.textContent = isExit ? `LAUNCH BAY · ${m.dist}m` : `🎯 ${m.dist}m`
+      edgeLabel.textContent = `${badge ? `${badge} ` : ''}${isExit ? `LAUNCH BAY · ${m.dist}m` : `🎯 ${m.dist}m`}`
     } else {
       edge.style.display = 'none'
     }

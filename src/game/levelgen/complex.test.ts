@@ -8,41 +8,16 @@ import { mulberry32 } from '../rng'
 import { setupFloor } from '../systems/missions'
 import { LEVEL_H, LEVEL_W } from '../types'
 import { createCityWorld } from '../testkit'
+import { floodLinked } from '../stairs'
 import { createWorld } from '../world'
 import { BIOME_DEFS, BIOMES, biomeForFloor, carveComplex, cityFloorOrdinal, COMPLEX_MIN_FLOOR, isComplexFloor } from './complex'
 import { generateComplexLevel, generateLevel } from './generate'
-import { isFloorTile, isWallTile, levelChecksum, Tile, TileGrid, type Level } from './level'
+import { isFloorTile, isStairTile, isWallTile, levelChecksum, Tile, TileGrid, type Level } from './level'
 import { COMPLEX_ROOM_TYPE } from './roomTypes'
 import type { Rect } from './rooms'
 
-const reachFrom = (level: Level, sx: number, sy: number): Uint8Array => {
-  const { w, h } = level
-  const reach = new Uint8Array(w * h)
-  const queue = [sy * w + sx]
-  reach[queue[0]] = 1
-  while (queue.length > 0) {
-    const i = queue.pop()!
-    const x = i % w
-    const y = (i / w) | 0
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
-      const nx = x + dx
-      const ny = y + dy
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
-      const n = ny * w + nx
-      if (reach[n] || level.solid[n]) continue
-      reach[n] = 1
-      queue.push(n)
-    }
-  }
-  return reach
-}
-
-const spawnReach = (level: Level): Uint8Array => reachFrom(level, Math.floor(level.spawn.x), Math.floor(level.spawn.y))
+/** Reachable on foot from spawn — taking the stairs, so a loft counts. */
+const spawnReach = (level: Level): Uint8Array => floodLinked(level, Math.floor(level.spawn.y) * level.w + Math.floor(level.spawn.x))
 
 const tile = (level: Level, x: number, y: number): number => level.tiles[y * level.w + x]
 
@@ -301,7 +276,7 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
               const t = tile(level, x, y)
               tiles++
               if (isWallTile(t)) walls++
-              else expect(isFloorTile(t) || t === Tile.Grass || t === Tile.Exit, `${tag}: bad deck ${t} at ${x},${y}`).toBe(true)
+              else expect(isFloorTile(t) || t === Tile.Grass || t === Tile.Exit || isStairTile(t), `${tag}: bad deck ${t} at ${x},${y}`).toBe(true)
             }
           }
         }
@@ -491,7 +466,8 @@ describe('complex generator: floorplans, not graph paper', () => {
     const mains = new Set<number>()
     let symmetric = 0
     for (let seed = 1; seed <= 40; seed++) {
-      const level = generateLevel(seed, 3)
+      // The ground plan's symmetry — the loft slot beside it is not part of it.
+      const level = generateComplexLevel(seed, 3, { storeys: false })
       mains.add(level.complex!.corridors.filter((c) => (c.axis === 'h' ? c.rect.h : c.rect.w) === 3).length)
       if (mirrorScore(level) > 0.87) symmetric++
     }

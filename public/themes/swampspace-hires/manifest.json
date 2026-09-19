@@ -488,6 +488,20 @@
    "tiles/bog-accent-1.png",
    "tiles/bog-accent-2.png"
   ],
+  "tile.stair_up": [
+   "tiles/stair_up-0.png",
+   "tiles/stair_up-1.png",
+   "tiles/stair_up-2.png"
+  ],
+  "tile.stair_down": [
+   "tiles/stair_down-0.png",
+   "tiles/stair_down-1.png",
+   "tiles/stair_down-2.png"
+  ],
+  "tile.landing.overlay": [
+   "tiles/landing-overlay-0.png",
+   "tiles/landing-overlay-1.png"
+  ],
   "tile.wall.cap": "tiles/wall-cap.png",
   "tile.wall.cap.inner": "tiles/wall-cap-inner.png",
   "tile.hull.cap": "tiles/hull-cap.png",

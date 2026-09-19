@@ -9,6 +9,7 @@ import { isWallTile, Tile, TileGrid, themeForFloor, type Building, type Building
 import { BORDER, cutLots, cutLotsVaried } from './lots'
 import { assignRoomTypes } from './roomTypes'
 import { splitRooms, type Rect } from './rooms'
+import { addStoreys } from './storeys'
 
 /** Chance an empty themed lot becomes a paved plaza with a green heart. */
 const PLAZA_CHANCE = 0.3
@@ -21,7 +22,13 @@ export const generateLevel = (seed: number, floor: number): Level =>
     : generateCityLevel(seed, floor, themeForFloor(cityFloorOrdinal(floor)))
 
 /** The indoor station complex (levelgen/complex.ts) — what floors 3, 5, 7… use. */
-export const generateComplexLevel = (seed: number, floor: number): Level => {
+export interface ComplexLevelOpts {
+  /** Build upper storeys (default true). `false` yields the ground storey
+   * alone — the byte-identity reference the storey tests compare against. */
+  storeys?: boolean
+}
+
+export const generateComplexLevel = (seed: number, floor: number, opts: ComplexLevelOpts = {}): Level => {
   const rng = mulberry32(seed).fork(`levelgen:${floor}`)
   const w = LEVEL_W
   const h = LEVEL_H
@@ -40,6 +47,10 @@ export const generateComplexLevel = (seed: number, floor: number): Level => {
     complex: plan.complex,
   }
   for (const b of level.buildings) b.roomTypes = assignRoomTypes(b)
+  // Storeys (levelgen/storeys.ts): a loft over one tower or large room, where
+  // the structural rule allows. Its own rng fork, run after everything above,
+  // so the ground storey's streams never move.
+  if (opts.storeys !== false) addStoreys(level, rng.fork('storeys'), plan.meta)
   return level
 }
 

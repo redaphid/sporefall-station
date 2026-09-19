@@ -1,5 +1,5 @@
 import { Container, Sprite } from 'pixi.js'
-import { isWallTile, Tile, WALL_CUT_OUTSIDE, type Level } from '../game/levelgen/level'
+import { isWallTile, STOREY_SIZE, STOREY_STRIDE, Tile, WALL_CUT_OUTSIDE, type Level, type StairDir } from '../game/levelgen/level'
 import { TILE_PX, type ArtRegistry, type OverlaySide } from './art'
 import { coordHash, planTileOverlays, type OverlayPlacement } from './tileSelect'
 import { CAP_QUARTER_TURNS, CORNER_QUARTER_TURNS, planWallCaps } from './wallCaps'
@@ -12,7 +12,14 @@ interface Chunk {
   x: number
   y: number
   size: number
+  /** Atlas storey slot this chunk belongs to, or -1 for gutter chunks (never
+   * shown). Always 0 on a single-storey level. */
+  slot: number
 }
+
+/** Quarter turns that rotate art authored facing NORTH (open side south) to a
+ * stair shaft's open side `dir`. */
+export const STAIR_QUARTER_TURNS: Record<StairDir, number> = { s: 0, w: 1, n: 2, e: 3 }
 
 /** Ground "height" rank for seam shading: water-street lowest, then moss/
  * grass, then raised sidewalk decking, then interior floors. A LOWER tile
@@ -68,6 +75,13 @@ export class TilemapView {
         else overlayAt.set(key, [p])
       }
     }
+    // Stair shafts: which way each stair tile / landing faces (rotation).
+    const stairDir = new Map<number, StairDir>()
+    const landingDir = new Map<number, StairDir>()
+    for (const l of level.stairs ?? []) {
+      stairDir.set(l.from.y * level.w + l.from.x, l.dir)
+      landingDir.set(l.landing.y * level.w + l.landing.x, l.dir)
+    }
     const chunksX = Math.ceil(level.w / CHUNK)
     const chunksY = Math.ceil(level.h / CHUNK)
     for (let cy = 0; cy < chunksY; cy++) {
@@ -93,8 +107,22 @@ export class TilemapView {
               container.addChild(back)
             }
             const sprite = new Sprite(art.tile(tileId, hash, tx, ty))
-            sprite.position.set(px, py)
+            const turn = stairDir.get(ty * level.w + tx)
+            if (turn !== undefined) {
+              // Stair art is authored facing north; turn it to the shaft.
+              sprite.anchor.set(0.5)
+              sprite.position.set(px + TILE_PX / 2, py + TILE_PX / 2)
+              sprite.rotation = (STAIR_QUARTER_TURNS[turn] * Math.PI) / 2
+            } else sprite.position.set(px, py)
             container.addChild(sprite)
+            const landing = landingDir.get(ty * level.w + tx)
+            if (landing !== undefined) {
+              const chevron = new Sprite(art.landingOverlay(hash))
+              chevron.anchor.set(0.5)
+              chevron.position.set(px + TILE_PX / 2, py + TILE_PX / 2)
+              chevron.rotation = (STAIR_QUARTER_TURNS[landing] * Math.PI) / 2
+              container.addChild(chevron)
+            }
 
             // Context-keyed overgrowth decals sit on the base tile, under the
             // grounding shadows (so AO still darkens moss at wall bases).
@@ -151,16 +179,26 @@ export class TilemapView {
           }
         }
         this.root.addChild(container)
-        this.chunks.push({ container, x: cx * CHUNK * TILE_PX, y: cy * CHUNK * TILE_PX, size: CHUNK * TILE_PX })
+        const x0 = cx * CHUNK
+        const slot = !level.storeys ? 0 : x0 % STOREY_STRIDE < STOREY_SIZE ? Math.floor(x0 / STOREY_STRIDE) : -1
+        this.chunks.push({ container, x: x0 * TILE_PX, y: cy * CHUNK * TILE_PX, size: CHUNK * TILE_PX, slot })
       }
     }
   }
 
-  /** Show only chunks overlapping the view rect (world pixels). */
-  cull(viewX: number, viewY: number, viewW: number, viewH: number): void {
+  /** Show only chunks overlapping the view rect (world pixels) AND on the
+   * viewer's storey `slot`. The storey mask is not an optimisation: at the
+   * widest zoom the screen spans more than a storey plus its gutter, so view
+   * culling alone would draw the next storey beside this one (stairs spec R3).
+   * Hidden chunks stay built — a storey change is a visibility flip. */
+  cull(viewX: number, viewY: number, viewW: number, viewH: number, slot = 0): void {
     for (const chunk of this.chunks) {
       chunk.container.visible =
-        chunk.x < viewX + viewW && chunk.x + chunk.size > viewX && chunk.y < viewY + viewH && chunk.y + chunk.size > viewY
+        chunk.slot === slot &&
+        chunk.x < viewX + viewW &&
+        chunk.x + chunk.size > viewX &&
+        chunk.y < viewY + viewH &&
+        chunk.y + chunk.size > viewY
     }
   }
 }

@@ -39,6 +39,10 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  * interpreted. Independent of `WorldJson.v` (which serialize.ts owns): a version
  * mismatch here discards the save and starts a fresh run rather than crashing.
  *
+ * 3 — storeys (docs/design/stairs-and-storeys.md). Complex floors gained a
+ *     loft slot in the level atlas, so a pre-storey complex-floor save would
+ *     already fail the levelChecksum and be dropped; the bump makes that
+ *     intent explicit and discards every pre-storey save cleanly.
  * 2 — the nine-item cull (banana/burger/chloroform/adrenaline/molotov/
  *     freezeGrenade/gasGrenade/bandage/medkit). A save written before it can
  *     hold those ids in a player's `loadout.inventory` and as `pickup.<id>`
@@ -51,7 +55,7 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  *     be interpreted, not in its shape.
  * 1 — initial.
  */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 /** Versioned on-disk wrapper around a WorldJson snapshot. */
 export interface SaveEnvelope {

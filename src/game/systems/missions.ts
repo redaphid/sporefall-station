@@ -1,4 +1,5 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
+import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
 import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
@@ -250,6 +251,7 @@ const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; 
     if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
     if (tx === sx && ty === sy) continue
     if (tx === w.level.exit.x && ty === w.level.exit.y) continue
+    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     return { tx, ty }
   }
   return null
@@ -402,7 +404,7 @@ const raiseStationAlert = (w: World, focus: Entity): void => {
   w.mission.bossAggroTriggered = true
   w.mission.alertTick = w.tick
   w.mission.alertFocusId = focus.id
-  w.mission.alertMark = { x: focus.pos.x, y: focus.pos.y }
+  w.mission.alertMark = groundAnchor(w.level, focus.pos.x, focus.pos.y)
   const hunters = w.entities.filter((e) => e.ai && !e.dead && !e.playerCtl).length
   w.events.push({ type: 'stationAlert', focusId: focus.id, doorsOpened, hunters })
 }
@@ -429,7 +431,9 @@ const broadcastAlert = (w: World): void => {
   const live = focus && !focus.dead && !focus.playerCtl?.downed ? focus : nearestLivePlayer(w)
   if (!live) return
   w.mission.alertFocusId = live.id
-  w.mission.alertMark = { x: live.pos.x, y: live.pos.y }
+  // An intruder upstairs is called out at the foot of the stairs: the hunt
+  // (ground-storey crew, Phase 1) converges on the stairwell, never the gutter.
+  w.mission.alertMark = groundAnchor(w.level, live.pos.x, live.pos.y)
 }
 
 /** The nearest-to-nothing live, standing player — the manhunt's fallback focus. */
@@ -569,6 +573,7 @@ export const nextFloor = (w: World): void => {
     p.prevPos.y = p.pos.y
     p.vel.x = 0
     p.vel.y = 0
+    delete p.stairLock // a fresh floor has fresh stairs
     if (p.health) {
       p.health.hp = Math.max(p.health.hp, Math.floor(p.health.max / 2))
       // Fresh-floor landing gets the same spawn grace as a fresh run.

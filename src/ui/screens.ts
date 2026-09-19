@@ -1,4 +1,5 @@
 import type { RenderView } from '../app/session'
+import { cameraRect, onViewerStorey } from '../game/stairs'
 import { MODS } from '../game/data/mods'
 import { themeDisplayName } from '../render/themeState'
 import { bossBar, bossRevealName, latchBossId } from './bossModel'
@@ -233,7 +234,11 @@ export const createScreens = (
     if (view.self) {
       for (const e of view.entities) {
         if (!e.playerCtl || e === view.self || e.dead) continue
-        teammates.push({ playerId: e.playerCtl.playerId, x: e.pos.x, y: e.pos.y, downed: !!e.playerCtl.downed })
+        // A teammate on another storey is pointed at where they stand in plan
+        // (their local position on OUR storey) with a ▲/▼ badge — never at the
+        // gutter between atlas slots (stairs.ts onViewerStorey).
+        const at = view.self ? onViewerStorey(view.level, view.self.pos.x, e.pos) : { ...e.pos, dz: 0 }
+        teammates.push({ playerId: e.playerCtl.playerId, x: at.x, y: at.y, downed: !!e.playerCtl.downed, dz: at.dz })
       }
     }
     // Solo (no teammates) or no camera to project with → clear and bail cheaply.
@@ -252,12 +257,12 @@ export const createScreens = (
     // edge arrow is still the right tool for someone you cannot see.
     const markers = locatorMarkers(view.self.pos, teammates, {
       ...cam,
-      levelW: view.level.w,
-      levelH: view.level.h,
-    }).filter((m) => !m.onScreen)
+      ...cameraRect(view.level, view.self.pos.x),
+    }).filter((m) => !m.onScreen || m.dz !== 0) // off-storey: no feet ring to stand in for it
+    
     // Cheap change-detection (like the HUD): skip DOM writes when nothing moved.
     const key = markers
-      .map((m) => `${m.playerId}:${m.onScreen ? 'o' : 'e'}${Math.round(m.sx)},${Math.round(m.sy)}:${m.angle.toFixed(2)}:${m.dist}:${m.color}`)
+      .map((m) => `${m.playerId}:${m.label}:${m.onScreen ? 'o' : 'e'}${Math.round(m.sx)},${Math.round(m.sy)}:${m.angle.toFixed(2)}:${m.dist}:${m.color}`)
       .join('|')
     if (key === lastLocator) return
     lastLocator = key

@@ -33,6 +33,14 @@ export const Tile = {
   /** Bog seep — swamp water that has found its way onto the deck (the station
    * is sinking). Walkable shallows; the flooded biome's signature. */
   Bog: 15,
+  // ── Stairs (docs/design/stairs-and-storeys.md) ───────────────────────────────
+  // Appended for the same reason: ids never renumber. Both are WALKABLE (not
+  // wall-family), and neither is `isFloorTile`, so furniture, loot and spawns
+  // skip them without being told.
+  /** The lower end of a stair shaft: stepping on it climbs to the storey above. */
+  StairUp: 16,
+  /** The upper end of a stair shaft: stepping on it descends to the storey below. */
+  StairDown: 17,
 } as const
 export type TileId = (typeof Tile)[keyof typeof Tile]
 
@@ -223,6 +231,45 @@ export const THEMES: readonly Theme[] = [
 /** Deterministic theme for a floor (1-based); consecutive floors always differ. */
 export const themeForFloor = (floor: number): Theme => THEMES[(floor - 1) % THEMES.length]
 
+/** Is this tile either end of a stair shaft? */
+export const isStairTile = (t: number): boolean => t === Tile.StairUp || t === Tile.StairDown
+
+// ── The storey atlas (docs/design/stairs-and-storeys.md §1.1) ──────────────────
+// Every storey of a floor sits side by side in the ONE Level grid, separated by
+// a 16-tile solid Hull gutter. Slot 0 (x 0..63) is always the ground storey.
+// A storey is a pure function of position — no entity field, wire bit or
+// serialized field — and every perception range in the sim (LOS, noise 12,
+// fear 5, net interest 14) is shorter than the gutter, so nothing leaks across.
+/** Tiles per storey side (the ground generators' map size). */
+export const STOREY_SIZE = 64
+/** Solid Hull between two storeys, wider than any sim perception range. */
+export const STOREY_GUTTER = 16
+/** Atlas x distance between the origins of two consecutive storey slots. */
+export const STOREY_STRIDE = STOREY_SIZE + STOREY_GUTTER
+
+/** One storey of a floor: which atlas slot holds it and its height `z`
+ * (0 = ground, +1 = the storey above it). `ox` is the slot's atlas x origin. */
+export interface Storey {
+  slot: number
+  z: number
+  kind: 'ground' | 'upper' | 'tower' | 'basement'
+  ox: number
+}
+
+export type StairDir = 'n' | 'e' | 's' | 'w'
+
+/** One direction of a stair shaft, in ATLAS coords: standing on `from` moves a
+ * body to `landing` (the tile in front of `to`, the matching stair tile on the
+ * other storey). The pair A->B and B->A are two links. `dir` is the shaft's
+ * open side, the same on both storeys. Arrival is on the landing, never on the
+ * stair tile. */
+export interface StairLink {
+  from: { x: number; y: number }
+  to: { x: number; y: number }
+  landing: { x: number; y: number }
+  dir: StairDir
+}
+
 export interface Level {
   w: number
   h: number
@@ -245,6 +292,12 @@ export interface Level {
    * switch the complex-aware systems (populate, complexDirector, render) key
    * off. Regenerated from seed+floor, never serialized. */
   complex?: ComplexInfo
+  /** The storeys of this floor (levelgen/storeys.ts). Absent means a single
+   * storey — every city floor, and a complex floor the structural rule gave no
+   * loft. Regenerated from seed+floor, never serialized. */
+  storeys?: Storey[]
+  /** Stair links, one per direction (see StairLink). Present with `storeys`. */
+  stairs?: StairLink[]
 }
 
 /** Indoor biome — how a complex floor looks and what crawls out of its vents. */

@@ -26,6 +26,7 @@
 // the renderer's draw code is untouched.
 
 import type { RenderView } from '../app/session'
+import { cameraRect } from '../game/stairs'
 import type { Annotation } from '../game/types'
 import { visibleAnnotations } from '../game/annotations'
 import { pickNearestEntity, pickRadiusAt, clearSelection, setSelected, selectedEntities } from '../game/select'
@@ -159,7 +160,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
 
   const camState = (view: RenderView): CameraState | undefined => {
     const cam = cameraSource?.()
-    return cam ? { ...cam, levelW: view.level.w, levelH: view.level.h } : undefined
+    return cam ? { ...cam, ...cameraRect(view.level, view.self?.pos.x ?? cam.x) } : undefined
   }
 
   const close = (): void => {

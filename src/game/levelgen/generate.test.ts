@@ -39,7 +39,7 @@ describe('generateLevel', () => {
       exits.add(`${level.exit.x},${level.exit.y}`)
       // Spawn/exit always sit on opposite sides of the map.
       const far = Math.hypot(level.spawn.x - level.exit.x, level.spawn.y - level.exit.y)
-      expect(far).toBeGreaterThan(level.w / 2)
+      expect(far).toBeGreaterThan(level.h / 2) // the map, not the storey atlas
     }
     expect(spawns.size).toBeGreaterThan(1)
     expect(exits.size).toBeGreaterThan(1)

@@ -32,6 +32,7 @@
 // answerable from the entity's own JSON (debug verbs `ai`, `behaviors`).
 
 import { NPCS } from '../data/npcs'
+import { sameStorey } from '../stairs'
 import type { Entity } from '../entity'
 import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, stationAlerted, type FearPulse, type World } from '../world'
@@ -232,6 +233,9 @@ const pursueMemory: Consideration = (w, e) => {
   // starts is a chase that is seen through.
   const leash = ai.sightRange * (stationAlerted(w) ? ALERT_LEASH : LEASH)
   if (!t || t.dead || dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) > leash) return []
+  // A quarry that took the stairs is gone from this storey (Phase 1: NPCs never
+  // climb). The chase ends; the ordinary cold-trail search takes over.
+  if (!sameStorey(t.pos.x, e.pos.x)) return []
   return [{ code: PURSUE, score: MEMORY_SCORE, tier: TIER_MEMORY, target: ai.targetId }]
 }
 

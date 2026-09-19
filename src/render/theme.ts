@@ -98,6 +98,13 @@ export const TILE_NAMES = [
   'plating',
   'hull',
   'bog',
+  // Stairs (docs/design/stairs-and-storeys.md §4): authored facing NORTH (the
+  // niche at the top, open side south); the tilemap rotates them per shaft.
+  'stair_up',
+  'stair_down',
+  // Not a tile of its own: `tile.landing.overlay` is the chevron decal laid on
+  // the deck tile in front of a stair.
+  'landing',
 ] as const
 
 /** Wall-family tile names that take an autotiled cap (render/wallCaps.ts):

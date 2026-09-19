@@ -229,6 +229,13 @@ export interface Entity {
    * pre-existing snapshot round-trips byte-for-byte. */
   mount?: 'wall'
 
+  /** Stair hysteresis (stairs.ts `stairStep`): set by a climb, held while the
+   * body stands on the stair or near its landing (the 3x3), cleared once it
+   * steps clear — so holding "forward" after arriving can't bounce it
+   * straight back. Omitted when clear, so every pre-stairs snapshot
+   * round-trips byte-for-byte. */
+  stairLock?: true
+
   health?: {
     hp: number
     max: number

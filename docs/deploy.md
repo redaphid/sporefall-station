@@ -167,11 +167,18 @@ both compiles.
 > merged for this reason; if you are about to add one, this note is why you
 > should not.
 >
-> **Use a separately-named Worker instead.** Deploy with a config whose `name`
-> differs from `sporefall-station` (so it cannot resolve to the production
-> script) and give it a custom hostname on a zone that is *not* Access-gated,
-> so a signed-out phone can load it. Such a config must not read or rewrite
-> production's config, routes or hostname.
+> **What replaced it: `/betas/<slug>/` (section E below).** The beta build is
+> uploaded to a KV namespace and served by the production Worker off a path on
+> the already-working custom domain, so there is no workers.dev hostname in the
+> picture and nothing for Access to intercept. Proxying *to* a version preview
+> from the Worker does not help either — the subrequest hits the same wall, and
+> minting a service token needs Zero Trust scope this project's credentials do
+> not have and must not be given.
+>
+> (The other escape hatch, if a whole separate Worker is ever wanted: deploy
+> with a config whose `name` differs from `sporefall-station`, on a hostname in
+> a zone that is not Access-gated. Such a config must not read or rewrite
+> production's config, routes or hostname. Nothing needs it today.)
 
 ### Verifying a deploy — never by loading the root
 
@@ -426,6 +433,101 @@ Cloudflare Workers" template already covers the KV binding, so deploys need no n
 secret.
 
 ---
+
+## E. Betas (per-branch builds at `/betas/<slug>/`)
+
+A beta is a full build of a branch, served from
+`https://sporefall.hypnodroid.com/betas/<slug>/` so the owner can *play* a
+branch before it merges. It is an **upload, not a deploy** — same model as
+review images (section D), and for the same reason: it has to be reachable
+before the PR lands.
+
+```bash
+BETA_SLUG=feat/sequenced-mods pnpm run build   # build with the beta base path
+pnpm run beta:publish                          # upload dist/ to KV, print the URL
+# → https://sporefall.hypnodroid.com/betas/sequenced-mods/
+```
+
+CI does both on every push to a `preview/**` branch (`preview-web.yml`) and
+prints the URL in the job summary. `/betas/` lists everything published.
+
+### The slug
+
+`src/app/betaSlug.ts` owns the rule, and **everything** imports it from there —
+the Vite config, the publish script, the Worker, and the running game. Take the
+branch's **last `/`-separated segment**, lowercase it, collapse every run of
+non-alphanumerics to a single `-`, trim leading/trailing dashes, cut to 40
+characters:
+
+| branch | slug |
+|---|---|
+| `feat/sequenced-mods` | `sequenced-mods` |
+| `preview/Betas Path!` | `betas-path` |
+| `release/v1.2.3` | `v1-2-3` |
+| `fix/foo/bar` | `bar` |
+| `feat/___` | *(refused — nothing publishable)* |
+
+Only the last segment survives, so `feat/x` and `preview/x` share a slug and the
+second publish wins. That is the deliberate trade for a URL a human can type;
+the `/betas/` listing shows each beta's **full branch name**, which is the only
+place such a collision is visible.
+
+### The three traps, and what defends against each
+
+1. **The asset base.** Vite has no `base` by default, so a normal build's
+   index.html asks for `/assets/index-<hash>.js` at the ROOT. Served under
+   `/betas/foo/`, that request leaves the beta entirely and is answered by
+   **production's** bundle: HTTP 200, the branch's URL, the live game's code.
+   Defence: `BETA_SLUG` makes `vite.config.ts` set `base`, and
+   `scripts/publish-beta.mts` **refuses to upload** a `dist/index.html` that
+   does not reference `/betas/<slug>/assets/`.
+2. **The SPA fallback.** `not_found_handling: "single-page-application"` answers
+   every unknown path with 200 + production's index.html. Defence: `/betas` and
+   `/betas/*` are in `run_worker_first`, and `src/worker/betas.ts` never calls
+   `env.ASSETS` — a deep link falls back to *that beta's own* index.html, and a
+   missing hashed chunk is a plain-text 404.
+3. **The service worker.** Production's worker has scope `/`, so it sits in
+   front of every same-origin navigation. Defence: `/betas/` is in
+   `SW_NAVIGATE_FALLBACK_DENYLIST` (`src/app/swConfig.ts`) so an installed PWA
+   does not answer a beta URL out of production's precache. A beta build ships
+   **no service worker of its own** (vite disables it; `shouldRegisterSw`
+   refuses independently), because registering one from a branch would take over
+   the live game for whoever reviewed it.
+
+`/betas/` is in the denylist of a service worker that is only updated by a
+**production deploy**, so an already-installed player may need one deploy of
+`main` before beta URLs behave for them.
+
+### Multiplayer
+
+`/ws/:room` keys a Durable Object by room name, and the sim is deterministic
+with an authoritative host — so a beta peer and a production peer in the same
+room do not see a version warning, they **desync**, and it reads as a bad
+network. A beta build therefore namespaces its rooms: `?room=car` becomes
+`sequenced-mods~car` (`namespaceRoom`). Two players on the same beta still meet.
+Proven against the real relay by `pnpm run e2e:beta:rooms`.
+
+### Verifying a beta — never by loading the root
+
+Same rule as section "Verifying a deploy", plus one beta-specific header:
+
+```bash
+curl -sI https://sporefall.hypnodroid.com/betas/<slug>/ | grep -i 'x-beta-slug'
+# expect: x-beta-slug: <slug>   (absent = you are looking at production)
+curl -s  https://sporefall.hypnodroid.com/betas/<slug>/ | grep -o 'src="/[^"]*"'
+# expect: src="/betas/<slug>/assets/index-<hash>.js"   (src="/assets/… = wrong build)
+```
+
+`x-beta-slug` exists precisely because a 200 proves nothing on this origin.
+
+### Housekeeping
+
+Betas are permanent until removed. To drop one:
+
+```bash
+pnpm exec wrangler kv key list --binding BETAS --prefix 'b/<slug>/' --remote
+# …then `kv bulk delete` that list, plus the `i/<slug>` index entry.
+```
 
 ## Sources
 

@@ -12,6 +12,31 @@ import {
   SW_TAKEOVER,
 } from './src/app/swConfig'
 import { SITE_ORIGIN } from './capacitor.config'
+import { BETAS_PREFIX, slugifyBranch } from './src/app/betaSlug'
+
+// BETA BUILD SWITCH. `BETA_SLUG=<branch name> pnpm run build` produces a bundle
+// meant to be served from https://<origin>/betas/<slug>/ instead of the root —
+// see src/worker/betas.ts and docs/deploy.md § "Betas".
+//
+// THIS IS THE LOAD-BEARING LINE OF THE WHOLE FEATURE. Vite has no `base` by
+// default, so a normally-built bundle's index.html asks for `/assets/index-<hash>.js`
+// at the ROOT. Served under /betas/foo/, that request leaves the beta's path
+// entirely and is answered by PRODUCTION's assets — a 200, the right-looking
+// page, and the wrong JavaScript. Nothing about the response says so. Setting
+// `base` rewrites those references to /betas/foo/assets/…, which is exactly what
+// the beta CI job asserts on the built index.html before it publishes anything.
+//
+// The value goes through the same slugifyBranch() the publish script and the
+// Worker use, so the path baked into the bundle cannot disagree with the path
+// its bytes were stored under. A BETA_SLUG that sanitizes to nothing is a hard
+// failure: silently building a root-based bundle here is the bug.
+const betaSlug = ((): string | null => {
+  const raw = process.env.BETA_SLUG ?? ''
+  if (raw.trim() === '') return null
+  const slug = slugifyBranch(raw)
+  if (slug === null) throw new Error(`BETA_SLUG=${JSON.stringify(raw)} does not sanitize to a usable beta slug`)
+  return slug
+})()
 
 // Baked into the bundle at build time so the running CODE can show its own
 // version. A simple INCREMENTING INTEGER (the git commit count) so it's obvious
@@ -31,6 +56,11 @@ const appVersion = (() => {
 })()
 
 export default defineConfig({
+  // '/' for production; '/betas/<slug>/' for a beta build. import.meta.env.BASE_URL
+  // carries it into the bundle, which is where src/app/betaSlug.ts reads it back
+  // out to namespace multiplayer rooms — one value, so the assets and the rooms
+  // can never disagree about which build this is.
+  base: betaSlug === null ? '/' : `${BETAS_PREFIX}${betaSlug}/`,
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
     // The origin this bundle is DEPLOYED to. The browser rarely needs it
@@ -48,6 +78,15 @@ export default defineConfig({
     // so it can be skipped on native, where a SW would cache the old web bundle
     // and fight the OTA updater.
     VitePWA({
+      // NO SERVICE WORKER IN A BETA BUILD. A service worker's blast radius is
+      // its scope, and a beta is same-origin with the live game: a sw.js served
+      // from /betas/<slug>/ could only ever fight the production worker for the
+      // player's cache, and the registration call asks for scope '/' anyway
+      // (src/app/pwa.ts), which would let a branch build hijack production for
+      // an installed player. Not generating one at all is the only version of
+      // this with no sharp edge; src/app/pwa.ts independently refuses to
+      // register under a beta base, so neither half alone can cause it.
+      disable: betaSlug !== null,
       // 'prompt', not 'autoUpdate': the browser must NOT activate a new worker
       // on its own. src/app/webUpdate.ts downloads in the background and swaps
       // at a safe moment (src/app/updatePolicy.ts) — the player still never

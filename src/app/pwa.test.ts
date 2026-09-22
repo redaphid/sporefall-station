@@ -7,10 +7,12 @@ import { shouldRegisterSw, SW_UPDATE_INTERVAL_MS, type PwaEnv } from './pwa'
 //   - registering on native => the SW precaches the old web bundle and silently
 //     out-votes Capgo OTA, so phones can never update;
 //   - refusing to register on the web => the PWA is online-only, which is the
-//     exact regression this module exists to fix.
+//     exact regression this module exists to fix;
+//   - registering from a BETA build => the registration asks for scope '/', so a
+//     branch build would take over the live game for whoever reviewed it.
 // So sweep the whole truth table rather than spot-checking the happy path.
 
-const env = (o: Partial<PwaEnv>): PwaEnv => ({ native: false, supported: true, prod: true, ...o })
+const env = (o: Partial<PwaEnv>): PwaEnv => ({ native: false, supported: true, prod: true, beta: false, ...o })
 
 describe('shouldRegisterSw', () => {
   it('registers for a production web build with service-worker support', () => {
@@ -29,12 +31,18 @@ describe('shouldRegisterSw', () => {
     expect(shouldRegisterSw(env({ supported: false }))).toBe(false)
   })
 
-  it('exhaustively: true only when web AND supported AND prod', () => {
+  it('never registers from a beta build — scope \'/\' would hijack production', () => {
+    expect(shouldRegisterSw(env({ beta: true }))).toBe(false)
+  })
+
+  it('exhaustively: true only when web AND supported AND prod AND not a beta', () => {
     const bools = [false, true]
     for (const native of bools) {
       for (const supported of bools) {
         for (const prod of bools) {
-          expect(shouldRegisterSw({ native, supported, prod })).toBe(!native && supported && prod)
+          for (const beta of bools) {
+            expect(shouldRegisterSw({ native, supported, prod, beta })).toBe(!native && supported && prod && !beta)
+          }
         }
       }
     }

@@ -15,4 +15,11 @@ export interface Env {
    * (30-day TTL vs permanent), different writer (the running game vs a local
    * script), and different blast radius if one ever needs purging. */
   WORLDS: KVNamespace
+  /** Per-branch beta BUILDS served at /betas/<slug>/ — see betas.ts. A whole
+   * Vite `dist/` per branch, so this namespace is by far the largest and the
+   * most disposable of the three: deleting every key in it costs a re-push of
+   * the branch, while the same act on REVIEW_IMAGES breaks published PR bodies
+   * and on WORLDS breaks shared `?state=` links. That difference in blast
+   * radius is why it is its own namespace and not a key prefix on one of them. */
+  BETAS: KVNamespace
 }

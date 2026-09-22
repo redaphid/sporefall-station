@@ -38,12 +38,13 @@
     // *.test.ts (incl. *.adversarial.test.ts, *.behavior.test.ts) — no *.spec.ts.
     "src/**/*.test.ts",
 
-    // --- Cloudflare Pages Functions -----------------------------------------
-    // functions/ota/check.ts is FILE-ROUTED: Pages maps the path to the route
-    // POST /ota/check and calls the exported onRequestPost/onRequestGet by
-    // convention. Nothing imports it — the only link is a runtime URL string in
-    // capacitor.config.ts (otaUpdateUrl). Invisible to static analysis.
-    "functions/**/*.ts",
+    // --- The Cloudflare Worker ----------------------------------------------
+    // NOT listed, deliberately. The OTA endpoint used to be a file-ROUTED Pages
+    // Function under functions/, which nothing imports and which therefore had
+    // to be an entry. It is now a Worker: wrangler.jsonc names src/worker/
+    // index.ts as `main`, and Knip's wrangler plugin reads that, so a hand-
+    // listed entry here would be redundant — and the stale functions/**/*.ts
+    // glob that outlived the migration was reported as matching nothing.
 
     // --- Debug tooling entry points (tools/) --------------------------------
     // Standalone programs run as `npx tsx <path>` (see docs/ and the
@@ -55,6 +56,16 @@
     "tools/debug-cli/cli.ts",
     "tools/mcp-debug/server.ts",
     "tools/debug-harness/host.ts",
+    // Same class: the live-play observation recorder, run as
+    // `npx tsx tools/observer/recorder.ts` (see .claude/skills/observer). Its
+    // pure core (digest.ts) is unit-tested by digest.test.ts under a STANDALONE
+    // vitest config — the root config's test.include is src/** only — which is
+    // invoked by hand as `pnpm exec vitest run --config tools/observer/
+    // vitest.config.ts`. Knip's vitest plugin only ever sees the root config,
+    // so that second config is reached by nothing and has to be named here too.
+    "tools/observer/recorder.ts",
+    "tools/observer/vitest.config.ts",
+
     // NB: tools/debug-client.ts is deliberately NOT listed. It's a library
     // (connectDebugger), imported by scripts/test/*.ts — Knip traces it from
     // those entries. If it ever stops being imported, it SHOULD get flagged.
@@ -92,7 +103,6 @@
     "tools/**/*.ts",
     "scripts/test/**/*.{ts,mts,mjs}",
     "e2e/**/*.mjs",
-    "functions/**/*.ts",
     "*.{ts,js}"
   ],
 
@@ -108,6 +118,16 @@
   // installs it with apt (see .github/workflows/web-e2e.yml); it will never
   // appear in package.json, so Knip must be told not to expect it there.
   "ignoreBinaries": ["ffmpeg"],
+
+  // `cloudflare:workers` (src/worker/roomDO.ts imports DurableObject from it) is
+  // a workerd RUNTIME built-in, the same shape as `node:fs` — the module is
+  // supplied by the edge runtime, its types come from @cloudflare/workers-types,
+  // and there is no npm package named `cloudflare` to depend on. Knip strips the
+  // `cloudflare:` prefix and looks for that package in package.json, so without
+  // this it reports an unlisted dependency that must never be installed. The
+  // caveat at the top of this file still holds for everything else: if you are
+  // adding a name below, first check the real fix is not a missing entry.
+  "ignoreDependencies": ["cloudflare"],
 
   // Report an export only when NOTHING anywhere imports it. Without this, a
   // `export const ENGAGE_RANGE` that its own module uses gets reported purely

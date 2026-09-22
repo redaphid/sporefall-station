@@ -12,7 +12,6 @@
 // fallback (enforced by test in `modColors.test.ts`). Lightness is varied
 // between neighbours so adjacent-hue pairs stay separable.
 
-import { MODS } from '../game/data/mods'
 
 /** Neutral slate used for any mod id with no explicit colour (a brand-new mod
  * added to the registry before its swatch is chosen). Deliberately a desaturated
@@ -49,7 +48,3 @@ export const MOD_PICKUP_COLORS: Record<string, number> = {
 /** Pure mod-id -> colour. Returns the mod's unique gem colour, or the neutral
  * fallback for any id absent from the table (e.g. a newly-registered mod). */
 export const modPickupColor = (id: string): number => MOD_PICKUP_COLORS[id] ?? MOD_PICKUP_FALLBACK
-
-/** The set of registered mod ids the palette must cover — exported so a test can
- * assert full coverage without re-importing the sim registry there. */
-export const modIds = (): string[] => Object.keys(MODS)

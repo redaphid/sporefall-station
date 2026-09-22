@@ -222,23 +222,6 @@ const num = (s: string | undefined, what: string): number => {
   return n
 }
 
-/** The session/lobby/record verbs, in addition to the world verbs. */
-export const SESSION_VERBS = new Set([
-  'create',
-  'join_bot',
-  'remove_bot',
-  'start_run',
-  'lobby',
-  'phase',
-  'input',
-  'tick',
-  'record_start',
-  'record_stop',
-  'save',
-  'load',
-  'replay',
-])
-
 /**
  * Route one verb line against a harness. Session verbs are handled here; any
  * other verb falls through to the world surface so `entities`/`get`/`set`/… keep

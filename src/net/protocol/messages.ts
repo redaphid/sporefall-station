@@ -18,7 +18,9 @@ import { MsgType } from '../types'
  * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
  * the floor). They name content that no longer exists, and a dead-code tool
  * will call them unused. They are CLAIMED, not unused — the same argument as
- * `BLE_LOBBY_INFO_UUID`'s `@protocolReservation` in net/types.ts.
+ * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
+ * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag
+ * on ARCHETYPES, which then reported the tag itself as unused.)
  *
  * The index IS the wire format. `encodeSnapshot` writes the position
  * (`archetypeIndex.get(a) ?? 0`) and `decodeSnapshot` reads it back positionally

@@ -25,25 +25,40 @@ const THROW_COOLDOWN = 20
 // populate.ts) — this removes only what the corpse leaves BEHIND, and with it
 // the `w.rng.chance` draw that used to happen inside `kill`.
 
-/** Interaction-matrix rule: a solid IMPACT on a frozen body shatters it — an
- * instant kill regardless of the blow's damage, clearing the frost. Only impact
- * (this path) shatters; damage-over-time never routes through here, so a frozen
- * agent burned to death by fire dies normally and does not shatter. Grounded in
- * StatusEffects.cs (frozen death → IceGib) + the frozen one-hit backstab. */
-const shatter = (w: World, target: Entity): void => {
-  removeStatus(target, 'frozen')
-  target.health!.hp = 0
-  // A frozen PLAYER shattering must DOWN them (via kill's player path), NOT
-  // gib-vanish: skip the `shattered` flag and the ice-gib event so they stay a
-  // visible, revivable downed body instead of disappearing from the snapshot.
-  if (target.playerCtl) {
-    kill(w, target)
-    return
-  }
-  target.shattered = true
-  w.events.push({ type: 'shatter', x: target.pos.x, y: target.pos.y, entityId: target.id })
-  kill(w, target)
-}
+/** Interaction-matrix rule: a solid IMPACT on a frozen body SHATTERS the ice —
+ * the frost breaks and the blow lands multiplied by this. Only impact (this
+ * path) shatters; damage-over-time never routes through here, so a frozen agent
+ * burned to death by fire dies normally and does not shatter. Grounded in
+ * StatusEffects.cs (frozen death → IceGib) + the frozen one-hit backstab.
+ *
+ * It used to be an INSTANT KILL regardless of the blow's damage, and that is the
+ * bug this number replaces. An execute keyed on a status rather than on a health
+ * pool does not scale: measured through the real damage path with the 14-dmg
+ * pistol (scripts/test/freeze-shatter-probe.mts), *every* body in the game died
+ * in two shots — shot 1 freezes, shot 2 executes. The 320 hp Mireclaw Alpha went
+ * from 30 shots / 17.4 s to 2 shots / 0.6 s, a 29x cut; the 95 hp brute 19 → 2;
+ * the 120 hp hivespire 12 → 2. One rare mod deleted the entire hp axis of the
+ * game's balance, boss phases included.
+ *
+ * A MULTIPLIER on the blow, not a flat payload, because damage in this engine is
+ * already a pipeline — resist affinity, rally, the barrel's damage threshold,
+ * lifesteal's payout — and a multiplied blow stays inside it. Three things fall
+ * out for free: armour still means something (a brute eats 0.35 of the amplified
+ * hit exactly as of a normal one), a heavier weapon shatters harder (a
+ * sledgehammer's 26 beats a pistol's 14, which is what "a SOLID impact" should
+ * mean), and lifesteal is bounded by construction — it pays on 5x a bullet, not
+ * on the victim's whole 320 hp lifebar, which is the exploit the old instant-kill
+ * return contract had to be hand-written to dodge.
+ *
+ * 5x is tuned off the grunt line, and it is a knob the owner should feel free to
+ * turn. Pistol 14 → 70 on the shatter, on top of the 14 the freezing shot
+ * already dealt: 84 across two shots, so everything up to ~84 effective hp still
+ * pops in two (thug 40, cop 60, mender 44, lobber 58, breacher 62) and the
+ * ice-gib death still plays. Above that it is a big bite, not an execute:
+ * bouncer 90 and bellwether 90 survive on a sliver, brute 95 keeps 65, hivespire
+ * 120 keeps 61, and the boss keeps 256 of 320 — frost is worth bringing to a
+ * boss (it roughly halves the fight) without being the boss's off switch. */
+export const SHATTER_DAMAGE_MULT = 5
 
 /**
  * Resolve one blow. Returns the damage ACTUALLY APPLIED, or `null` if the blow
@@ -85,48 +100,36 @@ export const applyDamage = (
   if (!target.health || target.dead || target.health.iframes > 0) return null
   if (target.playerCtl?.downed) return null // downed players are out of the fight, not a piñata
   if (isRolling(target, w.tick)) return null // dodge-roll i-frames: roll THROUGH bullets/melee
-  // A frozen body shatters on impact — but NOT a player. The shatter rule is an
-  // instant kill regardless of the blow's damage, and a player has no answer to
-  // it: freeze is applied BY enemies (freeze ray / freeze grenade, 120 ticks =
-  // four seconds) and immobilizes completely, so the sequence "enemy freezes
-  // you, any enemy touches you, you are downed" is unavoidable and reads as
-  // dying in one hit. Harmless while the station ignored you; lethal now the
-  // alert escalation sends the whole floor at you at once.
+  // A frozen body SHATTERS on impact — but NOT a player. The frost breaks either
+  // way; what differs is what the blow is worth.
+  //
+  // A player has no answer to an amplified blow: freeze is applied BY enemies
+  // (freeze ray / freeze grenade, 120 ticks = four seconds) and immobilizes
+  // completely, so the sequence "enemy freezes you, any enemy touches you, you
+  // are downed" is unavoidable and reads as dying in one hit. Harmless while the
+  // station ignored you; lethal now the alert escalation sends the whole floor
+  // at you at once.
   //
   // So for a player the impact CRACKS THE ICE instead: the freeze breaks and the
-  // blow lands as ordinary damage. Costs you tempo and a hit, not the run. The
-  // anti-chain-lock guard in statusFx then grants its usual post-immobilize
-  // immunity, so you cannot be instantly re-frozen either.
+  // blow lands as ORDINARY damage, unmultiplied. Costs you tempo and a hit, not
+  // the run. The anti-chain-lock guard in statusFx then grants its usual
+  // post-immobilize immunity, so you cannot be instantly re-frozen either.
   //
-  // Enemies still shatter, so freeze remains a genuine execute when YOU throw it.
+  // Everything else takes the blow times SHATTER_DAMAGE_MULT, and then keeps
+  // falling through the ordinary damage pipeline below — resist, rally, the
+  // object damage threshold, knockback, the hit event, the AI reaction, the
+  // death path. That fall-through is the point of the fix: a shatter is a very
+  // hard hit, not a separate lethality rule bolted alongside the hp system, so
+  // it cannot outrun an hp pool the way the old instant kill did, and every
+  // consumer downstream (lifesteal's payout, `destroyObject`'s loot and barrel
+  // explosion, `kill`'s downed/corpse handling) sees a normal, if large, blow.
+  let shattering = false
   if (isFrozen(target)) {
-    if (!target.playerCtl) {
-      // Reports the BLOW'S OWN damage — not zero, and emphatically not the
-      // corpse's hp pool. The distinction that matters here is damage DEALT
-      // versus lethality GRANTED: the bullet delivers its ordinary damage, and
-      // the ice then kills the body by a separate execute rule. You are paid for
-      // the former only.
-      //
-      // Three values were possible and only this one is right:
-      //   - the hp removed (~320 on the boss) would let a single lifesteal round
-      //     heal a whole lifebar off a grenade somebody else threw. Never
-      //     reachable before this contract existed, because the old lifesteal
-      //     read the BULLET (`p.damage`) rather than the victim — so it is a
-      //     hazard this return value could create, and it stays foreclosed.
-      //   - 0 is safe but overcorrects past what actually shipped, and it makes
-      //     frost + lifesteal a pair that silently pays nothing on every
-      //     execute: a combination the player deliberately assembled, punished
-      //     with no feedback.
-      //   - the blow's own resisted damage is bounded exactly like any normal
-      //     hit, and reproduces shipped behaviour: 14 dmg x 0.1304 frac = 1.83
-      //     healed against an unresisted body, identical to before. An armoured
-      //     one now pays less, which is the intended resist fix, not a
-      //     regression.
-      const dealt = Math.max(0, Math.round(amount * resistMult(target, 'physical')))
-      shatter(w, target)
-      return dealt
-    }
     removeStatus(target, 'frozen')
+    if (!target.playerCtl) {
+      shattering = true
+      amount *= SHATTER_DAMAGE_MULT
+    }
   }
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
   // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.
@@ -185,6 +188,15 @@ export const applyDamage = (
   commitCrime(w, target, w.byId.get(attackerId))
 
   if (target.health.hp <= 0) {
+    // The ice gib fires when the SHATTERING BLOW is the one that kills — not on
+    // every frozen death. A frozen body finished off by something else (fire DoT,
+    // a later unamplified shot after the frost already broke) dies as a corpse.
+    // `shattered` marks a body that left ice instead of a corpse, so it is for
+    // bodies only; an object's destruction visual is `destroyObject`'s business.
+    if (shattering) {
+      if (!isObject(target)) target.shattered = true
+      w.events.push({ type: 'shatter', x: target.pos.x, y: target.pos.y, entityId: target.id })
+    }
     if (isObject(target)) destroyObject(w, target, attackerId)
     else kill(w, target)
   }

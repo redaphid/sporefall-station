@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { addStatus, hasStatus } from './statusFx'
+import { addStatus, hasStatus, isFrozen } from './statusFx'
 import { addEntity, createWorld, type World } from '../world'
 import { spawnPlayer } from '../player'
 import { spawnObject } from './objects'
-import { applyDamage, kill, meleeAttack } from './combat'
+import { SHATTER_DAMAGE_MULT, applyDamage, kill, meleeAttack } from './combat'
 import { missionSystem } from './missions'
 import { buildSnapshot } from '../snapshot'
 import type { SimEvent } from '../types'
@@ -176,17 +176,29 @@ describe('kill — players go downed, everything else dies', () => {
   })
 })
 
-describe('shatter — frozen bodies gib on impact', () => {
+describe('shatter — frozen bodies take a multiplied blow', () => {
   let w: World
   beforeEach(() => {
     w = createWorld(1, 1)
   })
 
-  it('any impact on a frozen NPC is an instant kill regardless of damage, clearing frost', () => {
+  it('an impact on a frozen NPC lands x SHATTER_DAMAGE_MULT and clears the frost', () => {
     const e = npc(w, 20, 20)
     addStatus(w, e, 'frozen', 120)
     applyDamage(w, e, 1, 19, 20, 0, 99)
-    expect(e.health!.hp).toBe(0)
+    // A 1-damage poke is still a 5-damage poke: the ice multiplies the blow, it
+    // no longer substitutes for it. The old rule made this exact hit lethal.
+    expect(e.health!.hp).toBe(40 - SHATTER_DAMAGE_MULT)
+    expect(e.dead).toBeFalsy()
+    expect(e.shattered).toBeFalsy()
+    expect(events(w, 'shatter')).toHaveLength(0)
+    expect(isFrozen(e)).toBe(false)
+  })
+
+  it('a shattering blow big enough to kill gibs and emits the ice-gib event', () => {
+    const e = npc(w, 20, 20)
+    addStatus(w, e, 'frozen', 120)
+    applyDamage(w, e, 14, 19, 20, 0, 99)
     expect(e.dead).toBe(true)
     expect(e.shattered).toBe(true)
     expect(events(w, 'shatter')).toHaveLength(1)

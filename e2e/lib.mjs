@@ -10,6 +10,44 @@ export const OUT = process.env.E2E_OUT ?? join(__dirname, 'output')
 // Optional extra copy target (the parent shares these under a scratchpad dir).
 const SHARE = process.env.E2E_SHARE ?? ''
 const SIZE = { width: 1280, height: 720 }
+// Playwright ships its own ffmpeg, but that build is webm-only (no libx264), so
+// a machine without a system ffmpeg can still produce a real video — it just
+// stays webm. `E2E_FFMPEG` overrides the binary; `E2E_VIDEO=webm` skips the mux.
+const FFMPEG = process.env.E2E_FFMPEG ?? 'ffmpeg'
+const WANT_WEBM = process.env.E2E_VIDEO === 'webm'
+
+/**
+ * The browser these recordings drive.
+ *
+ * Default (CI, and any box with a working display-less setup): a headless
+ * chromium Playwright launches itself, exactly as before.
+ *
+ * `E2E_HEADFUL=1` launches the SAME chromium headed — the real compositor path,
+ * which is what a human actually sees. It needs a display; on a box whose
+ * display server is unusable (WSL2 with a wedged WSLg is the case that forced
+ * this), point `E2E_CDP` at an already-running headed browser's DevTools
+ * endpoint instead (e.g. a Windows-side `chrome.exe --remote-debugging-port=9333`,
+ * reachable from WSL when networkingMode=mirrored) and every recording runs in
+ * that real window. The connection is shared across recordings in one process,
+ * so the script — not `record()` — owns the browser's lifetime.
+ */
+let sharedBrowser = null
+export const acquireBrowser = async () => {
+  if (process.env.E2E_CDP) {
+    sharedBrowser ??= await chromium.connectOverCDP(process.env.E2E_CDP)
+    return { browser: sharedBrowser, shared: true }
+  }
+  return { browser: await chromium.launch({ headless: process.env.E2E_HEADFUL !== '1' }), shared: false }
+}
+
+/** Release a browser acquired above; shared (CDP) connections outlive the run. */
+export const releaseBrowser = async () => {
+  if (sharedBrowser) {
+    const b = sharedBrowser
+    sharedBrowser = null
+    await b.close().catch(() => {})
+  }
+}
 
 /**
  * Playwright's per-context webm → a real h264 mp4 in OUT, cleaning up after
@@ -32,10 +70,11 @@ export const muxVideo = (name, videoDir) => {
   const webmPath = join(OUT, `${name}.webm`)
   const mp4 = join(OUT, `${name}.mp4`)
   renameSync(join(videoDir, webm), webmPath)
-  execFileSync('ffmpeg', ['-y', '-i', webmPath, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-vf',
+  rmSync(videoDir, { recursive: true, force: true })
+  if (WANT_WEBM) return { mp4: webmPath, bytes: statSync(webmPath).size }
+  execFileSync(FFMPEG, ['-y', '-i', webmPath, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-vf',
     'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
     '-movflags', '+faststart', mp4], { stdio: 'ignore' })
-  rmSync(videoDir, { recursive: true, force: true })
   rmSync(webmPath, { force: true })
   return { mp4, bytes: statSync(mp4).size }
 }
@@ -66,7 +105,7 @@ export const record = async (spec) => {
   rmSync(videoDir, { recursive: true, force: true })
   mkdirSync(videoDir, { recursive: true })
 
-  const browser = await chromium.launch({ headless: true })
+  const { browser, shared } = await acquireBrowser()
   const context = await browser.newContext({ viewport: SIZE, recordVideo: { dir: videoDir, size: SIZE } })
   const page = await context.newPage()
   const errs = []
@@ -93,7 +132,7 @@ export const record = async (spec) => {
   const state = await page.evaluate(spec.readState)
   await page.close()
   await context.close()
-  await browser.close()
+  if (!shared) await browser.close()
 
   const { mp4, bytes } = muxVideo(spec.name, videoDir)
   const failures = [...spec.expect(state)]

@@ -244,6 +244,14 @@ export class NetClientSession implements Session {
   /** Hotbar slot tapped since the last input packet went out (-1 = none). Latched
    * so a tap between send-ticks isn't dropped — the host applies it as an edge. */
   private pendingHotbar = -1
+  /** Mod reorder tapped since the last input packet (undefined = none). Latched
+   * like `pendingHotbar` and shipped on the reliable lane. */
+  private pendingModSwap?: number
+  /** Mod casting rule the host announced in GameStart (absent = default fold). */
+  private modCasting?: 'sequence'
+  /** Local tick count when the newest snapshot landed, so the host's tick can
+   * be carried forward between snapshots (they arrive every few ticks). */
+  private tickAtSnap = 0
   private lastAckedSeq = 0
   /** Our OWN player's authoritative inventory, streamed by the host on change. */
   private localInv?: InventoryMsg
@@ -431,6 +439,7 @@ export class NetClientSession implements Session {
         const sameRun = start.seed === this.seed
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
+        this.modCasting = start.modCasting === 'sequence' ? 'sequence' : undefined
         // A GameStart while we are reconnecting normally replays the run we were
         // ALREADY in (the host repeats it after a ghost reclaim), so the level is
         // already live and snapshots resync the floor. But if the SEED changed,
@@ -537,6 +546,14 @@ export class NetClientSession implements Session {
    * client that missed the events entirely, which is how a snapshot self-heals
    * a client onto the right map.
    */
+  /** The host tick right now: the newest snapshot's tick carried forward by
+   * the local ticks since it landed (snapshots come every few ticks). Used only
+   * to count down host-tick deadlines on the HUD, such as a weapon recharge. */
+  private hostTickEstimate(): number {
+    if (this.lastSnapTick < 0) return 0
+    return this.lastSnapTick + Math.max(0, this.tickCount - this.tickAtSnap)
+  }
+
   private changeFloor(floor: number): void {
     if (floor <= this.floor) return
     this.floor = floor
@@ -565,6 +582,7 @@ export class NetClientSession implements Session {
     // duplicates included — and let the next real snapshot self-heal as before.
     if (this.lastSnapTick >= 0 && !isNewerTick(snap.tick, this.lastSnapTick)) return
     this.lastSnapTick = snap.tick
+    this.tickAtSnap = this.tickCount
     this.changeFloor(snap.floor) // guarded: only a DEEPER floor rebuilds the level
     // The wire carries a u16; `pendingInputs` holds unbounded counter values.
     // Lift before comparing, or every input looks unacked after 36 minutes.
@@ -676,6 +694,7 @@ export class NetClientSession implements Session {
     // Hotbar/Use are taps that can land on a non-send tick — latch them so the
     // next packet still carries the equip/throw instead of dropping it.
     if (cmd.hotbar >= 0) this.pendingHotbar = cmd.hotbar
+    if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
 
     // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
     // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
@@ -687,12 +706,17 @@ export class NetClientSession implements Session {
     // their held bit re-conveys intent on the next packet, and sustained fire would
     // otherwise flood the reliable FIFO every tick.
     if (this.tickCount % 2 === 0 && this.queue) {
-      const packet = encodeInput({ ...cmd, hotbar: this.pendingHotbar }, this.pendingEdges)
-      const hasPureEdge = this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0
+      const out: InputCmd = { ...cmd, hotbar: this.pendingHotbar }
+      delete out.modSwap
+      if (this.pendingModSwap !== undefined) out.modSwap = this.pendingModSwap
+      const packet = encodeInput(out, this.pendingEdges)
+      const hasPureEdge =
+        this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0 || this.pendingModSwap !== undefined
       if (hasPureEdge) this.queue.queueReliable(packet)
       else this.queue.queueSnapshot(packet)
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
+      this.pendingModSwap = undefined
     }
 
     // Predict own movement immediately
@@ -793,6 +817,7 @@ export class NetClientSession implements Session {
       alert: this.state.alert,
       mode: this.state.mode,
       revivesLeft: this.state.revivesLeft,
+      ...(this.modCasting ? { modCasting: this.modCasting, simTick: this.hostTickEstimate() } : {}),
       self: this.self,
     }
   }

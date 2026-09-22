@@ -1,7 +1,7 @@
 import type { Entity } from '../game/entity'
 import type { Level } from '../game/levelgen/level'
 import type { Annotation, SimEvent } from '../game/types'
-import type { RunMode } from '../game/world'
+import type { ModCasting, RunMode } from '../game/world'
 
 /** What the render layer consumes each frame. */
 export interface RenderView {
@@ -26,6 +26,14 @@ export interface RenderView {
   mode?: RunMode
   /** Party-shared comebacks left this run (only meaningful in `normal`). */
   revivesLeft?: number
+  /** Mod casting rule in force (host truth; clients mirror it from GameStart).
+   * Absent = the default fold. Drives the HUD's sequence strip. */
+  modCasting?: ModCasting
+  /** The HOST's sim tick the view reflects. Equal to `tick` on a host; on a
+   * client it is the newest snapshot's tick (the client's own `tick` is a local
+   * frame counter). Compared against host-tick deadlines such as a weapon's
+   * `rechargeUntil`. Optional: absent means `tick`. */
+  simTick?: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
   /** Inert on-screen annotations to draw over the scene (see game/types.ts).

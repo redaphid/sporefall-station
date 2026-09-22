@@ -466,6 +466,7 @@ export const mergeInputs = (...sources: InputSource[]): InputSource => ({
       out.throwItem ||= c.throwItem
       out.roll ||= c.roll
       if (c.hotbar >= 0) out.hotbar = c.hotbar
+      if (c.modSwap !== undefined) out.modSwap = c.modSwap
     }
     return out
   },

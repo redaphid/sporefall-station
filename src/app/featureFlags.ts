@@ -24,6 +24,16 @@
  *    rather than as an obvious failure. The `ARCHETYPES` bug already proved
  *    rendering and the wire are entangled in this codebase.
  *
+ *    ONE SANCTIONED EXCEPTION, and it keeps the rule intact: a flag may choose a
+ *    RUN RULE. The app layer reads the flag once, when a host BUILDS a run, and
+ *    writes a plain sim value into the new World (`sequencedMods` ->
+ *    `World.modCasting`), exactly as the difficulty `mode` is chosen. From then
+ *    on the rule is world state: it serializes with the save, replays with a
+ *    recording, and reaches clients in GameStart. The sim and the protocol still
+ *    never read a flag (the grep test still holds), a client's own setting has
+ *    no effect on the host's run, and toggling mid-run changes nothing until the
+ *    next run is built.
+ *
  * 4. EVERY FLAG HAS A WAY TO DIE. `retire` states the condition under which the
  *    flag is deleted or its default flips. This is not bureaucracy: this repo
  *    already carries `INFECTION_ENABLED = false`, hiding an entire unfinished
@@ -66,6 +76,16 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
     retire:
       'Default flipped ON. Remaining step: delete the flag and fold the six into CHARSET_ALIAS_BASE once the colour pass lands and each of the six has more than the single south-facing idle frame it reuses for all five facings.',
     since: 400,
+  },
+  {
+    key: 'sequencedMods',
+    label: 'Sequenced mods (prototype)',
+    description:
+      'Your gun fires its mods one at a time, in the order you set, instead of all at once. Tap two mods in the sequence strip to swap them. Applies to the next run you start or host.',
+    defaultOn: false,
+    retire:
+      'Prototype. Delete the flag (and World.modCasting) once the owner has played it side by side with the default fold and picked one: either promote sequencing to the only mode or remove modSequence.ts.',
+    since: 567,
   },
 ]
 

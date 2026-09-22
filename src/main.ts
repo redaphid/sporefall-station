@@ -33,6 +33,11 @@ import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { loadSettings } from './app/settings'
+import { flagOn } from './app/featureFlags'
+import type { ModCasting } from './game/world'
+import { createModSwapQueue, previewSwaps, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
+import { buildSequence } from './ui/sequenceModel'
+import { createSequenceStrip } from './ui/sequenceStrip'
 import {
   canRequestFullscreen,
   enterFullscreen,
@@ -280,6 +285,10 @@ const boot = async (): Promise<void> => {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
+  // Sequenced-mods reorder requests from the HUD strip / pause menu ride out on
+  // the local player's next command (see input/modSwapQueue.ts).
+  const modSwaps = createModSwapQueue()
+  input = withModSwaps(input, modSwaps)
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
@@ -604,6 +613,7 @@ const boot = async (): Promise<void> => {
     stateReplay,
     stateRing,
     padZoom,
+    modSwaps,
   )
 }
 
@@ -665,9 +675,13 @@ const stopTransportOnPagehide = (transport: Transport): void => {
   window.addEventListener('pagehide', () => void transport.stop().catch(() => {}), { once: true })
 }
 
+/** The `sequencedMods` flag, resolved to the run rule a host latches into each
+ * run it builds. Read per run, so toggling applies from the next run. */
+const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
+
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -691,7 +705,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     stopTransportOnPagehide(transport)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
@@ -908,6 +922,7 @@ const createPauseOverlay = (
     onRestart?: () => void
     onShare?: (note?: string) => Promise<ShareResult>
     weaponThumb?: WeaponThumb
+    modSwaps?: ModSwapQueue
   },
 ): PauseOverlay => {
   const el = document.createElement('div')
@@ -918,6 +933,25 @@ const createPauseOverlay = (
   el.innerHTML = `<div style="font:800 40px system-ui;color:#fff;letter-spacing:6px;text-shadow:0 2px 8px #000">PAUSED</div>`
   const panel = createLoadoutPanel(actions.weaponThumb)
   el.appendChild(panel.el)
+  // Sequenced mods: the wand order, reorderable while paused. The sim is
+  // stopped, so swaps queue and apply on the first tick after Resume; the strip
+  // previews the queued order meanwhile.
+  const swaps = actions.modSwaps
+  let lastView: RenderView | undefined
+  const paintSeq = (): void => {
+    const v = lastView
+    seq.update(
+      v && swaps
+        ? buildSequence(v.self, v.modCasting, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
+        : null,
+    )
+  }
+  const seq = createSequenceStrip((a, b) => {
+    swaps?.push(a, b)
+    paintSeq()
+  })
+  seq.el.style.cssText += ';width:min(340px,86vw);box-sizing:border-box;padding:8px 10px;border-radius:10px;background:#141822f2;text-align:left;color:#e7e7ee;font:12px system-ui'
+  el.appendChild(seq.el)
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center'
   const btn = (label: string, primary: boolean): HTMLButtonElement => {
@@ -1034,6 +1068,10 @@ const createPauseOverlay = (
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
       if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
+      if (show) {
+        lastView = view
+        paintSeq()
+      }
       wasPaused = show
       el.style.display = show ? 'flex' : 'none'
     },
@@ -1122,8 +1160,10 @@ const runLoop = (
   stateRing?: StateSharing,
   /** Controller zoom poller (view-only) — stepped once per render frame. */
   padZoom?: PadZoom,
+  /** Sequenced-mods reorder queue shared by the HUD strip and the pause menu. */
+  modSwaps?: ModSwapQueue,
 ): void => {
-  const hud = createHud(uiMount)
+  const hud = createHud(uiMount, modSwaps ? (a, b) => modSwaps.push(a, b) : undefined)
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
   // only (`cursor: none` on the canvas) — mouse AIM reads the cursor's ABSOLUTE
   // position (the window `pointermove` tracker → aim.pointerAim), so we must NOT
@@ -1243,6 +1283,7 @@ const runLoop = (
     onRestart,
     onShare: sharing ? (note) => sharing.share(note) : undefined,
     weaponThumb: renderer.weaponThumb,
+    modSwaps,
   })
   if (canPause)
     window.addEventListener('keydown', (ev) => {

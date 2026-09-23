@@ -2,6 +2,10 @@
 # Parity M4 proof: build, serve on an ephemeral port, drive the frost +
 # wet-electric interaction scenarios in a real browser, assert shatter + chain,
 # capture a video and screenshots. Serves on its OWN port (never 5173/4173).
+#
+# Headless by default. `E2E_HEADFUL=1` runs it headed, and `E2E_CDP=<devtools
+# url>` drives an already-running headed browser instead - the path that works
+# on a WSL2 box whose WSLg is wedged. See acquireBrowser in e2e/lib.mjs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

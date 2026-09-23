@@ -18,7 +18,7 @@
 import { describe, expect, it } from 'vitest'
 import { spawnNpc } from '../populate'
 import { addStatus, isFrozen } from './statusFx'
-import { applyDamage } from './combat'
+import { SHATTER_DAMAGE_MULT, applyDamage } from './combat'
 import { createWorld } from '../world'
 import { spawnPlayer } from '../player'
 
@@ -78,16 +78,28 @@ describe('a frozen PLAYER is not shattered', () => {
   })
 })
 
-describe('a frozen ENEMY still shatters', () => {
-  it('is executed by a solid impact, so freeze stays a player tool', () => {
+describe('a frozen ENEMY still shatters — hard, but not for free', () => {
+  it('takes the blow x SHATTER_DAMAGE_MULT, so freeze stays worth bringing', () => {
     const w = arena()
     const npc = spawnNpc(w, 'thug', 8.5, 8.5)
     npc.health = { hp: 100, max: 100, iframes: 0 }
     addStatus(w, npc, 'frozen', 120)
 
-    applyDamage(w, npc, 1, 0, 0, 0, -1) // a single point of damage
+    applyDamage(w, npc, 14, 0, 0, 0, -1) // one pistol round
 
-    expect(npc.health!.hp).toBe(0)
+    expect(npc.health!.hp).toBe(100 - 14 * SHATTER_DAMAGE_MULT)
+    expect(npc.dead).toBeFalsy()
+  })
+
+  it('an ordinary grunt still pops in two shots, ice gib and all', () => {
+    // The feel the mechanic is FOR: freeze, then break. A 40hp thug takes 14 and
+    // freezes, then eats 70 and gibs — which is what the old instant kill looked
+    // like from the player's side, and what a boss's 320hp pool no longer does.
+    const w = arena()
+    const npc = spawnNpc(w, 'thug', 8.5, 8.5)
+    addStatus(w, npc, 'frozen', 120)
+    applyDamage(w, npc, 14, 0, 0, 0, -1)
     expect(npc.dead).toBe(true)
+    expect(npc.shattered).toBe(true)
   })
 })

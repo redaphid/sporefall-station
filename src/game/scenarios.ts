@@ -95,14 +95,33 @@ const placePlayer = (w: World, x: number, y: number): void => {
   player.prevPos = { x: player.pos.x, y: player.pos.y }
 }
 
-/** Two bystanders: one pre-frozen (ice-blue), one untouched twin. Hitting the
- * frozen one shatters it; the twin shrugs off the same blow. */
+/** Two bystanders: one pre-frozen (ice-blue), one untouched twin. The same blow
+ * lands x SHATTER_DAMAGE_MULT on the frozen one — enough to gib a bystander —
+ * and at face value on the twin, who walks away. */
 const setupFrost = (w: World): void => {
   const { x, y } = findStage(w, 5)
   const frozen = bystander(w, x + 1, y)
   freeze(w, frozen)
   bystander(w, x + 3, y)
   placePlayer(w, x + 2, y)
+}
+
+/** The freeze-shatter BALANCE stage: a real Mireclaw Alpha (320hp, 0.75 physical
+ * resist) beside an ordinary thug (40hp), both pre-frozen, both in one frame.
+ * Hit each once and the whole fix is visible at a glance — the thug gibs, the
+ * boss takes a chunk off a full bar and keeps coming. Under the old rule both
+ * died to the same single poke, which is the bug this stage exists to show. */
+const setupBossFreeze = (w: World): void => {
+  const { x, y } = findStage(w, 5)
+  const boss = spawnNpc(w, 'boss', x + 1.5, y + 0.5)
+  boss.ai = undefined // hold still on stage, like every other staged body
+  boss.intent = { x: 0, y: 0 }
+  freeze(w, boss)
+  const thug = spawnNpc(w, 'thug', x + 4.5, y + 0.5)
+  thug.ai = undefined
+  thug.intent = { x: 0, y: 0 }
+  freeze(w, thug)
+  placePlayer(w, x + 3, y)
 }
 
 /** A puddle of wet bystanders in a row; zapping the near one arcs down the
@@ -942,6 +961,7 @@ const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>
   objects: setupObjects,
   fire: setupFire,
   frost: setupFrost,
+  'boss-freeze': setupBossFreeze,
   'wet-electric': setupWetElectric,
   inventory: setupInventory,
   items: setupItems,

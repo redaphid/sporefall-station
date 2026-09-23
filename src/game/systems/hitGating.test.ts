@@ -22,7 +22,7 @@ import { spawnPlayer } from '../player'
 import { spawnNpc } from '../populate'
 import { emptyInput } from '../types'
 import { addEntity, createWorld, tickWorld, type World } from '../world'
-import { applyDamage, fireWeapon } from './combat'
+import { SHATTER_DAMAGE_MULT, applyDamage, fireWeapon } from './combat'
 import { applyModPickup, weaponStack } from './inventory'
 import { resolveWeapon } from './resolveWeapon'
 import { isRolling } from './roll'
@@ -108,36 +108,38 @@ describe('applyDamage reports HOW MUCH it dealt, or null if it never landed', ()
     expect(blocked.health!.hp).toBe(100)
   })
 
-  // ── SHATTER: damage DEALT vs lethality GRANTED ────────────────────────────
-  // The bullet delivers its ordinary damage; the ice then kills by a separate
-  // execute rule. Lifesteal is paid for the former only.
-  it('a shatter reports the BLOW\'S own damage, not the victim\'s hp pool', () => {
+  // ── SHATTER: the blow, multiplied ─────────────────────────────────
+  // A shatter is no longer a separate execute rule granting lethality; it is the
+  // SAME blow worth SHATTER_DAMAGE_MULT times as much, so what it reports is
+  // exactly what it removed, and lifesteal's payout is bounded by construction.
+  it('a shatter reports the amplified blow — and that IS the hp it removed', () => {
     const e = body(w, 320)
     addStatus(w, e, 'frozen', 120)
     // 14 is the pistol's damage; the body is unresisted, so it passes through.
-    expect(applyDamage(w, e, 14, 0, 0, 0, 99)).toBe(14)
-    expect(e.dead).toBe(true)
+    expect(applyDamage(w, e, 14, 0, 0, 0, 99)).toBe(14 * SHATTER_DAMAGE_MULT)
+    expect(e.health!.hp).toBe(320 - 14 * SHATTER_DAMAGE_MULT)
+    expect(e.dead).toBeFalsy() // a 320hp pool no longer dies to one shatter
   })
 
-  it('a shatter NEVER reports the hp it removed — the exploit stays foreclosed', () => {
+  it("a shatter NEVER reports the victim's hp pool — the exploit stays foreclosed", () => {
     // The hazard this return value could create: if a shatter reported the 320hp
     // it wiped, one lifesteal round would heal a whole boss lifebar off a grenade
-    // somebody else threw. Bounded to the blow, exactly like any normal hit.
+    // somebody else threw. Bounded to the (amplified) blow, like any normal hit.
     const e = body(w, 320)
     addStatus(w, e, 'frozen', 120)
     const dealt = applyDamage(w, e, 14, 0, 0, 0, 99)
-    expect(dealt).toBeLessThanOrEqual(14)
+    expect(dealt).toBeLessThanOrEqual(14 * SHATTER_DAMAGE_MULT)
     expect(dealt).not.toBe(320)
   })
 
   it('a shatter still applies RESIST to the blow it reports', () => {
-    // The one intended difference from shipped behaviour: armour now reduces the
-    // lifesteal payout on an execute, as it does on every other hit.
+    // Armour reduces an amplified hit exactly as it reduces an ordinary one —
+    // which is the whole reason the multiplier rides the normal damage pipeline
+    // instead of sitting beside it.
     const e = body(w, 320)
     e.resist = { physical: 0.35 }
     addStatus(w, e, 'frozen', 120)
-    expect(applyDamage(w, e, 14, 0, 0, 0, 99)).toBe(5) // round(14 * 0.35)
-    expect(e.dead).toBe(true)
+    expect(applyDamage(w, e, 14, 0, 0, 0, 99)).toBe(25) // round(14 * 5 * 0.35)
   })
 })
 

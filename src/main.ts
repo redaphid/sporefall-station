@@ -63,6 +63,7 @@ import { BleClientTransport, BleHostTransport } from './net/transport/bleTranspo
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
 import { resolveWsBaseUrl, WsTransport } from './net/transport/wsTransport'
+import { betaSlugFromBase, namespaceRoom } from './app/betaSlug'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import type { ZoomSink } from './render/zoomModel'
@@ -150,7 +151,13 @@ const boot = async (): Promise<void> => {
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
-  const room = params.get('room') ?? 'car'
+  // A beta build (served from /betas/<slug>/) plays in its OWN rooms. The sim is
+  // deterministic and the host is authoritative, so a beta peer and a production
+  // peer sharing room 'car' do not see a version warning — they DESYNC, and it
+  // reads as a flaky network rather than two different builds. Namespacing by
+  // the slug the bundle was built with keeps beta testers together and away from
+  // live players; production (slug null) is untouched. See src/app/betaSlug.ts.
+  const room = namespaceRoom(params.get('room') ?? 'car', betaSlugFromBase(import.meta.env.BASE_URL))
   const name = params.get('name') ?? `Player-${(Math.random() * 90 + 10) | 0}`
 
   // Browser fullscreen on run-start: the Fullscreen API needs a live user

@@ -8,6 +8,7 @@ import {
   type WebUpdater,
 } from './webUpdate'
 import { APP_VERSION } from './version'
+import { betaSlugFromBase } from './betaSlug'
 
 // Offline-first for the WEB build (browser tab + "Add to Home Screen" install).
 //
@@ -29,13 +30,26 @@ export type PwaEnv = {
   supported: boolean
   /** A production build; the dev server intentionally ships no sw.js. */
   prod: boolean
+  /** This bundle is a per-branch BETA served under /betas/<slug>/ rather than
+   * the site root — see src/app/betaSlug.ts. */
+  beta: boolean
 }
 
 /**
  * Pure decision, so the guard rails are testable without a DOM or a real
  * registration. Kept separate from the imperative call below on purpose.
+ *
+ * `beta` is a hard no, and the reason is the `scope: '/'` in the registration
+ * below. A beta build is served same-origin with the live game, so a worker
+ * registered from /betas/<slug>/ with root scope would take control of
+ * PRODUCTION for that player and start answering its navigations out of a
+ * branch build's precache — a review of a risky branch would break the live
+ * game for whoever did the reviewing, and keep breaking it after they closed
+ * the tab. vite.config.ts also refuses to emit a sw.js for a beta build at all;
+ * both halves are deliberate, because either one alone is a single point of
+ * failure for a bug the player would experience as "the game is broken now".
  */
-export const shouldRegisterSw = (env: PwaEnv): boolean => !env.native && env.supported && env.prod
+export const shouldRegisterSw = (env: PwaEnv): boolean => !env.native && env.supported && env.prod && !env.beta
 
 /**
  * How often a long-lived tab re-checks the origin for a newer version. Without
@@ -95,6 +109,7 @@ export const registerPwa = (): WebUpdater | null => {
     native: Capacitor.isNativePlatform(),
     supported: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
     prod: import.meta.env.PROD,
+    beta: betaSlugFromBase(import.meta.env.BASE_URL) !== null,
   }
   if (!shouldRegisterSw(env)) return null
 

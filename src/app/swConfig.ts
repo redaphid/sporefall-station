@@ -40,6 +40,15 @@ export const SW_NAVIGATE_FALLBACK = 'index.html'
  * ...but NEVER for these. `/ota/*` and `/ws/*` are Worker routes, and
  * `/download` is a real navigation to the APK — answering it with index.html
  * would hand people the game page instead of the app.
+ *
+ * `/betas/` is the sharpest entry in this list. Production's service worker has
+ * scope '/', so it sits in front of EVERY same-origin navigation — including
+ * one to a per-branch beta build (src/worker/betas.ts). Without this line an
+ * installed player opening /betas/foo/ would be handed PRODUCTION's cached
+ * index.html straight out of the precache, without a network request ever
+ * leaving the device: the reviewer reviews the live game, the URL says
+ * otherwise, and there is no status code or console error to notice. The Worker
+ * route cannot defend against this — the request never reaches it.
  */
 export const SW_NAVIGATE_FALLBACK_DENYLIST: readonly RegExp[] = [
   /^\/ws\//,
@@ -47,6 +56,7 @@ export const SW_NAVIGATE_FALLBACK_DENYLIST: readonly RegExp[] = [
   /^\/download/,
   /^\/get$/,
   /^\/asset-showcase/,
+  /^\/betas(\/|$)/,
 ]
 
 /** The shape of a runtime-caching rule's matcher, as workbox calls it. */
@@ -62,6 +72,11 @@ export interface UrlMatch {
  */
 export const SW_RUNTIME_CACHING = [
   {
+    // NB the leading-slash anchors: a beta build's art lives at
+    // /betas/<slug>/themes/… , which deliberately does NOT match. Beta bytes
+    // must never enter production's caches — they are republished in place on
+    // every push to the branch, so a cached copy pins the reviewer to an old
+    // build of something that is supposed to be moving.
     urlPattern: ({ url, sameOrigin }: UrlMatch): boolean =>
       sameOrigin && (url.pathname.startsWith('/sprites/') || url.pathname.startsWith('/themes/')),
     handler: 'CacheFirst' as const,

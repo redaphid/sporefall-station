@@ -1,18 +1,16 @@
-// Cloudflare Worker entry — the single origin that serves EVERYTHING:
+// Cloudflare Worker entry — the single origin that serves EVERYTHING: the built
+// game, the multiplayer relay, the OTA manifest, review images, shared debug
+// states and the per-branch beta builds.
 //
-//   /ws/:room  → the RoomDO Durable Object (WebSocket multiplayer relay)
-//   /ota/check → the self-hosted OTA manifest endpoint (handleOta)
-//   /review/*  → review-only before/after images from KV (handleReviewImage)
-//   everything else → the built game in dist/, via the ASSETS binding
-//
-// wrangler.jsonc routes only /ws/*, /ota/* and /review/* through this Worker
-// (`run_worker_first`); all other paths are served straight from static assets
-// (free, cached, with public/_headers + public/_redirects honored). The ASSETS
-// fallback below is belt-and-suspenders for anything that still reaches here.
+// This module is deliberately TINY. All it does is name the Durable Object
+// class and hand `fetch` to the router, because the `export { RoomDO }` below
+// imports `cloudflare:workers` — a module that exists only inside workerd, so
+// anything in this file is unreachable from a node test run. The routing itself
+// lives in router.ts, where it can be (and is) tested; see the header there for
+// the route table and for why each KV-backed route must never fall through to
+// the ASSETS binding.
 
-import { STATE_PREFIX, handleWorldStore } from './worldStore'
-import { handleOta } from './ota'
-import { REVIEW_PREFIX, handleReviewImage } from './reviewImages'
+import { route } from './router'
 import type { Env } from './env'
 
 // The Durable Object class must be exported from the Worker's entry module so the
@@ -21,30 +19,6 @@ export { RoomDO } from './roomDO'
 
 export default {
   async fetch(request, env): Promise<Response> {
-    const url = new URL(request.url)
-
-    // /ws/:room → the room's Durable Object. idFromName makes the room name the
-    // stable key, so every peer naming the same room lands on the same instance.
-    if (url.pathname.startsWith('/ws/')) {
-      const room = decodeURIComponent(url.pathname.slice('/ws/'.length)) || 'default'
-      const stub = env.ROOM.get(env.ROOM.idFromName(room))
-      return stub.fetch(request)
-    }
-
-    if (url.pathname === '/ota/check') return handleOta(request, env)
-
-    // /review/* → a before/after image from KV, for embedding in PR bodies.
-    // MUST be handled here and never fall through to ASSETS: the SPA fallback
-    // would answer a missing image with 200 + index.html. See reviewImages.ts.
-    if (url.pathname.startsWith(REVIEW_PREFIX)) return handleReviewImage(request, env)
-
-    // /state/* → a shared debug-state capture (POST to store, GET to fetch).
-    // Same rule as /review/*: it MUST be handled here, because the SPA fallback
-    // would answer a missing/expired id with 200 + index.html and the game would
-    // try to JSON.parse a page of HTML. See worldStore.ts.
-    if (url.pathname === STATE_PREFIX || url.pathname.startsWith(`${STATE_PREFIX}/`))
-      return handleWorldStore(request, env)
-
-    return env.ASSETS.fetch(request)
+    return route(request, env)
   },
 } satisfies ExportedHandler<Env>

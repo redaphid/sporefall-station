@@ -1,18 +1,27 @@
 name: preview-web
 
-# Per-branch PREVIEW deploys, so risky work can be looked at without it reaching
-# the live game. The standing rule this implements: conservative work goes to
-# `main` (deploy-web.yml, which is what phones actually run); anything the owner
-# might want to veto — combat changes, removals, new art — goes here first and he
+# Per-branch BETA builds, so risky work can be looked at without it reaching the
+# live game. The standing rule this implements: conservative work goes to `main`
+# (deploy-web.yml, which is what phones actually run); anything the owner might
+# want to veto — combat changes, removals, new art — goes here first and he
 # judges it from a URL.
 #
-# This project is Cloudflare WORKERS, not Pages (migrated — see wrangler.jsonc),
-# so there is no Pages per-branch preview to switch on. The Workers equivalent is
-# a VERSION: `wrangler versions upload` builds and uploads a version, gives it its
-# own permanent preview origin, and does NOT shift any traffic. Live stays live.
+#   https://sporefall.hypnodroid.com/betas/<slug>/
 #
-# Preview URL shape: https://<version-prefix>-sporefall-station.<subdomain>.workers.dev
-# It is printed in the job summary AND in the "Preview URL" step log.
+# <slug> is the branch's last path segment, sanitized — `preview/sequenced-mods`
+# becomes `sequenced-mods`. src/app/betaSlug.ts owns that rule and is the single
+# place it is defined; this workflow never re-implements it.
+#
+# WHAT THIS JOB DOES NOT DO: it does not deploy the Worker, touch production's
+# routes, publish an OTA manifest, or shift any traffic. It builds the app with
+# a beta base path and UPLOADS the files to a KV namespace, exactly like
+# `pnpm run review:image` uploads a PR screenshot. Production is untouched.
+#
+# WHY NOT `wrangler versions upload`: it was what this workflow used to do, and
+# every URL it advertised was a Cloudflare Access login page — *.workers.dev on
+# this account sits behind a wildcard Access app. The job went green while the
+# preview was unreachable, which is worse than having no preview job at all. The
+# long version is in docs/deploy.md § "Previews".
 #
 # Trigger: push to preview/** (or run it by hand against any branch).
 
@@ -33,7 +42,7 @@ concurrency:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    name: Upload a preview version (no traffic shift)
+    name: Publish a beta build (no deploy, no traffic shift)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,35 +63,54 @@ jobs:
       - name: Check theme manifests against assets on disk
         run: pnpm exec vitest run src/render/themeManifestSync.test.ts
 
-      - name: Build web bundle
+      # BETA_SLUG is what makes this a beta rather than a normal build: it sets
+      # Vite's `base` to /betas/<slug>/ so index.html asks for its JavaScript at
+      # /betas/<slug>/assets/… . Without it the built page would request
+      # /assets/… and be answered by PRODUCTION's bundle — a 200, the right URL,
+      # and the wrong build. It also switches off the service worker, which
+      # would otherwise be registered with scope '/' and hijack the live game
+      # for whoever opened the beta. See vite.config.ts.
+      - name: Build beta bundle
         run: pnpm run build
         env:
+          BETA_SLUG: ${{ github.ref_name }}
           CAP_SERVER_URL: ""
 
-      # `versions upload` needs Workers Scripts:Edit, the same token the deploy
-      # workflow already uses. No OTA bundle and no APK here on purpose: a
-      # preview must never publish an OTA manifest, or installed phones would
-      # pull an unreviewed build.
-      - name: Upload preview version
-        id: upload
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: versions upload --message "preview ${{ github.ref_name }} @ ${{ github.sha }}"
-
-      # wrangler prints the preview URL; surface it somewhere findable rather
-      # than making anyone read the raw log.
-      - name: Preview URL
-        env:
-          OUT: ${{ steps.upload.outputs.command-output }}
+      # Upload dist/ to the BETAS KV namespace. Needs Workers KV Storage:Edit,
+      # which the "Edit Cloudflare Workers" token template already includes
+      # alongside the Workers Scripts:Edit that deploy-web.yml uses — the same
+      # CLOUDFLARE_API_TOKEN secret, no new scope. The script refuses to publish
+      # a bundle whose index.html does not reference its own base, and reads the
+      # shell back out of KV to prove the upload landed. No OTA bundle and no
+      # APK here on purpose: a beta must never publish an OTA manifest, or
+      # installed phones would pull an unreviewed build.
+      - name: Publish beta to KV
+        id: publish
         run: |
           set -euo pipefail
-          echo "$OUT"
-          URL="$(printf '%s' "$OUT" | grep -oE 'https://[a-z0-9-]+\.workers\.dev' | head -1 || true)"
-          if [ -n "$URL" ]; then
-            echo "Preview: $URL"
-            { echo "### Preview deploy"; echo; echo "Branch \`${{ github.ref_name }}\` is live at:"; echo; echo "$URL"; } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Could not parse a preview URL from wrangler output — read the step log above." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          URL="$(pnpm exec tsx scripts/publish-beta.mts)"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BETA_SLUG: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
+
+      # Surface the URL somewhere findable rather than making anyone read the log.
+      - name: Beta URL
+        env:
+          URL: ${{ steps.publish.outputs.url }}
+        run: |
+          set -euo pipefail
+          echo "Beta: $URL"
+          {
+            echo "### Beta build"
+            echo
+            echo "Branch \`${{ github.ref_name }}\` is live at:"
+            echo
+            echo "$URL"
+            echo
+            echo "All published betas: <https://sporefall.hypnodroid.com/betas/>"
+            echo
+            echo "_Nothing was deployed — this is an upload to KV. Production is unchanged._"
+          } >> "$GITHUB_STEP_SUMMARY"

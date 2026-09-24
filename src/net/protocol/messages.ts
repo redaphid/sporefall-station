@@ -18,7 +18,9 @@ import { MsgType } from '../types'
  * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
  * the floor). They name content that no longer exists, and a dead-code tool
  * will call them unused. They are CLAIMED, not unused — the same argument as
- * `BLE_LOBBY_INFO_UUID`'s `@protocolReservation` in net/types.ts.
+ * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
+ * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag
+ * on ARCHETYPES, which then reported the tag itself as unused.)
  *
  * The index IS the wire format. `encodeSnapshot` writes the position
  * (`archetypeIndex.get(a) ?? 0`) and `decodeSnapshot` reads it back positionally
@@ -339,6 +341,11 @@ export const encodeInput = (
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
+  // OPTIONAL trailing u16: a sequenced-mods reorder request, +1 biased (0 is
+  // never written; absent = none). Written ONLY when a swap is pending, so every
+  // ordinary input packet is byte-identical to before. An older host reads the
+  // hotbar byte and never looks further, so the extra bytes are ignored.
+  if (cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff) w.u16(cmd.modSwap + 1)
   return w.finish()
 }
 
@@ -353,11 +360,13 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
   const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
+  const modSwap = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no reorder
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
+  if (modSwap > 0) cmd.modSwap = modSwap - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
@@ -475,6 +484,10 @@ export interface GameStartMsg {
    * a run already in progress and must not build floor 1's level for a party
    * standing on floor 3. Optional for back-compat: absent means 1. */
   floor?: number
+  /** Mod casting rule the host runs (World.modCasting). Optional and additive:
+   * an older client ignores it, and absent means the default fold. Clients do
+   * not simulate combat; they need it only to draw the sequence HUD. */
+  modCasting?: 'sequence'
 }
 export interface GoMsg {
   startTick: number

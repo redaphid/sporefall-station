@@ -58,7 +58,3 @@ export const DOWNED_COLOR = hexColor(DOWNED_COLOR_INT)
  * share a hue, and the numeral is then the only thing telling them apart, so it
  * must stay unique. */
 export const playerLabel = (playerId: number): string => `P${(playerId | 0) + 1}`
-
-/** What the LOCAL player's own marker says. Deliberately not `P1`: the whole
- * point is that your marker is not one of the numbered ones you must read. */
-export const SELF_LABEL = 'YOU'

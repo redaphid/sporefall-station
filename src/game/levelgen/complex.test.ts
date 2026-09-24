@@ -21,6 +21,31 @@ const spawnReach = (level: Level): Uint8Array => floodLinked(level, Math.floor(l
 
 const tile = (level: Level, x: number, y: number): number => level.tiles[y * level.w + x]
 
+/** Every tile a CITY floor may lay and a complex floor may not. */
+const CITY_TILES: ReadonlySet<number> = new Set([Tile.Street, Tile.Sidewalk, Tile.WallCutNW, Tile.WallCutNE, Tile.WallCutSE, Tile.WallCutSW])
+
+/**
+ * Index of the first tile failing `bad`, or -1 — the whole-grid sweeps below
+ * assert on THIS, once per floor, instead of calling `expect` per tile.
+ *
+ * That is not a style preference, it is the difference between a suite that
+ * passes and one that does not. These sweeps cover 240 floors x 9216 tiles =
+ * 2.2M tiles; `expect()` costs ~25us of assertion machinery per call (more for
+ * `.not.toContain`, which allocates its array fresh every time), so the
+ * per-tile form spent ~51s of a 60s budget purely on the harness for a scan the
+ * raw loop finishes in 31ms. It passed alone and TIMED OUT in a full run, where
+ * the other workers take the slack — the classic "flaky only in CI" shape.
+ * Coverage is identical (every tile of every floor is still checked) and the
+ * message is strictly better: it names the offending tile instead of the index.
+ */
+const firstTile = (level: Level, bad: (t: number, i: number) => boolean): number => {
+  for (let i = 0; i < level.tiles.length; i++) if (bad(level.tiles[i], i)) return i
+  return -1
+}
+
+/** `x,y (tile N)` for a grid index — only ever read from a failure message. */
+const describeTile = (level: Level, i: number): string => (i < 0 ? 'nowhere' : `${i % level.w},${(i / level.w) | 0} (tile ${level.tiles[i]})`)
+
 const inRect = (r: Rect, x: number, y: number): boolean => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h
 
 /** Index of the mission objective: the deepest module by doors crossed from
@@ -158,17 +183,16 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
 
   it('never lays a city tile: no street, sidewalk or bevelled corner indoors', () => {
     for (const { level, tag } of sweep(60)) {
-      for (const t of level.tiles) {
-        expect([Tile.Street, Tile.Sidewalk, Tile.WallCutNW, Tile.WallCutNE, Tile.WallCutSE, Tile.WallCutSW], tag).not.toContain(t)
-      }
+      // ASSERT PER FLOOR, NOT PER TILE — see the note above `firstTile`.
+      const bad = firstTile(level, (t) => CITY_TILES.has(t))
+      expect(bad, `${tag}: city tile ${describeTile(level, bad)}`).toBe(-1)
     }
   })
 
   it('solid layer agrees with the tiles (Hull is solid, every deck tile walkable)', () => {
     for (const { level, tag } of sweep(20)) {
-      for (let i = 0; i < level.tiles.length; i++) {
-        expect(level.solid[i], `${tag} tile ${i}`).toBe(isWallTile(level.tiles[i]) ? 1 : 0)
-      }
+      const bad = firstTile(level, (t, i) => level.solid[i] !== (isWallTile(t) ? 1 : 0))
+      expect(bad, `${tag}: solid=${level.solid[bad]} disagrees with tile ${describeTile(level, bad)}`).toBe(-1)
     }
   })
 
@@ -186,10 +210,8 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
   it('EVERY walkable tile is reachable from spawn — no sealed pockets anywhere', () => {
     for (const { level, tag } of sweep(60)) {
       const reach = spawnReach(level)
-      for (let i = 0; i < level.tiles.length; i++) {
-        if (level.solid[i]) continue
-        expect(reach[i], `${tag}: tile ${i % level.w},${(i / level.w) | 0} sealed off`).toBe(1)
-      }
+      const bad = firstTile(level, (_t, i) => !level.solid[i] && reach[i] !== 1)
+      expect(bad, `${tag}: tile ${describeTile(level, bad)} sealed off`).toBe(-1)
     }
   })
 

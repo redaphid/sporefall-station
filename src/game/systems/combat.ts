@@ -1,8 +1,8 @@
 import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
-import { WEAPONS, type StatusApply } from '../data/items'
+import { WEAPONS, type StatusApply, type WeaponDef } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
-import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
+import { makeEntity, resistMult, type Entity, type ItemStack, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
@@ -12,6 +12,7 @@ import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
+import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
 import { spawnSporeBurst } from './spore'
 import { vlen } from '../simMath'
 
@@ -428,6 +429,9 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   if (!e.combat) return false
   const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
   const stack = weaponStack(e)
+  // Sequenced casting (opt-in run rule). A weapon with no mods has nothing to
+  // sequence and takes the default path below, unchanged.
+  if (sequencing(w) && stack?.mods && stack.mods.length > 0) return fireSequenced(w, e, weapon, stack)
   const rw = resolveWeapon(weapon, stack?.mods)
   if (weapon.kind === 'melee') {
     e.combat.cooldown = rw.cooldownTicks
@@ -452,10 +456,68 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   return true
 }
 
+/**
+ * The sequenced-casting fire path (systems/modSequence). One trigger pull plans
+ * up to `castsPerTrigger` casts from the weapon's stored `castIndex`; each cast
+ * resolves the base weapon with ONLY its own mods (its modifiers plus at most
+ * one payload), so every projectile carries at most one element. A multi-cast
+ * gun splits its pellets between casts, laid out left to right across the fan
+ * in cast order. Running off the end of the list wraps the index and locks the
+ * weapon for `rechargeOnWrap` ticks. Returns false (no shot) while recharging.
+ */
+const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack): boolean => {
+  if (recharging(stack, w.tick)) return false
+  const shape = sequenceShape(weapon)
+  const plan = planCasts(stack.mods, shape, stack.castIndex ?? 0)
+  // Every entry unknown/empty: nothing live, fire the bare weapon.
+  const casts = plan.casts.length > 0 ? plan.casts : [{ mods: [] as WeaponMod[], positions: [] as number[] }]
+  stack.castIndex = plan.nextIndex
+  let cooldown = 1
+  if (weapon.kind === 'melee') {
+    const rw = resolveWeapon(weapon, casts[0].mods)
+    cooldown = rw.cooldownTicks
+    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
+    if (weapon.durability !== undefined) wearMelee(e)
+    if (hit) {
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
+    }
+  } else {
+    // Shares are fixed per cast slot (castsPerTrigger), so a pull cut short by
+    // a wrap fires only the groups it cast: the thin last blast marks the wrap.
+    const shares = pelletShares(weapon.pellets ?? 1, shape.castsPerTrigger)
+    const resolved = casts.map((c, g) => resolveWeapon({ ...weapon, pellets: shares[g] }, c.mods))
+    const total = resolved.reduce((n, rw) => n + rw.pellets, 0)
+    let k = 0
+    for (let g = 0; g < casts.length; g++) {
+      const rw = resolved[g]
+      cooldown = Math.max(cooldown, rw.cooldownTicks)
+      const spec = projectileSpec(rw)
+      for (let j = 0; j < rw.pellets; j++, k++) {
+        const offset = total > 1 ? (k / (total - 1) - 0.5) * rw.spread : 0
+        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, casts[g].mods)
+      }
+    }
+  }
+  if (plan.wrapped && shape.rechargeOnWrap > 0) {
+    cooldown = Math.max(cooldown, shape.rechargeOnWrap)
+    stack.rechargeUntil = w.tick + cooldown
+  }
+  e.combat!.cooldown = cooldown
+  return true
+}
+
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
     if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
+    // Sequenced mods: a reorder request is applied before the action gates, so a
+    // swap asked for mid-roll or while stunned is not silently dropped.
+    if (sequencing(w)) {
+      const swap = inputs.get(e.playerCtl.playerId)?.modSwap
+      if (swap !== undefined) applyModSwap(e, swap)
+    }
     if (isRolling(e, w.tick)) continue // mid-roll: hands full — no attack/ability/throw
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
     if (isImmobilized(e)) continue // frozen/electrified can't act

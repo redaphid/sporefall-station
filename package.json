@@ -54,7 +54,8 @@
     "e2e:share": "bash e2e/run-share-button.sh",
     "test:e2e:start-menu": "bash e2e/run-start-menu-fit.sh",
     "test:e2e:deep-link": "bash e2e/run-deep-link-wins.sh",
-    "test:e2e:group-scenarios": "bash e2e/run-group-scenarios.sh"
+    "test:e2e:group-scenarios": "bash e2e/run-group-scenarios.sh",
+    "e2e:seq-mods": "bash e2e/run-sequenced-mods.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

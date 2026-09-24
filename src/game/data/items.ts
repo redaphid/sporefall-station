@@ -40,6 +40,14 @@ export interface WeaponDef {
   spread?: number
   /** Status inflicted on whatever the hit lands on (freeze ray, sledgehammer). */
   onHit?: StatusApply
+  /** Sequenced mods only (World.modCasting): how many leading mods are live.
+   * Default 3 (systems/modSequence DEFAULT_SEQUENCE_SHAPE). */
+  slots?: number
+  /** Sequenced mods only: consecutive casts per trigger pull. Default 1; melee
+   * is always 1. A multi-cast gun splits its pellets between the casts. */
+  castsPerTrigger?: number
+  /** Sequenced mods only: ticks the weapon is locked after its sequence wraps. */
+  rechargeOnWrap?: number
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
@@ -56,6 +64,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     knockback: 16,
     durability: 12,
     onHit: { status: 'stun', ticks: 20 },
+    // Sequenced shape: the long build. Many slots, one per swing, slow wrap.
+    slots: 8,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 75,
   },
   // The Mireclaw Alpha's natural armament. A baseball bat on an apex swamp
   // predator was the placeholder that made the boss read as a fat gangster;
@@ -73,6 +85,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 18,
     knockback: 3,
     projectileSpeed: 14,
+    // Sequenced shape: short wand, one mod per shot, quick wrap.
+    slots: 4,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 20,
   },
   shotgun: {
     id: 'shotgun',
@@ -85,6 +101,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     projectileSpeed: 16,
     pellets: 5,
     spread: 0.5,
+    // Sequenced shape: two casts per trigger, each pellet group takes the next mod.
+    slots: 4,
+    castsPerTrigger: 2,
+    rechargeOnWrap: 30,
   },
   machinegun: {
     id: 'machinegun',
@@ -95,6 +115,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 5,
     knockback: 1,
     projectileSpeed: 16,
+    // Sequenced shape: hoses through a long list, then a long cool-down.
+    slots: 6,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 45,
   },
   freezeRay: {
     id: 'freezeRay',

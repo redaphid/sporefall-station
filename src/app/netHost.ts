@@ -2,7 +2,7 @@ import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
-import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
+import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -58,6 +58,9 @@ interface PeerState {
    * Edge-triggered like the button edges: applied once, then reset, so a single
    * tap equips exactly once instead of re-equipping every tick. */
   pendingHotbar: number
+  /** Mod reorder the client asked for since the last tick consumed one
+   * (undefined = none). Edge-latched exactly like `pendingHotbar`. */
+  pendingModSwap?: number
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
@@ -101,8 +104,10 @@ export class NetHostSession implements Session {
     private transport: Transport,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
+    /** Mod casting rule for runs this host builds (see HostSession). */
+    private modCasting?: ModCasting | (() => ModCasting | undefined),
   ) {
-    this.world = createWorld(seed, 1, mode)
+    this.world = this.freshWorld()
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onPeerConnected(ev.peer)
       else if (ev.type === 'peerDisconnected') this.onPeerLost(ev.peer)
@@ -134,7 +139,22 @@ export class NetHostSession implements Session {
    * at the wrong map.
    */
   private gameStartMsg(): GameStartMsg {
-    return { seed: this.seed, players: this.lobbyPlayers(), mode: this.world.mode, floor: this.world.floor }
+    return {
+      seed: this.seed,
+      players: this.lobbyPlayers(),
+      mode: this.world.mode,
+      floor: this.world.floor,
+      // Additive and optional: an older client ignores the key, and a host
+      // without the rule never writes it, so the message is unchanged by default.
+      ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
+    }
+  }
+
+  private freshWorld(): World {
+    const w = createWorld(this.seed, 1, this.mode)
+    const casting = typeof this.modCasting === 'function' ? this.modCasting() : this.modCasting
+    if (casting) w.modCasting = casting
+    return w
   }
 
   /** Host presses Start: build the world, spawn everyone, tell clients. */
@@ -180,7 +200,7 @@ export class NetHostSession implements Session {
    */
   restart(seed?: number): void {
     if (seed !== undefined) this.seed = seed >>> 0
-    this.world = createWorld(this.seed, 1, this.mode)
+    this.world = this.freshWorld()
     this.ghosts.clear()
     // Force a fresh inventory push after respawn: the new loadout must reach every
     // client even if it happens to hash-match the pre-restart one.
@@ -205,6 +225,11 @@ export class NetHostSession implements Session {
       // it, so a single tap doesn't re-equip every tick until the next packet.
       cmd.hotbar = p.pendingHotbar
       p.pendingHotbar = -1
+      delete cmd.modSwap
+      if (p.pendingModSwap !== undefined) {
+        cmd.modSwap = p.pendingModSwap
+        p.pendingModSwap = undefined
+      }
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
@@ -348,6 +373,7 @@ export class NetHostSession implements Session {
       alert: stationAlerted(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
+      ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
       self: this.self,
     }
   }
@@ -435,6 +461,7 @@ export class NetHostSession implements Session {
         // A hotbar tap is an edge: latch the requested slot so the next tick equips
         // it once even if the packet arrived between ticks (OR-ed like the edges).
         if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
+        if (cmd.modSwap !== undefined) p.pendingModSwap = cmd.modSwap
       }
       return
     }

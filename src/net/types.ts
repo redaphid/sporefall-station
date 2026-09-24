@@ -42,7 +42,6 @@ export const BLE_DATA_C2H_UUID = '5f47a3c2-9b1e-4a52-8f6d-2c3e4b5a6d70'
 export const BLE_LOBBY_INFO_UUID = '5f47a3c3-9b1e-4a52-8f6d-2c3e4b5a6d70'
 
 export const SNAPSHOT_INTERVAL_TICKS = 3 // 10Hz at 30Hz sim
-export const INPUT_SEND_HZ = 20
 
 /** First byte of every message. */
 export const MsgType = {
@@ -63,7 +62,6 @@ export const MsgType = {
    * (slots/activeSlot/mods/ammo). Reliable, sent only on change. */
   Inventory: 19,
 } as const
-export type MsgTypeId = (typeof MsgType)[keyof typeof MsgType]
 
 const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))
 

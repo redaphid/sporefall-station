@@ -122,6 +122,7 @@ describe('the flag registry itself', () => {
     // edited without touching this table fails.
     const EXPECTED_DEFAULTS: Record<string, boolean> = {
       newEnemyArt: true,
+      sequencedMods: false,
     }
     expect(Object.fromEntries(FEATURE_FLAGS.map((f) => [f.key, f.defaultOn]))).toEqual(EXPECTED_DEFAULTS)
   })

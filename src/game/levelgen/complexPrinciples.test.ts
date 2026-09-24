@@ -100,28 +100,48 @@ describe('P1: a hierarchy of circulation', () => {
         if (level.solid[k] || doors.has(k) || passage.has(k)) return false
         return [Tile.Hall, Tile.Grate, Tile.Exit].includes(tileAt(level, x, y) as 10) || level.complex!.corridors.some((c) => inRect(c.rect, x, y))
       }
+      // ONE assertion per floor per axis, on the WORST run found — not one per
+      // tile. `max(run) <= 2` is the same statement as `every run <= 2`, but
+      // this sweep walks 40 seeds x 4 floors x 9216 tiles twice, and `expect()`
+      // costs ~25us of assertion machinery a call: the per-tile form spent 40
+      // of the suite's 60s budget on the harness alone, two thirds of the way
+      // to the timeout that the identical pattern in complex.test.ts already
+      // tripped under parallel load. The message still names the tile.
+      let worstRow = { run: 0, x: 0, y: 0 }
       for (let y = 1; y < level.h - 1; y++) {
         let run = 0
         for (let x = 1; x < level.w - 1; x++) {
           const thin = hall(x, y) && !hall(x, y - 1) && !hall(x, y + 1)
           run = thin ? run + 1 : 0
-          expect(run, `${tag}: 1-wide hall at ${x},${y}`).toBeLessThanOrEqual(2)
+          if (run > worstRow.run) worstRow = { run, x, y }
         }
       }
+      expect(worstRow.run, `${tag}: 1-wide hall run ending at ${worstRow.x},${worstRow.y}`).toBeLessThanOrEqual(2)
+
+      let worstCol = { run: 0, x: 0, y: 0 }
       for (let x = 1; x < level.w - 1; x++) {
         let run = 0
         for (let y = 1; y < level.h - 1; y++) {
           const thin = hall(x, y) && !hall(x - 1, y) && !hall(x + 1, y)
           run = thin ? run + 1 : 0
-          expect(run, `${tag}: 1-wide hall at ${x},${y}`).toBeLessThanOrEqual(2)
+          if (run > worstCol.run) worstCol = { run, x, y }
         }
       }
+      expect(worstCol.run, `${tag}: 1-wide hall run ending at ${worstCol.x},${worstCol.y}`).toBeLessThanOrEqual(2)
+
+      // Same again for the service passages: find the first offender, assert once.
+      let badDeck = -1
+      let badCorridor = -1
       for (const k of meta.service.tiles) {
         const x = k % level.w
         const y = (k / level.w) | 0
-        expect([Tile.Plating, Tile.Bog, Tile.Grass], tag).toContain(tileAt(level, x, y))
-        expect(level.complex!.corridors.some((c) => inRect(c.rect, x, y)), `${tag}: passage in a corridor`).toBe(false)
+        const t = tileAt(level, x, y)
+        if (badDeck < 0 && t !== Tile.Plating && t !== Tile.Bog && t !== Tile.Grass) badDeck = k
+        if (badCorridor < 0 && level.complex!.corridors.some((c) => inRect(c.rect, x, y))) badCorridor = k
       }
+      const where = (k: number): string => `${k % level.w},${(k / level.w) | 0}`
+      expect(badDeck, `${tag}: service passage at ${where(badDeck)} is tile ${tileAt(level, badDeck % level.w, (badDeck / level.w) | 0)}, not plating`).toBe(-1)
+      expect(badCorridor, `${tag}: passage in a corridor at ${where(badCorridor)}`).toBe(-1)
     }
   })
 })

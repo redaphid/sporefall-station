@@ -2,12 +2,16 @@ import { SPECIAL_NAME } from '../game/player'
 import { CONSUMABLES, WEAPONS } from '../game/data/items'
 import type { RenderView } from '../app/session'
 import { hotbarSlots, modBadge } from './hotbarModel'
+import { buildSequence } from './sequenceModel'
+import { createSequenceStrip } from './sequenceStrip'
 
 export interface Hud {
   update(view: RenderView): void
 }
 
-export const createHud = (mount: HTMLElement): Hud => {
+/** `onModSwap` enables the sequenced-mods strip's tap-to-swap (it is shown only
+ * while the run is sequenced; see sequenceModel). */
+export const createHud = (mount: HTMLElement, onModSwap?: (a: number, b: number) => void): Hud => {
   const root = document.createElement('div')
   // Offset by the notch/status-bar inset so the health bar clears the OS clock on
   // notched/foldable phones (Razr Ultra). --sf-safe-* are the STAGE-space safe
@@ -29,6 +33,10 @@ export const createHud = (mount: HTMLElement): Hud => {
   const hpBar = root.querySelector<HTMLElement>('#hp')!
   const info = root.querySelector<HTMLElement>('#info')!
   const hotbar = root.querySelector<HTMLElement>('#hotbar')!
+  // The sequence strip is the one interactive piece of the HUD (the root stays
+  // click-through); it only appears in a sequenced run.
+  const seq = createSequenceStrip(onModSwap ?? (() => {}), { compact: true })
+  root.insertBefore(seq.el, hotbar)
 
   let lastHp = -1
   let lastInfo = ''
@@ -61,6 +69,8 @@ export const createHud = (mount: HTMLElement): Hud => {
         lastInfo = text
         info.textContent = text
       }
+
+      seq.update(buildSequence(self, view.modCasting, view.simTick ?? view.tick))
 
       const inv = self.loadout?.inventory ?? []
       const active = self.loadout?.activeSlot ?? -1

@@ -186,6 +186,13 @@ export interface ItemStack {
    * fixture/snapshot serializes byte-for-byte unchanged (same optional-field
    * discipline as `annotations`). Resolved by `resolveWeapon` at the fire site. */
   mods?: WeaponMod[]
+  /** Sequenced casting only (World.modCasting): the position in the weapon's
+   * live mod window that the next cast starts from. Absent until the first
+   * sequenced shot, so default-mode stacks never carry it. */
+  castIndex?: number
+  /** Sequenced casting only: absolute tick until which the weapon recharges
+   * after its sequence wrapped. Absent until the first wrap. */
+  rechargeUntil?: number
 }
 
 /** Slot-based equipment — the ONE loadout representation shared by players AND

@@ -125,5 +125,10 @@ player would notice.
 | `e2e/` | Playwright + ffmpeg deterministic video recorder + scenario assertions |
 | `scripts/test/` | Debug/exploratory harness scripts (not unit tests; no `test_` prefix) |
 
+Design lineage — which game each mechanic was taken from, why it fits, and
+whether it shipped, is flagged off, or was rejected and on what grounds — lives
+in `INSPO.md`. Read it before proposing a mechanic: several have already been
+ruled out, with the reasoning preserved.
+
 Prefer Context7 MCP for current library docs (Capacitor, pixi.js, playwright, MCP
 SDK) rather than relying on memory — these APIs move.

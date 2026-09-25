@@ -1,10 +1,11 @@
 // @ts-check
 // Parity M4 proof: drives the frost + wet-electric interaction scenarios in a
 // real browser, records a video + labeled screenshots, and asserts live:
-//   FROST:        a frozen NPC hit once shatters (hp 0 + shattered); an
-//                 unfrozen twin hit once survives.
+//   FROST:        a frozen NPC hit once takes the blow x SHATTER_DAMAGE_MULT
+//                 and, on a 25hp bystander, gibs (dead + shattered); an
+//                 unfrozen twin takes the base blow and survives.
 //   WET-ELECTRIC: zapping one wet NPC chains to and damages the adjacent wet NPC.
-import { chromium } from 'playwright-core'
+import { acquireBrowser, releaseBrowser } from './lib.mjs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { mkdirSync, rmSync, readdirSync, renameSync } from 'node:fs'
@@ -14,7 +15,6 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:4890'
 const OUT = process.env.E2E_OUT ?? join(__dirname, 'output-frost')
 const VIDEO_DIR = join(OUT, 'video')
 const SEED = process.env.E2E_SEED ?? '424242'
-const CHROME = process.env.PW_CHROME
 
 rmSync(OUT, { recursive: true, force: true })
 mkdirSync(VIDEO_DIR, { recursive: true })
@@ -87,13 +87,33 @@ const runFrost = async (page) => {
   log('frozen', frozen.id, 'twin', twin.id, 'twinHp', twin.hp)
   await screenshot(page, 'frozen-and-twin')
 
-  const frozenRes = await page.evaluate((id) => window.__debug.hit(id, 1), frozen.id)
-  const twinRes = await page.evaluate((id) => window.__debug.hit(id, 1), twin.id)
+  // One pistol round (14) into each. Shattering multiplies it by 5, which is
+  // lethal to a 25hp bystander; the twin eats the plain 14 and walks.
+  const DMG = 14
+  const MULT = 5
+  const frozenRes = await page.evaluate(([id, d]) => window.__debug.hit(id, d), [frozen.id, DMG])
+  const twinRes = await page.evaluate(([id, d]) => window.__debug.hit(id, d), [twin.id, DMG])
   log('after hit — frozen', JSON.stringify(frozenRes), 'twin', JSON.stringify(twinRes))
   await screenshot(page, 'after-shatter')
 
-  check(frozenRes && frozenRes.shattered === true && frozenRes.hp === 0, 'frozen NPC shatters on impact (hp 0 + shattered)')
-  check(twinRes && twinRes.shattered === false && twinRes.dead === false && twinRes.hp === twin.hp - 1, 'unfrozen twin survives the same hit')
+  check(frozenRes && frozenRes.shattered === true && frozenRes.dead === true, 'frozen NPC shatters on impact (dead + ice gib)')
+  check(twinRes && twinRes.shattered === false && twinRes.dead === false && twinRes.hp === twin.hp - DMG, `unfrozen twin takes only the base blow (${twin.hp} -> ${twin.hp - DMG})`)
+  // The regression the owner reported: the shatter must be a MULTIPLIED BLOW,
+  // not an execute. Prove it on a body the multiplied blow cannot kill.
+  const tank = await page.evaluate((d) => {
+    const v = window.__sporefall.renderView()
+    const t = v.entities.find((e) => e.kind === 'npc' && !e.dead)
+    if (!t) return null
+    window.__debug.freeze(t.id)
+    const before = t.health ? t.health.hp : 0
+    window.__world.byId.get(t.id).health.hp = 400
+    window.__world.byId.get(t.id).health.max = 400
+    window.__world.byId.get(t.id).health.iframes = 0
+    const res = window.__debug.hit(t.id, d)
+    return { before, ...res }
+  }, DMG)
+  log('400hp frozen body after one shatter:', JSON.stringify(tank))
+  check(!!tank && tank.dead === false && tank.hp === 400 - DMG * MULT, `a 400hp frozen body SURVIVES the shatter, down ${DMG * MULT} (was an instant kill)`)
 }
 
 const runWetElectric = async (page) => {
@@ -117,7 +137,10 @@ const runWetElectric = async (page) => {
 }
 
 const main = async () => {
-  const browser = await chromium.launch({ headless: true, executablePath: CHROME || undefined })
+  // Same browser seam as `record()`: headless by default, headed on
+  // E2E_HEADFUL=1, or an already-running headed browser via E2E_CDP (see the
+  // acquireBrowser doc in lib.mjs — WSLg can leave no usable local display).
+  const { browser, shared } = await acquireBrowser()
   const context = await browser.newContext({
     viewport: { width: 900, height: 700 },
     recordVideo: { dir: VIDEO_DIR, size: { width: 900, height: 700 } },
@@ -136,7 +159,8 @@ const main = async () => {
 
   await page.close()
   await context.close()
-  await browser.close()
+  if (shared) await releaseBrowser()
+  else await browser.close()
 
   const webm = readdirSync(VIDEO_DIR).find((f) => f.endsWith('.webm'))
   if (webm) {

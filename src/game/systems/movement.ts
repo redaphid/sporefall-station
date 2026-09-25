@@ -2,8 +2,10 @@ import type { Entity } from '../entity'
 import { isSolidTile } from '../levelgen/level'
 import { SIM_DT, type InputCmd } from '../types'
 import type { World } from '../world'
+import { groupSpeedMult } from './groupFx'
 import { isRolling, ROLL_SPEED } from './roll'
 import { isImmobilized } from './statusFx'
+import { vlen } from '../simMath'
 
 const FRICTION = 12 // knockback velocity decay per second
 
@@ -130,7 +132,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
         e.intent.x = 0
         e.intent.y = 0
         if (cmd) {
-          const len = Math.hypot(cmd.moveX, cmd.moveY)
+          const len = vlen(cmd.moveX, cmd.moveY)
           if (len > 0.01) {
             const norm = len > 1 ? 1 / len : 1
             e.intent.x = cmd.moveX * norm
@@ -141,7 +143,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
       // Facing follows the aim vector (aim stick, or aim-where-you-move; see
       // selectAim). A centred aim leaves facing untouched so you keep pointing
       // where you last aimed instead of snapping to a default direction.
-      if (cmd && Math.hypot(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
+      if (cmd && vlen(cmd.aimX, cmd.aimY) > 0.01) e.facing = Math.atan2(cmd.aimY, cmd.aimX)
     } else if (e.playerCtl?.downed) {
       // A downed body has no self-driven movement. Intent is only rewritten for
       // upright players (the branch above), so without this a player downed
@@ -155,7 +157,13 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
 
     // Rolling ignores stun-freeze on movement (it's committed) and uses the burst
     // speed; everyone else uses their walk speed and halts while stunned.
-    const speed = rolling ? ROLL_SPEED : e.speed
+    // Group effects (a leader's rally, a pack's rage) scale the walk only — a
+    // roll's burst is the roll's own. ×1 for anything outside a group.
+    const speed = rolling ? ROLL_SPEED : e.speed * groupSpeedMult(e, w.tick)
+    if (isRooted(e)) {
+      e.vel.x = 0 // knockback lands, but a rooted body does not travel on it
+      e.vel.y = 0
+    }
     const ix = stunned && !rolling ? 0 : e.intent.x
     const iy = stunned && !rolling ? 0 : e.intent.y
     const dx = (ix * speed + e.vel.x) * SIM_DT
@@ -178,6 +186,10 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
  * pairwise resolve, unchanged: both bodies move, including static props (a prop
  * gives way when shoved, which the pathless NPC steering relies on to slip past
  * furniture instead of wedging on it). A no-op when the pair doesn't overlap. */
+/** A ROOTED body (a hive spire, systems/groups.ts) grows where it grew: bodies
+ * that bump it give way entirely, and blows never knock it anywhere. */
+const isRooted = (e: Entity): boolean => e.hive !== undefined
+
 const resolvePair = (a: Entity, b: Entity, blocked: (tx: number, ty: number) => boolean): void => {
   const dx = b.pos.x - a.pos.x
   const dy = b.pos.y - a.pos.y
@@ -188,8 +200,12 @@ const resolvePair = (a: Entity, b: Entity, blocked: (tx: number, ty: number) => 
   const push = ((rr - d) / 2) * 0.5 // soft: resolve half the overlap per tick
   const nx = dx / d
   const ny = dy / d
-  moveAndCollide(a, -nx * push, -ny * push, blocked)
-  moveAndCollide(b, nx * push, ny * push, blocked)
+  // Against a rooted body the mover takes the WHOLE separation (both halves).
+  const ra = isRooted(a)
+  const rb = isRooted(b)
+  if (ra && rb) return
+  if (!ra) moveAndCollide(a, -nx * push * (rb ? 2 : 1), -ny * push * (rb ? 2 : 1), blocked)
+  if (!rb) moveAndCollide(b, nx * push * (ra ? 2 : 1), ny * push * (ra ? 2 : 1), blocked)
 }
 
 /**

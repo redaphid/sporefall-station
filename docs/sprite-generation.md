@@ -21,7 +21,8 @@ Required models (exact filenames, in ComfyUI's `models/` tree):
 
 | Kind | File | Used for |
 |---|---|---|
-| checkpoint | `AnythingXL_xl.safetensors` (SDXL) | hero/env/character-anchor generation with the pixel-art LoRA |
+| checkpoint | `AnythingXL_xl.safetensors` (SDXL) | chars, tiles, items, fx — with the pixel-art LoRA. **Not props** (see the row below) |
+| checkpoint | `juggernautXL_juggXIByRundiffusion.safetensors` (SDXL) | **props, always.** An anime base composes busy multi-object scenes, so props came back as warehouses, stacks and sprite-sheet grids: 1/8 clean on `anything-xl` vs 8/8 on this, and later 0/12 vs 12/12 on the same recipe. `generate.py` pins it per-category (`CAT_MODEL`); you do not pass it by hand |
 | checkpoint | `dreamshaper_8.safetensors` (SD1.5) | low-VRAM fallback path; step-frame img2img; NPC sweeps |
 | lora | `pixel_art_style_by_skormino_v7.05_test_72img.safetensors` | pixel-art style. **This LoRA is Illustrious/SDXL** — with an SD1.5 checkpoint it silently no-ops (an earlier pack made exactly this mistake). Triggers: `masterpiece, pixpix, 8-bit, pixel_art`; CFG 3–4, euler, 28+ steps |
 | ipadapter | `ip-adapter-plus_sdxl_vit-h.safetensors`, `ip-adapter-plus_sd15.bin` | style anchoring (loaded automatically by IPAdapterUnifiedLoader preset "PLUS (high strength)") |
@@ -80,8 +81,8 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 
 | Script | Role |
 |---|---|
-| `comfy.py` | HTTP driver + graph builder. Env knobs: `COMFY`, `CKPT`, `LORA`, `LORA_W`, `SIZE`. Sampler recipe lives here (CFG 3.5, euler, 28 steps). |
-| `generate.py` | **The job table** — every asset's subject prompt, negatives, category, target px — plus the `sweep` / `final` CLI. |
+| `comfy.py` | HTTP driver + graph builder. Env knobs: `COMFY`, `CKPT`, `LORA`, `LORA_W`, `SIZE`. Sampler recipe lives here (CFG 3.5, euler, 28 steps). `CKPT` is the pack default and is **not** what props use. |
+| `generate.py` | **The job table** — every asset's subject prompt, negatives, category, target px — plus the `sweep` / `final` CLI. Also `CAT_MODEL`, the per-category base model: props are pinned to `juggernautXL` at CFG 7.0 / 768px; everything else takes the pack default. A category with no entry there is a hard error, never a silent fallback. |
 | `post.py` | Post-processing: content bbox crop → k-centroid downscale → palette quantize (no dither) → hard alpha → canvas placement; `tile()`, `sprite()`, `luma_sprite()`, `derive_step()`, `seam_energy()`, `contact_sheet()`. |
 | `palette.py` | The locked theme palette (34 colors for swampspace). Run it to emit a swatch sheet. |
 | `verify.py` | VLM gate (§5): per-asset checks, `--pairs`, `--same`, `--style`. |
@@ -103,7 +104,9 @@ export SWAMPSPACE_STAGE=/tmp/swampspace-stage    # raw sweeps live here, never c
 python3 generate.py --list                       # every job name
 python3 generate.py sweep prop.spore-barrel --seeds=8    # one asset sweep
 python3 generate.py sweep char.bog-mutant.s-idle --seeds=8   # one character pose
-# low-VRAM / fallback path:
+# low-VRAM / fallback path. NB this only reaches chars/tiles/items/fx: props
+# ignore $CKPT by design and stay on juggernautXL (CAT_MODEL in generate.py),
+# because a prop on the anime base is the 1/8-vs-8/8 defect, not a preference.
 CKPT=dreamshaper_8.safetensors LORA= SIZE=512 python3 generate.py sweep item.root-club --seeds=4
 
 # after curating (recording the pick in curation.json):
@@ -196,6 +199,62 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
 
 ## 4. Technique playbook (do not relearn these the expensive way)
 
+0. **Change ONE knob at a time, against a FIXED seed set.** This is the most
+   expensive lesson in this file and it outranks every specific fact below it.
+
+   A sweep tells you the *current recipe's yield*. It cannot tell you *which
+   knob is wrong* — and if you sweep a recipe that has never been executed, you
+   spend the whole run learning that, at ~1 usable in 10.
+
+   Worked example, 2026-08. The props kept returning a warehouse, a stack, or a
+   literal 4×3 GRID instead of one object. A night went into negative prompts
+   aimed at exactly that — `NEG_STACK`, an anti-grid trim, a tombstone list,
+   ground-plinth wording. **None of it moved the number.** Then, one knob at a
+   time against a fixed 8-seed set:
+
+   | changed | clean single objects | verdict |
+   |---|---|---|
+   | baseline | 1/8 | control |
+   | CFG 3.5 → 7.0 | 2/8 | kept |
+   | LoRA weight 1.0 → 0.6 | ~1/8, mushy edges | **reverted** |
+   | SIZE 1024 → 768 | same rate, chunkier at 32px | kept |
+   | **CKPT `anything-xl` → `juggernautXL`** | **8/8** | kept |
+
+   …and 8/8 again on eight *fresh* seeds. **The checkpoint was the whole
+   defect**, and no amount of prompt wording was ever going to fix it, because
+   `anything-xl` is an **anime** checkpoint and anime models compose busy,
+   multi-object, sprite-sheet-like scenes. We were describing the symptom back
+   to the model that was causing it.
+
+   Four iterations found what a night of parallel sweeping could not. The fixed
+   seed set is what makes it work: comparing 8 fresh seeds against 8 other fresh
+   seeds measures seed luck, not the change.
+
+   Corollary: **when a subject "refuses" a concept, suspect the base model
+   before you conclude the concept is impossible.** `wall-screen` was 0/12 and
+   written off as "the model refusing to draw a wall panel"; that verdict was
+   reached under the wrong checkpoint and had to be re-tested.
+
+   **This finding is now enforced, not just recorded.** For a long time it lived
+   only in `exp_props.py` — an experiment script nobody is told to run — while
+   the documented path here, `generate.py sweep prop.<name>`, passed no
+   checkpoint at all and fell through to the anime default. The lesson was
+   written down and the tool still did the wrong thing. `CAT_MODEL` in
+   `generate.py` now pins the base model per category and **raises** for a
+   category it has no decision for, because the failure mode is not a crash: the
+   run succeeds, the images look confident and well-formed, and they are
+   entirely wrong. A silent fallback to a wrong-but-plausible default is the
+   most expensive kind of bug in this pipeline.
+
+0b. **Judge by eye, at the size the player sees, beside the cast.** Neither the
+   silhouette-consistency harness nor the render suite can do this for you —
+   both passed happily on art that was dismissed as grey blobs in four seconds.
+   A gate that passes bad art is worse than no gate: it manufactures confidence.
+   Composite candidates at their true logical footprint (props 32px, cast 48px)
+   on the floor tint and look at them. Keep a log with the FAILURES in it —
+   `NEG_STACK` was assumed helpful for hours and was only found to be actively
+   harmful once someone wrote the result down.
+
 1. **Reference separation.** IPAdapter refs must be ENVIRONMENT-only for
    props/tiles and CHARACTER-only for figures. Mixing them grows faces on lamp
    posts. In `generate.py` this is the `refs="env" / "char-anchor" /
@@ -236,6 +295,12 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
 10. **Seed sweeps + human curation.** 4–8 seeds per asset, contact-sheet at
     FINAL sprite size (judging at 512 px lies), pick, record lineage in
     `curation.json`, regenerate any time with `generate.py final`.
+    **Props: budget 8–12, not 3.** A 5-subject × 3-seed prop sweep landed roughly
+    1 usable seed in 3 — two of three `spore-barrel` seeds grew a tree out of the
+    barrel, and `wall-screen` produced the exact reading its negatives forbade.
+    Judging that sweep by its best seed made it look like a 4-in-5 recipe and set
+    the seed budget far too low. **Rate the SWEEP, not the pick** — the pick is
+    curated by definition, so quoting it back as the hit rate is circular.
 11. **Cross-direction anchoring: derive, don't re-imagine.** txt2img per
     direction drifts identity — the first vine-ranger set shipped an `e` with
     a different cap, a bulky grey `ne` and slim `n` frames (width 21→31 px,
@@ -258,6 +323,11 @@ Ollama `qwen3-vl:8b`, majority vote (3 reads, `VOTES=` to change), temp 0.
 Checks per category:
 
 - props/items/tiles/fx: must NOT read as a person/creature (anthropomorphism);
+- props additionally: must NOT read as a **grave marker, boulder or planter**.
+  Anthropomorphism was the only wrong-reading anyone gated for, so the entire
+  prop set shipped as mossy headstones and passed every check we had. Note the
+  VLM gate **times out** and has never actually run — do not record it as passed;
+  read the contact sheet at game size instead;
 - floor tiles: camera must read top-down;
 - characters: `n`/`ne` poses must not show a face, `s` must not face away,
   `e` must read as a profile;

@@ -1,8 +1,9 @@
 import type { Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
+import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
-import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
+import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import type { CoopSample } from '../input/gamepadCoop'
@@ -14,8 +15,10 @@ export interface CoopSource {
 }
 
 // Slot 0 (the first pad) shares player 0 with the keyboard so the camera target
-// stays under the primary human; extra pads become players 1, 2, 3.
-const spawnOffset = (slot: number): number => slot * 1.5
+// stays under the primary human; extra pads become players 1, 2, 3. WHERE those
+// extra pads land is `playerSpawnPoint` (game/spawnPlacement.ts) — the fixed
+// `slot * 1.5` offset this used to apply landed 26.3% of local co-op players
+// inside a solid tile, entombed for the rest of the run.
 
 /** Clamp an aim vector to unit magnitude, preserving its angle. Out-of-spec pads
  * (Stadia reads up to ~1.11 on diagonals) would otherwise over-scale the reticle
@@ -67,6 +70,9 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
     hotbar: b.hotbar >= 0 ? b.hotbar : a.hotbar,
     throwItem: a.throwItem || b.throwItem,
     roll: a.roll || b.roll,
+    // Optional: only present when one side asked for a reorder, so a merge of
+    // two ordinary commands stays exactly the shape it always was.
+    ...((b.modSwap ?? a.modSwap) !== undefined ? { modSwap: b.modSwap ?? a.modSwap } : {}),
   }
 }
 
@@ -93,6 +99,10 @@ export class HostSession implements Session {
     private coop?: CoopSource,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
+    /** Mod casting rule for runs this session builds (the `sequencedMods` flag,
+     * resolved by the app layer). Latched into each new world at creation; a
+     * function is re-read per run, so a toggle applies from the next run. */
+    private modCasting?: ModCasting | (() => ModCasting | undefined),
   ) {
     this.buildRun()
   }
@@ -101,9 +111,12 @@ export class HostSession implements Session {
    * and by restart() — a fresh run from default state. */
   private buildRun(): void {
     this.world = createWorld(this.seed, 1, this.mode)
+    const casting = typeof this.modCasting === 'function' ? this.modCasting() : this.modCasting
+    if (casting) this.world.modCasting = casting
     populateWorld(this.world)
     setupFloor(this.world)
-    this.self = spawnPlayer(this.world, 0, this.world.level.spawn.x, this.world.level.spawn.y)
+    const at = playerSpawnPoint(this.world.level, 0)
+    this.self = spawnPlayer(this.world, 0, at.x, at.y)
   }
 
   /** Play again from a game-over: rebuild the run in place. (Solo has no
@@ -126,8 +139,8 @@ export class HostSession implements Session {
     if (slot === 0) return // player 0 already exists (self)
     if (this.joined.has(slot)) return
     this.joined.add(slot)
-    const spawn = this.world.level.spawn
-    spawnPlayer(this.world, slot, spawn.x + spawnOffset(slot), spawn.y)
+    const at = playerSpawnPoint(this.world.level, slot)
+    spawnPlayer(this.world, slot, at.x, at.y)
   }
 
   tick(): void {
@@ -162,6 +175,7 @@ export class HostSession implements Session {
       alert: stationAlerted(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
+      ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
       self: this.self,
       annotations: this.world.annotations,
     }

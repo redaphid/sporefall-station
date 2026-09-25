@@ -1,6 +1,42 @@
 import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+// The caching plan lives in src/ as plain data so it can be unit-tested — three
+// of its rules are load-bearing and silently breakable (swConfig.test.ts).
+import {
+  SW_CLEANUP_OUTDATED_CACHES,
+  SW_GLOB_PATTERNS,
+  SW_NAVIGATE_FALLBACK,
+  SW_NAVIGATE_FALLBACK_DENYLIST,
+  SW_RUNTIME_CACHING,
+  SW_TAKEOVER,
+} from './src/app/swConfig'
+import { SITE_ORIGIN } from './capacitor.config'
+import { BETAS_PREFIX, slugifyBranch } from './src/app/betaSlug'
+
+// BETA BUILD SWITCH. `BETA_SLUG=<branch name> pnpm run build` produces a bundle
+// meant to be served from https://<origin>/betas/<slug>/ instead of the root —
+// see src/worker/betas.ts and docs/deploy.md § "Betas".
+//
+// THIS IS THE LOAD-BEARING LINE OF THE WHOLE FEATURE. Vite has no `base` by
+// default, so a normally-built bundle's index.html asks for `/assets/index-<hash>.js`
+// at the ROOT. Served under /betas/foo/, that request leaves the beta's path
+// entirely and is answered by PRODUCTION's assets — a 200, the right-looking
+// page, and the wrong JavaScript. Nothing about the response says so. Setting
+// `base` rewrites those references to /betas/foo/assets/…, which is exactly what
+// the beta CI job asserts on the built index.html before it publishes anything.
+//
+// The value goes through the same slugifyBranch() the publish script and the
+// Worker use, so the path baked into the bundle cannot disagree with the path
+// its bytes were stored under. A BETA_SLUG that sanitizes to nothing is a hard
+// failure: silently building a root-based bundle here is the bug.
+const betaSlug = ((): string | null => {
+  const raw = process.env.BETA_SLUG ?? ''
+  if (raw.trim() === '') return null
+  const slug = slugifyBranch(raw)
+  if (slug === null) throw new Error(`BETA_SLUG=${JSON.stringify(raw)} does not sanitize to a usable beta slug`)
+  return slug
+})()
 
 // Baked into the bundle at build time so the running CODE can show its own
 // version. A simple INCREMENTING INTEGER (the git commit count) so it's obvious
@@ -20,7 +56,20 @@ const appVersion = (() => {
 })()
 
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(appVersion) },
+  // '/' for production; '/betas/<slug>/' for a beta build. import.meta.env.BASE_URL
+  // carries it into the bundle, which is where src/app/betaSlug.ts reads it back
+  // out to namespace multiplayer rooms — one value, so the assets and the rooms
+  // can never disagree about which build this is.
+  base: betaSlug === null ? '/' : `${BETAS_PREFIX}${betaSlug}/`,
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    // The origin this bundle is DEPLOYED to. The browser rarely needs it
+    // (`location.origin` is already the site), but the native Android
+    // webview serves the bundled dist/ from Capacitor's `https://localhost`,
+    // so anything that must reach the Worker has to be told the real host at
+    // build time. Single-sourced from capacitor.config.ts's OTA URL.
+    __SITE_ORIGIN__: JSON.stringify(SITE_ORIGIN),
+  },
   plugins: [
     // Offline-first on the WEB. The Android APK gets its offline story from the
     // bundled dist/ inside the app + Capgo OTA; the browser/home-screen install
@@ -29,7 +78,20 @@ export default defineConfig({
     // so it can be skipped on native, where a SW would cache the old web bundle
     // and fight the OTA updater.
     VitePWA({
-      registerType: 'autoUpdate',
+      // NO SERVICE WORKER IN A BETA BUILD. A service worker's blast radius is
+      // its scope, and a beta is same-origin with the live game: a sw.js served
+      // from /betas/<slug>/ could only ever fight the production worker for the
+      // player's cache, and the registration call asks for scope '/' anyway
+      // (src/app/pwa.ts), which would let a branch build hijack production for
+      // an installed player. Not generating one at all is the only version of
+      // this with no sharp edge; src/app/pwa.ts independently refuses to
+      // register under a beta base, so neither half alone can cause it.
+      disable: betaSlug !== null,
+      // 'prompt', not 'autoUpdate': the browser must NOT activate a new worker
+      // on its own. src/app/webUpdate.ts downloads in the background and swaps
+      // at a safe moment (src/app/updatePolicy.ts) — the player still never
+      // taps anything, it just doesn't happen mid-fight. See SW_TAKEOVER.
+      registerType: 'prompt',
       injectRegister: null,
       // index.html/manifest/icons already live in the repo; don't let the plugin
       // synthesize a second manifest that would fight public/manifest.webmanifest.
@@ -39,47 +101,18 @@ export default defineConfig({
         // That keeps the cache-control story to a single rule: exactly one file
         // must stay revalidated so a new deploy is discoverable (public/_headers).
         inlineWorkboxRuntime: true,
-        // The app shell + hashed JS/CSS + icons, plus the DEFAULT theme chain
-        // (swampspace-hires falls back to swampspace, so offline play needs
-        // both). Deliberately EXCLUDES public/sprites/** — 7.1 MB used only by
-        // the legacy `city` theme and the dev asset-showcase page; it is picked
-        // up on demand by the runtime cache below instead of bloating install.
         globDirectory: 'dist',
-        globPatterns: [
-          'index.html',
-          'manifest.webmanifest',
-          'assets/**/*.{js,css}',
-          'icons/**/*.{png,svg,ico}',
-          'themes/index.json',
-          'themes/swampspace-hires/**/*.{json,png,webp}',
-          'themes/swampspace/**/*.{json,png,webp}',
-        ],
-        // Deep links (`/?mode=solo&seed=7`) and home-screen launches are
-        // navigations — serve the precached shell for them when offline.
-        navigateFallback: 'index.html',
-        // ...but NEVER for the Worker routes or the self-hosted APK: /download
-        // is a real navigation that must reach the network, and swallowing it
-        // would hand people index.html instead of the .apk.
-        navigateFallbackDenylist: [/^\/ws\//, /^\/ota\//, /^\/download/, /^\/get$/, /^\/asset-showcase/],
-        // A new deploy must be able to reach an installed client: take over as
-        // soon as the new SW installs, and drop every previous cache version.
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-          {
-            // Non-default themes and the legacy sprite pack: cached the first
-            // time they're actually used, then available offline.
-            urlPattern: ({ url, sameOrigin }) =>
-              sameOrigin && (url.pathname.startsWith('/sprites/') || url.pathname.startsWith('/themes/')),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'sporefall-art-on-demand',
-              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // Every value below is defined and unit-tested in src/app/swConfig.ts.
+        // `skipWaiting`/`clientsClaim` are BOTH false in SW_TAKEOVER: a new
+        // worker installs completely, then waits for the app to swap it in at a
+        // safe moment. That is what makes the update atomic from the page's
+        // point of view — read the note on SW_TAKEOVER before changing it.
+        globPatterns: [...SW_GLOB_PATTERNS],
+        navigateFallback: SW_NAVIGATE_FALLBACK,
+        navigateFallbackDenylist: [...SW_NAVIGATE_FALLBACK_DENYLIST],
+        ...SW_TAKEOVER,
+        cleanupOutdatedCaches: SW_CLEANUP_OUTDATED_CACHES,
+        runtimeCaching: [...SW_RUNTIME_CACHING],
       },
       devOptions: {
         // Keep `pnpm run dev` a plain, cache-free Vite server — a SW in dev

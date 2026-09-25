@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from './generate'
-import { isWallTile, levelChecksum, Tile, TileGrid } from './level'
+import { generateCityLevel, generateLevel } from './generate'
+import { isFloorTile, isWallTile, levelChecksum, Tile, TileGrid } from './level'
 
 describe('generateLevel', () => {
   it('is bit-exact deterministic for the same seed and floor', () => {
@@ -20,9 +20,10 @@ describe('generateLevel', () => {
     expect(levelChecksum(a)).not.toBe(levelChecksum(c))
   })
 
-  it('cycles themes so consecutive floors look different', () => {
-    const themes = Array.from({ length: 5 }, (_, i) => generateLevel(7, i + 1).theme)
-    // Every adjacent floor pair uses a different district theme.
+  it('cycles themes so consecutive city floors look different', () => {
+    // Floors 3, 5, 7… are indoor complexes; the city floors are 1, 2, 4, 6, 8.
+    const themes = [1, 2, 4, 6, 8].map((f) => generateLevel(7, f).theme)
+    // Every adjacent city-floor pair uses a different district theme.
     for (let i = 1; i < themes.length; i++) {
       expect(themes[i]).not.toBe(themes[i - 1])
     }
@@ -38,7 +39,7 @@ describe('generateLevel', () => {
       exits.add(`${level.exit.x},${level.exit.y}`)
       // Spawn/exit always sit on opposite sides of the map.
       const far = Math.hypot(level.spawn.x - level.exit.x, level.spawn.y - level.exit.y)
-      expect(far).toBeGreaterThan(level.w / 2)
+      expect(far).toBeGreaterThan(level.h / 2) // the map, not the storey atlas
     }
     expect(spawns.size).toBeGreaterThan(1)
     expect(exits.size).toBeGreaterThan(1)
@@ -48,7 +49,9 @@ describe('generateLevel', () => {
     const pois = new Set<string>()
     for (let seed = 1; seed <= 30; seed++) {
       for (let floor = 1; floor <= 4; floor++) {
-        for (const b of generateLevel(seed, floor).buildings) {
+        // City set-pieces: floors 3+ build the indoor complex in play, so drive
+        // the city generator directly to keep its courtyards/vaults covered.
+        for (const b of generateCityLevel(seed, floor).buildings) {
           if (b.poi) pois.add(b.poi)
         }
       }
@@ -96,7 +99,7 @@ describe('generateLevel', () => {
             let anyReachable = false
             for (let y = room.y; y < room.y + room.h && !anyReachable; y++) {
               for (let x = room.x; x < room.x + room.w && !anyReachable; x++) {
-                if (grid.get(x, y) === Tile.Floor && reachable[y * level.w + x]) anyReachable = true
+                if (isFloorTile(grid.get(x, y)) && reachable[y * level.w + x]) anyReachable = true
               }
             }
             expect(anyReachable, `room ${room.x},${room.y} in building ${b.rect.x},${b.rect.y} seed ${seed} floor ${floor}`).toBe(true)

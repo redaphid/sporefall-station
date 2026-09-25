@@ -121,3 +121,41 @@ describe('marker projection matches the rendered world transform (Camera.apply p
     expect(Math.abs(projected.y - rendered.y)).toBeLessThanOrEqual(1)
   })
 })
+
+// Storeys (stairs spec §3.5): on a multi-storey floor the clamp rect is the
+// viewer's storey in the atlas (x0 = 80 for the loft), and the DOM projection
+// must still agree with the render there, corners included.
+describe('camera parity — the loft storey rect (x0 = 80)', () => {
+  const X0 = 80
+  const rendered = (camX: number, camY: number, zoom: number, wx: number, wy: number): { x: number; y: number } => {
+    const c = new Camera()
+    c.snapTo(camX, camY)
+    c.snapZoom(zoom)
+    const w = recWorld()
+    c.update(1 / 60)
+    c.apply(w as never, SCREEN.w, SCREEN.h, LEVEL.w, LEVEL.h, X0, 0)
+    const T = TILE_PX * zoom
+    return { x: w.pos.x + wx * T, y: w.pos.y + wy * T }
+  }
+  const spots = [
+    { x: X0 + 1.5, y: 1.5 },
+    { x: X0 + LEVEL.w - 1.5, y: LEVEL.h - 1.5 },
+    { x: X0 + LEVEL.w / 2, y: LEVEL.h / 2 },
+  ]
+  for (const zoom of [0.5, 1, 2])
+    for (const s of spots)
+      it(`zoom ${zoom} at ${s.x},${s.y}: projection matches the render and never shows the gutter side`, () => {
+        const cam: CameraState = { ...camState(s.x, s.y, zoom), levelX0: X0 }
+        const p = projectToScreen(s.x, s.y, cam)
+        const r = rendered(s.x, s.y, zoom, s.x, s.y)
+        expect(p.x).toBeCloseTo(r.x, 6)
+        expect(p.y).toBeCloseTo(r.y, 6)
+        const back = screenToWorld(p.x, p.y, cam)
+        expect(back.x).toBeCloseTo(s.x, 6)
+        // The applied centre stays inside the loft's clamp band, never pulled
+        // back toward x 0..63 (the old whole-level clamp would have).
+        const centre = screenToWorld(SCREEN.w / 2, SCREEN.h / 2, cam)
+        expect(centre.x).toBeGreaterThan(X0)
+        expect(centre.x).toBeLessThan(X0 + LEVEL.w)
+      })
+})

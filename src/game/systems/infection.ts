@@ -7,7 +7,7 @@
 //
 // ⚠️ SHIPPED BEHIND A TOGGLE. `INFECTION_ENABLED` (below) defaults to FALSE —
 // this changes game feel substantially, so it is OFF until the owner opts in,
-// exactly like `INFINITE_AMMO`. While off, `infectionSystem` is never called,
+// a build-time feature gate. While off, `infectionSystem` is never called,
 // no entity is ever `infected`, and the brain's infection branch is skipped, so
 // the shipped sim is byte-identical. A test/sim may force it per-world via
 // `w.aiFlags.infection` (which wins over the toggle) without touching the flag.
@@ -19,6 +19,7 @@ import { ELEMENTS } from '../data/elements'
 import type { Entity } from '../entity'
 import type { World } from '../world'
 import { addStatus, hasStatus, removeStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OWNER TUNING — every lever for the outbreak lives here.
@@ -100,7 +101,7 @@ export const infectionSystem = (w: World): void => {
     for (const t of w.entities) {
       if (t === src || t.dead || !t.health || t.infected) continue
       if (!t.ai && !t.playerCtl) continue
-      const d = Math.hypot(t.pos.x - src.pos.x, t.pos.y - src.pos.y)
+      const d = vlen(t.pos.x - src.pos.x, t.pos.y - src.pos.y)
       if (d <= CONTACT_RADIUS + t.radius + src.radius) addStatus(w, t, 'spore', CONTACT_DOSE)
     }
   }

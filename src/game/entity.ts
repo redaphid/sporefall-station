@@ -30,6 +30,11 @@ export interface LockoutEntry {
   guardUntil: number
   chainUntil: number
   tier: number
+  /** Only set for the LEGACY counter-based immobilizes (`stun`/`sleep`), which
+   * live on `Entity.status` counters instead of `fx`: with no `fx[kind].until` to
+   * read, this is how the guard knows a lock is still running. Absent for
+   * `frozen`/`electrified`, which read their active window straight off `fx`. */
+  activeUntil?: number
 }
 
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
@@ -140,7 +145,30 @@ export interface AiState {
   /** Squad membership (behavior 'squad'): shared squad id + this member's role
    * in the stack. Assigned by populate for gangster packs. */
   squad?: { id: number; role: 'lead' | 'flank' | 'rear' }
+  /** Group membership (systems/groups.ts): the id of a `World.groups` entry —
+   * a raid ("tide") or a hound pack — plus this member's role in it. The group
+   * layer owns the shared state (phase, target, rally point); every member reads
+   * it through its considerations. Absent on everything else → snapshot-stable. */
+  group?: { id: number; role: GroupRole }
+  /** RALLIED by a live leader within earshot until this absolute tick: faster
+   * and harder to hurt (systems/groupFx.ts). Refreshed every tick by the group
+   * layer while in range, so it lapses a moment after the leader falls. */
+  rallyUntil?: number
+  /** MANHUNTER until this absolute tick (hound pack rage): faster, never flees,
+   * tracks the aggressor (systems/groups.ts). */
+  rageUntil?: number
+  /** Latched retreat-to-heal: set below the retreat threshold while the group
+   * has a live medic, cleared once patched back up (systems/groups.ts). */
+  healing?: boolean
+  /** A player that hurt this body since the group layer last looked — the
+   * manhunter trigger. Stamped by combat.applyDamage, consumed by groups.ts. */
+  provokedBy?: EntityId
+  /** Lobber (siege gun): next absolute tick it may fire a shell. */
+  lobAt?: number
 }
+
+/** A member's job inside its group (systems/groups.ts). */
+export type GroupRole = 'leader' | 'grunt' | 'medic' | 'sapper' | 'artillery' | 'hound'
 
 /** One applied weapon modifier: a registry id (`data/mods.ts`) plus a
  * deterministic stack count. Pure JSON — no functions/closures — so a modded
@@ -158,6 +186,13 @@ export interface ItemStack {
    * fixture/snapshot serializes byte-for-byte unchanged (same optional-field
    * discipline as `annotations`). Resolved by `resolveWeapon` at the fire site. */
   mods?: WeaponMod[]
+  /** Sequenced casting only (World.modCasting): the position in the weapon's
+   * live mod window that the next cast starts from. Absent until the first
+   * sequenced shot, so default-mode stacks never carry it. */
+  castIndex?: number
+  /** Sequenced casting only: absolute tick until which the weapon recharges
+   * after its sequence wrapped. Absent until the first wrap. */
+  rechargeUntil?: number
 }
 
 /** Slot-based equipment — the ONE loadout representation shared by players AND
@@ -179,7 +214,7 @@ export interface Loadout {
 export interface Entity {
   id: EntityId
   kind: EntityKind
-  /** Key into data/ definitions: 'thug', 'cop', 'player', 'medkit', 'door.wood', ... */
+  /** Key into data/ definitions: 'thug', 'cop', 'player', 'grenade', 'door.wood', ... */
   archetype: string
   pos: Vec2
   /** Position at the previous tick — used for render interpolation. */
@@ -192,6 +227,21 @@ export interface Entity {
   speed: number
   radius: number
   facing: number // radians
+
+  /** A furnishing that STANDS AGAINST a wall, facing out of it (so the wall is
+   * at `facing + π`). Purely presentational: the renderer nudges the sprite that
+   * way so a rank of shelving kisses the wall instead of floating a half-tile
+   * off it. The sim treats a mounted prop exactly like any other soft prop —
+   * same tile, same collision, same hp. Absent on everything else, so every
+   * pre-existing snapshot round-trips byte-for-byte. */
+  mount?: 'wall'
+
+  /** Stair hysteresis (stairs.ts `stairStep`): set by a climb, held while the
+   * body stands on the stair or near its landing (the 3x3), cleared once it
+   * steps clear — so holding "forward" after arriving can't bounce it
+   * straight back. Omitted when clear, so every pre-stairs snapshot
+   * round-trips byte-for-byte. */
+  stairLock?: true
 
   health?: {
     hp: number
@@ -248,7 +298,7 @@ export interface Entity {
     ttl: number
     /** Grenades: AoE on fuse-end or impact instead of point damage. */
     explode?: { radius: number; damage: number }
-    /** Thrown items: the area effect applied where it lands (molotov → fire). */
+    /** Thrown items: the area effect applied where it lands (grenade → explode). */
     onLand?: import('./data/items').AreaEffect
     /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
     onHit?: import('./data/items').StatusApply
@@ -257,7 +307,10 @@ export interface Entity {
     pierceLeft?: number
     /** Wall bounces left — reflect off a blocked tile instead of dying (bounce). */
     bounceLeft?: number
-    /** Per-tick turn rate (radians) steering toward the nearest hostile (homing). */
+    /** Per-tick turn rate (radians) of the homing seeker head. Steering is
+     * line-of-sight-gated and cone-limited (see projectiles.homeToward): the
+     * round chases only VISIBLE enemies of its owner ahead of it, and flies
+     * straight otherwise — it never curves at something behind a wall. */
     homing?: number
     /** Spawn N damaging children on the first body it strikes (split/multishot). */
     split?: { count: number; damage: number; speed: number; ttl: number }
@@ -278,6 +331,10 @@ export interface Entity {
      * look from its mods, Nova-Drift style. Absent = vanilla shot, so every
      * pre-feature world/fixture serializes byte-for-byte unchanged. */
     mods?: WeaponMod[]
+    /** A LOBBED shell (the siege gun's): it arcs OVER bodies and walls and
+     * only resolves where it comes down, at ttl — never on the first thing in
+     * its path. Absent on every ordinary projectile → snapshot-stable. */
+    arc?: boolean
   }
   pickup?: { itemId: string; qty: number }
   /**
@@ -326,6 +383,9 @@ export interface Entity {
    * colliding ground hazard). `fuel` burns down 1/tick; while it lasts it lays
    * the `spore` element on bodies standing in the cell (see systems/spore.ts). */
   spore?: { fuel: number }
+  /** A HIVE SPIRE's infestation clock (systems/groups.ts): absolute ticks for its
+   * next bud and next spread, plus the live buds it has spawned (capped). */
+  hive?: { nextSpawnAt: number; nextSpreadAt: number; children: EntityId[] }
   status?: { stun: number; sleep: number; hitFlashUntil: number; cloakUntil: number }
   /** Active status/element effects, keyed by kind ('burning', ...). */
   fx?: Fx
@@ -367,13 +427,21 @@ export interface Entity {
  * `player.ts` and `systems/missions.ts` can import without a cycle. */
 export const SPAWN_GRACE_TICKS = 90
 
+/** Default body radius for a walking entity (players and most NPCs). Named and
+ * exported so SPAWN PLACEMENT can test the same circle the collision resolver
+ * will (game/spawnPlacement.ts): a hard-coded copy that drifted from this would
+ * put bodies where they cannot stand, which is unrecoverable — see the entombment
+ * note there. Smaller than half a tile, so a body centred on a tile centre always
+ * fits inside that one tile. */
+export const BODY_RADIUS = 0.35
+
 /** Bare entity with no id — World.addEntity assigns ids so worlds stay self-contained. */
 export const makeEntity = (
   kind: EntityKind,
   archetype: string,
   x: number,
   y: number,
-  radius = 0.35,
+  radius = BODY_RADIUS,
 ): Entity => ({
   id: 0,
   kind,

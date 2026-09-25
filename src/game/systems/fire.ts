@@ -45,7 +45,7 @@ export const igniteCell = (w: World, tx: number, ty: number): Entity | undefined
   return addEntity(w, e)
 }
 
-/** Light the cell an entity stands in (molotov splash, debug ignite). */
+/** Light the cell an entity stands in (barrel/`ignite` object, debug ignite). */
 export const ignite = (w: World, target: Entity): Entity | undefined =>
   igniteCell(w, Math.floor(target.pos.x), Math.floor(target.pos.y))
 

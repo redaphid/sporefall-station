@@ -68,12 +68,47 @@ Gate every merge on `pnpm run build` (typecheck) + `pnpm exec vitest run` + `pnp
 all green, resolve conflicts (watch for *semantic* conflicts, not just textual),
 re-run the full suite after each merge, then `git push origin main`.
 
-**Keep release notes current.** Each merge to `main` should update
-`src/ui/releaseNotes.ts` — prepend a single one-line, player-facing summary of
-the change (punchy, ~40 chars, no internal/tooling churn) and trim to the latest
-few. That file is the source of truth for the "what's new" line under the version
-number on the start menu, so the menu always reflects recent builds. Skip it only
-for pure internals with nothing a player would notice.
+**Show your work in the PR body.** Before/after shots belong in the PR — but this
+repo is private, so an in-repo image URL renders **broken** for the reviewer. Publish
+with `pnpm run review:image <file.png>` and paste the markdown it prints; it serves
+the image publicly from the Worker (`/review/*`, KV-backed, never in the game
+bundle) and refuses to hand back a URL it hasn't re-fetched as real image bytes.
+Honest contact sheets — failures included — are the point. See `docs/deploy.md` § D.
+
+**Link the owner to interesting situations.** Every finished feature ships with
+2-5 `?state=<id>` links: playable replays of moments that show the feature off,
+such as the squad breaking when its leader dies, or the player walking into the pillared hall.
+Each link gets a one-line label. Put them **in the PR body and in your report
+to the owner**. A screenshot shows him the feature; a link lets him play it.
+
+- Capture **after merge + deploy, against the live site**. A state link replays
+  the recorded inputs against whatever code the site is serving, so a link captured on
+  a branch build diverges or breaks once live code differs. Edit the PR
+  body after deploy to add them.
+- Procedure: open `https://sporefall.hypnodroid.com/?debug`, set the situation
+  up with the debug verbs (`sporefall.verb(...)`: seed/floor, teleport, spawn),
+  let it run a few seconds, then `await sporefallShare('<label>')`. That returns
+  `{ id, url }`. The snapshot holds ~1 s of rewind, so start the capture just
+  *after* the interesting beat.
+- Confirm each link: load it and check `window.__stateReplay` is green. A red
+  verdict means the snapshot missed state; don't hand it over.
+- While building, write the scenarios down as reproducible setups (seed,
+  floor, coords, spawns, what to watch), so the post-deploy capture is
+  mechanical. Details of the mechanic are in `docs/testing-video.md` §
+  "`?state=<id>` — shareable debug links".
+
+**Keep release notes current.** Each PR with a player-visible change should add
+one file under `src/ui/releaseNotes/` — `YYYY-MM-DD-short-slug.ts` exporting a
+single one-line, player-facing summary as `default` (punchy, ~40 chars, no
+internal/tooling churn). `src/ui/releaseNotes.ts` loads every file in that
+directory and shows the newest few under the version number on the start menu
+— **add a file, never edit an existing one**: that is what lets two PRs land a
+release note in the same afternoon without conflicting on each other's line
+(see the comment atop `releaseNotes.ts` for why this is a directory and not an
+array). Date the file by its **merge** date, not the day you branched — the
+prefix is the sort key, so a stale-dated note lands below newer ones and may
+never reach the menu at all. Skip it only for pure internals with nothing a
+player would notice.
 
 ## Map of the codebase
 

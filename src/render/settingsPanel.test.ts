@@ -383,4 +383,219 @@ describe('settings panel — controller remap section', () => {
     expect(bindBtn('attack').textContent).toBe('B')
     expect(bindBtn('interact').textContent).toBe('A · RB · L2 · R2')
   })
+
+  it('the zoom rows exist and render as unbound by default (the player binds them here)', () => {
+    create()
+    expect(bindBtn('zoomIn').textContent).toBe('—')
+    expect(bindBtn('zoomOut').textContent).toBe('—')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Controller NAVIGATION of the panel (the start-menu path): openForPad arms a
+// gamepad navigator over every button/select/checkbox; the gear path stays
+// touch-only; bind capture takes the pad over completely while it runs.
+// ---------------------------------------------------------------------------
+describe('settings panel — gamepad navigation', () => {
+  let root: HTMLElement
+  let pads: (Gamepad | null)[]
+  let clock: { schedule: (cb: () => void) => number; cancel: (h: number) => void; tick: () => void }
+  let origGetGamepads: typeof navigator.getGamepads
+
+  const makeClock = (): typeof clock => {
+    let pending: (() => void) | null = null
+    return {
+      schedule: (cb) => {
+        pending = cb
+        return 1
+      },
+      cancel: () => {
+        pending = null
+      },
+      tick: () => {
+        const cb = pending
+        pending = null
+        cb?.()
+      },
+    }
+  }
+
+  const fakePad = (pressed: number[] = []) =>
+    ({
+      index: 0,
+      id: 'Fake Pad',
+      mapping: 'standard',
+      connected: true,
+      buttons: Array.from({ length: 18 }, (_, i) => ({ pressed: pressed.includes(i), touched: false, value: pressed.includes(i) ? 1 : 0 })),
+      axes: [0, 0, 0, 0],
+    }) as unknown as Gamepad
+
+  const create = () =>
+    createSettingsPanel(root, false, () => {}, THEMES, () => pads, { schedule: clock.schedule, cancel: clock.cancel })
+
+  /** The nav walks real layout (`offsetParent`), which happy-dom doesn't do —
+   * force every panel control visible, the same trick gamepadMenu.test uses. */
+  const patchOffsets = (): void => {
+    for (const el of panelOf(root).querySelectorAll('button, select, input'))
+      Object.defineProperty(el, 'offsetParent', { value: document.body, configurable: true })
+  }
+
+  const navList = (): HTMLElement[] =>
+    Array.from(panelOf(root).querySelectorAll<HTMLElement>('button, select, input[type="checkbox"]'))
+
+  /** One press-then-release of a pad control, stepping the nav both frames. */
+  const pulse = (button: number): void => {
+    pads = [fakePad([button])]
+    clock.tick()
+    pads = [fakePad()]
+    clock.tick()
+  }
+  const NEXT = 13 // d-pad down
+  const CONFIRM = 0 // A
+
+  /** Walk the focus from index 0 to the given control. */
+  const stepTo = (target: HTMLElement): void => {
+    const idx = navList().indexOf(target)
+    expect(idx).toBeGreaterThanOrEqual(0)
+    for (let i = 0; i < idx; i++) pulse(NEXT)
+  }
+
+  const bindBtn = (action: string) => panelOf(root).querySelector<HTMLButtonElement>(`[data-remap-action="${action}"]`)!
+  const closeBtn = () => panelOf(root).querySelector<HTMLButtonElement>('[data-role="settings-close"]')!
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    localStorage.clear()
+    resetButtonMapCacheForTest()
+    setPadCapture(false)
+    pads = []
+    clock = makeClock()
+    root = mount()
+    origGetGamepads = navigator.getGamepads
+    ;(navigator as unknown as { getGamepads: () => (Gamepad | null)[] }).getGamepads = () => pads
+  })
+  afterEach(() => {
+    setPadCapture(false)
+    vi.useRealTimers()
+    ;(navigator as unknown as { getGamepads?: typeof origGetGamepads }).getGamepads = origGetGamepads
+  })
+
+  it('openForPad opens the panel; close() closes it; isOpen tracks both — and there IS a Close control', () => {
+    const panel = create()
+    expect(panel.isOpen()).toBe(false)
+    panel.openForPad()
+    expect(panel.isOpen()).toBe(true)
+    expect(panelOf(root).style.display).toBe('block')
+    expect(closeBtn()).toBeTruthy()
+    panel.close()
+    expect(panel.isOpen()).toBe(false)
+  })
+
+  it('gear-open does NOT arm the navigator: pad presses go nowhere (during play the pad belongs to combat)', () => {
+    create()
+    patchOffsets()
+    gearOf(root).click() // open via touch
+    pads = [fakePad([CONFIRM])]
+    clock.tick()
+    clock.tick()
+    expect(isPadCaptureActive()).toBe(false)
+    expect(navList()[0]!.style.boxShadow).toBe('') // no focus cursor at all
+  })
+
+  it('openForPad arms the navigator: the cursor appears, and confirm CYCLES the focused select', () => {
+    const panel = create()
+    patchOffsets()
+    panel.openForPad()
+    clock.tick() // resync frame: paint, no action
+    const q = panelOf(root).querySelector<HTMLSelectElement>('#q')!
+    expect(navList()[0]).toBe(q) // Effects select is first in DOM order
+    expect(q.style.boxShadow).not.toBe('')
+    expect(q.value).toBe('high')
+    pulse(CONFIRM)
+    expect(q.value).toBe('low')
+    pulse(CONFIRM)
+    expect(q.value).toBe('off')
+    pulse(CONFIRM)
+    expect(q.value).toBe('high') // wraps — no dead end
+  })
+
+  it('cycling a select through the navigator persists like a mouse change would', () => {
+    const panel = create()
+    patchOffsets()
+    panel.openForPad()
+    clock.tick()
+    pulse(CONFIRM) // Effects high → low
+    const root2 = mount()
+    createSettingsPanel(root2, false, () => {}, THEMES)
+    expect(panelOf(root2).querySelector<HTMLSelectElement>('#q')!.value).toBe('low')
+  })
+
+  it('a zoom action can be bound END-TO-END by pad: navigate to the row, confirm, press the button', () => {
+    const panel = create()
+    patchOffsets()
+    panel.openForPad()
+    clock.tick() // resync
+    stepTo(bindBtn('zoomIn'))
+    pulse(CONFIRM) // enter capture on the Zoom in row
+    expect(isPadCaptureActive()).toBe(true)
+    expect(bindBtn('zoomIn').textContent).toBe('press a button…')
+    // THE ADVERSARIAL PART: bind button 2 (X) — X is ALSO a nav confirm
+    // button. If the navigator were not suppressed during capture, this press
+    // would re-click the capturing row and toggle-cancel the capture.
+    pads = [fakePad([2])]
+    clock.tick() // nav frame while capturing: must do nothing
+    vi.advanceTimersByTime(60) // capture poll: binds X
+    expect(bindBtn('zoomIn').textContent).toBe('X')
+    expect(isPadCaptureActive()).toBe(true) // drain: held button stays spent
+    pads = [fakePad()]
+    vi.advanceTimersByTime(60) // released → capture over
+    expect(isPadCaptureActive()).toBe(false)
+    expect(JSON.parse(localStorage.getItem('sporefall.padmap')!).map.zoomIn).toEqual([2])
+    // The swap rule: special inherited zoomIn's old (empty) set — visibly
+    // unbound, restorable via its own reset. The deliberate cost of freeing a
+    // button on a fully-booked pad.
+    expect(bindBtn('special').textContent).toBe('—')
+  })
+
+  it('the reset button of a row is reachable and works by pad', () => {
+    localStorage.setItem('sporefall.padmap', JSON.stringify({ v: 1, map: { ...defaultButtonMap(), zoomIn: [4], roll: [] } }))
+    resetButtonMapCacheForTest()
+    const panel = create()
+    patchOffsets()
+    panel.openForPad()
+    clock.tick()
+    const reset = panelOf(root).querySelector<HTMLButtonElement>('[data-remap-reset="roll"]')!
+    stepTo(reset)
+    pulse(CONFIRM)
+    expect(panelOf(root).querySelector<HTMLButtonElement>('[data-remap-action="roll"]')!.textContent).toBe('LB')
+  })
+
+  it('Close is reachable by pad, closes the panel, and disarms the navigator', () => {
+    const panel = create()
+    patchOffsets()
+    panel.openForPad()
+    clock.tick()
+    stepTo(closeBtn())
+    pulse(CONFIRM)
+    expect(panel.isOpen()).toBe(false)
+    // Re-open via the gear (touch): the navigator must stay disarmed.
+    gearOf(root).click()
+    pads = [fakePad([CONFIRM])]
+    clock.tick()
+    clock.tick()
+    expect(navList()[0]!.style.boxShadow).toBe('')
+    expect(isPadCaptureActive()).toBe(false)
+  })
+
+  it('closing the panel (any path) while capturing ends the capture', () => {
+    const panel = create()
+    patchOffsets()
+    panel.openForPad()
+    clock.tick()
+    stepTo(bindBtn('zoomOut'))
+    pulse(CONFIRM)
+    expect(isPadCaptureActive()).toBe(true)
+    panel.close()
+    expect(isPadCaptureActive()).toBe(false)
+  })
 })

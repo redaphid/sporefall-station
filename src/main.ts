@@ -1,4 +1,5 @@
 import { HostSession } from './app/hostSession'
+import { cameraRect } from './game/stairs'
 import { createInspect, installInspect, type Inspect } from './app/inspect'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
@@ -7,15 +8,36 @@ import { pickNewSeed } from './app/newSeed'
 import { createLoadoutPanel, type WeaponThumb } from './ui/loadoutPanel'
 import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
+import { hostFailureMessage } from './app/hostError'
+import { joinFailureMessage } from './app/joinError'
+import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
+// Type-only: the implementations are dynamically imported, so neither the
+// replay nor the upload code reaches the initial boot chunk.
+import type { StateReplay } from './app/stateReplay'
+import type { ShareResult } from './app/stateShare'
 import { loadFixtureJson } from './game/fixtures'
-import { applyScenario } from './game/scenarios'
+import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './game/scenarios'
+import {
+  DEEP_LINK_FRESHEN_MS,
+  DEEP_LINK_RELOAD_GRACE_MS,
+  persistsRun,
+  readDeepLink,
+  resumesSave,
+  unknownScenarioMessage,
+  wantsFreshBuild,
+} from './app/deepLink'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { loadSettings } from './app/settings'
+import { flagOn } from './app/featureFlags'
+import type { ModCasting } from './game/world'
+import { createModSwapQueue, previewSwaps, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
+import { buildSequence } from './ui/sequenceModel'
+import { createSequenceStrip } from './ui/sequenceStrip'
 import {
   canRequestFullscreen,
   enterFullscreen,
@@ -23,7 +45,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT } from './game/types'
+import { SIM_DT, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -40,20 +62,45 @@ import { createTouch, mergeInputs, type TouchInput } from './input/touch'
 import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { notifyOtaReady } from './app/ota'
-import { registerPwa } from './app/pwa'
+import { FLOOR_TRANSITION_FRAMES, momentOf } from './app/updatePolicy'
+import { startUpdates, type Updates } from './app/updates'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
 import { resolveWsBaseUrl, WsTransport } from './net/transport/wsTransport'
+import { betaSlugFromBase, namespaceRoom } from './app/betaSlug'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
 import type { ZoomSink } from './render/zoomModel'
+import { loadZoom, persistZoomSink } from './render/zoomPersist'
 import { wireWheelZoom } from './input/wheelZoom'
+import { createPadZoom, type PadZoom } from './input/padZoom'
 import { createHud } from './ui/hud'
 import { createDebugLog } from './ui/debugLog'
+import {
+  frameErrorBannerText,
+  frameErrorMessage,
+  guardFrame,
+  initialFrameErrors,
+  noteFrameError,
+  noteFrameOk,
+} from './ui/frameErrorModel'
+import {
+  initialShare,
+  shareAction,
+  shareButtonLabel,
+  shareCopyRetried,
+  shareFailed,
+  shareStarted,
+  shareStatusText,
+  shareSucceeded,
+  shareUrl,
+  type ShareState,
+} from './ui/shareModel'
 import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
-import { createScreens } from './ui/screens'
+import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
+import { installStage, lockLandscape, toStage } from './ui/orientation'
 import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
@@ -62,26 +109,60 @@ import { createDraftScreen } from './ui/draftScreen'
 import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
 import { weaponStack } from './game/systems/inventory'
 
+/** The rewind ring, plus the single action the pause menu needs from it. Both
+ * live on one object because they are one feature: the ring is only worth
+ * running because something can capture it, and a capture is only worth having
+ * because the ring gave it run-up. */
+interface StateSharing {
+  /** Called from the frame loop after every live tick. */
+  afterTick(): void
+  /** Capture → self-check → upload. Rejects with the real reason. */
+  share(note?: string): Promise<ShareResult>
+}
+
 const boot = async (): Promise<void> => {
   // Confirm this bundle booted so the native OTA layer keeps it (and applies any
   // newer bundle it fetched). Non-blocking; no-op on web / dev live-reload.
   void notifyOtaReady()
 
-  // Install the offline service worker (web only — no-op inside the APK, where
-  // the bundled dist/ + OTA already provide offline). This is what makes the
-  // browser / home-screen install boot with the radio off.
-  registerPwa()
+  // Offline-first + stay-up-to-date. On the web this installs the service
+  // worker (what makes the browser / home-screen install boot with the radio
+  // off); inside the APK the bundled dist/ + Capgo already provide offline and
+  // this drives the OTA swap instead. Either way: downloads happen in the
+  // background, and the swap lands at a moment where a reload costs nothing —
+  // the player never taps anything. See src/app/updatePolicy.ts.
+  const updates = startUpdates()
 
   const mount = document.getElementById('app')!
   const uiMount = document.getElementById('ui')!
+  // ── Landscape always (src/ui/orientation.ts) ──────────────────────────────
+  // Take ownership of the rotating stage BEFORE the renderer exists: pixi sizes
+  // itself from #app (`resizeTo`), and #app fills the stage box, so the stage
+  // must already carry the swapped dimensions when the renderer first measures.
+  // On a phone stuck in portrait (rotation lock on, or iOS Safari where
+  // `screen.orientation.lock` does not exist) this turns the WHOLE presentation
+  // 90° — canvas, HUD, touch controls, menus, overlays — because they all live
+  // inside #stage. Input is corrected at the DOM event boundary rather than per
+  // control; see the orientation.ts header for why that is the safe shape.
+  const stageEl = document.getElementById('stage') ?? mount.parentElement!
+  const stage = installStage(stageEl, detectTouchCaps(navigator, (q) => window.matchMedia(q)))
   // UI chrome (settings gear/panel) mounts on #ui: it must hit-test ABOVE the
   // touch layer's stick zones (also on #ui) — chrome on #app is unreachable by
   // touch (see src/ui/chrome.ts).
   const renderer = await createRenderer(mount, uiMount)
+  // A portrait↔landscape flip changes the stage box; pixi's own resize observer
+  // would catch it a frame later, so nudge it in the same turn as the transform.
+  stage.onChange = (): void => renderer.app.resize()
 
   const params = new URLSearchParams(location.search)
   const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
-  const room = params.get('room') ?? 'car'
+  // A beta build (served from /betas/<slug>/) plays in its OWN rooms. The sim is
+  // deterministic and the host is authoritative, so a beta peer and a production
+  // peer sharing room 'car' do not see a version warning — they DESYNC, and it
+  // reads as a flaky network rather than two different builds. Namespacing by
+  // the slug the bundle was built with keeps beta testers together and away from
+  // live players; production (slug null) is untouched. See src/app/betaSlug.ts.
+  const room = namespaceRoom(params.get('room') ?? 'car', betaSlugFromBase(import.meta.env.BASE_URL))
   const name = params.get('name') ?? `Player-${(Math.random() * 90 + 10) | 0}`
 
   // Browser fullscreen on run-start: the Fullscreen API needs a live user
@@ -101,21 +182,86 @@ const boot = async (): Promise<void> => {
       })
     )
       enterFullscreen()
+    lockLandscape() // already-fullscreen case; the listener below covers the rest
   }
-  const mode = (params.get('mode') as GameMode | null) ?? (await pickMode(uiMount, requestFullscreenOnGesture))
+  // `screen.orientation.lock()` only SUCCEEDS in fullscreen, and the request
+  // above resolves asynchronously — so the lock that actually lands is this one,
+  // fired the moment fullscreen arrives. It is a silent no-op on iOS Safari,
+  // which exposes `screen.orientation` but implements no `lock()`; those players
+  // get landscape from the stage rotation instead. The native Android shell
+  // needs none of this (AndroidManifest `screenOrientation="sensorLandscape"`).
+  document.addEventListener('fullscreenchange', () => {
+    if (isFullscreen()) lockLandscape()
+  })
+  // Sitting at the picker is the cheapest possible moment to swap in a new
+  // build: no run exists yet. If one is already downloaded, it applies here.
+  updates.reportMoment('modePicker', 0)
+  // ── Deep links always win (src/app/deepLink.ts) ───────────────────────────
+  // A link naming a scenario / shared state / world is honoured on the CURRENT
+  // build: the service worker may have served the previous one, and `?mode=`
+  // skips the picker, which is otherwise the only moment an update applies. The
+  // moment is still `modePicker` here (no run exists), so a staged update is
+  // handed over as soon as it verifies and the page reloads with the same URL.
+  const link = readDeepLink(params)
+  if (wantsFreshBuild(link)) {
+    const note = showBootNote(uiMount, 'Loading the latest build…', 600)
+    const fresh = await updates.freshen(DEEP_LINK_FRESHEN_MS)
+    if (fresh === 'staged') {
+      note.show('Updating to the latest build…')
+      // The reload is on its way. If the swap never lands, carry on with this
+      // build rather than hang: the checks below still refuse a bad link.
+      await new Promise((resolve) => setTimeout(resolve, DEEP_LINK_RELOAD_GRACE_MS))
+    }
+    note.remove()
+  }
+  if (link.scenario !== null && !isKnownScenario(link.scenario)) {
+    // Never fall back to an ordinary run (or to the save): that is what made a
+    // stale build look like "it just took me to my existing game".
+    const msg = unknownScenarioMessage(link.scenario, SCENARIO_NAMES, APP_VERSION)
+    console.error(`sporefall: ${msg}`)
+    showBootError(uiMount, msg)
+    return
+  }
+  // A `?state=` link IS the intent: someone was sent an exact world to look at,
+  // so boot straight into it rather than making them pick Solo from the menu
+  // first (which would also build a throwaway world before replacing it).
+  // Shared states restore into SINGLE-PLAYER — see the `?state=` block below.
+  const sharedState = params.get('state')
+  const mode =
+    (params.get('mode') as GameMode | null) ??
+    // The third argument adds the Settings entry (opens the panel over the menu
+    // with controller navigation armed) — the pad-only player's route to button
+    // remapping, e.g. binding the zoom buttons.
+    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
+  // Past the picker, nothing between here and the frame loop can honestly
+  // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
+  // conservative one until the loop starts reporting real ones.
+  updates.reportMoment('inRun', 0)
 
   // Player 0 = keyboard (+ touch). Gamepads are owned by the co-op manager,
   // which press-to-joins each pad as player 0 (first pad) then 1, 2, 3.
   // A `?script=` deterministic input timeline replaces live input for e2e videos.
   const script = params.get('script') ? SCRIPTS[params.get('script')!] : undefined
-  // View-only zoom control: pinch (touch) + scrollwheel (desktop), both routed
-  // through the camera's smooth, anchored zoom target. Zero effect on the sim.
-  const zoomSink: ZoomSink = {
+  // View-only zoom control: pinch (touch) + scrollwheel (desktop) + held pad
+  // buttons (padZoom, below), all routed through the camera's smooth, anchored
+  // zoom target. Zero effect on the sim. The player's zoom is restored from the
+  // last session before any input wiring (snapZoom: no animated glide at boot)
+  // — the explicit `?zoom=` param, applied further down, still wins over the
+  // restore — and every change through the sink saves it back, debounced.
+  renderer.camera.snapZoom(loadZoom())
+  const zoomSink: ZoomSink = persistZoomSink({
     get: () => renderer.camera.zoomTarget,
     set: (z, ax, ay) => renderer.camera.setZoom(z, ax, ay),
     reset: () => renderer.camera.resetZoom(),
-  }
+  })
   wireWheelZoom(renderer.app.canvas, zoomSink)
+  // Controller zoom: hold the (settings-bound) zoomIn/zoomOut buttons to zoom,
+  // anchored on the screen centre — no cursor exists on a pad. Polled from the
+  // frame loop; inert while the settings panel is capturing a bind.
+  const padZoom = createPadZoom(zoomSink, () => ({
+    x: renderer.app.screen.width / 2,
+    y: renderer.app.screen.height / 2,
+  }))
   // Mouse aim (desktop/keyboard): track the cursor in canvas space and hand the
   // keyboard a provider that turns it into a CONTINUOUS aim vector from the local
   // player toward the cursor — so a keyboard player's bullet follows the mouse to
@@ -127,8 +273,11 @@ const boot = async (): Promise<void> => {
   let pointerScreen: { x: number; y: number } | null = null
   window.addEventListener('pointermove', (ev) => {
     if (ev.pointerType === 'touch') return
-    const rect = renderer.app.canvas.getBoundingClientRect()
-    pointerScreen = { x: ev.clientX - rect.left, y: ev.clientY - rect.top }
+    // STAGE coordinates — the same space renderer.worldToScreen reports in
+    // (pixi globals are canvas-local, and the canvas fills the stage). Using
+    // the canvas's bounding rect would be the ROTATED element's axis-aligned
+    // box, which is not the origin we want. See ui/orientation.ts.
+    pointerScreen = toStage(ev.clientX, ev.clientY)
   })
   const readPointerAim = (): Aim | null => {
     if (!pointerScreen) return null
@@ -143,6 +292,10 @@ const boot = async (): Promise<void> => {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
+  // Sequenced-mods reorder requests from the HUD strip / pause menu ride out on
+  // the local player's next command (see input/modSwapQueue.ts).
+  const modSwaps = createModSwapQueue()
+  input = withModSwaps(input, modSwaps)
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
@@ -152,14 +305,16 @@ const boot = async (): Promise<void> => {
   // Persist the AUTHORITATIVE world to localStorage so a full-page reload
   // seamlessly rejoins the in-progress run. SOLO/host only (HostSession owns the
   // authoritative world); a NetClient rejoins via the host, and we never persist
-  // a client-predicted world as authoritative. Explicit dev world-injection flows
-  // (`?world=`, `?scenario=`, `?script=`) take precedence over auto-resume.
+  // a client-predicted world as authoritative. A link that names the world
+  // (`?scenario=`, `?state=`, `?world=`, `?script=`) takes precedence over the
+  // save AND never writes to it: no persister at all, so neither the autosave
+  // nor a restart/death `clear()` can touch the player's real run.
   const store = browserStore()
-  const persister: Persister | undefined = store && session instanceof HostSession ? createPersister(store) : undefined
-  const scenario = params.get('scenario')
-  const explicitWorldOverride = !!scenario || !!params.get('world') || !!params.get('script')
+  const persister: Persister | undefined =
+    store && session instanceof HostSession && persistsRun(link) ? createPersister(store) : undefined
+  const scenario = link.scenario
   let resumed = false
-  if (persister && store && session instanceof HostSession && !explicitWorldOverride) {
+  if (persister && store && session instanceof HostSession && resumesSave(link)) {
     const saved = readSave(store) // null on no/corrupt/version-mismatched save → fresh game
     if (saved) {
       session.world = saved
@@ -171,7 +326,7 @@ const boot = async (): Promise<void> => {
   }
 
   if (scenario && session instanceof HostSession) {
-    applyScenario(session.world, scenario)
+    applyScenario(session.world, scenario, { floor: Number(params.get('floor')) || undefined })
     // Scenarios may carve/build tiles (stages, walls) — re-bake the tilemap so
     // the render matches the sim's level, not the pre-scenario one.
     renderer.setLevel(session.world.level)
@@ -185,14 +340,19 @@ const boot = async (): Promise<void> => {
   // snapshots. Placed before the `?e2e`/`?script=` exposure below so `window.__world`
   // points at the injected world. Absent `?world=`, behavior is unchanged.
   const worldParam = params.get('world')
+  // Shared with `?state=` below: both replace the freshly-built world wholesale.
+  const injectWorld =
+    session instanceof HostSession
+      ? (json: WorldJson): void => {
+          const host = session
+          const restored = deserializeWorld(json)
+          host.world = restored
+          host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
+          renderer.setLevel(restored.level)
+        }
+      : undefined
   if (worldParam && session instanceof HostSession) {
-    const host = session
-    const inject = (json: WorldJson): void => {
-      const restored = deserializeWorld(json)
-      host.world = restored
-      host.self = restored.entities.find((e) => e.playerCtl) ?? host.self
-      renderer.setLevel(restored.level)
-    }
+    const inject = injectWorld!
     if (worldParam === '@inline') {
       await new Promise<void>((resolve) => {
         ;(window as unknown as { __loadWorld: (j: WorldJson) => void }).__loadWorld = (j) => {
@@ -203,6 +363,40 @@ const boot = async (): Promise<void> => {
     } else {
       inject(loadFixtureJson(worldParam))
     }
+  }
+  // `?state=<id>` — a SHAREABLE debug state: the same exact-world injection as
+  // `?world=`, but fetched from the Worker instead of read out of the bundle, so
+  // a link can be sent to someone who does not have the fixture (or the repo).
+  //
+  // Scoped to SINGLE-PLAYER (solo/host owns the authoritative world). Restoring a
+  // multiplayer state onto one machine is a genuinely different problem — peers,
+  // slot ownership and per-client prediction all have to be re-established — and
+  // is deliberately not attempted here. A friend who opens the link plays the
+  // captured world solo, which is what reproducing a bug needs.
+  //
+  // The import is DYNAMIC so the share/compress code never lands in the boot
+  // chunk of a normal player, and any failure is reported loudly rather than
+  // silently dropping the player into a fresh, wrong world.
+  const stateParam = sharedState
+  let stateReplay: StateReplay | undefined
+  if (stateParam && injectWorld && session instanceof HostSession) {
+    const host = session
+    const { fetchState } = await import('./app/stateShare')
+    const { startStateReplay } = await import('./app/stateReplay')
+    const payload = await fetchState(stateParam)
+    // Load the world from ~1 s BEFORE the moment when there is run-up to play,
+    // so the viewer watches the bug happen; the frame loop below drives the
+    // recorded inputs forward and hands control over at the captured frame.
+    // With no rewind (sender had no ring armed) we land on the captured frame.
+    injectWorld(payload.rewind?.world ?? payload.world)
+    stateReplay = startStateReplay(payload, () => host.world, uiMount)
+    const { note, build } = payload.meta
+    console.log(
+      `sporefall: loaded shared state ${stateParam} ` +
+        `(floor ${payload.world.floor}, tick ${payload.world.tick}, ${payload.world.entities.length} entities` +
+        `${payload.rewind ? `, replaying ${payload.rewind.frames.length} ticks of run-up` : ''})` +
+        `${note ? ` — "${note}"` : ''}${build && build !== APP_VERSION ? ` [captured on build ${build}, you are on ${APP_VERSION}]` : ''}`,
+    )
   }
   const zoom = Number(params.get('zoom'))
   if (zoom > 0) renderer.camera.snapZoom(zoom) // clamped to [ZOOM_MIN, ZOOM_MAX]
@@ -288,8 +482,7 @@ const boot = async (): Promise<void> => {
           zoom: renderer.camera.zoom,
           screenW: renderer.app.screen.width,
           screenH: renderer.app.screen.height,
-          levelW: hostWorld.level.w,
-          levelH: hostWorld.level.h,
+          ...cameraRect(hostWorld.level, hostWorld.entities.find((e) => e.playerCtl)?.pos.x ?? renderer.camera.x),
         })
       // GROUND TRUTH projection: where the world container ACTUALLY drew a
       // world point this frame (post edge-clamp + shake). e2es assert the DOM
@@ -324,7 +517,111 @@ const boot = async (): Promise<void> => {
       setTheme: (id) => void renderer.setTheme(id),
     })
   }
-  runLoop(session, renderer, uiMount, coop, inspect, touch, debug, persister, resumed)
+  // Shareable states (`?state=`). Arm a rolling ring of the last second or two
+  // of inputs, and expose one-tap capture: the pause menu's Share button
+  // (createPauseOverlay, below) and `sporefallShare(note)` in the console are
+  // the same call. The ring is what turns "here is the corpse" into "here is the
+  // bug happening": a capture carries 1-2 s of run-up, so `respawned inside a
+  // wall` ships the spawn, not just the aftermath.
+  //
+  // NOT `?debug`-GATED, and that is the whole point of the button. The person
+  // who needs to report a bug is on a phone: he cannot open a console and he
+  // cannot add `?debug` to a URL mid-run. A capture path only reachable by
+  // someone who already opted in reports nothing, which is exactly the wall
+  // being removed here. This matches the existing split rather than breaking it
+  // — the read-only `window.sporefall` surface already ships in every build,
+  // while `sporefall.verb(...)` MUTATION stays `?debug`-only. Capturing and
+  // uploading a snapshot is a read.
+  //
+  // Armed always rather than lazily on first tap, and the cost is why that is
+  // affordable: one `serializeWorld` per 30 ticks (1 s) against the autosave's
+  // existing one per 45 — the same order as a cost every device already pays —
+  // plus two `WorldJson` held in memory and, per tick, two ints and a clone of a
+  // small input map. Arming on first tap would have been cheaper still, but it
+  // hands the FIRST share — the one taken seconds after the bug, the only one
+  // that matters — zero run-up. The module is still a DYNAMIC import, so the
+  // compressor/uploader stay out of the initial parse.
+  //
+  // Host/solo only: `NetClientSession` does not own the world it would upload,
+  // and (like the pause menu itself) has nowhere to put the button.
+  let stateRing: StateSharing | undefined
+  if (session instanceof HostSession) {
+    const host = session
+    const { StateRing, shareState } = await import('./app/stateShare')
+    let ring = new StateRing(host.world)
+    // ORDER MATTERS, and getting it wrong is exactly the bug this feature is
+    // built to catch. `onTickInputs` fires BEFORE `tickWorld`, so it can only
+    // STASH the composed slot→command map — the ground-truth input the world is
+    // a pure function of. The ring is fed AFTER the tick (see `afterTick` below,
+    // called from the frame loop next to `debug?.afterTick()`), because a
+    // checkpoint taken pre-tick is misaligned by one tick against the inputs
+    // recorded alongside it, and a replay from it drifts. The capture-time
+    // self-check caught precisely that during development.
+    let pending: Map<number, InputCmd> | undefined
+    host.onTickInputs = (inputs) => {
+      pending = new Map([...inputs].map(([slot, cmd]) => [slot, { ...cmd }]))
+    }
+    // New Seed / play-again REPLACES the world object; the buffered history then
+    // belongs to a world that no longer exists, so start the ring over.
+    let seen = host.world
+    const rebindRing = (): void => {
+      if (host.world !== seen) {
+        seen = host.world
+        ring = new StateRing(host.world)
+      }
+    }
+    // The one capture path. The button and the console verb both land here, so
+    // there is nothing to keep in sync and no second implementation to drift.
+    const share = async (note?: string): Promise<ShareResult> => {
+      rebindRing()
+      return shareState(host.world, { note }, ring)
+    }
+    ;(window as unknown as { sporefallShare: unknown }).sporefallShare = async (note?: string) => {
+      const r = await share(note)
+      console.log(
+        `sporefall: shared ${r.url}\n  ${(r.bytes / 1024).toFixed(1)} KiB uploaded ` +
+          `(${(r.rawBytes / 1024).toFixed(1)} KiB raw), ${r.rewindTicks} ticks of run-up`,
+      )
+      return r
+    }
+    // Fed from the frame loop AFTER each tick, so the recorded inputs and the
+    // checkpoint they are replayed from describe the same instant.
+    stateRing = {
+      afterTick: () => {
+        rebindRing()
+        if (!pending) return
+        ring.observe(host.world, pending)
+        pending = undefined
+      },
+      share,
+    }
+    if (params.has('debug'))
+      console.log('sporefall: state sharing armed — await sporefallShare("what broke"), or use the pause menu')
+  }
+  // A sleeping screen freezes this player — and if this player is the host, it
+  // freezes the authoritative sim and therefore EVERYONE, which looks like a
+  // crash rather than a phone. Acquired here because this is the point of no
+  // return into gameplay: `runLoop` never returns, game-over swaps the world in
+  // place rather than going back to the menu, so the only way out of a game is a
+  // reload — and the browser releases the lock for us on unload. The handle's
+  // `release()` exists for whenever a real quit-to-menu path arrives.
+  keepScreenAwake()
+  runLoop(
+    session,
+    renderer,
+    uiMount,
+    coop,
+    inspect,
+    updates,
+    touch,
+    debug,
+    persister,
+    resumed,
+    stateReplay,
+    stateRing,
+    padZoom,
+    modSwaps,
+  )
 }
 
 /** localStorage as a `KeyValueStore`, or `undefined` where it is unavailable
@@ -366,9 +663,32 @@ const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> =
   return new BroadcastChannelTransport('client', deps.room)
 }
 
+/**
+ * Hand the radio back when the page goes away.
+ *
+ * `Transport.stop()` existed but had NO call site anywhere in the app, so a
+ * reload (or the OTA updater swapping the bundle) left the BLE advertiser and
+ * the GATT service registered against a dead JS context. The stack keeps
+ * advertising a host nobody is simulating: joiners see the phantom in their
+ * Nearby Games list, connect, and wait forever for a lobby that no longer
+ * exists — and the fresh context's addGattService can collide with the
+ * already-registered service from the old one.
+ *
+ * `pagehide` rather than `unload`: it is the event that actually fires in
+ * mobile WebViews (and it fires for bfcache/backgrounding too, which is the case
+ * that matters on a phone).
+ */
+const stopTransportOnPagehide = (transport: Transport): void => {
+  window.addEventListener('pagehide', () => void transport.stop().catch(() => {}), { once: true })
+}
+
+/** The `sequencedMods` flag, resolved to the run rule a host latches into each
+ * run it builds. Read per run, so toggling applies from the next run. */
+const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
+
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -379,9 +699,11 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   const dbg = createDebugLog(deps.uiMount)
 
   if (mode === 'host') {
-    // Advertise the host's display name so the join list can label this phone
-    // (issue #35). No "Spore " tag: the scan already filters by service UUID, and
-    // the ~8-char advertisement budget is too tight to waste on a prefix.
+    // The display name is passed for the lobby, NOT for the airwaves: nothing
+    // this host broadcasts carries a name at all (#16 took it back off after #35
+    // put it on and killed discovery). Joining phones tag the row 'Sporefall'
+    // themselves — see toHostLabel — which needs no advertisement bytes and works
+    // against hosts running older builds too.
     const wsHost = new URLSearchParams(location.search).get('transport') === 'ws'
     const transport = wsHost
       ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
@@ -389,7 +711,8 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         ? new BleHostTransport(deps.name, dbg.log)
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport)
+    stopTransportOnPagehide(transport)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
@@ -397,7 +720,23 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       dbg.log(`host: lobby now ${players.length} player(s)`)
       lobby.setPlayers(players)
     }
-    await session.start()
+    // Hosting could not report its own failure. createSession is awaited at the
+    // call site WITHOUT a catch (the join path has one, this did not), so a
+    // rejected session.start() became an unhandled rejection and the player was
+    // left staring at "Waiting for players…" while nothing was on the air —
+    // indistinguishable from a healthy host that nobody has joined yet.
+    //
+    // That is the difference between a friend saying "it says Bluetooth
+    // permission denied" and "it just doesn't work", which is the difference
+    // between a fixable evening and a ruined one. Show the plugin's own words.
+    try {
+      await session.start()
+    } catch (err) {
+      console.error('host: start failed', err)
+      dbg.log(`host: START FAILED — ${err instanceof Error ? err.message : String(err)}`)
+      lobby.setStatus(hostFailureMessage(err))
+      return null
+    }
     await lobby.waitForStart()
     session.beginGame()
     lobby.close()
@@ -408,20 +747,63 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
   // join
   dbg.log(`join: mode start, native=${native}`)
   const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
+  stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
+
+  // The lobby is built BEFORE the connect attempt, not after it.
+  //
+  // It owns the only status line the joining player has, so creating it after
+  // connect() meant a failed join had nowhere to put the bad news: the pick-a-host
+  // overlay removed itself the instant you tapped a host, and the next screen was
+  // never created, leaving the player on a dead black rectangle. With the plugin's
+  // connect() also never settling on refusal (see withTimeout), that dead screen
+  // was permanent and indistinguishable from a slow-but-working join.
+  //
+  // Ordering is safe: both are opaque `inset:0` overlays in the same mount, so the
+  // later-appended pick-a-host screen paints ON TOP of this one and hands over to
+  // it when it removes itself.
+  const lobby = createLobbyUi(deps.uiMount, false)
 
   if (transport instanceof BleClientTransport) {
     // BLE needs an explicit pick-a-host step before the lobby.
-    await transport.start()
     const scanCtl: { stop: (() => Promise<void>) | null } = { stop: null }
-    const deviceId = await pickHost(deps.uiMount, (onFound) => {
-      void transport.scan(onFound).then((stop) => (scanCtl.stop = stop))
-    })
-    await scanCtl.stop?.()
-    await transport.connect(deviceId)
+    try {
+      await transport.start() // throws early and legibly if Bluetooth is off
+      const deviceId = await pickHost(deps.uiMount, (onFound, onError) => {
+        // The one join failure the try/catch below CANNOT see. `scan()` is not
+        // awaited — it is started from inside pickHost and its promise `void`ed —
+        // so a rejection here rejected nothing anybody was waiting on: the outer
+        // `await pickHost(...)` simply never settled and the guest watched
+        // "Scanning over Bluetooth…" until the phone was force-quit. To the player
+        // that is indistinguishable from a room with no host in it.
+        //
+        // The message comes from the same `joinFailureMessage` the catch below
+        // uses, so a scan failure reads exactly like a start/connect failure; only
+        // the surface differs, because the only screen up at this moment is the
+        // pick-a-host overlay.
+        void transport
+          .scan(onFound)
+          .then((stop) => (scanCtl.stop = stop))
+          .catch((err: unknown) => {
+            console.error('join: scan failed', err)
+            dbg.log(`join: SCAN FAILED — ${err instanceof Error ? err.message : String(err)}`)
+            onError(joinFailureMessage(err))
+          })
+      })
+      await scanCtl.stop?.()
+      lobby.setStatus('Connecting over Bluetooth…')
+      await transport.connect(deviceId)
+    } catch (err) {
+      console.error('join: start/connect failed', err)
+      dbg.log(`join: JOIN FAILED — ${err instanceof Error ? err.message : String(err)}`)
+      lobby.setStatus(joinFailureMessage(err))
+      // Hand the radio back: a failed join must not leave us scanning forever.
+      await scanCtl.stop?.().catch(() => {})
+      await transport.stop().catch(() => {})
+      return null
+    }
   }
 
-  const lobby = createLobbyUi(deps.uiMount, false)
   if (transport instanceof WebBluetoothClientTransport) {
     // Device was already picked in the gesture handler; now do the GATT
     // connect with the session's handlers registered so peerConnected lands.
@@ -449,6 +831,13 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       } else if (phase === 'ended') {
         lobby.setStatus('Host disconnected')
         resolve(false)
+      } else if (phase === 'unreachable') {
+        // The join handshake is retried now (netClient.ts), but a retry that
+        // never lands must still END somewhere the player can see. This is the
+        // Bluetooth link being up while the host never answers — the case that
+        // used to sit on "Looking for a host…" until the phone was force-quit.
+        lobby.setStatus('Host never answered — move closer and reload to retry')
+        resolve(false)
       }
     }
   })
@@ -474,16 +863,74 @@ const createPadHint = (mount: HTMLElement): ((show: boolean) => void) => {
   return (show) => (el.style.display = show ? 'block' : 'none')
 }
 
+/**
+ * The "something in the frame threw" banner. A crash-proof loop that reports
+ * nothing is a client that is quietly broken — which is precisely what made this
+ * class of bug survive a playtest. Tap to dismiss; it comes straight back if the
+ * fault repeats. Console gets the full stack either way.
+ */
+const createFrameErrorBanner = (mount: HTMLElement): ((text: string | null) => void) => {
+  const el = document.createElement('div')
+  markUiChrome(el)
+  el.style.cssText =
+    'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:none;z-index:80;max-width:92%;' +
+    'font:600 12px system-ui;color:#ffdede;background:#7f1d1dee;padding:6px 12px;border-radius:8px;' +
+    'pointer-events:auto;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+  el.title = 'Tap to dismiss'
+  let dismissed = ''
+  el.addEventListener('click', () => {
+    dismissed = el.textContent ?? ''
+    el.style.display = 'none'
+  })
+  mount.appendChild(el)
+  let shown: string | null = null
+  return (text) => {
+    if (text === shown) return // no DOM churn on a fault that repeats every frame
+    shown = text
+    if (text === null) {
+      el.style.display = 'none'
+      return
+    }
+    el.textContent = text
+    if (text !== dismissed) el.style.display = 'block'
+  }
+}
+
+/**
+ * Best-effort clipboard write. Reports whether it actually landed instead of
+ * swallowing the rejection, because the caller shows a different (and honest)
+ * screen when it did not — see ui/shareModel.ts. Fails legitimately in an
+ * insecure context, in a WebView that withholds the permission, and possibly
+ * after a slow await has outlived the tap's transient user activation.
+ */
+const copyToClipboard = async (text: string): Promise<boolean> => {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false // `navigator.clipboard` may not even exist; the catch covers both
+  }
+}
+
 /** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
- * panel and the Resume / New Seed / Run-it-back actions. `onResume` unpauses,
- * `onNewSeed`/`onRestart` are wired only on host/solo (undefined hides the
- * button). Reachable via Escape (main.ts) or the pad's Start button. */
+ * panel and the Resume / New Seed / Run-it-back / Share-state actions.
+ * `onResume` unpauses, `onNewSeed`/`onRestart`/`onShare` are wired only on
+ * host/solo (undefined hides the button). Reachable via Escape, the pad's
+ * Start button, or the ⏸ chrome button (main.ts — the only one of the three a
+ * phone has). */
 interface PauseOverlay {
   update(paused: boolean, view: RenderView): void
 }
 const createPauseOverlay = (
   mount: HTMLElement,
-  actions: { onResume: () => void; onNewSeed?: () => void; onRestart?: () => void; weaponThumb?: WeaponThumb },
+  actions: {
+    onResume: () => void
+    onNewSeed?: () => void
+    onRestart?: () => void
+    onShare?: (note?: string) => Promise<ShareResult>
+    weaponThumb?: WeaponThumb
+    modSwaps?: ModSwapQueue
+  },
 ): PauseOverlay => {
   const el = document.createElement('div')
   markUiChrome(el)
@@ -493,6 +940,25 @@ const createPauseOverlay = (
   el.innerHTML = `<div style="font:800 40px system-ui;color:#fff;letter-spacing:6px;text-shadow:0 2px 8px #000">PAUSED</div>`
   const panel = createLoadoutPanel(actions.weaponThumb)
   el.appendChild(panel.el)
+  // Sequenced mods: the wand order, reorderable while paused. The sim is
+  // stopped, so swaps queue and apply on the first tick after Resume; the strip
+  // previews the queued order meanwhile.
+  const swaps = actions.modSwaps
+  let lastView: RenderView | undefined
+  const paintSeq = (): void => {
+    const v = lastView
+    seq.update(
+      v && swaps
+        ? buildSequence(v.self, v.modCasting, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
+        : null,
+    )
+  }
+  const seq = createSequenceStrip((a, b) => {
+    swaps?.push(a, b)
+    paintSeq()
+  })
+  seq.el.style.cssText += ';width:min(340px,86vw);box-sizing:border-box;padding:8px 10px;border-radius:10px;background:#141822f2;text-align:left;color:#e7e7ee;font:12px system-ui'
+  el.appendChild(seq.el)
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center'
   const btn = (label: string, primary: boolean): HTMLButtonElement => {
@@ -517,6 +983,91 @@ const createPauseOverlay = (
     row.appendChild(rbBtn)
   }
   el.appendChild(row)
+  // ── Share state ───────────────────────────────────────────────────────────
+  // One tap: snapshot the live world (with the ring's run-up), verify it replays
+  // to itself, upload it, put the URL on the clipboard. The state machine and
+  // every word on screen are in ui/shareModel.ts, unit-tested, so this block is
+  // only DOM. Nothing here can paint a success that did not happen.
+  //
+  // KNOWN, AND DELIBERATE: the last link SURVIVES a New Seed / Run it back, so
+  // reopening the menu after a restart still shows it. It is not stale — an
+  // uploaded snapshot stays valid whatever the live world does next — and
+  // clearing it would throw away a link he may not have finished sending. The
+  // cost is that after a restart the link describes the PREVIOUS run.
+  const onShare = actions.onShare
+  if (onShare) {
+    const shareBtn = btn('🔗 Share state', false)
+    row.appendChild(shareBtn)
+    let share = initialShare()
+    const status = document.createElement('div')
+    status.dataset.role = 'share-status'
+    status.style.cssText = 'font:500 13px system-ui;color:#cfd3e0;max-width:min(92vw,540px);display:none'
+    // A READ-ONLY INPUT, not a <div>: on Android a long-press on plain text in a
+    // full-screen overlay does not reliably raise the selection handles, and the
+    // fallback path is worthless if it cannot actually be copied. An input gives
+    // the native select-all/copy affordance, and tapping it selects the lot so
+    // the long-press only has to hit "Copy".
+    const link = document.createElement('input')
+    link.readOnly = true
+    link.dataset.role = 'share-url'
+    link.setAttribute('aria-label', 'Shared state link')
+    link.style.cssText =
+      'font:500 13px ui-monospace,SFMono-Regular,Menlo,monospace;padding:9px 10px;border-radius:8px;' +
+      'border:1px solid #4a4f60;background:#11131b;color:#ffd76a;width:min(92vw,540px);display:none;' +
+      'text-align:center;box-sizing:border-box;pointer-events:auto'
+    const selectAll = (): void => link.select()
+    link.addEventListener('focus', selectAll)
+    link.addEventListener('click', selectAll)
+
+    const paint = (): void => {
+      shareBtn.textContent = shareButtonLabel(share)
+      const busy = shareAction(share) === 'none'
+      shareBtn.disabled = busy
+      shareBtn.style.opacity = busy ? '0.6' : '1'
+      const text = shareStatusText(share)
+      status.textContent = text ?? ''
+      status.style.display = text === null ? 'none' : 'block'
+      status.style.color = share.phase === 'failed' ? '#ff9a9a' : '#cfd3e0'
+      const url = shareUrl(share)
+      link.value = url ?? ''
+      link.style.display = url === null ? 'none' : 'block'
+    }
+
+    const set = (next: ShareState): void => {
+      share = next
+      paint()
+    }
+
+    shareBtn.addEventListener('click', () => {
+      const action = shareAction(share)
+      if (action === 'none') return
+      if (action === 'copy') {
+        // Retry inside a FRESH gesture — the whole reason this is a second tap
+        // rather than an automatic retry. No re-upload: same URL, same world.
+        const url = shareUrl(share)
+        const before = share
+        if (url !== null) void copyToClipboard(url).then((copied) => set(shareCopyRetried(before, copied)))
+        return
+      }
+      set(shareStarted())
+      // Fire-and-forget on purpose: the handler must return at once so the tap
+      // feels answered, and the pending state is what says "still working".
+      // Capture + a full replay self-check + gzip + upload is seconds, not
+      // milliseconds, which is also why the clipboard write below may find the
+      // tap's user activation expired — handled, not assumed away.
+      void (async () => {
+        try {
+          const r = await onShare('shared from the pause menu')
+          set(shareSucceeded(r.url, r.rewindTicks, await copyToClipboard(r.url)))
+        } catch (err) {
+          set(shareFailed(err))
+        }
+      })()
+    })
+    el.appendChild(status)
+    el.appendChild(link)
+    paint()
+  }
   mount.appendChild(el)
   let wasPaused = false
   return {
@@ -524,10 +1075,65 @@ const createPauseOverlay = (
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
       if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
+      if (show) {
+        lastView = view
+        paintSeq()
+      }
       wasPaused = show
       el.style.display = show ? 'flex' : 'none'
     },
   }
+}
+
+/** A centred status line during boot ("Loading the latest build…"). Appears
+ * only after `delayMs`, so the usual sub-second version check never flashes it. */
+const showBootNote = (
+  mount: HTMLElement,
+  text: string,
+  delayMs: number,
+): { show(text: string): void; remove(): void } => {
+  const el = document.createElement('div')
+  el.dataset.role = 'boot-note'
+  el.style.cssText =
+    'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;' +
+    'font:600 15px system-ui;color:#fff;background:#000c;padding:10px 18px;border-radius:10px;' +
+    'pointer-events:none;white-space:nowrap'
+  const show = (t: string): void => {
+    el.textContent = t
+    if (!el.isConnected) mount.appendChild(el)
+  }
+  const timer = setTimeout(() => show(text), delayMs)
+  return {
+    show: (t) => {
+      clearTimeout(timer)
+      show(t)
+    },
+    remove: () => {
+      clearTimeout(timer)
+      el.remove()
+    },
+  }
+}
+
+/** A blocking, visible boot error (e.g. an unknown `?scenario=`). No run is
+ * started behind it, so there is nothing to fall back to by accident. */
+const showBootError = (mount: HTMLElement, text: string): void => {
+  const el = document.createElement('div')
+  el.dataset.role = 'boot-error'
+  el.setAttribute('role', 'alert')
+  el.style.cssText =
+    'position:absolute;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;gap:14px;padding:24px;box-sizing:border-box;background:#0b0b12;color:#fff;' +
+    'font:500 15px/1.45 system-ui;text-align:center'
+  const msg = document.createElement('div')
+  msg.style.maxWidth = '640px'
+  msg.textContent = text
+  const home = document.createElement('a')
+  home.href = '/'
+  home.textContent = 'Go to the main menu'
+  home.style.cssText = 'color:#8fd;font-weight:700;font-size:16px;padding:10px 16px'
+  el.append(msg, home)
+  mount.appendChild(el)
 }
 
 /** Subtle, self-dismissing "resumed" confirmation shown once when an
@@ -550,12 +1156,21 @@ const runLoop = (
   uiMount: HTMLElement,
   coop: ReturnType<typeof createGamepadCoop>,
   inspect: Inspect,
+  updates: Updates,
   touch?: TouchInput,
   debug?: DebugLink,
   persister?: Persister,
   resumed = false,
+  /** Non-undefined only for a `?state=` link: drives the recorded run-up. */
+  stateReplay?: StateReplay,
+  /** Rewind ring + capture, fed after each live tick. Host/solo only. */
+  stateRing?: StateSharing,
+  /** Controller zoom poller (view-only) — stepped once per render frame. */
+  padZoom?: PadZoom,
+  /** Sequenced-mods reorder queue shared by the HUD strip and the pause menu. */
+  modSwaps?: ModSwapQueue,
 ): void => {
-  const hud = createHud(uiMount)
+  const hud = createHud(uiMount, modSwaps ? (a, b) => modSwaps.push(a, b) : undefined)
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
   // only (`cursor: none` on the canvas) — mouse AIM reads the cursor's ABSOLUTE
   // position (the window `pointermove` tracker → aim.pointerAim), so we must NOT
@@ -658,17 +1273,24 @@ const runLoop = (
   touch?.setInspectHandler((mode, x, y) => commOverlay.inspectAt(mode === 'tap' ? 'chip' : 'card', x, y))
   const overlay = createControllersOverlay(uiMount)
   // Pause overlay carries the shared gun+mods panel and the Resume / New Seed /
-  // Run-it-back actions. Solo/host can toggle pause with Escape (app-layer flip
-  // of session.isPaused — never touches the sim); the pad's Start also pauses.
+  // Run-it-back / Share-state actions. Solo/host can toggle pause with Escape
+  // (app-layer flip of session.isPaused — never touches the sim); the pad's
+  // Start also pauses (hostSession.ts), and the ⏸ button below is the touch
+  // equivalent.
   const canPause = session instanceof HostSession
   const setPaused = (p: boolean): void => {
     if (session instanceof HostSession) session.isPaused = p
   }
+  // `const` (not the parameter) so TypeScript keeps the narrowing inside the
+  // closure below.
+  const sharing = stateRing
   const pauseOverlay = createPauseOverlay(uiMount, {
     onResume: () => setPaused(false),
     onNewSeed,
     onRestart,
+    onShare: sharing ? (note) => sharing.share(note) : undefined,
     weaponThumb: renderer.weaponThumb,
+    modSwaps,
   })
   if (canPause)
     window.addEventListener('keydown', (ev) => {
@@ -677,6 +1299,34 @@ const runLoop = (
       if (view.gameOver || view.self?.dead) return // death screen owns the moment
       setPaused(!(session.isPaused ?? false))
     })
+  // ⏸ — THE ONLY WAY INTO THE PAUSE MENU FROM A PHONE.
+  //
+  // Pause had exactly two triggers, Escape and the pad's Start, and a phone has
+  // neither: on touch the pause menu was unreachable, so everything living on it
+  // (loadout, New Seed, Run it back, and now Share state) was desktop/controller
+  // only. Share state is specifically for the person holding a phone, so this
+  // gap had to close for the button to mean anything.
+  //
+  // UI CHROME, so the same two rules as the settings gear apply and are the
+  // reason it is tappable at all: it mounts on #ui (the touch layer's
+  // full-screen stick zones live there too, and chrome on #app would be under
+  // them in the hit test) and it is marked data-ui-chrome so the tap never
+  // enters the stick/inspect press classification. It sits left of the gear.
+  // Hidden while paused — the overlay's own Resume owns that moment — and on
+  // the death/game-over screens, matching the overlay's visibility rule.
+  const pauseBtn = document.createElement('button')
+  if (canPause) {
+    pauseBtn.textContent = '⏸'
+    pauseBtn.setAttribute('aria-label', 'Pause')
+    pauseBtn.dataset.role = 'pause-button'
+    markUiChrome(pauseBtn)
+    pauseBtn.style.cssText =
+      'position:absolute;right:52px;top:10px;z-index:70;width:34px;height:34px;border-radius:8px;' +
+      'border:1px solid #0008;background:#222c;color:#eee;font-size:16px;cursor:pointer;pointer-events:auto;' +
+      'touch-action:manipulation'
+    pauseBtn.addEventListener('click', () => setPaused(true))
+    uiMount.appendChild(pauseBtn)
+  }
   const showPadHint = createPadHint(uiMount)
   let currentLevel = session.renderView().level
 
@@ -696,82 +1346,151 @@ const runLoop = (
     { capture: true, passive: true },
   )
 
+  // Update-moment tracking (see the reportMoment call at the end of the frame).
+  // A networked session is one where a reload would drop OTHER players, not
+  // just us — couch co-op on one device shares a single local run, so it isn't.
+  const networked = session instanceof NetHostSession || session instanceof NetClientSession
+  let lastFloor: number | undefined
+  let floorFrames = 0
+
   let acc = 0
   let last = performance.now()
+  const showFrameError = createFrameErrorBanner(uiMount)
+  let frameErrors = initialFrameErrors()
   const frame = (now: number): void => {
-    const dt = Math.min((now - last) / 1000, 0.25)
-    acc += dt
-    last = now
-    while (acc >= SIM_DT) {
-      session.tick()
-      debug?.afterTick() // stream this tick's events + drain queued debug mutations
-      inspect.afterTick() // buffer this tick's events for sporefall.events()
-      acc -= SIM_DT
-    }
-    // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
-    // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
-    if (persister) {
-      const w = hostWorld()
-      if (w) persister.maybeSave(w)
-    }
-    const alpha = acc / SIM_DT
-    const view = session.renderView()
-    inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
-    if (view.level !== currentLevel) {
-      currentLevel = view.level
-      renderer.setLevel(view.level)
-    }
-    if (view.self) {
-      const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
-      const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
-      // Objective focus: while live, the camera glides to the link target and
-      // back (focusPanRate < normal → an animated pan, never a cut). The focus
-      // dies on its own timer, when the player moves, or if the target despawns.
-      const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
-      focus = tickFocus(focus, dt, view.self.pos, focusPos)
-      const rate = focusPanRate(focus)
-      if (focus) {
-        const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
-        renderer.camera.follow(t.x, t.y, dt, rate)
-      } else {
-        renderer.camera.follow(px, py, dt, rate)
-      }
-    }
-    renderer.draw(view, alpha, dt)
-    hud.update(view)
-    const pads = coop.debug()
-    // Twin-stick aim reticles: one per joined pad with a deflected right stick,
-    // anchored to that pad's player entity. Presentation only.
-    const anchors: ReticleAnchor[] = []
-    for (const e of view.entities)
-      if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
-    renderer.setReticles(padAimReticles(pads, anchors))
-    // Exposed-but-unjoined pad: nudge the player that any input joins.
-    showPadHint(pads.some((p) => p.slot === null))
-    vis = stepVisibility(vis, {
-      padJoined: anyPadActive(pads),
-      padActivity: anyPadProducing(pads),
-      touchActivity: touchSeen,
-    })
-    touchSeen = false
-    touch?.setVisible(sticksVisible(vis, caps))
-    touch?.update(view)
-    coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
-    screens.update(view)
-    missionPanel.update(view)
-    commOverlay.update(view)
-    overlay.update(pads)
-    pauseOverlay.update(session.isPaused ?? false, view)
-    const hide = shouldHideCursor({
-      paused: session.isPaused ?? false,
-      gameOver: view.gameOver,
-      selfDead: !!view.self?.dead,
-    })
-    if (hide !== cursorHidden) {
-      canvas.style.cursor = hide ? 'none' : ''
-      cursorHidden = hide
-    }
-    requestAnimationFrame(frame)
+    // THE LOOP MUST NOT BE KILLABLE. This used to re-arm requestAnimationFrame as
+    // its last statement with no try/catch, so a single throw anywhere below did
+    // not drop a frame — it ended rendering for the whole session on that device,
+    // while the host kept simulating and prediction kept the player walking. The
+    // rest of the party looked frozen. The re-arm now lives in `finally`, so the
+    // next frame always comes and the client recovers by itself the moment the
+    // state that caused the throw clears.
+    //
+    // Nothing is swallowed: every failure is counted, reported to the console
+    // (throttled, never muted — see ui/frameErrorModel.ts) and put on screen.
+    guardFrame(
+      () => {
+        const dt = Math.min((now - last) / 1000, 0.25)
+        acc += dt
+        last = now
+        while (acc >= SIM_DT) {
+          // A `?state=` link opens by REPLAYING the second before the capture,
+          // on this same fixed timestep so it runs at true gameplay speed. Live
+          // input is ignored until it reconverges on the captured frame; the
+          // banner from stateReplay.ts is what stops the viewer concluding the
+          // game has hung.
+          if (stateReplay?.active) stateReplay.step()
+          else {
+            session.tick()
+            stateRing?.afterTick() // record AFTER the tick — see the arming block
+          }
+          debug?.afterTick() // stream this tick's events + drain queued debug mutations
+          inspect.afterTick() // buffer this tick's events for sporefall.events()
+          acc -= SIM_DT
+        }
+        // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
+        // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
+        if (persister) {
+          const w = hostWorld()
+          if (w) persister.maybeSave(w)
+        }
+        const alpha = acc / SIM_DT
+        const view = session.renderView()
+        inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
+        if (view.level !== currentLevel) {
+          currentLevel = view.level
+          renderer.setLevel(view.level)
+        }
+        if (view.self) {
+          const px = view.self.prevPos.x + (view.self.pos.x - view.self.prevPos.x) * alpha
+          const py = view.self.prevPos.y + (view.self.pos.y - view.self.prevPos.y) * alpha
+          // Objective focus: while live, the camera glides to the link target and
+          // back (focusPanRate < normal → an animated pan, never a cut). The focus
+          // dies on its own timer, when the player moves, or if the target despawns.
+          const focusPos = focus ? resolveLink(focus.target, view.entities) : undefined
+          focus = tickFocus(focus, dt, view.self.pos, focusPos)
+          const rate = focusPanRate(focus)
+          if (focus) {
+            const t = focusCameraTarget(focus, { x: px, y: py }, focusPos)
+            renderer.camera.follow(t.x, t.y, dt, rate)
+          } else {
+            renderer.camera.follow(px, py, dt, rate)
+          }
+        }
+        // Controller zoom: held zoom buttons multiply the zoom target (view-only,
+        // centre-anchored). Before draw so this frame's camera already eases
+        // toward the new target.
+        padZoom?.update(dt)
+        renderer.draw(view, alpha, dt)
+        hud.update(view)
+        const pads = coop.debug()
+        // Twin-stick aim reticles: one per joined pad with a deflected right stick,
+        // anchored to that pad's player entity. Presentation only.
+        const anchors: ReticleAnchor[] = []
+        for (const e of view.entities)
+          if (e.playerCtl) anchors.push({ pos: e.pos, playerId: e.playerCtl.playerId, dead: e.dead })
+        renderer.setReticles(padAimReticles(pads, anchors))
+        // Exposed-but-unjoined pad: nudge the player that any input joins.
+        showPadHint(pads.some((p) => p.slot === null))
+        vis = stepVisibility(vis, {
+          padJoined: anyPadActive(pads),
+          padActivity: anyPadProducing(pads),
+          touchActivity: touchSeen,
+        })
+        touchSeen = false
+        touch?.setVisible(sticksVisible(vis, caps))
+        touch?.update(view)
+        coop.update(view) // cache inventory so the pad can resolve weapon-cycle presses
+        screens.update(view)
+        missionPanel.update(view)
+        commOverlay.update(view)
+        overlay.update(pads)
+        const paused = session.isPaused ?? false
+        pauseOverlay.update(paused, view)
+        // Same visibility rule as the overlay itself: gone while the pause menu
+        // is up (Resume owns that), gone on death/game-over (that screen does).
+        if (canPause) pauseBtn.style.display = paused || view.gameOver || view.self?.dead ? 'none' : 'block'
+        // Tell the updater where the player is, so a downloaded build can swap
+        // itself in at a moment that costs nothing (src/app/updatePolicy.ts). The
+        // floor-change window is held open for the length of the "FLOOR n" banner
+        // rather than a single frame, so a download that lands mid-floor doesn't
+        // have to wait for the next one. `anchors` is the player list this frame
+        // already built for the aim reticles — peers only count on a networked
+        // session, where reloading would take the others down with us.
+        if (lastFloor === undefined) lastFloor = view.floor
+        else if (view.floor !== lastFloor) {
+          lastFloor = view.floor
+          floorFrames = FLOOR_TRANSITION_FRAMES
+        } else if (floorFrames > 0) floorFrames--
+        updates.reportMoment(
+          momentOf({
+            runOver: restartAffordance(view).visible,
+            floorChanging: floorFrames > 0,
+            paused,
+          }),
+          networked ? Math.max(0, anchors.length - 1) : 0,
+        )
+        const hide = shouldHideCursor({ paused, gameOver: view.gameOver, selfDead: !!view.self?.dead })
+        if (hide !== cursorHidden) {
+          canvas.style.cursor = hide ? 'none' : ''
+          cursorHidden = hide
+        }
+        frameErrors = noteFrameOk(frameErrors)
+      },
+      (err) => {
+        const noted = noteFrameError(frameErrors, frameErrorMessage(err))
+        frameErrors = noted.state
+        if (noted.log) console.error('[frame] uncaught error — the loop keeps running:', err)
+        showFrameError(frameErrorBannerText(frameErrors))
+        // Drop the sim backlog this frame never worked off. `acc` is only spent
+        // inside the fixed-step loop above, so a throw before it drains leaves the
+        // time owed to pile up — and a fault that clears after a few seconds would
+        // then be paid off as one enormous catch-up burst, freezing the device for
+        // real. Losing the skipped time is the cheaper failure.
+        acc = 0
+      },
+      () => requestAnimationFrame(frame),
+    )
   }
   requestAnimationFrame(frame)
 }

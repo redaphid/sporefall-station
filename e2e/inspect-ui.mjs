@@ -248,7 +248,7 @@ const run = async () => {
   await tap(med.x, med.y)
   await settle(page)
   p = await popup(page)
-  p.visible && p.title.includes('Medkit') ? ok('tap inspects the medkit at 4× zoom') : fail(`zoom-in inspect: ${JSON.stringify({ mode: p.mode, title: p.title })}`)
+  p.visible && p.title.includes('Grenade') ? ok('tap inspects the grenade at 4× zoom') : fail(`zoom-in inspect: ${JSON.stringify({ mode: p.mode, title: p.title })}`)
   await shot(page, 'chip-item-zoom-in')
   // Expand to show the item card (heal stat).
   await tap(p.rect.x + p.rect.w / 2, p.rect.y + p.rect.h / 2)

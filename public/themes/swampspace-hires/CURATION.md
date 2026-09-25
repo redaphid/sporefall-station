@@ -134,3 +134,15 @@ built by `scripts/assets/rotoscope/` (docs/sprite-generation.md §6):
 - Film strips: `docs/assets/swampspace/rotoscope-walk-<dir>.png`; in-game
   proof `~/Videos/backseat/roto-walk-swampspace.mp4` (before:
   `roto-walk-before-2frame.mp4`). Manifest cadence `anim.walk: 4`.
+
+## Indoor complex tiles (floors 3+)
+
+`hall grate tiled plating hull bog` (+ accents) come from
+`scripts/assets/tiles_indoor.py` — deterministic procedural pixel art on the
+locked palette plus 7 interpolated indoor steps (`INDOOR_EXTRA`), ordered-dither
+transitions, structure (seams, grout, rivets) aligned to tile edges so every
+variant meets every other. The ComfyUI img2img repaint is still wired in (drop
+`--procedural`) but lost to the procedural pass at every denoise tried:
+≤0.4 changed nothing after the palette snap, ≥0.55 erased the moss and added
+speckle. Previews: `docs/assets/indoor-tiles/` (via `dump_complex_levels.mts`
++ `indoor_preview.py`).

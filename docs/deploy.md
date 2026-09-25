@@ -60,11 +60,45 @@ Three rules that are easy to break:
    `/download` is a real navigation to the APK — if the SW answered it with
    `index.html`, the APK download would hand people the game page instead.
 
-Update path: the SW uses `skipWaiting` + `clientsClaim` + `cleanupOutdatedCaches`,
-so a new deploy installs and drops old caches as soon as it's seen, and boots on
-the next launch. A long-lived tab re-checks hourly and on every re-focus. The page
-is deliberately *not* force-reloaded — yanking someone out of a run mid-game is
-worse than being one version behind until the next launch.
+### Update path (browser AND app): automatic, atomic, at a natural break
+
+Both platforms now run the **same** policy, so "up to date" means one thing
+everywhere and the player never taps anything.
+
+- **One version endpoint.** `GET /ota/check` (`src/worker/ota.ts`) is the single
+  source of truth. The browser reads it; the installed APK POSTs to it. The
+  number is the git commit count — `vite.config.ts` bakes it into the bundle and
+  `deploy-web.yml` writes the same value into `dist/ota/version.json`.
+- **Download in the background, atomically.** On the web that is the service
+  worker's `install`: it precaches *every* shell URL, and if any single fetch
+  fails the worker is discarded and the old one keeps serving its own complete
+  cache. On Android the Capgo plugin downloads and verifies the whole zip.
+- **Swap only at a safe moment.** `src/app/updatePolicy.ts` holds the one
+  enumerated list — mode picker, lobby, floor transition, run-over — plus a
+  much shorter list while other players are on the link. Everything else waits.
+  `updatePolicy.test.ts` asserts the *negative*: a reload can never fire outside
+  that list.
+
+Three rules here are load-bearing and easy to break silently, so they are now
+unit-tested as data in `src/app/swConfig.ts` (see `swConfig.test.ts`):
+
+- **`skipWaiting` and `clientsClaim` are both `false`, deliberately.** They used
+  to be `true`, which let the browser activate a new worker the instant it
+  installed and seize the open page — leaving a tab running OLD code against a
+  NEW precache whose predecessor `cleanupOutdatedCaches` had just deleted. That
+  is the half-old/half-new state offline-first makes permanent. Turning them
+  back on re-opens it.
+- **`/ota/*` must never be cached by the SW** (no precache glob, no runtime rule,
+  and on the navigation denylist) or a client can never observe a new version.
+- **Content is checked, never status.** `not_found_handling:
+  "single-page-application"` means every path returns 200, so a missing file
+  arrives as `index.html`. The version check requires a JSON content-type and
+  the documented shape; before swapping, `verifyPrecacheIntegrity` confirms no
+  critical asset was cached with the wrong content-type (i.e. the SPA fallback
+  stored under an `/assets/*.js` URL, which `install` would happily accept).
+
+A long-lived tab re-checks hourly and on every re-focus. Offline, the check just
+fails and nothing is said — offline is the expected case, not an error.
 
 **Rolling the service worker back is NOT just a revert.** Reverting the commit (or
 `wrangler rollback`) makes `/sw.js` 404 into the SPA fallback — browsers that
@@ -111,6 +145,66 @@ both compiles.
 > `CAP_SERVER_URL` **unset/empty**. When set, `capacitor.config.ts` points the
 > app at a laptop dev server; a static Cloudflare deploy must serve its own
 > bundled `dist/`. The workflow sets `CAP_SERVER_URL: ""` explicitly.
+
+### Previews — do NOT reach for `wrangler versions upload`
+
+> **`workers.dev` is behind Cloudflare Access on this account.** The native
+> `wrangler versions upload` preview route therefore **cannot work here**. A
+> preview version gets a `*.workers.dev` URL that answers with a Cloudflare
+> Access login page instead of the app — `302 → <team>.cloudflareaccess.com`
+> for any signed-out phone, which is exactly the device you wanted to hand the
+> preview to.
+>
+> **The trap is the ordering.** Production runs with `workers_dev: false` and no
+> subdomain of its own, so the failure does not surface until *after* you have
+> flipped `workers_dev` on and **spent a production deploy** doing it. You find
+> out the preview is unreachable at the point where you have already modified
+> production. This cost a full agent run.
+>
+> **A CI workflow built on this route is worse than none**, because it goes
+> green while every URL it advertises is a login page. A per-branch
+> `wrangler versions upload` workflow was written and deliberately **not**
+> merged for this reason; if you are about to add one, this note is why you
+> should not.
+>
+> **What replaced it: `/betas/<slug>/` (section E below).** The beta build is
+> uploaded to a KV namespace and served by the production Worker off a path on
+> the already-working custom domain, so there is no workers.dev hostname in the
+> picture and nothing for Access to intercept. Proxying *to* a version preview
+> from the Worker does not help either — the subrequest hits the same wall, and
+> minting a service token needs Zero Trust scope this project's credentials do
+> not have and must not be given.
+>
+> (The other escape hatch, if a whole separate Worker is ever wanted: deploy
+> with a config whose `name` differs from `sporefall-station`, on a hostname in
+> a zone that is not Access-gated. Such a config must not read or rewrite
+> production's config, routes or hostname. Nothing needs it today.)
+
+### Verifying a deploy — never by loading the root
+
+`wrangler.jsonc` sets `not_found_handling: "single-page-application"`, which means
+**every path returns HTTP 200**, including paths that do not exist. The root URL
+loading, and a `200` status, prove nothing whatsoever: a missing file is served
+`index.html` with a success code.
+
+To actually confirm a build is live, fetch the **hashed JS bundle** and check two
+things:
+
+1. the `content-type` is `application/javascript` — the SPA fallback returns
+   `text/html`, so this alone catches a missing asset;
+2. the body contains a **build-unique string** (the hash in the filename you took
+   from the fresh `dist/`, or a literal you know is new in this build).
+
+```bash
+# take the hashed entry chunk from the build you just made
+asset=$(ls dist/assets/index-*.js | head -1 | xargs basename)
+curl -sSI "https://<origin>/assets/$asset" | grep -i '^content-type'
+# expect: content-type: application/javascript   (text/html = NOT deployed)
+```
+
+Expect a **transient stale edge** for a short window right after a deploy — a
+first check that still shows the old bundle is not automatically a failed deploy;
+re-check before concluding.
 
 ### Secrets summary (web)
 
@@ -258,8 +352,8 @@ same Cloudflare Pages project as the web deploy.
 
 - Plugin: [`@capgo/capacitor-updater`](https://github.com/Cap-go/capacitor-updater)
   (MIT, self-hostable), configured in `capacitor.config.ts` with
-  `autoUpdate: true` + `autoUpdateUrl` and `statsUrl: ''`. The plugin config is
-  only added when `CAP_SERVER_URL` is **unset**, so dev live-reload is never
+  `autoUpdate: 'onlyDownload'` + `updateUrl` and `statsUrl: ''`. The plugin config
+  is only added when `CAP_SERVER_URL` is **unset**, so dev live-reload is never
   affected.
 - On each launch (when online) the native app POSTs to `/ota/check`, a Cloudflare
   **Pages Function** (`functions/ota/check.ts`). It reads the published version
@@ -267,9 +361,17 @@ same Cloudflare Pages project as the web deploy.
   is older, else `{ message: 'up-to-date' }`.
 - `deploy-web.yml` builds the app, zips it to `dist/ota/<version>.zip`, and writes
   `dist/ota/version.json`, then deploys everything. Version = git tag or short SHA.
-- The app downloads a newer bundle in the background and swaps it in on the next
-  launch. `src/app/ota.ts` calls `notifyAppReady()` so the native side keeps the
-  new bundle (and auto-rolls-back if a bundle fails to boot).
+- The app downloads a newer bundle in the background and then **installs it
+  itself**. `autoUpdate: 'onlyDownload'` means the plugin downloads, emits
+  `updateAvailable`, and deliberately never stages a next bundle — so
+  `src/app/ota.ts` is the ONLY installer: it captures the bundle id off that
+  event and calls `set({ id })` at the next safe moment
+  (`src/app/updatePolicy.ts` — the same list the browser uses), so a player never
+  has to relaunch. **The config and ota.ts are one change**: with nothing staged
+  natively, a bare `reload()` would re-render the bundle already running and
+  resolve successfully, installing nothing. `src/app/ota.test.ts` fails if either
+  half is reverted alone. `notifyAppReady()` keeps the new bundle (and
+  auto-rolls-back if a bundle fails to boot).
 - **Offline-safe:** if the check or download fails, the installed bundle just
   keeps running — no user-visible delay, no crash.
 
@@ -291,6 +393,141 @@ same Cloudflare Pages project as the web deploy.
 > plugins (e.g. BLE) must go out as a new signed APK (channel B).
 
 ---
+
+## D. Review images (before/after shots in PR bodies)
+
+This repo is **private**, and that breaks images in PR bodies: GitHub does **not**
+proxy in-repo image URLs on a private repo, so `![](…/blob/<sha>/shot.png?raw=true)`
+renders as a broken image for every reviewer. A **publicly reachable** URL *is*
+proxied (through `camo.githubusercontent.com`) and does render. So review images
+are served publicly by the Worker at `/review/*`.
+
+**Publishing one** — an upload, not a deploy, so it is live in seconds and works
+for a PR that has **not merged yet** (which is the whole point):
+
+```bash
+pnpm run review:image docs/prop-sweep/winners.png --prefix prop-sweep
+# → ![winners](https://sporefall.hypnodroid.com/review/prop-sweep/winners-c5a9f3f1.png)
+```
+
+Paste that markdown line into the PR body. Keys are content-addressed
+(`…-<sha8>.png`), so a URL's bytes never change and neither cache nor camo can go
+stale; re-uploading identical bytes is a no-op.
+
+- **They never enter the game.** Images live in the `REVIEW_IMAGES` KV namespace,
+  not in `public/` and not in the repo — zero bytes added to the Vite bundle, the
+  OTA zip, or the APK. Keep it that way.
+- **They are public.** Anything published here is world-readable by design (that is
+  what makes it render). Don't publish anything you wouldn't put on the live site.
+- **Only images.** `.png/.jpg/.jpeg/.gif/.webp/.avif`. `.svg` and `.html` are
+  refused on purpose — this path is same-origin with the game and both can script.
+- **Verify by content-type and magic bytes, never by status code.** `assets.
+  not_found_handling` is `single-page-application`, so *every* unknown path answers
+  **200 with the game's index.html**. A broken image URL looks perfectly healthy.
+  `/review/*` is in `run_worker_first` and `src/worker/reviewImages.ts` never falls
+  through to ASSETS: a miss is an honest 404 `text/plain`. `review:image` re-fetches
+  each URL after upload and refuses to print one that isn't real image bytes.
+
+Setup is already done (`kv_namespaces` in `wrangler.jsonc`); the CI token's "Edit
+Cloudflare Workers" template already covers the KV binding, so deploys need no new
+secret.
+
+---
+
+## E. Betas (per-branch builds at `/betas/<slug>/`)
+
+A beta is a full build of a branch, served from
+`https://sporefall.hypnodroid.com/betas/<slug>/` so the owner can *play* a
+branch before it merges. It is an **upload, not a deploy** — same model as
+review images (section D), and for the same reason: it has to be reachable
+before the PR lands.
+
+```bash
+BETA_SLUG=feat/sequenced-mods pnpm run build   # build with the beta base path
+pnpm run beta:publish                          # upload dist/ to KV, print the URL
+# → https://sporefall.hypnodroid.com/betas/sequenced-mods/
+```
+
+CI does both on every push to a `preview/**` branch (`preview-web.yml`) and
+prints the URL in the job summary. `/betas/` lists everything published.
+
+### The slug
+
+`src/app/betaSlug.ts` owns the rule, and **everything** imports it from there —
+the Vite config, the publish script, the Worker, and the running game. Take the
+branch's **last `/`-separated segment**, lowercase it, collapse every run of
+non-alphanumerics to a single `-`, trim leading/trailing dashes, cut to 40
+characters:
+
+| branch | slug |
+|---|---|
+| `feat/sequenced-mods` | `sequenced-mods` |
+| `preview/Betas Path!` | `betas-path` |
+| `release/v1.2.3` | `v1-2-3` |
+| `fix/foo/bar` | `bar` |
+| `feat/___` | *(refused — nothing publishable)* |
+
+Only the last segment survives, so `feat/x` and `preview/x` share a slug and the
+second publish wins. That is the deliberate trade for a URL a human can type;
+the `/betas/` listing shows each beta's **full branch name**, which is the only
+place such a collision is visible.
+
+### The three traps, and what defends against each
+
+1. **The asset base.** Vite has no `base` by default, so a normal build's
+   index.html asks for `/assets/index-<hash>.js` at the ROOT. Served under
+   `/betas/foo/`, that request leaves the beta entirely and is answered by
+   **production's** bundle: HTTP 200, the branch's URL, the live game's code.
+   Defence: `BETA_SLUG` makes `vite.config.ts` set `base`, and
+   `scripts/publish-beta.mts` **refuses to upload** a `dist/index.html` that
+   does not reference `/betas/<slug>/assets/`.
+2. **The SPA fallback.** `not_found_handling: "single-page-application"` answers
+   every unknown path with 200 + production's index.html. Defence: `/betas` and
+   `/betas/*` are in `run_worker_first`, and `src/worker/betas.ts` never calls
+   `env.ASSETS` — a deep link falls back to *that beta's own* index.html, and a
+   missing hashed chunk is a plain-text 404.
+3. **The service worker.** Production's worker has scope `/`, so it sits in
+   front of every same-origin navigation. Defence: `/betas/` is in
+   `SW_NAVIGATE_FALLBACK_DENYLIST` (`src/app/swConfig.ts`) so an installed PWA
+   does not answer a beta URL out of production's precache. A beta build ships
+   **no service worker of its own** (vite disables it; `shouldRegisterSw`
+   refuses independently), because registering one from a branch would take over
+   the live game for whoever reviewed it.
+
+`/betas/` is in the denylist of a service worker that is only updated by a
+**production deploy**, so an already-installed player may need one deploy of
+`main` before beta URLs behave for them.
+
+### Multiplayer
+
+`/ws/:room` keys a Durable Object by room name, and the sim is deterministic
+with an authoritative host — so a beta peer and a production peer in the same
+room do not see a version warning, they **desync**, and it reads as a bad
+network. A beta build therefore namespaces its rooms: `?room=car` becomes
+`sequenced-mods~car` (`namespaceRoom`). Two players on the same beta still meet.
+Proven against the real relay by `pnpm run e2e:beta:rooms`.
+
+### Verifying a beta — never by loading the root
+
+Same rule as section "Verifying a deploy", plus one beta-specific header:
+
+```bash
+curl -sI https://sporefall.hypnodroid.com/betas/<slug>/ | grep -i 'x-beta-slug'
+# expect: x-beta-slug: <slug>   (absent = you are looking at production)
+curl -s  https://sporefall.hypnodroid.com/betas/<slug>/ | grep -o 'src="/[^"]*"'
+# expect: src="/betas/<slug>/assets/index-<hash>.js"   (src="/assets/… = wrong build)
+```
+
+`x-beta-slug` exists precisely because a 200 proves nothing on this origin.
+
+### Housekeeping
+
+Betas are permanent until removed. To drop one:
+
+```bash
+pnpm exec wrangler kv key list --binding BETAS --prefix 'b/<slug>/' --remote
+# …then `kv bulk delete` that list, plus the `i/<slug>` index entry.
+```
 
 ## Sources
 

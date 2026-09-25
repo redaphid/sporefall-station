@@ -9,7 +9,40 @@ import { emptyInput } from '../../game/types'
 import { ByteReader, ByteWriter } from '../framing/codec'
 import { MsgType } from '../types'
 
-/** Fixed archetype registry — u8 index over the wire. Append only. */
+/**
+ * Fixed archetype registry — u8 index over the wire. Append only.
+ *
+ * ## `// RETIRED` entries are TOMBSTONES. Do not compact this list.
+ *
+ * Fourteen entries are marked `// RETIRED`: the nine culled items in every form
+ * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
+ * the floor). They name content that no longer exists, and a dead-code tool
+ * will call them unused. They are CLAIMED, not unused — the same argument as
+ * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
+ * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag
+ * on ARCHETYPES, which then reported the tag itself as unused.)
+ *
+ * The index IS the wire format. `encodeSnapshot` writes the position
+ * (`archetypeIndex.get(a) ?? 0`) and `decodeSnapshot` reads it back positionally
+ * (`ARCHETYPES[r.u8()] ?? 'player'`). Deleting `'banana'` at index 55 does not
+ * remove a meaning, it SHIFTS every meaning after it down by one — so a phone on
+ * the old bundle and a phone on the new one would agree they are both
+ * PROTOCOL_VERSION 3, sail through the handshake gate, and then silently
+ * disagree about what all 32 following entries mean. Furniture would arrive as
+ * mods, pickups as furniture, and the tail of the list would decode past the end
+ * as `'player'` — a screen full of phantom Rangers, the exact bug the second
+ * sweep below was written to fix.
+ *
+ * A HOLE IS THE CORRECT OUTCOME. Leaving the strings in place keeps all 88
+ * indices meaning exactly what they meant before the cull, which is what lets
+ * PROTOCOL_VERSION stay at 3 honestly: the two builds really are compatible.
+ * A pre-cull peer can still send `pickup.medkit`; a post-cull peer decodes the
+ * name correctly, draws it (the art keys are untouched), and treats the item as
+ * inert because `itemClass` returns 'unknown' — degraded, never desynced.
+ *
+ * Retiring costs one byte of nothing. Compacting costs a silent desync. Only
+ * ever append.
+ */
 export const ARCHETYPES = [
   'player',
   'thug',
@@ -23,8 +56,8 @@ export const ARCHETYPES = [
   'pickup.bat',
   'pickup.knife',
   'pickup.pistol',
-  'pickup.bandage',
-  'pickup.medkit',
+  'pickup.bandage', // RETIRED
+  'pickup.medkit', // RETIRED
   'pickup.cash',
   'pickup.briefcase',
   'gangster',
@@ -52,17 +85,17 @@ export const ARCHETYPES = [
   // which now fails if any registry grows without this list growing with it.
   // Appended alphabetically in one block. APPEND ONLY, NEVER REORDER.
   'atm',
-  'banana',
+  'banana', // RETIRED
   'barrel',
   'barricade',
   'bench',
   'bunk',
   'cabinet',
-  'chloroform',
+  'chloroform', // RETIRED
   'cryoTerminal',
   'desk',
-  'freezeGrenade',
-  'gasGrenade',
+  'freezeGrenade', // RETIRED
+  'gasGrenade', // RETIRED
   'generator',
   'locker',
   'mod.bounce',
@@ -83,21 +116,21 @@ export const ARCHETYPES = [
   'mod.splinterShot',
   'mod.split',
   'mod.velocity',
-  'molotov',
-  'pickup.adrenaline',
-  'pickup.banana',
-  'pickup.burger',
-  'pickup.chloroform',
+  'molotov', // RETIRED
+  'pickup.adrenaline', // RETIRED
+  'pickup.banana', // RETIRED
+  'pickup.burger', // RETIRED
+  'pickup.chloroform', // RETIRED
   'pickup.claws',
   'pickup.fists',
   'pickup.flamethrower',
-  'pickup.freezeGrenade',
+  'pickup.freezeGrenade', // RETIRED
   'pickup.freezeRay',
-  'pickup.gasGrenade',
+  'pickup.gasGrenade', // RETIRED
   'pickup.grenade',
   'pickup.keycard',
   'pickup.machinegun',
-  'pickup.molotov',
+  'pickup.molotov', // RETIRED
   'pickup.shotgun',
   'pickup.sledgehammer',
   'pickup.stunGun',
@@ -110,6 +143,19 @@ export const ARCHETYPES = [
   'toilet',
   'tv',
   'vending',
+  // PROTOCOL_VERSION 3. APPEND ONLY, at the end — this is a u8 wire index, and
+  // inserting or reordering renumbers every entry after it while both builds
+  // still claim the same version.
+  'chair',
+  // PROTOCOL_VERSION 4 — the group roster (systems/groups.ts): raid members,
+  // pack fauna and the hive spire. APPEND ONLY, at the end.
+  'drowner',
+  'bellwether',
+  'mender',
+  'breacher',
+  'lobber',
+  'gloamhound',
+  'hivespire',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix
@@ -156,6 +202,22 @@ const WIRE_MOD_CAP = 12
 const POS_SCALE = 32 // 1/32-tile precision in u16
 const FACING_SCALE = 256 / (Math.PI * 2)
 
+/** Largest coordinate the u16 position field can carry (2047.96875 tiles). */
+const MAX_WIRE_POS = 0xffff / POS_SCALE
+
+/** Positions ride a u16, which WRAPS on anything outside it: an entity nudged to
+ * x = -0.5 by knockback encoded as 65520 and arrived at x = 2047.5 — the far
+ * corner of a map that is ~100 tiles across. Clamping keeps an out-of-bounds body
+ * pinned at the edge, which reads as a stuck entity instead of a teleport, and
+ * (unlike the wrap) never invents a position on the OPPOSITE side of the level. */
+const clampPos = (v: number): number => (Number.isFinite(v) ? Math.min(MAX_WIRE_POS, Math.max(0, v)) : 0)
+
+/** Entity count is a u8, so 256+ entities wrapped it (300 -> 44) and the decoder
+ * silently returned 44 of them while ignoring 256 records it had no idea were
+ * there. The host caps interest at 48, so this is a guard rail, not a live path —
+ * but it keeps encode and decode agreeing about the same list. */
+const MAX_WIRE_ENTITIES = 255
+
 export interface WireEntity {
   id: number
   archetype: string
@@ -195,14 +257,15 @@ export const kindOf = (archetype: string): Entity['kind'] => {
 }
 
 export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
-  const w = new ByteWriter(16 + s.entities.length * 12)
-  w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(s.entities.length)
-  for (const e of s.entities) {
+  const entities = s.entities.length > MAX_WIRE_ENTITIES ? s.entities.slice(0, MAX_WIRE_ENTITIES) : s.entities
+  const w = new ByteWriter(16 + entities.length * 12)
+  w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(entities.length)
+  for (const e of entities) {
     w.u16(e.id)
     w.u8(archetypeIndex.get(normalizeArchetype(e.archetype)) ?? 0)
     w.u8(e.flags)
-    w.u16(Math.round(e.x * POS_SCALE))
-    w.u16(Math.round(e.y * POS_SCALE))
+    w.u16(Math.round(clampPos(e.x) * POS_SCALE))
+    w.u16(Math.round(clampPos(e.y) * POS_SCALE))
     w.u8(Math.round(((e.facing % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     w.u8(Math.round(e.hpPct * 255))
     // Variable tail, 'projectile' records only: u8 mod count, then one byte per
@@ -278,6 +341,11 @@ export const encodeInput = (
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
+  // OPTIONAL trailing u16: a sequenced-mods reorder request, +1 biased (0 is
+  // never written; absent = none). Written ONLY when a swap is pending, so every
+  // ordinary input packet is byte-identical to before. An older host reads the
+  // hotbar byte and never looks further, so the extra bytes are ignored.
+  if (cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff) w.u16(cmd.modSwap + 1)
   return w.finish()
 }
 
@@ -292,11 +360,13 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
   const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
+  const modSwap = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no reorder
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
+  if (modSwap > 0) cmd.modSwap = modSwap - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
@@ -408,6 +478,16 @@ export interface GameStartMsg {
   /** Difficulty rules the host is running; clients adopt it so co-op agrees.
    * Optional on the wire for back-compat — absent means the default (`normal`). */
   mode?: 'casual' | 'normal'
+  /** The floor the host is on RIGHT NOW. Layout never crosses the wire — the
+   * client regenerates it bit-exact from `seed`+`floor` — so this one number is
+   * the whole map. A lobby start is always floor 1, but a LATE joiner drops into
+   * a run already in progress and must not build floor 1's level for a party
+   * standing on floor 3. Optional for back-compat: absent means 1. */
+  floor?: number
+  /** Mod casting rule the host runs (World.modCasting). Optional and additive:
+   * an older client ignores it, and absent means the default fold. Clients do
+   * not simulate combat; they need it only to draw the sequence HUD. */
+  modCasting?: 'sequence'
 }
 export interface GoMsg {
   startTick: number
@@ -434,7 +514,14 @@ export interface StateMsg {
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */
   revivesLeft?: number
-  /** Per-slot HUD extras for each player's own display. */
+  /** Per-slot HUD extras for each player's own display.
+   *
+   * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
+   * with the total quantity of every carried stack except the briefcase, which
+   * is what it always was. Bandages themselves were culled. The field survives
+   * the cull because renaming or dropping it would change the shape of a JSON
+   * message that peers on an older bundle still send and read, for no gain —
+   * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
 }
 

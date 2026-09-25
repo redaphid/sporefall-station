@@ -17,18 +17,68 @@ GitHub issues the human can triage. Pairs with [`ecs-debug`](../ecs-debug/SKILL.
 (attach/inspect) and [`gameplay-experiments`](../gameplay-experiments/SKILL.md)
 (the systems vocabulary and how to prove an idea later).
 
-## Golden rule: READ ONLY
+## Golden rule: READ ONLY (annotations are the one exception)
 
 You are a spectator of a game a human is actively playing. **Never mutate the
-world and never advance it yourself.** The host is authoritative and the sim is
+sim and never advance it yourself.** The host is authoritative and the sim is
 deterministic — a stray `set`/`step`/`load` desyncs or corrupts the human's run.
 
 - **Allowed verbs only:** `games`, `state`, `entities`, `get`, `events`, `schema`,
-  `dump` (snapshot for your notes). Chrome `screenshot` is allowed (read-only).
+  `dump` (snapshot for your notes), and `annotate`/`clearAnnotations` (inert
+  presentation data — see the next section; no system reads them, so they cannot
+  steer the sim). Chrome `screenshot` is allowed (read-only).
 - **Forbidden here:** `set`, `set_field`, `spawn`, `kill`, `teleport`, `step`/`tick`,
-  `load`/`restore_world`, `annotate` — anything that writes to or steps the world.
+  `load`/`restore_world` — anything that writes gameplay state or steps the world.
   If you want to *test* an idea, do it later in a separate scratch game
   (`gameplay-experiments`), never in the human's session.
+
+## Golden rule 2: talk to the player THROUGH THE GAME UI
+
+The human is looking at the game, not at your terminal. **Annotations are your
+primary channel to them — prioritize it.** They should never have to wonder
+whether you are still watching.
+
+**Player directive (2026-08-22, standing): EVERY substantive message goes
+in-game, not only presence.** Status, findings, reactions, delivered features,
+what you're thinking about — mirror it on screen. The terminal is a written
+record; the game UI is the conversation. `.observer/say.ps1 "<msg>"` splits a
+message into stacked 2-line banners (x16, y110+78·i, ttl ~60s) — use it (or the
+same pattern) every beat you'd otherwise only narrate in the terminal.
+
+- **On attach:** post a short `text` banner ("OBSERVER online — watching").
+- **Heartbeat:** keep a presence line alive for the whole session — re-post a small
+  status `text` every few samples with a `ttlTick` a bit past your next expected
+  sample (~tick+600), so if your loop dies the banner fades instead of lying.
+- **Narrate notable moments** as they land: a `pin`/`label` on the thing you just
+  noted ("noted: witness silenced", "watching: door breach"), a `circle` on a zone
+  you flagged. One or two at a time, short text, always with `ttlTick` (~5-15s,
+  150-450 ticks) so the screen never accumulates clutter.
+- **At reflection time:** post a 1-line `text` summary of the top finding.
+- Keep it terse and sparse — never cover the action, never more than ~3 elements
+  on screen at once (`src/ui/annotationLayout.ts` de-overlaps, but restraint is
+  yours). The terminal journal stays the full record; the UI gets the pulse.
+
+CLI: `npx tsx tools/debug-cli/cli.ts annotate '[{"kind":"text","text":"...","ttlTick":<tick+N>}]'`
+Kinds: `text` (screen banner), `label` (`targetId`-anchored, follows sprite),
+`pin`/`arrow`/`circle` (world-anchored). See `gameplay-experiments` §3.
+
+Hard-won specifics (verified live):
+- A `text` banner with no x/y lands TOP-CENTER and collides with the mission
+  banner. Always pass screen coords — `"x":16,"y":44` (top-left, under the HUD)
+  is a proven clear spot.
+- `ttlTick` is an ABSOLUTE tick. Your posting loop has real latency (CLI startup
+  ~2-3s per verb): budget TTLs ≥ the gap between re-posts or the banner blinks
+  out between beats and the player thinks you left. A heartbeat posted every
+  sample with ttl ≈ tick+1000 stays gapless at ~30s sampling.
+- A long-TTL banner OUTLIVES THE RUN it was written for (`w.annotations` is
+  world state, but a run reset replaces the world — while a stale banner from
+  just before the reset can still mislead you if you post one during the death
+  screen). After any seed/floor change, `clearAnnotations` + re-post a correct
+  one before anything else.
+- The run can END AND RESTART while you code-dive: on every sample, compare
+  `seed` (and floor) against your last sample before interpreting — and during
+  endgame phases (objective unlocked, escape run), STOP code-reading and tighten
+  the sample cadence; that's the data you're there for.
 
 ## 1. Attach to the human's live game
 

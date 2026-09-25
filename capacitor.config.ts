@@ -16,6 +16,17 @@ const serverUrl = process.env.CAP_SERVER_URL
 const otaUpdateUrl =
   process.env.OTA_UPDATE_URL ?? 'https://sporefall.hypnodroid.com/ota/check'
 
+// The canonical public origin of the deployed site, derived from the OTA
+// endpoint above so the hostname is written down in EXACTLY ONE place. Two
+// copies of a hostname is a future outage: one gets updated, the other keeps
+// pointing at a domain nobody serves any more.
+//
+// vite.config.ts bakes this into the web bundle as `__SITE_ORIGIN__` (read via
+// src/app/version.ts). It is needed there because inside the Android webview
+// the app is served from Capacitor's own origin, so `location.origin` names the
+// APK's bundled assets rather than the server -- see src/app/stateShare.ts.
+export const SITE_ORIGIN = new URL(otaUpdateUrl).origin
+
 const config: CapacitorConfig = {
   appId: 'com.hypnodroid.backseat',
   appName: 'Sporefall Station',
@@ -32,7 +43,27 @@ const config: CapacitorConfig = {
     : {
         plugins: {
           CapacitorUpdater: {
-            autoUpdate: true,
+            // PAIRED WITH src/app/ota.ts. CHANGING EITHER ONE ALONE IS A REGRESSION.
+            //
+            // Why not `true`: `true` means 'atBackground', where the plugin calls
+            // setNextBundle() itself and swaps on the next backgrounding - a second
+            // installer that knows nothing about the co-op/mid-run rules in
+            // updatePolicy.ts, applying at exactly the moments that policy exists
+            // to refuse. 'onlyDownload' is, per Capgo's docs, "Check and download
+            // automatically, emit `updateAvailable`, and never set the next bundle
+            // or apply an update automatically" - leaving the app the single
+            // installer, as on the web.
+            //
+            // The trap that buys: since NOTHING is ever staged natively, a bare
+            // `reload()` in ota.ts is not enough. Per reload()'s own docs, "If no
+            // update is pending (no call to `next`), this simply reloads the
+            // current bundle." It would re-render the CURRENT bundle, resolve
+            // successfully, and install nothing - forever, with no error to catch.
+            // So ota.ts MUST stage the bundle id off the `updateAvailable` event
+            // explicitly (`set({ id })`). Do not "simplify" ota.ts back to a bare
+            // reload() without also reverting this line to `true` in the SAME
+            // commit - src/app/ota.test.ts fails if you do.
+            autoUpdate: 'onlyDownload',
             // capgo v4+ renamed `autoUpdateUrl` → `updateUrl`; with the old key
             // the plugin silently fell back to Capgo's SaaS endpoint (which
             // rejects self-hosted apps with HTTP 429) and updates never arrived.

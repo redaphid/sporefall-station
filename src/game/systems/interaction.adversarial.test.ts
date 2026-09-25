@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { spawnPlayer, STARTER_AMMO } from '../player'
+import { PLAYER_START_WEAPON, spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
+import { CONSUMABLES } from '../data/items'
 import { addEntity, createWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { applyDamage, detonate } from './combat'
@@ -113,7 +114,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     // loadout so the player is NOT stuck with a phantom weapon (issue: revived
     // players couldn't pick up mods). The pistol starter is real + slotted.
     expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
     expect(p.loadout!.activeSlot).toBe(0)
     expect(p.combat!.weapon).toBe('pistol')
     expect(w.revivesLeft).toBe(1) // penalty: one comeback spent
@@ -423,23 +424,49 @@ describe('auto-pickup', () => {
     expect(cash.dead).toBe(true)
   })
 
-  it('a weapon pickup is grabbed and auto-equipped (first weapon)', () => {
+  it('a weapon pickup is REFUSED and left lying on the ground', () => {
+    // The player's weapon is permanent, so no weapon can enter the inventory.
+    // Refused rather than swallowed: the entity survives, so nothing vanishes.
     const p = spawnPlayer(w, 0, 20, 20)
-    pickup('bat', 20, 20)
+    const before = p.loadout!.inventory.length
+    const bat = pickup('bat', 20, 20)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
-    expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(p.loadout!.inventory).toHaveLength(before)
+    expect(p.combat!.weapon).toBe(PLAYER_START_WEAPON)
+    expect(bat.dead).toBeFalsy()
   })
 
+  // `collect`'s auto-heal branch (itemClass === 'consumable' → top up instead of
+  // taking a slot) has no live content behind it after the item cull emptied the
+  // consumable class, but the branch is deliberately retained. Registering a test
+  // consumable keeps it under test rather than letting it rot untested until
+  // someone adds the next one.
   it('a consumable auto-heals a hurt player instead of taking a slot', () => {
+    CONSUMABLES.testStim = { id: 'testStim', name: 'Test Stim', heal: 30 }
+    try {
+      const p = spawnPlayer(w, 0, 20, 20)
+      p.health!.hp = 10
+      pickup('testStim', 20, 20) // heals 30
+      settle(p)
+      interactionSystem(w, idleFor(0))
+      expect(p.health!.hp).toBe(40)
+      expect(p.loadout!.inventory.some((s) => s.itemId === 'testStim')).toBe(false)
+    } finally {
+      delete CONSUMABLES.testStim
+    }
+  })
+
+  it('a pickup whose item id no longer exists is stashed, not crashed on', () => {
+    // The old-save / older-peer case: `collect` must not index the consumable
+    // table for an id that classes as 'unknown'. It takes a slot and sits inert.
     const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 10
-    pickup('bandage', 20, 20) // heals 30
+    pickup('medkit', 20, 20) // culled — no longer in any registry
     settle(p)
-    interactionSystem(w, idleFor(0))
-    expect(p.health!.hp).toBe(40)
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bandage')).toBe(false)
+    expect(() => interactionSystem(w, idleFor(0))).not.toThrow()
+    expect(p.health!.hp).toBe(10) // definitely did not heal
   })
 
   it('an out-of-reach pickup is left alone', () => {

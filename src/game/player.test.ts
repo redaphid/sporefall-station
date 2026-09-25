@@ -9,13 +9,12 @@ import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { addEntity, createWorld, tickWorld, type World } from './world'
 import { emptyInput, type InputCmd } from './types'
 import { serializeWorld, deserializeWorld } from './serialize'
-import { weaponStack, spendAmmo } from './systems/inventory'
+import { weaponStack } from './systems/inventory'
 import { resolveWeapon } from './systems/resolveWeapon'
 import { fireWeapon } from './systems/combat'
 import { spawnNpc } from './populate'
 import { WEAPONS } from './data/items'
 
-const STARTER_AMMO = 200
 
 const step = (w: World): void => tickWorld(w, new Map([[0, emptyInput()]]))
 const tickN = (w: World, inputs: Map<number, InputCmd>, n: number): void => {
@@ -34,7 +33,7 @@ describe('spawnPlayer — the starter weapon is a proper slotted ItemStack', () 
     const p = spawnPlayer(w, 0, 20, 20)
     expect(p.combat!.weapon).toBe('pistol')
     expect(p.loadout!.activeSlot).toBe(0)
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
     // The mod list resolves through the SAME weaponStack path the fire site uses.
     expect(weaponStack(p)?.itemId).toBe('pistol')
   })
@@ -101,17 +100,6 @@ describe('spawnPlayer — the starter gun holds mods (the #1 fix)', () => {
   })
 })
 
-describe('spawnPlayer — the starter pistol has finite (200-round) ammo', () => {
-  it('spendAmmo decrements and empties after exactly 200 shots', () => {
-    const w = createWorld(1, 1)
-    const p = spawnPlayer(w, 0, 20, 20)
-    for (let i = 0; i < STARTER_AMMO; i++) expect(spendAmmo(p)).toBe(true)
-    // 41st pull: empty gun clicks — no shot.
-    expect(spendAmmo(p)).toBe(false)
-    expect(weaponStack(p)?.qty).toBe(0)
-  })
-})
-
 describe('spawnPlayer — the slotted modded starter round-trips byte-for-byte', () => {
   it('serialize(deserialize(json)) === json after modding the starter', () => {
     const w = createWorld(5, 2)
@@ -123,6 +111,6 @@ describe('spawnPlayer — the slotted modded starter round-trips byte-for-byte',
     const restored = deserializeWorld(json)
     const rp = restored.entities.find((e) => e.playerCtl)!
     expect(weaponStack(rp)?.mods).toEqual([{ id: 'lifesteal', stacks: 1 }])
-    expect(weaponStack(rp)?.qty).toBe(STARTER_AMMO)
+    expect(weaponStack(rp)?.qty).toBe(1)
   })
 })

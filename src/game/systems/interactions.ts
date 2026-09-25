@@ -25,6 +25,7 @@ import type { Entity } from '../entity'
 import type { World } from '../world'
 import { kill } from './combat'
 import { addStatus, isWet } from './statusFx'
+import { vlen } from '../simMath'
 
 /** hp a wet body loses per electrocution (StatusEffects.cs spillWater case). */
 const ELEC_DAMAGE = 20
@@ -35,7 +36,7 @@ export const freeze = (w: World, e: Entity): void => addStatus(w, e, 'frozen', E
 
 export const wet = (w: World, e: Entity): void => addStatus(w, e, 'wet', ELEMENTS.wet.durationTicks)
 
-const near = (a: Entity, b: Entity): boolean => Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y) <= CHAIN_RADIUS
+const near = (a: Entity, b: Entity): boolean => vlen(a.pos.x - b.pos.x, a.pos.y - b.pos.y) <= CHAIN_RADIUS
 
 /** Zap `origin`: it becomes electrified (immobilized), and if it is wet the
  * shock floods the connected wet cluster — every reachable wet body is

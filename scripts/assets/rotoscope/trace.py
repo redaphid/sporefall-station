@@ -68,6 +68,13 @@ CN_END = float(os.environ.get("CN_END", "1.0"))
 # stale frames from an earlier run.
 TAG = os.environ.get("ROTO_TAG", "r1")
 CANVAS, CONTENT = 48, 46
+# The background the Blender frame is composited onto before img2img. It MUST
+# stay in one place: prep_white mixes it in, post_frame divides it back out
+# (unmix_bg), and if those two ever disagree the difference reappears as
+# coloured fringe on the silhouette. Diffusion + the LANCZOS upscale blend this
+# colour across the alpha boundary, so every edge pixel comes back as
+# `a*true + (1-a)*GEN_BG` and must be un-mixed, not merely masked.
+GEN_BG = (255, 255, 255)
 
 DIRS = ["s", "se", "e", "ne", "n"]
 FRAMES = list(range(8))
@@ -96,15 +103,130 @@ def depth_path(d, f):
 
 
 def prep_white(d, f):
-    """Composite the transparent Blender frame onto flat white (the pack's
-    generation background convention) for img2img."""
+    """Composite the transparent Blender frame onto flat GEN_BG (the pack's
+    generation background convention) for img2img.
+
+    post_frame MUST undo this with unmix_bg. Compositing is lossy at the edge:
+    a partially covered pixel keeps only the blended result, so the character's
+    true colour there is recoverable only by dividing GEN_BG back out using the
+    coverage we still hold in the Blender alpha."""
     os.makedirs(WHITE, exist_ok=True)
     dest = os.path.join(WHITE, f"walk-{d}-{f}.png")
     im = Image.open(blend_path(d, f)).convert("RGBA")
-    bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+    bg = Image.new("RGBA", im.size, tuple(GEN_BG) + (255,))
     bg.alpha_composite(im)
     bg.convert("RGB").save(dest)
     return dest
+
+
+def unmix_bg(rgb, alpha):
+    """Invert prep_white's composite: recover the character's own colour at
+    partially-covered edge pixels.
+
+    The traced frame is `observed = a*true + (1-a)*GEN_BG` for coverage
+    a = alpha/255, because diffusion and the LANCZOS upscale both blend across
+    the silhouette. post_frame then masks with a HARD alpha>100 threshold, so an
+    edge pixel that is 45% covered is kept fully opaque while still carrying 55%
+    of the background — near-white, which the palette lock snaps to #f2f6ea. That
+    is the white speckle: it is background bleed, not a highlight, which is why
+    it sits on the silhouette and why it flickers (each frame re-shades, so the
+    surviving specks land in different places).
+
+    Solving for `true` removes it at the source. Interior pixels have a == 1 and
+    are untouched. Below MIN_COVER the division amplifies noise more than it
+    recovers signal, so those pixels are left to the alpha mask to drop.
+
+    NOTE this handles ONLY the antialiased rim (alpha 1..254 — about 2k px of a
+    768 frame). It is not sufficient on its own: measured on walk-s-0, 47.9% of
+    pixels within 1px of the silhouette are near-white while the deep interior
+    is 1.0%, and those pixels have alpha == 255. Diffusion paints the background
+    INWARD past the geometric edge, so the dominant contamination has full
+    coverage and no amount of coverage algebra can reach it. debleed() does."""
+    import numpy as np
+    MIN_COVER = 0.30
+    a = (alpha.astype(np.float32) / 255.0)[..., None]
+    bg = np.float32(GEN_BG)
+    out = np.where(
+        a >= MIN_COVER,
+        (rgb.astype(np.float32) - (1.0 - a) * bg) / np.maximum(a, 1e-6),
+        rgb.astype(np.float32),
+    )
+    return out.clip(0, 255).astype(np.uint8)
+
+
+# Swept against the r2 vine-ranger cycle (40 frames), counting near-white pixels
+# on the silhouette edge. 6/42 -> 68 left, 10/42 -> 6, 14/50 -> 0, and 18/55
+# removes nothing further. 14/50 is the knee: it is the smallest band that takes
+# edge bleed to zero. What survives at 14/50 is 45 near-white pixels that are
+# 100% INTERIOR — visor//glint highlights the character genuinely has. Widening
+# the rim to chase those would start eating real art, which is the failure this
+# is meant to avoid, so the metric to watch when retuning is edge speckle, not
+# the total.
+DEBLEED_RIM = int(os.environ.get("DEBLEED_RIM", "14"))
+DEBLEED_TOL = int(os.environ.get("DEBLEED_TOL", "50"))
+
+
+def debleed(rgb, alpha, rim_px=None, tol=None):
+    """Evict GEN_BG from inside the silhouette BEFORE the downscale averages it.
+
+    This is the fix for the white speckle, and it has to run at full resolution:
+    k-centroid collapses ~16x16 source pixels into one 48px pixel, so a 1-2px
+    band of background bleed along the edge is averaged into every edge pixel of
+    the sprite and the palette lock then snaps the result to #f2f6ea. Removing
+    the specks afterwards would be cosmetic; the colour is already baked into the
+    average by then. Removing them here means the resampler never sees GEN_BG.
+
+    A pixel is treated as contamination when it is opaque, within `rim_px` of the
+    silhouette edge, and within `tol` of GEN_BG. The rim restriction is what
+    makes this safe: a genuinely light-coloured feature deep inside the character
+    is never a candidate, only the boundary band where bleed actually occurs
+    (measured: 47.9% near-white at the edge vs 1.0% in the interior).
+
+    Contaminated pixels take the colour of the nearest uncontaminated opaque
+    pixel, dilated outward one ring at a time. That preserves the character's own
+    dark outline — an outline is far from GEN_BG, so it is a donor, never a
+    target — which an erode-and-reflood would have destroyed."""
+    import numpy as np
+    rim_px = DEBLEED_RIM if rim_px is None else rim_px
+    tol = DEBLEED_TOL if tol is None else tol
+    out = rgb.astype(np.uint8).copy()
+    opaque = alpha > 100
+    if not opaque.any():
+        return out
+
+    near_bg = (np.abs(out.astype(np.int16) - np.int16(GEN_BG)).max(axis=-1) <= tol)
+
+    inner = opaque.copy()
+    for _ in range(rim_px):
+        p = np.pad(inner, 1, constant_values=False)
+        inner = inner & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+    rim = opaque & ~inner
+
+    bad = rim & near_bg
+    good = opaque & ~bad
+    if not bad.any() or not good.any():
+        return out
+
+    # Dilate donor colours into the contaminated band, nearest-first.
+    for _ in range(rim_px + 2):
+        if not bad.any():
+            break
+        gp = np.pad(good, 1, constant_values=False)
+        cp = np.pad(out, ((1, 1), (1, 1), (0, 0)))
+        acc = np.zeros(out.shape, np.float32)
+        cnt = np.zeros(alpha.shape, np.float32)
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            sy, sx = 1 + dy, 1 + dx
+            nb = gp[sy:sy + out.shape[0], sx:sx + out.shape[1]]
+            acc += cp[sy:sy + out.shape[0], sx:sx + out.shape[1]] * nb[..., None]
+            cnt += nb
+        fill = bad & (cnt > 0)
+        if not fill.any():
+            break
+        out[fill] = (acc[fill] / cnt[fill][..., None]).round().astype(np.uint8)
+        good = good | fill
+        bad = bad & ~fill
+    return out
 
 
 def _download(im, dest):
@@ -238,6 +360,12 @@ def post_frame(d, f, win, use_trace=True):
     tp = os.path.join(TRACED, f"walk-{d}-{f}.png")
     if use_trace:
         rgb = np.asarray(Image.open(tp).convert("RGB").resize(src.size, Image.LANCZOS))
+        # Divide out the generation background BEFORE anything reads these
+        # colours. The hard alpha>100 mask below keeps partially-covered edge
+        # pixels at full opacity, so without this they carry GEN_BG's white and
+        # the palette lock resolves them to #f2f6ea speckle along the silhouette.
+        rgb = unmix_bg(rgb, alpha)
+        rgb = debleed(rgb, alpha)
         # Signature-color rescue: the 3D proxy is a SEMANTIC mask — its cap
         # pixels are known exactly. Shaded back-view orange otherwise snaps to
         # the palette's tan (a blond-hair flicker across ne/n frames); bias

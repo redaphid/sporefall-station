@@ -38,7 +38,7 @@ const referencedFiles = (m: Manifest): string[] => {
 }
 
 // Mirrors sync_manifest.py: pooled tile art discovered from the tiles/ dir.
-const SURFACES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit'] as const
+const SURFACES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit', 'hall', 'grate', 'tiled', 'plating', 'hull', 'bog', 'stair_up', 'stair_down', 'landing'] as const
 const POOLS: readonly { key: (n: string) => string; pattern: (n: string) => RegExp }[] = [
   { key: (n) => `tile.${n}`, pattern: (n) => new RegExp(`^${n}-(\\d+)\\.png$`) },
   { key: (n) => `tile.${n}.accent`, pattern: (n) => new RegExp(`^${n}-accent-(\\d+)\\.png$`) },

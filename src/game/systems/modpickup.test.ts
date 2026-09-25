@@ -108,9 +108,12 @@ describe('mod pickup — degenerate inputs are safe', () => {
     p.combat!.weapon = 'pistol' // held but not slotted → phantom (legacy save / bug)
     const pick = dropMod(w, 'incendiary', p)
     step(w)
-    // The phantom is healed: pistol slotted + equipped, and the mod landed on it.
+    // The phantom is healed: pistol slotted, and the mod landed on it. The slot
+    // is NOT equipped — a weapon slot is never selectable now that the weapon is
+    // permanent, so `activeSlot` stays the held-item cursor (-1, nothing held).
+    // `weaponStack` finds the slot by the weapon id, which is what mods need.
     expect(weaponStack(p)?.itemId).toBe('pistol')
-    expect(p.loadout!.activeSlot).toBe(0)
+    expect(p.loadout!.activeSlot).toBe(-1)
     expect(p.combat!.weapon).toBe('pistol')
     expect(mods(p)).toEqual([{ id: 'incendiary', stacks: 1 }])
     expect(w.byId.get(pick.id)).toBeUndefined() // consumed + swept

@@ -2,10 +2,25 @@
 // proper: a scenario just seeds entities into a fresh world before play starts.
 
 import { WEAPONS } from './data/items'
-import { makeEntity, type Entity } from './entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
+import { nextFloor } from './systems/missions'
+import { findPath } from './path'
+import { vlen } from './simMath'
+import {
+  findArrival,
+  groupRng,
+  healAmount,
+  RETREAT_FRAC,
+  RETURN_FRAC,
+  spawnHive,
+  spawnPack,
+  spawnRaid,
+  standAt,
+  type RaidStrategy,
+} from './systems/groups'
 import { freeze, wet } from './systems/interactions'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
@@ -80,14 +95,33 @@ const placePlayer = (w: World, x: number, y: number): void => {
   player.prevPos = { x: player.pos.x, y: player.pos.y }
 }
 
-/** Two bystanders: one pre-frozen (ice-blue), one untouched twin. Hitting the
- * frozen one shatters it; the twin shrugs off the same blow. */
+/** Two bystanders: one pre-frozen (ice-blue), one untouched twin. The same blow
+ * lands x SHATTER_DAMAGE_MULT on the frozen one — enough to gib a bystander —
+ * and at face value on the twin, who walks away. */
 const setupFrost = (w: World): void => {
   const { x, y } = findStage(w, 5)
   const frozen = bystander(w, x + 1, y)
   freeze(w, frozen)
   bystander(w, x + 3, y)
   placePlayer(w, x + 2, y)
+}
+
+/** The freeze-shatter BALANCE stage: a real Mireclaw Alpha (320hp, 0.75 physical
+ * resist) beside an ordinary thug (40hp), both pre-frozen, both in one frame.
+ * Hit each once and the whole fix is visible at a glance — the thug gibs, the
+ * boss takes a chunk off a full bar and keeps coming. Under the old rule both
+ * died to the same single poke, which is the bug this stage exists to show. */
+const setupBossFreeze = (w: World): void => {
+  const { x, y } = findStage(w, 5)
+  const boss = spawnNpc(w, 'boss', x + 1.5, y + 0.5)
+  boss.ai = undefined // hold still on stage, like every other staged body
+  boss.intent = { x: 0, y: 0 }
+  freeze(w, boss)
+  const thug = spawnNpc(w, 'thug', x + 4.5, y + 0.5)
+  thug.ai = undefined
+  thug.intent = { x: 0, y: 0 }
+  freeze(w, thug)
+  placePlayer(w, x + 3, y)
 }
 
 /** A puddle of wet bystanders in a row; zapping the near one arcs down the
@@ -98,8 +132,10 @@ const setupWetElectric = (w: World): void => {
   placePlayer(w, x + 2, y)
 }
 
-/** A loaded loadout (bat / pistol / molotovs) and flammable targets downrange:
- * equip the gun and fire it dry, then throw a molotov to set the crates ablaze. */
+/** A loaded loadout (bat / pistol / grenades) and destructible targets downrange:
+ * equip the gun and fire it dry, then throw a grenade to blow the crates apart.
+ * The molotov this staged before the item cull is gone; fire is still reachable
+ * here by shooting a barrel or with the `incendiary` mod. */
 const setupInventory = (w: World): void => {
   const { x, y } = findStage(w, 8)
   const player = w.entities.find((e) => e.playerCtl)
@@ -110,7 +146,7 @@ const setupInventory = (w: World): void => {
     player.loadout!.inventory = [
       { itemId: 'bat', qty: WEAPONS.bat.durability! },
       { itemId: 'pistol', qty: 3 },
-      { itemId: 'molotov', qty: 2 },
+      { itemId: 'grenade', qty: 2 },
     ]
     player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'bat'
@@ -119,9 +155,11 @@ const setupInventory = (w: World): void => {
   crate(w, x + 5, y)
 }
 
-/** A broad loadout of the new item breadth (shotgun / freeze grenade /
- * chloroform / molotov / sledgehammer / adrenaline) with a bystander and crate
- * downrange to use them on. */
+/** A loadout spanning what a player can still carry after the item cull
+ * (shotgun / grenade / sledgehammer) with a bystander and crate downrange to use
+ * them on. Four of this stage's six original slots — freezeGrenade, chloroform,
+ * molotov and adrenaline — were culled items; the stage now shows the real
+ * breadth rather than staging things you can no longer find. */
 const setupItems = (w: World): void => {
   const { x, y } = findStage(w, 10)
   const player = w.entities.find((e) => e.playerCtl)
@@ -131,11 +169,8 @@ const setupItems = (w: World): void => {
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
       { itemId: 'shotgun', qty: 6 },
-      { itemId: 'freezeGrenade', qty: 2 },
-      { itemId: 'chloroform', qty: 2 },
-      { itemId: 'molotov', qty: 2 },
+      { itemId: 'grenade', qty: 2 },
       { itemId: 'sledgehammer', qty: WEAPONS.sledgehammer.durability! },
-      { itemId: 'adrenaline', qty: 1 },
     ]
     player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'shotgun'
@@ -243,24 +278,43 @@ const setupShowcase = (w: World): void => {
 
 const LANE_Y = 11 // open plaza lane below spawn — the camera frames it without clamping
 
+/**
+ * The id a wiped scripted stage renumbers its players from.
+ *
+ * This is CHOREOGRAPHY, not an arbitrary starting number. Several AI rhythms are
+ * phased by entity id — the think stagger is `id % 5` (systems/ai.ts:107),
+ * repaths are `id % REPATH_STAGGER`, strafe direction is `id % 2` — so the tick
+ * on which each staged thug thinks, routes and sidesteps is a function of the
+ * ids the stage hands out. The scripted demos were tuned with the player landing
+ * on an id ≡ 2 (mod 5), so the stage starts there and every beat keeps the
+ * timing it was recorded at. Change this and the demos re-phase:
+ * src/input/scripted.test.ts is the guard that says so.
+ */
+const STAGE_ID_BASE = 2
+
 const clearStage = (w: World): void => {
   // Scripted stages are hand-choreographed around faction stances (ambient
   // civilians amble, only the gang thugs charge), so opt out of the global
   // "everyone's an enemy" default — hostility here comes from disposition alone.
   w.hostile = false
-  // Mod-pickups (populate.ts) are the LAST entities stocked before the player is
-  // spawned, so they shift the player id + `nextId` up by their count. A scripted
-  // plaza wipes all populate entities anyway, but the AI think-stagger keys off
-  // `id % 5`, so that leftover shift would desync the tuned demo choreography.
-  // Roll the id space back by the mod-pickups we're removing → the scenario's ids
-  // are exactly what they'd be without the feature (a no-op when none spawned).
-  const modShift = w.entities.filter((e) => e.archetype.startsWith('mod.')).length
+  // The player is spawned AFTER populateWorld, so its id — and every stage id
+  // after it — is offset by however many entities populate happened to make.
+  // That matters because the AI think-stagger keys off `id % 5`, so a change in
+  // the population (a new mod-pickup feature, a different furniture count) would
+  // silently re-phase a hand-tuned demo's choreography.
+  //
+  // This used to be patched one feature at a time, by subtracting exactly the
+  // mod-pickups. Renumbering the survivors from the bottom of the id space
+  // instead makes a scripted stage INDEPENDENT of populate altogether: the
+  // plaza is wiped to the players anyway, so they may as well be entity 1..n,
+  // and every stage entity placed after them gets the same id on every run
+  // regardless of what levelgen and populate did upstream.
   const players = w.entities.filter((e) => !!e.playerCtl)
   w.entities = players
   w.byId.clear()
-  w.nextId -= modShift
+  w.nextId = STAGE_ID_BASE
   for (const e of players) {
-    e.id -= modShift
+    e.id = w.nextId++
     w.byId.set(e.id, e)
   }
 }
@@ -288,9 +342,11 @@ const stageDoor = (w: World, x: number, y: number, locked: boolean): void => {
 // move -> meet NPCs + grab a pickup -> open a door -> win a grenade+pistol battle
 const stageDemo = (w: World): void => {
   clearStage(w)
-  const medkit = makeEntity('pickup', 'pickup.medkit', 5.5, LANE_Y, 0.3)
-  medkit.pickup = { itemId: 'medkit', qty: 1 }
-  addEntity(w, medkit)
+  // Was a medkit before the item cull; a grenade is the pickup that still goes
+  // INTO the hotbar (cash would only tick a counter), so the demo beat reads.
+  const pick = makeEntity('pickup', 'pickup.grenade', 5.5, LANE_Y, 0.3)
+  pick.pickup = { itemId: 'grenade', qty: 1 }
+  addEntity(w, pick)
   stageWanderer(w, 8, LANE_Y - 0.6)
   stageWanderer(w, 9, LANE_Y + 1)
   const door = makeEntity('door', 'door', 12, LANE_Y, 0.5)
@@ -312,6 +368,41 @@ const stageDoors = (w: World): void => {
 const stageShooting = (w: World): void => {
   clearStage(w)
   for (const x of [12, 15, 18]) stageThug(w, x, LANE_Y).speed = 0
+}
+
+/**
+ * The HOMING-rework proof stage (playtest: "it mostly just curves the bullets
+ * into walls"), driven by the `shooting` script. A wall shields a NEARER thug
+ * north of the lane — the old global-nearest homing's bait, which it would
+ * chase into the wall — while two visible thugs stand in the open: one dead
+ * ahead down the lane, one off-axis south-east. The reworked seeker must kill
+ * both visible thugs (the off-axis one via a real curve) and leave the
+ * bunkered one untouched, every round flying straight past his cover.
+ */
+const stageHomingDemo = (w: World): void => {
+  clearStage(w)
+  // Open plaza under the whole stage (both layers — collision reads `solid`),
+  // so the tuned walk and firing lane never depend on the seed's architecture.
+  for (let y = 1; y <= 16; y++) {
+    for (let x = 1; x <= 22; x++) {
+      w.level.tiles[y * w.level.w + x] = Tile.Floor
+      w.level.solid[y * w.level.w + x] = 0
+    }
+  }
+  // The cover: a wall strip just north of the lane…
+  for (let x = 10; x <= 17; x++) {
+    w.level.tiles[10 * w.level.w + x] = Tile.Wall
+    w.level.solid[10 * w.level.w + x] = 1
+  }
+  // …with the bait thug bunkered behind it (nearest to the firing spot).
+  stageThug(w, 14.5, 8.5).speed = 0
+  // The visible marks: dead ahead down the lane, and off-axis south-east.
+  stageThug(w, 18, LANE_Y).speed = 0
+  stageThug(w, 15.5, 13.5).speed = 0
+  // The player's permanent pistol carries the mod under test.
+  const player = w.entities.find((e) => e.playerCtl)
+  const stack = player?.loadout?.inventory.find((s) => s.itemId === player.combat?.weapon)
+  if (stack) stack.mods = [{ id: 'homing', stacks: 2 }]
 }
 
 // a real steal mission: grab the briefcase (objective done) then reach the exit
@@ -485,9 +576,11 @@ const setupNpcAi = (w: World): void => {
     e.pickup = { itemId, qty: 1 }
     addEntity(w, e)
   }
-  drop('bandage', cx - 15.5, cy - 3.5)
+  // Loose loot for the scavenger to be drawn to. bandage/medkit were culled, so
+  // the bait is the two pickup kinds that still exist.
+  drop('grenade', cx - 15.5, cy - 3.5)
   drop('cash', cx - 14.5, cy - 0.5)
-  drop('medkit', cx - 15.5, cy - 6.5)
+  drop('cash', cx - 15.5, cy - 6.5)
 }
 
 /** The deliberate-AI showcase (feat/npc-ai-deliberate): three tactical moments
@@ -620,22 +713,280 @@ const stageArtCompare = (w: World): void => {
   stageThug(w, 19, LANE_Y)
 }
 
-export const applyScenario = (w: World, name: string): void => {
-  if (name === 'artcompare') stageArtCompare(w)
-  if (name === 'npc-combat') setupNpcCombat(w)
-  if (name === 'objects') setupObjects(w)
-  if (name === 'fire') setupFire(w)
-  if (name === 'frost') setupFrost(w)
-  if (name === 'wet-electric') setupWetElectric(w)
-  if (name === 'inventory') setupInventory(w)
-  if (name === 'items') setupItems(w)
-  if (name === 'relationships') setupRelationships(w)
-  if (name === 'showcase') setupShowcase(w)
-  if (name === 'demo') stageDemo(w)
-  if (name === 'doors') stageDoors(w)
-  if (name === 'shooting') stageShooting(w)
-  if (name === 'mission') stageMission(w)
-  if (name === 'ai-goals') setupAiGoals(w)
-  if (name === 'npc-ai') setupNpcAi(w)
-  if (name === 'npc-deliberate') setupNpcDeliberate(w)
+// ── The group layer's set-pieces (systems/groups.ts, docs/design/enemy-groups.md)
+//
+// Unlike the carved stages above, these NEVER touch a tile: they run on the
+// seed's own generated level, so a moment captured from one with
+// `sporefallShare()` restores through `?state=` (deserializeWorld regenerates the
+// level from seed+floor and refuses a checksum drift — a carved stage cannot be
+// shared). They clear the random cast (NPCs only — doors and furniture stay, the
+// sapper needs its door), make the player a tank so the clip never ends on a
+// down, and stage one group against it through the same spawners play uses.
+// Placement is a pure function of the seed (findArrival + a scenario fork), so
+// `?seed=N&scenario=<name>` reproduces the same moment every time.
+
+/** Clear the cast (NPCs, projectiles, groups), keep the map furniture, and make
+ * the first player an unkillable, passive-friendly tank. */
+const clearCast = (w: World): Entity | undefined => {
+  w.entities = w.entities.filter((e) => !e.ai && !e.projectile)
+  w.byId.clear()
+  for (const e of w.entities) w.byId.set(e.id, e)
+  w.groups = undefined
+  w.hostile = true
+  // Stand the floor's heist down. A real run's floor has a mission (setupFloor),
+  // and every way it completes throws EVERY door on the floor open (the station
+  // alert / gate-breach release): the prize picked up, or the target "gone" —
+  // and clearing the cast above deletes an assassinate/infiltrate boss outright.
+  // On seed 3 the sapper scenario seals the player into the prize room, so the
+  // player picked the briefcase up on tick 1 and the locked doors the Blast
+  // Diver came to blow were all open before it arrived. The set-piece is the
+  // raid, not the heist: the mission reads as done (like floor 10's `reach`), so
+  // nothing in missionSystem can unseal the map under it.
+  w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Hold out against the tide' }
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player?.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
+  return player
+}
+
+/** Stage one raid of `strategy` with an explicit muster against the player. */
+const stageTide = (w: World, strategy: RaidStrategy, roster: Parameters<typeof spawnRaid>[4], name: string): void => {
+  const player = clearCast(w)
+  if (!player) return
+  const at = findArrival(w, strategy, player, groupRng(w, `scenario:${name}`))
+  if (at) spawnRaid(w, strategy, at, player, roster)
+}
+
+/** The medic set-piece. The Bog Mender stands back, just past the reach of the
+ * player's pistol (MEDIC_BAND); its grunts start FORWARD of it, where the walk
+ * from the medic to the player comes within MEDIC_FRONT tiles of the player,
+ * already wounded below the retreat line. So the first thing they do is turn
+ * and run back to the medic, take its heal beam, and walk back in: the whole
+ * beat inside ~10s, and a player who shoots can catch a straggler but not
+ * the medic's patch-up itself.
+ *
+ * It used to drop all four in one knot at the assault drop point (6-9 tiles,
+ * point-blank for the pistol) at 30% hp. The grunts spawned beside the medic,
+ * so there was no fall-back to see; three of them queued for one-a-second
+ * heals and stood still for ~9s; the raid's own harpoons (friendly fire, fixed
+ * in projectiles.ts) killed the wounded as they walked back in; and a player
+ * who fought killed the lot in the first three seconds. Their hp is picked so
+ * two heal pulses cross the return line, which keeps the queue short. */
+const stageMedic = (w: World): void => {
+  const player = clearCast(w)
+  if (!player) return
+  const r = groupRng(w, 'scenario:tide-medic')
+  const at = findArrival(w, 'assault', player, r, MEDIC_BAND) ?? findArrival(w, 'assault', player, r)
+  if (!at) return
+  const g = spawnRaid(w, 'assault', at, player, ['medic', 'grunt', 'grunt', 'grunt'])
+  const medic = w.entities.find((m) => m.ai?.group?.id === g.id && m.ai.group.role === 'medic')
+  if (medic) {
+    // The fan put it beside the drop point; it holds exactly there.
+    medic.pos = { x: at.x, y: at.y }
+    medic.prevPos = { x: at.x, y: at.y }
+  }
+  const route = findPath(w.level, at.x, at.y, player.pos.x, player.pos.y) ?? []
+  const front = route.find((n) => vlen(n.x - player.pos.x, n.y - player.pos.y) <= MEDIC_FRONT) ?? at
+  const hurt = (max: number): number =>
+    Math.min(Math.ceil(max * RETREAT_FRAC) - 1, Math.max(1, Math.ceil(max * RETURN_FRAC) - 2 * healAmount(w.floor)))
+  for (const m of w.entities) {
+    if (m.ai?.group?.id !== g.id || m.ai.group.role !== 'grunt' || !m.health) continue
+    m.health.hp = hurt(m.health.max)
+    const spot = standAt(w, Math.floor(front.x) + 0.5, Math.floor(front.y) + 0.5)
+    if (!spot) continue
+    m.pos = { x: spot.x, y: spot.y }
+    m.prevPos = { x: spot.x, y: spot.y }
+  }
+}
+/** Where the Bog Mender waits: just past the starter pistol's 10-tile reach. */
+const MEDIC_BAND: [number, number] = [10.5, 13]
+/** How close to the player the wounded grunts start (tiles). */
+const MEDIC_FRONT = 6.5
+
+/** Seal a building for the sapper scenario: the building with the fewest
+ * doorways gets a LOCKED door in every one (an existing door is locked; an open
+ * doorway gets a new door entity — entities only, the tiles are untouched, so the
+ * moment stays shareable). Returns a standing spot inside, or null. */
+const sealBuilding = (w: World): { x: number; y: number } | null => {
+  let best: (typeof w.level.buildings)[number] | undefined
+  for (const b of w.level.buildings) {
+    if (b.doors.length === 0) continue
+    const room = b.rooms[0] ?? b.rect
+    if (isSolidTile(w.level, Math.floor(room.x + room.w / 2), Math.floor(room.y + room.h / 2))) continue
+    if (!best || b.doors.length < best.doors.length) best = b
+  }
+  if (!best) return null
+  for (const d of best.doors) {
+    let door = w.entities.find((e) => e.door && !e.dead && Math.floor(e.pos.x) === d.x && Math.floor(e.pos.y) === d.y)
+    if (!door) {
+      door = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
+      door.interact = { verb: 'open', range: 1.3 }
+      addEntity(w, door)
+    }
+    door.door = { open: false, locked: true, lockLevel: 3 }
+  }
+  const room = best.rooms[0] ?? best.rect
+  return { x: Math.floor(room.x + room.w / 2) + 0.5, y: Math.floor(room.y + room.h / 2) + 0.5 }
+}
+
+export const GROUP_SCENARIOS: Record<string, (w: World) => void> = {
+  /** An officer-led tide musters out of sight, then commits as one. Shoot the
+   * Bellwether (the tall brass-headed one) and watch the raid rout. */
+  'tide-staging': (w) => stageTide(w, 'staging', ['leader', 'medic', 'grunt', 'grunt', 'grunt'], 'tide-staging'),
+  /** A mortar battery sets up at range and shells the player over the walls;
+   * escorts guard it. Rush the gun to break the siege. */
+  'tide-siege': (w) => stageTide(w, 'siege', ['artillery', 'leader', 'grunt', 'grunt'], 'tide-siege'),
+  /** A wounded muster with a medic: the hurt fall back to the Bog Mender, are
+   * patched up, and return to the assault. */
+  'tide-medic': (w) => stageMedic(w),
+  /** The player is sealed inside a building (every doorway LOCKED); a sapper
+   * tide arrives outside, the Blast Diver plants a charge, backs off, and blows it. */
+  'tide-sappers': (w) => {
+    const player = clearCast(w)
+    const inside = player ? sealBuilding(w) : null
+    if (!player || !inside) return
+    player.pos = { x: inside.x, y: inside.y }
+    player.prevPos = { x: player.pos.x, y: player.pos.y }
+    const at = findArrival(w, 'sappers', player, groupRng(w, 'scenario:tide-sappers'))
+    if (at) spawnRaid(w, 'sappers', at, player, ['sapper', 'grunt', 'grunt', 'grunt'])
+  },
+  /** Two hound packs: the near one spots the player and ENCIRCLES before
+   * closing. Shoot any hound and both packs go manhunter (the howl carries). */
+  'hound-ring': (w) => {
+    const player = clearCast(w)
+    if (!player) return
+    const r = groupRng(w, 'scenario:hound-ring')
+    const near = findArrival(w, 'assault', player, r)
+    if (near) spawnPack(w, near, 4)
+    const far = findArrival(w, 'staging', player, r)
+    if (far) spawnPack(w, far, 3)
+  },
+  /** A hive spire in sight of the player: it buds sporelings at them, and 30s
+   * in, if it still stands, it roots a second spire nearby. Burn it early. */
+  'hive-spread': (w) => {
+    const player = clearCast(w)
+    if (!player) return
+    const at = findArrival(w, 'assault', player, groupRng(w, 'scenario:hive-spread'))
+    if (at) spawnHive(w, at.x, at.y)
+  },
+}
+
+/** Floor `?scenario=armed` lands on when no `&floor=` is given: the first
+ * indoor complex. */
+export const ARMED_DEFAULT_FLOOR = 3
+/** Doubled player HP. There is no armor system, so extra max HP stands in for it. */
+export const ARMED_HP = 240
+/** How many grenades to carry (throwables stack into one slot). */
+export const ARMED_GRENADES = 30
+
+/** `?scenario=armed[&floor=N]` drops a solo run straight onto floor N (default
+ * 3, the first station complex), kitted out to survive it. The floor is built
+ * by the real floor transition (`nextFloor` from N-1), so the level is exactly
+ * what a run reaching N gets: complex floors 3, 5, 7… come out as the indoor
+ * complex with their biome, populated and with the floor's mission set. No
+ * randomness of its own: the level and population come from the world's rng.
+ *
+ * The one-weapon rule holds (a player carries one permanent gun and cannot
+ * swap), so "well armed" means one heavily modded machine gun (guns carry no
+ * ammo, so it never runs dry), a big grenade stack held ready to throw, and
+ * double HP at full health. */
+const setupArmed = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
+  const target = Math.max(1, Math.floor(floor))
+  if (target !== w.floor) {
+    w.floor = target - 1
+    nextFloor(w)
+  }
+  const player = w.entities.find((e) => e.playerCtl)
+  if (!player) return
+  player.health = { hp: ARMED_HP, max: ARMED_HP, iframes: Math.max(player.health?.iframes ?? 0, SPAWN_GRACE_TICKS) }
+  player.loadout = {
+    inventory: [
+      {
+        itemId: 'machinegun',
+        qty: 1,
+        mods: [
+          { id: 'heavy', stacks: 2 },
+          { id: 'homing', stacks: 1 },
+          { id: 'lifesteal', stacks: 2 },
+          { id: 'pierce', stacks: 2 },
+          { id: 'rapid', stacks: 1 },
+        ],
+      },
+      { itemId: 'grenade', qty: ARMED_GRENADES },
+    ],
+    activeSlot: 1, // grenades held on the Use/Throw button; the gun fires regardless
+  }
+  if (player.combat) player.combat.weapon = 'machinegun'
+}
+
+/** `?scenario=stairs-demo[&floor=N]`: the `armed` kit on floor N (default 3),
+ * with the player standing two tiles in front of the loft stair, facing it —
+ * walk forward to climb. If floor N has no loft (the structural rule allowed
+ * none), the next complex floor that does is used instead. */
+const setupStairsDemo = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
+  setupArmed(w, floor)
+  for (let tries = 0; tries < 6 && !w.level.stairs; tries++) {
+    // Skip ahead to the next complex floor (odd floors from 3).
+    w.floor += w.floor % 2 === 1 ? 1 : 0
+    nextFloor(w)
+    setupArmed(w, w.floor)
+  }
+  const up = w.level.stairs?.find((l) => l.from.x < l.to.x) // the ground StairUp link
+  const player = w.entities.find((e) => e.playerCtl)
+  if (!up || !player) return
+  const d = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] }[up.dir]
+  // The ground landing is the landing of the reverse link.
+  const back = w.level.stairs!.find((l) => l.from.x === up.to.x && l.from.y === up.to.y)!
+  const lx = back.landing.x
+  const ly = back.landing.y
+  const stand = !isSolidTile(w.level, lx + d[0], ly + d[1]) ? { x: lx + d[0], y: ly + d[1] } : { x: lx, y: ly }
+  player.pos = { x: stand.x + 0.5, y: stand.y + 0.5 }
+  player.prevPos = { x: player.pos.x, y: player.pos.y }
+  player.facing = Math.atan2(-d[1], -d[0]) // looking at the stair
+}
+
+export interface ScenarioOpts {
+  /** `?floor=`: the floor the `armed` / `stairs-demo` scenarios start on. */
+  floor?: number
+}
+
+/** Every `?scenario=` name this build knows, and what it does to the world.
+ * A name missing from here is NOT silently ignored: main.ts treats it as a
+ * possible stale bundle (see src/app/deepLink.ts) and, failing that, shows an
+ * error rather than handing the player an ordinary run that looks like theirs. */
+const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>> = {
+  armed: (w, opts) => setupArmed(w, opts.floor),
+  'stairs-demo': (w, opts) => setupStairsDemo(w, opts.floor),
+  artcompare: stageArtCompare,
+  'npc-combat': setupNpcCombat,
+  objects: setupObjects,
+  fire: setupFire,
+  frost: setupFrost,
+  'boss-freeze': setupBossFreeze,
+  'wet-electric': setupWetElectric,
+  inventory: setupInventory,
+  items: setupItems,
+  relationships: setupRelationships,
+  showcase: setupShowcase,
+  demo: stageDemo,
+  doors: stageDoors,
+  shooting: stageShooting,
+  'homing-demo': stageHomingDemo,
+  mission: stageMission,
+  'ai-goals': setupAiGoals,
+  'npc-ai': setupNpcAi,
+  'npc-deliberate': setupNpcDeliberate,
+  ...GROUP_SCENARIOS,
+}
+
+/** The scenario names this build can apply, for error messages. */
+export const SCENARIO_NAMES: readonly string[] = Object.keys(SCENARIOS)
+
+export const isKnownScenario = (name: string): boolean => Object.hasOwn(SCENARIOS, name)
+
+/** Apply a named scenario. Returns false — and leaves the world untouched —
+ * for a name this build does not know. */
+export const applyScenario = (w: World, name: string, opts: ScenarioOpts = {}): boolean => {
+  if (!isKnownScenario(name)) return false
+  SCENARIOS[name]!(w, opts)
+  return true
 }

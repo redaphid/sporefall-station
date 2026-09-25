@@ -1,12 +1,14 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
+import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
-import { Tile, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
 import { raiseFloorAggro } from './relationships'
 import { addEntity, type World } from '../world'
+import { vlen } from '../simMath'
 
 export const setupFloor = (w: World): void => {
   // Mission first — door locking depends on which building it targets.
@@ -32,6 +34,15 @@ const WING_NAMES: Record<BuildingRole, string> = {
   warehouse: 'cargo hold',
   clinic: 'med-bay',
   bunker: 'reactor core',
+  mess: 'mess hall',
+  galley: 'galley',
+  quarters: 'crew quarters',
+  washroom: 'wash block',
+  lab: 'essence lab',
+  medbay: 'infirmary',
+  reactor: 'reactor hall',
+  depot: 'stores depot',
+  security: 'security post',
 }
 
 /** Themed module name for a building role (falls back to the raw role, defensively). */
@@ -214,7 +225,7 @@ const objectiveGateDoor = (w: World, building: Building): Entity | undefined => 
   const cx = room.x + room.w / 2
   const cy = room.y + room.h / 2
   return doors.reduce((best, d) =>
-    Math.hypot(d.pos.x - cx, d.pos.y - cy) < Math.hypot(best.pos.x - cx, best.pos.y - cy) ? d : best,
+    vlen(d.pos.x - cx, d.pos.y - cy) < vlen(best.pos.x - cx, best.pos.y - cy) ? d : best,
   )
 }
 
@@ -237,9 +248,10 @@ const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; 
   for (let attempt = 0; attempt < 24; attempt++) {
     const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
     const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
-    if (w.level.tiles[ty * w.level.w + tx] !== Tile.Floor) continue
+    if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
     if (tx === sx && ty === sy) continue
     if (tx === w.level.exit.x && ty === w.level.exit.y) continue
+    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     return { tx, ty }
   }
   return null
@@ -271,12 +283,17 @@ const placeSporeNode = (w: World, building: Building, rng: Rng): Entity | null =
 }
 
 const farthestBuilding = (w: World): Building | null => {
+  // Complex floors name their objective: the DEEPEST module by doors crossed
+  // from the spawn (levelgen/complex.ts, floorplan spec P2), which is not
+  // always the one farthest as the crow flies.
+  const named = w.level.complex?.objective
+  if (named !== undefined && named >= 0 && named < w.level.buildings.length) return w.level.buildings[named]
   let best: Building | null = null
   let bestDist = -1
   for (const b of w.level.buildings) {
     const cx = b.rect.x + b.rect.w / 2
     const cy = b.rect.y + b.rect.h / 2
-    const d = Math.hypot(cx - w.level.spawn.x, cy - w.level.spawn.y)
+    const d = vlen(cx - w.level.spawn.x, cy - w.level.spawn.y)
     if (d > bestDist) {
       best = b
       bestDist = d
@@ -302,7 +319,7 @@ const nearestPlayer = (w: World, x: number, y: number): Entity | undefined => {
   let bestD = Infinity
   for (const e of w.entities) {
     if (!e.playerCtl || e.dead) continue
-    const d = Math.hypot(e.pos.x - x, e.pos.y - y)
+    const d = vlen(e.pos.x - x, e.pos.y - y)
     if (d < bestD) {
       bestD = d
       best = e
@@ -387,7 +404,7 @@ const raiseStationAlert = (w: World, focus: Entity): void => {
   w.mission.bossAggroTriggered = true
   w.mission.alertTick = w.tick
   w.mission.alertFocusId = focus.id
-  w.mission.alertMark = { x: focus.pos.x, y: focus.pos.y }
+  w.mission.alertMark = groundAnchor(w.level, focus.pos.x, focus.pos.y)
   const hunters = w.entities.filter((e) => e.ai && !e.dead && !e.playerCtl).length
   w.events.push({ type: 'stationAlert', focusId: focus.id, doorsOpened, hunters })
 }
@@ -414,7 +431,9 @@ const broadcastAlert = (w: World): void => {
   const live = focus && !focus.dead && !focus.playerCtl?.downed ? focus : nearestLivePlayer(w)
   if (!live) return
   w.mission.alertFocusId = live.id
-  w.mission.alertMark = { x: live.pos.x, y: live.pos.y }
+  // An intruder upstairs is called out at the foot of the stairs: the hunt
+  // (ground-storey crew, Phase 1) converges on the stairwell, never the gutter.
+  w.mission.alertMark = groundAnchor(w.level, live.pos.x, live.pos.y)
 }
 
 /** The nearest-to-nothing live, standing player — the manhunt's fallback focus. */
@@ -554,6 +573,7 @@ export const nextFloor = (w: World): void => {
     p.prevPos.y = p.pos.y
     p.vel.x = 0
     p.vel.y = 0
+    delete p.stairLock // a fresh floor has fresh stairs
     if (p.health) {
       p.health.hp = Math.max(p.health.hp, Math.floor(p.health.max / 2))
       // Fresh-floor landing gets the same spawn grace as a fresh run.
@@ -572,6 +592,7 @@ export const nextFloor = (w: World): void => {
   }
   w.alarm = 0
   w.powerCut = {} // a fresh floor is fully powered again
+  w.director = undefined // the complex director re-plans per floor
   populateWorld(w)
   setupFloor(w)
   w.events.push({ type: 'floorChange', floor: w.floor })

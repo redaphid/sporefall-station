@@ -1,4 +1,5 @@
 import type { RenderView } from '../app/session'
+import { cameraRect, onViewerStorey } from '../game/stairs'
 import { MODS } from '../game/data/mods'
 import { themeDisplayName } from '../render/themeState'
 import { bossBar, bossRevealName, isRunReset, latchBossId, playerOutOfFight } from './bossModel'
@@ -206,7 +207,9 @@ export const createScreens = (
   // Top-centre health bar, clear of the notch and of the top-left player HUD.
   const bossHud = document.createElement('div')
   bossHud.style.cssText =
-    'position:absolute;top:calc(env(safe-area-inset-top, 0px) + 10px);left:50%;transform:translateX(-50%);' +
+    // --sf-safe-top: stage-space safe area (ui/orientation.ts) — follows the
+    // rotation when the landscape-always fallback turns the stage.
+    'position:absolute;top:calc(var(--sf-safe-top, 0px) + 10px);left:50%;transform:translateX(-50%);' +
     'width:min(60vw,340px);display:none;flex-direction:column;align-items:center;gap:2px;pointer-events:none;z-index:66'
   bossHud.innerHTML = `
     <div id="bossName" style="font:800 13px system-ui;letter-spacing:.14em;color:#e8d5f5;text-shadow:0 1px 3px #000"></div>
@@ -257,7 +260,11 @@ export const createScreens = (
     if (view.self) {
       for (const e of view.entities) {
         if (!e.playerCtl || e === view.self || e.dead) continue
-        teammates.push({ playerId: e.playerCtl.playerId, x: e.pos.x, y: e.pos.y, downed: !!e.playerCtl.downed })
+        // A teammate on another storey is pointed at where they stand in plan
+        // (their local position on OUR storey) with a ▲/▼ badge — never at the
+        // gutter between atlas slots (stairs.ts onViewerStorey).
+        const at = view.self ? onViewerStorey(view.level, view.self.pos.x, e.pos) : { ...e.pos, dz: 0 }
+        teammates.push({ playerId: e.playerCtl.playerId, x: at.x, y: at.y, downed: !!e.playerCtl.downed, dz: at.dz })
       }
     }
     // Solo (no teammates) or no camera to project with → clear and bail cheaply.
@@ -269,10 +276,19 @@ export const createScreens = (
       }
       return
     }
-    const markers = locatorMarkers(view.self.pos, teammates, { ...cam, levelW: view.level.w, levelH: view.level.h })
+    // OFF-SCREEN ONLY. A visible teammate is now marked in world space by the
+    // ring at their feet (render/playerMarkerLayer.ts), which — unlike this DOM
+    // caret, which was centred on the body — does not cover the character art it
+    // is labelling. Keeping both would double-mark every visible player. The
+    // edge arrow is still the right tool for someone you cannot see.
+    const markers = locatorMarkers(view.self.pos, teammates, {
+      ...cam,
+      ...cameraRect(view.level, view.self.pos.x),
+    }).filter((m) => !m.onScreen || m.dz !== 0) // off-storey: no feet ring to stand in for it
+    
     // Cheap change-detection (like the HUD): skip DOM writes when nothing moved.
     const key = markers
-      .map((m) => `${m.playerId}:${m.onScreen ? 'o' : 'e'}${Math.round(m.sx)},${Math.round(m.sy)}:${m.angle.toFixed(2)}:${m.dist}:${m.color}`)
+      .map((m) => `${m.playerId}:${m.label}:${m.onScreen ? 'o' : 'e'}${Math.round(m.sx)},${Math.round(m.sy)}:${m.angle.toFixed(2)}:${m.dist}:${m.color}`)
       .join('|')
     if (key === lastLocator) return
     lastLocator = key
@@ -357,9 +373,11 @@ const makeLocatorEl = (): LocatorEl => {
 
 /**
  * Reconcile the pooled marker elements against the computed markers: create for
- * new teammates, drop for departed ones, and (re)position/paint the rest. On-
- * screen teammates show just a coloured name caret; off-screen ones show the
- * rotating ➤ and a distance readout, edge-pinned by screens.ts's projection.
+ * new teammates, drop for departed ones, and (re)position/paint the rest.
+ *
+ * These are OFF-SCREEN teammates only (the caller filters): a rotating ➤ with a
+ * live distance readout, edge-pinned by screens.ts's projection. Teammates you
+ * can actually see wear a world-space ring at their feet instead.
  */
 const positionMarkers = (container: HTMLElement, pool: Map<number, LocatorEl>, markers: readonly LocatorMarker[]): void => {
   const live = new Set<number>()
@@ -375,17 +393,10 @@ const positionMarkers = (container: HTMLElement, pool: Map<number, LocatorEl>, m
     el.root.style.zIndex = m.downed ? '2' : '1'
     // Centre the marker on its anchor point (translate off its own half-size).
     el.root.style.transform = `translate(${m.sx}px, ${m.sy}px) translate(-50%, -50%)`
-    if (m.onScreen) {
-      // Visible: a downward caret + name so co-op players stay distinguishable.
-      el.arrow.textContent = m.downed ? '✖' : '▼'
-      el.arrow.style.transform = 'none'
-      el.tag.textContent = m.downed ? `${m.label} DOWN` : m.label
-    } else {
-      // Off-screen: rotate the ➤ toward them with a live world-distance readout.
-      el.arrow.textContent = '➤'
-      el.arrow.style.transform = `rotate(${m.angle}rad)`
-      el.tag.textContent = `${m.label}${m.downed ? ' DOWN' : ''} · ${m.dist}m`
-    }
+    // Rotate the ➤ toward them with a live world-distance readout.
+    el.arrow.textContent = '➤'
+    el.arrow.style.transform = `rotate(${m.angle}rad)`
+    el.tag.textContent = `${m.label}${m.downed ? ' DOWN' : ''} · ${m.dist}m`
   }
   for (const [id, el] of pool) {
     if (!live.has(id)) {

@@ -3,6 +3,7 @@ import { projectToScreen, screenToWorld, type CameraState } from '../ui/locatorM
 import {
   anchoredCenter,
   clampZoom,
+  padZoomFactor,
   pinchZoom,
   smoothZoom,
   wheelZoomFactor,
@@ -58,6 +59,34 @@ describe('wheelZoomFactor', () => {
     // 3 lines ≈ 48px, 1 page ≈ 120px — same formula after normalisation.
     expect(wheelZoomFactor(3, 1)).toBeCloseTo(wheelZoomFactor(48, 0), 12)
     expect(wheelZoomFactor(1, 2)).toBeCloseTo(wheelZoomFactor(120, 0), 12)
+  })
+})
+
+describe('padZoomFactor — held-button zoom steps', () => {
+  const DT = 1 / 60
+  it('zoomIn held grows, zoomOut held shrinks, and they are exact inverses', () => {
+    expect(padZoomFactor(true, false, DT)).toBeGreaterThan(1)
+    expect(padZoomFactor(false, true, DT)).toBeLessThan(1)
+    expect(padZoomFactor(true, false, DT) * padZoomFactor(false, true, DT)).toBeCloseTo(1, 12)
+  })
+  it('neither held and BOTH held are no-ops (factor exactly 1)', () => {
+    expect(padZoomFactor(false, false, DT)).toBe(1)
+    expect(padZoomFactor(true, true, DT)).toBe(1)
+  })
+  it('is framerate-independent: N small steps compose to one big step of the same total dt', () => {
+    let z = 1
+    for (let i = 0; i < 60; i++) z *= padZoomFactor(true, false, 1 / 60)
+    expect(z).toBeCloseTo(padZoomFactor(true, false, 1), 9)
+  })
+  it('a one-second hold covers half the full zoom range (the documented feel)', () => {
+    // ZOOM_MIN→ZOOM_MAX is ×8; e^PAD_ZOOM_RATE ≈ √8 per second.
+    expect(padZoomFactor(true, false, 1)).toBeCloseTo(Math.sqrt(ZOOM_MAX / ZOOM_MIN), 1)
+  })
+  it('degenerate dt (0, negative, NaN, Infinity) returns 1 — never NaN, never a jump', () => {
+    for (const dt of [0, -1, NaN, Infinity, -Infinity]) {
+      expect(padZoomFactor(true, false, dt)).toBe(1)
+      expect(padZoomFactor(false, true, dt)).toBe(1)
+    }
   })
 })
 

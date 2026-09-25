@@ -11,11 +11,33 @@ import { hasLineOfSight } from '../los'
 import { isSolidTile } from '../levelgen/level'
 import { findPath } from '../path'
 import { emitFear, type World } from '../world'
-import { ALERT, DRAWN, FLANK, FORMUP, FORTIFY, GARRISON, PATROL, RETREAT, SCAVENGE, SEARCH, STACK, WORK, decide } from './behaviors'
+import {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+  decide,
+} from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
+import { vlen } from '../simMath'
 
 const THINK_INTERVAL = 5 // ~6Hz per NPC at 30Hz sim, phase-spread by id
 const WANDER_RADIUS = 4
@@ -33,6 +55,15 @@ const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
 const STALL_TICKS = 45
 /** Movement below this distance across STALL_TICKS counts as no progress. */
 const STALL_DIST = 0.5
+/** Group-layer placement goals (systems/groups.ts): tactical moves, not strolls.
+ * They walk at full pace and skip the arrive-and-look-around beat, exactly as
+ * squad formation already did — a raider taking its muster slot, a hound its
+ * ring slot or a sapper its door does not stop to admire the view. */
+const TACTICAL = new Set([FORMUP, FLANK, STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+/** The group layer's own moves (not the squad's): these also steer with the
+ * strict swept-circle line check — see `sweptClear`. */
+const GROUP_MOVES = new Set([STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+const isGroupMove = (goal: string | undefined): boolean => goal !== undefined && GROUP_MOVES.has(goal)
 
 // ── Routing (path.ts) tuning ───────────────────────────────────────────────
 /** Ticks between route recomputes per NPC (+ id stagger, so repaths spread). */
@@ -188,7 +219,13 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     goal.code === DRAWN ||
     goal.code === RETREAT ||
     goal.code === FORMUP ||
-    goal.code === FORTIFY
+    goal.code === FORTIFY ||
+    goal.code === STAGE ||
+    goal.code === GUARD ||
+    goal.code === EMPLACE ||
+    goal.code === BREACH ||
+    goal.code === FALLBACK ||
+    goal.code === TEND
   ) {
     // #77 territory / #66 hive draw / #69 boss retreat-to-spore / squad
     // formation slot / barricade site: steer toward a world-derived point
@@ -202,7 +239,7 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     if (goal.at) ai.waypoint = { x: goal.at.x, y: goal.at.y }
     return
   }
-  if (goal.code === FLANK) {
+  if (goal.code === FLANK || goal.code === RING) {
     // Squad flanking: MOVE like a wander-to-point (around the target's far
     // side) but KEEP the engagement bookkeeping — the flanker still knows who
     // the fight is about, so `threat` takes over seamlessly on arrival.
@@ -311,11 +348,12 @@ const moveToward = (
   gy: number,
   pace: number,
   bestEffort = false,
+  strictLine = false,
 ): 'arrived' | 'moving' | 'blocked' => {
   const ai = e.ai!
   const dx = gx - e.pos.x
   const dy = gy - e.pos.y
-  const dist = Math.hypot(dx, dy)
+  const dist = vlen(dx, dy)
   if (dist < 0.05) {
     ai.path = undefined
     return 'arrived'
@@ -338,7 +376,8 @@ const moveToward = (
   if (
     hasLineOfSight(w.level, e.pos.x, e.pos.y, gx, gy, doorBlocked) &&
     hasLineOfSight(w.level, e.pos.x + px, e.pos.y + py, gx, gy, doorBlocked) &&
-    hasLineOfSight(w.level, e.pos.x - px, e.pos.y - py, gx, gy, doorBlocked)
+    hasLineOfSight(w.level, e.pos.x - px, e.pos.y - py, gx, gy, doorBlocked) &&
+    (!strictLine || sweptClear(w, e.pos.x, e.pos.y, gx, gy, e.radius, doorBlocked))
   ) {
     ai.path = undefined
     steerStraight()
@@ -347,7 +386,7 @@ const moveToward = (
   // Line blocked → route. Recompute only inside this entity's repath window so
   // route queries stay staggered across the crowd (deterministic per id).
   const cached = ai.path
-  const sameGoal = cached !== undefined && Math.hypot(cached.goal.x - gx, cached.goal.y - gy) <= GOAL_DRIFT
+  const sameGoal = cached !== undefined && vlen(cached.goal.x - gx, cached.goal.y - gy) <= GOAL_DRIFT
   const noRoute = sameGoal && cached.nodes.length === 0 // the cached "unroutable" verdict
   const spent = sameGoal && !noRoute && cached.i >= cached.nodes.length // walked a partial route to its end
   if (!sameGoal || noRoute || spent) {
@@ -372,7 +411,7 @@ const moveToward = (
     ai.path = { nodes, i: 0, goal: { x: gx, y: gy } }
   }
   const p = ai.path!
-  while (p.i < p.nodes.length && Math.hypot(p.nodes[p.i].x - e.pos.x, p.nodes[p.i].y - e.pos.y) < NODE_ARRIVE) p.i++
+  while (p.i < p.nodes.length && vlen(p.nodes[p.i].x - e.pos.x, p.nodes[p.i].y - e.pos.y) < NODE_ARRIVE) p.i++
   if (p.i >= p.nodes.length) {
     // Route walked out. A FULL route ended on the goal tile — close the last
     // stretch straight. A PARTIAL (best-effort) route ended as near as the map
@@ -389,7 +428,7 @@ const moveToward = (
   // A closed door on the node ahead: open it the moment it is in arm's reach —
   // the walker never phases through; it breaches, visibly, then walks in.
   const nKey = Math.floor(node.y) * lw + Math.floor(node.x)
-  if (ctx.closedDoors.has(nKey) && Math.hypot(node.x - e.pos.x, node.y - e.pos.y) <= DOOR_OPEN_RANGE) {
+  if (ctx.closedDoors.has(nKey) && vlen(node.x - e.pos.x, node.y - e.pos.y) <= DOOR_OPEN_RANGE) {
     const d = ctx.doorByTile.get(nKey)
     if (d?.door) {
       d.door.open = true
@@ -399,11 +438,52 @@ const moveToward = (
   }
   const ndx = node.x - e.pos.x
   const ndy = node.y - e.pos.y
-  const nd = Math.hypot(ndx, ndy) || 1
+  const nd = vlen(ndx, ndy) || 1
   e.intent.x = (ndx / nd) * pace
   e.intent.y = (ndy / nd) * pace
   e.facing = Math.atan2(ndy, ndx)
   return 'moving'
+}
+
+/** Does a body of radius `r` sweep from (x0,y0) to (x1,y1) without its circle
+ * touching a blocked tile? Samples the path every quarter tile and tests the
+ * circle's eight rim points. The three-line check above threads a doorway the
+ * body then clips on its frame corner (a sapper was measured wedged on one for
+ * the whole clip: centre line through the open door tile, rim over the jamb).
+ * Used only for the group layer's tactical moves (`strictLine`), so every
+ * pre-existing walker keeps its exact steering. */
+const RIM: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [0.7071, 0.7071],
+  [-0.7071, 0.7071],
+  [0.7071, -0.7071],
+  [-0.7071, -0.7071],
+]
+const sweptClear = (
+  w: World,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  r: number,
+  doorBlocked: (tx: number, ty: number) => boolean,
+): boolean => {
+  const dist = vlen(x1 - x0, y1 - y0)
+  const steps = Math.max(1, Math.ceil(dist / 0.25))
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const cx = x0 + (x1 - x0) * t
+    const cy = y0 + (y1 - y0) * t
+    for (const [ox, oy] of RIM) {
+      const tx = Math.floor(cx + ox * r)
+      const ty = Math.floor(cy + oy * r)
+      if (isSolidTile(w.level, tx, ty) || doorBlocked(tx, ty)) return false
+    }
+  }
+  return true
 }
 
 /** The 8 compass directions (unit vectors), fixed order = deterministic ties. */
@@ -502,7 +582,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     if (!goal) return
     const dx = goal.x - e.pos.x
     const dy = goal.y - e.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     const weapon = WEAPONS[e.combat?.weapon ?? 'fists']
 
     if (weapon.kind === 'ranged') {
@@ -534,7 +614,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     }
     if (seen) {
       ai.progress = undefined // live pursuit — stall bookkeeping is for cold trails
-    } else if (!ai.progress || Math.hypot(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
+    } else if (!ai.progress || vlen(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
       ai.progress = { x: e.pos.x, y: e.pos.y, tick: w.tick } // moved — mark fresh progress
     } else if (w.tick - ai.progress.tick > STALL_TICKS) {
       // Wedged against geometry chasing a memory: declare the trail cold so the
@@ -573,7 +653,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     if (!from) return
     const dx = e.pos.x - from.x
     const dy = e.pos.y - from.y
-    const dist = Math.hypot(dx, dy) || 1
+    const dist = vlen(dx, dy) || 1
     // Flight has no destination to route to — steer the away-vector, deflected
     // to the openest compass direction when a wall looms, so a panicked body
     // streams along walls and out of doorless corners instead of grinding.
@@ -583,7 +663,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     // chaser's body is not a tile). Mirrors the cold-trail bookkeeping the
     // aggro branch has always had; flight previously had NO equivalent, so
     // nothing anywhere caught a fleeing body that never moved.
-    if (!ai.progress || Math.hypot(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
+    if (!ai.progress || vlen(e.pos.x - ai.progress.x, e.pos.y - ai.progress.y) > STALL_DIST) {
       ai.progress = { x: e.pos.x, y: e.pos.y, tick: w.tick }
     } else if (w.tick - ai.progress.tick > FLEE_STALL_TICKS) {
       // Cornered with nowhere to run. Drop the panic and re-arbitrate: a
@@ -621,7 +701,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     }
     const dx = target.pos.x - e.pos.x
     const dy = target.pos.y - e.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     if (ai.goal === ALERT && dist <= ALERT_REACH) return performAlert(w, e, target)
     if (ai.goal === SCAVENGE && dist <= SCAVENGE_REACH) return collectPickup(w, e, target)
     if (dist > 0.2) {
@@ -648,7 +728,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
   if ((ai.mode === 'wander' || ai.mode === 'patrol') && ai.waypoint) {
     const dx = ai.waypoint.x - e.pos.x
     const dy = ai.waypoint.y - e.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     if (dist < 0.4) {
       ai.waypoint = undefined
       ai.mode = 'idle'
@@ -656,13 +736,15 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // Arrived on purpose → pause and look around before the next errand.
       // Squad positioning (formation slots, flank runs) skips the beat: those
       // arrivals are tactical placement, and a fidgeting stack reads wrong.
-      if (ai.goal !== FORMUP && ai.goal !== FLANK) ai.scanUntil = w.tick + SCAN_TICKS
+      if (!TACTICAL.has(ai.goal ?? '')) ai.scanUntil = w.tick + SCAN_TICKS
       return
     }
-    const pace = ai.mode === 'patrol' ? 0.85 : 0.6 // a beat is brisker than an amble
+    // A beat is brisker than an amble; a group-layer move is a run. (Squad
+    // formation/flank keep their historical amble — only the new codes run.)
+    const pace = ai.mode === 'patrol' ? 0.85 : isGroupMove(ai.goal) ? 1 : 0.6
     // Waypoint errands run BEST-EFFORT: a garrison whose core is sealed masses
     // on its locked door (the nearest reachable approach) instead of shrugging.
-    const res = moveToward(w, e, ctx, ai.waypoint.x, ai.waypoint.y, pace, true)
+    const res = moveToward(w, e, ctx, ai.waypoint.x, ai.waypoint.y, pace, true, isGroupMove(ai.goal))
     if (res === 'blocked') {
       // As close as the map allows (or nowhere to go at all): settle here and
       // re-decide instead of wall-grinding or oscillating.

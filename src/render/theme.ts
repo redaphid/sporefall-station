@@ -57,9 +57,23 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
 // with a warning and the art pass could not land without a code change. Until
 // those files exist the loader finds nothing and art.characterSet falls through
 // to the thug body exactly as before.
-export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss'] as const
+// #78 — the Sporefall threat roster (brute/cinder/sporeling/stalker/lurker/pod)
+// all spawn in normal play. They are canonical char keys for the same reason
+// `boss` is: without them `char.brute.*` is not canonical, so validateManifest
+// DROPS the mapping and the art can never load however many files ship.
+export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
+  'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
+  // The group roster (systems/groups.ts) — canonical for the same reason.
+  'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
 export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
-export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk'] as const
+// The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
+// `crate` are canonical for the same reason `boss` is above: a prop key that is
+// not listed here is not canonical, so validateManifest DROPS the mapping and
+// the PNG is silently discarded however correct the file is. `crate` needed no
+// new art at all -- cargo-crate.png has shipped since the pack landed and was
+// only ever reachable as prop.default.
+export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
+  'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node'] as const
 const UNIT_SINGLES = ['player', 'cop'] as const
 const UNIT_WALKERS = ['thug', 'scientist', 'robot'] as const
 
@@ -68,8 +82,38 @@ export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.e
 
 /** Tile names addressable from palette.tiles and tile.* sprite keys (mirrors the
  * Tile enum by name — the render layer maps them back to ids; the pure layer
- * stays game-free). */
-export const TILE_NAMES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit'] as const
+ * stays game-free). The last six are the indoor-complex decks (floors 3+):
+ * corridor `hall`, vent `grate`, ceramic `tiled`, tread `plating`, the outer
+ * pressure `hull` (wall family) and the `bog` seep flooding the deck. */
+export const TILE_NAMES = [
+  'street',
+  'sidewalk',
+  'floor',
+  'wall',
+  'grass',
+  'exit',
+  'hall',
+  'grate',
+  'tiled',
+  'plating',
+  'hull',
+  'bog',
+  // Stairs (docs/design/stairs-and-storeys.md §4): authored facing NORTH (the
+  // niche at the top, open side south); the tilemap rotates them per shaft.
+  'stair_up',
+  'stair_down',
+  // Not a tile of its own: `tile.landing.overlay` is the chevron decal laid on
+  // the deck tile in front of a stair.
+  'landing',
+] as const
+
+/** Wall-family tile names that take an autotiled cap (render/wallCaps.ts):
+ * `tile.<name>.cap` is the lit top strip authored along the tile's NORTH edge
+ * (RGBA, transparent below it) and `tile.<name>.cap.inner` the matching nub in
+ * the NW corner for concave corners. The tilemap rotates both to whichever
+ * edges face open ground, so the cap line runs continuously; the wall body
+ * art itself must then carry no cap. */
+export const WALL_CAP_NAMES = ['wall', 'hull'] as const
 
 /** tile.* sprite keys accept a single path OR an array: the array's entries are
  * VARIANTS the tilemap alternates deterministically by tile coordinate, so big
@@ -88,6 +132,10 @@ const buildSpriteKeys = (): Set<string> => {
     keys.add(`tile.${t}`)
     keys.add(`tile.${t}.accent`)
     keys.add(`tile.${t}.overlay`)
+  }
+  for (const t of WALL_CAP_NAMES) {
+    keys.add(`tile.${t}.cap`)
+    keys.add(`tile.${t}.cap.inner`)
   }
   for (const c of CHAR_NAMES) for (const d of DIRS5) for (const f of ['idle', 'step']) keys.add(`char.${c}.${d}-${f}`)
   // Animation-state frames (docs/themes.md "Animation states"):

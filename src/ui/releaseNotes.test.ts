@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { RELEASE_NOTES, formatReleaseNotes } from './releaseNotes'
+import { RELEASE_NOTES, formatReleaseNotes, selectNotes } from './releaseNotes'
 
 describe('formatReleaseNotes', () => {
   it('renders the seeded curated notes by default', () => {
@@ -58,5 +58,85 @@ describe('formatReleaseNotes', () => {
     expect(formatReleaseNotes(['x', 'y'], { maxLines: -3 })).toEqual([])
     // maxLen 0 clamps everything to just the ellipsis.
     expect(formatReleaseNotes(['abc'], { maxLen: 0 })).toEqual(['…'])
+  })
+})
+
+describe('selectNotes', () => {
+  const note = (date: string, slug: string) => `./releaseNotes/${date}-${slug}.ts`
+
+  it('orders by date prefix, newest first', () => {
+    const mods = {
+      [note('2026-08-17', 'oldest')]: 'oldest',
+      [note('2026-08-19', 'newest')]: 'newest',
+      [note('2026-08-18', 'middle')]: 'middle',
+    }
+    expect(selectNotes(mods)).toEqual(['newest', 'middle', 'oldest'])
+  })
+
+  it('caps to the newest count, leaving older files as inert history', () => {
+    const mods = Object.fromEntries(
+      ['2026-08-15', '2026-08-16', '2026-08-17', '2026-08-18', '2026-08-19'].map((d) => [note(d, 'x'), d]),
+    )
+    expect(selectNotes(mods, 2)).toEqual(['2026-08-19', '2026-08-18'])
+  })
+
+  it('IGNORES an undated filename instead of letting it pin itself to the top', () => {
+    // 'h' > '2', so a raw lexicographic sort would put this above every real
+    // note forever and silently evict the newest one.
+    const mods = {
+      [note('2026-08-19', 'real')]: 'real note',
+      './releaseNotes/helpers.ts': 'not a note',
+    }
+    expect(selectNotes(mods)).toEqual(['real note'])
+  })
+
+  it('ignores a non-note file even when it sorts below the dated ones', () => {
+    const mods = {
+      [note('2026-08-19', 'real')]: 'real note',
+      './releaseNotes/index.test.ts': 'not a note',
+    }
+    expect(selectNotes(mods)).toEqual(['real note'])
+  })
+
+  it('drops a malformed note rather than crashing the start menu', () => {
+    // A file exporting a named binding instead of a default yields undefined;
+    // formatReleaseNotes would throw on .trim() while painting the menu.
+    const mods = {
+      [note('2026-08-19', 'broken')]: undefined,
+      [note('2026-08-18', 'good')]: 'a real note',
+    }
+    expect(selectNotes(mods)).toEqual(['a real note'])
+    expect(() => formatReleaseNotes(selectNotes(mods))).not.toThrow()
+  })
+
+  it('drops blank notes BEFORE the cap so they never cost a visible slot', () => {
+    const mods = {
+      [note('2026-08-19', 'blank')]: '   ',
+      [note('2026-08-18', 'a')]: 'first',
+      [note('2026-08-17', 'b')]: 'second',
+    }
+    expect(selectNotes(mods, 2)).toEqual(['first', 'second'])
+  })
+
+  it('tolerates an empty directory and a zero/negative cap', () => {
+    expect(selectNotes({})).toEqual([])
+    expect(selectNotes({ [note('2026-08-19', 'x')]: 'x' }, 0)).toEqual([])
+    expect(selectNotes({ [note('2026-08-19', 'x')]: 'x' }, -3)).toEqual([])
+  })
+
+  it('is pure — same input yields identical output', () => {
+    const mods = { [note('2026-08-19', 'x')]: 'x', [note('2026-08-18', 'y')]: 'y' }
+    expect(selectNotes(mods)).toEqual(selectNotes(mods))
+  })
+})
+
+describe('the shipped note directory', () => {
+  it('every visible note is a usable one-liner', () => {
+    expect(RELEASE_NOTES.length).toBeGreaterThan(0)
+    for (const line of RELEASE_NOTES) {
+      expect(typeof line).toBe('string')
+      expect(line.trim()).toBe(line)
+      expect(line).not.toContain('\n')
+    }
   })
 })

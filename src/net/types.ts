@@ -1,6 +1,27 @@
 export type PeerId = string
 
-export const PROTOCOL_VERSION = 1
+/**
+ * The wire contract between two peers. The host refuses any `Hello` whose `v`
+ * differs (see netHost.ts), and the client surfaces that as the `rejected`
+ * phase — so a mismatch is a clean, explained refusal.
+ *
+ * **Bump this whenever the wire format changes, and appending to `ARCHETYPES`
+ * counts.** That list is an append-only `u8` index, and an index the receiver
+ * does not know decodes as `ARCHETYPES[i] ?? 'player'` (messages.ts). So two
+ * builds that disagree about the table both claim the same version, sail
+ * through the gate, and then the older peer quietly renders every new object
+ * as another copy of the player. Nothing errors; the game just lies.
+ *
+ * 4 — the group roster appended (88 -> 95): drowner, bellwether, mender,
+ *     breacher, lobber, gloamhound, hivespire — raids, hound packs and hive
+ *     spires now spawn in play, so an old peer would draw them as Rangers.
+ * 3 — `chair` appended (87 -> 88): the interior layout pass seats chairs at
+ *     desks, round tables and facing screens, so a chair is now spawnable.
+ * 2 — 59 archetypes appended (28 -> 87), so every spawnable object is
+ *     registered rather than only the enemies.
+ * 1 — initial.
+ */
+export const PROTOCOL_VERSION = 4
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'
@@ -21,7 +42,6 @@ export const BLE_DATA_C2H_UUID = '5f47a3c2-9b1e-4a52-8f6d-2c3e4b5a6d70'
 export const BLE_LOBBY_INFO_UUID = '5f47a3c3-9b1e-4a52-8f6d-2c3e4b5a6d70'
 
 export const SNAPSHOT_INTERVAL_TICKS = 3 // 10Hz at 30Hz sim
-export const INPUT_SEND_HZ = 20
 
 /** First byte of every message. */
 export const MsgType = {
@@ -42,7 +62,12 @@ export const MsgType = {
    * (slots/activeSlot/mods/ammo). Reliable, sent only on change. */
   Inventory: 19,
 } as const
-export type MsgTypeId = (typeof MsgType)[keyof typeof MsgType]
+
+const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))
+
+/** Does this first byte name a real message? The framing layer uses it to tell
+ * a genuine message start from payload bytes that merely parse as a header. */
+export const isKnownMsgType = (t: number): boolean => KNOWN_MSG_TYPES.has(t)
 
 const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))
 

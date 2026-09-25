@@ -6,6 +6,8 @@ import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
 import { mireclawSystem } from './systems/mireclaw'
 import { combatSystem } from './systems/combat'
+import { complexDirectorSystem, type DirectorState } from './systems/complexDirector'
+import { groupSystem, type GroupsState } from './systems/groups'
 import { elementSystem, fireSystem } from './systems/fire'
 import { sporeSystem } from './systems/spore'
 import { infectionActive, infectionSystem } from './systems/infection'
@@ -17,6 +19,7 @@ import { projectileSystem } from './systems/projectiles'
 import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
+import { stairSystem } from './systems/stairs'
 import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
 export interface MissionState {
@@ -111,6 +114,15 @@ export type RunMode = 'casual' | 'normal'
  * Shared across the party — a co-op run has one pool, not one per player. */
 export const REVIVES_PER_RUN = 2
 
+/**
+ * How a weapon's mods fire. Absent = the default fold (every mod on every
+ * shot, systems/resolveWeapon). `'sequence'` = the opt-in prototype where the
+ * mod list is an ordered wand and each cast consumes the next entry
+ * (systems/modSequence). A pure sim input like `mode`: the host picks it when
+ * the run is created and it rides the save and the GameStart message.
+ */
+export type ModCasting = 'sequence'
+
 export interface World {
   tick: number
   seed: number
@@ -142,6 +154,9 @@ export interface World {
   mode: RunMode
   /** Party-shared comebacks left this run; only consumed/gated in `normal`. */
   revivesLeft: number
+  /** Mod casting rule for this run (see ModCasting). Absent = default fold,
+   * so every existing world and snapshot is unchanged. */
+  modCasting?: ModCasting
   /** Combat tunable: when true every NPC treats players as an enemy on sight and
    * engages regardless of faction disposition (the "make them all enemies" knob).
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
@@ -171,6 +186,15 @@ export interface World {
    * touches determinism — it just serializes/replays with the world (see types.ts
    * `Annotation`). Default `[]`. */
   annotations: Annotation[]
+  /** Indoor-complex event director schedule (systems/complexDirector.ts).
+   * Present only on complex floors (3+) once the director has run; serialized
+   * only when present so city-floor snapshots stay byte-identical. */
+  director?: DirectorState
+  /** The group layer (systems/groups.ts): live raids and hound packs, the id
+   * sequence, and this floor's raid ("tide") schedule. Created by populate on
+   * floors that field groups; absent otherwise and serialized only when
+   * present, so every group-free snapshot is byte-identical. */
+  groups?: GroupsState
 }
 
 export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
@@ -262,10 +286,13 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
+  complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
+  groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)
   movementSystem(w, inputs)
+  stairSystem(w) // a player who stepped onto a stair climbs (or descends) now
   combatSystem(w, inputs)
   projectileSystem(w)
   interactionSystem(w, inputs)

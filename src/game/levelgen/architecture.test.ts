@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from './generate'
+import { generateCityLevel, generateLevel } from './generate'
 import { isWallTile, Tile, TileGrid, WALL_CUT_OUTSIDE, type Building, type Level } from './level'
 import { ALLEY_W, BOULEVARD_W, cutLotsVaried, STREET_W } from './lots'
 import { mulberry32 } from '../rng'
@@ -48,11 +48,12 @@ const rectHasReachable = (level: Level, reach: Uint8Array, r: Rect, tile?: numbe
   return false
 }
 
-/** All levels for seeds 1..n over floors 2..5 (the themed generator's domain). */
+/** Themed-CITY levels for seeds 1..n over floors 2..5 (floors 3+ now build the
+ * indoor complex in play; the city generator is exercised directly here). */
 const themedLevels = function* (n: number): Generator<{ seed: number; floor: number; level: Level }> {
   for (let seed = 1; seed <= n; seed++) {
     for (let floor = 2; floor <= 5; floor++) {
-      yield { seed, floor, level: generateLevel(seed, floor) }
+      yield { seed, floor, level: generateCityLevel(seed, floor) }
     }
   }
 }

@@ -25,8 +25,23 @@
  * can get big. Anything beyond this is a misparsed length, not a message. */
 export const MAX_MESSAGE_BYTES = 16384
 
-/** Slice one framed message into packet-sized chunks for the transport. */
+/** Slice one framed message into packet-sized chunks for the transport.
+ *
+ * REFUSES a message the length prefix cannot honestly carry. Both bad cases used
+ * to be silent and cost the receiver far more than the offending message:
+ * - `msg.length > 65535` wrapped the u16 prefix (a 70000B message declared 4464B),
+ *   so the reader framed a message out of the middle of the payload.
+ * - `MAX_MESSAGE_BYTES < msg.length <= 65535` framed cleanly but the reader
+ *   rejects it as an implausible length, desyncs, and then DISCARDS PACKETS until
+ *   it resynchronises — so an oversize message on the "never dropped" reliable
+ *   lane also eats the messages queued behind it.
+ * Throwing turns a silent, un-debuggable stream corruption into a loud failure at
+ * the one place that knows the real size. */
 export const frameMessage = (msg: Uint8Array, maxPacket: number): Uint8Array[] => {
+  if (msg.length === 0) throw new RangeError('frameMessage: empty message (the reader rejects a 0 length)')
+  if (msg.length > MAX_MESSAGE_BYTES) {
+    throw new RangeError(`frameMessage: ${msg.length}B exceeds MAX_MESSAGE_BYTES (${MAX_MESSAGE_BYTES})`)
+  }
   const framed = new Uint8Array(2 + msg.length)
   framed[0] = msg.length & 0xff
   framed[1] = (msg.length >> 8) & 0xff
@@ -92,6 +107,13 @@ export class StreamReader {
   }
 
   push(packet: Uint8Array, onMessage: (msg: Uint8Array) => void): void {
+    // An empty packet carries no evidence about anything. Falling through with it
+    // was doubly wrong: mid-message it reads as a SHORT packet (0 < senderMtu) and
+    // desyncs a message that is still perfectly intact, and every one of them
+    // pushes a 0 onto `packetLens`, which nothing ever drains while the buffer is
+    // empty — so a peer that spams empty writes grows that array without bound.
+    if (packet.length === 0) return
+
     if (this.resyncing) {
       if (!this.looksLikeStart(packet)) {
         this.discarded++
@@ -161,5 +183,13 @@ export class StreamReader {
     this.packetLens.length = 0
     this.resyncing = false
     this.discarded = 0
+    // The inferred MTU is stream state too, and it MUST NOT outlive the link that
+    // taught it. Carried across a reconnect it becomes a permanent lie: if the new
+    // connection negotiates a SMALLER MTU, every non-final packet of every
+    // multi-packet message now measures "short", so the reader desyncs on it,
+    // resynchronises onto the next message, desyncs again — forever, while the
+    // link stays up and nothing triggers a reconnect. That is precisely the
+    // silent, un-recoverable world-freeze this file exists to prevent.
+    this.senderMtu = 0
   }
 }

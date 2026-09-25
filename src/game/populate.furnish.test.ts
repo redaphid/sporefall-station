@@ -8,21 +8,32 @@
 // and everything round-trips through serialize/deserialize.
 
 import { describe, expect, it } from 'vitest'
+import { storeyOf } from './stairs'
 import { FURNISH_MAX_PER_ROOM, PROP_PLACEMENT, ROOM_FURNISH, populateWorld, roomOwningTile } from './populate'
 import { OBJECTS } from './data/objects'
 import type { Entity } from './entity'
-import { buildingAt, isWallTile, Tile, tileAt } from './levelgen/level'
+import { buildingAt, isFloorTile, isWallTile, tileAt } from './levelgen/level'
 import { deserializeWorld, serializeWorld } from './serialize'
+import { createCityWorld } from './testkit'
 import { createWorld, type World } from './world'
 
 const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
 
 /** After populateWorld the ONLY interactable entities are furnishings, so this
  * uniquely identifies them. */
-const furniture = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'interactable')
+// Room furniture lives on the ground storey; a loft's cache crate is loot
+// (populate stockLofts), not a room's furnishing.
+const furniture = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'interactable' && storeyOf(e.pos.x) === 0)
 
 const populated = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)
+  populateWorld(w)
+  return w
+}
+
+/** Same, on the city generator for any floor (vault set-pieces live there). */
+const populatedCity = (seed: number, floor: number): World => {
+  const w = createCityWorld(seed, floor)
   populateWorld(w)
   return w
 }
@@ -61,7 +72,7 @@ const freeTiles = (w: World, bi: number, ri: number): { x: number; y: number }[]
   const free: { x: number; y: number }[] = []
   for (let ty = room.y; ty < room.y + room.h; ty++) {
     for (let tx = room.x; tx < room.x + room.w; tx++) {
-      if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+      if (!isFloorTile(w.level.tiles[ty * lw + tx])) continue
       if (keepClear.has(ty * lw + tx)) continue
       if (tx === spawnTx && ty === spawnTy) continue
       if (tx === exitTx && ty === exitTy) continue
@@ -104,6 +115,15 @@ describe('furnish interiors — rooms are no longer empty boxes', () => {
         for (let bi = 0; bi < w.level.buildings.length; bi++) {
           const rooms = w.level.buildings[bi].rooms
           for (let ri = 0; ri < rooms.length; ri++) {
+            // A room only ONE tile wide is a corridor, not a room — the office
+            // "lobby" on seed 22 floor 3 is a 1×15 hallway spine. Every tile in
+            // it is the only way past itself, so ANY furnishing plugs the
+            // passage, and the circulation guard (populate.commitFurniture)
+            // rightly refuses all of them. Furnishing those was a bug this test
+            // used to require: see populate.reachability.test.ts, which fails on
+            // main precisely because hallways got props dropped in them.
+            const room = rooms[ri]
+            if (Math.min(room.w, room.h) < 2) continue
             if (freeTiles(w, bi, ri).length < 2) continue
             const inRoom = propsInRoom(w, bi, ri, props)
             expect(inRoom.length, `seed ${s} floor ${f} building ${bi} room ${ri}`).toBeGreaterThanOrEqual(1)
@@ -151,7 +171,7 @@ describe('furnish interiors — placement never breaks a room', () => {
         for (const e of furniture(w)) {
           const tx = Math.floor(e.pos.x)
           const ty = Math.floor(e.pos.y)
-          expect(w.level.tiles[ty * lw + tx]).toBe(Tile.Floor)
+          expect(isFloorTile(w.level.tiles[ty * lw + tx])).toBe(true)
           expect(doorTiles.has(ty * lw + tx), 'prop plugs a doorway').toBe(false)
           expect(tx === spawnTx && ty === spawnTy).toBe(false)
           expect(tx === exitTx && ty === exitTy).toBe(false)
@@ -289,7 +309,7 @@ describe('furnish interiors — degenerate rooms (adversarial)', () => {
     let sawVault = false
     for (let s = 1; s <= 120; s++) {
       for (const f of [2, 3, 4]) {
-        const w = populated(s, f)
+        const w = populatedCity(s, f)
         const props = furniture(w)
         for (let bi = 0; bi < w.level.buildings.length; bi++) {
           const b = w.level.buildings[bi]

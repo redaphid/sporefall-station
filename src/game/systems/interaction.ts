@@ -1,14 +1,15 @@
 import { PLAYER_START_WEAPON, SPECIAL_COOLDOWN_TICKS, starterLoadout } from '../player'
-import { CONSUMABLES, itemClass, WEAPONS } from '../data/items'
+import { CONSUMABLES, itemClass } from '../data/items'
 import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
 import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
-import { addItem, applyModPickup, equipSlot } from './inventory'
+import { addItem, applyModPickup } from './inventory'
 import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
+import { vlen } from '../simMath'
 
 const INTERACT_RANGE = 1.3
 /** How far a channeling picker may drift from the door before the pick drops. */
@@ -242,9 +243,9 @@ const runChannel = (w: World, p: Entity, cmd: InputCmd | undefined): void => {
   const door = w.byId.get(channel.targetId)
   if (!door?.door || !door.door.locked) return cancel('gone')
   // Walking off (stick input), being blasted away, or ending up out of reach.
-  if (cmd && Math.hypot(cmd.moveX, cmd.moveY) > PICK_MOVE_DEADZONE) return cancel('moved')
-  if (Math.hypot(p.pos.x - p.prevPos.x, p.pos.y - p.prevPos.y) > PICK_DRIFT_CANCEL) return cancel('moved')
-  if (Math.hypot(p.pos.x - door.pos.x, p.pos.y - door.pos.y) > PICK_BREAK_RANGE) return cancel('moved')
+  if (cmd && vlen(cmd.moveX, cmd.moveY) > PICK_MOVE_DEADZONE) return cancel('moved')
+  if (vlen(p.pos.x - p.prevPos.x, p.pos.y - p.prevPos.y) > PICK_DRIFT_CANCEL) return cancel('moved')
+  if (vlen(p.pos.x - door.pos.x, p.pos.y - door.pos.y) > PICK_BREAK_RANGE) return cancel('moved')
   if (--channel.ticksLeft > 0) return
   ctl.channel = undefined
   door.door.locked = false
@@ -260,7 +261,7 @@ const bleedAndRevive = (w: World, p: Entity): void => {
       e.playerCtl &&
       !e.playerCtl.downed &&
       !e.dead &&
-      Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
+      vlen(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
   )
   if (helper) {
     // Teammate revive: a standing ally hauls them up — the co-op window is kept.
@@ -318,22 +319,13 @@ export const nearestInteractable = (entities: readonly Entity[], p: Entity): Ent
   let bestDist = Infinity
   for (const e of entities) {
     if (!e.interact || e.dead) continue
-    const dist = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y)
+    const dist = vlen(e.pos.x - p.pos.x, e.pos.y - p.pos.y)
     if (dist <= (e.interact.range ?? INTERACT_RANGE) && dist < bestDist) {
       best = e
       bestDist = dist
     }
   }
   return best
-}
-
-/** A picked-up weapon arrives loaded: its slot count starts at a full magazine
- * (ranged) or full durability (melee); anything else keeps its pickup qty. */
-const startingCount = (itemId: string, qty: number): number => {
-  const def = WEAPONS[itemId]
-  if (def?.magSize) return def.magSize
-  if (def?.durability) return def.durability
-  return qty
 }
 
 const collect = (player: Entity, item: Entity): boolean => {
@@ -358,17 +350,11 @@ const collect = (player: Entity, item: Entity): boolean => {
     }
     return addItem(ld.inventory, itemId, qty)
   }
-  if (c === 'ammo') {
-    // Rounds top up an existing gun; otherwise stash for the gun you'll find.
-    const gun = ld.inventory.find((s) => itemClass(s.itemId) === 'ranged')
-    if (gun) {
-      gun.qty += qty
-      return true
-    }
-    return addItem(ld.inventory, itemId, qty)
-  }
-  // Weapons and throwables take a slot; auto-equip the first weapon you grab.
-  const added = addItem(ld.inventory, itemId, startingCount(itemId, qty))
-  if (added && (c === 'melee' || c === 'ranged') && ld.activeSlot < 0) equipSlot(player, ld.inventory.length - 1)
-  return added
+  // THE one-weapon rule, enforced at the door: a player carries exactly one
+  // permanent weapon, so a weapon can never enter their inventory. Nothing in
+  // level gen or on a corpse puts one on the floor any more, so this is defence
+  // in depth — refuse it and leave it lying there rather than silently eating it.
+  if (c === 'melee' || c === 'ranged') return false
+  // Throwables take a slot.
+  return addItem(ld.inventory, itemId, qty)
 }

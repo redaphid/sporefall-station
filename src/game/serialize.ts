@@ -10,8 +10,19 @@ import { serializeEntity } from '../debug/verbs'
 import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
 import { hashLabel, mulberry32 } from './rng'
+import type { DirectorState } from './systems/complexDirector'
+import type { GroupsState } from './systems/groups'
 import type { Annotation, SimEvent } from './types'
-import { createWorld, type FearPulse, type MissionState, type Noise, type World } from './world'
+import {
+  createWorld,
+  REVIVES_PER_RUN,
+  type FearPulse,
+  type MissionState,
+  type ModCasting,
+  type Noise,
+  type RunMode,
+  type World,
+} from './world'
 
 /** The versioned on-disk shape of a whole world. Stable and JSON-safe: every
  * field is a scalar, a plain record, or a verbatim entity clone. `level` is
@@ -40,6 +51,19 @@ export interface WorldJson {
   /** Combat "all NPCs are enemies" tunable. Omitted when true (the default) so
    * pre-feature snapshots round-trip byte-for-byte and load as hostile. */
   hostile?: boolean
+  /** Run difficulty. A SIM INPUT, not presentation: `combat.kill` and
+   * `interaction.recover` both branch on it, so a `casual` run that reloaded
+   * without this silently regained `normal` stakes. Omitted at the 'normal'
+   * default so pre-feature snapshots round-trip byte-for-byte. */
+  mode?: RunMode
+  /** Party-shared comebacks left this run. MUTATED during play
+   * (`interaction.recover` decrements it) and READ by `combat.kill` to decide
+   * whether a down is fatal — so omitting it handed a restored run its revives
+   * back and moved when the run ends. Omitted at the fresh-run default. */
+  revivesLeft?: number
+  /** Mod casting rule (World.modCasting). A sim input: omitted when absent (the
+   * default fold) so every existing snapshot round-trips byte-for-byte. */
+  modCasting?: ModCasting
   /** Per-wing power-cut flags (World.powerCut). Omitted when nothing is cut (the
    * default) so pre-feature snapshots round-trip byte-for-byte and load as fully
    * powered — same optional-field discipline as `hostile`/`annotations`. */
@@ -49,6 +73,10 @@ export interface WorldJson {
    * restored as `[]`. Entity SELECTION needs no field here: `Entity.selected`
    * rides along in each entity's verbatim JSON above. */
   annotations?: Annotation[]
+  /** Complex director schedule (World.director). Omitted when absent. */
+  director?: DirectorState
+  /** Group layer (World.groups). Omitted when absent. */
+  groups?: GroupsState
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -74,12 +102,24 @@ export const serializeWorld = (w: World): WorldJson => ({
   // Omit when at the hostile default so pre-existing snapshots stay byte-for-byte
   // unchanged; only a peaceful (false) world writes the field.
   ...(w.hostile ? {} : { hostile: false }),
+  // Difficulty + the revive economy. Both are read by the sim (combat.kill,
+  // interaction.recover), so leaving them out made a restored world diverge in a
+  // way NO existing test could see: `expectWorldEqual` compares two
+  // `serializeWorld` outputs, and a field absent from the schema is invisible on
+  // both sides. Same omit-at-default discipline as `hostile` above.
+  ...(w.mode === 'normal' ? {} : { mode: w.mode }),
+  ...(w.revivesLeft === REVIVES_PER_RUN ? {} : { revivesLeft: w.revivesLeft }),
+  ...(w.modCasting ? { modCasting: w.modCasting } : {}),
   // Omit when nothing is cut so a fully-powered station serializes exactly as
   // before this feature (no `powerCut` key at all).
   ...(Object.values(w.powerCut).some(Boolean) ? { powerCut: { ...w.powerCut } } : {}),
   // Omit when empty so pre-existing snapshots stay byte-for-byte unchanged (a
   // fresh world with no annotations serializes exactly as before this feature).
   ...(w.annotations.length ? { annotations: clone(w.annotations) } : {}),
+  // Only complex floors ever carry a director; city snapshots stay unchanged.
+  ...(w.director ? { director: clone(w.director) } : {}),
+  // Only floors that muster raids/packs carry groups; every other snapshot is unchanged.
+  ...(w.groups ? { groups: clone(w.groups) } : {}),
 })
 
 /** Rebuild a fresh, standalone world from a snapshot — byte-identical on every
@@ -94,6 +134,9 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.alarm = j.alarm
   w.powerCut = j.powerCut ? { ...j.powerCut } : {} // pre-feature snapshots load fully powered
   w.hostile = j.hostile ?? true // pre-feature snapshots load as hostile (the default)
+  w.mode = j.mode ?? 'normal' // pre-feature snapshots load at the normal default
+  w.revivesLeft = j.revivesLeft ?? REVIVES_PER_RUN
+  if (j.modCasting === 'sequence') w.modCasting = j.modCasting
   w.gameOver = j.gameOver
   w.mission = { ...j.mission }
   w.noises = j.noises.map((n) => ({ ...n }))
@@ -109,5 +152,7 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.byId = new Map(w.entities.map((e) => [e.id, e]))
   // Annotations are inert presentation data; default to none for older snapshots.
   w.annotations = j.annotations ? clone(j.annotations) : []
+  if (j.director) w.director = clone(j.director)
+  if (j.groups) w.groups = clone(j.groups)
   return w
 }

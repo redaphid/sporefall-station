@@ -265,4 +265,117 @@ export const NPCS: Record<string, NpcDef> = {
     wakeOn: ['noise', 'proximity', 'damage', 'fire'],
     resist: { spore: 0, poisoned: 0.3, burning: 1.4 },
   },
+
+  // ── Tides: the group roster (docs/design/enemy-groups.md) ─────────────────────
+  // These are the essence-echoes of the colony's WORK CREWS and its fauna — the
+  // swamp redreaming a security detail, a demolition gang, a medic, a pack. They
+  // are built to be met TOGETHER: each one is ordinary alone and changes what the
+  // group does (systems/groups.ts runs the group layer, behaviors.ts the brains).
+  // Numbers are floor-1 baselines; populate.spawnNpc ramps hp +15% per floor.
+  drowner: {
+    // Raid rank-and-file: a drowned security diver with a harpoon gun. The body
+    // of every tide. Deliberately a pistol-grade threat so a raid's danger is
+    // its NUMBERS and its orders, not any one member.
+    archetype: 'drowner',
+    faction: 'gang',
+    hp: 38,
+    speed: 3.4,
+    weapon: 'pistol',
+    sightRange: 9,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'raider',
+    resist: { poisoned: 0.7, spore: 0.5 },
+  },
+  bellwether: {
+    // The officer. Rings a bell for a head: every raid member within earshot is
+    // RALLIED (faster, harder to hurt). Kill it and the raid's nerve breaks —
+    // the whole tide routs. The priority target, and tanky enough to be a choice.
+    archetype: 'bellwether',
+    faction: 'gang',
+    hp: 90,
+    speed: 3.0,
+    weapon: 'pistol',
+    sightRange: 10,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'raider',
+    resist: { physical: 0.8, burning: 1.2 },
+  },
+  mender: {
+    // The medic. Hangs behind the line and patches whoever is hurt; wounded
+    // raiders RETREAT to it to be healed, then go back in. Fragile and unarmed,
+    // so the answer is to reach it — or to deny the retreat.
+    archetype: 'mender',
+    faction: 'gang',
+    hp: 44,
+    speed: 3.3,
+    weapon: 'fists',
+    sightRange: 9,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'mender',
+    resist: { poisoned: 0.2, spore: 0 },
+  },
+  breacher: {
+    // The sapper. Carries a caged bubble of distilled blast essence and walks
+    // the raid THROUGH locked hatches instead of around them — plants a charge,
+    // backs off, blows the door. Volatile: fire hurts it more.
+    archetype: 'breacher',
+    faction: 'gang',
+    hp: 62,
+    speed: 3.0,
+    weapon: 'bat',
+    sightRange: 9,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'raider',
+    resist: { physical: 0.85, burning: 1.4 },
+  },
+  lobber: {
+    // The siege gun. A living mortar that sets up at range and lobs arcing spore
+    // shells OVER walls at wherever its raid last saw you. Slow, keeps its
+    // distance, weak up close — the siege is broken by charging the battery.
+    archetype: 'lobber',
+    faction: 'gang',
+    hp: 58,
+    speed: 2.4,
+    weapon: 'fists',
+    sightRange: 11,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'mortar',
+    resist: { spore: 0, poisoned: 0.5, burning: 1.3 },
+  },
+  gloamhound: {
+    // Pack fauna. Hounds don't charge — they ENCIRCLE, spreading to a ring around
+    // the prey before closing together. Hurt one and the whole pack goes
+    // manhunter (and howls up any pack in earshot). Speed sits under the
+    // player's 4.5 so a pack is outrun only in a straight line.
+    archetype: 'gloamhound',
+    faction: 'neutral',
+    hp: 32,
+    speed: 4.2,
+    weapon: 'knife',
+    sightRange: 10,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'hound',
+    resist: { spore: 0, poisoned: 0.6 },
+  },
+  hivespire: {
+    // Infestation. A rooted spire that buds sporelings at anyone close and, left
+    // alone, PLANTS NEW SPIRES nearby — an infestation that spreads until it is
+    // burned out. Immobile (speed 0), soaks bullets, burns well.
+    archetype: 'hivespire',
+    faction: 'neutral',
+    hp: 120,
+    speed: 0,
+    weapon: 'fists',
+    sightRange: 9,
+    hostility: 'always',
+    fleesOnDamage: false,
+    behavior: 'hive',
+    resist: { physical: 0.7, burning: 1.6, spore: 0, poisoned: 0 },
+  },
 }

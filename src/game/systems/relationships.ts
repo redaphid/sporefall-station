@@ -20,6 +20,7 @@ import type { Entity, Faction, RelStatus } from '../entity'
 import { NPCS } from '../data/npcs'
 import type { EntityId } from '../types'
 import type { World } from '../world'
+import { vlen } from '../simMath'
 
 /** Hate a crime adds — the game's canonical AddRelHate(..., 5). */
 export const CRIME_HATE = 5
@@ -98,7 +99,7 @@ export const commitCrime = (w: World, victim: Entity, attacker: Entity | undefin
 
   for (const witness of w.entities) {
     if (!witness.ai || witness.dead || witness === victim) continue
-    if (Math.hypot(witness.pos.x - victim.pos.x, witness.pos.y - victim.pos.y) > LOS_RANGE) continue
+    if (vlen(witness.pos.x - victim.pos.x, witness.pos.y - victim.pos.y) > LOS_RANGE) continue
 
     // Frightened civilians flee the attacker rather than fight.
     if (NPCS[witness.archetype]?.fleesOnDamage && witness.ai.faction === 'civ') {

@@ -26,11 +26,13 @@
 // the renderer's draw code is untouched.
 
 import type { RenderView } from '../app/session'
+import { cameraRect } from '../game/stairs'
 import type { Annotation } from '../game/types'
 import { visibleAnnotations } from '../game/annotations'
 import { pickNearestEntity, pickRadiusAt, clearSelection, setSelected, selectedEntities } from '../game/select'
 import { TILE_PX } from '../render/art'
 import {
+  annotationScale,
   cardAnchor,
   clampToViewport,
   deOverlap,
@@ -38,12 +40,14 @@ import {
   wrapLabel,
   LABEL_LINE_HEIGHT,
   MAX_LABEL_WIDTH,
+  MIN_FONT_PX,
   type Rect,
 } from './annotationLayout'
 import { projectToScreen, screenToWorld, type CameraState } from './locatorModel'
 import { buildInfoCard, type InfoCard } from './inspectModel'
 import { createPressTracker, LONG_PRESS_MS } from './pressModel'
 import { isUiChrome, markUiChrome } from './chrome'
+import { toStage } from './orientation'
 import { themeDisplayName } from '../render/themeState'
 import type { CameraSource } from './screens'
 
@@ -52,10 +56,12 @@ export type InspectMode = 'chip' | 'card'
 
 export interface Overlay {
   update(view: RenderView): void
-  /** Open the info popup for whatever entity is under screen point (clientX/Y).
-   * The touch input layer calls this AFTER its claiming rules ruled the press
-   * neutral (never a stick, pinch, or button). A miss dismisses any open popup. */
-  inspectAt(mode: InspectMode, clientX: number, clientY: number): void
+  /** Open the info popup for whatever entity is under a STAGE point (see
+   * ui/orientation.ts — rotation-corrected, and identical to clientX/Y when the
+   * stage is not rotated). The touch input layer calls this AFTER its claiming
+   * rules ruled the press neutral (never a stick, pinch, or button), already in
+   * stage space. A miss dismisses any open popup. */
+  inspectAt(mode: InspectMode, stageX: number, stageY: number): void
 }
 
 export interface OverlayOpts {
@@ -154,7 +160,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
 
   const camState = (view: RenderView): CameraState | undefined => {
     const cam = cameraSource?.()
-    return cam ? { ...cam, levelW: view.level.w, levelH: view.level.h } : undefined
+    return cam ? { ...cam, ...cameraRect(view.level, view.self?.pos.x ?? cam.x) } : undefined
   }
 
   const close = (): void => {
@@ -177,12 +183,14 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     lastCardKey = ''
   }
 
-  const inspectAt = (mode: InspectMode, clientX: number, clientY: number): void => {
+  const inspectAt = (mode: InspectMode, stageX: number, stageY: number): void => {
     const view = lastView
     const cam = view && camState(view)
     if (!view || !cam) return
-    const rect = mount.getBoundingClientRect()
-    const w = screenToWorld(clientX - rect.left, clientY - rect.top, cam)
+    // Already stage space, which is what the camera projects in — no
+    // getBoundingClientRect: on a rotated stage that box is the element's
+    // axis-aligned bounds, and subtracting it would be silently wrong.
+    const w = screenToWorld(stageX, stageY, cam)
     // Zoom-aware pick reach: pickRadiusAt is pure game-side math — the VIEW
     // passes the current px-per-tile in, so src/game stays camera-free.
     // Projectiles are skipped so a tap lands on the actor/prop the player means;
@@ -211,7 +219,11 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     // Presses on interactive UI chrome (settings gear/panel, …) belong to the
     // chrome, never to inspect (chrome.ts) — structural, not per-widget.
     if (isUiChrome(ev.target)) return
-    press.down(ev.pointerId, ev.clientX, ev.clientY, performance.now())
+    // Stage coordinates at the boundary (ui/orientation.ts), so the press
+    // tracker's origin — which becomes the inspect point — is already correct
+    // on a rotated stage.
+    const p = toStage(ev.clientX, ev.clientY)
+    press.down(ev.pointerId, p.x, p.y, performance.now())
     clearTimeout(pressTimer)
     if (ev.pointerType !== 'mouse') {
       pressTimer = setTimeout(() => {
@@ -220,16 +232,20 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
       }, LONG_PRESS_MS)
     }
   })
-  mount.addEventListener('pointermove', (ev) => press.move(ev.pointerId, ev.clientX, ev.clientY))
+  mount.addEventListener('pointermove', (ev) => {
+    const p = toStage(ev.clientX, ev.clientY)
+    press.move(ev.pointerId, p.x, p.y)
+  })
   mount.addEventListener('pointerup', (ev) => {
     clearTimeout(pressTimer)
     if (isUiChrome(ev.target)) press.cancel(ev.pointerId) // released over chrome → never inspect
     const outcome = press.up(ev.pointerId, performance.now())
     if (outcome === null) return
+    const p = toStage(ev.clientX, ev.clientY)
     // Desktop click = the full card straight away; a touch tap opens the chip,
     // a threshold-crossing release (late timer) still opens the card.
-    if (ev.pointerType === 'mouse') inspectAt('card', ev.clientX, ev.clientY)
-    else inspectAt(outcome === 'longpress' ? 'card' : 'chip', ev.clientX, ev.clientY)
+    if (ev.pointerType === 'mouse') inspectAt('card', p.x, p.y)
+    else inspectAt(outcome === 'longpress' ? 'card' : 'chip', p.x, p.y)
   })
   mount.addEventListener('pointercancel', (ev) => {
     clearTimeout(pressTimer)
@@ -407,6 +423,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
       const vh = mount.clientHeight
       const anns = visibleAnnotations(view.annotations ?? [], view.tick)
       const T = TILE_PX * (cam?.zoom ?? 1)
+      const aScale = annotationScale(vw)
 
       // Resolve an annotation's screen anchor: entity-anchored reads the LIVE
       // entity position (so the mark follows it); else the world point; text banners
@@ -426,7 +443,9 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
           const p = projectToScreen(a.x, a.y, cam)
           return { ...p, onScreen: p.x >= 0 && p.x <= vw && p.y >= 0 && p.y <= vh }
         }
-        return { x: vw / 2, y: 24, onScreen: true } // bannerless text default
+        // Bannerless text default: below the mission banner (which owns the very
+        // top-center strip), pushed further down as the text itself scales up.
+        return { x: vw / 2, y: 24 + Math.round(26 * aScale), onScreen: true }
       }
 
       // ---- shapes (pin / circle / arrow), each an inert SVG-free DOM glyph.
@@ -481,7 +500,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
         textEls.set(it.key, te)
         if (it.targetId !== undefined) te.root.dataset.target = String(it.targetId)
         else delete te.root.dataset.target
-        setText(te.root, it.text, it.color)
+        setText(te.root, it.text, it.color, aScale)
         const w = te.root.offsetWidth
         const h = te.root.offsetHeight
         let x: number
@@ -559,7 +578,7 @@ const mkText = (parent: HTMLElement, key: string): TextEl => {
 
 /** Set the caption to pre-wrapped ≤3 nowrap lines so width/height stay bounded and
  * text never clips (scrollWidth==clientWidth). */
-const setText = (el: HTMLElement, text: string, color: string): void => {
+const setText = (el: HTMLElement, text: string, color: string, scale = 1): void => {
   const lines = wrapLabel(text)
   el.replaceChildren(
     ...lines.map((ln) => {
@@ -570,7 +589,10 @@ const setText = (el: HTMLElement, text: string, color: string): void => {
     }),
   )
   el.style.color = color
-  el.style.maxWidth = `${MAX_LABEL_WIDTH}px`
+  // Scale font + line height + width cap together (before the caller measures),
+  // so wrapped lines keep the same character budget at every scale.
+  el.style.font = `600 ${Math.round(MIN_FONT_PX * scale)}px/${Math.round(LABEL_LINE_HEIGHT * scale)}px system-ui`
+  el.style.maxWidth = `${Math.round(MAX_LABEL_WIDTH * scale)}px`
 }
 
 const mkShape = (parent: HTMLElement, key: string): HTMLElement => {

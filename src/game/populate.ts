@@ -1,7 +1,8 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { bunkerLaneKeys, isWallTile, Tile, tileAt, type Building, type RoomType } from './levelgen/level'
+import { bunkerLaneKeys, isFloorTile, isSolidTile, isWallTile, STOREY_SIZE, Tile, tileAt, type Building, type Corridor, type RoomType } from './levelgen/level'
+import { groupProps, planRoom, PROP_PLACEMENT, ROOM_LAYOUT, type FreeTile, type Placement } from './levelgen/furnish'
 import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
 
@@ -9,8 +10,11 @@ import type { Rect } from './levelgen/rooms'
 export { roomOwningTile }
 import type { Rng } from './rng'
 import { weightedModId } from './systems/draft'
+import { populateGroups } from './systems/groups'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
+import { vlen } from './simMath'
+import { floodLinked, stairReservedKeys } from './stairs'
 
 /** Roughly this fraction of interior rooms sprinkle a weapon-mod pickup, so mods
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
@@ -112,7 +116,10 @@ export const populateWorld = (w: World): void => {
   for (let i = 0; i < w.level.buildings.length; i++) {
     populateBuilding(w, rng, wrng, w.level.buildings[i], i)
   }
-  spawnStreetLife(w, rng, wrng)
+  // Indoor complex floors have no streets: the corridors get crew and
+  // security beats instead (same `populate` stream position, own logic).
+  if (w.level.complex) spawnCorridorLife(w, rng, wrng)
+  else spawnStreetLife(w, rng, wrng)
   sprinkleLoot(w, rng)
   scatterModPickups(w)
   // #78 follow-up: seed the resist-differentiated Sporefall roster into normal
@@ -132,10 +139,18 @@ export const populateWorld = (w: World): void => {
   assignBarricaders(w)
   assignSquads(w)
   spawnLurkers(w)
+  // Indoor complex only: sleepers in the bunk rooms (the director's ambush
+  // rooms). Own `sleepers` fork, appended last — city floors never draw it.
+  if (w.level.complex) spawnComplexSleepers(w)
+  // The group layer (floors 2+): hound packs, hive spires and the raid schedule.
+  // Own `groups` fork, appended last — nothing above moves.
+  populateGroups(w)
+  // Storeys (Phase 1): stock each loft with its loot cache. Own fork, last.
+  stockLofts(w)
 }
 
 /** Room types a lurker haunts — dark back-of-house corners, never the front. */
-const LURKER_ROOMS: readonly RoomType[] = ['stockroom', 'guardpost', 'bathroom', 'storage']
+const LURKER_ROOMS: readonly RoomType[] = ['stockroom', 'guardpost', 'bathroom', 'storage', 'washroom', 'depot']
 
 /** Seed dormant lurkers (the jump-scare ambusher, data/npcs.ts) sparingly into
  * preferred back rooms — deeper floors haunt more, floor 1 stays clean. Own
@@ -186,15 +201,16 @@ const lurkerHideTile = (w: World, b: Building, ri: number): { x: number; y: numb
   let bestScore = -Infinity
   for (let ty = room.y; ty < room.y + room.h; ty++) {
     for (let tx = room.x; tx < room.x + room.w; tx++) {
-      if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+      if (!isFloorTile(w.level.tiles[ty * lw + tx])) continue
       if (roomOwningTile(b.rooms, tx, ty) !== ri) continue
       if (taken.has(ty * lw + tx)) continue
+      if (stairReservedKeys(w.level).has(ty * lw + tx)) continue
       if (tx === spawnTx && ty === spawnTy) continue
       if (tx === exitTx && ty === exitTy) continue
       const walls = wallNeighbours(w, tx, ty)
       if (walls === 0) continue // it hides AGAINST something, never mid-floor
       let dmin = Infinity
-      for (const d of b.doors) dmin = Math.min(dmin, Math.hypot(d.x - tx, d.y - ty))
+      for (const d of b.doors) dmin = Math.min(dmin, vlen(d.x - tx, d.y - ty))
       const score = dmin + walls * 0.25 // far from doors first, cornered second
       if (score > bestScore) {
         bestScore = score
@@ -245,7 +261,7 @@ const assignSquads = (w: World): void => {
   let nextSquad = 1
   for (let bi = 0; bi < w.level.buildings.length; bi++) {
     const b = w.level.buildings[bi]
-    if (b.role !== 'warehouse' && b.role !== 'bunker') continue
+    if (b.role !== 'warehouse' && b.role !== 'bunker' && b.role !== 'reactor' && b.role !== 'security') continue
     const pack = w.entities.filter(
       (e) =>
         e.kind === 'npc' &&
@@ -264,52 +280,26 @@ const assignSquads = (w: World): void => {
   }
 }
 
-/** Room-type-appropriate interior furnishings. Reuses props that already have
- * art (crate/barrel/tv/toilet/vending/atm) plus the furniture archetypes, so a
- * room reads as WHAT IT IS at a glance: a bedroom holds bunks, a bathroom its
- * toilet, a shop floor its shelves and till, an armory its weapon lockers.
- * Repeats bias the weighting toward the room's signature prop. Everything here
- * is a soft, destructible object — never a solid tile — so it can't wall off a
- * room, block reachability, or trap an occupant. */
-export const ROOM_FURNISH: Record<RoomType, readonly string[]> = {
-  shopfloor: ['shelf', 'shelf', 'shelf', 'vending', 'atm', 'crate'],
-  stockroom: ['crate', 'crate', 'crate', 'shelf', 'barrel'],
-  living: ['tv', 'table', 'table', 'plant'],
-  bedroom: ['bunk', 'bunk', 'cabinet', 'plant'],
-  bathroom: ['toilet', 'cabinet'],
-  lobby: ['desk', 'bench', 'plant', 'vending'],
-  office: ['desk', 'desk', 'desk', 'cabinet', 'plant'],
-  storage: ['crate', 'crate', 'shelf', 'cabinet', 'barrel'],
-  waiting: ['bench', 'bench', 'plant', 'vending', 'tv'],
-  ward: ['bunk', 'bunk', 'cabinet', 'bench'],
-  supply: ['cabinet', 'cabinet', 'shelf', 'crate'],
-  guardpost: ['locker', 'crate', 'table', 'barrel'],
-  armory: ['locker', 'locker', 'locker', 'crate', 'barrel'],
-  barracks: ['bunk', 'bunk', 'locker', 'table'],
-  vault: ['locker', 'crate'],
+/** Which props a room type can hold, DERIVED from how that room type is laid
+ * out (`ROOM_LAYOUT` in levelgen/furnish.ts — the recipes are the source of
+ * truth now, so the palette can never drift out of sync with what is actually
+ * placed). Kept exported because tests, the rooms-tour fixture generator and
+ * mission code all ask "what belongs in a room of this type?".
+ *
+ * A room still reads as WHAT IT IS at a glance — a bedroom holds bunks, a
+ * bathroom its toilet, a shop floor its shelves and till, an armory its weapon
+ * lockers — but the ARRANGEMENT of those props is what stops it looking like
+ * scattered junk, and that lives in ROOM_LAYOUT. Everything here is a soft,
+ * destructible object — never a solid tile — so it can't wall off a room, block
+ * reachability, or trap an occupant. */
+const derivePalettes = (): Record<RoomType, readonly string[]> => {
+  const out = {} as Record<RoomType, readonly string[]>
+  for (const type of Object.keys(ROOM_LAYOUT) as RoomType[]) out[type] = groupProps(ROOM_LAYOUT[type])
+  return out
 }
+export const ROOM_FURNISH: Record<RoomType, readonly string[]> = derivePalettes()
 
-/** Where a prop WANTS to stand, so placement reads like someone arranged the
- * room: shelving/lockers/beds/appliances back against a wall, toilets and
- * planters tucked into corners, tables out in the middle of the room, loose
- * crates anywhere. A preference degrades gracefully (corner → wall → anywhere)
- * when the preferred tiles are taken, so density and safety are unaffected. */
-export const PROP_PLACEMENT: Record<string, 'wall' | 'corner' | 'center' | 'any'> = {
-  shelf: 'wall',
-  cabinet: 'wall',
-  locker: 'wall',
-  bunk: 'wall',
-  tv: 'wall',
-  vending: 'wall',
-  atm: 'wall',
-  bench: 'wall',
-  desk: 'wall',
-  toilet: 'corner',
-  plant: 'corner',
-  barrel: 'corner',
-  table: 'center',
-  crate: 'any',
-}
+export { PROP_PLACEMENT }
 
 /** Hard ceiling on furnishings per room, so a big open hall gets a believable
  * few — not two dozen crates packed shoulder to shoulder. */
@@ -330,42 +320,24 @@ const wallNeighbours = (w: World, tx: number, ty: number): number => {
   return count
 }
 
-/** Free tiles matching a prop's placement preference, degrading gracefully:
- * corner → any wall → anywhere; wall → anywhere; center → anywhere. Always
- * non-empty while `free` is. */
-const placementCandidates = (free: readonly FreeTile[], pref: 'wall' | 'corner' | 'center' | 'any'): FreeTile[] => {
-  if (pref === 'corner') {
-    const corners = free.filter((t) => t.walls >= 2)
-    if (corners.length > 0) return corners
-  }
-  if (pref === 'corner' || pref === 'wall') {
-    const walls = free.filter((t) => t.walls >= 1)
-    if (walls.length > 0) return walls
-  }
-  if (pref === 'center') {
-    const open = free.filter((t) => t.walls === 0)
-    if (open.length > 0) return open
-  }
-  return [...free]
-}
-
-interface FreeTile {
-  x: number
-  y: number
-  /** Orthogonal wall-neighbour count (see wallNeighbours). */
-  walls: number
-}
-
 /** Deterministically furnish every building interior with ROOM-TYPE-appropriate
- * props, arranged how a room of that type would actually be laid out: the
- * bedroom's bunks and the stockroom's shelving back against a wall, the
- * bathroom's toilet in a corner, the living-room table mid-floor. Runs on a
- * DEDICATED `furnish` fork so it neither perturbs nor is perturbed by the
- * loot/AI/mod streams — same seed+floor → the same furniture on every peer, and
- * every pre-existing populate test stays byte-identical. Placement leaves every
- * doorway (and the tile just inside it), the player spawn tile and the exit tile
- * clear, never stacks two props on one tile, and caps density at ~¼ of a room's
- * free floor so rooms stay walkable — even degenerate 2×2 vaults and closets. */
+ * props, ARRANGED the way a room of that type actually would be: the stockroom's
+ * shelving ranked down one wall with the crates heaped in a corner, the office's
+ * desks in a row each with its chair pulled up, the living room's seats drawn up
+ * facing the screen, the bathroom's toilet tucked in a corner.
+ *
+ * The arrangement itself is `planRoom` (levelgen/furnish.ts); this pass decides
+ * WHICH TILES are eligible and how many props a room may hold, then spawns what
+ * the planner decided. Runs on a DEDICATED `furnish` fork so it neither perturbs
+ * nor is perturbed by the loot/AI/mod streams — same seed+floor → the same
+ * furniture on every peer.
+ *
+ * Placement leaves every doorway (and the tile just inside it), the player spawn
+ * tile and the exit tile clear, never stacks two props on one tile, and caps
+ * density at ~¼ of a room's free floor so rooms stay walkable — even degenerate
+ * 2×2 vaults and closets. `populate.reachability.test.ts` proves the stronger
+ * property the arrangement work put at risk: even treating every prop as if it
+ * were solid, every doorway, room and objective stays reachable. */
 const furnishInteriors = (w: World): void => {
   const rng = w.rng.fork('furnish')
   const lw = w.level.w
@@ -373,11 +345,14 @@ const furnishInteriors = (w: World): void => {
   const spawnTy = Math.floor(w.level.spawn.y)
   const exitTx = Math.floor(w.level.exit.x)
   const exitTy = Math.floor(w.level.exit.y)
-  for (const building of w.level.buildings) {
-    // Keep every doorway (and the tile immediately inside it) clear so a
-    // furnishing can never plug the only way in or out of a room.
-    const keepClear = new Set<number>()
-    for (const d of building.doors) {
+  // Keep EVERY doorway on the floor (and the tile immediately inside it) clear,
+  // not just the doorways of the building being furnished. Buildings share walls
+  // and hallway spines, so a room of building A can perfectly well contain the
+  // tile just inside building B's door — and when this set was built per-building
+  // that neighbour's doorway got plugged. Level-wide is the whole fix.
+  const keepClear = new Set<number>()
+  for (const b of w.level.buildings) {
+    for (const d of b.doors) {
       keepClear.add(d.y * lw + d.x)
       for (const [dx, dy] of ORTHO) keepClear.add((d.y + dy) * lw + (d.x + dx))
     }
@@ -385,7 +360,14 @@ const furnishInteriors = (w: World): void => {
     // straight legs — that lane is a promised-open contract, so furniture (a
     // soft body that shoves movers) never sits on it. Shared with the fortify
     // behavior so runtime barricades honor the same lane (bunkerLaneKeys).
-    for (const k of bunkerLaneKeys(building, lw)) keepClear.add(k)
+    for (const k of bunkerLaneKeys(b, lw)) keepClear.add(k)
+  }
+  // The stair shafts' landings stay open deck (stairs.ts clearance).
+  for (const k of stairReservedKeys(w.level)) keepClear.add(k)
+  // Plan every room first, then commit the whole floor through the circulation
+  // guard below — a placement is only safe in the context of every OTHER prop.
+  const planned: Placement[] = []
+  for (const building of w.level.buildings) {
     // generateLevel always fills roomTypes; the fallback covers hand-built
     // Buildings in tests/scenarios (assignRoomTypes is pure and rng-free).
     const types = building.roomTypes ?? assignRoomTypes(building)
@@ -397,7 +379,7 @@ const furnishInteriors = (w: World): void => {
       const free: FreeTile[] = []
       for (let ty = room.y; ty < room.y + room.h; ty++) {
         for (let tx = room.x; tx < room.x + room.w; tx++) {
-          if (w.level.tiles[ty * lw + tx] !== Tile.Floor) continue
+          if (!isFloorTile(w.level.tiles[ty * lw + tx])) continue
           if (keepClear.has(ty * lw + tx)) continue
           if (tx === spawnTx && ty === spawnTy) continue
           if (tx === exitTx && ty === exitTy) continue
@@ -408,18 +390,152 @@ const furnishInteriors = (w: World): void => {
       // A closet with fewer than two free tiles stays bare — nowhere to stand
       // otherwise. Everything roomier gets at least one furnishing.
       if (free.length < 2) continue
-      const palette = ROOM_FURNISH[types[ri]]
       const n = Math.min(FURNISH_MAX_PER_ROOM, Math.max(1, Math.floor(free.length / 4)))
-      for (let i = 0; i < n && free.length > 0; i++) {
-        // Pick WHAT first, then stand it WHERE that kind of prop belongs.
-        const prop = rng.pick(palette)
-        const cands = placementCandidates(free, PROP_PLACEMENT[prop] ?? 'any')
-        const cell = cands[rng.int(0, cands.length - 1)]
-        free.splice(free.indexOf(cell), 1) // remove so no two props ever stack
-        spawnObject(w, prop, cell.x, cell.y)
-      }
+      // Plan the whole room as related GROUPS (levelgen/furnish.ts).
+      const plan = planRoom(free, lw, (x, y) => isWallTile(tileAt(w.level, x, y)), ROOM_LAYOUT[types[ri]], n, rng)
+      for (const p of plan) planned.push(p)
     }
   }
+  commitFurniture(w, planned)
+}
+
+/**
+ * Commit planned furniture, refusing any single piece that would cut the floor.
+ *
+ * Arranging props into ranks and clumps is exactly what makes a layout pass
+ * capable of building a WALL out of furniture: a rank across a narrow room, a
+ * heap of crates grown over a three-wide passage. Props are soft bodies (a
+ * player shoves through one), so this was never fatal — but "you can barge
+ * through it" is a poor answer to "that room looks sealed", and the hazard is
+ * not new: the old scattered placement violated the same property on seed 1,
+ * floor 1 (see populate.reachability.test.ts, which fails on both).
+ *
+ * So each piece is admitted only if, treating every already-admitted prop as
+ * SOLID, it leaves every still-reachable tile reachable — and can itself be
+ * walked up to. Pieces are considered in plan order, so a room's first
+ * (signature) piece is judged against an almost-empty floor and effectively
+ * always lands; only the marginal piece that would seal something is dropped.
+ * Deterministic: it draws no rng at all, so same seed → same admissions.
+ *
+ * COST. The obvious implementation — re-flood the whole floor per piece — is
+ * correct and made level generation ~64× slower (1.2ms → 74ms per floor), which
+ * a phone pays at every floor transition. Almost every piece is decided instead
+ * by a LOCAL cut-vertex test on the eight tiles around it: if all of its open
+ * orthogonal neighbours sit in one connected arc of that ring, they can still
+ * reach each other around the piece, so removing the tile cannot disconnect
+ * anything and no flood is needed. Only the genuinely ambiguous piece (its
+ * neighbours split into separate arcs — a doorway, a corridor pinch) pays for a
+ * flood. Same admissions, a fraction of the work.
+ */
+const commitFurniture = (w: World, planned: readonly Placement[]): void => {
+  const lw = w.level.w
+  const lh = w.level.h
+  const blocked = new Set<number>()
+  const startX = Math.floor(w.level.spawn.x)
+  const startY = Math.floor(w.level.spawn.y)
+  /** Tiles reachable from the player spawn, treating `blocked` as solid. */
+  // Stairs count as a way through (stairs.ts floodLinked): a loft reached
+  // only by its stair is reachable, so furniture never seals one off.
+  const reachable = (): Set<number> => {
+    const seen = new Set<number>()
+    const mask = floodLinked(w.level, startY * lw + startX, (k) => blocked.has(k))
+    for (let k = 0; k < mask.length; k++) if (mask[k]) seen.add(k)
+    return seen
+  }
+  const walkable = (tx: number, ty: number): boolean =>
+    tx >= 0 && ty >= 0 && tx < lw && ty < lh && !isSolidTile(w.level, tx, ty) && !blocked.has(ty * lw + tx)
+  /** Can a player stand next to the prop on `key` and act on it? */
+  const approachable = (key: number, reach: ReadonlySet<number>): boolean => {
+    const tx = key % lw
+    const ty = (key - tx) / lw
+    return ORTHO.some(([dx, dy]) => reach.has((ty + dy) * lw + (tx + dx)))
+  }
+  // The 8 ring offsets in CYCLIC order, so consecutive entries are themselves
+  // orthogonally adjacent — which is what lets a walk of the ring decide
+  // 4-connected reachability around the middle tile. Even indices are the
+  // orthogonal neighbours (N, E, S, W).
+  const RING = [
+    [0, -1], [1, -1], [1, 0], [1, 1],
+    [0, 1], [-1, 1], [-1, 0], [-1, -1],
+  ] as const
+  /** True when removing (tx,ty) provably cannot disconnect anything: all of its
+   * open orthogonal neighbours lie in ONE connected arc of the surrounding ring,
+   * so each can still reach the others by stepping around this tile. Conservative
+   * — `false` only means "not provable locally", and the caller then floods. */
+  const locallySafe = (tx: number, ty: number): boolean => {
+    const open: boolean[] = []
+    for (const [dx, dy] of RING) open.push(walkable(tx + dx, ty + dy))
+    const orth = [0, 2, 4, 6].filter((i) => open[i])
+    if (orth.length <= 1) return true // a leaf: nothing behind it to cut off
+    if (open.every((o) => o)) return true // wide open floor
+    // Label each open ring cell with the id of its cyclic arc.
+    const arc: number[] = new Array<number>(8).fill(-1)
+    let next = 0
+    for (let i = 0; i < 8; i++) {
+      if (!open[i] || arc[i] !== -1) continue
+      const id = next++
+      for (let k = 0; k < 8 && open[(i + k) % 8]; k++) arc[(i + k) % 8] = id
+    }
+    // Join the arcs that wrap across index 0.
+    if (open[0] && open[7] && arc[0] !== arc[7]) {
+      const from = arc[7]
+      for (let i = 0; i < 8; i++) if (arc[i] === from) arc[i] = arc[0]
+    }
+    return orth.every((i) => arc[i] === arc[orth[0]])
+  }
+  let reach = reachable()
+  for (const p of planned) {
+    const key = p.y * lw + p.x
+    // A tile the floor plan never connected to spawn in the first place is
+    // levelgen's business (a sealed vault chamber); furnishing it changes nothing.
+    if (!reach.has(key)) {
+      spawnPlanned(w, p)
+      continue
+    }
+    blocked.add(key)
+    // `after` is the reachable set once this tile is taken. When the local test
+    // proves nothing can be cut off, that is exactly `reach` minus this tile —
+    // no flood required.
+    let after: Set<number>
+    if (locallySafe(p.x, p.y)) {
+      after = reach
+      after.delete(key)
+    } else {
+      after = reachable()
+      if (after.size !== reach.size - 1) {
+        blocked.delete(key) // this piece would seal something off — leave it bare
+        continue
+      }
+    }
+    // It must be possible to walk up to the piece (to smash, loot or use it) —
+    // and it must not fence in a piece already standing beside it, because a
+    // later prop can steal the ONLY reachable neighbour an earlier one had.
+    let safe = approachable(key, after)
+    if (safe) {
+      for (const [dx, dy] of ORTHO) {
+        const nk = (p.y + dy) * lw + (p.x + dx)
+        if (blocked.has(nk) && nk !== key && !approachable(nk, after)) {
+          safe = false
+          break
+        }
+      }
+    }
+    if (!safe) {
+      blocked.delete(key)
+      if (after === reach) reach.add(key) // undo the in-place delete above
+      continue
+    }
+    reach = after
+    spawnPlanned(w, p)
+  }
+}
+
+const spawnPlanned = (w: World, p: Placement): void => {
+  const e = spawnObject(w, p.prop, p.x, p.y)
+  e.facing = p.facing
+  // A backed prop is drawn nudged into its wall (see render/sprites.ts), so a
+  // rank of shelving kisses the wall instead of floating a half-tile off it.
+  if (p.mounted) e.mount = 'wall'
 }
 
 /** #78 — inject the Sporefall threat roster (brute/cinder/sporeling/robot) into
@@ -432,6 +548,10 @@ const spawnEncounters = (w: World, erng: Rng): void => {
   const theme = w.level.theme
   const floor = w.floor
   for (const b of w.level.buildings) {
+    // A complex floor is ~3x as many (single-room) modules as a city floor has
+    // buildings, so only a share of modules roll encounters at all — keeps the
+    // floor's threat budget in the same band as the city's.
+    if (w.level.complex && !erng.chance(COMPLEX_ENCOUNTER_SHARE)) continue
     // Spore-vermin: a swarm that thickens with depth (and where blooms grow).
     let sporelings = 0
     if (erng.chance(floor >= 2 ? 0.45 : 0.2)) sporelings += erng.int(1, 1 + Math.min(3, floor))
@@ -462,12 +582,15 @@ const spawnEncounters = (w: World, erng: Rng): void => {
       ['pod', pods],
     ] as const) {
       for (let i = 0; i < n; i++) {
-        const spot = randomFloorInBuilding(w, erng, b)
+        const spot = randomFloorInBuilding(w, erng, b, true)
         if (spot) spawnNpc(w, arch, spot.x, spot.y)
       }
     }
   }
 }
+
+/** Share of complex modules that roll the Sporefall encounter table. */
+export const COMPLEX_ENCOUNTER_SHARE = 0.25
 
 const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number, number] }[]> = {
   shop: [
@@ -486,6 +609,33 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
     { archetype: 'thug', count: [1, 2] },
     { archetype: 'gangster', count: [1, 2] },
   ],
+  // Indoor complex modules (floors 3, 5, 7…). The essence-echoes of the crew still
+  // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
+  // swarms are layered on separately (spawnComplexSleepers, complexDirector).
+  // A complex has ~3x as many (single-room) modules as a city floor has
+  // buildings, so each module is lightly crewed: the floor total stays near a
+  // city floor's, and the director's swarms/ambushes supply the pressure.
+  mess: [
+    { archetype: 'civilian', count: [0, 2] },
+    { archetype: 'thug', count: [0, 1] },
+  ],
+  galley: [{ archetype: 'thug', count: [0, 1] }],
+  quarters: [{ archetype: 'civilian', count: [0, 1] }],
+  washroom: [],
+  lab: [
+    { archetype: 'scientist', count: [0, 1] },
+    { archetype: 'robot', count: [0, 1] },
+  ],
+  medbay: [{ archetype: 'scientist', count: [0, 1] }],
+  reactor: [
+    { archetype: 'robot', count: [0, 1] },
+    { archetype: 'thug', count: [0, 1] },
+  ],
+  depot: [{ archetype: 'thug', count: [0, 1] }],
+  security: [
+    { archetype: 'cop', count: [1, 1] },
+    { archetype: 'gangster', count: [0, 1] },
+  ],
 }
 
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, buildingIdx: number): void => {
@@ -497,7 +647,7 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
   for (const spec of specs) {
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
-      const spot = randomFloorInBuilding(w, rng, building)
+      const spot = randomFloorInBuilding(w, rng, building, true)
       if (!spot) continue
       // The new-archetype patrol beats (bunker band, courtyard pit) are FIXED
       // rectangles of provably-open tiles — patrol steering is straight-line
@@ -551,30 +701,55 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
   return null
 }
 
-// Loot is tiered by depth: floor 1 stays basic (bat/knife/bandages), then the
-// element arsenal folds in so the frost/fire/shock/sleep/poison systems come
-// online as you descend. Shops always stock element gear (see stockShop), so
-// the interaction combos stay reachable regardless of how the dice fall.
-const BASIC_LOOT = ['bat', 'knife', 'bandage', 'bandage', 'medkit', 'cash']
-const ELEMENT_THROWABLES = ['molotov', 'grenade', 'freezeGrenade', 'chloroform', 'banana', 'gasGrenade']
-const ELEMENT_WEAPONS = ['freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun']
-const GUNS = ['shotgun', 'machinegun']
+// WEAPONS ARE NOT LOOT. The player carries ONE permanent weapon and cannot pick
+// another up, so a gun on the floor would be a dead sparkle. The bat/knife that
+// used to open the basic table are simply GONE from it; the depth gate is
+// otherwise untouched, so floor 1 stays basic and the element throwables still
+// fold in as you descend, bringing the frost/fire/shock/sleep/poison systems
+// online. Offence on floor 1 now comes from the shop (which stocks throwables on
+// every floor, see stockShop) and from the scattered weapon-MODS, which are the
+// real progression now that the weapon itself is fixed.
+// The healing items (bandage/medkit) were culled along with the element
+// throwables, so the basic table is cash alone — floor 1 pays you, it does not
+// patch you up. Healing is passive regen + the `lifesteal` mod now.
+const BASIC_LOOT = ['cash']
+// Was molotov/freezeGrenade/chloroform/banana/gasGrenade + grenade. The five
+// element throwables were culled; the grenade is the survivor, so the depth
+// gate below still means "something to throw appears from floor 2" — there is
+// just one of them instead of six.
+const ELEMENT_THROWABLES = ['grenade']
 
-/** The floor's random-loot table: basics everywhere, element throwables and a
- * couple of element weapons from floor 2, the full arsenal from floor 3 on. */
+/** The floor's random-loot table: basics everywhere, the element throwables from
+ * floor 2, weighted up again from floor 3 on. */
 const lootTable = (floor: number): string[] => {
   const table = [...BASIC_LOOT]
-  if (floor >= 2) table.push(...ELEMENT_THROWABLES, 'freezeRay', 'sledgehammer')
-  if (floor >= 3) table.push(...ELEMENT_WEAPONS, ...GUNS, ...ELEMENT_THROWABLES)
+  if (floor >= 2) table.push(...ELEMENT_THROWABLES)
+  if (floor >= 3) table.push(...ELEMENT_THROWABLES)
   return table
 }
 
-/** Element gear a shop can carry — the reliable place to gear up on any floor,
- * so freeze-shatter / fire-spread combos are always within reach. */
+/** What a shop can carry — the reliable place to gear up on any floor, so a
+ * throwable is always within reach even on floor 1 (the random table gates them
+ * behind floor 2). Weapons left this list when the player's weapon became
+ * permanent; healing left it with the item cull. Grenades are the whole trade
+ * now, so this is a one-entry list ON PURPOSE — it is still a table, and a new
+ * throwable joins the shop by being added here. */
 const SHOP_STOCK = [
-  'freezeRay', 'tranquilizer', 'sledgehammer', 'flamethrower', 'stunGun', 'shotgun',
-  'molotov', 'freezeGrenade', 'chloroform', 'gasGrenade', 'banana', 'grenade', 'medkit',
+  'grenade',
 ]
+
+/** Every item id the level generator can lay on the floor as a `pickup.<id>`:
+ * the deepest loot table plus everything a shop can stock. This is now the WHOLE
+ * set — corpses no longer drop weapons, so nothing is added at runtime.
+ *
+ * Exported for `itemArtResolution.test.ts`, which asserts every one of these has
+ * real art. `banana` sat in this list for its whole life with no `ITEM_ALIAS`
+ * entry and silently rendered as a medkit; banana has since been culled, but the
+ * test outlives it — the guard is about the FALLBACK (an unaliased pickup lands
+ * on `item.default`, which is the medkit file), not about that one item, so the
+ * next id added here still cannot repeat it. Derived from the tables rather than
+ * restated, so a new loot entry is covered automatically. */
+export const LOOT_ITEM_IDS: readonly string[] = [...new Set([...lootTable(Number.MAX_SAFE_INTEGER), ...SHOP_STOCK])]
 
 const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number): void => {
   const e = makeEntity('pickup', `pickup.${itemId}`, x, y, 0.3)
@@ -582,8 +757,8 @@ const dropPickup = (w: World, itemId: string, x: number, y: number, qty: number)
   addEntity(w, e)
 }
 
-/** Lay out a shop's wares: a handful of element weapons/throwables on the floor
- * for the taking, so every run has somewhere to buy into the element systems. */
+/** Lay out a shop's wares: a handful of element throwables on the floor for the
+ * taking, so every run has somewhere to buy into the element systems. */
 const stockShop = (w: World, rng: Rng, building: Building): void => {
   const n = rng.int(2, 4)
   for (let i = 0; i < n; i++) {
@@ -621,6 +796,107 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
       }
       assignPatrol(a, beat)
       assignPatrol(b, beat)
+    }
+  }
+}
+
+/** Crew wanderers per complex floor (on corridor deck, outside the spawn-safe radius). */
+const CORRIDOR_WANDERERS: [number, number] = [2, 4]
+
+/** Corridor centreline as a two-point beat, inset one tile from each end. Every
+ * tile along it is carved corridor (walkable; no furniture is ever placed in a
+ * corridor), so the straight-line patrol steering can never snag. */
+export const corridorBeat = (c: Corridor): { x: number; y: number }[] => {
+  if (c.axis === 'h') {
+    const y = c.rect.y + Math.floor(c.rect.h / 2) + 0.5
+    return [
+      { x: c.rect.x + 1.5, y },
+      { x: c.rect.x + c.rect.w - 1.5, y },
+    ]
+  }
+  const x = c.rect.x + Math.floor(c.rect.w / 2) + 0.5
+  return [
+    { x, y: c.rect.y + 1.5 },
+    { x, y: c.rect.y + c.rect.h - 1.5 },
+  ]
+}
+
+/** Distance from point p to segment ab. */
+const distToSegment = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number => {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
+  return vlen(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+/** Indoor-complex replacement for street life: a few crew echoes drifting the
+ * corridors, and station-security pairs walking corridor beats. A beat is only
+ * eligible when its WHOLE centreline stays outside the spawn-safe radius, so a
+ * patrol never marches through the landing zone. */
+const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
+  const wanderers = rng.int(CORRIDOR_WANDERERS[0], CORRIDOR_WANDERERS[1])
+  for (let i = 0; i < wanderers; i++) {
+    const spot = randomStreetSpot(w, rng, Tile.Hall)
+    if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
+  }
+  const beats = (w.level.complex?.corridors ?? [])
+    .map(corridorBeat)
+    .filter(([a, b]) => vlen(b.x - a.x, b.y - a.y) >= 10 && distToSegment(w.level.spawn, a, b) >= SPAWN_SAFE_RADIUS)
+  const pairs = Math.min(beats.length, 1 + Math.floor(w.floor / 3))
+  for (let i = 0; i < pairs; i++) {
+    const beat = beats.splice(rng.int(0, beats.length - 1), 1)[0]
+    const along = beat[0].x === beat[1].x ? { x: 0, y: 0.8 } : { x: 0.8, y: 0 }
+    const a = spawnNpc(w, 'cop', beat[0].x, beat[0].y, wrng)
+    const b = spawnNpc(w, 'cop', beat[0].x + along.x, beat[0].y + along.y, wrng)
+    assignPatrol(a, beat)
+    assignPatrol(b, beat)
+  }
+}
+
+/** Most bunk rooms that may hold sleepers on a floor — a complex has a LOT of
+ * bunk rooms, so without a cap the dormant crew alone outnumbered a city
+ * floor's whole garrison. 2 on floor 3, one more every other floor, max 4. */
+export const maxSleeperRooms = (floor: number): number => Math.min(4, 1 + Math.floor(floor / 2))
+
+/** Chance a complex bunk room holds sleepers, by floor (capped). */
+export const sleeperChance = (floor: number): number => Math.min(0.6, 0.2 + 0.06 * floor)
+
+/** Seed DORMANT sleepers into complex bunk rooms: 2-3 crew echoes lying among
+ * the bunks, woken by a hit or a loud noise — or all at once by the complex
+ * director's room ambush when a player walks in (systems/complexDirector.ts).
+ * Own `sleepers` fork; stands only on free deck tiles (no prop, not a doorway). */
+const spawnComplexSleepers = (w: World): void => {
+  const rng = w.rng.fork('sleepers')
+  const lw = w.level.w
+  const taken = new Set<number>()
+  for (const e of w.entities) if (!e.dead) taken.add(Math.floor(e.pos.y) * lw + Math.floor(e.pos.x))
+  let rooms = 0
+  for (let bi = 0; bi < w.level.buildings.length; bi++) {
+    const b = w.level.buildings[bi]
+    if (b.role !== 'quarters') continue
+    if (rooms >= maxSleeperRooms(w.floor)) break
+    if (!rng.chance(sleeperChance(w.floor))) continue
+    rooms++
+    const room = b.rooms[0]
+    const doorNear = (tx: number, ty: number): boolean => b.doors.some((d) => Math.abs(d.x - tx) + Math.abs(d.y - ty) <= 1)
+    const free: { x: number; y: number }[] = []
+    for (let ty = room.y; ty < room.y + room.h; ty++) {
+      for (let tx = room.x; tx < room.x + room.w; tx++) {
+        if (!isFloorTile(w.level.tiles[ty * lw + tx]) || taken.has(ty * lw + tx) || doorNear(tx, ty)) continue
+        if (stairReservedKeys(w.level).has(ty * lw + tx)) continue
+        free.push({ x: tx, y: ty })
+      }
+    }
+    const n = Math.min(free.length, rng.int(2, 3))
+    for (let i = 0; i < n; i++) {
+      const t = free.splice(rng.int(0, free.length - 1), 1)[0]
+      taken.add(t.y * lw + t.x)
+      const npc = spawnNpc(w, 'thug', t.x + 0.5, t.y + 0.5)
+      npc.ai!.zone = { building: bi, role: b.role }
+      npc.ai!.dormant = true
+      npc.ai!.wakeOn = ['damage', 'noise']
+      npc.ai!.guard = true
     }
   }
 }
@@ -685,9 +961,10 @@ const randomFloorInRoom = (
   for (let attempt = 0; attempt < 16; attempt++) {
     const tx = rng.int(room.x, room.x + room.w - 1)
     const ty = rng.int(room.y, room.y + room.h - 1)
-    if (w.level.tiles[ty * w.level.w + tx] !== Tile.Floor) continue
+    if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
     if (tx === spawnTx && ty === spawnTy) continue
     if (tx === exitTx && ty === exitTy) continue
+    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null
@@ -695,8 +972,8 @@ const randomFloorInRoom = (
 
 /** Build an NPC's slotted loadout so its carried weapon is modelled EXACTLY like
  * a player's — a real `ItemStack` in a real slot, able to hold weapon-mods whose
- * effects fold into its shots at the shared fire site. A ranged weapon slots with
- * a full magazine, a melee weapon with its durability; innate fists (no magSize /
+ * effects fold into its shots at the shared fire site. A ranged weapon carries no
+ * ammo so it slots at a flat 1, a melee weapon at its durability; innate fists (no
  * durability) get NO loadout — undefined, resolving vanilla exactly as a
  * weaponless NPC did before this component existed, so DEFAULT behavior is
  * unchanged. `mods` (optional) seeds a MODDED enemy — a pierce/explosive/frost gun
@@ -704,7 +981,7 @@ const randomFloorInRoom = (
 export const npcLoadout = (weaponId: string, mods?: readonly WeaponMod[]): Loadout | undefined => {
   const def = WEAPONS[weaponId]
   if (!def) return undefined
-  const qty = def.kind === 'ranged' ? (def.magSize ?? 1) : def.durability
+  const qty = def.kind === 'ranged' ? 1 : def.durability
   if (qty === undefined) return undefined // fists / no-durability melee: innate, unslotted
   const stack: ItemStack = { itemId: weaponId, qty }
   if (mods && mods.length) stack.mods = mods.map((m) => ({ id: m.id, stacks: m.stacks }))
@@ -761,11 +1038,19 @@ const randomFloorInBuilding = (
   w: World,
   rng: Rng,
   building: Building,
+  /** An occupant: on a complex floor the gatehouse rooms sit right by the
+   * airlock, so keep the spawn-safe radius clear (as street life does). */
+  occupant = false,
 ): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 12; attempt++) {
     const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
     const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
-    if (w.level.tiles[ty * w.level.w + tx] === Tile.Floor) return { x: tx + 0.5, y: ty + 0.5 }
+    // A complex module may be L-shaped: its bounding rect then takes in a
+    // neighbour's floor, so only a tile of one of its OWN rooms counts.
+    if (w.level.complex && !building.rooms.some((r) => rectContains(r, tx, ty))) continue
+    if (occupant && w.level.complex && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
+    if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }
   return null
 }
@@ -780,8 +1065,43 @@ const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: num
     if (w.level.tiles[ty * w.level.w + tx] !== tile) continue
     const x = tx + 0.5
     const y = ty + 0.5
-    if (Math.hypot(x - w.level.spawn.x, y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (vlen(x - w.level.spawn.x, y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
     return { x, y }
   }
   return null
+}
+
+/** The loft cache (Phase 1, docs/design/stairs-and-storeys.md §5): every upper
+ * storey holds loot only — a smashable crate, a weapon-mod and one pickup from
+ * the floor's loot table — and never an enemy. Own `lofts` fork, appended
+ * last, so every other populate stream stays byte-identical per seed. */
+const stockLofts = (w: World): void => {
+  const level = w.level
+  if (!level.storeys || !level.stairs) return
+  const rng = w.rng.fork('lofts')
+  const reserved = stairReservedKeys(level)
+  for (const storey of level.storeys) {
+    if (storey.z === 0) continue
+    const free: { x: number; y: number }[] = []
+    for (let ty = 0; ty < level.h; ty++)
+      for (let tx = storey.ox; tx < storey.ox + STOREY_SIZE && tx < level.w; tx++) {
+        const k = ty * level.w + tx
+        if (!isFloorTile(level.tiles[k]) || reserved.has(k)) continue
+        free.push({ x: tx, y: ty })
+      }
+    // The crate against a wall (it reads as stored, not dropped), the loot mid-floor.
+    const walled = free.filter((t) => wallNeighbours(w, t.x, t.y) > 0)
+    const crateAt = (walled.length > 0 ? walled : free).at(rng.int(0, Math.max(0, (walled.length > 0 ? walled : free).length - 1)))
+    if (!crateAt) continue
+    spawnObject(w, 'crate', crateAt.x, crateAt.y)
+    const rest = free.filter((t) => t.x !== crateAt.x || t.y !== crateAt.y)
+    const pick = (): { x: number; y: number } | undefined => (rest.length > 0 ? rest.splice(rng.int(0, rest.length - 1), 1)[0] : undefined)
+    const modAt = pick()
+    if (modAt) dropModPickup(w, weightedModId(rng), modAt.x + 0.5, modAt.y + 0.5)
+    const lootAt = pick()
+    if (lootAt) {
+      const itemId = rng.pick(lootTable(w.floor))
+      dropPickup(w, itemId, lootAt.x + 0.5, lootAt.y + 0.5, itemId === 'cash' ? rng.int(10, 40) : 1)
+    }
+  }
 }

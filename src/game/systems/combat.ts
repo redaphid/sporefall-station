@@ -1,87 +1,94 @@
 import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
-import { WEAPONS, itemClass, type StatusApply } from '../data/items'
+import { WEAPONS, type StatusApply, type WeaponDef } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
-import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
+import { makeEntity, resistMult, type Entity, type ItemStack, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
-import { activeStack, equipSlot, spendAmmo, useHeld, wearMelee, weaponStack } from './inventory'
+import { groupDamageMult } from './groupFx'
+import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
+import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
 import { spawnSporeBurst } from './spore'
+import { vlen } from '../simMath'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
 const THROW_COOLDOWN = 20
 
-/**
- * ⚠️ TEMPORARY / TESTING-ONLY — flip to `false` to restore the normal ammo
- * economy exactly. While ON, ranged weapons never deplete and never read as
- * empty/out-of-ammo, so they always fire (effectively infinite ammo). This gates
- * ONLY the depletion in `fireWeapon`; the whole ammo system (spendAmmo, pickups,
- * qty) is left intact, so flipping this to `false` is a byte-exact revert to the
- * finite economy — no other change needed.
+// NPC corpses no longer drop their weapon. The player carries ONE permanent
+// weapon and cannot pick another up, so a dropped gun would be a dead sparkle
+// the player walks over forever. Enemies keep their own arsenal (NPC_ARSENAL in
+// populate.ts) — this removes only what the corpse leaves BEHIND, and with it
+// the `w.rng.chance` draw that used to happen inside `kill`.
+
+/** Interaction-matrix rule: a solid IMPACT on a frozen body SHATTERS the ice —
+ * the frost breaks and the blow lands multiplied by this. Only impact (this
+ * path) shatters; damage-over-time never routes through here, so a frozen agent
+ * burned to death by fire dies normally and does not shatter. Grounded in
+ * StatusEffects.cs (frozen death → IceGib) + the frozen one-hit backstab.
  *
- * Deterministic: it draws no RNG and touches no wall-clock — it just skips the
- * `spendAmmo` decrement, so the sim stays a pure function of seed + inputs.
+ * It used to be an INSTANT KILL regardless of the blow's damage, and that is the
+ * bug this number replaces. An execute keyed on a status rather than on a health
+ * pool does not scale: measured through the real damage path with the 14-dmg
+ * pistol (scripts/test/freeze-shatter-probe.mts), *every* body in the game died
+ * in two shots — shot 1 freezes, shot 2 executes. The 320 hp Mireclaw Alpha went
+ * from 30 shots / 17.4 s to 2 shots / 0.6 s, a 29x cut; the 95 hp brute 19 → 2;
+ * the 120 hp hivespire 12 → 2. One rare mod deleted the entire hp axis of the
+ * game's balance, boss phases included.
+ *
+ * A MULTIPLIER on the blow, not a flat payload, because damage in this engine is
+ * already a pipeline — resist affinity, rally, the barrel's damage threshold,
+ * lifesteal's payout — and a multiplied blow stays inside it. Three things fall
+ * out for free: armour still means something (a brute eats 0.35 of the amplified
+ * hit exactly as of a normal one), a heavier weapon shatters harder (a
+ * sledgehammer's 26 beats a pistol's 14, which is what "a SOLID impact" should
+ * mean), and lifesteal is bounded by construction — it pays on 5x a bullet, not
+ * on the victim's whole 320 hp lifebar, which is the exploit the old instant-kill
+ * return contract had to be hand-written to dodge.
+ *
+ * 5x is tuned off the grunt line, and it is a knob the owner should feel free to
+ * turn. Pistol 14 → 70 on the shatter, on top of the 14 the freezing shot
+ * already dealt: 84 across two shots, so everything up to ~84 effective hp still
+ * pops in two (thug 40, cop 60, mender 44, lobber 58, breacher 62) and the
+ * ice-gib death still plays. Above that it is a big bite, not an execute:
+ * bouncer 90 and bellwether 90 survive on a sliver, brute 95 keeps 65, hivespire
+ * 120 keeps 61, and the boss keeps 256 of 320 — frost is worth bringing to a
+ * boss (it roughly halves the fight) without being the boss's off switch. */
+export const SHATTER_DAMAGE_MULT = 5
+
+/**
+ * Resolve one blow. Returns the damage ACTUALLY APPLIED, or `null` if the blow
+ * never landed at all.
+ *
+ * ⚠️ `null` and `0` mean different things, and conflating them breaks real
+ * weapons. `null` = the blow was voided (i-frames, dodge-roll, downed, dead, an
+ * object under its damage threshold) and NOTHING about it should happen. `0` =
+ * it genuinely landed but took no hp — a pure-utility hit such as the freeze
+ * ray, whose entire job is its status. Callers must test `!== null`, never
+ * truthiness, or every 0-damage utility weapon silently stops working.
+ *
+ * The return value is load-bearing, not a convenience. It closes two defects
+ * that were both symptoms of this function returning `void`:
+ *
+ *  - Everything a hit does BESIDES damage — applying an element, healing via
+ *    lifesteal, firing a mod trigger — ran unconditionally, because no caller
+ *    could tell this function had bailed out. i-frames, the dodge-roll and the
+ *    downed state therefore suppressed the DAMAGE only: you could roll through a
+ *    sledgehammer swing, take nothing, and be stunned anyway, which defeats the
+ *    single counterplay the game offers against being locked down.
+ *  - Effects that SCALE with damage had no way to read what was actually dealt,
+ *    so lifesteal paid out on the bullet's INTENDED damage and never saw resist:
+ *    a 0.35-armoured brute absorbed 65% of the blow while the shooter was paid
+ *    in full.
+ *
+ * Returning the applied amount makes any future damage-scaled effect correct by
+ * construction, rather than by remembering to patch it.
  */
-export const INFINITE_AMMO: boolean = true
-
-/** Probability a dying NPC drops the weapon it was carrying as a grabbable
- * world pickup. The one sim tunable for the drop — kept here beside `kill`, the
- * single death site, mirroring the codebase's per-system-constant convention
- * (IFRAME_TICKS above, PICK_TICKS in interaction.ts). Any lethal death routes
- * through `kill`, so an NPC felled by a player, a fire tick, or an explosion all
- * roll identically. The roll draws from the world RNG (`w.rng`) so it is a pure
- * function of seed + inputs — a test predicts every drop from the seed. */
-export const WEAPON_DROP_CHANCE = 0.25
-
-/** A weapon id a corpse can actually drop: a real slotted melee/ranged weapon in
- * the registry, never innate 'fists' (the unarmed sentinel — dropping "Fists"
- * would be nonsense). Unarmed NPCs return false here and never draw the RNG. */
-const isDroppableWeapon = (weaponId: string): boolean =>
-  weaponId !== 'fists' &&
-  (WEAPONS[weaponId]?.kind === 'melee' || WEAPONS[weaponId]?.kind === 'ranged')
-
-/** On an NPC death, occasionally drop its carried weapon as a world pickup the
- * player can grab — reusing the `pickup.<itemId>` archetype + `collect` path
- * (interaction.ts), so a dropped gun equips exactly like any floor weapon. The
- * roll draws from `w.rng` ONLY when there is a real weapon to drop, so unarmed
- * deaths never perturb the shared stream. NPC loadouts are innate (no inventory,
- * no mods), so the weapon id is the whole of the carried state to preserve. */
-const rollWeaponDrop = (w: World, victim: Entity): void => {
-  const weaponId = victim.combat?.weapon
-  if (!weaponId || !isDroppableWeapon(weaponId)) return
-  if (!w.rng.chance(WEAPON_DROP_CHANCE)) return
-  const drop = makeEntity('pickup', `pickup.${weaponId}`, victim.pos.x, victim.pos.y, 0.3)
-  drop.pickup = { itemId: weaponId, qty: 1 }
-  addEntity(w, drop)
-  w.events.push({ type: 'weaponDrop', entityId: drop.id, fromId: victim.id, itemId: weaponId, x: victim.pos.x, y: victim.pos.y })
-}
-
-/** Interaction-matrix rule: a solid IMPACT on a frozen body shatters it — an
- * instant kill regardless of the blow's damage, clearing the frost. Only impact
- * (this path) shatters; damage-over-time never routes through here, so a frozen
- * agent burned to death by fire dies normally and does not shatter. Grounded in
- * StatusEffects.cs (frozen death → IceGib) + the frozen one-hit backstab. */
-const shatter = (w: World, target: Entity): void => {
-  removeStatus(target, 'frozen')
-  target.health!.hp = 0
-  // A frozen PLAYER shattering must DOWN them (via kill's player path), NOT
-  // gib-vanish: skip the `shattered` flag and the ice-gib event so they stay a
-  // visible, revivable downed body instead of disappearing from the snapshot.
-  if (target.playerCtl) {
-    kill(w, target)
-    return
-  }
-  target.shattered = true
-  w.events.push({ type: 'shatter', x: target.pos.x, y: target.pos.y, entityId: target.id })
-  kill(w, target)
-}
-
 export const applyDamage = (
   w: World,
   target: Entity,
@@ -90,35 +97,49 @@ export const applyDamage = (
   fromY: number,
   knockback: number,
   attackerId: number,
-): void => {
-  if (!target.health || target.dead || target.health.iframes > 0) return
-  if (target.playerCtl?.downed) return // downed players are out of the fight, not a piñata
-  if (isRolling(target, w.tick)) return // dodge-roll i-frames: roll THROUGH bullets/melee
-  // A frozen body shatters on impact — but NOT a player. The shatter rule is an
-  // instant kill regardless of the blow's damage, and a player has no answer to
-  // it: freeze is applied BY enemies (freeze ray / freeze grenade, 120 ticks =
-  // four seconds) and immobilizes completely, so the sequence "enemy freezes
-  // you, any enemy touches you, you are downed" is unavoidable and reads as
-  // dying in one hit. Harmless while the station ignored you; lethal now the
-  // alert escalation sends the whole floor at you at once.
+): number | null => {
+  if (!target.health || target.dead || target.health.iframes > 0) return null
+  if (target.playerCtl?.downed) return null // downed players are out of the fight, not a piñata
+  if (isRolling(target, w.tick)) return null // dodge-roll i-frames: roll THROUGH bullets/melee
+  // A frozen body SHATTERS on impact — but NOT a player. The frost breaks either
+  // way; what differs is what the blow is worth.
+  //
+  // A player has no answer to an amplified blow: freeze is applied BY enemies
+  // (freeze ray / freeze grenade, 120 ticks = four seconds) and immobilizes
+  // completely, so the sequence "enemy freezes you, any enemy touches you, you
+  // are downed" is unavoidable and reads as dying in one hit. Harmless while the
+  // station ignored you; lethal now the alert escalation sends the whole floor
+  // at you at once.
   //
   // So for a player the impact CRACKS THE ICE instead: the freeze breaks and the
-  // blow lands as ordinary damage. Costs you tempo and a hit, not the run. The
-  // anti-chain-lock guard in statusFx then grants its usual post-immobilize
-  // immunity, so you cannot be instantly re-frozen either.
+  // blow lands as ORDINARY damage, unmultiplied. Costs you tempo and a hit, not
+  // the run. The anti-chain-lock guard in statusFx then grants its usual
+  // post-immobilize immunity, so you cannot be instantly re-frozen either.
   //
-  // Enemies still shatter, so freeze remains a genuine execute when YOU throw it.
+  // Everything else takes the blow times SHATTER_DAMAGE_MULT, and then keeps
+  // falling through the ordinary damage pipeline below — resist, rally, the
+  // object damage threshold, knockback, the hit event, the AI reaction, the
+  // death path. That fall-through is the point of the fix: a shatter is a very
+  // hard hit, not a separate lethality rule bolted alongside the hp system, so
+  // it cannot outrun an hp pool the way the old instant kill did, and every
+  // consumer downstream (lifesteal's payout, `destroyObject`'s loot and barrel
+  // explosion, `kill`'s downed/corpse handling) sees a normal, if large, blow.
+  let shattering = false
   if (isFrozen(target)) {
-    if (!target.playerCtl) return shatter(w, target)
     removeStatus(target, 'frozen')
+    if (!target.playerCtl) {
+      shattering = true
+      amount *= SHATTER_DAMAGE_MULT
+    }
   }
   // Negative damage must NOT heal: clamp to 0 so a "negative hit" still registers
   // as a (harmless) blow — iframes, flash, knockback, event — but can never add hp.
   if (amount < 0) amount = 0
   // #78 damage affinity: armoured bodies shrug off impact, flammable ones don't.
   // Impact/explosion damage is 'physical'; missing table → ×1 (unchanged).
-  amount = Math.round(amount * resistMult(target, 'physical'))
-  if (resistsDamage(target, amount)) return // e.g. a barrel shrugs off a weak hit
+  // A RALLIED raider (a live leader in earshot) shrugs off a quarter of it.
+  amount = Math.round(amount * resistMult(target, 'physical') * groupDamageMult(target, w.tick))
+  if (resistsDamage(target, amount)) return null // e.g. a barrel shrugs off a weak hit
   target.health.hp -= amount
   target.health.iframes = IFRAME_TICKS
   // Stamp the last-hurt tick: passive regen (systems/regen.ts) counts its
@@ -132,7 +153,7 @@ export const applyDamage = (
   }
   const dx = target.pos.x - fromX
   const dy = target.pos.y - fromY
-  const len = Math.hypot(dx, dy) || 1
+  const len = vlen(dx, dy) || 1
   target.vel.x += (dx / len) * knockback
   target.vel.y += (dy / len) * knockback
   w.events.push({ type: 'hit', x: target.pos.x, y: target.pos.y, targetId: target.id, amount })
@@ -146,6 +167,9 @@ export const applyDamage = (
 
   // Civilians panic when hurt; bouncers take it personally
   if (target.ai) {
+    // A PLAYER's landed blow on a group member is remembered for the group layer
+    // (systems/groups.ts): it is what turns a hound pack manhunter.
+    if (target.ai.group && w.byId.get(attackerId)?.playerCtl) target.ai.provokedBy = attackerId
     const def = NPCS[target.archetype]
     if (def?.fleesOnDamage) {
       target.ai.mode = 'flee'
@@ -165,9 +189,19 @@ export const applyDamage = (
   commitCrime(w, target, w.byId.get(attackerId))
 
   if (target.health.hp <= 0) {
+    // The ice gib fires when the SHATTERING BLOW is the one that kills — not on
+    // every frozen death. A frozen body finished off by something else (fire DoT,
+    // a later unamplified shot after the frost already broke) dies as a corpse.
+    // `shattered` marks a body that left ice instead of a corpse, so it is for
+    // bodies only; an object's destruction visual is `destroyObject`'s business.
+    if (shattering) {
+      if (!isObject(target)) target.shattered = true
+      w.events.push({ type: 'shatter', x: target.pos.x, y: target.pos.y, entityId: target.id })
+    }
     if (isObject(target)) destroyObject(w, target, attackerId)
     else kill(w, target)
   }
+  return amount
 }
 
 export const kill = (w: World, target: Entity): void => {
@@ -201,10 +235,7 @@ export const kill = (w: World, target: Entity): void => {
   // NPC death: a body dropping throws off a fear pulse (#65) — nearby crew see
   // it fall and stampede, even with no sight of the killer.
   if (target.ai) emitFear(w, target)
-  // Mark dead, then roll for a weapon drop. Ordering the roll AFTER `dead = true`
-  // keeps the spawned pickup from ever re-entering this same kill.
   target.dead = true
-  rollWeaponDrop(w, target)
 }
 
 /** Swing at the nearest live target inside range and a 90° arc around facing. */
@@ -217,7 +248,7 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     if (e === attacker || e.dead || !e.health) continue
     const dx = e.pos.x - attacker.pos.x
     const dy = e.pos.y - attacker.pos.y
-    const dist = Math.hypot(dx, dy)
+    const dist = vlen(dx, dy)
     // Weapon range is edge-to-edge: include both bodies' radii.
     if (dist > range + attacker.radius + e.radius) continue
     // Within 90° of facing (or point-blank)
@@ -235,12 +266,21 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
     const ty = Math.sin(best.facing)
     const adx = attacker.pos.x - best.pos.x
     const ady = attacker.pos.y - best.pos.y
-    const alen = Math.hypot(adx, ady) || 1
+    const alen = vlen(adx, ady) || 1
     if ((adx / alen) * tx + (ady / alen) * ty < -0.2) finalDamage *= 3
     attacker.status.cloakUntil = w.tick // attacking breaks cloak
   }
-  applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id)
-  return best
+  // Report the target ONLY if the blow actually landed. `fireWeapon`'s melee
+  // branch applies the weapon's element and its mod triggers to whatever this
+  // returns, so handing back a target whose damage was voided by i-frames, a
+  // dodge-roll or the downed state is what let a sledgehammer stun a player who
+  // had successfully rolled through the swing.
+  //
+  // `!== null`, NOT truthiness: a 0-damage melee weapon lands for 0 and must
+  // still apply its status.
+  return applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id) !== null
+    ? best
+    : null
 }
 
 /** Resolved bullet-behavior spec carried onto a spawned projectile (weapon mods). */
@@ -307,7 +347,7 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   emitNoise(w, x, y)
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
-    const dist = Math.hypot(other.pos.x - x, other.pos.y - y)
+    const dist = vlen(other.pos.x - x, other.pos.y - y)
     if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
   }
   // Breach: a blast centred close enough blows a door open, locked or not —
@@ -317,7 +357,7 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   // one grenade can't take both bunker airlock doors (2 tiles apart) at once.
   for (const d of w.entities) {
     if (d.dead || !d.door || d.door.open) continue
-    if (Math.hypot(d.pos.x - x, d.pos.y - y) > radius) continue
+    if (vlen(d.pos.x - x, d.pos.y - y) > radius) continue
     const door = d.door
     const wasOvergrown = door.overgrown === true
     // A biolock or bog seal breached is LOUD: the always-available fallback that
@@ -389,6 +429,9 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   if (!e.combat) return false
   const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
   const stack = weaponStack(e)
+  // Sequenced casting (opt-in run rule). A weapon with no mods has nothing to
+  // sequence and takes the default path below, unchanged.
+  if (sequencing(w) && stack?.mods && stack.mods.length > 0) return fireSequenced(w, e, weapon, stack)
   const rw = resolveWeapon(weapon, stack?.mods)
   if (weapon.kind === 'melee') {
     e.combat.cooldown = rw.cooldownTicks
@@ -401,11 +444,9 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     }
     return true
   }
-  // Ammo depletion is gated behind INFINITE_AMMO (testing toggle above). When ON,
-  // `spendAmmo` is skipped entirely, so qty never drops and the gun never reads as
-  // empty — it always fires. When OFF this is the original: an empty gun clicks
-  // (no shot, no cooldown) and the dry-fire path stays reachable.
-  if (stack && !INFINITE_AMMO && !spendAmmo(e)) return false
+  // No ammo: a gun always fires. There is no magazine, no depletion and no
+  // dry-fire click — firing costs nothing, so the only thing gating a shot is
+  // the cooldown the caller already checked.
   e.combat.cooldown = rw.cooldownTicks
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {
@@ -415,19 +456,68 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   return true
 }
 
-/** Item classes the FIRE button diverts to item-USE instead of a weapon shot:
- * a consumable (bandage/medkit → heal, adrenaline → buff) or a throwable (lobbed).
- * When the active slot holds one of these, "shooting" uses it via the same
- * item-effect path as the dedicated Use button — no bullet is spawned. */
-const isUsableItem = (itemId: string): boolean => {
-  const c = itemClass(itemId)
-  return c === 'consumable' || c === 'throwable'
+/**
+ * The sequenced-casting fire path (systems/modSequence). One trigger pull plans
+ * up to `castsPerTrigger` casts from the weapon's stored `castIndex`; each cast
+ * resolves the base weapon with ONLY its own mods (its modifiers plus at most
+ * one payload), so every projectile carries at most one element. A multi-cast
+ * gun splits its pellets between casts, laid out left to right across the fan
+ * in cast order. Running off the end of the list wraps the index and locks the
+ * weapon for `rechargeOnWrap` ticks. Returns false (no shot) while recharging.
+ */
+const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack): boolean => {
+  if (recharging(stack, w.tick)) return false
+  const shape = sequenceShape(weapon)
+  const plan = planCasts(stack.mods, shape, stack.castIndex ?? 0)
+  // Every entry unknown/empty: nothing live, fire the bare weapon.
+  const casts = plan.casts.length > 0 ? plan.casts : [{ mods: [] as WeaponMod[], positions: [] as number[] }]
+  stack.castIndex = plan.nextIndex
+  let cooldown = 1
+  if (weapon.kind === 'melee') {
+    const rw = resolveWeapon(weapon, casts[0].mods)
+    cooldown = rw.cooldownTicks
+    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
+    if (weapon.durability !== undefined) wearMelee(e)
+    if (hit) {
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
+    }
+  } else {
+    // Shares are fixed per cast slot (castsPerTrigger), so a pull cut short by
+    // a wrap fires only the groups it cast: the thin last blast marks the wrap.
+    const shares = pelletShares(weapon.pellets ?? 1, shape.castsPerTrigger)
+    const resolved = casts.map((c, g) => resolveWeapon({ ...weapon, pellets: shares[g] }, c.mods))
+    const total = resolved.reduce((n, rw) => n + rw.pellets, 0)
+    let k = 0
+    for (let g = 0; g < casts.length; g++) {
+      const rw = resolved[g]
+      cooldown = Math.max(cooldown, rw.cooldownTicks)
+      const spec = projectileSpec(rw)
+      for (let j = 0; j < rw.pellets; j++, k++) {
+        const offset = total > 1 ? (k / (total - 1) - 0.5) * rw.spread : 0
+        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, casts[g].mods)
+      }
+    }
+  }
+  if (plan.wrapped && shape.rechargeOnWrap > 0) {
+    cooldown = Math.max(cooldown, shape.rechargeOnWrap)
+    stack.rechargeUntil = w.tick + cooldown
+  }
+  e.combat!.cooldown = cooldown
+  return true
 }
 
 /** Player attack + ability inputs. NPC attacks happen in the AI system. */
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
     if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
+    // Sequenced mods: a reorder request is applied before the action gates, so a
+    // swap asked for mid-roll or while stunned is not silently dropped.
+    if (sequencing(w)) {
+      const swap = inputs.get(e.playerCtl.playerId)?.modSwap
+      if (swap !== undefined) applyModSwap(e, swap)
+    }
     if (isRolling(e, w.tick)) continue // mid-roll: hands full — no attack/ability/throw
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
     if (isImmobilized(e)) continue // frozen/electrified can't act
@@ -453,18 +543,13 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     }
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
-    // FIRE button arbitration off the ACTIVE slot:
-    //  1. a usable non-weapon in hand (bandage/consumable → heal, throwable →
-    //     lob) is USED via the same item-effect path as the Use button — the
-    //     "shooting uses my equipped item" rule. No bullet, no swing.
-    //  2. otherwise fire the equipped weapon (gun/melee/fists) — unchanged.
-    // Nothing to fire (an out-of-ammo gun) is a dry no-op: the dodge-roll fallback
-    // lives on the USE button above, never on FIRE.
-    const active = activeStack(e)
-    if (active && isUsableItem(active.itemId)) {
-      if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
-      continue
-    }
+    // FIRE ALWAYS FIRES THE WEAPON. The old arbitration ("a usable item in the
+    // active slot makes FIRE use it instead") existed only because weapons and
+    // items shared one hotbar, so you could always cycle back to the gun. With a
+    // single permanent weapon that is no longer selectable, `activeSlot` is purely
+    // the held-item cursor and there is nothing to cycle back TO — that rule would
+    // leave a player holding a grenade permanently unable to shoot. Items go on
+    // the USE/Throw button above, which is where they now exclusively live.
     fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
   }
 }

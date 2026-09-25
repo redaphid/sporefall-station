@@ -61,17 +61,21 @@ describe('sim integration', () => {
     expect(dist).toBeGreaterThan(2)
   })
 
-  it('hurt player heals by walking over a bandage', () => {
+  // Was 'hurt player heals by walking over a bandage'. The item cull removed
+  // every healing item, so nothing on the floor heals any more — but what this
+  // covered end to end was the SIM INTEGRATION (move → interaction → the pickup
+  // leaves the world and lands in the loadout), not the heal specifically. It is
+  // re-pointed at the grenade so that chain stays under test through tickWorld.
+  it('player picks up a floor item by walking over it', () => {
     const w = createWorld(8, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
-    player.health!.hp = 40
-    const drop = makeEntity('pickup', 'pickup.bandage', 11.5, 1.5, 0.3)
-    drop.pickup = { itemId: 'bandage', qty: 1 }
+    const drop = makeEntity('pickup', 'pickup.grenade', 11.5, 1.5, 0.3)
+    drop.pickup = { itemId: 'grenade', qty: 1 }
     addEntity(w, drop)
 
     const right = new Map([[0, { ...emptyInput(), moveX: 1 }]])
     tickN(w, right, 20)
-    expect(player.health!.hp).toBe(70)
+    expect(player.loadout!.inventory.some((s) => s.itemId === 'grenade')).toBe(true)
     expect(w.byId.get(drop.id)).toBeUndefined()
   })
 

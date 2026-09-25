@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
 import { addEntity, createWorld, type World } from '../world'
 import { emptyInput, type InputCmd } from '../types'
-import { WEAPONS } from '../data/items'
+import { CONSUMABLES, THROWABLES, WEAPONS } from '../data/items'
 import { combatSystem } from './combat'
 import { fireAt } from './fire'
 import { applyAreaEffect } from './itemEffects'
-import { equipSlot, throwActive, useHeld } from './inventory'
+import { throwActive, useHeld } from './inventory'
+import { arm } from '../testkit'
 import { projectileSystem } from './projectiles'
 import { hasStatus } from './statusFx'
 
@@ -75,8 +76,7 @@ describe('item breadth', () => {
   describe('ranged weapons', () => {
     it('a shotgun fires its full spread of pellets in one shot, at varied angles', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'shotgun', qty: 6 }]
-      equipSlot(e, 0)
+      arm(e, 'shotgun')
       combatSystem(w, attack())
       const pellets = w.entities.filter((x) => x.projectile)
       expect(pellets).toHaveLength(WEAPONS.shotgun.pellets!)
@@ -85,8 +85,7 @@ describe('item breadth', () => {
 
     it('a freeze ray freezes the target it hits', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'freezeRay', qty: 6 }]
-      equipSlot(e, 0)
+      arm(e, 'freezeRay')
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && !hasStatus(target, 'frozen'); t++) projectileSystem(w)
@@ -95,8 +94,7 @@ describe('item breadth', () => {
 
     it('a tranquilizer puts the target to sleep', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'tranquilizer', qty: 5 }]
-      equipSlot(e, 0)
+      arm(e, 'tranquilizer')
       const target = dummy(w, 22, 20)
       combatSystem(w, attack())
       for (let t = 0; t < 30 && target.status!.sleep === 0; t++) projectileSystem(w)
@@ -107,54 +105,90 @@ describe('item breadth', () => {
   describe('melee onHit', () => {
     it('a sledgehammer stuns what it hits', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'sledgehammer', qty: 12 }]
-      equipSlot(e, 0)
+      arm(e, 'sledgehammer')
       const target = dummy(w, 21, 20)
       combatSystem(w, attack())
       expect(target.status!.stun).toBeGreaterThan(0)
     })
   })
 
+  // The freeze-grenade and chloroform throws that used to live here went with
+  // the item cull. The MECHANIC they covered — throwActive lobs the held item,
+  // the projectile lands, its declarative `onLand` fires, the slot empties — is
+  // unchanged and is re-covered below through the grenade, the one throwable
+  // deliberately kept. The status and sleep area effects themselves are still
+  // asserted directly in 'area effects (declarative onLand)' above, so removing
+  // the two items cost no coverage of the effects, only of the items.
   describe('throwables', () => {
-    it('throwing a freeze grenade freezes a nearby NPC where it lands', () => {
+    it('the grenade is the only throwable left, and it is still here', () => {
+      expect(Object.keys(THROWABLES)).toEqual(['grenade'])
+    })
+
+    it('throwing a grenade explodes where it lands and empties the slot', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'freezeGrenade', qty: 1 }]
+      e.loadout!.inventory = [{ itemId: 'grenade', qty: 1 }]
       e.loadout!.activeSlot = 0
       const victim = dummy(w, 23, 20)
       throwActive(w, e)
-      for (let t = 0; t < 60 && !hasStatus(victim, 'frozen'); t++) projectileSystem(w)
-      expect(hasStatus(victim, 'frozen')).toBe(true)
+      for (let t = 0; t < 60 && victim.health!.hp === 40; t++) projectileSystem(w)
+      expect(victim.health!.hp).toBeLessThan(40)
       expect(e.loadout!.inventory).toHaveLength(0)
     })
 
-    it('throwing chloroform puts a nearby NPC to sleep', () => {
+    it('a throwable id that no longer exists is inert — no projectile, slot kept', () => {
+      // What an old save or a pre-cull peer can still hand us. `throwActive`
+      // must refuse it rather than lob an undefined-speed projectile.
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'chloroform', qty: 1 }]
+      e.loadout!.inventory = [{ itemId: 'molotov', qty: 1 }]
       e.loadout!.activeSlot = 0
-      const victim = dummy(w, 22, 20)
-      throwActive(w, e)
-      for (let t = 0; t < 60 && victim.status!.sleep === 0; t++) projectileSystem(w)
-      expect(victim.status!.sleep).toBeGreaterThan(0)
+      expect(() => throwActive(w, e)).not.toThrow()
+      expect(throwActive(w, e)).toBe(false)
+      expect(w.entities.filter((x) => x.projectile)).toHaveLength(0)
+      expect(e.loadout!.inventory).toHaveLength(1)
     })
   })
 
+  // bandage / medkit / burger / adrenaline were the ENTIRE consumable class and
+  // all four were culled, so there is no longer an item that heals or buffs. The
+  // burger-heals and adrenaline-buffs cases cannot survive as written. What is
+  // kept is the pair of properties that actually matter now:
+  //   1. the class is empty ON PURPOSE, and an id from before the cull is inert
+  //      rather than a crash (old saves, older peers);
+  //   2. the consumable PIPELINE still works, so the machinery deliberately left
+  //      standing in data/items.ts is not quietly rotting dead code.
   describe('consumables (onUse)', () => {
-    it('a burger heals the user', () => {
-      const e = player(w)
-      e.health!.hp = 50
-      e.loadout!.inventory = [{ itemId: 'burger', qty: 1 }]
-      e.loadout!.activeSlot = 0
-      useHeld(w, e)
-      expect(e.health!.hp).toBeGreaterThan(50)
-      expect(e.loadout!.inventory).toHaveLength(0)
+    it('there are no consumables — the class was culled entire', () => {
+      expect(Object.keys(CONSUMABLES)).toEqual([])
     })
 
-    it('an adrenaline shot applies a self buff status', () => {
+    it('a culled consumable id is inert: no heal, no throw, no crash, slot kept', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'adrenaline', qty: 1 }]
+      e.health!.hp = 50
+      e.loadout!.inventory = [{ itemId: 'medkit', qty: 1 }]
       e.loadout!.activeSlot = 0
-      useHeld(w, e)
-      expect(hasStatus(e, 'hasted')).toBe(true)
+      expect(() => useHeld(w, e)).not.toThrow()
+      expect(useHeld(w, e)).toBe(false)
+      expect(e.health!.hp).toBe(50)
+      expect(e.loadout!.inventory).toHaveLength(1)
+    })
+
+    it('the consumable pipeline still heals and buffs when a consumable exists', () => {
+      // Registered for the duration of this test only: it proves heal + onUse in
+      // `consumeActive` are still wired, which an empty table cannot show. If a
+      // future consumable is added, it inherits working machinery.
+      CONSUMABLES.testStim = { id: 'testStim', name: 'Test Stim', heal: 25, onUse: { status: 'hasted', ticks: 300 } }
+      try {
+        const e = player(w)
+        e.health!.hp = 50
+        e.loadout!.inventory = [{ itemId: 'testStim', qty: 1 }]
+        e.loadout!.activeSlot = 0
+        expect(useHeld(w, e)).toBe(true)
+        expect(e.health!.hp).toBe(75)
+        expect(hasStatus(e, 'hasted')).toBe(true)
+        expect(e.loadout!.inventory).toHaveLength(0)
+      } finally {
+        delete CONSUMABLES.testStim
+      }
     })
   })
 })

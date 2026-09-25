@@ -314,5 +314,109 @@
  "extra.chars/spore-drone-s-attack-2.png": {
   "raw": "/tmp/claude-1000/-home-redaphid-Projects-streets-of-rogue-mobile/45274930-60ad-4e2f-b853-849ae40766ef/scratchpad/stage/char.spore-drone.s-attack-2/char-spore-drone-s-attack-2-s414600_00004_.png",
   "note": "staged for animation-state system; NOT in manifest (schema pending)"
+ },
+ "char.mireclaw-stalker.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.mireclaw-stalker.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "low horizontal six-legged scavenger; only non-upright body in the cast; ground shadow stripped in post"
+ },
+ "char.sporeling-mite.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.sporeling-mite.s-idle.png",
+  "seed": 414500,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "knee-high mushroom-cap critter; smallest silhouette in the cast"
+ },
+ "char.carapace-brute.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.carapace-brute.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 prompt; hunched quadruped - v1 drew 4/4 upright bipeds"
+ },
+ "char.cinder-husk.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.cinder-husk.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 prompt; charcoal husk with ember eyes. WEAKEST of the six - still reads humanoid"
+ },
+ "char.gloom-lurker.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.gloom-lurker.s-idle.png",
+  "seed": 414502,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 prompt; domed shell with tucked legs - v1 drew humanoids, a tree and a gown"
+ },
+ "char.brood-sac.s-idle": {
+  "index": 0,
+  "raw": "raws\\char.brood-sac.s-idle.png",
+  "seed": 414501,
+  "size": 1024,
+  "ckpt": "anything-xl",
+  "note": "v2 STATIC_KINDS object recipe; egg sac with glowing seam - v1 drew twig-people"
+ },
+ "char.bog-mender.s-idle": {
+  "seed": 414506,
+  "index": 0,
+  "raw": "raws/char.bog-mender.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; beaked plague-doctor medic with syringe - anything-xl drew anime girls 15/16"
+ },
+ "char.blast-diver.s-idle": {
+  "seed": 414503,
+  "index": 0,
+  "raw": "raws/char.blast-diver.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; squat iron diver under a glowing orange charge-dome - anything-xl drew sleek power armour 16/16"
+ },
+ "char.bellwether.s-idle": {
+  "seed": 414500,
+  "index": 0,
+  "raw": "raws/char.bellwether.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; brass bell for a head, bubble charms, officer coat - anything-xl never drew the bell"
+ },
+ "char.drowned-diver.s-idle": {
+  "seed": 414506,
+  "index": 0,
+  "raw": "raws/char.drowned-diver.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 chunky-biped recipe; porthole diving helmet, harpoon gun"
+ },
+ "char.gloam-hound.s-idle": {
+  "seed": 414505,
+  "index": 0,
+  "raw": "raws/char.gloam-hound.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 checkpoint; mangy snarling quadruped, bony back spines - anything-xl drew the silhouette but grey"
+ },
+ "char.spore-mortar.s-idle": {
+  "seed": 414502,
+  "index": 0,
+  "raw": "raws/char.spore-mortar.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 checkpoint; a hulking spore-ogre hauling a fleshy mortar tube on its shoulders. Juggernaut drifted the 4-legged beast to a biped (8/8); kept for style match over the grey anything-xl quadruped"
+ },
+ "char.hive-spire.s-idle": {
+  "seed": 414505,
+  "index": 0,
+  "raw": "raws/char.hive-spire.s-idle.png",
+  "size": 768,
+  "ckpt": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors",
+  "note": "r2 checkpoint; tall moss-chitin spire. COMPROMISE: every seed drew an isometric plinth; this one has the smallest"
  }
 }

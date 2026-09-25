@@ -129,6 +129,104 @@ describe('installGamepadMenuNav (DOM driver)', () => {
     return { a, b }
   }
 
+  it('suppress makes the nav inert, and a press consumed while suppressed can NEVER edge-fire on resume', () => {
+    const { a, b } = setup()
+    let aClicks = 0
+    a.addEventListener('click', () => aClicks++)
+    let bClicks = 0
+    b.addEventListener('click', () => bClicks++)
+
+    const clock = makeClock()
+    const pads: (PadLike | null)[] = [null]
+    const orig = navigator.getGamepads
+    ;(navigator as unknown as { getGamepads: () => (PadLike | null)[] }).getGamepads = () => pads
+
+    let suppressed = true
+    const teardown = installGamepadMenuNav(() => [a, b], {
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+      suppress: () => suppressed,
+    })
+    try {
+      pads[0] = pad([0]) // A pressed — but this press belongs to someone else
+      clock.tick()
+      expect(aClicks).toBe(0)
+      expect(a.style.boxShadow).toBe('') // no focus paint while suppressed
+      // Suppression lifts WHILE the button is still held (the adversarial case:
+      // e.g. the press that closed the other overlay is not yet released).
+      suppressed = false
+      clock.tick() // resync frame: baseline, paint, no action
+      expect(aClicks).toBe(0)
+      expect(a.style.boxShadow).not.toBe('') // cursor appears at once
+      clock.tick() // still held → still no edge
+      expect(aClicks).toBe(0)
+      pads[0] = pad([]) // release…
+      clock.tick()
+      pads[0] = pad([0]) // …then a FRESH press
+      clock.tick()
+      expect(aClicks).toBe(1)
+      expect(bClicks).toBe(0)
+    } finally {
+      teardown()
+      ;(navigator as unknown as { getGamepads?: typeof orig }).getGamepads = orig
+    }
+  })
+
+  it('clears the focus paint when suppression begins mid-flight', () => {
+    const { a } = setup()
+    const clock = makeClock()
+    const pads: (PadLike | null)[] = [null]
+    const orig = navigator.getGamepads
+    ;(navigator as unknown as { getGamepads: () => (PadLike | null)[] }).getGamepads = () => pads
+
+    let suppressed = false
+    const teardown = installGamepadMenuNav(() => [a], {
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+      suppress: () => suppressed,
+    })
+    try {
+      clock.tick()
+      expect(a.style.boxShadow).not.toBe('')
+      suppressed = true
+      clock.tick()
+      expect(a.style.boxShadow).toBe('')
+    } finally {
+      teardown()
+      ;(navigator as unknown as { getGamepads?: typeof orig }).getGamepads = orig
+    }
+  })
+
+  it('a custom activate receives the focused control instead of .click()', () => {
+    const { a, b } = setup()
+    let clicks = 0
+    b.addEventListener('click', () => clicks++)
+    const clock = makeClock()
+    const pads: (PadLike | null)[] = [null]
+    const orig = navigator.getGamepads
+    ;(navigator as unknown as { getGamepads: () => (PadLike | null)[] }).getGamepads = () => pads
+
+    const activated: HTMLElement[] = []
+    const teardown = installGamepadMenuNav(() => [a, b], {
+      schedule: clock.schedule,
+      cancel: clock.cancel,
+      activate: (el) => activated.push(el),
+    })
+    try {
+      pads[0] = pad([13]) // down → focus b
+      clock.tick()
+      pads[0] = pad([])
+      clock.tick()
+      pads[0] = pad([0]) // confirm
+      clock.tick()
+      expect(activated).toEqual([b])
+      expect(clicks).toBe(0) // the default .click() was replaced, not doubled
+    } finally {
+      teardown()
+      ;(navigator as unknown as { getGamepads?: typeof orig }).getGamepads = orig
+    }
+  })
+
   it('clicks the focused button when confirm is pressed', () => {
     const { a, b } = setup()
     let aClicks = 0

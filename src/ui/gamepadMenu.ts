@@ -85,11 +85,30 @@ export const stepMenuNav = (reading: PadReading, mem: NavMemory, index: number, 
  * data attribute so we can cleanly strip it when focus moves or nav tears down. */
 const FOCUS_SHADOW = '0 0 0 3px #ffd76a, 0 0 14px #ffd76aaa'
 
+/** What the nav cursor can land on. Buttons everywhere; the settings panel also
+ * walks its selects and checkboxes (all three carry `.disabled`, `.focus()`,
+ * and `.click()`, which is all the driver touches). */
+export type MenuNavControl = HTMLButtonElement | HTMLSelectElement | HTMLInputElement
+
 export interface GamepadMenuNavOptions {
   /** Poll scheduler + canceller — injectable so tests can drive frames by hand.
    * Defaults to requestAnimationFrame/cancelAnimationFrame. */
   schedule?: (cb: () => void) => number
   cancel?: (handle: number) => void
+  /**
+   * While true, this navigator is INERT: no focus paint, no movement, no
+   * activation. On the first frame after suppression lifts, the edge memory is
+   * re-baselined against the pad's CURRENT held state before anything can act,
+   * so a press consumed elsewhere (another overlay's navigator, the remap bind
+   * capture) can never edge-fire here on resume — only a genuinely fresh press
+   * does. This is what keeps exactly one navigator live when overlays stack
+   * (settings over the start menu).
+   */
+  suppress?: () => boolean
+  /** Confirm action for the focused control; defaults to `.click()`. The
+   * settings panel uses it to cycle a <select> instead (a synthetic click
+   * cannot open the native dropdown). */
+  activate?: (el: MenuNavControl) => void
 }
 
 /**
@@ -100,20 +119,21 @@ export interface GamepadMenuNavOptions {
  * leave running for the lifetime of a persistent overlay.
  */
 export const installGamepadMenuNav = (
-  getButtons: () => HTMLButtonElement[],
+  getButtons: () => MenuNavControl[],
   options: GamepadMenuNavOptions = {},
 ): (() => void) => {
   const schedule = options.schedule ?? ((cb) => requestAnimationFrame(cb))
   const cancel = options.cancel ?? ((h) => cancelAnimationFrame(h))
+  const activate = options.activate ?? ((el: MenuNavControl) => el.click())
   let handle = 0
   let index = 0
   let mem = emptyNavMemory()
-  let painted: HTMLButtonElement | null = null
+  let painted: MenuNavControl | null = null
 
-  const liveButtons = (): HTMLButtonElement[] =>
+  const liveButtons = (): MenuNavControl[] =>
     getButtons().filter((b) => !b.disabled && b.offsetParent !== null)
 
-  const paint = (btns: HTMLButtonElement[]): void => {
+  const paint = (btns: MenuNavControl[]): void => {
     const cur = btns[index] ?? null
     if (cur === painted) {
       if (cur && document.activeElement !== cur) cur.focus?.()
@@ -133,15 +153,35 @@ export const installGamepadMenuNav = (
     return null
   }
 
+  // Set while suppressed; the first live frame afterwards re-baselines the edge
+  // memory instead of acting (see GamepadMenuNavOptions.suppress).
+  let resync = false
+
   const frame = (): void => {
     const btns = liveButtons()
-    if (btns.length > 0) {
+    if (options.suppress?.()) {
+      resync = true
+      if (painted) {
+        painted.style.boxShadow = ''
+        painted = null
+      }
+    } else if (btns.length > 0) {
       if (index >= btns.length) index = btns.length - 1
-      const step = stepMenuNav(readMenuPad(readPads()), mem, index, btns.length)
-      mem = step.mem
-      index = step.index
-      paint(btns)
-      if (step.activate) btns[index]?.click()
+      if (resync) {
+        resync = false
+        const r = readMenuPad(readPads())
+        mem = { prevDown: r.prev, nextDown: r.next, confirmDown: r.confirm }
+        paint(btns) // show the cursor at once; presses act from the next frame
+      } else {
+        const step = stepMenuNav(readMenuPad(readPads()), mem, index, btns.length)
+        mem = step.mem
+        index = step.index
+        paint(btns)
+        if (step.activate) {
+          const focused = btns[index]
+          if (focused) activate(focused)
+        }
+      }
     } else if (painted) {
       painted.style.boxShadow = ''
       painted = null

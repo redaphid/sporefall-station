@@ -143,3 +143,23 @@ describe('spawn grace iframes', () => {
     expect(p.pos.x).toBeGreaterThan(startX)
   })
 })
+
+// The group layer (packs, hive spires) and the complex floorplans landed on
+// separate branches: the new archetypes put a gatehouse right at the airlock,
+// so pin that no standing group lands inside the spawn-safe radius there.
+describe('complex floors: no group spawns inside SPAWN_SAFE_RADIUS', () => {
+  it('packs and hives keep clear of the airlock, seeds 1..20 on floors 3/5/7/9', () => {
+    for (const floor of [3, 5, 7, 9]) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const w = createWorld(seed, floor, 'normal')
+        populateWorld(w)
+        expect(w.level.complex, `seed ${seed} floor ${floor}`).toBeDefined()
+        for (const e of w.entities) {
+          if (e.dead || !(e.ai?.group || e.hive)) continue
+          const d = Math.hypot(e.pos.x - w.level.spawn.x, e.pos.y - w.level.spawn.y)
+          expect(d, `seed ${seed} floor ${floor}: ${e.kind}#${e.id}`).toBeGreaterThanOrEqual(SPAWN_SAFE_RADIUS)
+        }
+      }
+    }
+  })
+})

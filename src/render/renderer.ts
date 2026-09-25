@@ -1,9 +1,12 @@
 import { Application, ColorMatrixFilter, Container, Graphics, Sprite, Text, Texture, type TextStyleOptions } from 'pixi.js'
 import { Capacitor } from '@capacitor/core'
 import type { Level } from '../game/levelgen/level'
+import { storeyBounds, storeyOf } from '../game/stairs'
 import type { RenderView } from '../app/session'
+import { flagOn } from '../app/featureFlags'
 import { loadSettings, type ShaderFxMode } from '../app/settings'
 import { createArt, TILE_PX, type ArtRegistry } from './art'
+import { WORLD_LAYER_ORDER, type WorldLayerName } from './worldLayers'
 import { BackbufferPipeline } from './backbuffer'
 import { BulletLayer } from './bullets'
 import { DistortionPool, packPrims, specsForEvents, sustainedSpecs, type UvProjector } from './distortion'
@@ -11,7 +14,9 @@ import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
 import { setActiveThemeChain } from './themeState'
 import { Camera } from './camera'
+import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './complexLook'
 import { EffectsLayer } from './effects'
+import { GroupFxLayer } from './groupFx'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
@@ -27,6 +32,7 @@ import {
   VIGNETTE_MAX,
 } from './juice'
 import { createPickTracker } from './pickModel'
+import { PlayerMarkerLayer } from './playerMarkerLayer'
 import { createSettingsPanel } from './settingsPanel'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
@@ -73,6 +79,11 @@ export interface GameRenderer {
    * (computed by input/aim.padAimReticles). Pass [] to clear. Presentation
    * only — the sim never sees them. */
   setReticles(reticles: readonly { x: number; y: number }[]): void
+  /** The settings panel, for the start menu's Settings entry: `open` shows the
+   * panel with CONTROLLER NAVIGATION armed (a pad-only player's way in);
+   * `close`/`isOpen` let the menu keep exactly one gamepad navigator live at a
+   * time. The in-game gear keeps its touch-only behavior. */
+  settingsUi: { open(): void; close(): void; isOpen(): boolean }
 }
 
 /** Canvas clear color when no theme palette provides one. */
@@ -116,6 +127,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       await loadSpriteTextures(app.renderer, c),
       { tiles: p.tiles, entities: p.entities },
       resolveAnimTpfs(c),
+      flagOn(loadSettings().flags, 'newEnemyArt'),
     )
   }
   // Facade over the swappable registry so the tilemap/entity/effect layers keep
@@ -124,8 +136,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const art: ArtRegistry = {
     tile: (id, v, tx, ty) => inner.tile(id, v, tx, ty),
     tileOverlayPool: (id) => inner.tileOverlayPool(id),
+    landingOverlay: (h) => inner.landingOverlay(h),
     tileMacro: (id) => inner.tileMacro(id),
     wallShadow: (s) => inner.wallShadow(s),
+    wallCap: (id) => inner.wallCap(id),
     groundSeam: (s) => inner.groundSeam(s),
     entity: (a) => inner.entity(a),
     entityFlash: (a, d) => inner.entityFlash(a, d),
@@ -149,7 +163,14 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // GPU mesh in world space — no per-entity filter — so it rides the camera
   // transform and the backbuffer composite like the bullets do.
   const statusFx = new StatusFxLayer()
+  // Co-op identity: a ring at each player's feet + their name, so a crew is
+  // readable mid-fight and you can find YOURSELF instantly (playerMarkers.ts).
+  const playerMarkers = new PlayerMarkerLayer()
   const effects = new EffectsLayer(art)
+  // Raid tells (sapper charge + countdown, breach shockwave, medic heal beam,
+  // retreat cross): drawn over the effects sprites, inside the same layer.
+  const groupFx = new GroupFxLayer()
+  effects.root.addChild(groupFx.root)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
@@ -193,7 +214,38 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   }
   // The pick layer lives INSIDE `world`: it is world-space affordance art, so
   // it rides the camera transform and (deliberately) the distortion field too.
-  world.addChild(tilemap.root, entities.root, statusFx.root, bullets.root, effects.root, reticleLayer, pickLayer)
+  // Player markers sit directly ABOVE the entity layer — so no prop can hide the
+  // ring that says which body is yours — and BELOW status-fx/bullets/effects, so
+  // every threat and every impact still paints over the top of them.
+  //
+  // SINKING THIS LAYER BELOW `entities` LOOKS RIGHT AND IS NOT. The entity layer
+  // is y-sorted, so anything standing one tile south of a player — a desk, a
+  // crate, an enemy — spans `foot-16 … foot+32` in world px and swallows a
+  // player's ring whole. A downed teammate behind furniture would show no red
+  // ring and no X at all: the revive cue, gone. Markers are kept from covering
+  // the character by being TINY, which is tuning, not by being buried, which
+  // is a regression.
+  // Mounted BY the pinned order (worldLayers.ts) rather than alongside it, so
+  // the test that guards the order guards what actually paints.
+  //
+  // Indoor complex lights-out: `dark` is a dimming rect over the blacked-out
+  // wing, above the actors (they vanish into the dark) but under the
+  // affordance layers.
+  const darkLayer = new Graphics()
+  darkLayer.eventMode = 'none'
+  let darkWing: DarkWing | null = null
+  const worldLayers: Record<WorldLayerName, Container> = {
+    tilemap: tilemap.root,
+    entities: entities.root,
+    playerMarkers: playerMarkers.root,
+    statusFx: statusFx.root,
+    bullets: bullets.root,
+    effects: effects.root,
+    dark: darkLayer,
+    reticle: reticleLayer,
+    pick: pickLayer,
+  }
+  world.addChild(...WORLD_LAYER_ORDER.map((name) => worldLayers[name]))
 
   // --- Backbuffer weapon-FX pipeline (backbuffer.ts). The world lives inside
   // `sceneRoot`; the pipeline either composites it through the distortion
@@ -257,6 +309,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     })
   }
 
+  let currentLevel: Level | undefined
+  let themeFloorTint = 0xffffff
   const applyThemePalette = (c: ThemeChain): void => {
     const p = resolvePalette(c)
     app.renderer.background.color = p.background ?? DEFAULT_BACKGROUND
@@ -264,7 +318,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     // The fractal pass stays palette-coherent: its tint ramp derives from the
     // active theme's background + accent, not hardcoded hues.
     pipeline.setPalette(p.background ?? DEFAULT_BACKGROUND, p.uiAccent ?? 0xffe066)
-    tilemap.root.tint = p.floorTint ?? 0xffffff
+    themeFloorTint = p.floorTint ?? 0xffffff
+    tilemap.root.tint = floorTintFor(currentLevel, themeFloorTint)
     if (p.uiAccent !== undefined)
       document.documentElement.style.setProperty('--theme-accent', `#${p.uiAccent.toString(16).padStart(6, '0')}`)
     else document.documentElement.style.removeProperty('--theme-accent')
@@ -289,9 +344,14 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const damageOverlay = overlay('normal', 0xd11a1a)
   const warmOverlay = overlay('add', 0xff7a1a)
   const coldOverlay = overlay('add', 0x3aa0ff)
+  // Storey change: a short fade up from black as the view flips storeys.
+  const storeyFadeOverlay = overlay('normal', 0x000000)
+  const STOREY_FADE_S = 0.15
+  let storeyFade = 0
+  /** The storey slot the view shows (-1 = not yet known). */
+  let viewSlot = -1
   const grade = new ColorMatrixFilter()
 
-  let currentLevel: Level | undefined
   // Inspect-card thumbnails: art key → data URL, extracted lazily from the live
   // registry. Theme-keyed implicitly — the cache empties on every theme swap.
   const thumbs = new Map<string, string | undefined>()
@@ -334,6 +394,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     if (currentLevel) tilemap.build(currentLevel, art)
     entities.refresh()
     bullets.refresh()
+    playerMarkers.refresh()
   }
 
   const native = Capacitor.isNativePlatform()
@@ -341,19 +402,26 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // haptics + the effects-quality gate pick them up without a reload. A theme
   // change from the panel hot-swaps the renderer's assets.
   const themeList = await listThemes()
-  let settings = createSettingsPanel(
+  const settingsPanel = createSettingsPanel(
     chromeMount,
     native,
     (s) => {
       const prevTheme = settings.theme
+      const prevArt = flagOn(settings.flags, 'newEnemyArt')
       settings = s
       if (s.theme !== prevTheme) void setTheme(s.theme)
+      // Creature-art switch: same full asset re-bake as a theme swap, because
+      // which archetypes count as character sprites changes with it. Reuses
+      // setTheme rather than a parallel path so there is one rebuild to keep
+      // correct. Live, no reload.
+      else if (flagOn(s.flags, 'newEnemyArt') !== prevArt) void setTheme(chain[0].id)
       // A `?fx=` URL override pins the mode for the session; otherwise the
       // panel's Shader FX choice applies live (and persists via settings.ts).
       pipeline.setMode(urlFx ?? s.shaderFx)
     },
     themeList,
-  ).settings()
+  )
+  let settings = settingsPanel.settings()
   const haptics = createHaptics(nativeHapticDriver(), () => settings)
 
   const viewRect = { x: 0, y: 0, w: 0, h: 0 }
@@ -374,6 +442,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     setTheme,
     entityThumb,
     weaponThumb,
+    settingsUi: {
+      open: () => settingsPanel.openForPad(),
+      close: () => settingsPanel.close(),
+      isOpen: () => settingsPanel.isOpen(),
+    },
     worldToScreen(wx: number, wy: number): { x: number; y: number } {
       // The live container transform — the rendered truth, no re-derived math.
       const p = world.toGlobal({ x: wx * TILE_PX, y: wy * TILE_PX })
@@ -385,12 +458,30 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     setLevel(level: Level): void {
       currentLevel = level
       tilemap.build(level, art)
+      tilemap.root.tint = floorTintFor(level, themeFloorTint)
+      darkWing = null
       levelW = level.w
       levelH = level.h
       camera.snapTo(level.spawn.x, level.spawn.y)
+      viewSlot = -1
     },
     draw(view: RenderView, alpha: number, dt: number): void {
       elapsed += dt
+      // ---- Storeys: show only the viewer's storey (stairs spec §3.5). The
+      // viewer is the local player; the storey is a function of x alone.
+      const multi = !!currentLevel?.storeys
+      const slot = multi ? storeyOf(view.self?.pos.x ?? camera.x) : 0
+      if (slot !== viewSlot) {
+        // A climb is an 80-tile teleport: cut the camera, don't pan it.
+        if (viewSlot !== -1 && view.self) {
+          camera.snapTo(view.self.pos.x, view.self.pos.y)
+          storeyFade = 1
+        }
+        viewSlot = slot
+      }
+      const onStorey = (x: number): boolean => !multi || storeyOf(x) === slot
+      const shown = multi ? view.entities.filter((e) => onStorey(e.pos.x)) : view.entities
+      const bounds = currentLevel ? storeyBounds(currentLevel, view.self?.pos.x ?? camera.x) : undefined
       const fx = settings.effectsQuality
       const juicing = fx !== 'off'
       // Event-driven juice: sparks/gibs, camera shake, hitstop, element tint, and
@@ -399,6 +490,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
         for (const ev of view.events) {
+          // Another storey's sparks and shakes are not ours to see.
+          if (multi && 'x' in ev && typeof ev.x === 'number' && !onStorey(ev.x)) continue
           const isSelf =
             view.self != null &&
             (('targetId' in ev && ev.targetId === view.self.id) ||
@@ -420,6 +513,17 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
             // Stop-drop-and-roll steam puff: a pale quench flash where the burn
             // was smothered, so the shortened/killed burn reads as CAUSED by the roll.
             effects.spawn('hit', ev.x, ev.y, view.tick, STEAM_TINT)
+          } else if (ev.type === 'ventSwarm') {
+            // The grate bursts: a spore-green spray where the swarm crawls out.
+            effects.spawn('explosion', ev.x, ev.y, view.tick, 0x7fd65a)
+          } else if (ev.type === 'ambush') {
+            effects.spawn('hit', ev.x, ev.y, view.tick, 0xd17f7f)
+          } else if (ev.type === 'heal') {
+            // The Bog Mender's patch lands: a green sparkle on the healed body.
+            const to = view.entities.find((e) => e.id === ev.entityId)
+            if (to) effects.spawn('pickup', to.pos.x, to.pos.y, view.tick, 0x6dff8a)
+          } else if (ev.type === 'sapperCharge') {
+            effects.spawn('hit', ev.x, ev.y, view.tick, 0xffb02e)
           } else if (ev.type === 'pickup' || ev.type === 'modPickup') {
             const by = view.entities.find((e) => e.id === ev.byId)
             if (by) effects.spawn('pickup', by.pos.x, by.pos.y, view.tick)
@@ -432,6 +536,12 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
             cold = Math.min(1, cold + t.cold)
             if (selfHurt) vignette = Math.min(VIGNETTE_MAX, vignette + 0.35)
           }
+        }
+        darkWing = updateDarkWing(darkWing, view.events, view.tick)
+        darkLayer.clear()
+        if (darkWing) {
+          const r = darkWing.rect
+          darkLayer.rect(r.x * TILE_PX, r.y * TILE_PX, r.w * TILE_PX, r.h * TILE_PX).fill({ color: 0x02040a, alpha: DARK_ALPHA })
         }
         sound.handle(view.events)
         haptics.handle(view.events, view.self)
@@ -449,16 +559,20 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (frozen) hitstop = tickHitstop(hitstop)
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
-        entities.update(view.entities, alpha, view.tick, view.floor)
-        statusFx.update(view.entities, alpha, view.tick)
-        bullets.update(view.entities, alpha, view.tick)
+        entities.update(shown, alpha, view.tick, view.floor)
+        playerMarkers.update(shown, view.self?.id, alpha, view.tick)
+        statusFx.update(shown, alpha, view.tick)
+        bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)
       }
+      // Outside the hitstop freeze: the tracker must see every tick's events.
+      groupFx.update(view, elapsed)
       drawReticles()
       drawPickUi(view)
-      camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
+      if (bounds) camera.apply(world, app.screen.width, app.screen.height, bounds.w, bounds.h, bounds.x0, bounds.y0)
+      else camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
-      tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h)
+      tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h, slot)
 
       // --- Backbuffer composite: pack the live distortion prims into the
       // shader's uniform arrays (screen-uv space via the REAL world transform —
@@ -480,7 +594,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           radiusToUv: (r) => (r * pxPerTile) / sh2,
         }
         // Exit-portal idle flourish: anchored on the level's exit tile.
-        if (currentLevel) {
+        if (currentLevel && onStorey(currentLevel.exit.x)) {
           const e = proj.toUv(currentLevel.exit.x + 0.5, currentLevel.exit.y + 0.5)
           pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))
         } else {
@@ -523,7 +637,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         : 0
       const sw = app.screen.width
       const sh = app.screen.height
+      storeyFade = Math.max(0, storeyFade - dt / STOREY_FADE_S)
       for (const [ov, a] of [
+        [storeyFadeOverlay, storeyFade],
         [damageOverlay, red],
         [warmOverlay, warm * 0.35],
         [coldOverlay, cold * 0.3],

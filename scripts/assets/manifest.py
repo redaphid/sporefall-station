@@ -26,6 +26,21 @@ NAMES = {
     "shopkeeper": "Barter Frog",
     "scientist": "Mycologist",
     "robot": "Derelict Unit",
+    # #78 Sporefall threat roster.
+    "brute": "Carapace Brute",
+    "cinder": "Cinder Husk",
+    "sporeling": "Spore Mite",
+    "stalker": "Mireclaw Stalker",
+    "lurker": "Gloom Lurker",
+    "pod": "Brood Sac",
+    # The group roster (docs/design/enemy-groups.md).
+    "drowner": "Drowned Diver",
+    "bellwether": "Tide Bellwether",
+    "mender": "Bog Mender",
+    "breacher": "Blast Diver",
+    "lobber": "Spore Mortar",
+    "gloamhound": "Gloam Hound",
+    "hivespire": "Hive Spire",
     "crate": "Cargo Pod",
     "barrel": "Spore Barrel",
     "atm": "Cryo Terminal",
@@ -71,6 +86,19 @@ ANIM_SECTION = {"walk": 4}
 CHAR_FILES = {arch: kind for arch, (kind, *_rest) in G.CHARS.items()}
 CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
                    if t in CHAR_FILES and arch in ("gangster",)})
+# The Mireclaw Alpha has its own body now, so it is listed EXPLICITLY rather
+# than through CHAR_ALIASES. It cannot come from the alias update above: that
+# line resolves an alias to the TARGET's files, and CHAR_ALIASES maps
+# boss -> thug, so the Alpha would silently be handed the bog-mutant art again
+# -- the pixel-identical bug ARCHETYPE_SCALE exists to paper over.
+#
+# Same silent-revert hazard as PROP_KEYS below: char.boss.* only reaches the
+# shipped manifest because this table names it, so omitting it here means the
+# next regeneration drops all ten keys and the boss falls back to the thug.
+#
+# Only s-idle and s-step exist; the per-direction BORROW below fills se/e/ne/n
+# from the s art, which is exactly what every other non-player NPC does.
+CHAR_FILES["boss"] = "mireclaw-alpha"
 
 ITEM_KEYS = {  # engine item id -> our themed file (items table key)
     "pistol": "spore-pistol", "bat": "root-club", "knife": "shard-knife",
@@ -79,8 +107,33 @@ ITEM_KEYS = {  # engine item id -> our themed file (items table key)
 }
 PROP_KEYS = {  # engine prop name -> props table key
     "barrel": "spore-barrel", "atm": "cryo-terminal",
-    "vending-machine": "nutrient-dispenser", "tv": "console-monitor",
+    "vending-machine": "nutrient-dispenser", "tv": "wall-screen",
     "toilet": "hydro-recycler",
+    # Furniture that USED to reuse another prop's art: a weapons locker wore the
+    # cryo-terminal, a supply cabinet the nutrient dispenser, a desk and the TV
+    # both wore the console. Each now has art made for it, so the reuse is gone.
+    #
+    # These entries must agree with the shipped manifest.json. They are the same
+    # silent-revert hazard as prop.default below: this table is what `build()`
+    # writes, so leaving it pointing at the old shared art means the next
+    # regeneration quietly undoes the dedicated sprites and every locker goes
+    # back to being an ATM. Change art here and in the manifest together.
+    "locker": "weapons-locker", "cabinet": "supply-cabinet",
+    "desk": "work-desk",
+    # The mess chair. Same hazard as the line above: the `chair` archetype only
+    # stops drawing procedurally because prop.chair is in the shipped manifest,
+    # so it has to be in THIS table as well or the next regeneration drops the
+    # key and every chair silently reverts to the drawn silhouette.
+    "chair": "chair",
+    # The sporeforge furnishings, plus `crate` -- which needed no new art, only
+    # a key: cargo-crate.png was already shipping as prop.default. Same
+    # silent-revert hazard as every line above: this table is what build()
+    # writes, so a missing entry means the next regeneration drops the key and
+    # the archetype reverts to its procedural silhouette.
+    "crate": "cargo-crate",
+    "shelf": "storage-rack", "bunk": "crew-bunk",
+    "bench": "mess-bench", "table": "mess-table",
+    "plant": "bio-planter", "spore-node": "spore-node",
 }
 
 
@@ -143,7 +196,20 @@ def build():
                     if not exists(rel):
                         break  # frames must be contiguous from 0
                     sprites[f"char.{arch}.{d}-{state}-{n}"] = rel
-    put("prop.default", "props/cargo-pod.png")
+    # `prop.default` is not a fallback nobody sees: art.ts routes the `crate`
+    # archetype to `sprites.prop`, and crate is the MOST COMMON object in the
+    # game (23.0 per floor, 19.1% of all props). It pointed at cargo-pod.png —
+    # a grey mossy dome — so every crate in the game was a mossy dome.
+    #
+    # Deliberately pointed at art that does not exist yet. `put` omits a missing
+    # file, so today this emits nothing and `crate` falls through to the
+    # procedural brown slatted crate, which is the better read. The day
+    # cargo-crate.png is generated this starts mapping on its own.
+    #
+    # Do NOT "fix" this back to cargo-pod.png: that is the revert this comment
+    # exists to prevent. Regenerating the manifest was the one action that could
+    # silently undo the crate fix.
+    put("prop.default", "props/cargo-crate.png")
     for eng, ours in PROP_KEYS.items():
         put(f"prop.{eng}", f"props/{ours}.png")
     put("item.default", "items/biogel-kit.png")

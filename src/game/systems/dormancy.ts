@@ -13,6 +13,7 @@
 import type { Entity } from '../entity'
 import { anyPowerCut, type World } from '../world'
 import { gatherStimuli } from './stimulus'
+import { vlen } from '../simMath'
 
 /** How close a noise/fire/spore stimulus must be to trip a dormant entity. */
 export const WAKE_STIMULUS_RANGE = 7
@@ -31,7 +32,7 @@ const bodyNear = (w: World, e: Entity, range: number): boolean => {
     if (p === e || p.dead || !p.health) continue
     if (!p.playerCtl && !p.ai) continue
     if (p.ai?.faction === e.ai!.faction) continue // its own kind doesn't wake it
-    if (Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y) <= range) return true
+    if (vlen(p.pos.x - e.pos.x, p.pos.y - e.pos.y) <= range) return true
   }
   return false
 }
@@ -51,14 +52,14 @@ const wakeTrigger = (w: World, e: Entity, stimuli: ReturnType<typeof gatherStimu
   // An opened door nearby — the lurker's room was just entered.
   if (kinds.includes('door')) {
     for (const d of w.entities) {
-      if (d.door?.open && !d.dead && Math.hypot(d.pos.x - e.pos.x, d.pos.y - e.pos.y) <= WAKE_DOOR_RANGE)
+      if (d.door?.open && !d.dead && vlen(d.pos.x - e.pos.x, d.pos.y - e.pos.y) <= WAKE_DOOR_RANGE)
         return 'door'
     }
   }
   // Environmental stimuli (noise / fire / spore) within range.
   for (const s of stimuli) {
     if (!kinds.includes(s.kind)) continue
-    if (Math.hypot(s.x - e.pos.x, s.y - e.pos.y) <= WAKE_STIMULUS_RANGE) return s.kind
+    if (vlen(s.x - e.pos.x, s.y - e.pos.y) <= WAKE_STIMULUS_RANGE) return s.kind
   }
   return undefined
 }

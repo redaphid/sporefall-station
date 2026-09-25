@@ -129,13 +129,20 @@ const avatarOf = (host: NetHostSession, slot: number) => host.world.byId.get(hos
 
 /** Give a host-side player a rich, multi-weapon inventory incl. a modded gun. */
 const richLoadout = (): { inventory: ItemStack[]; activeSlot: number } => ({
+  // Slot 0 is the PERMANENT weapon — the only weapon a player ever has, and the
+  // slot its mods live in, so the mods are what must survive the wire. Slots
+  // 1..n are held items (throwables/consumables), the only selectable ones.
+  // Post-cull this is what a rich inventory actually looks like: the permanent
+  // modded weapon, the one surviving throwable in a deep stack, and the mission
+  // briefcase. It used to run pistol/molotov/grenade/bandage; three of those four
+  // ids no longer exist, and a wire test that round-trips dead content proves
+  // less than one that round-trips what a player can really be carrying.
   inventory: [
-    { itemId: 'pistol', qty: 20 },
-    { itemId: 'freezeRay', qty: 6, mods: [{ id: 'frost', stacks: 2 }] },
-    { itemId: 'stunGun', qty: 4 },
-    { itemId: 'bandage', qty: 37 },
+    { itemId: 'pistol', qty: 1, mods: [{ id: 'frost', stacks: 2 }] },
+    { itemId: 'briefcase', qty: 1 },
+    { itemId: 'grenade', qty: 37 },
   ],
-  activeSlot: 0,
+  activeSlot: 2, // the grenade is HELD; a weapon slot can never be the active one
 })
 
 const tickN = async (host: NetHostSession, bob: ReturnType<MockHub['addClient']>, n: number): Promise<void> => {
@@ -147,7 +154,7 @@ const tickN = async (host: NetHostSession, bob: ReturnType<MockHub['addClient']>
 }
 
 describe('co-op client inventory (issue #57)', () => {
-  it("gives the joining client its OWN full inventory — slots, activeSlot, mods, ammo — not a bandage summary", async () => {
+  it("gives the joining client its OWN full inventory — slots, activeSlot, mods, ammo — not a one-number summary", async () => {
     const { host, bob } = await startPair(201)
     const avatar = avatarOf(host, 1)
     const { inventory, activeSlot } = richLoadout()
@@ -159,41 +166,61 @@ describe('co-op client inventory (issue #57)', () => {
 
     const self = bob.session.renderView().self!
     const inv = self.loadout!.inventory
-    // Full slot list arrives — the pistol, the modded freeze ray, the stun gun.
-    expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'freezeRay', 'stunGun', 'bandage'])
-    expect(self.loadout!.activeSlot).toBe(0)
-    // Ammo qty rides along per slot.
-    expect(inv.find((s) => s.itemId === 'pistol')!.qty).toBe(20)
+    // Full slot list arrives — the modded permanent weapon plus every held item.
+    expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(self.loadout!.activeSlot).toBe(2)
+    // Per-slot qty rides along.
+    expect(inv.find((s) => s.itemId === 'pistol')!.qty).toBe(1)
     // Per-weapon mods survive to the client so the badge renders.
-    expect(inv.find((s) => s.itemId === 'freezeRay')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
-    // Bandages are ONE stack of 37 — not 37 phantom slots.
-    expect(inv.filter((s) => s.itemId === 'bandage')).toHaveLength(1)
-    expect(inv.find((s) => s.itemId === 'bandage')!.qty).toBe(37)
+    expect(inv.find((s) => s.itemId === 'pistol')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
+    // A deep stack is ONE stack of 37 — not 37 phantom slots. This is the whole
+    // point of streaming the real inventory instead of the HUD's count.
+    expect(inv.filter((s) => s.itemId === 'grenade')).toHaveLength(1)
+    expect(inv.find((s) => s.itemId === 'grenade')!.qty).toBe(37)
   })
 
-  it('round-trips a client hotbar switch → host equips → client reflects the new active weapon', async () => {
+  it('round-trips a client hotbar switch → host holds the item → client reflects it', async () => {
     const input = makeInput()
     const { host, bob } = await startPair(202, input.source)
     const avatar = avatarOf(host, 1)
     avatar.loadout!.inventory = richLoadout().inventory
-    avatar.loadout!.activeSlot = 0
+    avatar.loadout!.activeSlot = -1
     avatar.combat!.weapon = 'pistol'
     await tickN(host, bob, 4)
-    expect(bob.session.renderView().self!.loadout!.activeSlot).toBe(0)
+    expect(bob.session.renderView().self!.loadout!.activeSlot).toBe(-1)
 
-    // Client taps hotbar slot 1 (the freeze ray).
-    input.set({ hotbar: 1 })
+    // Client taps hotbar slot 2 (the grenade). Slot 0 is the PERMANENT weapon and
+    // is not selectable, so the hotbar cursor only ever lands on held items.
+    input.set({ hotbar: 2 })
     await tickN(host, bob, 2)
     input.set({}) // release the tap
     await tickN(host, bob, 4)
 
-    // Host equipped it authoritatively…
-    expect(avatar.loadout!.activeSlot).toBe(1)
-    expect(avatar.combat!.weapon).toBe('freezeRay')
+    // Host held it authoritatively…
+    expect(avatar.loadout!.activeSlot).toBe(2)
+    expect(avatar.combat!.weapon).toBe('pistol') // the weapon never changes
     // …and the change came back to the client.
     const self = bob.session.renderView().self!
-    expect(self.loadout!.activeSlot).toBe(1)
-    expect(self.combat!.weapon).toBe('freezeRay')
+    expect(self.loadout!.activeSlot).toBe(2)
+    expect(self.combat!.weapon).toBe('pistol')
+  })
+
+  it('a client tap on the WEAPON slot is refused by the host — no switch, no weapon change', async () => {
+    const input = makeInput()
+    const { host, bob } = await startPair(212, input.source)
+    const avatar = avatarOf(host, 1)
+    avatar.loadout!.inventory = richLoadout().inventory
+    avatar.loadout!.activeSlot = -1
+    avatar.combat!.weapon = 'pistol'
+    await tickN(host, bob, 4)
+
+    input.set({ hotbar: 0 }) // slot 0 is the permanent weapon
+    await tickN(host, bob, 2)
+    input.set({})
+    await tickN(host, bob, 4)
+
+    expect(avatar.loadout!.activeSlot).toBe(-1) // nothing became held
+    expect(avatar.combat!.weapon).toBe('pistol')
   })
 
   it('syncs ammo count to the client as the host spends rounds', async () => {
@@ -225,13 +252,13 @@ describe('co-op client inventory (issue #57)', () => {
 
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
     avatar.loadout!.inventory = richLoadout().inventory
-    avatar.loadout!.activeSlot = 1
-    avatar.combat!.weapon = 'freezeRay'
+    avatar.loadout!.activeSlot = 2
+    avatar.combat!.weapon = 'pistol'
     await tickN(host, late, 6)
 
     const self = late.session.renderView().self!
-    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'freezeRay', 'stunGun', 'bandage'])
-    expect(self.loadout!.activeSlot).toBe(1)
+    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(self.loadout!.activeSlot).toBe(2)
   })
 
   it('gives multiple clients each THEIR own inventory, not each other\'s', async () => {
@@ -252,7 +279,7 @@ describe('co-op client inventory (issue #57)', () => {
     const caraAvatar = avatarOf(host, 2)
     bobAvatar.loadout!.inventory = [{ itemId: 'pistol', qty: 5 }]
     bobAvatar.loadout!.activeSlot = 0
-    caraAvatar.loadout!.inventory = [{ itemId: 'shotgun', qty: 3 }, { itemId: 'stunGun', qty: 4 }]
+    caraAvatar.loadout!.inventory = [{ itemId: 'pistol', qty: 1 }, { itemId: 'grenade', qty: 4 }]
     caraAvatar.loadout!.activeSlot = 1
 
     for (let i = 0; i < 6; i++) {
@@ -263,7 +290,7 @@ describe('co-op client inventory (issue #57)', () => {
     }
 
     expect(bob.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol'])
-    expect(cara.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toEqual(['shotgun', 'stunGun'])
+    expect(cara.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'grenade'])
     expect(cara.session.renderView().self!.loadout!.activeSlot).toBe(1)
   })
 
@@ -283,24 +310,28 @@ describe('co-op client inventory (issue #57)', () => {
     expect(host.debugInventorySends).toBeGreaterThan(sentAfterFirst)
   })
 
-  it('round-trips a client Use/Throw input → host consumes the held item → client sees the new qty', async () => {
+  // Was driven with a bandage, whose heal made the host-authoritative effect
+  // easy to see. The cull removed every consumable, so the held item is now the
+  // grenade and the observable effect is a projectile leaving the host's hand
+  // instead of a heal. The rule under test is unchanged: the CLIENT presses Use,
+  // the HOST decides, and the client's own qty follows the host's number.
+  it('round-trips a client Use/Throw input → host spends the held item → client sees the new qty', async () => {
     const input = makeInput()
     const { host, bob } = await startPair(207, input.source)
     const avatar = avatarOf(host, 1)
-    avatar.loadout!.inventory = [{ itemId: 'bandage', qty: 3 }]
+    avatar.loadout!.inventory = [{ itemId: 'grenade', qty: 3 }]
     avatar.loadout!.activeSlot = 0
-    avatar.health!.hp = 40 // hurt, so the bandage actually heals
     await tickN(host, bob, 4)
     expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(3)
 
-    input.set({ throwItem: true }) // Use the held bandage
+    input.set({ throwItem: true }) // Use the held grenade
     await tickN(host, bob, 2)
     input.set({})
     await tickN(host, bob, 4)
 
-    // Host consumed one and healed authoritatively…
+    // Host spent one authoritatively and the throw really happened…
     expect(avatar.loadout!.inventory[0].qty).toBe(2)
-    expect(avatar.health!.hp).toBe(70)
+    expect(host.world.entities.some((e) => e.projectile && !e.dead)).toBe(true)
     // …and the client's own inventory reflects the spend.
     expect(bob.session.renderView().self!.loadout!.inventory[0].qty).toBe(2)
   })
@@ -353,8 +384,8 @@ describe('co-op client inventory (issue #57)', () => {
     const invMsg = b.received().find((m) => m[0] === MsgType.Inventory)
     expect(invMsg).toBeDefined()
     const inv = decodeJson<InventoryMsg>(invMsg!)
-    expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'freezeRay', 'stunGun', 'bandage'])
-    expect(inv.inventory.find((s) => s.itemId === 'freezeRay')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
+    expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(inv.inventory.find((s) => s.itemId === 'pistol')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
   })
 
   it('serializes an InventoryMsg round-trip losslessly (mods + ammo preserved)', () => {
@@ -363,7 +394,7 @@ describe('co-op client inventory (issue #57)', () => {
       inventory: [
         { itemId: 'pistol', qty: 17 },
         { itemId: 'freezeRay', qty: 6, mods: [{ id: 'frost', stacks: 2 }, { id: 'rapid', stacks: 1 }] },
-        { itemId: 'bandage', qty: 37 },
+        { itemId: 'grenade', qty: 37 },
       ],
       activeSlot: 1,
       weapon: 'freezeRay',

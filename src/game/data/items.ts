@@ -27,9 +27,6 @@ export interface WeaponDef {
   knockback: number
   /** Ranged only. */
   projectileSpeed?: number
-  ammoPerShot?: number
-  /** Ranged: rounds a full slot holds — the slot's count doubles as ammo. */
-  magSize?: number
   /** Melee: swings before it breaks — the slot's count doubles as durability.
    * Absent (natural armament) = innate, never consumed. */
   durability?: number
@@ -43,6 +40,14 @@ export interface WeaponDef {
   spread?: number
   /** Status inflicted on whatever the hit lands on (freeze ray, sledgehammer). */
   onHit?: StatusApply
+  /** Sequenced mods only (World.modCasting): how many leading mods are live.
+   * Default 3 (systems/modSequence DEFAULT_SEQUENCE_SHAPE). */
+  slots?: number
+  /** Sequenced mods only: consecutive casts per trigger pull. Default 1; melee
+   * is always 1. A multi-cast gun splits its pellets between the casts. */
+  castsPerTrigger?: number
+  /** Sequenced mods only: ticks the weapon is locked after its sequence wraps. */
+  rechargeOnWrap?: number
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
@@ -59,6 +64,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     knockback: 16,
     durability: 12,
     onHit: { status: 'stun', ticks: 20 },
+    // Sequenced shape: the long build. Many slots, one per swing, slow wrap.
+    slots: 8,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 75,
   },
   // The Mireclaw Alpha's natural armament. A baseball bat on an apex swamp
   // predator was the placeholder that made the boss read as a fat gangster;
@@ -76,8 +85,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 18,
     knockback: 3,
     projectileSpeed: 14,
-    ammoPerShot: 1,
-    magSize: 8,
+    // Sequenced shape: short wand, one mod per shot, quick wrap.
+    slots: 4,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 20,
   },
   shotgun: {
     id: 'shotgun',
@@ -88,9 +99,12 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 26,
     knockback: 4,
     projectileSpeed: 16,
-    magSize: 6,
     pellets: 5,
     spread: 0.5,
+    // Sequenced shape: two casts per trigger, each pellet group takes the next mod.
+    slots: 4,
+    castsPerTrigger: 2,
+    rechargeOnWrap: 30,
   },
   machinegun: {
     id: 'machinegun',
@@ -101,7 +115,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 5,
     knockback: 1,
     projectileSpeed: 16,
-    magSize: 30,
+    // Sequenced shape: hoses through a long list, then a long cool-down.
+    slots: 6,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 45,
   },
   freezeRay: {
     id: 'freezeRay',
@@ -112,7 +129,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 22,
     knockback: 0,
     projectileSpeed: 13,
-    magSize: 6,
     onHit: { status: 'frozen', ticks: 120 },
   },
   tranquilizer: {
@@ -124,7 +140,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 20,
     knockback: 0,
     projectileSpeed: 13,
-    magSize: 5,
     onHit: { status: 'sleep', ticks: 150 },
   },
   flamethrower: {
@@ -136,7 +151,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 6,
     knockback: 0,
     projectileSpeed: 11,
-    magSize: 40,
     onHit: { status: 'burning', ticks: 240 },
   },
   stunGun: {
@@ -148,7 +162,6 @@ export const WEAPONS: Record<string, WeaponDef> = {
     cooldownTicks: 24,
     knockback: 1,
     projectileSpeed: 14,
-    magSize: 4,
     onHit: { status: 'electrified', ticks: 45 },
   },
 }
@@ -164,31 +177,44 @@ export interface ThrowableDef {
   cooldownTicks: number
 }
 
+// The element throwables (molotov / freezeGrenade / chloroform / banana /
+// gasGrenade) were CULLED — the grenade is the one thing you throw now. The
+// `AreaEffect` union deliberately keeps its `fire` and `status` arms: nothing
+// in this table produces them today, but fire still arrives from barrels,
+// `ignite` objects and the `incendiary` mod, and statuses still arrive from
+// weapon `onHit`, so the throw pipeline stays general rather than being
+// narrowed to `explode` and having to be widened again.
 export const THROWABLES: Record<string, ThrowableDef> = {
-  molotov: { id: 'molotov', name: 'Molotov', speed: 9, range: 6, damage: 0, onLand: { kind: 'fire' }, cooldownTicks: 20 },
   grenade: { id: 'grenade', name: 'Grenade', speed: 8, range: 6, damage: 0, onLand: { kind: 'explode', radius: 2.2, damage: 40 }, cooldownTicks: 25 },
-  freezeGrenade: { id: 'freezeGrenade', name: 'Freeze Grenade', speed: 9, range: 6, damage: 0, onLand: { kind: 'status', status: 'frozen', ticks: 120, radius: 2 }, cooldownTicks: 20 },
-  chloroform: { id: 'chloroform', name: 'Chloroform', speed: 8, range: 4, damage: 0, onLand: { kind: 'status', status: 'sleep', ticks: 180, radius: 1.8 }, cooldownTicks: 20 },
-  banana: { id: 'banana', name: 'Banana Peel', speed: 7, range: 4, damage: 0, onLand: { kind: 'status', status: 'slip', ticks: 45, radius: 1.2 }, cooldownTicks: 15 },
-  gasGrenade: { id: 'gasGrenade', name: 'Gas Grenade', speed: 8, range: 5, damage: 0, onLand: { kind: 'status', status: 'poisoned', ticks: 150, radius: 2 }, cooldownTicks: 20 },
 }
 
 export interface ConsumableDef {
   id: string
   name: string
   heal?: number
-  /** A self status applied on use (adrenaline → buff). */
+  /** A self status applied on use (e.g. a stimulant → `hasted`). */
   onUse?: StatusApply
 }
 
-export const CONSUMABLES: Record<string, ConsumableDef> = {
-  bandage: { id: 'bandage', name: 'Bandage', heal: 30 },
-  medkit: { id: 'medkit', name: 'Medkit', heal: 100 },
-  burger: { id: 'burger', name: 'Burger', heal: 20 },
-  adrenaline: { id: 'adrenaline', name: 'Adrenaline', onUse: { status: 'hasted', ticks: 300 } },
-}
+/**
+ * EMPTY BY DECISION, not by accident. bandage / medkit / burger / adrenaline
+ * were culled, and they were the whole consumable class — so there is no
+ * item-based healing or item-based self-buff in the game any more. Healing now
+ * comes only from passive regen (systems/regen.ts) and the `lifesteal` weapon
+ * mod.
+ *
+ * The table, the `ConsumableDef` shape and every consumer of them are kept: the
+ * item pipeline dispatches on data (`itemClass` → 'consumable' → `consumeActive`
+ * → heal/onUse), so a future consumable is one line here and nothing else. An
+ * id that is NOT in this table classes as 'unknown' and is inert — it cannot be
+ * used, and no code path indexes this table unguarded (see the `itemClass`
+ * gate in systems/interaction.ts `collect` and the `if (!def) return false` in
+ * systems/inventory.ts `consumeActive`). That is what makes an old save or an
+ * older peer's snapshot carrying `medkit` harmless rather than a crash.
+ */
+export const CONSUMABLES: Record<string, ConsumableDef> = {}
 
-export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'ammo' | 'key' | 'cash' | 'unknown'
+export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' | 'cash' | 'unknown'
 
 /** What kind of thing an item id is — the switch every use-rule dispatches on. */
 export const itemClass = (itemId: string): ItemClass => {
@@ -198,7 +224,6 @@ export const itemClass = (itemId: string): ItemClass => {
   // ignore slot limits, survive a down (recover keeps only 'key' items), and
   // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
   if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
-  if (itemId === 'ammo') return 'ammo'
   if (WEAPONS[itemId]) return WEAPONS[itemId].kind
   if (THROWABLES[itemId]) return 'throwable'
   if (CONSUMABLES[itemId]) return 'consumable'

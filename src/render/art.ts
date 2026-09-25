@@ -1,10 +1,11 @@
-import { Container, Graphics, Sprite, Texture, type Renderer } from 'pixi.js'
-import { Tile } from '../game/levelgen/level'
+import { Container, Graphics, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js'
+import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
 import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
+import { CAP_QUARTER_TURNS, cutCapSides } from './wallCaps'
 
 // These are LOGICAL sizes. The default swampspace-hires pack reads crisp at
 // 32/48 because its manifest declares `artScale: 2` — themeLoader bakes its art
@@ -47,6 +48,9 @@ export interface ArtRegistry {
   /** Context-placed RGBA decal pool for a surface (`tile.<name>.overlay`) —
    * empty when the theme ships none. Placement: tileSelect.planTileOverlays. */
   tileOverlayPool(tileId: number): readonly Texture[]
+  /** The chevron decal for a stair's landing tile, authored pointing NORTH at
+   * the stair (the tilemap rotates it with the shaft). */
+  landingOverlay(hash?: number): Texture
   /** Macro side (N of an N×N sliced pool) the active theme declares for a
    * surface, if any — the tilemap feeds it back into variant/overlay planning. */
   tileMacro(tileId: number): number | undefined
@@ -54,6 +58,13 @@ export interface ArtRegistry {
    * strongest below a wall (side 'n' — the wall stands to the tile's north),
    * subtle on the flanks. Overlay-blended by the tilemap. */
   wallShadow(side: OverlaySide): Texture
+  /** The lit cap strip of a wall-family tile (wallCaps.ts): `edge` runs along
+   * the tile's NORTH edge and `inner` is the concave-corner nub in its NW
+   * corner, both on a transparent full-tile canvas — the tilemap rotates them
+   * to whichever edges/corners face open ground. Undefined for non-wall tiles
+   * and for themes whose wall art carries no cap. Bevelled corners bake their
+   * own caps into `tile()`. */
+  wallCap(tileId: number): WallCapTextures | undefined
   /** Soft seam strip for a boundary where a LOWER surface (street water) meets
    * a higher one (deck/grass) — drawn on the lower tile's edge. */
   groundSeam(side: OverlaySide): Texture
@@ -110,6 +121,12 @@ export interface DirPose {
  * neighbor via DIR_FALLBACK when the renderer picks a pose. */
 export type CharSet = Partial<Record<Dir5, DirPose>>
 
+/** A wall family's cap pieces — see ArtRegistry.wallCap. */
+export interface WallCapTextures {
+  edge: Texture
+  inner: Texture
+}
+
 export interface SpriteTextures {
   /** Themed tile art, keyed by tile NAME (street/sidewalk/floor/wall/grass/
    * exit): each entry is a non-empty variant pool the tilemap alternates by
@@ -119,6 +136,8 @@ export interface SpriteTextures {
   tileAccents?: Record<string, Texture[]>
   /** Context-placed RGBA decal pools per tile name (`tile.<name>.overlay`). */
   tileOverlays?: Record<string, Texture[]>
+  /** Wall-cap pieces per wall-family tile name (`tile.<name>.cap` + `.cap.inner`). */
+  tileCaps?: Record<string, WallCapTextures>
   /** Macro-slicing declarations per tile name (manifest `macroTiles`). */
   tileMacro?: Record<string, number>
   player?: Texture
@@ -162,12 +181,17 @@ export interface ArtPalette {
 /**
  * Per-archetype sprite BULK — a multiplier on the drawn billboard only.
  *
- * The Mireclaw Alpha borrows the thug's directional set (see CHARSET_ALIAS
- * below) and was therefore PIXEL-IDENTICAL to the commonest enemy in the game:
- * same body, same palette, same size. Until it gets its own art (see
- * docs/assets/boss-art-brief.md) this is the cheap half of the fix — an Alpha
- * that is half again the size of its own brood reads as a different creature at
- * a glance, and the size difference survives whatever art lands later.
+ * The Mireclaw Alpha USED TO borrow the thug's directional set (see
+ * CHARSET_ALIAS below) and was therefore PIXEL-IDENTICAL to the commonest enemy
+ * in the game: same body, same palette, same size. It now has art of its own — a
+ * violet armoured crab, see docs/assets/boss-art-brief.md — which fixes the body
+ * and the palette.
+ *
+ * This stays at 1.5 anyway, and that is deliberate, not a leftover. It is the
+ * ONLY size lever there is: post.sprite normalises every sprite onto one 48x48
+ * canvas, so the Alpha cannot simply be drawn bigger than its brood. An Alpha
+ * half again the size of the creatures it spawns reads as a different creature
+ * at a glance. Do NOT trim this to 'compensate' for the art having landed.
  *
  * Deliberately NOT the collision radius: entity radius stays 0.35 so the boss
  * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the bat's
@@ -175,21 +199,86 @@ export interface ArtPalette {
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
   boss: 1.5,
+  // A rooted hive spire towers over the sporelings it buds; the officer stands a
+  // head above its raid, which is what makes it findable in a crowd.
+  hivespire: 1.3,
+  bellwether: 1.15,
 }
 
 // Archetypes that borrow another archetype's directional set (bouncers use the
 // cop body; the boss uses the thug; shopkeepers use the civilian).
-const CHARSET_ALIAS: Record<string, string> = {
+const CHARSET_ALIAS_BASE: Record<string, string> = {
   player: 'player',
   cop: 'cop',
   gangster: 'gangster',
   bouncer: 'cop',
   thug: 'thug',
+  // FALLBACK ONLY, and it must stay. The pack now ships char.boss.* files, and
+  // characterSet() below tries sprites.chars[archetype] BEFORE sprites.chars[alias]
+  // — so the Alpha already uses its own set with no change on this line. Pointing
+  // this at 'boss' instead would gain nothing and would cost the graceful
+  // degradation: packs without the Alpha art (city, test) fall back to the thug
+  // body here rather than to a procedural blob. Membership of this map is also
+  // what isCharacterSprite() tests, so the key cannot simply be removed.
   boss: 'thug',
   civilian: 'civilian',
   scientist: 'scientist',
   robot: 'robot',
   shopkeeper: 'civilian',
+  // #78 Sporefall threat roster. Membership of THIS map is what `isCharacterSprite`
+  // tests, so until each of these was listed it fell past the character path
+  // entirely and drew as the generic procedural entity blob — six different
+  // enemies rendering as the same grey eyeball in normal play.
+  //
+  // Each maps to ITSELF, not to a borrowed body: they are the creatures the pack
+  // has bespoke art for, and aliasing e.g. brute->thug would just reintroduce the
+  // pixel-identical problem ARCHETYPE_SCALE exists to paper over. If a kind's art
+  // is missing the lookup still falls through to its own procedural set, which is
+  // per-archetype distinct — so a partial art drop degrades, it does not break.
+}
+
+/** The six Sporefall threats' bespoke character art, kept SEPARATE from the base
+ * map on purpose.
+ *
+ * The `newEnemyArt` setting is now ON by default, but the SHAPE of this code is
+ * unchanged and deliberately so: the flag still only ever ADDS these entries,
+ * and switching it off still yields `CHARSET_ALIAS_BASE` byte-for-byte — what
+ * shipped before this art existed — rather than a second branch that
+ * reconstructs it and merely looks the same. So "off" remains a real, provable
+ * escape hatch now that it is no longer the default.
+ *
+ * Why it flipped: with it off, these six are absent from CHARSET_ALIAS, so
+ * `isCharacterSprite` is false for them and they miss the character path
+ * entirely, falling to the generic blob draw tinted `entityColors.default`
+ * (0xcccccc). That is what "the enemies the boss spawns are white circles" was —
+ * the boss's brood is `sporeling`, and the art had been shipping all along.
+ *
+ * Each maps to ITSELF, not a borrowed body: aliasing e.g. brute->thug would just
+ * reintroduce the pixel-identical problem. A missing file still falls through to
+ * the per-archetype procedural set, so a partial art drop degrades rather than
+ * breaks.
+ *
+ * REMOVAL PLAN: this is scaffolding, not architecture. When the colour pass
+ * lands and the art is accepted, fold these into CHARSET_ALIAS_BASE and delete
+ * the flag. A feature flag nobody removes is its own debt — see the
+ * INFECTION_ENABLED precedent, where a dead constant hid a whole unfinished
+ * system. */
+const NEW_ENEMY_CHARSET: Record<string, string> = {
+  brute: 'brute',
+  cinder: 'cinder',
+  sporeling: 'sporeling',
+  stalker: 'stalker',
+  lurker: 'lurker',
+  pod: 'pod',
+  // The group roster (raids, hound packs, hive spires — systems/groups.ts).
+  // Same rule: each maps to itself; missing art falls to its own procedural set.
+  drowner: 'drowner',
+  bellwether: 'bellwether',
+  mender: 'mender',
+  breacher: 'breacher',
+  lobber: 'lobber',
+  gloamhound: 'gloamhound',
+  hivespire: 'hivespire',
 }
 
 // World props/furnishings mapped to the closest existing themed prop sprite
@@ -208,10 +297,34 @@ export const PROP_SPRITE: Record<string, string> = {
   locker: 'locker',
   cabinet: 'cabinet',
   desk: 'desk',
+  // The mess chair now has art of its own, so it stops drawing procedurally.
+  // FURNITURE_SHAPE.chair stays exactly where it is: the sprite wins when the
+  // theme ships one, and the bespoke silhouette is still the right fallback for
+  // packs (city, test) that do not.
+  chair: 'chair',
   // Station machinery reuses the terminal/console art (previously fell through
   // to the character eyeball). The Cryo Terminal object is literally that art.
   cryoTerminal: 'atm',
   generator: 'tv',
+  // `crate` is not new art: public/themes/swampspace/props/cargo-crate.png has
+  // shipped since the pack landed, but `crate` was never a registered sprite
+  // key, so every crate in the game drew the procedural slatted silhouette
+  // while its own texture sat unused behind prop.default. This is the same
+  // desk -> work-desk indirection: archetype on the left, ART name on the
+  // right, filename in the theme manifest.
+  crate: 'crate',
+  // The sporeforge furnishings. Each of these has a FURNITURE_SHAPE entry
+  // directly below and KEEPS it: the sprite wins wherever a theme ships one,
+  // and the drawn silhouette stays the fallback for the packs (city, test)
+  // that do not. Deleting those would regress every theme without prop art.
+  shelf: 'shelf',
+  bunk: 'bunk',
+  bench: 'bench',
+  table: 'table',
+  plant: 'plant',
+  // The archetype is camelCase `sporeNode` (it is what OBJECTS and the
+  // renderer look up); the ART name is kebab-case like every other prop key.
+  sporeNode: 'spore-node',
 }
 
 // Consumables/weapons that reuse another item's sprite.
@@ -229,14 +342,19 @@ export const PROP_SPRITE: Record<string, string> = {
 // `grenade` is the sharpest case: `items/spore-grenade.png` ships in both themes
 // and was never once drawn, because the manifest keys it `item.grenade-item`
 // while the entity archetype is `pickup.grenade`.
-const ITEM_ALIAS: Record<string, string> = {
-  bandage: 'medkit',
+export const ITEM_ALIAS: Record<string, string> = {
+  // The aliases for the culled items are GONE, not repointed: bandage→medkit,
+  // freezeGrenade/gasGrenade/banana→grenade-item and chloroform→molotov all
+  // named item ids that no longer exist, and an alias for a dead id is a
+  // promise about art that nothing can ever ask for.
+  //
+  // The ART is deliberately untouched. `item.medkit` is the same file every
+  // theme uses for `item.default`, so deleting it would break the fallback for
+  // EVERY unaliased pickup; `item.molotov` and `item.grenade-item` still ship
+  // in both theme manifests. Nothing here removes a sprite another key shares.
+  //
   // Thrown explosives — the spore-grenade art was already on disk.
   grenade: 'grenade-item',
-  freezeGrenade: 'grenade-item',
-  gasGrenade: 'grenade-item',
-  // Thrown flasks share the molotov's bottle silhouette.
-  chloroform: 'molotov',
   // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
   machinegun: 'shotgun',
   flamethrower: 'shotgun',
@@ -271,6 +389,16 @@ const TILE_ID_BY_NAME: Record<string, number> = {
   wall: Tile.Wall,
   grass: Tile.Grass,
   exit: Tile.Exit,
+  // Indoor complex decks (floors 3, 5, 7…). A theme may ship `tiles.hall` etc. art;
+  // until one does they draw procedurally below.
+  hall: Tile.Hall,
+  grate: Tile.Grate,
+  tiled: Tile.Tiled,
+  plating: Tile.Plating,
+  hull: Tile.Hull,
+  bog: Tile.Bog,
+  stair_up: Tile.StairUp,
+  stair_down: Tile.StairDown,
 }
 
 const TILE_COLORS: Record<number, number> = {
@@ -280,6 +408,14 @@ const TILE_COLORS: Record<number, number> = {
   [Tile.Wall]: 0x1b1b24,
   [Tile.Grass]: 0x2e5d3a,
   [Tile.Exit]: 0xd4af37,
+  [Tile.Hall]: 0x3d4650,
+  [Tile.Grate]: 0x2c3238,
+  [Tile.Tiled]: 0x8c9a9c,
+  [Tile.Plating]: 0x565c62,
+  [Tile.Hull]: 0x14181e,
+  [Tile.Bog]: 0x2f4a3a,
+  [Tile.StairUp]: 0x59636d,
+  [Tile.StairDown]: 0x23282e,
 }
 
 /** For each bevelled wall corner variant, the polygon of the KEPT wall area
@@ -303,6 +439,15 @@ const ENTITY_COLORS: Record<string, number> = {
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
   lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
+  // The group roster's procedural fallbacks: distinct hues so a raid with no art
+  // shipped still reads as officer / medic / sapper / gun / grunt at a glance.
+  drowner: 0x59636d, // waterlogged slate
+  bellwether: 0xcbb277, // brass
+  mender: 0x8f6c38, // rust apron (its green tank is the art's job)
+  breacher: 0xff9032, // the caged charge
+  lobber: 0xa05ae0, // spore-violet
+  gloamhound: 0xb08d50, // mangy ochre
+  hivespire: 0xe04a2a, // raw flesh
 
   scientist: 0xd9e4e8,
   robot: 0x8fa1b3,
@@ -315,7 +460,7 @@ const ENTITY_COLORS: Record<string, number> = {
 // drawn as a DISTINCT procedural silhouette (bed, table, shelf, planter, egg
 // pod, slatted crate) — never a generic box and never the character eyeball.
 // A 'box' shape is the last-resort tinted footprint for anything unmapped.
-export type FurnitureShape = 'bunk' | 'table' | 'bench' | 'shelf' | 'plant' | 'crate' | 'pod' | 'box'
+export type FurnitureShape = 'bunk' | 'table' | 'bench' | 'shelf' | 'chair' | 'plant' | 'crate' | 'pod' | 'box'
 
 /** Object archetypes that draw as a bespoke procedural furniture silhouette
  * (rather than a themed prop texture). Exported so art-resolution tests can
@@ -325,6 +470,7 @@ export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
   table: 'table',
   bench: 'bench',
   shelf: 'shelf',
+  chair: 'chair',
   plant: 'plant',
   crate: 'crate',
   pod: 'pod',
@@ -343,6 +489,41 @@ export const FURNITURE_SHAPE: Record<string, FurnitureShape> = {
   generator: 'box',
 }
 
+/**
+ * Furnishings whose sprite is turned to match the layout planner's `facing`.
+ *
+ * EMPTY, AND THAT IS THE ANSWER, not an oversight. It once held bunk, table,
+ * bench, desk and chair, on the theory that their art was ELONGATED and
+ * top-down, so turning it would read correctly. The art settled the theory:
+ * every prop texture this game ships is drawn in THREE-QUARTER projection —
+ * seen from above-and-in-front, with a front face, a near edge and legs that
+ * stand on the floor. Nothing drawn that way survives being turned by a
+ * heading; at `facing = π` a desk hangs from the ceiling by its legs.
+ *
+ * That is not hypothetical. `work-desk.png` shipped upside down on main for six
+ * days (#42): the three-quarter desk art landed in #29 at 14:54 and `desk` was
+ * added to this set in #28 at 14:57 — two PRs that were each right on their own
+ * and wrong together. `table` carried the identical defect and only looked fine
+ * because no layout ever turned one. The owner chose to keep the three-quarter
+ * art and stop turning it, at a real cost: a chair no longer visibly faces the
+ * desk it was pulled up to. Turning it again means top-down art first.
+ *
+ * Deliberately an ALLOWLIST, not a blocklist. Any archetype not named here
+ * keeps rotation 0 — exactly what shipped before furniture carried a facing at
+ * all — so new prop art can never be silently rotated into nonsense by a layout
+ * change. `facing` itself stays live and serialized: a `mount: 'wall'` prop
+ * still reads it to nudge into the wall it backs (WALL_MOUNT_NUDGE, sprites.ts).
+ *
+ * Add to this set only after LOOKING at the sprite turned — that look is
+ * `scripts/assets/rotation_gate.py`, which parses this very literal.
+ */
+export const ROTATES_WITH_FACING: ReadonlySet<string> = new Set([])
+
+/** How far into its wall a `mount: 'wall'` prop is drawn, in tiles. Enough that
+ * a rank of shelving visibly touches the wall instead of floating a half-tile
+ * off it; small enough that the prop still clearly occupies its own tile. */
+export const WALL_MOUNT_NUDGE = 0.22
+
 /** Base tint per furniture archetype (theme palette entities can override). */
 const FURNITURE_COLORS: Record<string, number> = {
   bunk: 0x6b7a8f,
@@ -352,6 +533,11 @@ const FURNITURE_COLORS: Record<string, number> = {
   bench: 0xa9b4bb,
   locker: 0x59616b,
   table: 0x9c6b3f,
+  // Moulded slate, NOT wood: a chair sits next to wooden tables, desks and
+  // crates all over this station, and a brown chair beside a brown table just
+  // reads as one lumpy brown mass. The cool tone separates the seating from the
+  // thing it is pulled up to at a glance.
+  chair: 0x8f9aa3,
   plant: 0x2e7d46,
   crate: 0x6b4d26,
   barricade: 0x5a5248, // scrap-grey junk pile, distinct from the loot crate
@@ -372,7 +558,15 @@ export const createArt = (
   sprites: SpriteTextures = {},
   palette: ArtPalette = {},
   animTpfs: Partial<Record<AnimStateName, number>> = {},
+  /** Draw the six Sporefall threats' bespoke art instead of the generic
+   * procedural blobs. Defaults FALSE so the untouched path is the historical
+   * one. Purely local presentation — never reaches the sim or the wire. */
+  newEnemyArt = false,
 ): ArtRegistry => {
+  // Flag ON adds the six; flag OFF leaves the base map exactly as it was.
+  const CHARSET_ALIAS: Record<string, string> = newEnemyArt
+    ? { ...CHARSET_ALIAS_BASE, ...NEW_ENEMY_CHARSET }
+    : CHARSET_ALIAS_BASE
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
 
@@ -393,23 +587,6 @@ export const createArt = (
 
   const drawTile = (tileId: number, variant: number): Texture => {
     const T = TILE_PX
-    // Bevelled wall corner: transparent canvas, wall-coloured polygon with the
-    // outside triangle cut away (the tilemap layers ground art underneath).
-    const cutPoly = WALL_CUT_POLY[tileId]
-    if (cutPoly) {
-      const wall = tileColors[Tile.Wall] ?? 0x1b1b24
-      const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
-      const pts = cutPoly.map((v) => v * T)
-      g.poly(pts).fill(wall)
-      g.poly(pts).stroke({ width: 2, color: 0x000000, alpha: 0.3 })
-      // Same top highlight the square wall carries, clipped to the kept width.
-      const topY = 0
-      const xs = cutPoly.filter((_, i) => i % 2 === 0 && cutPoly[i + 1] === 0).map((v) => v * T)
-      if (xs.length >= 2) g.rect(Math.min(...xs), topY, Math.max(...xs) - Math.min(...xs), 3).fill(0x2a2a36)
-      const tex = renderer.generateTexture(g)
-      g.destroy()
-      return tex
-    }
     const color = tileColors[tileId] ?? 0xff00ff
     const g = new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill(color)
     switch (tileId) {
@@ -421,7 +598,8 @@ export const createArt = (
           const offset = row % 2 === 0 ? T / 3 : T * 0.66
           g.rect(offset, y, 1, T / 4).fill({ color: 0x000000, alpha: 0.3 })
         }
-        g.rect(0, 0, T, 3).fill(0x2a2a36)
+        // No cap here: the lit top strip is a separate autotiled layer
+        // (wallCap / wallCaps.ts), laid on whichever edges face open ground.
         break
       }
       case Tile.Floor: {
@@ -458,6 +636,89 @@ export const createArt = (
         }
         break
       }
+      case Tile.Hall: {
+        // Corridor deck plating: panel seams + a worn hazard stripe on the edge.
+        g.rect(0, 0, T, 1).fill({ color: 0x000000, alpha: 0.35 })
+        g.rect(0, 0, 1, T).fill({ color: 0x000000, alpha: 0.25 })
+        g.rect(T / 2, 0, 1, T).fill({ color: 0x000000, alpha: 0.12 })
+        for (const [cx, cy] of [
+          [3, 3],
+          [T - 4, 3],
+          [3, T - 4],
+          [T - 4, T - 4],
+        ])
+          g.rect(cx, cy, 1.5, 1.5).fill({ color: 0xffffff, alpha: 0.12 })
+        if (variant % 3 === 0) g.rect(0, T - 3, T, 2).fill({ color: 0xc9a227, alpha: 0.18 })
+        break
+      }
+      case Tile.Grate: {
+        // Vent grate: dark recess, slats, a sickly glow from below.
+        g.rect(2, 2, T - 4, T - 4).fill(0x101418)
+        g.rect(4, 4, T - 8, T - 8).fill({ color: 0x5fd068, alpha: 0.12 })
+        for (let i = 0; i < 5; i++) g.rect(3, 4 + i * ((T - 8) / 5), T - 6, 2).fill(0x4a525a)
+        g.rect(2, 2, T - 4, T - 4).stroke({ width: 1, color: 0x6a737c, alpha: 0.7 })
+        break
+      }
+      case Tile.Tiled: {
+        // Scrubbed ceramic: a 4x4 grout grid, one tile stained per variant.
+        for (let i = 0; i < 4; i++) {
+          g.rect(0, i * (T / 4), T, 1).fill({ color: 0x000000, alpha: 0.2 })
+          g.rect(i * (T / 4), 0, 1, T).fill({ color: 0x000000, alpha: 0.2 })
+        }
+        const sx = Math.floor(hash2(variant, 3) * 4) * (T / 4)
+        const sy = Math.floor(hash2(5, variant) * 4) * (T / 4)
+        g.rect(sx + 1, sy + 1, T / 4 - 1, T / 4 - 1).fill({ color: 0x000000, alpha: 0.08 })
+        break
+      }
+      case Tile.Plating: {
+        // Diamond tread plate.
+        for (let y = 0; y < 4; y++) {
+          for (let x = 0; x < 4; x++) {
+            const cx = (x + (y % 2) * 0.5 + 0.25) * (T / 4)
+            const cy = (y + 0.5) * (T / 4)
+            g.rect(cx - 2, cy - 0.5, 4, 1).fill({ color: 0xffffff, alpha: 0.1 })
+          }
+        }
+        g.rect(0, 0, T, T).stroke({ width: 1, color: 0x000000, alpha: 0.3 })
+        break
+      }
+      case Tile.Hull: {
+        // Outer pressure hull: heavy riveted bands.
+        g.rect(0, T / 2 - 2, T, 4).fill({ color: 0x000000, alpha: 0.4 })
+        for (let i = 0; i < 3; i++) g.rect(4 + i * (T / 3), T / 2 - 1, 2, 2).fill({ color: 0xffffff, alpha: 0.12 })
+        break
+      }
+      case Tile.Bog: {
+        // Swamp seep over the deck: murky water with ripples.
+        for (let i = 0; i < 3; i++) {
+          const x = hash2(i * 5, variant * 7) * (T - 10) + 2
+          const y = hash2(variant * 3, i * 11) * (T - 6) + 2
+          g.ellipse(x + 4, y + 2, 5, 2).stroke({ width: 1, color: 0x9fd8a8, alpha: 0.2 })
+        }
+        g.rect(0, 0, T, T).fill({ color: 0x0a1a10, alpha: 0.15 })
+        break
+      }
+      case Tile.StairUp:
+      case Tile.StairDown: {
+        // Authored facing NORTH (niche at the top, open to the south); the
+        // tilemap rotates it per shaft. Up: treads brighten as they rise.
+        // Down: treads fall away into shadow at the far edge.
+        const up = tileId === Tile.StairUp
+        const steps = 6
+        for (let i = 0; i < steps; i++) {
+          const y = (i * T) / steps
+          const k = up ? 1 - i / steps : i / steps
+          const lit = up ? 0xa2adb4 : 0x7b8791
+          g.rect(4, y, T - 8, T / steps).fill({ color: up ? lit : 0x08080c, alpha: up ? 0.15 + 0.5 * (1 - k) : 0.15 + 0.7 * (1 - k) })
+          g.rect(4, y, T - 8, 1).fill({ color: 0xffffff, alpha: up ? 0.35 * (1 - k) + 0.1 : 0.25 * k + 0.05 })
+        }
+        // Handrails both sides.
+        g.rect(1, 0, 3, T).fill(0x3c444d)
+        g.rect(T - 4, 0, 3, T).fill(0x3c444d)
+        g.rect(2, 0, 1, T).fill({ color: 0xffffff, alpha: 0.25 })
+        g.rect(T - 3, 0, 1, T).fill({ color: 0xffffff, alpha: 0.25 })
+        break
+      }
       case Tile.Exit: {
         // Gold pad with a chevron pointing onward
         g.rect(3, 3, T - 6, T - 6).stroke({ width: 2, color: 0x8a6d1f })
@@ -470,24 +731,95 @@ export const createArt = (
     return tex
   }
 
-  /** Themed wall art clipped to a bevel-cut polygon, cached per cut tile id —
-   * so corner cuts wear the same dressed wall the straight runs do. */
-  const themedCutCache = new Map<number, Texture>()
-  const themedCut = (tileId: number, wallTex: Texture): Texture => {
-    let tex = themedCutCache.get(tileId)
+  // ---- Wall caps (the lit top strip, autotiled by wallCaps.ts) -------------
+  // Procedural cap for a procedural wall body: a flat strip in the colour the
+  // square wall used to bake along its top.
+  const PROC_CAP: Record<string, number> = { wall: 0x2a2a36, hull: 0x222831 }
+  const PROC_CAP_PX = 3
+  const procCapCache = new Map<string, WallCapTextures>()
+  const procCap = (family: string): WallCapTextures => {
+    let caps = procCapCache.get(family)
+    if (!caps) {
+      const T = TILE_PX
+      const color = PROC_CAP[family] ?? PROC_CAP.wall
+      const piece = (w: number): Texture => {
+        const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+        g.rect(0, 0, w, PROC_CAP_PX).fill(color)
+        g.rect(0, PROC_CAP_PX, w, 1).fill({ color: 0x000000, alpha: 0.35 })
+        const tex = renderer.generateTexture(g)
+        g.destroy()
+        return tex
+      }
+      caps = { edge: piece(T), inner: piece(PROC_CAP_PX + 1) }
+      procCapCache.set(family, caps)
+    }
+    return caps
+  }
+
+  /** Cap pieces for a wall-family tile: the theme's `tile.<name>.cap` pair
+   * when it ships one; the procedural strip when the BODY is procedural too;
+   * none when the theme dresses the wall but authored no cap (its art is then
+   * drawn exactly as shipped). Bevelled corners share the plain wall's. */
+  const wallCap = (tileId: number): WallCapTextures | undefined => {
+    if (!isWallTile(tileId)) return undefined
+    const family = tileId === Tile.Hull ? 'hull' : 'wall'
+    const themed = sprites.tileCaps?.[family]
+    if (themed) return themed
+    const body = sprites.tiles?.[family]
+    return body && body.length > 0 ? undefined : procCap(family)
+  }
+
+  /** Bevelled wall corner: the wall body (themed variant 0, else the
+   * procedural brick) clipped to the kept polygon, with its caps baked in —
+   * the strip along both exposed edges AND along the 45° cut, so the cap line
+   * wraps the bevel. Cached per cut tile id. The tilemap lays the ground the
+   * cut exposes underneath. */
+  const DIAG_CAP_ROT: Record<number, number> = {
+    [Tile.WallCutNW]: -Math.PI / 4,
+    [Tile.WallCutNE]: Math.PI / 4,
+    [Tile.WallCutSE]: (3 * Math.PI) / 4,
+    [Tile.WallCutSW]: (-3 * Math.PI) / 4,
+  }
+  const cutCache = new Map<number, Texture>()
+  const cutTile = (tileId: number): Texture => {
+    let tex = cutCache.get(tileId)
     if (!tex) {
+      const T = TILE_PX
+      const poly = WALL_CUT_POLY[tileId]
       const holder = new Container()
       // Transparent backer pins bounds to the full tile.
-      holder.addChild(new Graphics().rect(0, 0, TILE_PX, TILE_PX).fill({ color: 0, alpha: 0 }))
-      const spr = new Sprite(wallTex)
-      spr.width = TILE_PX
-      spr.height = TILE_PX
-      const mask = new Graphics().poly(WALL_CUT_POLY[tileId].map((v) => v * TILE_PX)).fill(0xffffff)
-      spr.mask = mask
-      holder.addChild(spr, mask)
-      tex = renderer.generateTexture(holder)
+      holder.addChild(new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 }))
+      const kept = new Container()
+      const themedWall = sprites.tiles?.wall
+      const body = new Sprite(themedWall && themedWall.length > 0 ? themedWall[0] : drawTile(Tile.Wall, 0))
+      body.width = T
+      body.height = T
+      kept.addChild(body)
+      const caps = wallCap(tileId)
+      if (caps) {
+        for (const side of cutCapSides(tileId)) {
+          const strip = new Sprite(caps.edge)
+          strip.anchor.set(0.5)
+          strip.position.set(T / 2, T / 2)
+          strip.rotation = (CAP_QUARTER_TURNS[side] * Math.PI) / 2
+          kept.addChild(strip)
+        }
+        // Along the cut: top edge of the strip on the hypotenuse, strip inward.
+        const diag = new Sprite(caps.edge)
+        diag.anchor.set(0.5, 0)
+        // Midpoint of the cut's long side: a quarter tile in from the outside corner.
+        const cut = WALL_CUT_OUTSIDE[tileId]
+        diag.position.set((cut.dx < 0 ? 0.25 : 0.75) * T, (cut.dy < 0 ? 0.25 : 0.75) * T)
+        diag.rotation = DIAG_CAP_ROT[tileId]
+        kept.addChild(diag)
+      }
+      const mask = new Graphics().poly(poly.map((v) => v * T)).fill(0xffffff)
+      kept.mask = mask
+      holder.addChild(kept, mask)
+      // Explicit frame: the diagonal strip overhangs the tile before masking.
+      tex = renderer.generateTexture({ target: holder, frame: new Rectangle(0, 0, T, T) })
       holder.destroy({ children: true })
-      themedCutCache.set(tileId, tex)
+      cutCache.set(tileId, tex)
     }
     return tex
   }
@@ -508,11 +840,8 @@ export const createArt = (
       const macro = tx !== undefined && ty !== undefined ? sprites.tileMacro?.[name] : undefined
       return variants[pickTileVariant(variants.length, macro, tx ?? 0, ty ?? 0, hash)]
     }
-    // Bevelled corners wear the themed wall art (clipped) when the theme ships one.
-    const themedWall = sprites.tiles?.wall
-    if (WALL_CUT_POLY[tileId] && themedWall && themedWall.length > 0) {
-      return themedCut(tileId, themedWall[0])
-    }
+    // Bevelled corners wear the plain wall's body (clipped) + baked caps.
+    if (WALL_CUT_POLY[tileId]) return cutTile(tileId)
     const key = tileId * TILE_VARIANTS + (hash % TILE_VARIANTS)
     let tex = tileCache.get(key)
     if (!tex) {
@@ -703,6 +1032,26 @@ export const createArt = (
             g.rect(pad, y - 1, s, 2).fill(dk)
             g.rect(pad, y - 1, s, 1).fill({ color: lt, alpha: colorOverride ? 1 : 0.5 })
           }
+          break
+        }
+        case 'chair': {
+          // Seat pad with a proud BACKREST on the -x side, so the chair "looks"
+          // toward +x — the same convention the character sprites use, which
+          // means the planner's `facing` rotation points it at whatever it was
+          // pulled up to (a desk, a table, a screen). The gap between back and
+          // seat is what makes it read as a chair rather than a small crate at
+          // 32px, and it stays clearly SMALLER than the table it belongs to so a
+          // set reads as one big thing with little ones drawn up to it.
+          const seatW = T * 0.4
+          const seatH = T * 0.44
+          const sx = T * 0.38
+          const sy = (T - seatH) / 2
+          const backW = T * 0.13
+          g.roundRect(sx - backW - T * 0.06, sy - 1, backW, seatH + 2, 2).fill(dk)
+          g.roundRect(sx - backW - T * 0.06, sy - 1, backW, seatH + 2, 2).stroke({ width: 1.5, color: line, alpha: sAlpha })
+          g.roundRect(sx, sy, seatW, seatH, 3).fill(base)
+          g.roundRect(sx, sy, seatW, seatH, 3).stroke({ width: 2, color: line, alpha: sAlpha })
+          g.rect(sx, sy, seatW, 2).fill({ color: lt, alpha: colorOverride ? 1 : 0.7 })
           break
         }
         case 'plant': {
@@ -1070,6 +1419,28 @@ export const createArt = (
     return tex
   }
 
+  // The chevron decal on a stair's landing, pointing NORTH (at the stair);
+  // the tilemap rotates it with the shaft. Themed pool when the pack ships
+  // `tile.landing.overlay`, else a procedural pair of hazard chevrons.
+  let procLanding: Texture | undefined
+  const landingOverlay = (hash = 0): Texture => {
+    const pool = sprites.tileOverlays?.landing
+    if (pool && pool.length > 0) return pool[hash % pool.length]
+    if (!procLanding) {
+      const T = TILE_PX
+      const g = new Graphics().rect(0, 0, T, T).fill({ color: 0, alpha: 0 })
+      for (const cy of [T * 0.35, T * 0.62]) {
+        g.poly([T * 0.25, cy + 5, T * 0.5, cy - 3, T * 0.75, cy + 5, T * 0.75, cy + 8, T * 0.5, cy, T * 0.25, cy + 8]).fill({
+          color: 0xc9a227,
+          alpha: 0.55,
+        })
+      }
+      procLanding = renderer.generateTexture(g)
+      g.destroy()
+    }
+    return procLanding
+  }
+
   const EMPTY_POOL: readonly Texture[] = []
   const tileOverlayPool = (tileId: number): readonly Texture[] => {
     const name = TILE_NAME_BY_ID[tileId]
@@ -1082,9 +1453,11 @@ export const createArt = (
 
   return {
     tile,
+    landingOverlay,
     tileOverlayPool,
     tileMacro: tileMacroFor,
     wallShadow,
+    wallCap,
     groundSeam,
     entity,
     entityFlash,

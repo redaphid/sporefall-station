@@ -19,6 +19,12 @@
  * `alpha` multiplies the sprite alpha. Only the deliberate hop components
  * (walk bob, attack lunge) ever move `dy` — every other state keeps dy = 0 so
  * the feet never leave the ground.
+ *
+ * That last sentence holds for `stride`, which is every character with legs and
+ * the default for anything not listed in LOCOMOTION. It is deliberately NOT true
+ * of `hover`, whose whole job is to keep the body off the floor — see
+ * LocomotionStyle below. Read "feet never leave the ground" as a statement about
+ * bodies that have feet, not as a global invariant of this module.
  */
 
 import type { AnimStateName } from './animState'
@@ -43,7 +49,39 @@ export const MOTION = {
   landSquash: { amount: 0.14, ticks: 5 },
   /** Death: topple to ±rot around the feet while fading alpha 1 → 0. */
   deathFall: { rot: Math.PI / 2 },
+  /** HOVER locomotion: continuous vertical float, idle and moving alike. Larger
+   * than walkBob because it is the character's whole read — a drone that does
+   * not visibly hover just looks like a static sprite sliding along the floor. */
+  hover: { amp: 2.2, freq: 0.11, movingScale: 1.35 },
+  /** PULSE locomotion: volume-ish-preserving radial breath (sx up as sy down).
+   * Never touches dy — a sac sitting on the ground stays on the ground. */
+  pulse: { amp: 0.06, freq: 0.13, movingScale: 1.6 },
 } as const
+
+/** How a character's body carries itself. The 48px canvas is the reason this
+ * exists: a limb is 1–2px there, so articulating legs is mush, while moving the
+ * WHOLE sprite reads cleanly. Rather than draw walk frames a body plan does not
+ * have, pick the transform that matches how the thing actually moves.
+ *
+ * - `stride` — feet on the ground: walk bob + lean, idle breathe. The default,
+ *   and the only style that assumes legs.
+ * - `hover`  — never touches the floor: continuous float in every state. Feet
+ *   deliberately DO leave the ground; that is the point.
+ * - `pulse`  — grounded but boneless: radial breath, no vertical travel. */
+export type LocomotionStyle = 'stride' | 'hover' | 'pulse'
+
+/** Per-archetype locomotion. Anything absent is `stride`, so adding a character
+ * never silently changes how it moves — you opt in. Keyed by the same archetype
+ * string the art registry uses. */
+export const LOCOMOTION: Readonly<Record<string, LocomotionStyle>> = {
+  'spore-drone': 'hover',
+  'gloom-lurker': 'hover',
+  'brood-sac': 'pulse',
+  'sporeling-mite': 'pulse',
+}
+
+export const locomotionFor = (archetype: string): LocomotionStyle =>
+  LOCOMOTION[archetype] ?? 'stride'
 
 export interface MotionInput {
   state: AnimStateName
@@ -64,6 +102,9 @@ export interface MotionInput {
   /** The last roll's `untilTick`, while the sim still carries the roll object
    * (it persists through cooldown) — drives the landing squash after it ends. */
   rollUntil?: number
+  /** How this body carries itself. Omitted = `stride`, so every existing caller
+   * keeps its current motion exactly. */
+  style?: LocomotionStyle
 }
 
 /** Transform offsets to compose onto the sprite (identity = no motion). */
@@ -80,22 +121,60 @@ export const IDENTITY_POSE: MotionPose = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1, a
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
 
+/** Whole-body locomotion for non-striding bodies, shared by idle and walk (they
+ * differ only in gain — these creatures never change gait, they just do more of
+ * the same). Phase-shifted per entity id so a cluster does not pulse in unison.
+ *
+ * `hover` is the ONE place dy moves outside walk bob and attack lunge, and it is
+ * deliberate: the feet-stay-planted invariant is a statement about bodies that
+ * have feet. A drone that plants itself on the floor reads as a bug. */
+const applyLocomotion = (
+  p: MotionPose,
+  style: Exclude<LocomotionStyle, 'stride'>,
+  m: MotionInput,
+  moving: boolean,
+): void => {
+  const cfg = MOTION[style]
+  const gain = moving ? cfg.movingScale : 1
+  const wave = Math.sin(m.t * cfg.freq + (m.id % 32))
+  if (style === 'hover') {
+    p.dy += wave * cfg.amp * gain
+    return
+  }
+  // Radial breath: widen as it flattens, so the footprint stays put.
+  const q = wave * cfg.amp * gain
+  p.sx += q
+  p.sy -= q
+}
+
 /** Compose every active motion component for this frame. The roll state itself
  * returns identity — the whole-body tumble (anchor swap + spin) stays in
  * sprites.ts, and this layer adds only the LANDING squash after it. */
 export const composeMotion = (m: MotionInput): MotionPose => {
   const p: MotionPose = { ...IDENTITY_POSE }
+  const style = m.style ?? 'stride'
 
   switch (m.state) {
     case 'walk': {
-      p.dy += walkBob(m.t)
-      const lean = Math.max(-1, Math.min(1, m.vx / MOTION.lean.refSpeed))
-      p.rot += lean * MOTION.lean.rad
+      if (style === 'stride') {
+        p.dy += walkBob(m.t)
+        const lean = Math.max(-1, Math.min(1, m.vx / MOTION.lean.refSpeed))
+        p.rot += lean * MOTION.lean.rad
+      } else {
+        // A hoverer/pulser in motion does MORE of what it already does; it does
+        // not acquire a gait. No lean either — leaning implies planted feet to
+        // lean against.
+        applyLocomotion(p, style, m, true)
+      }
       break
     }
     case 'idle': {
-      // Slow breathe, phase-shifted per entity so crowds don't sync.
-      p.sy += Math.sin(m.t * MOTION.breathe.freq + (m.id % 32)) * MOTION.breathe.amp
+      if (style === 'stride') {
+        // Slow breathe, phase-shifted per entity so crowds don't sync.
+        p.sy += Math.sin(m.t * MOTION.breathe.freq + (m.id % 32)) * MOTION.breathe.amp
+      } else {
+        applyLocomotion(p, style, m, false)
+      }
       break
     }
     case 'attack': {

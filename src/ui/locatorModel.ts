@@ -1,4 +1,5 @@
 import { TILE_PX } from '../render/art'
+import { storeyBadge } from '../game/stairs'
 import { appliedCenter } from '../render/cameraModel'
 
 /**
@@ -9,18 +10,12 @@ import { appliedCenter } from '../render/cameraModel'
  * through here; there is deliberately no other projection or compass path.
  */
 
-/** Stable per-slot caret colours; teammates keep the same hue all game.
- * Eight distinct hues so an 8-player run (slots 0..7) has no colour collisions. */
-const SLOT_COLORS = ['#5aa9ff', '#7fd17f', '#ffd76a', '#d17fd1', '#ff9a5a', '#6ad1c8', '#c98cff', '#ff7fa8'] as const
-/** Downed teammates override their slot colour with a loud red — rush to revive. */
-export const DOWNED_COLOR = '#ff4d4d'
-
-/** Stable caret colour for a player slot (playerId). Wraps past the palette. */
-export const playerColor = (playerId: number): string =>
-  SLOT_COLORS[((playerId % SLOT_COLORS.length) + SLOT_COLORS.length) % SLOT_COLORS.length]
-
-/** Short stable label for a player slot: P1, P2, … (1-based, human-facing). */
-export const playerLabel = (playerId: number): string => `P${playerId + 1}`
+// Identity colour/label is ONE table for the whole game (render/playerIdentity.ts)
+// — the off-screen arrow here and the feet ring drawn in world space must agree,
+// or "follow the teal arrow" leads you to the wrong body. Re-exported so the
+// existing DOM call sites keep importing it from the locator.
+export { DOWNED_COLOR, playerColor, playerLabel } from '../render/playerIdentity'
+import { DOWNED_COLOR, playerColor, playerLabel } from '../render/playerIdentity'
 
 /** A teammate as the locator sees them — a player entity that is not `self`. */
 export interface Teammate {
@@ -28,6 +23,9 @@ export interface Teammate {
   x: number
   y: number
   downed: boolean
+  /** Storeys above (+) or below (-) the viewer; x/y are then the teammate's
+   * position re-expressed on the viewer's storey. Absent = same storey. */
+  dz?: number
 }
 
 /** Everything screens.ts must know to project world → screen, mirroring Camera.apply. */
@@ -40,6 +38,10 @@ export interface CameraState {
   screenH: number
   levelW: number
   levelH: number
+  /** Origin of the clamp rect — the viewer's storey on a multi-storey floor
+   * (stairs.ts storeyBounds). Absent = 0, the whole level. */
+  levelX0?: number
+  levelY0?: number
 }
 
 /** One teammate's on-screen marker (visible) or off-screen edge arrow (radar). */
@@ -56,6 +58,8 @@ export interface LocatorMarker {
   /** Off-screen only: glyph rotation (rad) and rounded world distance for the label. */
   angle: number
   dist: number
+  /** Storey offset (see Teammate.dz); 0 on the viewer's storey. */
+  dz: number
 }
 
 /** Pixels the marker anchor is inset from the raw screen edge so carets/arrows don't clip. */
@@ -71,7 +75,7 @@ export const projectToScreen = (wx: number, wy: number, cam: CameraState): { x: 
   // The APPLIED camera centre — the shared soft-edge clamp (cameraModel.ts),
   // identical to what Camera.apply renders with. Never re-derive it here: a
   // divergent clamp misplaces every marker precisely in map corners.
-  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH)
+  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH, cam.levelX0, cam.levelY0)
   return { x: cam.screenW / 2 + (wx - c.x) * T, y: cam.screenH / 2 + (wy - c.y) * T }
 }
 
@@ -83,7 +87,7 @@ export const projectToScreen = (wx: number, wy: number, cam: CameraState): { x: 
  */
 export const screenToWorld = (sx: number, sy: number, cam: CameraState): { x: number; y: number } => {
   const T = TILE_PX * cam.zoom
-  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH)
+  const c = appliedCenter(cam.x, cam.y, T, cam.screenW, cam.screenH, cam.levelW, cam.levelH, cam.levelX0, cam.levelY0)
   return { x: c.x + (sx - cam.screenW / 2) / T, y: c.y + (sy - cam.screenH / 2) / T }
 }
 
@@ -139,8 +143,10 @@ export const locatorMarkers = (self: { x: number; y: number }, teammates: readon
     const m = pointMarker(self, t, cam)
     if (!m) continue
     const color = t.downed ? DOWNED_COLOR : playerColor(t.playerId)
-    const label = playerLabel(t.playerId)
-    markers.push({ playerId: t.playerId, color, label, downed: t.downed, ...m })
+    const dz = t.dz ?? 0
+    // Off-storey: the storey badge rides the label ("P2 ▲1").
+    const label = dz === 0 ? playerLabel(t.playerId) : `${playerLabel(t.playerId)} ${storeyBadge(dz)}`
+    markers.push({ playerId: t.playerId, color, label, downed: t.downed, ...m, dz })
   }
   // Alive first, downed last → downed carets/arrows render on top (higher priority).
   markers.sort((a, b) => Number(a.downed) - Number(b.downed))

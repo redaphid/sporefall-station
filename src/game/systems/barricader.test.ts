@@ -7,11 +7,12 @@
 // deterministic per seed.
 
 import { describe, expect, it } from 'vitest'
-import { generateLevel } from '../levelgen/generate'
+import { generateCityLevel } from '../levelgen/generate'
 import { bunkerLaneKeys, Tile, type Building } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import { serializeWorld } from '../serialize'
 import { emptyInput, type SimEvent } from '../types'
+import { createCityWorld } from '../testkit'
 import { createWorld, tickWorld, type World } from '../world'
 import { BARRICADE_CAP, barricadeSpotFor } from './behaviors'
 import { applyDamage } from './combat'
@@ -172,7 +173,7 @@ describe('populate wiring', () => {
   const bunkerFloor = (): { seed: number; floor: number } => {
     for (let seed = 1; seed <= 100; seed++) {
       for (let floor = 2; floor <= 4; floor++) {
-        if (generateLevel(seed, floor).buildings.some((b) => b.role === 'bunker')) return { seed, floor }
+        if (generateCityLevel(seed, floor).buildings.some((b) => b.role === 'bunker')) return { seed, floor }
       }
     }
     throw new Error('no bunker in search bound')
@@ -182,7 +183,7 @@ describe('populate wiring', () => {
     let saw = false
     for (let seed = 1; seed <= 30 && !saw; seed++) {
       for (let floor = 2; floor <= 4 && !saw; floor++) {
-        const w = createWorld(seed, floor)
+        const w = createCityWorld(seed, floor)
         populateWorld(w)
         for (const e of w.entities) {
           if (e.ai?.behavior === 'barricader') saw = true
@@ -195,7 +196,7 @@ describe('populate wiring', () => {
 
   it('a real populated bunker floor runs: any barricade built honors every rule', () => {
     const { seed, floor } = bunkerFloor()
-    const w = createWorld(seed, floor)
+    const w = createCityWorld(seed, floor)
     populateWorld(w)
     setupFloor(w)
     run(w, 1200)

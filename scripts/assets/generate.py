@@ -112,12 +112,64 @@ TRIGGER = "masterpiece, pixpix, 8-bit, pixel_art"
 LOOK = ("16-bit era palette, bold dark outlines, chunky readable shapes, "
         "dark teal alien jungle overgrowing tan sci-fi metal, olive moss, "
         "bioluminescent green accents, moody")
+# Props use this instead of LOOK. LOOK positively requests "dark teal alien
+# jungle overgrowing tan sci-fi metal, olive moss" -- which is right for tiles
+# and creatures, and is a direct contradiction of the props' own negatives
+# ("covered in moss, moss cap, overgrown, foliage on top"). Asking for moss and
+# forbidding it in the same prompt is how the shipped props became mossy lumps;
+# the prop recipe fixed the negatives but left the positive request in place.
+#
+# Evidence this matters rather than being tidiness: the g2 sweep ran a moss-free
+# LOOK and produced zero moss caps across 15 images, against a shipped set where
+# all six props have one. Manufactured wear is kept -- these are derelict station
+# fittings, not showroom stock -- but as grime and worn paint, not vegetation.
+PROP_LOOK = ("16-bit era palette, bold dark outlines, chunky readable shapes, "
+             "worn tan and teal painted sci-fi metal, scuffed paint, grimy panel seams, "
+             "bioluminescent green indicator lights, moody")
 NEG_BASE = ("photorealistic, 3d render, smooth gradient, soft shading, text, watermark, "
             "signature, blurry, jpeg artifacts, bright cheerful, pastel, "
             "sprite sheet, grid, multiple views, turnaround, duplicate, two copies, "
             "several objects side by side, faded ghost copy")
 NEG_FIGURE = ("person, humanoid, figure, character, creature, monster, face, head, "
               "arms, legs, hands, body, standing figure, portrait, silhouette of a person")
+# The recipe's "feet on the ground" invites a painted dirt mound / cast shadow.
+# The background key cannot tell that grey ellipse from the creature, so it welds
+# it into the alpha as a grey SLAB under the sprite — invisible at 1024px, but at
+# 48px it is a third of the sprite's height. Negatived on every ground creature.
+NEG_GROUND = ("ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
+              "plinth, cast shadow on the ground, diorama, puddle, sand, gravel, "
+              # Second pass. The list above still let two things through on the
+              # last sweep: a teal ground PUDDLE and a hard elliptical DROP
+              # SHADOW. "puddle" and "cast shadow on the ground" were both
+              # already present, so the miss was not a gap in coverage — the
+              # phrasing was too abstract. Name the pictorial form, not the
+              # concept: an "ellipse under the object" is what the model draws.
+              # This matters more for props than for creatures: the background
+              # key cannot tell a grey ellipse from the sprite, so it welds it
+              # into the ALPHA, where no colour pass can ever reach it.
+              "drop shadow, shadow ellipse, contact shadow, dark ellipse under the object, "
+              "shadow blob, reflection, mirrored reflection, wet floor, standing water, "
+              "spilled liquid, water pooling at the base, floor, floor plane, ground plane, "
+              "surface beneath the object, stilts, legs propping it up")
+
+# The WRONG READING, named. Describing a locker is not enough — you must forbid
+# the tombstone, or the model splits the difference and gives you a locker-ish
+# headstone. Every shipped prop before this constant existed came out as a mossy
+# boulder or a grave marker; see _mycel-results/sprite-inventory.md for the
+# contact sheet that made it undeniable.
+#
+# `tree`/`planter` are in this list because of a measured failure, not a hunch:
+# in the g2 sweep two of three spore-barrel seeds grew a TREE out of the barrel
+# (one on stilts in a puddle, one a planter tub). The old list named moss, shrub,
+# bush and foliage — but never `tree`, so the model had an unblocked route to the
+# same silhouette. That single omission is most of the difference between the
+# ~1-in-3 hit rate observed and the 4-in-5 that was reported.
+NEG_WRONG_READ = ("gravestone, tombstone, headstone, grave marker, monolith, standing stone, "
+                  "menhir, cairn, boulder, rock, stone, mossy rock, moss ball, mound of moss, "
+                  "shrub, bush, mushroom, organic blob, lump, weathered stone, "
+                  "moss cap, overgrown, covered in moss, vines, foliage on top, cemetery, "
+                  "tree, potted plant, planter, plant pot, flower pot, tub, trunk, branches, "
+                  "leaves, canopy, topiary, bonsai, terrarium, on stilts, on legs")
 BG_OBJ = "single isolated game object centered on plain flat white background"
 BG_CHAR = "single character centered on plain flat white background, full body, feet on the ground"
 BG_TILE = ("flat texture swatch filling the whole frame edge to edge, no horizon, no sky, "
@@ -194,7 +246,225 @@ CHARS = {
                 "green skin, moss, olive, tall, slim, hulking muscular, "
                 "ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, "
                 "cast shadow on the ground, diorama"),
+    # ── #78 Sporefall threat roster ──────────────────────────────────────────
+    # These six archetypes SPAWN IN NORMAL PLAY and every one of them was
+    # rendering as the same grey procedural eyeball. Each new kind has to clear
+    # the same bar the stalker did: diverge from the whole existing cast on BOTH
+    # axes — silhouette AND dominant color — or the pack reads as one creature
+    # in six tints. What is already taken:
+    #   vine-ranger  upright biped   / teal + orange visor
+    #   spore-drone  floating pod    / grey metal
+    #   bog-mutant   hulking biped   / olive green
+    #   mycologist   biped           / pale white-grey
+    #   derelict-bot box on treads   / rust tan-orange
+    #   frog-settler squat + round   / mottled green
+    #   mireclaw     low horizontal  / near-black chitin
+    # v2. v1 said "quadruped ... twice as wide as a person" and drew four upright
+    # armoured BIPEDS out of four seeds. What separates this from the stalker —
+    # which never drifts — is that the stalker states its silhouette as explicit
+    # geometry ("twice as wide as it is tall", "no upright torso") instead of
+    # naming a body plan and hoping. Same treatment here.
+    "brute": ("carapace-brute",
+              "a massive armored beast walking on ALL FOURS, a long heavy body carried "
+              "horizontally on four thick pillar legs, no upright torso, the broad domed "
+              "bone-plate head shield held low at the FRONT of the body at the same "
+              "height as its shoulders like a battering ram, overlapping pale bone-tan "
+              "carapace plates across a humped armored back, tiny deep-set eyes beneath "
+              "the shield, short thick tail behind, wide flat crouched silhouette twice "
+              "as wide as it is tall",
+              # Four legs + a bone shield is the whole idea; the bog-mutant is the
+              # trap this one falls into (both are "big and strong").
+              "human, person, humanoid, upright, standing biped, two legs, bipedal, "
+              "torso, chest, waist, shoulders, arms, hands, fists, human proportions, "
+              "nude, naked, bare skin, human skin, man, woman, "
+              "mech, robot suit, power armor, wings, spacesuit, helmet, visor, orange "
+              "cap, teal suit, olive green skin, moss, hovering, floating, tank treads, "
+              "boxy robot, mushroom, thin, slim, spindly, six legs, insect, crab, frog, "
+              "big round eyes, " + NEG_GROUND),
+    # v2. v1 ("a gaunt smouldering ash husk ... lean and starved") drew four pale
+    # grey NUDE HUMAN FIGURES — no char, no embers. Describing a humanoid at all
+    # lets the cast anchor win, so v2 leads with the material (burnt crust, no
+    # skin) rather than the body, and negatives the human read explicitly.
+    "cinder": ("cinder-husk",
+               "a burnt-out husk monster with NO SKIN anywhere, its entire body a crust "
+               "of cracked black charcoal like burnt bark, molten ember-orange light "
+               "glowing out of every crack across its chest and shoulders, a featureless "
+               "eyeless charcoal skull head with one burning orange slit, long thin "
+               "blackened arms ending in three hooked claws, hunched forward over a "
+               "jagged broken spine, ash smoke curling off its shoulders, charred pitch "
+               "black body with hot orange glowing fissures",
+               "nude, naked, bare skin, human skin, flesh, skin texture, smooth skin, "
+               "pale grey body, woman, man, person, human, breasts, hair, face, eyes, "
+               "nose, mouth, lips, "
+               "hulking muscular, broad shoulders, bulky, armor plates, carapace, "
+               "spacesuit, helmet, visor, orange cap, teal suit, green skin, moss, olive, "
+               "mushroom, hovering, floating, tank treads, boxy robot, six legs, insect, "
+               "crab, frog, big round eyes, campfire, bonfire, torch, " + NEG_GROUND),
+    "sporeling": ("sporeling-mite",
+                  "a tiny scuttling fungal critter, one oversized pale cream mushroom cap "
+                  "dome covering almost its whole body, glowing green gills underneath the "
+                  "cap rim, four stubby little legs poking out below, no arms at all, two "
+                  "pinprick eyes in the shadow under the cap, knee-high, small and round "
+                  "and low to the ground",
+                  "human, person, humanoid, upright, standing biped, tall, large, huge, "
+                  "hulking, muscular, spacesuit, helmet, visor, orange cap, teal suit, "
+                  "arms, hands, weapon, robot, treads, hovering, six legs, crab, claws, "
+                  "frog face, wide mouth, dark chitin, " + NEG_GROUND),
+    # v2. v1 asked for a "tall narrow VERTICAL" body with four folded limbs and
+    # got, from four seeds, two humanoids, a tree and a figure in a ball gown:
+    # tall + vertical + limbs is a person, and the cast anchor is a person too.
+    # v2 gives up the vertical read and describes a closed SHELL — a shape with
+    # no limb count to get wrong. It still diverges from the stalker (a long
+    # sprawling six-legged body) by being smooth, compact and featureless.
+    "lurker": ("gloom-lurker",
+               "an ambush creature coiled up tight inside a smooth armored dome shell, a "
+               "dark teal chitin carapace clamped shut like a closed clam hugging the "
+               "floor, a rim of small glowing violet eyespots around the front edge of the "
+               "shell, short hooked grasping claws just barely tucked out of sight beneath "
+               "the shell rim, no head, no face, no upright body, squat and rounded and "
+               "low to the ground, wider than it is tall",
+               "tall, upright, standing, vertical, human, person, humanoid, figure, biped, "
+               "two legs, torso, arms, hands, nude, naked, bare skin, woman, man, dress, "
+               "gown, robe, tree, trunk, branches, plant, "
+               "wide, broad, bulky, hulking, muscular, spacesuit, helmet, visor, "
+               "orange cap, teal spacesuit, leather straps, gear, olive green skin, moss, "
+               "mushroom cap, hovering, floating, tank treads, boxy robot, six splayed "
+               "legs, long legs, crab, frog, big round eyes, face, mouth, "
+               + NEG_GROUND),
+    # v2. v1 ran through the CHARACTER recipe and drew twig-people: the recipe
+    # says "full body, feet on the ground" and the pose word is "standing", which
+    # a legless egg sac cannot satisfy, so the model supplied a body. It is a prop
+    # that happens to have an archetype — see STATIC_KINDS, which gives it the
+    # object framing and the ENVIRONMENT anchor instead of the humanoid cast one.
+    "pod": ("brood-sac",
+            "a bulbous organic egg sac rooted to the floor, a fat teardrop bulb of taut "
+            "sickly olive-yellow membrane webbed with dark veins, a vertical split seam "
+            "down the front leaking green bioluminescent light, a knot of short fibrous "
+            "roots gripping the floor at its base, no legs, no arms, no head, "
+            "a motionless object, not a creature",
+            "human, person, humanoid, figure, character, face, eyes, mouth, arms, hands, "
+            "legs, feet, walking, standing figure, torso, limbs, twig person, tree, "
+            "spacesuit, helmet, visor, teal suit, robot, treads, "
+            "metal, barrel, crate, box, canister, mushroom cap, insect, crab, six legs, "
+            "hovering, floating, " + NEG_GROUND),
+    # ── Tides: the raid roster (docs/design/enemy-groups.md) ─────────────────
+    # Seven more kinds, and the same bar as #78: each must diverge from the whole
+    # cast above on silhouette AND dominant colour. The upright ones are the risk
+    # (upright biped is what the ranger, mutant and mycologist already are), so
+    # each leads with one unmistakable prop that changes the OUTLINE -- a bell for
+    # a head, a cage on the back, a tank on the back, a porthole helmet -- rather
+    # than with a body description the cast anchor can win.
+    "drowner": ("drowned-diver",
+                "a drowned colony diver, a slumped waterlogged figure in an old heavy canvas "
+                "diving suit stained dark slate-grey, a big round dull pewter diving helmet with "
+                "one round porthole window full of murky green water and no face visible, long "
+                "strands of black swamp weed trailing from the shoulders, a rusty harpoon gun "
+                "held across the body in both hands, heavy weighted boots, hunched, "
+                "chunky proportions, big helmet, short legs",
+                "teal suit, orange visor, orange cap, face, eyes, mouth, bare skin, muscular, "
+                "olive green skin, moss-crusted skin, hovering, floating, tank treads, "
+                "bright colors, " + NEG_GROUND),
+    # v2 (all three). v1 of each is recorded because each failed differently:
+    #  bellwether  8/8 drew a hooded officer -- the coat landed, the BELL never
+    #              did; "its head is a bell" reads as a hat to the model. v2 names
+    #              the object first and the body second, and bans the hood.
+    #  mender      7/8 drew an anime girl in a short dress: "stooped thin figure
+    #              ... thin crooked legs" is exactly the pose vocabulary of that
+    #              genre on this base. v2 is a beaked, fully-wrapped figure with
+    #              no skin anywhere, and negatives the genre by name.
+    #  breacher    8/8 drew a sleek power-armour suit and not one caged charge;
+    #              the charge was the whole silhouette idea. v2 leads with it.
+    "bellwether": ("bellwether",
+                   "a huge heavy bronze church bell worn as a helmet covering the whole head "
+                   "and shoulders, a hot orange glow shining out from under the rim of the bell, "
+                   "beneath it a tall figure in a long tattered dark brown officer's greatcoat "
+                   "with gold buttons and gold epaulettes, holding a tall banner pole hung with "
+                   "small glowing glass bubbles, standing straight and proud, no face",
+                   "hood, hooded, cloak hood, teal suit, orange visor, orange cap, face, eyes, "
+                   "mouth, human head, hair, skull, green skin, moss, olive skin, hovering, "
+                   "tank treads, crown, wings, spear tip, " + NEG_GROUND),
+    "mender": ("bog-mender",
+               "a hunched faceless swamp medic wrapped head to toe in stained rust-brown "
+               "oilcloth, a long curved leather plague doctor beak mask with two round dark "
+               "goggle eyes, a big round glass tank of glowing bright green fluid strapped on "
+               "its hunched back and sticking up above its head, rubber hoses running from the "
+               "tank to a long brass syringe held in one gloved hand, crooked bent posture, "
+               "heavy boots, no skin visible",
+               "girl, woman, female, anime, cute, young, pretty face, dress, skirt, bare legs, "
+               "thighs, bare skin, hair, white suit, hazmat suit, faceplate, teal suit, orange "
+               "visor, orange cap, muscular, armor, hovering, tank treads, mushroom, "
+               + NEG_GROUND),
+    "breacher": ("blast-diver",
+                 "a huge glowing orange-red round bomb sphere strapped on the back inside a "
+                 "black iron cage, the cage sticking up high above the shoulders, carried by a "
+                 "short squat stocky dwarf-like demolition diver in thick dark iron riveted "
+                 "diving armor, a heavy round riveted iron diving helmet with a narrow yellow "
+                 "slit, yellow and black hazard stripes on the shoulder pads, huge gauntlets, "
+                 "wide stance, as wide as it is tall",
+                 "slim, sleek, tall, female, woman, curvy, power armor, space marine, samus, "
+                 "teal suit, orange cap, face, eyes, mouth, bare skin, green skin, moss, olive, "
+                 "claws, monster, hovering, floating, tank treads, " + NEG_GROUND),
+    "lobber": ("spore-mortar",
+               "a squat siege beast shaped like a living mortar cannon, a low wide bulbous "
+               "body of warty dark purple-grey hide carried on four short thick stumpy legs, "
+               "one wide fleshy chimney tube rising from its back and angled upward like a "
+               "cannon barrel, glowing violet spore globs packed inside the mouth of the "
+               "tube, no head, two tiny eyes low at the front, wide flat silhouette wider "
+               "than it is tall",
+               "human, person, humanoid, upright, standing biped, two legs, bipedal, torso, "
+               "arms, hands, spacesuit, helmet, visor, orange cap, teal suit, olive green "
+               "skin, moss, frog, frog face, big round eyes, wide mouth, six legs, insect, "
+               "crab, bone plates, hovering, floating, tank treads, metal cannon, "
+               + NEG_GROUND),
+    "gloamhound": ("gloam-hound",
+                   "a gaunt swamp hound beast standing on all fours, a lean wolf-like "
+                   "quadruped with long thin legs, mangy ochre-yellow hide with dark brown "
+                   "stripes stretched over visible ribs, a long narrow snout full of needle "
+                   "teeth, small glowing pale green eyes, a ridge of bony spines along its "
+                   "back, low hunting crouch, four legs",
+                   "human, person, humanoid, upright, standing biped, two legs, bipedal, "
+                   "torso, arms, hands, spacesuit, helmet, visor, orange cap, teal suit, "
+                   "six legs, insect, crab, carapace plates, bone shield, mushroom, "
+                   "hovering, floating, tank treads, fat, bulky, cute, puppy, "
+                   + NEG_GROUND),
+    "hivespire": ("hive-spire",
+                  "a tall organic hive spire rooted into the floor, a narrow twisted tower of "
+                  "fused fleshy chitin tubes with pale bone ridges, dark red living flesh "
+                  "between the tubes, dozens of small round pores glowing bright green, "
+                  "dripping ooze, a spiky open crown at the top, much taller than it is wide, "
+                  "no legs, no arms, no head, a motionless object, not a creature",
+                  "human, person, humanoid, figure, character, face, eyes, mouth, arms, "
+                  "hands, legs, feet, walking, torso, limbs, twig person, tree, trunk, "
+                  "branches, leaves, egg, teardrop, round bulb, sac, spacesuit, helmet, "
+                  "visor, robot, treads, metal, barrel, crate, mushroom cap, insect, crab, "
+                  "hovering, floating, " + NEG_GROUND),
 }
+# Archetypes that are STATIC OBJECTS wearing an archetype, not figures. The
+# character recipe hard-codes "full body, feet on the ground" and a pose word
+# ("standing facing the viewer"), and a legless egg sac cannot satisfy either —
+# so the model invents a body to hang them on. These kinds get the object
+# framing and, per docs §4, the ENVIRONMENT anchor rather than the humanoid cast
+# anchor, which is the same rule props already follow.
+STATIC_KINDS = {"pod", "hivespire"}
+# The r2 CHUNK treatment for upright bipeds — the recipe the 96px hi-res cast was
+# actually drawn with (scripts/assets/ART-RUN-NOTES.md "Recipe: juggernautXL at
+# 768, CFG 3.5, chunky-proportion prompt on bipeds only"; it lived in the staging
+# driver D:/tmp/sprite-stage-0822/tools/cast.py and is copied here verbatim so the
+# repo can reproduce it). ONLY bipeds: every other kind states its silhouette as
+# explicit geometry, which "4 heads tall, wide planted stance" would fight.
+# Sweep these with `CKPT='SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors'
+# SIZE=768` — on the anime base the same prompts drew anime girls (the mender, 15
+# of 16 across two prompt versions).
+CHUNKY_BIPEDS = {"drowner", "bellwether", "mender", "breacher"}
+BG_CHUNKY = ("single character centered on plain flat white background, full body, "
+             "feet on the ground, stocky chibi videogame proportions, only 4 heads tall, "
+             "oversized head, short thick legs, broad heavy shoulders, wide planted stance, "
+             "thick sturdy limbs, bulky wide silhouette")
+NEG_THIN = ("elongated, slender, lanky, skinny, thin limbs, spindly, long legs, "
+            "tall thin figure, realistic human proportions, 8 heads tall, "
+            "fashion model, willowy, narrow shoulders, stretched, anorexic")
+BG_STATIC = ("single isolated game object centered on plain flat white background, "
+             "the whole object in frame, resting on the floor")
 CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
 
 # ---- the rest of the pack ---------------------------------------------------
@@ -209,26 +479,243 @@ TILES = {
                       "olive moss over teal-gray riveted metal panels, every part of the frame "
                       "covered in roots and metal, faint green glow deep between the roots"),
 }
+# name -> (manifest path, EXPLICIT GEOMETRY, extra negatives)
+#
+# Three rules, each earned by a failure:
+#
+# 1. State the SILHOUETTE as geometry, not as a noun. "a barrel" produced a mossy
+#    boulder for the entire life of this pack. "a SQUAT CYLINDER standing on its
+#    flat circular end with a visible elliptical rim" produced a barrel.
+# 2. State PROPORTION as a ratio AND negative the opposite. The first corrected
+#    barrel came out a 1:3 canister — right geometry, wrong object, and a 10px
+#    sliver once posted to the 32px prop footprint.
+# 3. NEVER ASK FOR MOSS. Every prompt here used to request it ("moss on the top
+#    edges", "overgrown with green moss", "moss growing from the dispensing
+#    slot", "small plants sprouting from it"). Combined with the env anchor and
+#    the missing NEG_GROUND, that is the whole recipe for a mossy grave marker.
+#
+# And do not ask for COLOUR. Generation supplies shape; `ramp_grade` keeps only
+# VALUE and discards hue by construction, so a near-white render with clean value
+# structure is the correct input, not a defect.
+#
+# SEED BUDGET: 8-12 per subject, not 3. The g2 sweep ran 3 and hit roughly 1 in 3
+# usable; reporting it as "worked first time" was reading the curated seed as if
+# it were the sweep. Expect to curate, and expect to reject.
+#
+# Ranked by measured encounter rate (200 seeds x floors 1-5, 120,736 objects —
+# see _mycel-results/sprite-inventory.md): crate 23.0/floor, desk 13.3,
+# cabinet 11.7, barrel 8.2, vending 5.0, tv 4.4, locker 3.3, toilet 3.1, atm 2.4.
 PROPS = {
-    "cargo-pod": ("props/cargo-pod.png",
-                  "a battered sci-fi cargo crate pod, tan metal with teal panel accents, moss on "
-                  "the top edges, glowing green status light"),
+    # #1 object in the game. Nothing has ever been generated for it: it was
+    # recorded as an unreachable orphan, so it was never on any queue.
+    "cargo-crate": ("props/cargo-crate.png",
+                    "a sturdy rectangular sci-fi supply crate, a CLOSED BOX with six flat faces "
+                    "and hard square corners, four vertical corner posts and horizontal "
+                    "reinforcing bands strapping the sides, recessed latch clamps on the front "
+                    "face, a stencilled cargo number and a small green status light, tan metal "
+                    "with teal panel accents, a flat square lid, sitting squarely flat on the "
+                    "floor, chunky and boxy, slightly wider than it is tall, roughly 6 wide by "
+                    "5 tall",
+                    "dome, domed top, rounded top, curved, sphere, hemisphere, mound, hill, "
+                    "barrel, cylinder, drum, pod, egg, sack, bag, tarpaulin, cloth, open lid, "
+                    "spilling contents, tall, narrow, pillar, column"),
+    "work-desk": ("props/work-desk.png",
+                  # NOTHING ON TOP is load-bearing twice over: the old prompt asked for a
+                  # monitor on the desktop, so no reseed could ever fix the monitor tower —
+                  # and a desk wearing a monitor is the same object as wall-screen, which
+                  # defeats the split that justifies generating both.
+                  "a low wide sci-fi office work desk, a bare empty flat rectangular horizontal "
+                  "desktop surface with NOTHING ON TOP of it, supported on two solid side "
+                  "panels, a drawer unit under one end, WIDE horizontal silhouette, the desktop "
+                  "is a wide flat plank twice as wide as the whole object is tall, low to the "
+                  "floor, roughly 8 wide by 4 tall",
+                  "monitor, screen, computer, keyboard, tower, clutter, objects on the desk, "
+                  "tall, upright slab, vertical, narrow, cabinet, obelisk, pillar, column"),
+    "supply-cabinet": ("props/supply-cabinet.png",
+                       "a tall narrow sci-fi supply cabinet, a rectangular metal cupboard with "
+                       "TWO hinged doors meeting at a vertical seam down the middle, a "
+                       "horizontal handle bar on each door, louvred vent slots near the top, "
+                       "four short feet lifting it off the floor, flat square top, sharp square "
+                       "corners, roughly 4 wide by 6 tall",
+                       "rounded top, dome, arch, curved top, screen, window, glass front, "
+                       "extremely tall, thin, sliver, pole"),
     "spore-barrel": ("props/spore-barrel.png",
-                     "a sealed biotech barrel pod overgrown with green moss, glowing green spore "
-                     "sacs clustered on its side, tan metal with warning stripes"),
-    "cryo-terminal": ("props/cryo-terminal.png",
-                      "an upright cryo-credit terminal kiosk, gray-teal metal cabinet with a "
-                      "small glowing amber screen, frost at the base, thin vines climbing one side"),
+                     "a SQUAT cylindrical oil drum barrel standing upright on its flat circular "
+                     "end, clearly a CYLINDER with a visible round elliptical rim at the top, "
+                     "two raised horizontal ribs banding around the middle, a single yellow "
+                     "hazard warning stripe, tan and teal metal, flat circular lid with a bung "
+                     "cap, chunky and stout, only slightly taller than it is wide, roughly 4 "
+                     "wide by 5 tall",
+                     "dome, hemisphere, egg, sphere, round top, tapered, cone, sack, pot, vase, "
+                     "tall, narrow, thin, slender, pillar, column, canister, tube, rocket, pipe"),
     "nutrient-dispenser": ("props/nutrient-dispenser.png",
-                           "an upright vending machine nutrient dispenser, teal metal cabinet "
-                           "with glowing green canisters visible behind a cracked window, moss "
-                           "growing from the dispensing slot"),
-    "console-monitor": ("props/console-monitor.png",
-                        "a derelict computer console monitor on a stubby stand, dark screen with "
-                        "flickering green static glyphs, tan-gray casing, moss on top"),
+                           # The ONE prop whose silhouette was already right. Regenerate only if
+                           # the ramp cannot carry it — shape here is not the problem.
+                           "an upright vending machine nutrient dispenser, a tall rectangular "
+                           "metal cabinet with a large glass window front, three horizontal "
+                           "shelves of canisters visible behind the glass, a dispensing slot at "
+                           "the bottom, a keypad beside the window, flat square top, roughly 4 "
+                           "wide by 7 tall",
+                           "rounded top, dome, arch, solid front, no window, doors, "
+                           "sliver, pole, obelisk"),
+    "wall-screen": ("props/wall-screen.png",
+                    "a wall-mounted sci-fi flat panel display screen, a thin rectangular monitor "
+                    "in a slim bezel showing glowing green readout glyphs, mounted flush against "
+                    "a vertical wall on a bracket, a bundle of cables trailing from one bottom "
+                    "corner, flat and thin, wider than it is tall, no floor contact and nothing "
+                    "beneath it, roughly 7 wide by 5 tall",
+                    "stand, post, pole, tripod, base plate, pedestal, feet, stubby stand, "
+                    "desk monitor, on a table, thick body, box, crt, deep cabinet, tall, "
+                    "narrow, tower"),
+    "weapons-locker": ("props/weapons-locker.png",
+                       "a tall rectangular steel weapons locker, one full-height vertical door "
+                       "with a recessed handle and a small keypad panel, three horizontal "
+                       "louvred vent slits at eye height, a stencilled yellow number on the "
+                       "door, riveted edges, flat square top, hard square corners, like a school "
+                       "locker, roughly 4 wide by 7 tall",
+                       "rounded top, arch, dome, screen, glass, vending machine, shelves, "
+                       "window, sliver, pole, obelisk"),
+    "cryo-terminal": ("props/cryo-terminal.png",
+                      "an upright cryo-credit terminal kiosk, a narrow rectangular metal cabinet "
+                      "with a small glowing screen set into an angled head at the top, a card "
+                      "slot and a keypad below it, a flat square top, straight vertical sides, "
+                      "standing flat on the floor, roughly 3 wide by 6 tall",
+                      "rounded top, dome, arch, tapered, obelisk, pillar, headstone, "
+                      "extremely tall, sliver"),
     "hydro-recycler": ("props/hydro-recycler.png",
-                       "a squat hydroponic water recycler unit, a bowl-shaped basin of glowing "
-                       "teal water on a metal base with pipes, small plants sprouting from it"),
+                       "a squat hydroponic water recycler unit, a wide open circular BASIN with "
+                       "a clearly visible elliptical rim holding glowing teal water, sitting on "
+                       "a short cylindrical metal pedestal with two pipes running up one side, "
+                       "wider than it is tall, roughly 6 wide by 4 tall",
+                       "closed top, solid lump, dome, sphere, tall, narrow, pillar, "
+                       "plants, sprouts, foliage"),
+    # ---- the furnishings that never had art ---------------------------------
+    # These six archetypes are placed by the room planner (levelgen/furnish.ts)
+    # and have ALWAYS drawn as hand-coded PixiJS vector shapes (render/art.ts
+    # FURNITURE_SHAPE) rather than pack art. Together they are 51% of every
+    # furnishing the game spawns and 56% of what is inside a house -- `shelf`
+    # alone is the single most common object in the game at 20.8 per floor,
+    # ahead of the crate. They are listed here in encounter-rate order.
+    #
+    # Same recipe as the six above: geometry stated with explicit proportions,
+    # then the wrong reading negatived BY NAME. The wrong reading for furniture
+    # is the neighbouring piece of furniture -- a bench that comes back with a
+    # backrest is a chair, and a table with drawers is the desk we already ship.
+    # THE SHELF IS THE HARD ONE, AND HERE IS THE MEASUREMENT SO NOBODY REPEATS IT.
+    # This wording yields ~2/8 clean single racks on the fixed seed set
+    # 1000-1007 (tag p2) -- the weakest subject in the group, and the one that
+    # matters most at 20.8/floor.
+    #
+    # TRIED AND REJECTED (tag p3, SAME eight seeds, one knob): loading the
+    # shelves. "every shelf PACKED FULL of stacked crates ... solid back panel",
+    # plus anti-duplicate negatives ("two racks, several racks, row of shelving,
+    # aisle, warehouse interior"). The theory was that an open frame is mostly
+    # HOLES and holes are noise at 32px, so solid loaded bands would survive the
+    # downscale better.
+    #
+    # It measured WORSE: ~1/8. Loading the shelves reads to the model as a
+    # WAREHOUSE, and a warehouse is composed as an AISLE -- six of eight seeds
+    # came back as two racks facing each other, which is exactly the duplicate
+    # the negatives named and did not prevent. Same shape as the NEG_STACK
+    # lesson in docs/sprite-generation.md 4.0: naming the defect in the negatives
+    # does not move a compositional tendency of the base model.
+    #
+    # So the next knob to try is NOT more negatives and NOT more loading. It is
+    # the object's own proportions -- a wider, shallower, fewer-levelled unit
+    # that cannot read as aisle racking in the first place.
+    "storage-rack": ("props/storage-rack.png",
+                     "a tall open shelving rack, an upright metal frame with FOUR separate "
+                     "horizontal shelf boards stacked one above another with clear open gaps "
+                     "between them, a vertical corner post at each end, completely OPEN at the "
+                     "front with no doors and no glass, a few small crates and canisters resting "
+                     "on the shelves, flat square top, roughly 6 wide by 7 tall",
+                     "cabinet, cupboard, closed doors, solid front panel, glass front, window, "
+                     "one single shelf, table, desk, workbench, wardrobe, dome, rounded top, "
+                     "books, bookcase"),
+    # VALUE IS A GAMEPLAY CONSTRAINT ON THIS SUBJECT, not a matter of taste, and
+    # it is stated in the prompt because that is the only place it can be fixed.
+    # Measured against the SHIPPED default pack (`swampspace-hires`): its floor
+    # sits at luminance 82 and the bog-mutant threat at 53 -- the threat reads
+    # precisely BECAUSE it is darker than the floor. Accepted pack props occupy
+    # 67-99. The first sweep off the old wording put 7 of 8 chairs between 95 and
+    # 151, i.e. brighter than every accepted prop and up to +69 over the floor,
+    # so the eye went to the furniture instead of to the thing trying to kill
+    # you. That is #42's primary defect, reproduced.
+    #
+    # The cause was "slim tubular frame" + "thin straight legs": tubular metal
+    # renders as polished chrome, and chrome at 32px is four white lines. Only
+    # seed 1005 landed in band (78), and it did so by coming back with a painted
+    # teal seat instead of a bare metal one -- so the fix is to ASK for what that
+    # seed found by luck. Material and value are wording the model obeys well;
+    # this is not the negatives-vs-composition trap of the shelf reroll (sec. 6
+    # of #42), where naming a defect failed to move a compositional habit.
+    # SECOND KNOB: BLOCKIER. Stating the material got the value into band (the
+    # sweep moved from 95-151 to 56-82) but produced a WIRE chair -- thin legs,
+    # delicate frame -- and dark plus thin is the worst of both: it sits down in
+    # the value hierarchy correctly and then cannot be read at all. Two of eight
+    # stopped reading as chairs in the room shot.
+    #
+    # "Easier to see" is therefore solved as LEGIBILITY OF FORM, never as
+    # brightness -- brightness is the defect that started this. The levers are
+    # mass (thick square members instead of tubes), a solid back panel instead of
+    # an open frame, and the pack's heavy black outline, none of which raise mean
+    # luminance. `crate, box, cube, cabinet` are negatived because that is the
+    # near-miss this direction invites: a blocky chair over-simplified is the
+    # crate that the top-down sweep already failed as (sec. 3d of #42).
+    "mess-chair": ("props/mess-chair.png",
+                   "a single BLOCKY chunky mess-hall chair, bold simple geometric shapes, ONE "
+                   "thick solid rectangular seat slab carried on four THICK SQUARE post legs, a "
+                   "solid rectangular backrest panel standing up behind the seat, heavy chunky "
+                   "members with real thickness, the seat slab the SAME worn dark teal as the "
+                   "backrest, bare painted metal seat with nothing resting on it, "
+                   "the seat and backrest PAINTED worn dark teal, "
+                   "the legs and frame DARK gunmetal grey, matte unpolished metal, dark overall, "
+                   "a thick black outline around the whole object, the backrest facing the "
+                   "viewer squarely, roughly 4 wide by 5 tall",
+                   "armchair, sofa, couch, loveseat, throne, recliner, cushioned lounge, "
+                   "stool, table, desk, bench, long, wide, two chairs, several chairs, "
+                   "row of seats, armrests, "
+                   # The white-spindle failure, named as material rather than as
+                   # a shape -- the legs were never the wrong SHAPE.
+                   "chrome, polished steel, shiny metal, mirror finish, glossy, "
+                   "bright white highlights, white plastic, pale wood, cream, ivory, "
+                   "brightly lit, overexposed, "
+                   # The wire-chair failure from the previous sweep.
+                   "thin, spindly, wiry, delicate, hairline legs, thin wire legs, wire frame, "
+                   "folding chair, skeletal, flimsy, ornate, curved tubing, spokes, slats, "
+                   "openwork lattice, office chair, wheels, "
+                   # ...and the failure that over-correcting toward mass invites.
+                   "crate, box, cube, cabinet, solid block, featureless slab, "
+                   # The two best-FACING candidates of the previous sweep both put
+                   # a bright white pad on the seat -- a value spike in the middle
+                   # of the sprite, which is the very defect this subject is being
+                   # regenerated to fix. Named as the objects it renders as.
+                   "white cushion, pale cushion, seat pad, white upholstery, sheet of paper, "
+                   "folded towel, cloth on the seat, book, tray, object resting on the seat, "
+                   "bright white patch, white highlight on the seat"),
+    "crew-bunk": ("props/crew-bunk.png",
+                  "a low single crew bed seen from a high angle looking down at it, ONE long "
+                  "rectangular mattress lying flat on a low metal frame, a pale pillow at one "
+                  "end and a folded blanket across the other end, four short stubby legs, LONG "
+                  "horizontal silhouette twice as long as it is wide, low to the floor, "
+                  "roughly 8 wide by 4 tall",
+                  "bunk beds, stacked beds, two levels, upper bunk, ladder, tall headboard, "
+                  "upright, vertical, sofa, couch, chair, table, person, sleeping figure, "
+                  "canopy, four poster"),
+    "transit-bench": ("props/transit-bench.png",
+                      "a long backless waiting bench, ONE single long flat horizontal plank "
+                      "seat carried on two solid end supports, completely open underneath, NO "
+                      "backrest of any kind, LONG low horizontal silhouette three times as wide "
+                      "as it is tall, roughly 9 wide by 3 tall",
+                      "backrest, back panel, back rail, chair, armchair, armrests, sofa, "
+                      "table, desk, tall, upright, cushions, pillows, several benches"),
+    "mess-table": ("props/mess-table.png",
+                   "a square mess-hall table, ONE flat square tabletop with NOTHING ON TOP of "
+                   "it, held up by four straight legs at the corners, open underneath, seen "
+                   "from a slightly high game angle, roughly 7 wide by 5 tall",
+                   "desk, drawers, drawer unit, side panels, cabinet, objects on the table, "
+                   "plates, cups, food, clutter, chairs, stools, round tabletop, circular, "
+                   "tall, narrow"),
 }
 ITEMS = {
     "spore-pistol": ("items/spore-pistol.png",
@@ -267,6 +754,82 @@ FX = {
 TILE_PX, CHAR_PX, PROP_PX, ITEM_PX, FLAME_PX, FX_PX = 32, 48, 32, 32, 48, 64
 ENV_ANCHORS = [os.path.join(ANCHORS, f) for f in ("env-a.png", "env-b.png")]
 
+# ---------------------------------------------------------------------------
+# BASE MODEL PER CATEGORY.
+#
+# This table exists because the documented path was silently wrong. `sweep
+# prop.<name>` never passed a checkpoint, so it fell through to comfy.CKPT --
+# `anything-xl`, an ANIME model -- while the only code that knew better was
+# exp_props.py, an experiment script nobody is told to run. The measurement, on
+# a fixed 8-seed set (see exp_props.py and docs/sprite-generation.md 6):
+#
+#     anything-xl     1/8 clean single props
+#     juggernautXL    8/8      <- one change, and 8/8 again on 8 FRESH seeds
+#
+# Reproduced again later: 0/12 on anything-xl (a winged cat on a stool, two
+# humanoids) against 12/12 on juggernautXL, same recipe. Anime bases compose
+# busy multi-object scenes, so "a cargo crate" comes back as a warehouse, a
+# stack, or a sprite-sheet grid. Every negative-prompt fix aimed at this cost a
+# night and none of them moved the number. The base model was the whole defect.
+#
+# CFG and SIZE travel WITH the checkpoint because they were measured together:
+# CFG 3.5 -> 7.0 is worth the last seed (8/8 vs 7/8), and SIZE 1024 -> 768 does
+# not change the hit rate but makes the hits chunkier at the 32px footprint.
+# Threading the checkpoint alone would leave the documented path still unable to
+# reproduce the art that was actually approved.
+PROP_CKPT = "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
+PROP_CFG = 7.0
+PROP_SIZE = 768
+
+# `None` means "whatever comfy.py resolves -- its default, or $CKPT". For
+# chars/tiles/items that is a RECORDED DECISION, not an omission: they were all
+# authored against the anime base and would drift if it moved under them, and
+# the documented low-VRAM escape hatch
+# (`CKPT=dreamshaper_8.safetensors LORA= SIZE=512 ... sweep item.root-club`)
+# only works because these categories leave the choice to the environment.
+# Pinning them here would silently break that flag.
+PACK_DEFAULT = None
+
+CAT_MODEL = {
+    "prop": {"ckpt": PROP_CKPT, "cfg": PROP_CFG, "size": PROP_SIZE},
+    "char": {"ckpt": PACK_DEFAULT},
+    "tile": {"ckpt": PACK_DEFAULT},
+    "item": {"ckpt": PACK_DEFAULT},
+    # `fx` (flames, spore bursts) is easy to forget -- it has no table of its own
+    # up top, it is expanded out of FX further down, and it was missed on the
+    # first pass of this very table. The guard below caught it. Same reasoning as
+    # chars/tiles/items: authored against the anime base, left there on purpose.
+    "fx": {"ckpt": PACK_DEFAULT},
+}
+
+
+def model_args(name, spec):
+    """Base-model kwargs for a job, or DIE.
+
+    Deliberately has no fallback. A missing entry raises instead of quietly
+    handing the job to comfy.CKPT, because that exact silent fallback is the bug
+    this table exists to fix: the run still succeeds, the images still look
+    confident and well-formed, and they are entirely wrong. A new category must
+    make its own choice here -- `PACK_DEFAULT` is how you say "the anime base is
+    correct for this one", and saying it costs one line.
+    """
+    cat = spec.get("cat")
+    if cat not in CAT_MODEL:
+        raise SystemExit(
+            f"{name}: no base-model decision recorded for category {cat!r}.\n"
+            f"  Add {cat!r} to CAT_MODEL in generate.py. Use PACK_DEFAULT if the\n"
+            f"  pack default (anything-xl / $CKPT) is right for it, or pin a\n"
+            f"  checkpoint the way 'prop' does. Refusing to guess: guessing here\n"
+            f"  is what rendered every prop on an anime model for months.")
+    profile = CAT_MODEL[cat]
+    if "ckpt" not in profile:
+        raise SystemExit(
+            f"{name}: CAT_MODEL[{cat!r}] records no 'ckpt' key. Set it to\n"
+            f"  PACK_DEFAULT explicitly rather than leaving it out.")
+    # A None ckpt is the recorded "use the pack default" case; drop it so
+    # build_graph applies comfy.CKPT (and therefore $CKPT) as it always has.
+    return {k: v for k, v in profile.items() if v is not None}
+
 
 def jobs():
     """Expand the tables into a flat {name: spec} job dict."""
@@ -276,11 +839,24 @@ def jobs():
                                    pos=f"{TRIGGER}, {subj}, {BG_TILE}, {LOOK}",
                                    neg=f"{NEG_FIGURE}, horizon, sky, depth, isometric, {NEG_BASE}",
                                    seamless=True, alpha=False)
-    for name, (path, subj) in PROPS.items():
+    # Props take NO IPAdapter refs, for the same reason items don't (see the
+    # comment below): `anchors/env-a.png` IS a mossy barrel sitting in a puddle
+    # of grass, and IPAdapter stamped that silhouette onto every prop in the
+    # pack. The items were rescued from this anchor years ago; the props never
+    # were, and every shipped prop is wearing the anchor's shape.
+    #
+    # They also get NEG_GROUND, which every ground CREATURE already got and no
+    # prop ever did. That omission is why each prop has a painted mound welded
+    # into its ALPHA — and because it is in the alpha, no colour pass can reach
+    # it. That mound is the tombstone plinth.
+    for name, (path, subj, extra) in PROPS.items():
         out[f"prop.{name}"] = dict(cat="prop", path=path, px=PROP_PX,
-                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, upright, slight high "
-                                       f"three-quarter game angle, {LOOK}",
-                                   neg=f"{NEG_FIGURE}, {NEG_BASE}", refs="env")
+                                   pos=f"{TRIGGER}, {subj}, {BG_OBJ}, nothing underneath it, "
+                                       f"no shadow and no floor, object fills at least 80% of the "
+                                       f"frame height, tightly cropped, centered, upright, "
+                                       f"slight high three-quarter game angle, {PROP_LOOK}",
+                                   neg=f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, "
+                                       f"{NEG_WRONG_READ}, {extra}")
     # Items get NO IPAdapter refs: the environment anchors (mossy barrel + deck
     # tile) turned every weapon into a mushroom. Inventory-icon wording instead;
     # palette lock keeps them cohesive with the pack.
@@ -303,15 +879,24 @@ def jobs():
                 jname = f"char.{kind}.{d}-{frame}"
                 is_anchor_pose = d == "s" and frame == "idle"
                 neg_parts = [p for p in (DIR_NEG.get(d, ""), kneg) if p]
+                # A static kind has no pose and no facing — it is the same object
+                # from every direction — so it drops the "standing/full body" recipe
+                # and takes the environment anchor that props use.
+                static = arch in STATIC_KINDS
+                chunky = arch in CHUNKY_BIPEDS
+                subject = ("flat 2D game object sprite" if static
+                           else "full body game character sprite")
+                pose = "seen from the front" if static else dprompt
                 spec = dict(
                     cat="char", arch=arch, kind=kind, dir=d, frame=frame,
                     path=f"chars/{kind}-{d}-{frame}.png", px=CHAR_PX,
-                    pos=f"{TRIGGER}, full body game character sprite, {desc}, {dprompt}, "
-                        f"{BG_CHAR}, {LOOK}",
-                    neg=", ".join(neg_parts + [
+                    pos=f"{TRIGGER}, {subject}, {desc}, {pose}, "
+                        f"{BG_STATIC if static else BG_CHUNKY if chunky else BG_CHAR}, {LOOK}",
+                    neg=", ".join(neg_parts + ([NEG_THIN] if chunky else []) + [
                         f"two characters, crowd, cropped, close-up, portrait, {NEG_BASE}"]),
-                    refs="char-cast" if is_anchor_pose else "char-anchor",
-                    ipw=0.3 if is_anchor_pose else DIR_IPW[d],
+                    refs=("env" if static
+                          else "char-cast" if is_anchor_pose else "char-anchor"),
+                    ipw=0.5 if static else (0.3 if is_anchor_pose else DIR_IPW[d]),
                 )
                 if frame == "step":
                     # STEP frames are img2img FROM the direction's curated idle
@@ -384,15 +969,23 @@ def sweep(names, seeds=6, base_seed=414500):
                 print(f"SKIP {name}: curate {spec['init_from_idle']} first "
                       f"(no durable raw — see `generate.py curate`)")
                 continue
+        # The installed rembg node is STRICTLY batch-1: its `tensor2pil` does a
+        # bare `.squeeze()`, so a (B,H,W,C) batch reaches PIL as a 4-D array and
+        # raises "Cannot handle this data type". Worse than the crash is the
+        # near-miss — `pil2tensor` re-`unsqueeze`s to batch 1, so any batch that
+        # DID survive would silently return one image and drop the rest. So an
+        # alpha job is swept one seed at a time; only the un-cut jobs batch.
+        chunk = 1 if spec_alpha(spec) else CHUNK
         done = 0
         while done < seeds:
-            n = min(CHUNK, seeds - done)
+            n = min(chunk, seeds - done)
             g = comfy.build_graph(
                 pos=spec["pos"], neg=spec["neg"], seed=base_seed + done, batch=n,
                 seamless=spec.get("seamless", False), refs=refs or None,
                 ip_weight=spec.get("ipw", 0.8), init=init,
                 denoise=spec.get("denoise", 1.0), alpha=spec_alpha(spec),
                 prefix=name.replace(".", "-") + f"-s{base_seed + done}",
+                **model_args(name, spec),
             )
             paths = comfy.run(g, dest)
             done += n
@@ -409,6 +1002,28 @@ def final(names, allow_regen=False):
     import comfy
     from PIL import Image
     import post as P
+    import packs
+
+    # PREFLIGHT: refuse to spend a run producing art the player cannot see.
+    # THEME is the 48px base pack, but the game loads `swampspace-hires` first
+    # and theme resolution answers from the FIRST manifest that MENTIONS a key.
+    # On 2026-08-23 nine sprites went in here and were shadowed by August art:
+    # correct merge, green deploy, green gates, fresh browser, nothing visible.
+    # Nothing failed, which is exactly why this has to.
+    target = os.path.basename(THEME)
+    chars = [n for n in names if jobs().get(n, {}).get("cat") == "char"]
+    if chars and target != packs.default_pack():
+        keys = packs.sprite_keys(packs.default_pack())
+        shadowed = sorted(k for k in keys if k.startswith("char."))
+        if shadowed and os.environ.get("ALLOW_SHADOWED") != "1":
+            raise packs.ShadowedWrite(
+                f"'{target}' is not the pack the game loads ({packs.default_pack()}), "
+                f"which already mentions {len(shadowed)} char keys and therefore "
+                f"answers first. Character art written here will be INVISIBLE.\n"
+                f"  Fix: after this, run "
+                f"`python hires_chars.py {' '.join(chars[:3])}` (or --all-curated) "
+                f"to post the same picks into {packs.default_pack()}.\n"
+                f"  Override for a deliberate base-only write: ALLOW_SHADOWED=1")
 
     cur = load_curation()
     for name in names:
@@ -436,6 +1051,7 @@ def final(names, allow_regen=False):
                 refs=resolve_refs(spec) or None, ip_weight=spec.get("ipw", 0.8),
                 init=init, denoise=spec.get("denoise", 1.0),
                 alpha=spec.get("alpha", True), prefix="final-" + name.replace(".", "-"),
+                **model_args(name, spec),
             )
             paths = comfy.run(g, os.path.join(STAGE, "final", name))
             raw = paths[pick.get("index", 0)]
@@ -456,8 +1072,26 @@ def final(names, allow_regen=False):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+    # Accept BOTH `--key=value` and `--key value`. The docstring has always shown
+    # the space-separated form, but the parser only matched `--key=`, so a
+    # documented `curate ... --seed 414501 --ckpt anything-xl` recorded NONE of
+    # it — the flag matched nothing and its value fell through into the
+    # positional list, where curate ignores anything past the file. Silently
+    # losing seed/size/ckpt loses the provenance curation.json exists to keep.
+    VALUE_FLAGS = {"--seed", "--index", "--batch", "--size", "--ckpt", "--note", "--seeds"}
+    args, flagmap, rest = [], {}, list(sys.argv[1:])
+    while rest:
+        a = rest.pop(0)
+        if not a.startswith("--"):
+            args.append(a)
+        elif "=" in a:
+            k, v = a.split("=", 1)
+            flagmap[k] = v
+        elif a in VALUE_FLAGS and rest and not rest[0].startswith("--"):
+            flagmap[a] = rest.pop(0)
+        else:
+            flagmap[a] = True
+    flags = list(flagmap)
     J = jobs()
     if "--list" in flags:
         print("\n".join(J))
@@ -465,10 +1099,8 @@ if __name__ == "__main__":
     cmd, names = (args[0], args[1:]) if args else (None, [])
 
     def flagval(key, default=None):
-        for f in flags:
-            if f.startswith(key + "="):
-                return f.split("=", 1)[1]
-        return default
+        v = flagmap.get(key, default)
+        return default if v is True else v
 
     if cmd == "curate":
         # curate <job> <file> [--seed N --index I --batch B --size N --ckpt X --note "..."]

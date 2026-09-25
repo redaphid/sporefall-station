@@ -34,16 +34,19 @@ const npcs: Entity[] = [
 // Freeze every NPC: a long sleep makes aiSystem skip them (no move, no attack).
 for (const e of npcs) e.status = { stun: 0, sleep: 100000, hitFlashUntil: 0, cloakUntil: 0 }
 
-// A pickup to point a pin at and to inspect.
-const medkit = spawnNpc(w, 'thug', A.x - 3, A.y + 2) // reuse spawn plumbing, then reshape
-medkit.kind = 'pickup'
-medkit.archetype = 'medkit'
-delete medkit.ai
-delete medkit.combat
-delete medkit.health
-medkit.status = undefined
-medkit.pickup = { itemId: 'medkit', qty: 1 }
-medkit.interact = { verb: 'pickup', range: 0.8 }
+// A pickup to point a pin at and to inspect. Was a medkit until the item cull
+// removed every consumable; it is now a grenade, and it carries the PROPER
+// `pickup.<id>` archetype (the old bare 'medkit' string was never in the wire
+// ARCHETYPES list at all, so kindOf/art had to guess at it).
+const pick = spawnNpc(w, 'thug', A.x - 3, A.y + 2) // reuse spawn plumbing, then reshape
+pick.kind = 'pickup'
+pick.archetype = 'pickup.grenade'
+delete pick.ai
+delete pick.combat
+delete pick.health
+pick.status = undefined
+pick.pickup = { itemId: 'grenade', qty: 1 }
+pick.interact = { verb: 'pickup', range: 0.8 }
 
 const dir = fileURLToPath(new URL('../../src/game/__fixtures__/', import.meta.url))
 mkdirSync(dir, { recursive: true })

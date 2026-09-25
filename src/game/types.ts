@@ -25,6 +25,11 @@ export interface InputCmd {
   throwItem: boolean
   /** Dodge-roll this tick (edge-triggered): a burst + i-frames in the move dir. */
   roll: boolean
+  /** Sequenced mods only: swap two entries of the wielded weapon's mod list this
+   * tick, packed `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered
+   * and OPTIONAL: absent on every input that does not ask, so default-mode
+   * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
+  modSwap?: number
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -135,6 +140,8 @@ export type SimEvent =
    * klaxon, the banner and the alarm wash all hang off it. */
   | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
+  /** A body took the stairs: it now stands on the landing of storey `z`. */
+  | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }
   | { type: 'runOver'; floor: number }
   | { type: 'roll'; x: number; y: number; entityId: EntityId }
@@ -153,3 +160,41 @@ export type SimEvent =
   /** A barricader plugged a chokepoint: destructible `barricade` object
    * `entityId` now stands beside a doorway at x,y, built by `byId`. */
   | { type: 'barricade'; entityId: EntityId; byId: EntityId; x: number; y: number }
+  /** Complex director (floors 3, 5, 7…): a vent grate at x,y burst and `count`
+   * sporelings crawled out hunting `targetId`. */
+  | { type: 'ventSwarm'; x: number; y: number; count: number; targetId: EntityId }
+  /** Complex director: a player stepped into crew quarters `building` and its
+   * `count` dormant sleepers rose at once (room centre x,y). */
+  | { type: 'ambush'; building: number; count: number; x: number; y: number }
+  /** Complex director: wing `wing` (tile rect x,y,w,h) lost power until tick
+   * `until`. The rect rides along so a renderer needs no level lookup. */
+  | { type: 'lightsOut'; wing: number; until: number; x: number; y: number; w: number; h: number }
+  /** Complex director: the dark wing's power came back. */
+  | { type: 'lightsOn'; wing: number }
+  // ── Group layer (systems/groups.ts) ──
+  /** A tide arrived: raid `groupId` of `count` members, running `strategy`,
+   * mustered at x,y and hunting `targetId`. */
+  | { type: 'raidArrive'; groupId: number; strategy: string; x: number; y: number; count: number; targetId: EntityId }
+  /** Group `groupId` moved from phase `prev` to `phase` (staging→attack, …). */
+  | { type: 'groupPhase'; groupId: number; phase: string; prev: string }
+  /** A raid's nerve broke (`leader` fell, or `casualties` passed the line):
+   * its `count` survivors rout from around x,y. */
+  | { type: 'raidRouted'; groupId: number; reason: 'leader' | 'casualties'; x: number; y: number; count: number }
+  /** A routed raider slipped out of sight and popped back into the swamp — no drop. */
+  | { type: 'dissolve'; entityId: EntityId; x: number; y: number }
+  /** A medic (`byId`) patched `entityId` for `amount` hp. */
+  | { type: 'heal'; entityId: EntityId; byId: EntityId; amount: number }
+  /** A siege gun lobbed a shell from x,y that comes down at tx,ty in `ticks`. */
+  | { type: 'lob'; entityId: EntityId; x: number; y: number; tx: number; ty: number; ticks: number }
+  /** A sapper planted a charge on door `doorId` (at x,y) that blows in `fuse` ticks. */
+  | { type: 'sapperCharge'; entityId: EntityId; doorId: EntityId; x: number; y: number; fuse: number }
+  /** A hound pack spotted `targetId` and began to encircle it. */
+  | { type: 'packHunt'; groupId: number; targetId: EntityId; count: number }
+  /** A pack's ring closed (or timed out) on `targetId` — now it goes in. */
+  | { type: 'packClose'; groupId: number; targetId: EntityId; closed: boolean }
+  /** A pack went MANHUNTER on `targetId` (someone hurt one of them, or a howl carried). */
+  | { type: 'packRage'; groupId: number; targetId: EntityId; x: number; y: number; count: number }
+  /** A hive spire (`byId`) budded sporeling `entityId`. */
+  | { type: 'hiveSpawn'; entityId: EntityId; byId: EntityId }
+  /** A hive spire (`byId`) rooted a NEW spire `entityId` at x,y — the infestation spreads. */
+  | { type: 'hiveSpread'; entityId: EntityId; byId: EntityId; x: number; y: number }

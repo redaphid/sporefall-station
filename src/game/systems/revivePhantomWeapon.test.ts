@@ -13,7 +13,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { spawnPlayer, STARTER_AMMO, PLAYER_START_WEAPON } from '../player'
+import { spawnPlayer, PLAYER_START_WEAPON } from '../player'
 import { emptyInput } from '../types'
 import { addEntity, createWorld, tickWorld, type World } from '../world'
 import { interactionSystem } from './interaction'
@@ -61,7 +61,7 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
     expect(p.combat!.weapon).toBe(stack!.itemId) // combat.weapon is consistent
     expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
     // Starter pistol comes back fully loaded (moddable slot, carries mods).
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: STARTER_AMMO }])
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
   })
 
   it('normal revive KEEPS key items and re-slots the starter ahead of them', () => {
@@ -73,7 +73,7 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
     downAndRevive(w, p)
 
     expect(p.loadout!.inventory).toEqual([
-      { itemId: 'pistol', qty: STARTER_AMMO },
+      { itemId: 'pistol', qty: 1 },
       { itemId: 'keycard.red', qty: 1 },
     ])
     expect(weaponStack(p)!.itemId).toBe('pistol') // activeSlot 0 still resolves the gun
@@ -131,7 +131,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
     return e
   }
 
-  it('a phantom RANGED weapon (combat.weapon set, empty inventory) is slotted + equipped, then modded', () => {
+  it('a phantom RANGED weapon (combat.weapon set, empty inventory) is slotted, then modded', () => {
     const p = bareEntity()
     p.combat!.weapon = 'machinegun' // legacy-save phantom: named but unslotted
     const res = applyModPickup(p, 'bounce')
@@ -139,8 +139,11 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
     const stack = weaponStack(p)
     expect(stack).toBeDefined()
     expect(stack!.itemId).toBe('machinegun')
-    expect(stack!.qty).toBe(30) // materialized with a full magazine
-    expect(p.loadout!.activeSlot).toBe(0)
+    expect(stack!.qty).toBe(1) // no ammo: a gun materializes at a flat 1, as a home for mods
+    // Slotted but NOT equipped: a weapon slot is never selectable (the weapon is
+    // permanent), so activeSlot stays the held-item cursor. What matters is that
+    // `weaponStack` reaches the slot, which is where the mod lands.
+    expect(p.loadout!.activeSlot).toBe(-1)
     expect(p.combat!.weapon).toBe('machinegun')
     expect(stack!.mods).toEqual([{ id: 'bounce', stacks: 1 }])
   })
@@ -176,7 +179,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
   it('a full inventory cannot be over-stuffed by materialization (leaves the mod on the ground)', () => {
     const p = bareEntity()
     p.combat!.weapon = 'pistol'
-    p.loadout!.inventory = Array.from({ length: 6 }, () => ({ itemId: 'bandage', qty: 1 }))
+    p.loadout!.inventory = Array.from({ length: 6 }, () => ({ itemId: 'grenade', qty: 1 }))
     const res = applyModPickup(p, 'frost')
     expect(res).toBeNull()
     expect(p.loadout!.inventory).toHaveLength(6) // MAX_SLOTS respected

@@ -37,6 +37,30 @@ export const isBetaSlug = (value: string): boolean =>
   value.length > 0 && value.length <= MAX_SLUG_LENGTH && BETA_SLUG_RE.test(value)
 
 /**
+ * The slug shape CI mints for a PULL REQUEST's beta: `pr-<number>`.
+ *
+ * WHY A SECOND SCHEME EXISTS AT ALL. slugifyBranch keeps only the branch's last
+ * segment, so `feat/x` and `preview/x` are the same beta — documented, accepted,
+ * and fine while a human chooses when to publish. It stops being fine the moment
+ * EVERY open PR publishes automatically: two PRs whose branches happen to end in
+ * the same word would silently overwrite each other's beta, and the loser would
+ * be a PR comment pointing at somebody else's build. A GitHub PR number is
+ * unique within a repo and is never reused, so `pr-<number>` cannot collide with
+ * another PR no matter what the branches are called. It also survives a force
+ * push and a branch rename, which is what lets ONE sticky comment keep the same
+ * URL for the PR's whole life.
+ */
+export const PR_SLUG_RE = /^pr-[0-9]+$/
+
+/** PR number → the slug its beta is published under. */
+export const betaSlugForPr = (prNumber: number | string): string | null => {
+  const digits = String(prNumber).trim()
+  if (!/^[0-9]+$/.test(digits) || Number(digits) <= 0) return null
+  const slug = `pr-${Number(digits)}`
+  return isBetaSlug(slug) ? slug : null
+}
+
+/**
  * Branch name → beta slug, or null when nothing usable survives.
  *
  * THE RULE: take the branch's LAST `/`-separated segment, lowercase it, turn
@@ -55,6 +79,12 @@ export const isBetaSlug = (value: string): boolean =>
  * URL a human can type. The publish script records the full branch name in the
  * beta's index entry, so `/betas/` always shows which branch the bytes came
  * from — if two branches are fighting over one slug, the listing says so.
+ *
+ * ONE SLUG IS NOT AVAILABLE TO A BRANCH: `pr-<digits>` is reserved for the
+ * PR-triggered betas (PR_SLUG_RE). A branch called `preview/pr-7` would
+ * otherwise overwrite PR #7's beta and make its sticky comment a lie about
+ * whose code is at that URL, with no error anywhere — so this refuses instead,
+ * and the publish fails loudly with a name the author can change.
  */
 export const slugifyBranch = (branch: string): string | null => {
   const last = branch.split('/').pop() ?? ''
@@ -64,7 +94,27 @@ export const slugifyBranch = (branch: string): string | null => {
     .replace(/^-+|-+$/g, '')
     .slice(0, MAX_SLUG_LENGTH)
     .replace(/-+$/, '')
+  if (PR_SLUG_RE.test(slug)) return null
   return isBetaSlug(slug) ? slug : null
+}
+
+/**
+ * The ONE resolver every publisher goes through: a PR number wins, a branch
+ * name is the fallback, and nothing else mints a slug.
+ *
+ * Vite (which bakes the base path into the bundle) and scripts/publish-beta.mts
+ * (which decides the KV prefix) both call this with the same two environment
+ * inputs, so the path the HTML asks for and the path the bytes are stored under
+ * cannot disagree — the same reason slugifyBranch itself lives in one file.
+ */
+export const resolveBetaSlug = (input: {
+  pr?: string | number | null
+  branch?: string | null
+}): string | null => {
+  const pr = input.pr === null || input.pr === undefined ? '' : String(input.pr).trim()
+  if (pr !== '') return betaSlugForPr(pr)
+  const branch = (input.branch ?? '').trim()
+  return branch === '' ? null : slugifyBranch(branch)
 }
 
 /**

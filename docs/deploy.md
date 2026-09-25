@@ -448,16 +448,28 @@ pnpm run beta:publish                          # upload dist/ to KV, print the U
 # → https://sporefall.hypnodroid.com/betas/sequenced-mods/
 ```
 
-CI does both on every push to a `preview/**` branch (`preview-web.yml`) and
-prints the URL in the job summary. `/betas/` lists everything published.
+**CI does this for every pull request, with no branch naming needed.**
+`preview-web.yml` runs on `pull_request` (opened/synchronize/reopened) and
+publishes to `/betas/pr-<number>/`, then posts **one sticky comment** on the PR
+with the URL, the slug, the commit it was built from and a timestamp — edited in
+place on each push rather than added to. It still runs on a push to a
+`preview/**` branch, for work that has no PR yet. `/betas/` lists everything
+published.
 
-### The slug
+### The slug: two rules, and why
 
-`src/app/betaSlug.ts` owns the rule, and **everything** imports it from there —
-the Vite config, the publish script, the Worker, and the running game. Take the
-branch's **last `/`-separated segment**, lowercase it, collapse every run of
-non-alphanumerics to a single `-`, trim leading/trailing dashes, cut to 40
-characters:
+`src/app/betaSlug.ts` owns both, and **everything** imports them from there —
+the Vite config, the publish script, the Worker, and the running game.
+`resolveBetaSlug()` is the single entry point: a PR number wins, a branch name
+is the fallback.
+
+**A pull request → `pr-<number>`.** Unique per repo, never reused, and unchanged
+by a force push or a branch rename — so the URL in the sticky comment stays true
+for the PR's whole life, and two PRs can never land on the same beta.
+
+**A branch → its last `/`-separated segment**, lowercased, every run of
+non-alphanumerics collapsed to a single `-`, leading/trailing dashes trimmed,
+cut to 40 characters:
 
 | branch | slug |
 |---|---|
@@ -466,11 +478,27 @@ characters:
 | `release/v1.2.3` | `v1-2-3` |
 | `fix/foo/bar` | `bar` |
 | `feat/___` | *(refused — nothing publishable)* |
+| `preview/pr-7` | *(refused — `pr-<n>` is reserved for PR betas)* |
 
 Only the last segment survives, so `feat/x` and `preview/x` share a slug and the
-second publish wins. That is the deliberate trade for a URL a human can type;
-the `/betas/` listing shows each beta's **full branch name**, which is the only
-place such a collision is visible.
+second publish wins. That is the deliberate trade for a URL a human can type,
+and it is exactly why an automatic per-PR beta does **not** use it: two open PRs
+whose branches end in the same word would overwrite each other and each PR's
+comment would link to the other's build — HTTP 200, the right URL, the wrong
+code. `pr-<digits>` is therefore refused as a *branch* slug too, so a branch
+cannot hijack a PR's beta either.
+
+The `/betas/` listing labels a PR beta `PR #<n> · <branch>` and a branch beta by
+its branch alone, so which rule a row is living under is readable on the page —
+and a branch-slug collision is still visible there, as it always was.
+
+### Fork PRs
+
+A fork's `pull_request` run gets a read-only token and **no repository
+secrets** — it can neither write to KV nor comment. `preview-web.yml` detects
+that (`head.repo.full_name != github.repository`), skips green, and writes the
+reason into the job summary. To get a beta for a fork's changes, push the branch
+to this repository as `preview/<name>`.
 
 ### The three traps, and what defends against each
 
@@ -522,12 +550,23 @@ curl -s  https://sporefall.hypnodroid.com/betas/<slug>/ | grep -o 'src="/[^"]*"'
 
 ### Housekeeping
 
-Betas are permanent until removed. To drop one:
+A **PR beta deletes itself** when the PR closes (merged or not): the `cleanup`
+job in `preview-web.yml` runs `scripts/unpublish-beta.mts` and rewrites the
+sticky comment to say the beta is gone. Without that, KV would keep a whole
+`dist/` — 500+ keys — per PR forever, and `/betas/` would fill with rows for
+work that landed months ago.
+
+A **branch beta is permanent until someone removes it**, because nothing tells
+CI when a `preview/**` branch is done with. Remove one by hand:
 
 ```bash
-pnpm exec wrangler kv key list --binding BETAS --prefix 'b/<slug>/' --remote
-# …then `kv bulk delete` that list, plus the `i/<slug>` index entry.
+pnpm run beta:unpublish --branch preview/foo   # or: --pr 123
 ```
+
+That lists `b/<slug>/`, deletes every key under it **and** the `i/<slug>` index
+row in the same batch — a half-removed beta whose row survives leaves `/betas/`
+advertising a URL whose files are gone. It is not an error when there is nothing
+to delete.
 
 ## Sources
 

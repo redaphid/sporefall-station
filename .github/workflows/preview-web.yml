@@ -1,16 +1,26 @@
 name: preview-web
 
-# Per-branch BETA builds, so risky work can be looked at without it reaching the
-# live game. The standing rule this implements: conservative work goes to `main`
-# (deploy-web.yml, which is what phones actually run); anything the owner might
-# want to veto — combat changes, removals, new art — goes here first and he
-# judges it from a URL.
+# Every pull request gets a playable BETA, and the PR says where it is.
 #
-#   https://sporefall.hypnodroid.com/betas/<slug>/
+#   https://sporefall.hypnodroid.com/betas/pr-<number>/
 #
-# <slug> is the branch's last path segment, sanitized — `preview/sequenced-mods`
-# becomes `sequenced-mods`. src/app/betaSlug.ts owns that rule and is the single
-# place it is defined; this workflow never re-implements it.
+# The point is that the owner never has to ask for one, and never has to go
+# looking. Opening a PR publishes a build; every push republishes it; ONE sticky
+# comment on the PR carries the URL, the commit and the timestamp, edited in
+# place rather than added to; closing the PR deletes the beta again.
+#
+# WHY THE SLUG IS `pr-<number>` AND NOT THE BRANCH. src/app/betaSlug.ts takes a
+# branch's LAST path segment, so `feat/x` and `preview/x` are the same beta —
+# an accepted trade back when a human chose when to publish (#80), and a real
+# hazard now that every PR publishes by itself: two PRs whose branches end in
+# the same word would overwrite each other and each comment would link to the
+# other's build, with nothing in the response to say so. A PR number is unique
+# per repo, never reused, and survives a force push or a branch rename, so the
+# URL in the sticky comment stays true for the PR's whole life. `/betas/` labels
+# those rows `PR #<n> · <branch>` so the two slug rules are told apart there too.
+#
+# The original trigger still works: a push to `preview/**` publishes under the
+# branch's last segment, for work that has no PR yet.
 #
 # WHAT THIS JOB DOES NOT DO: it does not deploy the Worker, touch production's
 # routes, publish an OTA manifest, or shift any traffic. It builds the app with
@@ -22,31 +32,74 @@ name: preview-web
 # this account sits behind a wildcard Access app. The job went green while the
 # preview was unreachable, which is worse than having no preview job at all. The
 # long version is in docs/deploy.md § "Previews".
-#
-# Trigger: push to preview/** (or run it by hand against any branch).
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: ['preview/**']
   workflow_dispatch:
 
+# `pull-requests: write` is what lets the sticky comment be written at all.
+# GitHub hands a FORK's pull_request run a read-only token and no secrets, so on
+# a fork this permission is not granted whatever is written here — which is why
+# the fork case is a separate, explicitly skipping job below rather than a
+# failure everyone learns to ignore.
 permissions:
   contents: read
+  pull-requests: write
 
-# Previews are per-branch, so only cancel superseded runs of the SAME branch —
-# unlike the deploy workflow, two different previews may build concurrently.
+# One beta per PR (or per preview branch), so a second push supersedes the first
+# rather than racing it into the same KV prefix. Two DIFFERENT PRs still build
+# concurrently — they have different groups and, now, different slugs.
 concurrency:
-  group: preview-web-${{ github.ref }}
+  group: preview-web-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  preview:
+  # A fork PR cannot reach CLOUDFLARE_API_TOKEN and cannot write a comment, so
+  # there is nothing for the real job to do and no way to say so on the PR. Say
+  # it in the job summary and go green: a red X on a contributor's first PR,
+  # for a beta they were never going to get, teaches the wrong lesson.
+  fork-note:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    name: Skip beta (fork PR — no secrets, read-only token)
+    steps:
+      - name: Explain the skip
+        run: |
+          {
+            echo "### No beta for this PR"
+            echo
+            echo "It comes from a fork (\`${{ github.event.pull_request.head.repo.full_name }}\`)."
+            echo "A fork's \`pull_request\` run gets a read-only token and no repository"
+            echo "secrets, so this job can neither publish to KV nor comment on the PR."
+            echo
+            echo "To get a beta for these changes, push the branch to this repository"
+            echo "(e.g. as \`preview/<name>\`) and it will publish under its own slug."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  beta:
+    # Publish for: a same-repo PR that is open, or a push to preview/**, or a
+    # hand-run. Never for a closed PR — that is the cleanup job's event.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action != 'closed' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     name: Publish a beta build (no deploy, no traffic shift)
     steps:
+      # For a PR, check out the HEAD commit rather than the default
+      # refs/pull/N/merge. A beta is meant to be "this branch, as it stands" —
+      # the same thing a preview/** push publishes — and the sha in the sticky
+      # comment has to be one the author can find in their own branch.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -63,17 +116,38 @@ jobs:
       - name: Check theme manifests against assets on disk
         run: pnpm exec vitest run src/render/themeManifestSync.test.ts
 
-      # BETA_SLUG is what makes this a beta rather than a normal build: it sets
-      # Vite's `base` to /betas/<slug>/ so index.html asks for its JavaScript at
-      # /betas/<slug>/assets/… . Without it the built page would request
-      # /assets/… and be answered by PRODUCTION's bundle — a 200, the right URL,
-      # and the wrong build. It also switches off the service worker, which
-      # would otherwise be registered with scope '/' and hijack the live game
-      # for whoever opened the beta. See vite.config.ts.
+      # The slug, the branch and the commit, resolved ONCE and reused by the
+      # build, the publish and the comment. Computing them per-step is how a
+      # comment ends up describing a build that was made from something else.
+      - name: Resolve beta identity
+        id: id
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          BRANCH="${HEAD_BRANCH:-${GITHUB_REF_NAME}}"
+          SHA="${HEAD_SHA:-${GITHUB_SHA}}"
+          {
+            echo "pr=${PR:-}"
+            echo "branch=$BRANCH"
+            echo "sha=$SHA"
+            echo "builtAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      # BETA_SLUG/BETA_PR are what make this a beta rather than a normal build:
+      # they set Vite's `base` to /betas/<slug>/ so index.html asks for its
+      # JavaScript at /betas/<slug>/assets/… . Without them the built page would
+      # request /assets/… and be answered by PRODUCTION's bundle — a 200, the
+      # right URL, and the wrong build. They also switch off the service worker,
+      # which would otherwise be registered with scope '/' and hijack the live
+      # game for whoever opened the beta. See vite.config.ts.
       - name: Build beta bundle
         run: pnpm run build
         env:
-          BETA_SLUG: ${{ github.ref_name }}
+          BETA_PR: ${{ steps.id.outputs.pr }}
+          BETA_SLUG: ${{ steps.id.outputs.branch }}
           CAP_SERVER_URL: ""
 
       # Upload dist/ to the BETAS KV namespace. Needs Workers KV Storage:Edit,
@@ -93,11 +167,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          BETA_SLUG: ${{ github.ref_name }}
-          GITHUB_SHA: ${{ github.sha }}
+          BETA_PR: ${{ steps.id.outputs.pr }}
+          BETA_SLUG: ${{ steps.id.outputs.branch }}
+          GITHUB_SHA: ${{ steps.id.outputs.sha }}
 
       # Surface the URL somewhere findable rather than making anyone read the log.
       - name: Beta URL
+        if: steps.publish.outputs.url != ''
         env:
           URL: ${{ steps.publish.outputs.url }}
         run: |
@@ -106,7 +182,7 @@ jobs:
           {
             echo "### Beta build"
             echo
-            echo "Branch \`${{ github.ref_name }}\` is live at:"
+            echo "Branch \`${{ steps.id.outputs.branch }}\` is live at:"
             echo
             echo "$URL"
             echo
@@ -114,3 +190,110 @@ jobs:
             echo
             echo "_Nothing was deployed — this is an upload to KV. Production is unchanged._"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # THE STICKY COMMENT. `if: always()` on purpose: when the publish fails,
+      # the comment must SAY so. Leaving the previous success in place would
+      # hand the owner a URL that still loads — serving the build from two
+      # pushes ago — with the PR insisting it is current. A beta that is quietly
+      # stale is the exact failure /betas/ exists to avoid.
+      - name: Comment the beta URL on the PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          URL: ${{ steps.publish.outputs.url }}
+          SLUG_BRANCH: ${{ steps.id.outputs.branch }}
+          SHA: ${{ steps.id.outputs.sha }}
+          BUILT_AT: ${{ steps.id.outputs.builtAt }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "$URL" ]; then
+            {
+              echo "### ▶ Play this PR"
+              echo
+              echo "**$URL**"
+              echo
+              echo "| | |"
+              echo "|---|---|"
+              echo "| slug | \`pr-$PR\` |"
+              echo "| branch | \`$SLUG_BRANCH\` |"
+              echo "| built from | \`${SHA:0:8}\` |"
+              echo "| built at | $BUILT_AT |"
+              echo
+              echo "If the commit above is not the tip of this branch, the beta is stale —"
+              echo "push again, or re-run [the workflow]($RUN_URL)."
+              echo
+              echo "_Nothing was deployed. The build was uploaded to KV; production is unchanged._"
+              echo "_All betas: <https://sporefall.hypnodroid.com/betas/>_"
+            } > comment.md
+          else
+            {
+              echo "### ▶ Play this PR"
+              echo
+              echo "**No beta for \`${SHA:0:8}\` — the publish failed.** See [the run]($RUN_URL)."
+              echo
+              echo "Any URL this comment showed before pointed at an OLDER commit, so it was"
+              echo "removed rather than left up: a beta that silently lags its PR is worse"
+              echo "than no beta."
+              echo
+              echo "_Attempted at $BUILT_AT for branch \`$SLUG_BRANCH\`._"
+            } > comment.md
+          fi
+          bash .github/scripts/sticky-comment.sh "$PR" comment.md
+
+  # Delete the PR's beta when the PR closes (merged or not). Without this, KV
+  # keeps a whole dist/ per PR forever and `/betas/` fills with rows nobody will
+  # ever open again. Merged work is on production; abandoned work should not be
+  # playable at a stable URL.
+  cleanup:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    name: Delete this PR's beta
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Not fatal when there is nothing to delete — a PR closed without ever
+      # publishing is normal, and a cleanup job that goes red for it gets muted.
+      - name: Remove the beta from KV
+        run: pnpm exec tsx scripts/unpublish-beta.mts --pr "$PR"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR: ${{ github.event.pull_request.number }}
+
+      # Update the same sticky comment rather than adding a farewell one, and
+      # rather than leaving a link that now 404s.
+      - name: Retire the sticky comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### ▶ Play this PR"
+            echo
+            if [ "$MERGED" = "true" ]; then
+              echo "This PR is merged, so its beta was deleted — the code is on"
+              echo "<https://sporefall.hypnodroid.com/> now."
+            else
+              echo "This PR was closed without merging, so its beta was deleted."
+            fi
+            echo
+            echo "_Other betas: <https://sporefall.hypnodroid.com/betas/>_"
+          } > comment.md
+          bash .github/scripts/sticky-comment.sh "$PR" comment.md

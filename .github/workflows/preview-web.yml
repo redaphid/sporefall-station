@@ -169,7 +169,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BETA_PR: ${{ steps.id.outputs.pr }}
           BETA_SLUG: ${{ steps.id.outputs.branch }}
-          GITHUB_SHA: ${{ steps.id.outputs.sha }}
+          # BETA_SHA and NOT GITHUB_SHA. On a `pull_request` run GITHUB_SHA is
+          # the ephemeral refs/pull/N/merge commit, not the branch tip this job
+          # checked out and built — and setting `GITHUB_SHA:` here does NOT
+          # override it, because GitHub reserves the `GITHUB_` prefix and drops
+          # the assignment without a word. The first run of this workflow wrote
+          # a /betas/ row citing the merge commit while the PR comment cited the
+          # branch tip: two commits, same bytes, nothing saying which was true.
+          BETA_SHA: ${{ steps.id.outputs.sha }}
 
       # Surface the URL somewhere findable rather than making anyone read the log.
       - name: Beta URL

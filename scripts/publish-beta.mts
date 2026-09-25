@@ -78,6 +78,18 @@ interface Options {
    * last segment, which is the only slug shape two open PRs cannot collide on.
    * Empty string means "publish under the branch name", the original rule. */
   pr: string
+  /** Commit the bundle was built from, recorded in the listing entry.
+   *
+   * IT CANNOT BE READ FROM `GITHUB_SHA`, which is the trap that produced the
+   * first wrong entry this script ever wrote. On a `pull_request` run GITHUB_SHA
+   * is the ephemeral refs/pull/N/merge commit, NOT the branch tip the workflow
+   * checks out and builds — and a step-level `env: GITHUB_SHA:` override does
+   * not fix it, because GitHub reserves the `GITHUB_` prefix and ignores the
+   * assignment silently. The result was a `/betas/` row and a PR comment citing
+   * two different commits for the same bytes, with no way to tell which lied.
+   * So the caller states the sha explicitly, under a name GitHub will not
+   * intercept. */
+  sha: string
   dist: string
   origin: string
   /** Write to `wrangler dev`'s SIMULATED KV instead of the real namespace, so a
@@ -95,6 +107,8 @@ const parseArgs = (argv: string[]): Options => {
     // wants recorded, so the workflow passes BETA_SLUG=<head branch> too.
     branch: process.env.BETA_SLUG || process.env.GITHUB_REF_NAME || git(['rev-parse', '--abbrev-ref', 'HEAD']),
     pr: (process.env.BETA_PR ?? '').trim(),
+    // BETA_SHA, not GITHUB_SHA — see Options.sha.
+    sha: (process.env.BETA_SHA ?? '').trim(),
     dist: join(REPO_ROOT, 'dist'),
     origin: DEFAULT_ORIGIN,
     local: false,
@@ -103,6 +117,7 @@ const parseArgs = (argv: string[]): Options => {
     const arg = argv[i]
     if (arg === '--branch') opts.branch = argv[++i] ?? ''
     else if (arg === '--pr') opts.pr = (argv[++i] ?? '').trim()
+    else if (arg === '--sha') opts.sha = (argv[++i] ?? '').trim()
     else if (arg === '--dist') opts.dist = resolve(argv[++i] ?? '')
     else if (arg === '--origin') opts.origin = (argv[++i] ?? '').replace(/\/$/, '')
     else if (arg === '--local') opts.local = true
@@ -219,7 +234,7 @@ const main = async (): Promise<void> => {
   const entry = {
     slug,
     branch: opts.branch,
-    sha: process.env.GITHUB_SHA || git(['rev-parse', 'HEAD']),
+    sha: opts.sha || process.env.GITHUB_SHA || git(['rev-parse', 'HEAD']),
     builtAt: new Date().toISOString(),
     files: records.length,
     ...(opts.pr === '' ? {} : { pr: Number(opts.pr) }),

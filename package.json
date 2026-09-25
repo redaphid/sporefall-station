@@ -16,6 +16,7 @@
     "worker:dev": "wrangler dev",
     "review:image": "node scripts/review-image.mjs",
     "beta:publish": "tsx scripts/publish-beta.mts",
+    "beta:unpublish": "tsx scripts/unpublish-beta.mts",
     "worker:deploy": "wrangler deploy",
     "preview": "vite preview",
     "test": "vitest run",

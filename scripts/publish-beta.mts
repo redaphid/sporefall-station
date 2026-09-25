@@ -4,6 +4,15 @@
 //   BETA_SLUG=feat/sequenced-mods pnpm run build     # build with the right base
 //   pnpm run beta:publish                            # upload dist/ to KV
 //
+// For a PULL REQUEST the slug comes from the PR number instead of the branch,
+// because every open PR now publishes automatically and two branches ending in
+// the same word must not overwrite each other (src/app/betaSlug.ts):
+//
+//   BETA_PR=123 BETA_SLUG=feat/x pnpm run build      # base = /betas/pr-123/
+//   pnpm run beta:publish --pr 123                   # KV prefix b/pr-123/
+//
+// Removing one again: `pnpm run beta:unpublish --pr 123` (scripts/unpublish-beta.mts).
+//
 // This is an UPLOAD, not a deploy — the same model as `pnpm run review:image`,
 // and for the same reason: a beta has to be reachable BEFORE its PR merges.
 // Nothing here touches the production Worker, its routes or its assets. (The
@@ -26,7 +35,7 @@ import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BETAS_PREFIX, slugifyBranch } from '../src/app/betaSlug.ts'
+import { BETAS_PREFIX, resolveBetaSlug } from '../src/app/betaSlug.ts'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const BINDING = 'BETAS'
@@ -64,6 +73,23 @@ const git = (args: string[]): string => {
 
 interface Options {
   branch: string
+  /** Pull request number, when publishing FOR a PR. Set by the CI job that runs
+   * on `pull_request`; it makes the slug `pr-<number>` instead of the branch's
+   * last segment, which is the only slug shape two open PRs cannot collide on.
+   * Empty string means "publish under the branch name", the original rule. */
+  pr: string
+  /** Commit the bundle was built from, recorded in the listing entry.
+   *
+   * IT CANNOT BE READ FROM `GITHUB_SHA`, which is the trap that produced the
+   * first wrong entry this script ever wrote. On a `pull_request` run GITHUB_SHA
+   * is the ephemeral refs/pull/N/merge commit, NOT the branch tip the workflow
+   * checks out and builds — and a step-level `env: GITHUB_SHA:` override does
+   * not fix it, because GitHub reserves the `GITHUB_` prefix and ignores the
+   * assignment silently. The result was a `/betas/` row and a PR comment citing
+   * two different commits for the same bytes, with no way to tell which lied.
+   * So the caller states the sha explicitly, under a name GitHub will not
+   * intercept. */
+  sha: string
   dist: string
   origin: string
   /** Write to `wrangler dev`'s SIMULATED KV instead of the real namespace, so a
@@ -76,8 +102,13 @@ interface Options {
 const parseArgs = (argv: string[]): Options => {
   const opts: Options = {
     // GITHUB_REF_NAME is what the CI job has; the local git branch is the
-    // fallback so the same command works from a laptop.
+    // fallback so the same command works from a laptop. On a `pull_request`
+    // run GITHUB_REF_NAME is `<n>/merge`, which is not a branch name anybody
+    // wants recorded, so the workflow passes BETA_SLUG=<head branch> too.
     branch: process.env.BETA_SLUG || process.env.GITHUB_REF_NAME || git(['rev-parse', '--abbrev-ref', 'HEAD']),
+    pr: (process.env.BETA_PR ?? '').trim(),
+    // BETA_SHA, not GITHUB_SHA — see Options.sha.
+    sha: (process.env.BETA_SHA ?? '').trim(),
     dist: join(REPO_ROOT, 'dist'),
     origin: DEFAULT_ORIGIN,
     local: false,
@@ -85,6 +116,8 @@ const parseArgs = (argv: string[]): Options => {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--branch') opts.branch = argv[++i] ?? ''
+    else if (arg === '--pr') opts.pr = (argv[++i] ?? '').trim()
+    else if (arg === '--sha') opts.sha = (argv[++i] ?? '').trim()
     else if (arg === '--dist') opts.dist = resolve(argv[++i] ?? '')
     else if (arg === '--origin') opts.origin = (argv[++i] ?? '').replace(/\/$/, '')
     else if (arg === '--local') opts.local = true
@@ -158,8 +191,13 @@ const bulk = (verb: 'put' | 'delete', payload: unknown[], chunkBytes = 20_000_00
 const main = async (): Promise<void> => {
   const opts = parseArgs(process.argv.slice(2))
   STORE = opts.local ? '--local' : '--remote'
-  const slug = slugifyBranch(opts.branch)
-  if (slug === null) die(`branch ${JSON.stringify(opts.branch)} does not sanitize to a usable beta slug`)
+  const slug = resolveBetaSlug({ pr: opts.pr, branch: opts.branch })
+  if (slug === null)
+    die(
+      opts.pr === ''
+        ? `branch ${JSON.stringify(opts.branch)} does not sanitize to a usable beta slug`
+        : `--pr ${JSON.stringify(opts.pr)} is not a usable pull request number`,
+    )
   if (!existsSync(join(opts.dist, 'index.html'))) die(`${opts.dist}/index.html is missing — run the build first`)
 
   const indexHtml = readFileSync(join(opts.dist, 'index.html'), 'utf8')
@@ -190,12 +228,16 @@ const main = async (): Promise<void> => {
   bulk('put', records)
   bulk('delete', stale)
 
+  // `pr` is omitted rather than set to 0 for a branch publish: src/worker/
+  // betas.ts treats its PRESENCE as the statement "this slug is PR-unique", and
+  // a falsy-but-present number would label a branch beta as PR #0.
   const entry = {
     slug,
     branch: opts.branch,
-    sha: process.env.GITHUB_SHA || git(['rev-parse', 'HEAD']),
+    sha: opts.sha || process.env.GITHUB_SHA || git(['rev-parse', 'HEAD']),
     builtAt: new Date().toISOString(),
     files: records.length,
+    ...(opts.pr === '' ? {} : { pr: Number(opts.pr) }),
   }
   bulk('put', [{ key: `i/${slug}`, value: JSON.stringify(entry) }])
 

@@ -28,9 +28,11 @@ export interface BossViewLike {
  * run is over.
  *
  * This is the same condition that raises the restart overlay
- * (`screens.restartAffordance`), and `bossModel.equivalence.test.ts` pins the
- * two together so they cannot drift apart. It is stated here rather than
- * imported from `screens.ts` because `screens.ts` imports *this* module.
+ * (`screens.restartAffordance`), and the `playerOutOfFight tracks
+ * restartAffordance exactly` suite in `bossHud.death.test.ts` pins the two
+ * together over the same eight views so they cannot drift apart. It is stated
+ * here rather than imported from `screens.ts` because `screens.ts` imports
+ * *this* module.
  */
 export const playerOutOfFight = (view: BossViewLike): boolean =>
   !!view.gameOver || !!view.self?.dead || !!view.self?.playerCtl?.downed

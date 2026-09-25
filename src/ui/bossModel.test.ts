@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../game/entity'
 import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from '../game/systems/behaviors'
 import type { SimEvent } from '../game/types'
-import { bossBar, bossPhase, bossRevealName, latchBossId } from './bossModel'
+import { bossBar, bossPhase, bossRevealName, isRunReset, latchBossId, playerOutOfFight } from './bossModel'
 
 const NAME = 'Mireclaw Alpha'
 
@@ -18,7 +18,17 @@ const bossEntity = (id: number, hp: number, max = 320): Entity => {
   e.health = { hp, max, iframes: 0 }
   return e
 }
-const view = (entities: Entity[], events: SimEvent[] = []) => ({ entities, events })
+/** A local player entity — alive and standing unless told otherwise. */
+const player = (over: { dead?: boolean; downed?: boolean } = {}): Entity => {
+  const e = makeEntity('player', 'player', 1, 1)
+  e.dead = over.dead
+  e.playerCtl = {
+    playerId: 0,
+    ...(over.downed ? { downed: { bleedTicks: 900, reviveProgress: 0 } } : {}),
+  } as Entity['playerCtl']
+  return e
+}
+const view = (entities: Entity[], events: SimEvent[] = []) => ({ entities, events, self: player() })
 const reveal = (entityId: number, maxHp = 320): SimEvent => ({ type: 'bossReveal', entityId, x: 5, y: 5, maxHp })
 
 describe('latchBossId', () => {
@@ -117,5 +127,91 @@ describe('bossBar', () => {
     const other = bossEntity(9, 320)
     const mine = bossEntity(1, 160)
     expect(bossBar(view([other, mine]), 1, NAME)?.hp).toBe(160)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The reported bug: "I still see the boss health bar when I die."
+//
+// The bar was gated ONLY on the boss being alive, never on the player. A boss
+// at full HP is still very much alive when it kills you, so the bar stayed up —
+// and because the HUD carries z-index:66 while the restart overlay carries
+// none, it painted on TOP of the YOU DIED scrim rather than behind it.
+// ---------------------------------------------------------------------------
+
+describe('playerOutOfFight — the local player is no longer playing', () => {
+  it('is false during ordinary play', () => {
+    expect(playerOutOfFight({ entities: [], events: [], self: player() })).toBe(false)
+  })
+
+  it('is true when the local player is DEAD', () => {
+    expect(playerOutOfFight({ entities: [], events: [], self: player({ dead: true }) })).toBe(true)
+  })
+
+  it('is true when the local player is DOWNED (bleeding out)', () => {
+    expect(playerOutOfFight({ entities: [], events: [], self: player({ downed: true }) })).toBe(true)
+  })
+
+  it('is true at game-over even if self still looks alive', () => {
+    expect(playerOutOfFight({ entities: [], events: [], self: player(), gameOver: true })).toBe(true)
+  })
+
+  it('is false with no self at all — a spectator frame is not a death screen', () => {
+    expect(playerOutOfFight({ entities: [], events: [] })).toBe(false)
+  })
+})
+
+describe('bossBar hides while the player is out of the fight', () => {
+  const liveBoss = () => [bossEntity(1, 320)]
+
+  it('REGRESSION: a healthy boss draws NO bar once the local player is dead', () => {
+    const v = { entities: liveBoss(), events: [], self: player({ dead: true }) }
+    expect(bossBar(v, 1, NAME)).toBeNull()
+  })
+
+  it('draws no bar while the local player is downed and bleeding out', () => {
+    const v = { entities: liveBoss(), events: [], self: player({ downed: true }) }
+    expect(bossBar(v, 1, NAME)).toBeNull()
+  })
+
+  it('draws no bar at game-over', () => {
+    const v = { entities: liveBoss(), events: [], self: player(), gameOver: true }
+    expect(bossBar(v, 1, NAME)).toBeNull()
+  })
+
+  it('control: the SAME boss and latch DO draw a bar while the player is up', () => {
+    const v = { entities: liveBoss(), events: [], self: player() }
+    expect(bossBar(v, 1, NAME)?.hp).toBe(320)
+  })
+
+  it('comes back on a revive — the gate is not a one-way latch', () => {
+    const down = { entities: liveBoss(), events: [], self: player({ downed: true }) }
+    expect(bossBar(down, 1, NAME)).toBeNull()
+    const up = { entities: liveBoss(), events: [], self: player() }
+    expect(bossBar(up, 1, NAME)?.hp).toBe(320)
+  })
+
+  it('player and boss dying on the SAME frame still yields no bar', () => {
+    const dead = bossEntity(1, 0)
+    dead.dead = true
+    const v = { entities: [dead], events: [], self: player({ dead: true }) }
+    expect(bossBar(v, 1, NAME)).toBeNull()
+  })
+})
+
+describe('isRunReset — "Run it back" must not carry the latch into a new world', () => {
+  it('is false on the first frame we have ever seen', () => {
+    expect(isRunReset(undefined, 0)).toBe(false)
+    expect(isRunReset(undefined, 5000)).toBe(false)
+  })
+
+  it('is false while the tick advances normally', () => {
+    expect(isRunReset(10, 11)).toBe(false)
+    expect(isRunReset(10, 10)).toBe(false) // a repeated frame is not a new run
+  })
+
+  it('is TRUE when the tick goes backwards — the world was rebuilt in place', () => {
+    expect(isRunReset(5000, 0)).toBe(true)
+    expect(isRunReset(1, 0)).toBe(true)
   })
 })

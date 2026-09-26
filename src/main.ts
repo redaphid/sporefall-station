@@ -63,6 +63,7 @@ import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { notifyOtaReady } from './app/ota'
 import { FLOOR_TRANSITION_FRAMES, momentOf } from './app/updatePolicy'
+import { runRefresh } from './app/refresh'
 import { startUpdates, type Updates } from './app/updates'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
@@ -913,8 +914,8 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
 }
 
 /** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
- * panel and the Resume / New Seed / Run-it-back / Share-state actions.
- * `onResume` unpauses, `onNewSeed`/`onRestart`/`onShare` are wired only on
+ * panel and the Resume / New Seed / Run-it-back / Refresh / Share-state actions.
+ * `onResume` unpauses, `onNewSeed`/`onRestart`/`onRefresh`/`onShare` are wired only on
  * host/solo (undefined hides the button). Reachable via Escape, the pad's
  * Start button, or the ⏸ chrome button (main.ts — the only one of the three a
  * phone has). */
@@ -927,6 +928,8 @@ const createPauseOverlay = (
     onResume: () => void
     onNewSeed?: () => void
     onRestart?: () => void
+    /** Save, fetch the newest build, go to the picker. `show` paints its status. */
+    onRefresh?: (show: (text: string) => void) => void
     onShare?: (note?: string) => Promise<ShareResult>
     weaponThumb?: WeaponThumb
     modSwaps?: ModSwapQueue
@@ -983,6 +986,24 @@ const createPauseOverlay = (
     row.appendChild(rbBtn)
   }
   el.appendChild(row)
+  const onRefresh = actions.onRefresh
+  if (onRefresh) {
+    const refreshBtn = btn('⟳ Refresh', false)
+    refreshBtn.dataset.role = 'pause-refresh'
+    const status = document.createElement('div')
+    status.dataset.role = 'refresh-status'
+    status.style.cssText = 'font:600 14px system-ui;color:#cfd3e0;display:none'
+    refreshBtn.addEventListener('click', () => {
+      // One way out: nothing else on this panel may act on a run that is leaving.
+      for (const b of row.querySelectorAll('button')) b.disabled = true
+      onRefresh((text) => {
+        status.textContent = text
+        status.style.display = 'block'
+      })
+    })
+    row.appendChild(refreshBtn)
+    el.appendChild(status)
+  }
   // ── Share state ───────────────────────────────────────────────────────────
   // One tap: snapshot the live world (with the ring's run-up), verify it replays
   // to itself, upload it, put the URL on the clipboard. The state machine and
@@ -1284,10 +1305,32 @@ const runLoop = (
   // `const` (not the parameter) so TypeScript keeps the narrowing inside the
   // closure below.
   const sharing = stateRing
+  // Set by Refresh and never cleared: the page is on its way to the picker.
+  let leaving = false
+  const onRefresh = (show: (text: string) => void): void => {
+    void runRefresh({
+      save: () => {
+        const w = hostWorld()
+        if (w) persister?.flush(w)
+      },
+      leave: () => {
+        // An updater's own reload keeps the current URL, so point it at the picker first.
+        history.replaceState(null, '', import.meta.env.BASE_URL)
+        leaving = true
+      },
+      freshen: (ms) => updates.freshen(ms),
+      latest: () => updates.latest,
+      running: APP_VERSION,
+      show,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      goToMenu: () => location.replace(import.meta.env.BASE_URL),
+    })
+  }
   const pauseOverlay = createPauseOverlay(uiMount, {
     onResume: () => setPaused(false),
     onNewSeed,
     onRestart,
+    onRefresh,
     onShare: sharing ? (note) => sharing.share(note) : undefined,
     weaponThumb: renderer.weaponThumb,
     modSwaps,
@@ -1464,6 +1507,7 @@ const runLoop = (
         } else if (floorFrames > 0) floorFrames--
         updates.reportMoment(
           momentOf({
+            leaving,
             runOver: restartAffordance(view).visible,
             floorChanging: floorFrames > 0,
             paused,

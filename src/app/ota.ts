@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { decideApply, type UpdateMoment } from './updatePolicy'
+import type { CheckOutcome } from './webUpdate'
 
 // Over-the-air (OTA) web-bundle updates for the INSTALLED ANDROID APP.
 //
@@ -35,9 +36,25 @@ import { decideApply, type UpdateMoment } from './updatePolicy'
 export interface NativeUpdater {
   /** A verified bundle is downloaded and ready to be swapped in. */
   readonly staged: boolean
+  /** The newer build the last check found published, or null if none was seen. */
+  readonly latest: string | null
   /** Tell the updater where the player is. It applies if (and only if) it may. */
   reportMoment(moment: UpdateMoment, peers: number): void
+  /**
+   * Check NOW instead of waiting for the next launch, and wait (at most
+   * `timeoutMs`) for a newer bundle to download. The same contract as
+   * `WebUpdater.freshen`: `'staged'` means it is downloaded and will apply the
+   * moment the policy allows.
+   */
+  freshen(timeoutMs: number): Promise<CheckOutcome | 'timeout'>
 }
+
+/**
+ * What our /ota/check answers a phone that is already current (`decideOta` in
+ * src/worker/ota.ts). Capgo's `getLatest()` rejects with it as the message, so
+ * it is the one rejection that means "up to date" rather than "unreachable".
+ */
+export const OTA_UP_TO_DATE = 'up-to-date'
 
 /**
  * Confirm this bundle booted successfully, so the native side keeps it instead
@@ -70,7 +87,13 @@ export const startNativeUpdates = (): NativeUpdater | null => {
   // the "staged" flag — `set()` cannot be called without an id, so deriving one
   // from the other makes a staged-but-nameless bundle unrepresentable.
   let stagedId: string | null = null
+  let latest: string | null = null
   let applied = false
+  /** `freshen()` callers waiting on the download they started. */
+  const waiters: ((outcome: CheckOutcome) => void)[] = []
+  const settle = (outcome: CheckOutcome): void => {
+    for (const wake of waiters.splice(0)) wake(outcome)
+  }
   // Most conservative default: never apply before the app has said where the
   // player is (mirrors webUpdate.ts).
   let moment: UpdateMoment = 'inRun'
@@ -102,18 +125,49 @@ export const startNativeUpdates = (): NativeUpdater | null => {
     // A player sitting in the menu when the download lands should not have to
     // move for it to apply.
     applyIfAllowed()
+    settle('staged')
   }).catch(() => {
     // No plugin (dev live-reload) — updates simply never stage. Silent.
   })
+  void CapacitorUpdater.addListener('downloadFailed', () => settle('incomplete')).catch(() => {})
 
   return {
     get staged(): boolean {
       return stagedId !== null
     },
+    get latest(): string | null {
+      return latest
+    },
     reportMoment(next: UpdateMoment, nextPeers: number): void {
       moment = next
       peers = nextPeers
       applyIfAllowed()
+    },
+    async freshen(timeoutMs: number): Promise<CheckOutcome | 'timeout'> {
+      if (stagedId !== null) return 'staged'
+      // `getLatest` only asks. The download goes through the plugin's own
+      // pipeline below, which ends in the same `updateAvailable` as a launch.
+      try {
+        const found = await CapacitorUpdater.getLatest()
+        if (!found.url) return 'up-to-date'
+        latest = found.version
+      } catch (err) {
+        return err instanceof Error && err.message === OTA_UP_TO_DATE ? 'up-to-date' : 'unavailable'
+      }
+      if (stagedId !== null) return 'staged'
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve('timeout'), timeoutMs)
+        waiters.push((outcome) => {
+          clearTimeout(timer)
+          resolve(outcome)
+        })
+        CapacitorUpdater.triggerUpdateCheck().then(
+          (r) => {
+            if (r.status === 'unavailable') settle('unavailable')
+          },
+          () => settle('unavailable'),
+        )
+      })
     },
   }
 }

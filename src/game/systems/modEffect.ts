@@ -9,7 +9,8 @@
 import type { StatusApply, WeaponDef } from '../data/items'
 import { MODS, type BulletBehavior, type ResolvedTrigger } from '../data/mods'
 import type { WeaponMod } from '../entity'
-import { resolveWeapon } from './resolveWeapon'
+import { PLAYER_MELEE_MULT } from '../player'
+import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { pelletShares, planCasts, sequenceShape } from './modSequence'
 
 /** The fields of a resolved weapon that `fireWeapon` reads. Both kinds read
@@ -29,10 +30,14 @@ export interface ExecutedShot {
   behavior?: BulletBehavior
 }
 
-export const executedShot = (weapon: WeaponDef, mods: readonly WeaponMod[]): ExecutedShot => {
-  const rw = resolveWeapon(weapon, mods)
+/** The damage a swing deals before the target's defences: players hit harder
+ * with melee. fireWeapon calls this too, so the panel cannot drift from it. */
+export const meleeDamage = (resolvedDamage: number, byPlayer: boolean): number =>
+  Math.round(resolvedDamage * (byPlayer ? PLAYER_MELEE_MULT : 1))
+
+const shotFrom = (weapon: WeaponDef, rw: ResolvedWeapon, byPlayer: boolean): ExecutedShot => {
   const shot: ExecutedShot = {
-    damage: rw.damage,
+    damage: weapon.kind === 'melee' ? meleeDamage(rw.damage, byPlayer) : rw.damage,
     cooldownTicks: rw.cooldownTicks,
     onHit: rw.onHit,
     triggers: rw.triggers,
@@ -43,6 +48,61 @@ export const executedShot = (weapon: WeaponDef, mods: readonly WeaponMod[]): Exe
   shot.projectileSpeed = rw.projectileSpeed
   shot.behavior = rw.behavior
   return shot
+}
+
+/** One cast of `weapon` with `mods`, fired by a player unless `byPlayer` is false. */
+export const executedShot = (weapon: WeaponDef, mods: readonly WeaponMod[], byPlayer = true): ExecutedShot =>
+  shotFrom(weapon, resolveWeapon(weapon, mods), byPlayer)
+
+/** Everything one trigger pull fires, as a player. */
+export interface ExecutedPull {
+  casts: ExecutedShot[]
+  cooldownTicks: number
+  /** Ranged only: pellets across every cast, and the angle between the outer two. */
+  pellets?: number
+  fan?: number
+}
+
+/**
+ * The pull a player fires next. Mirrors fireWeapon and fireSequenced
+ * (combat.ts): in sequenced mode it plans the pull from `castIndex`, splits the
+ * pellets between its casts, fans them across one spread, and takes the slowest
+ * cast's cooldown, raised to the recharge when the pull wraps.
+ * `src/ui/loadoutTruth.test.ts` fires the real weapon and holds the panel to it.
+ */
+export const executedPull = (
+  weapon: WeaponDef,
+  mods: readonly WeaponMod[],
+  sequenced = false,
+  castIndex = 0,
+): ExecutedPull => {
+  if (!sequenced || mods.length === 0) {
+    const shot = executedShot(weapon, mods)
+    if (weapon.kind === 'melee') return { casts: [shot], cooldownTicks: shot.cooldownTicks }
+    return { casts: [shot], cooldownTicks: shot.cooldownTicks, pellets: shot.pellets, fan: shot.spread ?? 0 }
+  }
+  const shape = sequenceShape(weapon)
+  const plan = planCasts(mods, shape, castIndex)
+  // Every entry unknown or empty: the sim fires the bare weapon.
+  const castMods: WeaponMod[][] = plan.casts.length > 0 ? plan.casts.map((c) => c.mods) : [[]]
+  const recharge = (cd: number): number =>
+    plan.wrapped && shape.rechargeOnWrap > 0 ? Math.max(cd, shape.rechargeOnWrap) : cd
+  if (weapon.kind === 'melee') {
+    const shot = executedShot(weapon, castMods[0])
+    return { casts: [shot], cooldownTicks: recharge(shot.cooldownTicks) }
+  }
+  const shares = pelletShares(weapon.pellets ?? 1, shape.castsPerTrigger)
+  const rws = castMods.map((m, g) => resolveWeapon({ ...weapon, pellets: shares[g] }, m))
+  const total = rws.reduce((n, rw) => n + rw.pellets, 0)
+  const offsets: number[] = []
+  for (const rw of rws) for (let j = 0; j < rw.pellets; j++) offsets.push(total > 1 ? (offsets.length / (total - 1) - 0.5) * rw.spread : 0)
+  const casts = rws.map((rw) => shotFrom(weapon, rw, true))
+  return {
+    casts,
+    cooldownTicks: recharge(Math.max(1, ...casts.map((c) => c.cooldownTicks))),
+    pellets: total,
+    fan: Math.max(...offsets) - Math.min(...offsets),
+  }
 }
 
 /** `live`: the mod changes what fires. `inert`: it changes nothing. `penalty`:

@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { makeEntity, type Entity, type WeaponMod } from '../game/entity'
-import { spawnPlayer } from '../game/player'
+import { PLAYER_MELEE_MULT, spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld } from '../game/serialize'
 import { draftCards } from '../game/systems/draft'
 import { weaponStack } from '../game/systems/inventory'
@@ -70,7 +70,9 @@ describe('loadout: default casting', () => {
     expect(model.behaviors.map((b) => b.key)).toEqual(['onhit'])
     const dmg = model.stats.find((s) => s.key === 'damage')!
     expect(dmg.direction).toBe(-1)
-    expect(dmg.resolvedText).toBe(String(Math.round(WEAPONS.sledgehammer.damage * 0.8)))
+    // A player's swing carries the player melee bonus on top of Barrage's cut.
+    expect(dmg.resolvedText).toBe(String(Math.round(WEAPONS.sledgehammer.damage * 0.8 * PLAYER_MELEE_MULT)))
+    expect(dmg.baseText).toBe(String(Math.round(WEAPONS.sledgehammer.damage * PLAYER_MELEE_MULT)))
     expect(model.stats.map((s) => s.key)).toContain('knockback')
   })
 

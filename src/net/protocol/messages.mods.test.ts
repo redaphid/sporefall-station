@@ -151,23 +151,22 @@ describe('a real modded shot, host sim → wire → client mirror', () => {
     return applyWireEntity(undefined, we, w.tick)
   }
 
-  it('Tesla then Cryo reaches the client as a Cryo round, with its modifiers', () => {
+  it('Tesla, pierce, Cryo: the first cast reaches the client as a bare Tesla round', () => {
     const e = clientRound([{ id: 'shock', stacks: 1 }, { id: 'pierce', stacks: 2 }, { id: 'frost', stacks: 1 }])
-    expect(e.projectile?.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'pierce', stacks: 2 }])
+    expect(e.projectile?.mods).toEqual([{ id: 'shock', stacks: 1 }])
   })
 
-  it('Cryo then Tesla reaches the client as a Tesla round', () => {
-    const e = clientRound([{ id: 'frost', stacks: 1 }, { id: 'shock', stacks: 1 }])
-    expect(e.projectile?.mods).toEqual([{ id: 'shock', stacks: 1 }])
+  it('pierce then Cryo is one cast: it reaches the client as a Cryo round, with its modifiers', () => {
+    const e = clientRound([{ id: 'pierce', stacks: 2 }, { id: 'frost', stacks: 1 }])
+    expect(e.projectile?.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'pierce', stacks: 2 }])
   })
 })
 
 describe("a shard or blast carrying its cast's element, host sim → wire → client", () => {
-  /** Fire the sequenced cast of `mods` that starts at window position `at` at a
-   * 1-hp body until the round dies; returns the host world. */
+  /** Fire the cast of `mods` that starts at window position `at` at a 1-hp
+   * body until the round dies; returns the host world. */
   const fired = (mods: string[], at: number) => {
     const w = createWorld(1, 1)
-    w.modCasting = 'sequence'
     const p = spawnPlayer(w, 0, 20, 20)
     p.loadout!.inventory = []
     const stack = arm(p, 'pistol')

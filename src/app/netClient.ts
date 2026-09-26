@@ -253,7 +253,6 @@ export class NetClientSession implements Session {
   /** Floor-draft card tapped since the last input packet, shipped reliably. */
   private pendingDraftPick?: number
   /** Mod casting rule the host announced in GameStart (absent = default fold). */
-  private modCasting?: 'sequence'
   /** Local tick count when the newest snapshot landed, so the host's tick can
    * be carried forward between snapshots (they arrive every few ticks). */
   private tickAtSnap = 0
@@ -444,7 +443,6 @@ export class NetClientSession implements Session {
         const sameRun = start.seed === this.seed
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
-        this.modCasting = start.modCasting === 'sequence' ? 'sequence' : undefined
         // A GameStart while we are reconnecting normally replays the run we were
         // ALREADY in (the host repeats it after a ghost reclaim), so the level is
         // already live and snapshots resync the floor. But if the SEED changed,
@@ -841,7 +839,7 @@ export class NetClientSession implements Session {
       lockdown: this.state.lockdown,
       mode: this.state.mode,
       revivesLeft: this.state.revivesLeft,
-      ...(this.modCasting ? { modCasting: this.modCasting, simTick: this.hostTickEstimate() } : {}),
+      simTick: this.hostTickEstimate(),
       ...(this.state.modifier ? { modifier: modifierView(this.state.modifier, this.hostTickEstimate()) } : {}),
       self: this.self,
     }

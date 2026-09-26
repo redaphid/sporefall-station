@@ -77,12 +77,12 @@ describe('buildLoadout', () => {
   it('a modded gun yields the right chips, colors, stacks and resolved stats', () => {
     const mods = [
       { id: 'overload', stacks: 2 },
-      { id: 'incendiary', stacks: 1 },
       { id: 'pierce', stacks: 3 },
+      { id: 'incendiary', stacks: 1 },
     ]
     const m = buildLoadout(player('pistol', mods))!
-    // Chips are sorted by id and carry name/icon/desc/stacks.
-    expect(m.mods.map((c) => c.id)).toEqual(['incendiary', 'overload', 'pierce'])
+    // Chips are in firing order and carry name/icon/desc/stacks.
+    expect(m.mods.map((c) => c.id)).toEqual(['overload', 'pierce', 'incendiary'])
     const overload = m.mods.find((c) => c.id === 'overload')!
     expect(overload.name).toBe(MODS.overload.name)
     expect(overload.desc).toBe(MODS.overload.blurb)

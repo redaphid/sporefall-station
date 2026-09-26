@@ -1,7 +1,7 @@
 // What a mod will actually DO on a given weapon, derived from what the fire path
 // executes rather than from the mod's own description. The UI reads this so a
-// mod the sim never runs (pierce on a sledgehammer, the losing element of two,
-// choke on a single-pellet pistol) reads as inert instead of as a working buff.
+// mod the sim never runs (pierce on a sledgehammer, a stowed mod, choke on a
+// single-pellet pistol) reads as inert instead of as a working buff.
 //
 // `modEffect.truth.test.ts` fires every mod on every weapon through the real
 // `fireWeapon` and fails if this verdict and the sim's behaviour disagree.
@@ -11,7 +11,7 @@ import { MODS, stackMod, type BulletBehavior, type ResolvedTrigger } from '../da
 import type { WeaponMod } from '../entity'
 import { PLAYER_MELEE_MULT } from '../player'
 import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
-import { pelletShares, planCasts, sequenceShape } from './modSequence'
+import { pelletShares, planCasts, planPull, type SequenceShape } from './modSequence'
 
 /** The fields of a resolved weapon that `fireWeapon` reads. Both kinds read
  * damage, cooldown, element and triggers. Only a swing reads knockback: a
@@ -67,25 +67,14 @@ export interface ExecutedPull {
 }
 
 /**
- * The pull a player fires next. Mirrors fireWeapon and fireSequenced
- * (combat.ts): in sequenced mode it plans the pull from `castIndex`, splits the
- * pellets between its casts, fans them across one spread, and takes the slowest
- * cast's cooldown, raised to the recharge when the pull wraps.
+ * The pull a player fires next. Mirrors fireWeapon (combat.ts): it plans the
+ * pull from `castIndex`, splits the pellets between its casts, fans them across
+ * one spread, and takes the slowest cast's cooldown, raised to the recharge
+ * when the pull wraps a cycle of two or more casts.
  * `src/ui/loadoutTruth.test.ts` fires the real weapon and holds the panel to it.
  */
-export const executedPull = (
-  weapon: WeaponDef,
-  mods: readonly WeaponMod[],
-  sequenced = false,
-  castIndex = 0,
-): ExecutedPull => {
-  if (!sequenced || mods.length === 0) {
-    const shot = executedShot(weapon, mods)
-    if (weapon.kind === 'melee') return { casts: [shot], cooldownTicks: shot.cooldownTicks }
-    return { casts: [shot], cooldownTicks: shot.cooldownTicks, pellets: shot.pellets, fan: shot.spread ?? 0 }
-  }
-  const shape = sequenceShape(weapon)
-  const plan = planCasts(mods, shape, castIndex)
+export const executedPull = (weapon: WeaponDef, mods: readonly WeaponMod[], castIndex = 0): ExecutedPull => {
+  const { shape, plan } = planPull(weapon, mods, castIndex)
   // Every entry unknown or empty: the sim fires the bare weapon.
   const castMods: WeaponMod[][] = plan.casts.length > 0 ? plan.casts.map((c) => c.mods) : [[]]
   const recharge = (cd: number): number =>
@@ -115,52 +104,54 @@ export type ModVerdict =
   | { kind: 'inert'; reason: string }
   | { kind: 'penalty'; reason: string }
 
-/** One trigger pull of a sequenced weapon: its casts, each with the pellets it
- * fires, and whether the pull ran off the end of the wand. */
+/** One trigger pull: its casts, each with the pellets it fires, and whether the
+ * pull ran off the end of the wand. */
 interface CyclePull {
   casts: { mods: WeaponMod[]; pellets: number }[]
   wrapped: boolean
 }
 
-/** Every pull of one full sequenced cycle from index 0: the order the fire path
+/** Every pull of one full cycle from index 0: the order the fire path
  * walks the wand in steady state. */
-const pullCycle = (weapon: WeaponDef, mods: readonly WeaponMod[]): CyclePull[] => {
-  const shape = sequenceShape(weapon)
+const pullCycle = (weapon: WeaponDef, mods: readonly WeaponMod[]): { shape: SequenceShape; pulls: CyclePull[] } => {
+  const { shape } = planPull(weapon, mods, 0)
   const shares = pelletShares(weapon.pellets ?? 1, shape.castsPerTrigger)
-  const out: CyclePull[] = []
+  const pulls: CyclePull[] = []
   let index = 0
   for (let pull = 0; pull <= shape.slots; pull++) {
     const plan = planCasts(mods, shape, index)
     if (plan.casts.length === 0) break
-    out.push({ casts: plan.casts.map((c, g) => ({ mods: c.mods, pellets: shares[g] })), wrapped: plan.wrapped })
+    pulls.push({ casts: plan.casts.map((c, g) => ({ mods: c.mods, pellets: shares[g] })), wrapped: plan.wrapped })
     if (plan.wrapped) break
     index = plan.nextIndex
   }
-  return out
+  return { shape, pulls }
 }
 
-/** The shot a sequenced mod rides in, with and without it. A pull's cooldown is
- * the slowest of its casts, raised to the recharge when the pull wraps (as in
- * fireSequenced), so a mod that only speeds up a wrapping cast changes nothing. */
-const sequencedShots = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: string): [ExecutedShot, ExecutedShot] | undefined => {
+/** The shot a mod rides in, with and without it. A pull's cooldown is the
+ * slowest of its casts, raised to the recharge when the pull wraps (as in
+ * fireWeapon), so a mod that only speeds up a wrapping cast changes nothing.
+ * Undefined when the mod is stowed: no cast of the cycle carries it. */
+const castShots = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: string): [ExecutedShot, ExecutedShot] | undefined => {
   const hasIt = (c: { mods: WeaponMod[] }): boolean => c.mods.some((m) => m.id === modId)
-  const pull = pullCycle(weapon, mods).find((p) => p.casts.some(hasIt))
+  const { shape, pulls } = pullCycle(weapon, mods)
+  const pull = pulls.find((p) => p.casts.some(hasIt))
   if (!pull) return undefined
   const shot = (dropIt: boolean): ExecutedShot => {
     const shots = pull.casts.map((c) =>
       executedShot({ ...weapon, pellets: c.pellets }, dropIt ? c.mods.filter((m) => m.id !== modId) : c.mods),
     )
     let cooldown = Math.max(1, ...shots.map((s) => s.cooldownTicks))
-    if (pull.wrapped) cooldown = Math.max(cooldown, sequenceShape(weapon).rechargeOnWrap)
+    if (pull.wrapped) cooldown = Math.max(cooldown, shape.rechargeOnWrap)
     return { ...shots[pull.casts.findIndex(hasIt)], cooldownTicks: cooldown }
   }
   return [shot(false), shot(true)]
 }
 
-/** A sequenced mod whose only effect is a faster cast that the wrap recharge
- * then outlasts. */
+/** A mod whose only effect is a faster cast that the wrap recharge then
+ * outlasts. */
 const rechargeHidesIt = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: string): boolean => {
-  const cast = pullCycle(weapon, mods).flatMap((p) => p.casts).find((c) => c.mods.some((m) => m.id === modId))
+  const cast = pullCycle(weapon, mods).pulls.flatMap((p) => p.casts).find((c) => c.mods.some((m) => m.id === modId))
   const rate = (list: WeaponMod[]): number => executedShot(weapon, list).cooldownTicks
   return cast !== undefined && rate(cast.mods) !== rate(cast.mods.filter((m) => m.id !== modId))
 }
@@ -175,28 +166,24 @@ const LABEL: Record<string, string> = {
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 
+/** The verdict a mod past the weapon's live window gets: it never fires. */
+export const STOWED_VERDICT = { kind: 'inert', reason: 'stowed: swap it in' } as const satisfies ModVerdict
+
 /**
- * The verdict for mod `modId` as installed in `mods` on `weapon`. In sequenced
- * mode it is judged on the one cast it rides in; a mod past the weapon's live
- * window is stowed and never fires. A mod missing from `mods` is judged as if
- * picked up: placed where a pick lands, which decides whether its element wins.
+ * The verdict for mod `modId` as installed in `mods` on `weapon`, judged on the
+ * one cast it rides in. A mod past the weapon's live window is stowed and never
+ * fires. A mod missing from `mods` is judged as if picked up: placed where a
+ * pick lands, which decides whether it is live or stowed.
  */
-export const modVerdict = (
-  weapon: WeaponDef,
-  mods: readonly WeaponMod[],
-  modId: string,
-  sequenced = false,
-): ModVerdict => {
+export const modVerdict = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: string): ModVerdict => {
   if (!MODS[modId]) return { kind: 'inert', reason: 'unknown mod' }
   const installed = mods.some((m) => m.id === modId && m.stacks > 0) ? mods : stackMod(mods.map((m) => ({ ...m })), modId, 1)
-  const shots = sequenced
-    ? sequencedShots(weapon, installed, modId)
-    : [executedShot(weapon, installed), executedShot(weapon, installed.filter((m) => m.id !== modId))]
-  if (!shots) return { kind: 'inert', reason: 'stowed: swap it in' }
+  const shots = castShots(weapon, installed, modId)
+  if (!shots) return { ...STOWED_VERDICT }
   const [withIt, without] = shots
   if (same(withIt, without)) {
-    if (sequenced && rechargeHidesIt(weapon, installed, modId)) return { kind: 'inert', reason: 'recharge hides it' }
-    return { kind: 'inert', reason: inertReason(weapon, withIt, modId) }
+    if (rechargeHidesIt(weapon, installed, modId)) return { kind: 'inert', reason: 'recharge hides it' }
+    return { kind: 'inert', reason: weapon.kind === 'melee' ? 'no effect on melee' : 'no effect on this gun' }
   }
 
   const worse: string[] = []
@@ -212,10 +199,3 @@ export const modVerdict = (
   return { kind: 'penalty', reason: worse.length === 1 ? `only lowers ${worse[0]}` : 'only makes it worse' }
 }
 
-const inertReason = (weapon: WeaponDef, shot: ExecutedShot, modId: string): string => {
-  if (MODS[modId].onHit) {
-    const winner = Object.values(MODS).find((d) => d.id !== modId && d.onHit && same(d.onHit, shot.onHit))
-    if (winner) return `${winner.name} overrides it`
-  }
-  return weapon.kind === 'melee' ? 'no effect on melee' : 'no effect on this gun'
-}

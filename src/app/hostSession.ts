@@ -5,7 +5,7 @@ import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { extractionView, setupFloor } from '../game/systems/missions'
 import { lockdownView } from '../game/systems/alarm'
-import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
+import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import type { CoopSample } from '../input/gamepadCoop'
@@ -102,10 +102,6 @@ export class HostSession implements Session {
     private coop?: CoopSource,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
-    /** Mod casting rule for runs this session builds (the `sequencedMods` flag,
-     * resolved by the app layer). Latched into each new world at creation; a
-     * function is re-read per run, so a toggle applies from the next run. */
-    private modCasting?: ModCasting | (() => ModCasting | undefined),
   ) {
     this.buildRun()
   }
@@ -114,8 +110,6 @@ export class HostSession implements Session {
    * and by restart() — a fresh run from default state. */
   private buildRun(): void {
     this.world = createWorld(this.seed, 1, this.mode)
-    const casting = typeof this.modCasting === 'function' ? this.modCasting() : this.modCasting
-    if (casting) this.world.modCasting = casting
     populateWorld(this.world)
     setupFloor(this.world)
     const at = playerSpawnPoint(this.world.level, 0)
@@ -180,7 +174,6 @@ export class HostSession implements Session {
       lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
-      ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
       ...(this.world.modifier ? { modifier: modifierView(this.world.modifier, this.world.tick) } : {}),
       self: this.self,
       annotations: this.world.annotations,

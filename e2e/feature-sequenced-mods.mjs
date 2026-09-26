@@ -7,11 +7,9 @@
 // mods resolved to. The run is still fully deterministic (inline fixture +
 // `?script=`); only the *sampling* is state-driven.
 //
-// Four clips:
+// One clip:
 //   seq-on    — sequenced pistol: strip, index advancing, wrap + recharge,
 //               tap-two-chips swap on the HUD, pause-menu reorder + preview.
-//   seq-off   — the SAME world and the SAME script with the flag off (no
-//               `modCasting`): no strip, every mod folds into every shot.
 //
 // Browser: see e2e/lib.mjs `acquireBrowser`. `E2E_CDP` points at a real headed
 // browser; there is no headless path in this file's intent.
@@ -33,7 +31,7 @@ const SIZE = { width: 1280, height: 720 }
  *   pull 2 -> incendiary
  *   pull 3 -> shock           -> runs off the end: wrap + recharge
  */
-const modded = (sequenced) => {
+const modded = () => {
   const w = JSON.parse(JSON.stringify(base))
   const p = w.entities.find((e) => e.playerCtl)
   p.combat.weapon = 'pistol'
@@ -53,7 +51,6 @@ const modded = (sequenced) => {
     ],
     activeSlot: 0,
   }
-  if (sequenced) w.modCasting = 'sequence'
   return w
 }
 
@@ -65,7 +62,6 @@ const probe = () => {
   const stack = pl?.loadout?.inventory?.[pl.loadout.activeSlot ?? 0]
   return {
     tick: w.tick,
-    modCasting: w.modCasting ?? null,
     castIndex: stack?.castIndex ?? null,
     rechargeUntil: stack?.rechargeUntil ?? null,
     recharging: stack?.rechargeUntil !== undefined && stack.rechargeUntil > w.tick,
@@ -180,14 +176,12 @@ const runClip = async ({ name, world, beats, expect }) => {
   return true
 }
 
-// ---------------------------------------------------------------- flag ON ---
 // Each beat waits for the SIM to reach the state it is meant to show.
 const seqOn = () =>
   runClip({
     name: 'seq-on',
-    world: modded(true),
+    world: modded(),
     expect: (f, shots) => [
-      f.modCasting !== 'sequence' && 'run was not sequenced',
       !shots.some((s) => s.state.castIndex === 2) && 'never saw the index advance to 2',
       !shots.some((s) => s.state.recharging) && 'never caught the wrap recharge',
       !shots.some((s) => s.state.rechargeBar) && 'recharge bar never rendered',
@@ -233,11 +227,10 @@ const seqOn = () =>
           await sleep(500)
         },
       },
-      // 9. Reorder from the pause menu. The intent (modSwapQueue.ts) is that the
-      //    swap is a PREVIEW while paused and applies on the first tick after
-      //    Resume. `pauseReorder` reads the strip synchronously either side of
-      //    each tap, which is the only way to see the preview at all — see the
-      //    finding recorded in `pauseReorderEvidence`.
+      // 9. Reorder from the pause menu. The swap is a PREVIEW while paused
+      //    (modSwapQueue.ts) and applies on the first tick after Resume.
+      //    `pauseReorderEvidence` reads the strip either side of each tap and
+      //    again a frame later, when the preview must still hold.
       {
         label: '09-pause-reorder-tapped',
         pauseStrip: true,
@@ -273,25 +266,6 @@ const seqOn = () =>
     ],
   })
 
-// --------------------------------------------------------------- flag OFF ---
-const seqOff = () =>
-  runClip({
-    name: 'seq-off',
-    world: modded(false),
-    expect: (f, shots) => [
-      f.modCasting !== null && 'flag-off run somehow got a casting rule',
-      shots.some((s) => s.state.stripChips > 0) && 'the strip rendered with the flag OFF',
-      f.castIndex !== null && 'flag-off run wrote a castIndex',
-    ],
-    beats: [
-      { label: '01-no-strip', when: (s) => s.tick > 8 },
-      { label: '02-firing-folded', when: (s) => s.tick > 250 },
-      { label: '03-aftermath', when: (s) => s.tick > 400 },
-    ],
-  })
-
-let ok = true
-ok = (await seqOn()) && ok
-ok = (await seqOff()) && ok
+const ok = await seqOn()
 await releaseBrowser()
 if (!ok) process.exitCode = 1

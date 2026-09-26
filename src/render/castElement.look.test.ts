@@ -47,11 +47,10 @@ const body = (w: World, x: number, y: number, hp: number): Entity => {
   return e
 }
 
-/** A sequenced machine gun facing east at a 1-hp body, with a pack around it
- * inside every blast. */
+/** A machine gun facing east at a 1-hp body, with a pack around it inside
+ * every blast. */
 const BASE: WorldJson = (() => {
   const w = createWorld(1, 1)
-  w.modCasting = 'sequence'
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
   arm(p, 'machinegun')

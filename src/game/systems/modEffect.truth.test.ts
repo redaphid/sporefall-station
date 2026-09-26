@@ -1,6 +1,6 @@
 // The display/behaviour contract for mods (#88): for every mod on every weapon,
-// in both casting modes, `modVerdict` says "inert" exactly when firing the REAL
-// weapon with the mod produces the same result as firing it without. A new mod
+// `modVerdict` says "inert" exactly when firing the REAL weapon with the mod
+// produces the same result as firing it without. A new mod
 // whose effect the fire path ignores (or a fire-path change that stops reading a
 // field) fails here instead of shipping a chip that lies.
 
@@ -20,7 +20,7 @@ import { modVerdict } from './modEffect'
 const MOD_IDS = Object.keys(MODS)
 const WEAPON_IDS = Object.keys(WEAPONS)
 // An id the registry does not know: liveEntries/resolveWeapon skip it, so it
-// stands in for "no mod here" while keeping the list non-empty (sequenced path).
+// stands in for "no mod here" while keeping the list non-empty.
 const EMPTY_SLOT = '__none__'
 
 const npc = (w: World, x: number, hp: number): Entity => {
@@ -31,9 +31,8 @@ const npc = (w: World, x: number, hp: number): Entity => {
 
 /** Shooter facing east at a target one tile away. `fragile` makes the target die
  * to any blow, with a bystander in blast range, so on-kill triggers show. */
-const rig = (weaponId: string, sequenced: boolean, fragile: boolean): WorldJson => {
+const rig = (weaponId: string, fragile: boolean): WorldJson => {
   const w = createWorld(1, 1)
-  if (sequenced) w.modCasting = 'sequence'
   const p = spawnPlayer(w, 0, 20.5, 20.5)
   p.health!.iframes = 0
   p.loadout!.inventory = []
@@ -45,20 +44,20 @@ const rig = (weaponId: string, sequenced: boolean, fragile: boolean): WorldJson 
 }
 
 const rigs = new Map<string, WorldJson>()
-const rigFor = (weaponId: string, sequenced: boolean, fragile: boolean): WorldJson => {
-  const key = `${weaponId}/${sequenced}/${fragile}`
-  if (!rigs.has(key)) rigs.set(key, rig(weaponId, sequenced, fragile))
+const rigFor = (weaponId: string, fragile: boolean): WorldJson => {
+  const key = `${weaponId}/${fragile}`
+  if (!rigs.has(key)) rigs.set(key, rig(weaponId, fragile))
   return rigs.get(key)!
 }
 
 /** Everything one trigger pull changed that the game plays out: projectiles as
  * spawned (minus `mods`, the renderer's provenance tag), what the swing did to
  * the bodies in front, events, and the shooter's cooldown. */
-const pullOutcome = (weaponId: string, mods: WeaponMod[], sequenced: boolean): string => {
+const pullOutcome = (weaponId: string, mods: WeaponMod[]): string => {
   const scenes = WEAPONS[weaponId].kind === 'melee' ? [false, true] : [false]
   return scenes
     .map((fragile) => {
-      const w = deserializeWorld(rigFor(weaponId, sequenced, fragile))
+      const w = deserializeWorld(rigFor(weaponId, fragile))
       const p = w.entities.find((e) => e.playerCtl)!
       weaponStack(p)!.mods = mods.map((m) => ({ ...m }))
       fireWeapon(w, p)
@@ -73,45 +72,22 @@ const pullOutcome = (weaponId: string, mods: WeaponMod[], sequenced: boolean): s
 
 const m = (id: string): WeaponMod => ({ id, stacks: 1 })
 
-describe('mod verdict equals executed behaviour, default casting', () => {
-  for (const weaponId of WEAPON_IDS) {
-    // Both sides of every neighbour: list order picks the element, so an
-    // element before another element is the one the fire path drops.
-    it(`${weaponId}: every mod, alone, before and after every other mod`, () => {
-      const disagreements: string[] = []
-      for (const rest of [[], ...MOD_IDS.map((x) => [m(x)])]) {
-        const without = pullOutcome(weaponId, rest, false)
-        for (const id of MOD_IDS) {
-          if (rest.some((r) => r.id === id)) continue
-          for (const list of [[...rest, m(id)], [m(id), ...rest]]) {
-            const inert = pullOutcome(weaponId, list, false) === without
-            const verdict = modVerdict(WEAPONS[weaponId], list, id)
-            if (inert !== (verdict.kind === 'inert')) disagreements.push(`${id} in [${list.map((r) => r.id)}]: fired ${inert ? 'inert' : 'live'}, shown ${verdict.kind}`)
-          }
-        }
-      }
-      expect(disagreements).toEqual([])
-    })
-  }
-})
-
-describe('mod verdict equals executed behaviour, sequenced casting', () => {
-  // Single-cast lists only, so the cast the mod rides in is the whole pull and
-  // cadence (wrap, recharge) is identical with and without it: a modifier
-  // after another modifier, a modifier before each payload, and a payload
-  // after each modifier.
+describe('mod verdict equals executed behaviour', () => {
+  // One-cast wands only, so the cast the mod rides in is the whole pull and
+  // cadence (a one-cast wand never recharges) is identical with and without
+  // it: every mod alone, a modifier after another modifier, a modifier before
+  // each payload, and a payload after each modifier.
   for (const weaponId of WEAPON_IDS) {
     it(`${weaponId}: every mod in a one-cast wand`, () => {
       const disagreements: string[] = []
       for (const id of MOD_IDS) {
-        for (const x of MOD_IDS) {
+        for (const x of [undefined, ...MOD_IDS]) {
           if (x === id) continue
-          if (isPayloadMod(id) && isPayloadMod(x)) continue
-          const before = isPayloadMod(x)
-          const list = before ? [m(id), m(x)] : [m(x), m(id)]
+          if (x && isPayloadMod(id) && isPayloadMod(x)) continue
+          const list = !x ? [m(id)] : isPayloadMod(x) ? [m(id), m(x)] : [m(x), m(id)]
           const hollow = list.map((e) => (e.id === id ? m(EMPTY_SLOT) : e))
-          const inert = pullOutcome(weaponId, list, true) === pullOutcome(weaponId, hollow, true)
-          const verdict = modVerdict(WEAPONS[weaponId], list, id, true)
+          const inert = pullOutcome(weaponId, list) === pullOutcome(weaponId, hollow)
+          const verdict = modVerdict(WEAPONS[weaponId], list, id)
           if (inert !== (verdict.kind === 'inert')) disagreements.push(`${id} in [${list.map((e) => e.id)}]: fired ${inert ? 'inert' : 'live'}, shown ${verdict.kind}`)
         }
       }
@@ -121,14 +97,13 @@ describe('mod verdict equals executed behaviour, sequenced casting', () => {
 })
 
 describe('verdict reasons', () => {
-  it('every inert or penalty reason, on every weapon and mode, is five words or fewer', () => {
+  it('every inert or penalty reason, on every weapon, is five words or fewer', () => {
     for (const weaponId of WEAPON_IDS)
-      for (const sequenced of [false, true])
-        for (const id of MOD_IDS)
-          for (const x of [undefined, ...MOD_IDS])
-            for (const list of x && x !== id ? [[m(x), m(id)], [m(id), m(x)]] : [[m(id)]]) {
-              const v = modVerdict(WEAPONS[weaponId], list, id, sequenced)
-              if (v.kind !== 'live') expect(v.reason.split(/\s+/).length, `${weaponId} [${list.map((e) => e.id)}] ${id}: ${v.reason}`).toBeLessThanOrEqual(5)
-            }
+      for (const id of MOD_IDS)
+        for (const x of [undefined, ...MOD_IDS])
+          for (const list of x && x !== id ? [[m(x), m(id)], [m(id), m(x)]] : [[m(id)]]) {
+            const v = modVerdict(WEAPONS[weaponId], list, id)
+            if (v.kind !== 'live') expect(v.reason.split(/\s+/).length, `${weaponId} [${list.map((e) => e.id)}] ${id}: ${v.reason}`).toBeLessThanOrEqual(5)
+          }
   })
 })

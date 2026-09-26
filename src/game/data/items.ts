@@ -40,13 +40,13 @@ export interface WeaponDef {
   spread?: number
   /** Status inflicted on whatever the hit lands on (freeze ray, sledgehammer). */
   onHit?: StatusApply
-  /** Sequenced mods only (World.modCasting): how many leading mods are live.
-   * Default 3 (systems/modSequence DEFAULT_SEQUENCE_SHAPE). */
+  /** How many leading mods are live; later ones are stowed. Default 3
+   * (systems/modSequence DEFAULT_SEQUENCE_SHAPE). */
   slots?: number
-  /** Sequenced mods only: consecutive casts per trigger pull. Default 1; melee
-   * is always 1. A multi-cast gun splits its pellets between the casts. */
+  /** Consecutive casts per trigger pull. Default 1; melee is always 1. A
+   * multi-cast gun splits its pellets between the casts. */
   castsPerTrigger?: number
-  /** Sequenced mods only: ticks the weapon is locked after its sequence wraps. */
+  /** Ticks the weapon is locked after a cycle of two or more casts wraps. */
   rechargeOnWrap?: number
 }
 

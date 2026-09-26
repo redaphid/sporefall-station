@@ -168,7 +168,7 @@ const findRoom = (w: World, cols: number, rows: number): { x: number; y: number 
  * leaps to its neighbour 2 tiles off. BLIND: a thug choking on spore in the far
  * corner, which can't see the player. The e2e video and stills shoot this. */
 const setupElementVerbs = (w: World): void => {
-  const { x, y } = findRoom(w, 11, 5)
+  const { x, y } = findRoom(w, 9, 4)
   const player = w.entities.find((e) => e.playerCtl)
   if (player) {
     player.pos = { x: x + 0.5, y: y + 2.5 }
@@ -184,7 +184,7 @@ const setupElementVerbs = (w: World): void => {
   const zapped = thug(5, 0)
   thug(7, 0) // the leap's landing: 2 tiles off, inside ARC_JUMP_RADIUS
   applyStatus(w, zapped, 'electrified', 30, player?.id)
-  applyStatus(w, thug(9, 4), 'spore', 150)
+  applyStatus(w, thug(8, 3), 'spore', 150)
 }
 
 /** A loaded loadout (bat / pistol / grenades) and destructible targets downrange:

@@ -80,6 +80,9 @@
     // but holds non-test programs, so it must not be swallowed by a test glob.
     "scripts/test/**/*.{ts,mts,mjs}",
 
+    // The loadout census CLI, run as `npx tsx scripts/census.mts` (docs/design/arena-census.md).
+    "scripts/census.mts",
+
     // --- Playwright/ffmpeg e2e scenarios (e2e/) -----------------------------
     // Every e2e/*.mjs is a standalone Playwright scenario launched by node from
     // a shell script, which Knip cannot parse. Several are reached only by a

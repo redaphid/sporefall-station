@@ -162,6 +162,10 @@ model emits frames that are coherent with each other.
 Framework: **`D:\projects\puck-sprites`** (cyber-puck's, approved 2026-09-22),
 driven in place — nothing was forked into this repo. Full procedure and the
 failures it cost: [`docs/sprite-cast-runbook.md`](../../../docs/sprite-cast-runbook.md).
+The recipe (engine pin, keyframes, prompts, loop picks, clip digests) is committed
+at [`scripts/assets/cast/frog-settler/`](../../../scripts/assets/cast/frog-settler/);
+`cast.py export frog-settler --check` rebuilds every frog PNG here from it byte for
+byte, and `cast.py rebuild frog-settler --check` regenerates the Wan clips too.
 
 | stage | what |
 |---|---|

@@ -5,7 +5,12 @@
 
 import { describe, expect, it } from 'vitest'
 import { MODS } from '../../game/data/mods'
-import { makeEntity } from '../../game/entity'
+import { makeEntity, type Entity, type WeaponMod } from '../../game/entity'
+import { spawnPlayer } from '../../game/player'
+import { combatSystem } from '../../game/systems/combat'
+import { arm } from '../../game/testkit'
+import { emptyInput } from '../../game/types'
+import { createWorld } from '../../game/world'
 import {
   applyWireEntity,
   decodeSnapshot,
@@ -124,5 +129,30 @@ describe('host → wire → client entity bridge', () => {
   it('a vanilla wire bullet leaves the client mirror unmodded', () => {
     const e = applyWireEntity(undefined, wire(), 5)
     expect(e.projectile?.mods).toBeUndefined()
+  })
+})
+
+describe('a real modded shot, host sim → wire → client mirror', () => {
+  /** Fire one round from a pistol holding `mods` and return it as the client sees it. */
+  const clientRound = (mods: WeaponMod[]): Entity => {
+    const w = createWorld(1, 1)
+    const p = spawnPlayer(w, 0, 20, 20)
+    p.loadout!.inventory = []
+    arm(p, 'pistol').mods = mods
+    p.facing = 0
+    combatSystem(w, new Map([[0, { ...emptyInput(), attack: true }]]))
+    const round = w.entities.find((e) => e.kind === 'projectile')!
+    const [we] = roundTrip([toWireEntity(round, w.tick)]).entities
+    return applyWireEntity(undefined, we, w.tick)
+  }
+
+  it('Tesla then Cryo reaches the client as a Cryo round, with its modifiers', () => {
+    const e = clientRound([{ id: 'shock', stacks: 1 }, { id: 'pierce', stacks: 2 }, { id: 'frost', stacks: 1 }])
+    expect(e.projectile?.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'pierce', stacks: 2 }])
+  })
+
+  it('Cryo then Tesla reaches the client as a Tesla round', () => {
+    const e = clientRound([{ id: 'frost', stacks: 1 }, { id: 'shock', stacks: 1 }])
+    expect(e.projectile?.mods).toEqual([{ id: 'shock', stacks: 1 }])
   })
 })

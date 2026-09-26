@@ -220,10 +220,12 @@ describe('sequenced fire path (combatSystem)', () => {
     expect(stackOf(p).castIndex).toBeUndefined()
   })
 
-  it('without the run rule the same loadout folds every mod into one shot (default mode)', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('incendiary')], false)
-    const [a] = pull(w, p)
-    expect(a.projectile!.mods!.map((x) => x.id)).toEqual(['frost', 'incendiary'])
+  it('without the run rule the same loadout folds into one shot that carries the newest element (default mode)', () => {
+    const { w, p } = rig('pistol', [m('frost'), m('pierce'), m('incendiary')], false)
+    const shots = pull(w, p)
+    expect(shots).toHaveLength(1)
+    expect(elements(shots)).toEqual(['burning'])
+    expect(shots[0].projectile!.mods!.map((x) => x.id)).toEqual(['incendiary', 'pierce'])
     expect(stackOf(p).castIndex).toBeUndefined()
   })
 })

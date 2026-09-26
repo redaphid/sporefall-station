@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createDraftScreen } from './draftScreen'
 
-const OFFER = ['pierce', 'frost', 'overload']
+const OFFER = { offer: ['pierce', 'frost', 'overload'] }
 
 const mount = () => {
   const el = document.createElement('div')
@@ -18,7 +18,7 @@ describe('draft screen', () => {
     const { screen, cards } = mount()
     screen.update(null, [{ playerId: 0, cursor: 0 }], 20)
     screen.update(OFFER, [], 20)
-    screen.update([], [{ playerId: 0, cursor: 0 }], 20)
+    screen.update({ offer: [] }, [{ playerId: 0, cursor: 0 }], 20)
     expect(screen.visible).toBe(false)
     expect(cards()).toHaveLength(0)
   })
@@ -27,7 +27,7 @@ describe('draft screen', () => {
     const { screen, cards } = mount()
     screen.update(OFFER, [{ playerId: 0, cursor: 1 }, { playerId: 1, cursor: 1 }, { playerId: 2, cursor: 2 }], 12)
     expect(screen.visible).toBe(true)
-    expect(cards().map((c) => c.dataset.modId)).toEqual(OFFER)
+    expect(cards().map((c) => c.dataset.modId)).toEqual(OFFER.offer)
     expect(cards().map((c) => [...c.querySelectorAll('span')].map((s) => s.textContent))).toEqual([[], ['P1', 'P2'], ['P3']])
     expect(cards()[0].style.outline).toMatch(/^none/)
     expect(cards()[1].style.outline).toContain('solid')
@@ -55,7 +55,7 @@ describe('draft screen', () => {
 
   it('drops unknown mod ids rather than drawing a blank card', () => {
     const { screen, cards } = mount()
-    screen.update(['frost', 'no-such-mod'], [{ playerId: 0, cursor: 0 }], 12)
+    screen.update({ offer: ['frost', 'no-such-mod'] }, [{ playerId: 0, cursor: 0 }], 12)
     expect(cards().map((c) => c.dataset.modId)).toEqual(['frost'])
   })
 })

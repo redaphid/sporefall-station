@@ -207,10 +207,20 @@ export interface ItemStack {
  * innate fists, a class-starter with no slot) resolves VANILLA — undefined stack,
  * infinite/no-wear — exactly as an inventory-less NPC did before this component
  * existed, so every pre-loadout snapshot round-trips byte-for-byte. */
+/** One picked player trait (data/traits.ts) and how many times it was taken.
+ * Same shape as `WeaponMod`, so it serializes like one. */
+export interface TraitStack {
+  id: string
+  stacks: number
+}
+
 /** A floor-draft hand a player is still choosing from (systems/draft.ts). */
 export interface DraftHand {
-  /** The mod ids on offer, in card order. */
+  /** The GUN cards: mod ids on offer, in card order. */
   offer: string[]
+  /** The one YOU card: a trait id, dealt after the gun cards (`handCards`).
+   * Absent on a hand dealt before traits existed. */
+  trait?: string
   /** Index of the card under this player's cursor. */
   cursor: number
   /** Absolute tick at which the hand takes the card under the cursor. */
@@ -315,8 +325,11 @@ export interface Entity {
      * + speed-burst window; `cooldownUntilTick` gates the next roll (no chaining);
      * `dirX/dirY` is the frozen roll heading (move dir, or facing when stationary). */
     roll?: { untilTick: number; cooldownUntilTick: number; dirX: number; dirY: number }
-    /** Present while this player is choosing a mod from the floor draft. */
+    /** Present while this player is choosing a card from the floor draft. */
     draft?: DraftHand
+    /** Traits taken from the draft's YOU card (data/traits.ts), in pick order.
+     * Absent until the first pick, so a trait-less player serializes as before. */
+    traits?: TraitStack[]
   }
   projectile?: {
     ownerId: EntityId

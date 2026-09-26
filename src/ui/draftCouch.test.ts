@@ -47,7 +47,7 @@ const frame = (w: World, localIds: number[], self = player(w, 0), answeredUntil 
   const screen = createDraftScreen(el, () => {})
   const d = localDraft(w.entities, new Set(localIds), self, answeredUntil)
   const layout: DraftLayout = d.inPlay ? 'strip' : 'full'
-  screen.update(d.offer, d.seats, 10, layout)
+  screen.update(d.hand, d.seats, 10, layout)
   const root = el.querySelector<HTMLDivElement>('.draft-screen')!
   const cards = [...el.querySelectorAll<HTMLButtonElement>('.draft-card')]
   return { d, screen, root, cards }
@@ -101,14 +101,14 @@ describe('floor draft at the couch', () => {
     takeExit(w)
     const el = document.createElement('div')
     const screen = createDraftScreen(el, () => {})
-    const offer = player(w, 0).playerCtl!.draft!.offer
-    screen.update(offer, [{ playerId: 0, cursor: 0 }, { playerId: 1, cursor: 0 }], 10, 'full')
+    const hand = player(w, 0).playerCtl!.draft!
+    screen.update(hand, [{ playerId: 0, cursor: 0 }, { playerId: 1, cursor: 0 }], 10, 'full')
     const first = el.querySelector('.draft-card')
-    screen.update(offer, [{ playerId: 1, cursor: 2 }], 9, 'strip')
+    screen.update(hand, [{ playerId: 1, cursor: 2 }], 9, 'strip')
     expect(el.querySelector('.draft-card')).toBe(first)
     expect(screen.layout).toBe('strip')
     expect(el.querySelectorAll('.draft-card')[2].textContent).toContain('P2')
-    screen.update(offer, [{ playerId: 1, cursor: 2 }], 9, 'full')
+    screen.update(hand, [{ playerId: 1, cursor: 2 }], 9, 'full')
     expect(screen.layout).toBe('full')
     expect((el.querySelector('.draft-screen') as HTMLElement).style.pointerEvents).toBe('auto')
   })
@@ -147,7 +147,7 @@ describe('floor draft at the couch', () => {
     takeExit(w)
     step(w, { 0: { draftPick: 0 }, 1: { draftPick: 1 } })
     const { d, screen, root } = frame(w, [0, 1])
-    expect(d.offer).toBeNull()
+    expect(d.hand).toBeNull()
     expect(screen.visible).toBe(false)
     expect(root.style.display).toBe('none')
   })

@@ -151,6 +151,9 @@ export type SimEvent =
    * they had no gun to hold it). `timedOut` = the hand ran out of time and took
    * the card under the cursor. */
   | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
+  /** A player took the YOU card: trait `traitId`, now at `stacks` (`maxed` =
+   * it was already at its cap, so the pick changed nothing). */
+  | { type: 'traitPick'; byId: EntityId; traitId: string; stacks: number; maxed: boolean; timedOut: boolean }
   /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
    * raise `w.alarm` to `level`. */
   | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }

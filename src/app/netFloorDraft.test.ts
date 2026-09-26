@@ -122,11 +122,11 @@ describe('floor draft over co-op', () => {
     // The client never touched its loadout: the gun is still vanilla on both sides.
     expect(weaponStack(avatar)!.mods ?? []).toEqual([])
 
-    picks.pick(2)
+    picks.pick(1)
     await step(host, bob, 4)
     expect(avatar.playerCtl!.draft).toBeUndefined()
-    expect(weaponStack(avatar)!.mods).toEqual([{ id: offer[2], stacks: 1 }])
-    expect(weaponStack(bob.session.renderView().self!)!.mods).toEqual([{ id: offer[2], stacks: 1 }])
+    expect(weaponStack(avatar)!.mods).toEqual([{ id: offer[1], stacks: 1 }])
+    expect(weaponStack(bob.session.renderView().self!)!.mods).toEqual([{ id: offer[1], stacks: 1 }])
     await step(host, bob, 16)
     expect(bob.session.renderView().self!.playerCtl!.draft).toBeUndefined()
   })

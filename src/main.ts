@@ -106,7 +106,7 @@ import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 import { projectToScreen } from './ui/locatorModel'
 import { createDraftScreen, localDraft } from './ui/draftScreen'
-import type { DraftLoadout } from './game/systems/draft'
+import { draftYou, type DraftLoadout } from './game/systems/draft'
 import { withDraftPicks, type DraftPickSource } from './input/draftPick'
 import { weaponStack } from './game/systems/inventory'
 import { WEAPONS } from './game/data/items'
@@ -1433,11 +1433,12 @@ const runLoop = (
         if (view.self?.playerCtl) localIds.add(view.self.playerCtl.playerId)
         const draft = localDraft(view.entities, localIds, view.self, answeredUntil)
         draftScreen.update(
-          draft.offer,
+          draft.hand,
           draft.seats,
           Math.ceil((draft.until - view.tick) / SIM_RATE),
           draft.inPlay ? 'strip' : 'full',
           draftLoadout(view),
+          draftYou(view.self, view.entities),
         )
         // Twin-stick aim reticles: one per joined pad with a deflected right stick,
         // anchored to that pad's player entity. Presentation only.

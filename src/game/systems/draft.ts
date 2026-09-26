@@ -1,30 +1,53 @@
-// The between-floor mod DRAFT (ROUNDS-style "pick 1 of N cards"). The offer is a
-// PURE, deterministic function of (seed, floor): every peer computes the same
-// hand with no netcode, from a dedicated RNG stream forked off the seed — so it
-// never perturbs the sim stream, yet replays byte-identically. Co-op-friendly:
-// one shared hand per floor, everyone drafts together (no loser-shaming for kids).
+// The between-floor DRAFT (ROUNDS-style "pick 1 of N cards"). A hand is two GUN
+// cards (mods) and one YOU card (a trait, data/traits.ts). Each kind comes from
+// its own RNG stream forked off (seed, floor), so the hand is a pure function of
+// them, never perturbs the sim stream, and the gun cards are exactly the ones
+// the draft dealt before YOU cards existed. Co-op-friendly: one shared hand per
+// floor, everyone drafts together (no loser-shaming for kids).
 
 import { MODS, modMaxStacks, stackMod, type ModDef, type ModRarity } from '../data/mods'
 import type { WeaponDef } from '../data/items'
-import { SPAWN_GRACE_TICKS, type Entity, type ItemStack, type WeaponMod } from '../entity'
+import { TRAITS } from '../data/traits'
+import { SPAWN_GRACE_TICKS, type DraftHand, type Entity, type ItemStack, type TraitStack, type WeaponMod } from '../entity'
 import { hashLabel, mulberry32, type Rng } from '../rng'
 import { emptyInput, SIM_RATE, type InputCmd } from '../types'
 import type { World } from '../world'
 import { applyModPickup } from './inventory'
 import { modVerdict, type ModVerdict } from './modEffect'
+import { applyTraitPick, traitVerdict } from './traits'
 
 /** Rarity weights for the weighted draw (ROUNDS gates power by rarity tier). */
 const RARITY_WEIGHT: Record<ModRarity, number> = { common: 6, rare: 3, legendary: 1 }
 
+/** One card of a hand: a GUN card (a mod id) or the YOU card (a trait id). */
+export interface DraftCardRef {
+  kind: 'mod' | 'trait'
+  id: string
+}
+
+/** A hand's cards in the order the cursor walks them: the gun cards, then the
+ * YOU card. The single definition of card order for the sim and the screen. */
+export const handCards = (hand: Pick<DraftHand, 'offer' | 'trait'>): DraftCardRef[] => [
+  ...hand.offer.map((id) => ({ kind: 'mod' as const, id })),
+  ...(hand.trait !== undefined ? [{ kind: 'trait' as const, id: hand.trait }] : []),
+]
+
 export interface DraftCard {
+  kind: 'mod' | 'trait'
+  /** Position in `handCards`, which is what a tap must send. */
+  index: number
   id: string
   name: string
   blurb: string
   icon: string
   rarity: ModRarity
-  /** What the pick would do on the drafting player's weapon. */
+  /** What the pick would do: on the drafter's gun for a GUN card, on the
+   * drafter for the YOU card. */
   verdict?: ModVerdict
 }
+
+/** Gun cards per hand. The third slot went to the YOU card. */
+export const GUN_CARDS = 2
 
 /** Draw `count` DISTINCT mod ids from the registry, weighted by rarity, without
  * replacement — a pure function of the supplied RNG stream position. */
@@ -49,22 +72,31 @@ export const draftOffer = (rng: Rng, count = 3): string[] => {
  * single-card analogue of `draftOffer`, shared by the world mod-pickup placement
  * (populate.ts) so scattered pickups follow the same common/rare/legendary odds
  * as the draft. Pure in the RNG: same stream position → same id. */
-export const weightedModId = (rng: Rng): string => {
-  const all = Object.values(MODS)
+export const weightedModId = (rng: Rng): string => weightedPick(Object.values(MODS), rng).id
+
+/** One entry of a non-empty rarity-tiered table, weighted by rarity. */
+const weightedPick = <T extends { rarity: ModRarity }>(all: readonly T[], rng: Rng): T => {
   const total = all.reduce((s, m) => s + RARITY_WEIGHT[m.rarity], 0)
   let r = rng.next() * total
   for (let i = 0; i < all.length - 1; i++) {
     r -= RARITY_WEIGHT[all[i].rarity]
-    if (r <= 0) return all[i].id
+    if (r <= 0) return all[i]
   }
-  return all[all.length - 1].id
+  return all[all.length - 1]
 }
 
-/** The deterministic hand offered on clearing `floor` for a run `seed`. Uses a
- * dedicated `draft:<floor>` fork so it is reproducible and independent of the
- * sim RNG — identical on host and every client. */
-export const floorDraftOffer = (seed: number, floor: number, count = 3): string[] =>
+/** The deterministic gun cards offered on clearing `floor` for a run `seed`.
+ * Uses a dedicated `draft:<floor>` fork so it is reproducible and independent of
+ * the sim RNG — identical on host and every client. */
+export const floorDraftOffer = (seed: number, floor: number, count = GUN_CARDS): string[] =>
   draftOffer(mulberry32(hashLabel(seed >>> 0, `draft:${floor}`)), count)
+
+/** The YOU card for clearing `floor`: one trait, weighted by rarity, drawn from
+ * its own `trait:<floor>` fork so it moves neither the gun cards nor the sim. */
+export const floorTraitOffer = (seed: number, floor: number): string | undefined => {
+  const all = Object.values(TRAITS)
+  return all.length === 0 ? undefined : weightedPick(all, mulberry32(hashLabel(seed >>> 0, `trait:${floor}`))).id
+}
 
 /** The weapon a draft pick would land on. */
 export interface DraftLoadout {
@@ -81,17 +113,29 @@ const draftVerdict = (loadout: DraftLoadout, id: string): ModVerdict => {
   return modVerdict(loadout.weapon, loadout.mods, id, loadout.sequenced)
 }
 
-/** Presentation data for a set of offered mod ids (kid-readable blurbs/icons),
- * each with what it would do on `loadout` when one is given. */
-export const draftCards = (ids: readonly string[], loadout?: DraftLoadout): DraftCard[] =>
-  ids
-    .filter((id) => MODS[id])
-    .map((id) => {
-      const d = MODS[id]
-      const card: DraftCard = { id: d.id, name: d.name, blurb: d.blurb, icon: d.icon, rarity: d.rarity }
-      if (loadout) card.verdict = draftVerdict(loadout, id)
-      return card
-    })
+/** The drafter as the YOU card judges it: what they already hold, and how
+ * many players are in the run (a co-op trait does nothing alone). */
+export interface DraftYou {
+  traits?: readonly TraitStack[]
+  party: number
+}
+
+/** `self` as the YOU card judges them, among the run's `entities`. */
+export const draftYou = (self: Entity | undefined, entities: readonly Entity[]): DraftYou | undefined =>
+  self?.playerCtl ? { traits: self.playerCtl.traits, party: entities.filter((e) => e.playerCtl && !e.dead).length } : undefined
+
+/** Presentation data for a hand (kid-readable blurbs/icons), each card with what
+ * it would do: GUN cards on `loadout`, the YOU card on `you`, when given.
+ * Unknown ids are dropped; each card keeps its `handCards` index. */
+export const draftCards = (hand: Pick<DraftHand, 'offer' | 'trait'>, loadout?: DraftLoadout, you?: DraftYou): DraftCard[] =>
+  handCards(hand).flatMap(({ kind, id }, index): DraftCard[] => {
+    const d = kind === 'mod' ? MODS[id] : TRAITS[id]
+    if (!d) return []
+    const card: DraftCard = { kind, index, id: d.id, name: d.name, blurb: d.blurb, icon: d.icon, rarity: d.rarity }
+    if (kind === 'mod' && loadout) card.verdict = draftVerdict(loadout, id)
+    if (kind === 'trait' && you) card.verdict = traitVerdict(you.traits, id, you.party)
+    return [card]
+  })
 
 /** Append a picked mod onto a weapon's stack, stacking an existing one up to its
  * cap. Mutates and returns the stack's mod list. The single write path shared by
@@ -117,24 +161,37 @@ const intents = (cmd: InputCmd): number =>
   (cmd.attack || cmd.interact ? CONFIRM : 0)
 
 const takeCard = (w: World, e: Entity, index: number, timedOut: boolean): void => {
-  const modId = e.playerCtl!.draft!.offer[index]
+  const card = handCards(e.playerCtl!.draft!)[index]
   delete e.playerCtl!.draft
-  const res = applyModPickup(e, modId)
   // The drafter stood still while the fight went on; give them the landing grace again.
   if (e.health) e.health.iframes = Math.max(e.health.iframes, SPAWN_GRACE_TICKS)
-  w.events.push({ type: 'draftPick', byId: e.id, modId, weapon: res?.weapon ?? 'none', maxed: res?.maxed ?? false, timedOut })
+  if (card.kind === 'trait') {
+    // An id this build does not know closes the hand as a spent pick.
+    const res = TRAITS[card.id] ? applyTraitPick(e, card.id) : { stacks: 0, maxed: true }
+    w.events.push({ type: 'traitPick', byId: e.id, traitId: card.id, stacks: res.stacks, maxed: res.maxed, timedOut })
+    return
+  }
+  const res = applyModPickup(e, card.id)
+  w.events.push({ type: 'draftPick', byId: e.id, modId: card.id, weapon: res?.weapon ?? 'none', maxed: res?.maxed ?? false, timedOut })
 }
 
 /** Deal the hand for the floor just cleared to every live player. Called when
  * a player takes the exit; everyone gets the same cards and picks on their own. */
 export const dealFloorDraft = (w: World, clearedFloor: number): void => {
   const offer = floorDraftOffer(w.seed, clearedFloor)
-  if (offer.length === 0) return
+  const trait = floorTraitOffer(w.seed, clearedFloor)
+  if (offer.length === 0 && trait === undefined) return
   for (const e of w.entities) {
     if (!e.playerCtl || e.dead) continue
     // A teammate took the exit before this player chose: keep what they were pointing at.
     if (e.playerCtl.draft) takeCard(w, e, e.playerCtl.draft.cursor, true)
-    e.playerCtl.draft = { offer: [...offer], cursor: 0, until: w.tick + DRAFT_TICKS, held: PREV | NEXT | CONFIRM }
+    e.playerCtl.draft = {
+      offer: [...offer],
+      ...(trait !== undefined ? { trait } : {}),
+      cursor: 0,
+      until: w.tick + DRAFT_TICKS,
+      held: PREV | NEXT | CONFIRM,
+    }
   }
 }
 
@@ -150,7 +207,7 @@ export const draftSystem = (w: World, inputs: Map<number, InputCmd>): Map<number
   for (const e of w.entities) {
     const hand = e.playerCtl?.draft
     if (!hand || e.dead) continue
-    const n = hand.offer.length
+    const n = handCards(hand).length
     if (n === 0) {
       delete e.playerCtl!.draft
       continue

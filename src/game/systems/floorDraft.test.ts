@@ -15,7 +15,7 @@ import { emptyInput, type InputCmd, type SimEvent } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
 import { applyDamage } from './combat'
 import { weaponStack } from './inventory'
-import { dealFloorDraft, DRAFT_TICKS, draftSystem, floorDraftOffer } from './draft'
+import { dealFloorDraft, DRAFT_TICKS, draftSystem, floorDraftOffer, floorTraitOffer, handCards } from './draft'
 import { nextFloor, setupFloor } from './missions'
 
 const SEED = 7
@@ -50,6 +50,8 @@ const step = (w: World, cmds: Record<number, Partial<InputCmd>> = {}): SimEvent[
 }
 
 const picks = (events: SimEvent[]) => events.filter((e) => e.type === 'draftPick')
+const traitPicks = (events: SimEvent[]) => events.filter((e) => e.type === 'traitPick')
+const anyPicks = (events: SimEvent[]) => events.filter((e) => e.type === 'draftPick' || e.type === 'traitPick')
 const modsOf = (p: Entity) => weaponStack(p)?.mods ?? []
 
 describe('floor draft — dealt on floor advance', () => {
@@ -59,9 +61,22 @@ describe('floor draft — dealt on floor advance', () => {
     expect(w.floor).toBe(2)
     expect(events.some((e) => e.type === 'floorChange')).toBe(true)
     const offer = floorDraftOffer(SEED, 1)
-    expect(offer).toHaveLength(3)
+    const trait = floorTraitOffer(SEED, 1)!
+    expect(offer).toHaveLength(2)
+    expect(trait).toBeDefined()
     for (const id of [0, 1]) {
-      expect(player(w, id).playerCtl!.draft).toEqual({ offer, cursor: 0, until: w.tick - 1 + DRAFT_TICKS, held: 7 })
+      expect(player(w, id).playerCtl!.draft).toEqual({ offer, trait, cursor: 0, until: w.tick - 1 + DRAFT_TICKS, held: 7 })
+    }
+  })
+
+  it('every hand is two gun cards then exactly one YOU card, and the gun cards are the ones main dealt', () => {
+    for (const seed of [1, 7, 42, 1234, 0xdeadbeef]) {
+      const w = run(1, seed)
+      takeExit(w)
+      const cards = handCards(player(w).playerCtl!.draft!)
+      expect(cards.map((c) => c.kind), `seed ${seed}`).toEqual(['mod', 'mod', 'trait'])
+      // The gun cards are the first two of the three-card offer main dealt for this floor.
+      expect(cards.slice(0, 2).map((c) => c.id)).toEqual(floorDraftOffer(seed, 1, 3).slice(0, 2))
     }
   })
 
@@ -171,8 +186,61 @@ describe('floor draft — choosing', () => {
     const w = run()
     takeExit(w)
     const offer = player(w).playerCtl!.draft!.offer
-    step(w, { 0: { draftPick: 2, moveX: 1, attack: true } })
-    expect(modsOf(player(w))).toEqual([{ id: offer[2], stacks: 1 }])
+    step(w, { 0: { draftPick: 1, moveX: 1, attack: true } })
+    expect(modsOf(player(w))).toEqual([{ id: offer[1], stacks: 1 }])
+    expect(player(w).playerCtl!.traits).toBeUndefined()
+  })
+
+  it('the YOU card puts a trait on the player and leaves the gun alone', () => {
+    const w = run()
+    takeExit(w)
+    const p = player(w)
+    const trait = p.playerCtl!.draft!.trait!
+    const events = step(w, { 0: { draftPick: 2 } })
+    expect(p.playerCtl!.draft).toBeUndefined()
+    expect(p.playerCtl!.traits).toEqual([{ id: trait, stacks: 1 }])
+    expect(modsOf(p)).toEqual([])
+    expect(traitPicks(events)).toEqual([{ type: 'traitPick', byId: p.id, traitId: trait, stacks: 1, maxed: false, timedOut: false }])
+    expect(picks(events)).toEqual([])
+    expect(p.health!.iframes).toBeGreaterThanOrEqual(SPAWN_GRACE_TICKS - 1)
+  })
+
+  it('two local players pick different cards from the same hand: one a gun card, one the YOU card', () => {
+    const w = run(2)
+    takeExit(w)
+    const { offer, trait } = player(w, 0).playerCtl!.draft!
+    step(w)
+    step(w, { 0: { moveX: -1 }, 1: { moveX: 1 } }) // P1 wraps to the YOU card, P2 steps to gun card 1
+    step(w, { 0: {}, 1: {} })
+    const events = step(w, { 0: { attack: true }, 1: { interact: true } })
+    expect(traitPicks(events)).toEqual([expect.objectContaining({ byId: player(w, 0).id, traitId: trait })])
+    expect(picks(events)).toEqual([expect.objectContaining({ byId: player(w, 1).id, modId: offer[1] })])
+    expect(player(w, 0).playerCtl!.traits).toEqual([{ id: trait, stacks: 1 }])
+    expect(modsOf(player(w, 0))).toEqual([])
+    expect(player(w, 1).playerCtl!.traits).toBeUndefined()
+    expect(modsOf(player(w, 1))).toEqual([{ id: offer[1], stacks: 1 }])
+  })
+
+  it('a YOU card already held at its cap is a spent pick: reported maxed, nothing stacks', () => {
+    const w = run()
+    takeExit(w)
+    const p = player(w)
+    const trait = p.playerCtl!.draft!.trait!
+    p.playerCtl!.traits = [{ id: trait, stacks: 99 }]
+    const events = step(w, { 0: { draftPick: 2 } })
+    expect(traitPicks(events)[0]).toMatchObject({ traitId: trait, maxed: true, stacks: 99 })
+    expect(p.playerCtl!.traits).toEqual([{ id: trait, stacks: 99 }])
+  })
+
+  it('a YOU card naming a trait this build does not know closes the hand without a crash', () => {
+    const w = run()
+    takeExit(w)
+    const p = player(w)
+    p.playerCtl!.draft!.trait = 'no-such-trait'
+    const events = step(w, { 0: { draftPick: 2 } })
+    expect(p.playerCtl!.draft).toBeUndefined()
+    expect(p.playerCtl!.traits).toBeUndefined()
+    expect(traitPicks(events)[0]).toMatchObject({ traitId: 'no-such-trait', maxed: true, stacks: 0 })
   })
 
   it('ignores a bogus draftPick: out of range, negative, fractional, NaN', () => {
@@ -181,6 +249,7 @@ describe('floor draft — choosing', () => {
     for (const bad of [3, 255, -1, 0.5, NaN, Infinity]) step(w, { 0: { draftPick: bad } })
     expect(player(w).playerCtl!.draft).toBeDefined()
     expect(modsOf(player(w))).toEqual([])
+    expect(player(w).playerCtl!.traits).toBeUndefined()
   })
 
   it('stacks onto a mod the gun already has, and reports a maxed one', () => {
@@ -259,13 +328,14 @@ describe('floor draft — while a player is choosing', () => {
     const w = run()
     takeExit(w)
     const p = player(w)
-    const { offer, until } = p.playerCtl!.draft!
+    const { trait, until } = p.playerCtl!.draft!
     step(w)
-    step(w, { 0: { moveX: -1 } }) // cursor → 2
-    while (w.tick < until) expect(picks(step(w))).toEqual([])
+    step(w, { 0: { moveX: -1 } }) // cursor → 2, the YOU card
+    while (w.tick < until) expect(anyPicks(step(w))).toEqual([])
     const events = step(w)
-    expect(picks(events)).toEqual([expect.objectContaining({ modId: offer[2], timedOut: true })])
+    expect(anyPicks(events)).toEqual([expect.objectContaining({ type: 'traitPick', traitId: trait, timedOut: true })])
     expect(p.playerCtl!.draft).toBeUndefined()
+    expect(p.playerCtl!.traits).toEqual([{ id: trait, stacks: 1 }])
   })
 
   it('a teammate taking the next exit before you chose keeps the card you were on, then deals the new hand', () => {
@@ -306,6 +376,7 @@ describe('floor draft — while a player is choosing', () => {
     expect(late.playerCtl!.draft).toBeUndefined()
     takeExit(w, 0)
     expect(late.playerCtl!.draft!.offer).toEqual(floorDraftOffer(SEED, 2))
+    expect(late.playerCtl!.draft!.trait).toBe(floorTraitOffer(SEED, 2))
   })
 
   it('survives a corrupted hand: an empty offer closes, an out-of-range cursor resets', () => {
@@ -316,9 +387,11 @@ describe('floor draft — while a player is choosing', () => {
     step(w)
     expect(p.playerCtl!.draft!.cursor).toBe(0)
     p.playerCtl!.draft!.offer = []
+    delete p.playerCtl!.draft!.trait
     expect(() => step(w, { 0: { attack: true } })).not.toThrow()
     expect(p.playerCtl!.draft).toBeUndefined()
     expect(modsOf(p)).toEqual([])
+    expect(p.playerCtl!.traits).toBeUndefined()
   })
 })
 

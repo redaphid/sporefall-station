@@ -158,13 +158,13 @@ describe('draft', () => {
     const w = coop()
     const bruiser = player(w, 1)
     const loadout = { weapon: WEAPONS.sledgehammer, mods: weaponStack(bruiser)!.mods!, sequenced: false }
-    const cards = draftCards(['pierce', 'overload', 'incendiary'], loadout)
+    const cards = draftCards({ offer: ['pierce', 'overload', 'incendiary'] }, loadout)
     expect(cards.map((c) => c.verdict)).toEqual([
       { kind: 'inert', reason: 'no effect on melee' },
       { kind: 'live' },
       { kind: 'inert', reason: 'already maxed' },
     ])
-    expect(draftCards(['pierce']).map((c) => c.verdict)).toEqual([undefined])
+    expect(draftCards({ offer: ['pierce'] }).map((c) => c.verdict)).toEqual([undefined])
   })
 })
 
@@ -183,7 +183,7 @@ describe('DOM', () => {
   it('a draft card for a dead pick shows the reason in its face, not a tooltip', () => {
     const mount = document.createElement('div')
     const screen = createDraftScreen(mount, () => {})
-    screen.update(['pierce', 'overload'], [{ playerId: 0, cursor: 0 }], 10, 'full', {
+    screen.update({ offer: ['pierce', 'overload'] }, [{ playerId: 0, cursor: 0 }], 10, 'full', {
       weapon: WEAPONS.sledgehammer,
       mods: [],
       sequenced: false,
@@ -199,9 +199,9 @@ describe('draft screen re-renders when a verdict changes', () => {
     const mount = document.createElement('div')
     const screen = createDraftScreen(mount, () => {})
     const seats = [{ playerId: 0, cursor: 0 }]
-    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.pistol, mods: [], sequenced: false })
+    screen.update({ offer: ['pierce'] }, seats, 10, 'full', { weapon: WEAPONS.pistol, mods: [], sequenced: false })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')).toBeNull()
-    screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.sledgehammer, mods: [], sequenced: false })
+    screen.update({ offer: ['pierce'] }, seats, 9, 'full', { weapon: WEAPONS.sledgehammer, mods: [], sequenced: false })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')
   })
 })

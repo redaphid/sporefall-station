@@ -49,7 +49,7 @@ describe('floorDraftOffer — deterministic pick-1-of-N', () => {
 
 describe('draftCards — display data', () => {
   it('maps ids to kid-readable cards, dropping unknowns', () => {
-    const cards = draftCards(['frost', 'nope', 'bounce'])
+    const cards = draftCards({ offer: ['frost', 'nope', 'bounce'] })
     expect(cards.map((c) => c.id)).toEqual(['frost', 'bounce'])
     expect(cards[0]).toMatchObject({ name: MODS.frost.name, blurb: MODS.frost.blurb, icon: MODS.frost.icon, rarity: 'rare' })
   })

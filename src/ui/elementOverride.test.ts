@@ -148,7 +148,7 @@ describe('before the pick: a new element is judged as the newest, because a pick
     const pk = dropMod(w, 'frost', 30.5, 30.5)
     expect(buildInfoCard(pk, { self: p }).rows.find((r) => r.label === 'On your weapon')).toBeUndefined()
     const loadout = { weapon: WEAPONS.pistol, mods: weaponStack(p)!.mods!, sequenced: false }
-    expect(draftCards(['frost', 'shock'], loadout).map((c) => c.verdict)).toEqual([LIVE, { kind: 'inert', reason: 'already maxed' }])
+    expect(draftCards({ offer: ['frost', 'shock'] }, loadout).map((c) => c.verdict)).toEqual([LIVE, { kind: 'inert', reason: 'already maxed' }])
     expect(chips(w)).toEqual({ shock: LIVE })
 
     grab(w, 'frost')
@@ -161,7 +161,7 @@ describe('before the pick: a new element is judged as the newest, because a pick
       const w = rig()
       grab(w, ...held)
       const loadout = { weapon: WEAPONS.pistol, mods: weaponStack(player(w))!.mods!, sequenced: false }
-      expect(draftCards(['incendiary'], loadout)[0].verdict, held.join()).toEqual(LIVE)
+      expect(draftCards({ offer: ['incendiary'] }, loadout)[0].verdict, held.join()).toEqual(LIVE)
       grab(w, 'incendiary')
       expect(chips(w), held.join()).toEqual({ frost: overriddenBy('incendiary'), incendiary: LIVE, shock: overriddenBy('incendiary') })
       expect(landed(w), held.join()).toEqual(['burning'])
@@ -172,7 +172,7 @@ describe('before the pick: a new element is judged as the newest, because a pick
     const w = rig(false, [{ id: 'frost', stacks: 0 }, { id: 'shock', stacks: 1 }])
     const p = player(w)
     const loadout = { weapon: WEAPONS.pistol, mods: weaponStack(p)!.mods!, sequenced: false }
-    expect(draftCards(['frost'], loadout)[0].verdict).toEqual(overriddenBy('shock'))
+    expect(draftCards({ offer: ['frost'] }, loadout)[0].verdict).toEqual(overriddenBy('shock'))
     const pk = dropMod(w, 'frost', 30.5, 30.5)
     expect(buildInfoCard(pk, { self: p }).rows.find((r) => r.label === 'On your weapon')?.value).toBe('Tesla Rounds overrides it')
 

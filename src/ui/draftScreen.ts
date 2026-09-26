@@ -1,4 +1,5 @@
-// The floor-draft screen (#84): "pick 1 of 3" between floors. Pure DOM, drawn
+// The floor-draft screen (#84): "pick 1 of 3" between floors: two GUN cards and
+// one YOU card, framed differently so the kind reads before the words. Pure DOM, drawn
 // from sim state every frame. The hand and each player's cursor live on
 // `playerCtl.draft`, steered by the player's own InputCmd (stick = move, A or
 // interact = take), so pads, keyboard and remote peers all go through the sim.
@@ -11,8 +12,8 @@
 // undimmed strip along the bottom edge that lets clicks through to the world,
 // so the player who picked can see the fight they were returned to.
 
-import { draftCards, type DraftCard, type DraftLoadout } from '../game/systems/draft'
-import type { Entity } from '../game/entity'
+import { draftCards, type DraftCard, type DraftLoadout, type DraftYou } from '../game/systems/draft'
+import type { DraftHand, Entity } from '../game/entity'
 import { markUiChrome } from './chrome'
 
 const RARITY_COLOR: Record<DraftCard['rarity'], string> = {
@@ -24,6 +25,15 @@ const RARITY_COLOR: Record<DraftCard['rarity'], string> = {
 /** Seat colours for local players 1-4, so two pads on one couch can tell their cursors apart. */
 const SEAT_COLOR = ['#ffd75e', '#5ee0ff', '#ff7ad9', '#7dff8a']
 
+/** The two card kinds, told apart by frame, face and label before any reading. */
+const KIND_LOOK: Record<DraftCard['kind'], { label: string; accent: string; face: string; frame: string }> = {
+  mod: { label: '🔫 GUN', accent: '#8fb4d9', face: 'linear-gradient(#1a1f2e,#0c0f18)', frame: 'solid' },
+  trait: { label: '🙂 YOU', accent: '#6ff0b0', face: 'linear-gradient(#173226,#0a1711)', frame: 'double' },
+}
+
+/** The cards a hand shows. */
+export type ShownHand = Pick<DraftHand, 'offer' | 'trait'>
+
 /** One local player still choosing: whose cursor sits on which card. */
 export interface DraftSeat {
   playerId: number
@@ -32,7 +42,7 @@ export interface DraftSeat {
 
 /** What the local screen should draw for the floor draft this frame. */
 export interface LocalDraft {
-  offer: readonly string[] | null
+  hand: ShownHand | null
   seats: DraftSeat[]
   /** Latest deadline tick among the seats. */
   until: number
@@ -51,7 +61,7 @@ export const localDraft = (
   self: Entity | undefined,
   answeredUntil: number,
 ): LocalDraft => {
-  const out: LocalDraft = { offer: null, seats: [], until: 0, inPlay: false }
+  const out: LocalDraft = { hand: null, seats: [], until: 0, inPlay: false }
   for (const e of entities) {
     const ctl = e.playerCtl
     if (!ctl || e.dead || !localIds.has(ctl.playerId)) continue
@@ -60,7 +70,7 @@ export const localDraft = (
       out.inPlay = true
       continue
     }
-    out.offer ??= hand.offer
+    out.hand ??= hand
     out.until = Math.max(out.until, hand.until)
     out.seats.push({ playerId: ctl.playerId, cursor: hand.cursor })
   }
@@ -70,14 +80,16 @@ export const localDraft = (
 export type DraftLayout = 'full' | 'strip'
 
 export interface DraftScreen {
-  /** Show `offer` with each seat's cursor, or hide when `offer` is null. `loadout`
-   * (the local player's gun) marks cards that would do nothing on it. */
+  /** Show `hand` with each seat's cursor, or hide when `hand` is null. `loadout`
+   * (the local player's gun) marks GUN cards that would do nothing on it, and
+   * `you` (the local player) marks a YOU card that would do nothing for them. */
   update(
-    offer: readonly string[] | null,
+    hand: ShownHand | null,
     seats: readonly DraftSeat[],
     secondsLeft: number,
     layout?: DraftLayout,
     loadout?: DraftLoadout,
+    you?: DraftYou,
   ): void
   readonly visible: boolean
   readonly layout: DraftLayout
@@ -107,6 +119,8 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
   let titleEl: HTMLDivElement | null = null
   let hintEl: HTMLDivElement | null = null
   let cardEls: HTMLButtonElement[] = []
+  /** Each drawn card's index in the hand, which is what the cursor and a tap use. */
+  let cardIdx: number[] = []
   let chipRows: HTMLDivElement[] = []
   let timer: HTMLDivElement | null = null
 
@@ -117,30 +131,42 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
 
     const title = document.createElement('div')
     titleEl = title
-    title.textContent = 'FLOOR CLEARED — take one mod for your gun'
+    title.textContent = 'FLOOR CLEARED — pick one: your gun, or you'
     title.style.cssText = 'font:800 22px system-ui;color:#ffd75e;text-shadow:0 2px 6px #000;text-align:center'
     panel.appendChild(title)
 
     const row = document.createElement('div')
     row.className = 'draft-row'
     cardEls = []
+    cardIdx = []
     chipRows = []
-    cards.forEach((c, i) => {
+    cards.forEach((c) => {
+      const look = KIND_LOOK[c.kind]
       const card = document.createElement('button')
       card.className = 'draft-card'
-      card.dataset.modId = c.id
-      card.dataset.index = String(i)
+      card.dataset.kind = c.kind
+      if (c.kind === 'mod') card.dataset.modId = c.id
+      else card.dataset.traitId = c.id
+      card.dataset.index = String(c.index)
       card.style.cssText =
-        `border-radius:14px;border:2px solid ${RARITY_COLOR[c.rarity]};` +
-        'background:linear-gradient(#1a1f2e,#0c0f18);color:#eee;display:flex;flex-direction:column;' +
+        `border-radius:14px;border:${c.kind === 'trait' ? 4 : 2}px ${look.frame} ${look.accent};` +
+        `background:${look.face};color:#eee;display:flex;flex-direction:column;` +
         'align-items:center;cursor:pointer;box-shadow:0 6px 20px #000a;pointer-events:auto;' +
         'touch-action:manipulation;transition:transform .08s'
 
       const chips = document.createElement('div')
       chips.style.cssText = 'display:flex;gap:6px;min-height:22px'
 
+      const kind = document.createElement('div')
+      kind.className = 'draft-kind'
+      kind.textContent = look.label
+      kind.style.cssText =
+        `font:900 12px system-ui;letter-spacing:2px;padding:2px 10px;border-radius:8px;` +
+        `color:#0b0f14;background:${look.accent}`
+
       const icon = document.createElement('div')
       icon.textContent = c.icon
+      icon.className = 'draft-icon'
       icon.style.cssText = 'font-size:56px;line-height:1'
 
       const name = document.createElement('div')
@@ -156,9 +182,9 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
       rar.textContent = c.rarity.toUpperCase()
       rar.style.cssText = `margin-top:auto;font:700 11px system-ui;letter-spacing:1.5px;color:${RARITY_COLOR[c.rarity]}`
 
-      card.append(chips, icon, name, blurb)
-      // The blurb says what the mod is for; this says what it would do on YOUR
-      // weapon, so a dead pick is visible before you take it.
+      card.append(chips, kind, icon, name, blurb)
+      // The blurb says what the card is for; this says what it would do for
+      // YOU (on your gun, or on you), so a dead pick is visible before you take it.
       if (c.verdict && c.verdict.kind !== 'live') {
         const inert = c.verdict.kind === 'inert'
         const verdict = document.createElement('div')
@@ -171,9 +197,10 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
         if (inert) card.dataset.inert = '1'
       }
       card.appendChild(rar)
-      card.onclick = () => onPick(i)
+      card.onclick = () => onPick(c.index)
       row.appendChild(card)
       cardEls.push(card)
+      cardIdx.push(c.index)
       chipRows.push(chips)
     })
     panel.appendChild(row)
@@ -206,7 +233,7 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
       card.style.gap = strip ? '4px' : '12px'
       card.style.padding = strip ? '6px 6px' : '18px 14px'
       card.style.opacity = card.dataset.inert ? '0.6' : strip ? '0.92' : '1'
-      const icon = card.children[1] as HTMLElement | undefined
+      const icon = card.querySelector<HTMLElement>('.draft-icon')
       if (icon) icon.style.fontSize = strip ? '28px' : '56px'
       const blurb = card.querySelector<HTMLElement>('.draft-blurb')
       if (blurb) blurb.style.display = strip ? 'none' : ''
@@ -220,8 +247,9 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
     get layout() {
       return layout
     },
-    update(offer, seats, secondsLeft, next = 'full', loadout) {
-      if (!offer || offer.length === 0 || seats.length === 0) {
+    update(hand, seats, secondsLeft, next = 'full', loadout, you) {
+      const cards = hand ? draftCards(hand, loadout, you) : []
+      if (cards.length === 0 || seats.length === 0) {
         if (shownKey) {
           root.style.display = 'none'
           root.replaceChildren()
@@ -229,15 +257,14 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
         }
         return
       }
-      const cards = draftCards(offer, loadout)
-      const key = cards.map((c) => `${c.id}:${c.verdict?.kind ?? 'live'}`).join(',')
+      const key = cards.map((c) => `${c.kind}:${c.id}:${c.verdict?.kind ?? 'live'}`).join(',')
       if (key !== shownKey) {
         build(cards)
         shownKey = key
         applyLayout(next)
       } else if (next !== layout) applyLayout(next)
       cardEls.forEach((card, i) => {
-        const here = seats.filter((s) => s.cursor === i)
+        const here = seats.filter((s) => s.cursor === cardIdx[i])
         const lead = here[0]
         card.style.outline = lead ? `3px solid ${SEAT_COLOR[lead.playerId % SEAT_COLOR.length]}` : 'none'
         card.style.outlineOffset = '3px'

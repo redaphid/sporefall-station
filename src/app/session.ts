@@ -1,4 +1,5 @@
 import type { Entity } from '../game/entity'
+import type { ModifierView } from '../game/floorModifiers'
 import type { Level } from '../game/levelgen/level'
 import type { Annotation, SimEvent } from '../game/types'
 import type { ModCasting, RunMode } from '../game/world'
@@ -43,6 +44,8 @@ export interface RenderView {
   simTick?: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
+  /** This floor's modifier as the HUD and renderer show it. Absent = clean floor. */
+  modifier?: ModifierView
   /** Inert on-screen annotations to draw over the scene (see game/types.ts).
    * Empty/omitted on sessions that don't surface them (clients mirror host state). */
   annotations?: readonly Annotation[]

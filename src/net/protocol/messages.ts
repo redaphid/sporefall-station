@@ -4,6 +4,7 @@ import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
+import type { FloorModifier } from '../../game/floorModifiers'
 import type { InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
 import { ByteReader, ByteWriter } from '../framing/codec'
@@ -575,6 +576,10 @@ export interface StateMsg {
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */
   revivesLeft?: number
+  /** This floor's modifier (host truth). Absent on a clean floor and from an
+   * older host. The client derives the tide/hunt display from it and its own
+   * host-tick estimate, so it needs no per-tick traffic. */
+  modifier?: FloorModifier
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it

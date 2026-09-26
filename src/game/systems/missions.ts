@@ -4,6 +4,7 @@ import { generateLevel } from '../levelgen/generate'
 import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
+import { applyFloorModifier } from './modifierSystem'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
 import { dealFloorDraft } from './draft'
@@ -23,6 +24,8 @@ export const setupFloor = (w: World): void => {
   // floor hostile — runs on EVERY floor (even floor 1's plain locks), unlike the
   // access gate which only dresses floors >= 2.
   tagObjectiveGate(w)
+  // Last, and on its own stream: nothing above moves with or without it.
+  applyFloorModifier(w)
 }
 
 /** Sporefall flavour for each generic building role: the derelict station's

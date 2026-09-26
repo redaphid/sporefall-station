@@ -16,6 +16,8 @@ import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serial
 import { kill as killEntity } from '../game/systems/combat'
 import { addAnnotations, clearAnnotations } from '../game/annotations'
 import { selectedEntities } from '../game/select'
+import { FLOOR_MODIFIER_KINDS, type FloorModifierKind } from '../game/floorModifiers'
+import { startFloorModifier } from '../game/systems/modifierSystem'
 import { emptyInput, type InputCmd, type SimEvent } from '../game/types'
 import { addEntity, tickWorld, type World } from '../game/world'
 import { decodeArg } from './protocol'
@@ -35,6 +37,7 @@ export const WRITE_VERBS = new Set([
   'clearAnnotations',
   'addMod',
   'setBehavior',
+  'modifier',
 ])
 
 export interface VerbCtx {
@@ -530,6 +533,24 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (!ctx.setTheme) throw new Error('theme switching unavailable here (no renderer attached)')
       ctx.setTheme(rest)
       return JSON.stringify({ theme: rest, status: 'switching' })
+    }
+
+    case 'modifier': {
+      // `modifier` reads this floor's modifier; `modifier <kind> [age]` forces
+      // one as if the floor began `age` ticks ago (bogTide 450 = tide in now,
+      // hunted 900 = pack lands next tick); `modifier none` clears it.
+      const [kind, ageArg] = rest.split(/\s+/)
+      if (!kind) return JSON.stringify(w.modifier ?? null)
+      if (kind === 'none') {
+        w.modifier = undefined
+        return 'null'
+      }
+      const age = ageArg === undefined ? 0 : Number(ageArg)
+      if (!FLOOR_MODIFIER_KINDS.includes(kind as FloorModifierKind) || !Number.isInteger(age) || age < 0) {
+        throw new Error(`usage: modifier [${FLOOR_MODIFIER_KINDS.join('|')}|none] [ageTicks>=0]`)
+      }
+      startFloorModifier(w, kind as FloorModifierKind, age)
+      return JSON.stringify(w.modifier)
     }
 
     case 'command':

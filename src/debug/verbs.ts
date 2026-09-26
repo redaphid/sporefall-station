@@ -5,11 +5,13 @@
 // testable and lets the channel decide WHEN to run it (reads immediately,
 // writes deferred onto the sim step).
 
-import { makeEntity, type Entity } from '../game/entity'
+import { makeEntity, type Entity, type ItemStack } from '../game/entity'
 import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behaviors'
 import { NPCS } from '../game/data/npcs'
 import { MODS, isModId, modMaxStacks } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
+import { liveEntries, packModSwap, planCasts, recharging, sequenceShape } from '../game/systems/modSequence'
+import { WEAPONS } from '../game/data/items'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
@@ -165,7 +167,17 @@ const HELD_BUTTONS = ['attack', 'special'] as const
 // so holding one across N ticks would repeat it (a held swap undoes itself).
 const EDGE_BUTTONS = ['interact', 'throwItem', 'roll'] as const
 const EDGE_INTS = ['hotbar', 'modSwap'] as const
-const HELD_KEYS = new Set<string>([...HELD_AXES, ...HELD_BUTTONS, ...EDGE_BUTTONS, ...EDGE_INTS, 'player', 'aimAt'])
+// Sugar for the wand, first tick only (they compile to `modSwap`):
+//   "swap":[a,b]  reorder: swap entries a and b of the mod list (packModSwap(a, b))
+//   "eject":i     reactive wands: drop entry i on the floor (packModSwap(i, i))
+const WAND_SUGAR = ['swap', 'eject'] as const
+const HELD_KEYS = new Set<string>([...HELD_AXES, ...HELD_BUTTONS, ...EDGE_BUTTONS, ...EDGE_INTS, ...WAND_SUGAR, 'player', 'aimAt'])
+
+const listIndex = (v: unknown, what: string): number => {
+  const n = num(String(v), what)
+  if (!Number.isInteger(n) || n < 0 || n > 255) throw new Error(`${what} must be a mod-list index 0..255, got ${String(v)}`)
+  return n
+}
 
 export const parseHeldInput = (w: World, text: string): HeldInput => {
   const raw = JSON.parse(text) as unknown
@@ -186,6 +198,16 @@ export const parseHeldInput = (w: World, text: string): HeldInput => {
   }
   if (raw.hotbar !== undefined) cmd.hotbar = num(String(raw.hotbar), 'hotbar')
   if (raw.modSwap !== undefined) cmd.modSwap = num(String(raw.modSwap), 'modSwap')
+  const wandKeys = ['modSwap', ...WAND_SUGAR].filter((k) => raw[k] !== undefined)
+  if (wandKeys.length > 1) throw new Error(`step input: use only one of ${wandKeys.join(', ')} per step (one wand edit per tick)`)
+  if (raw.swap !== undefined) {
+    if (!Array.isArray(raw.swap) || raw.swap.length !== 2) throw new Error('step input "swap" must be [a, b]')
+    const a = listIndex(raw.swap[0], 'swap[0]')
+    const b = listIndex(raw.swap[1], 'swap[1]')
+    if (a === b) throw new Error('step input "swap" needs two different entries (to eject one, use "eject")')
+    cmd.modSwap = packModSwap(a, b)
+  }
+  if (raw.eject !== undefined) cmd.modSwap = packModSwap(listIndex(raw.eject, 'eject'), listIndex(raw.eject, 'eject'))
   const aimAt = raw.aimAt === undefined ? undefined : num(String(raw.aimAt), 'aimAt')
   // An id never allocated is a typo; one that existed and is gone (killed) just leaves aim as-is.
   if (aimAt !== undefined && !(Number.isInteger(aimAt) && aimAt > 0 && aimAt < w.nextId)) throw new Error(`no entity ${aimAt} to aim at`)
@@ -212,6 +234,34 @@ export const heldCmd = (w: World, h: HeldInput, i: number): InputCmd => {
     }
   }
   return c
+}
+
+/** Ticks left on each status, for reading combo clocks (wet 150, frozen 120, electrified 30). */
+const fxLeft = (w: World, e: Entity): Record<string, number> | undefined => {
+  if (!e.fx) return undefined
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(e.fx)) out[k] = Math.max(0, v.until - w.tick)
+  return Object.keys(out).length ? out : undefined
+}
+
+/** The wand as a player reads it in sequenced / reactive runs: every entry by
+ * list index (the index `swap`/`eject` take), which are live and which are in
+ * the pocket, what the next pull fires, and any recharge left. */
+const wandView = (w: World, stack: ItemStack | undefined): Record<string, unknown> | undefined => {
+  const def = stack && WEAPONS[stack.itemId]
+  if (!w.modCasting || !stack || !def) return undefined
+  const mods = stack.mods ?? []
+  const shape = sequenceShape(def)
+  const live = liveEntries(mods, shape.slots)
+  const plan = planCasts(mods, shape, stack.castIndex ?? 0)
+  return {
+    entries: mods.map((m, i) => `${i}:${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}${live.includes(i) ? '' : ' (pocket)'}`),
+    slots: shape.slots,
+    ...(w.modCasting === 'reactive' ? { capacity: shape.slots + 2 } : {}),
+    nextPull: plan.casts.map((c) => c.mods.map((m) => m.id).join('+')),
+    wrapsAfterNextPull: plan.wrapped,
+    rechargeLeft: recharging(stack, w.tick) ? stack.rechargeUntil! - w.tick : 0,
+  }
 }
 
 /** Replace a live world's contents in place so every closed-over reference (the
@@ -349,7 +399,10 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           at: { x: Math.round(e.pos.x * 10) / 10, y: Math.round(e.pos.y * 10) / 10 },
           hp: e.health ? `${e.health.hp}/${e.health.max}` : undefined,
           fx: e.fx && Object.keys(e.fx).length ? Object.keys(e.fx) : undefined,
+          fxLeft: fxLeft(w, e),
           resist: e.resist,
+          // An ejected wand chip (reactive wands): `armed` once a shot can crack it.
+          chip: e.pickup?.chip ? (w.tick >= e.pickup.chip.armedAt ? 'armed' : 'arming') : undefined,
           mode: e.ai?.mode,
           faction: e.ai?.faction,
         }))
@@ -368,7 +421,9 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           downed: me.playerCtl!.downed !== undefined,
           weapon: stack?.itemId,
           mods: stack?.mods?.map((m) => `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`) ?? [],
+          wand: wandView(w, stack),
           fx: me.fx && Object.keys(me.fx).length ? Object.keys(me.fx) : undefined,
+          fxLeft: fxLeft(w, me),
         },
         near,
       })
@@ -421,7 +476,11 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       const events: Record<string, number> = {}
       for (let i = 0; i < n; i++) {
         tickWorld(w, held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map())
-        for (const ev of w.events) events[ev.type] = (events[ev.type] ?? 0) + 1
+        for (const ev of w.events) {
+          // A reaction is only legible by name: count `reaction:chain`, not `reaction`.
+          const key = ev.type === 'reaction' ? `reaction:${ev.reaction}` : ev.type === 'chipBurst' ? `chipBurst:${ev.modId}` : ev.type
+          events[key] = (events[key] ?? 0) + 1
+        }
       }
       const aimAtGone = held?.aimAt !== undefined && !w.byId.has(held.aimAt) ? true : undefined
       return JSON.stringify({ tick: w.tick, advanced: n, player: held?.entityId, aimAtGone, events })
@@ -464,7 +523,12 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       const cap = modMaxStacks(modId)
       const mods = (stack.mods ??= [])
       const existing = mods.find((m) => m.id === modId)
-      if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
+      if (w.modCasting === 'reactive') {
+        // Reactive wands: one chip is one entry (so [soak][shock][soak] is
+        // expressible), up to the mod's copy cap. Staging only: no wand capacity.
+        const have = mods.reduce((n, m) => n + (m.id === modId ? m.stacks : 0), 0)
+        for (let k = 0; k < Math.min(stacks, cap - have); k++) mods.push({ id: modId, stacks: 1 })
+      } else if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
       else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
       return JSON.stringify({ id: e.id, weapon: e.combat?.weapon, mods: stack.mods })
     }

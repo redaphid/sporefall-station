@@ -72,6 +72,10 @@ export interface ModDef {
   onHit?: StatusApply
   /** A trigger effect; its magnitude scales with stacks in resolveWeapon. */
   trigger?: ModTrigger
+  /** Only exists in reactive-wand runs (World.modCasting 'reactive'): left out of
+   * the draft hand and the floor-drop pool otherwise, so adding it to the
+   * registry perturbs no existing seed's loot. */
+  reactiveOnly?: true
 }
 
 /** Default stack cap (ROUNDS lets you re-pick a card; we bound it). */
@@ -137,6 +141,16 @@ export const MODS: Record<string, ModDef> = {
     maxStacks: 1,
     blurb: 'Zaps and stuns — arcs through anything wet.',
     onHit: { status: 'electrified', ticks: 45 },
+  },
+
+  // Design B (reactive wands): the one player element that makes things wet, so
+  // the wet + shock chain in systems/interactions is performable from a wand.
+  // Harmless on its own. `maxStacks` is "copies per wand" in reactive runs.
+  soak: {
+    id: 'soak', name: 'Soak Rounds', icon: '💧', category: 'behavior', rarity: 'common',
+    maxStacks: 3, reactiveOnly: true,
+    blurb: 'Soaks what it hits. Wet things conduct lightning.',
+    onHit: { status: 'wet', ticks: 150 },
   },
 
   // ---- BEHAVIOR: bullet mechanics ------------------------------------------

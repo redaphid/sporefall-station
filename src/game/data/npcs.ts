@@ -29,6 +29,13 @@ export interface NpcDef {
    * Absent → neutral to everything (the townsfolk baseline). This is what makes
    * a Sporefall enemy DEMAND a particular tool — no single weapon clears them all. */
   resist?: Record<string, number>
+  /** Reactive wands only (Design B): a status this body keeps on itself,
+   * re-applied every `every` ticks while its hp fraction is above
+   * `untilHpFrac`. It makes a weakness a fact you can SEE (`look` shows the
+   * status) and a rule the reaction table already covers: a boss whose hide is
+   * `wet` conducts every Shock round and fizzles every Fire round. Never read
+   * outside a reactive run, so no other run changes. */
+  hide?: { status: 'wet'; every: number; untilHpFrac: number; resist?: Record<string, number> }
   /** #68 — spawns INERT until a stimulus wakes it (the spore pod, the lurker).
    * NOT the Derelict Unit: that one spawns awake and merely turns hostile on a
    * `wakeOn` power-cut, so it sets `wakeOn` WITHOUT `dormant`. */
@@ -86,6 +93,10 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
     behavior: 'mireclaw',
     resist: { physical: 0.75, burning: 1.25, poisoned: 0.5, spore: 0 },
+    // It came out of the bog soaked, and dries off at half health: lightning
+    // jumps through it in phase 1 (and hurts it 1.6x), fire fizzles off it
+    // until then. Reactive-wand runs only.
+    hide: { status: 'wet', every: 60, untilHpFrac: 0.5, resist: { electrified: 1.6 } },
   },
   cop: {
     archetype: 'cop',

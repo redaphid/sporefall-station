@@ -123,6 +123,8 @@ export const MOD_VISUALS: Record<string, BulletTraitDelta> = {
   // ---- BEHAVIOR: elements ----------------------------------------------------
   frost: { hue: { color: 0x8fd4ff, weight: 1 }, glowAdd: 0.3, glowColor: 0x8fd4ff, trailAdd: 1, trailColor: 0xc9ecff },
   incendiary: { hue: { color: 0xff7a2a, weight: 1 }, glowAdd: 0.35, glowColor: 0xff6018, trailAdd: 1, trailColor: 0xffb040, jitterAdd: 0.18, distortAdd: 0.3 },
+  // Soak (reactive wands): a fat, wobbling droplet with a wet blue trail.
+  soak: { sizeMul: 1.1, hue: { color: 0x3a8cff, weight: 1 }, trailAdd: 0.8, trailColor: 0x8cc4ff, pulseAdd: 0.3 },
   shock: { hue: { color: 0xfff27a, weight: 1 }, glowAdd: 0.3, glowColor: 0xaad4ff, jitterAdd: 0.6, trailAdd: 0.5, trailColor: 0xd8f0ff, distortAdd: 0.35 },
 
   // ---- BEHAVIOR: bullet mechanics -------------------------------------------

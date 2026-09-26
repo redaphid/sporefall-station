@@ -19,10 +19,14 @@ export interface DraftCard {
   rarity: ModRarity
 }
 
+/** The mods a random draw may produce. Reactive-only mods (soak) join the pool
+ * only in a reactive-wand run, so every other run draws exactly as before. */
+const dropPool = (reactive: boolean): ModDef[] => Object.values(MODS).filter((m) => reactive || !m.reactiveOnly)
+
 /** Draw `count` DISTINCT mod ids from the registry, weighted by rarity, without
  * replacement — a pure function of the supplied RNG stream position. */
-export const draftOffer = (rng: Rng, count = 3): string[] => {
-  const remaining: ModDef[] = Object.values(MODS)
+export const draftOffer = (rng: Rng, count = 3, reactive = false): string[] => {
+  const remaining: ModDef[] = dropPool(reactive)
   const chosen: string[] = []
   while (chosen.length < count && remaining.length > 0) {
     const total = remaining.reduce((s, m) => s + RARITY_WEIGHT[m.rarity], 0)
@@ -42,8 +46,8 @@ export const draftOffer = (rng: Rng, count = 3): string[] => {
  * single-card analogue of `draftOffer`, shared by the world mod-pickup placement
  * (populate.ts) so scattered pickups follow the same common/rare/legendary odds
  * as the draft. Pure in the RNG: same stream position → same id. */
-export const weightedModId = (rng: Rng): string => {
-  const all = Object.values(MODS)
+export const weightedModId = (rng: Rng, reactive = false): string => {
+  const all = dropPool(reactive)
   const total = all.reduce((s, m) => s + RARITY_WEIGHT[m.rarity], 0)
   let r = rng.next() * total
   for (let i = 0; i < all.length - 1; i++) {
@@ -56,8 +60,8 @@ export const weightedModId = (rng: Rng): string => {
 /** The deterministic hand offered on clearing `floor` for a run `seed`. Uses a
  * dedicated `draft:<floor>` fork so it is reproducible and independent of the
  * sim RNG — identical on host and every client. */
-export const floorDraftOffer = (seed: number, floor: number, count = 3): string[] =>
-  draftOffer(mulberry32(hashLabel(seed >>> 0, `draft:${floor}`)), count)
+export const floorDraftOffer = (seed: number, floor: number, count = 3, reactive = false): string[] =>
+  draftOffer(mulberry32(hashLabel(seed >>> 0, `draft:${floor}`)), count, reactive)
 
 /** Presentation data for a set of offered mod ids (kid-readable blurbs/icons). */
 export const draftCards = (ids: readonly string[]): DraftCard[] =>

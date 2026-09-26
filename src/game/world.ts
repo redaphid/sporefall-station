@@ -19,6 +19,7 @@ import { projectileSystem } from './systems/projectiles'
 import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
+import { hideSystem } from './systems/reactions'
 import { stairSystem } from './systems/stairs'
 import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
@@ -118,10 +119,14 @@ export const REVIVES_PER_RUN = 2
  * How a weapon's mods fire. Absent = the default fold (every mod on every
  * shot, systems/resolveWeapon). `'sequence'` = the opt-in prototype where the
  * mod list is an ordered wand and each cast consumes the next entry
- * (systems/modSequence). A pure sim input like `mode`: the host picks it when
- * the run is created and it rides the save and the GameStart message.
+ * (systems/modSequence). `'reactive'` = sequence plus Design B's wand reactions
+ * (the wand-reactions flag): statuses on a body combo with the next element to
+ * land on it (systems/reactions), one chip is one list entry, and a chip can be
+ * ejected onto the floor and cracked (systems/wandChips). A pure sim input like
+ * `mode`: the host picks it when the run is created and it rides the save and
+ * the GameStart message.
  */
-export type ModCasting = 'sequence'
+export type ModCasting = 'sequence' | 'reactive'
 
 export interface World {
   tick: number
@@ -306,6 +311,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   elementSystem(w)
   statusSystem(w)
   statusFxSystem(w)
+  if (w.modCasting === 'reactive') hideSystem(w) // Design B: a boss keeps its hide (wet) on
   mireclawSystem(w) // #69 boss phases: summon / regen-in-cloud / enrage (after HP + spore/fire settle)
   // Regen runs LAST among the damage-aware systems: after every source that can
   // hurt a player this tick (so "hurt this tick" is final) and after movement (so

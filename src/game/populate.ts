@@ -939,7 +939,7 @@ const scatterModPickups = (w: World): void => {
       if (!rng.chance(MOD_PICKUP_ROOM_CHANCE)) continue
       const spot = randomFloorInRoom(w, rng, room, spawnTx, spawnTy)
       if (!spot) continue
-      dropModPickup(w, weightedModId(rng), spot.x, spot.y)
+      dropModPickup(w, weightedModId(rng, w.modCasting === 'reactive'), spot.x, spot.y)
     }
   }
 }
@@ -1007,6 +1007,8 @@ export const spawnNpc = (w: World, archetype: string, x: number, y: number, wrng
   // #78 — carry the archetype's damage-affinity table onto the entity so the
   // shared damage path can read it (absent for neutral townsfolk).
   if (def.resist) e.resist = { ...def.resist }
+  // Design B (reactive wands only): a hide brings its weakness with it.
+  if (w.modCasting === 'reactive' && def.hide?.resist) e.resist = { ...e.resist, ...def.hide.resist }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
   e.ai = {
     mode: 'idle',
@@ -1097,7 +1099,7 @@ const stockLofts = (w: World): void => {
     const rest = free.filter((t) => t.x !== crateAt.x || t.y !== crateAt.y)
     const pick = (): { x: number; y: number } | undefined => (rest.length > 0 ? rest.splice(rng.int(0, rest.length - 1), 1)[0] : undefined)
     const modAt = pick()
-    if (modAt) dropModPickup(w, weightedModId(rng), modAt.x + 0.5, modAt.y + 0.5)
+    if (modAt) dropModPickup(w, weightedModId(rng, w.modCasting === 'reactive'), modAt.x + 0.5, modAt.y + 0.5)
     const lootAt = pick()
     if (lootAt) {
       const itemId = rng.pick(lootTable(w.floor))

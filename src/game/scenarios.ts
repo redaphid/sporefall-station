@@ -8,6 +8,7 @@ import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
 import { nextFloor } from './systems/missions'
 import { findPath } from './path'
+import { hasLineOfSight } from './los'
 import { vlen } from './simMath'
 import {
   findArrival,
@@ -944,6 +945,91 @@ const setupStairsDemo = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
   player.facing = Math.atan2(-d[1], -d[0]) // looking at the stair
 }
 
+// ── Design B: reactive wands (World.modCasting 'reactive', the wand-reactions flag)
+//
+// Both stages FORCE the reactive rule on the world: they exist only to show it,
+// and a stage that quietly ran the default fold would look like a broken build.
+// They run on the seed's own generated floor (no carved tiles), so a moment in
+// them restores through `?state=`. The player keeps the `armed` double HP but is
+// NOT a tank: damage taken is part of what a playtest measures.
+
+/** The lab wand: four live chips that look strong together and mostly are not,
+ * plus a Soak chip in the pocket that fixes them. Pistol: 4 live slots,
+ * 1 cast per pull, 20-tick recharge on the wrap. */
+export const WAND_LAB_MODS: readonly string[] = ['frost', 'incendiary', 'shock', 'heavy', 'soak']
+
+/** Clear the floor's cast (NPCs, projectiles, groups) and stand its heist down,
+ * keeping doors and furniture; returns the first player, re-kitted with the lab
+ * wand on a pistol. */
+const wandStage = (w: World, floor: number | undefined): Entity | undefined => {
+  setupArmed(w, floor)
+  w.modCasting = 'reactive'
+  w.entities = w.entities.filter((e) => !e.ai && !e.projectile && !(e.pickup && e.archetype.startsWith('mod.')))
+  w.byId.clear()
+  for (const e of w.entities) w.byId.set(e.id, e)
+  w.groups = undefined
+  w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Wand lab: find the combos' }
+  const player = w.entities.find((e) => e.playerCtl)
+  if (!player) return undefined
+  player.loadout = {
+    inventory: [{ itemId: 'pistol', qty: 1, mods: WAND_LAB_MODS.map((id) => ({ id, stacks: 1 })) }],
+    activeSlot: -1,
+  }
+  if (player.combat) player.combat.weapon = 'pistol'
+  return player
+}
+
+/** An open tile `lo..hi` tiles from `from` that it can see, nearest the middle
+ * of the band first (ties by tile order), or null. Deterministic. */
+const tileInSight = (w: World, from: Entity, lo: number, hi: number): { x: number; y: number } | null => {
+  const mid = (lo + hi) / 2
+  let best: { x: number; y: number } | null = null
+  let bestScore = Infinity
+  for (let y = 1; y < w.level.h - 1; y++) {
+    for (let x = 1; x < w.level.w - 1; x++) {
+      if (isSolidTile(w.level, x, y)) continue
+      const d = vlen(x + 0.5 - from.pos.x, y + 0.5 - from.pos.y)
+      if (d < lo || d > hi) continue
+      if (!hasLineOfSight(w.level, from.pos.x, from.pos.y, x + 0.5, y + 0.5)) continue
+      if (!standAt(w, x + 0.5, y + 0.5)) continue
+      const score = Math.abs(d - mid)
+      if (score < bestScore) {
+        bestScore = score
+        best = { x: x + 0.5, y: y + 0.5 }
+      }
+    }
+  }
+  return best
+}
+
+/** `?scenario=wand-lab[&floor=N]`: the lab wand against a drowner tide (four
+ * grunts, who move in a bunch: the chain's ideal prey) arriving in sight, and a
+ * spare Soak chip on the floor beside the player. */
+const setupWandLab = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
+  const player = wandStage(w, floor)
+  if (!player) return
+  const at = tileInSight(w, player, 7, 9) ?? findArrival(w, 'assault', player, groupRng(w, 'scenario:wand-lab'))
+  if (at) spawnRaid(w, 'assault', at, player, ['grunt', 'grunt', 'grunt', 'grunt'])
+  const spare = tileInSight(w, player, 1.5, 2.5)
+  if (spare) {
+    const chip = makeEntity('pickup', 'mod.soak', spare.x, spare.y, 0.3)
+    chip.pickup = { itemId: 'soak', qty: 1 }
+    addEntity(w, chip)
+  }
+}
+
+/** `?scenario=wand-boss[&floor=N]`: the lab wand against a Mireclaw Alpha about
+ * 8 tiles away, in sight. In a reactive run the boss keeps its hide (it re-soaks
+ * itself until half health), so lightning jumps through it and fire fizzles. */
+const setupWandBoss = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
+  const player = wandStage(w, floor)
+  if (!player) return
+  const at = tileInSight(w, player, 7.5, 8.5)
+  if (!at) return
+  const boss = spawnNpc(w, 'boss', at.x, at.y)
+  w.mission = { template: 'assassinate', complete: false, exitUnlocked: false, targetEntityId: boss.id, description: 'Wand lab: kill the Mireclaw Alpha' }
+}
+
 export interface ScenarioOpts {
   /** `?floor=`: the floor the `armed` / `stairs-demo` scenarios start on. */
   floor?: number
@@ -962,6 +1048,8 @@ const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>
   fire: setupFire,
   frost: setupFrost,
   'boss-freeze': setupBossFreeze,
+  'wand-lab': (w, opts) => setupWandLab(w, opts.floor),
+  'wand-boss': (w, opts) => setupWandBoss(w, opts.floor),
   'wet-electric': setupWetElectric,
   inventory: setupInventory,
   items: setupItems,

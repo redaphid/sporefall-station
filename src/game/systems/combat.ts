@@ -14,6 +14,8 @@ import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
 import { spawnSporeBurst } from './spore'
+import { reactiveHit } from './reactions'
+import { ejectChip } from './wandChips'
 import { vlen } from '../simMath'
 
 const IFRAME_TICKS = 5
@@ -97,6 +99,9 @@ export const applyDamage = (
   fromY: number,
   knockback: number,
   attackerId: number,
+  /** Reactive wands only (systems/reactions): false when the blow carries an
+   * element, which reacts with the ice instead of shattering it. */
+  mayShatter = true,
 ): number | null => {
   if (!target.health || target.dead || target.health.iframes > 0) return null
   if (target.playerCtl?.downed) return null // downed players are out of the fight, not a piñata
@@ -125,7 +130,7 @@ export const applyDamage = (
   // consumer downstream (lifesteal's payout, `destroyObject`'s loot and barrel
   // explosion, `kill`'s downed/corpse handling) sees a normal, if large, blow.
   let shattering = false
-  if (isFrozen(target)) {
+  if (mayShatter && isFrozen(target)) {
     removeStatus(target, 'frozen')
     if (!target.playerCtl) {
       shattering = true
@@ -340,7 +345,17 @@ export const spawnProjectile = (
  * The one AoE primitive — reused by grenades/explosive bullets (projectiles.ts)
  * and by on-kill detonator triggers. Kept here (not projectiles.ts) so the
  * projectile system can import it without a cycle back through applyDamage. */
-export const detonate = (w: World, x: number, y: number, radius: number, damage: number, ownerId: EntityId): void => {
+export const detonate = (
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  damage: number,
+  ownerId: EntityId,
+  /** Reactive wands only: the blast carries the round's element (or none) to
+   * every body it lands on, through the reaction table. Absent = the plain blast. */
+  reactive?: { onHit?: StatusApply },
+): void => {
   w.events.push({ type: 'explosion', x, y, radius })
   // Explosions are LOUD: every NPC in earshot comes to investigate the boom —
   // the price of the fast door-breach path below (vs the slow, quiet pick).
@@ -348,7 +363,9 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
     const dist = vlen(other.pos.x - x, other.pos.y - y)
-    if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
+    if (dist > radius + other.radius) continue
+    if (reactive) reactiveHit(w, other, damage, x, y, 10, ownerId, reactive.onHit)
+    else applyDamage(w, other, damage, x, y, 10, ownerId)
   }
   // Breach: a blast centred close enough blows a door open, locked or not —
   // the always-available alternative to picking (the player special IS a
@@ -516,7 +533,9 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // swap asked for mid-roll or while stunned is not silently dropped.
     if (sequencing(w)) {
       const swap = inputs.get(e.playerCtl.playerId)?.modSwap
-      if (swap !== undefined) applyModSwap(e, swap)
+      // Reactive wands: a swap of an entry with ITSELF (packModSwap(i, i), a
+      // no-op in plain sequence mode) means "eject entry i onto the floor".
+      if (swap !== undefined && !ejectChip(w, e, swap)) applyModSwap(e, swap)
     }
     if (isRolling(e, w.tick)) continue // mid-roll: hands full — no attack/ability/throw
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue

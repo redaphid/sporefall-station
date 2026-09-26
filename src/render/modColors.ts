@@ -33,6 +33,7 @@ export const MOD_PICKUP_COLORS: Record<string, number> = {
   frost: 0x42d4f4, //    cyan      — ice (semantic)
   incendiary: 0xf58231, // orange  — fire (semantic)
   shock: 0xffe119, //    yellow    — electricity (semantic)
+  soak: 0x1f6fff, //     deep blue — water (semantic, reactive wands only)
   // ---- BEHAVIOR: bullet mechanics ------------------------------------------
   bounce: 0xaaffc3, //   mint      — ricochet
   pierce: 0x000075, //   navy      — punch-through

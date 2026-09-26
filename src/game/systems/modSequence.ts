@@ -45,8 +45,9 @@ export const sequenceShape = (def: WeaponDef): SequenceShape => ({
 /** A payload mod ends a cast and supplies the cast's single element. */
 export const isPayloadMod = (id: string): boolean => MODS[id]?.onHit !== undefined
 
-/** Is this world running sequenced casting? */
-export const sequencing = (w: World): boolean => w.modCasting === 'sequence'
+/** Is this world running sequenced casting? Reactive wands (Design B) are
+ * sequenced casting plus reactions, so they count. */
+export const sequencing = (w: World): boolean => w.modCasting === 'sequence' || w.modCasting === 'reactive'
 
 /** The live part of the list: known ids with positive stacks, first `slots` of
  * them. Unknown/empty entries are skipped rather than occupying a slot, the

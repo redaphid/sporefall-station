@@ -156,6 +156,8 @@ export const ARCHETYPES = [
   'lobber',
   'gloamhound',
   'hivespire',
+  // PROTOCOL_VERSION 5 — Design B prototype (reactive wands): the Soak chip's pickup. APPEND ONLY.
+  'mod.soak',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix
@@ -192,6 +194,7 @@ export const WIRE_MODS = [
   'lifesteal',
   'detonator',
   'splinterShot',
+  'soak',
 ] as const
 
 const wireModIndex = new Map<string, number>(WIRE_MODS.map((m, i) => [m, i]))
@@ -487,7 +490,7 @@ export interface GameStartMsg {
   /** Mod casting rule the host runs (World.modCasting). Optional and additive:
    * an older client ignores it, and absent means the default fold. Clients do
    * not simulate combat; they need it only to draw the sequence HUD. */
-  modCasting?: 'sequence'
+  modCasting?: 'sequence' | 'reactive'
 }
 export interface GoMsg {
   startTick: number

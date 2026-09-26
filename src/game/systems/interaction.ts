@@ -6,6 +6,8 @@ import type { Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
 import { addItem, applyModPickup } from './inventory'
+import { reactiveWands } from './reactions'
+import { pickUpChip } from './wandChips'
 import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
@@ -119,12 +121,19 @@ const autoPickup = (w: World, p: Entity): void => {
     const dx = e.pos.x - p.pos.x
     const dy = e.pos.y - p.pos.y
     const rr = e.radius + p.radius
-    if (dx * dx + dy * dy >= rr * rr) continue
+    if (dx * dx + dy * dy >= rr * rr) {
+      // Reactive wands: the ejector has stepped off their own chip, so from now
+      // on walking back onto it picks it up again.
+      const chip = e.pickup.chip
+      if (chip && chip.ejectedBy === p.id) chip.ownerLeft = true
+      continue
+    }
     // A weapon-mod pickup mods the grabber's own equipped gun (per-player, so co-op
     // stays consistent with every other pickup). No moddable weapon in hand → leave
     // it on the ground to grab after finding a gun, rather than wasting the mod.
     if (isModId(e.pickup.itemId)) {
-      const res = applyModPickup(p, e.pickup.itemId)
+      // Reactive wands: one chip is one entry, and a full wand leaves it lying.
+      const res = reactiveWands(w) ? pickUpChip(p, e) : applyModPickup(p, e.pickup.itemId)
       if (res) {
         e.dead = true
         w.events.push({ type: 'modPickup', entityId: e.id, byId: p.id, modId: res.modId, weapon: res.weapon, maxed: res.maxed })

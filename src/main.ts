@@ -684,7 +684,12 @@ const stopTransportOnPagehide = (transport: Transport): void => {
 
 /** The `sequencedMods` flag, resolved to the run rule a host latches into each
  * run it builds. Read per run, so toggling applies from the next run. */
-const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
+const runModCasting = (): ModCasting | undefined => {
+  const flags = loadSettings().flags
+  // Wand reactions build on sequenced casting, so it wins when both are on.
+  if (flagOn(flags, 'wandReactions')) return 'reactive'
+  return flagOn(flags, 'sequencedMods') ? 'sequence' : undefined
+}
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {

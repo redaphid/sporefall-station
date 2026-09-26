@@ -136,7 +136,7 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.hostile = j.hostile ?? true // pre-feature snapshots load as hostile (the default)
   w.mode = j.mode ?? 'normal' // pre-feature snapshots load at the normal default
   w.revivesLeft = j.revivesLeft ?? REVIVES_PER_RUN
-  if (j.modCasting === 'sequence') w.modCasting = j.modCasting
+  if (j.modCasting === 'sequence' || j.modCasting === 'reactive') w.modCasting = j.modCasting
   w.gameOver = j.gameOver
   w.mission = { ...j.mission }
   w.noises = j.noises.map((n) => ({ ...n }))

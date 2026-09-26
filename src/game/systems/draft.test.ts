@@ -24,7 +24,9 @@ describe('floorDraftOffer — deterministic pick-1-of-N', () => {
 
   it('respects a requested hand size, capped at the registry size', () => {
     expect(floorDraftOffer(1, 1, 2)).toHaveLength(2)
-    expect(floorDraftOffer(1, 1, 999).length).toBe(Object.keys(MODS).length)
+    // Reactive-only chips (soak) join the hand only in a reactive-wand run.
+    expect(floorDraftOffer(1, 1, 999).length).toBe(Object.values(MODS).filter((m) => !m.reactiveOnly).length)
+    expect(floorDraftOffer(1, 1, 999, true).length).toBe(Object.keys(MODS).length)
   })
 })
 

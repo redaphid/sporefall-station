@@ -248,7 +248,7 @@ export class NetClientSession implements Session {
    * like `pendingHotbar` and shipped on the reliable lane. */
   private pendingModSwap?: number
   /** Mod casting rule the host announced in GameStart (absent = default fold). */
-  private modCasting?: 'sequence'
+  private modCasting?: 'sequence' | 'reactive'
   /** Local tick count when the newest snapshot landed, so the host's tick can
    * be carried forward between snapshots (they arrive every few ticks). */
   private tickAtSnap = 0
@@ -439,7 +439,7 @@ export class NetClientSession implements Session {
         const sameRun = start.seed === this.seed
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
-        this.modCasting = start.modCasting === 'sequence' ? 'sequence' : undefined
+        this.modCasting = start.modCasting === 'sequence' || start.modCasting === 'reactive' ? start.modCasting : undefined
         // A GameStart while we are reconnecting normally replays the run we were
         // ALREADY in (the host repeats it after a ghost reclaim), so the level is
         // already live and snapshots resync the floor. But if the SEED changed,

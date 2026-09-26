@@ -6,6 +6,8 @@ import { canSeeEntity, hateToward } from './goals'
 import { applyAreaEffect } from './itemEffects'
 import { CRIME_HATE, initialFactionHate } from './relationships'
 import { applyStatus } from './statusFx'
+import { reactiveHit, reactiveWands } from './reactions'
+import { crackChipHit } from './wandChips'
 import { vlen } from '../simMath'
 
 // ── Homing (reworked after playtest: "it mostly just curves bullets into walls").
@@ -173,16 +175,20 @@ const spawnSplinter = (w: World, e: Entity): void => {
 }
 
 export const projectileSystem = (w: World): void => {
+  const reactive = reactiveWands(w)
   for (const e of w.entities) {
     if (!e.projectile || e.dead) continue
     const p = e.projectile
+    // Reactive wands: an explosive round's blast carries its element to every
+    // body it catches. Absent otherwise, so the plain blast is untouched.
+    const blast = reactive ? { onHit: p.onHit } : undefined
     if (p.homing) homeToward(w, e)
     e.pos.x += e.vel.x * SIM_DT
     e.pos.y += e.vel.y * SIM_DT
     p.ttl--
 
     if (p.ttl <= 0) {
-      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, blast)
       if (p.splinter) spawnSplinter(w, e)
       land(w, e)
       e.dead = true
@@ -194,8 +200,17 @@ export const projectileSystem = (w: World): void => {
     if (p.arc) continue
     if (isBlocked(w, Math.floor(e.pos.x), Math.floor(e.pos.y))) {
       if (bounceOffWall(w, e)) continue // ricochet — stays alive
-      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, blast)
       if (p.splinter) spawnSplinter(w, e)
+      land(w, e)
+      e.dead = true
+      continue
+    }
+
+    // Reactive wands: a round that meets an armed ejected payload chip cracks it
+    // (systems/wandChips) and is spent on it.
+    if (reactive && crackChipHit(w, e)) {
+      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, blast)
       land(w, e)
       e.dead = true
       continue
@@ -217,7 +232,7 @@ export const projectileSystem = (w: World): void => {
       if (dx * dx + dy * dy >= rr * rr) continue
 
       if (p.explode) {
-        detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+        detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, blast)
         if (p.splinter) spawnSplinter(w, e)
         land(w, e)
         e.dead = true
@@ -239,11 +254,17 @@ export const projectileSystem = (w: World): void => {
       // off bullets i-frames had already voided, and mod triggers fired on hits
       // that never connected. A body's i-frames are 5 ticks, so a multi-pellet
       // volley lands most of its pellets straight into them.
-      const dealt = applyDamage(w, other, p.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, p.ownerId)
+      // Reactive wands resolve the element against the status already on the
+      // body (systems/reactions) and apply it there; otherwise the plain path.
+      const fromX = e.pos.x - e.vel.x * SIM_DT
+      const fromY = e.pos.y - e.vel.y * SIM_DT
+      const dealt = reactive
+        ? reactiveHit(w, other, p.damage, fromX, fromY, 3, p.ownerId, p.onHit)
+        : applyDamage(w, other, p.damage, fromX, fromY, 3, p.ownerId)
       // `!== null`, NOT truthiness: 0 is a hit that landed and dealt no hp (the
       // freeze ray), and it must still apply its status.
       const landed = dealt !== null
-      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
+      if (landed && p.onHit && !reactive) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
       const killed = !!other.dead || (other.health?.hp ?? 1) <= 0
       if (landed && p.lifestealFrac) {
         // Pay out on damage ACTUALLY DEALT, never the bullet's intended damage.

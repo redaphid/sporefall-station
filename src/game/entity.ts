@@ -337,7 +337,16 @@ export interface Entity {
      * its path. Absent on every ordinary projectile → snapshot-stable. */
     arc?: boolean
   }
-  pickup?: { itemId: string; qty: number }
+  pickup?: {
+    itemId: string
+    qty: number
+    /** Reactive wands only (Design B): a weapon chip a player EJECTED onto the
+     * floor. `armedAt` is the tick from which a projectile can crack it (a
+     * payload chip bursts its element). `ownerLeft` flips once the ejector has
+     * stepped off it, so dropping a chip does not instantly re-pick it. Absent
+     * on floor loot, so every existing pickup serializes unchanged. */
+    chip?: { ejectedBy: EntityId; armedAt: number; ownerLeft: boolean }
+  }
   /**
    * A door/hatch. `open`/`locked`/`lockLevel` are the original mundane lock (a
    * pick channel opens it — interaction.ts). Everything below is OPTIONAL, so a

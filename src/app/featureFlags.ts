@@ -87,6 +87,16 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
       'Prototype. Delete the flag (and World.modCasting) once the owner has played it side by side with the default fold and picked one: either promote sequencing to the only mode or remove modSequence.ts.',
     since: 567,
   },
+  {
+    key: 'wandReactions',
+    label: 'Wand reactions (prototype B)',
+    description:
+      'Sequenced mods, plus combos: statuses stay on enemies and react with the next element (soak then zap chains, fire on wet fizzles, fire on ice cracks). Adds the Soak chip, and chips can be ejected onto the floor and shot to burst. Applies to the next run you start or host.',
+    defaultOn: false,
+    retire:
+      'Prototype (docs: loadout design B). Delete if two couch sessions never produce an unprompted soak-then-zap or a laughed-at fizzle; otherwise fold into sequencedMods and make it the default.',
+    since: 580,
+  },
 ]
 
 const BY_KEY: ReadonlyMap<string, FeatureFlag> = new Map(FEATURE_FLAGS.map((f) => [f.key, f]))

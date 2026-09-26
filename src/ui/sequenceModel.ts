@@ -52,7 +52,7 @@ export const buildSequence = (
   simTick: number,
   order?: (mods: readonly { id: string; stacks: number }[]) => { id: string; stacks: number }[],
 ): SequenceModel | null => {
-  if (modCasting !== 'sequence' || !self?.combat) return null
+  if ((modCasting !== 'sequence' && modCasting !== 'reactive') || !self?.combat) return null
   const def = WEAPONS[self.combat.weapon]
   const stack = weaponStack(self)
   if (!def || !stack?.mods || stack.mods.length === 0) return null

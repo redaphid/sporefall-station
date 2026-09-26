@@ -119,6 +119,16 @@ export type SimEvent =
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
+  /** Reactive wands (Design B): the element that just landed on `targetId` met
+   * the status already on it. `reaction` names what happened: `chain`,
+   * `thermalCrack` and `shatter` are payoffs; `fizzle` and `numb` are duds.
+   * `byId` fired the incoming half; `primer` is the status that was waiting. */
+  | { type: 'reaction'; reaction: string; x: number; y: number; targetId: EntityId; byId: EntityId; primer: string; incoming: string }
+  /** Reactive wands: `byId` ejected `modId` from its weapon; it lies on the floor as pickup `entityId`. */
+  | { type: 'chipEject'; entityId: EntityId; byId: EntityId; modId: string; x: number; y: number }
+  /** Reactive wands: a projectile owned by `byId` cracked the ejected payload
+   * chip `entityId`, bursting `modId`'s element over every body within `radius`. */
+  | { type: 'chipBurst'; entityId: EntityId; byId: EntityId; modId: string; x: number; y: number; radius: number; bodies: number }
   | { type: 'use'; entityId: EntityId; byId: EntityId }
   /** The mission's objective gateway (`door.objectiveGate`) was breached/unlocked
    * by the player — a point-of-no-return that turned the whole floor hostile

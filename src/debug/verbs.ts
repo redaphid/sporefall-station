@@ -10,6 +10,8 @@ import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behavi
 import { NPCS } from '../game/data/npcs'
 import { MODS, isModId, stackMod } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
+import { TRAITS } from '../game/data/traits'
+import { applyTraitPick } from '../game/systems/traits'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
@@ -34,6 +36,7 @@ export const WRITE_VERBS = new Set([
   'annotate',
   'clearAnnotations',
   'addMod',
+  'addTrait',
   'setBehavior',
 ])
 
@@ -463,6 +466,17 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (!stack) throw new Error(`entity ${e.id} has no slotted weapon to mod (equip a ranged/melee weapon from inventory first)`)
       stackMod((stack.mods ??= []), modId, stacks)
       return JSON.stringify({ id: e.id, weapon: e.combat?.weapon, mods: stack.mods })
+    }
+
+    case 'addTrait': {
+      // Give a player a trait, exactly as the draft's YOU card does: registry
+      // checked and capped at its maxStacks. `addTrait <id> <traitId>`.
+      const [ids, traitId] = rest.split(/\s+/)
+      const e = entity(w, ids)
+      if (!traitId || !TRAITS[traitId]) throw new Error(`unknown trait "${traitId}" — known: ${Object.keys(TRAITS).sort().join(', ')}`)
+      if (!e.playerCtl) throw new Error(`entity ${e.id} is not a player; only players carry traits`)
+      const res = applyTraitPick(e, traitId)
+      return JSON.stringify({ id: e.id, ...res, traits: e.playerCtl.traits })
     }
 
     case 'ai': {

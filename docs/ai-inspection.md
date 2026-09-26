@@ -74,7 +74,7 @@ sporefall.verb('teleport 12 5 5')
 
 Under `?debug` the whole verb surface of `src/debug/verbs.ts` is live —
 `get/set/spawn/kill/teleport/step/dump/load/annotate/ai/behaviors/setBehavior/
-addMod/theme/schema/state/events` — the exact same dispatcher the debug hub,
+addMod/addTrait/theme/schema/state/events` — the exact same dispatcher the debug hub,
 CLI, and MCP server drive:
 
 ```js

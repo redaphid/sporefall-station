@@ -51,6 +51,7 @@ pt run.json new --seed 5 --scenario armed --floor 3 # or any ?scenario= name; --
 pt run.json look 10                                 # player build + nearby entities, nearest first (hp, fx, resist, ai mode)
 pt run.json spawn npc brute 1.5 6                   # stage a situation with any debug verb
 pt run.json addMod 222 incendiary
+pt run.json addTrait 222 anchor                     # a draft YOU card trait (data/traits.ts)
 pt run.json step 90 '{"aimAt":223,"attack":true}'   # hold an input for 90 ticks (3 s); returns event counts
 ```
 

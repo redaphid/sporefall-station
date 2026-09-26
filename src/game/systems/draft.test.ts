@@ -26,6 +26,25 @@ describe('floorDraftOffer — deterministic pick-1-of-N', () => {
     expect(floorDraftOffer(1, 1, 2)).toHaveLength(2)
     expect(floorDraftOffer(1, 1, 999).length).toBe(Object.keys(MODS).length)
   })
+
+  // Captured on main @ 7853983, before the draft dealt a YOU card. The gun
+  // stream must never move: a seed shared on an old build still deals the same guns.
+  it('draws the same three-gun stream main drew', () => {
+    const MAIN: Record<string, string[]> = {
+      '1:1': ['overload', 'heavy', 'pierce'],
+      '1:6': ['explosive', 'choke', 'rapid'],
+      '7:1': ['bounce', 'heavy', 'homing'],
+      '7:4': ['shock', 'split', 'bounce'],
+      '42:3': ['shock', 'bulk', 'heavy'],
+      '1234:3': ['homing', 'choke', 'detonator'],
+      '3735928559:2': ['bulk', 'choke', 'glassCannon'],
+      '3735928559:6': ['pierce', 'incendiary', 'splinterShot'],
+    }
+    for (const [key, offer] of Object.entries(MAIN)) {
+      const [seed, floor] = key.split(':').map(Number)
+      expect(floorDraftOffer(seed, floor, 3), key).toEqual(offer)
+    }
+  })
 })
 
 describe('draftCards — display data', () => {

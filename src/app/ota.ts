@@ -129,7 +129,10 @@ export const startNativeUpdates = (): NativeUpdater | null => {
   }).catch(() => {
     // No plugin (dev live-reload) — updates simply never stage. Silent.
   })
+  // A failed download emits `downloadFailed` then `noNeedUpdate`, and a clean
+  // "nothing newer" only the latter; the first to arrive settles a `freshen()`.
   void CapacitorUpdater.addListener('downloadFailed', () => settle('incomplete')).catch(() => {})
+  void CapacitorUpdater.addListener('noNeedUpdate', () => settle('up-to-date')).catch(() => {})
 
   return {
     get staged(): boolean {
@@ -152,7 +155,7 @@ export const startNativeUpdates = (): NativeUpdater | null => {
         if (!found.url) return 'up-to-date'
         latest = found.version
       } catch (err) {
-        return err instanceof Error && err.message === OTA_UP_TO_DATE ? 'up-to-date' : 'unavailable'
+        return (err as { message?: unknown } | null)?.message === OTA_UP_TO_DATE ? 'up-to-date' : 'unavailable'
       }
       if (stagedId !== null) return 'staged'
       return new Promise((resolve) => {

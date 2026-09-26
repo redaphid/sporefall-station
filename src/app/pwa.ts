@@ -58,6 +58,15 @@ export const shouldRegisterSw = (env: PwaEnv): boolean => !env.native && env.sup
  */
 export const SW_UPDATE_INTERVAL_MS = 60 * 60 * 1000
 
+/**
+ * The worker waiting to REPLACE the running one, or null. A first-ever install
+ * also passes through `waiting` for a moment before it activates on its own;
+ * counting that as an update left the updater "staged" with nothing to hand
+ * over, so Refresh announced an update that could never land.
+ */
+export const updateWaiting = <W>(reg: { readonly active: W | null; readonly waiting: W | null } | undefined): W | null =>
+  reg?.active ? reg.waiting : null
+
 /** Read the version endpoint. Rejects when offline — the caller expects that. */
 const probeVersion = async (): Promise<HttpProbe> => {
   // `no-store` on OUR side too: the service worker already never caches this
@@ -119,7 +128,7 @@ export const registerPwa = (): WebUpdater | null => {
     checkForWorker: async () => {
       await registration?.update()
     },
-    waiting: () => registration?.waiting ?? null,
+    waiting: () => updateWaiting(registration),
     precacheEntries: readPrecache,
     reload: () => location.reload(),
     appVersion: APP_VERSION,

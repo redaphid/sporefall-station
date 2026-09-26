@@ -151,14 +151,14 @@ describe('a real modded shot, host sim → wire → client mirror', () => {
     return applyWireEntity(undefined, we, w.tick)
   }
 
-  it('Tesla then Cryo reaches the client as a Cryo round, with its modifiers', () => {
+  it('Tesla, pierce, Cryo: the first cast reaches the client as a bare Tesla round', () => {
     const e = clientRound([{ id: 'shock', stacks: 1 }, { id: 'pierce', stacks: 2 }, { id: 'frost', stacks: 1 }])
-    expect(e.projectile?.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'pierce', stacks: 2 }])
+    expect(e.projectile?.mods).toEqual([{ id: 'shock', stacks: 1 }])
   })
 
-  it('Cryo then Tesla reaches the client as a Tesla round', () => {
-    const e = clientRound([{ id: 'frost', stacks: 1 }, { id: 'shock', stacks: 1 }])
-    expect(e.projectile?.mods).toEqual([{ id: 'shock', stacks: 1 }])
+  it('pierce then Cryo is one cast: it reaches the client as a Cryo round, with its modifiers', () => {
+    const e = clientRound([{ id: 'pierce', stacks: 2 }, { id: 'frost', stacks: 1 }])
+    expect(e.projectile?.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'pierce', stacks: 2 }])
   })
 })
 

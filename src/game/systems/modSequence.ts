@@ -120,24 +120,27 @@ export const planCasts = (
 export const cycleCasts = (mods: readonly WeaponMod[] | undefined, shape: SequenceShape): number =>
   planCasts(mods, { ...shape, castsPerTrigger: shape.slots }, 0).casts.length
 
-/** The next trigger pull, and the shape it fires with. */
+/** The next trigger pull, the shape it fires with, and the casts in the
+ * weapon's whole cycle. */
 export interface PullPlan {
   shape: SequenceShape
   plan: CastPlan
+  cycle: number
 }
 
 /**
  * Plan the next trigger pull of `def` loaded with `mods`. A wand whose whole
  * cycle is one cast (only modifiers, or a single element) is a plain gun: every
  * pull fires that full cast with all its pellets, at the cast's cooldown, and
- * never recharges (#115). The pellet split and the wrap recharge apply only to
- * a cycle of two or more casts.
+ * never recharges (#115). It has no position, so it ignores `castIndex`. The
+ * pellet split and the wrap recharge apply only to a cycle of two or more casts.
  */
 export const planPull = (def: WeaponDef, mods: readonly WeaponMod[] | undefined, castIndex: number): PullPlan => {
   const shape = sequenceShape(def)
-  if (cycleCasts(mods, shape) > 1) return { shape, plan: planCasts(mods, shape, castIndex) }
+  const cycle = cycleCasts(mods, shape)
+  if (cycle > 1) return { shape, plan: planCasts(mods, shape, castIndex), cycle }
   const plain = { ...shape, castsPerTrigger: 1, rechargeOnWrap: 0 }
-  return { shape: plain, plan: planCasts(mods, plain, 0) }
+  return { shape: plain, plan: planCasts(mods, plain, 0), cycle }
 }
 
 /** Is the weapon stack still recharging at `tick`? */

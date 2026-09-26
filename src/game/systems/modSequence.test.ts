@@ -247,7 +247,7 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
     const cd = executedShot(WEAPONS.machinegun, armedKit).cooldownTicks
     expect(fired.map((f) => f.tick)).toEqual(Array.from({ length: Math.ceil(90 / cd) }, (_, i) => i * cd))
     expect(stackOf(p).rechargeUntil).toBeUndefined()
-    expect(stackOf(p).castIndex).toBe(0)
+    expect(stackOf(p).castIndex).toBeUndefined()
   })
 
   it('every round of a modifiers-only wand carries every live mod at the full-kit stats', () => {
@@ -294,7 +294,7 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
     stackOf(p).castIndex = 1
     const [shot] = pull(w, p)
     expect(shot.projectile!.mods!.map((x) => x.id)).toEqual(['frost', 'overload'])
-    expect(stackOf(p).castIndex).toBe(0)
+    expect(stackOf(p).castIndex).toBeUndefined()
   })
 
   it('stowed and unknown entries do not make a cycle: one live cast is still a plain gun', () => {

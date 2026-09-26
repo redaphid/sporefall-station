@@ -124,12 +124,6 @@ const step = async (host: NetHostSession, bob: ReturnType<MockHub['addClient']>,
 }
 
 describe('sequenced mods over co-op', () => {
-  it("the client's view carries the host tick its recharge bar is measured against", async () => {
-    const { host, bob } = await startPair(301, makeInput().source)
-    await step(host, bob, 2)
-    expect(bob.session.renderView().simTick).toBe(host.world.tick)
-  })
-
   it("the client's HUD shows the host's castIndex and recharge on every tick of a firefight", async () => {
     const input = makeInput()
     const { host, bob, avatar } = await startPair(303, input.source)

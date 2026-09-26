@@ -293,16 +293,19 @@ const boot = async (): Promise<void> => {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
-  // Sequenced-mods reorder requests from the HUD strip / pause menu ride out on
-  // the local player's next command (see input/modSwapQueue.ts).
+  // Mod reorder requests from the HUD strip / pause menu ride out on the local
+  // player's next command (see input/modSwapQueue.ts). `paused` is bound to the
+  // session once it exists: a paused session samples and drops commands.
   const modSwaps = createModSwapQueue()
-  input = withModSwaps(input, modSwaps)
+  let paused = (): boolean => false
+  input = withModSwaps(input, modSwaps, () => !paused())
   const draftPicks = withDraftPicks(input)
   input = draftPicks
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
   if (!session) return
+  paused = () => session.isPaused ?? false
 
   // ── Save-game persistence (feat/localstorage-resume) ──────────────────────
   // Persist the AUTHORITATIVE world to localStorage so a full-page reload

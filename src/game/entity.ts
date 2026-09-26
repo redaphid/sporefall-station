@@ -190,8 +190,8 @@ export interface ItemStack {
    * discipline as `annotations`). Resolved by `resolveWeapon` at the fire site. */
   mods?: WeaponMod[]
   /** The position in the weapon's live mod window that the next cast starts
-   * from (systems/modSequence). Absent until the first shot with mods, so a
-   * stack with no mods never carries it. */
+   * from (systems/modSequence). Only a wand whose cycle has two or more casts
+   * carries it; a one-cast wand or a stack with no mods never does. */
   castIndex?: number
   /** Absolute tick until which the weapon recharges after a cycle of two or
    * more casts wrapped. Absent until the first such wrap. */

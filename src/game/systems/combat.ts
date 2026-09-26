@@ -462,13 +462,14 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   if (!e.combat) return false
   const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
   const stack = weaponStack(e)
-  // A stack with no mods has nothing to sequence and grows no sequence state.
-  const wand = stack?.mods?.length ? stack : undefined
-  if (wand && recharging(wand, w.tick)) return false
-  const { shape, plan } = planPull(weapon, wand?.mods, wand?.castIndex ?? 0)
+  if (stack && recharging(stack, w.tick)) return false
+  const { shape, plan, cycle } = planPull(weapon, stack?.mods, stack?.castIndex ?? 0)
   // Nothing live (no mods, or every entry unknown/empty): fire the bare weapon.
   const casts = plan.casts.length > 0 ? plan.casts : [{ mods: [] as WeaponMod[] }]
-  if (wand) wand.castIndex = plan.nextIndex
+  // Only a cycle of two or more casts has a position to keep. A one-cast wand
+  // (or a stack with no mods) carries none, exactly like a plain gun.
+  if (stack && cycle > 1) stack.castIndex = plan.nextIndex
+  else if (stack) delete stack.castIndex
   let cooldown = 1
   if (weapon.kind === 'melee') {
     const rw = resolveWeapon(weapon, casts[0].mods)
@@ -497,9 +498,9 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
       }
     }
   }
-  if (wand && plan.wrapped && shape.rechargeOnWrap > 0) {
+  if (stack && plan.wrapped && shape.rechargeOnWrap > 0) {
     cooldown = Math.max(cooldown, shape.rechargeOnWrap)
-    wand.rechargeUntil = w.tick + cooldown
+    stack.rechargeUntil = w.tick + cooldown
   }
   e.combat.cooldown = cooldown
   return true

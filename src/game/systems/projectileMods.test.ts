@@ -56,12 +56,12 @@ describe('projectile mod provenance', () => {
     expect(b.projectile!.mods).toBeUndefined()
   })
 
-  it('a modded shot carries the normalized (sorted, capped) mod list', () => {
+  it('a modded shot carries the normalized (sorted, capped) mod list of its cast', () => {
     const p = armed(w, 20, 20, 'pistol', [
       { id: 'pierce', stacks: 2 },
-      { id: 'frost', stacks: 99 }, // frost caps at 1
       { id: 'bogus', stacks: 3 }, // unknown → dropped
       { id: 'overload', stacks: 1 },
+      { id: 'frost', stacks: 99 }, // frost caps at 1, and ends the one cast
     ])
     fire(w, p)
     const [b] = bullets(w)

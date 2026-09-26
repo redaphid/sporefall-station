@@ -950,6 +950,11 @@ const pairOnComplex = async (input: InputSource): Promise<Awaited<ReturnType<typ
     await step(pair.host, [pair.bob], 18)
   }
   expect(pair.host.world.floor).toBe(3)
+  // Each descent dealt a floor draft, which holds its player still. Run the hands
+  // out through the real timeout path, then let a 2 Hz state message close Bob's.
+  for (const e of pair.host.world.entities) if (e.playerCtl?.draft) e.playerCtl.draft.until = pair.host.world.tick
+  await step(pair.host, [pair.bob], 16)
+  expect(pair.bob.session.renderView().self?.playerCtl?.draft).toBeUndefined()
   return pair
 }
 

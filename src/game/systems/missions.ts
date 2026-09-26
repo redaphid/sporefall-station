@@ -6,6 +6,7 @@ import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
+import { dealFloorDraft } from './draft'
 import { raiseFloorAggro } from './relationships'
 import { addEntity, type World } from '../world'
 import { vlen } from '../simMath'
@@ -505,6 +506,8 @@ export const missionSystem = (w: World): void => {
       if (!e.playerCtl || e.playerCtl.downed || e.dead) continue
       if (Math.floor(e.pos.x) === w.level.exit.x && Math.floor(e.pos.y) === w.level.exit.y) {
         nextFloor(w)
+        // Dealt here, not in nextFloor, so a scenario's floor jump opens no hand.
+        dealFloorDraft(w, w.floor - 1)
         return
       }
     }

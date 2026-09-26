@@ -73,6 +73,7 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
     // Optional: only present when one side asked for a reorder, so a merge of
     // two ordinary commands stays exactly the shape it always was.
     ...((b.modSwap ?? a.modSwap) !== undefined ? { modSwap: b.modSwap ?? a.modSwap } : {}),
+    ...((b.draftPick ?? a.draftPick) !== undefined ? { draftPick: b.draftPick ?? a.draftPick } : {}),
   }
 }
 

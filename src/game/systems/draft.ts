@@ -5,9 +5,12 @@
 // one shared hand per floor, everyone drafts together (no loser-shaming for kids).
 
 import { MODS, modMaxStacks, stackMod, type ModDef, type ModRarity } from '../data/mods'
-import type { ItemStack, WeaponMod } from '../entity'
-import { hashLabel, mulberry32, type Rng } from '../rng'
 import type { WeaponDef } from '../data/items'
+import { SPAWN_GRACE_TICKS, type Entity, type ItemStack, type WeaponMod } from '../entity'
+import { hashLabel, mulberry32, type Rng } from '../rng'
+import { emptyInput, SIM_RATE, type InputCmd } from '../types'
+import type { World } from '../world'
+import { applyModPickup } from './inventory'
 import { modVerdict, type ModVerdict } from './modEffect'
 
 /** Rarity weights for the weighted draw (ROUNDS gates power by rarity tier). */
@@ -96,4 +99,76 @@ export const draftCards = (ids: readonly string[], loadout?: DraftLoadout): Draf
 export const applyDraftPick = (stack: ItemStack, modId: string, stacks = 1): WeaponMod[] => {
   if (!MODS[modId]) throw new Error(`unknown mod: ${modId}`)
   return stackMod((stack.mods ??= []), modId, stacks)
+}
+
+/** How long a hand stays open before it takes the card under the cursor. The
+ * sim never pauses for a draft, so this bounds how long one player can stand
+ * out of the fight (or a dropped client's avatar can stand in it). */
+export const DRAFT_TICKS = 20 * SIM_RATE
+
+const PREV = 1
+const NEXT = 2
+const CONFIRM = 4
+const STICK = 0.5
+
+const intents = (cmd: InputCmd): number =>
+  (cmd.moveX <= -STICK || cmd.moveY <= -STICK ? PREV : 0) |
+  (cmd.moveX >= STICK || cmd.moveY >= STICK ? NEXT : 0) |
+  (cmd.attack || cmd.interact ? CONFIRM : 0)
+
+const takeCard = (w: World, e: Entity, index: number, timedOut: boolean): void => {
+  const modId = e.playerCtl!.draft!.offer[index]
+  delete e.playerCtl!.draft
+  const res = applyModPickup(e, modId)
+  // The drafter stood still while the fight went on; give them the landing grace again.
+  if (e.health) e.health.iframes = Math.max(e.health.iframes, SPAWN_GRACE_TICKS)
+  w.events.push({ type: 'draftPick', byId: e.id, modId, weapon: res?.weapon ?? 'none', maxed: res?.maxed ?? false, timedOut })
+}
+
+/** Deal the hand for the floor just cleared to every live player. Called when
+ * a player takes the exit; everyone gets the same cards and picks on their own. */
+export const dealFloorDraft = (w: World, clearedFloor: number): void => {
+  const offer = floorDraftOffer(w.seed, clearedFloor)
+  if (offer.length === 0) return
+  for (const e of w.entities) {
+    if (!e.playerCtl || e.dead) continue
+    // A teammate took the exit before this player chose: keep what they were pointing at.
+    if (e.playerCtl.draft) takeCard(w, e, e.playerCtl.draft.cursor, true)
+    e.playerCtl.draft = { offer: [...offer], cursor: 0, until: w.tick + DRAFT_TICKS, held: PREV | NEXT | CONFIRM }
+  }
+}
+
+/**
+ * Run every open hand for one tick and return the inputs the rest of the sim
+ * should see. A drafting player's command steers the hand (move = cursor,
+ * attack/interact = take, `draftPick` = take that card) and is replaced by a
+ * neutral one, so the drafter stands still and cannot fire; they are also
+ * invulnerable until they pick. Everyone else plays on: nobody waits.
+ */
+export const draftSystem = (w: World, inputs: Map<number, InputCmd>): Map<number, InputCmd> => {
+  let out = inputs
+  for (const e of w.entities) {
+    const hand = e.playerCtl?.draft
+    if (!hand || e.dead) continue
+    const n = hand.offer.length
+    if (n === 0) {
+      delete e.playerCtl!.draft
+      continue
+    }
+    if (!(hand.cursor >= 0 && hand.cursor < n)) hand.cursor = 0
+    const cmd = inputs.get(e.playerCtl!.playerId)
+    const now = cmd ? intents(cmd) : 0
+    const pressed = now & ~hand.held
+    hand.held = now
+    if (pressed & PREV) hand.cursor = (hand.cursor + n - 1) % n
+    if (pressed & NEXT) hand.cursor = (hand.cursor + 1) % n
+    const direct = cmd?.draftPick
+    if (direct !== undefined && Number.isInteger(direct) && direct >= 0 && direct < n) takeCard(w, e, direct, false)
+    else if (pressed & CONFIRM) takeCard(w, e, hand.cursor, false)
+    else if (w.tick >= hand.until) takeCard(w, e, hand.cursor, true)
+    else if (e.health) e.health.iframes = Math.max(e.health.iframes, 2)
+    if (out === inputs) out = new Map(inputs)
+    out.set(e.playerCtl!.playerId, { ...emptyInput(), seq: cmd?.seq ?? 0, aimX: 0, aimY: 0 })
+  }
+  return out
 }

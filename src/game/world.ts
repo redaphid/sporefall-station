@@ -20,6 +20,7 @@ import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
 import { stairSystem } from './systems/stairs'
+import { draftSystem } from './systems/draft'
 import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
 export interface MissionState {
@@ -278,8 +279,9 @@ export const doorClosedAt = (w: World, tx: number, ty: number): boolean => {
 export const isBlocked = (w: World, tx: number, ty: number): boolean =>
   isSolidTile(w.level, tx, ty) || doorClosedAt(w, tx, ty)
 
-export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
+export const tickWorld = (w: World, rawInputs: Map<number, InputCmd>): void => {
   w.events.length = 0
+  const inputs = draftSystem(w, rawInputs)
   if (w.noises.length > 0) w.noises = w.noises.filter((n) => n.expires > w.tick)
   if (w.fear.length > 0) w.fear = w.fear.filter((f) => f.expires > w.tick)
   for (const e of w.entities) {

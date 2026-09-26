@@ -14,7 +14,7 @@ import { emptyInput, SIM_RATE, type InputCmd } from '../types'
 import type { World } from '../world'
 import { applyModPickup } from './inventory'
 import { modVerdict, type ModVerdict } from './modEffect'
-import { applyTraitPick, traitVerdict } from './traits'
+import { applyTraitPick, partySize, traitVerdict } from './traits'
 
 /** Rarity weights for the weighted draw (ROUNDS gates power by rarity tier). */
 const RARITY_WEIGHT: Record<ModRarity, number> = { common: 6, rare: 3, legendary: 1 }
@@ -122,7 +122,7 @@ export interface DraftYou {
 
 /** `self` as the YOU card judges them, among the run's `entities`. */
 export const draftYou = (self: Entity | undefined, entities: readonly Entity[]): DraftYou | undefined =>
-  self?.playerCtl ? { traits: self.playerCtl.traits, party: entities.filter((e) => e.playerCtl && !e.dead).length } : undefined
+  self?.playerCtl ? { traits: self.playerCtl.traits, party: partySize(entities) } : undefined
 
 /** Presentation data for a hand (kid-readable blurbs/icons), each card with what
  * it would do: GUN cards on `loadout`, the YOU card on `you`, when given.

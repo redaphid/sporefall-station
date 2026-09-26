@@ -62,14 +62,21 @@ export const reviveHelp = (e: Entity): { rate: number; reach: number } => {
 export const seesAffinities = (e: Entity | undefined): boolean =>
   e !== undefined && held(e).some((h) => h.def.sees === 'affinities')
 
+/** Players still in the run: what a co-op trait needs more than one of. */
+export const partySize = (entities: readonly Entity[]): number =>
+  entities.reduce((n, e) => (e.playerCtl && !e.dead ? n + 1 : n), 0)
+
+/** Whether held trait `id` acts in a run of `party` players. */
+export const heldTraitVerdict = (id: string, party: number): ModVerdict =>
+  TRAITS[id]?.coop && party < 2 ? { kind: 'inert', reason: 'needs a teammate' } : { kind: 'live' }
+
 /** What taking trait `id` would do for a player holding `traits`, in a run of
  * `party` players. The same verdict vocabulary as a gun card's. */
 export const traitVerdict = (traits: readonly TraitStack[] | undefined, id: string, party: number): ModVerdict => {
   const def = TRAITS[id]
   const stacks = traits?.find((t) => t.id === id)?.stacks ?? 0
   if (def && stacks >= def.maxStacks) return { kind: 'inert', reason: 'you have it' }
-  if (def?.coop && party < 2) return { kind: 'inert', reason: 'needs a teammate' }
-  return { kind: 'live' }
+  return heldTraitVerdict(id, party)
 }
 
 /** Take trait `id`: a new trait joins the end of the list, a held one stacks up

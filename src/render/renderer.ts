@@ -18,6 +18,7 @@ import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './compl
 import { EffectsLayer } from './effects'
 import { GroupFxLayer } from './groupFx'
 import { VerbMarkerLayer } from './verbMarkerLayer'
+import { ScoutTagLayer } from './scoutTagLayer'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
@@ -176,6 +177,9 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // eye for spore blindness, over the head, above every sprite.
   const verbMarkers = new VerbMarkerLayer()
   effects.root.addChild(verbMarkers.root)
+  // Scout Eye: weak/tough tags over nearby enemies, on the scout's screen only.
+  const scoutTags = new ScoutTagLayer()
+  effects.root.addChild(scoutTags.root)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
@@ -568,6 +572,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
         entities.update(shown, alpha, view.tick, view.floor)
         playerMarkers.update(shown, view.self?.id, alpha, view.tick)
         verbMarkers.update(shown, alpha, view.tick)
+        scoutTags.update(shown, view.self, alpha)
         statusFx.update(shown, alpha, view.tick)
         bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)

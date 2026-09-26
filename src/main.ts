@@ -7,6 +7,7 @@ import type { RenderView, Session } from './app/session'
 import { pickNewSeed } from './app/newSeed'
 import { createLoadoutPanel, type WeaponThumb } from './ui/loadoutPanel'
 import { buildLoadout } from './ui/loadoutModel'
+import { partySize } from './game/systems/traits'
 import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
 import { joinFailureMessage } from './app/joinError'
@@ -1065,7 +1066,7 @@ const createPauseOverlay = (
     update(paused, view) {
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
-      if (show && !wasPaused) panel.update(buildLoadout(view.self, view.modCasting)) // refresh on open
+      if (show && !wasPaused) panel.update(buildLoadout(view.self, view.modCasting, partySize(view.entities))) // refresh on open
       if (show) {
         lastView = view
         paintSeq()

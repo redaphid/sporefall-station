@@ -63,6 +63,21 @@ const modChip = (m: LoadoutModel['mods'][number]): string => {
     </div>`
 }
 
+/** A trait row: what it does, in the card's own words, so a pad player reads it without a tooltip. */
+const traitRow = (t: LoadoutModel['traits'][number]): string => {
+  const inert = t.verdict.kind !== 'live'
+  return `<div data-trait-id="${t.id}" data-verdict="${t.verdict.kind}" style="display:flex;align-items:center;gap:8px;
+      padding:5px 9px;border-radius:9px;background:${inert ? '#ffffff06' : '#6ff0b014'};
+      border:1px ${inert ? 'dashed #6b6b76' : 'solid #6ff0b055'}">
+      <span style="font-size:18px;line-height:1">${t.icon}</span>
+      <span style="min-width:0">
+        <span style="font-weight:800;color:${inert ? '#9a9aa6' : '#bff7d9'}">${escapeHtml(t.name)}${t.stacks > 1 ? ` ×${t.stacks}` : ''}</span>
+        <span style="display:block;font-size:11px;color:#aeb2be">${escapeHtml(t.desc)}</span>
+        ${t.verdict.kind !== 'live' ? `<span class="trait-verdict" style="display:block;font-size:10px;font-weight:700;color:#b0b0bc;text-transform:uppercase">${escapeHtml(t.verdict.reason)}</span>` : ''}
+      </span>
+    </div>`
+}
+
 const behaviorBadge = (b: LoadoutModel['behaviors'][number]): string =>
   `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;
       font-size:11px;font-weight:700;color:#e7e7ee;background:#ffffff12;border:1px solid #ffffff1f">
@@ -118,6 +133,13 @@ export const createLoadoutPanel = (weaponThumb?: WeaponThumb): LoadoutPanel => {
         : model.unarmed
           ? ''
           : `<div style="margin-bottom:12px;font-size:12px;color:#7a7f8c;font-style:italic">No mods installed — clean build.</div>`}
+
+      ${model.traits.length > 0
+        ? `<div style="margin-bottom:12px">
+             <div style="font-size:10px;letter-spacing:1.5px;color:#7a7f8c;text-transform:uppercase;margin-bottom:6px">You</div>
+             <div style="display:flex;flex-direction:column;gap:4px">${model.traits.map(traitRow).join('')}</div>
+           </div>`
+        : ''}
 
       <div style="font-size:10px;letter-spacing:1.5px;color:#7a7f8c;text-transform:uppercase;margin-bottom:6px">Stats${model.statsScope === 'next shot' ? ' · next shot' : ''}</div>
       <div style="display:flex;flex-direction:column;gap:4px">${model.stats.map(statRow).join('')}</div>

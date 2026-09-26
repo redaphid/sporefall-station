@@ -15,6 +15,8 @@
 import type { Entity } from '../game/entity'
 import { WEAPONS } from '../game/data/items'
 import { MODS, type ModRarity } from '../game/data/mods'
+import { TRAITS } from '../game/data/traits'
+import { heldTraitVerdict } from '../game/systems/traits'
 import { weaponStack } from '../game/systems/inventory'
 import { executedPull, executedShot, modVerdict, type ExecutedShot, type ModVerdict } from '../game/systems/modEffect'
 import type { ModCasting } from '../game/world'
@@ -52,6 +54,17 @@ export interface LoadoutMod {
   verdict: ModVerdict
 }
 
+/** One trait the player took from a YOU card. */
+export interface LoadoutTrait {
+  id: string
+  name: string
+  icon: string
+  desc: string
+  stacks: number
+  /** Inert when it needs a teammate and the run has none. */
+  verdict: ModVerdict
+}
+
 /** A resolved bullet-behavior badge (pierce/bounce/explosive/element/…). */
 export interface LoadoutBehavior {
   key: string
@@ -72,6 +85,8 @@ export interface LoadoutModel {
   stats: LoadoutStat[]
   mods: LoadoutMod[]
   behaviors: LoadoutBehavior[]
+  /** The player's own traits, in pick order. */
+  traits: LoadoutTrait[]
 }
 
 const round = (n: number, dp = 0): number => {
@@ -148,7 +163,7 @@ const buildBehaviors = (casts: readonly ExecutedShot[]): LoadoutBehavior[] => {
  * weapon component at all (nothing to show). Bare fists / an unknown weapon id
  * resolve as `unarmed` with innate stats and no mods — never a crash or a blank.
  */
-export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting): LoadoutModel | null => {
+export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting, party = 1): LoadoutModel | null => {
   if (!e || !e.combat) return null
   const wid = e.combat.weapon
   const def = WEAPONS[wid] ?? WEAPONS.fists
@@ -209,5 +224,11 @@ export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting): Lo
     stats,
     mods: chips,
     behaviors: buildBehaviors(casts),
+    traits: (e.playerCtl?.traits ?? [])
+      .filter((t) => TRAITS[t.id] && t.stacks > 0)
+      .map((t) => {
+        const d = TRAITS[t.id]
+        return { id: d.id, name: d.name, icon: d.icon, desc: d.blurb, stacks: t.stacks, verdict: heldTraitVerdict(d.id, party) }
+      }),
   }
 }

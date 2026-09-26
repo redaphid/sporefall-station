@@ -7,6 +7,7 @@ import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } f
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout, selfModVerdict } from './loadoutModel'
+import { partySize } from '../game/systems/traits'
 import { installGamepadMenuNav } from './gamepadMenu'
 
 export interface Screens {
@@ -316,7 +317,7 @@ export const createScreens = (
                 ? 'Restart the run now, or wait for a revive.'
                 : 'Waiting on your team…'
           // Freeze the fallen player's gun + mods into the panel as it opens.
-          loadout.update(buildLoadout(view.self, view.modCasting))
+          loadout.update(buildLoadout(view.self, view.modCasting, partySize(view.entities)))
           overlay.style.display = 'flex'
         } else {
           // Revived / fresh run began — drop back into play.

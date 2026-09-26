@@ -5,6 +5,7 @@
 // and owns no sim state. The swap itself goes out as a player input.
 
 import { markUiChrome } from './chrome'
+import { installGamepadMenuNav, type GamepadMenuNavOptions } from './gamepadMenu'
 import type { SequenceModel } from './sequenceModel'
 
 export interface SequenceStrip {
@@ -98,3 +99,18 @@ export const createSequenceStrip = (onSwap: (a: number, b: number) => void, opts
     },
   }
 }
+
+/** Controller reordering for a strip: the d-pad or left stick walks the chips
+ * and a face button taps the focused one, so two taps swap, exactly as two
+ * finger taps do. Start is not a tap here: it resumes the run. Returns the
+ * teardown. `hidden` is true while the strip is off screen. */
+export const installStripPadNav = (
+  strip: SequenceStrip,
+  hidden: () => boolean,
+  clock: Pick<GamepadMenuNavOptions, 'schedule' | 'cancel'> = {},
+): (() => void) =>
+  installGamepadMenuNav(() => [...strip.el.querySelectorAll<HTMLButtonElement>('button[data-i]')], {
+    ...clock,
+    suppress: hidden,
+    confirmButtons: [0, 1, 2, 3],
+  })

@@ -227,11 +227,10 @@ const seqOn = () =>
           await sleep(500)
         },
       },
-      // 9. Reorder from the pause menu. The intent (modSwapQueue.ts) is that the
-      //    swap is a PREVIEW while paused and applies on the first tick after
-      //    Resume. `pauseReorder` reads the strip synchronously either side of
-      //    each tap, which is the only way to see the preview at all — see the
-      //    finding recorded in `pauseReorderEvidence`.
+      // 9. Reorder from the pause menu. The swap is a PREVIEW while paused
+      //    (modSwapQueue.ts) and applies on the first tick after Resume.
+      //    `pauseReorderEvidence` reads the strip either side of each tap and
+      //    again a frame later, when the preview must still hold.
       {
         label: '09-pause-reorder-tapped',
         pauseStrip: true,

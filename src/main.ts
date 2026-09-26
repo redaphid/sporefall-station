@@ -35,7 +35,7 @@ import { createPersister, readSave, type KeyValueStore, type Persister } from '.
 import { loadSettings } from './app/settings'
 import { createModSwapQueue, previewSwaps, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
 import { buildSequence } from './ui/sequenceModel'
-import { createSequenceStrip } from './ui/sequenceStrip'
+import { createSequenceStrip, installStripPadNav } from './ui/sequenceStrip'
 import {
   canRequestFullscreen,
   enterFullscreen,
@@ -933,7 +933,9 @@ const createPauseOverlay = (
   el.appendChild(panel.el)
   // Sequenced mods: the wand order, reorderable while paused. The sim is
   // stopped, so swaps queue and apply on the first tick after Resume; the strip
-  // previews the queued order meanwhile.
+  // previews the queued order meanwhile. Touch and mouse tap two chips; a pad
+  // walks the chips with the d-pad or stick and taps with a face button (Start
+  // stays Resume, so it never taps a chip on the way out).
   const swaps = actions.modSwaps
   let lastView: RenderView | undefined
   const paintSeq = (): void => {
@@ -950,6 +952,7 @@ const createPauseOverlay = (
   })
   seq.el.style.cssText += ';width:min(340px,86vw);box-sizing:border-box;padding:8px 10px;border-radius:10px;background:#141822f2;text-align:left;color:#e7e7ee;font:12px system-ui'
   el.appendChild(seq.el)
+  installStripPadNav(seq, () => el.style.display === 'none')
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center'
   const btn = (label: string, primary: boolean): HTMLButtonElement => {

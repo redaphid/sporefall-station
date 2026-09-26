@@ -26,12 +26,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 /** The local player's live mod order, straight off the sim. */
 const simOrder = () => {
   const p = window.world.entities.find((e) => e.playerCtl?.playerId === 0)
-  return p.loadout.inventory[p.loadout.activeSlot ?? 0].mods.map((m) => m.id)
+  return p.loadout.inventory.find((s) => s.itemId === p.combat.weapon).mods.map((m) => m.id)
 }
-/** Chip order drawn by the pause strip (the last strip on the page). */
-const pauseStripOrder = () => {
+/** Chip names drawn by a strip: the HUD's (first) or the pause menu's (last). */
+const stripNames = (which) => {
   const strips = document.querySelectorAll('[data-role="mod-sequence"]')
-  return [...strips[strips.length - 1].querySelectorAll('button[data-i]')].map((b) => b.title.split(' (')[0])
+  const strip = which === 'hud' ? strips[0] : strips[strips.length - 1]
+  return [...strip.querySelectorAll('button[data-i]')].map((b) => b.title.split(' (')[0])
 }
 const paused = () => {
   const strips = document.querySelectorAll('[data-role="mod-sequence"]')
@@ -54,14 +55,18 @@ const boot = async (context) => {
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(URL, { waitUntil: 'commit' })
   await until(page, 'the armed run', () => window.world?.tick > 30 && document.querySelectorAll('[data-role="mod-sequence"] button[data-i]').length === 5)
-  return { page, errors }
+  const start = await page.evaluate(simOrder)
+  const hud = await page.evaluate(stripNames, 'hud')
+  const idOf = Object.fromEntries(hud.map((name, i) => [name, start[i]]))
+  /** The pause strip's preview, as mod ids. */
+  const preview = async () => (await page.evaluate(stripNames, 'pause')).map((name) => idOf[name])
+  return { page, errors, start, bootErrors: [...errors], preview }
 }
 
 const touchRun = async (browser) => {
   const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 })
-  const { page, errors } = await boot(context)
-  const r = { input: 'touch', maxTouchPoints: await page.evaluate(() => navigator.maxTouchPoints) }
-  r.start = await page.evaluate(simOrder)
+  const { page, errors, start, bootErrors, preview } = await boot(context)
+  const r = { input: 'touch', maxTouchPoints: await page.evaluate(() => navigator.maxTouchPoints), bootErrors, start }
   const hud = page.locator('[data-role="mod-sequence"]').first()
   await hud.locator('button[data-i="0"]').tap()
   await hud.locator('button[data-i="1"]').tap()
@@ -73,7 +78,7 @@ const touchRun = async (browser) => {
   await strip.locator('button[data-i="2"]').tap()
   await strip.locator('button[data-i="4"]').tap()
   await sleep(500)
-  r.pausedPreview = await page.evaluate(pauseStripOrder)
+  r.pausedPreview = await preview()
   r.pausedSim = await page.evaluate(simOrder)
   await page.screenshot({ path: join(OUT, 'touch-paused-preview.png') })
   await page.getByRole('button', { name: 'Resume' }).tap()
@@ -103,7 +108,7 @@ const FAKE_PAD = () => {
 const padRun = async (browser) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, hasTouch: false })
   await context.addInitScript(FAKE_PAD)
-  const { page, errors } = await boot(context)
+  const { page, errors, start, bootErrors, preview } = await boot(context)
   const press = async (button) => {
     await page.evaluate((b) => window.__pad.press(b), button)
     await sleep(120)
@@ -113,8 +118,7 @@ const padRun = async (browser) => {
   const A = 0
   const START = 9
   const RIGHT = 15
-  const r = { input: 'gamepad' }
-  r.start = await page.evaluate(simOrder)
+  const r = { input: 'gamepad', bootErrors, start }
   await press(A) // any input joins the pad (it lands on the local player's slot)
   await press(START)
   await until(page, 'the pause menu', paused)
@@ -126,7 +130,7 @@ const padRun = async (browser) => {
   await press(RIGHT)
   await press(A) // tap chip 3: swap 1 and 3
   await sleep(300)
-  r.pausedPreview = await page.evaluate(pauseStripOrder)
+  r.pausedPreview = await preview()
   r.pausedSim = await page.evaluate(simOrder)
   await page.screenshot({ path: join(OUT, 'pad-paused-preview.png') })
   await press(START)
@@ -157,7 +161,9 @@ const checks = [
   ['pad: the pause strip previews the swap', JSON.stringify(pad.pausedPreview) === JSON.stringify(swap(pad.start, 1, 3))],
   ['pad: the paused sim is untouched', JSON.stringify(pad.pausedSim) === JSON.stringify(pad.start)],
   ['pad: Start resumes and applies the queued swap', JSON.stringify(pad.afterResume) === JSON.stringify(pad.pausedPreview)],
-  ['no page errors', touch.errors.length === 0 && pad.errors.length === 0],
+  // Headless WSL Chromium has no WebGL, so the renderer may throw at boot
+  // before any input; only an error raised after that counts against the run.
+  ['no page errors after boot', touch.errors.length === touch.bootErrors.length && pad.errors.length === pad.bootErrors.length],
 ]
 const report = { url: URL, touch, pad, checks: Object.fromEntries(checks) }
 writeFileSync(join(OUT, 'run.json'), JSON.stringify(report, null, 2))

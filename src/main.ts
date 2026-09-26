@@ -45,7 +45,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT, type InputCmd } from './game/types'
+import { SIM_DT, SIM_RATE, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -105,9 +105,8 @@ import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 import { projectToScreen } from './ui/locatorModel'
-import { createDraftScreen } from './ui/draftScreen'
-import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
-import { weaponStack } from './game/systems/inventory'
+import { createDraftScreen, type DraftSeat } from './ui/draftScreen'
+import { withDraftPicks, type DraftPickSource } from './input/draftPick'
 
 /** The rewind ring, plus the single action the pause menu needs from it. Both
  * live on one object because they are one feature: the ring is only worth
@@ -296,6 +295,8 @@ const boot = async (): Promise<void> => {
   // the local player's next command (see input/modSwapQueue.ts).
   const modSwaps = createModSwapQueue()
   input = withModSwaps(input, modSwaps)
+  const draftPicks = withDraftPicks(input)
+  input = draftPicks
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
@@ -444,28 +445,6 @@ const boot = async (): Promise<void> => {
       // fire-and-forget; this resolves when the new assets are actually baked).
       ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
         renderer.setTheme(id)
-      // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
-      // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
-      // the local player's equipped gun. Exposed here so a screenshot e2e can show
-      // the card screen and drive a pick headlessly (no pixel math). The automatic
-      // floor-clear trigger lands with floor progression (deferred, see P4 note).
-      const draftScreen = createDraftScreen(uiMount)
-      const applyPick = (id: string): void => {
-        const self = hostWorld.entities.find((e) => e.playerCtl)
-        const stack = self && weaponStack(self)
-        if (stack) applyDraftPick(stack, id)
-      }
-      ;(window as unknown as { __draftOffer: (f?: number) => string }).__draftOffer = (f) =>
-        JSON.stringify(floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor))
-      ;(window as unknown as { __draftShow: (f?: number) => string }).__draftShow = (f) => {
-        const offer = floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor)
-        draftScreen.show(offer, applyPick)
-        return JSON.stringify(offer)
-      }
-      ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
-        applyPick(id)
-        draftScreen.hide()
-      }
       // Drive the view zoom headlessly: smooth (real interpolation path) or
       // snapped (deterministic stills at exact zoom levels).
       ;(window as unknown as { __zoom: (z: number, snap?: boolean) => number }).__zoom = (z, snap) => {
@@ -621,6 +600,7 @@ const boot = async (): Promise<void> => {
     stateRing,
     padZoom,
     modSwaps,
+    draftPicks,
   )
 }
 
@@ -1169,8 +1149,19 @@ const runLoop = (
   padZoom?: PadZoom,
   /** Sequenced-mods reorder queue shared by the HUD strip and the pause menu. */
   modSwaps?: ModSwapQueue,
+  /** Tapped floor-draft cards, queued onto the local player's next command. */
+  draftPicks?: DraftPickSource,
 ): void => {
   const hud = createHud(uiMount, modSwaps ? (a, b) => modSwaps.push(a, b) : undefined)
+  // A net client hears its hand closed only on the next 2 Hz state message, so
+  // after a tap the local seat is hidden until a hand with a new deadline arrives.
+  let answeredUntil = -1
+  const draftScreen = createDraftScreen(uiMount, (index) => {
+    const hand = session.renderView().self?.playerCtl?.draft
+    if (!hand || !draftPicks) return
+    answeredUntil = hand.until
+    draftPicks.pick(index)
+  })
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
   // only (`cursor: none` on the canvas) — mouse AIM reads the cursor's ABSOLUTE
   // position (the window `pointermove` tracker → aim.pointerAim), so we must NOT
@@ -1424,6 +1415,23 @@ const runLoop = (
         renderer.draw(view, alpha, dt)
         hud.update(view)
         const pads = coop.debug()
+        // Floor draft: one card row shared by every LOCAL player still holding a
+        // hand (the keyboard/touch player plus joined pads); remote peers pick on
+        // their own screens.
+        const localIds = new Set(pads.flatMap((p) => (p.slot === null ? [] : [p.slot])))
+        if (view.self?.playerCtl) localIds.add(view.self.playerCtl.playerId)
+        const seats: DraftSeat[] = []
+        let offer: string[] | null = null
+        let until = 0
+        for (const e of view.entities) {
+          const hand = e.playerCtl?.draft
+          if (!hand || e.dead || !localIds.has(e.playerCtl!.playerId)) continue
+          if (e === view.self && hand.until === answeredUntil) continue
+          offer ??= hand.offer
+          until = Math.max(until, hand.until)
+          seats.push({ playerId: e.playerCtl!.playerId, cursor: hand.cursor })
+        }
+        draftScreen.update(offer, seats, Math.ceil((until - view.tick) / SIM_RATE))
         // Twin-stick aim reticles: one per joined pad with a deflected right stick,
         // anchored to that pad's player entity. Presentation only.
         const anchors: ReticleAnchor[] = []

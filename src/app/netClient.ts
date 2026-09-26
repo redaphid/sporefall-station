@@ -247,6 +247,8 @@ export class NetClientSession implements Session {
   /** Mod reorder tapped since the last input packet (undefined = none). Latched
    * like `pendingHotbar` and shipped on the reliable lane. */
   private pendingModSwap?: number
+  /** Floor-draft card tapped since the last input packet, shipped reliably. */
+  private pendingDraftPick?: number
   /** Mod casting rule the host announced in GameStart (absent = default fold). */
   private modCasting?: 'sequence'
   /** Local tick count when the newest snapshot landed, so the host's tick can
@@ -663,7 +665,8 @@ export class NetClientSession implements Session {
 
   private stepSelf(cmd: InputCmd): void {
     const self = this.self
-    if (!self || self.playerCtl?.downed) return
+    // A drafting player stands still on the host; predicting a walk would rubber-band.
+    if (!self || self.playerCtl?.downed || self.playerCtl?.draft) return
     const len = Math.hypot(cmd.moveX, cmd.moveY)
     if (len < 0.01) return
     const norm = len > 1 ? 1 / len : 1
@@ -695,6 +698,7 @@ export class NetClientSession implements Session {
     // next packet still carries the equip/throw instead of dropping it.
     if (cmd.hotbar >= 0) this.pendingHotbar = cmd.hotbar
     if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
+    if (cmd.draftPick !== undefined) this.pendingDraftPick = cmd.draftPick
 
     // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
     // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
@@ -709,14 +713,21 @@ export class NetClientSession implements Session {
       const out: InputCmd = { ...cmd, hotbar: this.pendingHotbar }
       delete out.modSwap
       if (this.pendingModSwap !== undefined) out.modSwap = this.pendingModSwap
+      delete out.draftPick
+      if (this.pendingDraftPick !== undefined) out.draftPick = this.pendingDraftPick
       const packet = encodeInput(out, this.pendingEdges)
       const hasPureEdge =
-        this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0 || this.pendingModSwap !== undefined
+        this.pendingEdges.roll ||
+        this.pendingEdges.throwItem ||
+        this.pendingHotbar >= 0 ||
+        this.pendingModSwap !== undefined ||
+        this.pendingDraftPick !== undefined
       if (hasPureEdge) this.queue.queueReliable(packet)
       else this.queue.queueSnapshot(packet)
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
       this.pendingModSwap = undefined
+      this.pendingDraftPick = undefined
     }
 
     // Predict own movement immediately
@@ -773,6 +784,8 @@ export class NetClientSession implements Session {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
       this.self.playerCtl.cash = hud.cash
       this.self.playerCtl.abilityCooldown = hud.abilityCd
+      if (hud.draft) this.self.playerCtl.draft = hud.draft
+      else delete this.self.playerCtl.draft
       if (this.self.combat) this.self.combat.weapon = hud.weapon
       else this.self.combat = { weapon: hud.weapon, cooldown: 0 }
     }

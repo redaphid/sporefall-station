@@ -61,6 +61,8 @@ interface PeerState {
   /** Mod reorder the client asked for since the last tick consumed one
    * (undefined = none). Edge-latched exactly like `pendingHotbar`. */
   pendingModSwap?: number
+  /** Floor-draft card the client tapped (undefined = none), latched like `pendingModSwap`. */
+  pendingDraftPick?: number
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
@@ -230,6 +232,11 @@ export class NetHostSession implements Session {
         cmd.modSwap = p.pendingModSwap
         p.pendingModSwap = undefined
       }
+      delete cmd.draftPick
+      if (p.pendingDraftPick !== undefined) {
+        cmd.draftPick = p.pendingDraftPick
+        p.pendingDraftPick = undefined
+      }
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
@@ -342,6 +349,7 @@ export class NetHostSession implements Session {
         abilityCd: e.playerCtl.abilityCooldown,
         bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
         briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        ...(e.playerCtl.draft ? { draft: e.playerCtl.draft } : {}),
       }
     }
     const state: StateMsg = {
@@ -462,6 +470,7 @@ export class NetHostSession implements Session {
         // it once even if the packet arrived between ticks (OR-ed like the edges).
         if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
         if (cmd.modSwap !== undefined) p.pendingModSwap = cmd.modSwap
+        if (cmd.draftPick !== undefined) p.pendingDraftPick = cmd.draftPick
       }
       return
     }

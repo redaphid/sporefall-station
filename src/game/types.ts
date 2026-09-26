@@ -30,6 +30,10 @@ export interface InputCmd {
    * and OPTIONAL: absent on every input that does not ask, so default-mode
    * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
   modSwap?: number
+  /** Floor draft: take card N of this player's hand this tick (a tap or click on
+   * the card). Optional and edge-triggered like `modSwap`; pad and keyboard
+   * players steer the hand with move + attack/interact instead. */
+  draftPick?: number
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -140,6 +144,10 @@ export type SimEvent =
    * klaxon, the banner and the alarm wash all hang off it. */
   | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
+  /** A player took `modId` from their floor-draft hand onto `weapon` (`none` if
+   * they had no gun to hold it). `timedOut` = the hand ran out of time and took
+   * the card under the cursor. */
+  | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
   /** A body took the stairs: it now stands on the landing of storey `z`. */
   | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }

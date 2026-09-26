@@ -78,7 +78,7 @@ describe('resolveHubTarget', () => {
     expect(resolveHubTarget({ protocol: 'file:', hostname: '' }, null)).toEqual({ ok: true, url: `ws://127.0.0.1:${DEFAULT_HUB_PORT}` })
   })
 
-  it('never dials from an https:// page: the hub serves plain ws://, which browsers refuse there', () => {
+  it('never dials from an https:// page, where browsers refuse ws:// to the live host', () => {
     const target = resolveHubTarget(https('sporefall.hypnodroid.com'), null)
     expect(target.ok).toBe(false)
     if (!target.ok) expect(target.reason).toMatch(/HTTPS/)

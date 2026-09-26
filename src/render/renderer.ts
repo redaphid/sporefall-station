@@ -16,7 +16,9 @@ import { setActiveThemeChain } from './themeState'
 import { Camera } from './camera'
 import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './complexLook'
 import { EffectsLayer } from './effects'
+import { darknessRuns, easeTide, lowTileRuns, TIDE_COLOR } from './modifierLook'
 import { GroupFxLayer } from './groupFx'
+import { VerbMarkerLayer } from './verbMarkerLayer'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
@@ -171,6 +173,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // retreat cross): drawn over the effects sprites, inside the same layer.
   const groupFx = new GroupFxLayer()
   effects.root.addChild(groupFx.root)
+  // #87 element verbs with no body look of their own: panic "!!" and a slashed
+  // eye for spore blindness, over the head, above every sprite.
+  const verbMarkers = new VerbMarkerLayer()
+  effects.root.addChild(verbMarkers.root)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
@@ -234,14 +240,25 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   const darkLayer = new Graphics()
   darkLayer.eventMode = 'none'
   let darkWing: DarkWing | null = null
+  // Floor modifiers: brownout darkness (a lamp round each player) shares the
+  // `dark` slot with the wing blackout; the bog tide's water sits just over the
+  // floor, under every actor, so bodies stand IN it.
+  const brownoutLayer = new Graphics()
+  brownoutLayer.eventMode = 'none'
+  const darkRoot = new Container()
+  darkRoot.addChild(darkLayer, brownoutLayer)
+  const tideLayer = new Graphics()
+  tideLayer.eventMode = 'none'
+  tideLayer.alpha = 0
   const worldLayers: Record<WorldLayerName, Container> = {
     tilemap: tilemap.root,
+    tide: tideLayer,
     entities: entities.root,
     playerMarkers: playerMarkers.root,
     statusFx: statusFx.root,
     bullets: bullets.root,
     effects: effects.root,
-    dark: darkLayer,
+    dark: darkRoot,
     reticle: reticleLayer,
     pick: pickLayer,
   }
@@ -395,6 +412,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     entities.refresh()
     bullets.refresh()
     playerMarkers.refresh()
+    verbMarkers.refresh()
   }
 
   const native = Capacitor.isNativePlatform()
@@ -460,6 +478,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       tilemap.build(level, art)
       tilemap.root.tint = floorTintFor(level, themeFloorTint)
       darkWing = null
+      tideLayer.clear()
+      for (const r of lowTileRuns(level)) tideLayer.rect(r.x * TILE_PX, r.y * TILE_PX, r.w * TILE_PX, TILE_PX)
+      tideLayer.fill({ color: TIDE_COLOR })
+      tideLayer.alpha = 0
       levelW = level.w
       levelH = level.h
       camera.snapTo(level.spawn.x, level.spawn.y)
@@ -561,6 +583,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (!frozen) {
         entities.update(shown, alpha, view.tick, view.floor)
         playerMarkers.update(shown, view.self?.id, alpha, view.tick)
+        verbMarkers.update(shown, alpha, view.tick)
         statusFx.update(shown, alpha, view.tick)
         bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)
@@ -573,6 +596,16 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       else camera.apply(world, app.screen.width, app.screen.height, levelW, levelH)
       camera.viewRect(app.screen.width, app.screen.height, viewRect)
       tilemap.cull(viewRect.x, viewRect.y, viewRect.w, viewRect.h, slot)
+      tideLayer.alpha = easeTide(tideLayer.alpha, !!view.modifier?.flooded, dt)
+      tideLayer.visible = tideLayer.alpha > 0 && slot === 0
+      brownoutLayer.clear()
+      if (view.modifier?.kind === 'brownout') {
+        const lamps = shown.filter((e) => e.playerCtl && !e.dead).map((e) => e.pos)
+        const tiles = { x: viewRect.x / TILE_PX, y: viewRect.y / TILE_PX, w: viewRect.w / TILE_PX, h: viewRect.h / TILE_PX }
+        for (const r of darknessRuns(tiles, lamps)) {
+          brownoutLayer.rect(r.x * TILE_PX, r.y * TILE_PX, r.w * TILE_PX, TILE_PX).fill({ color: 0x02040a, alpha: r.alpha })
+        }
+      }
 
       // --- Backbuffer composite: pack the live distortion prims into the
       // shader's uniform arrays (screen-uv space via the REAL world transform —

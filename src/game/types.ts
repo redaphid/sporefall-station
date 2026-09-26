@@ -140,6 +140,13 @@ export type SimEvent =
    * klaxon, the banner and the alarm wash all hang off it. */
   | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
+  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+   * raise `w.alarm` to `level`. */
+  | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
+  /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
+  | { type: 'lockdown' }
+  /** #86 — the lockdown's seal cycle ran out: the Launch Bay is open. */
+  | { type: 'lockdownLifted' }
   /** A body took the stairs: it now stands on the landing of storey `z`. */
   | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }
@@ -190,6 +197,12 @@ export type SimEvent =
   | { type: 'sapperCharge'; entityId: EntityId; doorId: EntityId; x: number; y: number; fuse: number }
   /** A hound pack spotted `targetId` and began to encircle it. */
   | { type: 'packHunt'; groupId: number; targetId: EntityId; count: number }
+  /** A floor modifier took hold on floor entry (floorModifiers.ts). */
+  | { type: 'floorModifier'; kind: 'bogTide' | 'brownout' | 'hunted' }
+  /** Bog tide turned: `rising` = the low ground is flooding now. */
+  | { type: 'tide'; rising: boolean }
+  /** A tracker pack landed on a `hunted` floor, already on `targetId`'s scent. */
+  | { type: 'huntersArrive'; groupId: number; x: number; y: number; count: number; targetId: EntityId }
   /** A pack's ring closed (or timed out) on `targetId` — now it goes in. */
   | { type: 'packClose'; groupId: number; targetId: EntityId; closed: boolean }
   /** A pack went MANHUNTER on `targetId` (someone hurt one of them, or a howl carried). */

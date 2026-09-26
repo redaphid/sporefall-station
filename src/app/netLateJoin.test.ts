@@ -392,3 +392,37 @@ describe('late join: a finished run is not a joinable run', () => {
     expect(countPlayers(host)).toBe(2)
   })
 })
+
+describe('late join: the floor modifier reaches the joiner', () => {
+  const joinAndRun = async (hub: MockHub, host: NetHostSession): Promise<NetClientSession> => {
+    const bob = hub.addClient('Bob', stubInput())
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    for (let i = 0; i < 40; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+    return bob.session
+  }
+
+  it('a joiner on a hunted floor shows the modifier and the host’s hunt countdown', async () => {
+    const { hub, host } = await hostOnFloor(4, 2) // seed 4 floor 2 rolls `hunted`
+    expect(host.world.modifier?.kind).toBe('hunted')
+    for (let i = 0; i < 90; i++) host.tick()
+    const bob = await joinAndRun(hub, host)
+    const mine = bob.renderView().modifier
+    const theirs = host.renderView().modifier
+    expect(mine?.kind).toBe('hunted')
+    expect(theirs?.kind).toBe('hunted')
+    expect(Math.abs((mine?.huntIn ?? -99) - (theirs?.huntIn ?? 99))).toBeLessThanOrEqual(1)
+  })
+
+  it('a clean floor sends no modifier, so the joiner shows none', async () => {
+    const { hub, host } = await hostOnFloor(1, 2) // seed 1 floor 2 is clean
+    expect(host.world.modifier).toBeUndefined()
+    const bob = await joinAndRun(hub, host)
+    expect(bob.renderView().modifier).toBeUndefined()
+  })
+})

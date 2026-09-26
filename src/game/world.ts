@@ -1,4 +1,5 @@
 import type { Entity } from './entity'
+import type { FloorModifier } from './floorModifiers'
 import { generateLevel } from './levelgen/generate'
 import { isSolidTile, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
@@ -13,6 +14,7 @@ import { sporeSystem } from './systems/spore'
 import { infectionActive, infectionSystem } from './systems/infection'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
+import { modifierSystem } from './systems/modifierSystem'
 import { movementSystem } from './systems/movement'
 import { rollSystem } from './systems/roll'
 import { projectileSystem } from './systems/projectiles'
@@ -63,6 +65,12 @@ export interface MissionState {
    * seen — and it is what lets NPCs across the floor keep coming. Refreshing it
    * only every N ticks is what keeps the escape EVADABLE. */
   alertMark?: Vec2
+  /** #86 — noticed gunfire/attacks, in ticks of sustained fire (systems/alarm.ts).
+   * Omitted when 0 so a quiet floor round-trips byte-for-byte. */
+  heat?: number
+  /** #86 — the tick the Launch Bay's lockdown seal cycle started (the alarm hit
+   * LOCKDOWN_ALARM the loud way; restarted when the objective completes). */
+  lockdownTick?: number
   /** Latch: a live player has SEEN the Mireclaw Alpha, so its entrance has been
    * announced and its phases are running (systems/mireclaw.maybeReveal). Also
    * what keeps the boss dormant — and its brood unspent — until someone walks
@@ -195,6 +203,10 @@ export interface World {
    * floors that field groups; absent otherwise and serialized only when
    * present, so every group-free snapshot is byte-identical. */
   groups?: GroupsState
+  /** This floor's modifier (floorModifiers.ts), rolled by setupFloor from
+   * seed+floor. Absent on a clean floor and serialized only when present, so
+   * every clean-floor snapshot is byte-identical. */
+  modifier?: FloorModifier
 }
 
 export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
@@ -288,6 +300,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   }
   complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
   groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
+  modifierSystem(w) // floor modifier: tracker-pack arrivals, the tide wetting whoever wades
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)

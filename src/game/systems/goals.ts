@@ -18,11 +18,13 @@
 // combine into a decision — lives in ./behaviors.ts, keyed by the entity's
 // `ai.behavior` component.
 
-import type { Entity } from '../entity'
+import { resistMult, type Entity } from '../entity'
+import { sightMult } from '../floorModifiers'
 import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
 import { anyPowerCut, doorClosedAt, type World } from '../world'
 import { initialPlayerHate } from './relationships'
+import { hasStatus } from './statusFx'
 import { vlen } from '../simMath'
 
 export const WANDER = 'wander'
@@ -66,12 +68,21 @@ export const fleeScore = (hate: number, hp: number, max: number, dist: number): 
 export const canSeeEntity = (w: World, a: Entity, b: Entity): boolean =>
   hasLineOfSight(w.level, a.pos.x, a.pos.y, b.pos.x, b.pos.y, (tx, ty) => doorClosedAt(w, tx, ty))
 
+/** How far a body choking on spore can still make anything out (tiles): arm's
+ * reach. Spore BLINDS — a chaser that breathes it loses you. */
+export const SPORE_BLIND_RANGE = 1.5
+
+/** Choking on spore it isn't immune to. */
+export const sporeBlinded = (e: Entity): boolean => hasStatus(e, 'spore') && resistMult(e, 'spore') > 0
+
 /** True when `a` actually PERCEIVES `b`: inside its (cloak-halved) sight range
  * AND with unbroken line of sight. The one definition of "can it see it" used by
  * scoring, memory updates, and steering — so an NPC can never track a live
  * position it has no way of knowing. */
 export const perceives = (w: World, a: Entity, b: Entity): boolean => {
-  const sight = a.ai?.sightRange ?? 0
+  // Brownout dims every NPC's sight (#89); spore then caps what is left at arm's reach (#87).
+  const lit = (a.ai?.sightRange ?? 0) * sightMult(w)
+  const sight = sporeBlinded(a) ? Math.min(SPORE_BLIND_RANGE, lit) : lit
   const range = b.status && b.status.cloakUntil > w.tick ? sight * 0.5 : sight
   if (vlen(b.pos.x - a.pos.x, b.pos.y - a.pos.y) > range) return false
   return canSeeEntity(w, a, b)

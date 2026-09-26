@@ -4,9 +4,11 @@ import { generateLevel } from '../levelgen/generate'
 import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
+import { applyFloorModifier } from './modifierSystem'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
 import { raiseFloorAggro } from './relationships'
+import { alarmSystem, exitSealed } from './alarm'
 import { addEntity, type World } from '../world'
 import { vlen } from '../simMath'
 
@@ -21,6 +23,8 @@ export const setupFloor = (w: World): void => {
   // floor hostile — runs on EVERY floor (even floor 1's plain locks), unlike the
   // access gate which only dresses floors >= 2.
   tagObjectiveGate(w)
+  // Last, and on its own stream: nothing above moves with or without it.
+  applyFloorModifier(w)
 }
 
 /** Sporefall flavour for each generic building role: the derelict station's
@@ -476,6 +480,7 @@ export const missionSystem = (w: World): void => {
   // BEFORE completion so the tick the alert latches is a broadcast tick by
   // construction ((tick - alertTick) % N === 0 at tick === alertTick).
   broadcastAlert(w)
+  alarmSystem(w)
 
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
@@ -500,7 +505,7 @@ export const missionSystem = (w: World): void => {
   }
 
   // Floor transition: any live player standing on the unlocked exit tile
-  if (w.mission.exitUnlocked) {
+  if (w.mission.exitUnlocked && !exitSealed(w)) {
     for (const e of w.entities) {
       if (!e.playerCtl || e.playerCtl.downed || e.dead) continue
       if (Math.floor(e.pos.x) === w.level.exit.x && Math.floor(e.pos.y) === w.level.exit.y) {
@@ -555,6 +560,8 @@ const completeMission = (w: World, focus?: Entity): void => {
   // that processes the batch in order ends on the alert — which is the thing the
   // player actually needs to act on (see ui/screens.ts).
   w.events.push({ type: 'missionComplete', description: w.mission.description })
+  // A loud run's lockdown seal cycle starts over with the prize in hand.
+  if (w.mission.lockdownTick !== undefined) w.mission.lockdownTick = w.tick
   if (focus) raiseStationAlert(w, focus)
 }
 

@@ -9,6 +9,7 @@ import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
+import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
@@ -183,6 +184,8 @@ export const applyDamage = (
       target.ai.thinkAt = w.tick
     }
   }
+
+  if (target.playerCtl) seeAttackOnPlayer(w, target, attackerId)
 
   // Disposition: a player attack on a civ/cop is a crime — witnesses re-derive
   // their stance toward the attacker (cops/allies turn hostile, civilians flee).
@@ -439,7 +442,7 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
     return true
@@ -480,7 +483,7 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
   } else {
@@ -550,6 +553,7 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // the held-item cursor and there is nothing to cycle back TO — that rule would
     // leave a player holding a grenade permanently unable to shoot. Items go on
     // the USE/Throw button above, which is where they now exclusively live.
-    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
+    // THE single fire-site: mods/elements/pellets fold in here
+    if (fireWeapon(w, e) && WEAPONS[e.combat.weapon]?.kind === 'ranged') hearGunfire(w, e, e.combat.cooldown)
   }
 }

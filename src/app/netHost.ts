@@ -2,8 +2,10 @@ import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
+import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
+import { modifierView } from '../game/floorModifiers'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import { SendQueue } from '../net/channel/sendQueue'
@@ -352,8 +354,10 @@ export class NetHostSession implements Session {
       gameOver: this.world.gameOver,
       alarm: this.world.alarm,
       alert: stationAlerted(this.world),
+      lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
+      ...(this.world.modifier ? { modifier: { ...this.world.modifier } } : {}),
       huds,
     }
     this.broadcastJson(MsgType.State, state)
@@ -371,9 +375,11 @@ export class NetHostSession implements Session {
       missionTargetId: this.world.mission.targetEntityId,
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
+      lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
+      ...(this.world.modifier ? { modifier: modifierView(this.world.modifier, this.world.tick) } : {}),
       self: this.self,
     }
   }

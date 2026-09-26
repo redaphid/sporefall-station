@@ -65,9 +65,11 @@ describe('mod sequencing: flag off matches main', () => {
   // (`projectile.mods`) drops the element that frost overrides, so incendiary
   // no longer rides these rounds. Reverting only that filter reproduced the
   // previous digests (68f8aaa8, 457a3b14), and with every projectile's `mods`
-  // removed both builds digest identically (8029abfa, 5cc314e6).
+  // removed both builds digest identically (8029abfa, 5cc314e6). Seed 7
+  // re-pinned for #87: `applyStatus` now records who landed a status
+  // (`fx.frozen.source`). Dropping only that source reproduced '92430cd7'.
   const GOLDEN: Record<number, string> = {
-    7: '92430cd7',
+    7: 'd18f1870',
     1234: '3f405983',
   }
 

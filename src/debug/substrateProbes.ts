@@ -161,3 +161,37 @@ export const stunProbe = (seed: number, ground: StunGround, team: Team): StunPro
   }
   return { seed, ground, team, shots: shots.size, downedAt, ...tally }
 }
+
+export interface RangeFightResult {
+  seed: number
+  distance: number
+  build: string
+  outcome: Outcome
+  ticks: number
+  damage: number
+  /** Tick a gangster first fired, if one did. */
+  firstReply?: number
+}
+
+/** arena-kiter's three gangsters, staged `distance` tiles down an open street
+ * row (past the 8 tiles they can see) against the census bot. */
+export const kiterAtRange = (seed: number, distance: number, build: CensusBuild): RangeFightResult => {
+  const w = newRun(seed, build.sequenced)
+  stageArena(w, { question: 'kiter at range', foes: [] }, openStreetRow(w, distance + 2))
+  const me = teamOf(w)[0]
+  if (!me) throw new Error('probe: the run has no player')
+  for (const mod of build.mods) runVerb(w, `addMod ${me.id} ${mod}`)
+  const foes = [0, -1, 1].map((dy) => spawnNpc(w, 'gangster', me.pos.x + distance, me.pos.y + dy))
+  const ids = new Set(foes.map((f) => f.id))
+  const tally = emptyTally(1)
+  const prevHp = [me.health!.hp]
+  let firstReply: number | undefined
+  for (let t = 0; ; t++) {
+    const won = foes.every((e) => e.dead || e.health!.hp <= 0)
+    const down = me.dead || me.playerCtl!.downed
+    const outcome: Outcome | undefined = won ? 'won' : down ? 'downed' : t >= FIGHT_TICKS ? 'timeout' : undefined
+    if (outcome) return { seed, distance, build: build.name, outcome, ticks: t, damage: tally.damage[0], firstReply }
+    stepAndTally(w, [me], tally, prevHp, true)
+    if (firstReply === undefined && w.entities.some((e) => e.projectile && ids.has(e.projectile.ownerId))) firstReply = t
+  }
+}

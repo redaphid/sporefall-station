@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CENSUS_BUILDS, runFight } from './census'
-import { stunProbe, teamFight } from './substrateProbes'
+import { kiterAtRange, stunProbe, teamFight } from './substrateProbes'
 
 const build = (name: string) => CENSUS_BUILDS.find((b) => b.name === name)!
 
@@ -41,5 +41,12 @@ describe('substrate probes', () => {
     expect(wet.arcHits[0]).toBeGreaterThan(0)
     expect(wet.arcHits[1]).toBeGreaterThan(0)
     expect(wet.damage[0] + wet.damage[1]).toBeGreaterThan(dry.damage[0] + dry.damage[1])
+  })
+
+  it('kiters staged out of sight replay identically, and gunfire draws a reply from 12 tiles', () => {
+    const a = kiterAtRange(303, 12, build('none'))
+    expect(kiterAtRange(303, 12, build('none'))).toEqual(a)
+    expect(a.firstReply).toBeDefined()
+    expect(a.damage).toBeGreaterThan(0)
   })
 })

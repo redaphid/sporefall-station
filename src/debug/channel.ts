@@ -163,7 +163,16 @@ const connectWithBackoff = (
   }
 
   const open = (): void => {
-    ws = new WS(url)
+    try {
+      ws = new WS(url)
+    } catch (e) {
+      // The constructor throws only for a URL the browser will never dial
+      // (SecurityError for ws:// from HTTPS, SyntaxError for a bad URL), so
+      // retrying cannot help. Give up and leave the game running.
+      stopped = true
+      log(`[debug] hub unavailable (${url}): ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
     ws.onopen = () => {
       ready = true
       attempt = 0

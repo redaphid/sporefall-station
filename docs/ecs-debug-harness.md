@@ -50,6 +50,14 @@ The channel is a **no-op without `?debug`** (dynamically imported only when the
 flag is set) and only attaches to sessions that own an authoritative world
 (solo / host). On connect it logs `[debug] connected to ws://…` to the console.
 
+An HTTPS page never dials the hub. The hub serves plain `ws://`, and browsers
+block `ws://` from an HTTPS page, so on the live site `?debug` logs
+`[debug] hub unavailable: …` and the game runs without the hub.
+`sporefall.verb(...)` still works in the page console. A `?debugPort=` outside
+1-65535 gets the same log line. If the browser refuses the socket for any other
+reason, the channel logs `[debug] hub unavailable (<url>): <reason>` once and
+stops dialing. The game keeps running.
+
 ## 3. Drive it from the CLI
 
 ```sh

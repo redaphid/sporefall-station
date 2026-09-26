@@ -489,16 +489,18 @@ const boot = async (): Promise<void> => {
   // page reload — no frozen zombie, no blind observer. See DebugLink in channel.ts.
   let debug: DebugLink | undefined
   if (params.has('debug') && 'world' in session) {
-    const { startDebugLink } = await import('./debug/channel')
-    const { hubUrl, DEFAULT_HUB_PORT } = await import('./debug/protocol')
-    const port = Number(params.get('debugPort')) || DEFAULT_HUB_PORT
-    // `?debug=<name>` labels this game in the hub's registry so multiple games on
-    // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
-    const name = params.get('debug') || undefined
-    debug = startDebugLink((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
-      name,
-      setTheme: (id) => void renderer.setTheme(id),
-    })
+    const { resolveHubTarget } = await import('./debug/protocol')
+    const hub = resolveHubTarget(location, params.get('debugPort'))
+    if (hub.ok) {
+      const { startDebugLink } = await import('./debug/channel')
+      // `?debug=<name>` labels this game in the hub's registry so multiple games on
+      // one hub stay distinguishable/selectable; bare `?debug` falls back to order.
+      const name = params.get('debug') || undefined
+      debug = startDebugLink((session as HostSession).world, hub.url, console.log, {
+        name,
+        setTheme: (id) => void renderer.setTheme(id),
+      })
+    } else console.log(`[debug] hub unavailable: ${hub.reason}. sporefall.verb(...) still works in this console.`)
   }
   // Shareable states (`?state=`). Arm a rolling ring of the last second or two
   // of inputs, and expose one-tap capture: the pause menu's Share button

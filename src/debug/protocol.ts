@@ -76,6 +76,21 @@ export interface GameInfo {
 
 export const hubUrl = (host: string, port = DEFAULT_HUB_PORT): string => `ws://${host}:${port}`
 
+/** Where a `?debug` page dials the hub, or why it cannot. */
+export type HubTarget = { ok: true; url: string } | { ok: false; reason: string }
+
+/** Resolve the hub for the page that loaded the app. The hub is a plain `ws://`
+ * server (tools/debug-hub), and browsers throw on `ws://` from an HTTPS page, so
+ * an HTTPS page never dials. `debugPort` is the raw `?debugPort=` value. */
+export const resolveHubTarget = (page: { protocol: string; hostname: string }, debugPort: string | null): HubTarget => {
+  if (page.protocol === 'https:')
+    return { ok: false, reason: 'this page is HTTPS and the hub serves plain ws://, which browsers block here. Serve the app over http:// to use the hub' }
+  const port = debugPort ? Number(debugPort) : DEFAULT_HUB_PORT
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    return { ok: false, reason: `?debugPort=${debugPort} is not a port number (1-65535)` }
+  return { ok: true, url: hubUrl(page.hostname || '127.0.0.1', port) }
+}
+
 // UTF-8-safe base64, portable across the browser webview and Node (both expose
 // btoa/atob + TextEncoder/TextDecoder). Used for verb payloads with whitespace.
 export const toB64 = (s: string): string =>

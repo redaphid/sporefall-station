@@ -5,7 +5,9 @@
 import { describe, expect, it } from 'vitest'
 import { emptyInput, type InputCmd } from '../game/types'
 import { weaponStack } from '../game/systems/inventory'
-import { floorDraftOffer } from '../game/systems/draft'
+import { floorDraftOffer, floorTraitOffer } from '../game/systems/draft'
+import { encodeJson } from '../net/framing/codec'
+import { MsgType } from '../net/types'
 import type { InputSource } from '../input/input'
 import { withDraftPicks } from '../input/draftPick'
 import { decodeInput, encodeInput } from '../net/protocol/messages'
@@ -131,6 +133,50 @@ describe('floor draft over co-op', () => {
     expect(bob.session.renderView().self!.playerCtl!.draft).toBeUndefined()
   })
 
+  it('the YOU card crosses the link: the hand carries it, a tap takes it on the host, and the trait comes back to that client', async () => {
+    const input = makeInput()
+    const picks = withDraftPicks(input.source)
+    const { host, bob, avatar } = await startPair(picks)
+    await step(host, bob, 3)
+    descend(host)
+    await step(host, bob, 16)
+    const trait = floorTraitOffer(SEED, 1)!
+    expect(bob.session.renderView().self!.playerCtl!.draft!.trait).toBe(trait)
+
+    picks.pick(2)
+    await step(host, bob, 4)
+    expect(avatar.playerCtl!.traits).toEqual([{ id: trait, stacks: 1 }])
+    expect(weaponStack(avatar)!.mods ?? []).toEqual([])
+    expect(host.self.playerCtl!.traits).toBeUndefined() // the host still has its own hand open
+    expect(bob.session.renderView().self!.playerCtl!.traits).toEqual([{ id: trait, stacks: 1 }])
+    // and it stays through later inventory traffic
+    await step(host, bob, 30)
+    expect(bob.session.renderView().self!.playerCtl!.traits).toEqual([{ id: trait, stacks: 1 }])
+  })
+
+  it('a client that joins mid-floor gets no hand, then the next hand with its YOU card, and its trait arrives', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(SEED, 'Host', makeInput().source, hub.hostTransport, 'normal')
+    await host.start()
+    host.beginGame()
+    for (let i = 0; i < 5; i++) host.tick()
+    const input = makeInput()
+    const picks = withDraftPicks(input.source)
+    const bob = hub.addClient('Late', picks)
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    await step(host, bob, 20)
+    const self = () => bob.session.renderView().self!
+    expect(self().playerCtl!.draft).toBeUndefined()
+    descend(host)
+    await step(host, bob, 16)
+    expect(self().playerCtl!.draft!.trait).toBe(floorTraitOffer(SEED, 1))
+    picks.pick(2)
+    await step(host, bob, 20)
+    expect(self().playerCtl!.traits).toEqual([{ id: floorTraitOffer(SEED, 1), stacks: 1 }])
+  })
+
   it('a drafting client does not predict a walk the host will not make', async () => {
     const input = makeInput()
     const { host, bob, avatar } = await startPair(input.source)
@@ -144,6 +190,24 @@ describe('floor draft over co-op', () => {
     const self = bob.session.renderView().self!
     expect(avatar.pos).toEqual(hostAt)
     expect(Math.hypot(self.pos.x - hostAt.x, self.pos.y - hostAt.y)).toBeLessThan(0.05)
+  })
+})
+
+describe('trait wire cost', () => {
+  it('a trait costs its own id once, on the owner\u2019s change-gated inventory message, and nothing when absent', () => {
+    const inv = { slot: 1, inventory: [{ itemId: 'pistol', qty: 1 }], activeSlot: -1, weapon: 'pistol' }
+    const bare = encodeJson(MsgType.Inventory, inv).length
+    const one = encodeJson(MsgType.Inventory, { ...inv, traits: [{ id: 'staticSkin', stacks: 1 }] }).length
+    const three = encodeJson(MsgType.Inventory, {
+      ...inv,
+      traits: [
+        { id: 'staticSkin', stacks: 1 },
+        { id: 'softSteps', stacks: 2 },
+        { id: 'medicHands', stacks: 1 },
+      ],
+    }).length
+    expect(one - bare).toBeLessThanOrEqual(45)
+    expect(three - bare).toBeLessThanOrEqual(120)
   })
 })
 

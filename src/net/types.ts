@@ -12,6 +12,9 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 6 — the floor draft deals a YOU card: `DraftHand.trait` in `StateMsg.huds`,
+ *     and `InventoryMsg.traits`. An old client would draw two cards of three
+ *     and never see its traits, so it is refused rather than half-working.
  * 5 — snapshots gain a sparse element-status trailer (frozen/burning/wet/...),
  *     so a client draws statused enemies. An old peer would ignore it silently.
  * 4 — the group roster appended (88 -> 95): drowner, bellwether, mender,
@@ -23,7 +26,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 5
+export const PROTOCOL_VERSION = 6
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

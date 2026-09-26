@@ -801,6 +801,8 @@ export class NetClientSession implements Session {
       if (this.localInv) {
         ld.inventory = this.localInv.inventory
         ld.activeSlot = this.localInv.activeSlot
+        if (this.localInv.traits) this.self.playerCtl.traits = this.localInv.traits
+        else delete this.self.playerCtl.traits
         if (this.self.combat) this.self.combat.weapon = this.localInv.weapon
         else this.self.combat = { weapon: this.localInv.weapon, cooldown: 0 }
       } else if (hud) {

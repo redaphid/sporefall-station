@@ -1,4 +1,4 @@
-import type { DraftHand, Entity, ItemStack } from '../../game/entity'
+import type { DraftHand, Entity, ItemStack, TraitStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
@@ -606,4 +606,8 @@ export interface InventoryMsg {
   activeSlot: number
   /** The currently-swung weapon id (may differ from activeSlot when a throwable/consumable is held). */
   weapon: string
+  /** The receiving player's traits (the draft's YOU card). Only the owner needs
+   * them: for the pause panel, the YOU card's verdict and Scout Eye's tags. No
+   * trait changes a walk the client predicts, so teammates never receive them. */
+  traits?: TraitStack[]
 }

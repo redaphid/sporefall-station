@@ -267,13 +267,15 @@ export class NetHostSession implements Session {
       const avatar = this.world.byId.get(p.entityId)
       const ld = avatar?.loadout
       if (!avatar?.playerCtl || !ld) continue
+      const traits = avatar.playerCtl.traits
       const msg: InventoryMsg = {
         slot: p.slot,
         inventory: ld.inventory,
         activeSlot: ld.activeSlot,
         weapon: avatar.combat?.weapon ?? 'fists',
+        ...(traits?.length ? { traits } : {}),
       }
-      const sig = JSON.stringify([msg.inventory, msg.activeSlot, msg.weapon])
+      const sig = JSON.stringify([msg.inventory, msg.activeSlot, msg.weapon, msg.traits])
       if (sig === p.lastInvSig) continue
       p.lastInvSig = sig
       p.queue.queueReliable(encodeJson(MsgType.Inventory, msg))

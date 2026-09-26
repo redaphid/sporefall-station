@@ -8,7 +8,7 @@ import { WEAPONS } from '../game/data/items'
 import { MODS } from '../game/data/mods'
 import type { Entity } from '../game/entity'
 import { weaponStack } from '../game/systems/inventory'
-import { isPayloadMod, liveEntries, sequenceShape } from '../game/systems/modSequence'
+import { isPayloadMod, liveEntries, planPull } from '../game/systems/modSequence'
 import type { ModCasting } from '../game/world'
 import { modPickupColor } from '../render/modColors'
 import { toCssHex } from './loadoutModel'
@@ -60,22 +60,12 @@ export const buildSequence = (
   const def = WEAPONS[self.combat.weapon]
   const stack = weaponStack(self)
   if (!def || !stack?.mods || stack.mods.length === 0) return null
-  const shape = sequenceShape(def)
   const mods = order ? order(stack.mods) : stack.mods
+  const { shape, plan } = planPull(def, mods, stack.castIndex ?? 0)
   const live = liveEntries(mods, shape.slots)
   const liveSet = new Set(live)
-  // Mark the cast(s) the next pull fires: walk forward from castIndex the same
-  // way planCasts does, stopping at the wrap.
-  const nextSet = new Set<number>()
-  const start = stack.castIndex ?? 0
-  let i = Number.isInteger(start) && start >= 0 && start < live.length ? start : 0
-  for (let c = 0; c < shape.castsPerTrigger && i < live.length; c++) {
-    while (i < live.length) {
-      const idx = live[i++]
-      nextSet.add(idx)
-      if (isPayloadMod(mods[idx].id)) break
-    }
-  }
+  // The cast(s) the next pull fires, as the fire path plans them.
+  const nextSet = new Set(plan.casts.flatMap((c) => c.positions.map((pos) => live[pos])))
   const entries: SequenceEntry[] = mods.map((m, listIndex) => {
     const d = MODS[m.id]
     const v = d && liveSet.has(listIndex) ? modVerdict(def, mods, m.id, true) : undefined

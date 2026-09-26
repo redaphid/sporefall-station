@@ -223,8 +223,14 @@ describe('the review probes, pinned', () => {
   }
   const stat = (l: LoadoutModel, k: string) => l.stats.find((s) => s.key === k)!.resolvedText
 
-  it('a sequenced pistol with only Rapid wraps every pull, so it fires at the recharge rate', () => {
-    expect(stat(panel('pistol', [m('rapid')], true), 'fireRate')).toBe('1.5/s')
+  it('a sequenced pistol with only Rapid is one cast, so it fires at the Rapid rate, not the recharge (#115)', () => {
+    expect(stat(panel('pistol', [m('rapid')], true), 'fireRate')).toBe('2/s')
+  })
+  it('a sequenced pistol [frost, rapid] wraps on the Rapid cast, so its next pull after frost waits out the recharge', () => {
+    const w = rig('pistol', [m('frost'), m('rapid')], true)
+    const p = w.entities.find((e: Entity) => e.playerCtl)!
+    weaponStack(p)!.castIndex = 1
+    expect(stat(buildLoadout(p, w.modCasting)!, 'fireRate')).toBe('1.5/s')
   })
   it('a sequenced shotgun [frost, bulk, shock] shows both casts: 7 pellets, both elements, the 30-tick recharge', () => {
     const l = panel('shotgun', [m('frost'), m('bulk'), m('shock')], true)

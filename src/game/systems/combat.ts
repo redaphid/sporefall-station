@@ -13,7 +13,7 @@ import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
-import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
+import { applyModSwap, pelletShares, planPull, recharging, sequencing } from './modSequence'
 import { meleeDamage } from './modEffect'
 import { spawnSporeBurst } from './spore'
 import { vlen } from '../simMath'
@@ -471,8 +471,7 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
  */
 const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack): boolean => {
   if (recharging(stack, w.tick)) return false
-  const shape = sequenceShape(weapon)
-  const plan = planCasts(stack.mods, shape, stack.castIndex ?? 0)
+  const { shape, plan } = planPull(weapon, stack.mods, stack.castIndex ?? 0)
   // Every entry unknown/empty: nothing live, fire the bare weapon.
   const casts = plan.casts.length > 0 ? plan.casts : [{ mods: [] as WeaponMod[], positions: [] as number[] }]
   stack.castIndex = plan.nextIndex

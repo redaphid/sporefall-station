@@ -120,6 +120,30 @@ export const planCasts = (
   return { casts, nextIndex: i, wrapped }
 }
 
+/** Casts in one full cycle of the live window, from position 0 to the wrap. */
+export const cycleCasts = (mods: readonly WeaponMod[] | undefined, shape: SequenceShape): number =>
+  planCasts(mods, { ...shape, castsPerTrigger: shape.slots }, 0).casts.length
+
+/** The next trigger pull, and the shape it fires with. */
+export interface PullPlan {
+  shape: SequenceShape
+  plan: CastPlan
+}
+
+/**
+ * Plan the next trigger pull of `def` loaded with `mods`. A wand whose whole
+ * cycle is one cast (only modifiers, or a single element) is a plain gun: every
+ * pull fires that full cast with all its pellets, at the cast's cooldown, and
+ * never recharges (#115). The pellet split and the wrap recharge apply only to
+ * a cycle of two or more casts.
+ */
+export const planPull = (def: WeaponDef, mods: readonly WeaponMod[] | undefined, castIndex: number): PullPlan => {
+  const shape = sequenceShape(def)
+  if (cycleCasts(mods, shape) > 1) return { shape, plan: planCasts(mods, shape, castIndex) }
+  const plain = { ...shape, castsPerTrigger: 1, rechargeOnWrap: 0 }
+  return { shape: plain, plan: planCasts(mods, plain, 0) }
+}
+
 /** Is the weapon stack still recharging at `tick`? */
 export const recharging = (stack: ItemStack | undefined, tick: number): boolean =>
   stack?.rechargeUntil !== undefined && stack.rechargeUntil > tick

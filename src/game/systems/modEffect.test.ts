@@ -105,9 +105,12 @@ describe('sequenced casting', () => {
     expect(modVerdict(WEAPONS.pistol, mods, 'explosive', false).kind).toBe('live')
   })
 
-  it('a faster cast that wraps anyway is outlasted by the recharge', () => {
-    expect(modVerdict(WEAPONS.pistol, [m('rapid')], 'rapid', true)).toEqual({ kind: 'inert', reason: 'recharge hides it' })
-    expect(modVerdict(WEAPONS.pistol, [m('rapid')], 'rapid', false).kind).toBe('live')
+  it('a faster cast that wraps a two-cast cycle is outlasted by the recharge', () => {
+    expect(modVerdict(WEAPONS.pistol, [m('frost'), m('rapid')], 'rapid', true)).toEqual({ kind: 'inert', reason: 'recharge hides it' })
+  })
+
+  it('a one-cast wand never recharges, so its fire-rate mod counts (#115)', () => {
+    expect(modVerdict(WEAPONS.pistol, [m('rapid')], 'rapid', true).kind).toBe('live')
   })
 
   it('a fire-rate mod on a cast that does not wrap still counts', () => {

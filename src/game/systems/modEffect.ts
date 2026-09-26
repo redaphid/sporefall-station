@@ -11,7 +11,7 @@ import { MODS, stackMod, type BulletBehavior, type ResolvedTrigger } from '../da
 import type { WeaponMod } from '../entity'
 import { PLAYER_MELEE_MULT } from '../player'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
-import { pelletShares, planCasts, sequenceShape } from './modSequence'
+import { pelletShares, planCasts, planPull, type SequenceShape } from './modSequence'
 
 /** The fields of a resolved weapon that `fireWeapon` reads. Both kinds read
  * damage, cooldown, element and triggers. Only a swing reads knockback: a
@@ -81,8 +81,7 @@ export const executedPull = (
     if (weapon.kind === 'melee') return { casts: [shot], cooldownTicks: shot.cooldownTicks }
     return { casts: [shot], cooldownTicks: shot.cooldownTicks, pellets: shot.pellets, fan: shot.spread ?? 0 }
   }
-  const shape = sequenceShape(weapon)
-  const plan = planCasts(mods, shape, castIndex)
+  const { shape, plan } = planPull(weapon, mods, castIndex)
   // Every entry unknown or empty: the sim fires the bare weapon.
   const castMods: WeaponMod[][] = plan.casts.length > 0 ? plan.casts.map((c) => c.mods) : [[]]
   const recharge = (cd: number): number =>
@@ -121,19 +120,19 @@ interface CyclePull {
 
 /** Every pull of one full sequenced cycle from index 0: the order the fire path
  * walks the wand in steady state. */
-const pullCycle = (weapon: WeaponDef, mods: readonly WeaponMod[]): CyclePull[] => {
-  const shape = sequenceShape(weapon)
+const pullCycle = (weapon: WeaponDef, mods: readonly WeaponMod[]): { shape: SequenceShape; pulls: CyclePull[] } => {
+  const { shape } = planPull(weapon, mods, 0)
   const shares = pelletShares(weapon.pellets ?? 1, shape.castsPerTrigger)
-  const out: CyclePull[] = []
+  const pulls: CyclePull[] = []
   let index = 0
   for (let pull = 0; pull <= shape.slots; pull++) {
     const plan = planCasts(mods, shape, index)
     if (plan.casts.length === 0) break
-    out.push({ casts: plan.casts.map((c, g) => ({ mods: c.mods, pellets: shares[g] })), wrapped: plan.wrapped })
+    pulls.push({ casts: plan.casts.map((c, g) => ({ mods: c.mods, pellets: shares[g] })), wrapped: plan.wrapped })
     if (plan.wrapped) break
     index = plan.nextIndex
   }
-  return out
+  return { shape, pulls }
 }
 
 /** The shot a sequenced mod rides in, with and without it. A pull's cooldown is
@@ -141,14 +140,15 @@ const pullCycle = (weapon: WeaponDef, mods: readonly WeaponMod[]): CyclePull[] =
  * fireSequenced), so a mod that only speeds up a wrapping cast changes nothing. */
 const sequencedShots = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: string): [ExecutedShot, ExecutedShot] | undefined => {
   const hasIt = (c: { mods: WeaponMod[] }): boolean => c.mods.some((m) => m.id === modId)
-  const pull = pullCycle(weapon, mods).find((p) => p.casts.some(hasIt))
+  const { shape, pulls } = pullCycle(weapon, mods)
+  const pull = pulls.find((p) => p.casts.some(hasIt))
   if (!pull) return undefined
   const shot = (dropIt: boolean): ExecutedShot => {
     const shots = pull.casts.map((c) =>
       executedShot({ ...weapon, pellets: c.pellets }, dropIt ? c.mods.filter((m) => m.id !== modId) : c.mods),
     )
     let cooldown = Math.max(1, ...shots.map((s) => s.cooldownTicks))
-    if (pull.wrapped) cooldown = Math.max(cooldown, sequenceShape(weapon).rechargeOnWrap)
+    if (pull.wrapped) cooldown = Math.max(cooldown, shape.rechargeOnWrap)
     return { ...shots[pull.casts.findIndex(hasIt)], cooldownTicks: cooldown }
   }
   return [shot(false), shot(true)]
@@ -157,7 +157,7 @@ const sequencedShots = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: st
 /** A sequenced mod whose only effect is a faster cast that the wrap recharge
  * then outlasts. */
 const rechargeHidesIt = (weapon: WeaponDef, mods: readonly WeaponMod[], modId: string): boolean => {
-  const cast = pullCycle(weapon, mods).flatMap((p) => p.casts).find((c) => c.mods.some((m) => m.id === modId))
+  const cast = pullCycle(weapon, mods).pulls.flatMap((p) => p.casts).find((c) => c.mods.some((m) => m.id === modId))
   const rate = (list: WeaponMod[]): number => executedShot(weapon, list).cooldownTicks
   return cast !== undefined && rate(cast.mods) !== rate(cast.mods.filter((m) => m.id !== modId))
 }

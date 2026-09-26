@@ -16,14 +16,17 @@ import { arm } from '../testkit'
 import { combatSystem } from './combat'
 import {
   applyModSwap,
+  cycleCasts,
   isPayloadMod,
   liveEntries,
   packModSwap,
   pelletShares,
   planCasts,
+  planPull,
   sequenceShape,
   unpackModSwap,
 } from './modSequence'
+import { executedShot } from './modEffect'
 import { weaponStack } from './inventory'
 
 const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
@@ -227,6 +230,106 @@ describe('sequenced fire path (combatSystem)', () => {
     expect(elements(shots)).toEqual(['burning'])
     expect(shots[0].projectile!.mods!.map((x) => x.id)).toEqual(['incendiary', 'pierce'])
     expect(stackOf(p).castIndex).toBeUndefined()
+  })
+})
+
+/** Ticks at which `p` fired over `ticks` ticks of held trigger through tickWorld,
+ * with the element and pellet count of each pull. */
+const heldFire = (w: World, p: Entity, ticks: number): { tick: number; pellets: number; el?: string }[] => {
+  const out: { tick: number; pellets: number; el?: string }[] = []
+  for (let t = 0; t < ticks; t++) {
+    const before = new Set(w.entities.map((e) => e.id))
+    const tick = w.tick
+    tickWorld(w, new Map([[0, { ...emptyInput(), attack: true }]]))
+    const shots = w.entities.filter((e) => !before.has(e.id) && e.projectile?.ownerId === p.id)
+    if (shots.length) out.push({ tick, pellets: shots.length, el: shots[0].projectile!.onHit?.status })
+  }
+  return out
+}
+
+describe('a one-cast wand fires like a plain gun (#115)', () => {
+  const armedKit = [m('heavy', 2), m('homing'), m('lifesteal', 2), m('pierce', 2), m('rapid')]
+
+  it('the armed machine gun (modifiers only) fires at its cooldown and never recharges', () => {
+    const { w, p } = rig('machinegun', armedKit)
+    const fired = heldFire(w, p, 90)
+    const cd = executedShot(WEAPONS.machinegun, armedKit).cooldownTicks
+    expect(fired.map((f) => f.tick)).toEqual(Array.from({ length: Math.ceil(90 / cd) }, (_, i) => i * cd))
+    expect(stackOf(p).rechargeUntil).toBeUndefined()
+    expect(stackOf(p).castIndex).toBe(0)
+  })
+
+  it('every round of a modifiers-only wand carries every live mod, exactly as the fold did', () => {
+    const seq = rig('machinegun', armedKit)
+    const fold = rig('machinegun', armedKit, false)
+    const a = pull(seq.w, seq.p)[0].projectile!
+    const b = pull(fold.w, fold.p)[0].projectile!
+    expect(a).toEqual(b)
+  })
+
+  it('a lone element fires every round, at the cooldown, with no recharge', () => {
+    const { w, p } = rig('pistol', [m('frost')])
+    const fired = heldFire(w, p, 60)
+    const cd = WEAPONS.pistol.cooldownTicks
+    expect(fired).toEqual([0, cd, 2 * cd, 3 * cd].map((tick) => ({ tick, pellets: 1, el: 'frozen' })))
+    expect(stackOf(p).rechargeUntil).toBeUndefined()
+  })
+
+  it('modifiers ending on one element are one cast: overload rides every frost round', () => {
+    const { w, p } = rig('pistol', [m('overload', 2), m('frost')])
+    const shots = [pull(w, p), pull(w, p), pull(w, p)].flat()
+    expect(elements(shots)).toEqual(['frozen', 'frozen', 'frozen'])
+    for (const s of shots) expect(s.projectile!.damage).toBe(Math.round(WEAPONS.pistol.damage * 1.25 * 1.25))
+    expect(stackOf(p).rechargeUntil).toBeUndefined()
+  })
+
+  it('a one-cast shotgun fires all its pellets every pull, not a 3-pellet half', () => {
+    const { w, p } = rig('shotgun', [m('pierce')])
+    for (let i = 0; i < 3; i++) expect(pull(w, p)).toHaveLength(WEAPONS.shotgun.pellets!)
+    expect(stackOf(p).rechargeUntil).toBeUndefined()
+  })
+
+  it('a one-cast sledgehammer swings at its cooldown, not its 75-tick recharge', () => {
+    const { w, p } = rig('sledgehammer', [m('heavy')])
+    pull(w, p)
+    expect(p.combat!.cooldown).toBe(executedShot(WEAPONS.sledgehammer, [m('heavy')]).cooldownTicks)
+    expect(stackOf(p).rechargeUntil).toBeUndefined()
+  })
+
+  it('a stale castIndex on a one-cast wand still fires the whole cast', () => {
+    const { w, p } = rig('pistol', [m('overload'), m('frost')])
+    stackOf(p).castIndex = 1
+    const [shot] = pull(w, p)
+    expect(shot.projectile!.mods!.map((x) => x.id)).toEqual(['frost', 'overload'])
+    expect(stackOf(p).castIndex).toBe(0)
+  })
+
+  it('stowed and unknown entries do not make a cycle: one live cast is still a plain gun', () => {
+    const { w, p } = rig('pistol', [m('bogus'), m('frost', 0), m('heavy'), m('pierce'), m('rapid'), m('bounce'), m('shock')])
+    // Live window (4 slots): heavy, pierce, rapid, bounce. Shock is stowed.
+    const fired = heldFire(w, p, 40)
+    expect(fired.every((f) => f.el === undefined)).toBe(true)
+    expect(fired.length).toBeGreaterThan(2)
+    expect(stackOf(p).rechargeUntil).toBeUndefined()
+  })
+
+  it('a modifier after the only element makes two casts, so the wrap still recharges', () => {
+    const { w, p } = rig('pistol', [m('frost'), m('heavy')])
+    expect(elements(pull(w, p))).toEqual(['frozen'])
+    expect(elements(pull(w, p))).toEqual([undefined])
+    expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.pistol.rechargeOnWrap!)
+  })
+
+  it('cycleCasts counts casts to the wrap; planPull drops the recharge only for a one-cast cycle', () => {
+    const pistol = sequenceShape(WEAPONS.pistol)
+    expect(cycleCasts([], pistol)).toBe(0)
+    expect(cycleCasts(armedKit, pistol)).toBe(1)
+    expect(cycleCasts([m('overload'), m('frost')], pistol)).toBe(1)
+    expect(cycleCasts([m('frost'), m('overload')], pistol)).toBe(2)
+    expect(cycleCasts([m('frost'), m('incendiary'), m('shock')], pistol)).toBe(3)
+    expect(planPull(WEAPONS.pistol, [m('frost')], 0).shape.rechargeOnWrap).toBe(0)
+    expect(planPull(WEAPONS.shotgun, [m('frost')], 0).shape.castsPerTrigger).toBe(1)
+    expect(planPull(WEAPONS.pistol, [m('frost'), m('shock')], 0).shape).toEqual(pistol)
   })
 })
 

@@ -39,10 +39,16 @@ describe('sequence strip model', () => {
   })
 
   it('reports recharge left against the host tick', () => {
-    const model = buildSequence(tech([m('frost')], 0, 50), 'sequence', 40)!
+    const model = buildSequence(tech([m('frost'), m('shock')], 0, 50), 'sequence', 40)!
     expect(model.rechargeLeft).toBe(10)
     expect(model.rechargeTotal).toBe(20)
-    expect(buildSequence(tech([m('frost')], 0, 50), 'sequence', 60)!.rechargeLeft).toBe(0)
+    expect(buildSequence(tech([m('frost'), m('shock')], 0, 50), 'sequence', 60)!.rechargeLeft).toBe(0)
+  })
+
+  it('a one-cast wand has no recharge and highlights its whole window every pull (#115)', () => {
+    const model = buildSequence(tech([m('overload'), m('frost')], 1), 'sequence', 0)!
+    expect(model.rechargeTotal).toBe(0)
+    expect(model.entries.map((e) => e.next)).toEqual([true, true])
   })
 
   it('previews queued swaps without touching the stack', () => {

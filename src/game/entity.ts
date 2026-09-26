@@ -252,6 +252,12 @@ export interface Entity {
      * counts from here. Optional/absent until first hurt, so pre-feature snapshots
      * round-trip byte-for-byte (same discipline as `mods`/`annotations`). */
     lastHurtTick?: number
+    /** Lifesteal earned but not yet paid, in [-0.5, 0.5). hp stays whole, so each
+     * heal pays Math.round of what is owed (the damage rounding rule) and carries
+     * the rest to the next hit. Carrying lets small hits add up: rounded alone, a
+     * 1-stack build heals 0 on any hit of 3 or less, such as a machinegun into a
+     * brute. Absent until the first lifesteal hit, so older snapshots round-trip. */
+    lifestealCarry?: number
   }
   // (Spawn-protection grace for players rides `health.iframes` — see
   // SPAWN_GRACE_TICKS below — so every damage source already honors it.)

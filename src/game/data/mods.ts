@@ -202,6 +202,19 @@ export const isModId = (id: string): id is keyof typeof MODS => Object.prototype
 /** The cap for a mod id (its own `maxStacks`, else the default). */
 export const modMaxStacks = (id: string): number => MODS[id]?.maxStacks ?? DEFAULT_MAX_STACKS
 
+/** Add `stacks` of `modId` to a weapon's mod list, capped. A mod already listed
+ * (at any stack count) stacks in place; a new one joins the end. The list is
+ * therefore pickup order, and resolveWeapon takes a shot's element from that
+ * order, so a preview of a pick (modVerdict) must place it here too. Mutates
+ * and returns `mods`. */
+export const stackMod = (mods: { id: string; stacks: number }[], modId: string, stacks: number): { id: string; stacks: number }[] => {
+  const cap = modMaxStacks(modId)
+  const existing = mods.find((m) => m.id === modId)
+  if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
+  else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
+  return mods
+}
+
 /** Canonicalize a mod list: drop unknown ids and non-positive stacks, floor and
  * cap stack counts, sort by id. The ONE normal form for mod provenance carried
  * on a projectile (entity + wire codec + renderer), so the same loadout is

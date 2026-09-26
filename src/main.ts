@@ -108,6 +108,7 @@ import { projectToScreen } from './ui/locatorModel'
 import { createDraftScreen } from './ui/draftScreen'
 import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
 import { weaponStack } from './game/systems/inventory'
+import { WEAPONS } from './game/data/items'
 
 /** The rewind ring, plus the single action the pause menu needs from it. Both
  * live on one object because they are one feature: the ring is only worth
@@ -459,7 +460,10 @@ const boot = async (): Promise<void> => {
         JSON.stringify(floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor))
       ;(window as unknown as { __draftShow: (f?: number) => string }).__draftShow = (f) => {
         const offer = floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor)
-        draftScreen.show(offer, applyPick)
+        const self = hostWorld.entities.find((e) => e.playerCtl)
+        const weapon = self?.combat && WEAPONS[self.combat.weapon]
+        const loadout = weapon && self && { weapon, mods: weaponStack(self)?.mods ?? [], sequenced: hostWorld.modCasting === 'sequence' }
+        draftScreen.show(offer, applyPick, loadout || undefined)
         return JSON.stringify(offer)
       }
       ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
@@ -1074,7 +1078,7 @@ const createPauseOverlay = (
     update(paused, view) {
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
-      if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
+      if (show && !wasPaused) panel.update(buildLoadout(view.self, view.modCasting)) // refresh on open
       if (show) {
         lastView = view
         paintSeq()

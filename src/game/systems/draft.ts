@@ -4,9 +4,11 @@
 // never perturbs the sim stream, yet replays byte-identically. Co-op-friendly:
 // one shared hand per floor, everyone drafts together (no loser-shaming for kids).
 
-import { MODS, modMaxStacks, type ModDef, type ModRarity } from '../data/mods'
+import { MODS, modMaxStacks, stackMod, type ModDef, type ModRarity } from '../data/mods'
 import type { ItemStack, WeaponMod } from '../entity'
 import { hashLabel, mulberry32, type Rng } from '../rng'
+import type { WeaponDef } from '../data/items'
+import { modVerdict, type ModVerdict } from './modEffect'
 
 /** Rarity weights for the weighted draw (ROUNDS gates power by rarity tier). */
 const RARITY_WEIGHT: Record<ModRarity, number> = { common: 6, rare: 3, legendary: 1 }
@@ -17,6 +19,8 @@ export interface DraftCard {
   blurb: string
   icon: string
   rarity: ModRarity
+  /** What the pick would do on the drafting player's weapon. */
+  verdict?: ModVerdict
 }
 
 /** Draw `count` DISTINCT mod ids from the registry, weighted by rarity, without
@@ -59,13 +63,31 @@ export const weightedModId = (rng: Rng): string => {
 export const floorDraftOffer = (seed: number, floor: number, count = 3): string[] =>
   draftOffer(mulberry32(hashLabel(seed >>> 0, `draft:${floor}`)), count)
 
-/** Presentation data for a set of offered mod ids (kid-readable blurbs/icons). */
-export const draftCards = (ids: readonly string[]): DraftCard[] =>
+/** The weapon a draft pick would land on. */
+export interface DraftLoadout {
+  weapon: WeaponDef
+  mods: readonly WeaponMod[]
+  sequenced: boolean
+}
+
+/** What picking `id` would do to `loadout`'s weapon. A mod already at its stack
+ * cap is a no-op pick (applyDraftPick clamps it). */
+const draftVerdict = (loadout: DraftLoadout, id: string): ModVerdict => {
+  const held = loadout.mods.find((m) => m.id === id)
+  if (held && held.stacks >= modMaxStacks(id)) return { kind: 'inert', reason: 'already maxed' }
+  return modVerdict(loadout.weapon, loadout.mods, id, loadout.sequenced)
+}
+
+/** Presentation data for a set of offered mod ids (kid-readable blurbs/icons),
+ * each with what it would do on `loadout` when one is given. */
+export const draftCards = (ids: readonly string[], loadout?: DraftLoadout): DraftCard[] =>
   ids
     .filter((id) => MODS[id])
     .map((id) => {
       const d = MODS[id]
-      return { id: d.id, name: d.name, blurb: d.blurb, icon: d.icon, rarity: d.rarity }
+      const card: DraftCard = { id: d.id, name: d.name, blurb: d.blurb, icon: d.icon, rarity: d.rarity }
+      if (loadout) card.verdict = draftVerdict(loadout, id)
+      return card
     })
 
 /** Append a picked mod onto a weapon's stack, stacking an existing one up to its
@@ -73,10 +95,5 @@ export const draftCards = (ids: readonly string[]): DraftCard[] =>
  * the draft UI and the `addMod` debug verb's intent. */
 export const applyDraftPick = (stack: ItemStack, modId: string, stacks = 1): WeaponMod[] => {
   if (!MODS[modId]) throw new Error(`unknown mod: ${modId}`)
-  const cap = modMaxStacks(modId)
-  const mods = (stack.mods ??= [])
-  const existing = mods.find((m) => m.id === modId)
-  if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
-  else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
-  return mods
+  return stackMod((stack.mods ??= []), modId, stacks)
 }

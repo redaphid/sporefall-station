@@ -8,10 +8,11 @@ from `INSPO.md` (open as #82 on the `docs/inspo` branch) and from the loadout
 brief of 2026-09-25. Measured numbers come from the arena census (#121,
 `docs/design/arena-census.md`), the substrate census (#122,
 `docs/design/substrate-census.md`), and the persona playtests of the three
-loadout prototypes (#111, #112, #113). The three loadout design docs and the
-playtest scores were written in a session scratchpad, not in the repo, so the
-figures quoted from them here (such as design B's 22,620 wands) are copied, not
-linked. Every claim about a study cites a source in
+loadout prototypes (#111, #112, #113). The three loadout design docs, their
+brief, the playtest protocol and the playtest scores are in
+[`docs/design/loadout-exploration/`](design/loadout-exploration/), and the
+research notes behind this paper are in
+[`docs/whitepaper-research/`](whitepaper-research/). Every claim about a study cites a source in
 [References](#8-references) that was opened while writing this, and each
 reference says whether its full text, its abstract, or only its record was
 read.
@@ -721,8 +722,8 @@ fights.
 | baseline, fold | 2 | 1 | 2 | 1 |
 | baseline, sequenced | 2 | 1 | 2 | 2 |
 
-Scores are 1 to 5, from `playtest-results.json` in the loadout-design
-scratchpad. No prototype scored more than one point above the better of the
+Scores are 1 to 5, from
+[`playtest-results.json`](design/loadout-exploration/playtest-results.json). No prototype scored more than one point above the better of the
 two controls on any axis.
 Every kid persona scored legibility 1.
 

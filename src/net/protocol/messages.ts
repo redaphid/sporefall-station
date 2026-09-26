@@ -196,6 +196,12 @@ export const WIRE_MODS = [
 
 const wireModIndex = new Map<string, number>(WIRE_MODS.map((m, i) => [m, i]))
 
+/** Element statuses (`Entity.fx` keys) as a bit index in the snapshot's status
+ * trailer. Frozen history like WIRE_MODS: append only, at most 8. */
+export const WIRE_STATUSES = ['burning', 'frozen', 'wet', 'electrified', 'poisoned', 'spore'] as const
+
+const wireStatusBit = new Map<string, number>(WIRE_STATUSES.map((k, i) => [k, 1 << i]))
+
 /** Most mods a single bullet advertises on the wire (bounds the record size). */
 const WIRE_MOD_CAP = 12
 
@@ -229,6 +235,9 @@ export interface WireEntity {
   /** Bullet mod provenance ('projectile' archetype only) — drives the client's
    * procedural bullet look. Absent/empty = vanilla shot. */
   mods?: { id: string; stacks: number }[]
+  /** Active element statuses (`Entity.fx` keys) that the renderer tints and
+   * shades. Absent = none. */
+  statuses?: string[]
 }
 
 export interface WireSnapshot {
@@ -280,6 +289,20 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
       }
     }
   }
+  // Sparse status trailer: the flags byte is full, and most entities carry no
+  // status, so only statused records pay. u8 count, then (u8 record index, u8
+  // WIRE_STATUSES bitmask) per statused entity. Omitted entirely when nobody is
+  // statused, so a quiet snapshot is byte-identical to the pre-trailer format.
+  const statused: [number, number][] = []
+  entities.forEach((e, i) => {
+    let mask = 0
+    for (const k of e.statuses ?? []) mask |= wireStatusBit.get(k) ?? 0
+    if (mask) statused.push([i, mask])
+  })
+  if (statused.length > 0) {
+    w.u8(statused.length)
+    for (const [i, mask] of statused) w.u8(i).u8(mask)
+  }
   return w.finish()
 }
 
@@ -315,6 +338,15 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
       }
     }
     entities.push(we)
+  }
+  if (r.remaining > 0) {
+    const n = r.u8()
+    for (let j = 0; j < n && r.remaining >= 2; j++) {
+      const target = entities[r.u8()]
+      const mask = r.u8()
+      const statuses = WIRE_STATUSES.filter((_, bit) => (mask & (1 << bit)) !== 0)
+      if (target && statuses.length > 0) target.statuses = statuses
+    }
   }
   return { tick, floor, alarm, lastInputSeq, entities }
 }
@@ -399,6 +431,8 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   }
   // Modded bullets carry their build so clients compose the same look.
   if (e.projectile?.mods && e.projectile.mods.length > 0) we.mods = e.projectile.mods.map((m) => ({ ...m }))
+  const statuses = e.fx ? Object.keys(e.fx).filter((k) => wireStatusBit.has(k)) : []
+  if (statuses.length > 0) we.statuses = statuses
   return we
 }
 
@@ -421,6 +455,11 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
     e.projectile ??= { ownerId: 0, damage: 0, ttl: 1 }
     e.projectile.mods = we.mods.map((m) => ({ ...m }))
   }
+  // Render mirror only: the client never runs statusFx, so `until` just keeps
+  // the entry live until the next snapshot restates or drops it. No `source`:
+  // the renderer then draws each status at its base intensity and canonical hue.
+  if (we.statuses && we.statuses.length > 0) e.fx = Object.fromEntries(we.statuses.map((k) => [k, { until: tick + 2 }]))
+  else delete e.fx
   if ((we.flags & SnapFlags.HitFlash) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.hitFlashUntil = tick + 2

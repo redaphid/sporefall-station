@@ -120,6 +120,32 @@ describe('mod verdict equals executed behaviour, sequenced casting', () => {
   }
 })
 
+describe('mod verdict equals executed behaviour, an element riding a shard or blast', () => {
+  // A losing element is not inert when a shard, shrapnel or blast carries it
+  // (#119): every ordering of two elements, one self-hitting mod and a filler.
+  const orderings = (xs: string[]): string[][] =>
+    xs.length === 0 ? [[]] : xs.flatMap((x, i) => orderings([...xs.slice(0, i), ...xs.slice(i + 1)]).map((r) => [x, ...r]))
+  for (const weaponId of ['pistol', 'shotgun', 'sledgehammer']) {
+    it(`${weaponId}: every ordering of frost, shock, a self-hitting mod and rapid`, () => {
+      const disagreements: string[] = []
+      let rides = 0
+      for (const self of ['split', 'splinterShot', 'explosive', 'detonator']) {
+        for (const order of orderings(['frost', 'shock', self, 'rapid'])) {
+          const list = order.map(m)
+          for (const id of ['frost', 'shock']) {
+            const inert = pullOutcome(weaponId, list, false) === pullOutcome(weaponId, list.filter((x) => x.id !== id), false)
+            const verdict = modVerdict(WEAPONS[weaponId], list, id)
+            if (!inert && id !== order.filter((x) => x === 'frost' || x === 'shock').at(-1)) rides++
+            if (inert !== (verdict.kind === 'inert')) disagreements.push(`${id} in [${order}]: fired ${inert ? 'inert' : 'live'}, shown ${verdict.kind}`)
+          }
+        }
+      }
+      expect(disagreements).toEqual([])
+      if (weaponId !== 'sledgehammer') expect(rides).toBeGreaterThan(0)
+    })
+  }
+})
+
 describe('verdict reasons', () => {
   it('every inert or penalty reason, on every weapon and mode, is five words or fewer', () => {
     for (const weaponId of WEAPON_IDS)

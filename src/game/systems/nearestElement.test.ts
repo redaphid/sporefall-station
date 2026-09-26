@@ -16,7 +16,7 @@ import { addEntity, createWorld, tickWorld, type World } from '../world'
 import { combatSystem } from './combat'
 import { weaponStack } from './inventory'
 import { projectileSystem } from './projectiles'
-import { ELEMENT_TIE_BREAK, elementFor } from './resolveWeapon'
+import { elementFor } from './resolveWeapon'
 import { hasStatus, isPanicking } from './statusFx'
 
 const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
@@ -93,7 +93,6 @@ describe('elementFor: the element closest to a mod in the list', () => {
     elementFor(list.indexOf(id), list.map((x) => m(x)))?.id
 
   it('a tie goes to the later element', () => {
-    expect(ELEMENT_TIE_BREAK).toBe(1)
     expect(at(['frost', 'split', 'shock'], 'split')).toBe('shock')
     expect(at(['shock', 'explosive', 'frost'], 'explosive')).toBe('frost')
   })

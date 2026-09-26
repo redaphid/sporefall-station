@@ -4,6 +4,7 @@ import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
+import { modifierView } from '../game/floorModifiers'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import { SendQueue } from '../net/channel/sendQueue'
@@ -354,6 +355,7 @@ export class NetHostSession implements Session {
       alert: stationAlerted(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
+      ...(this.world.modifier ? { modifier: { ...this.world.modifier } } : {}),
       huds,
     }
     this.broadcastJson(MsgType.State, state)
@@ -374,6 +376,7 @@ export class NetHostSession implements Session {
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
+      ...(this.world.modifier ? { modifier: modifierView(this.world.modifier, this.world.tick) } : {}),
       self: this.self,
     }
   }

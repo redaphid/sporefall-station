@@ -31,6 +31,11 @@ describe('world layer order', () => {
     }
   })
 
+  it('floods the floor under every actor: bodies stand in the tide, not behind it', () => {
+    expect(layerDepth('tide')).toBe(1)
+    expect(paintsUnder('tide', 'entities')).toBe(true)
+  })
+
   it('mounts every layer exactly once', () => {
     expect(new Set(WORLD_LAYER_ORDER).size).toBe(WORLD_LAYER_ORDER.length)
   })

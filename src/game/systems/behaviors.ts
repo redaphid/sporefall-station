@@ -1144,6 +1144,18 @@ const packFollow: Consideration = (w, e) => {
   return [{ code: FORMUP, score: FORM_SCORE, tier: TIER_MEMORY, at }]
 }
 
+// A TRACKER pack (a `hunted` floor) follows its prey's scent: it walks to the
+// pack's periodic fix instead of prowling its den, and keeps doing so after it
+// loses sight. Seeing the prey hands over to `threat`/`encircle` as usual.
+const track: Consideration = (w, e) => {
+  const g = groupOf(w, e)
+  if (!g?.tracker || g.phase === 'encircle' || g.targetId === undefined || !g.mark) return []
+  const t = w.byId.get(g.targetId)
+  if (!t || t.dead) return []
+  if (dist2d(g.mark.x, g.mark.y, e.pos.x, e.pos.y) < 1.5) return []
+  return [{ code: PURSUE, score: RAID_PURSUE_SCORE, tier: TIER_MEMORY, target: t.id, at: { x: g.mark.x, y: g.mark.y } }]
+}
+
 // A ROOTED body (the hive spire) only lashes at what is within reach — it never
 // chases, so it never routes a path it could not walk anyway.
 const rooted: Consideration = (w, e) => {
@@ -1185,6 +1197,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   rage,
   encircle,
   packFollow,
+  track,
   rooted,
   hunt,
   alertGuards,
@@ -1275,8 +1288,8 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     considerations: ['rout', 'siegeGun', 'threat', 'raidOrders', 'wander'],
   },
   hound: {
-    about: 'pack fauna: prowls with its pack, ENCIRCLES prey before closing, and goes manhunter when any packmate is hurt',
-    considerations: ['rage', 'encircle', 'threat', 'packFollow', 'drawnToStimulus', 'wander'],
+    about: 'pack fauna: prowls with its pack, ENCIRCLES prey before closing, and goes manhunter when any packmate is hurt; a hunted-floor tracker pack follows its prey’s scent',
+    considerations: ['rage', 'encircle', 'threat', 'track', 'packFollow', 'drawnToStimulus', 'wander'],
   },
   hive: {
     about: 'a rooted hive spire: lashes at whatever is in reach; its budding and spreading run in the group system',

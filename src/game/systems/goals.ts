@@ -19,6 +19,7 @@
 // `ai.behavior` component.
 
 import { resistMult, type Entity } from '../entity'
+import { sightMult } from '../floorModifiers'
 import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
 import { anyPowerCut, doorClosedAt, type World } from '../world'
@@ -79,7 +80,9 @@ export const sporeBlinded = (e: Entity): boolean => hasStatus(e, 'spore') && res
  * scoring, memory updates, and steering — so an NPC can never track a live
  * position it has no way of knowing. */
 export const perceives = (w: World, a: Entity, b: Entity): boolean => {
-  const sight = sporeBlinded(a) ? Math.min(SPORE_BLIND_RANGE, a.ai?.sightRange ?? 0) : (a.ai?.sightRange ?? 0)
+  // Brownout dims every NPC's sight (#89); spore then caps what is left at arm's reach (#87).
+  const lit = (a.ai?.sightRange ?? 0) * sightMult(w)
+  const sight = sporeBlinded(a) ? Math.min(SPORE_BLIND_RANGE, lit) : lit
   const range = b.status && b.status.cloakUntil > w.tick ? sight * 0.5 : sight
   if (vlen(b.pos.x - a.pos.x, b.pos.y - a.pos.y) > range) return false
   return canSeeEntity(w, a, b)

@@ -10,6 +10,7 @@ import { serializeEntity } from '../debug/verbs'
 import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
 import { hashLabel, mulberry32 } from './rng'
+import type { FloorModifier } from './floorModifiers'
 import type { DirectorState } from './systems/complexDirector'
 import type { GroupsState } from './systems/groups'
 import type { Annotation, SimEvent } from './types'
@@ -77,6 +78,8 @@ export interface WorldJson {
   director?: DirectorState
   /** Group layer (World.groups). Omitted when absent. */
   groups?: GroupsState
+  /** Floor modifier (World.modifier). Omitted on a clean floor. */
+  modifier?: FloorModifier
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -120,6 +123,7 @@ export const serializeWorld = (w: World): WorldJson => ({
   ...(w.director ? { director: clone(w.director) } : {}),
   // Only floors that muster raids/packs carry groups; every other snapshot is unchanged.
   ...(w.groups ? { groups: clone(w.groups) } : {}),
+  ...(w.modifier ? { modifier: { ...w.modifier } } : {}),
 })
 
 /** Rebuild a fresh, standalone world from a snapshot — byte-identical on every
@@ -154,5 +158,6 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.annotations = j.annotations ? clone(j.annotations) : []
   if (j.director) w.director = clone(j.director)
   if (j.groups) w.groups = clone(j.groups)
+  if (j.modifier) w.modifier = { ...j.modifier }
   return w
 }

@@ -1,4 +1,5 @@
 import type { Entity } from '../game/entity'
+import { isLowTile, modifierView, tideFlooded, WADE_SPEED } from '../game/floorModifiers'
 import { generateLevel } from '../game/levelgen/generate'
 import type { Level } from '../game/levelgen/level'
 import { isSolidTile } from '../game/levelgen/level'
@@ -670,7 +671,12 @@ export class NetClientSession implements Session {
     const len = Math.hypot(cmd.moveX, cmd.moveY)
     if (len < 0.01) return
     const norm = len > 1 ? 1 / len : 1
-    const speed = 4.5 // class speeds vary ±1; mispredictions get reconciled
+    // Class speeds vary ±1; mispredictions get reconciled. Wading in a bog-tide
+    // flood is predicted, though: it is a steady 35% cut, not a blip.
+    const wading =
+      tideFlooded(this.state.modifier, this.hostTickEstimate()) &&
+      isLowTile(this.level.tiles[Math.floor(self.pos.y) * this.level.w + Math.floor(self.pos.x)])
+    const speed = 4.5 * (wading ? WADE_SPEED : 1)
     self.facing = Math.atan2(cmd.moveY * norm, cmd.moveX * norm)
     moveAndCollide(self, cmd.moveX * norm * speed * SIM_DT, cmd.moveY * norm * speed * SIM_DT, this.blocked)
     const r = stairStep(this.level, self.pos.x, self.pos.y, this.stairLock)
@@ -821,6 +827,7 @@ export class NetClientSession implements Session {
       mode: this.state.mode,
       revivesLeft: this.state.revivesLeft,
       ...(this.modCasting ? { modCasting: this.modCasting, simTick: this.hostTickEstimate() } : {}),
+      ...(this.state.modifier ? { modifier: modifierView(this.state.modifier, this.hostTickEstimate()) } : {}),
       self: this.self,
     }
   }

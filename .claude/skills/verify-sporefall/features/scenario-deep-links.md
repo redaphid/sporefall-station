@@ -17,7 +17,7 @@ A link such as `/?mode=solo&seed=18&scenario=armed&floor=3` drops the player str
 Preconditions: doctor green. For `wins`, create a save first in the same context.
 
 - **Stage (Lane B).** `--open '/?mode=solo&seed=18&scenario=armed&floor=3' --until-tick 30 --assert "sporefall.session().floor === 3"`. Then `--eval "sporefall.player().combat.weapon"` and expect the machine gun loadout.
-- **Wins over the save (Lane B).** `--open '/?mode=solo&seed=5' --until-tick 60 --reload '/?mode=solo&seed=18&scenario=armed&floor=3' --until-tick 30`. Assert floor 3, then assert `JSON.parse(localStorage.getItem('sporefall.savegame')).world.seed === 5` (the envelope may be the world itself; see `e2e/deep-link-wins.mjs`).
+- **Wins over the save (Lane B).** `--open '/?mode=solo' --until-tick 60 --eval "sporefall.session().seed" --reload '/?mode=solo&seed=18&scenario=armed&floor=3' --until-tick 30`. Assert floor 3, then assert `JSON.parse(localStorage.getItem('sporefall.savegame')).world.seed` equals the recorded seed. The first run takes no `seed=`, because a seeded run is never saved. The save envelope may be the world itself; see `e2e/deep-link-wins.mjs`.
 - **Unknown (Lane B).** `--reload '/?mode=solo&scenario=nope' --until "document.querySelector('[data-role=boot-error]')" --shot unknown-scenario`.
 - **Look of a scene (Lane A).** Navigate to the same URL and screenshot after the beat named in the scenario's comment in `src/game/scenarios.ts`.
 

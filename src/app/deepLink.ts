@@ -1,5 +1,5 @@
-// Deep links that name a world — `?scenario=`, `?state=`, `?world=` (and the
-// e2e `?script=`) — versus the player's saved run.
+// Deep links that name a world — `?scenario=`, `?state=`, `?world=`, `?seed=`
+// (and the e2e `?script=`) — versus the player's saved run.
 //
 // THE BUG THIS EXISTS FOR (2026-09-18): the owner opened
 // `/?mode=solo&seed=18&scenario=armed&floor=3` on their phone minutes after the
@@ -18,6 +18,9 @@
 //      actual run was destroyed by merely opening the link.
 //
 // The rules below fix each one, and are pure so they are tested directly.
+//
+// `?seed=` joined the list later: a profile holding a seed-7 save opened
+// `/?mode=solo&seed=31337` and got the seed-7 run back at tick ~10k.
 
 /** The world-naming parameters of a URL. */
 export interface DeepLink {
@@ -25,6 +28,8 @@ export interface DeepLink {
   readonly state: string | null
   readonly world: string | null
   readonly script: string | null
+  /** The seed the run will use; `0` or non-numeric means "roll one". */
+  readonly seed: number | null
 }
 
 export const readDeepLink = (params: URLSearchParams): DeepLink => ({
@@ -32,6 +37,7 @@ export const readDeepLink = (params: URLSearchParams): DeepLink => ({
   state: params.get('state') || null,
   world: params.get('world') || null,
   script: params.get('script') || null,
+  seed: Number(params.get('seed')) || null,
 })
 
 /**
@@ -39,12 +45,17 @@ export const readDeepLink = (params: URLSearchParams): DeepLink => ({
  * run: the save is neither resumed nor written.
  */
 export const overridesSave = (link: DeepLink): boolean =>
-  link.scenario !== null || link.state !== null || link.world !== null || link.script !== null
+  link.scenario !== null ||
+  link.state !== null ||
+  link.world !== null ||
+  link.script !== null ||
+  link.seed !== null
 
 /**
  * Is this a link someone was SENT — worth making sure the running build is the
  * current one before honouring it? `?script=` is excluded: it is an e2e input
- * timeline, run against whatever build the harness is serving.
+ * timeline, run against whatever build the harness is serving. `?seed=` is
+ * excluded too: every build can start any seed.
  */
 export const wantsFreshBuild = (link: DeepLink): boolean =>
   link.scenario !== null || link.state !== null || link.world !== null

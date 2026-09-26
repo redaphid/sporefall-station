@@ -184,13 +184,10 @@ where the proof lives.
   waits.
 - **A saved run resumes.** After a plain `/`, picking Solo run continues the autosave in
   that browser profile rather than starting fresh. Lane B `--open` gets a fresh context
-  every time. Lane A shares the owner's profile, and there **any** saved run on the origin
-  wins over `?mode=solo&seed=N`: `?seed=31337` loaded a seed-7 save. Worse, an open game tab
-  re-saves on page hide, so clearing the key and then reloading does not work. For a fresh
-  Lane A run, close every game tab on the origin. Then, from a non-game page on that origin
-  (`/manifest.webmanifest`), run `localStorage.removeItem('sporefall.savegame')`, and only
-  then navigate to the game. A `?scenario=` deep link never reads or writes the save
-  (`e2e/deep-link-wins.mjs`), so prefer a scenario when one fits.
+  every time. A URL with `?seed=N` always starts seed N and never reads or writes the save,
+  so a seeded run cannot be resumed by a reload either, and a fresh Lane A run needs no
+  cleanup. To exercise the autosave, start the run without `seed=`. Plain `/` and
+  `?mode=solo` resume whatever the profile saved, and Lane A shares the owner's profile.
 - **The service worker serves the old build.** After a rebuild on the same port, a Lane A
   tab can still run the previous bundle. Compare the page's `index-*.js` script with the
   doctor line, and if they differ, unregister the worker and clear its caches:

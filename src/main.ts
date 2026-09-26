@@ -155,7 +155,8 @@ const boot = async (): Promise<void> => {
   stage.onChange = (): void => renderer.app.resize()
 
   const params = new URLSearchParams(location.search)
-  const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
+  const link = readDeepLink(params)
+  const seed = link.seed ?? (Math.random() * 0xffffffff) >>> 0
   // A beta build (served from /betas/<slug>/) plays in its OWN rooms. The sim is
   // deterministic and the host is authoritative, so a beta peer and a production
   // peer sharing room 'car' do not see a version warning — they DESYNC, and it
@@ -202,7 +203,6 @@ const boot = async (): Promise<void> => {
   // skips the picker, which is otherwise the only moment an update applies. The
   // moment is still `modePicker` here (no run exists), so a staged update is
   // handed over as soon as it verifies and the page reloads with the same URL.
-  const link = readDeepLink(params)
   if (wantsFreshBuild(link)) {
     const note = showBootNote(uiMount, 'Loading the latest build…', 600)
     const fresh = await updates.freshen(DEEP_LINK_FRESHEN_MS)
@@ -306,7 +306,7 @@ const boot = async (): Promise<void> => {
   // seamlessly rejoins the in-progress run. SOLO/host only (HostSession owns the
   // authoritative world); a NetClient rejoins via the host, and we never persist
   // a client-predicted world as authoritative. A link that names the world
-  // (`?scenario=`, `?state=`, `?world=`, `?script=`) takes precedence over the
+  // (`?scenario=`, `?state=`, `?world=`, `?seed=`, `?script=`) takes precedence over the
   // save AND never writes to it: no persister at all, so neither the autosave
   // nor a restart/death `clear()` can touch the player's real run.
   const store = browserStore()

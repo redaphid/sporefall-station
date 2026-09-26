@@ -162,6 +162,9 @@ describe('floor modifiers: the roll', () => {
 
   describe('byte-identical to main apart from the modifier itself', () => {
     // Captured on main @ 16cf73f with the same build helpers and `worldDigest`.
+    // The two `play:` digests re-pinned for #86: this input fires, and player
+    // gunfire is now a heard noise. With `hearGunfire` stubbed out they
+    // reproduce '1ed48e2d' and '53d35f3b'.
     const GOLDEN: Record<string, string> = {
       'direct:7:1': '2dec1543',
       'stairs:7:1': '2dec1543',
@@ -181,8 +184,8 @@ describe('floor modifiers: the roll', () => {
       'stairs:10:3': '08567d0b',
       'direct:2:4': '6c0ad81b',
       'stairs:2:4': '58662ff6',
-      'play:7:1': '1ed48e2d',
-      'play:1:2': '53d35f3b',
+      'play:7:1': '84582f4c',
+      'play:1:2': 'e19bf8a5',
     }
     const floors: [number, number][] = [[7, 1], [1, 2], [4, 2], [5, 2], [6, 2], [1, 3], [3, 3], [10, 3], [2, 4]]
     for (const [seed, floor] of floors) {

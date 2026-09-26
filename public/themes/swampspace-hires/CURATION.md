@@ -31,8 +31,13 @@ regenerate any pick with `python3 scripts/assets/generate.py final <job>`).
 
 Two generator configurations (recorded per pick in `curation.json`):
 
-- **SDXL** `AnythingXL_xl` + skormino pixel LoRA @1024 — tiles, props, the
-  ranger's 10 poses, spore-drone idle.
+- **SDXL** `juggernautXL_juggXIByRundiffusion` + skormino pixel LoRA @768–1024
+  — tiles, props, the ranger's 10 poses, spore-drone idle and the r2 cast.
+  (This line named `AnythingXL_xl` until **2026-09-25**. That was stale, and
+  the art disagrees with it: of the 26 raws in `scripts/assets/raws/` that
+  still carry their ComfyUI graph, 20 are juggernautXL and 6 are anything-xl —
+  the 2026-07 figures only. The anime base is **superseded**; `curation.json`
+  records the real checkpoint per pick.)
 - **SD1.5** `dreamshaper_8` @512 (no LoRA — it's SDXL-only) — NPC cast,
   items, wall tile, all step frames. Adopted when resident VLM models on the
   shared GPU pushed SDXL into 30-min lowvram batches. The k-centroid +

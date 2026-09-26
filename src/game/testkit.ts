@@ -16,10 +16,17 @@ import { createWorld, tickWorld, type RunMode, type World } from './world'
 export { loadFixture, loadFixtureJson } from './fixtures'
 
 /** Tick a world `n` times, feeding a fresh, defaulted clone of `inputs` each tick
- * (partial commands are filled from `emptyInput`). Returns the world for chaining. */
+ * (partial commands are filled from `emptyInput`). Returns the world for chaining.
+ * Fails the test if any tick leaves an hp that is not a whole number: the
+ * snapshot codec can only carry whole hp, so a fraction splits host from client. */
 export const runTicks = (w: World, inputs: Map<number, Partial<InputCmd>>, n: number): World => {
   for (let i = 0; i < n; i++) {
     tickWorld(w, new Map([...inputs].map(([slot, cmd]) => [slot, { ...emptyInput(), ...cmd }])))
+    for (const e of w.entities) {
+      if (e.health && !Number.isInteger(e.health.hp)) {
+        expect.fail(`tick ${w.tick}: ${e.archetype}#${e.id} hp ${e.health.hp} is not whole`)
+      }
+    }
   }
   return w
 }

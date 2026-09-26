@@ -3,7 +3,7 @@
 // encode/decode pair is a faithful round-trip.
 
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_HUB_PORT, decodeArg, encodeArg, fromB64, hubUrl, toB64 } from './protocol'
+import { DEFAULT_HUB_PORT, decodeArg, encodeArg, fromB64, hubUrl, resolveHubTarget, toB64 } from './protocol'
 
 describe('toB64 / fromB64 round-trip', () => {
   const cases: Record<string, string> = {
@@ -64,4 +64,47 @@ describe('hubUrl', () => {
   it('honours an explicit port', () => {
     expect(hubUrl('localhost', 9999)).toBe('ws://localhost:9999')
   })
+})
+
+describe('resolveHubTarget', () => {
+  const http = (hostname: string) => ({ protocol: 'http:', hostname })
+  const https = (hostname: string) => ({ protocol: 'https:', hostname })
+
+  it('dials the host that served an http:// page, on the default port', () => {
+    expect(resolveHubTarget(http('192.168.1.5'), null)).toEqual({ ok: true, url: `ws://192.168.1.5:${DEFAULT_HUB_PORT}` })
+  })
+
+  it('falls back to loopback when the page has no hostname', () => {
+    expect(resolveHubTarget({ protocol: 'file:', hostname: '' }, null)).toEqual({ ok: true, url: `ws://127.0.0.1:${DEFAULT_HUB_PORT}` })
+  })
+
+  it('never dials from an https:// page: the hub serves plain ws://, which browsers refuse there', () => {
+    const target = resolveHubTarget(https('sporefall.hypnodroid.com'), null)
+    expect(target.ok).toBe(false)
+    if (!target.ok) expect(target.reason).toMatch(/HTTPS/)
+  })
+
+  it('refuses https:// even with an explicit ?debugPort= and a loopback host', () => {
+    expect(resolveHubTarget(https('sporefall.hypnodroid.com'), '7900').ok).toBe(false)
+    expect(resolveHubTarget(https('localhost'), null).ok).toBe(false)
+  })
+
+  it('uses ?debugPort= when it is a TCP port', () => {
+    expect(resolveHubTarget(http('localhost'), '7900')).toEqual({ ok: true, url: 'ws://localhost:7900' })
+    expect(resolveHubTarget(http('localhost'), '1')).toEqual({ ok: true, url: 'ws://localhost:1' })
+    expect(resolveHubTarget(http('localhost'), '65535')).toEqual({ ok: true, url: 'ws://localhost:65535' })
+  })
+
+  it('treats a bare ?debugPort= like an absent one', () => {
+    expect(resolveHubTarget(http('localhost'), '')).toEqual({ ok: true, url: `ws://localhost:${DEFAULT_HUB_PORT}` })
+  })
+
+  it.each(['-1', '0', '65536', '99999', '7810.5', 'abc', 'NaN', 'Infinity'])(
+    'reports ?debugPort=%s as unusable instead of building a URL the browser throws on',
+    (raw) => {
+      const target = resolveHubTarget(http('localhost'), raw)
+      expect(target.ok).toBe(false)
+      if (!target.ok) expect(target.reason).toContain(`?debugPort=${raw}`)
+    },
+  )
 })

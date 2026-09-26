@@ -75,16 +75,19 @@ const m = (id: string): WeaponMod => ({ id, stacks: 1 })
 
 describe('mod verdict equals executed behaviour, default casting', () => {
   for (const weaponId of WEAPON_IDS) {
-    it(`${weaponId}: every mod, alone and after every other mod`, () => {
+    // Both sides of every neighbour: list order picks the element, so an
+    // element before another element is the one the fire path drops.
+    it(`${weaponId}: every mod, alone, before and after every other mod`, () => {
       const disagreements: string[] = []
       for (const rest of [[], ...MOD_IDS.map((x) => [m(x)])]) {
         const without = pullOutcome(weaponId, rest, false)
         for (const id of MOD_IDS) {
           if (rest.some((r) => r.id === id)) continue
-          const list = [...rest, m(id)]
-          const inert = pullOutcome(weaponId, list, false) === without
-          const verdict = modVerdict(WEAPONS[weaponId], list, id)
-          if (inert !== (verdict.kind === 'inert')) disagreements.push(`${id} after [${rest.map((r) => r.id)}]: fired ${inert ? 'inert' : 'live'}, shown ${verdict.kind}`)
+          for (const list of [[...rest, m(id)], [m(id), ...rest]]) {
+            const inert = pullOutcome(weaponId, list, false) === without
+            const verdict = modVerdict(WEAPONS[weaponId], list, id)
+            if (inert !== (verdict.kind === 'inert')) disagreements.push(`${id} in [${list.map((r) => r.id)}]: fired ${inert ? 'inert' : 'live'}, shown ${verdict.kind}`)
+          }
         }
       }
       expect(disagreements).toEqual([])
@@ -122,9 +125,10 @@ describe('verdict reasons', () => {
     for (const weaponId of WEAPON_IDS)
       for (const sequenced of [false, true])
         for (const id of MOD_IDS)
-          for (const x of [undefined, ...MOD_IDS]) {
-            const v = modVerdict(WEAPONS[weaponId], x && x !== id ? [m(x), m(id)] : [m(id)], id, sequenced)
-            if (v.kind !== 'live') expect(v.reason.split(/\s+/).length, `${weaponId} ${id} ${x}: ${v.reason}`).toBeLessThanOrEqual(5)
-          }
+          for (const x of [undefined, ...MOD_IDS])
+            for (const list of x && x !== id ? [[m(x), m(id)], [m(id), m(x)]] : [[m(id)]]) {
+              const v = modVerdict(WEAPONS[weaponId], list, id, sequenced)
+              if (v.kind !== 'live') expect(v.reason.split(/\s+/).length, `${weaponId} [${list.map((e) => e.id)}] ${id}: ${v.reason}`).toBeLessThanOrEqual(5)
+            }
   })
 })

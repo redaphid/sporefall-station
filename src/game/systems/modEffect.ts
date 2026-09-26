@@ -7,7 +7,7 @@
 // `fireWeapon` and fails if this verdict and the sim's behaviour disagree.
 
 import type { StatusApply, WeaponDef } from '../data/items'
-import { MODS, type BulletBehavior, type ResolvedTrigger } from '../data/mods'
+import { MODS, stackMod, type BulletBehavior, type ResolvedTrigger } from '../data/mods'
 import type { WeaponMod } from '../entity'
 import { PLAYER_MELEE_MULT } from '../player'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
@@ -175,8 +175,8 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 /**
  * The verdict for mod `modId` as installed in `mods` on `weapon`. In sequenced
  * mode it is judged on the one cast it rides in; a mod past the weapon's live
- * window is stowed and never fires. A mod missing from `mods` is judged as if a
- * stack of it were installed.
+ * window is stowed and never fires. A mod missing from `mods` is judged as if
+ * picked up: placed where a pick lands, which decides whether its element wins.
  */
 export const modVerdict = (
   weapon: WeaponDef,
@@ -185,7 +185,7 @@ export const modVerdict = (
   sequenced = false,
 ): ModVerdict => {
   if (!MODS[modId]) return { kind: 'inert', reason: 'unknown mod' }
-  const installed = mods.some((m) => m.id === modId && m.stacks > 0) ? mods : [...mods, { id: modId, stacks: 1 }]
+  const installed = mods.some((m) => m.id === modId && m.stacks > 0) ? mods : stackMod(mods.map((m) => ({ ...m })), modId, 1)
   const shots = sequenced
     ? sequencedShots(weapon, installed, modId)
     : [executedShot(weapon, installed), executedShot(weapon, installed.filter((m) => m.id !== modId))]

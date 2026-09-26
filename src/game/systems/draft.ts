@@ -4,7 +4,7 @@
 // never perturbs the sim stream, yet replays byte-identically. Co-op-friendly:
 // one shared hand per floor, everyone drafts together (no loser-shaming for kids).
 
-import { MODS, modMaxStacks, type ModDef, type ModRarity } from '../data/mods'
+import { MODS, modMaxStacks, stackMod, type ModDef, type ModRarity } from '../data/mods'
 import type { ItemStack, WeaponMod } from '../entity'
 import { hashLabel, mulberry32, type Rng } from '../rng'
 import type { WeaponDef } from '../data/items'
@@ -95,10 +95,5 @@ export const draftCards = (ids: readonly string[], loadout?: DraftLoadout): Draf
  * the draft UI and the `addMod` debug verb's intent. */
 export const applyDraftPick = (stack: ItemStack, modId: string, stacks = 1): WeaponMod[] => {
   if (!MODS[modId]) throw new Error(`unknown mod: ${modId}`)
-  const cap = modMaxStacks(modId)
-  const mods = (stack.mods ??= [])
-  const existing = mods.find((m) => m.id === modId)
-  if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
-  else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
-  return mods
+  return stackMod((stack.mods ??= []), modId, stacks)
 }

@@ -154,7 +154,7 @@ describe('nextFloor carry-over', () => {
     w.mission.complete = true
     w.mission.exitUnlocked = true
     nextFloor(w)
-    expect(w.mission.template).toMatch(/steal|assassinate|reach/)
+    expect(w.mission.template).toMatch(/steal|extraction|assassinate|reach/)
     // A steal/assassinate mission on the new floor starts incomplete again.
     if (w.mission.template !== 'reach') expect(w.mission.complete).toBe(false)
   })

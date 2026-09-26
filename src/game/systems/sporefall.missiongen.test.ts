@@ -115,7 +115,7 @@ describe('shallow floors are untouched (the frozen table holds)', () => {
       for (const floor of [1, 2, 3, 4]) {
         const w = createWorld(seed, floor)
         setupFloor(w)
-        expect(['steal', 'assassinate', 'reach']).toContain(w.mission.template)
+        expect(['steal', 'extraction', 'assassinate', 'reach']).toContain(w.mission.template)
       }
     }
   })

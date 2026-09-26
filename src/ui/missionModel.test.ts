@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { missionChipText, missionObjectives, resolveLink, type MissionViewLike } from './missionModel'
+import { EXTRACT_ROW_TEXT, missionChipText, missionObjectives, resolveLink, type MissionViewLike } from './missionModel'
 
 const ent = (id: number, x = 10, y = 10, dead = false): { id: number; dead?: boolean; pos: { x: number; y: number } } => ({
   id,
@@ -107,5 +107,38 @@ describe('resolveLink', () => {
   })
   it('an empty link resolves to nothing', () => {
     expect(resolveLink({}, [ent(7)])).toBeUndefined()
+  })
+})
+
+describe('missionObjectives — extraction', () => {
+  const x = (held: boolean): Partial<MissionViewLike> => ({ extraction: { x: 3, y: 4, held } })
+
+  it('prize on the floor: the grab row is active and linked; the way out is locked and points nowhere', () => {
+    const rows = missionObjectives(base(x(false)))
+    expect(rows).toEqual([
+      { key: 'mission', text: base().missionText, state: 'active', link: { targetId: 7 } },
+      { key: 'exit', text: EXTRACT_ROW_TEXT, state: 'locked', link: undefined },
+    ])
+  })
+
+  it('prize in hand: the grab row is done and the entry, never the Launch Bay, is the linked objective', () => {
+    const rows = missionObjectives(base({ ...x(true), entities: [ent(7, 10, 10, true)] }))
+    expect(rows[0]).toMatchObject({ key: 'mission', state: 'done', link: undefined })
+    expect(rows[1]).toEqual({ key: 'exit', text: EXTRACT_ROW_TEXT, state: 'active', link: { x: 3.5, y: 4.5 } })
+  })
+
+  it('a dropped prize (new, live target) re-links the grab row', () => {
+    const rows = missionObjectives(base({ ...x(false), missionTargetId: 9, entities: [ent(7, 1, 1, true), ent(9, 5, 5)] }))
+    expect(rows[0].link).toEqual({ targetId: 9 })
+  })
+
+  it('works before the level arrives on a client (no exit), and game over still clears everything', () => {
+    expect(missionObjectives(base({ ...x(true), exit: undefined }))[1].state).toBe('active')
+    expect(missionObjectives(base({ ...x(true), gameOver: true }))).toEqual([])
+  })
+
+  it('chip reads what to do now', () => {
+    expect(missionChipText(base(x(true)))).toBe('Floor 1 — GOT IT! Get out the way you came')
+    expect(missionChipText(base(x(false)))).toBe(`Floor 1 — ${base().missionText}`)
   })
 })

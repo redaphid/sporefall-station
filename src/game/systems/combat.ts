@@ -1,4 +1,4 @@
-import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
+import { SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
 import { WEAPONS, type StatusApply, type WeaponDef } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
@@ -13,6 +13,7 @@ import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
+import { meleeDamage } from './modEffect'
 import { spawnSporeBurst } from './spore'
 import { vlen } from '../simMath'
 
@@ -435,11 +436,11 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   const rw = resolveWeapon(weapon, stack?.mods)
   if (weapon.kind === 'melee') {
     e.combat.cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const damage = meleeDamage(rw.damage, e.playerCtl !== undefined)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
     return true
@@ -476,11 +477,11 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
   if (weapon.kind === 'melee') {
     const rw = resolveWeapon(weapon, casts[0].mods)
     cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const damage = meleeDamage(rw.damage, e.playerCtl !== undefined)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
   } else {

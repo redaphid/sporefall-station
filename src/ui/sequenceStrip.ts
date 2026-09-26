@@ -19,7 +19,7 @@ const esc = (s: string): string =>
 const keyOf = (m: SequenceModel | null, picked: number): string =>
   m
     ? `${m.weaponName}|${m.rechargeLeft}|${picked}|` +
-      m.entries.map((e) => `${e.id}:${e.stacks}:${e.live ? 1 : 0}${e.next ? 1 : 0}`).join(',')
+      m.entries.map((e) => `${e.id}:${e.stacks}:${e.live ? 1 : 0}${e.next ? 1 : 0}:${e.verdict ?? ''}`).join(',')
     : ''
 
 export const createSequenceStrip = (onSwap: (a: number, b: number) => void, opts: { compact?: boolean } = {}): SequenceStrip => {
@@ -52,11 +52,14 @@ export const createSequenceStrip = (onSwap: (a: number, b: number) => void, opts
         const outline = e.listIndex === picked ? '#ffffff' : e.next && !recharging ? '#ffd76a' : e.payload ? e.color : '#ffffff30'
         const glow = e.next && !recharging ? `box-shadow:0 0 8px #ffd76a;` : ''
         const shape = e.payload ? 'border-radius:50%;' : 'border-radius:6px;'
-        return `${divider}<button data-i="${e.listIndex}" title="${esc(e.name)}${e.payload ? ' (element)' : ' (modifier)'}${e.live ? '' : ' (stowed)'}"
+        return `${divider}<button data-i="${e.listIndex}" title="${esc(e.name)}${e.payload ? ' (element)' : ' (modifier)'}${e.live ? '' : ' (stowed)'}${e.verdict ? ` (${esc(e.verdict)})` : ''}"
+          data-verdict="${e.verdict ? esc(e.verdict) : ''}"
           style="all:unset;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;
           width:${size}px;height:${size}px;${shape}font-size:${Math.round(size * 0.55)}px;
-          background:${e.payload ? `${e.color}40` : '#00000080'};border:2px solid ${outline};${glow}
-          opacity:${e.live ? (recharging ? 0.45 : 1) : 0.35}">${e.icon}${
+          background:${e.payload ? `${e.color}40` : '#00000080'};border:2px ${e.verdict ? 'dashed' : 'solid'} ${outline};${glow}
+          opacity:${e.live ? (recharging || e.verdict ? 0.45 : 1) : 0.35}">${e.icon}${
+            e.verdict ? `<span style="position:absolute;left:-3px;top:-4px;font:800 9px system-ui;color:#fff;background:#b0413e;border-radius:4px;padding:0 2px">✕</span>` : ''
+          }${
             e.stacks > 1 ? `<span style="position:absolute;right:-3px;bottom:-4px;font:800 9px system-ui;color:#fff;background:#000c;border-radius:4px;padding:0 2px">${e.stacks}</span>` : ''
           }</button>`
       })

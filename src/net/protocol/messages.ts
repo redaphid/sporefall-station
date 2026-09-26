@@ -1,4 +1,4 @@
-import type { Entity, ItemStack } from '../../game/entity'
+import type { DraftHand, Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
@@ -377,7 +377,11 @@ export const encodeInput = (
   // never written; absent = none). Written ONLY when a swap is pending, so every
   // ordinary input packet is byte-identical to before. An older host reads the
   // hotbar byte and never looks further, so the extra bytes are ignored.
-  if (cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff) w.u16(cmd.modSwap + 1)
+  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff ? cmd.modSwap + 1 : 0
+  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick < 0xff ? cmd.draftPick + 1 : 0
+  if (swap > 0 || pick > 0) w.u16(swap)
+  // OPTIONAL trailing u8 after the swap slot: a floor-draft card, +1 biased.
+  if (pick > 0) w.u8(pick)
   return w.finish()
 }
 
@@ -392,13 +396,17 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
   const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
-  const modSwap = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no reorder
+  const swapSlot = r.remaining >= 2
+  const modSwap = swapSlot ? r.u16() : 0 // back-compat: absent → no reorder
+  // The draft byte only ever follows a swap slot, so one stray byte is never a pick.
+  const draftPick = swapSlot && r.remaining >= 1 ? r.u8() : 0
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
   if (modSwap > 0) cmd.modSwap = modSwap - 1
+  if (draftPick > 0) cmd.draftPick = draftPick - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
@@ -554,6 +562,8 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
+  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
+  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional
@@ -571,7 +581,10 @@ export interface StateMsg {
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
-  huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
+  huds: Record<
+    number,
+    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+  >
 }
 
 /**

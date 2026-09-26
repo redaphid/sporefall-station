@@ -6,7 +6,7 @@ import { bossBar, bossRevealName, latchBossId } from './bossModel'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
-import { buildLoadout } from './loadoutModel'
+import { buildLoadout, selfModVerdict } from './loadoutModel'
 import { installGamepadMenuNav } from './gamepadMenu'
 
 export interface Screens {
@@ -283,12 +283,15 @@ export const createScreens = (
           // completion banner: "you won" is much less useful right now than
           // "every door just opened and the floor is coming for you".
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
-          else if (ev.type === 'stationAlert') showBanner('STATION ALERT — GET TO THE LAUNCH BAY')
+          else if (ev.type === 'stationAlert')
+            showBanner(view.extraction ? 'STATION ALERT — GET OUT THE WAY YOU CAME' : 'STATION ALERT — GET TO THE LAUNCH BAY')
+          else if (ev.type === 'prizeDropped') showBanner('PRIZE DROPPED — GO GET IT')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
           else if (ev.type === 'modPickup' && ev.byId === view.self?.id) {
             const m = MODS[ev.modId]
             const label = `${m?.icon ?? '🔧'} ${m?.name ?? ev.modId}`
-            showToast(ev.maxed ? `${label} — MAXED` : `Got ${label}!`)
+            const v = ev.maxed ? undefined : selfModVerdict(view.self, ev.modId, view.modCasting)
+            showToast(ev.maxed ? `${label} — MAXED` : v && v.kind !== 'live' ? `Got ${label} — ${v.reason}` : `Got ${label}!`)
           }
         }
       }
@@ -309,7 +312,7 @@ export const createScreens = (
                 ? 'Restart the run now, or wait for a revive.'
                 : 'Waiting on your team…'
           // Freeze the fallen player's gun + mods into the panel as it opens.
-          loadout.update(buildLoadout(view.self))
+          loadout.update(buildLoadout(view.self, view.modCasting))
           overlay.style.display = 'flex'
         } else {
           // Revived / fresh run began — drop back into play.

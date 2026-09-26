@@ -31,8 +31,13 @@ regenerate any pick with `python3 scripts/assets/generate.py final <job>`).
 
 Two generator configurations (recorded per pick in `curation.json`):
 
-- **SDXL** `AnythingXL_xl` + skormino pixel LoRA @1024 — tiles, props, the
-  ranger's 10 poses, spore-drone idle.
+- **SDXL** `juggernautXL_juggXIByRundiffusion` + skormino pixel LoRA @768–1024
+  — tiles, props, the ranger's 10 poses, spore-drone idle and the r2 cast.
+  (This line named `AnythingXL_xl` until **2026-09-25**. That was stale, and
+  the art disagrees with it: of the 26 raws in `scripts/assets/raws/` that
+  still carry their ComfyUI graph, 20 are juggernautXL and 6 are anything-xl —
+  the 2026-07 figures only. The anime base is **superseded**; `curation.json`
+  records the real checkpoint per pick.)
 - **SD1.5** `dreamshaper_8` @512 (no LoRA — it's SDXL-only) — NPC cast,
   items, wall tile, all step frames. Adopted when resident VLM models on the
   shared GPU pushed SDXL into 30-min lowvram batches. The k-centroid +
@@ -50,10 +55,10 @@ palette (`scripts/assets/palette.py`), no dither, hard alpha.
 | thug | bog-mutant | hulking moss-crusted olive brute (boss/gangster share) |
 | scientist | mycologist | pale hazmat, green shoulder pods, sample tube |
 | robot | derelict-bot | dark boxy machine, orange eye lenses |
-| civilian | frog-settler | squat frog in rope-belted poncho (shopkeeper shares) |
+| civilian | frog-settler | cloaked swamp frog in a brown hood — **full 5-dir idle/step + 8-frame walk**, 2026-09-25, Wan 2.2 I2V, see below (shopkeeper shares) |
 
-Characters: 48×48, feet bottom-center. The player has all 5 drawn directions;
-NPCs ship s-idle/s-step and borrow the rest via manifest fallback chains
+Characters: 48×48, feet bottom-center. The player and **frog-settler** have all
+5 drawn directions with 8-frame walk cycles; the other NPCs ship s-idle/s-step and borrow the rest via manifest fallback chains
 (`manifest.py` mentions every one of the 70 char keys so nothing falls back to
 the city theme's human sprites mid-walk).
 
@@ -146,3 +151,31 @@ variant meets every other. The ComfyUI img2img repaint is still wired in (drop
 ≤0.4 changed nothing after the palette snap, ≥0.55 erased the moss and added
 speckle. Previews: `docs/assets/indoor-tiles/` (via `dump_complex_levels.mts`
 + `indoor_preview.py`).
+
+## frog-settler, 2026-09-25 — the video route (cyber-puck's framework)
+
+The frog is the first character in this pack animated by a **video model**
+rather than by independently-sampled per-frame SDXL. Per-frame sampling has no
+temporal coherence by construction (`docs/sprite-pipeline-wan.md`); a video
+model emits frames that are coherent with each other.
+
+Framework: **`D:\projects\puck-sprites`** (cyber-puck's, approved 2026-09-22),
+driven in place — nothing was forked into this repo. Full procedure and the
+failures it cost: [`docs/sprite-cast-runbook.md`](../../../docs/sprite-cast-runbook.md).
+
+| stage | what |
+|---|---|
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step, 1280×720 on white, one per direction, from the curated `anchors/frog-settler-s-idle.png` |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo + lightx2v 4-step, bf16 compute, 848×480, 81 frames @16 fps, seed 3 |
+| matte | `premat.py --shrink 1` (border-connected white matte; a chroma key punches holes in pale chest/cloak) |
+| cut | `video2atlas.py --pixel --sprite-height 96 --frames 8 --lens-guard 0`, forced to a FULL stride |
+| post | white-speck inpaint + this pack's locked 34-colour palette |
+
+Loop seams, relative to an ordinary frame step (under 1.0 = the seam is
+smoother than a normal step): s 0.42 (period 45), se 0.48 (38), e 0.16 (48),
+ne 0.34 (54), n 0.37 (45).
+
+The **cloak is deliberate** — the owner approved it on the turnaround. It made
+the committed silhouette spec wrong, because that spec was measured off the
+old bare-headed front frog; `consistency-spec.json` is re-anchored on
+`se-idle`, whose build sits on the median of all ten pose frames.

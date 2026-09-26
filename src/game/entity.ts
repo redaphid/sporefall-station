@@ -323,7 +323,7 @@ export interface Entity {
     damage: number
     ttl: number
     /** Grenades: AoE on fuse-end or impact instead of point damage. `element`:
-     * the element mod id the blast applies (an explosive mod's nearest element). */
+     * the element mod id the blast applies (ResolvedWeapon.carries). */
     explode?: { radius: number; damage: number; element?: string }
     /** Thrown items: the area effect applied where it lands (grenade → explode). */
     onLand?: import('./data/items').AreaEffect
@@ -340,7 +340,7 @@ export interface Entity {
      * straight otherwise — it never curves at something behind a wall. */
     homing?: number
     /** Spawn N damaging children on the first body it strikes (split/multishot).
-     * `element`: the element mod id the shards apply (the split mod's nearest). */
+     * `element`: the element mod id the shards apply (ResolvedWeapon.carries). */
     split?: { count: number; damage: number; speed: number; ttl: number; element?: string }
     /** Shatter into a RADIAL burst of short-range fragments on ANY termination —
      * wall/ttl/body impact (splinterShot). Distinct from `split` (a forward fork

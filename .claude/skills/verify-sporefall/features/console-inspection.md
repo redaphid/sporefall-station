@@ -23,4 +23,4 @@ Suite that covers this: `pnpm run e2e:ai-inspect`. Not yet driven through this s
 
 ## Gotchas
 
-- `?debug` also dials the WebSocket debug hub on port 7810. With no hub, expect a console connection error. That error is not a page error, and `drive.mjs` still passes.
+- Over `http://`, `?debug` also dials the WebSocket debug hub on port 7810. With no hub, expect a console connection error. That error is not a page error, and `drive.mjs` still passes. Over `https://`, `?debug` does not dial and logs `[debug] hub unavailable: …` instead.

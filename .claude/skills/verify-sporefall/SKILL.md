@@ -139,8 +139,9 @@ Steps run in argv order. The full list is in the header of `drive.mjs`: `--open`
 The preview serves `http://`, so it never shows the browser's HTTPS-only rules, such as the
 block on `ws://` sockets from an HTTPS page. To test those rules, add
 `--origin https://sporefall.hypnodroid.com`. The page then loads at that origin, and the
-driver answers every request to it from your preview. Requests to other origins still go
-to the network.
+driver answers every HTTP request to it from your preview. The driver closes every
+WebSocket to that host, so a run never joins the real relay. Requests to other origins
+still go to the network.
 
 ```sh
 $S/drive.mjs --origin https://sporefall.hypnodroid.com --name https-debug \
@@ -196,12 +197,13 @@ where the proof lives.
   comes from `--until`.
 - **`?debug` on the live HTTPS site needs the fix for issue #129.** Before that fix, the
   debug channel dialed `ws://` from the HTTPS page, the browser threw `SecurityError`, and
-  the page stayed blank at tick 0. Live build 658 has the bug. The first build that
-  includes the fix is safe. On that build, the console logs
+  the page stayed blank at tick 0. Build 658, live on 2026-09-25, has the bug. Every
+  build that includes the fix works. On those builds, the console logs
   `[debug] hub unavailable: this page is HTTPS…`, the game runs, and `sporefall.verb`
-  works. The hub stays out of reach from HTTPS in every build, because it serves plain
-  `ws://`. If `?debug` on the live site shows tick 0 and a `SecurityError`, the deployed
-  build predates the fix. Open `?e2e=1` instead, which also enables `sporefall.verb`.
+  works. An HTTPS page never dials the hub, by design, so the CLI and MCP reach only
+  games served over `http://`. If `?debug` on the live site shows tick 0 and a
+  `SecurityError`, the deployed build predates the fix. Open `?e2e=1` instead, which also
+  enables `sporefall.verb`.
 - **Headless WSL Chromium has no working WebGL.** The default flags and swiftshader both
   crash the tab. Use Lane A for anything rendered.
 - **Lane A tabs freeze in the background.** See Lane A. Drive time with `step`, never with

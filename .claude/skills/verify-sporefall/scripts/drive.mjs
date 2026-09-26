@@ -4,10 +4,11 @@
 //
 //   drive.mjs [--port 4990] [--name label] [--video] [--viewport 1280x720] [--origin https://host] STEP...
 //
-// --origin loads pages at that origin but answers every request to it from the
-// local preview, so this build runs under a real https:// origin. The browser
+// --origin loads pages at that origin but answers every HTTP request to it from
+// the local preview, so this build runs under a real https:// origin. The browser
 // then applies its HTTPS-only rules (mixed content, secure context), which the
-// http:// preview cannot show.
+// http:// preview cannot show. WebSockets to that host are closed, so a run never
+// joins the real relay.
 //
 // Steps run in the order given:
 //   --open <path>        load BASE+path in a fresh context (resets localStorage).
@@ -69,11 +70,18 @@ const newContext = async () => {
     viewport: { width, height },
     ...(opt.video ? { recordVideo: { dir: videoDir, size: { width, height } } } : {}),
   })
-  if (opt.origin)
+  if (opt.origin) {
+    // Node's fetch, not route.fetch: Playwright requires route.fetch to keep the
+    // request's protocol, and this swaps https for http.
     await context.route(`${BASE}/**`, async (route) => {
-      const { pathname, search } = new URL(route.request().url())
-      await route.fulfill({ response: await route.fetch({ url: LOCAL + pathname + search }) })
+      const req = route.request()
+      const { pathname, search } = new URL(req.url())
+      const res = await fetch(LOCAL + pathname + search, { method: req.method(), body: req.postDataBuffer() ?? undefined })
+      const headers = Object.fromEntries([...res.headers].filter(([k]) => k !== 'content-encoding' && k !== 'content-length'))
+      await route.fulfill({ status: res.status, headers, body: Buffer.from(await res.arrayBuffer()) })
     })
+    await context.routeWebSocket((url) => url.host === new URL(BASE).host, (ws) => ws.close())
+  }
   page = await context.newPage()
   page.on('pageerror', (e) => pageErrors.push(String(e)))
   page.on('console', (m) => {

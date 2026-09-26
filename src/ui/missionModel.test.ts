@@ -109,3 +109,37 @@ describe('resolveLink', () => {
     expect(resolveLink({}, [ent(7)])).toBeUndefined()
   })
 })
+
+describe('#86 lockdown: the HUD says why the Launch Bay is shut', () => {
+  it('before the objective: the exit row names the lockdown and the chip flags it', () => {
+    const v = base({ lockdown: {} })
+    const exit = missionObjectives(v)[1]
+    expect(exit).toMatchObject({ key: 'exit', state: 'locked' })
+    expect(exit.text).toMatch(/^LOCKDOWN/)
+    expect(missionChipText(v)).toBe('Floor 1 — LOCKDOWN · Extract the specimen canister from the commissary')
+  })
+
+  it('after the objective: a sealed bay stays LOCKED with a countdown, but still links to it', () => {
+    const v = base({ missionComplete: true, lockdown: { secondsLeft: 14 } })
+    expect(missionObjectives(v)[1]).toMatchObject({
+      key: 'exit',
+      state: 'locked',
+      text: 'LAUNCH BAY SEALED · lockdown 14s',
+      link: { x: 40.5, y: 40.5 },
+    })
+    expect(missionChipText(v)).toBe('Floor 1 — LAUNCH BAY SEALED · 14s')
+  })
+
+  it('no lockdown: exactly the pre-#86 row and chip', () => {
+    expect(missionObjectives(base({ missionComplete: true }))[1]).toMatchObject({ state: 'active', text: 'Reach the Launch Bay' })
+    expect(missionChipText(base({ missionComplete: true }))).toBe('Floor 1 — LAUNCH BAY is open!')
+  })
+
+  it('a `reach` floor under lockdown keeps one row, and it is the sealed one', () => {
+    const rows = missionObjectives(
+      base({ missionText: 'Reach the Launch Bay', missionComplete: true, missionTargetId: undefined, lockdown: { secondsLeft: 3 } }),
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ key: 'exit', state: 'locked', text: 'LAUNCH BAY SEALED · lockdown 3s' })
+  })
+})

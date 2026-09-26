@@ -824,6 +824,7 @@ export class NetClientSession implements Session {
       missionTargetId: this.state.missionTargetId,
       gameOver: this.state.gameOver,
       alert: this.state.alert,
+      lockdown: this.state.lockdown,
       mode: this.state.mode,
       revivesLeft: this.state.revivesLeft,
       ...(this.modCasting ? { modCasting: this.modCasting, simTick: this.hostTickEstimate() } : {}),

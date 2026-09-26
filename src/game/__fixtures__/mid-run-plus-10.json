@@ -10,9 +10,16 @@
     "template": "reach",
     "complete": true,
     "exitUnlocked": true,
-    "description": "Reach the Launch Bay"
+    "description": "Reach the Launch Bay",
+    "heat": 18
   },
-  "noises": [],
+  "noises": [
+    {
+      "x": 0.35009999999999997,
+      "y": 1.5,
+      "expires": 126
+    }
+  ],
   "events": [],
   "rng": -933849113,
   "baseRng": 20260715,

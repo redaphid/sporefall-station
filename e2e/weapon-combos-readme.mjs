@@ -21,7 +21,7 @@ const BLURB = {
   'weapon-shock': 'Tesla Rounds — the hit zaps and stuns (arcs through anything wet).',
   'weapon-lifesteal': 'Vampiric — the player starts at 40 HP and heals back up off every hit.',
   'combo-pierce-explosive': 'Pierce + Explosive — the bullet passes through targets AND explodes.',
-  'combo-frost-shock': 'Cryo + Tesla — freeze and electrify stacked on one shot.',
+  'combo-shock-then-frost': 'Tesla picked first, Cryo second. One element per shot, and the newest one (Cryo) lands.',
 }
 
 // Presentation order (base weapons, then single mods, then combos).
@@ -29,7 +29,7 @@ const ORDER = [
   'base-pistol', 'base-shotgun', 'base-machinegun',
   'weapon-explosive', 'weapon-pierce', 'weapon-frost', 'weapon-incendiary',
   'weapon-splinter', 'weapon-bounce', 'weapon-velocity', 'weapon-shock', 'weapon-lifesteal',
-  'combo-pierce-explosive', 'combo-frost-shock',
+  'combo-pierce-explosive', 'combo-shock-then-frost',
 ]
 
 const present = new Set(readdirSync(dir).filter((f) => f.endsWith('.mp4')).map((f) => f.replace(/\.mp4$/, '')))

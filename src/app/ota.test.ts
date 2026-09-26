@@ -27,8 +27,12 @@ interface UpdateAvailableLike {
 
 const mocks = vi.hoisted(() => {
   const listeners: ((event: UpdateAvailableLike) => void)[] = []
+  const others = new Map<string, (() => void)[]>()
   return {
     listeners,
+    others,
+    getLatest: vi.fn(async (): Promise<{ version: string; url?: string }> => ({ version: '905', url: 'https://x/905.zip' })),
+    triggerUpdateCheck: vi.fn(async (): Promise<{ status: string; queued: boolean }> => ({ status: 'queued', queued: true })),
     isNativePlatform: vi.fn((): boolean => true),
     notifyAppReady: vi.fn(async (): Promise<void> => {}),
     // The two id-carrying ways to make a downloaded bundle the running one:
@@ -40,6 +44,7 @@ const mocks = vi.hoisted(() => {
     addListener: vi.fn(
       async (event: string, listener: (e: UpdateAvailableLike) => void): Promise<{ remove: () => Promise<void> }> => {
         if (event === 'updateAvailable') listeners.push(listener)
+        else others.set(event, [...(others.get(event) ?? []), () => listener({ bundle: { id: '', version: '' } })])
         return { remove: async (): Promise<void> => {} }
       },
     ),
@@ -89,9 +94,15 @@ const swapAttempts = (): number =>
 const SOLO_UNSAFE = UPDATE_MOMENTS.filter((m) => !(SAFE_MOMENTS as readonly UpdateMoment[]).includes(m))
 const COOP_UNSAFE = UPDATE_MOMENTS.filter((m) => !(COOP_SAFE_MOMENTS as readonly UpdateMoment[]).includes(m))
 
+/** Fire a payload-free plugin event (`downloadFailed`, `noNeedUpdate`). */
+const emit = (event: string): void => {
+  for (const listener of mocks.others.get(event) ?? []) listener()
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.listeners.length = 0
+  mocks.others.clear()
   mocks.isNativePlatform.mockReturnValue(true)
 })
 
@@ -223,6 +234,90 @@ describe('applying at most once', () => {
 
     updater.reportMoment('modePicker', 0)
     expect(appliedBundleIds()).toEqual([BUNDLE, BUNDLE])
+  })
+})
+
+describe('freshen: pause → Refresh on the installed app', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('downloads a newer bundle now and resolves staged once it lands', async () => {
+    const updater = startUpdater()
+    const pending = updater.freshen(20_000)
+    await vi.waitFor(() => expect(mocks.triggerUpdateCheck).toHaveBeenCalledTimes(1))
+    expect(updater.latest).toBe('905')
+
+    emitUpdateAvailable(BUNDLE)
+    expect(await pending).toBe('staged')
+  })
+
+  it('installs the fetched bundle when Refresh reports it is leaving, and not before', async () => {
+    const updater = startUpdater()
+    updater.reportMoment('paused', 0)
+    const pending = updater.freshen(20_000)
+    await vi.waitFor(() => expect(mocks.triggerUpdateCheck).toHaveBeenCalled())
+    emitUpdateAvailable(BUNDLE)
+    await pending
+    expect(swapAttempts(), 'swapped behind a plain pause').toBe(0)
+
+    updater.reportMoment('leaving', 0)
+    expect(appliedBundleIds()).toEqual([BUNDLE])
+  })
+
+  it('reads our worker\'s "up-to-date" rejection as current, and downloads nothing', async () => {
+    mocks.getLatest.mockRejectedValueOnce(new Error('up-to-date'))
+    expect(await startUpdater().freshen(20_000)).toBe('up-to-date')
+    expect(mocks.triggerUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  it('treats any other rejection as offline', async () => {
+    mocks.getLatest.mockRejectedValueOnce(new Error('Request failed: Unable to resolve host'))
+    expect(await startUpdater().freshen(20_000)).toBe('unavailable')
+    expect(mocks.triggerUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  it('treats a reply with no bundle url as current', async () => {
+    mocks.getLatest.mockResolvedValueOnce({ version: '899' })
+    expect(await startUpdater().freshen(20_000)).toBe('up-to-date')
+  })
+
+  it('reports a failed download instead of waiting it out', async () => {
+    const updater = startUpdater()
+    const pending = updater.freshen(20_000)
+    await vi.waitFor(() => expect(mocks.triggerUpdateCheck).toHaveBeenCalled())
+    emit('downloadFailed')
+    emit('noNeedUpdate')
+    expect(await pending).toBe('incomplete')
+  })
+
+  it('reports current when the pipeline ends with nothing new', async () => {
+    const updater = startUpdater()
+    const pending = updater.freshen(20_000)
+    await vi.waitFor(() => expect(mocks.triggerUpdateCheck).toHaveBeenCalled())
+    emit('noNeedUpdate')
+    expect(await pending).toBe('up-to-date')
+  })
+
+  it('reports unavailable when the plugin refuses to check', async () => {
+    mocks.triggerUpdateCheck.mockResolvedValueOnce({ status: 'unavailable', queued: false })
+    expect(await startUpdater().freshen(20_000)).toBe('unavailable')
+  })
+
+  it('gives up after its timeout when the download never finishes', async () => {
+    vi.useFakeTimers()
+    const updater = startUpdater()
+    const pending = updater.freshen(20_000)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(await pending).toBe('timeout')
+    expect(swapAttempts()).toBe(0)
+  })
+
+  it('answers staged at once for a bundle already downloaded, without asking the server', async () => {
+    const updater = startUpdater()
+    emitUpdateAvailable(BUNDLE)
+    expect(await updater.freshen(20_000)).toBe('staged')
+    expect(mocks.getLatest).not.toHaveBeenCalled()
   })
 })
 

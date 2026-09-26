@@ -1,6 +1,7 @@
 // Deterministic demo setups, selected by `?scenario=`. Kept out of the sim
 // proper: a scenario just seeds entities into a fresh world before play starts.
 
+import { ARENAS, stageArena } from './arenas'
 import { WEAPONS } from './data/items'
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
@@ -976,6 +977,7 @@ const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>
   'npc-ai': setupNpcAi,
   'npc-deliberate': setupNpcDeliberate,
   ...GROUP_SCENARIOS,
+  ...Object.fromEntries(Object.entries(ARENAS).map(([name, spec]) => [name, (w: World) => stageArena(w, spec)])),
 }
 
 /** The scenario names this build can apply, for error messages. */

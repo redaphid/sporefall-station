@@ -439,7 +439,7 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
     return true
@@ -480,7 +480,7 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
   } else {

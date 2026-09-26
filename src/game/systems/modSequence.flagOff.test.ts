@@ -57,9 +57,12 @@ const run = (seed: number, ticks: number): World => {
 }
 
 describe('mod sequencing: flag off matches main', () => {
-  // Captured on main @ 9d0894d with this exact file.
+  // Captured on main @ 9d0894d with this exact file. Seed 7 re-captured for #87:
+  // its incendiary rounds now make the burning target panic (a deliberate sim
+  // change, not a sequencing leak). With panic disabled it still reproduced
+  // 'deaefb3a' exactly, so nothing else moved.
   const GOLDEN: Record<number, string> = {
-    7: 'deaefb3a',
+    7: 'ea5f5b29',
     1234: '6251b800',
   }
 

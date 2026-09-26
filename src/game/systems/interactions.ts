@@ -31,6 +31,9 @@ import { vlen } from '../simMath'
 const ELEC_DAMAGE = 20
 /** How close two wet bodies must be for the arc to jump between them (tiles). */
 const CHAIN_RADIUS = 1.6
+/** How far a shock leaps from the body it hit to the nearest other NPC, wet or
+ * dry (tiles). One leap only, and never onto a player. */
+export const ARC_JUMP_RADIUS = 2.5
 
 export const freeze = (w: World, e: Entity): void => addStatus(w, e, 'frozen', ELEMENTS.frozen.durationTicks)
 
@@ -38,17 +41,41 @@ export const wet = (w: World, e: Entity): void => addStatus(w, e, 'wet', ELEMENT
 
 const near = (a: Entity, b: Entity): boolean => vlen(a.pos.x - b.pos.x, a.pos.y - b.pos.y) <= CHAIN_RADIUS
 
-/** Zap `origin`: it becomes electrified (immobilized), and if it is wet the
- * shock floods the connected wet cluster — every reachable wet body is
- * electrified and takes electrocution damage. A dry origin is a dead end. */
-export const shock = (w: World, origin: Entity): void => {
+/** The nearest living non-player body within ARC_JUMP_RADIUS of `from` that the
+ * arc hasn't touched. Ties keep the earlier entity (ascending id). */
+const arcJumpTarget = (w: World, from: Entity, seen: Set<Entity>): Entity | undefined => {
+  let best: Entity | undefined
+  let bestD = ARC_JUMP_RADIUS
+  for (const n of w.entities) {
+    if (seen.has(n) || n.dead || !n.health || !n.ai || n.playerCtl) continue
+    const d = vlen(from.pos.x - n.pos.x, from.pos.y - n.pos.y)
+    if (d > bestD) continue
+    bestD = d
+    best = n
+  }
+  return best
+}
+
+/** Zap `origin`: it becomes electrified (immobilized), then the arc LEAPS once
+ * to the nearest other NPC (a player is never a leap target, and a shocked
+ * player never throws a leap). Any wet body the arc reaches floods the
+ * connected wet cluster — every reachable wet body is electrified and takes
+ * electrocution damage. A dry body is a dead end for the flood. */
+export const shock = (w: World, origin: Entity, ticks = ELEMENTS.electrified.durationTicks): void => {
   const seen = new Set<Entity>()
   const queue: Entity[] = [origin]
   while (queue.length) {
     const e = queue.shift()!
     if (seen.has(e) || e.dead) continue
     seen.add(e)
-    addStatus(w, e, 'electrified', ELEMENTS.electrified.durationTicks)
+    addStatus(w, e, 'electrified', ticks)
+    if (e === origin && !origin.playerCtl) {
+      const leap = arcJumpTarget(w, origin, seen)
+      if (leap) {
+        w.events.push({ type: 'shock', x: leap.pos.x, y: leap.pos.y, targetId: leap.id })
+        queue.push(leap)
+      }
+    }
     if (!isWet(e)) continue // dry: immobilized only, no water damage, no arc
     if (e.health && !e.playerCtl?.downed) {
       // A downed body is out of the fight — shock damage can't re-kill it (#52).

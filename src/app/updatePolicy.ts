@@ -36,6 +36,9 @@ export const UPDATE_MOMENTS = [
   'paused',
   /** Actively playing. */
   'inRun',
+  /** The player pressed Refresh: the run is saved and the page is on its way
+   * to the picker, so a reload is exactly what they asked for. */
+  'leaving',
 ] as const
 
 export type UpdateMoment = (typeof UPDATE_MOMENTS)[number]
@@ -49,11 +52,13 @@ export type UpdateMoment = (typeof UPDATE_MOMENTS)[number]
  *   autosave + the "resumed" toast), so a reload here comes back into the same
  *   run on the same floor. This is the "natural break" in the truest sense.
  * - `runOver` — the run is over; there is nothing left to lose.
+ * - `leaving` — the player asked to leave (pause → Refresh), and the run was
+ *   saved before this moment was reported.
  *
  * Everything NOT on this list is unsafe. Notably `paused`: a pause overlay
  * looks like a menu but the run behind it is live and mid-floor.
  */
-export const SAFE_MOMENTS = ['modePicker', 'lobby', 'floorTransition', 'runOver'] as const
+export const SAFE_MOMENTS = ['modePicker', 'lobby', 'floorTransition', 'runOver', 'leaving'] as const
 
 /**
  * The much shorter list that also applies when OTHER PLAYERS share this
@@ -133,6 +138,8 @@ export const decideApply = (state: UpdateGateState): ApplyDecision => {
 
 /** Everything needed to name the player's moment, without a RenderView. */
 export interface MomentInputs {
+  /** The player pressed Refresh and the page is about to leave the run. */
+  readonly leaving: boolean
   /** The run-over / downed / dead overlay is up (screens.ts `restartAffordance`). */
   readonly runOver: boolean
   /** We are inside the window just after the floor changed. */
@@ -146,6 +153,7 @@ export interface MomentInputs {
  * trusted. Anything this does not recognise is `inRun` — the unsafe default.
  */
 export const momentOf = (i: MomentInputs): UpdateMoment => {
+  if (i.leaving) return 'leaving'
   if (i.runOver) return 'runOver'
   if (i.floorChanging) return 'floorTransition'
   if (i.paused) return 'paused'

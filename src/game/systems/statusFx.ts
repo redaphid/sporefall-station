@@ -162,6 +162,12 @@ export const isWet = (e: Entity): boolean => hasStatus(e, 'wet')
  * gate on this. */
 export const isImmobilized = (e: Entity): boolean => hasStatus(e, 'frozen') || hasStatus(e, 'electrified')
 
+/** Every status that stops a body walking: the legacy stun/sleep counters plus
+ * the fx immobilizes. The host's movementSystem and the co-op client's
+ * prediction (netClient.stepSelf) both gate on this, so they cannot disagree. */
+export const isMovementLocked = (e: Entity): boolean =>
+  (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)
+
 /** Expire every effect whose tick has arrived. Pure function of world.tick, so
  * it behaves identically whether the world ran unbroken or was restored. */
 export const statusFxSystem = (w: World): void => {

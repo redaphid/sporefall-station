@@ -21,6 +21,12 @@ export default tseslint.config(
         { object: 'Math', property: 'random', message: 'Use the seeded Rng from rng.ts.' },
         { object: 'Date', property: 'now', message: 'No wall-clock in the sim. Ticks only.' },
       ],
+      // Regen and dormancy read `health.lastHurtTick`. A site that takes hp by
+      // hand skips it, as the damage-over-time tick did (#130).
+      'no-restricted-syntax': ['error',
+        { selector: "AssignmentExpression[operator='-='][left.property.name='hp']", message: 'Take hp with combat.hurt(), which records the hurt.' },
+        { selector: "AssignmentExpression[left.property.name='hp'] > BinaryExpression.right[operator='-']", message: 'Take hp with combat.hurt(), which records the hurt.' },
+      ],
     },
   },
 )

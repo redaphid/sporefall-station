@@ -12,7 +12,7 @@
 import { ELEMENTS } from '../data/elements'
 import { makeEntity, resistMult, type Entity, type EntityKind } from '../entity'
 import { addEntity, type World } from '../world'
-import { kill } from './combat'
+import { hurt, kill } from './combat'
 import { applyStatus } from './statusFx'
 import { vlen } from '../simMath'
 
@@ -138,7 +138,7 @@ export const elementSystem = (w: World): void => {
       // one takes extra. Missing table → ×1 (unchanged DOT).
       const dmg = Math.round(def.dot * resistMult(e, kind))
       if (dmg <= 0) continue // immune (mult 0) — the status lingers but does no harm
-      e.health.hp -= dmg
+      hurt(w, e.health, dmg)
       w.events.push({ type: 'hit', x: e.pos.x, y: e.pos.y, targetId: e.id, amount: dmg })
       if (e.health.hp <= 0) {
         kill(w, e)

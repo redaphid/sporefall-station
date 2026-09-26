@@ -63,6 +63,15 @@ const THROW_COOLDOWN = 20
  * boss (it roughly halves the fight) without being the boss's off switch. */
 export const SHATTER_DAMAGE_MULT = 5
 
+/** Take `amount` hp and record the hurt. Every damage source goes through here
+ * (lint enforces it): passive regen (systems/regen.ts) restarts its wait from
+ * `lastHurtTick` and a `damage` sleeper (systems/dormancy.ts) wakes on it, so a
+ * source that skipped the stamp healed through its own damage (#130). */
+export const hurt = (w: World, health: NonNullable<Entity['health']>, amount: number): void => {
+  health.hp -= amount // eslint-disable-line no-restricted-syntax -- the one sanctioned hp loss
+  health.lastHurtTick = w.tick
+}
+
 /**
  * Resolve one blow. Returns the damage ACTUALLY APPLIED, or `null` if the blow
  * never landed at all.
@@ -142,13 +151,10 @@ export const applyDamage = (
   // A RALLIED raider (a live leader in earshot) shrugs off a quarter of it.
   amount = Math.round(amount * resistMult(target, 'physical') * groupDamageMult(target, w.tick))
   if (resistsDamage(target, amount)) return null // e.g. a barrel shrugs off a weak hit
-  target.health.hp -= amount
+  // Any landed blow, even a clamped 0-damage one, counts as a hurt. The
+  // iframes/roll/downed/resist early-outs above never reach this line.
+  hurt(w, target.health, amount)
   target.health.iframes = IFRAME_TICKS
-  // Stamp the last-hurt tick: passive regen (systems/regen.ts) counts its
-  // "unharmed" window from here, so any landed blow (even a clamped 0-damage one)
-  // interrupts and restarts the wait. Only LANDED blows reach this line — the
-  // iframes/roll/downed/resist early-outs above never do.
-  target.health.lastHurtTick = w.tick
   if (target.status) {
     target.status.hitFlashUntil = w.tick + FLASH_TICKS
     target.status.sleep = 0 // damage wakes sleepers

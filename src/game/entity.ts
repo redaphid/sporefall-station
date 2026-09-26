@@ -264,9 +264,9 @@ export interface Entity {
     hp: number
     max: number
     iframes: number
-    /** Absolute tick of the last LANDED blow (set by combat.applyDamage and the
-     * shock arc). Drives passive regen: the "unharmed" clock (systems/regen.ts)
-     * counts from here. Optional/absent until first hurt, so pre-feature snapshots
+    /** Absolute tick of the last LANDED blow, damage over time included (set by
+     * combat.hurt, which every damage source calls). Drives passive regen: the
+     * "unharmed" clock (systems/regen.ts) counts from here. Optional/absent until first hurt, so pre-feature snapshots
      * round-trip byte-for-byte (same discipline as `mods`/`annotations`). */
     lastHurtTick?: number
     /** Lifesteal earned but not yet paid, in [-0.5, 0.5). hp stays whole, so each

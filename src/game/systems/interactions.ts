@@ -24,7 +24,7 @@ import { ELEMENTS } from '../data/elements'
 import { resistMult, type Entity } from '../entity'
 import type { EntityId } from '../types'
 import type { World } from '../world'
-import { kill } from './combat'
+import { hurt, kill } from './combat'
 import { addStatus, isWet } from './statusFx'
 import { vlen } from '../simMath'
 
@@ -93,10 +93,7 @@ export const shock = (
     const dmg = Math.round(ELEC_DAMAGE * resistMult(e, 'electrified'))
     if (e.health && !e.playerCtl?.downed && dmg > 0) {
       // A downed body is out of the fight — shock damage can't re-kill it (#52).
-      e.health.hp -= dmg
-      // This is the one damage site that bypasses combat.applyDamage, so stamp the
-      // last-hurt tick here too — an arc still counts as being harmed for regen.
-      e.health.lastHurtTick = w.tick
+      hurt(w, e.health, dmg)
       w.events.push({ type: 'shock', x: e.pos.x, y: e.pos.y, targetId: e.id })
       if (e.health.hp <= 0) kill(w, e)
     }

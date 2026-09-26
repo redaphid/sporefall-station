@@ -129,9 +129,9 @@ where the proof lives.
   crash the tab. Use Lane A for anything rendered.
 - **A saved run resumes.** After a plain `/`, picking Solo run continues the autosave in
   that browser profile rather than starting fresh. Lane B `--open` gets a fresh context
-  every time. Lane A shares a profile, and even `?mode=solo&seed=7` resumed a seed-7 save
-  there (it came up at tick 10769). For a fresh Lane A run, first `browser_evaluate`
-  `() => localStorage.removeItem('sporefall.savegame')` on the origin, then navigate.
+  every time. A URL with `?seed=N` always starts seed N and never reads or writes the save,
+  so a seeded run cannot be resumed by a reload either. To exercise the autosave, start
+  the run without `seed=`.
 - **The service worker.** A preview origin that previously served an older build can hand
   back that build. Doctor checks the server, not the page. If behavior looks stale in
   Lane A, compare `sporefall.version()` with the doctor's build number.

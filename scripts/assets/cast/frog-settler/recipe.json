@@ -73,19 +73,29 @@
   "seed": 3,
   "dirs": {
    "s": {
-    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen from the front, facing the camera, walking straight toward us. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen from the front, facing the camera, walking straight toward us. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours.",
+    "frames": 81,
+    "frames_sha256": "fc8a12e2907d789cfecd559855ccee8da7e729775be5a8fb2ee1d8adbe0c2b55"
    },
    "se": {
-    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen in a three-quarter front view turned toward the right of the frame, walking diagonally toward the lower right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen in a three-quarter front view turned toward the right of the frame, walking diagonally toward the lower right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours.",
+    "frames": 81,
+    "frames_sha256": "423796cb4eff6f4b559ebbdbc685ddeeca1ccdde769b362451cdd4c66147be1a"
    },
    "e": {
-    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, in full side profile facing the right side of the frame, walking to the right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, in full side profile facing the right side of the frame, walking to the right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours.",
+    "frames": 81,
+    "frames_sha256": "594e1440646822de8485f96298d8ef956dc1ba6c505c4e810d7cf359dfdf3f7a"
    },
    "ne": {
-    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen in a three-quarter rear view turned toward the right of the frame, walking away from us toward the upper right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours. He never turns around and never faces the camera: we only ever see him from behind for the whole clip. His green legs and feet step out from under the hem of the cloak, one and then the other."
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen in a three-quarter rear view turned toward the right of the frame, walking away from us toward the upper right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours. He never turns around and never faces the camera: we only ever see him from behind for the whole clip. His green legs and feet step out from under the hem of the cloak, one and then the other.",
+    "frames": 81,
+    "frames_sha256": "2b95e183c5a6453fe6d55c6ab2520b0e9acb6d3eddc81e48c08b61e39a81e77c"
    },
    "n": {
-    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen from directly behind, walking straight away from us. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen from directly behind, walking straight away from us. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours.",
+    "frames": 81,
+    "frames_sha256": "04d97ff19eb2276d03dd7525216e7ca378355b66a31182a2e7dd80d877514c02"
    }
   }
  },
@@ -113,31 +123,56 @@
     "args": [
      "--min-period",
      "30"
-    ]
+    ],
+    "loop": {
+     "start": 24,
+     "period": 45,
+     "seam": 0.422
+    }
    },
    "se": {
     "args": [
      "--min-period",
      "30"
-    ]
+    ],
+    "loop": {
+     "start": 28,
+     "period": 38,
+     "seam": 0.481
+    }
    },
    "e": {
     "args": [
      "--min-period",
      "30"
-    ]
+    ],
+    "loop": {
+     "start": 27,
+     "period": 48,
+     "seam": 0.158
+    }
    },
    "ne": {
     "args": [
      "--min-period",
      "40"
-    ]
+    ],
+    "loop": {
+     "start": 19,
+     "period": 54,
+     "seam": 0.429
+    }
    },
    "n": {
     "args": [
      "--min-period",
      "30"
-    ]
+    ],
+    "loop": {
+     "start": 26,
+     "period": 45,
+     "seam": 0.365
+    }
    }
   }
  },

@@ -1,0 +1,65 @@
+{
+ "dir": "e",
+ "png_sha256": "7c8901f80b860bb25f71dc57d59f4223331882724062fa2c39b7949a2c78ce35",
+ "clip": {
+  "frames": 81,
+  "frames_sha256": "594e1440646822de8485f96298d8ef956dc1ba6c505c4e810d7cf359dfdf3f7a"
+ },
+ "premat": [
+  "--shrink",
+  "1"
+ ],
+ "args": [
+  "--pixel",
+  "--sprite-height",
+  "96",
+  "--matte",
+  "alpha",
+  "--erode",
+  "1",
+  "--frames",
+  "8",
+  "--lens-guard",
+  "0",
+  "--no-canon",
+  "--min-period",
+  "30"
+ ],
+ "cell": [
+  88,
+  104
+ ],
+ "pivot": [
+  45.0,
+  102.0
+ ],
+ "loop": {
+  "start": 27,
+  "period": 48,
+  "error": 0.00469,
+  "error_rel": 0.158,
+  "rank_rel": 0.484,
+  "step": 0.02962
+ },
+ "source_frames": [
+  27,
+  33,
+  39,
+  45,
+  51,
+  57,
+  63,
+  69
+ ],
+ "durations_ms": [
+  375,
+  375,
+  375,
+  375,
+  375,
+  375,
+  375,
+  375
+ ],
+ "scale": 0.27119
+}

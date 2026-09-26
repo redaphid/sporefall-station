@@ -2,7 +2,7 @@ import { PLAYER_START_WEAPON, SPECIAL_COOLDOWN_TICKS, starterLoadout } from '../
 import { CONSUMABLES, itemClass } from '../data/items'
 import { isModId } from '../data/mods'
 import { OBJECTS } from '../data/objects'
-import type { Entity } from '../entity'
+import { SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import type { InputCmd } from '../types'
 import { type World } from '../world'
 import { addItem, applyModPickup } from './inventory'
@@ -300,6 +300,10 @@ const recover = (w: World, p: Entity): void => {
   const ctl = p.playerCtl!
   ctl.downed = undefined
   p.health!.hp = Math.max(1, Math.floor(p.health!.max * REVIVE_HP_FRACTION))
+  // Getting up next to whoever downed you must not be a second death: without
+  // grace the attacker re-downs a 30%-hp player in ~1-2 s, which in `casual`
+  // loops forever. The spawn grace (3 s) is long enough to react and run clear.
+  p.health!.iframes = Math.max(p.health!.iframes, SPAWN_GRACE_TICKS)
   if (w.mode !== 'normal') return
   w.revivesLeft = Math.max(0, w.revivesLeft - 1)
   ctl.cash = 0

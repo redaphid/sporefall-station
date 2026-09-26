@@ -258,7 +258,8 @@ export interface Entity {
   combat?: { weapon: string; cooldown: number }
   /** #78 — damage AFFINITY table: a multiplier on incoming damage keyed by kind
    * (`'physical'` for weapon impact/explosions, or an element id: `burning`,
-   * `spore`, `poisoned`). 1 = neutral, <1 resistant, 0 = immune, >1 vulnerable.
+   * `spore`, `poisoned`, `electrified` for the wet-shock arc). 1 = neutral, <1
+   * resistant, 0 = immune, >1 vulnerable.
    * A missing key (or absent table) is neutral (×1), so every existing entity
    * and fixture is byte-identical. Copied from the archetype (`NpcDef.resist`)
    * at spawn; this is what makes different enemies demand different tools. */

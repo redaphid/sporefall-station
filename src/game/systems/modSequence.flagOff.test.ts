@@ -57,10 +57,14 @@ const run = (seed: number, ticks: number): World => {
 }
 
 describe('mod sequencing: flag off matches main', () => {
-  // Captured on main @ 9d0894d with this exact file.
+  // Captured on main @ 9d0894d with this exact file. Re-pinned once for #91:
+  // the default-mode element rule changed from alphabetical to newest-in-list,
+  // so this gun's rounds now freeze (frost is its newest element) instead of
+  // burn. Restoring the alphabetical pick alone reproduced the old digests
+  // (deaefb3a, 6251b800).
   const GOLDEN: Record<number, string> = {
-    7: 'deaefb3a',
-    1234: '6251b800',
+    7: '68f8aaa8',
+    1234: '457a3b14',
   }
 
   for (const seed of [7, 1234]) {

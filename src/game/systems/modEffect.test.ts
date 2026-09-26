@@ -64,13 +64,16 @@ describe('the pistol every player holds', () => {
 })
 
 describe('elements share one slot in default casting', () => {
-  it('the losing element reads as overridden, naming the winner', () => {
+  it('an older element reads as overridden, naming the newest one on the list', () => {
     const mods = [m('frost'), m('shock')]
     expect(modVerdict(WEAPONS.pistol, mods, 'frost')).toEqual({ kind: 'inert', reason: 'Tesla Rounds overrides it' })
     expect(modVerdict(WEAPONS.pistol, mods, 'shock').kind).toBe('live')
     const three = [m('shock'), m('incendiary'), m('frost')]
-    expect(modVerdict(WEAPONS.pistol, three, 'incendiary')).toEqual({ kind: 'inert', reason: 'Tesla Rounds overrides it' })
-    expect(modVerdict(WEAPONS.pistol, [m('incendiary'), m('frost')], 'frost')).toEqual({ kind: 'inert', reason: 'Incendiary overrides it' })
+    expect(modVerdict(WEAPONS.pistol, three, 'shock')).toEqual({ kind: 'inert', reason: 'Cryo Rounds overrides it' })
+    expect(modVerdict(WEAPONS.pistol, three, 'incendiary')).toEqual({ kind: 'inert', reason: 'Cryo Rounds overrides it' })
+    expect(modVerdict(WEAPONS.pistol, three, 'frost').kind).toBe('live')
+    expect(modVerdict(WEAPONS.pistol, [m('frost'), m('incendiary')], 'frost')).toEqual({ kind: 'inert', reason: 'Incendiary overrides it' })
+    expect(modVerdict(WEAPONS.pistol, [m('incendiary'), m('frost')], 'frost').kind).toBe('live')
   })
 
   it('sequenced casting fires each element on its own shot, so both are live', () => {

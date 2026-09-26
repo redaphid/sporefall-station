@@ -6,7 +6,7 @@ This directory holds the maintained recipes for proving player-facing behavior o
 
 - Serve this checkout with `$S/serve.sh start <port>` and require every `$S/doctor.sh <port>` line to be `ok`.
 - Never drive a server this run did not start. Doctor fails on someone else's preview.
-- Lane A (visual) is the soul-desktop Playwright MCP at `http://localhost:<port>`. Lane B (sim/DOM, no canvas) is `$S/drive.mjs --port <port>`.
+- Lane A (visual and playtesting) is claude-in-chrome, one tab per agent, at `http://localhost:<port>`. Lane B (sim/DOM, no canvas) is `$S/drive.mjs --port <port>`.
 - Pass `seed` explicitly so a run is reproducible.
 
 ## Driving conventions

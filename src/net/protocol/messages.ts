@@ -505,6 +505,8 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
+  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
+  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional

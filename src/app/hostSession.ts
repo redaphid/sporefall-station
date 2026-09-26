@@ -2,7 +2,7 @@ import type { Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { setupFloor } from '../game/systems/missions'
+import { extractionView, setupFloor } from '../game/systems/missions'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -171,6 +171,7 @@ export class HostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
+      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
       mode: this.world.mode,

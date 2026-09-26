@@ -5,6 +5,7 @@
  * every function here is unit-testable in isolation.
  */
 
+import { MODS } from '../game/data/mods'
 import type { SimEvent } from '../game/types'
 
 // --- Screen shake (magnitude in world tiles) ---------------------------------
@@ -117,11 +118,14 @@ const TINT_FADE = 1.2 // intensity/sec
 export const decayTint = (v: number, dt: number): number => Math.max(0, v - dt * TINT_FADE)
 
 /** Warm (fire) vs cold (frost) intensity an event contributes, 0 if neither.
- * Explosions/fire-DOT hits warm the scene; shatter/shock chill it. */
+ * Explosions/fire-DOT hits warm the scene; shatter/shock chill it, and so does
+ * a blast that freezes or electrifies. */
 export const tintForEvent = (ev: SimEvent): { warm: number; cold: number } => {
   switch (ev.type) {
-    case 'explosion':
-      return { warm: 0.8, cold: 0 }
+    case 'explosion': {
+      const status = ev.element ? MODS[ev.element]?.onHit?.status : undefined
+      return status === 'frozen' || status === 'electrified' ? { warm: 0, cold: 0.8 } : { warm: 0.8, cold: 0 }
+    }
     case 'shatter':
       return { warm: 0, cold: 0.7 }
     case 'shock':

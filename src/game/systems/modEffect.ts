@@ -10,14 +10,15 @@ import type { StatusApply, WeaponDef } from '../data/items'
 import { MODS, stackMod, type BulletBehavior, type ResolvedTrigger } from '../data/mods'
 import type { WeaponMod } from '../entity'
 import { PLAYER_MELEE_MULT } from '../player'
-import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
+import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
 import { pelletShares, planCasts, planPull, type SequenceShape } from './modSequence'
 
 /** The fields of a resolved weapon that `fireWeapon` reads. Both kinds read
  * damage, cooldown, element and triggers. Only a swing reads knockback: a
  * bullet always shoves by a fixed amount (projectiles.ts). Only a gun reads the
  * bullet fields, and spread only when it fires more than one pellet (a lone
- * pellet's fan offset is always 0). */
+ * pellet's fan offset is always 0). An element that loses the round can still
+ * ride its shards or blast (`carries`), so it is live there. */
 export interface ExecutedShot {
   damage: number
   cooldownTicks: number
@@ -28,6 +29,7 @@ export interface ExecutedShot {
   spread?: number
   projectileSpeed?: number
   behavior?: BulletBehavior
+  carries?: CarriedElements
 }
 
 /** The damage a swing deals before the target's defences: players hit harder
@@ -47,6 +49,7 @@ const shotFrom = (weapon: WeaponDef, rw: ResolvedWeapon, byPlayer: boolean): Exe
   if (rw.pellets > 1) shot.spread = rw.spread
   shot.projectileSpeed = rw.projectileSpeed
   shot.behavior = rw.behavior
+  shot.carries = rw.carries
   return shot
 }
 
@@ -108,7 +111,7 @@ interface CyclePull {
   wrapped: boolean
 }
 
-/** Every pull of one full sequenced cycle from index 0: the order the fire path
+/** Every pull of one full cycle from index 0: the order the fire path
  * walks the wand in steady state. */
 const pullCycle = (weapon: WeaponDef, mods: readonly WeaponMod[]): { shape: SequenceShape; pulls: CyclePull[] } => {
   const { shape } = planPull(weapon, mods, 0)
@@ -164,7 +167,7 @@ const LABEL: Record<string, string> = {
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 
 /** The verdict a mod past the weapon's live window gets: it never fires. */
-export const STOWED_VERDICT: ModVerdict = { kind: 'inert', reason: 'stowed: swap it in' }
+export const STOWED_VERDICT = { kind: 'inert', reason: 'stowed: swap it in' } as const satisfies ModVerdict
 
 /**
  * The verdict for mod `modId` as installed in `mods` on `weapon`, judged on the
@@ -176,7 +179,7 @@ export const modVerdict = (weapon: WeaponDef, mods: readonly WeaponMod[], modId:
   if (!MODS[modId]) return { kind: 'inert', reason: 'unknown mod' }
   const installed = mods.some((m) => m.id === modId && m.stacks > 0) ? mods : stackMod(mods.map((m) => ({ ...m })), modId, 1)
   const shots = castShots(weapon, installed, modId)
-  if (!shots) return STOWED_VERDICT
+  if (!shots) return { ...STOWED_VERDICT }
   const [withIt, without] = shots
   if (same(withIt, without)) {
     if (rechargeHidesIt(weapon, installed, modId)) return { kind: 'inert', reason: 'recharge hides it' }

@@ -8,9 +8,14 @@ import { MODS } from '../../game/data/mods'
 import { makeEntity, type Entity, type WeaponMod } from '../../game/entity'
 import { spawnPlayer } from '../../game/player'
 import { combatSystem } from '../../game/systems/combat'
+import { projectileSystem } from '../../game/systems/projectiles'
 import { arm } from '../../game/testkit'
 import { emptyInput } from '../../game/types'
-import { createWorld } from '../../game/world'
+import { addEntity, createWorld } from '../../game/world'
+import { decodeJson, encodeJson } from '../framing/codec'
+import { MsgType } from '../types'
+import { composeBulletTraits } from '../../render/bulletVisuals'
+import type { EventsMsg } from './messages'
 import {
   applyWireEntity,
   decodeSnapshot,
@@ -154,5 +159,56 @@ describe('a real modded shot, host sim → wire → client mirror', () => {
   it('Cryo then Tesla reaches the client as a Tesla round', () => {
     const e = clientRound([{ id: 'frost', stacks: 1 }, { id: 'shock', stacks: 1 }])
     expect(e.projectile?.mods).toEqual([{ id: 'shock', stacks: 1 }])
+  })
+})
+
+describe("a shard or blast carrying its cast's element, host sim → wire → client", () => {
+  /** Fire the cast of `mods` that starts at window position `at` at a 1-hp
+   * body until the round dies; returns the host world. */
+  const fired = (mods: string[], at: number) => {
+    const w = createWorld(1, 1)
+    const p = spawnPlayer(w, 0, 20, 20)
+    p.loadout!.inventory = []
+    const stack = arm(p, 'pistol')
+    stack.mods = mods.map((id) => ({ id, stacks: 1 }))
+    stack.castIndex = at
+    p.facing = 0
+    const t = addEntity(w, makeEntity('npc', 'civilian', 24, 20))
+    t.health = { hp: 1, max: 40, iframes: 0 }
+    const near = addEntity(w, makeEntity('npc', 'civilian', 24.8, 20.9))
+    near.health = { hp: 400, max: 400, iframes: 0 }
+    combatSystem(w, new Map([[0, { ...emptyInput(), attack: true }]]))
+    const round = w.entities.find((e) => e.kind === 'projectile')!
+    const events = [...w.events]
+    for (let i = 0; i < 40 && !round.dead; i++) {
+      w.events = []
+      projectileSystem(w)
+      events.push(...w.events)
+      w.tick++
+    }
+    return { w, round, events }
+  }
+
+  it("[frost, split, rapid, shock]: the client draws the second cast's shards as shock, like their round", () => {
+    const { w, round } = fired(['frost', 'split', 'rapid', 'shock'], 1)
+    const shards = w.entities.filter((e) => e.kind === 'projectile' && e !== round)
+    expect(shards).toHaveLength(2)
+    const wire = roundTrip([round, ...shards].map((e) => toWireEntity(e, w.tick))).entities
+    const [clientRound, ...clientShards] = wire.map((we) => applyWireEntity(undefined, we, w.tick))
+    expect(clientRound.projectile?.mods).toEqual([{ id: 'rapid', stacks: 1 }, { id: 'shock', stacks: 1 }, { id: 'split', stacks: 1 }])
+    for (const [i, c] of clientShards.entries()) {
+      expect(shards[i].projectile!.onHit?.status).toBe('electrified')
+      expect(c.projectile?.mods).toEqual(shards[i].projectile!.mods)
+      expect(c.projectile?.mods).toEqual(clientRound.projectile?.mods)
+      expect(composeBulletTraits(c.projectile?.mods)).toEqual(composeBulletTraits(shards[i].projectile!.mods))
+    }
+  })
+
+  it("[frost, explosive, rapid, shock]: the second cast's shock blast reaches the client in the events message", () => {
+    const { w, events } = fired(['frost', 'explosive', 'rapid', 'shock'], 1)
+    const sent: EventsMsg = { tick: w.tick, events }
+    const got = decodeJson<EventsMsg>(encodeJson(MsgType.Events, sent))
+    expect(got.events).toContainEqual(expect.objectContaining({ type: 'explosion', element: 'shock' }))
+    expect(got).toEqual(sent)
   })
 })

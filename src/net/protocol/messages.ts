@@ -373,7 +373,7 @@ export const encodeInput = (
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
-  // OPTIONAL trailing u16: a sequenced-mods reorder request, +1 biased (0 is
+  // OPTIONAL trailing u16: a mod reorder request, +1 biased (0 is
   // never written; absent = none). Written ONLY when a swap is pending, so every
   // ordinary input packet is byte-identical to before. An older host reads the
   // hotbar byte and never looks further, so the extra bytes are ignored.

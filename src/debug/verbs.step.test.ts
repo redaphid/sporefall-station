@@ -71,7 +71,6 @@ describe('step verb with a held input', () => {
 
   it('edge fields fire on the first tick only (a held swap would undo itself)', () => {
     const { w, pid } = arena()
-    w.modCasting = 'sequence'
     runVerb(w, `addMod ${pid} frost`)
     runVerb(w, `addMod ${pid} heavy`)
     const order = () => weaponStack(w.byId.get(pid)!)!.mods!.map((m) => m.id)

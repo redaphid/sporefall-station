@@ -1,6 +1,6 @@
-// Sequenced mods over the co-op link: the run rule reaches clients in
-// GameStart, a client's reorder reaches the host as an input, and the client's
-// HUD reads the host's own castIndex/recharge (InventoryMsg), never a local copy.
+// Sequenced mods over the co-op link: a client's reorder reaches the host as an
+// input, and the client's HUD reads the host's own castIndex/recharge
+// (InventoryMsg), never a local copy.
 //
 // The host is the ship's quartermaster here; the client is the night-shift tech
 // who keeps asking why the cryo rounds come out first.
@@ -99,9 +99,9 @@ const LOCKER_7: WeaponMod[] = [
   { id: 'shock', stacks: 1 },
 ]
 
-const startPair = async (seed: number, sequenced: boolean, clientInput: InputSource) => {
+const startPair = async (seed: number, clientInput: InputSource) => {
   const hub = new MockHub()
-  const host = new NetHostSession(seed, 'Quartermaster', makeInput().source, hub.hostTransport, 'normal', sequenced ? 'sequence' : undefined)
+  const host = new NetHostSession(seed, 'Quartermaster', makeInput().source, hub.hostTransport, 'normal')
   const bob = hub.addClient('NightShift', clientInput)
   await host.start()
   await bob.session.start()
@@ -124,19 +124,15 @@ const step = async (host: NetHostSession, bob: ReturnType<MockHub['addClient']>,
 }
 
 describe('sequenced mods over co-op', () => {
-  it('the run rule reaches the client in GameStart; an unsequenced host sends nothing new', async () => {
-    const on = await startPair(301, true, makeInput().source)
-    await step(on.host, on.bob, 2)
-    expect(on.bob.session.renderView().modCasting).toBe('sequence')
-    const off = await startPair(302, false, makeInput().source)
-    await step(off.host, off.bob, 2)
-    expect(off.bob.session.renderView().modCasting).toBeUndefined()
-    expect(off.bob.session.renderView().simTick).toBeUndefined()
+  it("the client's view carries the host tick its recharge bar is measured against", async () => {
+    const { host, bob } = await startPair(301, makeInput().source)
+    await step(host, bob, 2)
+    expect(bob.session.renderView().simTick).toBe(host.world.tick)
   })
 
   it("the client's HUD shows the host's castIndex and recharge on every tick of a firefight", async () => {
     const input = makeInput()
-    const { host, bob, avatar } = await startPair(303, true, input.source)
+    const { host, bob, avatar } = await startPair(303, input.source)
     await step(host, bob, 2)
     input.set({ attack: true, aimX: 1, aimY: 0 })
     let sawWrap = false
@@ -151,8 +147,8 @@ describe('sequenced mods over co-op', () => {
       if (hostStack.rechargeUntil !== undefined) sawWrap = true
       // The strip the client draws marks the same cast as the host's own model.
       const view = bob.session.renderView()
-      const clientModel = buildSequence(view.self, view.modCasting, view.simTick ?? view.tick)!
-      const hostModel = buildSequence(avatar, 'sequence', host.world.tick)!
+      const clientModel = buildSequence(view.self, view.simTick ?? view.tick)!
+      const hostModel = buildSequence(avatar, host.world.tick)!
       expect(clientModel.entries.map((e) => e.next)).toEqual(hostModel.entries.map((e) => e.next))
       expect(clientModel.rechargeLeft).toBe(hostModel.rechargeLeft)
     }
@@ -162,7 +158,7 @@ describe('sequenced mods over co-op', () => {
 
   it("a client's reorder arrives at the host as an input and comes back in its inventory", async () => {
     const input = makeInput()
-    const { host, bob, avatar } = await startPair(304, true, input.source)
+    const { host, bob, avatar } = await startPair(304, input.source)
     await step(host, bob, 2)
     input.set({ modSwap: packModSwap(1, 3) })
     await step(host, bob, 2)
@@ -171,15 +167,6 @@ describe('sequenced mods over co-op', () => {
     const order = ['overload', 'shock', 'incendiary', 'frost']
     expect(weaponStack(avatar)!.mods!.map((m) => m.id)).toEqual(order)
     expect(weaponStack(bob.session.renderView().self!)!.mods!.map((m) => m.id)).toEqual(order)
-  })
-
-  it('an unsequenced host ignores a reorder input', async () => {
-    const input = makeInput()
-    const { host, bob, avatar } = await startPair(305, false, input.source)
-    await step(host, bob, 2)
-    input.set({ modSwap: packModSwap(0, 1) })
-    await step(host, bob, 4)
-    expect(weaponStack(avatar)!.mods!.map((m) => m.id)).toEqual(LOCKER_7.map((m) => m.id))
   })
 })
 
@@ -214,7 +201,7 @@ describe('input wire: the reorder tail is additive', () => {
   })
 })
 
-describe('determinism with sequencing on', () => {
+describe('determinism', () => {
   /** Hold fire, sweep aim, and reorder every 41st tick. */
   const script = (t: number): InputCmd => {
     const a = t * 0.05
@@ -228,7 +215,7 @@ describe('determinism with sequencing on', () => {
   }
 
   const soloRun = (seed: number, ticks: number): HostSession => {
-    const s = new HostSession(seed, scripted(), undefined, 'normal', 'sequence')
+    const s = new HostSession(seed, scripted(), undefined, 'normal')
     weaponStack(s.self)!.mods = LOCKER_7.map((m) => ({ ...m }))
     s.self.health!.iframes = 99999
     for (let i = 0; i < ticks; i++) s.tick()
@@ -242,26 +229,17 @@ describe('determinism with sequencing on', () => {
     expect(weaponStack(a.self)!.castIndex).toBeDefined()
   })
 
-  it('the rule is re-read per run: a toggled flag applies from the next restart', () => {
-    let on = false
-    const s = new HostSession(9, makeInput().source, undefined, 'normal', () => (on ? 'sequence' : undefined))
-    expect(s.world.modCasting).toBeUndefined()
-    on = true
-    s.restart()
-    expect(s.world.modCasting).toBe('sequence')
-  })
-
   it('host and a replaying peer agree: a second host fed the same inputs reaches the same digest', async () => {
     // The co-op client does not simulate combat (it renders the host), so the
     // host-vs-client check for SIM state is: an independent host fed the exact
     // per-tick commands the first one consumed lands on the same world.
-    const first = new HostSession(777, scripted(), undefined, 'normal', 'sequence')
+    const first = new HostSession(777, scripted(), undefined, 'normal')
     weaponStack(first.self)!.mods = LOCKER_7.map((m) => ({ ...m }))
     const log: InputCmd[] = []
     first.onTickInputs = (inputs) => log.push({ ...inputs.get(0)! })
     for (let i = 0; i < 300; i++) first.tick()
     let k = 0
-    const replay = new HostSession(777, { sample: () => ({ ...log[k++] }) }, undefined, 'normal', 'sequence')
+    const replay = new HostSession(777, { sample: () => ({ ...log[k++] }) }, undefined, 'normal')
     weaponStack(replay.self)!.mods = LOCKER_7.map((m) => ({ ...m }))
     for (let i = 0; i < 300; i++) replay.tick()
     expect(worldDigest(replay.world)).toBe(worldDigest(first.world))

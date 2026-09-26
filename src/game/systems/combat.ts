@@ -1,6 +1,6 @@
 import { SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
 import { WEAPONS, type StatusApply } from '../data/items'
-import { normalizeMods, type ResolvedTrigger } from '../data/mods'
+import { MODS, normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
 import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
@@ -11,7 +11,7 @@ import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
 import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
-import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
+import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { applyModSwap, pelletShares, planPull, recharging } from './modSequence'
 import { meleeDamage } from './modEffect'
@@ -298,8 +298,13 @@ export interface ProjectileSpec {
   split?: number
   splinter?: number
   lifestealFrac?: number
+  carries?: CarriedElements
   triggers?: ResolvedTrigger[]
 }
+
+/** `spec` with the element it carries, keeping the key absent when there is none. */
+const carrying = <T extends object>(spec: T, element: string | undefined): T & { element?: string } =>
+  element ? { ...spec, element } : spec
 
 export const spawnProjectile = (
   w: World,
@@ -329,11 +334,12 @@ export const spawnProjectile = (
     if (spec.pierce) p.pierceLeft = spec.pierce
     if (spec.bounce) p.bounceLeft = spec.bounce
     if (spec.homing) p.homing = spec.homing
-    if (spec.explodeRadius && spec.explodeDamage) p.explode = { radius: spec.explodeRadius, damage: spec.explodeDamage }
-    if (spec.split && spec.split > 0) p.split = { count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }
+    const carries = spec.carries ?? {}
+    if (spec.explodeRadius && spec.explodeDamage) p.explode = carrying({ radius: spec.explodeRadius, damage: spec.explodeDamage }, carries.explode)
+    if (spec.split && spec.split > 0) p.split = carrying({ count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }, carries.split)
     // Splinter: a radial shrapnel burst on death — many short-lived, weak fragments
     // (fast but ttl ~6 ticks → a tight scatter, not a second volley).
-    if (spec.splinter && spec.splinter > 0) p.splinter = { count: spec.splinter, damage: Math.max(1, Math.round(damage * 0.35)), speed: speed * 0.7, ttl: 6 }
+    if (spec.splinter && spec.splinter > 0) p.splinter = carrying({ count: spec.splinter, damage: Math.max(1, Math.round(damage * 0.35)), speed: speed * 0.7, ttl: 6 }, carries.splinter)
     if (spec.lifestealFrac) p.lifestealFrac = spec.lifestealFrac
     if (spec.triggers && spec.triggers.length) p.triggers = spec.triggers
   }
@@ -343,16 +349,29 @@ export const spawnProjectile = (
 /** A blast at (x,y): every live body in radius takes `damage` from the owner.
  * The one AoE primitive — reused by grenades/explosive bullets (projectiles.ts)
  * and by on-kill detonator triggers. Kept here (not projectiles.ts) so the
- * projectile system can import it without a cycle back through applyDamage. */
-export const detonate = (w: World, x: number, y: number, radius: number, damage: number, ownerId: EntityId): void => {
-  w.events.push({ type: 'explosion', x, y, radius })
+ * projectile system can import it without a cycle back through applyDamage.
+ * A blast carrying `element` (a mod id) applies that element to every body it
+ * damages, through the same gate and status path as a bullet hit. */
+export const detonate = (
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  damage: number,
+  ownerId: EntityId,
+  element?: string,
+): void => {
+  w.events.push(element ? { type: 'explosion', x, y, radius, element } : { type: 'explosion', x, y, radius })
+  const onHit = element ? MODS[element]?.onHit : undefined
   // Explosions are LOUD: every NPC in earshot comes to investigate the boom —
   // the price of the fast door-breach path below (vs the slow, quiet pick).
   emitNoise(w, x, y)
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
     const dist = vlen(other.pos.x - x, other.pos.y - y)
-    if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
+    if (dist > radius + other.radius) continue
+    const landed = applyDamage(w, other, damage, x, y, 10, ownerId) !== null
+    if (landed && onHit) applyStatus(w, other, onHit.status, onHit.ticks, ownerId)
   }
   // Breach: a blast centred close enough blows a door open, locked or not —
   // the always-available alternative to picking (the player special IS a
@@ -397,7 +416,7 @@ export const runHitTriggers = (
   for (const t of triggers) {
     if (!t.explode) continue
     if (t.event === 'hit' || (t.event === 'kill' && killed)) {
-      detonate(w, victim.pos.x, victim.pos.y, t.explode.radius, t.explode.damage, ownerId)
+      detonate(w, victim.pos.x, victim.pos.y, t.explode.radius, t.explode.damage, ownerId, t.explode.element)
     }
   }
 }
@@ -418,6 +437,7 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
     split: b.split || undefined,
     splinter: b.splinter || undefined,
     lifestealFrac: b.lifestealFrac || undefined,
+    carries: rw.carries,
     triggers: rw.triggers.length ? rw.triggers : undefined,
   }
 }

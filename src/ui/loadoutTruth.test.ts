@@ -59,7 +59,14 @@ interface Fired {
 
 const pristine = new WeakMap<World, Entity>()
 const targetOf = (w: World): Entity => w.entities.find((e) => e.kind === 'npc')!
-const explosions = (w: World): number => w.events.filter((e) => e.type === 'explosion').length
+const blastsOf = (w: World): (string | undefined)[] =>
+  w.events.flatMap((e) => (e.type === 'explosion' ? [e.element] : []))
+const explosions = (w: World): number => blastsOf(w).length
+/** A shard, shrapnel or blast badge names the status of the element the sim gave it. */
+const carrying = (label: string, element: string | undefined): string => {
+  const status = element ? MODS[element]?.onHit?.status : undefined
+  return status ? `${label} · ${status}` : label
+}
 
 /** Fire one pull and read what happened off the world, then reset for the next. */
 const pull = (w: World): Fired => {
@@ -85,8 +92,8 @@ const pull = (w: World): Fired => {
     // Stun and sleep ride their own timers on `status`, not `fx`.
     if (target.status && target.status.stun > 0) badges.push('stun on hit')
     if (target.status && target.status.sleep > 0) badges.push('sleep on hit')
-    if (explosions(w) > 0) badges.push('On hit: blast')
-    if (explosions(fragile) > explosions(w)) badges.push('On kill: blast')
+    if (explosions(w) > 0) badges.push(carrying('On hit: blast', blastsOf(w)[0]))
+    if (explosions(fragile) > explosions(w)) badges.push(carrying('On kill: blast', blastsOf(fragile).at(-1)))
     fired.badges = badges.sort()
   } else {
     fired.damage = shots.map((s) => s.projectile!.damage)
@@ -98,12 +105,12 @@ const pull = (w: World): Fired => {
       if (q!.pierceLeft) badges.add(`Pierce ×${q!.pierceLeft}`)
       if (q!.bounceLeft) badges.add(`Bounce ×${q!.bounceLeft}`)
       if (q!.homing) badges.add('Homing')
-      if (q!.explode) badges.add(`Explosive (${q!.explode.damage})`)
-      if (q!.split) badges.add(`Split ×${q!.split.count}`)
-      if (q!.splinter) badges.add(`Splinter ×${q!.splinter.count}`)
+      if (q!.explode) badges.add(carrying(`Explosive (${q!.explode.damage})`, q!.explode.element))
+      if (q!.split) badges.add(carrying(`Split ×${q!.split.count}`, q!.split.element))
+      if (q!.splinter) badges.add(carrying(`Splinter ×${q!.splinter.count}`, q!.splinter.element))
       if (q!.lifestealFrac) badges.add(`Lifesteal ${Math.round(q!.lifestealFrac * 100)}%`)
       if (q!.onHit) badges.add(`${q!.onHit.status} on hit`)
-      for (const t of q!.triggers ?? []) badges.add(`On ${t.event}: blast`)
+      for (const t of q!.triggers ?? []) badges.add(carrying(`On ${t.event}: blast`, t.explode?.element))
     }
     fired.badges = [...badges].sort()
   }
@@ -150,6 +157,9 @@ const LISTS: WeaponMod[][] = [
   [m('rapid', 3), m('frost')],
   [m('frost'), m('bulk'), m('shock')],
   [m('rapid'), m('frost'), m('shock'), m('incendiary')],
+  // An element that loses the round can still ride a shard or blast (#119).
+  ...['split', 'splinterShot', 'explosive', 'detonator'].map((id) => [m('frost'), m(id), m('rapid'), m('shock')]),
+  [m('shock'), m('split'), m('explosive'), m('frost')],
   ...MOD_IDS.map((_, i) => [m(MOD_IDS[i]), m(MOD_IDS[(i * 5 + 3) % 18]), m(MOD_IDS[(i * 7 + 11) % 18])]).filter(
     (l) => new Set(l.map((x) => x.id)).size === 3,
   ),

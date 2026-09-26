@@ -6,10 +6,11 @@
 // It folds the MODS registry over the base def in SORTED-KEY order, so a cast's
 // stats do not depend on the order of its modifiers (Brotato's additive-pool
 // lesson + RoR2's per-effect curves). The cast's element, if it has one, is the
-// hit's element; otherwise the base weapon's. Every output field is clamped to
-// stay finite and non-degenerate under huge stacks (cooldown floored ≥1 so
-// fireRate can't divide-by-zero; chance-like fields use a hyperbolic curve that
-// approaches but never reaches 100%).
+// hit's element, and every shard, fragment and blast the cast's rounds spawn
+// carries it too (`carries`); otherwise the hit takes the base weapon's. Every
+// output field is clamped to stay finite and non-degenerate under huge stacks
+// (cooldown floored ≥1 so fireRate can't divide-by-zero; chance-like fields use
+// a hyperbolic curve that approaches but never reaches 100%).
 
 import type { WeaponDef, StatusApply } from '../data/items'
 import { MODS, modMaxStacks, normalizeMods, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
@@ -29,7 +30,21 @@ export interface ResolvedWeapon {
    * provenance is built from this, so its look shows only what the cast runs. */
   mods?: WeaponMod[]
   behavior: BulletBehavior
+  /** The element each self-hitting behavior carries. */
+  carries: CarriedElements
   triggers: ResolvedTrigger[]
+}
+
+/** The element mod id carried by each behavior whose hits are its own: split
+ * shards, splinter shrapnel, and the explosive blast. It is the cast's element
+ * mod, the payload that ends the cast. A base weapon's own element is not a
+ * mod, so it rides none of them. A key is absent when the weapon lacks the
+ * behavior or the cast holds no element mod.
+ * A trigger's blast carries the same, on `ResolvedTrigger.explode.element`. */
+export interface CarriedElements {
+  split?: string
+  splinter?: string
+  explode?: string
 }
 
 // Clamp bounds — the anti-blowup guardrails (all finite, no NaN/Infinity).
@@ -77,8 +92,8 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
   const triggers: ResolvedTrigger[] = []
 
   const known = mods.filter((m) => MODS[m.id] && m.stacks > 0)
-  const element = known.find((m) => MODS[m.id].onHit)
-  const onHit: StatusApply | undefined = element ? MODS[element.id].onHit : base.onHit
+  const element = known.find((m) => MODS[m.id].onHit)?.id
+  const onHit: StatusApply | undefined = element ? MODS[element].onHit : base.onHit
 
   // Sorted-key fold → order-independent stats. Skip unknown ids and non-positive stacks.
   const active = known
@@ -103,12 +118,19 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       const t = def.trigger
       triggers.push({
         event: t.event,
-        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks } } : {}),
+        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks, ...(element ? { element } : {}) } } : {}),
       })
     }
   }
 
   behavior.lifestealFrac = lifestealStacks > 0 ? hyperbolic(lifestealPerStack, lifestealStacks) : 0
+  const carries: CarriedElements = element
+    ? {
+        ...(behavior.split > 0 ? { split: element } : {}),
+        ...(behavior.splinter > 0 ? { splinter: element } : {}),
+        ...(behavior.explodeRadius > 0 && behavior.explodeDamage > 0 ? { explode: element } : {}),
+      }
+    : {}
 
   return {
     base,
@@ -130,6 +152,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       splinter: clamp(Math.round(behavior.splinter), 0, BEHAVIOR_CAP),
       lifestealFrac: clamp(behavior.lifestealFrac, 0, 0.95),
     },
+    carries,
     triggers,
   }
 }

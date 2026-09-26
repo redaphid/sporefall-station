@@ -119,6 +119,12 @@ export const selfModVerdict = (
   return modVerdict(def, weaponStack(self!)?.mods ?? [], modId, modCasting === 'sequence')
 }
 
+/** A shard, shrapnel or blast badge names the status its element applies. */
+const carrying = (label: string, element: string | undefined): string => {
+  const status = element ? MODS[element]?.onHit?.status : undefined
+  return status ? `${label} · ${status}` : label
+}
+
 /** Bullet-behavior badges — only the effects the fire path executes, across
  * every cast of the pull (a sequenced shotgun can carry two elements). */
 const buildBehaviors = (casts: readonly ExecutedShot[]): LoadoutBehavior[] => {
@@ -132,13 +138,14 @@ const buildBehaviors = (casts: readonly ExecutedShot[]): LoadoutBehavior[] => {
       if (b.pierce > 0) add({ key: 'pierce', icon: '🏹', label: `Pierce ×${b.pierce}` })
       if (b.bounce > 0) add({ key: 'bounce', icon: '🪃', label: `Bounce ×${b.bounce}` })
       if (b.homing > 0) add({ key: 'homing', icon: '🧲', label: 'Homing' })
-      if (b.explodeRadius > 0) add({ key: 'explosive', icon: '💣', label: `Explosive (${b.explodeDamage})` })
-      if (b.split > 0) add({ key: 'split', icon: '✳️', label: `Split ×${b.split}` })
-      if (b.splinter > 0) add({ key: 'splinter', icon: '🔪', label: `Splinter ×${b.splinter}` })
+      const c = r.carries ?? {}
+      if (b.explodeRadius > 0) add({ key: 'explosive', icon: '💣', label: carrying(`Explosive (${b.explodeDamage})`, c.explode) })
+      if (b.split > 0) add({ key: 'split', icon: '✳️', label: carrying(`Split ×${b.split}`, c.split) })
+      if (b.splinter > 0) add({ key: 'splinter', icon: '🔪', label: carrying(`Splinter ×${b.splinter}`, c.splinter) })
       if (b.lifestealFrac > 0) add({ key: 'lifesteal', icon: '🩸', label: `Lifesteal ${Math.round(b.lifestealFrac * 100)}%` })
     }
     if (r.onHit) add({ key: 'onhit', icon: '✨', label: `${r.onHit.status} on hit` })
-    for (const t of r.triggers) add({ key: `trigger:${t.event}`, icon: '☠️', label: `On ${t.event}: blast` })
+    for (const t of r.triggers) add({ key: `trigger:${t.event}`, icon: '☠️', label: carrying(`On ${t.event}: blast`, t.explode?.element) })
   }
   return out
 }

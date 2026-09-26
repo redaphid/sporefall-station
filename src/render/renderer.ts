@@ -9,6 +9,7 @@ import { createArt, TILE_PX, type ArtRegistry } from './art'
 import { WORLD_LAYER_ORDER, type WorldLayerName } from './worldLayers'
 import { BackbufferPipeline } from './backbuffer'
 import { BulletLayer } from './bullets'
+import { blastTint } from './bulletVisuals'
 import { DistortionPool, packPrims, specsForEvents, sustainedSpecs, type UvProjector } from './distortion'
 import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from './theme'
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
@@ -526,7 +527,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           } else if (ev.type === 'death') {
             effects.spawn('blood', ev.x, ev.y, view.tick)
           } else if (ev.type === 'explosion') {
-            effects.spawn('explosion', ev.x, ev.y, view.tick)
+            effects.spawn('explosion', ev.x, ev.y, view.tick, blastTint(ev.element))
           } else if (ev.type === 'shatter') {
             effects.spawn('hit', ev.x, ev.y, view.tick, FROST_TINT)
           } else if (ev.type === 'shock') {

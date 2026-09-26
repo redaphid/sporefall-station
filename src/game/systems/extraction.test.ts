@@ -1,7 +1,7 @@
 // `extraction` missions (#85): grab the prize → station alert → get back out
 // the way you came. Covers the RNG-stream guarantee against a baseline of the
 // pre-extraction world (regenerate with scripts/test/gen-mission-baseline.mts,
-// extraction selection switched off; re-captured after #92 moved 10 idle worlds), the full loop, carrier loss in solo and co-op, a
+// extraction selection switched off; re-captured after #92 moved 10 idle worlds and after #114 moved 6:8 and 16:3), the full loop, carrier loss in solo and co-op, a
 // mid-floor late join, and the empty floor.
 
 import { describe, expect, it } from 'vitest'

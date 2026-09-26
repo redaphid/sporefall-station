@@ -5,7 +5,9 @@
 // of PICK order (Brotato's additive-pool lesson + RoR2's per-effect curves). The
 // one exception is the element: a hit carries one, and it is the NEWEST element
 // on the list (the list is pickup order), so the player's latest pick is the one
-// that lands. Every
+// that lands. In sequenced casting the list is one cast, so that element is the
+// payload that ends it, and every shard, fragment and blast the cast's rounds
+// spawn carries it too (`carries`). Every
 // output field is clamped to stay finite and non-degenerate under huge stacks
 // (cooldown floored ≥1 so fireRate can't divide-by-zero; chance-like fields use a
 // hyperbolic curve that approaches but never reaches 100%).
@@ -29,7 +31,21 @@ export interface ResolvedWeapon {
    * is built from this, so its look never shows an element the hit will not apply. */
   mods?: WeaponMod[]
   behavior: BulletBehavior
+  /** The element each self-hitting behavior carries. */
+  carries: CarriedElements
   triggers: ResolvedTrigger[]
+}
+
+/** The element mod id carried by each behavior whose hits are its own: split
+ * shards, splinter shrapnel, and the explosive blast. It is the element mod the
+ * round lands, which in a sequenced cast is the payload that ends the cast. A
+ * base weapon's own element is not a mod, so it rides none of them. A key is
+ * absent when the weapon lacks the behavior or the list holds no element mod.
+ * A trigger's blast carries the same, on `ResolvedTrigger.explode.element`. */
+export interface CarriedElements {
+  split?: string
+  splinter?: string
+  explode?: string
 }
 
 // Clamp bounds — the anti-blowup guardrails (all finite, no NaN/Infinity).
@@ -81,6 +97,8 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
   const onHit: StatusApply | undefined = newestElement ? MODS[newestElement.id].onHit : base.onHit
   const executed = known.filter((m) => !MODS[m.id].onHit || m.id === newestElement?.id)
 
+  const element = newestElement?.id
+
   // Sorted-key fold → order-independent stats. Skip unknown ids and non-positive stacks.
   const active = known
     .map((m) => ({ def: MODS[m.id], stacks: Math.min(Math.floor(m.stacks), modMaxStacks(m.id)) }))
@@ -104,12 +122,19 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       const t = def.trigger
       triggers.push({
         event: t.event,
-        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks } } : {}),
+        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks, ...(element ? { element } : {}) } } : {}),
       })
     }
   }
 
   behavior.lifestealFrac = lifestealStacks > 0 ? hyperbolic(lifestealPerStack, lifestealStacks) : 0
+  const carries: CarriedElements = element
+    ? {
+        ...(behavior.split > 0 ? { split: element } : {}),
+        ...(behavior.splinter > 0 ? { splinter: element } : {}),
+        ...(behavior.explodeRadius > 0 && behavior.explodeDamage > 0 ? { explode: element } : {}),
+      }
+    : {}
 
   return {
     base,
@@ -131,6 +156,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       splinter: clamp(Math.round(behavior.splinter), 0, BEHAVIOR_CAP),
       lifestealFrac: clamp(behavior.lifestealFrac, 0, 0.95),
     },
+    carries,
     triggers,
   }
 }

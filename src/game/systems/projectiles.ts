@@ -6,6 +6,7 @@ import { canSeeEntity, hateToward } from './goals'
 import { applyAreaEffect } from './itemEffects'
 import { CRIME_HATE, initialFactionHate } from './relationships'
 import { applyStatus } from './statusFx'
+import { crackBlow, cracked, splashPrime, strike } from './reactions'
 import { vlen } from '../simMath'
 
 // ── Homing (reworked after playtest: "it mostly just curves bullets into walls").
@@ -216,6 +217,18 @@ export const projectileSystem = (w: World): void => {
       const rr = other.radius + e.radius
       if (dx * dx + dy * dy >= rr * rr) continue
 
+      if (p.prime) {
+        // Primer/Striker prototype: a Primer glob bursts on the first body and
+        // coats around it (a piercing glob coats and keeps flying). No damage.
+        splashPrime(w, e.pos.x, e.pos.y, p.prime, p.ownerId)
+        if (p.pierceLeft && p.pierceLeft > 0) {
+          p.pierceLeft -= 1
+          ;(p.hitIds ??= []).push(other.id)
+          continue
+        }
+        e.dead = true
+        break
+      }
       if (p.explode) {
         detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
         if (p.splinter) spawnSplinter(w, e)
@@ -239,11 +252,26 @@ export const projectileSystem = (w: World): void => {
       // off bullets i-frames had already voided, and mod triggers fired on hits
       // that never connected. A body's i-frames are 5 ticks, so a multi-pellet
       // volley lands most of its pellets straight into them.
-      const dealt = applyDamage(w, other, p.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, p.ownerId)
+      // Primer/Striker prototype: a plain round on a rimed body CRACKS (harder,
+      // armour ignored, double knockback).
+      const crack = w.primerStriker ? crackBlow(other, p.onHit, p.damage) : undefined
+      const dealt = applyDamage(
+        w,
+        other,
+        crack ?? p.damage,
+        e.pos.x - e.vel.x * SIM_DT,
+        e.pos.y - e.vel.y * SIM_DT,
+        crack === undefined ? 3 : 6,
+        p.ownerId,
+      )
       // `!== null`, NOT truthiness: 0 is a hit that landed and dealt no hp (the
       // freeze ray), and it must still apply its status.
       const landed = dealt !== null
-      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
+      if (landed && w.primerStriker) {
+        // The Striker's verb meets whatever the Primer left on the body.
+        if (crack !== undefined) cracked(w, other)
+        strike(w, other, p.onHit)
+      } else if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
       const killed = !!other.dead || (other.health?.hp ?? 1) <= 0
       if (landed && p.lifestealFrac) {
         // Pay out on damage ACTUALLY DEALT, never the bullet's intended damage.
@@ -274,6 +302,14 @@ export const projectileSystem = (w: World): void => {
 
 /** A thrown item applies its area effect where it lands (grenade → explode, freeze
  * grenade → frozen burst, grenade → blast). */
-const land = (w: World, e: { pos: { x: number; y: number }; projectile?: { ownerId: number; onLand?: import('../data/items').AreaEffect } }): void => {
+const land = (
+  w: World,
+  e: {
+    pos: { x: number; y: number }
+    projectile?: { ownerId: number; onLand?: import('../data/items').AreaEffect; prime?: NonNullable<Entity['projectile']>['prime'] }
+  },
+): void => {
   if (e.projectile?.onLand) applyAreaEffect(w, e.pos.x, e.pos.y, e.projectile.onLand, e.projectile.ownerId)
+  // A Primer glob that ends on a wall or at range still bursts where it stops.
+  if (e.projectile?.prime) splashPrime(w, e.pos.x, e.pos.y, e.projectile.prime, e.projectile.ownerId)
 }

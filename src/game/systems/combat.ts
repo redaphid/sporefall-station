@@ -14,6 +14,7 @@ import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
 import { spawnSporeBurst } from './spore'
+import { applyLoadoutSwap, firePrimer } from './primer'
 import { vlen } from '../simMath'
 
 const IFRAME_TICKS = 5
@@ -516,7 +517,11 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // swap asked for mid-roll or while stunned is not silently dropped.
     if (sequencing(w)) {
       const swap = inputs.get(e.playerCtl.playerId)?.modSwap
-      if (swap !== undefined) applyModSwap(e, swap)
+      // Primer/Striker prototype: the same input spans both guns and the floor.
+      if (swap !== undefined) {
+        if (w.primerStriker) applyLoadoutSwap(w, e, swap)
+        else applyModSwap(e, swap)
+      }
     }
     if (isRolling(e, w.tick)) continue // mid-roll: hands full — no attack/ability/throw
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
@@ -541,6 +546,10 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
       if (useHeld(w, e)) e.combat.cooldown = THROW_COOLDOWN
       else if (tryStartRoll(w, e, cmd.moveX, cmd.moveY)) continue // nothing usable → backflip
     }
+
+    // Primer/Striker prototype: the second trigger. Its own clock, so both
+    // triggers can be held together.
+    if (w.primerStriker && cmd.prime) firePrimer(w, e)
 
     if (!cmd.attack || e.combat.cooldown > 0) continue
     // FIRE ALWAYS FIRES THE WEAPON. The old arbitration ("a usable item in the

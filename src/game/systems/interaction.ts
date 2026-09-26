@@ -8,6 +8,7 @@ import { type World } from '../world'
 import { addItem, applyModPickup } from './inventory'
 import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
+import { canGrab, routeModPickup } from './primer'
 import { fireAt } from './fire'
 import { vlen } from '../simMath'
 
@@ -124,7 +125,10 @@ const autoPickup = (w: World, p: Entity): void => {
     // stays consistent with every other pickup). No moddable weapon in hand → leave
     // it on the ground to grab after finding a gun, rather than wasting the mod.
     if (isModId(e.pickup.itemId)) {
-      const res = applyModPickup(p, e.pickup.itemId)
+      // Primer/Striker prototype: an ejected cartridge waits out its dropper's
+      // no-grab window, and a grab lands in the Primer while it has room.
+      if (w.primerStriker && !canGrab(w, p, e.pickup)) continue
+      const res = w.primerStriker ? routeModPickup(p, e.pickup.itemId) : applyModPickup(p, e.pickup.itemId)
       if (res) {
         e.dead = true
         w.events.push({ type: 'modPickup', entityId: e.id, byId: p.id, modId: res.modId, weapon: res.weapon, maxed: res.maxed })

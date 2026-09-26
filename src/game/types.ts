@@ -30,6 +30,12 @@ export interface InputCmd {
    * and OPTIONAL: absent on every input that does not ask, so default-mode
    * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
   modSwap?: number
+  /** Primer/Striker prototype only: fire the Primer (the second trigger).
+   * Level-triggered like `attack`, OPTIONAL like `modSwap` (absent = not
+   * pressed), and ignored unless World.primerStriker is set. Under that rule
+   * `modSwap` also spans both guns: indices 0-15 are the Striker's mod list,
+   * 16-31 the Primer's, and 0xFF is the floor (eject). */
+  prime?: boolean
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -119,6 +125,14 @@ export type SimEvent =
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
+  /** Primer/Striker prototype: a coat landed or a verb reacted with one. `name`
+   * is `coat.<substance>` or the reaction (arc, wildfire, ignite, steam, melt,
+   * flashFreeze, deepFreeze, fizzle, crack, magnetHop); `count` is how many
+   * bodies it reached. */
+  | { type: 'reaction'; name: string; x: number; y: number; targetId?: EntityId; count: number }
+  /** Primer/Striker prototype: `byId` ejected `modId` from a gun as a world
+   * cartridge (`entityId`, an ordinary mod pickup). */
+  | { type: 'modEject'; entityId: EntityId; byId: EntityId; modId: string; x: number; y: number }
   | { type: 'use'; entityId: EntityId; byId: EntityId }
   /** The mission's objective gateway (`door.objectiveGate`) was breached/unlocked
    * by the player — a point-of-no-return that turned the whole floor hostile

@@ -87,6 +87,16 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
       'Prototype. Delete the flag (and World.modCasting) once the owner has played it side by side with the default fold and picked one: either promote sequencing to the only mode or remove modSequence.ts.',
     since: 567,
   },
+  {
+    key: 'primerStrikerGuns',
+    label: 'Primer + Striker (prototype)',
+    description:
+      'Solo only. A second gun on its own trigger (I on a keyboard; no pad button yet) splashes goo that your main gun reacts with: water + spark arcs, oil + fire spreads, ice + bullets cracks. Turns on sequenced mods too. Applies to the next solo run.',
+    defaultOn: false,
+    retire:
+      'Prototype for loadout design A (Primer and Striker). Delete the flag, World.primerStriker, systems/primer.ts and systems/reactions.ts if playtests reject it; otherwise promote it to the run rule and give it the bench UI, the wire trailer and co-op.',
+    since: 600,
+  },
 ]
 
 const BY_KEY: ReadonlyMap<string, FeatureFlag> = new Map(FEATURE_FLAGS.map((f) => [f.key, f]))

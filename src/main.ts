@@ -685,10 +685,13 @@ const stopTransportOnPagehide = (transport: Transport): void => {
 /** The `sequencedMods` flag, resolved to the run rule a host latches into each
  * run it builds. Read per run, so toggling applies from the next run. */
 const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
+/** The `primerStrikerGuns` prototype flag, read per run like `runModCasting`. Solo
+ * only for now: the second trigger does not cross the wire yet. */
+const runPrimerStriker = (): boolean => flagOn(loadSettings().flags, 'primerStrikerGuns')
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting, runPrimerStriker)
     deps.renderer.setLevel(session.world.level)
     return session
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MODS } from '../data/mods'
+import { MODS, POOLED_MODS } from '../data/mods'
 import type { ItemStack } from '../entity'
 import { applyDraftPick, draftCards, floorDraftOffer } from './draft'
 
@@ -22,9 +22,10 @@ describe('floorDraftOffer — deterministic pick-1-of-N', () => {
     expect(a).not.toEqual(b)
   })
 
-  it('respects a requested hand size, capped at the registry size', () => {
+  it('respects a requested hand size, capped at the pooled registry size', () => {
     expect(floorDraftOffer(1, 1, 2)).toHaveLength(2)
-    expect(floorDraftOffer(1, 1, 999).length).toBe(Object.keys(MODS).length)
+    // Prototype-only (`unpooled`) mods are never offered.
+    expect(floorDraftOffer(1, 1, 999).length).toBe(POOLED_MODS.length)
   })
 })
 

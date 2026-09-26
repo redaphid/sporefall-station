@@ -302,6 +302,10 @@ export interface Entity {
     onLand?: import('./data/items').AreaEffect
     /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
     onHit?: import('./data/items').StatusApply
+    /** Primer/Striker prototype: a Primer glob. It deals no damage; where it
+     * bursts it coats every non-player body within `radius` with `substance`
+     * (none = a dud glob from a cast with no payload). */
+    prime?: { substance?: import('./data/reactions').SubstanceId; radius: number }
     // ---- weapon-mod behavior fields (all optional → snapshot-stable). ----
     /** Extra victims to pass through before dying (pierce). Decrements per body. */
     pierceLeft?: number
@@ -336,7 +340,15 @@ export interface Entity {
      * its path. Absent on every ordinary projectile → snapshot-stable. */
     arc?: boolean
   }
-  pickup?: { itemId: string; qty: number }
+  pickup?: {
+    itemId: string
+    qty: number
+    /** Primer/Striker prototype: an ejected cartridge. Its dropper cannot
+     * re-grab it before tick `noGrabUntil`; everyone else can at once. Absent
+     * on every other pickup, so existing snapshots are unchanged. */
+    noGrabUntil?: number
+    dropperId?: EntityId
+  }
   /**
    * A door/hatch. `open`/`locked`/`lockLevel` are the original mundane lock (a
    * pick channel opens it — interaction.ts). Everything below is OPTIONAL, so a

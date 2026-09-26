@@ -2,7 +2,7 @@
 // proper: a scenario just seeds entities into a fresh world before play starts.
 
 import { WEAPONS } from './data/items'
-import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type WeaponMod } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
 import { assignPatrol, spawnNpc } from './populate'
 import { igniteCell } from './systems/fire'
@@ -944,6 +944,152 @@ const setupStairsDemo = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
   player.facing = Math.atan2(-d[1], -d[0]) // looking at the stair
 }
 
+// ── Primer/Striker prototype (design A) ─────────────────────────────────────
+// Both scenarios switch the run rule on themselves (World.primerStriker, plus
+// the sequencing it implies), so `?scenario=primer` works without the flag.
+
+/** The open W×H block of floor nearest the level centre, as its top-left cell. */
+const findOpenRect = (w: World, rw: number, rh: number): { x: number; y: number } | null => {
+  const midX = Math.floor(w.level.w / 2)
+  const midY = Math.floor(w.level.h / 2)
+  let best: { x: number; y: number } | null = null
+  let bestD = Infinity
+  for (let y = 1; y + rh < w.level.h; y++) {
+    for (let x = 1; x + rw < w.level.w; x++) {
+      const d = Math.abs(x + rw / 2 - midX) + Math.abs(y + rh / 2 - midY)
+      if (d >= bestD) continue
+      let open = true
+      for (let j = 0; j < rh && open; j++) open = openRow(w, x, y + j, rw)
+      if (open) {
+        best = { x, y }
+        bestD = d
+      }
+    }
+  }
+  return best
+}
+
+/** Clear the floor's NPCs and projectiles and stand the heist down, keeping the
+ * player's real hp (unlike clearCast): these stages measure damage taken. */
+const clearForPrimer = (w: World): Entity | undefined => {
+  w.entities = w.entities.filter((e) => !e.ai && !e.projectile)
+  w.byId.clear()
+  for (const e of w.entities) w.byId.set(e.id, e)
+  w.groups = undefined
+  w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Primer/Striker test range' }
+  w.primerStriker = true
+  w.modCasting = 'sequence'
+  return w.entities.find((e) => e.playerCtl)
+}
+
+const armBothGuns = (player: Entity, striker: WeaponMod[], primer: WeaponMod[]): void => {
+  player.loadout = {
+    inventory: [
+      { itemId: 'pistol', qty: 1, mods: striker },
+      { itemId: 'primerLobber', qty: 1, mods: primer },
+    ],
+    activeSlot: -1,
+  }
+  if (player.combat) player.combat.weapon = 'pistol'
+}
+
+/** An NPC that sleeps until something hurts it: it holds its spot so the pack's
+ * spacing is the puzzle, and a Magnet can still drag it (knockback moves a
+ * sleeper). */
+const sleeper = (w: World, archetype: string, x: number, y: number): Entity => {
+  const e = spawnNpc(w, archetype, x, y)
+  if (e.status) e.status.sleep = 30 * 60 * 5
+  e.intent = { x: 0, y: 0 }
+  return e
+}
+
+/**
+ * `?scenario=primer`: the design-A showcase. An open hall; the player on the
+ * west edge with a Striker pistol [pierce][shock][heavy] and a Lobber Primer
+ * [explosive][soak]. East of them, asleep:
+ *  - a TIGHT pack of 4 thugs (1 tile apart): one soak glob + one spark chains
+ *    all four;
+ *  - a SPREAD pack of 5 thugs (a centre and four 2.2 tiles out): the soak
+ *    splash reaches them all, but the arc (1.6 tiles) cannot jump the gaps.
+ * A Magnet cartridge (`shock`) lies two tiles north of the player. Grab it (it
+ * slots into the Primer), put it in front of `explosive`, magnetise the spread
+ * pack, wait for the clump, then soak and spark.
+ */
+const setupPrimer = (w: World): void => {
+  const player = clearForPrimer(w)
+  const at = findOpenRect(w, 16, 11)
+  if (!player || !at) return
+  const my = at.y + 5
+  player.pos = { x: at.x + 2.5, y: my + 0.5 }
+  player.prevPos = { x: player.pos.x, y: player.pos.y }
+  player.facing = 0
+  armBothGuns(
+    player,
+    [
+      { id: 'pierce', stacks: 1 },
+      { id: 'shock', stacks: 1 },
+      { id: 'heavy', stacks: 1 },
+    ],
+    [
+      { id: 'explosive', stacks: 1 },
+      { id: 'soak', stacks: 1 },
+    ],
+  )
+  // Tight pack, north-east: a 2×2 block one tile apart.
+  const tight: [number, number][] = [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+    [1, 1],
+  ]
+  for (const [dx, dy] of tight) sleeper(w, 'thug', at.x + 6.5 + dx, at.y + 0.5 + dy)
+  // Spread pack, east: a centre body and four around it, each 2.2 tiles from
+  // the centre (wider than the 1.6-tile arc, inside an explosive splash), open
+  // on the player's side so a glob can reach the centre.
+  const cx = at.x + 9.5
+  const cy = my + 1.5
+  const spread: [number, number][] = [
+    [0, 0],
+    [0, -2.2],
+    [0, 2.2],
+    [1.9, -1.1],
+    [1.9, 1.1],
+  ]
+  for (const [dx, dy] of spread) sleeper(w, 'thug', cx + dx, cy + dy)
+  const magnet = makeEntity('pickup', 'mod.shock', at.x + 2.5, my - 1.5, 0.3)
+  magnet.pickup = { itemId: 'shock', qty: 1 }
+  addEntity(w, magnet)
+}
+
+/**
+ * `?scenario=primer-boss`: a Mireclaw Alpha that is WEAK TO LIGHTNING
+ * (`resist.electrified: 2`), awake, 8 tiles east of the player in an open hall.
+ * The player carries the protocol's hand of four in the Striker, in an order
+ * that is not built for this fight — [incendiary][pierce][frost][shock] — and
+ * the Lobber's own Soaker. Preparing means re-slotting before it closes in.
+ */
+const setupPrimerBoss = (w: World): void => {
+  const player = clearForPrimer(w)
+  const at = findOpenRect(w, 14, 7)
+  if (!player || !at) return
+  const my = at.y + 3
+  player.pos = { x: at.x + 2.5, y: my + 0.5 }
+  player.prevPos = { x: player.pos.x, y: player.pos.y }
+  player.facing = 0
+  armBothGuns(
+    player,
+    [
+      { id: 'incendiary', stacks: 1 },
+      { id: 'pierce', stacks: 1 },
+      { id: 'frost', stacks: 1 },
+      { id: 'shock', stacks: 1 },
+    ],
+    [{ id: 'soak', stacks: 1 }],
+  )
+  const boss = spawnNpc(w, 'boss', at.x + 10.5, my + 0.5)
+  boss.resist = { ...(boss.resist ?? {}), electrified: 2 }
+}
+
 export interface ScenarioOpts {
   /** `?floor=`: the floor the `armed` / `stairs-demo` scenarios start on. */
   floor?: number
@@ -975,6 +1121,8 @@ const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>
   'ai-goals': setupAiGoals,
   'npc-ai': setupNpcAi,
   'npc-deliberate': setupNpcDeliberate,
+  primer: setupPrimer,
+  'primer-boss': setupPrimerBoss,
   ...GROUP_SCENARIOS,
 }
 

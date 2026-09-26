@@ -156,6 +156,9 @@ export const ARCHETYPES = [
   'lobber',
   'gloamhound',
   'hivespire',
+  // Primer/Striker prototype: the Soaker cartridge and the Primer chassis.
+  'mod.soak',
+  'pickup.primerLobber',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix
@@ -192,6 +195,7 @@ export const WIRE_MODS = [
   'lifesteal',
   'detonator',
   'splinterShot',
+  'soak', // Primer/Striker prototype
 ] as const
 
 const wireModIndex = new Map<string, number>(WIRE_MODS.map((m, i) => [m, i]))

@@ -48,6 +48,9 @@ export interface WeaponDef {
   castsPerTrigger?: number
   /** Sequenced mods only: ticks the weapon is locked after its sequence wraps. */
   rechargeOnWrap?: number
+  /** Primer/Striker prototype: a `primer` chassis fires on the second trigger
+   * and coats instead of hurting. Absent = an ordinary (striker) gun. */
+  role?: 'primer'
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
@@ -163,6 +166,22 @@ export const WEAPONS: Record<string, WeaponDef> = {
     knockback: 1,
     projectileSpeed: 14,
     onHit: { status: 'electrified', ticks: 45 },
+  },
+  // Primer/Striker prototype (World.primerStriker): the second gun. It does no
+  // damage; its payload mod decides which substance its glob splashes on.
+  primerLobber: {
+    id: 'primerLobber',
+    name: 'Lobber',
+    kind: 'ranged',
+    role: 'primer',
+    damage: 0,
+    range: 9,
+    cooldownTicks: 12,
+    knockback: 0,
+    projectileSpeed: 10,
+    slots: 3,
+    castsPerTrigger: 1,
+    rechargeOnWrap: 40,
   },
 }
 

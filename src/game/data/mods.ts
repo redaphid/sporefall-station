@@ -7,6 +7,7 @@
 // scaling curves) — authored fresh, not ported.
 
 import type { StatusApply } from './items'
+import type { SubstanceId } from './reactions'
 
 /** The mutable stat surface a STAT mod tweaks (mirrors the fire-relevant fields
  * of WeaponDef). `cooldownTicks` IS fireRate — lower fires faster. */
@@ -72,6 +73,14 @@ export interface ModDef {
   onHit?: StatusApply
   /** A trigger effect; its magnitude scales with stacks in resolveWeapon. */
   trigger?: ModTrigger
+  /** Primer/Striker prototype (World.primerStriker): the SUBSTANCE this mod
+   * coats with when it sits in the Primer. In the Striker it keeps its `onHit`
+   * verb. Inert in every other run. */
+  primer?: SubstanceId
+  /** Kept out of the draft hand and the scattered world pickups. Set only on
+   * prototype mods, so the rarity-weighted pools (and every existing seed's
+   * pickups) are exactly what they were before the prototype existed. */
+  unpooled?: true
 }
 
 /** Default stack cap (ROUNDS lets you re-pick a card; we bound it). */
@@ -125,18 +134,21 @@ export const MODS: Record<string, ModDef> = {
     maxStacks: 1,
     blurb: 'Freezes what it hits — and a solid hit shatters the ice.',
     onHit: { status: 'frozen', ticks: 120 },
+    primer: 'rime',
   },
   incendiary: {
     id: 'incendiary', name: 'Incendiary', icon: '🔥', category: 'behavior', rarity: 'rare',
     maxStacks: 1,
     blurb: 'Sets enemies on fire — they keep burning.',
     onHit: { status: 'burning', ticks: 240 },
+    primer: 'oil',
   },
   shock: {
     id: 'shock', name: 'Tesla Rounds', icon: '🌩️', category: 'behavior', rarity: 'rare',
     maxStacks: 1,
     blurb: 'Zaps and stuns — arcs through anything wet.',
     onHit: { status: 'electrified', ticks: 45 },
+    primer: 'magnet',
   },
 
   // ---- BEHAVIOR: bullet mechanics ------------------------------------------
@@ -194,7 +206,23 @@ export const MODS: Record<string, ModDef> = {
     blurb: 'Enemies explode when they die — chain the carnage.',
     trigger: { event: 'kill', explode: { radius: 2, damage: 24 } },
   },
+
+  // ---- PROTOTYPE: Primer/Striker (World.primerStriker) ----------------------
+  // Appended last and `unpooled`, so the draft and pickup pools are unchanged.
+  soak: {
+    id: 'soak', name: 'Soaker', icon: '💧', category: 'behavior', rarity: 'common',
+    maxStacks: 1, unpooled: true,
+    blurb: 'Primer: soaks them wet (sparks and frost spread through water). Striker: a wet, shoving jet.',
+    onHit: { status: 'wet', ticks: 150 },
+    mul: { knockback: 1.6 },
+    primer: 'soak',
+  },
 }
+
+/** The mods a draft or a scattered pickup may roll: every registry entry except
+ * the prototype-only ones. Same order as MODS, so the weighted draws are
+ * byte-identical to the registry before any `unpooled` mod was appended. */
+export const POOLED_MODS: readonly ModDef[] = Object.values(MODS).filter((m) => !m.unpooled)
 
 /** A registry-checked mod id (used by the addMod verb + draft). */
 export const isModId = (id: string): id is keyof typeof MODS => Object.prototype.hasOwnProperty.call(MODS, id)

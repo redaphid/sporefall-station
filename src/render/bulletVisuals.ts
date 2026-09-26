@@ -124,6 +124,8 @@ export const MOD_VISUALS: Record<string, BulletTraitDelta> = {
   frost: { hue: { color: 0x8fd4ff, weight: 1 }, glowAdd: 0.3, glowColor: 0x8fd4ff, trailAdd: 1, trailColor: 0xc9ecff },
   incendiary: { hue: { color: 0xff7a2a, weight: 1 }, glowAdd: 0.35, glowColor: 0xff6018, trailAdd: 1, trailColor: 0xffb040, jitterAdd: 0.18, distortAdd: 0.3 },
   shock: { hue: { color: 0xfff27a, weight: 1 }, glowAdd: 0.3, glowColor: 0xaad4ff, jitterAdd: 0.6, trailAdd: 0.5, trailColor: 0xd8f0ff, distortAdd: 0.35 },
+  // Soaker (Primer/Striker prototype): a fat, wobbling water round.
+  soak: { hue: { color: 0x3a8cff, weight: 1 }, sizeMul: 1.2, glowAdd: 0.2, glowColor: 0x6ab0ff, trailAdd: 1, trailColor: 0x9ccfff, jitterAdd: 0.1 },
 
   // ---- BEHAVIOR: bullet mechanics -------------------------------------------
   // Bouncy: the trail flips signature lime — a ricochet reads mid-flight.

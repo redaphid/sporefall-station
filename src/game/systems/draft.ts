@@ -4,7 +4,7 @@
 // never perturbs the sim stream, yet replays byte-identically. Co-op-friendly:
 // one shared hand per floor, everyone drafts together (no loser-shaming for kids).
 
-import { MODS, modMaxStacks, type ModDef, type ModRarity } from '../data/mods'
+import { MODS, modMaxStacks, POOLED_MODS, type ModDef, type ModRarity } from '../data/mods'
 import type { ItemStack, WeaponMod } from '../entity'
 import { hashLabel, mulberry32, type Rng } from '../rng'
 
@@ -22,7 +22,7 @@ export interface DraftCard {
 /** Draw `count` DISTINCT mod ids from the registry, weighted by rarity, without
  * replacement — a pure function of the supplied RNG stream position. */
 export const draftOffer = (rng: Rng, count = 3): string[] => {
-  const remaining: ModDef[] = Object.values(MODS)
+  const remaining: ModDef[] = [...POOLED_MODS]
   const chosen: string[] = []
   while (chosen.length < count && remaining.length > 0) {
     const total = remaining.reduce((s, m) => s + RARITY_WEIGHT[m.rarity], 0)
@@ -43,7 +43,7 @@ export const draftOffer = (rng: Rng, count = 3): string[] => {
  * (populate.ts) so scattered pickups follow the same common/rare/legendary odds
  * as the draft. Pure in the RNG: same stream position → same id. */
 export const weightedModId = (rng: Rng): string => {
-  const all = Object.values(MODS)
+  const all = POOLED_MODS
   const total = all.reduce((s, m) => s + RARITY_WEIGHT[m.rarity], 0)
   let r = rng.next() * total
   for (let i = 0; i < all.length - 1; i++) {

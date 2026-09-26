@@ -10,6 +10,8 @@ import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behavi
 import { NPCS } from '../game/data/npcs'
 import { MODS, isModId, modMaxStacks } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
+import { packModSwap } from '../game/systems/modSequence'
+import { describeWand, FLOOR_SLOT, PRIMER_BASE, primerStack } from '../game/systems/primer'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
@@ -160,12 +162,22 @@ export interface HeldInput {
 }
 
 const HELD_AXES = ['moveX', 'moveY', 'aimX', 'aimY'] as const
-const HELD_BUTTONS = ['attack', 'special'] as const
+const HELD_BUTTONS = ['attack', 'special', 'prime'] as const
 // The input layer edge-triggers these; the sim acts on every tick they are set,
 // so holding one across N ticks would repeat it (a held swap undoes itself).
 const EDGE_BUTTONS = ['interact', 'throwItem', 'roll'] as const
 const EDGE_INTS = ['hotbar', 'modSwap'] as const
-const HELD_KEYS = new Set<string>([...HELD_AXES, ...HELD_BUTTONS, ...EDGE_BUTTONS, ...EDGE_INTS, 'player', 'aimAt'])
+// Friendly spellings of `modSwap` (Primer/Striker prototype): `swap: [a, b]`
+// and `eject: i`. Both are first-tick-only, like modSwap itself.
+const EDGE_SWAPS = ['swap', 'eject'] as const
+const HELD_KEYS = new Set<string>([...HELD_AXES, ...HELD_BUTTONS, ...EDGE_BUTTONS, ...EDGE_INTS, ...EDGE_SWAPS, 'player', 'aimAt'])
+
+/** A swap index: 0-15 Striker, 16-31 Primer, 255 the floor. */
+const swapIndex = (v: unknown, field: string): number => {
+  const n = num(String(v), field)
+  if (!Number.isInteger(n) || n < 0 || n > 255) throw new Error(`step input "${field}" indices must be integers 0-255, got "${String(v)}"`)
+  return n
+}
 
 export const parseHeldInput = (w: World, text: string): HeldInput => {
   const raw = JSON.parse(text) as unknown
@@ -186,6 +198,13 @@ export const parseHeldInput = (w: World, text: string): HeldInput => {
   }
   if (raw.hotbar !== undefined) cmd.hotbar = num(String(raw.hotbar), 'hotbar')
   if (raw.modSwap !== undefined) cmd.modSwap = num(String(raw.modSwap), 'modSwap')
+  const swapAsks = ['modSwap', ...EDGE_SWAPS].filter((k) => raw[k] !== undefined)
+  if (swapAsks.length > 1) throw new Error(`step input: use one of modSwap / swap / eject per step, got ${swapAsks.join(' + ')}`)
+  if (raw.swap !== undefined) {
+    if (!Array.isArray(raw.swap) || raw.swap.length !== 2) throw new Error('step input "swap" must be [a, b]')
+    cmd.modSwap = packModSwap(swapIndex(raw.swap[0], 'swap'), swapIndex(raw.swap[1], 'swap'))
+  }
+  if (raw.eject !== undefined) cmd.modSwap = packModSwap(swapIndex(raw.eject, 'eject'), FLOOR_SLOT)
   const aimAt = raw.aimAt === undefined ? undefined : num(String(raw.aimAt), 'aimAt')
   // An id never allocated is a typo; one that existed and is gone (killed) just leaves aim as-is.
   if (aimAt !== undefined && !(Number.isInteger(aimAt) && aimAt > 0 && aimAt < w.nextId)) throw new Error(`no entity ${aimAt} to aim at`)
@@ -351,6 +370,7 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           fx: e.fx && Object.keys(e.fx).length ? Object.keys(e.fx) : undefined,
           resist: e.resist,
           mode: e.ai?.mode,
+          asleep: e.status && e.status.sleep > 0 ? true : undefined,
           faction: e.ai?.faction,
         }))
       return JSON.stringify({
@@ -361,6 +381,7 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
         mission: w.mission.description,
         missionComplete: w.mission.complete,
         modCasting: w.modCasting ?? 'fold',
+        ...(w.primerStriker ? { primerStriker: true } : {}),
         player: {
           id: me.id,
           at: { x: Math.round(me.pos.x * 10) / 10, y: Math.round(me.pos.y * 10) / 10 },
@@ -369,6 +390,9 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           weapon: stack?.itemId,
           mods: stack?.mods?.map((m) => `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`) ?? [],
           fx: me.fx && Object.keys(me.fx).length ? Object.keys(me.fx) : undefined,
+          // Primer/Striker prototype: both guns, their swap indices, and the
+          // cast cycle each will actually fire.
+          ...(w.primerStriker ? { striker: describeWand(w, stack, 0), primer: describeWand(w, primerStack(me), PRIMER_BASE) } : {}),
         },
         near,
       })
@@ -419,12 +443,26 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (!Number.isInteger(n) || n < 0) throw new Error(`step count must be a non-negative integer, got "${count}"`)
       const held = json.length ? parseHeldInput(w, decodeArg(json.join(' '))) : undefined
       const events: Record<string, number> = {}
+      const reached: Record<string, number> = {}
       for (let i = 0; i < n; i++) {
         tickWorld(w, held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map())
-        for (const ev of w.events) events[ev.type] = (events[ev.type] ?? 0) + 1
+        for (const ev of w.events) {
+          // A Primer/Striker reaction is counted by name (reaction:arc, …), and
+          // `reached` sums the bodies each kind touched (did the arc chain?).
+          const key = ev.type === 'reaction' ? `reaction:${ev.name}` : ev.type
+          events[key] = (events[key] ?? 0) + 1
+          if (ev.type === 'reaction') reached[ev.name] = (reached[ev.name] ?? 0) + ev.count
+        }
       }
       const aimAtGone = held?.aimAt !== undefined && !w.byId.has(held.aimAt) ? true : undefined
-      return JSON.stringify({ tick: w.tick, advanced: n, player: held?.entityId, aimAtGone, events })
+      return JSON.stringify({
+        tick: w.tick,
+        advanced: n,
+        player: held?.entityId,
+        aimAtGone,
+        events,
+        ...(Object.keys(reached).length ? { reached } : {}),
+      })
     }
 
     case 'schema':

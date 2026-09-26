@@ -1,3 +1,4 @@
+import { RIME_SLOW } from '../data/reactions'
 import type { Entity } from '../entity'
 import { isSolidTile } from '../levelgen/level'
 import { SIM_DT, type InputCmd } from '../types'
@@ -159,7 +160,9 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
     // speed; everyone else uses their walk speed and halts while stunned.
     // Group effects (a leader's rally, a pack's rage) scale the walk only — a
     // roll's burst is the roll's own. ×1 for anything outside a group.
-    const speed = rolling ? ROLL_SPEED : e.speed * groupSpeedMult(e, w.tick)
+    // Primer/Striker prototype: a rimed body is slowed.
+    const rime = w.primerStriker && e.fx?.rimed ? RIME_SLOW : 1
+    const speed = rolling ? ROLL_SPEED : e.speed * groupSpeedMult(e, w.tick) * rime
     if (isRooted(e)) {
       e.vel.x = 0 // knockback lands, but a rooted body does not travel on it
       e.vel.y = 0

@@ -1,7 +1,7 @@
 // Headless playtest: one world per state file, one verb per call. No browser, no
 // hub, deterministic, and safe to run in parallel (each agent owns its file).
 //
-//   npx tsx scripts/playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced]
+//   npx tsx scripts/playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced] [--primerStriker]
 //   npx tsx scripts/playtest.mts <state.json> look [radius]
 //   npx tsx scripts/playtest.mts <state.json> step 30 '{"aimAt":42,"attack":true}'
 //   npx tsx scripts/playtest.mts <state.json> <any debug verb line>   (spawn, addMod, get, entities, …)
@@ -18,23 +18,38 @@ import { emptyInput } from '../src/game/types'
 
 const [file, verb, ...rest] = process.argv.slice(2)
 if (!file || !verb) {
-  console.error('usage: playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced] | <verb line>')
+  console.error('usage: playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced] [--primerStriker] | <verb line>')
   process.exit(2)
 }
 
+const KNOWN_NEW_FLAGS = new Set(['--seed', '--scenario', '--floor', '--sequenced', '--primerStriker'])
 const flag = (name: string): string | undefined => {
   const i = rest.indexOf(`--${name}`)
   return i >= 0 ? rest[i + 1] : undefined
 }
 
 if (verb === 'new') {
+  const unknown = rest.filter((a) => a.startsWith('--') && !KNOWN_NEW_FLAGS.has(a))
+  if (unknown.length) {
+    console.error(`unknown option(s) ${unknown.join(' ')}; known: ${[...KNOWN_NEW_FLAGS].join(' ')}`)
+    process.exit(2)
+  }
   const seed = Number(flag('seed') ?? 1)
   const scenario = flag('scenario')
   if (scenario && !isKnownScenario(scenario)) {
     console.error(`unknown scenario "${scenario}"; known: ${SCENARIO_NAMES.join(', ')}`)
     process.exit(2)
   }
-  const host = new HostSession(seed, { sample: emptyInput }, undefined, 'normal', rest.includes('--sequenced') ? 'sequence' : undefined)
+  // --primerStriker turns on the Primer/Striker prototype exactly as the app's
+  // flag does: HostSession latches it into the run (and it implies sequencing).
+  const host = new HostSession(
+    seed,
+    { sample: emptyInput },
+    undefined,
+    'normal',
+    rest.includes('--sequenced') ? 'sequence' : undefined,
+    rest.includes('--primerStriker'),
+  )
   if (scenario) applyScenario(host.world, scenario, { floor: Number(flag('floor')) || undefined })
   writeFileSync(file, JSON.stringify(serializeWorld(host.world)))
   console.log(runVerb(host.world, 'look'))

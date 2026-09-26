@@ -9,6 +9,10 @@ import { addEntity, type World } from './world'
 export const PLAYER_HP = 120
 export const PLAYER_SPEED = 4.5
 export const PLAYER_START_WEAPON = 'pistol'
+/** Primer/Striker prototype (World.primerStriker): the second gun every player
+ * starts with, and the one cartridge in it. */
+export const PRIMER_START_WEAPON = 'primerLobber'
+export const PRIMER_START_MODS: readonly { id: string; stacks: number }[] = [{ id: 'soak', stacks: 1 }]
 /** Players swing melee weapons harder than NPCs do. */
 export const PLAYER_MELEE_MULT = 1.25
 /** HUD/touch label for the special (the grenade lob). */
@@ -60,6 +64,8 @@ export const spawnPlayer = (w: World, playerId: number, x: number, y: number): E
   // The loadout is the SHARED equipment component (players and NPCs alike carry
   // one); playerCtl now holds only player-specific concerns.
   e.loadout = starterLoadout(PLAYER_START_WEAPON)
+  // Primer/Striker prototype: the second gun, the Lobber, with one Soaker in it.
+  if (w.primerStriker) e.loadout.inventory.push({ itemId: PRIMER_START_WEAPON, qty: 1, mods: PRIMER_START_MODS.map((m) => ({ ...m })) })
   e.playerCtl = {
     playerId,
     abilityCooldown: 0,

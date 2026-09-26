@@ -133,6 +133,13 @@ export const aiSystem = (w: World): void => {
       e.intent.y = 0
       continue
     }
+    // Primer/Striker prototype: a steamed body is blinded — it has lost its
+    // target and cannot think or fight until the steam clears.
+    if (w.primerStriker && e.fx?.steamed) {
+      e.intent.x = 0
+      e.intent.y = 0
+      continue
+    }
     if (w.tick >= e.ai.thinkAt) {
       think(w, e)
       e.ai.thinkAt = w.tick + THINK_INTERVAL + (e.id % 5)

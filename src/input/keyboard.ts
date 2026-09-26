@@ -3,7 +3,8 @@ import { selectAim, type Aim } from './aim'
 import type { InputSource } from './input'
 
 /** WASD/arrows move, J/space attack, K/E interact, L/shift special, 1-6 equip
- * hotbar slot, Q/G throw, F/left-ctrl dodge-roll.
+ * hotbar slot, Q/G throw, F/left-ctrl dodge-roll, I fires the Primer (the
+ * Primer/Striker prototype's second trigger; inert on any other run).
  *
  * `readPointerAim` (optional) supplies the MOUSE as a continuous aim device: a
  * unit vector from the player toward the cursor (see aim.pointerAim). When it
@@ -20,6 +21,7 @@ export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource =
   let specialEdge = false
   let throwEdge = false
   let rollEdge = false
+  let primeEdge = false
   let hotbarEdge = -1
   let seq = 0
 
@@ -31,6 +33,7 @@ export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource =
     if (ev.code === 'KeyL' || ev.code === 'ShiftLeft') specialEdge = true
     if (ev.code === 'KeyQ' || ev.code === 'KeyG') throwEdge = true
     if (ev.code === 'KeyF' || ev.code === 'ControlLeft') rollEdge = true
+    if (ev.code === 'KeyI') primeEdge = true
     if (ev.code.startsWith('Digit')) {
       const n = Number(ev.code.slice(5))
       if (n >= 1 && n <= 6) hotbarEdge = n - 1
@@ -51,6 +54,9 @@ export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource =
       cmd.throwItem = throwEdge
       cmd.roll = rollEdge
       cmd.hotbar = hotbarEdge
+      // Optional field: set only while pressed, so every other command keeps its shape.
+      if (primeEdge || down.has('KeyI')) cmd.prime = true
+      primeEdge = false
       attackEdge = false
       interactEdge = false
       specialEdge = false

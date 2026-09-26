@@ -16,6 +16,7 @@ import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
 import { rollSystem } from './systems/roll'
 import { projectileSystem } from './systems/projectiles'
+import { magnetSystem } from './systems/reactions'
 import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
@@ -157,6 +158,12 @@ export interface World {
   /** Mod casting rule for this run (see ModCasting). Absent = default fold,
    * so every existing world and snapshot is unchanged. */
   modCasting?: ModCasting
+  /** Primer/Striker prototype (design A, the `primerStriker` flag, resolved by
+   * the app layer when it builds a run): players carry a second gun that coats,
+   * Striker rounds react with the coats, and the reorder input moves mods
+   * between guns or ejects them. Implies `modCasting: 'sequence'`. Absent on
+   * every other world, so every existing snapshot is unchanged. */
+  primerStriker?: true
   /** Combat tunable: when true every NPC treats players as an enemy on sight and
    * engages regardless of faction disposition (the "make them all enemies" knob).
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
@@ -290,6 +297,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
+  if (w.primerStriker) magnetSystem(w) // prototype: magnetised bodies drift together
   rollSystem(w, inputs)
   movementSystem(w, inputs)
   stairSystem(w) // a player who stepped onto a stair climbs (or descends) now

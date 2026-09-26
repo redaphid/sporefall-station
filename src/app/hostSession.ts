@@ -3,6 +3,7 @@ import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
+import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -173,6 +174,7 @@ export class HostSession implements Session {
       missionTargetId: this.world.mission.targetEntityId,
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
+      lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),

@@ -57,10 +57,13 @@ const run = (seed: number, ticks: number): World => {
 }
 
 describe('mod sequencing: flag off matches main', () => {
-  // Captured on main @ 9d0894d with this exact file.
+  // Captured on main @ 9d0894d with this exact file (deaefb3a / 6251b800), then
+  // re-pinned once for #86, which made player gunfire a heard noise. With
+  // `hearGunfire` stubbed out the old digests still match, so the move is #86's
+  // noise, not a sequencing leak.
   const GOLDEN: Record<number, string> = {
-    7: 'deaefb3a',
-    1234: '6251b800',
+    7: '69a98966',
+    1234: '525325f7',
   }
 
   for (const seed of [7, 1234]) {

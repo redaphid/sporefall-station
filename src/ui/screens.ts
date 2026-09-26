@@ -285,6 +285,10 @@ export const createScreens = (
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
           else if (ev.type === 'stationAlert') showBanner('STATION ALERT — GET TO THE LAUNCH BAY')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
+          else if (ev.type === 'alarmRaised')
+            showBanner(`ALARM ${ev.level}/3 — ${ev.cause === 'gunfire' ? 'THE CREW HEARD GUNFIRE' : 'THE CREW SAW THE ATTACK'}`)
+          else if (ev.type === 'lockdown') showBanner('LOCKDOWN — THE LAUNCH BAY IS SEALED')
+          else if (ev.type === 'lockdownLifted') showBanner('LOCKDOWN LIFTED — LAUNCH BAY OPEN')
           else if (ev.type === 'modPickup' && ev.byId === view.self?.id) {
             const m = MODS[ev.modId]
             const label = `${m?.icon ?? '🔧'} ${m?.name ?? ev.modId}`

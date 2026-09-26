@@ -140,6 +140,13 @@ export type SimEvent =
    * klaxon, the banner and the alarm wash all hang off it. */
   | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
+  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+   * raise `w.alarm` to `level`. */
+  | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
+  /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
+  | { type: 'lockdown' }
+  /** #86 — the lockdown's seal cycle ran out: the Launch Bay is open. */
+  | { type: 'lockdownLifted' }
   /** A body took the stairs: it now stands on the landing of storey `z`. */
   | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }

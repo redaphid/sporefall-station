@@ -250,7 +250,12 @@ export const projectileSystem = (w: World): void => {
         // Reading `p.damage` here ignored resist entirely, so an armoured target
         // absorbed most of the blow while the shooter was still paid in full.
         const owner = w.byId.get(p.ownerId) // may be gone — guard
-        if (owner?.health) owner.health.hp = Math.min(owner.health.max, owner.health.hp + dealt * p.lifestealFrac)
+        if (owner?.health) {
+          const owed = (owner.health.lifestealCarry ?? 0) + dealt * p.lifestealFrac
+          const heal = Math.round(owed)
+          owner.health.lifestealCarry = owed - heal
+          owner.health.hp = Math.min(owner.health.max, owner.health.hp + heal)
+        }
       }
       if (landed) runHitTriggers(w, other, p.triggers, p.ownerId, killed)
       if (landed && p.split) spawnSplit(w, e)

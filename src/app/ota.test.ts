@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NativeUpdater } from './ota'
-import { decideOta } from '../worker/ota'
 import { COOP_SAFE_MOMENTS, SAFE_MOMENTS, UPDATE_MOMENTS, type UpdateMoment } from './updatePolicy'
 
 // src/app/ota.ts is the ONLY thing that installs a downloaded update on Android.
@@ -267,10 +266,8 @@ describe('freshen: pause → Refresh on the installed app', () => {
   })
 
   it('reads our worker\'s "up-to-date" rejection as current, and downloads nothing', async () => {
-    // Capgo rejects getLatest with the reply's `message`, so pin it to what the worker really sends.
-    const reply = decideOta('905', { version: '905', url: 'https://x/905.zip' })
-    if (!('message' in reply)) throw new Error('the worker offered an update to a phone already on it')
-    mocks.getLatest.mockRejectedValueOnce(new Error(reply.message))
+    // Capgo rejects getLatest with the reply's `message`; src/worker/ota.test.ts pins the same literal.
+    mocks.getLatest.mockRejectedValueOnce(new Error('up-to-date'))
     expect(await startUpdater().freshen(20_000)).toBe('up-to-date')
     expect(mocks.triggerUpdateCheck).not.toHaveBeenCalled()
   })

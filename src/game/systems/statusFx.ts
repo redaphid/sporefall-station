@@ -133,7 +133,7 @@ export const applyStatus = (w: World, e: Entity, status: string, ticks: number, 
     return
   }
   // A shock is never just a status: it arcs (interactions.shock).
-  if (status === 'electrified') return shock(w, e, ticks)
+  if (status === 'electrified') return shock(w, e, ticks, source)
   addStatus(w, e, status, ticks, source)
 }
 
@@ -148,7 +148,10 @@ export const applyStatus = (w: World, e: Entity, status: string, ticks: number, 
 /** Ticks a freshly-lit body spends running before it steadies (first in a chain). */
 export const PANIC_TICKS = 60
 
-export const isPanicking = (w: World, e: Entity): boolean => (e.lockout?.panic?.activeUntil ?? 0) > w.tick
+/** Panicking at `tick`. Takes a bare tick so the renderer can ask too. */
+export const panicAt = (e: Entity, tick: number): boolean => (e.lockout?.panic?.activeUntil ?? 0) > tick
+
+export const isPanicking = (w: World, e: Entity): boolean => panicAt(e, w.tick)
 
 const panic = (w: World, e: Entity, source?: EntityId): void => {
   if (!e.ai || e.archetype === 'boss' || resistMult(e, 'burning') <= 0) return

@@ -22,6 +22,7 @@
 
 import { ELEMENTS } from '../data/elements'
 import type { Entity } from '../entity'
+import type { EntityId } from '../types'
 import type { World } from '../world'
 import { kill } from './combat'
 import { addStatus, isWet } from './statusFx'
@@ -42,12 +43,15 @@ export const wet = (w: World, e: Entity): void => addStatus(w, e, 'wet', ELEMENT
 const near = (a: Entity, b: Entity): boolean => vlen(a.pos.x - b.pos.x, a.pos.y - b.pos.y) <= CHAIN_RADIUS
 
 /** The nearest living non-player body within ARC_JUMP_RADIUS of `from` that the
- * arc hasn't touched. Ties keep the earlier entity (ascending id). */
-const arcJumpTarget = (w: World, from: Entity, seen: Set<Entity>): Entity | undefined => {
+ * arc hasn't touched and that didn't fire the shock. Ties keep the earlier
+ * entity (ascending id). */
+const arcJumpTarget = (w: World, from: Entity, seen: Set<Entity>, source?: EntityId): Entity | undefined => {
   let best: Entity | undefined
   let bestD = ARC_JUMP_RADIUS
   for (const n of w.entities) {
-    if (seen.has(n) || n.dead || !n.health || !n.ai || n.playerCtl) continue
+    // An NPC stun gunner fights from inside leap range, so its own bolt must
+    // never jump back onto it.
+    if (seen.has(n) || n.dead || !n.health || !n.ai || n.playerCtl || n.id === source) continue
     const d = vlen(from.pos.x - n.pos.x, from.pos.y - n.pos.y)
     if (d > bestD) continue
     bestD = d
@@ -60,8 +64,15 @@ const arcJumpTarget = (w: World, from: Entity, seen: Set<Entity>): Entity | unde
  * to the nearest other NPC (a player is never a leap target, and a shocked
  * player never throws a leap). Any wet body the arc reaches floods the
  * connected wet cluster — every reachable wet body is electrified and takes
- * electrocution damage. A dry body is a dead end for the flood. */
-export const shock = (w: World, origin: Entity, ticks = ELEMENTS.electrified.durationTicks): void => {
+ * electrocution damage. A dry body is a dead end for the flood. `source` (who
+ * fired it) is never the leap target; a wet source standing in the flooded
+ * puddle still conducts. */
+export const shock = (
+  w: World,
+  origin: Entity,
+  ticks = ELEMENTS.electrified.durationTicks,
+  source?: EntityId,
+): void => {
   const seen = new Set<Entity>()
   const queue: Entity[] = [origin]
   while (queue.length) {
@@ -70,7 +81,7 @@ export const shock = (w: World, origin: Entity, ticks = ELEMENTS.electrified.dur
     seen.add(e)
     addStatus(w, e, 'electrified', ticks)
     if (e === origin && !origin.playerCtl) {
-      const leap = arcJumpTarget(w, origin, seen)
+      const leap = arcJumpTarget(w, origin, seen, source)
       if (leap) {
         w.events.push({ type: 'shock', x: leap.pos.x, y: leap.pos.y, targetId: leap.id })
         queue.push(leap)

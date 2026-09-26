@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { Tile } from '../levelgen/level'
-import { spawnNpc } from '../populate'
+import { populateWorld, spawnNpc } from '../populate'
 import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
@@ -25,6 +25,7 @@ import { fireAt, fireSystem } from './fire'
 import { perceives, SPORE_BLIND_RANGE } from './goals'
 import { ARC_JUMP_RADIUS, shock } from './interactions'
 import { spawnObject } from './objects'
+import { setupFloor } from './missions'
 import { statusSystem } from './status'
 import {
   IMMOBILIZE_IMMUNE_TICKS,
@@ -263,6 +264,52 @@ describe('electrified JUMPS', () => {
     expect(isImmobilized(b)).toBe(false) // thawed, but inside the immunity gap
     applyStatus(w, a, 'electrified', 45)
     expect(isImmobilized(b)).toBe(false)
+  })
+
+  it('the leap never jumps back onto whoever fired the shock (an NPC stun gunner)', () => {
+    const { w, cx, cy } = arena()
+    const shooter = spawnNpc(w, 'thug', cx, cy)
+    const victim = spawnNpc(w, 'thug', cx + 2, cy) // inside ARC_JUMP_RADIUS of the shooter
+    // What projectiles.ts does when an NPC's stun-gun bolt lands.
+    applyStatus(w, victim, 'electrified', 45, shooter.id)
+    expect(isImmobilized(victim)).toBe(true)
+    expect(isImmobilized(shooter)).toBe(false)
+    expect(w.events.some((ev) => ev.type === 'shock' && ev.targetId === shooter.id)).toBe(false)
+  })
+
+  it('with the shooter excluded, the leap still takes the next-nearest NPC', () => {
+    const { w, cx, cy } = arena()
+    const shooter = spawnNpc(w, 'thug', cx + 1, cy) // nearest to the victim
+    const victim = spawnNpc(w, 'thug', cx, cy)
+    const other = spawnNpc(w, 'thug', cx - 2, cy)
+    applyStatus(w, victim, 'electrified', 45, shooter.id)
+    expect([victim, shooter, other].map(isImmobilized)).toEqual([true, false, true])
+  })
+
+  it('ambient seed 43: the stun-gun cop fighting from leap range never shocks itself', () => {
+    // Seed 43's cop (stunGun) duels a sporeling from inside ARC_JUMP_RADIUS with
+    // the player idle. Before the fix its own bolt leapt back onto it several
+    // times in 300 ticks. Nothing else on this floor fires a shock, so any shock
+    // event naming a stun gunner is self-inflicted.
+    const w = createWorld(43, 1, 'normal')
+    populateWorld(w)
+    setupFloor(w)
+    const at = playerSpawnPoint(w.level, 0)
+    spawnPlayer(w, 0, at.x, at.y)
+    const shooters = new Set(w.entities.filter((e) => e.combat?.weapon === 'stunGun').map((e) => e.id))
+    expect(shooters.size).toBeGreaterThan(0)
+    let selfShocks = 0
+    let shocks = 0
+    for (let t = 0; t < 300; t++) {
+      runTicks(w, idle, 1)
+      for (const ev of w.events) {
+        if (ev.type !== 'shock') continue
+        shocks++
+        if (ev.targetId !== undefined && shooters.has(ev.targetId)) selfShocks++
+      }
+    }
+    expect(shocks).toBeGreaterThan(0) // the cop really does land bolts
+    expect(selfShocks).toBe(0)
   })
 
   it('a leap into a wet body floods the wet cluster behind it', () => {

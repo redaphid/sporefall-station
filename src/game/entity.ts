@@ -322,8 +322,9 @@ export interface Entity {
     ownerId: EntityId
     damage: number
     ttl: number
-    /** Grenades: AoE on fuse-end or impact instead of point damage. */
-    explode?: { radius: number; damage: number }
+    /** Grenades: AoE on fuse-end or impact instead of point damage. `element`:
+     * the element mod id the blast applies (an explosive mod's nearest element). */
+    explode?: { radius: number; damage: number; element?: string }
     /** Thrown items: the area effect applied where it lands (grenade → explode). */
     onLand?: import('./data/items').AreaEffect
     /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
@@ -338,13 +339,15 @@ export interface Entity {
      * round chases only VISIBLE enemies of its owner ahead of it, and flies
      * straight otherwise — it never curves at something behind a wall. */
     homing?: number
-    /** Spawn N damaging children on the first body it strikes (split/multishot). */
-    split?: { count: number; damage: number; speed: number; ttl: number }
+    /** Spawn N damaging children on the first body it strikes (split/multishot).
+     * `element`: the element mod id the shards apply (the split mod's nearest). */
+    split?: { count: number; damage: number; speed: number; ttl: number; element?: string }
     /** Shatter into a RADIAL burst of short-range fragments on ANY termination —
      * wall/ttl/body impact (splinterShot). Distinct from `split` (a forward fork
      * on first body hit): this is an omnidirectional shrapnel spray at the point
-     * the round dies. Fragments never carry this field, so they can't re-splinter. */
-    splinter?: { count: number; damage: number; speed: number; ttl: number }
+     * the round dies. Fragments never carry this field, so they can't re-splinter.
+     * `element`: the element mod id the fragments apply. */
+    splinter?: { count: number; damage: number; speed: number; ttl: number; element?: string }
     /** Heal the owner by frac·damage dealt on each hit (lifesteal). */
     lifestealFrac?: number
     /** Bodies already struck (pierce), so one victim isn't re-hit every tick. */

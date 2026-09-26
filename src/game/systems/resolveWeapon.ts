@@ -5,7 +5,8 @@
 // of PICK order (Brotato's additive-pool lesson + RoR2's per-effect curves). The
 // one exception is the element: a hit carries one, and it is the NEWEST element
 // on the list (the list is pickup order), so the player's latest pick is the one
-// that lands. Every
+// that lands. A mod that makes its own hit (shards, shrapnel, a blast) carries
+// the element closest to it on the list instead (elementFor). Every
 // output field is clamped to stay finite and non-degenerate under huge stacks
 // (cooldown floored ≥1 so fireRate can't divide-by-zero; chance-like fields use a
 // hyperbolic curve that approaches but never reaches 100%).
@@ -29,7 +30,19 @@ export interface ResolvedWeapon {
    * is built from this, so its look never shows an element the hit will not apply. */
   mods?: WeaponMod[]
   behavior: BulletBehavior
+  /** The element each self-hitting behavior carries (elementFor). */
+  carries: CarriedElements
   triggers: ResolvedTrigger[]
+}
+
+/** The element mod id carried by each behavior whose hits are its own: split
+ * shards, splinter shrapnel, and the explosive blast. A key is absent when the
+ * weapon lacks the behavior or its list holds no element. A trigger's blast
+ * carries its own, on `ResolvedTrigger.explode.element`. */
+export interface CarriedElements {
+  split?: string
+  splinter?: string
+  explode?: string
 }
 
 // Clamp bounds — the anti-blowup guardrails (all finite, no NaN/Infinity).
@@ -47,6 +60,28 @@ const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.m
 /** RoR2 hyperbolic curve: 1 − 1/(1 + a·x). Asymptotes below 1 no matter how many
  * stacks — the anti-degenerate rule for any chance/fraction field (e.g. lifesteal). */
 const hyperbolic = (perStack: number, stacks: number): number => 1 - 1 / (1 + perStack * stacks)
+
+/** Which side wins when two elements sit equally close to a mod: 1 = the later
+ * pick, -1 = the earlier one. Later matches newest-wins and sequenced riding,
+ * where a modifier rides the payload after it. */
+export const ELEMENT_TIE_BREAK = 1 as 1 | -1
+
+/**
+ * The element a mod that makes its own hit (split shards, splinter shrapnel, an
+ * explosive or detonator blast) carries: the element mod closest to it in the
+ * live list, measured in list positions. `live` is the weapon's mod list in
+ * pickup order with unknown ids and empty stacks already dropped, and
+ * `modIndex` indexes into it. Returns undefined when the list holds no element.
+ */
+export const elementFor = (modIndex: number, live: readonly WeaponMod[]): WeaponMod | undefined => {
+  for (let d = 1; d < live.length; d++) {
+    for (const j of [modIndex + d * ELEMENT_TIE_BREAK, modIndex - d * ELEMENT_TIE_BREAK]) {
+      const m = live[j]
+      if (m && MODS[m.id]?.onHit) return m
+    }
+  }
+  return undefined
+}
 
 const zeroBehavior = (): BulletBehavior => ({
   pierce: 0, bounce: 0, homing: 0, explodeRadius: 0, explodeDamage: 0, split: 0, splinter: 0, lifestealFrac: 0,
@@ -82,11 +117,14 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
   const executed = known.filter((m) => !MODS[m.id].onHit || m.id === newestElement?.id)
 
   // Sorted-key fold → order-independent stats. Skip unknown ids and non-positive stacks.
+  // The sort is stable, so a repeated id keeps list order and its first entry
+  // decides the element its behavior carries.
   const active = known
-    .map((m) => ({ def: MODS[m.id], stacks: Math.min(Math.floor(m.stacks), modMaxStacks(m.id)) }))
+    .map((m, i) => ({ def: MODS[m.id], stacks: Math.min(Math.floor(m.stacks), modMaxStacks(m.id)), element: elementFor(i, known)?.id }))
     .sort((a, b) => a.def.id.localeCompare(b.def.id))
+  const carries: CarriedElements = {}
 
-  for (const { def, stacks } of active) {
+  for (const { def, stacks, element } of active) {
     if (def.add) for (const k of Object.keys(def.add) as (keyof WeaponStats)[]) add[k] += (def.add[k] ?? 0) * stacks
     if (def.mul) for (const k of Object.keys(def.mul) as (keyof WeaponStats)[]) mul[k] *= Math.pow(def.mul[k] ?? 1, stacks)
     if (def.behavior) {
@@ -97,6 +135,11 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       if (b.splinter) behavior.splinter += b.splinter * stacks
       if (b.homing) behavior.homing += b.homing * stacks
       if (b.explodeRadius) behavior.explodeRadius += b.explodeRadius * stacks
+      if (element) {
+        if (b.split) carries.split ??= element
+        if (b.splinter) carries.splinter ??= element
+        if (b.explodeRadius) carries.explode ??= element
+      }
       if (b.explodeDamage) behavior.explodeDamage += b.explodeDamage * stacks
       if (b.lifestealFrac) lifestealStacks += stacks // hyperbolic — folded below
     }
@@ -104,7 +147,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       const t = def.trigger
       triggers.push({
         event: t.event,
-        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks } } : {}),
+        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks, ...(element ? { element } : {}) } } : {}),
       })
     }
   }
@@ -131,6 +174,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       splinter: clamp(Math.round(behavior.splinter), 0, BEHAVIOR_CAP),
       lifestealFrac: clamp(behavior.lifestealFrac, 0, 0.95),
     },
+    carries,
     triggers,
   }
 }

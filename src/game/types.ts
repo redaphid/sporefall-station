@@ -123,7 +123,9 @@ export type SimEvent =
    * (`entityId`) at `x,y`. `fromId` is the corpse it fell from. Rolled from the
    * world RNG at the kill site — a pure function of seed + inputs. */
   | { type: 'weaponDrop'; entityId: EntityId; fromId: EntityId; itemId: string; x: number; y: number }
-  | { type: 'explosion'; x: number; y: number; radius: number }
+  /** `element`: the element mod id the blast applies to every body it damages.
+   * Absent on a plain blast. The renderer tints the blast from it. */
+  | { type: 'explosion'; x: number; y: number; radius: number; element?: string }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
   | { type: 'use'; entityId: EntityId; byId: EntityId }

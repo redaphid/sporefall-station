@@ -16,7 +16,8 @@
 // systems/modifierSystem.ts.
 
 import type { Entity } from './entity'
-import { STOREY_SIZE, Tile, type Level } from './levelgen/level'
+import { rectContains, STOREY_SIZE, Tile, type Level } from './levelgen/level'
+import type { Rect } from './levelgen/rooms'
 import { hashLabel, mulberry32 } from './rng'
 import { storeyOf } from './stairs'
 import { SIM_RATE } from './types'
@@ -35,7 +36,15 @@ export interface FloorModifier {
   packId?: number
   /** hunted: packs sent so far this floor (seeds each arrival's dice). */
   hunts?: number
+  /** bogTide: rooms that flood with the low ground (see EXPERIMENT_FLOODED_ROOMS). */
+  floodRooms?: Rect[]
 }
+
+/** EXPERIMENT (substrate census, not shipped design): a bog tide also floods
+ * the rooms in `FloorModifier.floodRooms`, so a staged boss lair takes on water
+ * with the streets. No rolled floor sets `floodRooms`; only the `arena-bog-*`
+ * scenarios do. Set false to turn the experiment off. */
+export const EXPERIMENT_FLOODED_ROOMS = true
 
 /** Floor 1 teaches the base game, so it is always clean. */
 export const MODIFIER_FIRST_FLOOR = 2
@@ -89,10 +98,13 @@ export const tideFlooded = (m: Pick<FloorModifier, 'kind' | 'since'> | undefined
   m?.kind === 'bogTide' && tick >= m.since && (tick - m.since) % TIDE_PERIOD >= TIDE_PERIOD - TIDE_FLOOD
 
 /** Is this body standing in the flood right now? */
-export const inFlood = (w: World, e: Entity): boolean =>
-  tideFlooded(w.modifier, w.tick) &&
-  storeyOf(e.pos.x) === 0 &&
-  isLowTile(w.level.tiles[Math.floor(e.pos.y) * w.level.w + Math.floor(e.pos.x)])
+export const inFlood = (w: World, e: Entity): boolean => {
+  if (!tideFlooded(w.modifier, w.tick) || storeyOf(e.pos.x) !== 0) return false
+  const x = Math.floor(e.pos.x)
+  const y = Math.floor(e.pos.y)
+  if (isLowTile(w.level.tiles[y * w.level.w + x])) return true
+  return EXPERIMENT_FLOODED_ROOMS && (w.modifier?.floodRooms?.some((r) => rectContains(r, x, y)) ?? false)
+}
 
 /** Walk-speed multiplier from the floor's modifier (1 unless wading). */
 export const wadeMult = (w: World, e: Entity): number => (inFlood(w, e) ? WADE_SPEED : 1)

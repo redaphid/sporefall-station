@@ -1,7 +1,9 @@
 import { NPCS } from './data/npcs'
+import { TIDE_FLOOD, TIDE_PERIOD } from './floorModifiers'
 import { isSolidTile, rectContains } from './levelgen/level'
 import type { Rect } from './levelgen/rooms'
 import { spawnNpc } from './populate'
+import { startFloorModifier } from './systems/modifierSystem'
 import type { World } from './world'
 
 export interface ArenaFoe {
@@ -17,7 +19,14 @@ export interface ArenaSpec {
   foes: readonly ArenaFoe[]
   /** The arena this one differs from in exactly the foe overrides, for a side-by-side census comparison. */
   control?: string
+  /** Fought on a bog-tide floor whose tide floods the arena room as the fight
+   * starts (EXPERIMENT_FLOODED_ROOMS). */
+  tide?: boolean
 }
+
+/** How far into its cycle a tide arena's tide starts: the flood rises on the
+ * first tick, holds TIDE_FLOOD ticks, and returns TIDE_PERIOD ticks later. */
+export const TIDE_ARENA_AGE = TIDE_PERIOD - TIDE_FLOOD
 
 const MIRECLAW_WEAK_TO_LIGHTNING: Record<string, number> = { electrified: 2 }
 
@@ -59,6 +68,17 @@ export const ARENAS: Readonly<Record<string, ArenaSpec>> = {
     question: 'Mireclaw Alpha weak to lightning and standing wet, so a shock chain could land.',
     foes: [{ archetype: 'boss', count: 1, resist: MIRECLAW_WEAK_TO_LIGHTNING, wet: true }],
     control: 'arena-boss-wet',
+  },
+  'arena-bog-boss-stock': {
+    question: 'Mireclaw Alpha with its stock resists, in a lair the bog tide floods as the fight starts.',
+    foes: [{ archetype: 'boss', count: 1 }],
+    tide: true,
+  },
+  'arena-bog-boss': {
+    question: 'Mireclaw Alpha weak to lightning (electrified x2), in a lair the bog tide floods as the fight starts.',
+    foes: [{ archetype: 'boss', count: 1, resist: MIRECLAW_WEAK_TO_LIGHTNING }],
+    control: 'arena-bog-boss-stock',
+    tide: true,
   },
 }
 
@@ -125,6 +145,10 @@ export const stageArena = (w: World, spec: ArenaSpec, room: Rect | undefined = a
   const far = Math.min(depth - 1, sight)
   const cells: { x: number; y: number }[] = []
   for (let d = far; d >= Math.ceil((far + 1) / 2); d--) cells.push(...lineCells(w, room, alongX, d))
+  if (spec.tide) {
+    startFloorModifier(w, 'bogTide', TIDE_ARENA_AGE)
+    w.modifier!.floodRooms = [room]
+  }
   let next = 0
   for (const foe of spec.foes) {
     for (let i = 0; i < foe.count && next < cells.length; i++) {

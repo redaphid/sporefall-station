@@ -5,7 +5,12 @@ import { isSolidTile, rectContains } from './levelgen/level'
 import type { Rect } from './levelgen/rooms'
 import { populateWorld } from './populate'
 import { spawnPlayer } from './player'
-import { ARENAS, arenaRoom, stageArena } from './arenas'
+import { ARENAS, arenaRoom, stageArena, TIDE_ARENA_AGE } from './arenas'
+import { TIDE_FLOOD, TIDE_PERIOD } from './floorModifiers'
+import { ELEMENTS } from './data/elements'
+import { spawnNpc } from './populate'
+import { deserializeWorld, serializeWorld } from './serialize'
+import { isWet } from './systems/statusFx'
 import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './scenarios'
 import { playerSpawnPoint } from './spawnPlacement'
 import { setupFloor } from './systems/missions'
@@ -177,6 +182,54 @@ describe('arena scenarios', () => {
     stageArena(w, { question: 'strip', foes: [] }, strip)
     expect(inside(strip, player(w))).toBe(true)
     expect(foes(w)).toEqual([])
+  })
+
+  describe('tide arenas (EXPERIMENT_FLOODED_ROOMS)', () => {
+    const tideRoom = (seed: number, tide: boolean): { w: World; room: Rect } => {
+      const w = run(seed)
+      const room = arenaRoom(w)!
+      stageArena(w, { question: 'tide', foes: [], tide }, room)
+      return { w, room }
+    }
+
+    it('floods the arena room on the first tick, dries it once the tide is out for wet to wear off, and floods it again next cycle', () => {
+      for (const seed of [303, 5, 4]) {
+        const { w } = tideRoom(seed, true)
+        const me = player(w)
+        expect(w.modifier?.kind).toBe('bogTide')
+        expect(w.tick - w.modifier!.since).toBe(TIDE_ARENA_AGE)
+        runTicks(w, new Map(), 1)
+        expect(isWet(me), `seed ${seed} flooded`).toBe(true)
+        runTicks(w, new Map(), TIDE_FLOOD + ELEMENTS.wet.durationTicks)
+        expect(isWet(me), `seed ${seed} tide out`).toBe(false)
+        runTicks(w, new Map(), TIDE_PERIOD - TIDE_FLOOD - ELEMENTS.wet.durationTicks)
+        expect(isWet(me), `seed ${seed} next flood`).toBe(true)
+      }
+    })
+
+    it('keeps the same room dry with no tide, and keeps every other room dry under it', () => {
+      const dry = tideRoom(303, false)
+      runTicks(dry.w, new Map(), 1)
+      expect(dry.w.modifier).toBeUndefined()
+      expect(isWet(player(dry.w))).toBe(false)
+
+      const { w, room } = tideRoom(303, true)
+      const other = w.level.buildings.flatMap((b) => b.rooms).find((r) => r !== room && !isSolidTile(w.level, r.x + 1, r.y + 1))!
+      const bystander = spawnNpc(w, 'thug', other.x + 1.5, other.y + 1.5)
+      runTicks(w, new Map(), 1)
+      expect(isWet(player(w))).toBe(true)
+      expect(isWet(bystander)).toBe(false)
+    })
+
+    it('round-trips its flooded rooms through a snapshot and replays byte-identically', () => {
+      const { w } = arena(303, 'arena-bog-boss')
+      runTicks(w, new Map(), 10)
+      const b = deserializeWorld(serializeWorld(w))
+      expect(b.modifier?.floodRooms).toEqual(w.modifier?.floodRooms)
+      runTicks(w, new Map(), 120)
+      runTicks(b, new Map(), 120)
+      expectWorldEqual(w, b)
+    })
   })
 
   it('leaves the world alone when there is no player to stage', () => {

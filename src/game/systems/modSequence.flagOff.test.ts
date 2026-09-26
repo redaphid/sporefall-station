@@ -61,10 +61,14 @@ describe('mod sequencing: flag off matches main', () => {
   // the default-mode element rule changed from alphabetical to newest-in-list,
   // so this gun's rounds now freeze (frost is its newest element) instead of
   // burn. Restoring the alphabetical pick alone reproduced the old digests
-  // (deaefb3a, 6251b800).
+  // (deaefb3a, 6251b800). Re-pinned again for #117: a round's provenance
+  // (`projectile.mods`) drops the element that frost overrides, so incendiary
+  // no longer rides these rounds. Reverting only that filter reproduced the
+  // previous digests (68f8aaa8, 457a3b14), and with every projectile's `mods`
+  // removed both builds digest identically (8029abfa, 5cc314e6).
   const GOLDEN: Record<number, string> = {
-    7: '68f8aaa8',
-    1234: '457a3b14',
+    7: '92430cd7',
+    1234: '3f405983',
   }
 
   for (const seed of [7, 1234]) {

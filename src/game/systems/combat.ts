@@ -451,7 +451,7 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {
     const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
-    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, stack?.mods)
+    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, rw.mods)
   }
   return true
 }
@@ -496,7 +496,7 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
       const spec = projectileSpec(rw)
       for (let j = 0; j < rw.pellets; j++, k++) {
         const offset = total > 1 ? (k / (total - 1) - 0.5) * rw.spread : 0
-        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, casts[g].mods)
+        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, rw.mods)
       }
     }
   }

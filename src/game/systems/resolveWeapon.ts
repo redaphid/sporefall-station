@@ -11,7 +11,7 @@
 // hyperbolic curve that approaches but never reaches 100%).
 
 import type { WeaponDef, StatusApply } from '../data/items'
-import { MODS, modMaxStacks, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
+import { MODS, modMaxStacks, normalizeMods, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
 import type { WeaponMod } from '../entity'
 
 export interface ResolvedWeapon {
@@ -24,6 +24,10 @@ export interface ResolvedWeapon {
   knockback: number
   /** Element applied on hit (base weapon's, or set by an elemental mod). */
   onHit?: StatusApply
+  /** The mods this weapon executes, in normalizeMods form: every mod except the
+   * elements a newer element overrides. Absent when none. A round's provenance
+   * is built from this, so its look never shows an element the hit will not apply. */
+  mods?: WeaponMod[]
   behavior: BulletBehavior
   triggers: ResolvedTrigger[]
 }
@@ -75,6 +79,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
   const known = mods.filter((m) => MODS[m.id] && m.stacks > 0)
   const newestElement = [...known].reverse().find((m) => MODS[m.id].onHit)
   const onHit: StatusApply | undefined = newestElement ? MODS[newestElement.id].onHit : base.onHit
+  const executed = known.filter((m) => !MODS[m.id].onHit || m.id === newestElement?.id)
 
   // Sorted-key fold → order-independent stats. Skip unknown ids and non-positive stacks.
   const active = known
@@ -115,6 +120,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
     projectileSpeed: clamp(add.projectileSpeed * mul.projectileSpeed, 0.5, SPEED_CAP),
     knockback: clamp(add.knockback * mul.knockback, 0, KNOCKBACK_CAP),
     onHit,
+    mods: normalizeMods(executed),
     behavior: {
       pierce: clamp(Math.round(behavior.pierce), 0, BEHAVIOR_CAP),
       bounce: clamp(Math.round(behavior.bounce), 0, BEHAVIOR_CAP),

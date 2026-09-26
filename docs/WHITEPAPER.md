@@ -26,8 +26,10 @@ a lot. That's the core game mechanic." In the loadout brief he sharpened it to
 
 Design B counted 22,620 possible wands of up to four chips. The arena census
 fought 21 builds through the real sim and found that today's elements give
-about three distinct answers. The gap between 22,620 and three is the subject
-of this paper. A combination only counts if it plays differently from its
+about three distinct answers: frost, fire, and fire plus a lock. After #92 made
+burning foes panic, the substrate census (with #99 and #101 merged alongside)
+found one build, `incendiary+pierce`, that won all 40 non-boss fights. The gap
+between 22,620 and one is the subject of this paper. A combination only counts if it plays differently from its
 neighbours in a situation the game actually puts in front of the player.
 
 ### 2.2 Eight rulings, one taste
@@ -54,8 +56,9 @@ taste.
   behind it.
 - **The screen tells the truth.** INSPO names the defect class: "the status
   display is truthful about intent and false about behaviour." The same taste
-  rejected backbuffer shaders that sat "randomly on the ground with no effect"
-  and asked for them on "bullet effects for appropriate mods" instead.
+  rejected backbuffer shaders that sat "randomly on the ground with no effect",
+  called the on-screen labels "obtuse", and asked to "use shaders to make
+  lightning look like lightning". The truthful mod UI (#93) is now on `main`.
 
 Read together, the rulings describe a system a player can reason about. Each
 piece does one recognisable thing. Pieces combine by rule, so any result is
@@ -73,7 +76,10 @@ example, is weak to lightning."
 That sentence holds two ideas. Randomness alone is not the fun. And the fun he
 wants has a before and an after: you learn something about a fight that has not
 happened yet, you change your weapon because of it, and the fight goes
-differently because you did. The earlier Dark Souls ask ("I want bosses like
+differently because you did. That loop needs three things: a way to learn the
+weakness, a way to act on it, and a fight where acting on it changes the result.
+Section 4 shows that the game had none of the three until very recently. The
+earlier Dark Souls ask ("I want bosses like
 Dark souls") points the same way, and `docs/design/boss-variety.md` sets the bar
 that makes it testable: "If two bosses are beaten by doing the same thing, there
 is only one boss."
@@ -86,7 +92,9 @@ on phones over Bluetooth, on a couch, with a controller. The heist ask shows wha
 he wants the kids to do together: "a multi-stage bank heist or something. that
 requires careful planning amongst my nephews." The combinations are what the
 family talks about. "Look what my gun does" is the sentence the mechanic exists
-to produce.
+to produce. His ask for NPC memory says the same about the world: "I want the
+players actions to name differences in the world and characters they can
+_feel_."
 
 ### 2.5 The constraint around all of it
 

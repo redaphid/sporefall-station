@@ -57,10 +57,23 @@ const run = (seed: number, ticks: number): World => {
 }
 
 describe('mod sequencing: flag off matches main', () => {
-  // Captured on main @ 9d0894d with this exact file.
+  // Captured on main @ 9d0894d with this exact file. Re-pinned once for #91:
+  // the default-mode element rule changed from alphabetical to newest-in-list,
+  // so this gun's rounds now freeze (frost is its newest element) instead of
+  // burn. Restoring the alphabetical pick alone reproduced the old digests
+  // (deaefb3a, 6251b800). Re-pinned again for #117: a round's provenance
+  // (`projectile.mods`) drops the element that frost overrides, so incendiary
+  // no longer rides these rounds. Reverting only that filter reproduced the
+  // previous digests (68f8aaa8, 457a3b14), and with every projectile's `mods`
+  // removed both builds digest identically (8029abfa, 5cc314e6). Seed 7
+  // re-pinned for #87: applyStatus now records who applied a status
+  // (`fx.frozen.source`), a deliberate sim change. Integration PR #122 reverted
+  // only that and reproduced '92430cd7'; seed 1234 does not move. Both re-pinned
+  // for #86: player gunfire is now a heard noise. With `hearGunfire` stubbed
+  // out the previous digests (d18f1870, 3f405983) still match.
   const GOLDEN: Record<number, string> = {
-    7: 'deaefb3a',
-    1234: '6251b800',
+    7: 'a13b7b25',
+    1234: 'e92bcf60',
   }
 
   for (const seed of [7, 1234]) {

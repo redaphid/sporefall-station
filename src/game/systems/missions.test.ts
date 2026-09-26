@@ -64,6 +64,7 @@ describe('roguelite loop', () => {
       reach: /^Reach the Launch Bay$/,
       contain: /^Burn back the Spore Node in the .* before it blooms$/,
       infiltrate: /^Breach the biolock and purge the Mireclaw Alpha in the /,
+      extraction: /^Grab the specimen canister in the .*, then get out the way you came$/,
     }
     const OFF_THEME = /briefcase|\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
     const seen = new Set<string>()

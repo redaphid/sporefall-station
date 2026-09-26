@@ -16,7 +16,7 @@ A host opens a lobby, friends join, and the host starts the game. Every instance
 
 ## Driving it with Playwright
 
-Preconditions: doctor green. Both pages must share one browser context, because BroadcastChannel does not cross contexts. `drive.mjs` drives one page, so use `node e2e/offline-coop.mjs` (set `OFFLINE_PORT`), or Lane A with two tabs via `browser_tabs`.
+Preconditions: doctor green. Both pages must share one browser context, because BroadcastChannel does not cross contexts. `drive.mjs` drives one page, so use `node e2e/offline-coop.mjs` (set `OFFLINE_PORT`), or Lane A with two claude-in-chrome tabs. Both tabs must tick for real (BroadcastChannel carries live frames), so put each in its own Chrome window so neither is a background tab.
 
 - **Lane A.** Open the host URL in tab 0 and the join URL in tab 1. Wait until the host's `document.querySelectorAll('#players > div').length >= 2`, click `Start game` in tab 0, and then check `window.world.tick > 60` in both tabs. Screenshot both.
 - **Scripted.** `pnpm run build && node e2e/offline-coop.mjs`. It serves `dist/` itself on `OFFLINE_PORT` (default 8123), blocks all external network, and records the late-join page to mp4.

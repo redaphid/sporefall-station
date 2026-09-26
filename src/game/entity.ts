@@ -123,6 +123,9 @@ export interface AiState {
   /** #65 — a POINT to flee away from when there is no threat ENTITY to run from
    * (a caught fear pulse / stampede). Steering uses it when `targetId` is unset. */
   fleeFrom?: Vec2
+  /** Where a burning body is running from while it panics (statusFx `panic`);
+   * the window itself is `lockout.panic`. */
+  panicFrom?: Vec2
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
   /** Where/when this NPC last made real progress toward an UNSEEN chase goal —
@@ -204,6 +207,20 @@ export interface ItemStack {
  * innate fists, a class-starter with no slot) resolves VANILLA — undefined stack,
  * infinite/no-wear — exactly as an inventory-less NPC did before this component
  * existed, so every pre-loadout snapshot round-trips byte-for-byte. */
+/** A floor-draft hand a player is still choosing from (systems/draft.ts). */
+export interface DraftHand {
+  /** The mod ids on offer, in card order. */
+  offer: string[]
+  /** Index of the card under this player's cursor. */
+  cursor: number
+  /** Absolute tick at which the hand takes the card under the cursor. */
+  until: number
+  /** Intent bits held on the previous tick. Cards move or are taken only on a
+   * fresh press, and a hand opens with every bit set, so a stick or trigger still
+   * held from walking onto the exit does nothing until released. */
+  held: number
+}
+
 export interface Loadout {
   /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
   inventory: ItemStack[]
@@ -252,13 +269,20 @@ export interface Entity {
      * counts from here. Optional/absent until first hurt, so pre-feature snapshots
      * round-trip byte-for-byte (same discipline as `mods`/`annotations`). */
     lastHurtTick?: number
+    /** Lifesteal earned but not yet paid, in [-0.5, 0.5). hp stays whole, so each
+     * heal pays Math.round of what is owed (the damage rounding rule) and carries
+     * the rest to the next hit. Carrying lets small hits add up: rounded alone, a
+     * 1-stack build heals 0 on any hit of 3 or less, such as a machinegun into a
+     * brute. Absent until the first lifesteal hit, so older snapshots round-trip. */
+    lifestealCarry?: number
   }
   // (Spawn-protection grace for players rides `health.iframes` — see
   // SPAWN_GRACE_TICKS below — so every damage source already honors it.)
   combat?: { weapon: string; cooldown: number }
   /** #78 — damage AFFINITY table: a multiplier on incoming damage keyed by kind
    * (`'physical'` for weapon impact/explosions, or an element id: `burning`,
-   * `spore`, `poisoned`). 1 = neutral, <1 resistant, 0 = immune, >1 vulnerable.
+   * `spore`, `poisoned`, `electrified` for the wet-shock arc). 1 = neutral, <1
+   * resistant, 0 = immune, >1 vulnerable.
    * A missing key (or absent table) is neutral (×1), so every existing entity
    * and fixture is byte-identical. Copied from the archetype (`NpcDef.resist`)
    * at spawn; this is what makes different enemies demand different tools. */
@@ -291,6 +315,8 @@ export interface Entity {
      * + speed-burst window; `cooldownUntilTick` gates the next roll (no chaining);
      * `dirX/dirY` is the frozen roll heading (move dir, or facing when stationary). */
     roll?: { untilTick: number; cooldownUntilTick: number; dirX: number; dirY: number }
+    /** Present while this player is choosing a mod from the floor draft. */
+    draft?: DraftHand
   }
   projectile?: {
     ownerId: EntityId
@@ -325,8 +351,9 @@ export interface Entity {
     hitIds?: EntityId[]
     /** Resolved trigger effects fired on hit/kill (on-reload handled elsewhere). */
     triggers?: import('./data/mods').ResolvedTrigger[]
-    /** Build provenance: the (normalized) mod list of the gun that fired this
-     * shot. Pure inert data — no system reads it — carried so the renderer (and
+    /** Build provenance: the (normalized) mods this shot executes, which is the
+     * gun's list minus any element a newer element overrides (ResolvedWeapon.mods).
+     * Pure inert data — no system reads it — carried so the renderer (and
      * net peers, via the snapshot codec) can COMPOSE the bullet's procedural
      * look from its mods, Nova-Drift style. Absent = vanilla shot, so every
      * pre-feature world/fixture serializes byte-for-byte unchanged. */

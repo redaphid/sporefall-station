@@ -106,6 +106,15 @@ describe('resolveWeapon — order independence (the key invariant)', () => {
     expect(a).toEqual(b)
     expect(a).toEqual(c)
   })
+  it('two elements: stats stay order-independent, the newest element wins onHit', () => {
+    const cryoLast = resolveWeapon(pistol, [{ id: 'shock', stacks: 1 }, { id: 'overload', stacks: 1 }, { id: 'frost', stacks: 1 }])
+    const teslaLast = resolveWeapon(pistol, [{ id: 'frost', stacks: 1 }, { id: 'overload', stacks: 1 }, { id: 'shock', stacks: 1 }])
+    expect(cryoLast.onHit).toEqual({ status: 'frozen', ticks: 120 })
+    expect(teslaLast.onHit).toEqual({ status: 'electrified', ticks: 45 })
+    expect(cryoLast.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'overload', stacks: 1 }])
+    expect(teslaLast.mods).toEqual([{ id: 'overload', stacks: 1 }, { id: 'shock', stacks: 1 }])
+    expect({ ...cryoLast, onHit: undefined, mods: undefined }).toEqual({ ...teslaLast, onHit: undefined, mods: undefined })
+  })
 })
 
 describe('resolveWeapon — conflicting / duplicate mods', () => {

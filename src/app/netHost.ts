@@ -1,7 +1,8 @@
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { setupFloor } from '../game/systems/missions'
+import { extractionView, setupFloor } from '../game/systems/missions'
+import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
 import { modifierView } from '../game/floorModifiers'
@@ -62,6 +63,8 @@ interface PeerState {
   /** Mod reorder the client asked for since the last tick consumed one
    * (undefined = none). Edge-latched exactly like `pendingHotbar`. */
   pendingModSwap?: number
+  /** Floor-draft card the client tapped (undefined = none), latched like `pendingModSwap`. */
+  pendingDraftPick?: number
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
@@ -231,6 +234,11 @@ export class NetHostSession implements Session {
         cmd.modSwap = p.pendingModSwap
         p.pendingModSwap = undefined
       }
+      delete cmd.draftPick
+      if (p.pendingDraftPick !== undefined) {
+        cmd.draftPick = p.pendingDraftPick
+        p.pendingDraftPick = undefined
+      }
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
@@ -343,6 +351,7 @@ export class NetHostSession implements Session {
         abilityCd: e.playerCtl.abilityCooldown,
         bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
         briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        ...(e.playerCtl.draft ? { draft: e.playerCtl.draft } : {}),
       }
     }
     const state: StateMsg = {
@@ -350,9 +359,11 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
+      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alarm: this.world.alarm,
       alert: stationAlerted(this.world),
+      lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       ...(this.world.modifier ? { modifier: { ...this.world.modifier } } : {}),
@@ -371,8 +382,10 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
+      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
+      lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
@@ -465,6 +478,7 @@ export class NetHostSession implements Session {
         // it once even if the packet arrived between ticks (OR-ed like the edges).
         if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
         if (cmd.modSwap !== undefined) p.pendingModSwap = cmd.modSwap
+        if (cmd.draftPick !== undefined) p.pendingDraftPick = cmd.draftPick
       }
       return
     }

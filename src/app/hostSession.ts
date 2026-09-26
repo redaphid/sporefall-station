@@ -3,7 +3,8 @@ import { modifierView } from '../game/floorModifiers'
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { setupFloor } from '../game/systems/missions'
+import { extractionView, setupFloor } from '../game/systems/missions'
+import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
@@ -74,6 +75,7 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
     // Optional: only present when one side asked for a reorder, so a merge of
     // two ordinary commands stays exactly the shape it always was.
     ...((b.modSwap ?? a.modSwap) !== undefined ? { modSwap: b.modSwap ?? a.modSwap } : {}),
+    ...((b.draftPick ?? a.draftPick) !== undefined ? { draftPick: b.draftPick ?? a.draftPick } : {}),
   }
 }
 
@@ -172,8 +174,10 @@ export class HostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
+      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
+      lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
       ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),

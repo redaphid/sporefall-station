@@ -5,6 +5,8 @@
 // no mission, client placeholder text, game over) resolve here, so the DOM
 // glue in missionPanel.ts stays a dumb renderer.
 
+import { LOCKDOWN_TICKS } from '../game/systems/alarm'
+
 /** What an objective row can point at: a live entity (preferred — the engine
  * reads its live position every frame) or a fixed world point (the exit tile). */
 export interface ObjectiveLink {
@@ -36,7 +38,22 @@ export interface MissionViewLike {
   entities: readonly { id: number; dead?: boolean; pos: { x: number; y: number } }[]
   /** Exit tile (integer corner) — omitted on a client before the level arrives. */
   exit?: { x: number; y: number }
+  /** Open `extraction` mission: the way out is this entry tile, not the exit. */
+  extraction?: { x: number; y: number; held: boolean }
+  /** #86 lockdown (RenderView.lockdown): the alarm sealed the way out. */
+  lockdown?: { secondsLeft?: number }
 }
+
+/** The line that tells the player WHY the way out is shut, or undefined when no
+ * lockdown is in force. An extraction's way out is the entry, not the Launch Bay. */
+const lockdownText = (v: Pick<MissionViewLike, 'lockdown' | 'extraction'>): string | undefined => {
+  if (!v.lockdown) return undefined
+  if (v.lockdown.secondsLeft !== undefined) return `${v.extraction ? 'WAY OUT' : 'LAUNCH BAY'} SEALED · lockdown ${v.lockdown.secondsLeft}s`
+  if (v.extraction) return `LOCKDOWN · the alarm will hold the way out ${LOCKDOWN_TICKS / 30}s after the grab`
+  return `LOCKDOWN · the alarm will hold the Launch Bay ${LOCKDOWN_TICKS / 30}s after the objective`
+}
+
+export const EXTRACT_ROW_TEXT = 'Get out the way you came'
 
 /** Case-insensitive "this mission IS the exit objective" test, so a `reach`
  * template doesn't render as two identical rows. The exit is the Launch Bay. */
@@ -54,6 +71,21 @@ const isReachText = (text: string): boolean => text.trim().toLowerCase() === 're
  */
 export const missionObjectives = (v: MissionViewLike): Objective[] => {
   if (v.gameOver) return []
+  const x = v.extraction
+  if (x) {
+    // Prize on the floor → go get it; prize in hand → the entry is the objective,
+    // unless a lockdown holds it shut.
+    const sealed = lockdownText(v)
+    return [
+      { key: 'mission', text: v.missionText, state: x.held ? 'done' : 'active', link: x.held ? undefined : entityLink(v) },
+      {
+        key: 'exit',
+        text: sealed ?? EXTRACT_ROW_TEXT,
+        state: x.held && !sealed ? 'active' : 'locked',
+        link: x.held ? { x: x.x + 0.5, y: x.y + 0.5 } : undefined,
+      },
+    ]
+  }
   const rows: Objective[] = []
   if (!isReachText(v.missionText)) {
     rows.push({
@@ -64,10 +96,11 @@ export const missionObjectives = (v: MissionViewLike): Objective[] => {
     })
   }
   if (v.exit) {
+    const sealed = lockdownText(v)
     rows.push({
       key: 'exit',
-      text: 'Reach the Launch Bay',
-      state: v.missionComplete ? 'active' : 'locked',
+      text: sealed ?? 'Reach the Launch Bay',
+      state: v.missionComplete && !sealed ? 'active' : 'locked',
       link: v.missionComplete ? { x: v.exit.x + 0.5, y: v.exit.y + 0.5 } : undefined,
     })
   }
@@ -84,8 +117,16 @@ const entityLink = (v: MissionViewLike): ObjectiveLink | undefined => {
 }
 
 /** Collapsed-chip text — parity with the old one-line mission readout. */
-export const missionChipText = (v: Pick<MissionViewLike, 'floor' | 'missionText' | 'missionComplete'>): string =>
-  v.missionComplete ? `Floor ${v.floor} — LAUNCH BAY is open!` : `Floor ${v.floor} — ${v.missionText}`
+export const missionChipText = (
+  v: Pick<MissionViewLike, 'floor' | 'missionText' | 'missionComplete' | 'extraction' | 'lockdown'>,
+): string => {
+  const secs = v.lockdown?.secondsLeft
+  if (v.extraction?.held)
+    return secs !== undefined ? `Floor ${v.floor} — GOT IT! Way out sealed · ${secs}s` : `Floor ${v.floor} — GOT IT! Get out the way you came`
+  if (v.missionComplete && secs !== undefined) return `Floor ${v.floor} — LAUNCH BAY SEALED · ${secs}s`
+  if (v.missionComplete) return `Floor ${v.floor} — LAUNCH BAY is open!`
+  return `Floor ${v.floor} — ${v.lockdown ? 'LOCKDOWN · ' : ''}${v.missionText}`
+}
 
 /**
  * Resolve a link to its CURRENT world position: a live entity's live pos, or

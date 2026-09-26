@@ -1,4 +1,4 @@
-import type { Entity, ItemStack } from '../../game/entity'
+import type { DraftHand, Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
@@ -197,6 +197,12 @@ export const WIRE_MODS = [
 
 const wireModIndex = new Map<string, number>(WIRE_MODS.map((m, i) => [m, i]))
 
+/** Element statuses (`Entity.fx` keys) as a bit index in the snapshot's status
+ * trailer. Frozen history like WIRE_MODS: append only, at most 8. */
+export const WIRE_STATUSES = ['burning', 'frozen', 'wet', 'electrified', 'poisoned', 'spore'] as const
+
+const wireStatusBit = new Map<string, number>(WIRE_STATUSES.map((k, i) => [k, 1 << i]))
+
 /** Most mods a single bullet advertises on the wire (bounds the record size). */
 const WIRE_MOD_CAP = 12
 
@@ -230,6 +236,9 @@ export interface WireEntity {
   /** Bullet mod provenance ('projectile' archetype only) — drives the client's
    * procedural bullet look. Absent/empty = vanilla shot. */
   mods?: { id: string; stacks: number }[]
+  /** Active element statuses (`Entity.fx` keys) that the renderer tints and
+   * shades. Absent = none. */
+  statuses?: string[]
 }
 
 export interface WireSnapshot {
@@ -281,6 +290,20 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
       }
     }
   }
+  // Sparse status trailer: the flags byte is full, and most entities carry no
+  // status, so only statused records pay. u8 count, then (u8 record index, u8
+  // WIRE_STATUSES bitmask) per statused entity. Omitted entirely when nobody is
+  // statused, so a quiet snapshot is byte-identical to the pre-trailer format.
+  const statused: [number, number][] = []
+  entities.forEach((e, i) => {
+    let mask = 0
+    for (const k of e.statuses ?? []) mask |= wireStatusBit.get(k) ?? 0
+    if (mask) statused.push([i, mask])
+  })
+  if (statused.length > 0) {
+    w.u8(statused.length)
+    for (const [i, mask] of statused) w.u8(i).u8(mask)
+  }
   return w.finish()
 }
 
@@ -317,6 +340,15 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
     }
     entities.push(we)
   }
+  if (r.remaining > 0) {
+    const n = r.u8()
+    for (let j = 0; j < n && r.remaining >= 2; j++) {
+      const target = entities[r.u8()]
+      const mask = r.u8()
+      const statuses = WIRE_STATUSES.filter((_, bit) => (mask & (1 << bit)) !== 0)
+      if (target && statuses.length > 0) target.statuses = statuses
+    }
+  }
   return { tick, floor, alarm, lastInputSeq, entities }
 }
 
@@ -346,7 +378,11 @@ export const encodeInput = (
   // never written; absent = none). Written ONLY when a swap is pending, so every
   // ordinary input packet is byte-identical to before. An older host reads the
   // hotbar byte and never looks further, so the extra bytes are ignored.
-  if (cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff) w.u16(cmd.modSwap + 1)
+  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff ? cmd.modSwap + 1 : 0
+  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick < 0xff ? cmd.draftPick + 1 : 0
+  if (swap > 0 || pick > 0) w.u16(swap)
+  // OPTIONAL trailing u8 after the swap slot: a floor-draft card, +1 biased.
+  if (pick > 0) w.u8(pick)
   return w.finish()
 }
 
@@ -361,13 +397,17 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
   const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
-  const modSwap = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no reorder
+  const swapSlot = r.remaining >= 2
+  const modSwap = swapSlot ? r.u16() : 0 // back-compat: absent → no reorder
+  // The draft byte only ever follows a swap slot, so one stray byte is never a pick.
+  const draftPick = swapSlot && r.remaining >= 1 ? r.u8() : 0
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
   if (modSwap > 0) cmd.modSwap = modSwap - 1
+  if (draftPick > 0) cmd.draftPick = draftPick - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
@@ -400,6 +440,8 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   }
   // Modded bullets carry their build so clients compose the same look.
   if (e.projectile?.mods && e.projectile.mods.length > 0) we.mods = e.projectile.mods.map((m) => ({ ...m }))
+  const statuses = e.fx ? Object.keys(e.fx).filter((k) => wireStatusBit.has(k)) : []
+  if (statuses.length > 0) we.statuses = statuses
   return we
 }
 
@@ -422,6 +464,11 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
     e.projectile ??= { ownerId: 0, damage: 0, ttl: 1 }
     e.projectile.mods = we.mods.map((m) => ({ ...m }))
   }
+  // Render mirror only: the client never runs statusFx, so `until` just keeps
+  // the entry live until the next snapshot restates or drops it. No `source`:
+  // the renderer then draws each status at its base intensity and canonical hue.
+  if (we.statuses && we.statuses.length > 0) e.fx = Object.fromEntries(we.statuses.map((k) => [k, { until: tick + 2 }]))
+  else delete e.fx
   if ((we.flags & SnapFlags.HitFlash) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.hitFlashUntil = tick + 2
@@ -429,6 +476,16 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   if ((we.flags & SnapFlags.Cloaked) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.cloakUntil = tick + 2
+  }
+  // Mirror stun/sleep as 1/0 so the client's prediction gate (isMovementLocked)
+  // and the drowsy sprite see them. The client never decrements these; the next
+  // snapshot restates or clears them.
+  const stun = (we.flags & SnapFlags.Stunned) !== 0 ? 1 : 0
+  const sleep = (we.flags & SnapFlags.Sleeping) !== 0 ? 1 : 0
+  if (stun || sleep || e.status) {
+    e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
+    e.status.stun = stun
+    e.status.sleep = sleep
   }
   if (we.archetype === 'player') {
     e.playerCtl ??= {
@@ -506,11 +563,15 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
+  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
+  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional
    * on the wire for back-compat with an older host. */
   alert?: boolean
+  /** #86 lockdown (see RenderView.lockdown). Optional for back-compat. */
+  lockdown?: { secondsLeft?: number }
   /** Difficulty rules in force (host authoritative). */
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */
@@ -527,7 +588,10 @@ export interface StateMsg {
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
-  huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
+  huds: Record<
+    number,
+    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+  >
 }
 
 /**

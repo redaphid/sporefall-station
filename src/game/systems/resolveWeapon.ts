@@ -1,14 +1,17 @@
 // The SINGLE weapon-mod composition point. `resolveWeapon` is a PURE function of
 // (immutable WeaponDef, mod list) — no clock, no RNG — so it is trivially unit-
 // testable and identical on every peer. It folds the MODS registry over the base
-// def in SORTED-KEY order, so the same card set yields the same gun regardless of
-// PICK order (Brotato's additive-pool lesson + RoR2's per-effect curves). Every
+// def in SORTED-KEY order, so the same card set yields the same stats regardless
+// of PICK order (Brotato's additive-pool lesson + RoR2's per-effect curves). The
+// one exception is the element: a hit carries one, and it is the NEWEST element
+// on the list (the list is pickup order), so the player's latest pick is the one
+// that lands. Every
 // output field is clamped to stay finite and non-degenerate under huge stacks
 // (cooldown floored ≥1 so fireRate can't divide-by-zero; chance-like fields use a
 // hyperbolic curve that approaches but never reaches 100%).
 
 import type { WeaponDef, StatusApply } from '../data/items'
-import { MODS, modMaxStacks, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
+import { MODS, modMaxStacks, normalizeMods, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
 import type { WeaponMod } from '../entity'
 
 export interface ResolvedWeapon {
@@ -21,6 +24,10 @@ export interface ResolvedWeapon {
   knockback: number
   /** Element applied on hit (base weapon's, or set by an elemental mod). */
   onHit?: StatusApply
+  /** The mods this weapon executes, in normalizeMods form: every mod except the
+   * elements a newer element overrides. Absent when none. A round's provenance
+   * is built from this, so its look never shows an element the hit will not apply. */
+  mods?: WeaponMod[]
   behavior: BulletBehavior
   triggers: ResolvedTrigger[]
 }
@@ -48,8 +55,9 @@ const zeroBehavior = (): BulletBehavior => ({
 /**
  * Fold a mod list over the immutable base weapon into an effective, resolved
  * weapon + bullet-behavior spec. Pure and total: sum all additive deltas
- * (× stacks), multiply all factors (^ stacks), then clamp. Mods are visited in
- * sorted registry-id order so composition is order-independent and deterministic.
+ * (× stacks), multiply all factors (^ stacks), then clamp. Stats fold in sorted
+ * registry-id order, so they are order-independent. The element (onHit) is the
+ * newest element mod in list order, falling back to the base weapon's.
  */
 export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []): ResolvedWeapon => {
   // Accumulators: additive pool (starts at base) and multiplicative product.
@@ -66,12 +74,15 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
   // A hyperbolic field can't just be summed: track its per-stack rate × total stacks.
   let lifestealStacks = 0
   const lifestealPerStack = MODS.lifesteal.behavior!.lifestealFrac!
-  let onHit: StatusApply | undefined = base.onHit
   const triggers: ResolvedTrigger[] = []
 
-  // Sorted-key fold → order-independence. Skip unknown ids and non-positive stacks.
-  const active = [...mods]
-    .filter((m) => MODS[m.id] && m.stacks > 0)
+  const known = mods.filter((m) => MODS[m.id] && m.stacks > 0)
+  const newestElement = [...known].reverse().find((m) => MODS[m.id].onHit)
+  const onHit: StatusApply | undefined = newestElement ? MODS[newestElement.id].onHit : base.onHit
+  const executed = known.filter((m) => !MODS[m.id].onHit || m.id === newestElement?.id)
+
+  // Sorted-key fold → order-independent stats. Skip unknown ids and non-positive stacks.
+  const active = known
     .map((m) => ({ def: MODS[m.id], stacks: Math.min(Math.floor(m.stacks), modMaxStacks(m.id)) }))
     .sort((a, b) => a.def.id.localeCompare(b.def.id))
 
@@ -89,7 +100,6 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       if (b.explodeDamage) behavior.explodeDamage += b.explodeDamage * stacks
       if (b.lifestealFrac) lifestealStacks += stacks // hyperbolic — folded below
     }
-    if (def.onHit) onHit = def.onHit // last (sorted-key) elemental mod wins the single onHit slot
     if (def.trigger) {
       const t = def.trigger
       triggers.push({
@@ -110,6 +120,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
     projectileSpeed: clamp(add.projectileSpeed * mul.projectileSpeed, 0.5, SPEED_CAP),
     knockback: clamp(add.knockback * mul.knockback, 0, KNOCKBACK_CAP),
     onHit,
+    mods: normalizeMods(executed),
     behavior: {
       pierce: clamp(Math.round(behavior.pierce), 0, BEHAVIOR_CAP),
       bounce: clamp(Math.round(behavior.bounce), 0, BEHAVIOR_CAP),

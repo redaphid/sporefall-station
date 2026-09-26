@@ -45,7 +45,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT, type InputCmd } from './game/types'
+import { SIM_DT, SIM_RATE, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -105,9 +105,11 @@ import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 import { projectToScreen } from './ui/locatorModel'
-import { createDraftScreen } from './ui/draftScreen'
-import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
+import { createDraftScreen, localDraft } from './ui/draftScreen'
+import type { DraftLoadout } from './game/systems/draft'
+import { withDraftPicks, type DraftPickSource } from './input/draftPick'
 import { weaponStack } from './game/systems/inventory'
+import { WEAPONS } from './game/data/items'
 
 /** The rewind ring, plus the single action the pause menu needs from it. Both
  * live on one object because they are one feature: the ring is only worth
@@ -155,7 +157,8 @@ const boot = async (): Promise<void> => {
   stage.onChange = (): void => renderer.app.resize()
 
   const params = new URLSearchParams(location.search)
-  const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
+  const link = readDeepLink(params)
+  const seed = link.seed ?? (Math.random() * 0xffffffff) >>> 0
   // A beta build (served from /betas/<slug>/) plays in its OWN rooms. The sim is
   // deterministic and the host is authoritative, so a beta peer and a production
   // peer sharing room 'car' do not see a version warning — they DESYNC, and it
@@ -202,7 +205,6 @@ const boot = async (): Promise<void> => {
   // skips the picker, which is otherwise the only moment an update applies. The
   // moment is still `modePicker` here (no run exists), so a staged update is
   // handed over as soon as it verifies and the page reloads with the same URL.
-  const link = readDeepLink(params)
   if (wantsFreshBuild(link)) {
     const note = showBootNote(uiMount, 'Loading the latest build…', 600)
     const fresh = await updates.freshen(DEEP_LINK_FRESHEN_MS)
@@ -296,6 +298,8 @@ const boot = async (): Promise<void> => {
   // the local player's next command (see input/modSwapQueue.ts).
   const modSwaps = createModSwapQueue()
   input = withModSwaps(input, modSwaps)
+  const draftPicks = withDraftPicks(input)
+  input = draftPicks
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
@@ -306,7 +310,7 @@ const boot = async (): Promise<void> => {
   // seamlessly rejoins the in-progress run. SOLO/host only (HostSession owns the
   // authoritative world); a NetClient rejoins via the host, and we never persist
   // a client-predicted world as authoritative. A link that names the world
-  // (`?scenario=`, `?state=`, `?world=`, `?script=`) takes precedence over the
+  // (`?scenario=`, `?state=`, `?world=`, `?seed=`, `?script=`) takes precedence over the
   // save AND never writes to it: no persister at all, so neither the autosave
   // nor a restart/death `clear()` can touch the player's real run.
   const store = browserStore()
@@ -444,28 +448,6 @@ const boot = async (): Promise<void> => {
       // fire-and-forget; this resolves when the new assets are actually baked).
       ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
         renderer.setTheme(id)
-      // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
-      // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
-      // the local player's equipped gun. Exposed here so a screenshot e2e can show
-      // the card screen and drive a pick headlessly (no pixel math). The automatic
-      // floor-clear trigger lands with floor progression (deferred, see P4 note).
-      const draftScreen = createDraftScreen(uiMount)
-      const applyPick = (id: string): void => {
-        const self = hostWorld.entities.find((e) => e.playerCtl)
-        const stack = self && weaponStack(self)
-        if (stack) applyDraftPick(stack, id)
-      }
-      ;(window as unknown as { __draftOffer: (f?: number) => string }).__draftOffer = (f) =>
-        JSON.stringify(floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor))
-      ;(window as unknown as { __draftShow: (f?: number) => string }).__draftShow = (f) => {
-        const offer = floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor)
-        draftScreen.show(offer, applyPick)
-        return JSON.stringify(offer)
-      }
-      ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
-        applyPick(id)
-        draftScreen.hide()
-      }
       // Drive the view zoom headlessly: smooth (real interpolation path) or
       // snapped (deterministic stills at exact zoom levels).
       ;(window as unknown as { __zoom: (z: number, snap?: boolean) => number }).__zoom = (z, snap) => {
@@ -621,6 +603,7 @@ const boot = async (): Promise<void> => {
     stateRing,
     padZoom,
     modSwaps,
+    draftPicks,
   )
 }
 
@@ -680,6 +663,14 @@ const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> =
  */
 const stopTransportOnPagehide = (transport: Transport): void => {
   window.addEventListener('pagehide', () => void transport.stop().catch(() => {}), { once: true })
+}
+
+/** The local player's gun as the draft cards judge it, so a pick that would do
+ * nothing on it reads as dead before it is taken. */
+const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
+  const weapon = view.self?.combat && WEAPONS[view.self.combat.weapon]
+  if (!weapon || !view.self) return undefined
+  return { weapon, mods: weaponStack(view.self)?.mods ?? [], sequenced: view.modCasting === 'sequence' }
 }
 
 /** The `sequencedMods` flag, resolved to the run rule a host latches into each
@@ -1074,7 +1065,7 @@ const createPauseOverlay = (
     update(paused, view) {
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
-      if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
+      if (show && !wasPaused) panel.update(buildLoadout(view.self, view.modCasting)) // refresh on open
       if (show) {
         lastView = view
         paintSeq()
@@ -1169,8 +1160,19 @@ const runLoop = (
   padZoom?: PadZoom,
   /** Sequenced-mods reorder queue shared by the HUD strip and the pause menu. */
   modSwaps?: ModSwapQueue,
+  /** Tapped floor-draft cards, queued onto the local player's next command. */
+  draftPicks?: DraftPickSource,
 ): void => {
   const hud = createHud(uiMount, modSwaps ? (a, b) => modSwaps.push(a, b) : undefined)
+  // A net client hears its hand closed only on the next 2 Hz state message, so
+  // after a tap the local seat is hidden until a hand with a new deadline arrives.
+  let answeredUntil = -1
+  const draftScreen = createDraftScreen(uiMount, (index) => {
+    const hand = session.renderView().self?.playerCtl?.draft
+    if (!hand || !draftPicks) return
+    answeredUntil = hand.until
+    draftPicks.pick(index)
+  })
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
   // only (`cursor: none` on the canvas) — mouse AIM reads the cursor's ABSOLUTE
   // position (the window `pointermove` tracker → aim.pointerAim), so we must NOT
@@ -1424,6 +1426,19 @@ const runLoop = (
         renderer.draw(view, alpha, dt)
         hud.update(view)
         const pads = coop.debug()
+        // Floor draft: one card row shared by every LOCAL player still holding a
+        // hand (the keyboard/touch player plus joined pads); remote peers pick on
+        // their own screens.
+        const localIds = new Set(pads.flatMap((p) => (p.slot === null ? [] : [p.slot])))
+        if (view.self?.playerCtl) localIds.add(view.self.playerCtl.playerId)
+        const draft = localDraft(view.entities, localIds, view.self, answeredUntil)
+        draftScreen.update(
+          draft.offer,
+          draft.seats,
+          Math.ceil((draft.until - view.tick) / SIM_RATE),
+          draft.inPlay ? 'strip' : 'full',
+          draftLoadout(view),
+        )
         // Twin-stick aim reticles: one per joined pad with a deflected right stick,
         // anchored to that pad's player entity. Presentation only.
         const anchors: ReticleAnchor[] = []

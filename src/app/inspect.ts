@@ -115,7 +115,7 @@ const HELP: readonly { sig: string; doc: string }[] = [
   { sig: 'events(sinceTick?)', doc: `recent sim events tagged {tick, type, ...} — ring buffer of the last ~${EVENT_TICK_WINDOW} ticks` },
   { sig: 'schema()', doc: 'live component/archetype reflection derived from the entities actually present' },
   { sig: 'serialize()', doc: 'lossless WorldJson string (replayable via the load verb or ?world=)' },
-  { sig: "verb(line, args?)", doc: "debug verbs — get/set/spawn/kill/teleport/step/load/annotate/ai/setBehavior/modifier/… e.g. verb('teleport 12 5 5'). Dev-gated: needs ?debug (or ?e2e); returns a refusal string in production." },
+  { sig: "verb(line, args?)", doc: "debug verbs — get/set/spawn/kill/teleport/step/load/annotate/ai/setBehavior/modifier/… e.g. verb('teleport 12 5 5'); verb('step 30 {\"moveX\":1,\"aimAt\":42,\"attack\":true}') holds a player's input for 30 ticks (works in a hidden tab) and returns event counts. Dev-gated: needs ?debug (or ?e2e); returns a refusal string in production." },
   { sig: 'rec.start() / rec.stop()', doc: 'record the live canvas — shaders and all — to a downloadable .webm. Persisted in the build, so it survives page refreshes.' },
 ]
 

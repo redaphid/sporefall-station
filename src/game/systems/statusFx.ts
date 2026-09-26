@@ -4,9 +4,10 @@
 // never a mutable countdown — so expiry is a pure function of world.tick and a
 // mid-effect snapshot restores with nothing to fix up. Mirrors brain's `fx`.
 
-import type { Entity, Fx } from '../entity'
+import { resistMult, type Entity, type Fx } from '../entity'
 import type { EntityId } from '../types'
 import type { World } from '../world'
+import { shock } from './interactions'
 
 // ── Anti-chain-lock for immobilize statuses ────────────────────────────────
 // `electrified` (stunGun, 45t on a 24t cooldown) and `frozen` (freeze ray/grenade,
@@ -51,15 +52,22 @@ export const IMMOBILIZE_CHAIN_TICKS = 90
 const diminishedGrant = (baseTicks: number, tier: number): number =>
   tier <= 1 ? baseTicks : Math.floor(baseTicks / 2 ** (tier - 1))
 
+/** Control effects share ONE guard: a body is under at most one of them at a
+ * time and gets the immunity gap after each, whatever the kind. Otherwise a
+ * shock landing as the ice melts (or a panic as the shock ends) chains two locks
+ * back to back and holds the victim longer than any single element can. */
+const CONTROL_KINDS = ['frozen', 'electrified', 'panic'] as const
+
+const controlBlocked = (w: World, e: Entity): boolean =>
+  isImmobilized(e) || isPanicking(w, e) || CONTROL_KINDS.some((k) => w.tick < (e.lockout?.[k]?.guardUntil ?? 0))
+
 /** Land an immobilize under the anti-chain-lock rules (see the block comment). */
 const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: number, source?: EntityId): void => {
   const fx = (e.fx ??= {})
   const lockout = (e.lockout ??= {})
   const track = lockout[kind]
   const hot = track !== undefined && w.tick < track.chainUntil
-  const immobilizedNow = w.tick < (fx[kind]?.until ?? 0)
-  const immuneNow = track !== undefined && w.tick < track.guardUntil
-  if (immobilizedNow || immuneNow) {
+  if (controlBlocked(w, e)) {
     // Can't (re)immobilize right now: grant NO new lock time, but keep the chain
     // hot so the diminishing tier carries to the next legal application.
     if (track) track.chainUntil = w.tick + IMMOBILIZE_CHAIN_TICKS
@@ -81,6 +89,11 @@ export const addStatus = (w: World, e: Entity, kind: string, durationTicks: numb
   if (e.dead) return
   if (!(durationTicks > 0)) return
   if (IMMOBILIZE_STATUSES.has(kind)) return applyImmobilize(w, e, kind, durationTicks, source)
+  // Water and fire cancel: a wet body can't catch (the flame just dries it), and
+  // soaking a burning body puts it out.
+  if (kind === 'burning' && isWet(e)) return removeStatus(e, 'wet')
+  if (kind === 'wet') removeStatus(e, 'burning')
+  if (kind === 'burning') panic(w, e, source)
   const fx: Fx = (e.fx ??= {})
   fx[kind] = { until: w.tick + durationTicks, source }
 }
@@ -94,7 +107,7 @@ export const hasStatus = (e: Entity, kind: string): boolean => e.fx !== undefine
 /** Apply one status to one entity — the single place item/element effects land.
  * `sleep` and `slip`/`stun` route to the proven legacy per-tick timers (which
  * already immobilize and wake-on-damage); everything else is an fx effect. */
-export const applyStatus = (w: World, e: Entity, status: string, ticks: number): void => {
+export const applyStatus = (w: World, e: Entity, status: string, ticks: number, source?: EntityId): void => {
   // `sleep` and `stun`/`slip` ride legacy per-tick counters on `e.status` rather
   // than `fx`, so they never went through `applyImmobilize` and had NO
   // anti-chain-lock at all — `e.status.stun = ticks` was a flat overwrite that
@@ -119,7 +132,42 @@ export const applyStatus = (w: World, e: Entity, status: string, ticks: number):
     if (e.status) e.status.stun = Math.max(e.status.stun, guardLegacyLock(w, e, 'stun', ticks))
     return
   }
-  addStatus(w, e, status, ticks)
+  // A shock is never just a status: it arcs (interactions.shock).
+  if (status === 'electrified') return shock(w, e, ticks, source)
+  addStatus(w, e, status, ticks, source)
+}
+
+// ── Burning ⇒ PANIC ────────────────────────────────────────────────────────
+// Catching fire makes an NPC drop the fight and bolt away from whoever lit it.
+// Panic is a control effect, so it rides the same lockout guard as stun/sleep
+// (`lockout.panic`): no refresh while panicking, an immunity window after, and
+// halving across a hot chain. A flamethrower held on one target panics it once
+// at full length and then barely at all — it can't keep an enemy out of the
+// fight. Bosses and fireproof bodies never panic.
+
+/** Ticks a freshly-lit body spends running before it steadies (first in a chain). */
+export const PANIC_TICKS = 60
+
+/** Panicking at `tick`. Takes a bare tick so the renderer can ask too. */
+export const panicAt = (e: Entity, tick: number): boolean => (e.lockout?.panic?.activeUntil ?? 0) > tick
+
+export const isPanicking = (w: World, e: Entity): boolean => panicAt(e, w.tick)
+
+const panic = (w: World, e: Entity, source?: EntityId): void => {
+  if (!e.ai || e.archetype === 'boss' || resistMult(e, 'burning') <= 0) return
+  if (controlBlocked(w, e)) {
+    const track = e.lockout?.panic
+    if (track) track.chainUntil = w.tick + IMMOBILIZE_CHAIN_TICKS
+    return
+  }
+  if (guardLegacyLock(w, e, 'panic', PANIC_TICKS) <= 0) return
+  const lighter = source !== undefined ? w.byId.get(source) : undefined
+  // No lighter (a fire cell, a barrel): bolt straight ahead, away from a point
+  // just behind the body — never the body's own position, which has no "away".
+  e.ai.panicFrom = lighter
+    ? { x: lighter.pos.x, y: lighter.pos.y }
+    : { x: e.pos.x - Math.cos(e.facing), y: e.pos.y - Math.sin(e.facing) }
+  e.ai.thinkAt = w.tick
 }
 
 /**
@@ -161,6 +209,12 @@ export const isWet = (e: Entity): boolean => hasStatus(e, 'wet')
  * neither move nor act until the status runs out. Movement, combat and AI all
  * gate on this. */
 export const isImmobilized = (e: Entity): boolean => hasStatus(e, 'frozen') || hasStatus(e, 'electrified')
+
+/** Every status that stops a body walking: the legacy stun/sleep counters plus
+ * the fx immobilizes. The host's movementSystem and the co-op client's
+ * prediction (netClient.stepSelf) both gate on this, so they cannot disagree. */
+export const isMovementLocked = (e: Entity): boolean =>
+  (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)
 
 /** Expire every effect whose tick has arrived. Pure function of world.tick, so
  * it behaves identically whether the world ran unbroken or was restored. */

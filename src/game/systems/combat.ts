@@ -1,4 +1,4 @@
-import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
+import { SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
 import { WEAPONS, type StatusApply, type WeaponDef } from '../data/items'
 import { normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
@@ -9,10 +9,12 @@ import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
+import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
+import { meleeDamage } from './modEffect'
 import { spawnSporeBurst } from './spore'
 import { vlen } from '../simMath'
 
@@ -183,6 +185,8 @@ export const applyDamage = (
       target.ai.thinkAt = w.tick
     }
   }
+
+  if (target.playerCtl) seeAttackOnPlayer(w, target, attackerId)
 
   // Disposition: a player attack on a civ/cop is a crime — witnesses re-derive
   // their stance toward the attacker (cops/allies turn hostile, civilians flee).
@@ -435,11 +439,11 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   const rw = resolveWeapon(weapon, stack?.mods)
   if (weapon.kind === 'melee') {
     e.combat.cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const damage = meleeDamage(rw.damage, e.playerCtl !== undefined)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
     return true
@@ -451,7 +455,7 @@ export const fireWeapon = (w: World, e: Entity): boolean => {
   const spec = projectileSpec(rw)
   for (let i = 0; i < rw.pellets; i++) {
     const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
-    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, stack?.mods)
+    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, rw.mods)
   }
   return true
 }
@@ -476,11 +480,11 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
   if (weapon.kind === 'melee') {
     const rw = resolveWeapon(weapon, casts[0].mods)
     cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const damage = meleeDamage(rw.damage, e.playerCtl !== undefined)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
   } else {
@@ -496,7 +500,7 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
       const spec = projectileSpec(rw)
       for (let j = 0; j < rw.pellets; j++, k++) {
         const offset = total > 1 ? (k / (total - 1) - 0.5) * rw.spread : 0
-        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, casts[g].mods)
+        spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, rw.mods)
       }
     }
   }
@@ -550,6 +554,7 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // the held-item cursor and there is nothing to cycle back TO — that rule would
     // leave a player holding a grenade permanently unable to shoot. Items go on
     // the USE/Throw button above, which is where they now exclusively live.
-    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
+    // THE single fire-site: mods/elements/pellets fold in here
+    if (fireWeapon(w, e) && WEAPONS[e.combat.weapon]?.kind === 'ranged') hearGunfire(w, e, e.combat.cooldown)
   }
 }

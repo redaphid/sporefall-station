@@ -5,7 +5,7 @@ import type { World } from '../world'
 import { wadeMult } from '../floorModifiers'
 import { groupSpeedMult } from './groupFx'
 import { isRolling, ROLL_SPEED } from './roll'
-import { isImmobilized } from './statusFx'
+import { isMovementLocked } from './statusFx'
 import { vlen } from '../simMath'
 
 const FRICTION = 12 // knockback velocity decay per second
@@ -117,7 +117,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
     isSolidTile(w.level, tx, ty) || closedDoors.has(ty * lw + tx)
   for (const e of w.entities) {
     if (e.dead || e.projectile) continue
-    const stunned = (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) || isImmobilized(e)
+    const stunned = isMovementLocked(e)
     // A dodge-roll overrides input: the frozen roll heading drives movement for
     // the whole roll window (rollSystem started it before us this tick).
     const rolling = isRolling(e, w.tick)

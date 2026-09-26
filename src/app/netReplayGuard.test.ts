@@ -152,8 +152,10 @@ const step = async (host: NetHostSession, bob: ClientHandle, n = 1): Promise<voi
 const armDescent = (host: NetHostSession): void => {
   host.world.mission.exitUnlocked = true
   const player = host.world.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)!
-  player.pos.x = host.world.level.exit.x + 0.5
-  player.pos.y = host.world.level.exit.y + 0.5
+  // An extraction floor's way out is the entry, not the Launch Bay.
+  const exit = host.world.mission.extractPoint ?? host.world.level.exit
+  player.pos.x = exit.x + 0.5
+  player.pos.y = exit.y + 0.5
   player.prevPos.x = player.pos.x
   player.prevPos.y = player.pos.y
 }

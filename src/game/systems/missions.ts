@@ -7,7 +7,9 @@ import type { Rng } from '../rng'
 import { applyFloorModifier } from './modifierSystem'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
+import { dealFloorDraft } from './draft'
 import { raiseFloorAggro } from './relationships'
+import { alarmSystem, exitSealed } from './alarm'
 import { addEntity, type World } from '../world'
 import { vlen } from '../simMath'
 
@@ -99,14 +101,28 @@ const generateMission = (w: World): void => {
     const item = makeEntity('pickup', 'pickup.briefcase', spot.x, spot.y, 0.3)
     item.pickup = { itemId: 'briefcase', qty: 1 }
     addEntity(w, item)
-    w.mission = {
-      template: 'steal',
-      targetEntityId: item.id,
-      targetBuilding: buildingIdx,
-      complete: false,
-      exitUnlocked: false,
-      description: `Extract the specimen canister from the ${wingName(building.role)}`,
-    }
+    // Past the tutorial floor, half the steals become EXTRACTIONS. Rolled on a
+    // dedicated fork so the mission stream (and every placement after it) stays
+    // byte-identical to the frozen steal table; only the objective's rules change.
+    const extraction = w.floor >= 2 && w.rng.fork('extraction').chance(0.5)
+    w.mission = extraction
+      ? {
+          template: 'extraction',
+          targetEntityId: item.id,
+          targetBuilding: buildingIdx,
+          complete: false,
+          exitUnlocked: false,
+          description: `Grab the specimen canister in the ${wingName(building.role)}, then get out the way you came`,
+          extractPoint: { x: Math.floor(w.level.spawn.x), y: Math.floor(w.level.spawn.y) },
+        }
+      : {
+          template: 'steal',
+          targetEntityId: item.id,
+          targetBuilding: buildingIdx,
+          complete: false,
+          exitUnlocked: false,
+          description: `Extract the specimen canister from the ${wingName(building.role)}`,
+        }
   } else {
     const spot = roomCenter(building)
     const boss = spawnNpc(w, 'boss', spot.x, spot.y)
@@ -479,6 +495,7 @@ export const missionSystem = (w: World): void => {
   // BEFORE completion so the tick the alert latches is a broadcast tick by
   // construction ((tick - alertTick) % N === 0 at tick === alertTick).
   broadcastAlert(w)
+  alarmSystem(w)
 
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
@@ -486,6 +503,8 @@ export const missionSystem = (w: World): void => {
         (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
       )
       if (holder) completeMission(w, holder)
+    } else if (w.mission.template === 'extraction') {
+      runExtraction(w)
     } else if (
       w.mission.template === 'assassinate' ||
       w.mission.template === 'infiltrate' ||
@@ -502,12 +521,16 @@ export const missionSystem = (w: World): void => {
     }
   }
 
-  // Floor transition: any live player standing on the unlocked exit tile
-  if (w.mission.exitUnlocked) {
+  // Floor transition: any live player standing on the unlocked exit tile — for
+  // an extraction, the entry they came in by. A lockdown seals it (#86).
+  if (w.mission.exitUnlocked && !exitSealed(w)) {
+    const exit = w.mission.extractPoint ?? w.level.exit
     for (const e of w.entities) {
       if (!e.playerCtl || e.playerCtl.downed || e.dead) continue
-      if (Math.floor(e.pos.x) === w.level.exit.x && Math.floor(e.pos.y) === w.level.exit.y) {
+      if (Math.floor(e.pos.x) === exit.x && Math.floor(e.pos.y) === exit.y) {
         nextFloor(w)
+        // Dealt here, not in nextFloor, so a scenario's floor jump opens no hand.
+        dealFloorDraft(w, w.floor - 1)
         return
       }
     }
@@ -528,6 +551,59 @@ export const missionSystem = (w: World): void => {
   if (players.length === 1 && !players[0].dead) return
   w.gameOver = true
   w.events.push({ type: 'runOver', floor: w.floor })
+}
+
+const holdsPrize = (e: Entity): boolean => (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase')
+
+/** The standing player carrying the extraction prize, if any. */
+export const extractionCarrier = (w: World): Entity | undefined =>
+  w.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed && holdsPrize(e))
+
+/** What the HUD needs to point at the way out: the extraction point, and whether
+ * the prize is in a standing player's hands (the objective is now "get out"). */
+export const extractionView = (w: World): { x: number; y: number; held: boolean } | undefined => {
+  const at = w.mission.extractPoint
+  if (w.mission.template !== 'extraction' || !at || w.mission.complete) return undefined
+  return { x: at.x, y: at.y, held: extractionCarrier(w) !== undefined }
+}
+
+/**
+ * `extraction`: taking the prize raises the station alert (the escape begins
+ * with the prize in hand), and the mission completes only when a standing
+ * carrier reaches the entry. A carrier who goes down or dies drops the prize
+ * where they fell; the mission target follows it, so the HUD re-points at the
+ * canister and NPCs leave it alone (behaviors.ts skips the mission target).
+ */
+const runExtraction = (w: World): void => {
+  const at = w.mission.extractPoint
+  for (const p of w.entities) {
+    if (!p.playerCtl || !holdsPrize(p)) continue
+    if (p.dead || p.playerCtl.downed) {
+      dropPrize(w, p)
+      continue
+    }
+    // The grab is an extraction's "objective": a loud run's lockdown cycle starts
+    // over with the prize in hand, as it does for a steal (#86).
+    if (w.mission.alertTick === undefined && w.mission.lockdownTick !== undefined) w.mission.lockdownTick = w.tick
+    raiseStationAlert(w, p)
+    if (at && Math.floor(p.pos.x) === at.x && Math.floor(p.pos.y) === at.y && !exitSealed(w)) {
+      completeMission(w, p)
+      return
+    }
+  }
+}
+
+const dropPrize = (w: World, carrier: Entity): void => {
+  const ld = carrier.loadout!
+  const i = ld.inventory.findIndex((s) => s.itemId === 'briefcase')
+  ld.inventory.splice(i, 1)
+  // Keep the active slot on the same stack when the prize sat in front of it.
+  if (i < ld.activeSlot) ld.activeSlot--
+  const item = makeEntity('pickup', 'pickup.briefcase', carrier.pos.x, carrier.pos.y, 0.3)
+  item.pickup = { itemId: 'briefcase', qty: 1 }
+  addEntity(w, item)
+  w.mission.targetEntityId = item.id
+  w.events.push({ type: 'prizeDropped', entityId: item.id, byId: carrier.id, x: item.pos.x, y: item.pos.y })
 }
 
 /** `contain` soft-fail: if the Spore Node lives past its bloom tick, it BLOOMS —
@@ -558,6 +634,9 @@ const completeMission = (w: World, focus?: Entity): void => {
   // that processes the batch in order ends on the alert — which is the thing the
   // player actually needs to act on (see ui/screens.ts).
   w.events.push({ type: 'missionComplete', description: w.mission.description })
+  // A loud run's lockdown seal cycle starts over with the prize in hand.
+  // An extraction restarted it at the grab instead (runExtraction).
+  if (w.mission.lockdownTick !== undefined && w.mission.template !== 'extraction') w.mission.lockdownTick = w.tick
   if (focus) raiseStationAlert(w, focus)
 }
 

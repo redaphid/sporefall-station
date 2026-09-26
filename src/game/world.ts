@@ -22,6 +22,7 @@ import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
 import { stairSystem } from './systems/stairs'
+import { draftSystem } from './systems/draft'
 import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
 export interface MissionState {
@@ -29,8 +30,10 @@ export interface MissionState {
    *  `contain`    — destroy the Spore Node (targetEntityId) before it BLOOMS;
    *                 the bloom is a soft-fail (room floods with spores), never a loss.
    *  `infiltrate` — reach & eliminate a target sealed behind a biolock (open it by
-   *                 keycard, power-cut, or breach). Completes on target death. */
-  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate'
+   *                 keycard, power-cut, or breach). Completes on target death.
+   *  `extraction` — a steal whose pickup raises the station alert; it completes
+   *                 only when a standing prize-holder reaches `extractPoint`. */
+  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate' | 'extraction'
   targetEntityId?: EntityId
   targetBuilding?: number
   complete: boolean
@@ -65,11 +68,21 @@ export interface MissionState {
    * seen — and it is what lets NPCs across the floor keep coming. Refreshing it
    * only every N ticks is what keeps the escape EVADABLE. */
   alertMark?: Vec2
+  /** #86 — noticed gunfire/attacks, in ticks of sustained fire (systems/alarm.ts).
+   * Omitted when 0 so a quiet floor round-trips byte-for-byte. */
+  heat?: number
+  /** #86 — the tick the Launch Bay's lockdown seal cycle started (the alarm hit
+   * LOCKDOWN_ALARM the loud way; restarted when the objective completes). */
+  lockdownTick?: number
   /** Latch: a live player has SEEN the Mireclaw Alpha, so its entrance has been
    * announced and its phases are running (systems/mireclaw.maybeReveal). Also
    * what keeps the boss dormant — and its brood unspent — until someone walks
    * in. Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
   bossRevealed?: boolean
+  /** `extraction` only: the tile (integer corner) the party came in by — the
+   * level spawn. Reaching it with the prize is the way out; the Launch Bay stays
+   * locked. `targetEntityId` follows the prize while it lies on the floor. */
+  extractPoint?: Vec2
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */
@@ -284,8 +297,9 @@ export const doorClosedAt = (w: World, tx: number, ty: number): boolean => {
 export const isBlocked = (w: World, tx: number, ty: number): boolean =>
   isSolidTile(w.level, tx, ty) || doorClosedAt(w, tx, ty)
 
-export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
+export const tickWorld = (w: World, rawInputs: Map<number, InputCmd>): void => {
   w.events.length = 0
+  const inputs = draftSystem(w, rawInputs)
   if (w.noises.length > 0) w.noises = w.noises.filter((n) => n.expires > w.tick)
   if (w.fear.length > 0) w.fear = w.fear.filter((f) => f.expires > w.tick)
   for (const e of w.entities) {

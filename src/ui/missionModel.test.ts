@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { missionChipText, missionObjectives, resolveLink, type MissionViewLike } from './missionModel'
+import { EXTRACT_ROW_TEXT, missionChipText, missionObjectives, resolveLink, type MissionViewLike } from './missionModel'
 
 const ent = (id: number, x = 10, y = 10, dead = false): { id: number; dead?: boolean; pos: { x: number; y: number } } => ({
   id,
@@ -107,5 +107,88 @@ describe('resolveLink', () => {
   })
   it('an empty link resolves to nothing', () => {
     expect(resolveLink({}, [ent(7)])).toBeUndefined()
+  })
+})
+
+describe('missionObjectives — extraction', () => {
+  const x = (held: boolean): Partial<MissionViewLike> => ({ extraction: { x: 3, y: 4, held } })
+
+  it('prize on the floor: the grab row is active and linked; the way out is locked and points nowhere', () => {
+    const rows = missionObjectives(base(x(false)))
+    expect(rows).toEqual([
+      { key: 'mission', text: base().missionText, state: 'active', link: { targetId: 7 } },
+      { key: 'exit', text: EXTRACT_ROW_TEXT, state: 'locked', link: undefined },
+    ])
+  })
+
+  it('prize in hand: the grab row is done and the entry, never the Launch Bay, is the linked objective', () => {
+    const rows = missionObjectives(base({ ...x(true), entities: [ent(7, 10, 10, true)] }))
+    expect(rows[0]).toMatchObject({ key: 'mission', state: 'done', link: undefined })
+    expect(rows[1]).toEqual({ key: 'exit', text: EXTRACT_ROW_TEXT, state: 'active', link: { x: 3.5, y: 4.5 } })
+  })
+
+  it('a dropped prize (new, live target) re-links the grab row', () => {
+    const rows = missionObjectives(base({ ...x(false), missionTargetId: 9, entities: [ent(7, 1, 1, true), ent(9, 5, 5)] }))
+    expect(rows[0].link).toEqual({ targetId: 9 })
+  })
+
+  it('works before the level arrives on a client (no exit), and game over still clears everything', () => {
+    expect(missionObjectives(base({ ...x(true), exit: undefined }))[1].state).toBe('active')
+    expect(missionObjectives(base({ ...x(true), gameOver: true }))).toEqual([])
+  })
+
+  it('chip reads what to do now', () => {
+    expect(missionChipText(base(x(true)))).toBe('Floor 1 — GOT IT! Get out the way you came')
+    expect(missionChipText(base(x(false)))).toBe(`Floor 1 — ${base().missionText}`)
+  })
+})
+
+describe('#86 lockdown: the HUD says why the Launch Bay is shut', () => {
+  it('before the objective: the exit row names the lockdown and the chip flags it', () => {
+    const v = base({ lockdown: {} })
+    const exit = missionObjectives(v)[1]
+    expect(exit).toMatchObject({ key: 'exit', state: 'locked' })
+    expect(exit.text).toMatch(/^LOCKDOWN/)
+    expect(missionChipText(v)).toBe('Floor 1 — LOCKDOWN · Extract the specimen canister from the commissary')
+  })
+
+  it('after the objective: a sealed bay stays LOCKED with a countdown, but still links to it', () => {
+    const v = base({ missionComplete: true, lockdown: { secondsLeft: 14 } })
+    expect(missionObjectives(v)[1]).toMatchObject({
+      key: 'exit',
+      state: 'locked',
+      text: 'LAUNCH BAY SEALED · lockdown 14s',
+      link: { x: 40.5, y: 40.5 },
+    })
+    expect(missionChipText(v)).toBe('Floor 1 — LAUNCH BAY SEALED · 14s')
+  })
+
+  it('no lockdown: exactly the pre-#86 row and chip', () => {
+    expect(missionObjectives(base({ missionComplete: true }))[1]).toMatchObject({ state: 'active', text: 'Reach the Launch Bay' })
+    expect(missionChipText(base({ missionComplete: true }))).toBe('Floor 1 — LAUNCH BAY is open!')
+  })
+
+  it('a `reach` floor under lockdown keeps one row, and it is the sealed one', () => {
+    const rows = missionObjectives(
+      base({ missionText: 'Reach the Launch Bay', missionComplete: true, missionTargetId: undefined, lockdown: { secondsLeft: 3 } }),
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ key: 'exit', state: 'locked', text: 'LAUNCH BAY SEALED · lockdown 3s' })
+  })
+})
+
+describe('#85 x #86: an extraction under lockdown names the way out, not the Launch Bay', () => {
+  const x = (held: boolean) => ({ extraction: { x: 3, y: 4, held } })
+  it('carrying the prize while sealed: the way-out row is locked with the countdown, and the chip says so', () => {
+    const v = base({ ...x(true), lockdown: { secondsLeft: 12 } })
+    expect(missionObjectives(v)[1]).toMatchObject({ key: 'exit', state: 'locked', text: 'WAY OUT SEALED · lockdown 12s', link: { x: 3.5, y: 4.5 } })
+    expect(missionChipText(v)).toBe('Floor 1 — GOT IT! Way out sealed · 12s')
+  })
+  it('before the grab under lockdown: the row explains the seal will follow the grab', () => {
+    expect(missionObjectives(base({ ...x(false), lockdown: {} }))[1].text).toMatch(/^LOCKDOWN · the alarm will hold the way out \d+s after the grab$/)
+  })
+  it('no lockdown: the extraction rows and chip are unchanged', () => {
+    expect(missionObjectives(base(x(true)))[1]).toMatchObject({ state: 'active', text: EXTRACT_ROW_TEXT })
+    expect(missionChipText(base(x(true)))).toBe('Floor 1 — GOT IT! Get out the way you came')
   })
 })

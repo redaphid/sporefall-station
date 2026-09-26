@@ -69,6 +69,7 @@ import { infectionActive } from './infection'
 import { spawnObject } from './objects'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 import { strongestStimulus } from './stimulus'
+import { isPanicking } from './statusFx'
 import { vlen } from '../simMath'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
@@ -1325,6 +1326,12 @@ export const HYSTERESIS_MARGIN = 0.25
  * incumbent gets the hysteresis bonus) in consideration / candidate order —
  * byte-for-byte deterministic. */
 export const decide = (w: World, e: Entity): Decision => {
+  // A panicking (burning) body outranks every behavior: it just runs.
+  const ai = e.ai
+  if (ai?.panicFrom) {
+    if (isPanicking(w, e)) return { goal: { code: FLEE, at: { ...ai.panicFrom } }, scores: { panic: 1 } }
+    ai.panicFrom = undefined
+  }
   const def = behaviorFor(e)
   const hyst = w.aiFlags?.hysteresis !== false // shipped ON; only an explicit false disables
   const incumbentCode = e.ai?.goal

@@ -87,7 +87,7 @@ const combos = [
 
   // ── combos (mods stack) ─────────────────────────────────────────────────
   { name: 'combo-pierce-explosive', title: 'Pierce + Explosive — pass through & boom', weapon: 'pistol', mods: [{ id: 'pierce', stacks: 2 }, { id: 'explosive', stacks: 2 }] },
-  { name: 'combo-frost-shock', title: 'Cryo + Tesla — freeze and zap', weapon: 'pistol', mods: [{ id: 'frost', stacks: 1 }, { id: 'shock', stacks: 1 }] },
+  { name: 'combo-shock-then-frost', title: 'Tesla, then Cryo — the newest element (Cryo) lands', weapon: 'pistol', mods: [{ id: 'shock', stacks: 1 }, { id: 'frost', stacks: 1 }] },
 ]
 
 // Optional `COMBO_FILTER=weapon-frost` to record a single clip (for iteration).

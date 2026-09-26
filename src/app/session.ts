@@ -17,12 +17,19 @@ export interface RenderView {
    * can hyperlink the objective to it. Absent for `reach` missions and on
    * clients running an older host. */
   missionTargetId?: number
+  /** `extraction` mission still open: the entry tile to get back to, and
+   * whether the prize is in a standing player's hands. Absent otherwise. */
+  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   /** STATION ALERT — this floor's objective is done and the escape run is on.
    * Drives the persistent pulsing alert wash (render/juice.ts `alertWash`), as
    * opposed to the one-shot klaxon/banner that ride the `stationAlert` event.
    * Optional so a session that doesn't surface it simply reads calm. */
   alert?: boolean
+  /** #86 LOCKDOWN — the alarm sealed the Launch Bay. `{}` while it waits on the
+   * objective; `secondsLeft` once the post-objective seal is counting down.
+   * Absent = no lockdown. */
+  lockdown?: { secondsLeft?: number }
   /** Difficulty rules in force (host truth; clients mirror it from the host). */
   mode?: RunMode
   /** Party-shared comebacks left this run (only meaningful in `normal`). */

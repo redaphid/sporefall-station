@@ -161,12 +161,12 @@ describe('floor modifiers: the roll', () => {
   })
 
   describe('byte-identical to main apart from the modifier itself', () => {
-    // Captured on main @ 16cf73f with the same build helpers and `worldDigest`.
+    // Captured on main @ 7853983 with the same build helpers and `worldDigest`.
     const GOLDEN: Record<string, string> = {
       'direct:7:1': '2dec1543',
       'stairs:7:1': '2dec1543',
-      'direct:1:2': 'bbca894b',
-      'stairs:1:2': 'ec5b05df',
+      'direct:1:2': '6062b4e2',
+      'stairs:1:2': '7e646164',
       'direct:4:2': '92795920',
       'stairs:4:2': 'b73d0410',
       'direct:5:2': 'eaa0178e',
@@ -179,10 +179,10 @@ describe('floor modifiers: the roll', () => {
       'stairs:3:3': '33a2cc63',
       'direct:10:3': '29c82ce9',
       'stairs:10:3': '08567d0b',
-      'direct:2:4': '6c0ad81b',
-      'stairs:2:4': '58662ff6',
-      'play:7:1': '1ed48e2d',
-      'play:1:2': '53d35f3b',
+      'direct:2:4': 'fdc23d09',
+      'stairs:2:4': 'a03e941c',
+      'play:7:1': '84582f4c',
+      'play:1:2': '39a56892',
     }
     const floors: [number, number][] = [[7, 1], [1, 2], [4, 2], [5, 2], [6, 2], [1, 3], [3, 3], [10, 3], [2, 4]]
     for (const [seed, floor] of floors) {

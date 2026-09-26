@@ -243,14 +243,19 @@ export const projectileSystem = (w: World): void => {
       // `!== null`, NOT truthiness: 0 is a hit that landed and dealt no hp (the
       // freeze ray), and it must still apply its status.
       const landed = dealt !== null
-      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
+      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks, p.ownerId)
       const killed = !!other.dead || (other.health?.hp ?? 1) <= 0
       if (landed && p.lifestealFrac) {
         // Pay out on damage ACTUALLY DEALT, never the bullet's intended damage.
         // Reading `p.damage` here ignored resist entirely, so an armoured target
         // absorbed most of the blow while the shooter was still paid in full.
         const owner = w.byId.get(p.ownerId) // may be gone — guard
-        if (owner?.health) owner.health.hp = Math.min(owner.health.max, owner.health.hp + dealt * p.lifestealFrac)
+        if (owner?.health) {
+          const owed = (owner.health.lifestealCarry ?? 0) + dealt * p.lifestealFrac
+          const heal = Math.round(owed)
+          owner.health.lifestealCarry = owed - heal
+          owner.health.hp = Math.min(owner.health.max, owner.health.hp + heal)
+        }
       }
       if (landed) runHitTriggers(w, other, p.triggers, p.ownerId, killed)
       if (landed && p.split) spawnSplit(w, e)

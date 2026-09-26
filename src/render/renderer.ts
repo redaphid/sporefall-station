@@ -18,6 +18,7 @@ import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './compl
 import { EffectsLayer } from './effects'
 import { darknessRuns, easeTide, lowTileRuns, TIDE_COLOR } from './modifierLook'
 import { GroupFxLayer } from './groupFx'
+import { VerbMarkerLayer } from './verbMarkerLayer'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
@@ -172,6 +173,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // retreat cross): drawn over the effects sprites, inside the same layer.
   const groupFx = new GroupFxLayer()
   effects.root.addChild(groupFx.root)
+  // #87 element verbs with no body look of their own: panic "!!" and a slashed
+  // eye for spore blindness, over the head, above every sprite.
+  const verbMarkers = new VerbMarkerLayer()
+  effects.root.addChild(verbMarkers.root)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
@@ -407,6 +412,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     entities.refresh()
     bullets.refresh()
     playerMarkers.refresh()
+    verbMarkers.refresh()
   }
 
   const native = Capacitor.isNativePlatform()
@@ -577,6 +583,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (!frozen) {
         entities.update(shown, alpha, view.tick, view.floor)
         playerMarkers.update(shown, view.self?.id, alpha, view.tick)
+        verbMarkers.update(shown, alpha, view.tick)
         statusFx.update(shown, alpha, view.tick)
         bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)
@@ -619,9 +626,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           },
           radiusToUv: (r) => (r * pxPerTile) / sh2,
         }
-        // Exit-portal idle flourish: anchored on the level's exit tile.
-        if (currentLevel && onStorey(currentLevel.exit.x)) {
-          const e = proj.toUv(currentLevel.exit.x + 0.5, currentLevel.exit.y + 0.5)
+        // Exit-portal idle flourish: anchored on the way out — the level's exit
+        // tile, or the entry during an extraction.
+        const out = view.extraction ?? currentLevel?.exit
+        if (out && onStorey(out.x)) {
+          const e = proj.toUv(out.x + 0.5, out.y + 0.5)
           pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))
         } else {
           pipeline.clearPortal()

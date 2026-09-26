@@ -203,7 +203,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
       edge.style.display = 'flex'
       edge.style.transform = `translate(${Math.round(m.sx)}px, ${Math.round(m.sy)}px) translate(-50%,-50%)`
       edgeArrow.style.transform = `rotate(${m.angle}rad)`
-      edgeLabel.textContent = `${badge ? `${badge} ` : ''}${isExit ? `LAUNCH BAY · ${m.dist}m` : `🎯 ${m.dist}m`}`
+      edgeLabel.textContent = `${badge ? `${badge} ` : ''}${isExit ? `${view.extraction ? 'EXTRACT' : 'LAUNCH BAY'} · ${m.dist}m` : `🎯 ${m.dist}m`}`
     } else {
       edge.style.display = 'none'
     }
@@ -231,6 +231,8 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
         missionTargetId: view.missionTargetId,
         entities: view.entities,
         exit: view.level.exit,
+        extraction: view.extraction,
+        lockdown: view.lockdown,
       })
 
       // Chip: hide entirely when there is nothing to say (game over).

@@ -30,6 +30,10 @@ export interface InputCmd {
    * and OPTIONAL: absent on every input that does not ask, so default-mode
    * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
   modSwap?: number
+  /** Floor draft: take card N of this player's hand this tick (a tap or click on
+   * the card). Optional and edge-triggered like `modSwap`; pad and keyboard
+   * players steer the hand with move + attack/interact instead. */
+  draftPick?: number
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -108,6 +112,9 @@ export type SimEvent =
   /** A `contain` mission's Spore Node bloomed (soft-fail): the room floods with
    * spores. Not a loss — just harder. */
   | { type: 'bloom'; x: number; y: number; entityId: EntityId }
+  /** An `extraction` carrier went down or died: the prize (new pickup `entityId`)
+   * lies where they fell. */
+  | { type: 'prizeDropped'; entityId: EntityId; byId: EntityId; x: number; y: number }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */
@@ -140,6 +147,17 @@ export type SimEvent =
    * klaxon, the banner and the alarm wash all hang off it. */
   | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
+  /** A player took `modId` from their floor-draft hand onto `weapon` (`none` if
+   * they had no gun to hold it). `timedOut` = the hand ran out of time and took
+   * the card under the cursor. */
+  | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
+  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+   * raise `w.alarm` to `level`. */
+  | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
+  /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
+  | { type: 'lockdown' }
+  /** #86 — the lockdown's seal cycle ran out: the Launch Bay is open. */
+  | { type: 'lockdownLifted' }
   /** A body took the stairs: it now stands on the landing of storey `z`. */
   | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }

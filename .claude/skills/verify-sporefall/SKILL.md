@@ -1,6 +1,6 @@
 ---
 name: verify-sporefall
-description: Launch this checkout's Sporefall Station web build on a port you own and drive it like a player to prove a change works. Covers the start menu, solo runs, ?scenario= deep links, the window.sporefall console surface, same-machine co-op, and ?state= links. Use it before you call a player-visible change done, or to reproduce a reported bug on the real page. Two lanes. The soul-desktop Playwright MCP gives a GPU-rendered world and screenshots. scripts/drive.mjs gives scripted headless sim and DOM assertions plus a video.
+description: Launch this checkout's Sporefall Station web build on a port you own and drive it like a player to prove a change works. Covers the start menu, solo runs, ?scenario= deep links, the window.sporefall console surface, same-machine co-op, and ?state= links. Use it before you call a player-visible change done, or to reproduce a reported bug on the real page. Headless playtesting via scripts/playtest.mts (no browser) is the default for judging builds. claude-in-chrome gives a GPU-rendered world, one tab per agent, and deterministic playtesting via the held-input step verb. scripts/drive.mjs gives scripted headless sim and DOM assertions plus a video.
 ---
 
 # Verify Sporefall Station
@@ -39,26 +39,79 @@ The port answers. The served HTML references a bundle that exists in *this* chec
 than the build. It also prints the build number the start menu shows (`564+`, where `+`
 means a dirty tree). Run it first whenever a result looks wrong.
 
+## Playtest headless (preferred for judging a build)
+
+The sim is pure TypeScript, so a playtester needs no browser, no server, and no desktop.
+Each playtester owns one state file, and every call is one verb against it:
+
+```sh
+pt() { npx tsx scripts/playtest.mts "$@"; }        # zsh does not word-split a $VAR command
+pt run.json new --seed 31337                        # the real solo floor 1 (HostSession), prints `look`
+pt run.json new --seed 5 --scenario armed --floor 3 # or any ?scenario= name; --sequenced for the wand flag
+pt run.json look 10                                 # player build + nearby entities, nearest first (hp, fx, resist, ai mode)
+pt run.json spawn npc brute 1.5 6                   # stage a situation with any debug verb
+pt run.json addMod 222 incendiary
+pt run.json step 90 '{"aimAt":223,"attack":true}'   # hold an input for 90 ticks (3 s); returns event counts
+```
+
+A run split across calls is byte-identical to one continuous run. The PRNG position is
+saved with the world, and a unit test enforces this. `step` input fields are the same as in
+Lane A below. If the `aimAt` target dies mid-burst, aim holds and the reply says
+`aimAtGone`. Play in bursts of 15 to 90 ticks and `look` between them, like a player
+reacting.
+
+Measured example (seed 31337, a brute placed 4.5 tiles away): a plain pistol did 25 of 95
+HP in 3 s against the brute's `physical: 0.35`. Adding `incendiary` did 52 more in the next
+3 s and left it `burning`, while it closed in and took the player from 120 to 40. That is
+the shape of evidence a fun or variety verdict should rest on.
+
+Limits: there is no picture (take stills in Lane A), and co-op is one held player per call
+(use `"player":N`).
+
 ## Drive
 
 Choose the lane by what the proof needs to show.
 
-**Lane A: the soul-desktop Playwright MCP (`mcp__soul__playwright__*`).** Use this for
-anything visual: sprites, tiles, FX, layout, and "does it look right". It is headed Chrome
-on the Windows host with the real GPU (ANGLE/D3D11, RTX 4090). It reaches the WSL server
-at `http://localhost:<port>`.
+**Lane A: claude-in-chrome (`mcp__claude-in-chrome__*`).** Use this for anything visual
+(sprites, tiles, FX, layout, "does it look right") and for playtesting. It is the owner's
+desktop Chrome with the real GPU (ANGLE/D3D11, RTX 4090), and it reaches the WSL server at
+`http://localhost:<port>`. Every action takes a `tabId`, so parallel agents are safe as long
+as each one owns its tab.
 
-- `browser_navigate` to `http://localhost:4990/?mode=solo&seed=7`.
-- Gate readiness with `browser_evaluate` on `() => window.world?.tick`. Do not rely on
-  load events (see the gotcha below).
-- Read the sim with `window.sporefall.*`. `sporefall.help()` lists the API.
-- Use `browser_snapshot` for button refs, then `browser_click`. The start menu buttons
-  are named `Solo run`, `Host co-op`, `Join co-op`, and `Settings`.
-- Take screenshots with `browser_take_screenshot` and `filename: "verify-<feature>-<label>.png"`.
-  The file lands in `D:\Projects\playwright-mcp\`, which is `/mnt/d/Projects/playwright-mcp/`
-  from WSL. Move it into your evidence dir right away.
-- This is one shared browser. You cannot run it side by side, and another session may be
-  using it. Drive one tab, and leave it on `about:blank` when you finish.
+- `tabs_context_mcp` first. If it says the extension is not connected, stop and report it,
+  because the owner has to open Chrome. Then `tabs_create_mcp`, and `navigate` your own tab
+  to `http://localhost:4990/?mode=solo&seed=7&debug`. Close your tab with `tabs_close_mcp`
+  when you finish.
+- **Background tabs do not tick.** Chrome freezes the frame loop of any tab that is not in
+  front, and only one tab per window is in front. Never wait on the live clock. Advance the
+  sim yourself with the held-input step verb (below), which runs synchronously in any tab.
+- Read the sim with `javascript_tool` and `window.sporefall.*`. `sporefall.help()` lists the API.
+- **Stills need a visible tab in a visible window.** A hidden tab's WebGL canvas does not
+  composite, so its screenshot shows the HUD over a black world. Check
+  `document.hidden === false` before you take a still. If the whole Chrome window is
+  minimized or covered, every tab reports hidden, and only the owner can fix that.
+  Visible frames also tick the sim live, so a still is evidence of how things look, not a
+  determinism checkpoint.
+- Stills for a PR: `computer` `screenshot` with `save_to_disk: true`, then move the file into
+  your evidence dir.
+
+**Playtesting with the held-input step verb** (`?debug` only). This advances the real sim
+N ticks while holding one player's `InputCmd`, and returns what happened:
+
+```js
+sporefall.verb('step 30 {"moveX":1,"moveY":0}')                      // walk right for 1 s
+sporefall.verb(`step 45 {"aimAt":${id},"attack":true}`)              // re-aims at entity `id` every tick
+sporefall.verb('step 1 {"modSwap":258}')                             // edge fields fire on tick 1 only
+// => {"tick":…,"advanced":45,"player":<entity id>,"events":{"hit":6,"death":1,"shock":2,…}}
+```
+
+Held every tick: `moveX`, `moveY`, `aimX`, `aimY` (clamped to -1..1), `attack`, and
+`special`. First tick only: `interact`, `throwItem`, `roll`, `hotbar`, and `modSwap`
+(`packModSwap(a,b) = a<<8|b`). `player` picks a playerId (default: the lowest), and
+`aimAt` takes an entity id. Unknown fields, bad types, and missing entities throw and
+advance nothing. Play in short bursts (15 to 60 ticks), then read `sporefall.entities(...)`
+and `sporefall.player()` before deciding the next move, the way a person reacts. Stage a
+situation with `spawn`, `teleport`, and `addMod` first if the test needs one.
 
 **Lane B: `scripts/drive.mjs` (headless Playwright in WSL).** Use this for scripted,
 repeatable assertions on sim state and the DOM, and for a video of the run. Under WSL the
@@ -115,8 +168,8 @@ $S/serve.sh stop 4990     # kills only the process group serve.sh recorded
 $S/serve.sh status        # anything left over from this checkout
 ```
 
-Stop any `wrangler dev` you started by its own pid. In the soul-desktop browser, navigate
-the tab to `about:blank`. Cleanup never touches `e2e/output/verify/`, because that is
+Stop any `wrangler dev` you started by its own pid. Close every claude-in-chrome tab you
+created. Cleanup never touches `e2e/output/verify/`, because that is
 where the proof lives.
 
 ## Gotchas
@@ -127,14 +180,22 @@ where the proof lives.
   comes from `--until`.
 - **Headless WSL Chromium has no working WebGL.** The default flags and swiftshader both
   crash the tab. Use Lane A for anything rendered.
+- **Lane A tabs freeze in the background.** See Lane A. Drive time with `step`, never with
+  waits.
 - **A saved run resumes.** After a plain `/`, picking Solo run continues the autosave in
   that browser profile rather than starting fresh. Lane B `--open` gets a fresh context
-  every time. Lane A shares a profile, and even `?mode=solo&seed=7` resumed a seed-7 save
-  there (it came up at tick 10769). For a fresh Lane A run, first `browser_evaluate`
-  `() => localStorage.removeItem('sporefall.savegame')` on the origin, then navigate.
-- **The service worker.** A preview origin that previously served an older build can hand
-  back that build. Doctor checks the server, not the page. If behavior looks stale in
-  Lane A, compare `sporefall.version()` with the doctor's build number.
+  every time. Lane A shares the owner's profile, and there **any** saved run on the origin
+  wins over `?mode=solo&seed=N`: `?seed=31337` loaded a seed-7 save. Worse, an open game tab
+  re-saves on page hide, so clearing the key and then reloading does not work. For a fresh
+  Lane A run, close every game tab on the origin. Then, from a non-game page on that origin
+  (`/manifest.webmanifest`), run `localStorage.removeItem('sporefall.savegame')`, and only
+  then navigate to the game. A `?scenario=` deep link never reads or writes the save
+  (`e2e/deep-link-wins.mjs`), so prefer a scenario when one fits.
+- **The service worker serves the old build.** After a rebuild on the same port, a Lane A
+  tab can still run the previous bundle. Compare the page's `index-*.js` script with the
+  doctor line, and if they differ, unregister the worker and clear its caches:
+  `for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+  for (const k of await caches.keys()) await caches.delete(k)`, then reload.
 
 ## Feature map
 

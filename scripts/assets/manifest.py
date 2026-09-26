@@ -141,6 +141,45 @@ def exists(rel):
     return os.path.exists(os.path.join(THEME, rel))
 
 
+# Character keys resolve *per key* against the theme chain, so any key we
+# omit falls back to CITY's art — a spore-drone cop facing south would turn
+# into a human cop when walking east. Mention every direction key
+# explicitly, borrowing within the theme (se→s, e→s, ne→e→s, n→s; step→idle)
+# until real art for that pose lands.
+BORROW = {"s": ["s"], "se": ["se", "s"], "e": ["e", "s"],
+          "ne": ["ne", "e", "s"], "n": ["n", "s"]}
+
+
+def char_keys(arch, kind, has=exists):
+    """Every char.<arch>.* key for one archetype, in emit order, given which
+    files a pack has (`has(rel)`). build() uses it for this pack; the cast
+    pipeline (scripts/assets/cast/cast.py export) uses it for both packs, so a
+    character's keys follow one rule wherever they are written."""
+    keys = {}
+    for d in G.DIRS:
+        for frame in ("idle", "step"):
+            candidates = [f"chars/{kind}-{b}-{f}.png"
+                          for b in BORROW[d]
+                          for f in ((frame, "idle") if frame == "step" else (frame,))]
+            rel = next((c for c in candidates if has(c)), None)
+            if rel:
+                keys[f"char.{arch}.{d}-{frame}"] = rel
+            else:
+                print(f"  (no art at all: char.{arch}.{d}-{frame})", file=sys.stderr)
+        # Animation-state clips (char.<arch>.<dir>-<state>-<n>, n contiguous
+        # from 0 — docs/themes.md "Animation states"). Emitted per actually-
+        # present file; the rotoscope pipeline (scripts/assets/rotoscope/)
+        # and the cast pipeline produce 8-frame walk cycles. Legacy idle/step
+        # keys above remain as the fallback for directions/states without clips.
+        for state in ANIM_STATES:
+            for n in range(8):
+                rel = f"chars/{kind}-{d}-{state}-{n}.png"
+                if not has(rel):
+                    break  # frames must be contiguous from 0
+                keys[f"char.{arch}.{d}-{state}-{n}"] = rel
+    return keys
+
+
 def build():
     sprites = {}
 
@@ -167,35 +206,8 @@ def build():
         put_pool(f"tile.{tile_name}", f"tiles/{tile_name}-{{}}.png")
         put_pool(f"tile.{tile_name}.accent", f"tiles/{tile_name}-accent-{{}}.png")
         put_pool(f"tile.{tile_name}.overlay", f"tiles/{tile_name}-overlay-{{}}.png")
-    # Character keys resolve *per key* against the theme chain, so any key we
-    # omit falls back to CITY's art — a spore-drone cop facing south would turn
-    # into a human cop when walking east. Mention every direction key
-    # explicitly, borrowing within the theme (se→s, e→s, ne→e→s, n→s; step→idle)
-    # until real art for that pose lands.
-    BORROW = {"s": ["s"], "se": ["se", "s"], "e": ["e", "s"],
-              "ne": ["ne", "e", "s"], "n": ["n", "s"]}
     for arch, kind in CHAR_FILES.items():
-        for d in G.DIRS:
-            for frame in ("idle", "step"):
-                candidates = [f"chars/{kind}-{b}-{f}.png"
-                              for b in BORROW[d]
-                              for f in ((frame, "idle") if frame == "step" else (frame,))]
-                rel = next((c for c in candidates if exists(c)), None)
-                if rel:
-                    sprites[f"char.{arch}.{d}-{frame}"] = rel
-                else:
-                    print(f"  (no art at all: char.{arch}.{d}-{frame})", file=sys.stderr)
-            # Animation-state clips (char.<arch>.<dir>-<state>-<n>, n contiguous
-            # from 0 — docs/themes.md "Animation states"). Emitted per actually-
-            # present file; the rotoscope pipeline (scripts/assets/rotoscope/)
-            # produces 8-frame walk cycles. Legacy idle/step keys above remain
-            # as the fallback for directions/states without clips.
-            for state in ANIM_STATES:
-                for n in range(8):
-                    rel = f"chars/{kind}-{d}-{state}-{n}.png"
-                    if not exists(rel):
-                        break  # frames must be contiguous from 0
-                    sprites[f"char.{arch}.{d}-{state}-{n}"] = rel
+        sprites.update(char_keys(arch, kind))
     # `prop.default` is not a fallback nobody sees: art.ts routes the `crate`
     # archetype to `sprites.prop`, and crate is the MOST COMMON object in the
     # game (23.0 per floor, 19.1% of all props). It pointed at cargo-pod.png —

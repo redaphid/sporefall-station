@@ -182,10 +182,26 @@ describe('DOM', () => {
 
   it('a draft card for a dead pick shows the reason in its face, not a tooltip', () => {
     const mount = document.createElement('div')
-    const screen = createDraftScreen(mount)
-    screen.show(['pierce', 'overload'], () => {}, { weapon: WEAPONS.sledgehammer, mods: [], sequenced: false })
+    const screen = createDraftScreen(mount, () => {})
+    screen.update(['pierce', 'overload'], [{ playerId: 0, cursor: 0 }], 10, 'full', {
+      weapon: WEAPONS.sledgehammer,
+      mods: [],
+      sequenced: false,
+    })
     const card = (id: string) => mount.querySelector(`[data-mod-id="${id}"]`)!
     expect(card('pierce').querySelector('.draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')
     expect(card('overload').querySelector('.draft-verdict')).toBeNull()
+  })
+})
+
+describe('draft screen re-renders when a verdict changes', () => {
+  it('the same hand redraws once the gun can no longer use a card', () => {
+    const mount = document.createElement('div')
+    const screen = createDraftScreen(mount, () => {})
+    const seats = [{ playerId: 0, cursor: 0 }]
+    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.pistol, mods: [], sequenced: false })
+    expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')).toBeNull()
+    screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.sledgehammer, mods: [], sequenced: false })
+    expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')
   })
 })

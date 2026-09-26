@@ -66,6 +66,12 @@ export interface MissionState {
    * seen — and it is what lets NPCs across the floor keep coming. Refreshing it
    * only every N ticks is what keeps the escape EVADABLE. */
   alertMark?: Vec2
+  /** #86 — noticed gunfire/attacks, in ticks of sustained fire (systems/alarm.ts).
+   * Omitted when 0 so a quiet floor round-trips byte-for-byte. */
+  heat?: number
+  /** #86 — the tick the Launch Bay's lockdown seal cycle started (the alarm hit
+   * LOCKDOWN_ALARM the loud way; restarted when the objective completes). */
+  lockdownTick?: number
   /** Latch: a live player has SEEN the Mireclaw Alpha, so its entrance has been
    * announced and its phases are running (systems/mireclaw.maybeReveal). Also
    * what keeps the boss dormant — and its brood unspent — until someone walks

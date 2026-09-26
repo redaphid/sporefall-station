@@ -9,6 +9,13 @@ export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | '
 export interface StatusEntry {
   until: number
   source?: EntityId
+  /** Damage over time dealt ahead of what this status has owed so far, in
+   * [0, 1). hp stays whole, so each damage tick deals what it owes rounded UP
+   * and keeps the overpayment here (fire.ts elementSystem). Over any window a
+   * body takes the exact resisted damage rounded up, so a resist above 0 always
+   * hurts (#131). A refresh keeps it. Absent when nothing is prepaid, so a
+   * whole-number burn snapshots as before. */
+  prepaid?: number
 }
 
 export type Fx = Record<string, StatusEntry>

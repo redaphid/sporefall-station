@@ -136,8 +136,16 @@ export const elementSystem = (w: World): void => {
       if (w.tick % def.interval !== 0) continue
       // #78 damage affinity: a fireproof body barely feels burning; a flammable
       // one takes extra. Missing table → ×1 (unchanged DOT).
-      const dmg = Math.round(def.dot * resistMult(e, kind))
-      if (dmg <= 0) continue // immune (mult 0) — the status lingers but does no harm
+      const mult = resistMult(e, kind)
+      if (mult <= 0) continue // immune (mult 0) — the status lingers but does no harm
+      // hp is whole, so deal what this tick owes rounded up and bank the rest
+      // against the next tick (#131). Rounding each tick alone made a cinder's
+      // 0.4 a 0, and made a half resist on a 1-damage element no resist at all.
+      const entry = e.fx[kind]
+      const owed = def.dot * mult - (entry.prepaid ?? 0)
+      const dmg = Math.ceil(owed)
+      entry.prepaid = dmg - owed || undefined
+      if (dmg <= 0) continue
       hurt(w, e.health, dmg)
       w.events.push({ type: 'hit', x: e.pos.x, y: e.pos.y, targetId: e.id, amount: dmg })
       if (e.health.hp <= 0) {

@@ -95,7 +95,8 @@ export const addStatus = (w: World, e: Entity, kind: string, durationTicks: numb
   if (kind === 'wet') removeStatus(e, 'burning')
   if (kind === 'burning') panic(w, e, source)
   const fx: Fx = (e.fx ??= {})
-  fx[kind] = { until: w.tick + durationTicks, source }
+  // A refresh continues the same status, so it keeps what its damage has prepaid.
+  fx[kind] = { ...fx[kind], until: w.tick + durationTicks, source }
 }
 
 export const removeStatus = (e: Entity, kind: string): void => {

@@ -123,6 +123,9 @@ export interface AiState {
   /** #65 — a POINT to flee away from when there is no threat ENTITY to run from
    * (a caught fear pulse / stampede). Steering uses it when `targetId` is unset. */
   fleeFrom?: Vec2
+  /** Where a burning body is running from while it panics (statusFx `panic`);
+   * the window itself is `lockout.panic`. */
+  panicFrom?: Vec2
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
   /** Where/when this NPC last made real progress toward an UNSEEN chase goal —

@@ -17,6 +17,7 @@ import { Camera } from './camera'
 import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './complexLook'
 import { EffectsLayer } from './effects'
 import { GroupFxLayer } from './groupFx'
+import { VerbMarkerLayer } from './verbMarkerLayer'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
 import {
@@ -171,6 +172,10 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // retreat cross): drawn over the effects sprites, inside the same layer.
   const groupFx = new GroupFxLayer()
   effects.root.addChild(groupFx.root)
+  // #87 element verbs with no body look of their own: panic "!!" and a slashed
+  // eye for spore blindness, over the head, above every sprite.
+  const verbMarkers = new VerbMarkerLayer()
+  effects.root.addChild(verbMarkers.root)
   // Twin-stick aim reticles: a small pooled overlay INSIDE the world container
   // so the camera transform (and shake) applies for free. Fed per frame via
   // setReticles; pool grows to the largest simultaneous count and hides spares.
@@ -395,6 +400,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     entities.refresh()
     bullets.refresh()
     playerMarkers.refresh()
+    verbMarkers.refresh()
   }
 
   const native = Capacitor.isNativePlatform()
@@ -561,6 +567,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (!frozen) {
         entities.update(shown, alpha, view.tick, view.floor)
         playerMarkers.update(shown, view.self?.id, alpha, view.tick)
+        verbMarkers.update(shown, alpha, view.tick)
         statusFx.update(shown, alpha, view.tick)
         bullets.update(shown, alpha, view.tick)
         effects.update(view.tick, alpha)

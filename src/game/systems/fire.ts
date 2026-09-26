@@ -13,6 +13,7 @@ import { makeEntity, resistMult, type Entity } from '../entity'
 import { addEntity, type World } from '../world'
 import { kill } from './combat'
 import { addStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 /** Ticks a freshly-lit cell burns before guttering out (~12s at 30tps). */
 const FUEL = 360
@@ -20,6 +21,9 @@ const FUEL = 360
 /** Fire creeps to a new neighbor every this-many ticks, not every frame — so
  * you watch it crawl down a row rather than flash across it. */
 const SPREAD_INTERVAL = 18
+
+/** Gap (tiles) between a burning body and a flammable that still counts as touching. */
+const BRUSH_SLACK = 0.1
 
 /** Fixed neighbor probe order — part of determinism, never reorder. */
 const NEIGHBORS: readonly [number, number][] = [
@@ -66,6 +70,16 @@ export const fireSystem = (w: World): void => {
         if (!NEIGHBORS.some(([dx, dy]) => fx + dx === tx && fy + dy === ty)) continue
         igniteCell(w, tx, ty)
       }
+    }
+  }
+
+  // A burning NPC lights whatever flammable it brushes past, so a panicking
+  // body carries the fire through the room it runs into.
+  for (const b of w.entities) {
+    if (b.dead || !b.ai || b.fx?.burning === undefined) continue
+    for (const t of flammables) {
+      if (t === b || vlen(t.pos.x - b.pos.x, t.pos.y - b.pos.y) > b.radius + t.radius + BRUSH_SLACK) continue
+      igniteCell(w, Math.floor(t.pos.x), Math.floor(t.pos.y))
     }
   }
 

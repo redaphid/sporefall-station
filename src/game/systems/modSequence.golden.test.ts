@@ -1,10 +1,8 @@
-// Flag-off proof for the sequenced-mods prototype. The golden digests below
-// were captured on `main` BEFORE any sequencing code existed. A world that has
-// not opted into sequencing must reproduce them exactly, including when its
-// inputs carry reorder requests that `main` had no idea about.
-//
-// If one of these fails, the prototype has leaked into the default path. Do not
-// re-pin the digest; find the leak.
+// Golden digests for sequenced casting: a real floor, a pistol wand of three
+// casts, 400 ticks of held fire with a sweeping aim and a reorder request every
+// 37th tick. Any change to what a pull fires, to the reorder input, or to the
+// per-weapon cast state moves these digests. Re-pin one only for a deliberate
+// sim change, and say in the comment what reproduces the old value.
 
 import { describe, expect, it } from 'vitest'
 import { worldDigest } from '../../debug/worldDigest'
@@ -13,6 +11,7 @@ import { spawnPlayer } from '../player'
 import { playerSpawnPoint } from '../spawnPlacement'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
+import { weaponStack } from './inventory'
 import { setupFloor } from './missions'
 
 /** FNV-1a over a string: a short, stable fingerprint of a (long) digest. */
@@ -26,7 +25,8 @@ const fnv1a = (s: string): string => {
 }
 
 /** A real floor with a player whose pistol carries a mixed bag of mods, in
- * pickup order, the way a draft would have left it. */
+ * pickup order, the way a draft would have left it: three casts,
+ * [incendiary] [overload x2, frost] [pierce]. */
 const buildRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   populateWorld(w)
@@ -43,7 +43,7 @@ const buildRun = (seed: number): World => {
 }
 
 /** Hold fire while sweeping aim in a slow circle; every 37th tick also ask to
- * swap two mod slots. `main` has no such input, so it must be inert here. */
+ * swap two mod slots. */
 const inputAt = (t: number): InputCmd => {
   const a = t * 0.07
   const cmd = { ...emptyInput(), seq: t, attack: true, aimX: Math.cos(a), aimY: Math.sin(a), moveX: Math.sin(t * 0.01) * 0.3 }
@@ -56,28 +56,19 @@ const run = (seed: number, ticks: number): World => {
   return w
 }
 
-describe('mod sequencing: flag off matches main', () => {
-  // Captured on main @ 9d0894d with this exact file. Re-pinned once for #91:
-  // the default-mode element rule changed from alphabetical to newest-in-list,
-  // so this gun's rounds now freeze (frost is its newest element) instead of
-  // burn. Restoring the alphabetical pick alone reproduced the old digests
-  // (deaefb3a, 6251b800). Re-pinned again for #117: a round's provenance
-  // (`projectile.mods`) drops the element that frost overrides, so incendiary
-  // no longer rides these rounds. Reverting only that filter reproduced the
-  // previous digests (68f8aaa8, 457a3b14), and with every projectile's `mods`
-  // removed both builds digest identically (8029abfa, 5cc314e6). Seed 7
-  // re-pinned for #87: applyStatus now records who applied a status
-  // (`fx.frozen.source`), a deliberate sim change. Integration PR #122 reverted
-  // only that and reproduced '92430cd7'; seed 1234 does not move. Both re-pinned
-  // for #86: player gunfire is now a heard noise. With `hearGunfire` stubbed
-  // out the previous digests (d18f1870, 3f405983) still match.
+describe('sequenced casting: golden digests', () => {
+  // Captured when sequencing became the only way guns fire. These seeds and
+  // this exact scenario were the flag-off goldens (a13b7b25, e92bcf60), which
+  // pinned the old fold-everything-into-every-shot path. Restoring that fold
+  // (fireWeapon firing the whole list as one cast, the reorder input ignored,
+  // resolveWeapon's newest-element pick) reproduces both old digests.
   const GOLDEN: Record<number, string> = {
-    7: 'a13b7b25',
-    1234: 'e92bcf60',
+    7: 'ee39480f',
+    1234: '5930fe81',
   }
 
   for (const seed of [7, 1234]) {
-    it(`seed ${seed}: 400 ticks of fire and swap requests digest exactly as on main`, () => {
+    it(`seed ${seed}: 400 ticks of fire and swap requests digest exactly`, () => {
       const w = run(seed, 400)
       expect(fnv1a(worldDigest(w))).toBe(GOLDEN[seed])
     })
@@ -93,11 +84,18 @@ describe('mod sequencing: flag off matches main', () => {
     expect(seen.size).toBeGreaterThanOrEqual(3)
   })
 
-  it('an unopted world never grows sequencing state', () => {
-    const w = run(7, 200)
-    const json = JSON.stringify(worldDigest(w))
-    expect(json).not.toContain('castIndex')
-    expect(json).not.toContain('rechargeUntil')
-    expect(json).not.toContain('modCasting')
+  it('the scenario walks the wand: the index advances, wraps, and recharges', () => {
+    const w = buildRun(7)
+    const p = w.entities.find((e) => e.playerCtl)!
+    const indices = new Set<number>()
+    let recharged = false
+    for (let t = 1; t <= 200; t++) {
+      tickWorld(w, new Map([[0, inputAt(t)]]))
+      const stack = weaponStack(p)!
+      indices.add(stack.castIndex ?? -1)
+      if (stack.rechargeUntil !== undefined) recharged = true
+    }
+    for (const i of [0, 1, 2]) expect(indices.has(i), `castIndex ${i}`).toBe(true)
+    expect(recharged).toBe(true)
   })
 })

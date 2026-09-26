@@ -64,6 +64,42 @@ describe('the navigation fallback never swallows a real download', () => {
   })
 })
 
+describe('the navigation fallback never swallows a Worker-served path', () => {
+  // Everything here is answered by src/worker/index.ts, and everything here can
+  // be reached by a human TAPPING a link — which is a navigation, the one
+  // request kind the fallback rewrites. A missing entry is invisible from the
+  // outside: the game loads at the wrong URL, at status 200, with no console
+  // error. Reproduced in Chrome against production before this line existed —
+  // /review/<key>.png rendered the start menu, `fromServiceWorker: true`.
+  it('lets a published review image reach the network', () => {
+    for (const path of [
+      '/review/art-prop-audit/chair-final-ba-5c220f90.png',
+      '/review/fix-review-route-sw/shot-0a1b2c3d.webp',
+    ]) {
+      expect(denied(path), `${path} must not be answered with index.html`).toBe(true)
+    }
+  })
+
+  it('keeps the beta builds off the fallback too', () => {
+    expect(denied('/betas')).toBe(true)
+    expect(denied('/betas/pr-81/')).toBe(true)
+  })
+
+  it('covers the shared debug-state route as well', () => {
+    // Not a live bug — the game only reaches /state with fetch(), which the
+    // fallback never rewrites. This is for the id pasted into an address bar.
+    expect(denied('/state')).toBe(true)
+    expect(denied('/state/9f3a2b')).toBe(true)
+  })
+
+  it('is scoped to the route, not to the word', () => {
+    // `/^\/review\//` needs the trailing slash, unlike the deliberate prefix
+    // rule for /asset-showcase — so a future in-game route is not denied by
+    // accident just because it starts with the same letters.
+    expect(denied('/reviewing-the-run')).toBe(false)
+  })
+})
+
 describe('the worker never takes over on its own', () => {
   // This is what keeps a half-old/half-new page from existing at all. With
   // skipWaiting the browser activates the new worker the instant it installs,

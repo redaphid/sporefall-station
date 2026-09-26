@@ -54,7 +54,7 @@ export interface NativeUpdater {
  * src/worker/ota.ts). Capgo's `getLatest()` rejects with it as the message, so
  * it is the one rejection that means "up to date" rather than "unreachable".
  */
-export const OTA_UP_TO_DATE = 'up-to-date'
+const OTA_UP_TO_DATE = 'up-to-date'
 
 /**
  * Confirm this bundle booted successfully, so the native side keeps it instead

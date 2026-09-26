@@ -12,7 +12,8 @@ import { ELEMENTS } from '../data/elements'
 import { makeEntity, resistMult, type Entity, type EntityKind } from '../entity'
 import { addEntity, type World } from '../world'
 import { kill } from './combat'
-import { addStatus } from './statusFx'
+import { applyStatus } from './statusFx'
+import { vlen } from '../simMath'
 
 /** Ticks a freshly-lit cell burns before guttering out (~12s at 30tps). */
 const FUEL = 360
@@ -29,6 +30,9 @@ const CREATURES: ReadonlySet<EntityKind> = new Set(['npc', 'player'])
  * creature, unless it is immune to burning (resist 0). */
 const catchesFire = (e: Entity): boolean =>
   (e.flammable === true || CREATURES.has(e.kind)) && resistMult(e, 'burning') > 0
+
+/** Gap (tiles) between a burning body and a flammable that still counts as touching. */
+const BRUSH_SLACK = 0.1
 
 /** Fixed neighbor probe order — part of determinism, never reorder. */
 const NEIGHBORS: readonly [number, number][] = [
@@ -63,7 +67,6 @@ export const ignite = (w: World, target: Entity): Entity | undefined =>
  * by spread this tick only probe their own neighbors next tick. */
 export const fireSystem = (w: World): void => {
   const fires = w.entities.filter((e) => e.fire && !e.dead)
-  if (fires.length === 0) return // nothing burns, so nothing spreads, ignites, or burns down
   const flammables = w.entities.filter((e) => e.flammable && !e.dead)
 
   if (w.tick % SPREAD_INTERVAL === 0) {
@@ -79,21 +82,36 @@ export const fireSystem = (w: World): void => {
     }
   }
 
+  // A burning NPC lights whatever flammable it brushes past, so a panicking
+  // body carries the fire through the room it runs into.
+  for (const b of w.entities) {
+    if (b.dead || !b.ai || b.fx?.burning === undefined) continue
+    for (const t of flammables) {
+      if (t === b || vlen(t.pos.x - b.pos.x, t.pos.y - b.pos.y) > b.radius + t.radius + BRUSH_SLACK) continue
+      igniteCell(w, Math.floor(t.pos.x), Math.floor(t.pos.y))
+    }
+  }
+
   // Set alight whatever catches fire and stands in a burning cell. This runs EVERY
   // tick over every flammable and creature (~100 props plus the NPCs a floor), so
   // the old per-entity `fireAt` (a full entity scan each) was O(n × entities).
   // Snapshot the burning cells into a set ONCE (keyed like the movement door grid:
   // `ty*w + tx`, unique per in-bounds tile) and probe it in O(1). Built here (after
   // spread) so cells lit this tick are included; ignition runs in ascending id order.
+  // It lands through applyStatus with no source, exactly like a burning round, so
+  // #92's rules hold here too: a wet body dries instead of catching, and an NPC
+  // that catches bolts forward in panic.
   const lw = w.level.w
   const fireCells = new Set<number>()
   for (const f of w.entities) {
     if (f.fire && !f.dead) fireCells.add(Math.floor(f.pos.y) * lw + Math.floor(f.pos.x))
   }
-  for (const t of w.entities) {
-    if (t.dead || !catchesFire(t)) continue
-    if (!fireCells.has(Math.floor(t.pos.y) * lw + Math.floor(t.pos.x))) continue
-    addStatus(w, t, 'burning', ELEMENTS.burning.durationTicks)
+  if (fireCells.size > 0) {
+    for (const t of w.entities) {
+      if (t.dead || !catchesFire(t)) continue
+      if (!fireCells.has(Math.floor(t.pos.y) * lw + Math.floor(t.pos.x))) continue
+      applyStatus(w, t, 'burning', ELEMENTS.burning.durationTicks)
+    }
   }
 
   for (const f of fires) {

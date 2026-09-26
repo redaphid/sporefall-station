@@ -15,7 +15,8 @@ import type { InputCmd, SimEvent } from '../types'
 import { addEntity, createWorld, type World } from '../world'
 import { fireAt, igniteCell } from './fire'
 import { freeze, wet } from './interactions'
-import { applyStatus, hasStatus } from './statusFx'
+import { spawnObject } from './objects'
+import { applyStatus, hasStatus, isPanicking } from './statusFx'
 
 const STAGE_W = 12
 
@@ -115,8 +116,10 @@ describe('fire sets creatures alight (#114)', () => {
 
   it('keeps burning for the full status duration after leaving the fire, then goes out', () => {
     const thug = npc(w, 'thug', s.x, s.y, 1000)
+    thug.speed = 0
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 10)
+    expect(cellOf(thug)).toEqual([s.x, s.y])
     const lastLit = w.tick - 1
     moveTo(thug, s.x + 6, s.y)
     const hpOut = thug.health!.hp
@@ -252,5 +255,52 @@ describe('fire sets creatures alight (#114)', () => {
     expectWorldEqual(a, b)
     const c = runTicks(stage(), inputs, 340)
     expectWorldEqual(a, c)
+  })
+})
+
+describe('floor fire meets the #92 element verbs', () => {
+  let w: World
+  let s: { x: number; y: number }
+  beforeEach(() => {
+    w = createWorld(1, 1)
+    s = findStage(w)
+  })
+
+  it('an NPC lit by floor fire panics and bolts out of the flames, still burning', () => {
+    const thug = spawnNpc(w, 'thug', s.x + 0.5, s.y + 0.5)
+    igniteCell(w, s.x, s.y)
+    runTicks(w, noInput, 1)
+    expect(isPanicking(w, thug)).toBe(true)
+    runTicks(w, noInput, 30)
+    expect(thug.ai!.goal).toBe('flee')
+    expect(fireAt(w, ...cellOf(thug))).toBe(false)
+    expect(hasStatus(thug, 'burning')).toBe(true)
+  })
+
+  it.each([
+    ['an NPC', (w: World, x: number, y: number) => npc(w, 'thug', x, y)],
+    ['a player', (w: World, x: number, y: number) => player(w, x + 0.5, y + 0.5)],
+  ])('%s that is wet is dried by its first tick in the fire and lit by the next', (_label, make) => {
+    const e = make(w, s.x, s.y)
+    wet(w, e)
+    igniteCell(w, s.x, s.y)
+    runTicks(w, noInput, 1)
+    expect(hasStatus(e, 'wet')).toBe(false)
+    expect(hasStatus(e, 'burning')).toBe(false)
+    expect(isPanicking(w, e)).toBe(false)
+    runTicks(w, noInput, 1)
+    expect(hasStatus(e, 'burning')).toBe(true)
+  })
+
+  it('an NPC lit by floor fire carries it to a crate it brushes past', () => {
+    const thug = npc(w, 'thug', s.x, s.y, 1000)
+    thug.speed = 0
+    igniteCell(w, s.x, s.y)
+    runTicks(w, noInput, 1)
+    const crate = spawnObject(w, 'crate', s.x + 8, s.y)
+    moveTo(thug, s.x + 7, s.y)
+    thug.pos.x += 0.3
+    runTicks(w, noInput, 1)
+    expect(fireAt(w, ...cellOf(crate))).toBe(true)
   })
 })

@@ -36,7 +36,11 @@ export interface MissionViewLike {
   entities: readonly { id: number; dead?: boolean; pos: { x: number; y: number } }[]
   /** Exit tile (integer corner) — omitted on a client before the level arrives. */
   exit?: { x: number; y: number }
+  /** Open `extraction` mission: the way out is this entry tile, not the exit. */
+  extraction?: { x: number; y: number; held: boolean }
 }
+
+export const EXTRACT_ROW_TEXT = 'Get out the way you came'
 
 /** Case-insensitive "this mission IS the exit objective" test, so a `reach`
  * template doesn't render as two identical rows. The exit is the Launch Bay. */
@@ -54,6 +58,19 @@ const isReachText = (text: string): boolean => text.trim().toLowerCase() === 're
  */
 export const missionObjectives = (v: MissionViewLike): Objective[] => {
   if (v.gameOver) return []
+  const x = v.extraction
+  if (x) {
+    // Prize on the floor → go get it; prize in hand → the entry is the objective.
+    return [
+      { key: 'mission', text: v.missionText, state: x.held ? 'done' : 'active', link: x.held ? undefined : entityLink(v) },
+      {
+        key: 'exit',
+        text: EXTRACT_ROW_TEXT,
+        state: x.held ? 'active' : 'locked',
+        link: x.held ? { x: x.x + 0.5, y: x.y + 0.5 } : undefined,
+      },
+    ]
+  }
   const rows: Objective[] = []
   if (!isReachText(v.missionText)) {
     rows.push({
@@ -84,8 +101,14 @@ const entityLink = (v: MissionViewLike): ObjectiveLink | undefined => {
 }
 
 /** Collapsed-chip text — parity with the old one-line mission readout. */
-export const missionChipText = (v: Pick<MissionViewLike, 'floor' | 'missionText' | 'missionComplete'>): string =>
-  v.missionComplete ? `Floor ${v.floor} — LAUNCH BAY is open!` : `Floor ${v.floor} — ${v.missionText}`
+export const missionChipText = (
+  v: Pick<MissionViewLike, 'floor' | 'missionText' | 'missionComplete' | 'extraction'>,
+): string =>
+  v.extraction?.held
+    ? `Floor ${v.floor} — GOT IT! Get out the way you came`
+    : v.missionComplete
+      ? `Floor ${v.floor} — LAUNCH BAY is open!`
+      : `Floor ${v.floor} — ${v.missionText}`
 
 /**
  * Resolve a link to its CURRENT world position: a live entity's live pos, or

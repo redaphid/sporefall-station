@@ -8,7 +8,7 @@
 import { makeEntity, type Entity } from '../game/entity'
 import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behaviors'
 import { NPCS } from '../game/data/npcs'
-import { MODS, isModId, modMaxStacks } from '../game/data/mods'
+import { MODS, isModId, stackMod } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
@@ -461,11 +461,7 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (!Number.isInteger(stacks) || stacks < 1) throw new Error(`stacks must be a positive integer, got "${stacksStr}"`)
       const stack = weaponStack(e)
       if (!stack) throw new Error(`entity ${e.id} has no slotted weapon to mod (equip a ranged/melee weapon from inventory first)`)
-      const cap = modMaxStacks(modId)
-      const mods = (stack.mods ??= [])
-      const existing = mods.find((m) => m.id === modId)
-      if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
-      else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
+      stackMod((stack.mods ??= []), modId, stacks)
       return JSON.stringify({ id: e.id, weapon: e.combat?.weapon, mods: stack.mods })
     }
 

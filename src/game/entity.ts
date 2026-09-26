@@ -123,6 +123,9 @@ export interface AiState {
   /** #65 — a POINT to flee away from when there is no threat ENTITY to run from
    * (a caught fear pulse / stampede). Steering uses it when `targetId` is unset. */
   fleeFrom?: Vec2
+  /** Where a burning body is running from while it panics (statusFx `panic`);
+   * the window itself is `lockout.panic`. */
+  panicFrom?: Vec2
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
   /** Where/when this NPC last made real progress toward an UNSEEN chase goal —
@@ -204,6 +207,20 @@ export interface ItemStack {
  * innate fists, a class-starter with no slot) resolves VANILLA — undefined stack,
  * infinite/no-wear — exactly as an inventory-less NPC did before this component
  * existed, so every pre-loadout snapshot round-trips byte-for-byte. */
+/** A floor-draft hand a player is still choosing from (systems/draft.ts). */
+export interface DraftHand {
+  /** The mod ids on offer, in card order. */
+  offer: string[]
+  /** Index of the card under this player's cursor. */
+  cursor: number
+  /** Absolute tick at which the hand takes the card under the cursor. */
+  until: number
+  /** Intent bits held on the previous tick. Cards move or are taken only on a
+   * fresh press, and a hand opens with every bit set, so a stick or trigger still
+   * held from walking onto the exit does nothing until released. */
+  held: number
+}
+
 export interface Loadout {
   /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
   inventory: ItemStack[]
@@ -298,6 +315,8 @@ export interface Entity {
      * + speed-burst window; `cooldownUntilTick` gates the next roll (no chaining);
      * `dirX/dirY` is the frozen roll heading (move dir, or facing when stationary). */
     roll?: { untilTick: number; cooldownUntilTick: number; dirX: number; dirY: number }
+    /** Present while this player is choosing a mod from the floor draft. */
+    draft?: DraftHand
   }
   projectile?: {
     ownerId: EntityId

@@ -22,6 +22,7 @@ import {
   type RaidStrategy,
 } from './systems/groups'
 import { freeze, wet } from './systems/interactions'
+import { applyStatus } from './systems/statusFx'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 
@@ -130,6 +131,60 @@ const setupWetElectric = (w: World): void => {
   const { x, y } = findStage(w, 6)
   for (let i = 1; i <= 4; i++) wet(w, bystander(w, x + i, y))
   placePlayer(w, x + 2, y)
+}
+
+/** The empty all-floor rectangle (`cols` x `rows` tiles, nothing standing in
+ * it) nearest the level centre: a room the camera can frame, where a fleeing
+ * body has somewhere to run. Falls back to `findStage` on a level without one. */
+const findRoom = (w: World, cols: number, rows: number): { x: number; y: number } => {
+  const midX = Math.floor(w.level.w / 2)
+  const midY = Math.floor(w.level.h / 2)
+  const occupied = new Set<number>()
+  for (const e of w.entities) if (!e.playerCtl) occupied.add(Math.floor(e.pos.y) * w.level.w + Math.floor(e.pos.x))
+  const clear = (x0: number, y0: number): boolean => {
+    for (let y = y0; y < y0 + rows; y++)
+      for (let x = x0; x < x0 + cols; x++) {
+        const i = y * w.level.w + x
+        if (w.level.tiles[i] !== Tile.Floor || w.level.solid[i] === 1 || occupied.has(i)) return false
+      }
+    return true
+  }
+  let best: { x: number; y: number } | undefined
+  let bestD = Infinity
+  for (let y = 1; y + rows < w.level.h; y++)
+    for (let x = 1; x + cols < w.level.w; x++) {
+      const d = Math.abs(x + (cols >> 1) - midX) + Math.abs(y + (rows >> 1) - midY)
+      if (d < bestD && clear(x, y)) {
+        bestD = d
+        best = { x, y }
+      }
+    }
+  return best ?? findStage(w, cols)
+}
+
+/** #87 — every element verb in one frame, on hostile thugs in one room. The
+ * player stands at the west wall. HELD: a frozen thug. PANICKING: a thug the
+ * player lit, which bolts east away from them. JUMPED: a shock on one thug that
+ * leaps to its neighbour 2 tiles off. BLIND: a thug choking on spore in the far
+ * corner, which can't see the player. The e2e video and stills shoot this. */
+const setupElementVerbs = (w: World): void => {
+  const { x, y } = findRoom(w, 9, 4)
+  const player = w.entities.find((e) => e.playerCtl)
+  if (player) {
+    player.pos = { x: x + 0.5, y: y + 2.5 }
+    player.prevPos = { ...player.pos }
+    player.facing = 0
+    // Tough enough to watch the whole show: the held and zapped thugs come for
+    // the player once their verbs wear off.
+    if (player.health) player.health.hp = player.health.max = 1000
+  }
+  const thug = (dx: number, dy: number): Entity => spawnNpc(w, 'thug', x + dx + 0.5, y + dy + 0.5)
+  freeze(w, thug(2, 0))
+  applyStatus(w, thug(2, 2), 'burning', 600, player?.id)
+  const zapped = thug(5, 0)
+  thug(7, 0) // the leap's landing: 2 tiles off, inside ARC_JUMP_RADIUS
+  applyStatus(w, zapped, 'electrified', 30, player?.id)
+  applyStatus(w, thug(8, 3), 'spore', 150)
 }
 
 /** A loaded loadout (bat / pistol / grenades) and destructible targets downrange:
@@ -963,6 +1018,7 @@ const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>
   frost: setupFrost,
   'boss-freeze': setupBossFreeze,
   'wet-electric': setupWetElectric,
+  'element-verbs': setupElementVerbs,
   inventory: setupInventory,
   items: setupItems,
   relationships: setupRelationships,

@@ -16,7 +16,7 @@ import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serial
 import { kill as killEntity } from '../game/systems/combat'
 import { addAnnotations, clearAnnotations } from '../game/annotations'
 import { selectedEntities } from '../game/select'
-import type { SimEvent } from '../game/types'
+import { emptyInput, type InputCmd, type SimEvent } from '../game/types'
 import { addEntity, tickWorld, type World } from '../game/world'
 import { decodeArg } from './protocol'
 
@@ -152,6 +152,68 @@ const assertNoForbiddenKeys = (v: unknown): void => {
   }
 }
 
+export interface HeldInput {
+  playerId: number
+  entityId: number
+  cmd: InputCmd
+  aimAt?: number
+}
+
+const HELD_AXES = ['moveX', 'moveY', 'aimX', 'aimY'] as const
+const HELD_BUTTONS = ['attack', 'special'] as const
+// The input layer edge-triggers these; the sim acts on every tick they are set,
+// so holding one across N ticks would repeat it (a held swap undoes itself).
+const EDGE_BUTTONS = ['interact', 'throwItem', 'roll'] as const
+const EDGE_INTS = ['hotbar', 'modSwap'] as const
+const HELD_KEYS = new Set<string>([...HELD_AXES, ...HELD_BUTTONS, ...EDGE_BUTTONS, ...EDGE_INTS, 'player', 'aimAt'])
+
+export const parseHeldInput = (w: World, text: string): HeldInput => {
+  const raw = JSON.parse(text) as unknown
+  if (!isPlainObject(raw)) throw new Error('step input must be a JSON object')
+  assertNoForbiddenKeys(raw)
+  for (const k of Object.keys(raw)) if (!HELD_KEYS.has(k)) throw new Error(`unknown step input field "${k}"`)
+  const players = w.entities.filter((e) => e.playerCtl).sort((a, b) => a.playerCtl!.playerId - b.playerCtl!.playerId)
+  if (players.length === 0) throw new Error('no player to hold input for')
+  const want = raw.player === undefined ? players[0].playerCtl!.playerId : num(String(raw.player), 'player')
+  const p = players.find((e) => e.playerCtl!.playerId === want)
+  if (!p) throw new Error(`no player with playerId ${want}`)
+  const cmd = emptyInput()
+  for (const k of HELD_AXES) if (raw[k] !== undefined) cmd[k] = Math.max(-1, Math.min(1, num(String(raw[k]), k)))
+  for (const k of [...HELD_BUTTONS, ...EDGE_BUTTONS]) {
+    if (raw[k] === undefined) continue
+    if (typeof raw[k] !== 'boolean') throw new Error(`step input "${k}" must be true or false`)
+    cmd[k] = raw[k]
+  }
+  if (raw.hotbar !== undefined) cmd.hotbar = num(String(raw.hotbar), 'hotbar')
+  if (raw.modSwap !== undefined) cmd.modSwap = num(String(raw.modSwap), 'modSwap')
+  const aimAt = raw.aimAt === undefined ? undefined : num(String(raw.aimAt), 'aimAt')
+  // An id never allocated is a typo; one that existed and is gone (killed) just leaves aim as-is.
+  if (aimAt !== undefined && !(Number.isInteger(aimAt) && aimAt > 0 && aimAt < w.nextId)) throw new Error(`no entity ${aimAt} to aim at`)
+  return { playerId: want, entityId: p.id, cmd, aimAt }
+}
+
+/** The command for the i-th held tick: edge fields only on the first, aim re-solved toward `aimAt`. */
+export const heldCmd = (w: World, h: HeldInput, i: number): InputCmd => {
+  const c: InputCmd = { ...h.cmd, seq: i }
+  if (i > 0) {
+    for (const k of EDGE_BUTTONS) c[k] = false
+    c.hotbar = -1
+    delete c.modSwap
+  }
+  const me = w.byId.get(h.entityId)
+  const target = h.aimAt === undefined ? undefined : w.byId.get(h.aimAt)
+  if (me && target) {
+    const dx = target.pos.x - me.pos.x
+    const dy = target.pos.y - me.pos.y
+    const len = Math.hypot(dx, dy)
+    if (len > 0) {
+      c.aimX = dx / len
+      c.aimY = dy / len
+    }
+  }
+  return c
+}
+
 /** Replace a live world's contents in place so every closed-over reference (the
  * channel holds one) keeps pointing at the same object. World is a flat record,
  * so copying its own fields from a freshly-deserialized world is a full swap. */
@@ -265,6 +327,53 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       return JSON.stringify({ id: e.id, pos: e.pos })
     }
 
+    case 'look': {
+      // A playtester's glance: the acting player, their build, and what is near,
+      // nearest first. Read-only.
+      const radius = rest ? num(rest, 'radius') : 12
+      const me = w.entities
+        .filter((e) => e.playerCtl && !e.dead)
+        .sort((a, b) => a.playerCtl!.playerId - b.playerCtl!.playerId)[0]
+      if (!me) return JSON.stringify({ tick: w.tick, floor: w.floor, gameOver: w.gameOver, player: null })
+      const stack = weaponStack(me)
+      const near = w.entities
+        .filter((e) => e !== me && !e.dead && e.kind !== 'projectile')
+        .map((e) => ({ e, d: Math.hypot(e.pos.x - me.pos.x, e.pos.y - me.pos.y) }))
+        .filter(({ d }) => d <= radius)
+        .sort((a, b) => a.d - b.d || a.e.id - b.e.id)
+        .map(({ e, d }) => ({
+          id: e.id,
+          kind: e.kind,
+          archetype: e.archetype,
+          dist: Math.round(d * 10) / 10,
+          at: { x: Math.round(e.pos.x * 10) / 10, y: Math.round(e.pos.y * 10) / 10 },
+          hp: e.health ? `${e.health.hp}/${e.health.max}` : undefined,
+          fx: e.fx && Object.keys(e.fx).length ? Object.keys(e.fx) : undefined,
+          resist: e.resist,
+          mode: e.ai?.mode,
+          faction: e.ai?.faction,
+        }))
+      return JSON.stringify({
+        tick: w.tick,
+        floor: w.floor,
+        alarm: w.alarm,
+        gameOver: w.gameOver,
+        mission: w.mission.description,
+        missionComplete: w.mission.complete,
+        modCasting: w.modCasting ?? 'fold',
+        player: {
+          id: me.id,
+          at: { x: Math.round(me.pos.x * 10) / 10, y: Math.round(me.pos.y * 10) / 10 },
+          hp: me.health ? `${me.health.hp}/${me.health.max}` : undefined,
+          downed: me.playerCtl!.downed !== undefined,
+          weapon: stack?.itemId,
+          mods: stack?.mods?.map((m) => `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`) ?? [],
+          fx: me.fx && Object.keys(me.fx).length ? Object.keys(me.fx) : undefined,
+        },
+        near,
+      })
+    }
+
     case 'state':
       return JSON.stringify({
         tick: w.tick,
@@ -302,13 +411,20 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
 
     case 'step':
     case 'tick': {
-      // Advance the deterministic sim N ticks with NEUTRAL input (no player
-      // commands) — the pure `(seed→RNG)+input` step, so the RNG stream is the
-      // only entropy. Default 1.
-      const n = rest ? num(rest, 'tick count') : 1
-      if (!Number.isInteger(n) || n < 0) throw new Error(`step count must be a non-negative integer, got "${rest}"`)
-      for (let i = 0; i < n; i++) tickWorld(w, new Map())
-      return JSON.stringify({ tick: w.tick, advanced: n })
+      // Advance the deterministic sim N ticks. Bare: NEUTRAL input. With a JSON
+      // HeldInput: that player's command, held — the playtest path, which works
+      // in a hidden tab whose frame loop is frozen. Default 1.
+      const [count, ...json] = rest.split(' ')
+      const n = count ? num(count, 'tick count') : 1
+      if (!Number.isInteger(n) || n < 0) throw new Error(`step count must be a non-negative integer, got "${count}"`)
+      const held = json.length ? parseHeldInput(w, decodeArg(json.join(' '))) : undefined
+      const events: Record<string, number> = {}
+      for (let i = 0; i < n; i++) {
+        tickWorld(w, held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map())
+        for (const ev of w.events) events[ev.type] = (events[ev.type] ?? 0) + 1
+      }
+      const aimAtGone = held?.aimAt !== undefined && !w.byId.has(held.aimAt) ? true : undefined
+      return JSON.stringify({ tick: w.tick, advanced: n, player: held?.entityId, aimAtGone, events })
     }
 
     case 'schema':

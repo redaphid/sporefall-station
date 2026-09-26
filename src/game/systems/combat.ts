@@ -9,6 +9,7 @@ import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
+import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
@@ -184,6 +185,8 @@ export const applyDamage = (
       target.ai.thinkAt = w.tick
     }
   }
+
+  if (target.playerCtl) seeAttackOnPlayer(w, target, attackerId)
 
   // Disposition: a player attack on a civ/cop is a crime — witnesses re-derive
   // their stance toward the attacker (cops/allies turn hostile, civilians flee).
@@ -571,6 +574,7 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // the held-item cursor and there is nothing to cycle back TO — that rule would
     // leave a player holding a grenade permanently unable to shoot. Items go on
     // the USE/Throw button above, which is where they now exclusively live.
-    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
+    // THE single fire-site: mods/elements/pellets fold in here
+    if (fireWeapon(w, e) && WEAPONS[e.combat.weapon]?.kind === 'ranged') hearGunfire(w, e, e.combat.cooldown)
   }
 }

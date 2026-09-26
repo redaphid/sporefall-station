@@ -569,6 +569,8 @@ export interface StateMsg {
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional
    * on the wire for back-compat with an older host. */
   alert?: boolean
+  /** #86 lockdown (see RenderView.lockdown). Optional for back-compat. */
+  lockdown?: { secondsLeft?: number }
   /** Difficulty rules in force (host authoritative). */
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */

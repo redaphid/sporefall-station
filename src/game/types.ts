@@ -153,6 +153,13 @@ export type SimEvent =
    * they had no gun to hold it). `timedOut` = the hand ran out of time and took
    * the card under the cursor. */
   | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
+  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+   * raise `w.alarm` to `level`. */
+  | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
+  /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
+  | { type: 'lockdown' }
+  /** #86 — the lockdown's seal cycle ran out: the Launch Bay is open. */
+  | { type: 'lockdownLifted' }
   /** A body took the stairs: it now stands on the landing of storey `z`. */
   | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }

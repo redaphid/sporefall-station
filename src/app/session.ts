@@ -25,6 +25,10 @@ export interface RenderView {
    * opposed to the one-shot klaxon/banner that ride the `stationAlert` event.
    * Optional so a session that doesn't surface it simply reads calm. */
   alert?: boolean
+  /** #86 LOCKDOWN — the alarm sealed the Launch Bay. `{}` while it waits on the
+   * objective; `secondsLeft` once the post-objective seal is counting down.
+   * Absent = no lockdown. */
+  lockdown?: { secondsLeft?: number }
   /** Difficulty rules in force (host truth; clients mirror it from the host). */
   mode?: RunMode
   /** Party-shared comebacks left this run (only meaningful in `normal`). */

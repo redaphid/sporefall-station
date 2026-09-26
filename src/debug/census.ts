@@ -41,6 +41,8 @@ export const CENSUS_BUILDS: readonly CensusBuild[] = [
   seq('pierce>incendiary>frost', ['pierce', 'incendiary', 'frost']),
   seq('pierce>shock>incendiary', ['pierce', 'shock', 'incendiary']),
   seq('pierce>frost>shock', ['pierce', 'frost', 'shock']),
+  seq('shock>frost', ['shock', 'frost']),
+  seq('shock>incendiary', ['shock', 'incendiary']),
   seq('hand shock-lead', ['pierce', 'shock', 'incendiary', 'frost']),
   seq('hand fire-lead', ['pierce', 'incendiary', 'frost', 'shock']),
   seq('hand frost-lead', ['pierce', 'frost', 'shock', 'incendiary']),
@@ -70,7 +72,7 @@ export interface FightResult {
   hpTraceHash: string
 }
 
-const livingFoes = (w: World): Entity[] => w.entities.filter((e) => e.ai && !e.dead && (e.health?.hp ?? 0) > 0)
+export const livingFoes = (w: World): Entity[] => w.entities.filter((e) => e.ai && !e.dead && (e.health?.hp ?? 0) > 0)
 
 const firstPlayer = (w: World): Entity => {
   const me = w.entities.find((e) => e.playerCtl)
@@ -105,7 +107,7 @@ export const botInput = (w: World, me: Entity): BotStep | undefined => {
   return input
 }
 
-const newRun = (seed: number, sequenced: boolean): World =>
+export const newRun = (seed: number, sequenced: boolean): World =>
   new HostSession(seed, { sample: emptyInput }, undefined, 'normal', sequenced ? 'sequence' : undefined).world
 
 const fnv = (h: number, n: number): number => {
@@ -163,7 +165,7 @@ export interface ReachResult {
 const REACH_FOE_HP = 5000
 const REACH_TICKS = 10 * SIM_RATE
 
-const openStreetRow = (w: World, n: number): Rect => {
+export const openStreetRow = (w: World, n: number): Rect => {
   const { level } = w
   const indoors = (x: number, y: number): boolean => level.buildings.some((b) => rectContains(b.rect, x, y))
   const standing = w.entities.filter((e) => e.kind === 'interactable' || e.kind === 'door')

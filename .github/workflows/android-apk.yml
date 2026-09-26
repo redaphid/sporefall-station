@@ -38,11 +38,9 @@ jobs:
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK packages
-        run: |
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

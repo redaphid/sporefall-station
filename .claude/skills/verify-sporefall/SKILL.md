@@ -94,6 +94,9 @@ as each one owns its tab.
   determinism checkpoint.
 - Stills for a PR: `computer` `screenshot` with `save_to_disk: true`, then move the file into
   your evidence dir.
+- GIFs: `gif_creator` records no frame for a scaled `screenshot` action. Use `wait` actions,
+  clicks, and full-size screenshots as the frame clock. Every GIF frame plays for 300 ms,
+  whatever the real time between two actions was, so the GIF's pace is not the game's.
 
 **Playtesting with the held-input step verb** (`?debug` only). This advances the real sim
 N ticks while holding one player's `InputCmd`, and returns what happened:
@@ -133,6 +136,18 @@ Steps run in argv order. The full list is in the header of `drive.mjs`: `--open`
 `--reload`, `--click`, `--until-tick`, `--until`, `--eval`, `--assert`, `--shot`, and
 `--wait-ms`. The exit code is 0 only if every `--assert` held and the page threw nothing.
 
+The preview serves `http://`, so it never shows the browser's HTTPS-only rules, such as the
+block on `ws://` sockets from an HTTPS page. To test those rules, add
+`--origin https://sporefall.hypnodroid.com`. The page then loads at that origin, and the
+driver answers every request to it from your preview. Requests to other origins still go
+to the network.
+
+```sh
+$S/drive.mjs --origin https://sporefall.hypnodroid.com --name https-debug \
+  --open '/?mode=solo&seed=1&debug' --until-tick 90 \
+  --assert "JSON.parse(sporefall.verb('state')).seed === 1"
+```
+
 Useful URL parameters: `mode=solo|host|join`, `seed=N`, `floor=N`, `scenario=<name>`
 (from `src/game/scenarios.ts`), `script=<name>` (from `src/input/scripted.ts`),
 `state=<id>`, `debug` (enables `sporefall.verb`), `transport=tabs`, `room`, `name`, and
@@ -141,8 +156,9 @@ Useful URL parameters: `mode=solo|host|join`, `seed=N`, `floor=N`, `scenario=<na
 ## Evidence
 
 Every Lane B run writes `e2e/output/verify/<timestamp>-<name>/`. It holds `run.json`
-(every step with its result and sim tick, plus the verdict, page errors, and console
-errors), numbered PNGs, and `<name>.mp4` when you pass `--video`. Put Lane A screenshots
+(every step with its result and sim tick, plus the verdict, page errors, console errors,
+and every console line in `consoleLog`), numbered PNGs, and `<name>.mp4` when you pass
+`--video`. Put Lane A screenshots
 in a directory of the same shape. `e2e/output*/` is gitignored. To show a reviewer an
 image, publish it with `pnpm run review:image <png>`, because the repo is private.
 
@@ -178,6 +194,14 @@ where the proof lives.
   top level, and the module blocks DCL until a mode is picked. `page.goto` with the default
   `load` or `domcontentloaded` hangs. The driver navigates on `commit`, and readiness
   comes from `--until`.
+- **`?debug` on the live HTTPS site needs the fix for issue #129.** Before that fix, the
+  debug channel dialed `ws://` from the HTTPS page, the browser threw `SecurityError`, and
+  the page stayed blank at tick 0. Live build 658 has the bug. The first build that
+  includes the fix is safe. On that build, the console logs
+  `[debug] hub unavailable: this page is HTTPS…`, the game runs, and `sporefall.verb`
+  works. The hub stays out of reach from HTTPS in every build, because it serves plain
+  `ws://`. If `?debug` on the live site shows tick 0 and a `SecurityError`, the deployed
+  build predates the fix. Open `?e2e=1` instead, which also enables `sporefall.verb`.
 - **Headless WSL Chromium has no working WebGL.** The default flags and swiftshader both
   crash the tab. Use Lane A for anything rendered.
 - **Lane A tabs freeze in the background.** See Lane A. Drive time with `step`, never with

@@ -2,7 +2,12 @@
 // Drive the served game in headless Chromium with an ordered list of steps and
 // write the evidence (run.json, stills, optional mp4) to one directory.
 //
-//   drive.mjs [--port 4990] [--name label] [--video] [--viewport 1280x720] STEP...
+//   drive.mjs [--port 4990] [--name label] [--video] [--viewport 1280x720] [--origin https://host] STEP...
+//
+// --origin loads pages at that origin but answers every request to it from the
+// local preview, so this build runs under a real https:// origin. The browser
+// then applies its HTTPS-only rules (mixed content, secure context), which the
+// http:// preview cannot show.
 //
 // Steps run in the order given:
 //   --open <path>        load BASE+path in a fresh context (resets localStorage).
@@ -26,12 +31,12 @@ import { execFileSync } from 'node:child_process'
 
 const ROOT = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: import.meta.dirname }).toString().trim()
 const argv = process.argv.slice(2)
-const opt = { port: process.env.PORT ?? '4990', name: 'run', video: false, viewport: '1280x720' }
+const opt = { port: process.env.PORT ?? '4990', name: 'run', video: false, viewport: '1280x720', origin: '' }
 const steps = []
 for (let i = 0; i < argv.length; i++) {
   const flag = argv[i].replace(/^--/, '')
   if (flag === 'video') opt.video = true
-  else if (['port', 'name', 'viewport'].includes(flag)) opt[flag] = argv[++i]
+  else if (['port', 'name', 'viewport', 'origin'].includes(flag)) opt[flag] = argv[++i]
   else steps.push({ step: flag, arg: argv[++i] })
 }
 if (!steps.length || steps[0].step !== 'open') {
@@ -39,7 +44,8 @@ if (!steps.length || steps[0].step !== 'open') {
   process.exit(2)
 }
 
-const BASE = `http://127.0.0.1:${opt.port}`
+const LOCAL = `http://127.0.0.1:${opt.port}`
+const BASE = opt.origin ? new URL(opt.origin).origin : LOCAL
 const stamp = new Date().toISOString().replace(/[:.]/g, '-')
 const OUT = resolve(process.env.VERIFY_OUT ?? join(ROOT, 'e2e/output/verify', `${stamp}-${opt.name}`))
 mkdirSync(OUT, { recursive: true })
@@ -52,6 +58,7 @@ let context
 let page
 const pageErrors = []
 const consoleErrors = []
+const consoleLog = []
 const log = []
 let failed = false
 
@@ -62,9 +69,17 @@ const newContext = async () => {
     viewport: { width, height },
     ...(opt.video ? { recordVideo: { dir: videoDir, size: { width, height } } } : {}),
   })
+  if (opt.origin)
+    await context.route(`${BASE}/**`, async (route) => {
+      const { pathname, search } = new URL(route.request().url())
+      await route.fulfill({ response: await route.fetch({ url: LOCAL + pathname + search }) })
+    })
   page = await context.newPage()
   page.on('pageerror', (e) => pageErrors.push(String(e)))
-  page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()))
+  page.on('console', (m) => {
+    consoleLog.push(`${m.type()}: ${m.text()}`)
+    if (m.type() === 'error') consoleErrors.push(m.text())
+  })
 }
 const tick = () => page.evaluate(() => window.world?.tick ?? null).catch(() => null)
 const evalExpr = (js) => page.evaluate((src) => JSON.parse(JSON.stringify((0, eval)(src)) ?? 'null'), js)
@@ -118,7 +133,7 @@ if (opt.video) {
 }
 
 failed ||= pageErrors.length > 0
-const run = { base: BASE, name: opt.name, verdict: failed ? 'FAIL' : 'PASS', steps: log, pageErrors, consoleErrors, video }
+const run = { base: BASE, name: opt.name, verdict: failed ? 'FAIL' : 'PASS', steps: log, pageErrors, consoleErrors, consoleLog, video }
 writeFileSync(join(OUT, 'run.json'), JSON.stringify(run, null, 2))
 console.log(`${run.verdict}  evidence: ${relative(ROOT, OUT)}/run.json${pageErrors.length ? `  pageErrors: ${pageErrors.length}` : ''}`)
 process.exit(failed ? 1 : 0)

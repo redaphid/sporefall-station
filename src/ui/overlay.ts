@@ -393,7 +393,7 @@ export const createOverlay = (mount: HTMLElement, cameraSource?: CameraSource, o
     }
 
     const c = e
-      ? buildInfoCard(e, { selfId: view.self?.id, missionTargetId: view.missionTargetId, self: view.self, modCasting: view.modCasting }, themeDisplayName)
+      ? buildInfoCard(e, { selfId: view.self?.id, missionTargetId: view.missionTargetId, self: view.self }, themeDisplayName)
       : lastCard // entity despawned entirely — show its last known card as destroyed
     if (!c) {
       close()

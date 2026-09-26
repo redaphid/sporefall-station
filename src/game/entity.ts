@@ -189,12 +189,12 @@ export interface ItemStack {
    * fixture/snapshot serializes byte-for-byte unchanged (same optional-field
    * discipline as `annotations`). Resolved by `resolveWeapon` at the fire site. */
   mods?: WeaponMod[]
-  /** Sequenced casting only (World.modCasting): the position in the weapon's
-   * live mod window that the next cast starts from. Absent until the first
-   * sequenced shot, so default-mode stacks never carry it. */
+  /** The position in the weapon's live mod window that the next cast starts
+   * from (systems/modSequence). Absent until the first shot with mods, so a
+   * stack with no mods never carries it. */
   castIndex?: number
-  /** Sequenced casting only: absolute tick until which the weapon recharges
-   * after its sequence wrapped. Absent until the first wrap. */
+  /** Absolute tick until which the weapon recharges after a cycle of two or
+   * more casts wrapped. Absent until the first such wrap. */
   rechargeUntil?: number
 }
 
@@ -351,8 +351,8 @@ export interface Entity {
     hitIds?: EntityId[]
     /** Resolved trigger effects fired on hit/kill (on-reload handled elsewhere). */
     triggers?: import('./data/mods').ResolvedTrigger[]
-    /** Build provenance: the (normalized) mods this shot executes, which is the
-     * gun's list minus any element a newer element overrides (ResolvedWeapon.mods).
+    /** Build provenance: the (normalized) mods of the cast that fired this shot
+     * (ResolvedWeapon.mods), so it never shows another cast's element.
      * Pure inert data — no system reads it — carried so the renderer (and
      * net peers, via the snapshot codec) can COMPOSE the bullet's procedural
      * look from its mods, Nova-Drift style. Absent = vanilla shot, so every

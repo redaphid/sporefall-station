@@ -203,9 +203,9 @@ export const isModId = (id: string): id is keyof typeof MODS => Object.prototype
 export const modMaxStacks = (id: string): number => MODS[id]?.maxStacks ?? DEFAULT_MAX_STACKS
 
 /** Add `stacks` of `modId` to a weapon's mod list, capped. A mod already listed
- * (at any stack count) stacks in place; a new one joins the end. The list is
- * therefore pickup order, and resolveWeapon takes a shot's element from that
- * order, so a preview of a pick (modVerdict) must place it here too. Mutates
+ * (at any stack count) stacks in place; a new one joins the end. The list is the
+ * weapon's firing order (systems/modSequence), and the end may be past its live
+ * window, so a preview of a pick (modVerdict) must place it here too. Mutates
  * and returns `mods`. */
 export const stackMod = (mods: { id: string; stacks: number }[], modId: string, stacks: number): { id: string; stacks: number }[] => {
   const cap = modMaxStacks(modId)

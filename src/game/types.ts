@@ -25,10 +25,9 @@ export interface InputCmd {
   throwItem: boolean
   /** Dodge-roll this tick (edge-triggered): a burst + i-frames in the move dir. */
   roll: boolean
-  /** Sequenced mods only: swap two entries of the wielded weapon's mod list this
-   * tick, packed `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered
-   * and OPTIONAL: absent on every input that does not ask, so default-mode
-   * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
+  /** Swap two entries of the wielded weapon's mod list this tick, packed
+   * `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered and
+   * OPTIONAL: absent on every input that does not ask. */
   modSwap?: number
   /** Floor draft: take card N of this player's hand this tick (a tap or click on
    * the card). Optional and edge-triggered like `modSwap`; pad and keyboard

@@ -18,7 +18,6 @@ import {
   REVIVES_PER_RUN,
   type FearPulse,
   type MissionState,
-  type ModCasting,
   type Noise,
   type RunMode,
   type World,
@@ -61,9 +60,6 @@ export interface WorldJson {
    * whether a down is fatal — so omitting it handed a restored run its revives
    * back and moved when the run ends. Omitted at the fresh-run default. */
   revivesLeft?: number
-  /** Mod casting rule (World.modCasting). A sim input: omitted when absent (the
-   * default fold) so every existing snapshot round-trips byte-for-byte. */
-  modCasting?: ModCasting
   /** Per-wing power-cut flags (World.powerCut). Omitted when nothing is cut (the
    * default) so pre-feature snapshots round-trip byte-for-byte and load as fully
    * powered — same optional-field discipline as `hostile`/`annotations`. */
@@ -109,7 +105,6 @@ export const serializeWorld = (w: World): WorldJson => ({
   // both sides. Same omit-at-default discipline as `hostile` above.
   ...(w.mode === 'normal' ? {} : { mode: w.mode }),
   ...(w.revivesLeft === REVIVES_PER_RUN ? {} : { revivesLeft: w.revivesLeft }),
-  ...(w.modCasting ? { modCasting: w.modCasting } : {}),
   // Omit when nothing is cut so a fully-powered station serializes exactly as
   // before this feature (no `powerCut` key at all).
   ...(Object.values(w.powerCut).some(Boolean) ? { powerCut: { ...w.powerCut } } : {}),
@@ -136,7 +131,6 @@ export const deserializeWorld = (j: WorldJson): World => {
   w.hostile = j.hostile ?? true // pre-feature snapshots load as hostile (the default)
   w.mode = j.mode ?? 'normal' // pre-feature snapshots load at the normal default
   w.revivesLeft = j.revivesLeft ?? REVIVES_PER_RUN
-  if (j.modCasting === 'sequence') w.modCasting = j.modCasting
   w.gameOver = j.gameOver
   w.mission = { ...j.mission }
   w.noises = j.noises.map((n) => ({ ...n }))

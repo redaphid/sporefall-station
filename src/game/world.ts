@@ -127,15 +127,6 @@ export type RunMode = 'casual' | 'normal'
  * Shared across the party — a co-op run has one pool, not one per player. */
 export const REVIVES_PER_RUN = 2
 
-/**
- * How a weapon's mods fire. Absent = the default fold (every mod on every
- * shot, systems/resolveWeapon). `'sequence'` = the opt-in prototype where the
- * mod list is an ordered wand and each cast consumes the next entry
- * (systems/modSequence). A pure sim input like `mode`: the host picks it when
- * the run is created and it rides the save and the GameStart message.
- */
-export type ModCasting = 'sequence'
-
 export interface World {
   tick: number
   seed: number
@@ -167,9 +158,6 @@ export interface World {
   mode: RunMode
   /** Party-shared comebacks left this run; only consumed/gated in `normal`. */
   revivesLeft: number
-  /** Mod casting rule for this run (see ModCasting). Absent = default fold,
-   * so every existing world and snapshot is unchanged. */
-  modCasting?: ModCasting
   /** Combat tunable: when true every NPC treats players as an enemy on sight and
    * engages regardless of faction disposition (the "make them all enemies" knob).
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and

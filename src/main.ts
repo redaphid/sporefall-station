@@ -33,8 +33,6 @@ import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { loadSettings } from './app/settings'
-import { flagOn } from './app/featureFlags'
-import type { ModCasting } from './game/world'
 import { createModSwapQueue, previewSwaps, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
 import { buildSequence } from './ui/sequenceModel'
 import { createSequenceStrip } from './ui/sequenceStrip'
@@ -671,16 +669,12 @@ const stopTransportOnPagehide = (transport: Transport): void => {
 const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
   const weapon = view.self?.combat && WEAPONS[view.self.combat.weapon]
   if (!weapon || !view.self) return undefined
-  return { weapon, mods: weaponStack(view.self)?.mods ?? [], sequenced: view.modCasting === 'sequence' }
+  return { weapon, mods: weaponStack(view.self)?.mods ?? [] }
 }
-
-/** The `sequencedMods` flag, resolved to the run rule a host latches into each
- * run it builds. Read per run, so toggling applies from the next run. */
-const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal')
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -704,7 +698,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     stopTransportOnPagehide(transport)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
@@ -943,7 +937,7 @@ const createPauseOverlay = (
     const v = lastView
     seq.update(
       v && swaps
-        ? buildSequence(v.self, v.modCasting, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
+        ? buildSequence(v.self, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
         : null,
     )
   }
@@ -1089,7 +1083,7 @@ const createPauseOverlay = (
     update(paused, view) {
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
-      if (show && !wasPaused) panel.update(buildLoadout(view.self, view.modCasting)) // refresh on open
+      if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
       if (show) {
         lastView = view
         paintSeq()

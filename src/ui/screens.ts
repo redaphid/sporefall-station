@@ -294,7 +294,7 @@ export const createScreens = (
           else if (ev.type === 'modPickup' && ev.byId === view.self?.id) {
             const m = MODS[ev.modId]
             const label = `${m?.icon ?? '🔧'} ${m?.name ?? ev.modId}`
-            const v = ev.maxed ? undefined : selfModVerdict(view.self, ev.modId, view.modCasting)
+            const v = ev.maxed ? undefined : selfModVerdict(view.self, ev.modId)
             showToast(ev.maxed ? `${label} — MAXED` : v && v.kind !== 'live' ? `Got ${label} — ${v.reason}` : `Got ${label}!`)
           }
         }
@@ -316,7 +316,7 @@ export const createScreens = (
                 ? 'Restart the run now, or wait for a revive.'
                 : 'Waiting on your team…'
           // Freeze the fallen player's gun + mods into the panel as it opens.
-          loadout.update(buildLoadout(view.self, view.modCasting))
+          loadout.update(buildLoadout(view.self))
           overlay.style.display = 'flex'
         } else {
           // Revived / fresh run began — drop back into play.

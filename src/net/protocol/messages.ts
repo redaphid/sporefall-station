@@ -541,10 +541,6 @@ export interface GameStartMsg {
    * a run already in progress and must not build floor 1's level for a party
    * standing on floor 3. Optional for back-compat: absent means 1. */
   floor?: number
-  /** Mod casting rule the host runs (World.modCasting). Optional and additive:
-   * an older client ignores it, and absent means the default fold. Clients do
-   * not simulate combat; they need it only to draw the sequence HUD. */
-  modCasting?: 'sequence'
 }
 export interface GoMsg {
   startTick: number

@@ -1,8 +1,7 @@
-// Sequenced mod casting (prototype, opt-in per run via `World.modCasting`).
+// Sequenced mod casting: how a weapon fires its mods.
 //
-// In the default mode every mod on a weapon folds into every shot at once
-// (resolveWeapon). In SEQUENCE mode the weapon's mod list is an ordered wand:
-// each cast consumes the next entry, so order becomes the mechanic.
+// A weapon's mod list is an ordered wand: each cast consumes the next entries,
+// so order is the mechanic.
 //
 // Two kinds of mod:
 //   - PAYLOAD: a mod that carries an element (`onHit`). A cast ends on it, and
@@ -11,7 +10,8 @@
 //     modifier does not end a cast; it rides on the next payload in sequence.
 // A cast walks forward from `castIndex` collecting modifiers until it consumes a
 // payload or runs off the end of the list. Running off the end WRAPS the index
-// to 0 and starts the weapon's recharge.
+// to 0 and, when the cycle has two or more casts, starts the weapon's recharge.
+// A one-cast cycle is a plain gun (planPull).
 //
 // Per-weapon sim state lives on the weapon's ItemStack (`castIndex`,
 // `rechargeUntil`) so it is per-entity, serializes with the world, and reaches a
@@ -21,7 +21,6 @@
 import type { WeaponDef } from '../data/items'
 import { MODS } from '../data/mods'
 import type { Entity, ItemStack, WeaponMod } from '../entity'
-import type { World } from '../world'
 import { weaponStack } from './inventory'
 
 /** The weapon's sequence shape, with defaults filled in. */
@@ -44,9 +43,6 @@ export const sequenceShape = (def: WeaponDef): SequenceShape => ({
 
 /** A payload mod ends a cast and supplies the cast's single element. */
 export const isPayloadMod = (id: string): boolean => MODS[id]?.onHit !== undefined
-
-/** Is this world running sequenced casting? */
-export const sequencing = (w: World): boolean => w.modCasting === 'sequence'
 
 /** The live part of the list: known ids with positive stacks, first `slots` of
  * them. Unknown/empty entries are skipped rather than occupying a slot, the

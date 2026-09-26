@@ -1,10 +1,10 @@
 // #88 contract: every number and badge on the loadout panel equals what the
-// real fire path does. For every weapon, a spread of mod lists (singles, every
-// ordered pair, payload+payload, three-mod wands) and both casting modes, the
-// test builds the panel, fires the real `fireWeapon` from the same state, reads
-// the result off the world (projectiles, hit events, cooldown) and compares.
-// Sequenced lists are walked pull by pull through a whole cycle, so multi-cast
-// pulls, pellet splits and the wrap recharge are all checked.
+// real fire path does. For every weapon and a spread of mod lists (singles,
+// every ordered pair, payload+payload, three-mod wands), the test builds the
+// panel, fires the real `fireWeapon` from the same state, reads the result off
+// the world (projectiles, hit events, cooldown) and compares. Each list is
+// walked pull by pull through a whole cycle, so multi-cast pulls, pellet splits
+// and the wrap recharge are all checked.
 //
 // It also holds the chip's live/penalty call to the fired outcome: a "penalty"
 // mod may only make fired numbers worse, and a "live" mod must improve one or
@@ -19,7 +19,7 @@ import { deserializeWorld, serializeWorld } from '../game/serialize'
 import { fireWeapon } from '../game/systems/combat'
 import { weaponStack } from '../game/systems/inventory'
 import { modVerdict } from '../game/systems/modEffect'
-import { sequenceShape } from '../game/systems/modSequence'
+import { cycleCasts, sequenceShape } from '../game/systems/modSequence'
 import { arm } from '../game/testkit'
 import { SIM_RATE } from '../game/types'
 import { addEntity, createWorld, type World } from '../game/world'
@@ -35,9 +35,8 @@ const text = (values: number[], fmt: (n: number) => string): string =>
   [...new Set(values.map((n) => round(n, 3)))].map(fmt).join('/')
 
 /** A player facing east at a 1000-hp thug one tile away, holding `weaponId`. */
-const rig = (weaponId: string, mods: WeaponMod[], sequenced: boolean): World => {
+const rig = (weaponId: string, mods: WeaponMod[]): World => {
   const w = createWorld(1, 1)
-  if (sequenced) w.modCasting = 'sequence'
   const p = spawnPlayer(w, 0, 20.5, 20.5)
   p.loadout!.inventory = []
   arm(p, weaponId).mods = mods.map((x) => ({ ...x }))
@@ -157,25 +156,23 @@ const LISTS: WeaponMod[][] = [
 ]
 
 describe('loadout panel equals the fired pull', () => {
-  for (const sequenced of [false, true]) {
-    for (const weaponId of WEAPON_IDS) {
-      it(`${weaponId}, ${sequenced ? 'sequenced' : 'default'} casting`, () => {
-        const melee = WEAPONS[weaponId].kind === 'melee'
-        const pulls = sequenced ? sequenceShape(WEAPONS[weaponId]).slots + 1 : 1
-        const lies: string[] = []
-        for (const list of LISTS) {
-          const w = rig(weaponId, list, sequenced)
-          const p = w.entities.find((e) => e.playerCtl)!
-          for (let n = 0; n < pulls; n++) {
-            const claim = shown(buildLoadout(p, w.modCasting)!, melee)
-            const truth = expected(pull(w), melee)
-            if (JSON.stringify(claim) !== JSON.stringify(truth))
-              lies.push(`[${list.map((x) => x.id)}] pull ${n}: shown ${JSON.stringify(claim)} fired ${JSON.stringify(truth)}`)
-          }
+  for (const weaponId of WEAPON_IDS) {
+    it(weaponId, () => {
+      const melee = WEAPONS[weaponId].kind === 'melee'
+      const pulls = sequenceShape(WEAPONS[weaponId]).slots + 1
+      const lies: string[] = []
+      for (const list of LISTS) {
+        const w = rig(weaponId, list)
+        const p = w.entities.find((e) => e.playerCtl)!
+        for (let n = 0; n < pulls; n++) {
+          const claim = shown(buildLoadout(p)!, melee)
+          const truth = expected(pull(w), melee)
+          if (JSON.stringify(claim) !== JSON.stringify(truth))
+            lies.push(`[${list.map((x) => x.id)}] pull ${n}: shown ${JSON.stringify(claim)} fired ${JSON.stringify(truth)}`)
         }
-        expect(lies.slice(0, 5)).toEqual([])
-      })
-    }
+      }
+      expect(lies.slice(0, 5)).toEqual([])
+    })
   }
 })
 
@@ -198,14 +195,17 @@ const firedDirection = (withIt: Fired, without: Fired): -1 | 0 | 1 => {
   return worse.every(Boolean) ? -1 : 1
 }
 
-describe('penalty and live chips match the fired change, default casting', () => {
+describe('penalty and live chips match the fired change, one-cast wands', () => {
+  // A one-cast wand fires its whole list every pull, so one pull with and one
+  // without the mod is the whole comparison.
   for (const weaponId of WEAPON_IDS) {
     it(weaponId, () => {
       const wrong: string[] = []
-      for (const list of LISTS.filter((l) => l.length > 0 && l.length <= 2)) {
-        const withIt = pull(rig(weaponId, list, false))
+      const shape = sequenceShape(WEAPONS[weaponId])
+      for (const list of LISTS.filter((l) => l.length > 0 && l.length <= 2 && cycleCasts(l, shape) === 1)) {
+        const withIt = pull(rig(weaponId, list))
         const id = list[list.length - 1].id
-        const without = pull(rig(weaponId, list.slice(0, -1), false))
+        const without = pull(rig(weaponId, list.slice(0, -1)))
         const fired = firedDirection(withIt, without)
         const verdict = modVerdict(WEAPONS[weaponId], list, id).kind
         const want = fired === 0 ? 'inert' : fired < 0 ? 'penalty' : 'live'
@@ -217,29 +217,29 @@ describe('penalty and live chips match the fired change, default casting', () =>
 })
 
 describe('the review probes, pinned', () => {
-  const panel = (weaponId: string, mods: WeaponMod[], sequenced: boolean): LoadoutModel => {
-    const w = rig(weaponId, mods, sequenced)
-    return buildLoadout(w.entities.find((e: Entity) => e.playerCtl)!, w.modCasting)!
+  const panel = (weaponId: string, mods: WeaponMod[]): LoadoutModel => {
+    const w = rig(weaponId, mods)
+    return buildLoadout(w.entities.find((e: Entity) => e.playerCtl)!)!
   }
   const stat = (l: LoadoutModel, k: string) => l.stats.find((s) => s.key === k)!.resolvedText
 
-  it('a sequenced pistol with only Rapid is one cast, so it fires at the Rapid rate, not the recharge (#115)', () => {
-    expect(stat(panel('pistol', [m('rapid')], true), 'fireRate')).toBe('2/s')
+  it('a pistol with only Rapid is one cast, so it fires at the Rapid rate, not the recharge (#115)', () => {
+    expect(stat(panel('pistol', [m('rapid')]), 'fireRate')).toBe('2/s')
   })
-  it('a sequenced pistol [frost, rapid] wraps on the Rapid cast, so its next pull after frost waits out the recharge', () => {
-    const w = rig('pistol', [m('frost'), m('rapid')], true)
+  it('a pistol [frost, rapid] wraps on the Rapid cast, so its next pull after frost waits out the recharge', () => {
+    const w = rig('pistol', [m('frost'), m('rapid')])
     const p = w.entities.find((e: Entity) => e.playerCtl)!
     weaponStack(p)!.castIndex = 1
-    expect(stat(buildLoadout(p, w.modCasting)!, 'fireRate')).toBe('1.5/s')
+    expect(stat(buildLoadout(p)!, 'fireRate')).toBe('1.5/s')
   })
-  it('a sequenced shotgun [frost, bulk, shock] shows both casts: 7 pellets, both elements, the 30-tick recharge', () => {
-    const l = panel('shotgun', [m('frost'), m('bulk'), m('shock')], true)
+  it('a shotgun [frost, bulk, shock] shows both casts: 7 pellets, both elements, the 30-tick recharge', () => {
+    const l = panel('shotgun', [m('frost'), m('bulk'), m('shock')])
     expect(stat(l, 'pellets')).toBe('7')
     expect(stat(l, 'fireRate')).toBe('1/s')
     expect(l.behaviors.filter((b) => b.key === 'onhit').map((b) => b.label).sort()).toEqual(['electrified on hit', 'frozen on hit'])
   })
   it("a player's sledgehammer shows the player melee bonus: 33 bare, 26 with Barrage", () => {
-    expect(stat(panel('sledgehammer', [], false), 'damage')).toBe('33')
-    expect(stat(panel('sledgehammer', [m('bulk')], false), 'damage')).toBe('26')
+    expect(stat(panel('sledgehammer', []), 'damage')).toBe('33')
+    expect(stat(panel('sledgehammer', [m('bulk')]), 'damage')).toBe('26')
   })
 })

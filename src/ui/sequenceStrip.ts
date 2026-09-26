@@ -1,4 +1,4 @@
-// The sequenced-mods strip: the wielded weapon's mod order as a row of chips,
+// The mod sequence strip: the wielded weapon's mod order as a row of chips,
 // the next cast outlined, stowed mods dimmed after a divider, and a recharge
 // bar when the sequence has wrapped. Tap one chip, then another, to swap them
 // (works with a mouse too). DOM only; paints a SequenceModel (sequenceModel.ts)

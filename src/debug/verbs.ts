@@ -360,7 +360,6 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
         gameOver: w.gameOver,
         mission: w.mission.description,
         missionComplete: w.mission.complete,
-        modCasting: w.modCasting ?? 'fold',
         player: {
           id: me.id,
           at: { x: Math.round(me.pos.x * 10) / 10, y: Math.round(me.pos.y * 10) / 10 },
@@ -368,6 +367,8 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           downed: me.playerCtl!.downed !== undefined,
           weapon: stack?.itemId,
           mods: stack?.mods?.map((m) => `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`) ?? [],
+          castIndex: stack?.castIndex,
+          rechargeUntil: stack?.rechargeUntil,
           fx: me.fx && Object.keys(me.fx).length ? Object.keys(me.fx) : undefined,
         },
         near,

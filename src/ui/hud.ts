@@ -9,8 +9,8 @@ export interface Hud {
   update(view: RenderView): void
 }
 
-/** `onModSwap` enables the sequenced-mods strip's tap-to-swap (it is shown only
- * while the run is sequenced; see sequenceModel). */
+/** `onModSwap` enables the mod sequence strip's tap-to-swap (it is shown while
+ * the weapon carries mods; see sequenceModel). */
 export const createHud = (mount: HTMLElement, onModSwap?: (a: number, b: number) => void): Hud => {
   const root = document.createElement('div')
   // Offset by the notch/status-bar inset so the health bar clears the OS clock on
@@ -34,7 +34,7 @@ export const createHud = (mount: HTMLElement, onModSwap?: (a: number, b: number)
   const info = root.querySelector<HTMLElement>('#info')!
   const hotbar = root.querySelector<HTMLElement>('#hotbar')!
   // The sequence strip is the one interactive piece of the HUD (the root stays
-  // click-through); it only appears in a sequenced run.
+  // click-through); it only appears while the weapon carries mods.
   const seq = createSequenceStrip(onModSwap ?? (() => {}), { compact: true })
   root.insertBefore(seq.el, hotbar)
 
@@ -70,7 +70,7 @@ export const createHud = (mount: HTMLElement, onModSwap?: (a: number, b: number)
         info.textContent = text
       }
 
-      seq.update(buildSequence(self, view.modCasting, view.simTick ?? view.tick))
+      seq.update(buildSequence(self, view.simTick ?? view.tick))
 
       const inv = self.loadout?.inventory ?? []
       const active = self.loadout?.activeSlot ?? -1

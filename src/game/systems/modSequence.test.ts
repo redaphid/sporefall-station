@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { WEAPONS } from '../data/items'
+import { normalizeMods } from '../data/mods'
 import type { Entity, WeaponMod } from '../entity'
 import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
@@ -31,10 +32,9 @@ import { weaponStack } from './inventory'
 
 const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
 
-/** A sequenced world with one player holding `weapon` loaded with `mods`. */
-const rig = (weapon: string, mods: WeaponMod[], sequenced = true): { w: World; p: Entity } => {
+/** A world with one player holding `weapon` loaded with `mods`. */
+const rig = (weapon: string, mods: WeaponMod[]): { w: World; p: Entity } => {
   const w = createWorld(1, 1)
-  if (sequenced) w.modCasting = 'sequence'
   const p = spawnPlayer(w, 0, 20.5, 20.5)
   p.health!.iframes = 0
   p.loadout!.inventory = []
@@ -137,7 +137,7 @@ describe('planCasts (pure)', () => {
   })
 })
 
-describe('sequenced fire path (combatSystem)', () => {
+describe('the fire path (combatSystem)', () => {
   it('the locker-7 pistol fires frost, fire, shock in order, one element per round', () => {
     const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock')])
     const got = [pull(w, p), pull(w, p), pull(w, p)]
@@ -216,19 +216,10 @@ describe('sequenced fire path (combatSystem)', () => {
     expect(stackOf(p).rechargeUntil).toBe(w.tick + WEAPONS.sledgehammer.rechargeOnWrap!)
   })
 
-  it('a weapon with no mods fires the default path and grows no sequence state', () => {
+  it('a weapon with no mods fires the bare weapon and grows no sequence state', () => {
     const { w, p } = rig('pistol', [])
     delete stackOf(p).mods
     expect(pull(w, p)).toHaveLength(1)
-    expect(stackOf(p).castIndex).toBeUndefined()
-  })
-
-  it('without the run rule the same loadout folds into one shot that carries the newest element (default mode)', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('pierce'), m('incendiary')], false)
-    const shots = pull(w, p)
-    expect(shots).toHaveLength(1)
-    expect(elements(shots)).toEqual(['burning'])
-    expect(shots[0].projectile!.mods!.map((x) => x.id)).toEqual(['incendiary', 'pierce'])
     expect(stackOf(p).castIndex).toBeUndefined()
   })
 })
@@ -259,12 +250,14 @@ describe('a one-cast wand fires like a plain gun (#115)', () => {
     expect(stackOf(p).castIndex).toBe(0)
   })
 
-  it('every round of a modifiers-only wand carries every live mod, exactly as the fold did', () => {
-    const seq = rig('machinegun', armedKit)
-    const fold = rig('machinegun', armedKit, false)
-    const a = pull(seq.w, seq.p)[0].projectile!
-    const b = pull(fold.w, fold.p)[0].projectile!
-    expect(a).toEqual(b)
+  it('every round of a modifiers-only wand carries every live mod at the full-kit stats', () => {
+    const { w, p } = rig('machinegun', armedKit)
+    const kit = executedShot(WEAPONS.machinegun, armedKit)
+    for (let i = 0; i < 3; i++) {
+      const [round] = pull(w, p)
+      expect(round.projectile!.mods).toEqual(normalizeMods(armedKit))
+      expect(round.projectile!.damage).toBe(kit.damage)
+    }
   })
 
   it('a lone element fires every round, at the cooldown, with no recharge', () => {
@@ -374,22 +367,15 @@ describe('reordering', () => {
     for (const v of [packModSwap(0, 0), packModSwap(0, 9), packModSwap(200, 1), -5, 1.5, NaN]) expect(applyModSwap(p, v)).toBe(false)
     expect(stackOf(p).mods!.map((x) => x.id)).toEqual(['frost', 'shock'])
   })
-
-  it('without the run rule a swap input is inert', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('shock')], false)
-    combatSystem(w, swapInput(0, 1))
-    expect(stackOf(p).mods!.map((x) => x.id)).toEqual(['frost', 'shock'])
-  })
 })
 
 describe('save/load', () => {
-  it('castIndex, rechargeUntil and the run rule survive a serialize round-trip and resume identically', () => {
+  it('castIndex and rechargeUntil survive a serialize round-trip and resume identically', () => {
     const { w, p } = rig('pistol', [m('frost'), m('incendiary'), m('shock')])
     pull(w, p)
     pull(w, p)
     pull(w, p) // wrapped: index 0, recharging
     const json = JSON.parse(JSON.stringify(serializeWorld(w)))
-    expect(json.modCasting).toBe('sequence')
     const back = deserializeWorld(json)
     const bp = back.byId.get(p.id)!
     expect(weaponStack(bp)!.castIndex).toBe(0)

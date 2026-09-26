@@ -2,6 +2,7 @@ import type { Entity } from '../entity'
 import { isSolidTile } from '../levelgen/level'
 import { SIM_DT, type InputCmd } from '../types'
 import type { World } from '../world'
+import { wadeMult } from '../floorModifiers'
 import { groupSpeedMult } from './groupFx'
 import { isRolling, ROLL_SPEED } from './roll'
 import { isMovementLocked } from './statusFx'
@@ -158,8 +159,9 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
     // Rolling ignores stun-freeze on movement (it's committed) and uses the burst
     // speed; everyone else uses their walk speed and halts while stunned.
     // Group effects (a leader's rally, a pack's rage) scale the walk only — a
-    // roll's burst is the roll's own. ×1 for anything outside a group.
-    const speed = rolling ? ROLL_SPEED : e.speed * groupSpeedMult(e, w.tick)
+    // roll's burst is the roll's own. ×1 for anything outside a group. Wading
+    // in a bog-tide flood slows the walk too; a roll bursts through the water.
+    const speed = rolling ? ROLL_SPEED : e.speed * groupSpeedMult(e, w.tick) * wadeMult(w, e)
     if (isRooted(e)) {
       e.vel.x = 0 // knockback lands, but a rooted body does not travel on it
       e.vel.y = 0

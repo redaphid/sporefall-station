@@ -1,4 +1,5 @@
 import type { Entity } from '../game/entity'
+import { modifierView } from '../game/floorModifiers'
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
@@ -173,6 +174,7 @@ export class HostSession implements Session {
       lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
+      ...(this.world.modifier ? { modifier: modifierView(this.world.modifier, this.world.tick) } : {}),
       self: this.self,
       annotations: this.world.annotations,
     }

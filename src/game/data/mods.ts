@@ -45,7 +45,8 @@ export interface ModTrigger {
  * projectile/melee hit path. Plain JSON → serializes with the world. */
 export interface ResolvedTrigger {
   event: 'hit' | 'kill' | 'reload'
-  explode?: { radius: number; damage: number }
+  /** `element`: the element mod id this blast applies (ResolvedWeapon.carries). */
+  explode?: { radius: number; damage: number; element?: string }
 }
 
 export type ModCategory = 'stat' | 'behavior' | 'trigger'

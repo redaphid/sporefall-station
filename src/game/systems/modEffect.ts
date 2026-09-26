@@ -10,14 +10,15 @@ import type { StatusApply, WeaponDef } from '../data/items'
 import { MODS, stackMod, type BulletBehavior, type ResolvedTrigger } from '../data/mods'
 import type { WeaponMod } from '../entity'
 import { PLAYER_MELEE_MULT } from '../player'
-import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
+import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
 import { pelletShares, planCasts, sequenceShape } from './modSequence'
 
 /** The fields of a resolved weapon that `fireWeapon` reads. Both kinds read
  * damage, cooldown, element and triggers. Only a swing reads knockback: a
  * bullet always shoves by a fixed amount (projectiles.ts). Only a gun reads the
  * bullet fields, and spread only when it fires more than one pellet (a lone
- * pellet's fan offset is always 0). */
+ * pellet's fan offset is always 0). An element that loses the round can still
+ * ride its shards or blast (`carries`), so it is live there. */
 export interface ExecutedShot {
   damage: number
   cooldownTicks: number
@@ -28,6 +29,7 @@ export interface ExecutedShot {
   spread?: number
   projectileSpeed?: number
   behavior?: BulletBehavior
+  carries?: CarriedElements
 }
 
 /** The damage a swing deals before the target's defences: players hit harder
@@ -47,6 +49,7 @@ const shotFrom = (weapon: WeaponDef, rw: ResolvedWeapon, byPlayer: boolean): Exe
   if (rw.pellets > 1) shot.spread = rw.spread
   shot.projectileSpeed = rw.projectileSpeed
   shot.behavior = rw.behavior
+  shot.carries = rw.carries
   return shot
 }
 

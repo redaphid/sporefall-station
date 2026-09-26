@@ -248,8 +248,8 @@ describe('fire sets creatures alight (#114)', () => {
     }
     const inputs = new Map([[0, { moveX: 1 }]])
     const a = runTicks(stage(), inputs, 40)
+    expect(a.entities.filter((e) => (e.ai || e.playerCtl) && e.fx?.burning).length).toBeGreaterThan(1)
     const snap = serializeWorld(a)
-    expect(snap.entities.filter((e) => (e.ai || e.playerCtl) && e.fx?.burning).length).toBeGreaterThan(1)
     runTicks(a, inputs, 300)
     const b = runTicks(deserializeWorld(snap), inputs, 300)
     expectWorldEqual(a, b)

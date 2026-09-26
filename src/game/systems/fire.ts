@@ -2,11 +2,12 @@
 // sim entity (kind 'fire') addressed by the cell it sits in, at most one per
 // cell. Each tick a fire licks at its four orthogonal neighbors and ignites any
 // flammable object standing there (spread), sets `burning` on flammable things
-// and creatures in its own cell, and burns its fuel down until it gutters out. The `burning`
-// status then deals its damage-over-time generically via elementSystem, so a
-// thing keeps burning after it walks out of the flames. Re-expressed from
-// observed Streets of Rogue behavior, not ported. Deterministic: spread follows
-// object positions in ascending entity-id order, no randomness.
+// and creatures in its own cell, and burns its fuel down until it gutters out.
+// The `burning` status then deals its damage-over-time generically via
+// elementSystem, so a thing keeps burning after it walks out of the flames.
+// Re-expressed from observed Streets of Rogue behavior, not ported.
+// Deterministic: spread follows object positions in ascending entity-id order,
+// no randomness.
 
 import { ELEMENTS } from '../data/elements'
 import { makeEntity, resistMult, type Entity, type EntityKind } from '../entity'
@@ -63,11 +64,25 @@ export const ignite = (w: World, target: Entity): Entity | undefined =>
   igniteCell(w, Math.floor(target.pos.x), Math.floor(target.pos.y))
 
 /** The fire lifecycle each tick: SPREAD to flammable neighbors, IGNITE
- * flammable things and creatures in a burning cell, then BURN DOWN and extinguish. Fires lit
- * by spread this tick only probe their own neighbors next tick. */
+ * flammable things and creatures in a burning cell, then BURN DOWN and
+ * extinguish. Fires lit by spread this tick only probe their own neighbors next
+ * tick. */
 export const fireSystem = (w: World): void => {
   const fires = w.entities.filter((e) => e.fire && !e.dead)
   const flammables = w.entities.filter((e) => e.flammable && !e.dead)
+
+  // Every burning cell, keyed `ty*w + tx` (unique per in-bounds tile) and kept
+  // current as this tick lights more. An O(1) probe here replaces a full entity
+  // scan (`fireAt`) per candidate, which a furnished floor (~100 flammables plus
+  // its NPCs) would pay on every tick.
+  const lw = w.level.w
+  const cellOf = (e: Entity): number => Math.floor(e.pos.y) * lw + Math.floor(e.pos.x)
+  const fireCells = new Set(fires.map(cellOf))
+  const light = (tx: number, ty: number): void => {
+    if (fireCells.has(ty * lw + tx)) return
+    igniteCell(w, tx, ty)
+    fireCells.add(ty * lw + tx)
+  }
 
   if (w.tick % SPREAD_INTERVAL === 0) {
     for (const f of fires) {
@@ -77,7 +92,7 @@ export const fireSystem = (w: World): void => {
         const tx = Math.floor(t.pos.x)
         const ty = Math.floor(t.pos.y)
         if (!NEIGHBORS.some(([dx, dy]) => fx + dx === tx && fy + dy === ty)) continue
-        igniteCell(w, tx, ty)
+        light(tx, ty)
       }
     }
   }
@@ -88,28 +103,16 @@ export const fireSystem = (w: World): void => {
     if (b.dead || !b.ai || b.fx?.burning === undefined) continue
     for (const t of flammables) {
       if (t === b || vlen(t.pos.x - b.pos.x, t.pos.y - b.pos.y) > b.radius + t.radius + BRUSH_SLACK) continue
-      igniteCell(w, Math.floor(t.pos.x), Math.floor(t.pos.y))
+      light(Math.floor(t.pos.x), Math.floor(t.pos.y))
     }
   }
 
-  // Set alight whatever catches fire and stands in a burning cell. This runs EVERY
-  // tick over every flammable and creature (~100 props plus the NPCs a floor), so
-  // the old per-entity `fireAt` (a full entity scan each) was O(n × entities).
-  // Snapshot the burning cells into a set ONCE (keyed like the movement door grid:
-  // `ty*w + tx`, unique per in-bounds tile) and probe it in O(1). Built here (after
-  // spread) so cells lit this tick are included; ignition runs in ascending id order.
-  // It lands through applyStatus with no source, exactly like a burning round, so
-  // #92's rules hold here too: a wet body dries instead of catching, and an NPC
-  // that catches bolts forward in panic.
-  const lw = w.level.w
-  const fireCells = new Set<number>()
-  for (const f of w.entities) {
-    if (f.fire && !f.dead) fireCells.add(Math.floor(f.pos.y) * lw + Math.floor(f.pos.x))
-  }
+  // Whatever catches fire and stands in a burning cell is set alight, in ascending
+  // id order. It lands through applyStatus with no source, exactly like a burning
+  // round, so a wet body dries instead of catching and a lit NPC panics (#92).
   if (fireCells.size > 0) {
     for (const t of w.entities) {
-      if (t.dead || !catchesFire(t)) continue
-      if (!fireCells.has(Math.floor(t.pos.y) * lw + Math.floor(t.pos.x))) continue
+      if (t.dead || !catchesFire(t) || !fireCells.has(cellOf(t))) continue
       applyStatus(w, t, 'burning', ELEMENTS.burning.durationTicks)
     }
   }

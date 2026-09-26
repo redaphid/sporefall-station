@@ -4,6 +4,8 @@ import type { Level } from '../game/levelgen/level'
 import { isSolidTile } from '../game/levelgen/level'
 import { stairStep } from '../game/stairs'
 import { moveAndCollide } from '../game/systems/movement'
+import { isRolling } from '../game/systems/roll'
+import { isMovementLocked } from '../game/systems/statusFx'
 import { SIM_DT, type InputCmd, type SimEvent } from '../game/types'
 import type { InputSource } from '../input/input'
 import { SendQueue } from '../net/channel/sendQueue'
@@ -664,6 +666,7 @@ export class NetClientSession implements Session {
   private stepSelf(cmd: InputCmd): void {
     const self = this.self
     if (!self || self.playerCtl?.downed) return
+    if (isMovementLocked(self) && !isRolling(self, this.tickCount)) return
     const len = Math.hypot(cmd.moveX, cmd.moveY)
     if (len < 0.01) return
     const norm = len > 1 ? 1 / len : 1

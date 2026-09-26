@@ -14,13 +14,13 @@ A player opens the game, sees the mode picker with the build number and release 
 - Open the site root. The picker appears.
 - Open a link with `?mode=solo`. The run starts directly.
 
-## Driving it with drive.mjs and the soul-desktop MCP
+## Driving it with drive.mjs and claude-in-chrome
 
 Preconditions: doctor green on `<port>`.
 
 - **Menu and solo (Lane B).** Run the SKILL.md example (`--open '/?seed=7'` … `--click 'Solo run'`). Expect `sporefall.session()` to be `{mode:'solo', seed:7, floor:1}`, player hp above 0, and a non-empty `sporefall.mission().description`.
 - **Autosave (Lane B).** A `?seed=` run is never saved, so open `/` with no seed, `--click 'Solo run'`, `--until-tick 90`, then `--assert "!!localStorage.getItem('sporefall.savegame')"` and `--eval "[sporefall.session().seed, sporefall.tick()]"`. Then add `--reload '/'` `--until "document.querySelector('[data-role=start-menu]')"` `--click 'Solo run'` `--until "window.world"` and assert the seed matches the one recorded. The resumed tick is the saved tick plus about one, not 0.
-- **Rendered world (Lane A).** `browser_navigate` to `http://localhost:<port>/?mode=solo&seed=7`, wait until `window.world.tick > 60`, and screenshot. Expect tiles, the player sprite, the HUD, and the mission pill.
+- **Rendered world (Lane A).** In your own tab, `navigate` to `http://localhost:<port>/?mode=solo&seed=7&debug`, run `sporefall.verb("step 60")`, and take a `computer` screenshot. Expect tiles, the player sprite, the HUD, and the mission pill.
 
 Last proven 2026-09-25 at build 564+. Lane B passed in `e2e/output/verify/2026-09-26T00-26-48-475Z-start-menu-solo/`: floor 1, 28 NPCs, the mission "Extract the specimen canister from the med-bay", the save written at tick 103, and a resume through the picker at tick 111. Lane A rendered through ANGLE on the RTX 4090; its still is `lane-a-rendered.png` in the same directory.
 

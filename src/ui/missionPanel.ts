@@ -232,6 +232,7 @@ export const createMissionPanel = (mount: HTMLElement, opts: MissionPanelOpts = 
         entities: view.entities,
         exit: view.level.exit,
         extraction: view.extraction,
+        lockdown: view.lockdown,
       })
 
       // Chip: hide entirely when there is nothing to say (game over).

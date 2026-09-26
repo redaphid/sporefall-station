@@ -21,8 +21,8 @@ Required models (exact filenames, in ComfyUI's `models/` tree):
 
 | Kind | File | Used for |
 |---|---|---|
-| checkpoint | `AnythingXL_xl.safetensors` (SDXL) | chars, tiles, items, fx — with the pixel-art LoRA. **Not props** (see the row below) |
-| checkpoint | `juggernautXL_juggXIByRundiffusion.safetensors` (SDXL) | **props, always.** An anime base composes busy multi-object scenes, so props came back as warehouses, stacks and sprite-sheet grids: 1/8 clean on `anything-xl` vs 8/8 on this, and later 0/12 vs 12/12 on the same recipe. `generate.py` pins it per-category (`CAT_MODEL`); you do not pass it by hand |
+| checkpoint | `juggernautXL_juggXIByRundiffusion.safetensors` (SDXL) | **everything: chars, tiles, items, fx *and* props.** It is `comfy.py`'s pack default (since 2026-09-25) *and* the per-category pin for props (`CAT_MODEL`); you do not pass it by hand |
+| checkpoint | `anything-xl.safetensors` (SDXL) | **superseded — do not use for new art.** This table said AnythingXL was the chars/tiles/items/fx base until 2026-09-25. That was stale: of the 26 curated raws in `scripts/assets/raws/` that still carry their graph in PNG metadata, **20 are juggernautXL and 6 are anything-xl**, all 6 from the first cast (brood-sac, carapace-brute and the other 2026-07 figures). Props were the loudest case — 1/8 clean on `anything-xl` vs 8/8 on juggernautXL, and later 0/12 vs 12/12 on the same recipe — because an anime base composes busy multi-object scenes. Kept here only so you can read the old picks' lineage in `curation.json` |
 | checkpoint | `dreamshaper_8.safetensors` (SD1.5) | low-VRAM fallback path; step-frame img2img; NPC sweeps |
 | lora | `pixel_art_style_by_skormino_v7.05_test_72img.safetensors` | pixel-art style. **This LoRA is Illustrious/SDXL** — with an SD1.5 checkpoint it silently no-ops (an earlier pack made exactly this mistake). Triggers: `masterpiece, pixpix, 8-bit, pixel_art`; CFG 3–4, euler, 28+ steps |
 | ipadapter | `ip-adapter-plus_sdxl_vit-h.safetensors`, `ip-adapter-plus_sd15.bin` | style anchoring (loaded automatically by IPAdapterUnifiedLoader preset "PLUS (high strength)") |

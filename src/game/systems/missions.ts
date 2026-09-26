@@ -8,6 +8,7 @@ import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
 import { dealFloorDraft } from './draft'
 import { raiseFloorAggro } from './relationships'
+import { alarmSystem, exitSealed } from './alarm'
 import { addEntity, type World } from '../world'
 import { vlen } from '../simMath'
 
@@ -491,6 +492,7 @@ export const missionSystem = (w: World): void => {
   // BEFORE completion so the tick the alert latches is a broadcast tick by
   // construction ((tick - alertTick) % N === 0 at tick === alertTick).
   broadcastAlert(w)
+  alarmSystem(w)
 
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
@@ -517,8 +519,8 @@ export const missionSystem = (w: World): void => {
   }
 
   // Floor transition: any live player standing on the unlocked exit tile — for
-  // an extraction, the entry they came in by.
-  if (w.mission.exitUnlocked) {
+  // an extraction, the entry they came in by. A lockdown seals it (#86).
+  if (w.mission.exitUnlocked && !exitSealed(w)) {
     const exit = w.mission.extractPoint ?? w.level.exit
     for (const e of w.entities) {
       if (!e.playerCtl || e.playerCtl.downed || e.dead) continue
@@ -577,8 +579,11 @@ const runExtraction = (w: World): void => {
       dropPrize(w, p)
       continue
     }
+    // The grab is an extraction's "objective": a loud run's lockdown cycle starts
+    // over with the prize in hand, as it does for a steal (#86).
+    if (w.mission.alertTick === undefined && w.mission.lockdownTick !== undefined) w.mission.lockdownTick = w.tick
     raiseStationAlert(w, p)
-    if (at && Math.floor(p.pos.x) === at.x && Math.floor(p.pos.y) === at.y) {
+    if (at && Math.floor(p.pos.x) === at.x && Math.floor(p.pos.y) === at.y && !exitSealed(w)) {
       completeMission(w, p)
       return
     }
@@ -626,6 +631,9 @@ const completeMission = (w: World, focus?: Entity): void => {
   // that processes the batch in order ends on the alert — which is the thing the
   // player actually needs to act on (see ui/screens.ts).
   w.events.push({ type: 'missionComplete', description: w.mission.description })
+  // A loud run's lockdown seal cycle starts over with the prize in hand.
+  // An extraction restarted it at the grab instead (runExtraction).
+  if (w.mission.lockdownTick !== undefined && w.mission.template !== 'extraction') w.mission.lockdownTick = w.tick
   if (focus) raiseStationAlert(w, focus)
 }
 

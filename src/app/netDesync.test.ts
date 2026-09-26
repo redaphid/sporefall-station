@@ -1,3 +1,4 @@
+import { LOCKDOWN_TICKS } from '../game/systems/alarm'
 import { describe, expect, it } from 'vitest'
 import { makeEntity } from '../game/entity'
 import { generateLevel } from '../game/levelgen/generate'
@@ -236,6 +237,9 @@ const hostSnapshotFor = (host: NetHostSession, avatarId: number): Uint8Array => 
  * the real `missionSystem` → `nextFloor` path (event broadcast included). */
 const armDescent = (host: NetHostSession): void => {
   host.world.mission.exitUnlocked = true
+  // The soak fires constantly, so the alarm can seal the bay (#86); staging a
+  // descent means any lockdown has already run its course.
+  host.world.mission.lockdownTick = -LOCKDOWN_TICKS
   const player = host.world.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)!
   // An extraction floor's way out is the entry, not the Launch Bay.
   const exit = host.world.mission.extractPoint ?? host.world.level.exit

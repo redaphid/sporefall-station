@@ -68,10 +68,12 @@ describe('mod sequencing: flag off matches main', () => {
   // removed both builds digest identically (8029abfa, 5cc314e6). Seed 7
   // re-pinned for #87: applyStatus now records who applied a status
   // (`fx.frozen.source`), a deliberate sim change. Integration PR #122 reverted
-  // only that and reproduced '92430cd7'; seed 1234 does not move.
+  // only that and reproduced '92430cd7'; seed 1234 does not move. Both re-pinned
+  // for #86: player gunfire is now a heard noise. With `hearGunfire` stubbed
+  // out the previous digests (d18f1870, 3f405983) still match.
   const GOLDEN: Record<number, string> = {
-    7: 'd18f1870',
-    1234: '3f405983',
+    7: 'a13b7b25',
+    1234: 'e92bcf60',
   }
 
   for (const seed of [7, 1234]) {

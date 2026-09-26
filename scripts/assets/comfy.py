@@ -18,7 +18,14 @@ import uuid
 
 HOST = os.environ.get("COMFY", "http://localhost:8188")
 
-CKPT = os.environ.get("CKPT", "SDXL1.0\\anything-xl.safetensors")
+# Pack default checkpoint. Was `SDXL1.0\anything-xl.safetensors` until 2026-09-25;
+# that was stale, and the art proves it. Of the 26 curated raws in `raws/` that
+# still carry their ComfyUI graph in PNG metadata, 20 were drawn on
+# juggernautXL and only 6 on anything-xl (all 6 from the earliest cast).
+# cyber-puck recorded the same finding independently: "sporefall-station's docs
+# and comfy.py defaults said AnythingXL ...; the approved, shipped images carry
+# juggernautXL". Trust the metadata over the docs — the PNGs are the truth.
+CKPT = os.environ.get("CKPT", "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors")
 LORA = os.environ.get("LORA", "pixel_art_style_by_skormino_v7.05_test_72img.safetensors")
 LORA_W = float(os.environ.get("LORA_W", "1.0"))
 SIZE = int(os.environ.get("SIZE", "1024"))

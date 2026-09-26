@@ -24,8 +24,12 @@ used as a generation input or reproduced.
 
 Recipe highlights (researched 2026-07, calibrated locally):
 
-- **Model**: SDXL `AnythingXL_xl.safetensors` + `pixel_art_style_by_skormino_v7.05`
-  LoRA. The skormino LoRA is **Illustrious/SDXL** — pairing it with an SD1.5
+- **Model**: SDXL `juggernautXL_juggXIByRundiffusion.safetensors` +
+  `pixel_art_style_by_skormino_v7.05`
+  (this line said `AnythingXL_xl.safetensors` until 2026-09-25 — stale; the
+  anime base only ever drew the first 2026-07 cast, and the PNG metadata on the
+  curated raws is the authority.)
+  The skormino LoRA is **Illustrious/SDXL** — pairing it with an SD1.5
   checkpoint (as an earlier pack did) silently no-ops. Triggers
   `masterpiece, pixpix, 8-bit, pixel_art`; CFG 3.5, euler, 28 steps, 1024 px.
 - **Consistency**: IPAdapterAdvanced "style transfer" (weight ~0.8) onto fixed

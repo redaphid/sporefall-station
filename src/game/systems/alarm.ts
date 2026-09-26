@@ -23,6 +23,7 @@ import type { EntityId } from '../types'
 import { NOISE_TTL, type World } from '../world'
 import { HEAR_RANGE, perceives } from './goals'
 import { vlen } from '../simMath'
+import { traitScale } from './traits'
 
 /** Heat per alarm level: ~12.5 s of unbroken fire (net of decay) near a
  * witness, so lockdown takes ~37 s of it. See scripts/test/alarm-sweep.mts. */
@@ -66,16 +67,21 @@ const addHeat = (w: World, amount: number, cause: 'gunfire' | 'attack'): void =>
  */
 export const hearGunfire = (w: World, shooter: Entity, loudness: number): void => {
   const { x, y } = shooter.pos
-  // A burst refreshes one noise instead of stacking dozens at the same spot.
+  const reach = traitScale(shooter, 'shotNoise')
+  // A burst refreshes one noise instead of stacking dozens at the same spot,
+  // and the refreshed noise carries as far as the louder of the two shots.
   const near = w.noises.find((n) => vlen(n.x - x, n.y - y) <= 1)
   if (near) {
     near.x = x
     near.y = y
     near.expires = w.tick + NOISE_TTL
-  } else w.noises.push({ x, y, expires: w.tick + NOISE_TTL })
+    const louder = Math.max(near.reach ?? 1, reach)
+    if (louder < 1) near.reach = louder
+    else delete near.reach
+  } else w.noises.push({ x, y, expires: w.tick + NOISE_TTL, ...(reach < 1 ? { reach } : {}) })
   for (const e of w.entities) {
     if (e === shooter || !isWitness(e)) continue
-    if (vlen(e.pos.x - x, e.pos.y - y) > HEAR_RANGE) continue
+    if (vlen(e.pos.x - x, e.pos.y - y) > HEAR_RANGE * reach) continue
     addHeat(w, loudness, 'gunfire')
     return
   }

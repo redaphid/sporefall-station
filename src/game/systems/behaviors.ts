@@ -71,6 +71,7 @@ import { determineRel, dispositionToward, initialFactionHate } from './relations
 import { strongestStimulus } from './stimulus'
 import { isPanicking } from './statusFx'
 import { vlen } from '../simMath'
+import { traitScale } from './traits'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
 export const PATROL = 'patrol'
@@ -172,8 +173,10 @@ const threat: Consideration = (w, e) => {
     if (!perceives(w, e, p)) continue // must actually perceive it (range + LOS, cloak-aware)
     const hate = hateToward(w, e, p.id)
     const aggress = battleScore(hate, hp, dist) * press
+    // Taunt changes WHOM a fighter picks, never WHETHER it fights: the threshold
+    // reads the raw score, the ranking reads the taunted one.
     if (aggress > WANDER_SCORE)
-      out.push({ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: aggress, tier: TIER_THREAT, target: p.id })
+      out.push({ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: aggress * traitScale(p, 'taunt'), tier: TIER_THREAT, target: p.id })
     const flee = fleeScore(hate, hp, max, dist)
     if (flee > WANDER_SCORE) out.push({ code: FLEE, score: flee, tier: TIER_THREAT, target: p.id })
   }

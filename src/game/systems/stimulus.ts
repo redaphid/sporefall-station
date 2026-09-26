@@ -19,6 +19,9 @@ export interface Stimulus {
   x: number
   y: number
   intensity: number
+  /** A quiet noise's reach (Noise.reach): it wakes sleepers only this fraction
+   * as far. Absent = full range. */
+  reach?: number
 }
 
 /** Base intensities — the pecking order a hive weighs (fire brightest, then a
@@ -34,7 +37,10 @@ const DRAW_FALLOFF = 0.12
 /** Every current draw stimulus, derived from the live world. */
 export const gatherStimuli = (w: World): Stimulus[] => {
   const out: Stimulus[] = []
-  for (const n of w.noises) out.push({ kind: 'noise', x: n.x, y: n.y, intensity: NOISE_INTENSITY })
+  for (const n of w.noises) {
+    const reach = n.reach ?? 1
+    out.push({ kind: 'noise', x: n.x, y: n.y, intensity: NOISE_INTENSITY * reach, ...(reach < 1 ? { reach } : {}) })
+  }
   for (const e of w.entities) {
     if (e.dead) continue
     if (e.fire) out.push({ kind: 'fire', x: e.pos.x, y: e.pos.y, intensity: FIRE_INTENSITY })

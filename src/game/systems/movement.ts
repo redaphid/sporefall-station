@@ -6,6 +6,7 @@ import { groupSpeedMult } from './groupFx'
 import { isRolling, ROLL_SPEED } from './roll'
 import { isMovementLocked } from './statusFx'
 import { vlen } from '../simMath'
+import { traitScale } from './traits'
 
 const FRICTION = 12 // knockback velocity decay per second
 
@@ -159,7 +160,7 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
     // speed; everyone else uses their walk speed and halts while stunned.
     // Group effects (a leader's rally, a pack's rage) scale the walk only — a
     // roll's burst is the roll's own. ×1 for anything outside a group.
-    const speed = rolling ? ROLL_SPEED : e.speed * groupSpeedMult(e, w.tick)
+    const speed = rolling ? ROLL_SPEED * traitScale(e, 'roll') : e.speed * groupSpeedMult(e, w.tick)
     if (isRooted(e)) {
       e.vel.x = 0 // knockback lands, but a rooted body does not travel on it
       e.vel.y = 0

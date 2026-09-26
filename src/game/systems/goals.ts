@@ -106,7 +106,7 @@ export const nearestNoise = (w: World, e: Entity): Vec2 | undefined => {
   let bestDist = HEAR_RANGE
   for (const n of w.noises) {
     const d = vlen(n.x - e.pos.x, n.y - e.pos.y)
-    if (d > bestDist) continue
+    if (d > bestDist || d > HEAR_RANGE * (n.reach ?? 1)) continue
     bestDist = d
     best = { x: n.x, y: n.y }
   }

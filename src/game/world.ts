@@ -89,6 +89,9 @@ export interface Noise {
   y: number
   /** Absolute tick at which it is forgotten. */
   expires: number
+  /** How far it carries, as a fraction of every hearer's normal range (a Soft
+   * Steps shot). Absent = full volume, so older snapshots round-trip. */
+  reach?: number
 }
 
 /** #65 — a FEAR PULSE: a scream a fleeing/dying body throws off that nearby

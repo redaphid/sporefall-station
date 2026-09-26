@@ -10,6 +10,7 @@ import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
 import { vlen } from '../simMath'
+import { reviveHelp } from './traits'
 
 const INTERACT_RANGE = 1.3
 /** How far a channeling picker may drift from the door before the pick drops. */
@@ -255,17 +256,16 @@ const runChannel = (w: World, p: Entity, cmd: InputCmd | undefined): void => {
 
 const bleedAndRevive = (w: World, p: Entity): void => {
   const downed = p.playerCtl!.downed!
-  const helper = w.entities.find(
-    (e) =>
-      e !== p &&
-      e.playerCtl &&
-      !e.playerCtl.downed &&
-      !e.dead &&
-      vlen(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE,
-  )
-  if (helper) {
+  // The best standing ally in reach sets the pace; helpers do not add up.
+  let rate = 0
+  for (const e of w.entities) {
+    if (e === p || !e.playerCtl || e.playerCtl.downed || e.dead) continue
+    const help = reviveHelp(e)
+    if (vlen(e.pos.x - p.pos.x, e.pos.y - p.pos.y) < INTERACT_RANGE * help.reach) rate = Math.max(rate, help.rate)
+  }
+  if (rate > 0) {
     // Teammate revive: a standing ally hauls them up — the co-op window is kept.
-    downed.reviveProgress += 1
+    downed.reviveProgress += rate
     if (downed.reviveProgress >= REVIVE_TICKS) recover(w, p)
   } else {
     downed.reviveProgress = 0

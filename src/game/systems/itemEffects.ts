@@ -10,6 +10,7 @@ import { applyDamage } from './combat'
 import { igniteCell } from './fire'
 import { applyStatus } from './statusFx'
 import { vlen } from '../simMath'
+import { ownBlastProof } from './traits'
 
 const within = (ax: number, ay: number, bx: number, by: number, r: number): boolean =>
   vlen(ax - bx, ay - by) <= r
@@ -25,6 +26,7 @@ export const applyAreaEffect = (w: World, x: number, y: number, effect: AreaEffe
     w.events.push({ type: 'explosion', x, y, radius: effect.radius })
     for (const e of w.entities) {
       if (e.dead || !e.health) continue
+      if (e.id === ownerId && ownBlastProof(e)) continue
       if (within(e.pos.x, e.pos.y, x, y, effect.radius + e.radius)) applyDamage(w, e, effect.damage, x, y, 10, ownerId)
     }
     return

@@ -59,7 +59,7 @@ const wakeTrigger = (w: World, e: Entity, stimuli: ReturnType<typeof gatherStimu
   // Environmental stimuli (noise / fire / spore) within range.
   for (const s of stimuli) {
     if (!kinds.includes(s.kind)) continue
-    if (vlen(s.x - e.pos.x, s.y - e.pos.y) <= WAKE_STIMULUS_RANGE) return s.kind
+    if (vlen(s.x - e.pos.x, s.y - e.pos.y) <= WAKE_STIMULUS_RANGE * (s.reach ?? 1)) return s.kind
   }
   return undefined
 }

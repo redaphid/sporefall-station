@@ -17,6 +17,7 @@ import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, seque
 import { meleeDamage } from './modEffect'
 import { spawnSporeBurst } from './spore'
 import { vlen } from '../simMath'
+import { meleeRetorts, ownBlastProof, traitScale } from './traits'
 
 const IFRAME_TICKS = 5
 const FLASH_TICKS = 3
@@ -156,8 +157,9 @@ export const applyDamage = (
   const dx = target.pos.x - fromX
   const dy = target.pos.y - fromY
   const len = vlen(dx, dy) || 1
-  target.vel.x += (dx / len) * knockback
-  target.vel.y += (dy / len) * knockback
+  const shove = knockback * traitScale(target, 'knockback')
+  target.vel.x += (dx / len) * shove
+  target.vel.y += (dy / len) * shove
   w.events.push({ type: 'hit', x: target.pos.x, y: target.pos.y, targetId: target.id, amount })
 
   // A landed blow breaks a lockpick channel — the one non-movement interrupt.
@@ -282,9 +284,9 @@ export const meleeAttack = (w: World, attacker: Entity, damage: number, range: n
   //
   // `!== null`, NOT truthiness: a 0-damage melee weapon lands for 0 and must
   // still apply its status.
-  return applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id) !== null
-    ? best
-    : null
+  if (applyDamage(w, best, finalDamage, attacker.pos.x, attacker.pos.y, knockback, attacker.id) === null) return null
+  for (const r of meleeRetorts(best)) applyStatus(w, attacker, r.status, r.ticks, best.id)
+  return best
 }
 
 /** Resolved bullet-behavior spec carried onto a spawned projectile (weapon mods). */
@@ -351,6 +353,7 @@ export const detonate = (w: World, x: number, y: number, radius: number, damage:
   emitNoise(w, x, y)
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
+    if (other.id === ownerId && ownBlastProof(other)) continue
     const dist = vlen(other.pos.x - x, other.pos.y - y)
     if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
   }

@@ -8,6 +8,7 @@ import { resistMult, type Entity, type Fx } from '../entity'
 import type { EntityId } from '../types'
 import type { World } from '../world'
 import { shock } from './interactions'
+import { traitImmune } from './traits'
 
 // ── Anti-chain-lock for immobilize statuses ────────────────────────────────
 // `electrified` (stunGun, 45t on a 24t cooldown) and `frozen` (freeze ray/grenade,
@@ -88,6 +89,7 @@ const applyImmobilize = (w: World, e: Entity, kind: string, durationTicks: numbe
 export const addStatus = (w: World, e: Entity, kind: string, durationTicks: number, source?: EntityId): void => {
   if (e.dead) return
   if (!(durationTicks > 0)) return
+  if (traitImmune(e, kind)) return
   if (IMMOBILIZE_STATUSES.has(kind)) return applyImmobilize(w, e, kind, durationTicks, source)
   // Water and fire cancel: a wet body can't catch (the flame just dries it), and
   // soaking a burning body puts it out.
@@ -125,10 +127,12 @@ export const applyStatus = (w: World, e: Entity, status: string, ticks: number, 
   // successive locks in one hot chain. Determinism is preserved — it is all
   // absolute ticks on `e.lockout`, which snapshots like everything else.
   if (status === 'sleep') {
+    if (traitImmune(e, 'sleep')) return
     if (e.status) e.status.sleep = Math.max(e.status.sleep, guardLegacyLock(w, e, 'sleep', ticks))
     return
   }
   if (status === 'slip' || status === 'stun') {
+    if (traitImmune(e, 'stun')) return
     if (e.status) e.status.stun = Math.max(e.status.stun, guardLegacyLock(w, e, 'stun', ticks))
     return
   }

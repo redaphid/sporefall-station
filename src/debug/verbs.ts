@@ -10,6 +10,9 @@ import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behavi
 import { NPCS } from '../game/data/npcs'
 import { MODS, isModId, modMaxStacks } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
+import { packStill, STILL_NEXT, STILL_PLANT } from '../game/systems/essence'
+import { WEAPONS } from '../game/data/items'
+import { liveEntries, sequenceShape } from '../game/systems/modSequence'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
@@ -164,7 +167,10 @@ const HELD_BUTTONS = ['attack', 'special'] as const
 // The input layer edge-triggers these; the sim acts on every tick they are set,
 // so holding one across N ticks would repeat it (a held swap undoes itself).
 const EDGE_BUTTONS = ['interact', 'throwItem', 'roll'] as const
-const EDGE_INTS = ['hotbar', 'modSwap'] as const
+// `still` is the raw essence-bubbles InputCmd field; `vent` is sugar for
+// `still: packStill(STILL_PLANT, index)` (plant rack entry `index` at your feet;
+// `"vent":"next"` vents the chamber that fires next, like the V key).
+const EDGE_INTS = ['hotbar', 'modSwap', 'still', 'vent'] as const
 const HELD_KEYS = new Set<string>([...HELD_AXES, ...HELD_BUTTONS, ...EDGE_BUTTONS, ...EDGE_INTS, 'player', 'aimAt'])
 
 export const parseHeldInput = (w: World, text: string): HeldInput => {
@@ -186,6 +192,13 @@ export const parseHeldInput = (w: World, text: string): HeldInput => {
   }
   if (raw.hotbar !== undefined) cmd.hotbar = num(String(raw.hotbar), 'hotbar')
   if (raw.modSwap !== undefined) cmd.modSwap = num(String(raw.modSwap), 'modSwap')
+  if (raw.still !== undefined && raw.vent !== undefined) throw new Error('step input: give "still" or "vent", not both')
+  if (raw.still !== undefined) cmd.still = num(String(raw.still), 'still')
+  if (raw.vent !== undefined) {
+    const index = raw.vent === 'next' ? STILL_NEXT : num(String(raw.vent), 'vent')
+    if (!Number.isInteger(index) || index < 0 || index > 0xff) throw new Error(`step input "vent" must be a rack index 0..255, got ${String(raw.vent)}`)
+    cmd.still = packStill(STILL_PLANT, index)
+  }
   const aimAt = raw.aimAt === undefined ? undefined : num(String(raw.aimAt), 'aimAt')
   // An id never allocated is a typo; one that existed and is gone (killed) just leaves aim as-is.
   if (aimAt !== undefined && !(Number.isInteger(aimAt) && aimAt > 0 && aimAt < w.nextId)) throw new Error(`no entity ${aimAt} to aim at`)
@@ -199,6 +212,7 @@ export const heldCmd = (w: World, h: HeldInput, i: number): InputCmd => {
     for (const k of EDGE_BUTTONS) c[k] = false
     c.hotbar = -1
     delete c.modSwap
+    delete c.still
   }
   const me = w.byId.get(h.entityId)
   const target = h.aimAt === undefined ? undefined : w.byId.get(h.aimAt)
@@ -330,9 +344,12 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
     case 'look': {
       // A playtester's glance: the acting player, their build, and what is near,
       // nearest first. Read-only.
-      const radius = rest ? num(rest, 'radius') : 12
+      // `look [radius] [playerId]`: a co-op playtester looks through player N's eyes.
+      const [rs, ps] = rest ? rest.split(/\s+/) : []
+      const radius = rs ? num(rs, 'radius') : 12
+      const pid = ps === undefined ? undefined : num(ps, 'playerId')
       const me = w.entities
-        .filter((e) => e.playerCtl && !e.dead)
+        .filter((e) => e.playerCtl && !e.dead && (pid === undefined || e.playerCtl.playerId === pid))
         .sort((a, b) => a.playerCtl!.playerId - b.playerCtl!.playerId)[0]
       if (!me) return JSON.stringify({ tick: w.tick, floor: w.floor, gameOver: w.gameOver, player: null })
       const stack = weaponStack(me)
@@ -352,7 +369,29 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           resist: e.resist,
           mode: e.ai?.mode,
           faction: e.ai?.faction,
+          bubble: e.bubble
+            ? { mod: e.bubble.mod.id, charges: e.bubble.charges, ttl: e.bubble.expiresTick - w.tick, by: e.bubble.ventedBy }
+            : undefined,
         }))
+      // Sequenced casting: the rack as the sim will fire it. `next` marks the
+      // chamber the next pull starts from; entries past the live window are stowed.
+      const def = stack ? WEAPONS[stack.itemId] : undefined
+      const shape = def && w.modCasting === 'sequence' ? sequenceShape(def) : undefined
+      const live = shape ? liveEntries(stack?.mods, shape.slots) : []
+      const rack = shape
+        ? {
+            slots: shape.slots,
+            castsPerTrigger: shape.castsPerTrigger,
+            rechargeLeft: Math.max(0, (stack?.rechargeUntil ?? 0) - w.tick),
+            entries: (stack?.mods ?? []).map((m, i) => ({
+              i,
+              mod: `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`,
+              live: live.includes(i),
+              ...(live[stack?.castIndex ?? 0] === i ? { next: true } : {}),
+              ...(m.charges !== undefined ? { charges: m.charges } : {}),
+            })),
+          }
+        : undefined
       return JSON.stringify({
         tick: w.tick,
         floor: w.floor,
@@ -361,6 +400,7 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
         mission: w.mission.description,
         missionComplete: w.mission.complete,
         modCasting: w.modCasting ?? 'fold',
+        ...(w.essences ? { essences: w.essences } : {}),
         player: {
           id: me.id,
           at: { x: Math.round(me.pos.x * 10) / 10, y: Math.round(me.pos.y * 10) / 10 },
@@ -369,6 +409,7 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           weapon: stack?.itemId,
           mods: stack?.mods?.map((m) => `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`) ?? [],
           fx: me.fx && Object.keys(me.fx).length ? Object.keys(me.fx) : undefined,
+          rack,
         },
         near,
       })

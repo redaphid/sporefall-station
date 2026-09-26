@@ -1,9 +1,11 @@
 import { emptyInput, type InputCmd } from '../game/types'
 import { selectAim, type Aim } from './aim'
 import type { InputSource } from './input'
+import { packStill, STILL_NEXT, STILL_PLANT } from '../game/systems/essence'
 
 /** WASD/arrows move, J/space attack, K/E interact, L/shift special, 1-6 equip
- * hotbar slot, Q/G throw, F/left-ctrl dodge-roll.
+ * hotbar slot, Q/G throw, F/left-ctrl dodge-roll, V vent the next chamber
+ * (essence bubbles prototype; the sim ignores it unless the run has the rule).
  *
  * `readPointerAim` (optional) supplies the MOUSE as a continuous aim device: a
  * unit vector from the player toward the cursor (see aim.pointerAim). When it
@@ -20,6 +22,7 @@ export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource =
   let specialEdge = false
   let throwEdge = false
   let rollEdge = false
+  let ventEdge = false
   let hotbarEdge = -1
   let seq = 0
 
@@ -31,6 +34,7 @@ export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource =
     if (ev.code === 'KeyL' || ev.code === 'ShiftLeft') specialEdge = true
     if (ev.code === 'KeyQ' || ev.code === 'KeyG') throwEdge = true
     if (ev.code === 'KeyF' || ev.code === 'ControlLeft') rollEdge = true
+    if (ev.code === 'KeyV') ventEdge = true
     if (ev.code.startsWith('Digit')) {
       const n = Number(ev.code.slice(5))
       if (n >= 1 && n <= 6) hotbarEdge = n - 1
@@ -51,6 +55,10 @@ export const createKeyboard = (readPointerAim?: () => Aim | null): InputSource =
       cmd.throwItem = throwEdge
       cmd.roll = rollEdge
       cmd.hotbar = hotbarEdge
+      // Optional field: present only on the tick V was tapped, so every other
+      // command keeps the exact shape it always had.
+      if (ventEdge) cmd.still = packStill(STILL_PLANT, STILL_NEXT)
+      ventEdge = false
       attackEdge = false
       interactEdge = false
       specialEdge = false

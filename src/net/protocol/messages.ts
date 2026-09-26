@@ -345,7 +345,13 @@ export const encodeInput = (
   // never written; absent = none). Written ONLY when a swap is pending, so every
   // ordinary input packet is byte-identical to before. An older host reads the
   // hotbar byte and never looks further, so the extra bytes are ignored.
-  if (cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff) w.u16(cmd.modSwap + 1)
+  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff ? cmd.modSwap + 1 : 0
+  // OPTIONAL second trailing u16: an essence-bubbles vent, +1 biased like the
+  // swap. When a vent is pending the swap slot is written even if empty (0 = no
+  // swap), so the vent always sits at a fixed offset. No vent, no bytes.
+  const still = cmd.still !== undefined && cmd.still >= 0 && cmd.still < 0xffff ? cmd.still + 1 : 0
+  if (swap > 0 || still > 0) w.u16(swap)
+  if (still > 0) w.u16(still)
   return w.finish()
 }
 
@@ -361,12 +367,14 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const aim = r.u8() / FACING_SCALE
   const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
   const modSwap = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no reorder
+  const still = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no vent
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
   if (modSwap > 0) cmd.modSwap = modSwap - 1
+  if (still > 0) cmd.still = still - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0

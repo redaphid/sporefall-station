@@ -5,7 +5,8 @@ import { applyDamage, detonate, runHitTriggers } from './combat'
 import { canSeeEntity, hateToward } from './goals'
 import { applyAreaEffect } from './itemEffects'
 import { CRIME_HATE, initialFactionHate } from './relationships'
-import { applyStatus } from './statusFx'
+import { applyStatus, isFrozen } from './statusFx'
+import { applyHitElements, essenceOn, lensPass } from './essence'
 import { vlen } from '../simMath'
 
 // ── Homing (reworked after playtest: "it mostly just curves bullets into walls").
@@ -180,6 +181,9 @@ export const projectileSystem = (w: World): void => {
     e.pos.x += e.vel.x * SIM_DT
     e.pos.y += e.vel.y * SIM_DT
     p.ttl--
+    // Essence bubbles: a round that just flew through a planted bubble picks up
+    // its essence (the lens) before anything it hits this tick.
+    if (essenceOn(w)) lensPass(w, e)
 
     if (p.ttl <= 0) {
       if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
@@ -239,11 +243,13 @@ export const projectileSystem = (w: World): void => {
       // off bullets i-frames had already voided, and mod triggers fired on hits
       // that never connected. A body's i-frames are 5 ticks, so a multi-pellet
       // volley lands most of its pellets straight into them.
+      const wasFrozen = essenceOn(w) && isFrozen(other) // read before the impact breaks the ice
       const dealt = applyDamage(w, other, p.damage, e.pos.x - e.vel.x * SIM_DT, e.pos.y - e.vel.y * SIM_DT, 3, p.ownerId)
       // `!== null`, NOT truthiness: 0 is a hit that landed and dealt no hp (the
       // freeze ray), and it must still apply its status.
       const landed = dealt !== null
-      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
+      if (landed && essenceOn(w)) applyHitElements(w, other, p.onHit, p.rider, wasFrozen)
+      else if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
       const killed = !!other.dead || (other.health?.hp ?? 1) <= 0
       if (landed && p.lifestealFrac) {
         // Pay out on damage ACTUALLY DEALT, never the bullet's intended damage.

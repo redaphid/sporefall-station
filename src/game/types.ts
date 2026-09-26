@@ -30,6 +30,11 @@ export interface InputCmd {
    * and OPTIONAL: absent on every input that does not ask, so default-mode
    * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
   modSwap?: number
+  /** Essence bubbles only: vent one entry of the wielded weapon's mod list this
+   * tick, packed `(op << 8) | index` (systems/essence packStill). op 1 = plant
+   * it at your feet. Edge-triggered and OPTIONAL like `modSwap`: absent on every
+   * input that does not ask. Ignored unless World.essences is 'bubbles'. */
+  still?: number
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -119,6 +124,18 @@ export type SimEvent =
   | { type: 'explosion'; x: number; y: number; radius: number }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
+  /** Essence bubbles: `byId` vented `modId` into the world as bubble `entityId`. */
+  | { type: 'bubblePlant'; entityId: EntityId; byId: EntityId; modId: string; x: number; y: number }
+  /** Essence bubbles: `byId` caught bubble `entityId` back into its rack. */
+  | { type: 'bubbleCatch'; entityId: EntityId; byId: EntityId; modId: string }
+  /** Essence bubbles: a bubble is gone. `spent` = its last lens charge was used,
+   * `expired` = 20 s passed, `capped` = its diver planted a third, `burst` = an
+   * enemy walked into it (a mine). */
+  | { type: 'bubblePop'; entityId: EntityId; modId: string; reason: 'spent' | 'expired' | 'capped' | 'burst'; x: number; y: number }
+  /** Essence bubbles: projectile `entityId` flew through bubble `bubbleId` and picked up `modId`. */
+  | { type: 'lens'; entityId: EntityId; bubbleId: EntityId; modId: string }
+  /** Essence bubbles, Conductor: an arc reached frozen body `targetId` and shattered the ice. */
+  | { type: 'conductor'; x: number; y: number; targetId: EntityId; amount: number }
   | { type: 'use'; entityId: EntityId; byId: EntityId }
   /** The mission's objective gateway (`door.objectiveGate`) was breached/unlocked
    * by the player — a point-of-no-return that turned the whole floor hostile

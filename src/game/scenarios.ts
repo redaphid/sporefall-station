@@ -23,6 +23,8 @@ import {
 } from './systems/groups'
 import { freeze, wet } from './systems/interactions'
 import { spawnObject } from './systems/objects'
+import { plantBubble } from './systems/essence'
+import { spawnPlayer } from './player'
 import { addEntity, type World } from './world'
 
 const crate = (w: World, cx: number, cy: number): Entity => {
@@ -944,6 +946,111 @@ const setupStairsDemo = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
   player.facing = Math.atan2(-d[1], -d[0]) // looking at the stair
 }
 
+// ── Essence bubbles (prototype C) ─────────────────────────────────────────────
+// Both stages switch the prototype's run rules on themselves (sequenced casting
+// plus essence bubbles), so the showcase can never load as an inert gem. On a
+// run that already has them, that is a no-op.
+
+/** Open cells in the box [x0..x1] x [y0..y1], row-major. */
+const openCells = (w: World, x0: number, x1: number, y0: number, y1: number): { x: number; y: number }[] => {
+  const out: { x: number; y: number }[] = []
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!isSolidTile(w.level, x, y)) out.push({ x, y })
+  return out
+}
+
+/** Floor N (default 3) by the real transition, the cast cleared, the player on
+ * the west end of a long open row facing east, at `ARMED_HP`, holding one gun
+ * with `mods`. Returns the player and the row. */
+const stageEssence = (
+  w: World,
+  floor: number | undefined,
+  weapon: string,
+  mods: { id: string; stacks: number }[],
+): { player: Entity; x: number; y: number } | undefined => {
+  const target = Math.max(1, Math.floor(floor ?? ARMED_DEFAULT_FLOOR))
+  if (target !== w.floor) {
+    w.floor = target - 1
+    nextFloor(w)
+  }
+  w.modCasting = 'sequence'
+  w.essences = 'bubbles'
+  const player = clearCast(w)
+  if (!player) return undefined
+  const { x, y } = findStage(w, 12)
+  player.pos = { x: x + 0.5, y: y + 0.5 }
+  player.prevPos = { x: player.pos.x, y: player.pos.y }
+  player.facing = 0
+  player.health = { hp: ARMED_HP, max: ARMED_HP, iframes: SPAWN_GRACE_TICKS }
+  player.loadout = { inventory: [{ itemId: weapon, qty: 1, mods: mods.map((m) => ({ ...m })) }], activeSlot: -1 }
+  if (player.combat) player.combat.weapon = weapon
+  return { player, x, y }
+}
+
+/** `?scenario=lens`: design C's showcase. A shotgun racked
+ * `[frost][choke][shock][bulk]`, a Storm bubble already planted two tiles
+ * ahead, and six Derelict Units (bullets ping off their armour) six tiles
+ * down the row. Fire the frost cast through the violet bubble: every pellet
+ * that crosses it carries frost AND storm, and the zap shatters the ice
+ * (Conductor), then arcs through the rest of the frozen pack. */
+const setupLens = (w: World, opts: ScenarioOpts): void => {
+  const staged = stageEssence(w, opts.floor, 'shotgun', [
+    { id: 'frost', stacks: 1 },
+    { id: 'choke', stacks: 1 },
+    { id: 'shock', stacks: 1 },
+    { id: 'bulk', stacks: 1 },
+  ])
+  if (!staged) return
+  const { player, x, y } = staged
+  plantBubble(w, player, { id: 'shock', stacks: 1 }, x + 2.5, y + 0.5)
+  for (const c of openCells(w, x + 6, x + 8, y - 1, y + 1).slice(0, 6)) spawnNpc(w, 'robot', c.x + 0.5, c.y + 0.5)
+}
+
+/** `?scenario=lens-coop`: design C's worked example 2, two divers. Diver 0
+ * holds a shotgun racked `[bulk][frost][choke][frost]` and has NO storm; diver 1
+ * (one tile behind) holds a pistol racked `[heavy][shock]` and has no frost.
+ * Six Derelict Units six tiles down the row. Neither can make Conductor alone:
+ * diver 1 has to vent the shock where diver 0 will fire through it. Headless,
+ * drive diver 1 with `"player":1`; in the browser diver 1 is an idle body. */
+const setupLensCoop = (w: World, opts: ScenarioOpts): void => {
+  const staged = stageEssence(w, opts.floor, 'shotgun', [
+    { id: 'bulk', stacks: 1 },
+    { id: 'frost', stacks: 1 },
+    { id: 'choke', stacks: 1 },
+    { id: 'frost', stacks: 1 },
+  ])
+  if (!staged) return
+  const { x, y } = staged
+  const mate = w.entities.find((e) => e.playerCtl?.playerId === 1) ?? spawnPlayer(w, 1, x + 0.5, y + 0.5)
+  const behind = isSolidTile(w.level, x, y + 1) ? { x: x + 1, y } : { x, y: y + 1 }
+  mate.pos = { x: behind.x + 0.5, y: behind.y + 0.5 }
+  mate.prevPos = { x: mate.pos.x, y: mate.pos.y }
+  mate.facing = 0
+  mate.health = { hp: ARMED_HP, max: ARMED_HP, iframes: SPAWN_GRACE_TICKS }
+  mate.loadout = { inventory: [{ itemId: 'pistol', qty: 1, mods: [{ id: 'heavy', stacks: 1 }, { id: 'shock', stacks: 1 }] }], activeSlot: -1 }
+  if (mate.combat) mate.combat.weapon = 'pistol'
+  for (const c of openCells(w, x + 6, x + 8, y - 1, y + 1).slice(0, 6)) spawnNpc(w, 'robot', c.x + 0.5, c.y + 0.5)
+}
+
+/** `?scenario=lens-boss`: the lightning-weak boss. A Mireclaw Alpha ten tiles
+ * down the row with `resist.electrified: 2` (the stand-in for the design's
+ * boss clue), and a pistol racked `[heavy][frost][pierce][shock]` with `split`
+ * stowed (design C, worked example 1). Every cast carries ONE element, so the
+ * only way to put ice and lightning on the same round is to vent one of them
+ * as a lens, or plant it in the boss's path as a mine. */
+const setupLensBoss = (w: World, opts: ScenarioOpts): void => {
+  const staged = stageEssence(w, opts.floor, 'pistol', [
+    { id: 'heavy', stacks: 1 },
+    { id: 'frost', stacks: 1 },
+    { id: 'pierce', stacks: 1 },
+    { id: 'shock', stacks: 1 },
+    { id: 'split', stacks: 1 },
+  ])
+  if (!staged) return
+  const { x, y } = staged
+  const boss = spawnNpc(w, 'boss', x + 10.5, y + 0.5)
+  boss.resist = { ...(boss.resist ?? {}), electrified: 2 }
+}
+
 export interface ScenarioOpts {
   /** `?floor=`: the floor the `armed` / `stairs-demo` scenarios start on. */
   floor?: number
@@ -975,6 +1082,9 @@ const SCENARIOS: Readonly<Record<string, (w: World, opts: ScenarioOpts) => void>
   'ai-goals': setupAiGoals,
   'npc-ai': setupNpcAi,
   'npc-deliberate': setupNpcDeliberate,
+  lens: setupLens,
+  'lens-boss': setupLensBoss,
+  'lens-coop': setupLensCoop,
   ...GROUP_SCENARIOS,
 }
 

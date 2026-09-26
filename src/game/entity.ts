@@ -177,6 +177,27 @@ export type GroupRole = 'leader' | 'grunt' | 'medic' | 'sapper' | 'artillery' | 
 export interface WeaponMod {
   id: string
   stacks: number
+  /** Essence bubbles only: lens charges left on an essence that was planted,
+   * partly spent, and caught back. Absent = a whole essence (full charges on its
+   * next plant). Without it, plant/shoot/catch/re-plant would refill a lens. */
+  charges?: number
+}
+
+/** Essence bubbles (World.essences): a mod vented out of a gun and
+ * planted in the world. Rides on a `pickup`-kind entity whose archetype is the
+ * mod's existing `mod.<id>` (so it renders and crosses the wire as a mod gem),
+ * but with no `pickup` component, so walking over it never collects it. */
+export interface Bubble {
+  /** The essence, stacks included. */
+  mod: WeaponMod
+  /** Lens passes left. The bubble pops at 0. */
+  charges: number
+  /** Absolute tick at which it pops if nothing spent it. */
+  expiresTick: number
+  /** The diver who vented it (the per-diver planted cap). */
+  ventedBy: EntityId
+  /** Tick it was planted: the cap pops the oldest first. */
+  plantedTick: number
 }
 
 export interface ItemStack {
@@ -335,8 +356,13 @@ export interface Entity {
      * only resolves where it comes down, at ttl — never on the first thing in
      * its path. Absent on every ordinary projectile → snapshot-stable. */
     arc?: boolean
+    /** Essence bubbles only: the one extra essence this round picked up flying
+     * through a planted bubble (a lens). At most one per round. */
+    rider?: WeaponMod
   }
   pickup?: { itemId: string; qty: number }
+  /** Present on a planted essence bubble (World.essences only). */
+  bubble?: Bubble
   /**
    * A door/hatch. `open`/`locked`/`lockLevel` are the original mundane lock (a
    * pick channel opens it — interaction.ts). Everything below is OPTIONAL, so a

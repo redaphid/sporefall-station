@@ -1,7 +1,7 @@
 // Headless playtest: one world per state file, one verb per call. No browser, no
 // hub, deterministic, and safe to run in parallel (each agent owns its file).
 //
-//   npx tsx scripts/playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced]
+//   npx tsx scripts/playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced] [--essenceBubbles]
 //   npx tsx scripts/playtest.mts <state.json> look [radius]
 //   npx tsx scripts/playtest.mts <state.json> step 30 '{"aimAt":42,"attack":true}'
 //   npx tsx scripts/playtest.mts <state.json> <any debug verb line>   (spawn, addMod, get, entities, …)
@@ -18,7 +18,7 @@ import { emptyInput } from '../src/game/types'
 
 const [file, verb, ...rest] = process.argv.slice(2)
 if (!file || !verb) {
-  console.error('usage: playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced] | <verb line>')
+  console.error('usage: playtest.mts <state.json> new [--seed N] [--scenario NAME] [--floor F] [--sequenced] [--essenceBubbles] | <verb line>')
   process.exit(2)
 }
 
@@ -34,7 +34,12 @@ if (verb === 'new') {
     console.error(`unknown scenario "${scenario}"; known: ${SCENARIO_NAMES.join(', ')}`)
     process.exit(2)
   }
-  const host = new HostSession(seed, { sample: emptyInput }, undefined, 'normal', rest.includes('--sequenced') ? 'sequence' : undefined)
+  // --essenceBubbles is the prototype's run rule; it rides on sequenced casting,
+  // so it turns --sequenced on too. Both reach the world the way the app sets
+  // them: through HostSession, latched when the run is built.
+  const bubbles = rest.includes('--essenceBubbles')
+  const sequenced = bubbles || rest.includes('--sequenced')
+  const host = new HostSession(seed, { sample: emptyInput }, undefined, 'normal', sequenced ? 'sequence' : undefined, bubbles)
   if (scenario) applyScenario(host.world, scenario, { floor: Number(flag('floor')) || undefined })
   writeFileSync(file, JSON.stringify(serializeWorld(host.world)))
   console.log(runVerb(host.world, 'look'))

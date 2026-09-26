@@ -9,6 +9,9 @@ import type { InputSource } from '../input/input'
 import type { CoopSample } from '../input/gamepadCoop'
 import type { RenderView, Session } from './session'
 
+/** Resolve a run-rule flag that may be a value or a per-run getter. */
+export const latchFlag = (f: boolean | (() => boolean) | undefined): boolean => (typeof f === 'function' ? f() : f === true)
+
 /** Local co-op provider: one sample() of every joined pad's player input. */
 export interface CoopSource {
   sample(): CoopSample
@@ -73,6 +76,7 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
     // Optional: only present when one side asked for a reorder, so a merge of
     // two ordinary commands stays exactly the shape it always was.
     ...((b.modSwap ?? a.modSwap) !== undefined ? { modSwap: b.modSwap ?? a.modSwap } : {}),
+    ...((b.still ?? a.still) !== undefined ? { still: b.still ?? a.still } : {}),
   }
 }
 
@@ -103,6 +107,9 @@ export class HostSession implements Session {
      * resolved by the app layer). Latched into each new world at creation; a
      * function is re-read per run, so a toggle applies from the next run. */
     private modCasting?: ModCasting | (() => ModCasting | undefined),
+    /** Essence bubbles run rule (the `essenceBubbles` flag): latched into each
+     * new world like `modCasting`, and only on top of sequenced casting. */
+    private essenceBubbles?: boolean | (() => boolean),
   ) {
     this.buildRun()
   }
@@ -113,6 +120,7 @@ export class HostSession implements Session {
     this.world = createWorld(this.seed, 1, this.mode)
     const casting = typeof this.modCasting === 'function' ? this.modCasting() : this.modCasting
     if (casting) this.world.modCasting = casting
+    if (casting && latchFlag(this.essenceBubbles)) this.world.essences = 'bubbles'
     populateWorld(this.world)
     setupFloor(this.world)
     const at = playerSpawnPoint(this.world.level, 0)

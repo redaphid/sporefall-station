@@ -685,10 +685,13 @@ const stopTransportOnPagehide = (transport: Transport): void => {
 /** The `sequencedMods` flag, resolved to the run rule a host latches into each
  * run it builds. Read per run, so toggling applies from the next run. */
 const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
+/** The `essenceBubbles` flag, latched per run like `sequencedMods` (and only
+ * meaningful on top of it). */
+const runEssenceBubbles = (): boolean => flagOn(loadSettings().flags, 'essenceBubbles')
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting, runEssenceBubbles)
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -712,7 +715,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     stopTransportOnPagehide(transport)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting, runEssenceBubbles)
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())

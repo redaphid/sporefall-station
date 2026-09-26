@@ -23,6 +23,7 @@ import {
 } from '../net/protocol/messages'
 import { isKnownMsgType, MsgType, PROTOCOL_VERSION, SNAPSHOT_INTERVAL_TICKS, type PeerId, type Transport } from '../net/types'
 import type { RenderView, Session } from './session'
+import { latchFlag } from './hostSession'
 
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
 const STATE_INTERVAL_TICKS = 15 // 2Hz
@@ -61,6 +62,7 @@ interface PeerState {
   /** Mod reorder the client asked for since the last tick consumed one
    * (undefined = none). Edge-latched exactly like `pendingHotbar`. */
   pendingModSwap?: number
+  pendingStill?: number
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
@@ -106,6 +108,8 @@ export class NetHostSession implements Session {
     private mode: RunMode = 'normal',
     /** Mod casting rule for runs this host builds (see HostSession). */
     private modCasting?: ModCasting | (() => ModCasting | undefined),
+    /** Essence bubbles run rule for runs this host builds (see HostSession). */
+    private essenceBubbles?: boolean | (() => boolean),
   ) {
     this.world = this.freshWorld()
     transport.on((ev) => {
@@ -154,6 +158,7 @@ export class NetHostSession implements Session {
     const w = createWorld(this.seed, 1, this.mode)
     const casting = typeof this.modCasting === 'function' ? this.modCasting() : this.modCasting
     if (casting) w.modCasting = casting
+    if (casting && latchFlag(this.essenceBubbles)) w.essences = 'bubbles'
     return w
   }
 
@@ -229,6 +234,11 @@ export class NetHostSession implements Session {
       if (p.pendingModSwap !== undefined) {
         cmd.modSwap = p.pendingModSwap
         p.pendingModSwap = undefined
+      }
+      delete cmd.still
+      if (p.pendingStill !== undefined) {
+        cmd.still = p.pendingStill
+        p.pendingStill = undefined
       }
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
@@ -462,6 +472,7 @@ export class NetHostSession implements Session {
         // it once even if the packet arrived between ticks (OR-ed like the edges).
         if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
         if (cmd.modSwap !== undefined) p.pendingModSwap = cmd.modSwap
+        if (cmd.still !== undefined) p.pendingStill = cmd.still
       }
       return
     }

@@ -247,6 +247,7 @@ export class NetClientSession implements Session {
   /** Mod reorder tapped since the last input packet (undefined = none). Latched
    * like `pendingHotbar` and shipped on the reliable lane. */
   private pendingModSwap?: number
+  private pendingStill?: number
   /** Mod casting rule the host announced in GameStart (absent = default fold). */
   private modCasting?: 'sequence'
   /** Local tick count when the newest snapshot landed, so the host's tick can
@@ -695,6 +696,7 @@ export class NetClientSession implements Session {
     // next packet still carries the equip/throw instead of dropping it.
     if (cmd.hotbar >= 0) this.pendingHotbar = cmd.hotbar
     if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
+    if (cmd.still !== undefined) this.pendingStill = cmd.still
 
     // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
     // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
@@ -709,14 +711,17 @@ export class NetClientSession implements Session {
       const out: InputCmd = { ...cmd, hotbar: this.pendingHotbar }
       delete out.modSwap
       if (this.pendingModSwap !== undefined) out.modSwap = this.pendingModSwap
+      delete out.still
+      if (this.pendingStill !== undefined) out.still = this.pendingStill
       const packet = encodeInput(out, this.pendingEdges)
       const hasPureEdge =
-        this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0 || this.pendingModSwap !== undefined
+        this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0 || this.pendingModSwap !== undefined || this.pendingStill !== undefined
       if (hasPureEdge) this.queue.queueReliable(packet)
       else this.queue.queueSnapshot(packet)
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
       this.pendingModSwap = undefined
+      this.pendingStill = undefined
     }
 
     // Predict own movement immediately

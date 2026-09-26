@@ -87,6 +87,16 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
       'Prototype. Delete the flag (and World.modCasting) once the owner has played it side by side with the default fold and picked one: either promote sequencing to the only mode or remove modSequence.ts.',
     since: 567,
   },
+  {
+    key: 'essenceBubbles',
+    label: 'Essence bubbles (prototype)',
+    description:
+      'Needs Sequenced mods. Pop a mod out of your gun and it floats where you stand: bullets that fly through it pick up its power, and an enemy that walks into a lightning, ice or fire bubble sets it off. Applies to the next run you start or host.',
+    defaultOn: false,
+    retire:
+      'Prototype of loadout design C. Delete the flag (and World.essenceBubbles, systems/essence.ts) if nobody says "shoot through my bubble" unprompted within three floors of a co-op session; otherwise promote it together with sequenced mods.',
+    since: 580,
+  },
 ]
 
 const BY_KEY: ReadonlyMap<string, FeatureFlag> = new Map(FEATURE_FLAGS.map((f) => [f.key, f]))

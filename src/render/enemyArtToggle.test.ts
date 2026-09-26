@@ -123,6 +123,7 @@ describe('the flag registry itself', () => {
     const EXPECTED_DEFAULTS: Record<string, boolean> = {
       newEnemyArt: true,
       sequencedMods: false,
+      essenceBubbles: false,
     }
     expect(Object.fromEntries(FEATURE_FLAGS.map((f) => [f.key, f.defaultOn]))).toEqual(EXPECTED_DEFAULTS)
   })

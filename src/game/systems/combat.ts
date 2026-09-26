@@ -14,6 +14,7 @@ import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
 import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
 import { spawnSporeBurst } from './spore'
+import { applyHitElements, essenceOn } from './essence'
 import { vlen } from '../simMath'
 
 const IFRAME_TICKS = 5
@@ -480,7 +481,8 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
     if (weapon.durability !== undefined) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (essenceOn(w)) applyHitElements(w, hit, rw.onHit, undefined)
+      else if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
   } else {

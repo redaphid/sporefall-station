@@ -15,6 +15,7 @@ import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
 import { movementSystem } from './systems/movement'
 import { rollSystem } from './systems/roll'
+import { essenceSystem } from './systems/essence'
 import { projectileSystem } from './systems/projectiles'
 import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
@@ -123,6 +124,9 @@ export const REVIVES_PER_RUN = 2
  */
 export type ModCasting = 'sequence'
 
+/** Essence bubbles prototype run rule (see World.essences). */
+export type EssenceRule = 'bubbles'
+
 export interface World {
   tick: number
   seed: number
@@ -157,6 +161,11 @@ export interface World {
   /** Mod casting rule for this run (see ModCasting). Absent = default fold,
    * so every existing world and snapshot is unchanged. */
   modCasting?: ModCasting
+  /** Essence bubbles prototype (loadout design C): mods can be vented out of the
+   * gun into the world as bubbles that act as lenses and mines (systems/essence).
+   * Requires `modCasting === 'sequence'`. A run rule like `modCasting`: absent =
+   * off, so every existing world and snapshot is unchanged. */
+  essences?: EssenceRule
   /** Combat tunable: when true every NPC treats players as an enemy on sight and
    * engages regardless of faction disposition (the "make them all enemies" knob).
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
@@ -292,6 +301,10 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   aiSystem(w)
   rollSystem(w, inputs)
   movementSystem(w, inputs)
+  // Essence bubbles: vents, catches, mines and expiry, after bodies have moved
+  // (so a mine sees where an enemy now stands) and before combat (so a vent and
+  // a shot on the same tick fire the rack as it is after the vent).
+  if (w.essences) essenceSystem(w, inputs)
   stairSystem(w) // a player who stepped onto a stair climbs (or descends) now
   combatSystem(w, inputs)
   projectileSystem(w)

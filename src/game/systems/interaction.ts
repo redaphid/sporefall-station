@@ -9,6 +9,7 @@ import { addItem, applyModPickup } from './inventory'
 import { circleOverlapsTile } from './movement'
 import { useObject } from './objects'
 import { fireAt } from './fire'
+import { catchBubble } from './essence'
 import { vlen } from '../simMath'
 
 const INTERACT_RANGE = 1.3
@@ -160,6 +161,11 @@ const doorwayOccupant = (w: World, d: Entity): Entity | undefined => {
 const handleInteract = (w: World, p: Entity): void => {
   const target = nearestInteractable(w.entities, p)
   if (!target) return
+  // Essence bubbles: interact catches a planted bubble back into the rack.
+  if (target.bubble) {
+    catchBubble(w, p, target)
+    return
+  }
   if (OBJECTS[target.archetype]?.use || OBJECTS[target.archetype]?.hackable) {
     useObject(w, p, target)
     return

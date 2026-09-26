@@ -162,13 +162,17 @@ describe('a real modded shot, host sim → wire → client mirror', () => {
   })
 })
 
-describe('a shard or blast carrying its own element, host sim → wire → client', () => {
-  /** Fire `mods` at a 1-hp body until the round dies; returns the host world. */
-  const fired = (mods: string[]) => {
+describe("a shard or blast carrying its cast's element, host sim → wire → client", () => {
+  /** Fire the sequenced cast of `mods` that starts at window position `at` at a
+   * 1-hp body until the round dies; returns the host world. */
+  const fired = (mods: string[], at: number) => {
     const w = createWorld(1, 1)
+    w.modCasting = 'sequence'
     const p = spawnPlayer(w, 0, 20, 20)
     p.loadout!.inventory = []
-    arm(p, 'pistol').mods = mods.map((id) => ({ id, stacks: 1 }))
+    const stack = arm(p, 'pistol')
+    stack.mods = mods.map((id) => ({ id, stacks: 1 }))
+    stack.castIndex = at
     p.facing = 0
     const t = addEntity(w, makeEntity('npc', 'civilian', 24, 20))
     t.health = { hp: 1, max: 40, iframes: 0 }
@@ -186,26 +190,26 @@ describe('a shard or blast carrying its own element, host sim → wire → clien
     return { w, round, events }
   }
 
-  it('[frost, split, rapid, shock]: the client draws frost shards off a shock round', () => {
-    const { w, round } = fired(['frost', 'split', 'rapid', 'shock'])
+  it("[frost, split, rapid, shock]: the client draws the second cast's shards as shock, like their round", () => {
+    const { w, round } = fired(['frost', 'split', 'rapid', 'shock'], 1)
     const shards = w.entities.filter((e) => e.kind === 'projectile' && e !== round)
     expect(shards).toHaveLength(2)
     const wire = roundTrip([round, ...shards].map((e) => toWireEntity(e, w.tick))).entities
     const [clientRound, ...clientShards] = wire.map((we) => applyWireEntity(undefined, we, w.tick))
     expect(clientRound.projectile?.mods).toEqual([{ id: 'rapid', stacks: 1 }, { id: 'shock', stacks: 1 }, { id: 'split', stacks: 1 }])
     for (const [i, c] of clientShards.entries()) {
+      expect(shards[i].projectile!.onHit?.status).toBe('electrified')
       expect(c.projectile?.mods).toEqual(shards[i].projectile!.mods)
-      expect(c.projectile?.mods).toEqual([{ id: 'frost', stacks: 1 }, { id: 'rapid', stacks: 1 }, { id: 'split', stacks: 1 }])
+      expect(c.projectile?.mods).toEqual(clientRound.projectile?.mods)
       expect(composeBulletTraits(c.projectile?.mods)).toEqual(composeBulletTraits(shards[i].projectile!.mods))
-      expect(composeBulletTraits(c.projectile?.mods).color).not.toBe(composeBulletTraits(clientRound.projectile?.mods).color)
     }
   })
 
-  it("[frost, explosive, rapid, shock]: the blast's element reaches the client in the events message", () => {
-    const { w, events } = fired(['frost', 'explosive', 'rapid', 'shock'])
+  it("[frost, explosive, rapid, shock]: the second cast's shock blast reaches the client in the events message", () => {
+    const { w, events } = fired(['frost', 'explosive', 'rapid', 'shock'], 1)
     const sent: EventsMsg = { tick: w.tick, events }
     const got = decodeJson<EventsMsg>(encodeJson(MsgType.Events, sent))
-    expect(got.events).toContainEqual(expect.objectContaining({ type: 'explosion', element: 'frost' }))
+    expect(got.events).toContainEqual(expect.objectContaining({ type: 'explosion', element: 'shock' }))
     expect(got).toEqual(sent)
   })
 })

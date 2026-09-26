@@ -45,7 +45,7 @@ export interface ModTrigger {
  * projectile/melee hit path. Plain JSON → serializes with the world. */
 export interface ResolvedTrigger {
   event: 'hit' | 'kill' | 'reload'
-  /** `element`: the element mod id this blast applies (resolveWeapon.elementFor). */
+  /** `element`: the element mod id this blast applies (ResolvedWeapon.carries). */
   explode?: { radius: number; damage: number; element?: string }
 }
 
@@ -237,12 +237,3 @@ export const normalizeMods = (
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([id, stacks]) => ({ id, stacks }))
 }
-
-/** The provenance of a hit a round spawns (a shard or a shrapnel fragment): the
- * round's mods with their element swapped for `element`, the one the child
- * applies, so the child looks like what it does. Element mods are single-stack. */
-export const childProvenance = (
-  mods: readonly { id: string; stacks: number }[] | undefined,
-  element: string | undefined,
-): { id: string; stacks: number }[] | undefined =>
-  normalizeMods([...(mods ?? []).filter((m) => !MODS[m.id]?.onHit), ...(element ? [{ id: element, stacks: 1 }] : [])])

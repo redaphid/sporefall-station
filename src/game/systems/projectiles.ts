@@ -1,4 +1,4 @@
-import { childProvenance, MODS } from '../data/mods'
+import { MODS } from '../data/mods'
 import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import { SIM_DT, type EntityId } from '../types'
 import { addEntity, isBlocked, type World } from '../world'
@@ -125,7 +125,7 @@ const bounceOffWall = (w: World, e: Entity): boolean => {
 /** Spawn a projectile's split shards in a fan around its heading — children
  * inherit the owner (so kill credit / PvP scoring stay correct) and deal reduced
  * damage. Children never re-split, so a huge split stack can't cascade. Each
- * shard applies the element its split carries and shows that element. */
+ * shard applies the element its split carries. */
 const spawnSplit = (w: World, e: Entity): void => {
   const p = e.projectile!
   const s = p.split!
@@ -150,7 +150,7 @@ const spawnSplit = (w: World, e: Entity): void => {
  * a deterministic per-fragment jitter drawn from the world RNG (`w.rng`, whose
  * stream position serializes → replay-identical). Fragments carry NO `splinter`
  * field, so they can never re-splinter — the recursion guard. They apply the
- * element the splinter carries and inherit the parent's other provenance (for the
+ * element the splinter carries and inherit the parent's provenance (for the
  * shared visual) but not its explode/split/pierce/triggers, so a shatter can't
  * cascade or double-detonate. */
 const spawnSplinter = (w: World, e: Entity): void => {
@@ -172,7 +172,9 @@ const spawnSplinter = (w: World, e: Entity): void => {
 }
 
 /** Arm a split shard or splinter fragment: the owner, its damage and life, the
- * element its parent behavior carries, and provenance that shows that element. */
+ * element its parent behavior carries, and the parent's provenance. That
+ * provenance already shows the element: it is the one element mod the round
+ * lands, and a base weapon's own element rides no child. */
 const shardOf = (
   child: Entity,
   ownerId: EntityId,
@@ -182,8 +184,7 @@ const shardOf = (
   child.projectile = { ownerId, damage: s.damage, ttl: s.ttl }
   const onHit = s.element ? MODS[s.element]?.onHit : undefined
   if (onHit) child.projectile.onHit = { ...onHit }
-  const mods = childProvenance(parentMods, s.element)
-  if (mods) child.projectile.mods = mods
+  if (parentMods) child.projectile.mods = parentMods.map((m) => ({ ...m }))
 }
 
 export const projectileSystem = (w: World): void => {

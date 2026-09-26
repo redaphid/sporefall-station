@@ -182,7 +182,7 @@ describe('fire sets creatures alight (#114)', () => {
     expect(thug.shattered).toBeUndefined()
   })
 
-  it('a cinder catches fire (0.2 resists, it does not immunise) and burns slower than a thug', () => {
+  it('a cinder catches fire (0.2 resists, it does not immunise) and loses less to it than a thug', () => {
     const cinder = npc(w, 'cinder', s.x, s.y, 500)
     const thug = npc(w, 'thug', s.x + 2, s.y, 500)
     igniteCell(w, s.x, s.y)

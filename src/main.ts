@@ -105,7 +105,7 @@ import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 import { projectToScreen } from './ui/locatorModel'
-import { createDraftScreen, type DraftSeat } from './ui/draftScreen'
+import { createDraftScreen, localDraft } from './ui/draftScreen'
 import { withDraftPicks, type DraftPickSource } from './input/draftPick'
 
 /** The rewind ring, plus the single action the pause menu needs from it. Both
@@ -1420,18 +1420,13 @@ const runLoop = (
         // their own screens.
         const localIds = new Set(pads.flatMap((p) => (p.slot === null ? [] : [p.slot])))
         if (view.self?.playerCtl) localIds.add(view.self.playerCtl.playerId)
-        const seats: DraftSeat[] = []
-        let offer: string[] | null = null
-        let until = 0
-        for (const e of view.entities) {
-          const hand = e.playerCtl?.draft
-          if (!hand || e.dead || !localIds.has(e.playerCtl!.playerId)) continue
-          if (e === view.self && hand.until === answeredUntil) continue
-          offer ??= hand.offer
-          until = Math.max(until, hand.until)
-          seats.push({ playerId: e.playerCtl!.playerId, cursor: hand.cursor })
-        }
-        draftScreen.update(offer, seats, Math.ceil((until - view.tick) / SIM_RATE))
+        const draft = localDraft(view.entities, localIds, view.self, answeredUntil)
+        draftScreen.update(
+          draft.offer,
+          draft.seats,
+          Math.ceil((draft.until - view.tick) / SIM_RATE),
+          draft.inPlay ? 'strip' : 'full',
+        )
         // Twin-stick aim reticles: one per joined pad with a deflected right stick,
         // anchored to that pad's player entity. Presentation only.
         const anchors: ReticleAnchor[] = []

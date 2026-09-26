@@ -4,8 +4,15 @@
 // interact = take), so pads, keyboard and remote peers all go through the sim.
 // A tap or click on a card calls `onPick(index)`, which queues a `draftPick`
 // input for the local player; this screen never edits a loadout.
+//
+// Two layouts. While every local player is choosing, nobody at this screen is
+// in the fight, so the hand takes the whole screen. Once any local player is
+// back in play (a couch partner picked first), the hand shrinks to an
+// undimmed strip along the bottom edge that lets clicks through to the world,
+// so the player who picked can see the fight they were returned to.
 
 import { draftCards, type DraftCard } from '../game/systems/draft'
+import type { Entity } from '../game/entity'
 import { markUiChrome } from './chrome'
 
 const RARITY_COLOR: Record<DraftCard['rarity'], string> = {
@@ -23,10 +30,60 @@ export interface DraftSeat {
   cursor: number
 }
 
+/** What the local screen should draw for the floor draft this frame. */
+export interface LocalDraft {
+  offer: readonly string[] | null
+  seats: DraftSeat[]
+  /** Latest deadline tick among the seats. */
+  until: number
+  /** A live local player without an open hand is back in the fight and must see it. */
+  inPlay: boolean
+}
+
+/**
+ * Collect the local players still holding a hand. `answeredUntil` hides the
+ * `self` seat after a tap, until a hand with a different deadline arrives
+ * (a net client hears its hand closed only on the next state message).
+ */
+export const localDraft = (
+  entities: readonly Entity[],
+  localIds: ReadonlySet<number>,
+  self: Entity | undefined,
+  answeredUntil: number,
+): LocalDraft => {
+  const out: LocalDraft = { offer: null, seats: [], until: 0, inPlay: false }
+  for (const e of entities) {
+    const ctl = e.playerCtl
+    if (!ctl || e.dead || !localIds.has(ctl.playerId)) continue
+    const hand = ctl.draft
+    if (!hand || (e === self && hand.until === answeredUntil)) {
+      out.inPlay = true
+      continue
+    }
+    out.offer ??= hand.offer
+    out.until = Math.max(out.until, hand.until)
+    out.seats.push({ playerId: ctl.playerId, cursor: hand.cursor })
+  }
+  return out
+}
+
+export type DraftLayout = 'full' | 'strip'
+
 export interface DraftScreen {
   /** Show `offer` with each seat's cursor, or hide when `offer` is null. */
-  update(offer: readonly string[] | null, seats: readonly DraftSeat[], secondsLeft: number): void
+  update(offer: readonly string[] | null, seats: readonly DraftSeat[], secondsLeft: number, layout?: DraftLayout): void
   readonly visible: boolean
+  readonly layout: DraftLayout
+}
+
+const ROOT_STYLE: Record<DraftLayout, string> = {
+  full:
+    'position:absolute;inset:0;align-items:center;justify-content:center;' +
+    'background:rgba(6,8,14,.82);z-index:60;backdrop-filter:blur(2px);overflow-y:auto;pointer-events:auto',
+  // Bottom edge only, no dim or blur, and clicks pass through except on cards.
+  strip:
+    'position:absolute;left:0;right:0;bottom:0;top:auto;align-items:flex-end;justify-content:center;' +
+    'background:none;z-index:60;backdrop-filter:none;overflow:visible;pointer-events:none',
 }
 
 export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) => void): DraftScreen => {
@@ -34,12 +91,14 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
   root.className = 'draft-screen'
   root.dataset.role = 'draft-screen'
   markUiChrome(root) // press-exempt UI chrome (chrome.ts)
-  root.style.cssText =
-    'position:absolute;inset:0;display:none;align-items:center;justify-content:center;' +
-    'background:rgba(6,8,14,.82);z-index:60;backdrop-filter:blur(2px);overflow-y:auto'
+  root.style.cssText = ROOT_STYLE.full + ';display:none'
   mount.appendChild(root)
 
   let shownKey = ''
+  let layout: DraftLayout = 'full'
+  let panelEl: HTMLDivElement | null = null
+  let titleEl: HTMLDivElement | null = null
+  let hintEl: HTMLDivElement | null = null
   let cardEls: HTMLButtonElement[] = []
   let chipRows: HTMLDivElement[] = []
   let timer: HTMLDivElement | null = null
@@ -47,15 +106,16 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
   const build = (offer: readonly string[]): void => {
     root.replaceChildren()
     const panel = document.createElement('div')
-    panel.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 16px'
+    panelEl = panel
 
     const title = document.createElement('div')
+    titleEl = title
     title.textContent = 'FLOOR CLEARED — take one mod for your gun'
     title.style.cssText = 'font:800 22px system-ui;color:#ffd75e;text-shadow:0 2px 6px #000;text-align:center'
     panel.appendChild(title)
 
     const row = document.createElement('div')
-    row.style.cssText = 'display:flex;gap:18px;flex-wrap:wrap;justify-content:center'
+    row.className = 'draft-row'
     cardEls = []
     chipRows = []
     draftCards(offer).forEach((c, i) => {
@@ -64,9 +124,9 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
       card.dataset.modId = c.id
       card.dataset.index = String(i)
       card.style.cssText =
-        `width:190px;min-height:240px;border-radius:14px;border:2px solid ${RARITY_COLOR[c.rarity]};` +
+        `border-radius:14px;border:2px solid ${RARITY_COLOR[c.rarity]};` +
         'background:linear-gradient(#1a1f2e,#0c0f18);color:#eee;display:flex;flex-direction:column;' +
-        'align-items:center;gap:12px;padding:18px 14px;cursor:pointer;box-shadow:0 6px 20px #000a;' +
+        'align-items:center;cursor:pointer;box-shadow:0 6px 20px #000a;pointer-events:auto;' +
         'touch-action:manipulation;transition:transform .08s'
 
       const chips = document.createElement('div')
@@ -81,6 +141,7 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
       name.style.cssText = `font:800 19px system-ui;color:${RARITY_COLOR[c.rarity]}`
 
       const blurb = document.createElement('div')
+      blurb.className = 'draft-blurb'
       blurb.textContent = c.blurb
       blurb.style.cssText = 'font:13px/1.4 system-ui;text-align:center;opacity:.88'
 
@@ -97,6 +158,7 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
     panel.appendChild(row)
 
     const hint = document.createElement('div')
+    hintEl = hint
     hint.textContent = '◀ ▶ choose  ·  A / fire / E takes it  ·  or tap a card'
     hint.style.cssText = 'font:600 14px system-ui;color:#cfd6e4;opacity:.85;text-align:center'
     timer = document.createElement('div')
@@ -105,11 +167,39 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
     root.appendChild(panel)
   }
 
+  /** Size the built hand for `next`. The strip keeps cards tappable but small. */
+  const applyLayout = (next: DraftLayout): void => {
+    layout = next
+    const strip = next === 'strip'
+    root.style.cssText = ROOT_STYLE[next] + ';display:flex'
+    if (panelEl)
+      panelEl.style.cssText =
+        'display:flex;flex-direction:column;align-items:center;' + (strip ? 'gap:6px;padding:6px 8px' : 'gap:14px;padding:20px 16px')
+    if (titleEl) titleEl.style.display = strip ? 'none' : ''
+    if (hintEl) hintEl.style.display = strip ? 'none' : ''
+    const row = root.querySelector<HTMLDivElement>('.draft-row')
+    if (row) row.style.cssText = `display:flex;gap:${strip ? 8 : 18}px;flex-wrap:${strip ? 'nowrap' : 'wrap'};justify-content:center`
+    for (const card of cardEls) {
+      card.style.width = strip ? '112px' : '190px'
+      card.style.minHeight = strip ? '0' : '240px'
+      card.style.gap = strip ? '4px' : '12px'
+      card.style.padding = strip ? '6px 6px' : '18px 14px'
+      card.style.opacity = strip ? '0.92' : '1'
+      const icon = card.children[1] as HTMLElement | undefined
+      if (icon) icon.style.fontSize = strip ? '28px' : '56px'
+      const blurb = card.querySelector<HTMLElement>('.draft-blurb')
+      if (blurb) blurb.style.display = strip ? 'none' : ''
+    }
+  }
+
   const screen: DraftScreen = {
     get visible() {
       return shownKey !== ''
     },
-    update(offer, seats, secondsLeft) {
+    get layout() {
+      return layout
+    },
+    update(offer, seats, secondsLeft, next = 'full') {
       if (!offer || offer.length === 0 || seats.length === 0) {
         if (shownKey) {
           root.style.display = 'none'
@@ -122,8 +212,8 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
       if (key !== shownKey) {
         build(offer)
         shownKey = key
-        root.style.display = 'flex'
-      }
+        applyLayout(next)
+      } else if (next !== layout) applyLayout(next)
       cardEls.forEach((card, i) => {
         const here = seats.filter((s) => s.cursor === i)
         const lead = here[0]

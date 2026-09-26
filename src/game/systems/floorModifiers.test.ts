@@ -2,8 +2,8 @@
 //
 // Mechanics run in hand-carved arenas (exact tiles, exact bodies) through the
 // real tickWorld. Wiring, replay and the "nothing else moved" proof run on real
-// populated floors. The golden digests were captured on `main` @ 16cf73f,
-// before any modifier code existed.
+// populated floors. The golden digests were first captured on `main` @ 16cf73f,
+// before any modifier code existed, and re-captured on `main` @ 7853983.
 
 import { describe, expect, it } from 'vitest'
 import { worldDigest } from '../../debug/worldDigest'
@@ -37,6 +37,7 @@ import { perceives } from './goals'
 import { groupById, membersOf, packSize } from './groups'
 import { shock } from './interactions'
 import { nextFloor, setupFloor } from './missions'
+import { spawnObject } from './objects'
 import { applyFloorModifier, HUNT_BAND, modifierSystem } from './modifierSystem'
 import { isWet } from './statusFx'
 
@@ -370,6 +371,20 @@ describe('bog tide', () => {
     tickN(w, 1)
     expect(isWet(p)).toBe(false)
     for (const e of w.entities) if (!e.health) expect(e.fx?.wet).toBeUndefined()
+  })
+
+  it('props in the flood stay dry, so an arc through the water never erases a barrel or crate', () => {
+    const w = shore()
+    w.tick = FLOOD_AT
+    const thug = spawnNpc(w, 'thug', 10.5, 10.5)
+    const barrel = spawnObject(w, 'barrel', 11, 10)
+    const crate = spawnObject(w, 'crate', 10, 11)
+    tickN(w, 1)
+    expect(isWet(thug)).toBe(true)
+    expect([isWet(barrel), isWet(crate)]).toEqual([false, false])
+    shock(w, thug)
+    expect([barrel.dead ?? false, crate.dead ?? false]).toEqual([false, false])
+    expect([barrel.health!.hp, crate.health!.hp]).toEqual([barrel.health!.max, crate.health!.max])
   })
 
   it('an empty floor floods without incident', () => {

@@ -21,6 +21,7 @@ import { hashLabel, mulberry32 } from '../rng'
 import type { World } from '../world'
 import { findArrival, groupById, livePlayers, packSize, spawnPack } from './groups'
 import { wet } from './interactions'
+import { isObject } from './objects'
 
 /** Tracker packs land this far (path-reachable tiles) from their prey: out of
  * the first glance, close enough that the pressure is real. */
@@ -56,7 +57,7 @@ const tide = (w: World): void => {
   else if (age > 0 && age % TIDE_PERIOD === 0) w.events.push({ type: 'tide', rising: false })
   if (!flooded) return
   for (const e of w.entities) {
-    if (e.dead || !e.health || e.projectile || e.pickup) continue
+    if (e.dead || !e.health || e.projectile || e.pickup || isObject(e)) continue
     if (inFlood(w, e)) wet(w, e)
   }
 }

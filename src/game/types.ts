@@ -112,6 +112,9 @@ export type SimEvent =
   /** A `contain` mission's Spore Node bloomed (soft-fail): the room floods with
    * spores. Not a loss — just harder. */
   | { type: 'bloom'; x: number; y: number; entityId: EntityId }
+  /** An `extraction` carrier went down or died: the prize (new pickup `entityId`)
+   * lies where they fell. */
+  | { type: 'prizeDropped'; entityId: EntityId; byId: EntityId; x: number; y: number }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */

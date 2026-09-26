@@ -829,6 +829,7 @@ export class NetClientSession implements Session {
       missionText,
       missionComplete: this.state.missionComplete,
       missionTargetId: this.state.missionTargetId,
+      extraction: this.state.extraction,
       gameOver: this.state.gameOver,
       alert: this.state.alert,
       mode: this.state.mode,

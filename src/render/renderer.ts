@@ -593,9 +593,11 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           },
           radiusToUv: (r) => (r * pxPerTile) / sh2,
         }
-        // Exit-portal idle flourish: anchored on the level's exit tile.
-        if (currentLevel && onStorey(currentLevel.exit.x)) {
-          const e = proj.toUv(currentLevel.exit.x + 0.5, currentLevel.exit.y + 0.5)
+        // Exit-portal idle flourish: anchored on the way out — the level's exit
+        // tile, or the entry during an extraction.
+        const out = view.extraction ?? currentLevel?.exit
+        if (out && onStorey(out.x)) {
+          const e = proj.toUv(out.x + 0.5, out.y + 0.5)
           pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))
         } else {
           pipeline.clearPortal()

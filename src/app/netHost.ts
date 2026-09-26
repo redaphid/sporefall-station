@@ -1,7 +1,7 @@
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { setupFloor } from '../game/systems/missions'
+import { extractionView, setupFloor } from '../game/systems/missions'
 import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
 import type { InputCmd } from '../game/types'
@@ -357,6 +357,7 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
+      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alarm: this.world.alarm,
       alert: stationAlerted(this.world),
@@ -377,6 +378,7 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
+      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
       mode: this.world.mode,

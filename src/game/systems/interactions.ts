@@ -21,7 +21,7 @@
 // id order, no randomness; it fully resolves within the call that starts it.
 
 import { ELEMENTS } from '../data/elements'
-import type { Entity } from '../entity'
+import { resistMult, type Entity } from '../entity'
 import type { World } from '../world'
 import { kill } from './combat'
 import { addStatus, isWet } from './statusFx'
@@ -50,9 +50,12 @@ export const shock = (w: World, origin: Entity): void => {
     seen.add(e)
     addStatus(w, e, 'electrified', ELEMENTS.electrified.durationTicks)
     if (!isWet(e)) continue // dry: immobilized only, no water damage, no arc
-    if (e.health && !e.playerCtl?.downed) {
+    // #78 damage affinity, keyed by the status id like the DOT path. An immune
+    // body takes nothing but still conducts the arc below.
+    const dmg = Math.round(ELEC_DAMAGE * resistMult(e, 'electrified'))
+    if (e.health && !e.playerCtl?.downed && dmg > 0) {
       // A downed body is out of the fight — shock damage can't re-kill it (#52).
-      e.health.hp -= ELEC_DAMAGE
+      e.health.hp -= dmg
       // This is the one damage site that bypasses combat.applyDamage, so stamp the
       // last-hurt tick here too — an arc still counts as being harmed for regen.
       e.health.lastHurtTick = w.tick

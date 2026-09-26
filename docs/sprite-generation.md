@@ -7,6 +7,10 @@ implementation is the **swampspace** pack ("Sporefall Station") built by
 Theme manifest format: `docs/themes.md`. Swampspace-specific art direction:
 `docs/swampspace-theme.md`.
 
+**Character animation (walk cycles) goes through the cast pipeline**
+(`scripts/assets/cast/cast.py`, a committed recipe per character driving puck-sprites'
+Qwen + Wan engine), not the per-frame SDXL path below: [`docs/sprite-cast-runbook.md`](sprite-cast-runbook.md).
+
 ## 1. Infrastructure setup
 
 ### ComfyUI

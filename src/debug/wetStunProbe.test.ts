@@ -23,17 +23,17 @@ describe('an NPC stun gunner against wet players on a flooded street (8 seeds)',
     expect(wet('fight', 1).dps[0]).toBeGreaterThan(3 * probe('dry street', 'fight', 1).dps[0])
   })
 
-  it.fails('no electrocution ever lands on a player while it is locked, solo or beside a wet teammate', () => {
+  it('no electrocution ever lands on a player while it is locked, solo or beside a wet teammate', () => {
     for (const [policy, team] of WET_CASES) expect(wet(policy, team).lockedArcHits, `${policy} ${team}`).toEqual(Array(team).fill(0))
   })
 
-  it.fails('a player who does nothing lasts at least 7 s (median) before going down', () => {
+  it('a player who does nothing lasts at least 7 s (median) before going down', () => {
     for (const team of [1, 2] as const) {
       for (const m of wet('stand', team).medianDownS) if (m !== undefined) expect(m).toBeGreaterThanOrEqual(7)
     }
   })
 
-  it.fails('anyone who fights back, reacts or flees stays up, solo or with a wet teammate', () => {
+  it('anyone who fights back, reacts or flees stays up, solo or with a wet teammate', () => {
     for (const [policy, team] of WET_CASES.filter(([p]) => p !== 'stand')) expect(wet(policy, team).downed, `${policy} ${team}`).toEqual(Array(team).fill(0))
   })
 

@@ -70,7 +70,7 @@ describe('a wet player takes the arc once per lock', () => {
     expect(w.events.filter((e) => e.type === 'shock' && e.targetId === p.id)).toHaveLength(1)
   })
 
-  it.fails('a stun gunner firing into the lock deals no electrocution and emits no shock hit', () => {
+  it('a stun gunner firing into the lock deals no electrocution and emits no shock hit', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
     zap(w, p)
@@ -81,7 +81,7 @@ describe('a wet player takes the arc once per lock', () => {
     expect(w.events.some((e) => e.type === 'shock' && e.targetId === p.id)).toBe(false)
   })
 
-  it.fails('nor in the immunity gap after the lock, but the next legal hit bites again', () => {
+  it('nor in the immunity gap after the lock, but the next legal hit bites again', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
     zap(w, p)
@@ -93,7 +93,7 @@ describe('a wet player takes the arc once per lock', () => {
     expect(isImmobilized(p)).toBe(true)
   })
 
-  it.fails('a frozen wet player is not electrocuted: every control shares the one guard', () => {
+  it('a frozen wet player is not electrocuted: every control shares the one guard', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
     addStatus(w, p, 'frozen', 120)
@@ -109,20 +109,24 @@ describe('a wet player takes the arc once per lock', () => {
 })
 
 describe('the wet teammate', () => {
-  it.fails('the arc floods a wet teammate one tile off once, not on every hit to the victim', () => {
+  it('the arc floods a wet teammate one tile off once per lock, not on every hit to the victim', () => {
     const { w, cx, cy } = arena()
     const a = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
     const b = wetPlayer(w, 1, cx + 0.5, cy + 1.5)
-    const hp = b.health!.hp
-    zap(w, a)
-    expect(hp - b.health!.hp).toBe(ELEC)
-    expect(isImmobilized(b)).toBe(true)
-    for (let i = 0; i < 3; i++) {
-      runTicks(w, idle, CADENCE)
+    const cost = (): number => {
       const before = b.health!.hp
       zap(w, a)
-      expect(before - b.health!.hp).toBe(0)
+      return before - b.health!.hp
     }
+    expect(cost()).toBe(ELEC)
+    expect(isImmobilized(b)).toBe(true)
+    const hits: number[] = []
+    for (let i = 0; i < 3; i++) {
+      runTicks(w, idle, CADENCE)
+      hits.push(cost())
+    }
+    // 24 and 48 land inside b's lock and gap (45 + 18 ticks); 72 is past it.
+    expect(hits).toEqual([0, 0, ELEC])
   })
 
   it('the guard is per body: a teammate who was dry for the first arc is hurt by the next', () => {
@@ -151,7 +155,7 @@ describe('NPCs keep the full flood (the player\'s Tesla against wet enemies)', (
     expect(thug.health.hp).toBe(1000 - 2 * ELEC)
   })
 
-  it.fails('a wet player\'s shock on a wet thug beside it floods the thug every time, and the player once', () => {
+  it('a wet player\'s shock on a wet thug beside it floods the thug every time, and the player once', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
     const thug = soak(w, spawnNpc(w, 'thug', cx + 1.5, cy + 0.5))
@@ -173,7 +177,7 @@ describe('the real stun gun on a wet player', () => {
     return gunner
   }
 
-  it.fails('over 10 s the player never takes electrocution on a tick it could not act', () => {
+  it('over 10 s the player never takes electrocution on a tick it could not act', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx - 2 + 0.5, cy + 0.5)
     stunGunner(w, cx + 2 + 0.5, cy + 0.5)

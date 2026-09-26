@@ -986,7 +986,10 @@ const createPauseOverlay = (
     status.style.cssText = 'font:600 14px system-ui;color:#cfd3e0;display:none'
     refreshBtn.addEventListener('click', () => {
       // One way out: nothing else on this panel may act on a run that is leaving.
-      for (const b of row.querySelectorAll('button')) b.disabled = true
+      for (const b of row.querySelectorAll('button')) {
+        b.disabled = true
+        b.style.opacity = '0.6'
+      }
       onRefresh((text) => {
         status.textContent = text
         status.style.display = 'block'

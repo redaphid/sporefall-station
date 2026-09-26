@@ -19,6 +19,7 @@
 // `ai.behavior` component.
 
 import type { Entity } from '../entity'
+import { sightMult } from '../floorModifiers'
 import { hasLineOfSight } from '../los'
 import type { EntityId, Vec2 } from '../types'
 import { anyPowerCut, doorClosedAt, type World } from '../world'
@@ -71,7 +72,7 @@ export const canSeeEntity = (w: World, a: Entity, b: Entity): boolean =>
  * scoring, memory updates, and steering — so an NPC can never track a live
  * position it has no way of knowing. */
 export const perceives = (w: World, a: Entity, b: Entity): boolean => {
-  const sight = a.ai?.sightRange ?? 0
+  const sight = (a.ai?.sightRange ?? 0) * sightMult(w)
   const range = b.status && b.status.cloakUntil > w.tick ? sight * 0.5 : sight
   if (vlen(b.pos.x - a.pos.x, b.pos.y - a.pos.y) > range) return false
   return canSeeEntity(w, a, b)

@@ -8,6 +8,7 @@ import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout } from './loadoutModel'
 import { installGamepadMenuNav } from './gamepadMenu'
+import { ANNOUNCE_MS, modifierKey, modifierStripText, modifierToast } from './modifierModel'
 
 export interface Screens {
   update(view: RenderView): void
@@ -162,6 +163,30 @@ export const createScreens = (
     toastTimer = setTimeout(() => (toast.style.opacity = '0'), 1800)
   }
 
+  // Floor modifier strip: a small line just under the mission chip. It reads out
+  // the modifier in full when it takes hold, then shrinks to a live readout
+  // (tide in, next pack). Top edge and pointer-transparent: never over the player.
+  const modStrip = document.createElement('div')
+  modStrip.dataset.role = 'floor-modifier'
+  modStrip.style.cssText =
+    'position:absolute;top:calc(var(--sf-safe-top, 0px) + 62px);left:50%;transform:translateX(-50%);' +
+    'color:#bfe6d6;font:700 12px system-ui;letter-spacing:.04em;text-shadow:0 1px 3px #000;white-space:nowrap;' +
+    'background:rgba(12,14,22,.45);border-radius:999px;padding:2px 10px;pointer-events:none;z-index:70;display:none'
+  mount.appendChild(modStrip)
+  let modKey = ''
+  let modAnnounceUntil = 0
+  const updateModifier = (view: RenderView): void => {
+    const key = modifierKey(view.floor, view.modifier)
+    const now = performance.now()
+    if (key !== modKey) {
+      modKey = key
+      modAnnounceUntil = now + ANNOUNCE_MS
+    }
+    const text = modifierStripText(view.modifier, now < modAnnounceUntil)
+    if (modStrip.textContent !== text) modStrip.textContent = text
+    modStrip.style.display = text ? 'block' : 'none'
+  }
+
   // ---- The BOSS: entrance card + pinned health bar ------------------------
   // Neither existed. The Alpha wore the thug's sprite and died in under two
   // seconds, so a player could clear a dozen boss floors and truthfully say
@@ -290,10 +315,13 @@ export const createScreens = (
             const label = `${m?.icon ?? '🔧'} ${m?.name ?? ev.modId}`
             showToast(ev.maxed ? `${label} — MAXED` : `Got ${label}!`)
           }
+          const modToast = modifierToast(ev)
+          if (modToast) showToast(modToast)
         }
       }
       updateBoss(view)
       updateLocator(view)
+      updateModifier(view)
 
       // Restart affordance: up at game-over AND the moment the local player is
       // downed/dead, so they can bail the level without waiting out the bleed-out.

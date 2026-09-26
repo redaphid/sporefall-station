@@ -468,6 +468,16 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.cloakUntil = tick + 2
   }
+  // Mirror stun/sleep as 1/0 so the client's prediction gate (isMovementLocked)
+  // and the drowsy sprite see them. The client never decrements these; the next
+  // snapshot restates or clears them.
+  const stun = (we.flags & SnapFlags.Stunned) !== 0 ? 1 : 0
+  const sleep = (we.flags & SnapFlags.Sleeping) !== 0 ? 1 : 0
+  if (stun || sleep || e.status) {
+    e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
+    e.status.stun = stun
+    e.status.sleep = sleep
+  }
   if (we.archetype === 'player') {
     e.playerCtl ??= {
       playerId: -1,

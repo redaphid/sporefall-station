@@ -43,16 +43,25 @@ const statRow = (s: LoadoutStat): string => {
     </div>`
 }
 
-const modChip = (m: LoadoutModel['mods'][number]): string =>
-  `<div title="${escapeAttr(m.desc)}" style="display:inline-flex;align-items:center;gap:5px;
-      padding:4px 9px 4px 7px;border-radius:999px;font-size:12px;font-weight:700;color:#fff;
-      background:linear-gradient(180deg, ${m.color}33, ${m.color}18);
-      border:1px solid ${m.color};box-shadow:0 0 10px ${m.color}55, inset 0 0 6px ${m.color}22">
+// An inert chip is greyed and struck through; a downside-only one keeps its
+// colour but carries a red reason. Either way the reason is on the chip itself,
+// not in a hover title a gamepad player can never see.
+const modChip = (m: LoadoutModel['mods'][number]): string => {
+  const v = m.verdict
+  const inert = v.kind === 'inert'
+  const color = inert ? '#6b6b76' : m.color
+  return `<div data-mod-id="${m.id}" data-verdict="${v.kind}" title="${escapeAttr(m.desc)}" style="display:inline-flex;align-items:center;gap:5px;
+      padding:4px 9px 4px 7px;border-radius:999px;font-size:12px;font-weight:700;color:${inert ? '#9a9aa6' : '#fff'};
+      background:linear-gradient(180deg, ${color}33, ${color}18);
+      border:1px ${inert ? 'dashed' : 'solid'} ${v.kind === 'penalty' ? '#e0704f' : color};
+      box-shadow:${inert ? 'none' : `0 0 10px ${color}55, inset 0 0 6px ${color}22`}">
       <span style="display:inline-block;width:11px;height:11px;border-radius:3px;transform:rotate(45deg);
-        background:${m.color};box-shadow:0 0 6px ${m.color}"></span>
-      <span>${m.icon} ${escapeHtml(m.name)}</span>
-      ${m.stacks > 1 ? `<span style="font-size:11px;color:${m.color};background:#0006;border-radius:6px;padding:0 5px;font-weight:800">×${m.stacks}</span>` : ''}
+        background:${color};box-shadow:${inert ? 'none' : `0 0 6px ${color}`}"></span>
+      <span style="${inert ? 'text-decoration:line-through' : ''}">${m.icon} ${escapeHtml(m.name)}</span>
+      ${m.stacks > 1 ? `<span style="font-size:11px;color:${color};background:#0006;border-radius:6px;padding:0 5px;font-weight:800">×${m.stacks}</span>` : ''}
+      ${v.kind !== 'live' ? `<span class="mod-verdict" style="font-size:10px;font-weight:600;color:${inert ? '#b0b0bc' : '#ff9a7a'}">${escapeHtml(v.reason)}</span>` : ''}
     </div>`
+}
 
 const behaviorBadge = (b: LoadoutModel['behaviors'][number]): string =>
   `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;
@@ -110,7 +119,7 @@ export const createLoadoutPanel = (weaponThumb?: WeaponThumb): LoadoutPanel => {
           ? ''
           : `<div style="margin-bottom:12px;font-size:12px;color:#7a7f8c;font-style:italic">No mods installed — clean build.</div>`}
 
-      <div style="font-size:10px;letter-spacing:1.5px;color:#7a7f8c;text-transform:uppercase;margin-bottom:6px">Stats</div>
+      <div style="font-size:10px;letter-spacing:1.5px;color:#7a7f8c;text-transform:uppercase;margin-bottom:6px">Stats${model.statsScope === 'next shot' ? ' · next shot' : ''}</div>
       <div style="display:flex;flex-direction:column;gap:4px">${model.stats.map(statRow).join('')}</div>
 
       ${model.behaviors.length > 0

@@ -12,6 +12,7 @@ import { isPayloadMod, liveEntries, sequenceShape } from '../game/systems/modSeq
 import type { ModCasting } from '../game/world'
 import { modPickupColor } from '../render/modColors'
 import { toCssHex } from './loadoutModel'
+import { modVerdict } from '../game/systems/modEffect'
 
 export interface SequenceEntry {
   /** Raw index into the weapon's mod list (what a swap request names). */
@@ -27,6 +28,9 @@ export interface SequenceEntry {
   live: boolean
   /** Part of the cast the next trigger pull fires. */
   next: boolean
+  /** Why a live-window mod changes nothing (or only hurts) on the shot it
+   * rides in. Absent when it works, and for stowed mods. */
+  verdict?: string
 }
 
 export interface SequenceModel {
@@ -74,7 +78,9 @@ export const buildSequence = (
   }
   const entries: SequenceEntry[] = mods.map((m, listIndex) => {
     const d = MODS[m.id]
+    const v = d && liveSet.has(listIndex) ? modVerdict(def, mods, m.id, true) : undefined
     return {
+      ...(v && v.kind !== 'live' ? { verdict: v.reason } : {}),
       listIndex,
       id: m.id,
       name: d?.name ?? m.id,

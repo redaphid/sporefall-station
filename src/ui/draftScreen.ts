@@ -4,7 +4,7 @@
 // the chosen id. Presentation only; the sim data (the deterministic offer + the
 // applied pick) lives in `game/systems/draft.ts`.
 
-import { draftCards, type DraftCard } from '../game/systems/draft'
+import { draftCards, type DraftCard, type DraftLoadout } from '../game/systems/draft'
 import { markUiChrome } from './chrome'
 
 const RARITY_COLOR: Record<DraftCard['rarity'], string> = {
@@ -15,7 +15,7 @@ const RARITY_COLOR: Record<DraftCard['rarity'], string> = {
 
 export interface DraftScreen {
   /** Show the hand; `onPick(id)` fires when a card is chosen (screen auto-hides). */
-  show(offer: readonly string[], onPick: (id: string) => void): void
+  show(offer: readonly string[], onPick: (id: string) => void, loadout?: DraftLoadout): void
   hide(): void
   readonly visible: boolean
 }
@@ -34,8 +34,8 @@ export const createDraftScreen = (mount: HTMLElement): DraftScreen => {
     get visible() {
       return visible
     },
-    show(offer, onPick) {
-      const cards = draftCards(offer)
+    show(offer, onPick, loadout) {
+      const cards = draftCards(offer, loadout)
       root.replaceChildren()
 
       const panel = document.createElement('div')
@@ -73,7 +73,21 @@ export const createDraftScreen = (mount: HTMLElement): DraftScreen => {
         rar.textContent = c.rarity.toUpperCase()
         rar.style.cssText = `margin-top:auto;font:700 11px system-ui;letter-spacing:1.5px;color:${RARITY_COLOR[c.rarity]}`
 
-        card.append(icon, name, blurb, rar)
+        card.append(icon, name, blurb)
+        // The blurb says what the mod is for; this says what it would do on
+        // YOUR weapon, so a dead pick is visible before you take it.
+        if (c.verdict && c.verdict.kind !== 'live') {
+          const inert = c.verdict.kind === 'inert'
+          const verdict = document.createElement('div')
+          verdict.className = 'draft-verdict'
+          verdict.textContent = c.verdict.reason.toUpperCase()
+          verdict.style.cssText =
+            `font:800 11px system-ui;letter-spacing:1px;padding:3px 8px;border-radius:6px;` +
+            `color:${inert ? '#c8c8d2' : '#ffb39e'};background:${inert ? '#ffffff14' : '#e0704f33'}`
+          card.appendChild(verdict)
+          if (inert) card.style.opacity = '0.6'
+        }
+        card.appendChild(rar)
         card.onclick = () => {
           this.hide()
           onPick(c.id)

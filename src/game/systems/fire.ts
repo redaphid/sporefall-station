@@ -123,6 +123,9 @@ export const fireSystem = (w: World): void => {
   }
 }
 
+/** The unit of `StatusEntry.prepaidMicroHp`. */
+const MICRO_HP = 1_000_000
+
 /** Generic per-tick element effects: any entity carrying an element with a
  * `dot` loses that hp each tick. Data-driven off ELEMENTS, so poisoned/etc.
  * light up for free once their behavior lands. */
@@ -141,10 +144,13 @@ export const elementSystem = (w: World): void => {
       // hp is whole, so deal what this tick owes rounded up and bank the rest
       // against the next tick (#131). Rounding each tick alone made a cinder's
       // 0.4 a 0, and made a half resist on a 1-damage element no resist at all.
+      // The ledger is in whole micro-hp: float remainders drift, and a drift of
+      // 1e-16 above a whole number would round a whole extra hp up.
       const entry = e.fx[kind]
-      const owed = def.dot * mult - (entry.prepaid ?? 0)
-      const dmg = Math.ceil(owed)
-      entry.prepaid = dmg - owed || undefined
+      const perTick = Math.max(1, Math.round(def.dot * mult * MICRO_HP)) // any resist above 0 owes something
+      const owed = perTick - (entry.prepaidMicroHp ?? 0)
+      const dmg = Math.ceil(owed / MICRO_HP)
+      entry.prepaidMicroHp = dmg * MICRO_HP - owed || undefined
       if (dmg <= 0) continue
       hurt(w, e.health, dmg)
       w.events.push({ type: 'hit', x: e.pos.x, y: e.pos.y, targetId: e.id, amount: dmg })

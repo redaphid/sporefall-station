@@ -52,14 +52,18 @@ const dotHits = (archetype: string, kind: string, ticks: number, resist?: number
 }
 const sum = (xs: number[]): number => xs.reduce((a, b) => a + b, 0)
 
+/** What a body with `resist` must take where an unresisted one takes `neutral`:
+ * the exact share, rounded up. The epsilon keeps float dust in the product
+ * (0.3 × 10 is 3.0000000000000004) from rounding a whole share up. */
+const share = (resist: number, neutral: number): number => Math.ceil(resist * neutral - 1e-9)
+
 describe('a resist scales damage over time instead of rounding it away', () => {
   it('a cinder takes about 20% of what a thug takes from the same burn', () => {
     expect(NPCS.cinder.resist?.burning).toBe(0.2)
     const thug = sum(dotHits('thug', 'burning', ELEMENTS.burning.durationTicks))
     const cinder = sum(dotHits('cinder', 'burning', ELEMENTS.burning.durationTicks))
     expect(thug).toBeGreaterThan(100)
-    expect(cinder).toBeGreaterThanOrEqual(0.2 * thug)
-    expect(cinder).toBeLessThan(0.2 * thug + 1)
+    expect(cinder).toBe(share(0.2, thug))
   })
 
   it('standing in fire re-lights the burn every tick without forgetting what it owes', () => {
@@ -75,8 +79,7 @@ describe('a resist scales damage over time instead of rounding it away', () => {
       thugLost += sum(hitsOn(w, thug))
       cinderLost += sum(hitsOn(w, cinder))
     }
-    expect(cinderLost).toBeGreaterThanOrEqual(0.2 * thugLost)
-    expect(cinderLost).toBeLessThan(0.2 * thugLost + 1)
+    expect(cinderLost).toBe(share(0.2, thugLost))
   })
 
   const rosterRows = Object.values(NPCS).flatMap((def) =>
@@ -89,12 +92,25 @@ describe('a resist scales damage over time instead of rounding it away', () => {
       expect(hits).toEqual([])
       return
     }
-    expect(sum(hits)).toBeGreaterThan(0)
-    expect(sum(hits)).toBeGreaterThanOrEqual(resist * neutral)
-    expect(sum(hits)).toBeLessThan(resist * neutral + 1)
+    expect(sum(hits)).toBe(share(resist, neutral))
   })
 
-  const tiny = [0.001, 0.01, 0.1, 0.2, 0.25, 0.3, 0.49]
+  // A status applied on tick 0 for (n - 1) intervals lands n damage ticks.
+  const wholeShares = [
+    ['burning', 0.2, 10],
+    ['burning', 0.35, 20],
+    ['poisoned', 0.3, 10],
+    ['poisoned', 0.7, 10],
+    ['spore', 0.1, 30],
+  ] as const
+  it.each(wholeShares)('%s at resist %s over %s damage ticks deals exactly its whole share', (kind, resist, n) => {
+    const ticks = (n - 1) * ELEMENTS[kind].interval
+    const neutral = sum(dotHits('thug', kind, ticks))
+    expect(neutral).toBe(n * ELEMENTS[kind].dot)
+    expect(sum(dotHits('thug', kind, ticks, resist))).toBe(share(resist, neutral))
+  })
+
+  const tiny = [1e-9, 0.001, 0.01, 0.1, 0.2, 0.25, 0.3, 0.49]
   it.each(DOTS.flatMap((d) => tiny.map((r) => [d.id, r] as const)))(
     '%s at resist %s still deals damage inside one damage interval',
     (kind, resist) => {

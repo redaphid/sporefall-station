@@ -56,8 +56,9 @@ live site, `?debug` logs `[debug] hub unavailable: …` and the game runs withou
 the hub.
 `sporefall.verb(...)` still works in the page console. A `?debugPort=` outside
 1-65535 gets the same log line. If the browser refuses the socket for any other
-reason, the channel logs `[debug] hub unavailable (<url>): <reason>` once and
-stops dialing. The game keeps running.
+reason, the channel logs `[debug] hub unavailable (<url>): <reason>` and stops
+retrying. The game keeps running. A New Seed tries once more, like a page reload.
+`tools/debug-harness/host.ts` exits with status 1 in the same case.
 
 ## 3. Drive it from the CLI
 

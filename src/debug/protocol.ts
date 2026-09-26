@@ -81,9 +81,8 @@ export type HubTarget = { ok: true; url: string } | { ok: false; reason: string 
 
 /** Resolve the hub for the page that loaded the app. The hub is a plain `ws://`
  * server (tools/debug-hub), and browsers throw on `ws://` from an HTTPS page to a
- * public host such as the live site. No workflow serves `?debug` over HTTPS from a
- * host that could reach the hub, so an HTTPS page never dials. `debugPort` is the
- * raw `?debugPort=` value. */
+ * public host such as the live site. By policy an HTTPS page never dials, even to
+ * loopback, which browsers would allow. `debugPort` is the raw `?debugPort=`. */
 export const resolveHubTarget = (page: { protocol: string; hostname: string }, debugPort: string | null): HubTarget => {
   if (page.protocol === 'https:')
     return { ok: false, reason: 'this page is HTTPS and the hub only speaks plain ws://. Serve the app over http:// to use the hub' }

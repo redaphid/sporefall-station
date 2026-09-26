@@ -99,6 +99,10 @@ export interface ChannelOpts {
   /** Injectable page-lifecycle source for tests; defaults to the real DOM
    * (window `pagehide`/`beforeunload` + document `visibilitychange`). */
   lifecycle?: LifecycleTarget
+  /** Called once if the socket cannot even be constructed for this URL. The
+   * channel has already logged and stopped dialing. The browser game ignores it
+   * and keeps running; a Node tool can exit non-zero. */
+  onUnavailable?: (reason: string) => void
 }
 
 /** The subset of page-lifecycle the channel needs to self-remove when the webview
@@ -170,7 +174,9 @@ const connectWithBackoff = (
       // (SecurityError for ws:// from HTTPS, SyntaxError for a bad URL), so
       // retrying cannot help. Give up and leave the game running.
       stopped = true
-      log(`[debug] hub unavailable (${url}): ${e instanceof Error ? e.message : String(e)}`)
+      const reason = e instanceof Error ? e.message : String(e)
+      log(`[debug] hub unavailable (${url}): ${reason}`)
+      opts.onUnavailable?.(reason)
       return
     }
     ws.onopen = () => {

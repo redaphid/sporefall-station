@@ -20,7 +20,7 @@ import { DEFAULT_HUB_PORT, hubUrl } from '../../src/debug/protocol'
 const url = process.env.DEBUG_HUB_URL ?? hubUrl('127.0.0.1', Number(process.env.DEBUG_HUB_PORT ?? DEFAULT_HUB_PORT))
 
 const harness = new GameHarness()
-const channel = startHarnessChannel(harness, url, (m) => console.log(m))
+const channel = startHarnessChannel(harness, url, (m) => console.log(m), { onUnavailable: () => process.exit(1) })
 
 console.log(`sporefall debug harness backend → ${url}`)
 console.log('drive it with tools/debug-cli/cli.ts (create / join_bot / start_run / tick / record_start …)')

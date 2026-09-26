@@ -7,7 +7,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HostSession } from '../app/hostSession'
 import { createScriptedInput } from '../input/scripted'
-import { startDebugLink, type LifecycleTarget } from './channel'
+import { startDebugLink, startHarnessChannel, type LifecycleTarget } from './channel'
+import { GameHarness } from './harness'
 
 const SECURITY = (): Error =>
   new DOMException(
@@ -105,13 +106,56 @@ describe.each([
     boot.link.stop()
   })
 
-  it('survives a New Seed rebind and keeps ticking the fresh world', () => {
+  it('survives a New Seed rebind, which tries once more like a page reload, and keeps ticking', () => {
     const boot = bootSolo(err)
     boot.play(3)
     boot.session.restart()
-    expect(() => boot.link.rebind(boot.session.world)).not.toThrow()
+    boot.link.rebind(boot.session.world)
+    vi.advanceTimersByTime(60_000)
     boot.play(7)
     expect(boot.session.world.tick).toBe(7)
+    expect(boot.socket.dials()).toBe(2)
+    expect(boot.logs.filter((l) => l.includes('hub unavailable'))).toHaveLength(2)
     boot.link.stop()
+  })
+})
+
+describe('onUnavailable', () => {
+  it('fires once with the browser reason, so a Node tool can exit non-zero', () => {
+    const socket = refusingSocket(SYNTAX)
+    const reasons: string[] = []
+    const ch = startHarnessChannel(new GameHarness(), 'ws://127.0.0.1:99999', () => {}, {
+      WebSocketImpl: socket.WS,
+      onUnavailable: (r) => reasons.push(r),
+    })
+    vi.advanceTimersByTime(60_000)
+    expect(reasons).toEqual([SYNTAX().message])
+    expect(socket.dials()).toBe(1)
+    ch.stop()
+  })
+
+  it('stays silent when the socket constructs, even if the hub is down', () => {
+    const reasons: string[] = []
+    class DownWS {
+      onopen: (() => void) | null = null
+      onclose: (() => void) | null = null
+      onerror: (() => void) | null = null
+      onmessage: ((ev: { data: string }) => void) | null = null
+      send(): void {}
+      close(): void {
+        this.onclose?.()
+      }
+      constructor() {
+        setTimeout(() => this.onclose?.(), 0)
+      }
+    }
+    const ch = startHarnessChannel(new GameHarness(), 'ws://127.0.0.1:7810', () => {}, {
+      WebSocketImpl: DownWS as unknown as typeof WebSocket,
+      baseDelayMs: 100,
+      onUnavailable: (r) => reasons.push(r),
+    })
+    vi.advanceTimersByTime(5_000)
+    expect(reasons).toEqual([])
+    ch.stop()
   })
 })

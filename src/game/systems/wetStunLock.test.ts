@@ -100,6 +100,13 @@ describe('a wet player takes the arc once per lock', () => {
     expect(zap(w, p)).toBe(0)
   })
 
+  it('a wet player knocked flat by a legacy stun (sledgehammer, slip) is not electrocuted', () => {
+    const { w, cx, cy } = arena()
+    const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
+    applyStatus(w, p, 'stun', 20)
+    expect(zap(w, p)).toBe(0)
+  })
+
   it('a dead or downed player is left alone, as before', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)

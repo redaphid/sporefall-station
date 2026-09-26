@@ -8,10 +8,11 @@
 //     agent gaining "Electrocuted" while `underWater || spillWater` takes
 //     ChangeHealth(-20) (-30 fully underwater). A DRY electrocuted agent is only
 //     immobilized (CantDoAnything), taking no water damage — so the arc conducts
-//     through wet bodies only and a dry body is a dead end. A PLAYER already
-//     under a control lock, or in the immunity gap after one, conducts but
-//     takes no electrocution: the anti-chain-lock guards the harm as well as
-//     the hold, so every arc that hurts a player is one it could walk out of.
+//     through wet bodies only and a dry body is a dead end. A PLAYER that
+//     cannot act (shocked, frozen, stunned, asleep), or is in the immunity gap
+//     after a shock or freeze, conducts but takes no electrocution: the
+//     anti-chain-lock guards the harm as well as the hold, so an arc only hurts
+//     a player who was free to walk out of the water.
 //
 // The matrix's other two rules live where their trigger is: SHATTER-on-impact in
 // combat.applyDamage (a hit on a frozen body), and IMMOBILIZE (frozen/electrified
@@ -28,7 +29,7 @@ import { resistMult, type Entity } from '../entity'
 import type { EntityId } from '../types'
 import type { World } from '../world'
 import { kill } from './combat'
-import { addStatus, controlBlocked, isWet } from './statusFx'
+import { addStatus, controlBlocked, isMovementLocked, isWet } from './statusFx'
 import { vlen } from '../simMath'
 
 /** hp a wet body loses per electrocution (StatusEffects.cs spillWater case). */
@@ -82,7 +83,7 @@ export const shock = (
     const e = queue.shift()!
     if (seen.has(e) || e.dead) continue
     seen.add(e)
-    const guarded = e.playerCtl !== undefined && controlBlocked(w, e)
+    const guarded = e.playerCtl !== undefined && (controlBlocked(w, e) || isMovementLocked(e))
     addStatus(w, e, 'electrified', ticks)
     if (e === origin && !origin.playerCtl) {
       const leap = arcJumpTarget(w, origin, seen, source)

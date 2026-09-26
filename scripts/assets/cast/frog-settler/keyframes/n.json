@@ -1,0 +1,294 @@
+{
+ "dir": "n",
+ "seed": 12,
+ "prompt": "Picture 1 and Picture 2 show the same cloaked frog villager standing and facing us from the front. Draw this exact same standing cloaked frog villager seen from DIRECTLY BEHIND: the back of his head, the back of his brown hooded cloak and scarf hanging down his back, and the backs of his arms and legs. His face is completely hidden, no eyes and no mouth visible. He is STANDING UPRIGHT on both hind feet, not sitting, not crouching, not kneeling, with his weight on both planted feet and his back straight. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions, the same height and the same size as in Picture 1, on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+ "inputs": {
+  "p1": {
+   "ref": "s",
+   "uploaded_as": "puck-sprites/frog-s-white.png",
+   "pixel_sha256": null
+  },
+  "p2": {
+   "ref": "s",
+   "uploaded_as": "puck-sprites/frog-s-white.png",
+   "pixel_sha256": null
+  },
+  "canvas": {
+   "ref": "white 1280x720",
+   "uploaded_as": "puck-sprites/canvas_white.png",
+   "pixel_sha256": null
+  }
+ },
+ "candidate": "/mnt/d/projects/puck-sprites/out/frog/kf2/frog-n-s12",
+ "raw_pixel_sha256": "ef3f83f489d540e49463e289cb9f867a7dd4093f34da62975a9835a2ab79a0bc",
+ "normalise": {
+  "from": "frog-n-alpha.png",
+  "height": 540,
+  "content_size": [
+   358,
+   540
+  ]
+ },
+ "png_sha256": "a1a91cb9ae438871b7fea1c2a6ca633fbf20f4c87e9c9b49fd9d85ee1b88aadd",
+ "graph": {
+  "41": {
+   "inputs": {
+    "image": "puck-sprites/frog-s-white.png"
+   },
+   "class_type": "LoadImage",
+   "_meta": {
+    "title": "Load Image"
+   },
+   "is_changed": [
+    "6198ef8445c4fa00784ebce145730c3a3c8e53d845efdf0d790809a58e6e624d"
+   ]
+  },
+  "170:145": {
+   "inputs": {
+    "shift": 3.1,
+    "model": [
+     "170:161",
+     0
+    ]
+   },
+   "class_type": "ModelSamplingAuraFlow",
+   "_meta": {
+    "title": "ModelSamplingAuraFlow"
+   }
+  },
+  "170:146": {
+   "inputs": {
+    "vae_name": "qwen_image_vae.safetensors"
+   },
+   "class_type": "VAELoader",
+   "_meta": {
+    "title": "Load VAE"
+   }
+  },
+  "170:147": {
+   "inputs": {
+    "reference_latents_method": "index_timestep_zero",
+    "conditioning": [
+     "170:149",
+     0
+    ]
+   },
+   "class_type": "FluxKontextMultiReferenceLatentMethod",
+   "_meta": {
+    "title": "Edit Model Reference Method"
+   }
+  },
+  "170:148": {
+   "inputs": {
+    "reference_latents_method": "index_timestep_zero",
+    "conditioning": [
+     "170:151",
+     0
+    ]
+   },
+   "class_type": "FluxKontextMultiReferenceLatentMethod",
+   "_meta": {
+    "title": "Edit Model Reference Method"
+   }
+  },
+  "170:149": {
+   "inputs": {
+    "prompt": "",
+    "clip": [
+     "170:162",
+     0
+    ],
+    "vae": [
+     "170:146",
+     0
+    ],
+    "image1": [
+     "170:160",
+     0
+    ]
+   },
+   "class_type": "TextEncodeQwenImageEditPlus",
+   "_meta": {
+    "title": "TextEncodeQwenImageEditPlus"
+   }
+  },
+  "170:151": {
+   "inputs": {
+    "prompt": "Picture 1 and Picture 2 show the same cloaked frog villager standing and facing us from the front. Draw this exact same standing cloaked frog villager seen from DIRECTLY BEHIND: the back of his head, the back of his brown hooded cloak and scarf hanging down his back, and the backs of his arms and legs. His face is completely hidden, no eyes and no mouth visible. He is STANDING UPRIGHT on both hind feet, not sitting, not crouching, not kneeling, with his weight on both planted feet and his back straight. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions, the same height and the same size as in Picture 1, on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+    "clip": [
+     "170:162",
+     0
+    ],
+    "vae": [
+     "170:146",
+     0
+    ],
+    "image1": [
+     "170:160",
+     0
+    ],
+    "image2": [
+     "900",
+     0
+    ]
+   },
+   "class_type": "TextEncodeQwenImageEditPlus",
+   "_meta": {
+    "title": "TextEncodeQwenImageEditPlus (Positive)"
+   }
+  },
+  "170:152": {
+   "inputs": {
+    "strength": 1.0,
+    "pre_cfg": false,
+    "model": [
+     "170:145",
+     0
+    ]
+   },
+   "class_type": "CFGNorm",
+   "_meta": {
+    "title": "CFGNorm"
+   }
+  },
+  "170:153": {
+   "inputs": {
+    "lora_name": "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+    "strength_model": 1.0,
+    "model": [
+     "170:152",
+     0
+    ]
+   },
+   "class_type": "LoraLoaderModelOnly",
+   "_meta": {
+    "title": "Load LoRA"
+   }
+  },
+  "170:156": {
+   "inputs": {
+    "pixels": [
+     "902",
+     0
+    ],
+    "vae": [
+     "170:146",
+     0
+    ]
+   },
+   "class_type": "VAEEncode",
+   "_meta": {
+    "title": "VAE Encode"
+   }
+  },
+  "170:161": {
+   "inputs": {
+    "unet_name": "qwen_image_edit_2511_fp8_e4m3fn.safetensors",
+    "weight_dtype": "default"
+   },
+   "class_type": "UNETLoader",
+   "_meta": {
+    "title": "Load Diffusion Model"
+   }
+  },
+  "170:162": {
+   "inputs": {
+    "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+    "type": "qwen_image",
+    "device": "default"
+   },
+   "class_type": "CLIPLoader",
+   "_meta": {
+    "title": "Load CLIP"
+   }
+  },
+  "170:169": {
+   "inputs": {
+    "seed": 12,
+    "steps": 4,
+    "cfg": 1.0,
+    "sampler_name": "euler",
+    "scheduler": "simple",
+    "denoise": 1.0,
+    "model": [
+     "170:153",
+     0
+    ],
+    "positive": [
+     "170:148",
+     0
+    ],
+    "negative": [
+     "170:147",
+     0
+    ],
+    "latent_image": [
+     "170:156",
+     0
+    ]
+   },
+   "class_type": "KSampler",
+   "_meta": {
+    "title": "KSampler"
+   }
+  },
+  "170:158": {
+   "inputs": {
+    "samples": [
+     "170:169",
+     0
+    ],
+    "vae": [
+     "170:146",
+     0
+    ]
+   },
+   "class_type": "VAEDecode",
+   "_meta": {
+    "title": "VAE Decode"
+   }
+  },
+  "170:160": {
+   "inputs": {
+    "image": [
+     "41",
+     0
+    ]
+   },
+   "class_type": "FluxKontextImageScale",
+   "_meta": {
+    "title": "FluxKontextImageScale"
+   }
+  },
+  "902": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "puck-sprites/canvas_white.png",
+    "upload": "image"
+   },
+   "is_changed": [
+    "45c5022dcaa72fc60285893485fbf2f42df16f886d6261dcd4cef17f74e00e90"
+   ]
+  },
+  "900": {
+   "class_type": "LoadImage",
+   "inputs": {
+    "image": "puck-sprites/frog-s-white.png",
+    "upload": "image"
+   },
+   "is_changed": [
+    "aae694571761efa46c17c268187c71ae706f129aa4cab35903723a18b7849fdb"
+   ]
+  },
+  "999": {
+   "class_type": "SaveImage",
+   "inputs": {
+    "filename_prefix": "puck-sprites/PS-K-frog-n-s12-165713",
+    "images": [
+     "170:158",
+     0
+    ]
+   }
+  }
+ }
+}

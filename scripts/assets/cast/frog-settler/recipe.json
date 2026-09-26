@@ -1,0 +1,166 @@
+{
+ "schema": 1,
+ "char": "frog-settler",
+ "engine": {
+  "repo": "D:/projects/puck-sprites",
+  "remote": "https://github.com/redaphid/puck-sprites",
+  "commit": "ceaedf16daa596491fe72d44d296f9d3ee41a0dd",
+  "comfyui": "0.37.0",
+  "runtime": {
+   "v2a": {
+    "python": "3.12.13",
+    "numpy": "2.5.3",
+    "Pillow": "12.3.0",
+    "scipy": "1.18.1"
+   },
+   "wsl": {
+    "python": "3.14.7",
+    "numpy": "2.4.2",
+    "Pillow": "12.1.1",
+    "scipy": "1.17.1"
+   }
+  }
+ },
+ "anchor": {
+  "file": "scripts/assets/anchors/frog-settler-s-idle.png",
+  "height": 560
+ },
+ "keyframes": {
+  "graph": "workflows/qwen/K3-front.json",
+  "height": 540,
+  "dirs": {
+   "s": {
+    "seed": 12,
+    "p1": "anchor",
+    "p2": {
+     "file": "/mnt/d/projects/puck-sprites/out/frog/keyframes/frog-e-s3/frog-e-white.png"
+    },
+    "prompt": "Picture 1 shows a standing frog villager seen from the front. Picture 2 shows the same frog villager in a side view wearing his brown hooded cloak and scarf. Draw this exact same cloaked frog villager standing and facing us straight from the front, looking at us: his wide green frog face with both eyes and both eye-stalk bumps, the brown hooded cloak hanging from his shoulders and the scarf wrapped at his throat exactly as in Picture 2, his arms down at his sides and his feet planted side by side. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions and the same size on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+    "sha256": "2debe80b6a4031357caf9475dce19f34e6cddb2c2f77a7c129b346324a6791bb"
+   },
+   "se": {
+    "seed": 3,
+    "p1": "s",
+    "p2": "s",
+    "prompt": "Picture 1 and Picture 2 show the same cloaked frog villager standing and facing us from the front. Draw this exact same standing cloaked frog villager rotated 45 degrees to a three-quarter view of his front-right: his body and face turned toward the right side of the image, one eye and the side of his wide muzzle visible, his brown cloak hanging open down his near side. He is STANDING UPRIGHT on both hind feet, not sitting, not crouching, not kneeling, with his weight on both planted feet and his back straight. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions, the same height and the same size as in Picture 1, on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+    "sha256": "d5765db644f29a34233a14c230b389c2df90ea7db0cac55db344fd3287df4137"
+   },
+   "e": {
+    "seed": 12,
+    "p1": "s",
+    "p2": "s",
+    "prompt": "Picture 1 and Picture 2 show the same cloaked frog villager standing and facing us from the front. Draw this exact same standing cloaked frog villager in a full side profile facing the right side of the image: the whole outline of his wide muzzle and one eye, his brown cloak hanging down his back and side, his near arm and near leg in front of the far ones, both feet on the ground. He is STANDING UPRIGHT on both hind feet, not sitting, not crouching, not kneeling, with his weight on both planted feet and his back straight. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions, the same height and the same size as in Picture 1, on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+    "sha256": "32d6023b20db8a6de80ab456eccc6d05228b10d9bfbcca39cd29582f8ec9763f"
+   },
+   "ne": {
+    "seed": 11,
+    "p1": "n",
+    "p2": "n",
+    "prompt": "Picture 1 and Picture 2 show the same cloaked frog villager standing, seen from directly behind. Draw this exact same standing cloaked frog villager turned 45 degrees to a three-quarter REAR view: we still see his back and the back of his brown hood, but his body is angled toward the right side of the image so the right edge of his hood and his right shoulder come forward and his far side is hidden. His green legs and feet are clearly visible below the hem of the cloak. NO eye is visible. NO face is visible. His head stays turned away from us. He is STANDING UPRIGHT on both hind feet, not sitting, not crouching, not kneeling, with his weight on both planted feet and his back straight. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions, the same height and the same size as in Picture 1, on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+    "sha256": "794e65306b1926348711c5cabb28d08ae777ae253015c2129c3c5ce23235035d"
+   },
+   "n": {
+    "seed": 12,
+    "p1": "s",
+    "p2": "s",
+    "prompt": "Picture 1 and Picture 2 show the same cloaked frog villager standing and facing us from the front. Draw this exact same standing cloaked frog villager seen from DIRECTLY BEHIND: the back of his head, the back of his brown hooded cloak and scarf hanging down his back, and the backs of his arms and legs. His face is completely hidden, no eyes and no mouth visible. He is STANDING UPRIGHT on both hind feet, not sitting, not crouching, not kneeling, with his weight on both planted feet and his back straight. Keep the identical painted swamp-creature style, the same green skin tones, the same brown hooded cloak and scarf, the same chunky proportions, the same height and the same size as in Picture 1, on a clean pure white background, with wide margins and nothing touching the edges. No text, no watermark, no grid.",
+    "sha256": "a1a91cb9ae438871b7fea1c2a6ca633fbf20f4c87e9c9b49fd9d85ee1b88aadd"
+   }
+  }
+ },
+ "walk": {
+  "graph": "L",
+  "seed": 3,
+  "dirs": {
+   "s": {
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen from the front, facing the camera, walking straight toward us. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+   },
+   "se": {
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen in a three-quarter front view turned toward the right of the frame, walking diagonally toward the lower right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+   },
+   "e": {
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, in full side profile facing the right side of the frame, walking to the right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+   },
+   "ne": {
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen in a three-quarter rear view turned toward the right of the frame, walking away from us toward the upper right. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours. He never turns around and never faces the camera: we only ever see him from behind for the whole clip. His green legs and feet step out from under the hem of the cloak, one and then the other."
+   },
+   "n": {
+    "prompt": "Pixel art game sprite animation. A stocky green frog villager wearing a brown hooded cloak and a scarf, seen from directly behind, walking straight away from us. He walks in place on the spot in a smooth looping walk cycle: his two legs step one after the other with clear alternating steps, his body bobs slightly and his cloak sways with each step. He does not move across the frame. Static camera, the camera does not move, plain white background, crisp pixel art, flat colours."
+   }
+  }
+ },
+ "cut": {
+  "premat": [
+   "--shrink",
+   "1"
+  ],
+  "args": [
+   "--pixel",
+   "--sprite-height",
+   "96",
+   "--matte",
+   "alpha",
+   "--erode",
+   "1",
+   "--frames",
+   "8",
+   "--lens-guard",
+   "0",
+   "--no-canon"
+  ],
+  "dirs": {
+   "s": {
+    "args": [
+     "--min-period",
+     "30"
+    ]
+   },
+   "se": {
+    "args": [
+     "--min-period",
+     "30"
+    ]
+   },
+   "e": {
+    "args": [
+     "--min-period",
+     "30"
+    ]
+   },
+   "ne": {
+    "args": [
+     "--min-period",
+     "40"
+    ]
+   },
+   "n": {
+    "args": [
+     "--min-period",
+     "30"
+    ]
+   }
+  }
+ },
+ "export": {
+  "idle": 0,
+  "step": 4,
+  "despeck": {
+   "lo": 225,
+   "spread": 14
+  },
+  "packs": [
+   {
+    "pack": "swampspace-hires",
+    "px": 96,
+    "content": 92,
+    "resample": "nearest"
+   },
+   {
+    "pack": "swampspace",
+    "px": 48,
+    "content": 46,
+    "resample": "lanczos"
+   }
+  ]
+ }
+}

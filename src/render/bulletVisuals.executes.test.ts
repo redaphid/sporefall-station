@@ -1,6 +1,7 @@
 // The bullet's look is composed from its provenance, so it must match what the
-// round does on a hit. Fires through the real combat system, then composes the
-// look with the renderer's own pure function (the same call bullets.ts makes).
+// round does on a hit: its own cast, never another cast's element. Fires the
+// first pull through the real combat system, then composes the look with the
+// renderer's own pure function (the same call bullets.ts makes).
 
 import { describe, expect, it } from 'vitest'
 import type { WeaponMod } from '../game/entity'
@@ -25,24 +26,24 @@ const lookOfShot = (mods: WeaponMod[]): BulletTraits => {
 }
 
 describe('a round looks like the element it applies', () => {
-  it('Tesla then Cryo and Cryo then Tesla no longer look alike', () => {
-    const freezes = lookOfShot([m('shock'), m('frost')])
-    const zaps = lookOfShot([m('frost'), m('shock')])
+  it('Tesla then Cryo and Cryo then Tesla open with different looks', () => {
+    const zaps = lookOfShot([m('shock'), m('frost')])
+    const freezes = lookOfShot([m('frost'), m('shock')])
     expect(freezes.color).not.toBe(zaps.color)
     expect(freezes.glowColor).not.toBe(zaps.glowColor)
     expect(freezes.jitter).not.toBe(zaps.jitter)
   })
 
-  it('Tesla then Cryo looks exactly like a Cryo-only round', () => {
-    expect(lookOfShot([m('shock'), m('frost')])).toEqual(lookOfShot([m('frost')]))
+  it('the first round of Tesla then Cryo looks exactly like a Tesla-only round', () => {
+    expect(lookOfShot([m('shock'), m('frost')])).toEqual(lookOfShot([m('shock')]))
   })
 
-  it('Cryo then Tesla looks exactly like a Tesla-only round', () => {
-    expect(lookOfShot([m('frost'), m('shock')])).toEqual(lookOfShot([m('shock')]))
+  it('the first round of Cryo then Tesla looks exactly like a Cryo-only round', () => {
+    expect(lookOfShot([m('frost'), m('shock')])).toEqual(lookOfShot([m('frost')]))
   })
 
-  it('with modifiers mixed in, only the overridden elements drop out of the look', () => {
-    const all = lookOfShot([m('incendiary'), m('pierce', 2), m('shock'), m('rapid'), m('frost')])
-    expect(all).toEqual(lookOfShot([m('pierce', 2), m('rapid'), m('frost')]))
+  it("with modifiers mixed in, a round looks like its own cast and nothing after it", () => {
+    const first = lookOfShot([m('pierce', 2), m('rapid'), m('frost'), m('incendiary'), m('shock')])
+    expect(first).toEqual(lookOfShot([m('pierce', 2), m('rapid'), m('frost')]))
   })
 })

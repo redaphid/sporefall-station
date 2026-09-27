@@ -1,8 +1,7 @@
 // A round's split shards, splinter shrapnel, explosive blast and detonator blast
 // carry the element that ends the round's cast (#119): a modifier rides the next
 // element after it in list order, and trailing modifiers form a bare cast that
-// carries none. Sequenced casting is being made the only firing mode, so every
-// case here forces `modCasting = 'sequence'`.
+// carries none.
 //
 // Every case sets exact world state and runs the real systems.
 
@@ -25,12 +24,11 @@ const STATUS_OF: Record<string, string> = { frost: 'frozen', incendiary: 'burnin
 const STATUSES = Object.values(STATUS_OF)
 const isElement = (id: string): boolean => MODS[id]?.onHit !== undefined
 
-/** A sequenced gun facing east, its next cast starting at window position `at`.
+/** A gun facing east, its next cast starting at window position `at`.
  * Seed 1 floor 1 has an open corridor over y 18..22, x 14..36: every stage
  * below stays inside it, so no wall stops a round, shard or blast. */
 const rig = (mods: string[], at = 0, weapon = 'pistol'): { w: World; p: Entity } => {
   const w = createWorld(1, 1)
-  w.modCasting = 'sequence'
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
   const stack = arm(p, weapon)

@@ -2,7 +2,7 @@ import type { Entity } from '../game/entity'
 import type { ModifierView } from '../game/floorModifiers'
 import type { Level } from '../game/levelgen/level'
 import type { Annotation, SimEvent } from '../game/types'
-import type { ModCasting, RunMode } from '../game/world'
+import type { RunMode } from '../game/world'
 
 /** What the render layer consumes each frame. */
 export interface RenderView {
@@ -34,9 +34,6 @@ export interface RenderView {
   mode?: RunMode
   /** Party-shared comebacks left this run (only meaningful in `normal`). */
   revivesLeft?: number
-  /** Mod casting rule in force (host truth; clients mirror it from GameStart).
-   * Absent = the default fold. Drives the HUD's sequence strip. */
-  modCasting?: ModCasting
   /** The HOST's sim tick the view reflects. Equal to `tick` on a host; on a
    * client it is the newest snapshot's tick (the client's own `tick` is a local
    * frame counter). Compared against host-tick deadlines such as a weapon's

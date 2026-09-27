@@ -43,9 +43,12 @@ export interface PadLike {
   axes: readonly number[]
 }
 
+/** The buttons that confirm by default: any face button, or Start. */
+export const MENU_CONFIRM_BUTTONS: readonly number[] = [0, 1, 2, 3, 9]
+
 /** Decode a pad snapshot into directional + confirm intent. Tolerant of short
  * button/axis arrays (non-standard pads) — every lookup is bounds-guarded. */
-export const readMenuPad = (gp: PadLike | null | undefined): PadReading => {
+export const readMenuPad = (gp: PadLike | null | undefined, confirmButtons: readonly number[] = MENU_CONFIRM_BUTTONS): PadReading => {
   if (!gp) return { prev: false, next: false, confirm: false }
   const pressed = (i: number): boolean => gp.buttons[i]?.pressed === true
   const axis = (i: number): number => gp.axes[i] ?? 0
@@ -54,7 +57,7 @@ export const readMenuPad = (gp: PadLike | null | undefined): PadReading => {
   // horizontal game-over button row with one control scheme.
   const prev = pressed(12) || pressed(14) || axis(1) <= -dz || axis(0) <= -dz
   const next = pressed(13) || pressed(15) || axis(1) >= dz || axis(0) >= dz
-  const confirm = pressed(0) || pressed(1) || pressed(2) || pressed(3) || pressed(9)
+  const confirm = confirmButtons.some(pressed)
   return { prev, next, confirm }
 }
 
@@ -109,6 +112,9 @@ export interface GamepadMenuNavOptions {
    * settings panel uses it to cycle a <select> instead (a synthetic click
    * cannot open the native dropdown). */
   activate?: (el: MenuNavControl) => void
+  /** Pad buttons that confirm; defaults to MENU_CONFIRM_BUTTONS. The pause menu
+   * leaves out Start, which already resumes the run. */
+  confirmButtons?: readonly number[]
 }
 
 /**
@@ -125,6 +131,7 @@ export const installGamepadMenuNav = (
   const schedule = options.schedule ?? ((cb) => requestAnimationFrame(cb))
   const cancel = options.cancel ?? ((h) => cancelAnimationFrame(h))
   const activate = options.activate ?? ((el: MenuNavControl) => el.click())
+  const read = (): PadReading => readMenuPad(readPads(), options.confirmButtons)
   let handle = 0
   let index = 0
   let mem = emptyNavMemory()
@@ -169,11 +176,11 @@ export const installGamepadMenuNav = (
       if (index >= btns.length) index = btns.length - 1
       if (resync) {
         resync = false
-        const r = readMenuPad(readPads())
+        const r = read()
         mem = { prevDown: r.prev, nextDown: r.next, confirmDown: r.confirm }
         paint(btns) // show the cursor at once; presses act from the next frame
       } else {
-        const step = stepMenuNav(readMenuPad(readPads()), mem, index, btns.length)
+        const step = stepMenuNav(read(), mem, index, btns.length)
         mem = step.mem
         index = step.index
         paint(btns)

@@ -16,7 +16,6 @@ import { dispositionToward, initialPlayerHate, determineRel } from '../game/syst
 import { weaponStack } from '../game/systems/inventory'
 import { pickTicks } from '../game/systems/interaction'
 import { SIM_RATE } from '../game/types'
-import type { ModCasting } from '../game/world'
 import { selfModVerdict } from './loadoutModel'
 
 export interface InfoRow {
@@ -55,8 +54,6 @@ export interface InfoCardCtx {
   missionTargetId?: number
   /** Local player: a mod pickup says what it would do on THIS player's weapon. */
   self?: Entity
-  /** The run's casting rule (RenderView.modCasting). */
-  modCasting?: ModCasting
 }
 
 /** Title-case an archetype key like `door.wood` → `Door Wood`. */
@@ -91,11 +88,11 @@ const itemName = (id: string): string =>
 
 /** One row per weapon mod on a stack: "❄️ Cryo Rounds" → "×N". Empty for a
  * vanilla / absent stack, so an unmodded gun shows just the Weapon row. */
-const modRows = (e: Entity, stack: ItemStack | undefined, modCasting: ModCasting | undefined): InfoRow[] =>
+const modRows = (e: Entity, stack: ItemStack | undefined): InfoRow[] =>
   (stack?.mods ?? [])
     .filter((m) => MODS[m.id] && m.stacks > 0)
     .map((m) => {
-      const v = selfModVerdict(e, m.id, modCasting)
+      const v = selfModVerdict(e, m.id)
       return { label: `${MODS[m.id].icon} ${MODS[m.id].name}`, value: `×${m.stacks}${v && v.kind !== 'live' ? ` · ${v.reason}` : ''}` }
     })
 
@@ -271,7 +268,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
   if (e.combat) {
     const wid = e.combat.weapon
     rows.push({ label: 'Weapon', value: wid && wid !== 'fists' ? itemName(wid) : 'Unarmed' })
-    for (const r of modRows(e, weaponStack(e), ctx.modCasting)) rows.push(r)
+    for (const r of modRows(e, weaponStack(e))) rows.push(r)
   }
 
   if (e.pickup) {
@@ -283,7 +280,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
       // A world weapon-mod pickup reads like "❄️ Cryo Rounds — freezes… (mod)".
       rows.push({ label: 'Mod', value: `${mod.icon} ${mod.name}` })
       rows.push({ label: 'Rarity', value: pretty(mod.rarity) })
-      const v = selfModVerdict(ctx.self, mod.id, ctx.modCasting)
+      const v = selfModVerdict(ctx.self, mod.id)
       if (v && v.kind !== 'live') rows.push({ label: 'On your weapon', value: v.reason })
       card.tagline = mod.blurb
     } else {

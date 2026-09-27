@@ -2,12 +2,12 @@
 // the pause and death screens. Given a player entity it produces a DOM-free view
 // model: the equipped weapon's name/kind/glyph, its BASE vs EXECUTED stats (so
 // the player sees exactly what their build fires), one coloured chip per
-// applied mod with its verdict (working, inert, or downside-only), and the
-// bullet-behavior badges the fire path will actually run.
+// applied mod in firing order with its verdict (working, inert, stowed, or
+// downside-only), and the bullet-behavior badges the fire path will run.
 //
 // It reuses the sim's single sources of truth — WEAPONS (data/items), MODS
 // (data/mods), `weaponStack` (systems/inventory) for the equipped stack's mod
-// list, `executedShot`/`modVerdict` (systems/modEffect) for what fires, and
+// list, `executedPull`/`modVerdict` (systems/modEffect) for what fires, and
 // `modPickupColor` (render/modColors) for each mod's signature gem hue — so the
 // panel never re-derives balance numbers or colours. Kept pure so it is unit-
 // tested exhaustively and the panel just paints the result.
@@ -17,7 +17,7 @@ import { WEAPONS } from '../game/data/items'
 import { MODS, type ModRarity } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
 import { executedPull, executedShot, modVerdict, type ExecutedShot, type ModVerdict } from '../game/systems/modEffect'
-import type { ModCasting } from '../game/world'
+import { cycleCasts, sequenceShape } from '../game/systems/modSequence'
 import { modPickupColor } from '../render/modColors'
 import { SIM_RATE } from '../game/types'
 
@@ -66,8 +66,8 @@ export interface LoadoutModel {
   /** True for bare fists / a missing weapon — mods are empty, stats are innate. */
   unarmed: boolean
   glyph: string
-  /** Sequenced casting: stats and effects describe the next shot only, since
-   * each cast fires just its own mods. Default casting: every shot. */
+  /** A wand of two or more casts: stats and effects describe the next shot
+   * only, since each cast fires just its own mods. One cast: every shot. */
   statsScope: 'every shot' | 'next shot'
   stats: LoadoutStat[]
   mods: LoadoutMod[]
@@ -109,14 +109,10 @@ const makeStat = (
  * no real weapon. A mod `self` does not carry yet is judged as if picked up,
  * which is what the draft and a pickup's inspect card need.
  */
-export const selfModVerdict = (
-  self: Entity | undefined,
-  modId: string,
-  modCasting: ModCasting | undefined,
-): ModVerdict | undefined => {
+export const selfModVerdict = (self: Entity | undefined, modId: string): ModVerdict | undefined => {
   const def = self?.combat && WEAPONS[self.combat.weapon]
   if (!def || def.id === 'fists') return undefined
-  return modVerdict(def, weaponStack(self!)?.mods ?? [], modId, modCasting === 'sequence')
+  return modVerdict(def, weaponStack(self!)?.mods ?? [], modId)
 }
 
 /** A shard, shrapnel or blast badge names the status its element applies. */
@@ -126,7 +122,7 @@ const carrying = (label: string, element: string | undefined): string => {
 }
 
 /** Bullet-behavior badges — only the effects the fire path executes, across
- * every cast of the pull (a sequenced shotgun can carry two elements). */
+ * every cast of the pull (a two-cast shotgun pull can carry two elements). */
 const buildBehaviors = (casts: readonly ExecutedShot[]): LoadoutBehavior[] => {
   const out: LoadoutBehavior[] = []
   const add = (x: LoadoutBehavior): void => {
@@ -155,19 +151,18 @@ const buildBehaviors = (casts: readonly ExecutedShot[]): LoadoutBehavior[] => {
  * weapon component at all (nothing to show). Bare fists / an unknown weapon id
  * resolve as `unarmed` with innate stats and no mods — never a crash or a blank.
  */
-export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting): LoadoutModel | null => {
+export const buildLoadout = (e: Entity | undefined): LoadoutModel | null => {
   if (!e || !e.combat) return null
   const wid = e.combat.weapon
   const def = WEAPONS[wid] ?? WEAPONS.fists
   const unarmed = !wid || wid === 'fists' || !WEAPONS[wid]
-  const sequenced = modCasting === 'sequence'
 
   const stack = weaponStack(e)
   const mods = unarmed ? [] : (stack?.mods ?? [])
   // The whole next trigger pull: every cast in it, its pellet split and its
   // cooldown (the wrap recharge included), as the fire path runs it.
   const base = executedShot(def, [])
-  const pull = executedPull(def, mods, sequenced, stack?.castIndex ?? 0)
+  const pull = executedPull(def, mods, stack?.castIndex ?? 0)
   const casts = pull.casts
 
   const stats: LoadoutStat[] = [
@@ -188,10 +183,9 @@ export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting): Lo
     if (def.durability) stats.push(makeStat('dura', 'Durability', def.durability, def.durability, true, (n) => String(round(n))))
   }
 
-  // Chips in the same sorted-id order the default fold visits them.
+  // Chips in firing order: the list order, stowed mods last.
   const chips: LoadoutMod[] = mods
     .filter((m) => MODS[m.id] && m.stacks > 0)
-    .sort((a, b) => a.id.localeCompare(b.id))
     .map((m) => {
       const d = MODS[m.id]
       return {
@@ -202,7 +196,7 @@ export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting): Lo
         stacks: m.stacks,
         rarity: d.rarity,
         color: toCssHex(modPickupColor(d.id)),
-        verdict: modVerdict(def, mods, d.id, sequenced),
+        verdict: modVerdict(def, mods, d.id),
       }
     })
 
@@ -212,7 +206,7 @@ export const buildLoadout = (e: Entity | undefined, modCasting?: ModCasting): Lo
     kind: def.kind,
     unarmed,
     glyph: def.kind === 'ranged' ? '🔫' : unarmed ? '👊' : '🗡️',
-    statsScope: sequenced ? 'next shot' : 'every shot',
+    statsScope: cycleCasts(mods, sequenceShape(def)) > 1 ? 'next shot' : 'every shot',
     stats,
     mods: chips,
     behaviors: buildBehaviors(casts),

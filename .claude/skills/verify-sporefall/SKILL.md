@@ -47,7 +47,7 @@ Each playtester owns one state file, and every call is one verb against it:
 ```sh
 pt() { npx tsx scripts/playtest.mts "$@"; }        # zsh does not word-split a $VAR command
 pt run.json new --seed 31337                        # the real solo floor 1 (HostSession), prints `look`
-pt run.json new --seed 5 --scenario armed --floor 3 # or any ?scenario= name; --sequenced for the wand flag
+pt run.json new --seed 5 --scenario armed --floor 3 # or any ?scenario= name
 pt run.json look 10                                 # player build + nearby entities, nearest first (hp, fx, resist, ai mode)
 pt run.json spawn npc brute 1.5 6                   # stage a situation with any debug verb
 pt run.json addMod 222 incendiary

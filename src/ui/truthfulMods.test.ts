@@ -23,9 +23,8 @@ const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
 /** Two players, host-authoritative: player 0 with a pistol, player 1 with a
  * sledgehammer, each carrying mods. Round-tripped through the save format so
  * the test starts from exact, serializable state. */
-const coop = (sequenced = false): World => {
+const coop = (): World => {
   const w = createWorld(7, 1)
-  if (sequenced) w.modCasting = 'sequence'
   const gunner = spawnPlayer(w, 0, 20.5, 20.5)
   gunner.facing = 0
   weaponStack(gunner)!.mods = [m('frost'), m('shock'), m('choke')]
@@ -39,25 +38,30 @@ const fire = new Map([
   [0, { attack: true }],
   [1, { attack: true }],
 ])
-const chip = (e: Entity, id: string, seq?: 'sequence') => buildLoadout(e, seq)!.mods.find((c) => c.id === id)!.verdict
+const chip = (e: Entity, id: string) => buildLoadout(e)!.mods.find((c) => c.id === id)!.verdict
 
-describe('loadout: default casting', () => {
-  it('the gun shows only the element its bullets carry, and the sim agrees', () => {
+describe('loadout', () => {
+  it('both elements are live because each fires on its own pull, and the panel follows the next pull', () => {
     const w = coop()
-    runTicks(w, fire, 3)
     const gunner = player(w, 0)
-    const shots = w.entities.filter((e) => e.projectile?.ownerId === gunner.id)
-    expect(shots.length).toBeGreaterThan(0)
-    expect(new Set(shots.map((s) => s.projectile!.onHit?.status))).toEqual(new Set(['electrified']))
-
-    expect(chip(gunner, 'frost')).toEqual({ kind: 'inert', reason: 'Tesla Rounds overrides it' })
+    expect(chip(gunner, 'frost')).toEqual({ kind: 'live' })
     expect(chip(gunner, 'shock')).toEqual({ kind: 'live' })
     expect(chip(gunner, 'choke')).toEqual({ kind: 'inert', reason: 'no effect on this gun' })
     const model = buildLoadout(gunner)!
-    expect(model.behaviors.filter((b) => b.key === 'onhit').map((b) => b.label)).toEqual(['electrified on hit'])
+    expect(model.statsScope).toBe('next shot')
+    expect(model.behaviors.filter((b) => b.key === 'onhit').map((b) => b.label)).toEqual(['frozen on hit'])
     expect(model.stats.map((s) => s.key)).not.toContain('knockback')
     expect(model.stats.map((s) => s.key)).not.toContain('spread')
-    expect(model.statsScope).toBe('every shot')
+    runTicks(w, fire, 1)
+    const shot = w.entities.find((e) => e.projectile?.ownerId === gunner.id)!
+    expect(shot.projectile!.onHit?.status).toBe('frozen')
+    // Next pull fires shock; the panel follows the sim's stored index.
+    expect(buildLoadout(gunner)!.behaviors.filter((b) => b.key === 'onhit').map((b) => b.label)).toEqual(['electrified on hit'])
+  })
+
+  it('a one-cast wand fires the same shot every pull, so its stats describe every shot', () => {
+    const w = coop()
+    expect(buildLoadout(player(w, 1))!.statsScope).toBe('every shot')
   })
 
   it('the sledgehammer never advertises bullet effects, and says Barrage only costs damage', () => {
@@ -86,25 +90,10 @@ describe('loadout: default casting', () => {
   })
 })
 
-describe('loadout: sequenced casting', () => {
-  it('both elements are live because each fires on its own shot, and stats describe the next shot', () => {
-    const w = coop(true)
-    const gunner = player(w, 0)
-    expect(chip(gunner, 'frost', 'sequence')).toEqual({ kind: 'live' })
-    expect(chip(gunner, 'shock', 'sequence')).toEqual({ kind: 'live' })
-    const model = buildLoadout(gunner, 'sequence')!
-    expect(model.statsScope).toBe('next shot')
-    expect(model.behaviors.find((b) => b.key === 'onhit')!.label).toBe('frozen on hit')
-    runTicks(w, fire, 1)
-    const shot = w.entities.find((e) => e.projectile?.ownerId === gunner.id)!
-    expect(shot.projectile!.onHit?.status).toBe('frozen')
-    // Next pull fires shock; the panel follows the sim's stored index.
-    expect(buildLoadout(gunner, 'sequence')!.behaviors.find((b) => b.key === 'onhit')!.label).toBe('electrified on hit')
-  })
-
-  it('the HUD strip flags the choke riding a single-pellet cast', () => {
-    const w = coop(true)
-    const strip = buildSequence(player(w, 0), 'sequence', w.tick)!
+describe('the HUD strip', () => {
+  it('flags the choke riding a single-pellet cast', () => {
+    const w = coop()
+    const strip = buildSequence(player(w, 0), w.tick)!
     expect(strip.entries.find((e) => e.id === 'choke')!.verdict).toBe('no effect on this gun')
     expect(strip.entries.find((e) => e.id === 'frost')!.verdict).toBeUndefined()
   })
@@ -133,7 +122,7 @@ describe('pickups', () => {
     runTicks(w, new Map(), 1)
     const ev = w.events.find((e) => e.type === 'modPickup')
     expect(ev).toMatchObject({ byId: bruiser.id, modId: 'homing', maxed: false })
-    expect(selfModVerdict(bruiser, 'homing', w.modCasting)).toEqual({ kind: 'inert', reason: 'no effect on melee' })
+    expect(selfModVerdict(bruiser, 'homing')).toEqual({ kind: 'inert', reason: 'no effect on melee' })
   })
 
   it('a player who joins mid-floor with a clean pistol sees choke as dead weight', () => {
@@ -149,7 +138,7 @@ describe('pickups', () => {
     const w = createWorld(7, 1)
     const p = spawnPlayer(w, 0, 20.5, 20.5)
     p.combat!.weapon = 'fists'
-    expect(selfModVerdict(p, 'pierce', undefined)).toBeUndefined()
+    expect(selfModVerdict(p, 'pierce')).toBeUndefined()
   })
 })
 
@@ -157,7 +146,7 @@ describe('draft', () => {
   it('cards carry the verdict for the drafting player, and none without a weapon', () => {
     const w = coop()
     const bruiser = player(w, 1)
-    const loadout = { weapon: WEAPONS.sledgehammer, mods: weaponStack(bruiser)!.mods!, sequenced: false }
+    const loadout = { weapon: WEAPONS.sledgehammer, mods: weaponStack(bruiser)!.mods! }
     const cards = draftCards(['pierce', 'overload', 'incendiary'], loadout)
     expect(cards.map((c) => c.verdict)).toEqual([
       { kind: 'inert', reason: 'no effect on melee' },
@@ -186,7 +175,6 @@ describe('DOM', () => {
     screen.update(['pierce', 'overload'], [{ playerId: 0, cursor: 0 }], 10, 'full', {
       weapon: WEAPONS.sledgehammer,
       mods: [],
-      sequenced: false,
     })
     const card = (id: string) => mount.querySelector(`[data-mod-id="${id}"]`)!
     expect(card('pierce').querySelector('.draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')
@@ -199,9 +187,9 @@ describe('draft screen re-renders when a verdict changes', () => {
     const mount = document.createElement('div')
     const screen = createDraftScreen(mount, () => {})
     const seats = [{ playerId: 0, cursor: 0 }]
-    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.pistol, mods: [], sequenced: false })
+    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.pistol, mods: [] })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')).toBeNull()
-    screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.sledgehammer, mods: [], sequenced: false })
+    screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.sledgehammer, mods: [] })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')
   })
 })

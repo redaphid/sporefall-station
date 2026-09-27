@@ -8,10 +8,10 @@ import type { WeaponMod } from '../entity'
 import { executedShot, modVerdict } from './modEffect'
 
 const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
-const verdicts = (weapon: string, sequenced = false): Record<string, string> =>
+const verdicts = (weapon: string): Record<string, string> =>
   Object.fromEntries(
     Object.keys(MODS).map((id) => {
-      const v = modVerdict(WEAPONS[weapon], [m(id)], id, sequenced)
+      const v = modVerdict(WEAPONS[weapon], [m(id)], id)
       return [id, v.kind === 'live' ? 'live' : `${v.kind}: ${v.reason}`]
     }),
   )
@@ -63,21 +63,17 @@ describe('the pistol every player holds', () => {
   })
 })
 
-describe('elements share one slot in default casting', () => {
-  it('an older element reads as overridden, naming the newest one on the list', () => {
-    const mods = [m('frost'), m('shock')]
-    expect(modVerdict(WEAPONS.pistol, mods, 'frost')).toEqual({ kind: 'inert', reason: 'Tesla Rounds overrides it' })
-    expect(modVerdict(WEAPONS.pistol, mods, 'shock').kind).toBe('live')
-    const three = [m('shock'), m('incendiary'), m('frost')]
-    expect(modVerdict(WEAPONS.pistol, three, 'shock')).toEqual({ kind: 'inert', reason: 'Cryo Rounds overrides it' })
-    expect(modVerdict(WEAPONS.pistol, three, 'incendiary')).toEqual({ kind: 'inert', reason: 'Cryo Rounds overrides it' })
-    expect(modVerdict(WEAPONS.pistol, three, 'frost').kind).toBe('live')
-    expect(modVerdict(WEAPONS.pistol, [m('frost'), m('incendiary')], 'frost')).toEqual({ kind: 'inert', reason: 'Incendiary overrides it' })
-    expect(modVerdict(WEAPONS.pistol, [m('incendiary'), m('frost')], 'frost').kind).toBe('live')
+describe('elements: each cast carries its own', () => {
+  it('no element overrides another: each fires on its own cast, so every one is live', () => {
+    for (const order of [['frost', 'shock'], ['shock', 'incendiary', 'frost']]) {
+      const mods = order.map((id) => m(id))
+      for (const id of order) expect(modVerdict(WEAPONS.pistol, mods, id), id + ' in ' + order.join(',')).toEqual({ kind: 'live' })
+    }
   })
 
-  it('sequenced casting fires each element on its own shot, so both are live', () => {
-    for (const id of ['frost', 'shock']) expect(modVerdict(WEAPONS.pistol, [m('frost'), m('shock')], id, true).kind).toBe('live')
+  it("the owner's wand [bounce x2, incendiary, splinter, frost]: every mod is live", () => {
+    const wand = [m('bounce', 2), m('incendiary'), m('splinterShot'), m('frost')]
+    for (const { id } of wand) expect(modVerdict(WEAPONS.pistol, wand, id), id).toEqual({ kind: 'live' })
   })
 
   it('an element the gun already fires adds nothing', () => {
@@ -98,20 +94,23 @@ describe('downside-only mods', () => {
   })
 })
 
-describe('sequenced casting', () => {
+describe('the wand: slots, casts and the recharge', () => {
   it('a mod past the live window is stowed and never fires', () => {
     const mods = ['pierce', 'bounce', 'homing', 'split', 'explosive'].map((id) => m(id))
-    expect(modVerdict(WEAPONS.pistol, mods, 'explosive', true)).toEqual({ kind: 'inert', reason: 'stowed: swap it in' })
-    expect(modVerdict(WEAPONS.pistol, mods, 'explosive', false).kind).toBe('live')
+    expect(modVerdict(WEAPONS.pistol, mods, 'explosive')).toEqual({ kind: 'inert', reason: 'stowed: swap it in' })
+    expect(modVerdict(WEAPONS.pistol, mods, 'split').kind).toBe('live')
   })
 
-  it('a faster cast that wraps anyway is outlasted by the recharge', () => {
-    expect(modVerdict(WEAPONS.pistol, [m('rapid')], 'rapid', true)).toEqual({ kind: 'inert', reason: 'recharge hides it' })
-    expect(modVerdict(WEAPONS.pistol, [m('rapid')], 'rapid', false).kind).toBe('live')
+  it('a faster cast that wraps a two-cast cycle is outlasted by the recharge', () => {
+    expect(modVerdict(WEAPONS.pistol, [m('frost'), m('rapid')], 'rapid')).toEqual({ kind: 'inert', reason: 'recharge hides it' })
+  })
+
+  it('a one-cast wand never recharges, so its fire-rate mod counts (#115)', () => {
+    expect(modVerdict(WEAPONS.pistol, [m('rapid')], 'rapid').kind).toBe('live')
   })
 
   it('a fire-rate mod on a cast that does not wrap still counts', () => {
-    expect(modVerdict(WEAPONS.pistol, [m('rapid'), m('frost'), m('shock')], 'rapid', true).kind).toBe('live')
+    expect(modVerdict(WEAPONS.pistol, [m('rapid'), m('frost'), m('shock')], 'rapid').kind).toBe('live')
   })
 })
 
@@ -128,11 +127,7 @@ describe('degenerate input', () => {
 
   it('unknown and empty neighbours do not change a verdict', () => {
     const junk = [m('bogus', 3), m('rapid', 0), m('pierce', -2)]
-    for (const id of Object.keys(MODS)) {
-      for (const seq of [false, true]) {
-        expect(modVerdict(WEAPONS.pistol, [...junk, m(id)], id, seq), `${id} ${seq}`).toEqual(modVerdict(WEAPONS.pistol, [m(id)], id, seq))
-      }
-    }
+    for (const id of Object.keys(MODS)) expect(modVerdict(WEAPONS.pistol, [...junk, m(id)], id), id).toEqual(modVerdict(WEAPONS.pistol, [m(id)], id))
   })
 
   it('huge stacks are clamped the way the fire path clamps them', () => {
@@ -143,8 +138,8 @@ describe('degenerate input', () => {
   it('is pure: the same input always gives the same verdict and never mutates the list', () => {
     const mods = [m('frost'), m('shock')]
     const before = JSON.stringify(mods)
-    const a = modVerdict(WEAPONS.pistol, mods, 'frost', true)
-    expect(modVerdict(WEAPONS.pistol, mods, 'frost', true)).toEqual(a)
+    const a = modVerdict(WEAPONS.pistol, mods, 'frost')
+    expect(modVerdict(WEAPONS.pistol, mods, 'frost')).toEqual(a)
     expect(JSON.stringify(mods)).toBe(before)
   })
 })

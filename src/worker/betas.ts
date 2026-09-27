@@ -54,6 +54,13 @@ export interface BetaIndexEntry {
   builtAt: string
   /** How many files were uploaded, so a truncated publish is obvious. */
   files: number
+  /** Pull request this beta was published FOR, when CI published it from a
+   * `pull_request` event. Present ⇔ the slug is `pr-<number>`, which is the
+   * whole reason a PR beta cannot collide with another PR's. Absent for a beta
+   * published from a `preview/**` branch push or from a laptop, whose slug is
+   * the branch's last segment and CAN collide — so this field is also what
+   * tells a reader of `/betas/` which of the two rules a row is living under. */
+  pr?: number
 }
 
 /** Extension → content-type for the files a Vite build actually emits. Unknown
@@ -174,17 +181,26 @@ const fail = (message: string, status: number): Response =>
 const escapeHtml = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c)
 
+/** How one listing row describes itself. A PR beta leads with `PR #<n>` because
+ * that — not the branch — is the thing whose uniqueness the slug rests on; a
+ * branch beta leads with the branch, which is the only place its known slug
+ * collision is visible. Both still print the branch and the commit. */
+const betaLabel = (entry: BetaIndexEntry): string =>
+  entry.pr === undefined
+    ? escapeHtml(entry.branch)
+    : `PR #${escapeHtml(String(entry.pr))} &middot; ${escapeHtml(entry.branch)}`
+
 /** The `/betas/` listing. Deliberately a hand-written page with no JS and no
  * assets: it has to work even when every beta in it is broken. */
 export const renderBetaIndex = (entries: readonly BetaIndexEntry[]): string => {
   const rows =
     entries.length === 0
-      ? '<p>No betas published yet. Push to a <code>preview/**</code> branch.</p>'
+      ? '<p>No betas published yet. Open a pull request, or push to a <code>preview/**</code> branch.</p>'
       : `<ul>${entries
           .map(
             (e) =>
               `<li><a href="${BETAS_PREFIX}${escapeHtml(e.slug)}/">${escapeHtml(e.slug)}</a>` +
-              ` <small>${escapeHtml(e.branch)} @ ${escapeHtml(e.sha.slice(0, 8))}` +
+              ` <small>${betaLabel(e)} @ ${escapeHtml(e.sha.slice(0, 8))}` +
               ` &middot; ${escapeHtml(e.builtAt)} &middot; ${e.files} files</small></li>`,
           )
           .join('')}</ul>`

@@ -12,7 +12,7 @@ import {
   SW_TAKEOVER,
 } from './src/app/swConfig'
 import { SITE_ORIGIN } from './capacitor.config'
-import { BETAS_PREFIX, slugifyBranch } from './src/app/betaSlug'
+import { BETAS_PREFIX, resolveBetaSlug } from './src/app/betaSlug'
 
 // BETA BUILD SWITCH. `BETA_SLUG=<branch name> pnpm run build` produces a bundle
 // meant to be served from https://<origin>/betas/<slug>/ instead of the root —
@@ -26,15 +26,27 @@ import { BETAS_PREFIX, slugifyBranch } from './src/app/betaSlug'
 // `base` rewrites those references to /betas/foo/assets/…, which is exactly what
 // the beta CI job asserts on the built index.html before it publishes anything.
 //
-// The value goes through the same slugifyBranch() the publish script and the
+// The value goes through the same resolveBetaSlug() the publish script and the
 // Worker use, so the path baked into the bundle cannot disagree with the path
 // its bytes were stored under. A BETA_SLUG that sanitizes to nothing is a hard
 // failure: silently building a root-based bundle here is the bug.
+//
+// BETA_PR is the OTHER input, and it WINS when set: a beta published for a pull
+// request lives at /betas/pr-<number>/ rather than under the branch's last
+// segment, because every open PR publishes automatically now and two PRs whose
+// branches end in the same word must not overwrite each other. See
+// src/app/betaSlug.ts and .github/workflows/preview-web.yml.
 const betaSlug = ((): string | null => {
-  const raw = process.env.BETA_SLUG ?? ''
-  if (raw.trim() === '') return null
-  const slug = slugifyBranch(raw)
-  if (slug === null) throw new Error(`BETA_SLUG=${JSON.stringify(raw)} does not sanitize to a usable beta slug`)
+  const pr = (process.env.BETA_PR ?? '').trim()
+  const branch = (process.env.BETA_SLUG ?? '').trim()
+  if (pr === '' && branch === '') return null
+  const slug = resolveBetaSlug({ pr, branch })
+  if (slug === null)
+    throw new Error(
+      pr === ''
+        ? `BETA_SLUG=${JSON.stringify(branch)} does not sanitize to a usable beta slug`
+        : `BETA_PR=${JSON.stringify(pr)} is not a usable pull request number`,
+    )
   return slug
 })()
 

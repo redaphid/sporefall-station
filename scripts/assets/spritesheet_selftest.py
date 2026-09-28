@@ -42,11 +42,14 @@ def check(name, cond, detail=""):
 TEAL, CHEST, SATCHEL = (36, 86, 92), (242, 246, 234), (255, 144, 50)
 
 
-def wren(pose="idle", facing="right", size=1024, bg=(255, 255, 255), x_shift=0):
+def wren(pose="idle", facing="right", size=1024, bg=(255, 255, 255), x_shift=0, stride=None):
+    if size != 1024:  # she is drawn on the 1024 grid and scaled, so every size shows the same courier
+        return wren(pose, facing, 1024, bg, x_shift, stride).resize((size, size), Image.NEAREST)
     im = Image.new("RGB", (size, size), bg)
     d = ImageDraw.Draw(im)
     cx = size // 2 + x_shift
-    stride = 70 if pose not in ("idle",) else 0
+    if stride is None:
+        stride = 70 if pose not in ("idle",) else 0
     d.rectangle((cx - 110, 260, cx + 110, 760), fill=TEAL, outline=(8, 8, 12), width=10)  # body
     d.ellipse((cx - 90, 120, cx + 90, 300), fill=TEAL, outline=(8, 8, 12), width=10)  # head
     d.rectangle((cx - 50, 330, cx + 50, 560), fill=CHEST)  # pale chest, enclosed by teal
@@ -67,6 +70,9 @@ def satchel_side(frame: Image.Image) -> str:
     return "R" if np.where(sat)[1].mean() > body_x else "L"
 
 
+WALK_PERIOD = 40
+
+
 # ---- the fake ComfyUI -----------------------------------------------------------
 class Fake:
     prompts: list = []
@@ -74,13 +80,17 @@ class Fake:
     uploads: dict = {}
     face_left: set = set()  # directions the "model" gets wrong
     models = {
-        "diffusion_models": ["qwen_image_edit_2509_fp8_e4m3fn.safetensors",
+        "diffusion_models": ["Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf", "Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
+                             "Wan2.2-I2V-A14B-HighNoise-Q8_0.gguf",
+                             "qwen_image_edit_2509_fp8_e4m3fn.safetensors",
                              "qwen_image_edit_2511_fp8_e4m3fn.safetensors",
                              "wan2.2_i2v_high_noise_14B_Q4_K_M.gguf"],
         "loras": ["Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
                   "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
                   "Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
                   "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+                  "wan2.2\\wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+                  "wan2.2\\wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
                   "pixel_art_style_by_skormino_v7.05_test_72img.safetensors"],
         "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
         "vae": ["qwen_image_vae.safetensors", "wan_2.1_vae.safetensors"],
@@ -110,7 +120,7 @@ class H(http.server.BaseHTTPRequestHandler):
             g = Fake.prompts[int(pid)]
             outs = {}
             for nid, n in g.items():
-                if n["class_type"] != "SaveImage":
+                if n["class_type"] != "SaveImage" or "(mp4)" in n.get("_meta", {}).get("title", ""):
                     continue
                 title = n.get("_meta", {}).get("title", "")
                 fn = f"p{pid}-n{nid}.png"
@@ -119,6 +129,26 @@ class H(http.server.BaseHTTPRequestHandler):
                     d, pose = m.groups()
                     facing = "left" if (d in ("w", "nw", "sw") or d in Fake.face_left) else "right"
                     im = wren(pose, facing, bg=(250, 248, 246))  # warm off-white, like SDXL's "white"
+                elif title.startswith("keyframe "):
+                    im = Image.new("RGB", (1280, 720), (255, 255, 255))
+                    im.paste(wren(size=720), (280, 0))
+                elif title.startswith("walk ") and "(mp4)" not in title:
+                    # her deck-9 shift, walked in place: one full stride every WALK_PERIOD frames. Frame 0
+                    # stands still (the keyframe); the stride builds over the first few frames, as Wan's do.
+                    d = title.split()[1]
+                    facing = "left" if d in Fake.face_left else "right"
+                    ims = []
+                    for i in range(81):
+                        amp = min(1.0, i / 6)
+                        st = int(60 * amp * np.sin(2 * np.pi * i / WALK_PERIOD))
+                        fr = Image.new("RGB", (848, 480), (253, 253, 251))
+                        fr.paste(wren(facing=facing, size=480, stride=st, bg=(253, 253, 251)), (184, 0))
+                        buf = io.BytesIO()
+                        fr.save(buf, "PNG")
+                        Fake.images[f"{fn[:-4]}-{i:04d}.png"] = buf.getvalue()
+                        ims.append({"filename": f"{fn[:-4]}-{i:04d}.png", "subfolder": "", "type": "output"})
+                    outs[nid] = {"images": ims}
+                    continue
                 elif title.startswith("grid"):
                     k = len(title.split()) - 1
                     im = Image.new("RGB", (512 * k, 1024), (255, 255, 255))
@@ -187,6 +217,18 @@ def validate(g):
     return errs
 
 
+def g_class(g, nid):
+    return g[nid]["class_type"]
+
+
+def raises(fn):
+    try:
+        fn()
+    except (SystemExit, Exception):
+        return True
+    return False
+
+
 def overlaps(wf):
     ns, out = wf["nodes"], []
     for i, a in enumerate(ns):
@@ -250,11 +292,12 @@ def main():
                          ("qwen no-lightning", S.qwen_graph("c.png", dirs, poses, 7, {**q, "lightning": None})),
                          ("qwen gguf+angles", S.qwen_graph("c.png", dirs, poses, 7, {**q, "unet": "x.gguf"}, angles=True)),
                          ("grid", S.grid_graph("c.png", dirs, 7, q)),
-                         ("sdxl", S.sdxl_graph("c.png", dirs, poses, 7, "a courier"))):
+                         ("sdxl", S.sdxl_graph("c.png", dirs, poses, 7, "a courier")),
+                         ("video", S.video_graph("c.png", "e", 3, q, S.WAN, "a courier"))):
             errs = validate(g.nodes)
             check(f"{label}: validates", not errs, "; ".join(errs[:3]))
             saves = [n["_meta"]["title"] for n in g.nodes.values() if n["class_type"] == "SaveImage"]
-            if label != "grid":
+            if label not in ("grid", "video"):
                 want = {f"frame {d} {p}" for d in dirs for p in poses}
                 check(f"{label}: one titled save per frame", want <= set(saves), sorted(want - set(saves)))
             wf = g.workflow()
@@ -356,6 +399,71 @@ def main():
         S.main([src, "--out", os.path.join(tmp, "grid"), "--method", "grid", "--seeds", "3"])
         check("grid: cut into 5 idle cells", Image.open(os.path.join(tmp, "grid/s3/sheet.png")).size == (48, 240))
 
+        print("video route (the frog's)")
+        w, _ = S.detect_wan({})
+        check("wan: Q4_K_M experts picked over Q8", w["high"].endswith("HighNoise-Q4_K_M.gguf")
+              and w["low"].endswith("LowNoise-Q4_K_M.gguf"), (w["high"], w["low"]))
+        check("wan: lightx2v high/low LoRAs matched", "high_noise" in w["lora_high"] and "low_noise" in w["lora_low"])
+        vg = S.video_graph("c.png", "e", 3, q, w).nodes
+        wi = next(n["inputs"] for n in vg.values() if n["class_type"] == "WanImageToVideo")
+        check("wan: 848x480, 81 frames (the frog's settings)", (wi["width"], wi["height"], wi["length"]) == (848, 480, 81))
+        ka = [n["inputs"] for n in vg.values() if n["class_type"] == "KSamplerAdvanced"]
+        check("wan: high 0-2 then low 2-end, 4 steps, cfg 1",
+              [(k["start_at_step"], k["end_at_step"]) for k in ka] == [(0, 2), (2, 10000)]
+              and all(k["steps"] == 4 and k["cfg"] == 1.0 for k in ka))
+        check("wan: the walk starts from the keyframe (scaled), not the raw input",
+              g_class(vg, wi["start_image"][0]) == "ImageScale")
+        clip = [wren(stride=int(60 * min(1, i / 6) * np.sin(2 * np.pi * i / 40)), size=240) for i in range(81)]
+        lp = S.find_loop(clip)
+        check("loop: finds the full 40-frame stride, not the half", lp["period"] == 40, lp)
+        check("loop: seam smoother than an ordinary step", lp["seam"] < 1.0, lp)
+        check("loop: a clip too short says so", raises(lambda: S.find_loop(clip[:30])))
+        sp = Image.new("RGBA", (5, 5), (36, 86, 92, 255))
+        sp.putpixel((2, 2), (250, 250, 250, 255))
+        check("despeckle: an isolated white pixel takes its neighbours' colour",
+              S.despeckle(sp).getpixel((2, 2)) == (36, 86, 92, 255))
+        big = Image.new("RGBA", (5, 5), (250, 250, 250, 255))
+        check("despeckle: a white AREA (a real white shirt) is left alone", S.despeckle(big).getpixel((2, 2))[0] == 250)
+
+        n0 = len(Fake.prompts)
+        vout = os.path.join(tmp, "video")
+        S.main([src, "--out", vout, "--method", "video", "--dirs", "s,e"])
+        v = os.path.join(vout, "video-s3")
+        check("video: one queue per direction", len(Fake.prompts) - n0 == 2)
+        seeds = {n["inputs"].get("noise_seed", n["inputs"].get("seed")) for n in Fake.prompts[-1].values()
+                 if n["class_type"] in ("KSampler",) or (n["class_type"] == "KSamplerAdvanced"
+                                                          and n["inputs"]["add_noise"] == "enable")}
+        check("video: default seed is the frog's (3)", seeds == {3}, seeds)
+        vs = Image.open(f"{v}/sheet.png")
+        check("video: 96 px (swampspace-hires), idle+step+8 walk per row", vs.size == (960, 192), vs.size)
+        vm = json.load(open(f"{v}/sheet.json"))
+        check("video: loop recorded per direction", vm["loops"]["e"]["period"] == 40, vm.get("loops"))
+        check("video: pack naming chars/<kind>-<dir>-walk-<n>",
+              all(os.path.exists(f"{v}/frames/wren-e-walk-{i}.png") for i in range(8)))
+        check("video: all 81 clip frames kept for re-cutting", len(os.listdir(f"{v}/raw/walk-e")) == 81)
+        check("video: keyframe kept", os.path.exists(f"{v}/raw/e-keyframe.png"))
+        import palette
+        va = np.asarray(vs)
+        cols = {tuple(c) for c in va[va[..., 3] > 0][:, :3]}
+        check("video: every pixel on the pack's 34 colours", cols <= set(palette.RGB))
+        walk = [np.asarray(Image.open(f"{v}/frames/wren-e-walk-{i}.png"))[..., 3] > 0 for i in range(8)]
+        heads = {np.where(f.any(1))[0].min() for f in walk}
+        check("video: one fixed window: the head row never pumps", len(heads) == 1, heads)
+        check("video: the legs actually move across the cycle",
+              len({f.tobytes() for f in walk}) >= 4)
+        widths = [np.ptp(np.where(f.any(0))[0]) for f in walk]
+        stepw = np.ptp(np.where((np.asarray(Image.open(f"{v}/frames/wren-e-step.png"))[..., 3] > 0).any(0))[0])
+        check("video: step = the widest stride of the cycle", stepw == max(widths), (stepw, widths))
+        check("video: satchel on the right, facing right", satchel_side(Image.open(f"{v}/frames/wren-e-idle.png")) == "R")
+        check("video: editor + API flow per direction written",
+              os.path.exists(f"{v}/flow-e.json") and os.path.exists(f"{v}/flow-s_api.json"))
+        n1 = len(Fake.prompts)
+        S.main(["repack", v, "--period", "20:30", "--to", os.path.join(tmp, "vr")])
+        vr = json.load(open(os.path.join(tmp, "vr/sheet.json")))
+        check("repack --period re-cuts the saved clip without the GPU",
+              vr["loops"]["e"]["period"] in range(20, 31) and len(Fake.prompts) == n1, vr["loops"]["e"])
+        check("repack keeps the run's 96 px and palette", Image.open(os.path.join(tmp, "vr/sheet.png")).size == (960, 192))
+
         print("--flow: a flow tweaked in the editor and exported as API")
         wf_api = json.load(open(f"{r}/flow_api.json"))
         for n in wf_api.values():
@@ -378,7 +486,7 @@ def main():
 
         print("committed flows")
         flows = os.path.join(HERE, "flows")
-        for name in ("sprite-sheet-qwen", "sprite-sheet-sdxl", "sprite-sheet-grid"):
+        for name in ("sprite-sheet-qwen", "sprite-sheet-sdxl", "sprite-sheet-grid", "sprite-sheet-video-e"):
             f = os.path.join(flows, f"{name}.json")
             fa = os.path.join(flows, f"{name}_api.json")
             ok = os.path.exists(f) and os.path.exists(fa)

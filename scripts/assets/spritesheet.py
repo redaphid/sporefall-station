@@ -40,6 +40,7 @@ Models do not reliably obey "facing right": check `e`/`ne`/`se` by eye, and
 `--mirror e,ne` flips the raws if a seed came back facing left.
 """
 import argparse
+import glob
 import io
 import json
 import os
@@ -52,7 +53,7 @@ import urllib.request
 import uuid
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -312,10 +313,8 @@ def _stitch(g, rows: list[list[str]]) -> str | None:
     return cur, last + 1
 
 
-def qwen_graph(input_name, dirs, poses, seed, q, describe="", style=STYLE, prefix="sprite-sheet/run",
-               angles=False, stitch=True) -> Graph:
-    g = Graph()
-    g.band("models + input", "#335")
+def _qwen_loaders(g, q, input_name, angles=False):
+    """Qwen-Image-Edit model chain + the character input + the (CFG-1-inert) negative."""
     if q["unet"].endswith(".gguf"):
         m = g.add("UnetLoaderGGUF", {"unet_name": q["unet"]}, "Qwen-Image-Edit (GGUF)")
     else:
@@ -330,12 +329,27 @@ def qwen_graph(input_name, dirs, poses, seed, q, describe="", style=STYLE, prefi
     m = g.add("CFGNorm", {"model": [m, 0], "strength": 1.0})
     clip = g.add("CLIPLoader", {"clip_name": q["clip"], "type": "qwen_image", "device": "default"}, col=1)
     vae = g.add("VAELoader", {"vae_name": q["vae"]}, col=1)
-    lat = g.add("EmptySD3LatentImage", {"width": IN_SIZE, "height": IN_SIZE, "batch_size": 1}, col=1)
     src = g.add("LoadImage", {"image": input_name}, "character (square, on white)", col=2)
     neg = g.add("TextEncodeQwenImageEditPlus", {"clip": [clip, 0], "vae": [vae, 0], "image1": [src, 0], "prompt": ""},
                 "negative (ignored at CFG 1)", col=3)
     neg = g.add("FluxKontextMultiReferenceLatentMethod",
                 {"conditioning": [neg, 0], "reference_latents_method": "index_timestep_zero"}, col=3)
+    return m, clip, vae, src, neg
+
+
+def _idle_prompt(d, describe, style):
+    who = f" The character: {describe}." if describe else ""
+    return (f"Redraw the character from image 1 as a single full-body video game sprite: {DIRS[d]}, "
+            f"{POSES['idle']}. Keep the exact same character design, outfit, colors, markings and "
+            f"proportions.{who} {FRAME} {style}")
+
+
+def qwen_graph(input_name, dirs, poses, seed, q, describe="", style=STYLE, prefix="sprite-sheet/run",
+               angles=False, stitch=True) -> Graph:
+    g = Graph()
+    g.band("models + input", "#335")
+    m, clip, vae, src, neg = _qwen_loaders(g, q, input_name, angles)
+    lat = g.add("EmptySD3LatentImage", {"width": IN_SIZE, "height": IN_SIZE, "batch_size": 1}, col=1)
     steps, cfg = (4, 1.0) if q.get("lightning") else (20, 2.5)
     who = f" The character: {describe}." if describe else ""
     sheet = []
@@ -344,9 +358,7 @@ def qwen_graph(input_name, dirs, poses, seed, q, describe="", style=STYLE, prefi
         row, base_decode = [], None
         for c, pose in enumerate(poses):
             if pose == "idle":
-                text = (f"Redraw the character from image 1 as a single full-body video game sprite: {DIRS[d]}, "
-                        f"{POSES['idle']}. Keep the exact same character design, outfit, colors, markings and "
-                        f"proportions.{who} {FRAME} {style}")
+                text = _idle_prompt(d, describe, style)
                 if angles and q.get("angles"):
                     text = f"<sks> {DIRS[d]} eye-level shot full shot. " + text
                 imgs, latent, denoise = {"image1": [src, 0]}, [lat, 0], 1.0
@@ -461,6 +473,119 @@ def sdxl_graph(input_name, dirs, poses, seed, describe="", style="", prefix="spr
     return g
 
 
+
+# ---- the frog route: Qwen keyframe -> Wan 2.2 I2V walk -> loop cut --------------
+# public/themes/swampspace/CURATION.md "frog-settler, 2026-09-25 — the video route": keyframes from
+# Qwen-Image-Edit-2511 + Lightning at 1280x720 on white, one per direction; motion from Wan 2.2 I2V A14B
+# Q4_K_M high/low + lightx2v 4-step at 848x480, 81 frames @16 fps, seed 3; border-connected white matte
+# (--shrink 1); a FULL stride cut to 8 frames; white-speck clean-up; the pack's 34-colour palette at 96 px
+# (swampspace-hires is the pack the game loads, docs/sprite-pipeline-wan.md §5). The two-expert graph is
+# cyber-puck's tools/video/wan_flf_loop.py (build_a14b_gguf), start frame only.
+WAN = {
+    "high": "Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf",
+    "low": "Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
+    "lora_high": "wan2.2\\wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+    "lora_low": "wan2.2\\wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+    "clip": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+    "vae": "wan_2.1_vae.safetensors",
+    "width": 848, "height": 480, "length": 81, "fps": 16, "shift": 5.0, "steps": 4, "split": 2,
+}
+KEY_W, KEY_H = 1280, 720
+WALK = ("walks in place like a video game walk cycle: the legs step forward and back one after another with big, "
+        "clear, full strides, the arms swing, the body bobs gently, and it never moves across the frame")
+WAN_RULES = ("The camera is completely static and locked off: no zoom, no pan, no rotation. The character stays "
+             "centred and the same size, keeps facing the same direction the whole time, never turns around, and the "
+             "whole body stays in frame. Plain flat white background, no shadow, no ground, crisp pixel art, flat "
+             "colours, no motion blur.")
+# cfg 1 makes this inert (the 4-step LoRA's setting); it is kept so raising cfg in the editor has one to use
+WAN_NEG = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，"
+           "多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，杂乱的背景，三条腿，背景人很多，倒着走, "
+           "mirrored, flipped, turning around, camera zoom, camera pan, walking out of frame, blurry, smeared")
+
+
+def detect_wan(overrides: dict) -> tuple[dict, list[str]]:
+    w, notes = dict(WAN), []
+    unets = (listing("diffusion_models") or []) + (listing("unet") or [])
+    i2v = [u for u in unets if "i2v" in u.lower() and ("a14b" in u.lower() or "14b" in u.lower())
+           and "2.2" in u.replace("2_2", "2.2").replace("22", "2.2")]
+    for part in ("high", "low"):
+        c = sorted([u for u in i2v if part in u.lower()], key=lambda u: ("q4_k_m" not in u.lower(), u))
+        if c:
+            w[part] = c[0]
+        elif unets:
+            notes.append(f"no Wan 2.2 I2V A14B {part}-noise model found; using {w[part]!r}")
+    loras = listing("loras") or []
+    for part in ("high", "low"):
+        c = [lo for lo in loras if "lightx2v" in lo.lower() and "i2v" in lo.lower() and part in lo.lower()
+             and "2.2" in lo.replace("2_2", "2.2").replace("22", "2.2")]
+        if c:
+            w["lora_" + part] = sorted(c, key=lambda lo: ("4step" not in lo.lower(), lo))[0]
+        elif loras:
+            notes.append(f"no lightx2v Wan 2.2 I2V {part}-noise LoRA found; using {w['lora_' + part]!r}")
+    encs = (listing("text_encoders") or []) + (listing("clip") or [])
+    w["clip"] = next((e for e in encs if "umt5" in e.lower()), w["clip"])
+    vaes = listing("vae") or []
+    w["vae"] = next((v for v in vaes if "wan_2.1_vae" in v.lower() or "wan2.1_vae" in v.lower()), w["vae"])
+    w.update({k: v for k, v in overrides.items() if v is not None})
+    return w, notes
+
+
+def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="sprite-sheet/video") -> Graph:
+    """ONE direction: Qwen keyframe (1280x720 on white) -> Wan 2.2 I2V walk-in-place, 81 frames."""
+    g = Graph()
+    g.band("models + input", "#335")
+    m, clip, vae, src, neg = _qwen_loaders(g, q, input_name)
+    lat = g.add("EmptySD3LatentImage", {"width": KEY_W, "height": KEY_H, "batch_size": 1}, col=1)
+    steps, cfg = (4, 1.0) if q.get("lightning") else (20, 2.5)
+    g.band(f"keyframe {d} (Qwen-Image-Edit)")
+    pos = g.add("TextEncodeQwenImageEditPlus", {"clip": [clip, 0], "vae": [vae, 0], "image1": [src, 0],
+                                                "prompt": _idle_prompt(d, describe, style)}, f"{d} keyframe prompt", col=0)
+    pos = g.add("FluxKontextMultiReferenceLatentMethod",
+                {"conditioning": [pos, 0], "reference_latents_method": "index_timestep_zero"}, col=0)
+    ks = g.add("KSampler", {"model": [m, 0], "positive": [pos, 0], "negative": [neg, 0], "latent_image": [lat, 0],
+                            "seed": seed, "steps": steps, "cfg": cfg, "sampler_name": "euler", "scheduler": "simple",
+                            "denoise": 1.0}, f"{d} keyframe sampler", col=1)
+    key = g.add("VAEDecode", {"samples": [ks, 0], "vae": [vae, 0]}, col=1)
+    g.add("SaveImage", {"images": [key, 0], "filename_prefix": f"{prefix}/{d}-keyframe"}, f"keyframe {d}", col=2)
+    start = g.add("ImageScale", {"image": [key, 0], "upscale_method": "lanczos", "width": w["width"],
+                                 "height": w["height"], "crop": "center"}, "keyframe -> 848x480", col=3)
+    g.band(f"walk {d} (Wan 2.2 I2V A14B, 4-step)")
+    experts = []
+    for i, part in enumerate(("high", "low")):
+        if w[part].endswith(".gguf"):
+            u = g.add("UnetLoaderGGUF", {"unet_name": w[part]}, f"Wan 2.2 I2V {part} noise", col=0)
+        else:
+            u = g.add("UNETLoader", {"unet_name": w[part], "weight_dtype": "default"}, f"Wan 2.2 I2V {part} noise", col=0)
+        u = g.add("LoraLoaderModelOnly", {"model": [u, 0], "lora_name": w["lora_" + part], "strength_model": 1.0},
+                  f"lightx2v 4-step {part}", col=0)
+        experts.append(g.add("ModelSamplingSD3", {"model": [u, 0], "shift": w["shift"]}, col=0))
+    wclip = g.add("CLIPLoader", {"clip_name": w["clip"], "type": "wan", "device": "default"}, col=1)
+    wvae = g.add("VAELoader", {"vae_name": w["vae"]}, col=1)
+    who = describe or "The character from the start image"
+    text = (f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {DIRS[d]}, {WALK}. {WAN_RULES}")
+    wpos = g.add("CLIPTextEncode", {"clip": [wclip, 0], "text": text}, f"{d} walk prompt", col=2)
+    wneg = g.add("CLIPTextEncode", {"clip": [wclip, 0], "text": WAN_NEG}, "walk negative (inert at cfg 1)", col=2)
+    i2v = g.add("WanImageToVideo", {"positive": [wpos, 0], "negative": [wneg, 0], "vae": [wvae, 0],
+                                    "start_image": [start, 0], "width": w["width"], "height": w["height"],
+                                    "length": w["length"], "batch_size": 1}, col=3)
+    k1 = g.add("KSamplerAdvanced", {"model": [experts[0], 0], "positive": [i2v, 0], "negative": [i2v, 1],
+                                    "latent_image": [i2v, 2], "add_noise": "enable", "noise_seed": seed,
+                                    "steps": w["steps"], "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
+                                    "start_at_step": 0, "end_at_step": w["split"],
+                                    "return_with_leftover_noise": "enable"}, "high noise steps", col=4)
+    k2 = g.add("KSamplerAdvanced", {"model": [experts[1], 0], "positive": [i2v, 0], "negative": [i2v, 1],
+                                    "latent_image": [k1, 0], "add_noise": "disable", "noise_seed": 0,
+                                    "steps": w["steps"], "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
+                                    "start_at_step": w["split"], "end_at_step": 10000,
+                                    "return_with_leftover_noise": "disable"}, "low noise steps", col=4)
+    dec = g.add("VAEDecode", {"samples": [k2, 0], "vae": [wvae, 0]}, col=5)
+    g.add("SaveImage", {"images": [dec, 0], "filename_prefix": f"{prefix}/{d}-walk/f"}, f"walk {d}", col=5)
+    vid = g.add("CreateVideo", {"images": [dec, 0], "fps": float(w["fps"])}, col=6)
+    g.add("SaveVideo", {"video": [vid, 0], "filename_prefix": f"{prefix}/{d}-walk/clip", "format": "mp4",
+                        "codec": "h264"}, f"walk {d} (mp4)", col=6)
+    g.notes.append((NOTE_VIDEO, 520))
+    return g
+
 NOTE_QWEN = """Sprite sheet from ONE character image (Qwen-Image-Edit + Lightning 4-step).
 
 1. Load your character in 'character'. Square, on WHITE: a transparent PNG loads with a black
@@ -477,6 +602,16 @@ Side art must face RIGHT (the engine mirrors west): check e / se / ne by eye."""
 NOTE_GRID = """One-pass turnaround (Qwen-Image-Edit). Fast preview, not a pack: identity holds, spacing
 and poses wander. Input: square, on white. The CLI cuts the row into cells:
 spritesheet.py hero.png --method grid"""
+
+NOTE_VIDEO = """The frog-settler route, one direction per queue (CURATION.md, 2026-09-25):
+Qwen-Image-Edit keyframe (1280x720 on white) -> Wan 2.2 I2V A14B Q4_K_M + lightx2v 4-step,
+848x480, 81 frames @16 fps -> 'walk <dir>' frames + mp4.
+
+Input: square, on white (spritesheet.py prep hero.png). To do another direction, change the
+direction words in BOTH prompts (keyframe and walk) and the SaveImage titles.
+The CLI does all five, finds a full-stride loop, cuts 8 frames, mattes, palette-locks at 96 px:
+  spritesheet.py hero.png --method video
+Side art must face RIGHT: check the e keyframe before paying for its video."""
 
 NOTE_SDXL = """Sprite sheet from ONE character image, SDXL route (juggernautXL + skormino pixel LoRA +
 IP-Adapter on the input). Pixel-native, weaker identity than the Qwen flow.
@@ -625,12 +760,107 @@ def preview(raws, frames, dirs, poses, canvas, cell=192):
     return im
 
 
+# ---- post for the video route ----------------------------------------------------
+def find_loop(frames: list, pmin: int = 32, pmax: int = 64, skip: int = 6, window: int = 4) -> dict:
+    """The best full-stride loop in a walk clip: the period P and start s minimising the
+    difference between frames s..s+window and s+P..s+P+window. A WINDOW, not one frame:
+    a single pose recurs twice per stride (the leg passing forward, then back), so a
+    one-frame match finds loops that jump the motion backwards at the seam. `pmin` keeps
+    it a FULL stride: a front-view half stride (legs swapped) looks almost like a whole
+    one, and the frog's real periods were 38-54 frames at 16 fps. `seam` is the loop
+    point's difference relative to an ordinary frame-to-frame step: under 1.0, the loop
+    point is smoother than a normal step."""
+    small = [np.asarray(f.convert("L").resize((212, 120), Image.BILINEAR), np.float32) for f in frames]
+    n = len(small)
+    steps = [float(np.abs(small[t + 1] - small[t]).mean()) for t in range(skip, n - 1)]
+    step = float(np.median(steps)) if steps else 1.0
+    best = None
+    for p in range(pmin, min(pmax, n - skip - window) + 1):
+        for s in range(skip, n - p - window + 1):
+            e = float(np.mean([np.abs(small[s + k] - small[s + p + k]).mean() for k in range(window)]))
+            if best is None or e < best[0]:
+                best = (e, p, s)
+    if best is None:
+        raise SystemExit(f"clip of {n} frames is too short for a loop of {pmin}-{pmax} (lower --period)")
+    e, p, s = best
+    seam = float(np.abs(small[s] - small[s + p]).mean())
+    return {"period": p, "start": s, "seam": round(seam / max(step, 1e-6), 3), "step": round(step, 3),
+            "match": round(e, 3)}
+
+
+def cut_loop(frames: list, loop: dict, n: int = 8) -> list:
+    return [frames[loop["start"] + round(i * loop["period"] / n)] for i in range(n)]
+
+
+def shrink_alpha(im: Image.Image, px: int = 1) -> Image.Image:
+    """premat.py --shrink 1: pull the matte in so no backdrop-coloured rim survives."""
+    if px <= 0:
+        return im
+    r, g_, b, a = im.split()
+    for _ in range(px):
+        a = a.filter(ImageFilter.MinFilter(3))
+    return Image.merge("RGBA", (r, g_, b, a))
+
+
+def despeckle(im: Image.Image, lum: int = 225) -> Image.Image:
+    """White-speck inpaint: an isolated near-white opaque pixel (matte residue, a highlight
+    the palette snapped to white) takes its neighbours' most common colour."""
+    a = np.asarray(im.convert("RGBA")).copy()
+    h, w_ = a.shape[:2]
+    white = (a[..., 3] > 0) & (a[..., :3].min(-1) >= lum)
+    for y, x in zip(*np.where(white)):
+        nb = [a[j, i] for j, i in ((y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1))
+              if 0 <= j < h and 0 <= i < w_ and a[j, i, 3] > 0 and not white[j, i]]
+        if len(nb) >= 3:
+            vals, counts = np.unique(np.array(nb), axis=0, return_counts=True)
+            a[y, x] = vals[counts.argmax()]
+    return Image.fromarray(a, "RGBA")
+
+
+def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pal, shrink: int = 1) -> dict:
+    """Video frames share a locked camera, so each direction goes through ONE crop window
+    (the union of its frames) at ONE scale for the whole sheet: nothing pumps, feet stay
+    where the video put them (trace.py's fixed-window rule)."""
+    keyed = {k: shrink_alpha(key_background(v), shrink) for k, v in raws.items()}
+    boxes = {k: bbox(v) for k, v in keyed.items()}
+    union = {}
+    for d in dirs:
+        bs = [boxes[(d, p)] for p in poses if boxes.get((d, p))]
+        if bs:
+            union[d] = (min(b[0] for b in bs), min(b[1] for b in bs), max(b[2] for b in bs), max(b[3] for b in bs))
+    if not union:
+        raise SystemExit("every frame keyed to empty: is the background not plain?")
+    content = content or canvas - 2
+    s = content / max(max(u[3] - u[1], u[2] - u[0]) for u in union.values())
+    out = {}
+    for d in dirs:
+        u = union.get(d)
+        for p in poses:
+            frame = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+            if u and (d, p) in keyed:
+                tw, th = max(1, round((u[2] - u[0]) * s)), max(1, round((u[3] - u[1]) * s))
+                px = despeckle(snap(P.kcentroid(keyed[(d, p)].crop(u), tw, th), pal))
+                frame.paste(px, ((canvas - tw) // 2, canvas - 1 - th), px)
+            out[(d, p)] = frame
+    return out
+
+
+def widest(frames: list) -> int:
+    """Index of the widest silhouette: the full-stride contact pose, used as the pack's `step`."""
+    widths = []
+    for f in frames:
+        b = bbox(key_background(f.resize((f.width // 4, f.height // 4))))
+        widths.append(b[2] - b[0] if b else 0)
+    return int(np.argmax(widths))
+
+
 # ---- running ----------------------------------------------------------------------
 TITLE_RE = re.compile(r"^frame\s+(\w+)\s+(\S+)$")
 
 
-def harvest(api: dict, outputs: dict) -> tuple[dict, dict]:
-    """SaveImage outputs -> ({(dir, pose): image}, {grid title: image})."""
+def harvest(api: dict, outputs: dict, walks: dict | None = None) -> tuple[dict, dict]:
+    """SaveImage outputs -> ({(dir, pose): image}, {grid title: image}); `walk <dir>` saves
+    (a whole clip) land in `walks[dir]` as a frame list."""
     frames, grids = {}, {}
     for nid, ims in outputs.items():
         if not ims or nid not in api:
@@ -641,6 +871,10 @@ def harvest(api: dict, outputs: dict) -> tuple[dict, dict]:
             frames[(m.group(1), m.group(2))] = fetch(ims[0])
         elif title.startswith("grid "):
             grids[title] = fetch(ims[0])
+        elif title.startswith("keyframe "):
+            frames[(title.split()[1], "keyframe")] = fetch(ims[0])
+        elif re.match(r"^walk \w+$", title) and walks is not None:
+            walks[title.split()[1]] = [fetch(im) for im in sorted(ims, key=lambda i: i["filename"])]
     return frames, grids
 
 
@@ -690,6 +924,8 @@ def cmd_make(a):
                                             else input_palette(src, a.colors))
     if a.method == "grid":
         poses = ["idle"]
+    if a.method == "video":
+        return cmd_video(a, dirs, kind, root, src, pal)
     q, notes = (dict(QWEN), [])
     online = not a.dry_run
     if a.method in ("qwen", "grid") and online:
@@ -756,9 +992,85 @@ def cmd_make(a):
         print("\n".join(runs))
 
 
+WALK_POSES = ["idle", "step"] + [f"walk-{i}" for i in range(8)]
+
+
+def cmd_video(a, dirs, kind, root, src, pal):
+    """The frog route for every direction: one queue per direction (keyframe + walk clip),
+    then loop-find, cut 8 frames, and post them through one fixed window at 96 px."""
+    online = not a.dry_run
+    qo = {"unet": a.unet, "lightning": a.lightning, "clip": a.clip, "vae": a.vae}
+    if online:
+        q, notes = detect_qwen(qo)
+        w, wnotes = detect_wan({})
+        notes += wnotes
+    else:
+        q = {**QWEN, **{k: (None if v == "none" else v) for k, v in qo.items() if v}}
+        w, notes = dict(WAN), []
+    for n in notes:
+        print(" ·", n)
+    pmin, pmax = (int(x) for x in a.period.split(":"))
+    input_name = upload(src, f"spritesheet-{kind}.png") if online else f"spritesheet-{kind}.png"
+    runs = []
+    for seed in a.seeds or [3]:  # the frog's seed
+        out = os.path.join(root, f"video-s{seed}")
+        os.makedirs(f"{out}/raw", exist_ok=True)
+        graphs = {d: video_graph(input_name, d, seed, q, w, a.describe, a.style or STYLE,
+                                 f"sprite-sheet/{kind}/video-s{seed}") for d in dirs}
+        for d, g in graphs.items():
+            json.dump(g.nodes, open(f"{out}/flow-{d}_api.json", "w"), indent=1)
+            json.dump(g.workflow(), open(f"{out}/flow-{d}.json", "w"), indent=1)
+        if a.dry_run:
+            print(f"dry run: {out}/flow-<dir>_api.json for {', '.join(dirs)}")
+            continue
+        pids = {d: queue(g.nodes) for d, g in graphs.items()}  # ComfyUI runs them in order
+        print(f"seed {seed}: queued {len(pids)} direction(s) — a keyframe and an {w['length']}-frame walk each; "
+              f"minutes per direction")
+        raws, loops, t0 = {}, {}, time.time()
+        for d in dirs:
+            walks = {}
+            frames, _ = harvest(graphs[d].nodes, wait(pids[d], limit_s=7200, poll=5), walks)
+            clip = walks.get(d) or []
+            if d in a.mirror:
+                clip = [ImageOps.mirror(f) for f in clip]
+                frames = {k: ImageOps.mirror(v) for k, v in frames.items()}
+            if (d, "keyframe") in frames:
+                frames[(d, "keyframe")].save(f"{out}/raw/{d}-keyframe.png")
+            if len(clip) < pmin + 8:
+                print(f"  ! {d}: {len(clip)} frames, too few for a {pmin}+ frame loop; row stays empty")
+                continue
+            os.makedirs(f"{out}/raw/walk-{d}", exist_ok=True)
+            for i, f in enumerate(clip):
+                f.save(f"{out}/raw/walk-{d}/{i:04d}.png")
+            loop = find_loop(clip, pmin, pmax)
+            cyc = cut_loop(clip, loop)
+            loops[d] = loop
+            raws[(d, "idle")] = clip[0]  # the start frame: the keyframe, re-rendered by Wan in its own look
+            raws[(d, "step")] = cyc[widest(cyc)]
+            for i, f in enumerate(cyc):
+                raws[(d, f"walk-{i}")] = f
+            for p in ("idle", "step"):
+                raws[(d, p)].save(f"{out}/raw/{d}-{p}.png")
+            for i, f in enumerate(cyc):
+                f.save(f"{out}/raw/{d}-walk-{i}.png")
+            print(f"  {d}: loop of {loop['period']} frames from {loop['start']}, seam {loop['seam']} "
+                  f"(under 1.0 = smoother than a normal step)  [{time.time() - t0:.0f}s]")
+        dirs_run = [d for d in dirs if d in loops]
+        if not dirs_run:
+            continue
+        runs.append(finish(out, raws, dirs_run, WALK_POSES, a, kind, pal,
+                           {"method": "video", "seed": seed, "input": a.image, "kind": kind, "loops": loops,
+                            "models": {"qwen": q, "wan": w}, "mirrored": a.mirror}))
+    if runs:
+        print("\n".join(runs))
+
+
 def finish(out, raws, dirs, poses, a, kind, pal, meta) -> str:
     raws = {k: v for k, v in raws.items() if k[0] in dirs and k[1] in poses}
-    frames = pixelize(raws, dirs, poses, a.size, a.content, pal)
+    if meta.get("method") == "video":
+        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal)
+    else:
+        frames = pixelize(raws, dirs, poses, a.size, a.content, pal)
     json.dump({"palette": pal, "size": a.size, "content": a.content, "kind": kind},
               open(f"{out}/post.json", "w"))
     assemble(frames, dirs, poses, a.size, out, kind, {**meta, "palette": a.palette}, raws)
@@ -770,6 +1082,19 @@ def cmd_repack(a):
     """Re-run the pixel post on a finished run's raws: new size/palette, no GPU."""
     meta = json.load(open(f"{a.run}/sheet.json"))
     dirs, poses = meta["dirs"], meta["poses"]
+    a.size = a.size or meta.get("canvas", 48)
+    a.palette = a.palette or meta.get("palette", "input")
+    if a.period and meta.get("method") == "video":  # re-find the loop in the saved clips, then re-cut
+        pmin, pmax = (int(x) for x in a.period.split(":"))
+        for d in dirs:
+            clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{a.run}/raw/walk-{d}/*.png"))]
+            loop = find_loop(clip, pmin, pmax)
+            cyc = cut_loop(clip, loop)
+            meta.setdefault("loops", {})[d] = loop
+            cyc[widest(cyc)].save(f"{a.run}/raw/{d}-step.png")
+            for i, f in enumerate(cyc):
+                f.save(f"{a.run}/raw/{d}-walk-{i}.png")
+            print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}")
     raws = {}
     for d in dirs:
         for p in poses:
@@ -802,11 +1127,19 @@ def cmd_doctor(_a):
     print("qwen route will use:")
     for k in ("unet", "lightning", "clip", "vae", "angles"):
         print(f"  {k:9} {q.get(k)}")
+    w, wnotes = detect_wan({})
+    for n in wnotes:
+        print(" ·", n)
+    print("video route will use:")
+    for k in ("high", "low", "lora_high", "lora_low", "clip", "vae"):
+        print(f"  {k:9} {w[k]}")
     info = http_json("/object_info", timeout=60)
     need = {"qwen": ["TextEncodeQwenImageEditPlus", "FluxKontextMultiReferenceLatentMethod", "CFGNorm",
                      "ModelSamplingAuraFlow", "EmptySD3LatentImage"],
             "sdxl": ["IPAdapterAdvanced", "IPAdapterModelLoader", "PrepImageForClipVision"],
-            "flow sheet preview": ["ImageStitch"], "gguf": ["UnetLoaderGGUF"]}
+            "video": ["WanImageToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "UnetLoaderGGUF", "ImageScale",
+                      "CreateVideo", "SaveVideo"],
+            "flow sheet preview": ["ImageStitch"]}
     for route, nodes in need.items():
         miss = [n for n in nodes if n not in info]
         print(f"  {'ok ' if not miss else 'MISSING'} {route}" + (f": {', '.join(miss)}" if miss else ""))
@@ -837,6 +1170,8 @@ def cmd_flows(a):
         f"sprite-sheet-qwen{tag}": qwen_graph("character.png", dirs, poses, 1004, q, prefix="sprite-sheet/qwen"),
         f"sprite-sheet-sdxl{tag}": sdxl_graph("character.png", dirs, poses, 1004, prefix="sprite-sheet/sdxl"),
         "sprite-sheet-grid": grid_graph("character.png", dirs, 1004, q, prefix="sprite-sheet/grid"),
+        "sprite-sheet-video-e": video_graph("character.png", "e", 3, q, detect_wan({})[0] if specs else dict(WAN),
+                                            prefix="sprite-sheet/video"),
     }
     for name, g in made.items():
         json.dump(g.workflow(specs), open(f"{a.to}/{name}.json", "w"), indent=1)
@@ -860,10 +1195,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="spritesheet.py", description=__doc__.split("\n\n")[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     post = argparse.ArgumentParser(add_help=False)
-    post.add_argument("--size", type=int, default=48, help="frame canvas px (the pack's chars are 48)")
+    post.add_argument("--size", type=int, help="frame canvas px (default 48; 96 for --method video, the "
+                                                   "swampspace-hires size the game loads)")
     post.add_argument("--content", type=int, help="px the TALLEST frame spans (default size-2)")
-    post.add_argument("--palette", choices=["input", "swampspace", "none"], default="input",
-                      help="input = the character's own colours; swampspace = the pack's locked 34")
+    post.add_argument("--palette", choices=["input", "swampspace", "none"],
+                      help="input = the character's own colours (default); swampspace = the pack's locked 34 "
+                           "(default for --method video, as the frog shipped)")
     post.add_argument("--colors", type=int, default=24, help="palette size for --palette input")
     if sub == "doctor":
         return cmd_doctor(ap.parse_args(argv))
@@ -875,6 +1212,7 @@ def main(argv=None):
         ap = argparse.ArgumentParser(prog="spritesheet.py repack", parents=[post])
         ap.add_argument("run", help="a finished run dir (holds sheet.json and raw/)")
         ap.add_argument("--to", help="write here instead of over the run")
+        ap.add_argument("--period", help="video runs: re-find the loop in this frame range, e.g. 40:64")
         return cmd_repack(ap.parse_args(argv))
     if sub == "flows":
         ap.add_argument("--to", default=FLOWS)
@@ -884,7 +1222,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="spritesheet.py", parents=[post], description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("image", help="the character: any size, PNG with alpha or on a plain background")
-    ap.add_argument("--method", choices=["qwen", "grid", "sdxl"], default="qwen")
+    ap.add_argument("--method", choices=["qwen", "video", "grid", "sdxl"], default="qwen",
+                    help="video = the frog-settler route (Qwen keyframe + Wan 2.2 walk), 96 px")
+    ap.add_argument("--period", default="32:64", help="video: loop length range in frames (a FULL stride)")
     ap.add_argument("--dirs", default=",".join(PACK_DIRS), help=f"of {','.join(DIRS)}")
     ap.add_argument("--frames", default="basic",
                     help="preset (" + ", ".join(k + "=" + "+".join(v) for k, v in PRESETS.items())
@@ -907,6 +1247,8 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true", help="write flow_api.json / flow.json, queue nothing")
     a = ap.parse_args(argv)
     a.mirror = [d for d in a.mirror.split(",") if d]
+    a.size = a.size or (96 if a.method == "video" else 48)
+    a.palette = a.palette or ("swampspace" if a.method == "video" else "input")
     return cmd_make(a)
 
 

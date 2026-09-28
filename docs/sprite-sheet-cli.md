@@ -1,11 +1,18 @@
 # Sprite sheet from one character image
 
+> **Untested against a real ComfyUI.** Everything here was built and checked against
+> a fake server (`spritesheet_selftest.py`). Run `doctor` first. On the first real
+> run, check that the node settings in the editor flows landed in the right fields;
+> `spritesheet.py flows` with ComfyUI up rewrites them from your server's own node
+> definitions.
+
 `scripts/assets/spritesheet.py` takes any character image and returns a pixel
 sprite sheet: 5 directions × idle + step at 48 px by default, which is the
 pack's character contract (§3 of `sprite-generation.md`). It drives your local
 ComfyUI. The same graph ships as flows you can import and edit.
 
 ```bash
+pnpm run sprite:sheet -- hero.png --method video        # the frog-settler route: walk cycles, 96 px
 pnpm run sprite:sheet -- hero.png                       # qwen, s se e ne n × idle step, 48 px
 python3 scripts/assets/spritesheet.py doctor            # run this first: what's installed, what it'll use
 python3 scripts/assets/spritesheet.py hero.png --frames walk --seeds 1004 1005 1006
@@ -33,6 +40,38 @@ Needs `pip install pillow numpy` and ComfyUI at `http://127.0.0.1:8188`
 | `flow_api.json`, `flow.json` | the exact graph that ran, API and editor format |
 
 ## Methods
+
+**`video` — the frog-settler route.** This is how the approved frog was animated
+(`public/themes/swampspace/CURATION.md`, 2026-09-25), rebuilt from that record
+because the framework it ran in (`D:\projects\puck-sprites`) lives outside this repo.
+Each direction is queued once and runs these steps:
+
+1. **Keyframe.** Qwen-Image-Edit + Lightning redraws your image facing that
+   direction, at 1280×720 on white.
+2. **Motion.** Wan 2.2 I2V A14B Q4_K_M, high and low experts + lightx2v 4-step
+   (shift 5, 4 steps, cfg 1, high 0-2 / low 2-4). It renders an 81-frame
+   walk-in-place at 848×480, 16 fps, seed 3, starting from the keyframe. The
+   two-expert graph is cyber-puck's `wan_flf_loop.py` `build_a14b_gguf`, with
+   the start frame only.
+3. **Loop.** `find_loop` searches 32–64 frames (`--period`) for the period
+   whose 4-frame window matches best. A window, not one frame: a single pose
+   occurs twice per stride, once on the forward swing and once on the way back.
+   The 32-frame floor keeps it a *full* stride; the frog's periods were 38–54.
+   The seam is reported relative to an ordinary frame step, and under 1.0 is
+   smoother. The frog's seams were 0.16–0.48.
+4. **Cut.** 8 evenly spaced frames make `walk-0..7`. `step` is the widest
+   stride, and `idle` is the clip's start frame.
+5. **Post.** The matte is border-connected and shrunk 1 px (`premat --shrink 1`).
+   Each direction goes through one crop window for the whole cycle at one
+   scale, so nothing pumps between frames. Then a k-centroid downscale to
+   **96 px**, the pack's locked 34 colours, and a white-speck clean-up. 96 px
+   because the game loads `swampspace-hires` (`sprite-pipeline-wan.md` §5).
+
+Each row of the sheet is `idle, step, walk-0 … walk-7`, and the frames are named
+`<kind>-<dir>-walk-<n>.png`. All 81 frames of each clip are kept under
+`raw/walk-<dir>/`, so `repack <run> --period 40:64` can re-cut a loop without the
+GPU. Check the `e` keyframe for facing before you trust the rest. If it faces
+left, re-run with `--mirror e`.
 
 **`qwen` (default).** This is cyber-puck's Qwen-Image-Edit recipe (fp8 +
 Lightning 4-step, CFG 1, shift 3.1, `index_timestep_zero`, about 15 s a frame
@@ -90,6 +129,7 @@ Drawn side art must face **right**. Models don't reliably obey that. Check `e`,
 | Qwen, 5 dirs × idle + step | `sprite-sheet-qwen.json` | `sprite-sheet-qwen_api.json` |
 | SDXL, 5 dirs × idle + step | `sprite-sheet-sdxl.json` | `sprite-sheet-sdxl_api.json` |
 | Qwen one-pass turnaround | `sprite-sheet-grid.json` | `sprite-sheet-grid_api.json` |
+| Frog route, one direction (`e`): keyframe → Wan walk | `sprite-sheet-video-e.json` | `sprite-sheet-video-e_api.json` |
 
 Drag the editor file into ComfyUI. Load your character into the node titled
 **character**, then queue. The input must be square and on white: a transparent
@@ -116,8 +156,10 @@ the table in `comfy_ui.py`. A node that is in neither is an error, not a guess.
 
 ## Tests
 
-`python3 scripts/assets/spritesheet_selftest.py` runs 73 checks against a fake
+`python3 scripts/assets/spritesheet_selftest.py` runs 119 checks against a fake
 ComfyUI in about 90 s, with no GPU. It checks graph validity, editor-format
 link integrity, model detection, keying, scale and foot registration, palette,
-mirroring, repack, `--flow` and the committed flows. The exit code is the
+mirroring, repack, `--flow`, the committed flows and the video route. The video
+test uses a fake Wan clip with a known 40-frame stride, and the loop finder has to
+find that stride, not the 20-frame half. The exit code is the
 number of failures.

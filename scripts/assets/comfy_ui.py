@@ -53,6 +53,20 @@ BUILTIN = {
     "CLIPVisionLoader": ([], ["clip_name"], [("CLIP_VISION", "CLIP_VISION")]),
     "PrepImageForClipVision": ([("image", "IMAGE")], ["interpolation", "crop_position", "sharpening"],
                                [("IMAGE", "IMAGE")]),
+    # Wan 2.2 I2V (the frog route): two experts, KSamplerAdvanced split, frames out as an IMAGE batch
+    "ModelSamplingSD3": ([("model", "MODEL")], ["shift"], [("MODEL", "MODEL")]),
+    "WanImageToVideo": (
+        [("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("vae", "VAE"),
+         ("clip_vision_output", "CLIP_VISION_OUTPUT"), ("start_image", "IMAGE")],
+        ["width", "height", "length", "batch_size"],
+        [("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("latent", "LATENT")]),
+    "KSamplerAdvanced": (
+        [("model", "MODEL"), ("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("latent_image", "LATENT")],
+        ["add_noise", "noise_seed+control", "steps", "cfg", "sampler_name", "scheduler", "start_at_step",
+         "end_at_step", "return_with_leftover_noise"], [("LATENT", "LATENT")]),
+    "ImageScale": ([("image", "IMAGE")], ["upscale_method", "width", "height", "crop"], [("IMAGE", "IMAGE")]),
+    "CreateVideo": ([("images", "IMAGE"), ("audio", "AUDIO")], ["fps"], [("VIDEO", "VIDEO")]),
+    "SaveVideo": ([("video", "VIDEO")], ["filename_prefix", "format", "codec"], []),
     "IPAdapterAdvanced": (
         [("model", "MODEL"), ("ipadapter", "IPADAPTER"), ("image", "IMAGE"), ("image_negative", "IMAGE"),
          ("attn_mask", "MASK"), ("clip_vision", "CLIP_VISION")],

@@ -58,14 +58,6 @@
   }
  },
  "7": {
-  "class_type": "EmptySD3LatentImage",
-  "inputs": {
-   "width": 1024,
-   "height": 1024,
-   "batch_size": 1
-  }
- },
- "8": {
   "class_type": "LoadImage",
   "inputs": {
    "image": "character.png"
@@ -74,7 +66,7 @@
    "title": "character (square, on white)"
   }
  },
- "9": {
+ "8": {
   "class_type": "TextEncodeQwenImageEditPlus",
   "inputs": {
    "clip": [
@@ -86,7 +78,7 @@
     0
    ],
    "image1": [
-    "8",
+    "7",
     0
    ],
    "prompt": ""
@@ -95,14 +87,22 @@
    "title": "negative (ignored at CFG 1)"
   }
  },
- "10": {
+ "9": {
   "class_type": "FluxKontextMultiReferenceLatentMethod",
   "inputs": {
    "conditioning": [
-    "9",
+    "8",
     0
    ],
    "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "10": {
+  "class_type": "EmptySD3LatentImage",
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
   }
  },
  "11": {
@@ -118,7 +118,7 @@
    ],
    "prompt": "Redraw the character from image 1 as a single full-body video game sprite: front view, facing the viewer, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
    "image1": [
-    "8",
+    "7",
     0
    ]
   },
@@ -148,11 +148,11 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
-    "7",
+    "10",
     0
    ],
    "seed": 1004,
@@ -209,7 +209,7 @@
     0
    ],
    "image2": [
-    "8",
+    "7",
     0
    ]
   },
@@ -252,7 +252,7 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
@@ -309,7 +309,7 @@
    ],
    "prompt": "Redraw the character from image 1 as a single full-body video game sprite: three-quarter front view, body turned 45 degrees toward the right side of the image, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
    "image1": [
-    "8",
+    "7",
     0
    ]
   },
@@ -339,11 +339,11 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
-    "7",
+    "10",
     0
    ],
    "seed": 1004,
@@ -400,7 +400,7 @@
     0
    ],
    "image2": [
-    "8",
+    "7",
     0
    ]
   },
@@ -443,7 +443,7 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
@@ -500,7 +500,7 @@
    ],
    "prompt": "Redraw the character from image 1 as a single full-body video game sprite: full side profile facing the right side of the image, nose pointing right, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
    "image1": [
-    "8",
+    "7",
     0
    ]
   },
@@ -530,11 +530,11 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
-    "7",
+    "10",
     0
    ],
    "seed": 1004,
@@ -591,7 +591,7 @@
     0
    ],
    "image2": [
-    "8",
+    "7",
     0
    ]
   },
@@ -634,7 +634,7 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
@@ -691,7 +691,7 @@
    ],
    "prompt": "Redraw the character from image 1 as a single full-body video game sprite: three-quarter back view, turned away from the viewer toward the upper right of the image, back and shoulder visible, face hidden, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
    "image1": [
-    "8",
+    "7",
     0
    ]
   },
@@ -721,11 +721,11 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
-    "7",
+    "10",
     0
    ],
    "seed": 1004,
@@ -782,7 +782,7 @@
     0
    ],
    "image2": [
-    "8",
+    "7",
     0
    ]
   },
@@ -825,7 +825,7 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
@@ -882,7 +882,7 @@
    ],
    "prompt": "Redraw the character from image 1 as a single full-body video game sprite: back view seen from directly behind, back of the head visible, face hidden, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
    "image1": [
-    "8",
+    "7",
     0
    ]
   },
@@ -912,11 +912,11 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [
-    "7",
+    "10",
     0
    ],
    "seed": 1004,
@@ -973,7 +973,7 @@
     0
    ],
    "image2": [
-    "8",
+    "7",
     0
    ]
   },
@@ -1016,7 +1016,7 @@
     0
    ],
    "negative": [
-    "10",
+    "9",
     0
    ],
    "latent_image": [

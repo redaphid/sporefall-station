@@ -223,40 +223,6 @@
   },
   {
    "id": 7,
-   "type": "EmptySD3LatentImage",
-   "pos": [
-    480,
-    360
-   ],
-   "size": [
-    300,
-    146
-   ],
-   "flags": {},
-   "order": 6,
-   "mode": 0,
-   "inputs": [],
-   "outputs": [
-    {
-     "name": "LATENT",
-     "type": "LATENT",
-     "links": [
-      15
-     ],
-     "slot_index": 0
-    }
-   ],
-   "properties": {
-    "Node name for S&R": "EmptySD3LatentImage"
-   },
-   "widgets_values": [
-    2000,
-    800,
-    1
-   ]
-  },
-  {
-   "id": 8,
    "type": "LoadImage",
    "pos": [
     960,
@@ -267,7 +233,7 @@
     340
    ],
    "flags": {},
-   "order": 7,
+   "order": 6,
    "mode": 0,
    "inputs": [],
    "outputs": [
@@ -297,7 +263,7 @@
    "title": "character (square, on white)"
   },
   {
-   "id": 9,
+   "id": 8,
    "type": "TextEncodeQwenImageEditPlus",
    "pos": [
     1440,
@@ -308,7 +274,7 @@
     302
    ],
    "flags": {},
-   "order": 8,
+   "order": 7,
    "mode": 0,
    "inputs": [
     {
@@ -356,7 +322,7 @@
    "title": "negative (ignored at CFG 1)"
   },
   {
-   "id": 10,
+   "id": 9,
    "type": "FluxKontextMultiReferenceLatentMethod",
    "pos": [
     1440,
@@ -367,7 +333,7 @@
     94
    ],
    "flags": {},
-   "order": 9,
+   "order": 8,
    "mode": 0,
    "inputs": [
     {
@@ -391,6 +357,40 @@
    },
    "widgets_values": [
     "index_timestep_zero"
+   ]
+  },
+  {
+   "id": 10,
+   "type": "EmptySD3LatentImage",
+   "pos": [
+    480,
+    360
+   ],
+   "size": [
+    300,
+    146
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      15
+     ],
+     "slot_index": 0
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "EmptySD3LatentImage"
+   },
+   "widgets_values": [
+    2000,
+    800,
+    1
    ]
   },
   {
@@ -674,7 +674,7 @@
    4,
    5,
    0,
-   9,
+   8,
    0,
    "CLIP"
   ],
@@ -682,23 +682,23 @@
    5,
    6,
    0,
-   9,
+   8,
    1,
    "VAE"
   ],
   [
    6,
-   8,
+   7,
    0,
-   9,
+   8,
    2,
    "IMAGE"
   ],
   [
    7,
-   9,
+   8,
    0,
-   10,
+   9,
    0,
    "CONDITIONING"
   ],
@@ -720,7 +720,7 @@
   ],
   [
    10,
-   8,
+   7,
    0,
    11,
    2,
@@ -752,7 +752,7 @@
   ],
   [
    14,
-   10,
+   9,
    0,
    13,
    2,
@@ -760,7 +760,7 @@
   ],
   [
    15,
-   7,
+   10,
    0,
    13,
    3,

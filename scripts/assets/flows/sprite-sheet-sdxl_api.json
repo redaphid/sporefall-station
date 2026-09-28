@@ -1,0 +1,1207 @@
+{
+ "1": {
+  "class_type": "CheckpointLoaderSimple",
+  "inputs": {
+   "ckpt_name": "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
+  },
+  "_meta": {
+   "title": "juggernautXL (the pack's proven base)"
+  }
+ },
+ "2": {
+  "class_type": "LoraLoader",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "clip": [
+    "1",
+    1
+   ],
+   "lora_name": "pixel_art_style_by_skormino_v7.05_test_72img.safetensors",
+   "strength_model": 1.0,
+   "strength_clip": 1.0
+  },
+  "_meta": {
+   "title": "skormino pixel-art LoRA"
+  }
+ },
+ "3": {
+  "class_type": "EmptyLatentImage",
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  }
+ },
+ "4": {
+  "class_type": "IPAdapterModelLoader",
+  "inputs": {
+   "ipadapter_file": "ip-adapter-plus_sdxl_vit-h.safetensors"
+  }
+ },
+ "5": {
+  "class_type": "CLIPVisionLoader",
+  "inputs": {
+   "clip_name": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+  }
+ },
+ "6": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "character.png"
+  },
+  "_meta": {
+   "title": "character (square, on white)"
+  }
+ },
+ "7": {
+  "class_type": "PrepImageForClipVision",
+  "inputs": {
+   "image": [
+    "6",
+    0
+   ],
+   "interpolation": "LANCZOS",
+   "crop_position": "center",
+   "sharpening": 0.0
+  }
+ },
+ "8": {
+  "class_type": "IPAdapterAdvanced",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "ipadapter": [
+    "4",
+    0
+   ],
+   "image": [
+    "7",
+    0
+   ],
+   "clip_vision": [
+    "5",
+    0
+   ],
+   "weight": 0.8,
+   "weight_type": "style transfer",
+   "combine_embeds": "concat",
+   "start_at": 0.0,
+   "end_at": 0.9,
+   "embeds_scaling": "V only"
+  },
+  "_meta": {
+   "title": "s identity (IP-Adapter)"
+  }
+ },
+ "9": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "photo, photorealistic, 3d render, smooth gradient, soft shading, blurry, text, watermark, signature, sprite sheet, grid, multiple views, turnaround, duplicate, two characters, cropped, out of frame, floor shadow, cast shadow, ground, colored background, gradient background, scenery"
+  },
+  "_meta": {
+   "title": "s negative"
+  }
+ },
+ "10": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, front view, facing the viewer, standing still in a relaxed idle pose, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "s idle prompt"
+  }
+ },
+ "11": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "8",
+    0
+   ],
+   "positive": [
+    "10",
+    0
+   ],
+   "negative": [
+    "9",
+    0
+   ],
+   "latent_image": [
+    "3",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "s idle sampler"
+  }
+ },
+ "12": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "11",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "13": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "12",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/s-idle"
+  },
+  "_meta": {
+   "title": "frame s idle"
+  }
+ },
+ "14": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, front view, facing the viewer, mid-stride walking pose, one leg forward, arms swinging slightly, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "s step prompt"
+  }
+ },
+ "15": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "12",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "16": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "8",
+    0
+   ],
+   "positive": [
+    "14",
+    0
+   ],
+   "negative": [
+    "9",
+    0
+   ],
+   "latent_image": [
+    "15",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 0.38
+  },
+  "_meta": {
+   "title": "s step sampler"
+  }
+ },
+ "17": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "16",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "18": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "17",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/s-step"
+  },
+  "_meta": {
+   "title": "frame s step"
+  }
+ },
+ "19": {
+  "class_type": "IPAdapterAdvanced",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "ipadapter": [
+    "4",
+    0
+   ],
+   "image": [
+    "7",
+    0
+   ],
+   "clip_vision": [
+    "5",
+    0
+   ],
+   "weight": 0.75,
+   "weight_type": "style transfer",
+   "combine_embeds": "concat",
+   "start_at": 0.0,
+   "end_at": 0.9,
+   "embeds_scaling": "V only"
+  },
+  "_meta": {
+   "title": "se identity (IP-Adapter)"
+  }
+ },
+ "20": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "photo, photorealistic, 3d render, smooth gradient, soft shading, blurry, text, watermark, signature, sprite sheet, grid, multiple views, turnaround, duplicate, two characters, cropped, out of frame, floor shadow, cast shadow, ground, colored background, gradient background, scenery"
+  },
+  "_meta": {
+   "title": "se negative"
+  }
+ },
+ "21": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, three-quarter front view, body turned 45 degrees toward the right side of the image, standing still in a relaxed idle pose, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "se idle prompt"
+  }
+ },
+ "22": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "19",
+    0
+   ],
+   "positive": [
+    "21",
+    0
+   ],
+   "negative": [
+    "20",
+    0
+   ],
+   "latent_image": [
+    "3",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "se idle sampler"
+  }
+ },
+ "23": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "22",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "24": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "23",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/se-idle"
+  },
+  "_meta": {
+   "title": "frame se idle"
+  }
+ },
+ "25": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, three-quarter front view, body turned 45 degrees toward the right side of the image, mid-stride walking pose, one leg forward, arms swinging slightly, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "se step prompt"
+  }
+ },
+ "26": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "23",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "27": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "19",
+    0
+   ],
+   "positive": [
+    "25",
+    0
+   ],
+   "negative": [
+    "20",
+    0
+   ],
+   "latent_image": [
+    "26",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 0.38
+  },
+  "_meta": {
+   "title": "se step sampler"
+  }
+ },
+ "28": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "27",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "29": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "28",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/se-step"
+  },
+  "_meta": {
+   "title": "frame se step"
+  }
+ },
+ "30": {
+  "class_type": "IPAdapterAdvanced",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "ipadapter": [
+    "4",
+    0
+   ],
+   "image": [
+    "7",
+    0
+   ],
+   "clip_vision": [
+    "5",
+    0
+   ],
+   "weight": 0.55,
+   "weight_type": "style transfer",
+   "combine_embeds": "concat",
+   "start_at": 0.0,
+   "end_at": 0.9,
+   "embeds_scaling": "V only"
+  },
+  "_meta": {
+   "title": "e identity (IP-Adapter)"
+  }
+ },
+ "31": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "photo, photorealistic, 3d render, smooth gradient, soft shading, blurry, text, watermark, signature, sprite sheet, grid, multiple views, turnaround, duplicate, two characters, cropped, out of frame, floor shadow, cast shadow, ground, colored background, gradient background, scenery"
+  },
+  "_meta": {
+   "title": "e negative"
+  }
+ },
+ "32": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, full side profile facing the right side of the image, nose pointing right, standing still in a relaxed idle pose, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "e idle prompt"
+  }
+ },
+ "33": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "30",
+    0
+   ],
+   "positive": [
+    "32",
+    0
+   ],
+   "negative": [
+    "31",
+    0
+   ],
+   "latent_image": [
+    "3",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "e idle sampler"
+  }
+ },
+ "34": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "33",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "35": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "34",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/e-idle"
+  },
+  "_meta": {
+   "title": "frame e idle"
+  }
+ },
+ "36": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, full side profile facing the right side of the image, nose pointing right, mid-stride walking pose, one leg forward, arms swinging slightly, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "e step prompt"
+  }
+ },
+ "37": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "34",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "38": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "30",
+    0
+   ],
+   "positive": [
+    "36",
+    0
+   ],
+   "negative": [
+    "31",
+    0
+   ],
+   "latent_image": [
+    "37",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 0.38
+  },
+  "_meta": {
+   "title": "e step sampler"
+  }
+ },
+ "39": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "38",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "40": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "39",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/e-step"
+  },
+  "_meta": {
+   "title": "frame e step"
+  }
+ },
+ "41": {
+  "class_type": "IPAdapterAdvanced",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "ipadapter": [
+    "4",
+    0
+   ],
+   "image": [
+    "7",
+    0
+   ],
+   "clip_vision": [
+    "5",
+    0
+   ],
+   "weight": 0.5,
+   "weight_type": "style transfer",
+   "combine_embeds": "concat",
+   "start_at": 0.0,
+   "end_at": 0.9,
+   "embeds_scaling": "V only"
+  },
+  "_meta": {
+   "title": "ne identity (IP-Adapter)"
+  }
+ },
+ "42": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "photo, photorealistic, 3d render, smooth gradient, soft shading, blurry, text, watermark, signature, sprite sheet, grid, multiple views, turnaround, duplicate, two characters, cropped, out of frame, floor shadow, cast shadow, ground, colored background, gradient background, scenery, face, eyes, front view, looking at the viewer"
+  },
+  "_meta": {
+   "title": "ne negative"
+  }
+ },
+ "43": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, three-quarter back view, turned away from the viewer toward the upper right of the image, back and shoulder visible, face hidden, standing still in a relaxed idle pose, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "ne idle prompt"
+  }
+ },
+ "44": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "41",
+    0
+   ],
+   "positive": [
+    "43",
+    0
+   ],
+   "negative": [
+    "42",
+    0
+   ],
+   "latent_image": [
+    "3",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "ne idle sampler"
+  }
+ },
+ "45": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "44",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "46": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "45",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/ne-idle"
+  },
+  "_meta": {
+   "title": "frame ne idle"
+  }
+ },
+ "47": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, three-quarter back view, turned away from the viewer toward the upper right of the image, back and shoulder visible, face hidden, mid-stride walking pose, one leg forward, arms swinging slightly, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "ne step prompt"
+  }
+ },
+ "48": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "45",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "49": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "41",
+    0
+   ],
+   "positive": [
+    "47",
+    0
+   ],
+   "negative": [
+    "42",
+    0
+   ],
+   "latent_image": [
+    "48",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 0.38
+  },
+  "_meta": {
+   "title": "ne step sampler"
+  }
+ },
+ "50": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "49",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "51": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "50",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/ne-step"
+  },
+  "_meta": {
+   "title": "frame ne step"
+  }
+ },
+ "52": {
+  "class_type": "IPAdapterAdvanced",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "ipadapter": [
+    "4",
+    0
+   ],
+   "image": [
+    "7",
+    0
+   ],
+   "clip_vision": [
+    "5",
+    0
+   ],
+   "weight": 0.5,
+   "weight_type": "style transfer",
+   "combine_embeds": "concat",
+   "start_at": 0.0,
+   "end_at": 0.9,
+   "embeds_scaling": "V only"
+  },
+  "_meta": {
+   "title": "n identity (IP-Adapter)"
+  }
+ },
+ "53": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "photo, photorealistic, 3d render, smooth gradient, soft shading, blurry, text, watermark, signature, sprite sheet, grid, multiple views, turnaround, duplicate, two characters, cropped, out of frame, floor shadow, cast shadow, ground, colored background, gradient background, scenery, face, eyes, front view, looking at the viewer"
+  },
+  "_meta": {
+   "title": "n negative"
+  }
+ },
+ "54": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, back view seen from directly behind, back of the head visible, face hidden, standing still in a relaxed idle pose, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "n idle prompt"
+  }
+ },
+ "55": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "52",
+    0
+   ],
+   "positive": [
+    "54",
+    0
+   ],
+   "negative": [
+    "53",
+    0
+   ],
+   "latent_image": [
+    "3",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "n idle sampler"
+  }
+ },
+ "56": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "55",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "57": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "56",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/n-idle"
+  },
+  "_meta": {
+   "title": "frame n idle"
+  }
+ },
+ "58": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "clip": [
+    "2",
+    1
+   ],
+   "text": "masterpiece, pixpix, 8-bit, pixel_art, the character, back view seen from directly behind, back of the head visible, face hidden, mid-stride walking pose, one leg forward, arms swinging slightly, single full-body character game sprite centered on a plain flat pure white background, whole body in frame, feet visible, bold dark outlines, thick black outline, 16-bit era palette, chunky readable shapes"
+  },
+  "_meta": {
+   "title": "n step prompt"
+  }
+ },
+ "59": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "56",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "60": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "52",
+    0
+   ],
+   "positive": [
+    "58",
+    0
+   ],
+   "negative": [
+    "53",
+    0
+   ],
+   "latent_image": [
+    "59",
+    0
+   ],
+   "seed": 1004,
+   "steps": 28,
+   "cfg": 7.0,
+   "sampler_name": "euler",
+   "scheduler": "normal",
+   "denoise": 0.38
+  },
+  "_meta": {
+   "title": "n step sampler"
+  }
+ },
+ "61": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "60",
+    0
+   ],
+   "vae": [
+    "1",
+    2
+   ]
+  }
+ },
+ "62": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "61",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/n-step"
+  },
+  "_meta": {
+   "title": "frame n step"
+  }
+ },
+ "63": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "12",
+    0
+   ],
+   "image2": [
+    "17",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "64": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "23",
+    0
+   ],
+   "image2": [
+    "28",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "65": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "34",
+    0
+   ],
+   "image2": [
+    "39",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "66": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "45",
+    0
+   ],
+   "image2": [
+    "50",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "67": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "56",
+    0
+   ],
+   "image2": [
+    "61",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "68": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "63",
+    0
+   ],
+   "image2": [
+    "64",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "69": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "68",
+    0
+   ],
+   "image2": [
+    "65",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "70": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "69",
+    0
+   ],
+   "image2": [
+    "66",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "71": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "70",
+    0
+   ],
+   "image2": [
+    "67",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "72": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "71",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/sdxl/sheet"
+  },
+  "_meta": {
+   "title": "sheet preview (raw)"
+  }
+ }
+}

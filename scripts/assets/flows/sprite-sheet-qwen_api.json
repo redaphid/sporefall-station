@@ -1,0 +1,1229 @@
+{
+ "1": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "qwen_image_edit_2511_fp8_e4m3fn.safetensors",
+   "weight_dtype": "default"
+  },
+  "_meta": {
+   "title": "Qwen-Image-Edit"
+  }
+ },
+ "2": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+   "strength_model": 1.0
+  },
+  "_meta": {
+   "title": "Lightning 4-step LoRA (bypass = 20 steps, CFG 2.5)"
+  }
+ },
+ "3": {
+  "class_type": "ModelSamplingAuraFlow",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "shift": 3.1
+  }
+ },
+ "4": {
+  "class_type": "CFGNorm",
+  "inputs": {
+   "model": [
+    "3",
+    0
+   ],
+   "strength": 1.0
+  }
+ },
+ "5": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  }
+ },
+ "6": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_vae.safetensors"
+  }
+ },
+ "7": {
+  "class_type": "EmptySD3LatentImage",
+  "inputs": {
+   "width": 1024,
+   "height": 1024,
+   "batch_size": 1
+  }
+ },
+ "8": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "character.png"
+  },
+  "_meta": {
+   "title": "character (square, on white)"
+  }
+ },
+ "9": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "image1": [
+    "8",
+    0
+   ],
+   "prompt": ""
+  },
+  "_meta": {
+   "title": "negative (ignored at CFG 1)"
+  }
+ },
+ "10": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "9",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "11": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Redraw the character from image 1 as a single full-body video game sprite: front view, facing the viewer, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "s idle prompt"
+  }
+ },
+ "12": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "11",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "13": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "12",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "7",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "s idle sampler"
+  }
+ },
+ "14": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "13",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "15": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "14",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/s-idle"
+  },
+  "_meta": {
+   "title": "frame s idle"
+  }
+ },
+ "16": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Image 1 is a video game sprite of a character; image 2 shows the same character's design. Redraw image 1 with the same character, the same facing direction (front view, facing the viewer), the same size, position and colors, changing only the pose: mid-stride walking pose, one leg forward, arms swinging slightly. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "14",
+    0
+   ],
+   "image2": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "s step prompt"
+  }
+ },
+ "17": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "16",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "18": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "14",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "19": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "17",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "18",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "s step sampler"
+  }
+ },
+ "20": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "19",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "21": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "20",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/s-step"
+  },
+  "_meta": {
+   "title": "frame s step"
+  }
+ },
+ "22": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Redraw the character from image 1 as a single full-body video game sprite: three-quarter front view, body turned 45 degrees toward the right side of the image, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "se idle prompt"
+  }
+ },
+ "23": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "22",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "24": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "23",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "7",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "se idle sampler"
+  }
+ },
+ "25": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "24",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "26": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "25",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/se-idle"
+  },
+  "_meta": {
+   "title": "frame se idle"
+  }
+ },
+ "27": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Image 1 is a video game sprite of a character; image 2 shows the same character's design. Redraw image 1 with the same character, the same facing direction (three-quarter front view, body turned 45 degrees toward the right side of the image), the same size, position and colors, changing only the pose: mid-stride walking pose, one leg forward, arms swinging slightly. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "25",
+    0
+   ],
+   "image2": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "se step prompt"
+  }
+ },
+ "28": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "27",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "29": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "25",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "30": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "28",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "29",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "se step sampler"
+  }
+ },
+ "31": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "30",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "32": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "31",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/se-step"
+  },
+  "_meta": {
+   "title": "frame se step"
+  }
+ },
+ "33": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Redraw the character from image 1 as a single full-body video game sprite: full side profile facing the right side of the image, nose pointing right, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "e idle prompt"
+  }
+ },
+ "34": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "33",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "35": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "34",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "7",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "e idle sampler"
+  }
+ },
+ "36": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "35",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "37": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "36",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/e-idle"
+  },
+  "_meta": {
+   "title": "frame e idle"
+  }
+ },
+ "38": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Image 1 is a video game sprite of a character; image 2 shows the same character's design. Redraw image 1 with the same character, the same facing direction (full side profile facing the right side of the image, nose pointing right), the same size, position and colors, changing only the pose: mid-stride walking pose, one leg forward, arms swinging slightly. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "36",
+    0
+   ],
+   "image2": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "e step prompt"
+  }
+ },
+ "39": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "38",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "40": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "36",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "41": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "39",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "40",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "e step sampler"
+  }
+ },
+ "42": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "41",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "43": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "42",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/e-step"
+  },
+  "_meta": {
+   "title": "frame e step"
+  }
+ },
+ "44": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Redraw the character from image 1 as a single full-body video game sprite: three-quarter back view, turned away from the viewer toward the upper right of the image, back and shoulder visible, face hidden, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "ne idle prompt"
+  }
+ },
+ "45": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "44",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "46": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "45",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "7",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "ne idle sampler"
+  }
+ },
+ "47": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "46",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "48": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "47",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/ne-idle"
+  },
+  "_meta": {
+   "title": "frame ne idle"
+  }
+ },
+ "49": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Image 1 is a video game sprite of a character; image 2 shows the same character's design. Redraw image 1 with the same character, the same facing direction (three-quarter back view, turned away from the viewer toward the upper right of the image, back and shoulder visible, face hidden), the same size, position and colors, changing only the pose: mid-stride walking pose, one leg forward, arms swinging slightly. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "47",
+    0
+   ],
+   "image2": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "ne step prompt"
+  }
+ },
+ "50": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "49",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "51": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "47",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "52": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "50",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "51",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "ne step sampler"
+  }
+ },
+ "53": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "52",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "54": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "53",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/ne-step"
+  },
+  "_meta": {
+   "title": "frame ne step"
+  }
+ },
+ "55": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Redraw the character from image 1 as a single full-body video game sprite: back view seen from directly behind, back of the head visible, face hidden, standing still in a relaxed idle pose. Keep the exact same character design, outfit, colors, markings and proportions. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "n idle prompt"
+  }
+ },
+ "56": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "55",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "57": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "56",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "7",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "n idle sampler"
+  }
+ },
+ "58": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "57",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "59": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "58",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/n-idle"
+  },
+  "_meta": {
+   "title": "frame n idle"
+  }
+ },
+ "60": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Image 1 is a video game sprite of a character; image 2 shows the same character's design. Redraw image 1 with the same character, the same facing direction (back view seen from directly behind, back of the head visible, face hidden), the same size, position and colors, changing only the pose: mid-stride walking pose, one leg forward, arms swinging slightly. One character only, centered, the whole body in frame with empty margin around it, feet visible, plain flat pure white background, no shadow, no ground, no text, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "58",
+    0
+   ],
+   "image2": [
+    "8",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "n step prompt"
+  }
+ },
+ "61": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "60",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "62": {
+  "class_type": "VAEEncode",
+  "inputs": {
+   "pixels": [
+    "58",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "63": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "61",
+    0
+   ],
+   "negative": [
+    "10",
+    0
+   ],
+   "latent_image": [
+    "62",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "n step sampler"
+  }
+ },
+ "64": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "63",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "65": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "64",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/n-step"
+  },
+  "_meta": {
+   "title": "frame n step"
+  }
+ },
+ "66": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "14",
+    0
+   ],
+   "image2": [
+    "20",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "67": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "25",
+    0
+   ],
+   "image2": [
+    "31",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "68": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "36",
+    0
+   ],
+   "image2": [
+    "42",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "69": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "47",
+    0
+   ],
+   "image2": [
+    "53",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "70": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "58",
+    0
+   ],
+   "image2": [
+    "64",
+    0
+   ],
+   "direction": "right",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "71": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "66",
+    0
+   ],
+   "image2": [
+    "67",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "72": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "71",
+    0
+   ],
+   "image2": [
+    "68",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "73": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "72",
+    0
+   ],
+   "image2": [
+    "69",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "74": {
+  "class_type": "ImageStitch",
+  "inputs": {
+   "image1": [
+    "73",
+    0
+   ],
+   "image2": [
+    "70",
+    0
+   ],
+   "direction": "down",
+   "match_image_size": true,
+   "spacing_width": 0,
+   "spacing_color": "white"
+  }
+ },
+ "75": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "74",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/qwen/sheet"
+  },
+  "_meta": {
+   "title": "sheet preview (raw)"
+  }
+ }
+}

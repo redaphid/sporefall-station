@@ -15,6 +15,7 @@
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json && vite build",
     "worker:dev": "wrangler dev",
     "review:image": "node scripts/review-image.mjs",
+    "sprite:sheet": "python3 scripts/assets/spritesheet.py",
     "beta:publish": "tsx scripts/publish-beta.mts",
     "beta:unpublish": "tsx scripts/unpublish-beta.mts",
     "worker:deploy": "wrangler deploy",

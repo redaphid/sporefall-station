@@ -79,6 +79,10 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 
 ## 2. Driver scripts (`scripts/assets/`)
 
+> **One character image → a whole sheet:** `pnpm run sprite:sheet -- hero.png`
+> (Qwen-Image-Edit per-frame chain, importable flows in `scripts/assets/flows/`).
+> See [`sprite-sheet-cli.md`](sprite-sheet-cli.md).
+
 | Script | Role |
 |---|---|
 | `comfy.py` | HTTP driver + graph builder. Env knobs: `COMFY`, `CKPT`, `LORA`, `LORA_W`, `SIZE`. Sampler recipe lives here (CFG 3.5, euler, 28 steps). `CKPT` is the pack default and is **not** what props use. |

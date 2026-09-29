@@ -26,6 +26,15 @@ Aesthetic priority." So the aesthetic is judged ON THE PIXEL ART, not on the con
 3. **It makes sense in the setting and can fill the role** (the gameplay archetype in
    `src/game/data/npcs.ts`: size, behaviour, movement), not the old design.
 
+**Hard rejects, before any scoring** (Aaron's standing rules; v3 batch 2 broke three of them):
+- **No Hulk:** no muscle-bound brutes, bare six-packs or green/teal muscle men ("Make that brute
+  character not look like the hulk"; the bog-mutant is the canon's cautionary tale).
+- **No known-IP lookalikes:** nothing that reads as an existing character (Yoda/Grogu, Big Daddy,
+  Predator, stock orc, Jedi robe...). Test: would a player name a franchise on sight?
+- **Not steampunk:** no gears, cogs, clockwork, polished copper, Victorian filigree ("Don't make it
+  too steampunk"). Salvaged colony gear, rubber, canvas, faded safety paint.
+- **Not a duplicate of the cast** at 96 px (another armoured diver next to blast-diver, etc.).
+
 **Keep, never redesign:** frog-settler, sporeling-mite (the mushroom guy), mycologist (Aaron).
 
 ## Picking concept art

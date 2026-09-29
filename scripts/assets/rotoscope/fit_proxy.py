@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--dir", default="se")
     a = ap.parse_args(argv[:argv.index("--")] if "--" in argv else argv)
     os.makedirs(a.out, exist_ok=True)
-    stage = "/mnt/d/tmp/cast-walks/rnd-multileg/rig_multileg.py"
+    stage = os.path.join(os.path.abspath(a.out), "rig_multileg.py")  # on D: so the Windows Blender can read it
     open(stage, "w").write(open(RIG).read())
     r = subprocess.run([BLENDER, "-b", "-P", win(stage), "--", "--out", win(a.out), "--dirs", a.dir,
                         "--only", "0", "--samples", "4", *rig_args], capture_output=True, text=True)

@@ -67,6 +67,40 @@ setsid nohup python3 -u scripts/assets/spritesheet.py /mnt/d/tmp/cast-walks/runs
 - The describe goes into each direction's keyframe and Wan prompt. Face parts in it (eyes, lamps, fangs) draw a face on the back views, and leaving them out redraws the front without one (spore-drone, mireclaw-stalker). Pass the face in `--describe` (s/se/e) and a face-free `--describe-back` (ne/n). Look at every keyframe.
 - Non-walkers (hive-spire speed 0; brood-sac and gloom-lurker dormant until woken): still run the full set with `--motion pulse` and note it. Fliers (spore-drone) take `--motion hover`: the keyframe floats and Wan bobs it, limbs trailing. A `--describe` alone cannot change the motion, because the Wan motion sentence (`MOTIONS` in spritesheet.py) comes after it in the prompt; the default `walk` asks for full strides. The game requests walk from displacement only (`src/render/sprites.ts:288`); hive-spire never enters walk.
 
+## Step 1b: many-legged walkers, the Fun-Control route
+
+Use this step for any character with more than two legs (mireclaw-stalker, mireclaw-alpha, sporeling-mite, gloam-hound, probably carapace-brute). Wan I2V steps each leg at its own phase, so its clips hold no loop point (stalker se 1.98-2.70 on three takes). In this route, a Blender proxy of the body plan walks a fixed gait that repeats exactly every 16 frames. Its depth video drives Wan 2.2 Fun-Control A14B, and the direction's keyframe is the reference image. The legs follow the proxy, so the clip loops by construction, and the video model keeps the frames coherent.
+
+The proxy's outline is the outline Fun-Control draws. Fit the proxy to the keyframe before you use any GPU time. On an unfitted proxy, the stalker came out as a thin-legged spider, although its loop measured 0.07.
+
+1. Run Step 1 once for the keyframes. Only `raw/<d>-keyframe.png` and `raw/<d>-idle.png` are used; the Wan clips are not.
+2. Fit the proxy on CPU. Repeat until the bbox matches within about 5% and the IoU is 0.5 or more. Save the final arguments in `/mnt/d/tmp/cast-walks/<char>/proxy.args`.
+   ```sh
+   cd scripts/assets/rotoscope
+   python3 fit_proxy.py --ref /mnt/d/tmp/cast-walks/runs/<char>/take1/video-s3/raw/se-keyframe.png \
+     --out /mnt/d/tmp/cast-walks/<char>/fit/tryN -- $(cat /mnt/d/tmp/cast-walks/<char>/proxy.args)
+   ```
+   The command prints the bbox, the IoU, and the width of 10 bands, and it writes `overlay.png` (keyframe red, proxy green). The body-plan arguments are `--body-z --femur --tibia --foot-r --hip-x --leg-r --shell x,y,z --pole-up --spine-l --spines`. The camera arguments are `--elev --ortho --aim-z`. In zsh, pass the arguments as an array or `$(cat file)`. A quoted string arrives as one argument, and the rig then silently uses its defaults.
+3. Render 5 directions x 16 frames on CPU (Cycles on the CPU, so no GPU lock; about 1 min). Blender is a Windows binary, so the script and every path it gets must be on D:.
+   ```sh
+   cp scripts/assets/rotoscope/rig_multileg.py /mnt/d/tmp/cast-walks/<char>/
+   /mnt/d/tools/blender/blender.exe -b -P 'D:/tmp/cast-walks/<char>/rig_multileg.py' -- \
+     --out 'D:/tmp/cast-walks/<char>/proxy' --dirs s,se,e,ne,n --frames 16 $(cat /mnt/d/tmp/cast-walks/<char>/proxy.args)
+   ```
+4. Take GPU-WAN.lock. Run Fun-Control for each direction (about 2.5 min each). Pass the back-view describe for ne/n.
+   ```sh
+   python3 fun_control.py --depth /mnt/d/tmp/cast-walks/<char>/proxy/<d> \
+     --ref /mnt/d/tmp/cast-walks/runs/<char>/take1/video-s3/raw/<d>-keyframe.png \
+     --describe-file /mnt/d/tmp/cast-walks/runs/<char>/describe.txt --dir <d> \
+     --base-run /mnt/d/tmp/cast-walks/runs/<char>/take1/video-s3 --out /mnt/d/tmp/cast-walks/runs/<char>/fc-<d>
+   ```
+   `--base-run` copies the direction's idle and keyframe into the take and writes the take's `sheet.json`. After the last direction, release the lock and send `/free`.
+5. Measure each direction with `python3 loop_measure.py <take>/raw <d> --period 16`. It prints the CLI's loop pick, the partscan split into body and legs, and the gate-5 judge (identity, head drift, boil).
+6. Look at a montage beside the keyframe. A good loop number does not show whether the frames are on-model.
+7. Continue with Step 2: `cast_walk.py assemble <take1>/video-s3 --kind <char> --take s=.../fc-s --take se=.../fc-se ...`.
+
+The rig has one body plan: 8 legs on an alternating tetrapod gait (L1 R2 L3 R4 swing together). A four-legged character needs its own `LEGS` table and phases, for example a trot in which diagonal pairs swing together.
+
 ## Step 2: assemble, export, gate
 
 ```sh

@@ -100,6 +100,15 @@ Files in this folder:
 
 ## After a crash
 
+**Auto-resume (since 2026-09-29, Aaron: "set up Windows to restart this session if it crashes").**
+At Windows login, `Startup\claude-crash-resume.cmd` checks `D:\tmp\claude-resume\active`. If it
+exists, it opens Windows Terminal -> WSL `survivor` -> `~/.local/bin/claude-crash-resume`, which runs
+`claude --resume <SESSION> --remote-control --permission-mode auto` with a prompt pointing at the steps
+below. The marker holds `SESSION=`, `CWD=`, `EXPIRES=` (epoch). An expired marker is deleted, not
+resumed. The coordinator writes the marker when a run starts and deletes it when the run ends.
+Subagents, crons and monitors die with the crash; the resumed coordinator re-creates them.
+It needs a Windows login: if the box boots to a password screen it waits until Aaron logs in.
+
 1. Read this file, then `QUEUE.md` and the tail of `PROGRESS.md`. Then read
    `git log origin/art/cast-walk-cycles -10` and `git status` in
    `~/Worktrees/sporefall-station/cast-walks`.

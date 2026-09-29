@@ -53,7 +53,12 @@ Files in this folder:
    every shipped claim carries proof the coordinator checked itself: the
    commit sha on `origin/main`, the deploy run id, the live build number,
    and a frame's sha from the live site matching the commit. Anything it
-   did not verify is labelled "claimed, unverified".
+   did not verify is labelled "claimed, unverified". Each briefing also
+   attaches the newest images and video (contact sheets, walk GIFs, in-game
+   captures) with SendUserFile: "Showing the images during your report
+   serves as grounding and proof" (Aaron, 04:25). Workers save every visual
+   they make under `/mnt/d/tmp/cast-walks/<char>/` so the coordinator can
+   attach it.
 8. **Finish one character end to end before the next.** Aaron has to see
    the whole path work on the beta (the mycologist first, 2026-09-29). A
    character in progress takes priority over every queued one.

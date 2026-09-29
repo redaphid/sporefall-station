@@ -79,6 +79,8 @@ class Fake:
     images: dict = {}
     uploads: dict = {}
     face_left: set = set()  # directions the "model" gets wrong
+    fail: set = set()  # prompt ids that end in an execution error
+    deleted: list = []  # ids POSTed to /queue {"delete": [...]}
     models = {
         "diffusion_models": ["Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf", "Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
                              "Wan2.2-I2V-A14B-HighNoise-Q8_0.gguf",
@@ -118,6 +120,10 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(Fake.models.get(u.path.split("/", 2)[2], []))
         if u.path.startswith("/history/"):
             pid = u.path.rsplit("/", 1)[1]
+            if pid in Fake.fail:
+                return self._send({pid: {"status": {"status_str": "error", "completed": False, "messages": [
+                    ["execution_error", {"node_type": "KSamplerAdvanced",
+                                         "exception_message": "cutlass_fp16_linear: K mismatch"}]]}, "outputs": {}}})
             g = Fake.prompts[int(pid)]
             outs = {}
             for nid, n in g.items():
@@ -167,6 +173,8 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(Fake.images[fn], "image/png")
         if u.path == "/object_info":
             return self._send({})
+        if u.path == "/queue":
+            return self._send({"queue_running": [], "queue_pending": []})
         return self._send({"error": "no"}, code=404)
 
     def do_POST(self):
@@ -179,6 +187,11 @@ class H(http.server.BaseHTTPRequestHandler):
                 return self._send({"error": errs}, code=400)
             Fake.prompts.append(g)
             return self._send({"prompt_id": str(len(Fake.prompts) - 1)})
+        if self.path == "/queue":
+            Fake.deleted += json.loads(body).get("delete", [])
+            return self._send({})
+        if self.path == "/interrupt":
+            return self._send({})
         if self.path == "/upload/image":
             name = re.search(rb'filename="([^"]+)"', body).group(1).decode()
             Fake.uploads[name] = body
@@ -495,6 +508,12 @@ def main():
         check("video: satchel on the right, facing right", satchel_side(Image.open(f"{v}/frames/wren-e-idle.png")) == "R")
         check("video: editor + API flow per direction written",
               os.path.exists(f"{v}/flow-e.json") and os.path.exists(f"{v}/flow-s_api.json"))
+        n2 = len(Fake.prompts)
+        Fake.fail = {str(n2)}  # the first direction dies on the GPU
+        died = raises(lambda: S.main([src, "--out", os.path.join(tmp, "vfail"), "--method", "video", "--dirs", "s,se,e"]))
+        Fake.fail = set()
+        check("video: a GPU error stops the run and drops its other queued directions",
+              died and set(Fake.deleted) >= {str(n2 + 1), str(n2 + 2)}, Fake.deleted)
         n1 = len(Fake.prompts)
         S.main(["repack", v, "--period", "20:30", "--to", os.path.join(tmp, "vr")])
         vr = json.load(open(os.path.join(tmp, "vr/sheet.json")))

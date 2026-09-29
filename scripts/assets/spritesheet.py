@@ -183,6 +183,20 @@ def wait(pid: str, limit_s: int = 3600, poll: float = 2.0) -> dict:
     raise TimeoutError(pid)
 
 
+def cancel(pids) -> None:
+    """Drop our still-queued prompts (and stop ours if it is the one running), so a
+    run that has died does not leave the GPU busy on work nobody will collect."""
+    pids = list(pids)
+    try:
+        q = http_json("/queue", timeout=10)
+        running = {it[1] for it in q.get("queue_running", [])}
+        http("/queue", json.dumps({"delete": pids}).encode())
+        for pid in running & set(pids):
+            http("/interrupt", json.dumps({"prompt_id": pid}).encode())
+    except Exception as e:  # best effort: we are already on the way out with the real error
+        print(f"  ! could not cancel queued prompts {[p[:8] for p in pids]}: {e}")
+
+
 def fetch(im: dict) -> Image.Image:
     q = urllib.parse.urlencode({"filename": im["filename"], "subfolder": im.get("subfolder", ""),
                                 "type": im.get("type", "output")})
@@ -1032,9 +1046,14 @@ def cmd_video(a, dirs, kind, root, src, pal):
         print(f"seed {seed}: queued {len(pids)} direction(s) — a keyframe and an {w['length']}-frame walk each; "
               f"minutes per direction")
         raws, loops, t0 = {}, {}, time.time()
-        for d in dirs:
+        for i, d in enumerate(dirs):
             walks = {}
-            frames, _ = harvest(graphs[d].nodes, wait(pids[d], limit_s=7200, poll=5), walks)
+            try:
+                outputs = wait(pids[d], limit_s=7200, poll=5)
+            except (SystemExit, TimeoutError, KeyboardInterrupt):
+                cancel(pids[x] for x in dirs[i:])
+                raise
+            frames, _ = harvest(graphs[d].nodes, outputs, walks)
             clip = walks.get(d) or []
             if d in a.mirror:
                 clip = [ImageOps.mirror(f) for f in clip]

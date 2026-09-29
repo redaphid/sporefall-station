@@ -46,12 +46,14 @@ import json
 import os
 import re
 import shutil
+import signal
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from typing import NamedTuple
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageOps
@@ -537,20 +539,29 @@ KEY_W, KEY_H = 1280, 720
 # How the character moves in place: (keyframe pose, Wan motion sentence). The game plays these
 # frames as its walk whatever they show, so a flier or a rooted thing gets its own motion here;
 # a --describe cannot override the sentence, because the sentence follows it in the prompt.
+class Motion(NamedTuple):
+    pose: str       # the keyframe's pose
+    moves: str      # the Wan sentence
+    closed: bool    # first frame = last frame (WanFirstLastFrameToVideo): the whole clip is the loop
+
+
 MOTIONS = {
-    "walk": (POSES["idle"],
-             "walks in place like a video game walk cycle: the legs step forward and back one after another with "
-             "big, clear, full strides, the arms swing, the body bobs gently, and it never moves across the frame"),
-    # one rigid piece: limbs that swing on their own never repeat, so no loop closes (spore-drone, six takes)
-    "hover": ("floating in the air in a relaxed idle pose, nothing touching the ground, everything below the "
-              "body hanging straight down and still",
-              "hovers in place like a video game flying idle: the whole body bobs slowly up and down as one rigid "
-              "piece in one steady rhythm that repeats exactly, everything hanging below the body stays still and "
-              "moves only with the body, nothing ever touches the ground, it takes no steps, and it never moves "
-              "across the frame"),
-    "pulse": ("resting in place in a relaxed idle pose",
-              "stays rooted in place like a video game idle: it breathes and pulses slowly, swelling and "
-              "settling, its base never moves, and it never moves across the frame"),
+    "walk": Motion(POSES["idle"],
+                   "walks in place like a video game walk cycle: the legs step forward and back one after another "
+                   "with big, clear, full strides, the arms swing, the body bobs gently, and it never moves across "
+                   "the frame", closed=False),
+    # One rigid piece, once, first = last frame. Spore-drone, seven takes: limbs swinging on their own
+    # never repeat, and even a rigid bob keeps no steady rhythm, so only a clip that must end where it
+    # started loops.
+    "hover": Motion("floating in the air in a relaxed idle pose, nothing touching the ground, everything below "
+                    "the body hanging straight down and still",
+                    "hovers in place like a video game flying idle: the whole body rises slowly and sinks back down "
+                    "once as one rigid piece, everything hanging below the body stays still and moves only with the "
+                    "body, nothing ever touches the ground, it takes no steps, and it never moves across the frame",
+                    closed=True),
+    "pulse": Motion("resting in place in a relaxed idle pose",
+                    "stays rooted in place like a video game idle: it slowly swells and settles back once, its base "
+                    "never moves, and it never moves across the frame", closed=True),
 }
 WAN_RULES = ("The camera is completely static and locked off: no zoom, no pan, no rotation. The character stays "
              "centred and the same size, keeps facing the same direction the whole time, never turns around, and the "
@@ -592,7 +603,7 @@ def detect_wan(overrides: dict) -> tuple[dict, list[str]]:
 def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="sprite-sheet/video",
                 motion="walk") -> Graph:
     """ONE direction: Qwen keyframe (1280x720 on white) -> Wan 2.2 I2V, 81 frames of MOTIONS[motion] in place."""
-    pose, moves = MOTIONS[motion]
+    pose, moves, closed = MOTIONS[motion]
     g = Graph()
     g.band("models + input", "#335")
     m, clip, vae, src, neg = _qwen_loaders(g, q, input_name)
@@ -629,9 +640,10 @@ def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="spr
     text = (f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {DIRS[d]}, {moves}. {WAN_RULES}")
     wpos = g.add("CLIPTextEncode", {"clip": [wclip, 0], "text": text}, f"{d} walk prompt", col=2)
     wneg = g.add("CLIPTextEncode", {"clip": [wclip, 0], "text": WAN_NEG}, "walk negative (inert at cfg 1)", col=2)
-    i2v = g.add("WanImageToVideo", {"positive": [wpos, 0], "negative": [wneg, 0], "vae": [wvae, 0],
-                                    "start_image": [start, 0], "width": w["width"], "height": w["height"],
-                                    "length": w["length"], "batch_size": 1}, col=3)
+    ends = {"start_image": [start, 0], "end_image": [start, 0]} if closed else {"start_image": [start, 0]}
+    i2v = g.add("WanFirstLastFrameToVideo" if closed else "WanImageToVideo",
+                {"positive": [wpos, 0], "negative": [wneg, 0], "vae": [wvae, 0], **ends, "width": w["width"],
+                 "height": w["height"], "length": w["length"], "batch_size": 1}, col=3)
     k1 = g.add("KSamplerAdvanced", {"model": [experts[0], 0], "positive": [i2v, 0], "negative": [i2v, 1],
                                     "latent_image": [i2v, 2], "add_noise": "enable", "noise_seed": seed,
                                     "steps": w["steps"], "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple",
@@ -864,6 +876,22 @@ def preview(raws, frames, dirs, poses, canvas, cell=192):
 
 
 # ---- post for the video route ----------------------------------------------------
+def _small(frames: list) -> list:
+    return [np.asarray(f.convert("L").resize((212, 120), Image.BILINEAR), np.float32) for f in frames]
+
+
+def closed_loop(frames: list, skip: int = 6) -> dict:
+    """A first = last frame clip (Motion.closed) loops whole: frames 0 .. n-2, then frame 0 again.
+    `seam` is frame 0 against frame n-1 in find_loop's unit, so a clip that failed to come back
+    home fails the seam gate like any other loop."""
+    small = _small(frames)
+    n = len(small)
+    step = max(float(np.median([np.abs(small[t + 1] - small[t]).mean() for t in range(skip, n - 1)])), 1e-6)
+    seam = round(float(np.abs(small[0] - small[n - 1]).mean()) / step, 3)
+    return {"period": n - 1, "start": 0, "seam": seam, "step": round(step, 3), "match": seam,
+            "candidates": {n - 1: seam}, "closed": True}
+
+
 def find_loop(frames: list, pmin: int = 12, pmax: int = 64, skip: int = 6, window: int = 4,
               tol: float = 1.5, half: float = 0.6) -> dict:
     """The shortest FULL-stride loop in a walk clip. For each period P, the start s minimising
@@ -878,7 +906,7 @@ def find_loop(frames: list, pmin: int = 12, pmax: int = 64, skip: int = 6, windo
     stride (legs swapped): a period whose double scores under `half` of its own score is a
     half, and is skipped. `seam` is the loop point's difference relative to an ordinary
     frame-to-frame step: under 1.0, the loop point is smoother than a normal step."""
-    small = [np.asarray(f.convert("L").resize((212, 120), Image.BILINEAR), np.float32) for f in frames]
+    small = _small(frames)
     n = len(small)
     steps = [float(np.abs(small[t + 1] - small[t]).mean()) for t in range(skip, n - 1)]
     step = max(float(np.median(steps)) if steps else 1.0, 1e-6)
@@ -1192,7 +1220,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
             os.makedirs(f"{out}/raw/walk-{d}", exist_ok=True)
             for i, f in enumerate(clip):
                 f.save(f"{out}/raw/walk-{d}/{i:04d}.png")
-            loop = find_loop(clip, pmin, pmax)
+            loop = closed_loop(clip) if MOTIONS[a.motion].closed else find_loop(clip, pmin, pmax)
             cyc = cut_loop(clip, loop)
             loops[d] = loop
             raws[(d, "idle")] = clip[0]  # the start frame: the keyframe, re-rendered by Wan in its own look
@@ -1259,7 +1287,8 @@ def cmd_repack(a):
         ranges = period_ranges(a.period, dirs)
         for d in dirs:
             clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{raw}/walk-{d}/*.png"))]
-            loop = find_loop(clip, *ranges[d])
+            closed = meta.get("loops", {}).get(d, {}).get("closed")  # a first = last frame clip loops whole
+            loop = closed_loop(clip) if closed else find_loop(clip, *ranges[d])
             cyc = cut_loop(clip, loop)
             meta.setdefault("loops", {})[d] = loop
             cyc[widest(cyc)].save(f"{raw}/{d}-step.png")
@@ -1313,7 +1342,7 @@ def cmd_doctor(_a):
     need = {"qwen": ["TextEncodeQwenImageEditPlus", "FluxKontextMultiReferenceLatentMethod", "CFGNorm",
                      "ModelSamplingAuraFlow", "EmptySD3LatentImage"],
             "sdxl": ["IPAdapterAdvanced", "IPAdapterModelLoader", "PrepImageForClipVision"],
-            "video": ["WanImageToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "ModelComputeDtype", "UnetLoaderGGUF",
+            "video": ["WanImageToVideo", "WanFirstLastFrameToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "ModelComputeDtype", "UnetLoaderGGUF",
                       "ImageScale",
                       "CreateVideo", "SaveVideo"],
             "flow sheet preview": ["ImageStitch"]}
@@ -1438,4 +1467,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    # a detached run (setsid nohup ... &) ignores SIGINT, so `kill` is how it is stopped: make it cancel
+    # its queued prompts the way ^C does instead of leaving them on the GPU
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
     main()

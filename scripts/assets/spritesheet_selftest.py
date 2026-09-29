@@ -560,6 +560,24 @@ def main():
               and wan.index("domed drone") < wan.index("hovers in place"), wan)
         check("motion: hover keyframe floats, it does not stand", "floating in the air" in key and "standing" not in key, key)
         check("motion: the run records its motion", hm.get("motion") == "hover", hm.get("motion"))
+        hq = Fake.prompts[-1]
+        flf = [n["inputs"] for n in hq.values() if n["class_type"] == "WanFirstLastFrameToVideo"]
+        check("motion: hover closes the clip: first frame = last frame = the scaled keyframe",
+              len(flf) == 1 and flf[0]["start_image"] == flf[0]["end_image"]
+              and g_class(hq, flf[0]["start_image"][0]) == "ImageScale"
+              and not any(n["class_type"] == "WanImageToVideo" for n in hq.values()))
+        he = hm["loops"]["e"]
+        check("motion: a closed clip loops whole (81 frames: period 80 from 0)",
+              he.get("closed") and (he["period"], he["start"]) == (80, 0), he)
+        S.main(["repack", os.path.join(tmp, "hover", "video-s3"), "--period", "12:64", "--to", os.path.join(tmp, "hre")])
+        re_e = json.load(open(os.path.join(tmp, "hre", "sheet.json")))["loops"]["e"]
+        check("motion: repack --period (assemble) keeps a closed loop whole", re_e.get("closed") and re_e["period"] == 80, re_e)
+        home = [wren(stride=int(60 * np.sin(2 * np.pi * i / 80)), size=240) for i in range(81)]
+        cl = S.closed_loop(home)
+        check("loop: a closed clip that comes home passes the seam", cl["seam"] <= 0.5, cl)
+        away = [wren(stride=int(60 * i / 80), size=240) for i in range(81)]
+        check("loop: a closed clip that never came home fails the seam", S.closed_loop(away)["seam"] > 1.0,
+              S.closed_loop(away))
         n1 = len(Fake.prompts)
         check("motion: an unknown motion is refused before anything is queued",
               raises(lambda: S.main([src, "--out", os.path.join(tmp, "swim"), "--method", "video", "--motion", "swim"]))

@@ -10,6 +10,7 @@ import { Assets, Container, Sprite, Texture, type Renderer } from 'pixi.js'
 import {
   BASE_THEME_ID,
   CHAR_NAMES,
+  charArtKinds,
   DEFAULT_THEME_ID,
   DIRS5,
   ITEM_IDS,
@@ -243,6 +244,6 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     tiles, tileAccents, tileOverlays, tileCaps, tileMacro: resolveMacroTiles(chain), player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
-    flames, hit, explosion, pickup, blood, chars, items, props,
+    flames, hit, explosion, pickup, blood, chars, charKinds: charArtKinds(chain), items, props,
   }
 }

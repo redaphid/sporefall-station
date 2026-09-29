@@ -289,3 +289,37 @@ describe('locomotion styles — non-bipedal bodies', () => {
     }
   })
 })
+
+describe('drawnCycle — the frames carry the loop', () => {
+  const STYLES = ['stride', 'hover', 'pulse'] as const
+
+  it('walk and idle add no cycle of their own, for every body', () => {
+    for (const style of STYLES) {
+      for (const state of ['idle', 'walk'] as const) {
+        for (let t = 100; t < 160; t += 0.5) {
+          const p = composeMotion(base({ state, style, moving: state === 'walk', t, drawnCycle: true }))
+          expect({ dy: p.dy, sx: p.sx, sy: p.sy }, `${style} ${state} t=${t}`).toEqual({ dy: 0, sx: 1, sy: 1 })
+        }
+      }
+    }
+  })
+
+  it('a striding lean still answers the heading on top of drawn walk frames', () => {
+    const p = composeMotion(base({ state: 'walk', moving: true, vx: 3, t: 104.2, drawnCycle: true }))
+    expect(p.rot).toBeCloseTo(MOTION.lean.rad)
+    expect(p.dy).toBe(0)
+  })
+
+  it('attack, hurt, death and the landing squash are responses, not cycles: unchanged', () => {
+    for (const style of STYLES) {
+      for (const state of ['attack', 'hurt', 'death'] as const) {
+        const input = base({ state, style, start: 100, t: 102.5, facing: 0.7 })
+        expect(composeMotion({ ...input, drawnCycle: true }), `${style} ${state}`).toEqual(composeMotion(input))
+      }
+      const landing = base({ state: 'walk', style, moving: true, tick: 101, t: 101.5, rollUntil: 100 })
+      const drawn = composeMotion({ ...landing, drawnCycle: true })
+      expect(drawn.sy, `${style} landing`).toBeLessThan(1)
+      expect(drawn.sx, `${style} landing`).toBeGreaterThan(1)
+    }
+  })
+})

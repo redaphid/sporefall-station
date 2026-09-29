@@ -16,6 +16,7 @@ import { EntityViews } from './sprites'
 import {
   BASE_THEME_ID,
   CHAR_NAMES,
+  charArtKinds,
   DEFAULT_THEME_ID,
   DIRS5,
   emptyManifest,
@@ -63,7 +64,7 @@ const fakeBake = (chain: ThemeChain): SpriteTextures => {
     }
     if (Object.values(set).some((p) => p.idle || p.clips?.idle?.length)) chars[name] = set
   }
-  return { chars }
+  return { chars, charKinds: charArtKinds(chain) }
 }
 
 /** Procedural fallbacks only ever reach generateTexture; a blank one will do. */
@@ -183,11 +184,14 @@ describe('locomotion follows the drawn body, at the entity layer', () => {
 })
 
 describe('drawn cycles are not bobbed twice', () => {
-  const walkFrames = (name: string, kind: string, count: number): Record<string, string[]> => {
+  const drawnLoop = (name: string, kind: string, state: 'idle' | 'walk', count: number): Record<string, string[]> => {
     const out: Record<string, string[]> = {}
-    for (const d of DIRS5) for (let n = 0; n < count; n++) out[`char.${name}.${d}-walk-${n}`] = [`chars/${kind}-${d}-walk-${n}.png`]
+    for (const d of DIRS5) {
+      for (let n = 0; n < count; n++) out[`char.${name}.${d}-${state}-${n}`] = [`chars/${kind}-${d}-${state}-${n}.png`]
+    }
     return out
   }
+  const walkFrames = (name: string, kind: string, count: number) => drawnLoop(name, kind, 'walk', count)
 
   it('a walker whose pack draws its walk cycle gets no procedural bob on top of it', () => {
     // The frog-settler ships 8 drawn walk frames that already carry a head bob;
@@ -201,6 +205,14 @@ describe('drawn cycles are not bobbed twice', () => {
     const chain = overlay(walkFrames('cop', 'spore-drone', 8), HIRES)
     expect(idleGait(chain, 'cop')).toBe('hover')
     expect(walkLift(chain, 'cop')).toBe(0)
+  })
+
+  it('a pack that draws the idle loop owns the idle motion too', () => {
+    const drone = overlay(drawnLoop('cop', 'spore-drone', 'idle', 4), HIRES)
+    expect(observe(drone, 'cop', false)).toEqual({ lift: 0, widen: 0, breathe: 0 })
+    const ranger = overlay(drawnLoop('player', 'vine-ranger', 'idle', 4), HIRES)
+    expect(observe(ranger, 'player', false).breathe).toBe(0)
+    expect(observe(HIRES, 'player', false).breathe).toBeGreaterThan(0)
   })
 
   it('a one-frame drawn clip is a held pose, not a cycle: the procedural motion stays', () => {

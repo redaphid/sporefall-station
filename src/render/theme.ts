@@ -424,6 +424,21 @@ export const resolveSpritePaths = (key: string, chain: ThemeChain): string[] | u
   return undefined
 }
 
+/** The drawn body behind each char name, keyed like SpriteTextures.chars. The
+ * art pipeline names frames `<kind>-<dir>-<state>.png` (spritesheet.py
+ * --kind), so the file mapped to `char.<name>.s-idle` names the body:
+ * `chars/spore-drone-s-idle.png` is a `spore-drone`. A name whose file breaks
+ * the convention (city's `cop/front-idle.png`) or is unmapped gets no entry. */
+export const charArtKinds = (chain: ThemeChain): Record<string, string> => {
+  const out: Record<string, string> = {}
+  for (const name of CHAR_NAMES) {
+    const file = resolveSpritePaths(`char.${name}.s-idle`, chain)?.[0]?.split('/').pop()
+    const kind = file?.match(/^(.+)-s-idle\.png$/)?.[1]
+    if (kind) out[name] = kind
+  }
+  return out
+}
+
 /** Title-case an archetype key like `door.open` → `Door Open` — the last-resort
  * display name when no theme in the chain names the archetype. */
 export const prettyArchetype = (s: string): string =>

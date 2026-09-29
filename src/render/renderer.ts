@@ -148,6 +148,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     entityFlash: (a, d) => inner.entityFlash(a, d),
     isCharacterSprite: (a) => inner.isCharacterSprite(a),
     characterSet: (a) => inner.characterSet(a),
+    artKind: (a) => inner.artKind(a),
     walkStep: (a) => inner.walkStep(a),
     flameFrames: () => inner.flameFrames(),
     effectFrames: (k) => inner.effectFrames(k),

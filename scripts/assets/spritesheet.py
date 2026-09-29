@@ -720,20 +720,48 @@ def prep_input(path: str, size: int = IN_SIZE, fill: float = 0.84) -> Image.Imag
 
 
 # ---- post: raws -> pixel frames -------------------------------------------------
-def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0) -> Image.Image:
+def faint(rgb: np.ndarray, backdrop, pal, tol: float = 38, cover: float = 0.5) -> np.ndarray:
+    """Pixels that are mostly backdrop: none of the character's colours (each farther than `tol`),
+    but C = a*F + (1-a)*B within `tol` for the colour F that explains C best, with coverage
+    a < `cover`. Wan draws a fast leg as a motion-blur ghost, a grey smear about a third leg; a
+    colour key keeps it because it is not white, and the palette lock then paints it the nearest
+    light colour (the stalker's ne walk: a bone-coloured leg for one frame, 'a flash near his
+    feet'). The first test keeps pale parts the character owns: a near-white suit is also a
+    faint blend of any darker colour, and the mycologist lost its hood without it."""
+    c = rgb.reshape(-1, 3).astype(np.float32) - np.asarray(backdrop, np.float32)
+    f = np.asarray(pal, np.float32) - np.asarray(backdrop, np.float32)
+    ff = np.maximum((f * f).sum(1), 1.0)
+    cf = c @ f.T
+    cc = (c * c).sum(1)[:, None]
+    own = (cc - 2 * cf + ff).min(1) <= tol * tol
+    a = np.clip(cf / ff, 0, 1)
+    r2 = cc - 2 * a * cf + a * a * ff
+    k = r2.argmin(1)
+    i = np.arange(len(c))
+    return (~own & (a[i, k] < cover) & (r2[i, k] <= tol * tol)).reshape(rgb.shape[:2])
+
+
+def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=None) -> Image.Image:
     """Alpha from a BORDER-CONNECTED flood of the backdrop colour. A plain colour key
     also punches holes in pale interiors (cream fur, a white chest); only backdrop
     reachable from the frame edge is removed (cyber-puck's premat lesson).
 
     `pockets` > 0 also keys backdrop the flood cannot reach, in pieces of at least that many
     pixels: the gap where a claw curls back to a leg stays white otherwise. Only for a
-    character with no backdrop-coloured part of its own (`pocket_px`)."""
+    character with no backdrop-coloured part of its own (`pocket_px`).
+
+    `pal` (the character's colours) lets the flood also cross `faint` pixels, so a
+    motion-blur ghost joined to the backdrop goes with it; an enclosed one stays."""
     if P.has_alpha(im):
         return im.convert("RGBA")
     rgb = np.asarray(im.convert("RGB"))
-    near = np.sqrt(((rgb.astype(np.float32) - P.corner_bg(im)) ** 2).sum(-1)) <= thresh
+    backdrop = P.corner_bg(im)
+    near = np.sqrt(((rgb.astype(np.float32) - backdrop) ** 2).sum(-1)) <= thresh
+    see = near.copy()
+    if pal is not None:
+        see[~near] = faint(rgb[~near][None], backdrop, pal, thresh)[0]
     mask = Image.new("L", (im.width + 2, im.height + 2), 255)
-    mask.paste(Image.fromarray(np.where(near, 255, 0).astype(np.uint8), "L"), (1, 1))
+    mask.paste(Image.fromarray(np.where(see, 255, 0).astype(np.uint8), "L"), (1, 1))
     ImageDraw.floodfill(mask, (0, 0), 128, thresh=0)
     bg = np.asarray(mask)[1:-1, 1:-1] == 128
     if pockets:
@@ -758,6 +786,20 @@ def pocket_px(anchor: str | None, backdrop, thresh: float = 38) -> int:
     px = a[a[..., 3] > 128][:, :3]
     pale = float((np.sqrt(((px - backdrop) ** 2).sum(-1)) <= thresh).mean()) if len(px) else 1.0
     return POCKET_PX if pale < POCKET_PALE else 0
+
+
+GHOST_PALE = 0.05  # anchors' faint share: stalker 0.007, blast-diver 0.005, vine-ranger 0.023, mycologist 0.131
+
+
+def ghost_pal(anchor: str | None, backdrop, pal):
+    """`key_background(pal=)` for a character: `pal` when under GHOST_PALE of its anchor's opaque
+    pixels read as `faint`, else None. The mycologist's cream trousers are no colour of its
+    palette yet a faint blend of its tan, so a ghost key ate them (13% of its anchor)."""
+    if pal is None or not anchor or not os.path.exists(anchor):
+        return None
+    a = np.asarray(key_background(Image.open(anchor)))
+    px = a[a[..., 3] > 128][:, :3]
+    return pal if len(px) and float(faint(px[None], backdrop, pal).mean()) < GHOST_PALE else None
 
 
 def bbox(im: Image.Image):
@@ -980,11 +1022,11 @@ def despeckle(im: Image.Image, lum: int = 225) -> Image.Image:
 
 
 def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pal, shrink: int = 1,
-                   pockets: int = 0) -> dict:
+                   pockets: int = 0, ghost=None) -> dict:
     """Video frames share a locked camera, so each direction goes through ONE crop window
     (the union of its frames) at ONE scale for the whole sheet: nothing pumps, feet stay
-    where the video put them (trace.py's fixed-window rule)."""
-    keyed = {k: shrink_alpha(key_background(v, pockets=pockets), shrink) for k, v in raws.items()}
+    where the video put them (trace.py's fixed-window rule). `ghost`: `ghost_pal`'s colours."""
+    keyed = {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost), shrink) for k, v in raws.items()}
     boxes = {k: bbox(v) for k, v in keyed.items()}
     union = {}
     for d in dirs:
@@ -1252,8 +1294,9 @@ def cmd_video(a, dirs, kind, root, src, pal):
 def finish(out, raws, dirs, poses, a, kind, pal, meta) -> str:
     raws = {k: v for k, v in raws.items() if k[0] in dirs and k[1] in poses}
     if meta.get("method") == "video":
-        pockets = pocket_px(meta.get("input"), P.corner_bg(next(iter(raws.values()))))
-        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal, pockets=pockets)
+        backdrop = P.corner_bg(next(iter(raws.values())))
+        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal, pockets=pocket_px(meta.get("input"), backdrop),
+                                ghost=ghost_pal(meta.get("input"), backdrop, pal))
     else:
         frames = pixelize(raws, dirs, poses, a.size, a.content, pal)
     json.dump({"palette": pal, "size": a.size, "content": a.content, "kind": kind},

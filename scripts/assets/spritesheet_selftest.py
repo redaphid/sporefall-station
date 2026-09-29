@@ -630,6 +630,19 @@ def main():
         S.main(["repack", os.path.join(tmp, "hover", "video-s3"), "--period", "12:64", "--to", os.path.join(tmp, "hre")])
         re_e = json.load(open(os.path.join(tmp, "hre", "sheet.json")))["loops"]["e"]
         check("motion: repack --period (assemble) keeps a closed loop whole", re_e.get("closed") and re_e["period"] == 80, re_e)
+        S.main([src, "--out", os.path.join(tmp, "prowl"), "--method", "video", "--dirs", "e", "--motion", "prowl",
+                "--describe", "a crouched figure in a rubber hood"])
+        pq = Fake.prompts[-1]
+        pk, pw = queued_prompts(pq)
+        pm = json.load(open(os.path.join(tmp, "prowl", "video-s3", "sheet.json")))
+        check("motion: prowl keys a crouched mid-stride pose, never a standing one",
+              "crouched low mid-stride" in pk and "standing" not in pk, pk)
+        check("motion: prowl asks Wan for a low stepping gait after the describe",
+              "stays crouched" in pw and "legs step forward and back" in pw
+              and pw.index("rubber hood") < pw.index("runs in place"), pw)
+        check("motion: a prowl is an open clip cut to its shortest stride, like the walk",
+              pm.get("motion") == "prowl" and not pm["loops"]["e"].get("closed")
+              and not any(n["class_type"] == "WanFirstLastFrameToVideo" for n in pq.values()), pm["loops"]["e"])
         home = [wren(stride=int(60 * np.sin(2 * np.pi * i / 80)), size=240) for i in range(81)]
         cl = S.closed_loop(home)
         check("loop: a closed clip that comes home passes the seam", cl["seam"] <= 0.5, cl)

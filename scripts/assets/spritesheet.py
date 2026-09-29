@@ -696,6 +696,20 @@ def input_palette(im: Image.Image, colors: int) -> list[tuple]:
     return sorted({tuple(pal[i:i + 3]) for i in range(0, len(pal), 3)})
 
 
+def anchor_palette(path: str, min_share: float = 0.005) -> list[tuple]:
+    """--palette-from: the colours making up at least `min_share` of a finished sprite's opaque
+    pixels. Re-posting every direction onto its s-idle's own colours keeps a surface from
+    changing colour when the character turns (the mycologist's visor: green in s and se, cyan
+    in e, because each direction's clip is its own render)."""
+    a = np.asarray(Image.open(path).convert("RGBA"))
+    px = a[a[..., 3] > 128][:, :3]
+    cols, counts = np.unique(px, axis=0, return_counts=True)
+    keep = [tuple(int(v) for v in c) for c, n in zip(cols, counts) if n >= min_share * len(px)]
+    if not keep:
+        raise SystemExit(f"{path}: no opaque pixels to take a palette from")
+    return keep
+
+
 def snap(im: Image.Image, pal) -> Image.Image:
     a = np.asarray(im.convert("RGBA")).astype(np.float32).copy()
     if pal is not None:
@@ -971,6 +985,8 @@ def cmd_make(a):
     src.save(f"{root}/input-{IN_SIZE}.png")
     pal = None if a.palette == "none" else (list(SWAMP_RGB) if a.palette == "swampspace"
                                             else input_palette(src, a.colors))
+    if a.palette_from:
+        pal = anchor_palette(a.palette_from)
     if a.method == "grid":
         poses = ["idle"]
     if a.method == "video":
@@ -1176,7 +1192,10 @@ def cmd_repack(a):
             if os.path.exists(f):
                 raws[(d, p)] = Image.open(f).convert("RGB")
     kind = meta.get("kind") or next(iter(meta["frames"])).rsplit("-", 2)[0]
-    if a.palette == "input":
+    if a.palette_from:
+        pal = anchor_palette(a.palette_from)
+        meta["palette_from"] = os.path.abspath(a.palette_from)
+    elif a.palette == "input":
         src = os.path.join(os.path.dirname(os.path.abspath(a.run)), f"input-{IN_SIZE}.png")
         pal = input_palette(Image.open(src), a.colors)
     else:
@@ -1277,6 +1296,9 @@ def main(argv=None):
                       help="input = the character's own colours (default); swampspace = the pack's locked 34 "
                            "(default for --method video, as the frog shipped)")
     post.add_argument("--colors", type=int, default=24, help="palette size for --palette input")
+    post.add_argument("--palette-from", help="snap to the colours of this finished sprite (e.g. the run's own "
+                                             "frames/<kind>-s-idle.png), so no surface changes colour between "
+                                             "directions")
     if sub == "doctor":
         return cmd_doctor(ap.parse_args(argv))
     if sub == "prep":

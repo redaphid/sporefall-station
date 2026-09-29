@@ -541,11 +541,13 @@ MOTIONS = {
     "walk": (POSES["idle"],
              "walks in place like a video game walk cycle: the legs step forward and back one after another with "
              "big, clear, full strides, the arms swing, the body bobs gently, and it never moves across the frame"),
+    # one rigid piece: limbs that swing on their own never repeat, so no loop closes (spore-drone, six takes)
     "hover": ("floating in the air in a relaxed idle pose, nothing touching the ground, everything below the "
-              "body hanging loose",
-              "hovers in place like a video game flying idle: the whole body bobs up and down in a slow, steady, "
-              "even rhythm that repeats exactly, everything hanging below the body swings gently with the bob, "
-              "nothing ever touches the ground, it takes no steps, and it never moves across the frame"),
+              "body hanging straight down and still",
+              "hovers in place like a video game flying idle: the whole body bobs slowly up and down as one rigid "
+              "piece in one steady rhythm that repeats exactly, everything hanging below the body stays still and "
+              "moves only with the body, nothing ever touches the ground, it takes no steps, and it never moves "
+              "across the frame"),
     "pulse": ("resting in place in a relaxed idle pose",
               "stays rooted in place like a video game idle: it breathes and pulses slowly, swelling and "
               "settling, its base never moves, and it never moves across the frame"),

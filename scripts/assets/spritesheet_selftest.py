@@ -555,8 +555,8 @@ def main():
                 "--describe", "a domed drone with limbs hanging beneath it"])
         key, wan = queued_prompts(Fake.prompts[-1])
         hm = json.load(open(os.path.join(tmp, "hover", "video-s3", "sheet.json")))
-        check("motion: hover asks Wan for a bob and no steps, after the describe",
-              "bobs up and down" in wan and "strides" not in wan and "step forward" not in wan
+        check("motion: hover asks Wan for a rigid bob, still limbs and no steps, after the describe",
+              "as one rigid piece" in wan and "stays still" in wan and "strides" not in wan and "step forward" not in wan
               and wan.index("domed drone") < wan.index("hovers in place"), wan)
         check("motion: hover keyframe floats, it does not stand", "floating in the air" in key and "standing" not in key, key)
         check("motion: the run records its motion", hm.get("motion") == "hover", hm.get("motion"))

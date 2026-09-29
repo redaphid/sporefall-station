@@ -135,12 +135,12 @@
  "sporeling-mite": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 26,
-   "head_h": 36,
-   "mass": 754,
-   "cx": 0.03,
-   "foot_y": 45
+   "height": 46,
+   "width": 36,
+   "head_h": 21,
+   "mass": 952,
+   "cx": -0.34,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

@@ -17,7 +17,8 @@ sheet   rows = directions: the frog's row, then this character's, at 96 px on th
 gate    every ship gate, thresholds in cast-gate-spec.json: loop seam; colour drift vs the
         s-idle; consistency.py <kind> --check; verify.py per frame (job = its direction, so
         "ne/n must not show a face" covers the walk frames too), --pairs and --same; the
-        judge-sprite-mp4 metric gates on each loop; verify.py --style against the frog.
+        judge-sprite-mp4 metric gates on each loop, with boil in place of flicker; verify.py
+        --style against the frog; every pixel on the pack's locked palette.
         Runs on what export wrote into the packs. Exit 0 only on all-PASS; gate.json has it all.
 
 Outputs for a human go to $CAST_OUT/<kind>/ (default /mnt/d/tmp/cast-walks/<kind>/).
@@ -197,29 +198,82 @@ def _tail(cmd, env=None):
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
-def judge_loops(run, kind):
-    """judge-sprite-mp4's metric gates (sporefall-art sprites/judge.py) on each loop."""
+def _judge():
     sys.path.insert(0, JUDGE)
     from sprites import judge  # noqa: E402
+    return judge
+
+
+BOIL_N, BOIL_DOWN, BOIL_R = 16, 2, 6
+
+
+def boil(frames):
+    """Texture that re-rolls between frames, per unit of the sprite's own contrast.
+
+    Each frame is matched to the next one within BOIL_R px (after BOIL_DOWN x downsampling), so
+    limbs that move are matched away and what is left is change in place: boil. Dividing by the
+    mean in-silhouette gradient makes a cream suit with a dark visor comparable with a brown cloak.
+    Callers pass BOIL_N frames per stride, so a fast walker and a slow one move alike per step.
+    """
+    judge = _judge()
+    k, r = BOIL_DOWN, BOIL_R
+    fs = [f[:f.shape[0] // k * k, :f.shape[1] // k * k].reshape(f.shape[0] // k, k, f.shape[1] // k, k, 3).mean((1, 3))
+          for f in frames]
+    ms = [judge._mask(f) for f in fs]
+    res = []
+    for a, b, ma, mb in zip(fs, fs[1:], ms, ms[1:]):
+        pa = np.pad(a, ((r, r), (r, r), (0, 0)), mode="edge")
+        best = np.full(ma.shape, np.inf)
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                best = np.minimum(best, np.abs(pa[r + dy:r + dy + a.shape[0], r + dx:r + dx + a.shape[1]] - b).mean(2))
+        res.append(best[ma | mb].mean())
+    contrast = [(np.abs(np.diff(f, axis=1)).mean(2)[m[:, 1:]].mean() + np.abs(np.diff(f, axis=0)).mean(2)[m[1:]].mean()) / 2
+                for f, m in zip(fs, ms)]
+    return round(float(np.mean(res) / np.mean(contrast)), 4)
+
+
+def _rgb(paths):
+    return [np.asarray(Image.open(p).convert("RGB"), dtype=np.float32) for p in paths]
+
+
+def judge_loop(paths, start, period):
+    """Gate 5 on one loop of raw video frames: sprites.judge metrics, with boil in place of flicker."""
+    judge, lim = _judge(), SPEC["judge"]
+    frames = _rgb(paths[start:start + period])
+    n = min(BOIL_N, period)
+    rep = judge.measure(frames)
+    rep["boil"] = boil(_rgb([paths[start + round(i * period / n)] for i in range(n)]))
+    gates = {"identity_drift": rep["identity_drift"] <= judge.GATES["identity_drift"],
+             "head_drift": rep["head_drift"] <= lim["head_drift_max"],
+             "boil": rep["boil"] <= lim["boil_max"],
+             "sharpness": rep["sharpness"] >= judge.GATES["sharpness_min"],
+             "coverage_jitter": rep["coverage_jitter"] <= judge.GATES["coverage_jitter"]}
+    return frames, {"pass": all(gates.values()), "gates": gates,
+                    **{k: rep[k] for k in ("identity_drift", "head_drift", "boil", "flicker", "sharpness", "coverage_jitter")}}
+
+
+def judge_loops(run, kind):
     meta = json.load(open(f"{run}/sheet.json"))
     res = {}
     for d in DIRS:
         lp = meta["loops"][d]
-        paths = sorted(glob.glob(f"{run}/raw/walk-{d}/*.png"))[lp["start"]:lp["start"] + lp["period"]]
-        frames = [np.asarray(Image.open(p).convert("RGB"), dtype=np.float32) for p in paths]
-        rep = judge.measure(frames)
-        gates = {"identity_drift": rep["identity_drift"] <= judge.GATES["identity_drift"],
-                 "head_drift": rep["head_drift"] <= judge.GATES["head_drift"],
-                 "flicker": rep["flicker"] <= judge.GATES["flicker"],
-                 "sharpness": rep["sharpness"] >= judge.GATES["sharpness_min"],
-                 "coverage_jitter": rep["coverage_jitter"] <= judge.GATES["coverage_jitter"]}
+        frames, res[d] = judge_loop(sorted(glob.glob(f"{run}/raw/walk-{d}/*.png")), lp["start"], lp["period"])
+        res[d]["loop"] = lp
         o = os.path.join(out_dir(kind), "judge", d)
         os.makedirs(o, exist_ok=True)
-        judge._sheet(frames, os.path.join(o, "sheet.png"))
-        judge._sheet(frames, os.path.join(o, "heads.png"), head=True)
-        res[d] = {"pass": all(gates.values()), "gates": gates, "loop": lp,
-                  **{k: rep[k] for k in ("identity_drift", "head_drift", "flicker", "sharpness", "coverage_jitter")}}
+        _judge()._sheet(frames, os.path.join(o, "sheet.png"))
+        _judge()._sheet(frames, os.path.join(o, "heads.png"), head=True)
     return res
+
+
+def off_palette(paths):
+    """Share of the opaque pixels in these frames whose colour is not one of the pack's locked 34."""
+    import palette
+    pal = np.array([r << 16 | g << 8 | b for r, g, b in palette.RGB])
+    px = np.concatenate([a[a[..., 3] > 128][:, :3].astype(np.int64)
+                         for a in (np.asarray(Image.open(p).convert("RGBA")) for p in paths)])
+    return round(float(1 - np.isin(px[:, 0] << 16 | px[:, 1] << 8 | px[:, 2], pal).mean()), 4)
 
 
 SPEC = json.load(open(os.path.join(HERE, "cast-gate-spec.json")))
@@ -254,7 +308,7 @@ def colour_drift(kind, pack="swampspace-hires"):
 
 
 def cmd_gate(a):
-    """All five ship gates, thresholds from cast-gate-spec.json. Exit 0 only if every one passes."""
+    """Every ship gate, thresholds from cast-gate-spec.json. Exit 0 only if every one passes."""
     run, kind = os.path.abspath(a.run), a.kind
     out, ok = {"kind": kind, "run": run, "spec": SPEC}, {}
 
@@ -292,7 +346,7 @@ def cmd_gate(a):
         say(f"4b VLM {mode[2:]}", rc == 0, txt.splitlines()[-1])
 
     out["judge"] = judge_loops(run, kind)
-    say("5 judge-sprite-mp4", all(r["pass"] for r in out["judge"].values()),
+    say("5 judge + boil", all(r["pass"] for r in out["judge"].values()),
         " ".join(f"{d} {'ok' if r['pass'] else 'FAIL:' + ','.join(k for k, v in r['gates'].items() if not v)}"
                  for d, r in out["judge"].items()))
 
@@ -300,6 +354,11 @@ def cmd_gate(a):
     rc, txt = _tail([sys.executable, "verify.py", "--style", "--kind", kind], senv)
     out["style"] = txt.splitlines()[-12:]
     say("6 style vs frog", rc == 0, txt.splitlines()[-1])
+
+    theme = os.path.join(THEMES, SPEC["style"]["theme"], "chars")
+    out["palette"] = {d: off_palette([os.path.join(theme, f"{kind}-{d}-{p}.png") for p in POSES]) for d in DIRS}
+    say("6b locked palette", all(v <= SPEC["palette"]["off_max"] for v in out["palette"].values()),
+        f"off-palette share, max {SPEC['palette']['off_max']}: " + " ".join(f"{d} {v}" for d, v in out["palette"].items()))
 
     out["pass"] = all(ok.values())
     out["gates"] = ok

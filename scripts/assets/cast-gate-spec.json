@@ -21,13 +21,23 @@
   "pairs": "verify.py --pairs --kind",
   "same": "verify.py --same --kind"
  },
- "judge": "sprites.judge GATES (judge-sprite-mp4) on each direction's raw loop frames",
+ "judge": {
+  "_": "sprites.judge (judge-sprite-mp4) on each direction's raw loop. identity_drift, sharpness and coverage_jitter keep sprites.judge.GATES. Those GATES were calibrated on a Blender mannequin render and 40 fps boil clips; on 16 fps Wan walks the approved frog failed them (flicker 11.7-19.2 vs 5 in 5/5 directions, head_drift .066-.134 vs .08), and flicker cannot see boil there (heavy synthetic boil moved the mycologist's e from 22.3 to 24.3). So flicker is replaced by boil and head_drift is set from the frog. cast_gate_selftest.py proves both ways.",
+  "boil_max": 0.3,
+  "_boil": "cast_walk.boil: motion-compensated frame residual / in-silhouette contrast, the loop resampled to 16 frames per stride. The frog's shipped loops measure .103-.282; the judge's rejected boil clips (sporefall-art wip/demos/hifps, at 16 fps) measure far above. The near-still idle reject stays under every metric here.",
+  "head_drift_max": 0.14,
+  "_head_drift": "the frog's shipped loops .066-.134; the rejected boil clips .41-.75"
+ },
  "style": {
   "theme": "swampspace-hires",
   "anchors": [
    "chars/frog-settler-s-idle.png",
    "chars/frog-settler-se-idle.png"
   ],
-  "_": "verify.py --style --kind against the frog, the pack's reference video-route character"
+  "_": "verify.py --style --kind against the frog: rendering only (pixel density, outline, flat lighting), not colour; colour is gate 2 and the palette gate"
+ },
+ "palette": {
+  "off_max": 0.0,
+  "_": "share of opaque pixels whose colour is not one of palette.py's locked 34. Export snaps every frame onto the s-idle's colours; the frog and the mycologist measure 0. Replaces the style prompt's colour question, which described the palette as teal/olive and failed a cream suit drawn entirely in the locked colours."
  }
 }

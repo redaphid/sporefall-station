@@ -97,12 +97,12 @@
  "mycologist": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
+   "height": 45,
    "width": 23,
-   "head_h": 35,
-   "mass": 541,
-   "cx": -2.24,
-   "foot_y": 45
+   "head_h": 36,
+   "mass": 707,
+   "cx": 0.86,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

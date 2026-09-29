@@ -46,3 +46,18 @@ Not yet animated, in critic order (A/B first, C/D/F last; all get animated for t
 11. bog-mutant F (the Hulk; redesign first, Aaron veto)
 Redesign references: the critic's concept-art picks, /mnt/d/tmp/cast-walks/critique/concept-picks.md (in progress).
 Cleanup (critic): legacy step/attack frames for bog-mutant, derelict-bot and spore-drone are an older design, not in the manifest; delete them so nobody animates from them.
+
+## Rounds (Aaron, 2026-09-29 ~10:25)
+
+"Reviewed the critic score. We'll go through another pass once we're done animations stuff this time
+and get concept art characters in the next full round of characters. Hopefully our pipeline is faster now"
+
+- **Round 1 (now): animate the whole cast with the CURRENT designs**, in the critic order above. No
+  redesigns block this round. For speed, a character whose body can't loop cleanly (many legs, hover,
+  pulse) gets ONE take per direction and ships its least-bad loop under the rule-11 seam exception;
+  no retakes. Bipeds keep the 3-take budget.
+- **Round 2 (next): concept-art redesigns**, from the critic's v2 picks (`/mnt/d/tmp/cast-walks/critique/concept-picks-v2.md`,
+  aesthetic priority, `CRITIC.md`), anchor-free, each vetoed by Aaron, then animated. Prep already made:
+  bog-mutant candidates from pod-carrier (`/mnt/d/tmp/cast-walks/bog-mutant/`), the sameness
+  experiment (`/mnt/d/tmp/cast-walks/sameness/`).
+

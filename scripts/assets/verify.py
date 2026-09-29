@@ -29,6 +29,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import generate as G
 
+# VERIFY_THEME=swampspace-hires gates the pack the game loads (default: the 48 px base pack)
+if os.environ.get("VERIFY_THEME"):
+    G.THEME = os.path.join(os.path.dirname(G.THEME), os.environ["VERIFY_THEME"])
+
 OLLAMA = os.environ.get("OLLAMA", "http://localhost:11434")
 # --kind <kind>: only that character's jobs in --pack / --pairs / --same
 KIND = sys.argv[sys.argv.index("--kind") + 1] if "--kind" in sys.argv else None
@@ -65,7 +69,7 @@ def ask(path):
     im.save(buf, "PNG")
     body = {"model": MODEL, "prompt": PROMPT,
             "images": [base64.b64encode(buf.getvalue()).decode()],
-            "stream": False, "think": False, "options": {"temperature": 0}}
+            "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
     raw = ""
     for attempt in range(4):
         try:
@@ -148,7 +152,7 @@ def check_pair(idle_path, step_path):
     """VLM gate for idle/step pose consistency. Returns (verdict, problems)."""
     body = {"model": MODEL, "prompt": PAIR_PROMPT,
             "images": [_b64(idle_path), _b64(step_path)],
-            "stream": False, "think": False, "options": {"temperature": 0}}
+            "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
     raw = ""
     for attempt in range(4):
         try:
@@ -213,7 +217,7 @@ def check_same(path_a, path_b):
     votes = []
     for _ in range(VOTES):
         body = {"model": MODEL, "prompt": SAME_PROMPT, "images": imgs,
-                "stream": False, "think": False, "options": {"temperature": 0}}
+                "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
         raw = ""
         for attempt in range(4):
             try:
@@ -274,7 +278,8 @@ STYLE_PROMPT = (
 )
 
 # pack-wide style anchors: the player front sprite, the hero prop, the floor
-STYLE_ANCHORS = ("chars/vine-ranger-s-idle.png", "props/spore-barrel.png")
+STYLE_ANCHORS = tuple(os.environ.get("STYLE_ANCHORS", "chars/vine-ranger-s-idle.png,props/spore-barrel.png")
+                      .split(","))  # STYLE_ANCHORS=chars/frog-settler-s-idle.png,... to judge against other refs
 
 
 def style_mode():
@@ -286,11 +291,11 @@ def style_mode():
     J = G.jobs()
     for name, spec in J.items():
         p = os.path.join(G.THEME, spec["path"])
-        if not os.path.exists(p) or spec["path"] in STYLE_ANCHORS:
+        if not os.path.exists(p) or spec["path"] in STYLE_ANCHORS or not _wanted(spec):
             continue
         body = {"model": MODEL, "prompt": STYLE_PROMPT,
                 "images": [_b64(p)] + [_b64(a) for a in anchors],
-                "stream": False, "think": False, "options": {"temperature": 0}}
+                "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
         raw = ""
         for attempt in range(4):
             try:
@@ -310,6 +315,8 @@ def style_mode():
             except Exception:
                 pass
         probs = [k for k in ("same_style", "same_palette") if v.get(k) is False]
+        if not v:
+            probs = [f"no VLM answer from {OLLAMA} ({MODEL})"]
         checked += 1
         fails += 1 if probs else 0
         mark = "ok  " if not probs else "FAIL"

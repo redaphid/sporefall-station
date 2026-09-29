@@ -76,7 +76,8 @@ Files in this folder:
    "Have a separate agent, one with the role of an incredibly experienced, talented and critical
    pixel art artist critique each character. And queue the bad ones up at the end of the queue so we
    still end up with the full cast animated for testing"). A critic agent grades every character
-   A-F (`/mnt/d/tmp/cast-walks/critique/`). QUEUE.md order: A/B first, C/D/F last. Weak designs are
+   A-F (`/mnt/d/tmp/cast-walks/critique/`), briefed by `CRITIC.md` (aesthetic priority; any
+   lore-sensible character that can fill the role will do). QUEUE.md order: A/B first, C/D/F last. Weak designs are
    still animated (for testing), then redesigned. For testing, a character whose body can't make a
    clean loop (hover, many legs) ships its least-bad loop with a per-kind seam exception, the way
    Aaron accepted the stalker's ("Let's use what we have for now"), flagged in CURATION for a redo.

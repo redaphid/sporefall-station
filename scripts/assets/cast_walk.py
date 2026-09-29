@@ -116,8 +116,10 @@ def cmd_assemble(a):
     for d, src in takes.items():
         m = json.load(open(f"{src}/sheet.json"))
         meta["loops"][d] = m["loops"][d]
-        for f in glob.glob(f"{src}/raw/{d}-*.png"):
-            shutil.copyfile(f, f"{out}/raw/{os.path.basename(f)}")
+        for f in glob.glob(f"{src}/raw/{d}-*.png") + glob.glob(f"{src}/raw/{d}-*.mp4") + \
+                glob.glob(f"{src}/flow-{d}.json") + glob.glob(f"{src}/flow-{d}_api.json"):
+            dst = f"{out}/raw/{os.path.basename(f)}" if "/raw/" in f else f"{out}/{os.path.basename(f)}"
+            shutil.copyfile(f, dst)  # the flow that made this direction travels with its frames
         link = f"{out}/raw/walk-{d}"
         if not os.path.lexists(link):
             os.symlink(os.path.realpath(f"{src}/raw/walk-{d}"), link)
@@ -130,6 +132,19 @@ def cmd_assemble(a):
     subprocess.run(ss + [out, "--palette-from", f"{out}/frames/{a.kind}-s-idle.png", "--to", out + "-pal"], check=True,
                    stdout=subprocess.DEVNULL)
     print(f"-> {out}-pal (loops re-found, colours from its s-idle): export that")
+
+
+def _flow_of(kind, d="s"):
+    """The tEXt prompt/workflow chunks of the shipped <kind>-<d>-idle, for images built from it."""
+    from PIL import PngImagePlugin
+    info = Image.open(os.path.join(THEMES, "swampspace-hires", "chars", f"{kind}-{d}-idle.png")).info
+    if "workflow" not in info:
+        return None
+    pi = PngImagePlugin.PngInfo()
+    for k in ("prompt", "workflow"):
+        if k in info:
+            pi.add_text(k, info[k])
+    return pi
 
 
 def _row(kind, pack="swampspace-hires"):
@@ -160,7 +175,7 @@ def cmd_sheet(a):
                     dr.text((70 + c * cell + 4, y), p, fill=(150, 160, 150))
             y += cell + lab
     o = out_dir(a.kind)
-    im.save(f"{o}/contact-96-vs-{a.ref}.png")
+    im.save(f"{o}/contact-96-vs-{a.ref}.png", pnginfo=_flow_of(a.kind))
     # one animated strip: all five walks, the reference on top
     frames = []
     for i in range(8):
@@ -249,8 +264,9 @@ def cmd_gate(a):
 
     loops = json.load(open(f"{run}/sheet.json"))["loops"]
     out["seam"] = {d: loops[d]["seam"] for d in DIRS}
-    bad = {d: v for d, v in out["seam"].items() if v > SPEC["seam_max"]}
-    say("1 loop seam", not bad, f"max {SPEC['seam_max']}: " + " ".join(f"{d} {v}" for d, v in out["seam"].items()))
+    lim = {d: SPEC.get("seam_max_dir", {}).get(d, SPEC["seam_max"]) for d in DIRS}
+    bad = {d: v for d, v in out["seam"].items() if v > lim[d]}
+    say("1 loop seam", not bad, " ".join(f"{d} {v}/{lim[d]}" for d, v in out["seam"].items()))
 
     out["colour"] = colour_drift(kind)
     say("2 colour vs s-idle", all(r["pass"] for r in out["colour"].values()),

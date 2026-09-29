@@ -521,10 +521,17 @@ def main():
         check("video: a GPU error stops the run and drops its other queued directions",
               died and set(Fake.deleted) >= {str(n2 + 1), str(n2 + 2)}, Fake.deleted)
         n1 = len(Fake.prompts)
+        cut_e1 = Image.open(f"{v}/raw/e-walk-1.png").tobytes()
         S.main(["repack", v, "--period", "20:30", "--to", os.path.join(tmp, "vr")])
         vr = json.load(open(os.path.join(tmp, "vr/sheet.json")))
         check("repack --period re-cuts the saved clip without the GPU",
               vr["loops"]["e"]["period"] in range(20, 31) and len(Fake.prompts) == n1, vr["loops"]["e"])
+        check("repack --to leaves the source run's cut raws alone",
+              json.load(open(f"{v}/sheet.json"))["loops"]["e"]["period"] == 40
+              and Image.open(f"{v}/raw/e-walk-1.png").tobytes() == cut_e1)
+        S.main(["repack", os.path.join(tmp, "vr"), "--size", "48", "--to", os.path.join(tmp, "vr48")])
+        check("a repack --to output is itself repackable",
+              Image.open(os.path.join(tmp, "vr48/sheet.png")).size == (480, 96))
         check("repack keeps the run's 96 px and palette", Image.open(os.path.join(tmp, "vr/sheet.png")).size == (960, 192))
 
         print("--flow: a flow tweaked in the editor and exported as API")

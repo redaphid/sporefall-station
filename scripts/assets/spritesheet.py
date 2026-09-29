@@ -45,6 +45,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import time
 import urllib.error
@@ -1139,22 +1140,39 @@ def cmd_repack(a):
     dirs, poses = meta["dirs"], meta["poses"]
     a.size = a.size or meta.get("canvas", 48)
     a.palette = a.palette or meta.get("palette", "input")
+    out = os.path.abspath(a.to or a.run)
+    raw = f"{out}/raw"
+    if out != os.path.abspath(a.run):
+        # --to never touches the source run, and its output is itself a run `repack` can take:
+        # the cut raws are copied, the 81-frame clips linked
+        os.makedirs(raw, exist_ok=True)
+        for f in glob.glob(f"{a.run}/raw/*"):
+            dst = os.path.join(raw, os.path.basename(f))
+            if os.path.isdir(f):
+                if not os.path.lexists(dst):
+                    os.symlink(os.path.abspath(f), dst)
+            else:
+                shutil.copyfile(f, dst)
+        for f in ("input-%d.png" % IN_SIZE,):
+            src_in = os.path.join(os.path.dirname(os.path.abspath(a.run)), f)
+            if os.path.exists(src_in) and not os.path.exists(os.path.join(os.path.dirname(out), f)):
+                shutil.copyfile(src_in, os.path.join(os.path.dirname(out), f))
     if a.period and meta.get("method") == "video":  # re-find the loop in the saved clips, then re-cut
         ranges = period_ranges(a.period, dirs)
         for d in dirs:
-            clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{a.run}/raw/walk-{d}/*.png"))]
+            clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{raw}/walk-{d}/*.png"))]
             loop = find_loop(clip, *ranges[d])
             cyc = cut_loop(clip, loop)
             meta.setdefault("loops", {})[d] = loop
-            cyc[widest(cyc)].save(f"{a.run}/raw/{d}-step.png")
+            cyc[widest(cyc)].save(f"{raw}/{d}-step.png")
             for i, f in enumerate(cyc):
-                f.save(f"{a.run}/raw/{d}-walk-{i}.png")
+                f.save(f"{raw}/{d}-walk-{i}.png")
             print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}  "
                   f"(candidates {loop['candidates']})")
     raws = {}
     for d in dirs:
         for p in poses:
-            f = f"{a.run}/raw/{d}-{p}.png"
+            f = f"{raw}/{d}-{p}.png"
             if os.path.exists(f):
                 raws[(d, p)] = Image.open(f).convert("RGB")
     kind = meta.get("kind") or next(iter(meta["frames"])).rsplit("-", 2)[0]
@@ -1163,8 +1181,8 @@ def cmd_repack(a):
         pal = input_palette(Image.open(src), a.colors)
     else:
         pal = None if a.palette == "none" else list(SWAMP_RGB)
-    out = a.to or a.run
-    os.makedirs(out, exist_ok=True)
+    if not raws:
+        raise SystemExit(f"{raw}: no raw frames to repack")
     print(finish(out, raws, dirs, poses, a, kind, pal, {k: v for k, v in meta.items()
                                                        if k not in ("frames", "dirs", "poses", "canvas")}))
 

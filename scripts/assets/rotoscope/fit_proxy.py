@@ -55,7 +55,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     stage = os.path.join(os.path.abspath(a.out), "rig_multileg.py")  # on D: so the Windows Blender can read it
     open(stage, "w").write(open(RIG).read())
-    r = subprocess.run([BLENDER, "-b", "-P", win(stage), "--", "--out", win(a.out), "--dirs", a.dir,
+    r = subprocess.run([BLENDER, "-b", "-P", win(stage), "--", "--out", win(os.path.abspath(a.out)), "--dirs", a.dir,
                         "--only", "0", "--samples", "4", *rig_args], capture_output=True, text=True)
     if "RIG_MULTILEG_DONE" not in r.stdout:
         raise SystemExit(r.stdout[-2000:] + r.stderr[-2000:])

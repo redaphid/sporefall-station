@@ -25,3 +25,24 @@ Next humanoids, in order: drowned-diver (drowner), blast-diver (breacher), bog-m
 | 15 | spore-mortar | lobber | shipped s-idle | queued |
 | 16 | gloom-lurker | lurker | shipped s-idle | queued (non-walker) |
 | 17 | hive-spire | hivespire | shipped s-idle | queued (non-walker, speed 0) |
+
+## Order from 10:10 (critic grades, PROTOCOL rules 11-12)
+
+Grades: /mnt/d/tmp/cast-walks/critique/CRITIQUE.md, lineup https://2cb.pw/sporefall-cast-grades.
+Done or in flight: mycologist B, vine-ranger B, drowned-diver C, blast-diver B (all on main);
+mireclaw-stalker C (shipping, Aaron's loop exception), sporeling-mite C (waddle; motion fix 028ee9a),
+cinder-husk C (rendering), bellwether B (staged).
+Not yet animated, in critic order (A/B first, C/D/F last; all get animated for testing, weak ones then redesigned):
+1. mireclaw-alpha B (many legs: least-bad loop for testing, rule 11)
+2. gloom-lurker B (hover: least-bad loop for testing)
+3. carapace-brute C (quadruped)
+4. spore-mortar C
+5. derelict-bot C
+6. gloam-hound C (quadruped)
+7. bog-mender C (Step 0 prep saved in /mnt/d/tmp/cast-walks/bog-mender/)
+8. spore-drone C (parked hover; least-bad loop for testing)
+9. brood-sac D (stationary: pulse loop)
+10. hive-spire D (stationary: pulse loop)
+11. bog-mutant F (the Hulk; redesign first, Aaron veto)
+Redesign references: the critic's concept-art picks, /mnt/d/tmp/cast-walks/critique/concept-picks.md (in progress).
+Cleanup (critic): legacy step/attack frames for bog-mutant, derelict-bot and spore-drone are an older design, not in the manifest; delete them so nobody animates from them.

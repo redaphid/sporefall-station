@@ -2,7 +2,7 @@
 
 | # | character | archetype(s) | anchor | status |
 |---|---|---|---|---|
-| 0 | bog-mutant | thug, gangster | r2 (Hulk look) | Step 0 redesign candidates -> Aaron veto; walk later |
+| 0 | bog-mutant | thug, gangster | r2 (Hulk look) | Step 0 round 1 FAILED (https://2cb.pw/candidates-390b42): all 6 lost the fungus hook and read as the player ranger (slim teal suit, orange visor). Next agent: keep the r2 negatives that block the vine-ranger IPAdapter bleed; put the fungus hook first in a short prompt. Then Aaron veto, then walk. |
 | 1 | mycologist | scientist | r2 | **PRIORITY: finish e2e to beta first (Aaron)**. gates in progress (seam/colour PASS, gate 3 fixed 6f7136e, 4a 6/50 facing FAIL to triage) |
 | 2 | spore-drone | cop | r2 | queued |
 | 3 | mireclaw-stalker | stalker | r2 | queued |

@@ -30,6 +30,12 @@ sys.path.insert(0, HERE)
 import generate as G
 
 OLLAMA = os.environ.get("OLLAMA", "http://localhost:11434")
+# --kind <kind>: only that character's jobs in --pack / --pairs / --same
+KIND = sys.argv[sys.argv.index("--kind") + 1] if "--kind" in sys.argv else None
+
+
+def _wanted(spec):
+    return KIND is None or spec.get("kind") == KIND
 MODEL = os.environ.get("VLM", "qwen3-vl:8b")
 VOTES = int(os.environ.get("VOTES", "3"))
 
@@ -89,6 +95,8 @@ def check(path, spec):
     def count(key, *vals):
         return sum(1 for v in votes if v.get(key) in vals)
 
+    if all("_raw" in v for v in votes):  # Ollama down or model missing: no vote parsed, and every rule would pass
+        return {}, [f"no VLM answer from {OLLAMA} ({MODEL})"]
     cat = spec["cat"]
     if cat in ("prop", "item", "tile", "fx"):
         if count("is_figure", True) >= maj:
@@ -160,6 +168,8 @@ def check_pair(idle_path, step_path):
             pass
     probs = [k for k in ("same_character", "same_posture", "same_gear", "only_limbs_differ")
              if v.get(k) is False]
+    if not v:
+        probs = [f"no VLM answer from {OLLAMA} ({MODEL})"]
     return v, probs
 
 
@@ -169,7 +179,7 @@ def pairs_mode():
     fails = 0
     checked = 0
     for name, spec in J.items():
-        if spec["cat"] != "char" or spec["frame"] != "step":
+        if spec["cat"] != "char" or spec["frame"] != "step" or not _wanted(spec):
             continue
         step = os.path.join(G.THEME, spec["path"])
         idle = os.path.join(G.THEME, spec["path"].replace("-step", "-idle"))
@@ -226,6 +236,8 @@ def check_same(path_a, path_b):
     maj = VOTES // 2 + 1
     probs = [k for k in ("same_character", "same_proportions", "same_outfit")
              if sum(1 for v in votes if v.get(k) is False) >= maj]
+    if not any(votes):
+        probs = [f"no VLM answer from {OLLAMA} ({MODEL})"]
     return votes[-1], probs
 
 
@@ -236,7 +248,7 @@ def same_mode():
     fails = 0
     checked = 0
     for name, spec in J.items():
-        if spec["cat"] != "char" or (spec["dir"] == "s" and spec["frame"] == "idle"):
+        if spec["cat"] != "char" or (spec["dir"] == "s" and spec["frame"] == "idle") or not _wanted(spec):
             continue
         p = os.path.join(G.THEME, spec["path"])
         anchor = os.path.join(G.THEME, f"chars/{spec['kind']}-s-idle.png")
@@ -321,13 +333,14 @@ def main():
             sys.exit(1 if probs else 0)
         same_mode()
         return
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    args = [a for i, a in enumerate(sys.argv[1:], 1)
+            if not a.startswith("--") and sys.argv[i - 1] not in ("--kind", "--job")]
     J = G.jobs()
     targets = []  # (path, spec)
     if "--pack" in sys.argv:
         for name, spec in J.items():
             p = os.path.join(G.THEME, spec["path"])
-            if os.path.exists(p):
+            if os.path.exists(p) and _wanted(spec):
                 targets.append((name, p, spec))
     else:
         jobname = None

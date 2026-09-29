@@ -704,10 +704,14 @@ def prep_input(path: str, size: int = IN_SIZE, fill: float = 0.84) -> Image.Imag
 
 
 # ---- post: raws -> pixel frames -------------------------------------------------
-def key_background(im: Image.Image, thresh: float = 38) -> Image.Image:
+def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0) -> Image.Image:
     """Alpha from a BORDER-CONNECTED flood of the backdrop colour. A plain colour key
     also punches holes in pale interiors (cream fur, a white chest); only backdrop
-    reachable from the frame edge is removed (cyber-puck's premat lesson)."""
+    reachable from the frame edge is removed (cyber-puck's premat lesson).
+
+    `pockets` > 0 also keys backdrop the flood cannot reach, in pieces of at least that many
+    pixels: the gap where a claw curls back to a leg stays white otherwise. Only for a
+    character with no backdrop-coloured part of its own (`pocket_px`)."""
     if P.has_alpha(im):
         return im.convert("RGBA")
     rgb = np.asarray(im.convert("RGB"))
@@ -716,7 +720,28 @@ def key_background(im: Image.Image, thresh: float = 38) -> Image.Image:
     mask.paste(Image.fromarray(np.where(near, 255, 0).astype(np.uint8), "L"), (1, 1))
     ImageDraw.floodfill(mask, (0, 0), 128, thresh=0)
     bg = np.asarray(mask)[1:-1, 1:-1] == 128
+    if pockets:
+        from scipy import ndimage
+        lab, _ = ndimage.label(near & ~bg)
+        big = np.bincount(lab.ravel()) >= pockets
+        big[0] = False
+        bg |= big[lab]
     return Image.fromarray(np.dstack([rgb, np.where(bg, 0, 255).astype(np.uint8)]), "RGBA")
+
+
+POCKET_PX = 24      # raw video pixels, about 2x2 pixels of the 96 px sprite; smaller specks go to despeckle
+POCKET_PALE = 0.01  # the drone's anchor 0.0001, the mycologist's cream suit 0.0023, the frog 0.0033
+
+
+def pocket_px(anchor: str | None, backdrop, thresh: float = 38) -> int:
+    """`key_background(pockets=)` for a character: POCKET_PX when under POCKET_PALE of its anchor's
+    opaque pixels are backdrop-coloured, else 0 (it has a white part a pocket key would eat)."""
+    if not anchor or not os.path.exists(anchor):
+        return 0
+    a = np.asarray(key_background(Image.open(anchor))).astype(np.float32)
+    px = a[a[..., 3] > 128][:, :3]
+    pale = float((np.sqrt(((px - backdrop) ** 2).sum(-1)) <= thresh).mean()) if len(px) else 1.0
+    return POCKET_PX if pale < POCKET_PALE else 0
 
 
 def bbox(im: Image.Image):
@@ -922,11 +947,12 @@ def despeckle(im: Image.Image, lum: int = 225) -> Image.Image:
     return Image.fromarray(a, "RGBA")
 
 
-def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pal, shrink: int = 1) -> dict:
+def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pal, shrink: int = 1,
+                   pockets: int = 0) -> dict:
     """Video frames share a locked camera, so each direction goes through ONE crop window
     (the union of its frames) at ONE scale for the whole sheet: nothing pumps, feet stay
     where the video put them (trace.py's fixed-window rule)."""
-    keyed = {k: shrink_alpha(key_background(v), shrink) for k, v in raws.items()}
+    keyed = {k: shrink_alpha(key_background(v, pockets=pockets), shrink) for k, v in raws.items()}
     boxes = {k: bbox(v) for k, v in keyed.items()}
     union = {}
     for d in dirs:
@@ -1191,7 +1217,8 @@ def cmd_video(a, dirs, kind, root, src, pal):
 def finish(out, raws, dirs, poses, a, kind, pal, meta) -> str:
     raws = {k: v for k, v in raws.items() if k[0] in dirs and k[1] in poses}
     if meta.get("method") == "video":
-        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal)
+        pockets = pocket_px(meta.get("input"), P.corner_bg(next(iter(raws.values()))))
+        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal, pockets=pockets)
     else:
         frames = pixelize(raws, dirs, poses, a.size, a.content, pal)
     json.dump({"palette": pal, "size": a.size, "content": a.content, "kind": kind},

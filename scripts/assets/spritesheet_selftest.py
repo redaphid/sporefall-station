@@ -290,6 +290,25 @@ def main():
         k = np.asarray(S.key_background(wren(bg=(250, 248, 246))))
         check("key: backdrop gone", k[5, 5, 3] == 0)
         check("key: pale chest enclosed by the body stays opaque", k[440, 512, 3] == 255)
+        ring = Image.new("RGB", (120, 120), (255, 255, 255))
+        ImageDraw.Draw(ring).ellipse((20, 20, 100, 100), outline=(30, 60, 64), width=12)  # a claw curled to a leg
+        ImageDraw.Draw(ring).rectangle((20, 55, 32, 65), fill=(255, 255, 255))  # 3x3 backdrop speck in the rim
+        ImageDraw.Draw(ring).rectangle((20, 55, 32, 65), outline=(30, 60, 64), width=5)
+        check("key: an enclosed backdrop pocket stays opaque by default", np.asarray(S.key_background(ring))[60, 60, 3] == 255)
+        kp = np.asarray(S.key_background(ring, pockets=S.POCKET_PX))
+        check("key: pockets= keys the enclosed backdrop pocket", kp[60, 60, 3] == 0 and kp[5, 5, 3] == 0)
+        check("key: pockets= keeps the character and a speck under POCKET_PX (despeckle's job)",
+              kp[22, 60, 3] == 255 and kp[60, 26, 3] == 255)
+        dark = os.path.join(tmp, "dark-anchor.png")
+        da = Image.new("RGBA", (40, 40), (0, 0, 0, 0))  # matted, like the r2 anchors
+        ImageDraw.Draw(da).ellipse((5, 5, 35, 35), fill=(30, 60, 64, 255))
+        da.save(dark)
+        pale = os.path.join(tmp, "wren-anchor.png")
+        wren().save(pale)
+        check("key: pocket keying on for an anchor with no backdrop-coloured part",
+              S.pocket_px(dark, np.array([255.0, 255, 255])) == S.POCKET_PX)
+        check("key: pocket keying off for an anchor with a pale chest, and for no anchor",
+              S.pocket_px(pale, np.array([255.0, 255, 255])) == 0 and S.pocket_px(None, np.array([255.0, 255, 255])) == 0)
 
         print("model detection")
         q, notes = S.detect_qwen({})

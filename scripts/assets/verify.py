@@ -69,7 +69,7 @@ def ask(path):
     im.save(buf, "PNG")
     body = {"model": MODEL, "prompt": PROMPT,
             "images": [base64.b64encode(buf.getvalue()).decode()],
-            "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
+            "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 1536}}
     raw = ""
     for attempt in range(4):
         try:
@@ -152,7 +152,7 @@ def check_pair(idle_path, step_path):
     """VLM gate for idle/step pose consistency. Returns (verdict, problems)."""
     body = {"model": MODEL, "prompt": PAIR_PROMPT,
             "images": [_b64(idle_path), _b64(step_path)],
-            "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
+            "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 1536}}
     raw = ""
     for attempt in range(4):
         try:
@@ -217,7 +217,7 @@ def check_same(path_a, path_b):
     votes = []
     for _ in range(VOTES):
         body = {"model": MODEL, "prompt": SAME_PROMPT, "images": imgs,
-                "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
+                "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 1536}}
         raw = ""
         for attempt in range(4):
             try:
@@ -295,7 +295,7 @@ def style_mode():
             continue
         body = {"model": MODEL, "prompt": STYLE_PROMPT,
                 "images": [_b64(p)] + [_b64(a) for a in anchors],
-                "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 256}}
+                "stream": False, "think": False, "options": {"temperature": 0, "num_predict": 1536}}
         raw = ""
         for attempt in range(4):
             try:

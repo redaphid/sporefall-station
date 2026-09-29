@@ -28,7 +28,13 @@ Files in this folder:
 
 1. **Commit and push after every step.** The machine crashes. Unpushed work is lost.
    The branch is `art/cast-walk-cycles`.
-2. **Delegate everything.** Each character gets a fresh agent, in serial.
+2. **Delegate everything.** Each character gets a fresh agent. The GPU is serial (one job at a
+   time), the characters are not: start the next character's agent while the previous one is in
+   its CPU-only shipping steps (merge, CI, in-game video). Strict serial left the GPU idle ~25 min
+   per character on 09-29, and Aaron was "surprised we finished so few characters".
+   **Order by risk:** two-legged humanoids first (they loop on take 1-2, ~30 min each); anything
+   that hovers, pulses or has many legs is R&D with a hard 1-hour cap, never ahead of humanoids.
+   On 09-29 the drone and the stalker ate ~2 h each and shipped nothing.
 3. **Workers fix what they find.** A gate that fails good art, a script bug or
    a wrong default is fixed at its root by whoever finds it. They prove the fix
    (a test, or a before/after run), commit, push, and report the finding in one

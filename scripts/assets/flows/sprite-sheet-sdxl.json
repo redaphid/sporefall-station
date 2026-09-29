@@ -604,7 +604,14 @@
      "link": 16
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -816,7 +823,14 @@
      "link": 26
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -1098,7 +1112,14 @@
      "link": 39
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -1310,7 +1331,14 @@
      "link": 49
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -1592,7 +1620,14 @@
      "link": 62
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -1804,7 +1839,14 @@
      "link": 72
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -2086,7 +2128,14 @@
      "link": 85
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -2298,7 +2347,14 @@
      "link": 95
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -2580,7 +2636,14 @@
      "link": 108
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -2792,7 +2855,14 @@
      "link": 118
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },
@@ -3236,7 +3306,14 @@
      "link": 137
     }
    ],
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [],
+     "slot_index": 0
+    }
+   ],
    "properties": {
     "Node name for S&R": "SaveImage"
    },

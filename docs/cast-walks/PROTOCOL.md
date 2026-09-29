@@ -86,6 +86,15 @@ Files in this folder:
    teal suit via IPAdapter 0.3 + one shared LOOK suffix + shared seeds
    (`/mnt/d/tmp/cast-walks/research/art-docs-2026-09-29.md`). New designs: anchor off, each character
    its own build, palette and seed, drawing-medium words, photo negatives.
+13. **Every character that moves gets a real locomotion cycle** (Aaron, 2026-09-29 16:1x: "I'm
+   concerned you are reward hacking. I asked for walking animations. If they are not bipedal, find
+   an actual way for them to move, changing the character if necessary"). Every archetype with
+   speed > 0 in `src/game/data/npcs.ts` (all but hivespire) gets frames where the body visibly
+   travels through a gait: walk, prowl, crawl, scuttle, slither, hop, or wing-beat flight. A
+   breathing/pulse/hover-bob loop is NOT a substitute. If the design can't produce a gait that
+   moves, change the character (the critic picks one that can). Passing a gate with an exception
+   is not the goal; the character moving convincingly in game is. Stationary (speed 0) only:
+   hive-spire.
 9. **Keep notes in the repo.** A new standing instruction goes into this file
    and is pushed the same turn.
 10. **Design on-lore.** Every character design and every redesign prompt

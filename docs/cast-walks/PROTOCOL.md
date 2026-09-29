@@ -27,7 +27,7 @@ Files in this folder:
 ## Rules (Aaron, 2026-09-28/29)
 
 1. **Commit and push after every step.** The machine crashes. Unpushed work is lost.
-   The branch is `art/cast-walk-cycles`. Never push to `main`.
+   The branch is `art/cast-walk-cycles`.
 2. **Delegate everything.** Each character gets a fresh agent, in serial.
 3. **Workers fix what they find.** A gate that fails good art, a script bug or
    a wrong default is fixed at its root by whoever finds it. They prove the fix
@@ -36,8 +36,13 @@ Files in this folder:
 4. **Gates block shipping.** Workers make reasonable changes to the gates
    themselves ("You wrote the gate"). Fix a measurement that is wrong. Never
    loosen a number just to pass.
-5. **Deploy each character once it passes** to the beta (`preview/cast-walks`),
-   and verify the sha from the live URL.
+5. **Ship each character to `main` once it passes.** Aaron (2026-09-29
+   03:05): "You are free to merge straight to main. I want to be able to
+   play this in the morning with the new sprites." A finished character is
+   merged into `main` (no PR needed) after `pnpm run build`, `pnpm exec
+   vitest run` and `pnpm run lint` pass on the merge, then pushed. Verify
+   the sha of one of its frames from the live site. The beta
+   (`preview/cast-walks`) stays available for looks before a merge.
 6. **Show Aaron a redesign before the long render.** Before a redesigned
    character's Wan run, Aaron sees the candidates and can veto the look.
 7. **Report every half hour when asked.** Before each report, the coordinator

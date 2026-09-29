@@ -252,3 +252,36 @@ Known nit: the s frames stand 43 px on the 48 px pack against 45-46 in the other
 views, because the s retake's keyframe drew the figure about 4% smaller and one
 scale covers the sheet. It is inside the height tolerance (3); the old set
 varied by 2 px.
+
+## drowned-diver (drowner), 2026-09-29: the shipped design, walking, rifle removed
+
+The raid rank-and-file (`npcs.ts` `drowner`) had one frame, the August hires
+s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 kept the shipped design, lore family D (drowned machinery): a security diver's hard suit still walking a patrol nobody rescinded, dark visor, no face. It failed one check: it held a rifle, and the renderer already draws the drowner's pistol at the hand (`weaponArt.ts`), so in play it carried two guns. Coordinator ruling: removing the rifle is a cleanup, not a redesign. Before/after https://2cb.pw/old-vs-new-ef9cf8 |
+| input | Qwen-Image-Edit-2511 (Lightning 4-step) removed only the rifle from the NEAREST-upscaled s-idle; 4 seeds, all clean, seed 3 kept. Its blocks were sampled back onto the shipped 96 px grid and snapped to the s-idle's own colours (95% of shared pixels land on the exact old colour). sha256 `00543eb5c23029ea…`. The old s-idle is archived at `/mnt/d/tmp/cast-walks/archive/drowned-diver/anchor-2026-09-29/` |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction; `--describe` (visor, rust stain on the crown, mould patch on one shoulder pad, air tank) for s/se/e, a face-free `--describe-back` (smooth helmet back, tank between the pads) for ne/n |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848x480, 81 frames at 16 fps, `--motion walk` |
+| takes | take1 seed 3 for all five directions; every direction ships from it |
+| loops | the shortest full stride: s period 19 (seam .385), se 24 (.231), e 20 (.21), ne 21 (.411), n 22 (.378) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.drowner.*`, the only archetype on `drowned-diver` |
+
+Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .385 / .231 / .21 / .411 / .378 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .100-.183, head .055-.075 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. Frame heights: 88-92 px on the hi-res pack, 43-46 on the 48 px
+pack, every direction.

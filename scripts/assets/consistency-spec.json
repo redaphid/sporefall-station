@@ -249,12 +249,12 @@
  "drowned-diver": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 30,
-   "head_h": 36,
-   "mass": 672,
-   "cx": 2.65,
-   "foot_y": 45
+   "height": 45,
+   "width": 24,
+   "head_h": 31,
+   "mass": 660,
+   "cx": 1.29,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

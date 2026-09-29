@@ -173,5 +173,11 @@ Other traps: a clip can turn around late (mycologist n from ~frame 56); the loop
 
 - `/mnt/d/tmp/cast-walks/WORKTREE.lock`: whoever's name is in it owns `~/Worktrees/sporefall-station/cast-walks` (export, spec, CURATION, commit, deploy). Absent = free. Take it by writing `<you> | <char> | <time>`; delete it when your commit is pushed. Never edit the worktree while someone else holds it.
 - `/mnt/d/tmp/cast-walks/GPU-WAN.lock`: held by anyone running a Wan video run or a VLM gate. Absent = free. SDXL/Qwen still batches (Step 0) may run while it is held.
+- **Prefer your own worktree** (09-29: one worker held the shared worktree 50 min and blocked two ships):
+  `git -C ~/Projects/sporefall-station worktree add --detach ~/Worktrees/sporefall-station/<kind>-art origin/art/cast-walk-cycles`,
+  export/commit there, `git push origin HEAD:art/cast-walk-cycles` (fetch + rebase if rejected). The shared
+  cast-walks worktree and WORKTREE.lock are only for work that must happen there; never hold it across a GPU wait.
+- **Wait for the GPU lock, report, then launch as a separate call**, so a coordinator hold can reach you
+  before a render starts (09-29: a hold arrived 6 s after a combined wait+launch).
 - Wait on a lock with one blocking call: `while [ -e LOCK ]; do sleep 30; done` (long `timeout`).
 - Commit and push after EVERY step that changes the worktree (the machine crashes).

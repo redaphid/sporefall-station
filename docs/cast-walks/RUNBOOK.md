@@ -178,6 +178,7 @@ Other traps: a clip can turn around late (mycologist n from ~frame 56); the loop
   `git -C ~/Projects/sporefall-station worktree add --detach ~/Worktrees/sporefall-station/<kind>-art origin/art/cast-walk-cycles`,
   export/commit there, `git push origin HEAD:art/cast-walk-cycles` (fetch + rebase if rejected). The shared
   cast-walks worktree and WORKTREE.lock are only for work that must happen there; never hold it across a GPU wait.
+- **The watchdog auto-releases a stale GPU lock**: `/mnt/d/tmp/cast-walks/gpu-watchdog.sh` (the coordinator runs it) deletes `GPU-WAN.lock` when the GPU has been under 15% for 60 s, ComfyUI is empty and no gate process runs. Release the lock yourself the moment your GPU step ends; do CPU work (assemble, export, loopscan) without it.
 - **Wait for the GPU lock, report, then launch as a separate call**, so a coordinator hold can reach you
   before a render starts (09-29: a hold arrived 6 s after a combined wait+launch).
 - Wait on a lock with one blocking call: `while [ -e LOCK ]; do sleep 30; done` (long `timeout`).

@@ -578,6 +578,29 @@ def main():
         away = [wren(stride=int(60 * i / 80), size=240) for i in range(81)]
         check("loop: a closed clip that never came home fails the seam", S.closed_loop(away)["seam"] > 1.0,
               S.closed_loop(away))
+        def view_prompts(since, d):
+            for api in Fake.prompts[since:]:
+                by_title = {n.get("_meta", {}).get("title", ""): n["inputs"] for n in api.values()}
+                if f"{d} keyframe prompt" in by_title:
+                    return by_title[f"{d} keyframe prompt"]["prompt"] + " | " + by_title[f"{d} walk prompt"]["text"]
+            return ""
+        nb = len(Fake.prompts)
+        S.main([src, "--out", os.path.join(tmp, "back"), "--method", "video", "--dirs", "e,ne,n",
+                "--describe", "a crawler with one violet eye", "--describe-back", "a crawler seen from its spined back"])
+        views = {d: view_prompts(nb, d) for d in ("e", "ne", "n")}
+        check("describe-back: the side view's keyframe and Wan prompt keep --describe",
+              views["e"].count("violet eye") == 2 and "spined back" not in views["e"], views["e"])
+        check("describe-back: ne and n draw from --describe-back, never the face describe",
+              all(views[d].count("spined back") == 2 and "violet eye" not in views[d] for d in ("ne", "n")), views)
+        nb = len(Fake.prompts)
+        S.main([src, "--out", os.path.join(tmp, "noback"), "--method", "video", "--dirs", "n",
+                "--describe", "a crawler with one violet eye"])
+        check("describe-back: without it the back views keep --describe",
+              view_prompts(nb, "n").count("violet eye") == 2, view_prompts(nb, "n"))
+        nb = len(Fake.prompts)
+        check("describe-back: refused off the video route before anything is queued",
+              raises(lambda: S.main([src, "--out", os.path.join(tmp, "qback"), "--method", "qwen",
+                                     "--describe-back", "a back"])) and len(Fake.prompts) == nb)
         n1 = len(Fake.prompts)
         check("motion: an unknown motion is refused before anything is queued",
               raises(lambda: S.main([src, "--out", os.path.join(tmp, "swim"), "--method", "video", "--motion", "swim"]))

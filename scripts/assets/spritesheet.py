@@ -85,6 +85,8 @@ DIRS = {
           "back and shoulder visible, face hidden",
 }
 PACK_DIRS = ["s", "se", "e", "ne", "n"]  # the engine mirrors the west half
+# Face hidden. A describe that names the face (lamps, eyes, fangs) draws one on these views too.
+BACK_DIRS = ("ne", "n", "nw")
 
 POSES = {
     "idle": "standing still in a relaxed idle pose",
@@ -485,7 +487,7 @@ def sdxl_graph(input_name, dirs, poses, seed, describe="", style="", prefix="spr
                                           "weight_type": "style transfer", "combine_embeds": "concat",
                                           "start_at": 0.0, "end_at": 0.9, "embeds_scaling": "V only"},
                     f"{d} identity (IP-Adapter)", col=0)
-        neg_text = SDXL_NEG + (", " + BACK_NEG if d in ("n", "ne", "nw") else "")
+        neg_text = SDXL_NEG + (", " + BACK_NEG if d in BACK_DIRS else "")
         neg = g.add("CLIPTextEncode", {"clip": [lo, 1], "text": neg_text}, f"{d} negative", col=0)
         row, base = [], None
         for c, pose in enumerate(poses):
@@ -1092,6 +1094,8 @@ def cmd_make(a):
                                             else input_palette(src, a.colors))
     if a.palette_from:
         pal = anchor_palette(a.palette_from)
+    if a.describe_back and a.method != "video":
+        raise SystemExit("--describe-back is for --method video (the back views' keyframe and Wan prompt)")
     if a.method == "grid":
         poses = ["idle"]
     if a.method == "video":
@@ -1185,7 +1189,8 @@ def cmd_video(a, dirs, kind, root, src, pal):
     for seed in a.seeds or [3]:  # the frog's seed
         out = os.path.join(root, f"video-s{seed}")
         os.makedirs(f"{out}/raw", exist_ok=True)
-        graphs = {d: video_graph(input_name, d, seed, q, w, a.describe, a.style or STYLE,
+        graphs = {d: video_graph(input_name, d, seed, q, w,
+                                 (a.describe_back or a.describe) if d in BACK_DIRS else a.describe, a.style or STYLE,
                                  f"sprite-sheet/{kind}/video-s{seed}", a.motion) for d in dirs}
         for d, g in graphs.items():
             json.dump(g.nodes, open(f"{out}/flow-{d}_api.json", "w"), indent=1)
@@ -1445,6 +1450,9 @@ def main(argv=None):
                                                           "the flow's own seeds)")
     ap.add_argument("--describe", default="", help="one line about the character; helps side/back views, "
                                                    "needed by --method sdxl")
+    ap.add_argument("--describe-back", default="",
+                    help=f"video: the describe for the back views ({', '.join(BACK_DIRS)}), whose face is hidden "
+                         "(default --describe); keep face parts out of it or they are drawn on the back")
     ap.add_argument("--motion", choices=list(MOTIONS), default="walk",
                     help="video: how it moves in place; hover = fliers (bob, never step), pulse = rooted things")
     ap.add_argument("--style", help=f"style sentence (default: {STYLE!r})")

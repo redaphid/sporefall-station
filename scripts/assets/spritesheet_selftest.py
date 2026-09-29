@@ -79,6 +79,9 @@ class Fake:
     images: dict = {}
     uploads: dict = {}
     face_left: set = set()  # directions the "model" gets wrong
+    fail: set = set()  # prompt ids that end in an execution error
+    extra: list = []  # extra_data of each POST /prompt
+    deleted: list = []  # ids POSTed to /queue {"delete": [...]}
     models = {
         "diffusion_models": ["Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf", "Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
                              "Wan2.2-I2V-A14B-HighNoise-Q8_0.gguf",
@@ -93,7 +96,8 @@ class Fake:
                   "wan2.2\\wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
                   "pixel_art_style_by_skormino_v7.05_test_72img.safetensors"],
         "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-        "vae": ["qwen_image_vae.safetensors", "wan_2.1_vae.safetensors"],
+        # the real server (0.37) also has the Qwen-Image 2.1 VAE, which sorts before the Edit VAE
+        "vae": ["qwen_image_2.1_vae_bf16.safetensors", "qwen_image_vae.safetensors", "wan_2.1_vae.safetensors"],
         "checkpoints": ["SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"],
     }
 
@@ -117,6 +121,10 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(Fake.models.get(u.path.split("/", 2)[2], []))
         if u.path.startswith("/history/"):
             pid = u.path.rsplit("/", 1)[1]
+            if pid in Fake.fail:
+                return self._send({pid: {"status": {"status_str": "error", "completed": False, "messages": [
+                    ["execution_error", {"node_type": "KSamplerAdvanced",
+                                         "exception_message": "cutlass_fp16_linear: K mismatch"}]]}, "outputs": {}}})
             g = Fake.prompts[int(pid)]
             outs = {}
             for nid, n in g.items():
@@ -166,6 +174,8 @@ class H(http.server.BaseHTTPRequestHandler):
             return self._send(Fake.images[fn], "image/png")
         if u.path == "/object_info":
             return self._send({})
+        if u.path == "/queue":
+            return self._send({"queue_running": [], "queue_pending": []})
         return self._send({"error": "no"}, code=404)
 
     def do_POST(self):
@@ -173,11 +183,17 @@ class H(http.server.BaseHTTPRequestHandler):
         body = self.rfile.read(n)
         if self.path == "/prompt":
             g = json.loads(body)["prompt"]
+            Fake.extra.append(json.loads(body).get("extra_data"))
             errs = validate(g)
             if errs:
                 return self._send({"error": errs}, code=400)
             Fake.prompts.append(g)
             return self._send({"prompt_id": str(len(Fake.prompts) - 1)})
+        if self.path == "/queue":
+            Fake.deleted += json.loads(body).get("delete", [])
+            return self._send({})
+        if self.path == "/interrupt":
+            return self._send({})
         if self.path == "/upload/image":
             name = re.search(rb'filename="([^"]+)"', body).group(1).decode()
             Fake.uploads[name] = body
@@ -284,6 +300,8 @@ def main():
         check("detect: rank puts an 'Edit-2' release above 2511",
               S._qwen_rank("Qwen-Image-Edit-2_fp8.safetensors") > S._qwen_rank("qwen_image_edit_2511_fp8.safetensors"))
         check("detect: 2511 is not mistaken for 'Edit-2'", S._qwen_rank("qwen_image_edit_2511.safetensors")[0] == 3)
+        check("detect: the Edit VAE, not the 2.1 VAE that sorts first", q["vae"] == "qwen_image_vae.safetensors",
+              q["vae"])
         check("detect: --lightning none wins", S.detect_qwen({"lightning": "none"})[0]["lightning"] is None)
 
         print("graphs")
@@ -311,6 +329,20 @@ def main():
             ks = [n for n in wf["nodes"] if n["type"] == "KSampler"]
             check(f"{label}: KSampler widgets = seed, control, steps, cfg, sampler, scheduler, denoise",
                   all(len(n["widgets_values"]) == 7 and n["widgets_values"][1] == "fixed" for n in ks))
+        g = S.video_graph("c.png", "e", 3, q, S.WAN)
+        adv = [n for n in g.nodes.values() if n["class_type"] == "KSamplerAdvanced"]
+
+        def upstream(nid, cls):  # follow the model input back to the loader
+            while True:
+                n = g.nodes[nid]
+                if n["class_type"] == cls:
+                    return n
+                if "model" not in n["inputs"]:
+                    return None
+                nid = n["inputs"]["model"][0]
+        check("video: both Wan experts compute in bf16 (the frog's graph; fp16 dies on 0.37)",
+              all((upstream(k["inputs"]["model"][0], "ModelComputeDtype") or {}).get("inputs", {}).get("dtype") == "bf16"
+                  for k in adv) and len(adv) == 2)
         g = S.qwen_graph("c.png", dirs, poses, 7, {**q, "lightning": None})
         ks = [n["inputs"] for n in g.nodes.values() if n["class_type"] == "KSampler"]
         check("no lightning -> 20 steps, CFG 2.5", all(k["steps"] == 20 and k["cfg"] == 2.5 for k in ks))
@@ -339,6 +371,27 @@ def main():
         check("object_info: LoadImage gets its upload widget", sp["LoadImage"][1] == ["image", "upload"])
         check("object_info: link inputs keep their order",
               [n for n, _ in sp["KSampler"][0]] == ["model", "positive", "negative", "latent_image"])
+        # ComfyUI 0.37: optional widgets the API graph leaves unset, a dynamic combo, an empty combo
+        info = {"ModelSamplingAuraFlow": {"input": {"required": {"model": ["MODEL"], "shift": ["FLOAT"]}, "optional": {
+            "sampling": [["flow", "img_to_img_velocity"], {"default": "flow", "advanced": True}]}},
+            "output": ["MODEL"], "output_name": ["MODEL"]},
+            "SaveVideo": {"input": {"required": {"video": ["VIDEO"], "filename_prefix": ["STRING"],
+                                                 "format": ["COMFY_DYNAMICCOMBO_V3", {"options": [
+                                                     {"key": "auto", "inputs": {}}, {"key": "mp4", "inputs": {}}]}]},
+                                    "optional": {"codec": ["COMBO", {"options": ["auto", "h264"]}]}},
+                          "output": [], "output_name": []},
+            "Pick": {"input": {"required": {"name": [[]]}}, "output": [], "output_name": []}}
+        sp = comfy_ui.specs_from_object_info(info)
+        wf = comfy_ui.to_workflow({"1": {"class_type": "ModelSamplingAuraFlow", "inputs": {"shift": 3.1}},
+                                   "2": {"class_type": "SaveVideo", "inputs": {"filename_prefix": "x", "format": "mp4",
+                                                                               "codec": "h264"}}}, specs=sp)
+        by = {n["type"]: n for n in wf["nodes"]}
+        check("object_info: an unset optional widget gets its default, not null",
+              by["ModelSamplingAuraFlow"]["widgets_values"] == [3.1, "flow"], by["ModelSamplingAuraFlow"]["widgets_values"])
+        check("object_info: a dynamic combo is a widget, not a link socket",
+              by["SaveVideo"]["widgets_values"] == ["x", "mp4", "h264"]
+              and [i["name"] for i in by["SaveVideo"]["inputs"]] == ["video"], by["SaveVideo"])
+        check("object_info: an empty combo does not crash the spec read", sp["Pick"][1] == ["name"])
 
         print("end to end: qwen, 5 dirs x idle+step")
         out = os.path.join(tmp, "run")
@@ -417,7 +470,13 @@ def main():
         lp = S.find_loop(clip)
         check("loop: finds the full 40-frame stride, not the half", lp["period"] == 40, lp)
         check("loop: seam smoother than an ordinary step", lp["seam"] < 1.0, lp)
-        check("loop: a clip too short says so", raises(lambda: S.find_loop(clip[:30])))
+        check("loop: a clip too short says so", raises(lambda: S.find_loop(clip[:20])))
+        # a short-legged walker: 20-frame stride, so 40 and 60 match as well; cut one stride, not three
+        quick = [wren(stride=int(60 * min(1, i / 6) * np.sin(2 * np.pi * i / 20)), size=240) for i in range(81)]
+        lq = S.find_loop(quick)
+        check("loop: the shortest full stride (20), not two or three of them", lq["period"] == 20, lq)
+        check("loop: per-direction --period ranges", S.period_ranges("12:64,n=14:18", ["s", "n"])
+              == {"s": (12, 64), "n": (14, 18)})
         sp = Image.new("RGBA", (5, 5), (36, 86, 92, 255))
         sp.putpixel((2, 2), (250, 250, 250, 255))
         check("despeckle: an isolated white pixel takes its neighbours' colour",
@@ -455,13 +514,47 @@ def main():
         stepw = np.ptp(np.where((np.asarray(Image.open(f"{v}/frames/wren-e-step.png"))[..., 3] > 0).any(0))[0])
         check("video: step = the widest stride of the cycle", stepw == max(widths), (stepw, widths))
         check("video: satchel on the right, facing right", satchel_side(Image.open(f"{v}/frames/wren-e-idle.png")) == "R")
+        ex = Fake.extra[n0]
+        check("video: the editor workflow rides along as extra_pnginfo (drag-in rebuilds the graph)",
+              bool(ex) and "nodes" in ex["extra_pnginfo"]["workflow"])
+        check("video: ComfyUI's own keyframe file kept, bytes untouched",
+              os.path.exists(f"{v}/raw/e-keyframe-comfy.png"))
+        fi = Image.open(f"{v}/frames/wren-e-walk-3.png").info
+        check("video: a shipped frame carries its direction's flow (tEXt prompt + workflow)",
+              "nodes" in json.loads(fi.get("workflow", "{}")) and json.loads(fi["prompt"]) ==
+              json.load(open(f"{v}/flow-e_api.json")))
         check("video: editor + API flow per direction written",
               os.path.exists(f"{v}/flow-e.json") and os.path.exists(f"{v}/flow-s_api.json"))
+        n2 = len(Fake.prompts)
+        Fake.fail = {str(n2)}  # the first direction dies on the GPU
+        died = raises(lambda: S.main([src, "--out", os.path.join(tmp, "vfail"), "--method", "video", "--dirs", "s,se,e"]))
+        Fake.fail = set()
+        check("video: a GPU error stops the run and drops its other queued directions",
+              died and set(Fake.deleted) >= {str(n2 + 1), str(n2 + 2)}, Fake.deleted)
         n1 = len(Fake.prompts)
+        cut_e1 = Image.open(f"{v}/raw/e-walk-1.png").tobytes()
         S.main(["repack", v, "--period", "20:30", "--to", os.path.join(tmp, "vr")])
         vr = json.load(open(os.path.join(tmp, "vr/sheet.json")))
         check("repack --period re-cuts the saved clip without the GPU",
               vr["loops"]["e"]["period"] in range(20, 31) and len(Fake.prompts) == n1, vr["loops"]["e"])
+        check("repack --to leaves the source run's cut raws alone",
+              json.load(open(f"{v}/sheet.json"))["loops"]["e"]["period"] == 40
+              and Image.open(f"{v}/raw/e-walk-1.png").tobytes() == cut_e1)
+        S.main(["repack", os.path.join(tmp, "vr"), "--size", "48", "--to", os.path.join(tmp, "vr48")])
+        check("a repack --to frame still carries its flow",
+              "nodes" in json.loads(Image.open(os.path.join(tmp, "vr/frames/wren-e-idle.png")).info.get("workflow", "{}")))
+        check("a repack --to output is itself repackable",
+              Image.open(os.path.join(tmp, "vr48/sheet.png")).size == (480, 96))
+        anchor = os.path.join(tmp, "vr/frames/wren-s-idle.png")
+        S.main(["repack", os.path.join(tmp, "vr"), "--palette-from", anchor, "--to", os.path.join(tmp, "vpal")])
+        allowed = set(S.anchor_palette(anchor))
+        va = np.asarray(Image.open(os.path.join(tmp, "vpal/sheet.png")))
+        check("--palette-from: every frame uses only the s-idle's own colours",
+              {tuple(int(x) for x in c) for c in va[va[..., 3] > 0][:, :3]} <= allowed)
+        S.main(["repack", os.path.join(tmp, "vpal"), "--size", "48", "--to", os.path.join(tmp, "vpal48")])
+        va = np.asarray(Image.open(os.path.join(tmp, "vpal48/sheet.png")))
+        check("--palette-from sticks to the run: a later repack keeps it",
+              {tuple(int(x) for x in c) for c in va[va[..., 3] > 0][:, :3]} <= allowed)
         check("repack keeps the run's 96 px and palette", Image.open(os.path.join(tmp, "vr/sheet.png")).size == (960, 192))
 
         print("--flow: a flow tweaked in the editor and exported as API")

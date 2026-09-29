@@ -87,8 +87,8 @@
   },
   "tol": {
    "height": 2,
-   "width": 7,
-   "head_h": 6,
+   "width": 3,
+   "head_h": 2,
    "mass_frac": 0.22,
    "cx": 2.5,
    "foot_y": 1
@@ -97,12 +97,12 @@
  "mycologist": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
+   "height": 45,
    "width": 23,
-   "head_h": 35,
-   "mass": 541,
-   "cx": -2.24,
-   "foot_y": 45
+   "head_h": 36,
+   "mass": 707,
+   "cx": 0.86,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

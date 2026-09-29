@@ -45,6 +45,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sys
 import time
 import urllib.error
@@ -153,9 +154,15 @@ def upload(img: Image.Image, name: str) -> str:
     return json.loads(http("/upload/image", body, f"multipart/form-data; boundary={b}"))["name"]
 
 
-def queue(graph: dict) -> str:
+def queue(graph: dict, workflow: dict | None = None) -> str:
+    """Queue an API graph. `workflow` (the editor format) rides along as extra_pnginfo, so every
+    SaveImage/SaveVideo output embeds it and dragging the file into ComfyUI rebuilds the graph;
+    without it an output carries only the API `prompt`, which the editor can't lay out."""
+    body = {"prompt": graph}
+    if workflow is not None:
+        body["extra_data"] = {"extra_pnginfo": {"workflow": workflow}}
     try:
-        return http_json("/prompt", data=json.dumps({"prompt": graph}).encode())["prompt_id"]
+        return http_json("/prompt", data=json.dumps(body).encode())["prompt_id"]
     except urllib.error.HTTPError as e:  # 400 = validation: say WHICH node and input
         raise SystemExit(f"ComfyUI rejected the graph:\n{e.read().decode()[:3000]}")
 
@@ -183,10 +190,44 @@ def wait(pid: str, limit_s: int = 3600, poll: float = 2.0) -> dict:
     raise TimeoutError(pid)
 
 
-def fetch(im: dict) -> Image.Image:
+def cancel(pids) -> None:
+    """Drop our still-queued prompts (and stop ours if it is the one running), so a
+    run that has died does not leave the GPU busy on work nobody will collect."""
+    pids = list(pids)
+    try:
+        q = http_json("/queue", timeout=10)
+        running = {it[1] for it in q.get("queue_running", [])}
+        http("/queue", json.dumps({"delete": pids}).encode())
+        for pid in running & set(pids):
+            http("/interrupt", json.dumps({"prompt_id": pid}).encode())
+    except Exception as e:  # best effort: we are already on the way out with the real error
+        print(f"  ! could not cancel queued prompts {[p[:8] for p in pids]}: {e}")
+
+
+def fetch_bytes(im: dict) -> bytes:
     q = urllib.parse.urlencode({"filename": im["filename"], "subfolder": im.get("subfolder", ""),
                                 "type": im.get("type", "output")})
-    return Image.open(io.BytesIO(http(f"/view?{q}", timeout=120))).convert("RGB")
+    return http(f"/view?{q}", timeout=120)
+
+
+def fetch(im: dict) -> Image.Image:
+    return Image.open(io.BytesIO(fetch_bytes(im))).convert("RGB")
+
+
+def flow_info(run: str, d: str | None = None):
+    """PNG tEXt `prompt` + `workflow` for a frame of direction `d`, from the run's saved flow
+    (flow-<d>.json per direction on the video route, flow.json otherwise). Post-processed frames
+    lose ComfyUI's own chunks; these put the graph back, so a sprite dragged into ComfyUI
+    opens the flow that drew it."""
+    from PIL import PngImagePlugin
+    for stem in ([f"flow-{d}"] if d else []) + ["flow"]:
+        api, wf = f"{run}/{stem}_api.json", f"{run}/{stem}.json"
+        if os.path.exists(api) and os.path.exists(wf):
+            info = PngImagePlugin.PngInfo()
+            info.add_text("prompt", json.dumps(json.load(open(api)), separators=(",", ":")))
+            info.add_text("workflow", json.dumps(json.load(open(wf)), separators=(",", ":")))
+            return info
+    return None
 
 
 def listing(folder: str) -> list[str] | None:
@@ -236,8 +277,10 @@ def detect_qwen(overrides: dict) -> tuple[dict, list[str]]:
     if vl:
         cfg["clip"] = sorted(vl, key=lambda e: ("fp8" not in e, e))[0]
     vaes = listing("vae") or []
+    # The Edit models use the original Qwen-Image VAE. A server can also hold a newer one
+    # (`qwen_image_2.1_vae_bf16`, which sorts first), so keep the default when it's installed.
     qv = [v for v in vaes if "qwen" in v.lower()]
-    if qv:
+    if qv and cfg["vae"] not in vaes:
         cfg["vae"] = qv[0]
     for k, v in overrides.items():
         if v is not None:
@@ -556,6 +599,9 @@ def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="spr
             u = g.add("UnetLoaderGGUF", {"unet_name": w[part]}, f"Wan 2.2 I2V {part} noise", col=0)
         else:
             u = g.add("UNETLoader", {"unet_name": w[part], "weight_dtype": "default"}, f"Wan 2.2 I2V {part} noise", col=0)
+        # bf16 compute, as the frog's graph ran. Without it ComfyUI 0.37 takes the fp16 cutlass
+        # path for the GGUF experts + LoRA and the first sampler dies: "cutlass_fp16_linear: K mismatch".
+        u = g.add("ModelComputeDtype", {"model": [u, 0], "dtype": "bf16"}, col=0)
         u = g.add("LoraLoaderModelOnly", {"model": [u, 0], "lora_name": w["lora_" + part], "strength_model": 1.0},
                   f"lightx2v 4-step {part}", col=0)
         experts.append(g.add("ModelSamplingSD3", {"model": [u, 0], "shift": w["shift"]}, col=0))
@@ -676,6 +722,20 @@ def input_palette(im: Image.Image, colors: int) -> list[tuple]:
     return sorted({tuple(pal[i:i + 3]) for i in range(0, len(pal), 3)})
 
 
+def anchor_palette(path: str, min_share: float = 0.005) -> list[tuple]:
+    """--palette-from: the colours making up at least `min_share` of a finished sprite's opaque
+    pixels. Re-posting every direction onto its s-idle's own colours keeps a surface from
+    changing colour when the character turns (the mycologist's visor: green in s and se, cyan
+    in e, because each direction's clip is its own render)."""
+    a = np.asarray(Image.open(path).convert("RGBA"))
+    px = a[a[..., 3] > 128][:, :3]
+    cols, counts = np.unique(px, axis=0, return_counts=True)
+    keep = [tuple(int(v) for v in c) for c, n in zip(cols, counts) if n >= min_share * len(px)]
+    if not keep:
+        raise SystemExit(f"{path}: no opaque pixels to take a palette from")
+    return keep
+
+
 def snap(im: Image.Image, pal) -> Image.Image:
     a = np.asarray(im.convert("RGBA")).astype(np.float32).copy()
     if pal is not None:
@@ -723,9 +783,9 @@ def assemble(frames: dict, dirs, poses, canvas: int, outdir: str, kind: str, met
             f = frames[(d, p)]
             sheet.paste(f, (c * canvas, r * canvas))
             name = f"{kind}-{d}-{p}"
-            f.save(f"{outdir}/frames/{name}.png")
+            f.save(f"{outdir}/frames/{name}.png", pnginfo=flow_info(outdir, d))
             rects[name] = {"x": c * canvas, "y": r * canvas, "w": canvas, "h": canvas, "dir": d, "pose": p}
-    sheet.save(f"{outdir}/sheet.png")
+    sheet.save(f"{outdir}/sheet.png", pnginfo=flow_info(outdir, dirs[0]))
     big = sheet.resize((sheet.width * 4, sheet.height * 4), Image.NEAREST)
     bg = Image.new("RGBA", big.size, (38, 44, 40, 255))
     bg.alpha_composite(big)
@@ -761,31 +821,60 @@ def preview(raws, frames, dirs, poses, canvas, cell=192):
 
 
 # ---- post for the video route ----------------------------------------------------
-def find_loop(frames: list, pmin: int = 32, pmax: int = 64, skip: int = 6, window: int = 4) -> dict:
-    """The best full-stride loop in a walk clip: the period P and start s minimising the
-    difference between frames s..s+window and s+P..s+P+window. A WINDOW, not one frame:
+def find_loop(frames: list, pmin: int = 12, pmax: int = 64, skip: int = 6, window: int = 4,
+              tol: float = 1.5, half: float = 0.6) -> dict:
+    """The shortest FULL-stride loop in a walk clip. For each period P, the start s minimising
+    the difference between frames s..s+window and s+P..s+P+window. A WINDOW, not one frame:
     a single pose recurs twice per stride (the leg passing forward, then back), so a
-    one-frame match finds loops that jump the motion backwards at the seam. `pmin` keeps
-    it a FULL stride: a front-view half stride (legs swapped) looks almost like a whole
-    one, and the frog's real periods were 38-54 frames at 16 fps. `seam` is the loop
-    point's difference relative to an ordinary frame-to-frame step: under 1.0, the loop
-    point is smoother than a normal step."""
+    one-frame match finds loops that jump the motion backwards at the seam.
+
+    Every whole number of strides matches, so the best-scoring period is often two or three
+    strides (the mycologist: e stride 20 frames, best score at 40; s best at 57). Cut into 8
+    cells, that plays two or three strides per loop, at double or triple leg speed. So the
+    answer is the SHORTEST period scoring within `tol` of the best, unless it is a half
+    stride (legs swapped): a period whose double scores under `half` of its own score is a
+    half, and is skipped. `seam` is the loop point's difference relative to an ordinary
+    frame-to-frame step: under 1.0, the loop point is smoother than a normal step."""
     small = [np.asarray(f.convert("L").resize((212, 120), Image.BILINEAR), np.float32) for f in frames]
     n = len(small)
     steps = [float(np.abs(small[t + 1] - small[t]).mean()) for t in range(skip, n - 1)]
-    step = float(np.median(steps)) if steps else 1.0
-    best = None
+    step = max(float(np.median(steps)) if steps else 1.0, 1e-6)
+    per = {}  # period -> (match / step, start)
     for p in range(pmin, min(pmax, n - skip - window) + 1):
         for s in range(skip, n - p - window + 1):
-            e = float(np.mean([np.abs(small[s + k] - small[s + p + k]).mean() for k in range(window)]))
-            if best is None or e < best[0]:
-                best = (e, p, s)
-    if best is None:
+            e = float(np.mean([np.abs(small[s + k] - small[s + p + k]).mean() for k in range(window)])) / step
+            if p not in per or e < per[p][0]:
+                per[p] = (e, s)
+    if not per:
         raise SystemExit(f"clip of {n} frames is too short for a loop of {pmin}-{pmax} (lower --period)")
-    e, p, s = best
+    best = min(e for e, _ in per.values())
+    limit = tol * best + 0.02
+
+    def is_half(p):
+        doubles = [per[q][0] for q in range(2 * p - 2, 2 * p + 3) if q in per]
+        return bool(doubles) and min(doubles) < half * per[p][0]
+
+    ps = sorted(per)
+    minima = [p for i, p in enumerate(ps)
+              if per[p][0] <= limit and all(per[p][0] <= per[q][0] for q in ps[max(0, i - 2):i + 3])]
+    p = next((q for q in minima if not is_half(q)), min(per, key=lambda q: per[q][0]))
+    e, s = per[p]
     seam = float(np.abs(small[s] - small[s + p]).mean())
-    return {"period": p, "start": s, "seam": round(seam / max(step, 1e-6), 3), "step": round(step, 3),
-            "match": round(e, 3)}
+    return {"period": p, "start": s, "seam": round(seam / step, 3), "step": round(step, 3),
+            "match": round(e, 3), "candidates": {q: round(per[q][0], 2) for q in minima}}
+
+
+def period_ranges(spec: str, dirs) -> dict:
+    """--period '12:64' for every direction, or '12:64,n=14:18,e=16:24' per direction."""
+    out, default = {}, (12, 64)
+    for part in spec.split(","):
+        key, _, rng = part.rpartition("=")
+        lo, hi = (int(x) for x in rng.split(":"))
+        if key:
+            out[key] = (lo, hi)
+        else:
+            default = (lo, hi)
+    return {d: out.get(d, default) for d in dirs}
 
 
 def cut_loop(frames: list, loop: dict, n: int = 8) -> list:
@@ -858,9 +947,11 @@ def widest(frames: list) -> int:
 TITLE_RE = re.compile(r"^frame\s+(\w+)\s+(\S+)$")
 
 
-def harvest(api: dict, outputs: dict, walks: dict | None = None) -> tuple[dict, dict]:
+def harvest(api: dict, outputs: dict, walks: dict | None = None,
+            files: dict | None = None) -> tuple[dict, dict]:
     """SaveImage outputs -> ({(dir, pose): image}, {grid title: image}); `walk <dir>` saves
-    (a whole clip) land in `walks[dir]` as a frame list."""
+    (a whole clip) land in `walks[dir]` as a frame list. `files` gets the untouched bytes of
+    each keyframe and walk video, ComfyUI's embedded prompt + workflow intact."""
     frames, grids = {}, {}
     for nid, ims in outputs.items():
         if not ims or nid not in api:
@@ -872,7 +963,12 @@ def harvest(api: dict, outputs: dict, walks: dict | None = None) -> tuple[dict, 
         elif title.startswith("grid "):
             grids[title] = fetch(ims[0])
         elif title.startswith("keyframe "):
-            frames[(title.split()[1], "keyframe")] = fetch(ims[0])
+            blob = fetch_bytes(ims[0])
+            frames[(title.split()[1], "keyframe")] = Image.open(io.BytesIO(blob)).convert("RGB")
+            if files is not None:
+                files[f"{title.split()[1]}-keyframe-comfy.png"] = blob
+        elif re.match(r"^walk \w+ \(mp4\)$", title) and files is not None:
+            files[f"{title.split()[1]}-walk-comfy.mp4"] = fetch_bytes(ims[0])
         elif re.match(r"^walk \w+$", title) and walks is not None:
             walks[title.split()[1]] = [fetch(im) for im in sorted(ims, key=lambda i: i["filename"])]
     return frames, grids
@@ -922,6 +1018,8 @@ def cmd_make(a):
     src.save(f"{root}/input-{IN_SIZE}.png")
     pal = None if a.palette == "none" else (list(SWAMP_RGB) if a.palette == "swampspace"
                                             else input_palette(src, a.colors))
+    if a.palette_from:
+        pal = anchor_palette(a.palette_from)
     if a.method == "grid":
         poses = ["idle"]
     if a.method == "video":
@@ -963,7 +1061,7 @@ def cmd_make(a):
         label = f"seed {seed}" if seed is not None else "flow"
         print(f"{label}: queued {n_samp} sampler(s) on {HOST} ({q.get('unet') if a.method != 'sdxl' else 'sdxl'})")
         t0 = time.time()
-        frames, grids = harvest(api, wait(queue(api)))
+        frames, grids = harvest(api, wait(queue(api, wf)))
         print(f"{label}: done in {time.time() - t0:.0f}s" + " " * 20)
         if grids:
             gi = next(iter(grids.values()))
@@ -1009,7 +1107,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
         w, notes = dict(WAN), []
     for n in notes:
         print(" ·", n)
-    pmin, pmax = (int(x) for x in a.period.split(":"))
+    ranges = period_ranges(a.period, dirs)
     input_name = upload(src, f"spritesheet-{kind}.png") if online else f"spritesheet-{kind}.png"
     runs = []
     for seed in a.seeds or [3]:  # the frog's seed
@@ -1023,19 +1121,27 @@ def cmd_video(a, dirs, kind, root, src, pal):
         if a.dry_run:
             print(f"dry run: {out}/flow-<dir>_api.json for {', '.join(dirs)}")
             continue
-        pids = {d: queue(g.nodes) for d, g in graphs.items()}  # ComfyUI runs them in order
+        pids = {d: queue(g.nodes, g.workflow()) for d, g in graphs.items()}  # ComfyUI runs them in order
         print(f"seed {seed}: queued {len(pids)} direction(s) — a keyframe and an {w['length']}-frame walk each; "
               f"minutes per direction")
         raws, loops, t0 = {}, {}, time.time()
-        for d in dirs:
-            walks = {}
-            frames, _ = harvest(graphs[d].nodes, wait(pids[d], limit_s=7200, poll=5), walks)
+        for i, d in enumerate(dirs):
+            walks, files = {}, {}
+            try:
+                outputs = wait(pids[d], limit_s=7200, poll=5)
+            except (SystemExit, TimeoutError, KeyboardInterrupt):
+                cancel(pids[x] for x in dirs[i:])
+                raise
+            frames, _ = harvest(graphs[d].nodes, outputs, walks, files)
+            for name, blob in files.items():  # ComfyUI's own files, metadata and all
+                open(f"{out}/raw/{name}", "wb").write(blob)
             clip = walks.get(d) or []
             if d in a.mirror:
                 clip = [ImageOps.mirror(f) for f in clip]
                 frames = {k: ImageOps.mirror(v) for k, v in frames.items()}
             if (d, "keyframe") in frames:
                 frames[(d, "keyframe")].save(f"{out}/raw/{d}-keyframe.png")
+            pmin, pmax = ranges[d]
             if len(clip) < pmin + 8:
                 print(f"  ! {d}: {len(clip)} frames, too few for a {pmin}+ frame loop; row stays empty")
                 continue
@@ -1054,7 +1160,8 @@ def cmd_video(a, dirs, kind, root, src, pal):
             for i, f in enumerate(cyc):
                 f.save(f"{out}/raw/{d}-walk-{i}.png")
             print(f"  {d}: loop of {loop['period']} frames from {loop['start']}, seam {loop['seam']} "
-                  f"(under 1.0 = smoother than a normal step)  [{time.time() - t0:.0f}s]")
+                  f"(under 1.0 = smoother than a normal step; candidates {loop['candidates']})  "
+                  f"[{time.time() - t0:.0f}s]")
         dirs_run = [d for d in dirs if d in loops]
         if not dirs_run:
             continue
@@ -1084,31 +1191,55 @@ def cmd_repack(a):
     dirs, poses = meta["dirs"], meta["poses"]
     a.size = a.size or meta.get("canvas", 48)
     a.palette = a.palette or meta.get("palette", "input")
+    out = os.path.abspath(a.to or a.run)
+    raw = f"{out}/raw"
+    if out != os.path.abspath(a.run):
+        # --to never touches the source run, and its output is itself a run `repack` can take:
+        # the cut raws are copied, the 81-frame clips linked
+        os.makedirs(raw, exist_ok=True)
+        for f in glob.glob(f"{a.run}/raw/*"):
+            dst = os.path.join(raw, os.path.basename(f))
+            if os.path.isdir(f):
+                if not os.path.lexists(dst):
+                    os.symlink(os.path.abspath(f), dst)
+            else:
+                shutil.copyfile(f, dst)
+        for f in glob.glob(f"{a.run}/flow*.json"):  # the flows ride along, so re-posted frames re-embed them
+            shutil.copyfile(f, os.path.join(out, os.path.basename(f)))
+        for f in ("input-%d.png" % IN_SIZE,):
+            src_in = os.path.join(os.path.dirname(os.path.abspath(a.run)), f)
+            if os.path.exists(src_in) and not os.path.exists(os.path.join(os.path.dirname(out), f)):
+                shutil.copyfile(src_in, os.path.join(os.path.dirname(out), f))
     if a.period and meta.get("method") == "video":  # re-find the loop in the saved clips, then re-cut
-        pmin, pmax = (int(x) for x in a.period.split(":"))
+        ranges = period_ranges(a.period, dirs)
         for d in dirs:
-            clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{a.run}/raw/walk-{d}/*.png"))]
-            loop = find_loop(clip, pmin, pmax)
+            clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{raw}/walk-{d}/*.png"))]
+            loop = find_loop(clip, *ranges[d])
             cyc = cut_loop(clip, loop)
             meta.setdefault("loops", {})[d] = loop
-            cyc[widest(cyc)].save(f"{a.run}/raw/{d}-step.png")
+            cyc[widest(cyc)].save(f"{raw}/{d}-step.png")
             for i, f in enumerate(cyc):
-                f.save(f"{a.run}/raw/{d}-walk-{i}.png")
-            print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}")
+                f.save(f"{raw}/{d}-walk-{i}.png")
+            print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}  "
+                  f"(candidates {loop['candidates']})")
     raws = {}
     for d in dirs:
         for p in poses:
-            f = f"{a.run}/raw/{d}-{p}.png"
+            f = f"{raw}/{d}-{p}.png"
             if os.path.exists(f):
                 raws[(d, p)] = Image.open(f).convert("RGB")
     kind = meta.get("kind") or next(iter(meta["frames"])).rsplit("-", 2)[0]
-    if a.palette == "input":
+    a.palette_from = a.palette_from or meta.get("palette_from")  # a later repack keeps the run's colours
+    if a.palette_from:
+        pal = anchor_palette(a.palette_from)
+        meta["palette_from"] = os.path.abspath(a.palette_from)
+    elif a.palette == "input":
         src = os.path.join(os.path.dirname(os.path.abspath(a.run)), f"input-{IN_SIZE}.png")
         pal = input_palette(Image.open(src), a.colors)
     else:
         pal = None if a.palette == "none" else list(SWAMP_RGB)
-    out = a.to or a.run
-    os.makedirs(out, exist_ok=True)
+    if not raws:
+        raise SystemExit(f"{raw}: no raw frames to repack")
     print(finish(out, raws, dirs, poses, a, kind, pal, {k: v for k, v in meta.items()
                                                        if k not in ("frames", "dirs", "poses", "canvas")}))
 
@@ -1137,7 +1268,8 @@ def cmd_doctor(_a):
     need = {"qwen": ["TextEncodeQwenImageEditPlus", "FluxKontextMultiReferenceLatentMethod", "CFGNorm",
                      "ModelSamplingAuraFlow", "EmptySD3LatentImage"],
             "sdxl": ["IPAdapterAdvanced", "IPAdapterModelLoader", "PrepImageForClipVision"],
-            "video": ["WanImageToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "UnetLoaderGGUF", "ImageScale",
+            "video": ["WanImageToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "ModelComputeDtype", "UnetLoaderGGUF",
+                      "ImageScale",
                       "CreateVideo", "SaveVideo"],
             "flow sheet preview": ["ImageStitch"]}
     for route, nodes in need.items():
@@ -1156,8 +1288,8 @@ def cmd_flows(a):
     try:
         specs = comfy_ui.fetch_specs(HOST)
         print(f"widget specs from {HOST}/object_info")
-    except Exception:
-        print("server not reachable: widget specs from comfy_ui.BUILTIN")
+    except (urllib.error.URLError, OSError) as e:  # unreachable only; a parse bug must not pass as offline
+        print(f"server not reachable ({e}): widget specs from comfy_ui.BUILTIN")
     os.makedirs(a.to, exist_ok=True)
     q = dict(QWEN)
     if specs is not None:
@@ -1202,6 +1334,9 @@ def main(argv=None):
                       help="input = the character's own colours (default); swampspace = the pack's locked 34 "
                            "(default for --method video, as the frog shipped)")
     post.add_argument("--colors", type=int, default=24, help="palette size for --palette input")
+    post.add_argument("--palette-from", help="snap to the colours of this finished sprite (e.g. the run's own "
+                                             "frames/<kind>-s-idle.png), so no surface changes colour between "
+                                             "directions")
     if sub == "doctor":
         return cmd_doctor(ap.parse_args(argv))
     if sub == "prep":
@@ -1212,7 +1347,8 @@ def main(argv=None):
         ap = argparse.ArgumentParser(prog="spritesheet.py repack", parents=[post])
         ap.add_argument("run", help="a finished run dir (holds sheet.json and raw/)")
         ap.add_argument("--to", help="write here instead of over the run")
-        ap.add_argument("--period", help="video runs: re-find the loop in this frame range, e.g. 40:64")
+        ap.add_argument("--period", help="video runs: re-find the loop in this frame range, e.g. 12:64, "
+                                             "or per direction: 12:64,n=14:18")
         return cmd_repack(ap.parse_args(argv))
     if sub == "flows":
         ap.add_argument("--to", default=FLOWS)
@@ -1224,7 +1360,9 @@ def main(argv=None):
     ap.add_argument("image", help="the character: any size, PNG with alpha or on a plain background")
     ap.add_argument("--method", choices=["qwen", "video", "grid", "sdxl"], default="qwen",
                     help="video = the frog-settler route (Qwen keyframe + Wan 2.2 walk), 96 px")
-    ap.add_argument("--period", default="32:64", help="video: loop length range in frames (a FULL stride)")
+    ap.add_argument("--period", default="12:64", help="video: loop length range in frames, all directions "
+                                                        "(12:64) or per direction (12:64,e=16:24); the "
+                                                        "shortest full stride in range wins")
     ap.add_argument("--dirs", default=",".join(PACK_DIRS), help=f"of {','.join(DIRS)}")
     ap.add_argument("--frames", default="basic",
                     help="preset (" + ", ".join(k + "=" + "+".join(v) for k, v in PRESETS.items())

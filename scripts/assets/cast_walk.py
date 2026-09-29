@@ -5,17 +5,18 @@
     python3 scripts/assets/cast_walk.py export RUN --kind mycologist   # both packs + manifests
     python3 scripts/assets/cast_walk.py sheet  RUN --kind mycologist   # beside the frog at 96 px
     python3 scripts/assets/cast_walk.py gate   RUN --kind mycologist   # every gate, one verdict
-    python3 scripts/assets/cast_walk.py strip --kind mycologist        # flows out of the shipped frames
+    python3 scripts/assets/cast_walk.py embed --kind mycologist        # flows/cast/ back into the shipped frames
 
 RUN is a finished video run dir (`.../video-s3`, holding sheet.json, frames/ and raw/).
 
 export  a 96 px repack of the run's raws -> swampspace-hires/chars (the pack the game loads); a
         48 px repack of the same raws -> swampspace/chars (the pack consistency.py and verify.py read). Content 92 / 46,
         feet on canvas-2: the frog's numbers. Every archetype whose manifest keys already point at
-        chars/<kind>-* gets the 50 keys <dir>-{idle,step,walk-0..7}. Then strip.
-strip   each direction's embedded ComfyUI flow -> flows/cast/<kind>/<dir>.json (+ <dir>_api.json, the
-        prompt), then drop every text chunk from the shipped frames; the other chunks stay byte for byte,
-        so the pixels can't change. ~25 KB a frame that would otherwise ship in the web bundle and the APK.
+        chars/<kind>-* gets the 50 keys <dir>-{idle,step,walk-0..7}. The frames keep their embedded
+        ComfyUI flow (tEXt prompt + workflow, ~25 KB a frame); a copy goes to flows/cast/<kind>/<dir>.json
+        (the editor graph) + <dir>_api.json (the prompt).
+embed   flows/cast/<kind>/ back into every shipped frame of each direction: tEXt prompt + workflow
+        right after IHDR, where export's PIL save put them; every other chunk stays byte for byte.
 sheet   rows = directions: the frog's row, then this character's, at 96 px on the game's
         background; plus an animated GIF of all five walks beside the frog's.
 gate    every ship gate, thresholds in cast-gate-spec.json: loop seam; colour drift vs the
@@ -34,6 +35,7 @@ import os
 import shutil
 import subprocess
 import sys
+import zlib
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -41,7 +43,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 THEMES = os.path.join(REPO, "public", "themes")
-FLOWS = os.path.join(HERE, "flows", "cast")  # outside public/: kept in the repo, never shipped
+FLOWS = os.path.join(HERE, "flows", "cast")  # a copy of every shipped frame's flow
 PACKS = {"swampspace-hires": (96, 92), "swampspace": (48, 46)}
 DIRS = ["s", "se", "e", "ne", "n"]
 POSES = ["idle", "step"] + [f"walk-{i}" for i in range(8)]
@@ -104,27 +106,36 @@ def cmd_export(a):
             json.dump(m, fh, indent=indent, ensure_ascii=False)
             fh.write("\n")
         print(f"{pack}: {len(DIRS) * len(POSES)} frames, keys for {', '.join(archs)}")
-    strip_flows(a.kind)
+    save_flows(a.kind)
 
 
-def _without_text(png):
-    """The PNG minus its tEXt/iTXt/zTXt chunks; every other chunk is kept byte for byte."""
-    out, i = [png[:8]], 8
+def _frames(kind, d):
+    return [os.path.join(THEMES, pack, "chars", f"{kind}-{d}-{p}.png") for pack in PACKS for p in POSES]
+
+
+def _tEXt(key, text):
+    data = key + b"\0" + text
+    return len(data).to_bytes(4, "big") + b"tEXt" + data + zlib.crc32(b"tEXt" + data).to_bytes(4, "big")
+
+
+def _with_flow(png, prompt, workflow):
+    """The PNG with tEXt prompt + workflow right after IHDR and no other text chunk; every other chunk
+    is kept byte for byte."""
+    chunks, i = [], 8
     while i < len(png):
         end = i + 12 + int.from_bytes(png[i:i + 4], "big")
         if png[i + 4:i + 8] not in (b"tEXt", b"iTXt", b"zTXt"):
-            out.append(png[i:end])
+            chunks.append(png[i:end])
         i = end
-    return b"".join(out)
+    return png[:8] + chunks[0] + _tEXt(b"prompt", prompt) + _tEXt(b"workflow", workflow) + b"".join(chunks[1:])
 
 
-def strip_flows(kind):
-    """Move the flow the shipped frames of each direction embed to flows/cast/<kind>/, then strip the frames.
-    The flow is written before any frame loses it; a direction whose frames are already bare keeps its files."""
+def save_flows(kind):
+    """Copy the flow the shipped frames of each direction embed to flows/cast/<kind>/.
+    A direction whose frames carry no flow keeps the files it has."""
     os.makedirs(os.path.join(FLOWS, kind), exist_ok=True)
     for d in DIRS:
-        files = [os.path.join(THEMES, pack, "chars", f"{kind}-{d}-{p}.png") for pack in PACKS for p in POSES]
-        flows = {tuple(sorted(Image.open(f).text.items())) for f in files} - {()}
+        flows = {tuple(sorted(Image.open(f).text.items())) for f in _frames(kind, d)} - {()}
         if len(flows) > 1:
             raise SystemExit(f"{kind} {d}: the frames carry {len(flows)} different flows, want one per direction")
         if flows:
@@ -134,18 +145,20 @@ def strip_flows(kind):
             for name, key in ((f"{d}.json", "workflow"), (f"{d}_api.json", "prompt")):
                 with open(os.path.join(FLOWS, kind, name), "w", encoding="latin-1") as fh:
                     fh.write(text[key])
-        for f in files:
-            png = open(f, "rb").read()
-            bare = _without_text(png)
-            if bare != png:
-                with open(f, "wb") as fh:
-                    fh.write(bare)
-    print(f"{kind}: flows in {os.path.relpath(os.path.join(FLOWS, kind), REPO)}, frames stripped")
+    print(f"{kind}: flows copied to {os.path.relpath(os.path.join(FLOWS, kind), REPO)}")
 
 
-def cmd_strip(a):
+def cmd_embed(a):
     for kind in a.kind:
-        strip_flows(kind)
+        for d in DIRS:
+            prompt, workflow = (open(os.path.join(FLOWS, kind, f"{d}{s}.json"), "rb").read() for s in ("_api", ""))
+            for f in _frames(kind, d):
+                png = open(f, "rb").read()
+                out = _with_flow(png, prompt, workflow)
+                if out != png:
+                    with open(f, "wb") as fh:
+                        fh.write(out)
+        print(f"{kind}: flows embedded in its {len(DIRS) * len(PACKS) * len(POSES)} frames")
 
 
 def cmd_assemble(a):
@@ -430,9 +443,9 @@ def main():
             p.add_argument("--arch", nargs="+", help="archetypes to key (default: those already using the kind)")
         if name == "sheet":
             p.add_argument("--ref", default="frog-settler")
-    sub.add_parser("strip").add_argument("--kind", nargs="+", required=True)
+    sub.add_parser("embed").add_argument("--kind", nargs="+", required=True)
     a = ap.parse_args()
-    {"assemble": cmd_assemble, "export": cmd_export, "sheet": cmd_sheet, "gate": cmd_gate, "strip": cmd_strip}[a.cmd](a)
+    {"assemble": cmd_assemble, "export": cmd_export, "sheet": cmd_sheet, "gate": cmd_gate, "embed": cmd_embed}[a.cmd](a)
 
 
 if __name__ == "__main__":

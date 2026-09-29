@@ -48,11 +48,9 @@ jobs:
       # A stale theme manifest ships silently-broken art (an underfilled macro
       # pool drops the engine to per-tile hashing; a deleted-file ref 404s), so
       # gate the deploy on the manifest-vs-disk sync test. Regenerate pools
-      # after tile work with scripts/assets/sync_manifest.py. A PNG carrying its
-      # ComfyUI flow ships ~25 KB of text a frame; strip it with
-      # scripts/assets/cast_walk.py strip.
-      - name: Check theme manifests and PNG text against assets on disk
-        run: pnpm exec vitest run src/render/themeManifestSync.test.ts src/render/themePngText.test.ts
+      # after tile work with scripts/assets/sync_manifest.py.
+      - name: Check theme manifests against assets on disk
+        run: pnpm exec vitest run src/render/themeManifestSync.test.ts
 
       - name: Build web bundle
         run: pnpm run build
@@ -119,6 +117,12 @@ jobs:
           ls -la dist/download || true
         env:
           GH_TOKEN: ${{ github.token }}
+
+      # Workers reject any single asset over 25 MiB, and one such file fails
+      # the whole deploy. Runs after the OTA zip and the APK drop above, so it
+      # sees exactly what wrangler uploads.
+      - name: Check no file to upload is over 24 MiB
+        run: node scripts/check-dist-sizes.mjs dist
 
       - name: Deploy Worker (static assets + relay Durable Object)
         id: deploy

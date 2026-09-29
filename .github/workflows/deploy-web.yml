@@ -48,9 +48,11 @@ jobs:
       # A stale theme manifest ships silently-broken art (an underfilled macro
       # pool drops the engine to per-tile hashing; a deleted-file ref 404s), so
       # gate the deploy on the manifest-vs-disk sync test. Regenerate pools
-      # after tile work with scripts/assets/sync_manifest.py.
-      - name: Check theme manifests against assets on disk
-        run: pnpm exec vitest run src/render/themeManifestSync.test.ts
+      # after tile work with scripts/assets/sync_manifest.py. A PNG carrying its
+      # ComfyUI flow ships ~25 KB of text a frame; strip it with
+      # scripts/assets/cast_walk.py strip.
+      - name: Check theme manifests and PNG text against assets on disk
+        run: pnpm exec vitest run src/render/themeManifestSync.test.ts src/render/themePngText.test.ts
 
       - name: Build web bundle
         run: pnpm run build
@@ -104,6 +106,16 @@ jobs:
             || gh release download latest --repo "$GITHUB_REPOSITORY" --pattern 'sporefall.apk' \
                  --dir dist/download --clobber \
             || echo "no published APK yet — skipping (site still deploys)"
+          # Workers reject any asset over 25 MiB, which fails the whole deploy.
+          # The `latest` APK is usually the previous push's (android-apk.yml
+          # finishes after this job), so an APK size fix lands a deploy late.
+          # Drop an oversize APK (the download 404s)
+          # rather than block the site; it moves to external hosting later.
+          APK=dist/download/sporefall.apk
+          if [ -f "$APK" ] && [ "$(stat -c %s "$APK")" -gt $((24 * 1024 * 1024)) ]; then
+            echo "::warning::sporefall.apk is $(stat -c %s "$APK") B, over the 24 MiB budget (Workers cap 25 MiB); not serving it"
+            rm "$APK"
+          fi
           ls -la dist/download || true
         env:
           GH_TOKEN: ${{ github.token }}

@@ -175,6 +175,7 @@ def cmd_assemble(a):
     meta = json.load(open(f"{base}/sheet.json"))
     meta["takes"] = takes
     meta["dirs"] = list(DIRS)  # a partial retake as the base would drop the directions only a --take supplies
+    meta["lock_height"] = a.lock_height  # stored in the run, so export's re-posts keep it
     for d, src in takes.items():
         m = json.load(open(f"{src}/sheet.json"))
         meta["loops"][d] = m["loops"][d]
@@ -440,6 +441,9 @@ def main():
                            help="dir=<other run>, e.g. n=runs/x/take2-n/video-s11")
             p.add_argument("--out", required=True)
             p.add_argument("--period", default="12:64")
+            p.add_argument("--lock-height", action="store_true",
+                           help="bipeds: scale each direction so its idle stands as tall as the s idle "
+                                "(each keyframe draws the figure at its own size); never a quadruped")
         if name == "export":
             p.add_argument("--arch", nargs="+", help="archetypes to key (default: those already using the kind)")
         if name == "sheet":

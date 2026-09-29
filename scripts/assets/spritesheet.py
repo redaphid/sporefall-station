@@ -1040,11 +1040,14 @@ def despeckle(im: Image.Image, lum: int = 225) -> Image.Image:
 
 
 def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pal, shrink: int = 1,
-                   pockets: int = 0, ghost=None, beside=None) -> dict:
+                   pockets: int = 0, ghost=None, beside=None, lock_height: bool = False) -> dict:
     """Video frames share a locked camera, so each direction goes through ONE crop window
     (the union of its frames) at ONE scale for the whole sheet: nothing pumps, feet stay
     where the video put them (trace.py's fixed-window rule). `ghost`: `ghost_pal`'s colours;
-    `beside`: `clip_beside`'s neighbours."""
+    `beside`: `clip_beside`'s neighbours. `lock_height` (opt-in, bipeds): each direction's
+    keyframe is its own Qwen edit and draws the figure at its own size, so each direction is
+    scaled to make its idle as tall as the s idle. A quadruped's side is legitimately lower
+    than its front, so it never takes this."""
     keyed = {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ())), shrink)
              for k, v in raws.items()}
     boxes = {k: bbox(v) for k, v in keyed.items()}
@@ -1057,13 +1060,21 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
         raise SystemExit("every frame keyed to empty: is the background not plain?")
     content = content or canvas - 2
     s = content / max(max(u[3] - u[1], u[2] - u[0]) for u in union.values())
+    scale = {d: s for d in union}
+    ref = boxes.get(("s", "idle"))
+    if lock_height and ref:
+        for d, u in union.items():
+            b = boxes.get((d, "idle"))
+            if b:
+                fits = content / max(u[3] - u[1], u[2] - u[0])
+                scale[d] = min(s * (ref[3] - ref[1]) / (b[3] - b[1]), fits)
     out = {}
     for d in dirs:
         u = union.get(d)
         for p in poses:
             frame = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
             if u and (d, p) in keyed:
-                tw, th = max(1, round((u[2] - u[0]) * s)), max(1, round((u[3] - u[1]) * s))
+                tw, th = max(1, round((u[2] - u[0]) * scale[d])), max(1, round((u[3] - u[1]) * scale[d]))
                 px = despeckle(snap(P.kcentroid(keyed[(d, p)].crop(u), tw, th), pal))
                 frame.paste(px, ((canvas - tw) // 2, canvas - 1 - th), px)
             out[(d, p)] = frame
@@ -1338,7 +1349,8 @@ def finish(out, raws, dirs, poses, a, kind, pal, meta) -> str:
         backdrop = P.corner_bg(next(iter(raws.values())))
         frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal, pockets=pocket_px(meta.get("input"), backdrop),
                                 ghost=ghost_pal(meta.get("input"), backdrop, pal),
-                                beside=clip_beside(out, raws, meta.get("loops", {})))
+                                beside=clip_beside(out, raws, meta.get("loops", {})),
+                                lock_height=bool(meta.get("lock_height")))
     else:
         frames = pixelize(raws, dirs, poses, a.size, a.content, pal)
     json.dump({"palette": pal, "size": a.size, "content": a.content, "kind": kind},

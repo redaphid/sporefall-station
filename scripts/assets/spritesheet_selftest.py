@@ -286,6 +286,45 @@ def main():
         check("prep: pixel-art input upscaled NEAREST (no new colours)",
               len({tuple(c) for c in pt.reshape(-1, 3)}) <= len({tuple(c) for c in np.asarray(Image.open(tiny).convert('RGB')).reshape(-1, 3)}) + 1)
 
+        print("height lock (video frames, one scale per sheet)")
+
+        def on_frame(fig, w=848, h=480, zoom=1.0):  # a figure on a Wan-sized frame, feet near the bottom
+            f = fig.resize((max(1, round(fig.width * zoom)), max(1, round(fig.height * zoom))), Image.NEAREST)
+            im = Image.new("RGB", (w, h), (255, 255, 255))
+            im.paste(f, ((w - f.width) // 2, h - 20 - f.height))
+            return im
+
+        def tall(fr):
+            ys = np.where(np.asarray(fr)[..., 3].any(1))[0]
+            return int(ys[-1] - ys[0] + 1)
+
+        biped = wren(size=420)
+        bi = {("s", "idle"): on_frame(biped), ("s", "walk-0"): on_frame(biped),
+              ("ne", "idle"): on_frame(biped, zoom=0.93), ("ne", "walk-0"): on_frame(biped, zoom=0.93)}
+        drift = S.pixelize_fixed(bi, ["s", "ne"], ["idle", "walk-0"], 48, None, None)
+        locked = S.pixelize_fixed(bi, ["s", "ne"], ["idle", "walk-0"], 48, None, None, lock_height=True)
+        check("height lock off: a keyframe drawn 7% small ships 2+ px short at 48 px (the sporeling's ne)",
+              tall(drift[("s", "idle")]) - tall(drift[("ne", "idle")]) >= 2,
+              f"{tall(drift[('s', 'idle')])} vs {tall(drift[('ne', 'idle')])}")
+        check("height lock on: every direction's idle stands as tall as the s idle, +-1 px",
+              abs(tall(locked[("s", "idle")]) - tall(locked[("ne", "idle")])) <= 1,
+              f"{tall(locked[('s', 'idle')])} vs {tall(locked[('ne', 'idle')])}")
+        check("height lock on: the s direction itself is unchanged",
+              all(np.array_equal(np.asarray(drift[k]), np.asarray(locked[k])) for k in drift if k[0] == "s"))
+        beast = Image.new("RGB", (400, 400), (255, 255, 255))
+        ImageDraw.Draw(beast).rectangle((140, 60, 260, 400), fill=TEAL)  # head-on: narrow and tall
+        flank = Image.new("RGB", (400, 220), (255, 255, 255))
+        ImageDraw.Draw(flank).rectangle((0, 20, 400, 220), fill=TEAL)  # side-on: long and low
+        quad = {("s", "idle"): on_frame(beast), ("e", "idle"): on_frame(flank)}
+        plain = S.pixelize_fixed(quad, ["s", "e"], ["idle"], 48, None, None)
+        check("height lock is opt-in: a long-bodied quadruped's low side view keeps its own height",
+              tall(plain[("e", "idle")]) < tall(plain[("s", "idle")]) * 0.7,
+              f"{tall(plain[('e', 'idle')])} vs {tall(plain[('s', 'idle')])}")
+        locked_q = S.pixelize_fixed(quad, ["s", "e"], ["idle"], 48, None, None, lock_height=True)
+        check("height lock never grows a direction past the canvas",
+              all(np.asarray(f)[..., 3][0].sum() == 0 and np.asarray(f)[..., 3][:, [0, -1]].sum() == 0
+                  for f in locked_q.values()))
+
         print("keying")
         k = np.asarray(S.key_background(wren(bg=(250, 248, 246))))
         check("key: backdrop gone", k[5, 5, 3] == 0)

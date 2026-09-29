@@ -48,6 +48,29 @@ Files in this folder:
    character in progress takes priority over every queued one.
 9. **Keep notes in the repo.** A new standing instruction goes into this file
    and is pushed the same turn.
+10. **Design on-lore.** Every character design and every redesign prompt
+    follows the lore canon. The canon is the art repo's
+    `docs/LORE_CHARACTERS.md` (G1-G7, L1-L3, families A-E, Roster 2 §8),
+    its `sprites/roster_lore.py` and `docs/LORE_GROUNDING.md` (tone, not
+    committed there), and this repo's `docs/LORE.md` lines 25-62.
+    `/mnt/d/Projects/sporefall-art` is production: read it, never write it.
+    `RUNBOOK.md` Step 0 has the summary and the lore check that every design
+    passes before Aaron sees it. Aaron's words:
+    - 2026-09-25: "Make that brute character not look like the hulk"
+      (that is bog-mutant, not carapace-brute).
+    - 2026-09-29 00:04: "There are a lot of low quality character art in
+      there. Fell free to replace them. One of them is clearly "The Hulk",
+      for example. Have the agents are draw more from the lore, and good
+      concept art. But don't take forever finding great ones."
+    - 2026-09-29 00:09: "Read the copy for this pr:
+      https://github.com/redaphid/sporefall-station/pull/133" (its
+      `docs/design/setting-fit.md` ranks the sources Step 0 uses).
+    - 2026-09-29 00:48: "Not a 'bat', etc. Also dogs shouldn't have knives"
+      (said of weapons; it binds the cast too).
+    - 2026-09-29 00:50: "Don't make it too steampunk" (Step 0, "Not steampunk").
+    - 2026-09-29 00:51: "\"thug, cop, shopkeeper\" are not lore-appropriate
+      names"
+    - 2026-09-29 02:33, after the crash: "Remember the lore stuff as well"
 
 ## After a crash
 

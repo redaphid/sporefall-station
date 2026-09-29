@@ -90,6 +90,19 @@ def graph(ref_name, video_name, text, seed, prefix, w, h, length, shift, steps, 
     return g
 
 
+def adopt(base, out, d, raw):
+    """Make <out> a run `cast_walk.py assemble --take` reads: the base run's idle/keyframe for <d>, and a
+    sheet.json whose loop for <d> is spritesheet's own pick on this clip."""
+    import shutil
+    for f in glob.glob(os.path.join(base, "raw", f"{d}-idle.png")) + glob.glob(os.path.join(base, "raw", f"{d}-keyframe*")):
+        shutil.copyfile(f, os.path.join(out, "raw", os.path.basename(f)))
+    meta = json.load(open(os.path.join(base, "sheet.json")))
+    clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(os.path.join(raw, "*.png")))]
+    meta["loops"] = {d: S.find_loop(clip)}
+    meta["method"] = "video"
+    json.dump(meta, open(os.path.join(out, "sheet.json"), "w"), indent=1)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--depth", required=True)
@@ -103,6 +116,8 @@ def main():
     ap.add_argument("--steps", type=int, default=4)
     ap.add_argument("--split", type=int, default=2)
     ap.add_argument("--no-lora", action="store_true")
+    ap.add_argument("--base-run", help="a video-route run (video-sN) whose <dir>-idle/keyframe this take reuses, so "
+                                       "`cast_walk.py assemble <base> --take <dir>=<out>` can take it")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     tag = os.path.basename(a.out.rstrip("/"))
@@ -126,6 +141,8 @@ def main():
     ims = [im for imgs in outs.values() for im in imgs if im["filename"].startswith("f_")]
     for i, im in enumerate(sorted(ims, key=lambda im: im["filename"])):
         S.fetch(im).save(os.path.join(raw, f"{i:04d}.png"))
+    if a.base_run:
+        adopt(a.base_run, a.out, a.dir, raw)
     json.dump({"period": period, "seed": a.seed, "shift": a.shift, "steps": a.steps, "lora": not a.no_lora,
                "text": text}, open(os.path.join(a.out, "run.json"), "w"), indent=1)
     print(f"-> {raw} ({len(ims)} frames)")

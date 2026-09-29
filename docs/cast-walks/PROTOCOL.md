@@ -133,6 +133,10 @@ resumed. The coordinator writes the marker when a run starts and deletes it when
 Subagents, crons and monitors die with the crash; the resumed coordinator re-creates them.
 It needs a Windows login: if the box boots to a password screen it waits until Aaron logs in.
 
+0. **Check git first:** `find .git/objects -type f -empty` in `~/Projects/sporefall-station`; move any
+   empty objects aside and `git fetch` to restore them (crashes on 09-29 left 21 and 11). Save WIP
+   only with `/mnt/d/tmp/cast-walks/crash-save.sh <tag>`, which refuses to commit files the crash
+   truncated to 0 bytes (09-29 crash 5 zeroed 119 files and a blind save pushed them).
 1. Read this file, then `QUEUE.md` and the tail of `PROGRESS.md`. Then read
    `git log origin/art/cast-walk-cycles -10` and `git status` in
    `~/Worktrees/sporefall-station/cast-walks`.

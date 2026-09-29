@@ -139,6 +139,7 @@ Other traps: a clip can turn around late (mycologist n from ~frame 56); the loop
 
 ## Lessons log
 
+- **09-29 bog-mutant Step 0** (stopped after batch 1): cloning the r2 raw's embedded graph (`info['prompt']`) and swapping text + seed is the fastest proven still route, but its IPAdapter style ref is the vine-ranger at 0.3, so keep the r2 negatives (`helmet, visor, orange cap, teal suit`): I dropped them and all 6 came back as the player ranger. Put the distinctive hook in the first ~40 words. `2cb` could print a dead link as "exists"; fixed to re-fetch and sha-match every link.
 - **09-29 mycologist** (first through): the r2 hazmat design passed Step 0. n failed the 0.5 seam on all three takes (0.79 / 0.56 / 0.91) until Aaron set n to 1.0. The colour gate caught a per-direction visor hue change the silhouette spec cannot see; the s-idle palette lock fixes it but dulls a glow that only the walk frames had.
 
 ## Locks (added 09-29 after the crash; coordinator + one worker share one worktree and one GPU)

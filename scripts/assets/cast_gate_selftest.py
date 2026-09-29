@@ -8,7 +8,8 @@ fail art it exists to catch.
 Known good: the frog's shipped loops (the approved video-route character) and the mycologist.
 Known bad: the sporefall-art hi-fps clips rejected for boil (the judge's own calibration set),
 seeded synthetic boil on the frog's east loop, front and back views submitted as the wrong
-direction, a blurred sprite and a painted 3D render for style, a channel-rotated frame for palette.
+direction, another character's back view for identity, a blurred sprite and a painted 3D render
+for style, a channel-rotated frame for palette.
 Exit code = number of controls that came out wrong.
 """
 import glob
@@ -103,6 +104,18 @@ if "--cpu" not in sys.argv:
                          ("mycologist", "n-idle", "s")):
         v, probs = V.check(os.path.join(CHARS, f"{kind}-{src}.png"), {"cat": "char", "dir": d, "kind": kind, "path": ""})
         expect(f"{kind} {src} as {d}", False, not probs, f"view {v.get('view')} {probs}")
+
+    print("gate 4b same: a back view against its own front passes; another character's back fails")
+    for kind in ("mycologist", "drowned-diver", "vine-ranger", "frog-settler", "blast-diver"):
+        for q in ("ne-idle", "n-idle"):
+            _, probs = V.check_same(os.path.join(CHARS, f"{kind}-s-idle.png"), os.path.join(CHARS, f"{kind}-{q}.png"))
+            expect(f"{kind} {q} vs own s-idle", True, not probs, probs)
+    for front, back in (("drowned-diver", "mycologist"), ("mycologist", "drowned-diver"), ("vine-ranger", "drowned-diver"),
+                        ("drowned-diver", "vine-ranger"), ("frog-settler", "mycologist"), ("mycologist", "vine-ranger"),
+                        ("drowned-diver", "blast-diver"), ("blast-diver", "drowned-diver")):
+        for q in ("ne-idle", "n-idle"):
+            _, probs = V.check_same(os.path.join(CHARS, f"{front}-s-idle.png"), os.path.join(CHARS, f"{back}-{q}.png"))
+            expect(f"{back} {q} vs {front} s-idle", False, not probs, probs)
 
     print("gate 6: style vs the frog, rendering only; a negative counts as caught by 6 or 6b")
     anchors = [os.path.join(C.THEMES, "swampspace-hires", a) for a in C.SPEC["style"]["anchors"]]

@@ -214,11 +214,16 @@ def pairs_mode():
 SAME_PROMPT = (
     "These two images show sprites from one pixel-art game, supposedly the SAME "
     "character viewed from two different directions (front/side/back/three-quarter). "
-    "Judge identity, not pose: same body proportions (height, bulk, head size), same "
-    "outfit and colors, same gear. Answer ONLY with JSON: "
+    "A back or three-quarter-back view cannot show what is on the front (a face, a visor, "
+    "a chest badge), and can show what is on the back (a tank, a pack): never count those as differences. "
+    "Judge identity from what both views share: same body proportions (height, bulk, head size), "
+    "same outfit colours and materials, same gear. Answer ONLY with JSON: "
     '{"same_character": <bool>, "same_proportions": <bool>, "same_outfit": <bool>, '
     '"reason": "<short>"}'
 )
+# The old prompt ("same outfit and colors") failed every back view of the blast-diver, whose front
+# is a saturated orange visor its back cannot show ("first image has a large orange visor"), while
+# a back from another character still fails for bulk and suit colour: cast_gate_selftest.py.
 
 
 def check_same(path_a, path_b):

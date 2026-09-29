@@ -203,12 +203,19 @@ describe('locomotion styles — non-bipedal bodies', () => {
     }
   })
 
-  it('locomotionFor: unknown archetypes stride, so a new character never silently changes', () => {
+  it('locomotionFor: unknown art kinds stride, so a new character never silently changes', () => {
     expect(locomotionFor('vine-ranger')).toBe('stride')
     expect(locomotionFor('not-a-real-character')).toBe('stride')
     expect(locomotionFor('')).toBe('stride')
     expect(locomotionFor('spore-drone')).toBe('hover')
     expect(locomotionFor('brood-sac')).toBe('pulse')
+  })
+
+  it('locomotionFor: a kind named after an Object.prototype member is just unknown', () => {
+    // Kinds come from manifest file names, so any string can arrive here.
+    for (const k of ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf']) {
+      expect(locomotionFor(k), k).toBe('stride')
+    }
   })
 
   it('HOVER lifts off the floor in idle AND walk — the planted invariant is for bodies with feet', () => {

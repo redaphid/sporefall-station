@@ -318,11 +318,20 @@ def main():
         dl.rectangle((40, 5, 60, 19), fill=bone)  # a real bone spine: pale, but the character's own colour
         dl.rectangle((90, 20, 115, 60), fill=teal)
         dl.rectangle((98, 32, 106, 46), fill=ghost)  # a faint patch the body encloses
+        bare = leg.copy()  # the frames beside it: the swinging leg is elsewhere
+        dense = tuple(round(0.6 * c + 0.4 * 255) for c in charcoal)  # a blur more leg than backdrop (the se claw)
+        dl.rectangle((20, 60, 39, 110), fill=dense)
         kg = np.asarray(S.key_background(leg, pal=[charcoal, bone, teal]))
         check("key: pal= keys a motion-blur ghost joined to the backdrop", kg[85, 70, 3] == 0)
         check("key: pal= keeps the leg and a pale bone spine the character owns",
-              kg[60, 50, 3] == 255 and kg[10, 50, 3] == 255)
+              kg[60, 50, 3] == 255 and kg[10, 50, 3] == 255 and tuple(kg[10, 50, :3]) == bone)
         check("key: pal= keeps a faint patch the body encloses", kg[40, 102, 3] == 255)
+        kb = np.asarray(S.key_background(leg, pal=[charcoal, bone, teal], beside=(bare, bare)))
+        check("key: beside= keys a dense blur that is backdrop in the frames beside it", kb[85, 30, 3] == 0)
+        check("key: beside= keeps the leg", kb[60, 50, 3] == 255 and kb[10, 50, 3] == 255)
+        check("key: without beside= the dense blur stays (colour alone cannot see it)", kg[85, 30, 3] == 255)
+        check("key: a blend the frames beside it also show stays (the character's own pale part)",
+              np.asarray(S.key_background(leg, pal=[charcoal, bone, teal], beside=(leg, leg)))[85, 30, 3] == 255)
         check("key: without pal= the ghost stays opaque (the old key: the stalker's flash)",
               np.asarray(S.key_background(leg))[85, 70, 3] == 255)
         check("key: a grey the character owns is not a ghost",
@@ -345,12 +354,19 @@ def main():
               S.ghost_pal(myco, white, [tan, cream_pal]) is None)
         check("ghost key: off with no anchor", S.ghost_pal(None, white, pal3) is None)
         post = os.path.join(tmp, "ghost-post")
-        os.makedirs(post)
-        S.finish(post, {("s", "idle"): leg}, ["s"], ["idle"], type("A", (), {"size": 48, "content": 46, "palette": "x"}),
-                 "leg", pal3, {"method": "video", "input": stalk})
-        vf = np.asarray(Image.open(os.path.join(post, "frames", "leg-s-idle.png")).convert("RGBA"))
-        low_bone = int(((vf[24:, :, :3] == bone).all(-1) & (vf[24:, :, 3] > 0)).sum())
-        check("video post: the ghost is not painted bone below the spine", low_bone == 0, f"{low_bone} bone px low")
+        os.makedirs(os.path.join(post, "raw", "walk-s"))
+        clip = [leg if i == 5 else bare for i in range(11)]  # the leg blurs in clip frame 5 = walk-4
+        for i, f in enumerate(clip):
+            f.save(os.path.join(post, "raw", "walk-s", f"{i:04d}.png"))
+        walks = [f"walk-{i}" for i in range(8)]
+        S.finish(post, {("s", p): clip[1 + i] for i, p in enumerate(walks)}, ["s"], walks,
+                 type("A", (), {"size": 48, "content": 46, "palette": "x"}), "leg", pal3,
+                 {"method": "video", "input": stalk, "loops": {"s": {"start": 1, "period": 8}}})
+        w = [np.asarray(Image.open(os.path.join(post, "frames", f"leg-s-{p}.png")).convert("RGBA")) for p in walks]
+        low_bone = int(((w[4][24:, :, :3] == bone).all(-1) & (w[4][24:, :, 3] > 0)).sum())
+        check("video post: the thin ghost is not painted bone below the spine", low_bone == 0, f"{low_bone} bone px low")
+        check("video post: the dense blur is gone, so walk-4 matches the frames beside it",
+              np.array_equal(w[4], w[3]), f"{int((w[4] != w[3]).any(-1).sum())} px differ")
 
         print("model detection")
         q, notes = S.detect_qwen({})

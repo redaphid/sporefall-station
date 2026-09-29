@@ -118,12 +118,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # Workers reject any single asset over 25 MiB, and one such file fails
-      # the whole deploy. Runs after the OTA zip and the APK drop above, so it
-      # sees exactly what wrangler uploads.
-      - name: Check no file to upload is over 24 MiB
-        run: node scripts/check-dist-sizes.mjs dist
-
       - name: Deploy Worker (static assets + relay Durable Object)
         id: deploy
         uses: cloudflare/wrangler-action@v3

@@ -376,7 +376,8 @@ def main():
         p.add_argument("run")
         p.add_argument("--kind", required=True)
         if name == "assemble":
-            p.add_argument("--take", nargs="*", help="dir=<other run>, e.g. n=runs/x/take2-n/video-s11")
+            p.add_argument("--take", nargs="+", action="extend",  # repeated --take flags add up, not last-wins
+                           help="dir=<other run>, e.g. n=runs/x/take2-n/video-s11")
             p.add_argument("--out", required=True)
             p.add_argument("--period", default="12:64")
         if name == "export":

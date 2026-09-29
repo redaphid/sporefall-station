@@ -532,6 +532,16 @@ def main():
         S.main(["repack", os.path.join(tmp, "vr"), "--size", "48", "--to", os.path.join(tmp, "vr48")])
         check("a repack --to output is itself repackable",
               Image.open(os.path.join(tmp, "vr48/sheet.png")).size == (480, 96))
+        anchor = os.path.join(tmp, "vr/frames/wren-s-idle.png")
+        S.main(["repack", os.path.join(tmp, "vr"), "--palette-from", anchor, "--to", os.path.join(tmp, "vpal")])
+        allowed = set(S.anchor_palette(anchor))
+        va = np.asarray(Image.open(os.path.join(tmp, "vpal/sheet.png")))
+        check("--palette-from: every frame uses only the s-idle's own colours",
+              {tuple(int(x) for x in c) for c in va[va[..., 3] > 0][:, :3]} <= allowed)
+        S.main(["repack", os.path.join(tmp, "vpal"), "--size", "48", "--to", os.path.join(tmp, "vpal48")])
+        va = np.asarray(Image.open(os.path.join(tmp, "vpal48/sheet.png")))
+        check("--palette-from sticks to the run: a later repack keeps it",
+              {tuple(int(x) for x in c) for c in va[va[..., 3] > 0][:, :3]} <= allowed)
         check("repack keeps the run's 96 px and palette", Image.open(os.path.join(tmp, "vr/sheet.png")).size == (960, 192))
 
         print("--flow: a flow tweaked in the editor and exported as API")

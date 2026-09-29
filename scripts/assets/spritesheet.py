@@ -1192,6 +1192,7 @@ def cmd_repack(a):
             if os.path.exists(f):
                 raws[(d, p)] = Image.open(f).convert("RGB")
     kind = meta.get("kind") or next(iter(meta["frames"])).rsplit("-", 2)[0]
+    a.palette_from = a.palette_from or meta.get("palette_from")  # a later repack keeps the run's colours
     if a.palette_from:
         pal = anchor_palette(a.palette_from)
         meta["palette_from"] = os.path.abspath(a.palette_from)

@@ -48,11 +48,15 @@ COLORS = {"shell": lin("#2e8f8c"), "shell_dark": lin("#1d5a5e"), "leg": lin("#27
           "tip": lin("#26262b"), "bone": lin("#c9b48a"), "eye": lin("#9a3fc4"), "belly": lin("#3a4448")}
 
 # Body plan in the creature's frame: forward = -Y (faces the camera at yaw 0), up = +Z, ground z = 0.
-BODY_Z = 1.05
-FEMUR, TIBIA = 1.0, 1.35
+BODY_Z = float(arg("--body-z", "1.05"))
+FEMUR, TIBIA = float(arg("--femur", "1.0")), float(arg("--tibia", "1.35"))
+LEG_R = float(arg("--leg-r", "0.085"))
+SHELL = tuple(float(v) for v in arg("--shell", "0.55,0.95,0.42").split(","))
+POLE_UP = float(arg("--pole-up", "1.0"))
+SPINE_L = float(arg("--spine-l", "0.28"))
 # (hip y, rest-foot angle from lateral in degrees, + = forward), front to back, one side
 LEGS = [(-0.55, 50), (-0.2, 18), (0.15, -14), (0.5, -42)]
-HIP_X, FOOT_R = 0.34, 1.25
+HIP_X, FOOT_R = float(arg("--hip-x", "0.34")), float(arg("--foot-r", "1.25"))
 
 
 def material(name, color):
@@ -131,23 +135,24 @@ def cone(name, parent, loc, r_base, r_tip, length, mat, rot=(0, 0, 0)):
 
 
 # carapace: long low dome, darker belly under it, wedge head in front
-ellipsoid("carapace", body, (0, 0.1, 0.12), (0.55, 0.95, 0.42), "shell")
+ellipsoid("carapace", body, (0, 0.1, 0.12), SHELL, "shell")
 ellipsoid("belly", body, (0, 0.05, -0.1), (0.45, 0.8, 0.22), "belly")
 ellipsoid("abdomen", body, (0, 0.95, 0.05), (0.36, 0.42, 0.3), "shell_dark")
-ellipsoid("head", body, (0, -0.85, -0.02), (0.36, 0.4, 0.24), "shell")
+ellipsoid("head", body, (0, -0.82, 0.1), (0.4, 0.42, 0.3), "shell")
 for sx in (-1, 1):
-    ellipsoid(f"eye{sx}", body, (sx * 0.24, -1.05, 0.04), (0.07, 0.07, 0.07), "eye")
-    cone(f"fang{sx}", body, (sx * 0.12, -1.12, -0.12), 0.05, 0.005, 0.32, "bone", rot=(math.radians(165), 0, 0))
+    ellipsoid(f"eye{sx}", body, (sx * 0.26, -1.05, 0.18), (0.08, 0.08, 0.08), "eye")
+    cone(f"fang{sx}", body, (sx * 0.14, -1.14, -0.02), 0.06, 0.006, 0.36, "bone", rot=(math.radians(165), 0, 0))
 # crest: a row of curved bone spines on the dorsal ridge, raked back, plus two short side rows
-for i in range(10):
-    t = i / 9
+N_SP = int(arg("--spines", "14"))
+for i in range(N_SP):
+    t = i / (N_SP - 1)
     y = -0.7 + 1.55 * t
-    z = 0.12 + 0.42 * math.sqrt(max(0.0, 1 - ((y - 0.1) / 0.95) ** 2)) - 0.03
-    cone(f"spine{i}", body, (0, y, z), 0.05, 0.008, 0.28 + 0.12 * math.sin(math.pi * t), "bone",
+    z = 0.12 + SHELL[2] * math.sqrt(max(0.0, 1 - ((y - 0.1) / SHELL[1]) ** 2)) - 0.05
+    cone(f"spine{i}", body, (0, y, z), 0.075, 0.01, SPINE_L + 0.12 * math.sin(math.pi * t), "bone",
          rot=(math.radians(-35), 0, 0))
-    if 1 <= i <= 8:
+    if 1 <= i <= N_SP - 2:
         for sx in (-1, 1):
-            cone(f"spine{i}.{sx}", body, (sx * 0.3, y, z - 0.14), 0.035, 0.006, 0.18, "bone",
+            cone(f"spine{i}.{sx}", body, (sx * SHELL[0] * 0.55, y, z - SHELL[2] * 0.25), 0.05, 0.008, SPINE_L * 0.7, "bone",
                  rot=(math.radians(-30), math.radians(sx * 45), 0))
 
 
@@ -172,13 +177,13 @@ for sx, side in ((-1, "L"), (1, "R")):
         a = math.radians(ang)
         foot = Vector((hip.x + sx * FOOT_R * math.cos(a), hip.y - FOOT_R * math.sin(a), 0.0))
         phase = 0.0 if (i % 2 == 0) == (side == "L") else 0.5
-        fem = segment(f"femur.{side}{i}", 0.085, 0.07, FEMUR, "leg")
-        tib = segment(f"tibia.{side}{i}", 0.07, 0.012, TIBIA, "leg")
+        fem = segment(f"femur.{side}{i}", LEG_R, LEG_R * 0.82, FEMUR, "leg")
+        tib = segment(f"tibia.{side}{i}", LEG_R * 0.82, 0.012, TIBIA, "leg")
         LEG_SET.append((sx, hip, foot, phase, fem, tib))
 # charcoal lower tibia: a second, shorter tapered segment rides the tibia's distal half
 TIPS = []
 for sx, hip, foot, phase, fem, tib in LEG_SET:
-    bpy.ops.mesh.primitive_cone_add(radius1=0.011, radius2=0.05, depth=TIBIA * 0.5, vertices=12)
+    bpy.ops.mesh.primitive_cone_add(radius1=0.011, radius2=LEG_R * 0.6, depth=TIBIA * 0.5, vertices=12)
     ob = bpy.context.object
     ob.data.transform(Matrix.Translation((0, 0, -TIBIA * 0.25 - TIBIA * 0.5)))
     ob.scale = (1.06, 1.06, 1.0)
@@ -217,7 +222,7 @@ def pose(t):
         dist = min(max(d.length, abs(FEMUR - TIBIA) + 1e-3), FEMUR + TIBIA - 1e-3)
         u = d.normalized()
         out = Vector((foot.x - hip.x, foot.y - hip.y, 0)).normalized()
-        pole = (out * 0.35 + Vector((0, 0, 1))).normalized()
+        pole = (out + Vector((0, 0, POLE_UP))).normalized()
         v = (pole - u * pole.dot(u)).normalized()
         x = (FEMUR ** 2 - TIBIA ** 2 + dist ** 2) / (2 * dist)
         knee = h + u * x + v * math.sqrt(max(0.0, FEMUR ** 2 - x ** 2))
@@ -291,11 +296,13 @@ def render(path, depth):
     bpy.ops.render.render(write_still=True)
 
 
+ONLY = [int(v) for v in arg("--only", "").split(",") if v]
 for d in DIRS:
     root.rotation_euler = (0, 0, math.radians(DIRS_ALL[d]))
-    for f in range(FRAMES):
+    for f in (ONLY or range(FRAMES)):
         pose(f / FRAMES)
-        render(f"{OUT}/{d}/depth-{f:02d}.png", depth=True)
+        if not ONLY:
+            render(f"{OUT}/{d}/depth-{f:02d}.png", depth=True)
         render(f"{OUT}/{d}/color-{f:02d}.png", depth=False)
         print(f"rendered {d} {f}")
 print("RIG_MULTILEG_DONE")

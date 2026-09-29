@@ -2,12 +2,12 @@
  "vine-ranger": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 41,
+   "height": 43,
    "width": 21,
-   "head_h": 26,
-   "mass": 544,
-   "cx": -0.43,
-   "foot_y": 43
+   "head_h": 28,
+   "mass": 562,
+   "cx": 0.63,
+   "foot_y": 45
   },
   "tol": {
    "height": 3,

@@ -182,9 +182,16 @@ def family(frame, has_walk=False):
 
 # Width and head block change with the viewing angle (a profile is narrower than
 # a front view, a backpack joins the head rows from the side), so they are only
-# compared between frames drawn from the reference's own direction. Height, mass,
-# centroid and foot line hold across views and are checked on every pose frame.
+# compared between frames drawn from the reference's own direction. Height and
+# foot line hold across views and are checked on every pose frame.
 VIEW_DEPENDENT = ("width", "head_h")
+# In the side view the figure's width is its depth: a slim person in true profile
+# keeps ~60% of the front's pixel mass, and the centroid moves toward whatever is
+# carried behind. So a walk character's side-view poses take mass and centroid
+# from their own view's walk frames (same clip, same camera); the front/back 3/4
+# views still answer to the front reference.
+SIDE_VIEWS = ("e", "w")
+SIDE_FROM_WALK = ("mass", "cx")
 
 
 # How far a family's BUILD may sit from the character's reference build before
@@ -206,6 +213,11 @@ def check(data, spec):
         ref, tol = s["ref"], s["tol"]
         ref_dir = s["ref_frame"].split("-")[0]
         has_walk = any(family(fr) == "walk" for fr in frames)
+        side_ref = {}
+        for d in SIDE_VIEWS:
+            ms = [m for fr, m in frames.items() if fr.split("-")[0] == d and family(fr) == "walk"]
+            if ms and d != ref_dir:
+                side_ref[d] = {k: float(np.median([m[k] for m in ms])) for k in SIDE_FROM_WALK}
         # --- family build check: does each animation family read as the same
         # character as the spec's reference pose?
         fams = {}
@@ -234,12 +246,13 @@ def check(data, spec):
             if family(fr, has_walk) != "pose":
                 continue  # non-pose families are judged by the build check above
             same_view = fr.split("-")[0] == ref_dir
+            vref = {**ref, **side_ref.get(fr.split("-")[0], {})}
             checks = [
                 ("height", abs(m["height"] - ref["height"]), tol["height"]),
                 ("width", abs(m["width"] - ref["width"]), tol["width"]),
                 ("head_h", abs(m["head_h"] - ref["head_h"]), tol["head_h"]),
-                ("mass", abs(m["mass"] - ref["mass"]) / max(1, ref["mass"]), tol["mass_frac"]),
-                ("cx", abs(m["cx"] - ref["cx"]), tol["cx"]),
+                ("mass", abs(m["mass"] - vref["mass"]) / max(1, vref["mass"]), tol["mass_frac"]),
+                ("cx", abs(m["cx"] - vref["cx"]), tol["cx"]),
                 ("foot_y", abs(m["foot_y"] - ref["foot_y"]), tol["foot_y"]),
             ]
             for key, dev, lim in checks:

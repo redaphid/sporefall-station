@@ -290,6 +290,25 @@ def main():
         k = np.asarray(S.key_background(wren(bg=(250, 248, 246))))
         check("key: backdrop gone", k[5, 5, 3] == 0)
         check("key: pale chest enclosed by the body stays opaque", k[440, 512, 3] == 255)
+        ring = Image.new("RGB", (120, 120), (255, 255, 255))
+        ImageDraw.Draw(ring).ellipse((20, 20, 100, 100), outline=(30, 60, 64), width=12)  # a claw curled to a leg
+        ImageDraw.Draw(ring).rectangle((20, 55, 32, 65), fill=(255, 255, 255))  # 3x3 backdrop speck in the rim
+        ImageDraw.Draw(ring).rectangle((20, 55, 32, 65), outline=(30, 60, 64), width=5)
+        check("key: an enclosed backdrop pocket stays opaque by default", np.asarray(S.key_background(ring))[60, 60, 3] == 255)
+        kp = np.asarray(S.key_background(ring, pockets=S.POCKET_PX))
+        check("key: pockets= keys the enclosed backdrop pocket", kp[60, 60, 3] == 0 and kp[5, 5, 3] == 0)
+        check("key: pockets= keeps the character and a speck under POCKET_PX (despeckle's job)",
+              kp[22, 60, 3] == 255 and kp[60, 26, 3] == 255)
+        dark = os.path.join(tmp, "dark-anchor.png")
+        da = Image.new("RGBA", (40, 40), (0, 0, 0, 0))  # matted, like the r2 anchors
+        ImageDraw.Draw(da).ellipse((5, 5, 35, 35), fill=(30, 60, 64, 255))
+        da.save(dark)
+        pale = os.path.join(tmp, "wren-anchor.png")
+        wren().save(pale)
+        check("key: pocket keying on for an anchor with no backdrop-coloured part",
+              S.pocket_px(dark, np.array([255.0, 255, 255])) == S.POCKET_PX)
+        check("key: pocket keying off for an anchor with a pale chest, and for no anchor",
+              S.pocket_px(pale, np.array([255.0, 255, 255])) == 0 and S.pocket_px(None, np.array([255.0, 255, 255])) == 0)
 
         print("model detection")
         q, notes = S.detect_qwen({})
@@ -536,11 +555,60 @@ def main():
                 "--describe", "a domed drone with limbs hanging beneath it"])
         key, wan = queued_prompts(Fake.prompts[-1])
         hm = json.load(open(os.path.join(tmp, "hover", "video-s3", "sheet.json")))
-        check("motion: hover asks Wan for a bob and no steps, after the describe",
-              "bobs slowly up and down" in wan and "strides" not in wan and "step forward" not in wan
+        check("motion: hover asks Wan for a rigid bob, still limbs and no steps, after the describe",
+              "as one rigid piece" in wan and "stays still" in wan and "strides" not in wan and "step forward" not in wan
               and wan.index("domed drone") < wan.index("hovers in place"), wan)
         check("motion: hover keyframe floats, it does not stand", "floating in the air" in key and "standing" not in key, key)
         check("motion: the run records its motion", hm.get("motion") == "hover", hm.get("motion"))
+        hq = Fake.prompts[-1]
+        flf = [n["inputs"] for n in hq.values() if n["class_type"] == "WanFirstLastFrameToVideo"]
+        check("motion: hover closes the clip: first frame = last frame = the scaled keyframe",
+              len(flf) == 1 and flf[0]["start_image"] == flf[0]["end_image"]
+              and g_class(hq, flf[0]["start_image"][0]) == "ImageScale"
+              and not any(n["class_type"] == "WanImageToVideo" for n in hq.values()))
+        he = hm["loops"]["e"]
+        check("motion: a closed clip loops whole (81 frames: period 80 from 0)",
+              he.get("closed") and (he["period"], he["start"]) == (80, 0), he)
+        S.main(["repack", os.path.join(tmp, "hover", "video-s3"), "--period", "12:64", "--to", os.path.join(tmp, "hre")])
+        re_e = json.load(open(os.path.join(tmp, "hre", "sheet.json")))["loops"]["e"]
+        check("motion: repack --period (assemble) keeps a closed loop whole", re_e.get("closed") and re_e["period"] == 80, re_e)
+        home = [wren(stride=int(60 * np.sin(2 * np.pi * i / 80)), size=240) for i in range(81)]
+        cl = S.closed_loop(home)
+        check("loop: a closed clip that comes home passes the seam", cl["seam"] <= 0.5, cl)
+        away = [wren(stride=int(60 * i / 80), size=240) for i in range(81)]
+        check("loop: a closed clip that never came home fails the seam", S.closed_loop(away)["seam"] > 1.0,
+              S.closed_loop(away))
+        def view_prompts(since, d):
+            for api in Fake.prompts[since:]:
+                by_title = {n.get("_meta", {}).get("title", ""): n["inputs"] for n in api.values()}
+                if f"{d} keyframe prompt" in by_title:
+                    return by_title[f"{d} keyframe prompt"]["prompt"] + " | " + by_title[f"{d} walk prompt"]["text"]
+            return ""
+        nb = len(Fake.prompts)
+        S.main([src, "--out", os.path.join(tmp, "back"), "--method", "video", "--dirs", "e,ne,n",
+                "--describe", "a crawler with one violet eye", "--describe-back", "a crawler seen from its spined back"])
+        views = {d: view_prompts(nb, d) for d in ("e", "ne", "n")}
+        check("describe-back: the side view's keyframe and Wan prompt keep --describe",
+              views["e"].count("violet eye") == 2 and "spined back" not in views["e"], views["e"])
+        check("describe-back: ne and n draw from --describe-back, never the face describe",
+              all(views[d].count("spined back") == 2 and "violet eye" not in views[d] for d in ("ne", "n")), views)
+        nb = len(Fake.prompts)
+        S.main([src, "--out", os.path.join(tmp, "noback"), "--method", "video", "--dirs", "n",
+                "--describe", "a crawler with one violet eye"])
+        check("describe-back: without it the back views keep --describe",
+              view_prompts(nb, "n").count("violet eye") == 2, view_prompts(nb, "n"))
+        nb = len(Fake.prompts)
+        check("describe-back: refused off the video route before anything is queued",
+              raises(lambda: S.main([src, "--out", os.path.join(tmp, "qback"), "--method", "qwen",
+                                     "--describe-back", "a back"])) and len(Fake.prompts) == nb)
+        nb = len(Fake.prompts)
+        S.main([src, "--out", os.path.join(tmp, "scuttle"), "--method", "video", "--dirs", "e", "--motion", "scuttle",
+                "--describe", "a crawler on eight stilt legs"])
+        sc = view_prompts(nb, "e")
+        sm = json.load(open(os.path.join(tmp, "scuttle", "video-s3", "sheet.json")))
+        check("motion: scuttle asks Wan for a two-group, two-beat gait after the describe, standing keyframe, open loop",
+              "two alternating groups" in sc and "arms swing" not in sc and sc.index("stilt legs") < sc.index("scuttles")
+              and "standing still" in sc and sm.get("motion") == "scuttle" and not sm["loops"]["e"].get("closed"), sc)
         n1 = len(Fake.prompts)
         check("motion: an unknown motion is refused before anything is queued",
               raises(lambda: S.main([src, "--out", os.path.join(tmp, "swim"), "--method", "video", "--motion", "swim"]))

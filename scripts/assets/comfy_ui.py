@@ -61,6 +61,12 @@ BUILTIN = {
          ("clip_vision_output", "CLIP_VISION_OUTPUT"), ("start_image", "IMAGE")],
         ["width", "height", "length", "batch_size"],
         [("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("latent", "LATENT")]),
+    "WanFirstLastFrameToVideo": (
+        [("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("vae", "VAE"),
+         ("clip_vision_start_image", "CLIP_VISION_OUTPUT"), ("clip_vision_end_image", "CLIP_VISION_OUTPUT"),
+         ("start_image", "IMAGE"), ("end_image", "IMAGE")],
+        ["width", "height", "length", "batch_size"],
+        [("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("latent", "LATENT")]),
     "KSamplerAdvanced": (
         [("model", "MODEL"), ("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("latent_image", "LATENT")],
         ["add_noise", "noise_seed+control", "steps", "cfg", "sampler_name", "scheduler", "start_at_step",

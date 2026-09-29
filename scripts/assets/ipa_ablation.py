@@ -2,15 +2,17 @@
 """Arms of one still experiment on a character's own r2 graph, seeds fixed across arms.
 
 The graph is the one embedded in the character's durable raw (`raws/char.<kind>.s-idle.png`,
-juggernautXL + skormino LoRA + IPAdapter PLUS "style transfer" on the ranger + rembg). Each arm
+juggernautXL + skormino LoRA + IPAdapter PLUS "style transfer" on the ranger + rembg). The shipped
+sprite is the baseline; no arm anchors on the old ranger (Aaron 09-29: "not a great image"). Each arm
 edits a copy:
 
-  ipa30   the graph as shipped (IPAdapter 0.3)
-  ipa15   IPAdapter 0.15
-  ipa0    IPAdapter removed; the r2 prompt unchanged
-  lore    IPAdapter removed; the lore prompt (hook first, no shared LOOK / body template)
-  lore30  the lore prompt with the IPAdapter back at 0.3 (does the ref still pull once the text is fixed?)
+  ipa0    IPAdapter removed; the r2 prompt unchanged (shared LOOK suffix and body template kept)
+  lore    IPAdapter removed; hook-first lore prompt with its own build and palette line, drawing-medium
+          words and photo negatives (sporefall-art roster_lore.MEDIUM / NEG_PHOTO); LOOK and the shared
+          body template dropped
   cn      lore, plus a union ControlNet (depth) from a hand-drawn thumbnail of the outline
+  concept the critic's concept pick (sporefall-art assets/identity, painterly) as the IPAdapter reference
+          (linear 0.5, end 0.8) with that concept's own roster description; no ranger anywhere
 
     python3 ipa_ablation.py thumbs                 # draw the thumbnails
     python3 ipa_ablation.py gen <kind>             # queue every arm x seed, collect into OUT/<kind>/<arm>/
@@ -27,27 +29,31 @@ import comfy, post
 from cast_sameness import SWAMP, compare, features, load
 
 OUT = os.environ.get("OUT", "/mnt/d/tmp/cast-walks/sameness/exp")
-SEEDS = [886000, 886001, 886002, 886003]
 CAST = ["blast-diver", "drowned-diver", "bog-mender", "cinder-husk", "bellwether", "mycologist", "bog-mutant",
         "vine-ranger", "frog-settler"]
 IPA_REF_96 = "/mnt/d/tmp/cast-walks/sameness/IPA-ref-july.png"
 TEAL = {3, 4, 5, 6, 7, 27}  # palette.PALETTE indices of the teal ramp and the cyan accent
 
-PRE = "masterpiece, pixpix, 8-bit, pixel_art, full body game character sprite, "
+PRE = "masterpiece, pixpix, 8-bit, pixel_art, full body game character sprite, 2d video game character concept art, hand-drawn, "
 FRAME = (", standing facing the viewer, front view, single character centered on plain flat white background, "
-         "full body, feet on the ground, 16-bit era palette, bold dark outlines, chunky readable shapes, ")
+         "full body, feet on the ground, bold dark outlines, chunky readable shapes, ")
+NEG_PHOTO = ("photograph, photorealistic, photoreal, dslr photo, product photo, stock photo, 3d render, octane render, "
+             "cgi, ray traced, hyperrealistic skin, studio photography, depth of field, bokeh, ")
 NOT_STEAM = "steampunk, gears, cogs, clockwork, victorian, ornate, filigree, goggles, brass, polished copper, rivets, "
 
 CHARS = {
     "drowned-diver": dict(
+        seeds=[887200, 887201, 887202, 887203],
         # Family D: "a pressure suit with nobody in it", still walking the patrol nobody rescinded.
         lore=PRE + "an empty waterlogged colony security pressure suit still walking its patrol with nobody inside, "
              "a huge round dull grey helmet lolling to one side on drooping shoulders, its one round porthole half full "
              "of murky green swamp water with small rising bubbles and no face, one small amber status light on the chest, "
              "sagging tan-grey rubberised canvas suit streaked with oxide-orange rust and pale green-white salt crust, "
-             "a faded hazard-stripe band on one sleeve, empty hands hanging, heavy weighted boots, water dripping from the cuffs"
-             + FRAME + "tan, grey, oxide orange and corroded green-white, the amber light is the only bright colour",
-        neg="teal suit, teal, cyan suit, blue suit, orange visor, orange cap, face, eyes, mouth, skin, gun, harpoon, rifle, "
+             "a faded hazard-stripe band on one sleeve, empty hands hanging, heavy weighted boots, water dripping from the cuffs, "
+             "heavyset and broad-shouldered, low centre of mass, thick limbs"
+             + FRAME + "tan and sand-grey rubberised canvas, oxide orange corrosion, silt brown, corroded green-white, "
+             "one weak amber lamp as the only bright colour",
+        neg=NEG_PHOTO + "teal suit, teal, cyan suit, blue suit, orange visor, orange cap, face, eyes, mouth, skin, gun, harpoon, rifle, "
             "weapon, vines, leaves, moss, " + NOT_STEAM,
         # front view: an oversized bowl helmet tipped to the viewer's left, one shoulder dropped, arms hanging long
         thumb=[("ellipse", (215, 95, 470, 350), 240),
@@ -58,15 +64,18 @@ CHARS = {
                ("polygon", [(405, 565), (520, 560), (525, 700), (410, 700)], 215),
                ("ellipse", (240, 675, 385, 735), 225), ("ellipse", (395, 675, 545, 735), 225)]),
     "bog-mender": dict(
+        seeds=[887100, 887101, 887102, 887103],
         # Family A trade (the tool is the outline) in Roster 2's Yellowjack colours: the medic doses the wounded with
         # distilled essence from the still it carries.
         lore=PRE + "a small hunched colony field medic carrying a huge round glass tank of glowing green essence strapped high "
              "on the back, the tank rising far above the head and wider than the shoulders, rubber hoses looping from the tank "
              "to a hand pump held in one gloved hand, a faded hazard-yellow oilcloth smock with black hazard stripes and "
              "hand-stitched patches, a quilted bone-white liner hood, a plain grey rubber breathing mask, teal-stained "
-             "fingertips, short bowed legs in black rubber boots, bent forward under the weight"
-             + FRAME + "hazard yellow, bone-white and charcoal, the green glow in the tank is the only bright colour",
-        neg="plague doctor, beak, beak mask, bird mask, crow, teal suit, teal coat, teal clothing, blue coat, orange visor, "
+             "fingertips, short bowed legs in black rubber boots, bent forward under the weight, "
+             "hunched and top-heavy, curved spine, heavy forward shoulders"
+             + FRAME + "hot chemical yellow and acid citron, deep ochre hazard stripes, bone-white and charcoal, "
+             "the green glow in the tank is the only bright colour",
+        neg=NEG_PHOTO + "plague doctor, beak, beak mask, bird mask, crow, teal suit, teal coat, teal clothing, blue coat, orange visor, "
             "orange cap, syringe, needle, weapon, gun, knife, " + NOT_STEAM,
         # front view: a big round tank behind and above a small lowered head, bell-shaped smock, pump arm out to one side
         thumb=[("ellipse", (230, 70, 540, 380), 165),
@@ -78,7 +87,24 @@ CHARS = {
                ("polygon", [(415, 630), (490, 630), (495, 715), (420, 715)], 200),
                ("ellipse", (260, 690, 370, 735), 210), ("ellipse", (405, 690, 515, 735), 210)]),
 }
-ARMS = ["ipa30", "ipa15", "ipa0", "lore", "lore30", "cn"]
+ARMS = ["ipa0", "lore", "cn", "concept"]
+IDENTITY = "/mnt/d/Projects/sporefall-art/assets/identity"
+CONCEPT = {
+    # critic picks, /mnt/d/tmp/cast-walks/critique/concept-picks.md; text from sporefall-art sprites/roster_lore2.py
+    "bog-mender": (f"{IDENTITY}/lore/gauze-mother.png",
+                   PRE + "a tall pale colony caretaker in a floor-length pale linen shift with a wide stiff yoke at the "
+                   "shoulders, six long gauze ribbons hanging from the yoke to the floor, both hands folded at the sternum, "
+                   "hair bound in white cloth, teal-stained fingertips, one small glass vial of glowing green essence hung "
+                   "at the yoke, a narrow bell shape with long vertical streamers" + FRAME +
+                   "bleached bone-white and chalk, salt-crusted linen, dry paper-tan, one cold pale-cyan glow",
+                   "anime, cute, sexy, bare skin, cleavage, "),
+    "drowned-diver": (f"{IDENTITY}/lore/bloat-purser.png",
+                      PRE + "a hugely swollen drowned colonist in a burst grey hooded rain uniform coat that no longer "
+                      "closes, the torso rounded and taut, the hood pulled low over a hidden face, small hands and small "
+                      "head by contrast, short legs sunk into oversized waterlogged black boots, everything sagging, water "
+                      "dripping from the hem" + FRAME + "waterlogged grey-green and drowned slate, silt brown, one weak lamp-yellow",
+                      "helmet, diving helmet, gun, harpoon, weapon, "),
+}
 
 
 def raw_graph(kind: str) -> dict:
@@ -103,15 +129,21 @@ def add_cn(g: dict, image_name: str, strength=0.6, end=0.6) -> dict:
     return g
 
 
-def arm_graph(kind: str, arm: str, seed: int, thumb_name: str | None) -> dict:
+def arm_graph(kind: str, arm: str, seed: int, thumb_name: str | None, concept_name: str | None = None) -> dict:
     spec, g = CHARS[kind], copy.deepcopy(raw_graph(kind))
     r2neg = g["4"]["inputs"]["text"]
-    if arm.startswith("lore") or arm == "cn":
+    if arm in ("lore", "cn"):
         g["3"]["inputs"]["text"] = spec["lore"]
         g["4"]["inputs"]["text"] = spec["neg"] + r2neg
-    if arm == "ipa15" or arm == "lore30":
-        g["9"]["inputs"]["weight"] = 0.15 if arm == "ipa15" else 0.3
-    if arm in ("ipa0", "lore", "cn"):
+    if arm == "concept":
+        _, pos, neg = CONCEPT[kind]
+        ground, tail = r2neg.index("ground, dirt patch"), r2neg.index("two characters")
+        body = r2neg[ground:tail].split("elongated,")[0]  # the ground/shadow negatives, not the thin-body ones
+        g["3"]["inputs"]["text"] = pos
+        g["4"]["inputs"]["text"] = NEG_PHOTO + neg + NOT_STEAM + "teal suit, orange visor, orange cap, " + body + r2neg[tail:]
+        g["20"]["inputs"]["image"] = concept_name
+        g["9"]["inputs"].update(weight=0.5, weight_type="linear", end_at=0.8)
+    else:
         drop_ipa(g)
     if arm == "cn":
         add_cn(g, thumb_name)
@@ -134,12 +166,13 @@ def thumbs():
 
 def gen(kind: str):
     thumb = comfy.upload(f"{OUT}/{kind}/thumb.png")
+    concept = comfy.upload(CONCEPT[kind][0])
     jobs = []
     for arm in ARMS:
-        for s in SEEDS:
-            pid = comfy.post("/prompt", {"prompt": arm_graph(kind, arm, s, thumb)})["prompt_id"]
+        for s in CHARS[kind]["seeds"]:
+            pid = comfy.post("/prompt", {"prompt": arm_graph(kind, arm, s, thumb, concept)})["prompt_id"]
             jobs.append((pid, arm, s))
-    json.dump({a: arm_graph(kind, a, SEEDS[0], thumb) for a in ARMS}, open(f"{OUT}/{kind}/graphs.json", "w"), indent=1)
+    json.dump({a: arm_graph(kind, a, CHARS[kind]["seeds"][0], thumb, concept) for a in ARMS}, open(f"{OUT}/{kind}/graphs.json", "w"), indent=1)
     pending = list(jobs)
     t0 = time.time()
     while pending:
@@ -166,7 +199,7 @@ def gen(kind: str):
 
 
 def candidates(kind: str) -> dict[str, list[tuple[int, Image.Image]]]:
-    return {arm: [(s, Image.open(f"{OUT}/{kind}/{arm}/s{s}.png").convert("RGBA")) for s in SEEDS] for arm in ARMS}
+    return {arm: [(s, Image.open(f"{OUT}/{kind}/{arm}/s{s}.png").convert("RGBA")) for s in CHARS[kind]["seeds"]] for arm in ARMS}
 
 
 def fit(im: Image.Image, w: int, h: int) -> Image.Image:
@@ -175,22 +208,37 @@ def fit(im: Image.Image, w: int, h: int) -> Image.Image:
     return im
 
 
-def sheet(kind: str):
-    rows = [("shipped", [(0, load(kind))], [Image.open(os.path.join(HERE, "raws", f"char.{kind}.s-idle.png")).convert("RGBA")])]
-    rows += [(arm, [(s, post.sprite(im, 96, 92)) for s, im in c], [im for _, im in c]) for arm, c in candidates(kind).items()]
+def sheet(kind: str, context=("drowned-diver", "mycologist", "bog-mender", "blast-diver")):
+    """Top: the picks (PICKS="arm:seed,...") in the shipped lineup at 96 and 192 px on swamp. Below: every arm."""
+    seeds = CHARS[kind]["seeds"]
+    cands = candidates(kind)
+    picks = [p.split(":") for p in os.environ.get("PICKS", "").split(",") if p]
+    band = [(k, load(k)) for k in context if k != kind] + [(f"{kind} shipped", load(kind))]
+    band += [(f"{arm} {s}", post.sprite(dict(cands[arm])[int(s)], 96, 92)) for arm, s in picks]
+    rows = [("shipped", [load(kind)], [Image.open(os.path.join(HERE, "raws", f"char.{kind}.s-idle.png")).convert("RGBA")])]
+    rows += [(arm, [post.sprite(im, 96, 92) for _, im in c], [im for _, im in c]) for arm, c in cands.items()]
     big, pad, lab = 200, 8, 16
-    W = 90 + 4 * 100 + pad + 4 * (big + pad)
-    H = lab + len(rows) * (big + pad)
+    W = max(90 + 4 * 100 + pad + 4 * (big + pad), pad + len(band) * 200)
+    top = lab + 96 + lab + 192 + pad
+    H = top + lab + len(rows) * (big + pad)
     sh = Image.new("RGBA", (W, H), (236, 234, 226, 255))
     d = ImageDraw.Draw(sh)
-    d.text((pad, 2), f"{kind}: seeds {SEEDS[0]}-{SEEDS[-1]} in every arm. Left: 96 px game scale on swamp (12,20,22). Right: raw still.",
-           fill=(20, 24, 24, 255))
+    ink, gold = (20, 24, 24, 255), (255, 210, 120, 255)
+    d.rectangle((0, 0, W, top), fill=SWAMP + (255,))
+    d.text((pad, 2), f"{kind}: picks beside the shipped cast, 96 px (game scale) and 2x, swamp ground (12,20,22)", fill=gold)
+    for i, (name, im) in enumerate(band):
+        d.text((pad + i * 200, lab + 96 + 2), name, fill=gold)
+        sh.alpha_composite(im, (pad + i * 200 + 48, lab))
+        sh.alpha_composite(im.resize((192, 192), Image.NEAREST), (pad + i * 200, lab + 96 + lab))
+    d.text((pad, top + 2), f"every arm, seeds {seeds[0]}-{seeds[-1]} in each. Left: 96 px on swamp. Right: the raw still.", fill=ink)
     for r, (arm, small, larges) in enumerate(rows):
-        y = lab + r * (big + pad)
-        d.text((pad, y + big // 2), arm, fill=(20, 24, 24, 255))
+        y = top + lab + r * (big + pad)
+        d.text((pad, y + big // 2), arm, fill=ink)
         d.rectangle((90, y, 90 + 4 * 100, y + big), fill=SWAMP + (255,))
-        for i, (_, im) in enumerate(small):
+        for i, im in enumerate(small):
             sh.alpha_composite(im, (92 + i * 100, y + (big - 96) // 2))
+            if arm != "shipped":
+                d.text((94 + i * 100, y + big - 14), str(seeds[i]), fill=gold)
         for i, im in enumerate(larges):
             sh.alpha_composite(fit(im, big, big), (90 + 4 * 100 + pad + i * (big + pad), y))
     path = f"{OUT}/{kind}/sheet.png"

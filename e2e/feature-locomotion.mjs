@@ -1,7 +1,7 @@
 // Each body moves the way its ART is drawn (fix/locomotion-by-kind), on the
 // default swampspace-hires pack. Top row, standing: spore-drone (cop) and
-// gloom-lurker float, brood-sac (pod) and sporeling-mite pulse, the
-// frog-settler only breathes. Below it a spore-drone paces east-west, floating
+// gloom-lurker float, brood-sac (pod) pulses, sporeling-mite and the
+// frog-settler only breathe. Below it a spore-drone paces east-west, floating
 // harder and taking no steps; below the player a frog-settler paces on its
 // drawn 8-frame walk with no procedural bob on top. Staging follows
 // feature-scientist-walk.mjs: NPC brains off, speed halved, a rAF loop resends

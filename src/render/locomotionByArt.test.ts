@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest'
 import { Texture, type Renderer } from 'pixi.js'
 import { createArt, type CharSet, type DirPose, type SpriteTextures } from './art'
 import { ANIM_STATES, MAX_ANIM_FRAMES } from './animState'
+import { MOTION } from './motion'
 import { EntityViews } from './sprites'
 import {
   BASE_THEME_ID,
@@ -72,7 +73,8 @@ const fakeRenderer = { generateTexture: () => Texture.EMPTY } as unknown as Rend
 
 /** The sprite transform over 120 ticks for one character standing still or
  * walking east: how far it LIFTS (px of vertical travel), WIDENS (range of
- * |scale.x|) and BREATHES (range of scale.y). */
+ * |scale.x|), BREATHES (range of scale.y), ROCKS (range of rotation) and TILTS
+ * (largest |rotation|, where a walker's lean into its heading shows). */
 const observe = (chain: ThemeChain, archetype: string, moving: boolean) => {
   const art = createArt(fakeRenderer, fakeBake(chain), {}, {}, true)
   const views = new EntityViews(art)
@@ -80,6 +82,8 @@ const observe = (chain: ThemeChain, archetype: string, moving: boolean) => {
   const ys: number[] = []
   const sxs: number[] = []
   const sys: number[] = []
+  const rots: number[] = []
+  if (moving) e.vel = { x: 2, y: 0 }
   for (let tick = 200; tick < 320; tick++) {
     if (moving) {
       e.prevPos = { ...e.pos }
@@ -90,9 +94,16 @@ const observe = (chain: ThemeChain, archetype: string, moving: boolean) => {
     ys.push(s.position.y)
     sxs.push(Math.abs(s.scale.x))
     sys.push(s.scale.y)
+    rots.push(s.rotation)
   }
   const range = (v: number[]): number => Math.max(...v) - Math.min(...v)
-  return { lift: range(ys), widen: range(sxs), breathe: range(sys) }
+  return {
+    lift: range(ys),
+    widen: range(sxs),
+    breathe: range(sys),
+    rock: range(rots),
+    tilt: Math.max(...rots.map(Math.abs)),
+  }
 }
 
 type Gait = 'hover' | 'pulse' | 'stride'
@@ -114,12 +125,11 @@ const BASE = chainFor(BASE_THEME_ID)
 const CITY = chainFor('city')
 
 describe('locomotion follows the drawn body, at the entity layer', () => {
-  it('the swampspace packs draw cop/lurker as fliers (hover) and pod/sporeling as sacs (pulse)', () => {
+  it('the swampspace packs draw cop/lurker as fliers (hover) and pod as a sac (pulse)', () => {
     for (const [name, chain] of [['swampspace-hires', HIRES], ['swampspace', BASE]] as const) {
       expect(idleGait(chain, 'cop'), `${name} cop = spore-drone`).toBe('hover')
       expect(idleGait(chain, 'lurker'), `${name} lurker = gloom-lurker`).toBe('hover')
       expect(idleGait(chain, 'pod'), `${name} pod = brood-sac`).toBe('pulse')
-      expect(idleGait(chain, 'sporeling'), `${name} sporeling = sporeling-mite`).toBe('pulse')
     }
   })
 
@@ -183,6 +193,48 @@ describe('locomotion follows the drawn body, at the entity layer', () => {
   })
 })
 
+describe('the sporeling-mite walks on two short legs, with a waddle', () => {
+  // The kind alone, with no drawn walk: the gait is the procedural one.
+  const MITE = overlay({ 'char.sporeling.s-idle': ['chars/sporeling-mite-s-idle.png'] }, [])
+
+  it('in both swampspace packs it stands like a walker, breathing, while the brood-sac still pulses', () => {
+    for (const [name, chain] of [['swampspace-hires', HIRES], ['swampspace', BASE]] as const) {
+      expect(idleGait(chain, 'sporeling'), `${name} sporeling`).toBe('stride')
+      expect(observe(chain, 'sporeling', false).breathe, `${name} sporeling`).toBeGreaterThan(0)
+      expect(idleGait(chain, 'pod'), `${name} pod`).toBe('pulse')
+    }
+  })
+
+  it('in both swampspace packs a walking sporeling leans into its heading and never pulses', () => {
+    for (const [name, chain] of [['swampspace-hires', HIRES], ['swampspace', BASE]] as const) {
+      const o = observe(chain, 'sporeling', true)
+      expect(o.widen, `${name} widen`).toBe(0)
+      expect(o.tilt, `${name} tilt`).toBeGreaterThanOrEqual((2 / MOTION.lean.refSpeed) * MOTION.lean.rad - 1e-9)
+    }
+  })
+
+  it('on procedural art it rocks side to side over its feet, rising at most a pixel', () => {
+    const o = observe(MITE, 'sporeling', true)
+    expect(o.rock).toBeGreaterThan(1.8 * MOTION.waddle.rad)
+    expect(o.lift).toBeGreaterThan(0.5)
+    expect(o.lift).toBeLessThanOrEqual(MOTION.waddle.rise + 1e-9)
+    expect(o.widen).toBe(0)
+  })
+
+  it('the waddle belongs to the mite: a striding frog-settler, a thug and a moving brood-sac do not rock', () => {
+    expect(observe(HIRES, 'civilian', true).rock).toBe(0)
+    expect(observe(HIRES, 'thug', true).rock).toBe(0)
+    const sac = observe(HIRES, 'pod', true)
+    expect(sac.rock).toBe(0)
+    expect(sac.lift).toBe(0)
+    expect(sac.widen).toBeGreaterThan(0)
+  })
+
+  it('standing still, it does not rock', () => {
+    expect(observe(MITE, 'sporeling', false).rock).toBe(0)
+  })
+})
+
 describe('drawn cycles are not bobbed twice', () => {
   const drawnLoop = (name: string, kind: string, state: 'idle' | 'walk', count: number): Record<string, string[]> => {
     const out: Record<string, string[]> = {}
@@ -209,10 +261,17 @@ describe('drawn cycles are not bobbed twice', () => {
 
   it('a pack that draws the idle loop owns the idle motion too', () => {
     const drone = overlay(drawnLoop('cop', 'spore-drone', 'idle', 4), HIRES)
-    expect(observe(drone, 'cop', false)).toEqual({ lift: 0, widen: 0, breathe: 0 })
+    expect(observe(drone, 'cop', false)).toEqual({ lift: 0, widen: 0, breathe: 0, rock: 0, tilt: 0 })
     const ranger = overlay(drawnLoop('player', 'vine-ranger', 'idle', 4), HIRES)
     expect(observe(ranger, 'player', false).breathe).toBe(0)
     expect(observe(HIRES, 'player', false).breathe).toBeGreaterThan(0)
+  })
+
+  it('a sporeling whose walk is drawn: the frames carry the waddle, the lean stays', () => {
+    const o = observe(overlay(walkFrames('sporeling', 'sporeling-mite', 8), HIRES), 'sporeling', true)
+    expect(o.rock).toBe(0)
+    expect(o.lift).toBe(0)
+    expect(o.tilt).toBeCloseTo((2 / MOTION.lean.refSpeed) * MOTION.lean.rad)
   })
 
   it('a one-frame drawn clip is a held pose, not a cycle: the procedural motion stays', () => {

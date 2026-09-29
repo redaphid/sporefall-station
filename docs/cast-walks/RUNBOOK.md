@@ -106,6 +106,18 @@ A failure means a retake (max 3 per direction). **A gate that fails on good art,
 6. Deploy: `git push -f origin art/cast-walk-cycles:preview/cast-walks`. Wait: `gh run list --workflow preview-web.yml --branch preview/cast-walks -L 1 --json status,conclusion,headSha` until `completed`/`success` and `headSha` = your HEAD.
 7. Verify from the target: `curl -s https://sporefall.hypnodroid.com/betas/cast-walks/themes/swampspace-hires/chars/<char>-e-walk-3.png | sha256sum` equals `sha256sum public/themes/swampspace-hires/chars/<char>-e-walk-3.png`. Log the beta URL, the sha, and the live character list in PROGRESS.md.
 
+## In-game video (Step 3 proof)
+
+Headless Chromium on this box has no GL context (ANGLE `xcb_connect failed`; `--use-angle=swiftshader` closes the page), so record through the headed Windows Chrome already listening on `127.0.0.1:9222`, against a local preview of the build, never the live site:
+
+```sh
+export PATH=~/.local/bin:~/.local/node22/bin:$PATH
+corepack pnpm exec vite build && (corepack pnpm exec vite preview --port 4917 --strictPort --host 127.0.0.1 &)
+BASE_URL=http://127.0.0.1:4917 E2E_CDP=http://127.0.0.1:9222 E2E_OUT=/mnt/d/tmp/cast-walks/<char>/ingame node e2e/feature-<arch>-walk.mjs
+```
+
+Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a39): 8 of the archetype on a ring, each pacing one compass sector, NPC brains off, speed halved so each leg reads. Look at a still yourself before sending; `2cb` the MP4, a 4 s GIF and a still; save them under `/mnt/d/tmp/cast-walks/<char>/ingame/`. It opens a visible context in Aaron's Chrome while it records.
+
 ## Every image carries its flow
 
 - The CLI sends the editor graph as `extra_data.extra_pnginfo.workflow`, so ComfyUI's keyframe PNG and walk MP4 embed `workflow` + `prompt`; they are kept untouched as `raw/<dir>-keyframe-comfy.png` and `raw/<dir>-walk-comfy.mp4`.

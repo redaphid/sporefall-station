@@ -601,6 +601,14 @@ def main():
         check("describe-back: refused off the video route before anything is queued",
               raises(lambda: S.main([src, "--out", os.path.join(tmp, "qback"), "--method", "qwen",
                                      "--describe-back", "a back"])) and len(Fake.prompts) == nb)
+        nb = len(Fake.prompts)
+        S.main([src, "--out", os.path.join(tmp, "scuttle"), "--method", "video", "--dirs", "e", "--motion", "scuttle",
+                "--describe", "a crawler on eight stilt legs"])
+        sc = view_prompts(nb, "e")
+        sm = json.load(open(os.path.join(tmp, "scuttle", "video-s3", "sheet.json")))
+        check("motion: scuttle asks Wan for a two-group, two-beat gait after the describe, standing keyframe, open loop",
+              "two alternating groups" in sc and "arms swing" not in sc and sc.index("stilt legs") < sc.index("scuttles")
+              and "standing still" in sc and sm.get("motion") == "scuttle" and not sm["loops"]["e"].get("closed"), sc)
         n1 = len(Fake.prompts)
         check("motion: an unknown motion is refused before anything is queued",
               raises(lambda: S.main([src, "--out", os.path.join(tmp, "swim"), "--method", "video", "--motion", "swim"]))

@@ -552,6 +552,14 @@ MOTIONS = {
                    "walks in place like a video game walk cycle: the legs step forward and back one after another "
                    "with big, clear, full strides, the arms swing, the body bobs gently, and it never moves across "
                    "the frame", closed=False),
+    # Many legs. Told to walk, Wan steps each leg at its own phase and the clip never repeats
+    # (mireclaw-stalker legs 0.5-1.8 x a frame step at the best loop point, the mycologist's 0.1-0.3),
+    # so the legs move as two groups: two phases, like a biped's stride.
+    "scuttle": Motion(POSES["idle"],
+                      "scuttles in place like a video game walk cycle: its legs move in two alternating groups, one "
+                      "group lifts and steps forward while the other group stays planted, then the groups swap, the "
+                      "same short quick two-beat step repeating over and over at an even pace, the body stays level, "
+                      "and it never moves across the frame", closed=False),
     # One rigid piece, once, first = last frame. Spore-drone, seven takes: limbs swinging on their own
     # never repeat, and even a rigid bob keeps no steady rhythm, so only a clip that must end where it
     # started loops.
@@ -1454,7 +1462,8 @@ def main(argv=None):
                     help=f"video: the describe for the back views ({', '.join(BACK_DIRS)}), whose face is hidden "
                          "(default --describe); keep face parts out of it or they are drawn on the back")
     ap.add_argument("--motion", choices=list(MOTIONS), default="walk",
-                    help="video: how it moves in place; hover = fliers (bob, never step), pulse = rooted things")
+                    help="video: how it moves in place; scuttle = many legs (two-beat gait), hover = fliers (bob, never "
+                         "step), pulse = rooted things")
     ap.add_argument("--style", help=f"style sentence (default: {STYLE!r})")
     ap.add_argument("--name", help="run name (default: image file name)")
     ap.add_argument("--kind", help="frame file prefix (default: the name, slugged)")

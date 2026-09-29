@@ -64,3 +64,8 @@ animated yet".
   loop, rule-11 seam exception.
 - **Next pass:** the characters already animated (mycologist, vine-ranger, drowned-diver, blast-diver,
   frog-settler, mireclaw-stalker, sporeling-mite, cinder-husk) get the same concept-art treatment.
+
+**10:55 update (Aaron):** the v2 concept picks are rejected ("It needs to focus more on pixel art and
+how thin some of those would be"). The critic re-picks under the pixel-art / thickness-first CRITIC.md.
+**Keep, never redesign:** frog-settler, sporeling-mite, mycologist.
+

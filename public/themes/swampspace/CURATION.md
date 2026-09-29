@@ -285,3 +285,37 @@ Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
 
 Nothing parked. Frame heights: 88-92 px on the hi-res pack, 43-46 on the 48 px
 pack, every direction.
+
+## blast-diver (breacher), 2026-09-29: the shipped design, walking
+
+The raid's sapper (`npcs.ts` `breacher`) had one frame, the August hires
+s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 kept the shipped design, lore family A (salvage caste): the colony's hatch-breacher in the station's heirloom blast hard suit, a huge round charcoal helmet with one orange visor (the single hot accent), tan canvas cuffs. It holds nothing, so no cleanup was needed; the renderer draws its weapon at the hand (`weaponArt.ts`) |
+| input | the shipped hires s-idle as is, sha256 `f47c7de3f5bb9ab7…`, archived at `/mnt/d/tmp/cast-walks/archive/blast-diver/anchor-2026-09-29/` |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction; `--describe` (visor, valve canisters, tan cuffs, belt lights) for s/se/e. ne/n: the first face-free `--describe-back` named no back gear and Qwen drew twin slim tanks that the VLM read as a front view; the second names one upright air tank with two hoses into the helmet, matching the tank the e view drew |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848x480, 81 frames at 16 fps, `--motion walk` |
+| takes | s and e from take1 (seed 3). se take3 (seed 23): take1 turned to face front mid-clip (1.093), take2 missed by .032 (.532). n take3 and ne take2 (seed 11, second back describe) |
+| loops | the shortest full stride: s period 17 (seam .356), se 19 (.327), e 22 (.287), ne 24 (.297), n 21 (.679) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.breacher.*`, the only archetype on `blast-diver` |
+
+Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .356 / .327 / .287 / .297 / .679 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .085-.193, head .028-.068 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Gate 4b same was fixed on the way (7046bba): it counted the front's visor
+against every back view. Nothing parked. Frame heights: 84-90 px on the
+hi-res pack, 42-45 on the 48 px pack.

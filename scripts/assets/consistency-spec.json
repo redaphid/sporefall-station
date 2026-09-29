@@ -306,12 +306,12 @@
  "blast-diver": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 34,
+   "height": 45,
+   "width": 32,
    "head_h": 31,
-   "mass": 956,
-   "cx": -0.12,
-   "foot_y": 45
+   "mass": 943,
+   "cx": -0.07,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

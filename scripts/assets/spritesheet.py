@@ -780,31 +780,60 @@ def preview(raws, frames, dirs, poses, canvas, cell=192):
 
 
 # ---- post for the video route ----------------------------------------------------
-def find_loop(frames: list, pmin: int = 32, pmax: int = 64, skip: int = 6, window: int = 4) -> dict:
-    """The best full-stride loop in a walk clip: the period P and start s minimising the
-    difference between frames s..s+window and s+P..s+P+window. A WINDOW, not one frame:
+def find_loop(frames: list, pmin: int = 12, pmax: int = 64, skip: int = 6, window: int = 4,
+              tol: float = 1.5, half: float = 0.6) -> dict:
+    """The shortest FULL-stride loop in a walk clip. For each period P, the start s minimising
+    the difference between frames s..s+window and s+P..s+P+window. A WINDOW, not one frame:
     a single pose recurs twice per stride (the leg passing forward, then back), so a
-    one-frame match finds loops that jump the motion backwards at the seam. `pmin` keeps
-    it a FULL stride: a front-view half stride (legs swapped) looks almost like a whole
-    one, and the frog's real periods were 38-54 frames at 16 fps. `seam` is the loop
-    point's difference relative to an ordinary frame-to-frame step: under 1.0, the loop
-    point is smoother than a normal step."""
+    one-frame match finds loops that jump the motion backwards at the seam.
+
+    Every whole number of strides matches, so the best-scoring period is often two or three
+    strides (the mycologist: e stride 20 frames, best score at 40; s best at 57). Cut into 8
+    cells, that plays two or three strides per loop, at double or triple leg speed. So the
+    answer is the SHORTEST period scoring within `tol` of the best, unless it is a half
+    stride (legs swapped): a period whose double scores under `half` of its own score is a
+    half, and is skipped. `seam` is the loop point's difference relative to an ordinary
+    frame-to-frame step: under 1.0, the loop point is smoother than a normal step."""
     small = [np.asarray(f.convert("L").resize((212, 120), Image.BILINEAR), np.float32) for f in frames]
     n = len(small)
     steps = [float(np.abs(small[t + 1] - small[t]).mean()) for t in range(skip, n - 1)]
-    step = float(np.median(steps)) if steps else 1.0
-    best = None
+    step = max(float(np.median(steps)) if steps else 1.0, 1e-6)
+    per = {}  # period -> (match / step, start)
     for p in range(pmin, min(pmax, n - skip - window) + 1):
         for s in range(skip, n - p - window + 1):
-            e = float(np.mean([np.abs(small[s + k] - small[s + p + k]).mean() for k in range(window)]))
-            if best is None or e < best[0]:
-                best = (e, p, s)
-    if best is None:
+            e = float(np.mean([np.abs(small[s + k] - small[s + p + k]).mean() for k in range(window)])) / step
+            if p not in per or e < per[p][0]:
+                per[p] = (e, s)
+    if not per:
         raise SystemExit(f"clip of {n} frames is too short for a loop of {pmin}-{pmax} (lower --period)")
-    e, p, s = best
+    best = min(e for e, _ in per.values())
+    limit = tol * best + 0.02
+
+    def is_half(p):
+        doubles = [per[q][0] for q in range(2 * p - 2, 2 * p + 3) if q in per]
+        return bool(doubles) and min(doubles) < half * per[p][0]
+
+    ps = sorted(per)
+    minima = [p for i, p in enumerate(ps)
+              if per[p][0] <= limit and all(per[p][0] <= per[q][0] for q in ps[max(0, i - 2):i + 3])]
+    p = next((q for q in minima if not is_half(q)), min(per, key=lambda q: per[q][0]))
+    e, s = per[p]
     seam = float(np.abs(small[s] - small[s + p]).mean())
-    return {"period": p, "start": s, "seam": round(seam / max(step, 1e-6), 3), "step": round(step, 3),
-            "match": round(e, 3)}
+    return {"period": p, "start": s, "seam": round(seam / step, 3), "step": round(step, 3),
+            "match": round(e, 3), "candidates": {q: round(per[q][0], 2) for q in minima}}
+
+
+def period_ranges(spec: str, dirs) -> dict:
+    """--period '12:64' for every direction, or '12:64,n=14:18,e=16:24' per direction."""
+    out, default = {}, (12, 64)
+    for part in spec.split(","):
+        key, _, rng = part.rpartition("=")
+        lo, hi = (int(x) for x in rng.split(":"))
+        if key:
+            out[key] = (lo, hi)
+        else:
+            default = (lo, hi)
+    return {d: out.get(d, default) for d in dirs}
 
 
 def cut_loop(frames: list, loop: dict, n: int = 8) -> list:
@@ -1028,7 +1057,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
         w, notes = dict(WAN), []
     for n in notes:
         print(" ·", n)
-    pmin, pmax = (int(x) for x in a.period.split(":"))
+    ranges = period_ranges(a.period, dirs)
     input_name = upload(src, f"spritesheet-{kind}.png") if online else f"spritesheet-{kind}.png"
     runs = []
     for seed in a.seeds or [3]:  # the frog's seed
@@ -1060,6 +1089,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
                 frames = {k: ImageOps.mirror(v) for k, v in frames.items()}
             if (d, "keyframe") in frames:
                 frames[(d, "keyframe")].save(f"{out}/raw/{d}-keyframe.png")
+            pmin, pmax = ranges[d]
             if len(clip) < pmin + 8:
                 print(f"  ! {d}: {len(clip)} frames, too few for a {pmin}+ frame loop; row stays empty")
                 continue
@@ -1078,7 +1108,8 @@ def cmd_video(a, dirs, kind, root, src, pal):
             for i, f in enumerate(cyc):
                 f.save(f"{out}/raw/{d}-walk-{i}.png")
             print(f"  {d}: loop of {loop['period']} frames from {loop['start']}, seam {loop['seam']} "
-                  f"(under 1.0 = smoother than a normal step)  [{time.time() - t0:.0f}s]")
+                  f"(under 1.0 = smoother than a normal step; candidates {loop['candidates']})  "
+                  f"[{time.time() - t0:.0f}s]")
         dirs_run = [d for d in dirs if d in loops]
         if not dirs_run:
             continue
@@ -1109,16 +1140,17 @@ def cmd_repack(a):
     a.size = a.size or meta.get("canvas", 48)
     a.palette = a.palette or meta.get("palette", "input")
     if a.period and meta.get("method") == "video":  # re-find the loop in the saved clips, then re-cut
-        pmin, pmax = (int(x) for x in a.period.split(":"))
+        ranges = period_ranges(a.period, dirs)
         for d in dirs:
             clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(f"{a.run}/raw/walk-{d}/*.png"))]
-            loop = find_loop(clip, pmin, pmax)
+            loop = find_loop(clip, *ranges[d])
             cyc = cut_loop(clip, loop)
             meta.setdefault("loops", {})[d] = loop
             cyc[widest(cyc)].save(f"{a.run}/raw/{d}-step.png")
             for i, f in enumerate(cyc):
                 f.save(f"{a.run}/raw/{d}-walk-{i}.png")
-            print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}")
+            print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}  "
+                  f"(candidates {loop['candidates']})")
     raws = {}
     for d in dirs:
         for p in poses:
@@ -1237,7 +1269,8 @@ def main(argv=None):
         ap = argparse.ArgumentParser(prog="spritesheet.py repack", parents=[post])
         ap.add_argument("run", help="a finished run dir (holds sheet.json and raw/)")
         ap.add_argument("--to", help="write here instead of over the run")
-        ap.add_argument("--period", help="video runs: re-find the loop in this frame range, e.g. 40:64")
+        ap.add_argument("--period", help="video runs: re-find the loop in this frame range, e.g. 12:64, "
+                                             "or per direction: 12:64,n=14:18")
         return cmd_repack(ap.parse_args(argv))
     if sub == "flows":
         ap.add_argument("--to", default=FLOWS)
@@ -1249,7 +1282,9 @@ def main(argv=None):
     ap.add_argument("image", help="the character: any size, PNG with alpha or on a plain background")
     ap.add_argument("--method", choices=["qwen", "video", "grid", "sdxl"], default="qwen",
                     help="video = the frog-settler route (Qwen keyframe + Wan 2.2 walk), 96 px")
-    ap.add_argument("--period", default="32:64", help="video: loop length range in frames (a FULL stride)")
+    ap.add_argument("--period", default="12:64", help="video: loop length range in frames, all directions "
+                                                        "(12:64) or per direction (12:64,e=16:24); the "
+                                                        "shortest full stride in range wins")
     ap.add_argument("--dirs", default=",".join(PACK_DIRS), help=f"of {','.join(DIRS)}")
     ap.add_argument("--frames", default="basic",
                     help="preset (" + ", ".join(k + "=" + "+".join(v) for k, v in PRESETS.items())

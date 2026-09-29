@@ -468,7 +468,13 @@ def main():
         lp = S.find_loop(clip)
         check("loop: finds the full 40-frame stride, not the half", lp["period"] == 40, lp)
         check("loop: seam smoother than an ordinary step", lp["seam"] < 1.0, lp)
-        check("loop: a clip too short says so", raises(lambda: S.find_loop(clip[:30])))
+        check("loop: a clip too short says so", raises(lambda: S.find_loop(clip[:20])))
+        # a short-legged walker: 20-frame stride, so 40 and 60 match as well; cut one stride, not three
+        quick = [wren(stride=int(60 * min(1, i / 6) * np.sin(2 * np.pi * i / 20)), size=240) for i in range(81)]
+        lq = S.find_loop(quick)
+        check("loop: the shortest full stride (20), not two or three of them", lq["period"] == 20, lq)
+        check("loop: per-direction --period ranges", S.period_ranges("12:64,n=14:18", ["s", "n"])
+              == {"s": (12, 64), "n": (14, 18)})
         sp = Image.new("RGBA", (5, 5), (36, 86, 92, 255))
         sp.putpixel((2, 2), (250, 250, 250, 255))
         check("despeckle: an isolated white pixel takes its neighbours' colour",

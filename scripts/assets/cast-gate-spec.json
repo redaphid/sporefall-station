@@ -6,6 +6,15 @@
   "n": 1.0
  },
  "_seam_max_dir": "Aaron's decision, 2026-09-29: n (the back view) gets 1.0; every other direction keeps 0.5. The mycologist's three n takes measured 0.56 / 0.79 / 0.91 against 0.5.",
+ "seam_exception": {
+  "mireclaw-stalker": {
+   "s": 1.6,
+   "se": 1.4,
+   "e": 0.6,
+   "ne": 1.4
+  }
+ },
+ "_seam_exception": "Per-kind, testing only, flagged for a redo in both CURATION.md. mireclaw-stalker: Aaron, 2026-09-29 09:3x, 'Let's use what we have for now. The earlier stalker animations were pretty good, except for a flash near his feet, and possibly the loop.' Eight legs step at independent phases, so Wan I2V gives no loop point under 0.5 (best single-frame seams across 3 takes: s .48 off-model, se 1.32, ne 1.15). Ceilings are the shipped loops' measured seams rounded up to 0.1: s 1.564 (take2 P25), se 1.341 (take2 P24), e .566 (take1 P24), ne 1.31 (take2 P24); n .983 is under n's 1.0. Unpark path: the rotoscope rig (QUEUE.md).",
  "colour": {
   "anchor": "s-idle",
   "anchor_share": 0.005,

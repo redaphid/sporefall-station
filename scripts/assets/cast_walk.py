@@ -367,6 +367,13 @@ def colour_drift(kind, pack="swampspace-hires"):
     return res
 
 
+def seam_limits(kind):
+    """Gate 1's ceiling per direction: seam_max, then seam_max_dir, then this kind's seam_exception."""
+    lim = {d: SPEC.get("seam_max_dir", {}).get(d, SPEC["seam_max"]) for d in DIRS}
+    lim.update({d: v for d, v in SPEC.get("seam_exception", {}).get(kind, {}).items() if d in DIRS})
+    return lim
+
+
 def cmd_gate(a):
     """Every ship gate, thresholds from cast-gate-spec.json. Exit 0 only if every one passes."""
     run, kind = os.path.abspath(a.run), a.kind
@@ -378,7 +385,7 @@ def cmd_gate(a):
 
     loops = json.load(open(f"{run}/sheet.json"))["loops"]
     out["seam"] = {d: loops[d]["seam"] for d in DIRS}
-    lim = {d: SPEC.get("seam_max_dir", {}).get(d, SPEC["seam_max"]) for d in DIRS}
+    lim = seam_limits(kind)
     bad = {d: v for d, v in out["seam"].items() if v > lim[d]}
     say("1 loop seam", not bad, " ".join(f"{d} {v}/{lim[d]}" for d, v in out["seam"].items()))
 

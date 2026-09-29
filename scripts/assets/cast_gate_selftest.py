@@ -80,6 +80,13 @@ for clip in ("muck_slog", "net_cast", "run"):
                     "-i", f"{REJECTS}/{clip}_40fps_15s.mp4", "-vf", "fps=16", "-frames:v", "40", f"{out}/%04d.png"], check=True)
     gate5(f"rejected boil clip {clip} @16fps", False, sorted(glob.glob(f"{out}/*.png")), 8, 16)
 
+print("gate 1: a seam_exception moves only its own kind's ceiling")
+for kind, d, seam, want in (("mireclaw-stalker", "se", 1.341, True), ("mireclaw-stalker", "se", 1.41, False),
+                            ("mireclaw-stalker", "n", 1.01, False), ("mycologist", "se", 1.341, False),
+                            ("mycologist", "se", 0.5, True), ("frog-settler", "e", 0.566, False)):
+    lim = C.seam_limits(kind)[d]
+    expect(f"{kind} {d} seam {seam}", want, seam <= lim, f"limit {lim}")
+
 print(f"gate 6b: off-palette share <= {C.SPEC['palette']['off_max']}")
 myco = [os.path.join(CHARS, f"mycologist-{d}-{q}.png") for d in C.DIRS for q in C.POSES]
 v = C.off_palette(myco)

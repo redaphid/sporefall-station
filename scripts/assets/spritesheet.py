@@ -154,9 +154,15 @@ def upload(img: Image.Image, name: str) -> str:
     return json.loads(http("/upload/image", body, f"multipart/form-data; boundary={b}"))["name"]
 
 
-def queue(graph: dict) -> str:
+def queue(graph: dict, workflow: dict | None = None) -> str:
+    """Queue an API graph. `workflow` (the editor format) rides along as extra_pnginfo, so every
+    SaveImage/SaveVideo output embeds it and dragging the file into ComfyUI rebuilds the graph;
+    without it an output carries only the API `prompt`, which the editor can't lay out."""
+    body = {"prompt": graph}
+    if workflow is not None:
+        body["extra_data"] = {"extra_pnginfo": {"workflow": workflow}}
     try:
-        return http_json("/prompt", data=json.dumps({"prompt": graph}).encode())["prompt_id"]
+        return http_json("/prompt", data=json.dumps(body).encode())["prompt_id"]
     except urllib.error.HTTPError as e:  # 400 = validation: say WHICH node and input
         raise SystemExit(f"ComfyUI rejected the graph:\n{e.read().decode()[:3000]}")
 
@@ -198,10 +204,30 @@ def cancel(pids) -> None:
         print(f"  ! could not cancel queued prompts {[p[:8] for p in pids]}: {e}")
 
 
-def fetch(im: dict) -> Image.Image:
+def fetch_bytes(im: dict) -> bytes:
     q = urllib.parse.urlencode({"filename": im["filename"], "subfolder": im.get("subfolder", ""),
                                 "type": im.get("type", "output")})
-    return Image.open(io.BytesIO(http(f"/view?{q}", timeout=120))).convert("RGB")
+    return http(f"/view?{q}", timeout=120)
+
+
+def fetch(im: dict) -> Image.Image:
+    return Image.open(io.BytesIO(fetch_bytes(im))).convert("RGB")
+
+
+def flow_info(run: str, d: str | None = None):
+    """PNG tEXt `prompt` + `workflow` for a frame of direction `d`, from the run's saved flow
+    (flow-<d>.json per direction on the video route, flow.json otherwise). Post-processed frames
+    lose ComfyUI's own chunks; these put the graph back, so a sprite dragged into ComfyUI
+    opens the flow that drew it."""
+    from PIL import PngImagePlugin
+    for stem in ([f"flow-{d}"] if d else []) + ["flow"]:
+        api, wf = f"{run}/{stem}_api.json", f"{run}/{stem}.json"
+        if os.path.exists(api) and os.path.exists(wf):
+            info = PngImagePlugin.PngInfo()
+            info.add_text("prompt", json.dumps(json.load(open(api)), separators=(",", ":")))
+            info.add_text("workflow", json.dumps(json.load(open(wf)), separators=(",", ":")))
+            return info
+    return None
 
 
 def listing(folder: str) -> list[str] | None:
@@ -757,9 +783,9 @@ def assemble(frames: dict, dirs, poses, canvas: int, outdir: str, kind: str, met
             f = frames[(d, p)]
             sheet.paste(f, (c * canvas, r * canvas))
             name = f"{kind}-{d}-{p}"
-            f.save(f"{outdir}/frames/{name}.png")
+            f.save(f"{outdir}/frames/{name}.png", pnginfo=flow_info(outdir, d))
             rects[name] = {"x": c * canvas, "y": r * canvas, "w": canvas, "h": canvas, "dir": d, "pose": p}
-    sheet.save(f"{outdir}/sheet.png")
+    sheet.save(f"{outdir}/sheet.png", pnginfo=flow_info(outdir, dirs[0]))
     big = sheet.resize((sheet.width * 4, sheet.height * 4), Image.NEAREST)
     bg = Image.new("RGBA", big.size, (38, 44, 40, 255))
     bg.alpha_composite(big)
@@ -921,9 +947,11 @@ def widest(frames: list) -> int:
 TITLE_RE = re.compile(r"^frame\s+(\w+)\s+(\S+)$")
 
 
-def harvest(api: dict, outputs: dict, walks: dict | None = None) -> tuple[dict, dict]:
+def harvest(api: dict, outputs: dict, walks: dict | None = None,
+            files: dict | None = None) -> tuple[dict, dict]:
     """SaveImage outputs -> ({(dir, pose): image}, {grid title: image}); `walk <dir>` saves
-    (a whole clip) land in `walks[dir]` as a frame list."""
+    (a whole clip) land in `walks[dir]` as a frame list. `files` gets the untouched bytes of
+    each keyframe and walk video, ComfyUI's embedded prompt + workflow intact."""
     frames, grids = {}, {}
     for nid, ims in outputs.items():
         if not ims or nid not in api:
@@ -935,7 +963,12 @@ def harvest(api: dict, outputs: dict, walks: dict | None = None) -> tuple[dict, 
         elif title.startswith("grid "):
             grids[title] = fetch(ims[0])
         elif title.startswith("keyframe "):
-            frames[(title.split()[1], "keyframe")] = fetch(ims[0])
+            blob = fetch_bytes(ims[0])
+            frames[(title.split()[1], "keyframe")] = Image.open(io.BytesIO(blob)).convert("RGB")
+            if files is not None:
+                files[f"{title.split()[1]}-keyframe-comfy.png"] = blob
+        elif re.match(r"^walk \w+ \(mp4\)$", title) and files is not None:
+            files[f"{title.split()[1]}-walk-comfy.mp4"] = fetch_bytes(ims[0])
         elif re.match(r"^walk \w+$", title) and walks is not None:
             walks[title.split()[1]] = [fetch(im) for im in sorted(ims, key=lambda i: i["filename"])]
     return frames, grids
@@ -1028,7 +1061,7 @@ def cmd_make(a):
         label = f"seed {seed}" if seed is not None else "flow"
         print(f"{label}: queued {n_samp} sampler(s) on {HOST} ({q.get('unet') if a.method != 'sdxl' else 'sdxl'})")
         t0 = time.time()
-        frames, grids = harvest(api, wait(queue(api)))
+        frames, grids = harvest(api, wait(queue(api, wf)))
         print(f"{label}: done in {time.time() - t0:.0f}s" + " " * 20)
         if grids:
             gi = next(iter(grids.values()))
@@ -1088,18 +1121,20 @@ def cmd_video(a, dirs, kind, root, src, pal):
         if a.dry_run:
             print(f"dry run: {out}/flow-<dir>_api.json for {', '.join(dirs)}")
             continue
-        pids = {d: queue(g.nodes) for d, g in graphs.items()}  # ComfyUI runs them in order
+        pids = {d: queue(g.nodes, g.workflow()) for d, g in graphs.items()}  # ComfyUI runs them in order
         print(f"seed {seed}: queued {len(pids)} direction(s) — a keyframe and an {w['length']}-frame walk each; "
               f"minutes per direction")
         raws, loops, t0 = {}, {}, time.time()
         for i, d in enumerate(dirs):
-            walks = {}
+            walks, files = {}, {}
             try:
                 outputs = wait(pids[d], limit_s=7200, poll=5)
             except (SystemExit, TimeoutError, KeyboardInterrupt):
                 cancel(pids[x] for x in dirs[i:])
                 raise
-            frames, _ = harvest(graphs[d].nodes, outputs, walks)
+            frames, _ = harvest(graphs[d].nodes, outputs, walks, files)
+            for name, blob in files.items():  # ComfyUI's own files, metadata and all
+                open(f"{out}/raw/{name}", "wb").write(blob)
             clip = walks.get(d) or []
             if d in a.mirror:
                 clip = [ImageOps.mirror(f) for f in clip]
@@ -1169,6 +1204,8 @@ def cmd_repack(a):
                     os.symlink(os.path.abspath(f), dst)
             else:
                 shutil.copyfile(f, dst)
+        for f in glob.glob(f"{a.run}/flow*.json"):  # the flows ride along, so re-posted frames re-embed them
+            shutil.copyfile(f, os.path.join(out, os.path.basename(f)))
         for f in ("input-%d.png" % IN_SIZE,):
             src_in = os.path.join(os.path.dirname(os.path.abspath(a.run)), f)
             if os.path.exists(src_in) and not os.path.exists(os.path.join(os.path.dirname(out), f)):

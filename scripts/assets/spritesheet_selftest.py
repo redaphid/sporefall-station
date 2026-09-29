@@ -80,6 +80,7 @@ class Fake:
     uploads: dict = {}
     face_left: set = set()  # directions the "model" gets wrong
     fail: set = set()  # prompt ids that end in an execution error
+    extra: list = []  # extra_data of each POST /prompt
     deleted: list = []  # ids POSTed to /queue {"delete": [...]}
     models = {
         "diffusion_models": ["Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf", "Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf",
@@ -182,6 +183,7 @@ class H(http.server.BaseHTTPRequestHandler):
         body = self.rfile.read(n)
         if self.path == "/prompt":
             g = json.loads(body)["prompt"]
+            Fake.extra.append(json.loads(body).get("extra_data"))
             errs = validate(g)
             if errs:
                 return self._send({"error": errs}, code=400)
@@ -512,6 +514,15 @@ def main():
         stepw = np.ptp(np.where((np.asarray(Image.open(f"{v}/frames/wren-e-step.png"))[..., 3] > 0).any(0))[0])
         check("video: step = the widest stride of the cycle", stepw == max(widths), (stepw, widths))
         check("video: satchel on the right, facing right", satchel_side(Image.open(f"{v}/frames/wren-e-idle.png")) == "R")
+        ex = Fake.extra[n0]
+        check("video: the editor workflow rides along as extra_pnginfo (drag-in rebuilds the graph)",
+              bool(ex) and "nodes" in ex["extra_pnginfo"]["workflow"])
+        check("video: ComfyUI's own keyframe file kept, bytes untouched",
+              os.path.exists(f"{v}/raw/e-keyframe-comfy.png"))
+        fi = Image.open(f"{v}/frames/wren-e-walk-3.png").info
+        check("video: a shipped frame carries its direction's flow (tEXt prompt + workflow)",
+              "nodes" in json.loads(fi.get("workflow", "{}")) and json.loads(fi["prompt"]) ==
+              json.load(open(f"{v}/flow-e_api.json")))
         check("video: editor + API flow per direction written",
               os.path.exists(f"{v}/flow-e.json") and os.path.exists(f"{v}/flow-s_api.json"))
         n2 = len(Fake.prompts)
@@ -530,6 +541,8 @@ def main():
               json.load(open(f"{v}/sheet.json"))["loops"]["e"]["period"] == 40
               and Image.open(f"{v}/raw/e-walk-1.png").tobytes() == cut_e1)
         S.main(["repack", os.path.join(tmp, "vr"), "--size", "48", "--to", os.path.join(tmp, "vr48")])
+        check("a repack --to frame still carries its flow",
+              "nodes" in json.loads(Image.open(os.path.join(tmp, "vr/frames/wren-e-idle.png")).info.get("workflow", "{}")))
         check("a repack --to output is itself repackable",
               Image.open(os.path.join(tmp, "vr48/sheet.png")).size == (480, 96))
         anchor = os.path.join(tmp, "vr/frames/wren-s-idle.png")

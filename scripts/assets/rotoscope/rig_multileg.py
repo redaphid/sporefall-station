@@ -148,28 +148,38 @@ for i in range(N_SP):
     t = i / (N_SP - 1)
     y = -0.7 + 1.55 * t
     z = 0.12 + SHELL[2] * math.sqrt(max(0.0, 1 - ((y - 0.1) / SHELL[1]) ** 2)) - 0.05
-    cone(f"spine{i}", body, (0, y, z), 0.075, 0.01, SPINE_L + 0.12 * math.sin(math.pi * t), "bone",
+    cone(f"spine{i}", body, (0, y, z), 0.1, 0.012, SPINE_L + 0.12 * math.sin(math.pi * t), "bone",
          rot=(math.radians(-35), 0, 0))
     if 1 <= i <= N_SP - 2:
         for sx in (-1, 1):
-            cone(f"spine{i}.{sx}", body, (sx * SHELL[0] * 0.55, y, z - SHELL[2] * 0.25), 0.05, 0.008, SPINE_L * 0.7, "bone",
+            cone(f"spine{i}.{sx}", body, (sx * SHELL[0] * 0.55, y, z - SHELL[2] * 0.25), 0.075, 0.01, SPINE_L * 0.6, "bone",
                  rot=(math.radians(-30), math.radians(sx * 45), 0))
 
 
-def segment(name, r_top, r_end, length, mat):
-    """A tapered bone whose origin is its proximal joint and which extends along -Z."""
-    bpy.ops.mesh.primitive_cone_add(radius1=r_end, radius2=r_top, depth=length, vertices=12)
+FEM_N, TIB_N, TIP_N = 3, 6, 3   # sub-pieces per bone; the last TIP_N of the tibia are the dark hooked tip
+BOW = float(arg("--bow", "0.18"))     # femur bows out/up by this fraction of its chord
+CURL = float(arg("--curl", "0.22"))   # tibia bows out, then hooks in, by this fraction of its chord
+
+
+def piece(name, r0, r1, mat):
+    """A unit-length tapered piece along -Z from its origin (r0 at the origin, r1 at the far end), plus a
+    ball at its origin so a chain of pieces reads as one curved limb. Scaled to its chord each frame."""
+    bpy.ops.mesh.primitive_cone_add(radius1=r1, radius2=r0, depth=1.0, vertices=14)
     ob = bpy.context.object
-    ob.data.transform(Matrix.Translation((0, 0, -length / 2)))
+    ob.data.transform(Matrix.Translation((0, 0, -0.5)))
     ob.rotation_mode = "QUATERNION"
     adopt(ob, name, mat, root)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=r_top * 1.1, segments=12, ring_count=8)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=r0 * 1.06, segments=12, ring_count=8)
     j = bpy.context.object
-    adopt(j, name + ".joint", mat, ob)
-    return ob
+    adopt(j, name + ".j", mat, root)
+    return ob, j
 
 
-# legs: (side, index, hip, rest foot, phase offset). Alternating tetrapod: L0 R1 L2 R3 swing together.
+def chain(name, radii, mats):
+    return [piece(f"{name}.{k}", radii[k], radii[k + 1], mats[k]) for k in range(len(mats))]
+
+
+# legs: (side, hip, rest foot, phase, femur chain, tibia chain, spur). Alternating tetrapod: L0 R1 L2 R3 swing together.
 LEG_SET = []
 for sx, side in ((-1, "L"), (1, "R")):
     for i, (hy, ang) in enumerate(LEGS):
@@ -177,17 +187,27 @@ for sx, side in ((-1, "L"), (1, "R")):
         a = math.radians(ang)
         foot = Vector((hip.x + sx * FOOT_R * math.cos(a), hip.y - FOOT_R * math.sin(a), 0.0))
         phase = 0.0 if (i % 2 == 0) == (side == "L") else 0.5
-        fem = segment(f"femur.{side}{i}", LEG_R, LEG_R * 0.82, FEMUR, "leg")
-        tib = segment(f"tibia.{side}{i}", LEG_R * 0.82, 0.012, TIBIA, "leg")
-        LEG_SET.append((sx, hip, foot, phase, fem, tib))
-# charcoal lower tibia: a second, shorter tapered segment rides the tibia's distal half
-TIPS = []
-for sx, hip, foot, phase, fem, tib in LEG_SET:
-    bpy.ops.mesh.primitive_cone_add(radius1=0.011, radius2=LEG_R * 0.6, depth=TIBIA * 0.5, vertices=12)
-    ob = bpy.context.object
-    ob.data.transform(Matrix.Translation((0, 0, -TIBIA * 0.25 - TIBIA * 0.5)))
-    ob.scale = (1.06, 1.06, 1.0)
-    adopt(ob, tib.name + ".dark", "tip", tib)
+        fr = [LEG_R * (1.15 - 0.2 * k / FEM_N) for k in range(FEM_N + 1)]
+        tr = [LEG_R * (0.95 - 0.55 * k / TIB_N) for k in range(TIB_N)] + [0.012]
+        fem = chain(f"femur.{side}{i}", fr, ["leg"] * FEM_N)
+        tib = chain(f"tibia.{side}{i}", tr, ["leg"] * (TIB_N - TIP_N) + ["tip"] * TIP_N)
+        spur = cone(f"spur.{side}{i}", root, (0, 0, 0), LEG_R * 0.55, 0.008, 0.34, "bone")
+        spur.rotation_mode = "QUATERNION"
+        LEG_SET.append((sx, hip, foot, phase, fem, tib, spur))
+
+
+def bez(ps, t):
+    """de Casteljau: any-order Bezier through control points ps."""
+    while len(ps) > 1:
+        ps = [a.lerp(b, t) for a, b in zip(ps, ps[1:])]
+    return ps[0]
+
+
+def lay(pieces, pts):
+    for (ob, j), a, b in zip(pieces, pts, pts[1:]):
+        aim(ob, a, b)
+        ob.scale = (1, 1, (b - a).length)
+        j.location = a
 
 
 def ease(u):
@@ -215,7 +235,7 @@ def aim(ob, a, b):
 def pose(t):
     """t in [0, 1): one full gait cycle. Body height bobs twice per cycle (once per tetrapod swap)."""
     body.location = (0, 0, BODY_Z + 0.025 * math.cos(4 * math.pi * t))
-    for sx, hip, foot, phase, fem, tib in LEG_SET:
+    for sx, hip, foot, phase, fem, tib, spur in LEG_SET:
         h = hip + Vector((0, 0, body.location.z - BODY_Z))
         f = foot_at(foot, (t + phase) % 1.0)
         d = f - h
@@ -226,8 +246,16 @@ def pose(t):
         v = (pole - u * pole.dot(u)).normalized()
         x = (FEMUR ** 2 - TIBIA ** 2 + dist ** 2) / (2 * dist)
         knee = h + u * x + v * math.sqrt(max(0.0, FEMUR ** 2 - x ** 2))
-        aim(fem, h, knee)
-        aim(tib, knee, h + u * dist)
+        tip = h + u * dist
+        up = Vector((0, 0, 1))
+        c1 = (h + knee) / 2 + (out * 0.6 + up) .normalized() * BOW * (knee - h).length
+        lay(fem, [bez([h, c1, knee], k / FEM_N) for k in range(FEM_N + 1)])
+        seg = (tip - knee).length
+        c2 = knee + (tip - knee) * 0.35 + out * CURL * seg
+        c3 = tip + out * CURL * 1.1 * seg + up * 0.35 * CURL * seg
+        lay(tib, [bez([knee, c2, c3, tip], k / TIB_N) for k in range(TIB_N + 1)])
+        spur.location = knee
+        spur.rotation_quaternion = Vector((0, 0, 1)).rotation_difference((out * 1.0 - up * 0.5 - (knee - h).normalized() * 0.3).normalized())
 
 
 sc = bpy.context.scene

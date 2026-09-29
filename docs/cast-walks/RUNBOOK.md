@@ -15,7 +15,7 @@ Worked example: **mycologist** (`/mnt/d/tmp/cast-walks/mycologist/`, runs in
 | beta branch | `preview/cast-walks` -> workflow `preview-web.yml` -> `https://sporefall.hypnodroid.com/betas/cast-walks/` |
 | ComfyUI | `http://127.0.0.1:8188` (Windows, 4090, 0.37.0). Restart: `cd /mnt/d/tools/comfy && powershell.exe -NoProfile -ExecutionPolicy Bypass -File 'D:\tools\comfy\scripts\start.ps1' -Only default -Background`. Healthy = `spritesheet.py doctor` prints `ok` for qwen/sdxl/video. Never use 8189. |
 | outputs | ComfyUI writes to `D:\sync\Comfy\sprite-sheet\<kind>\...`; the CLI copies what it needs into the run dir |
-| VLM for gates | private Ollama `127.0.0.1:18436`, model `qwen3-vl:8b`, store `D:\tmp\cast-walks\ollama-models`. `localhost:11434` is a python gateway that answers HTTP 500; Aaron's own Ollama (11433) is down and has no qwen3-vl. Check: `curl -s localhost:18436/api/tags`. Restart: `powershell.exe -NoProfile -Command "$env:OLLAMA_HOST='127.0.0.1:18436'; $env:OLLAMA_MODELS='D:\tmp\cast-walks\ollama-models'; $env:OLLAMA_KEEP_ALIVE='2m'; Start-Process -FilePath 'D:\tools\ollama\ollama.exe' -ArgumentList 'serve' -WindowStyle Hidden"` (the call may hang the shell; run it with `run_in_background`). Ports 11434-11436 are taken. |
+| VLM for gates | private Ollama `127.0.0.1:18436`, model `qwen3-vl:8b-instruct` (the plain `qwen3-vl:8b` tag thinks before every answer and made a gate take an hour; `verify.py` defaults to instruct, one vote), store `D:\tmp\cast-walks\ollama-models`. `localhost:11434` is a python gateway that answers HTTP 500; Aaron's own Ollama (11433) is down and has no qwen3-vl. Check: `curl -s localhost:18436/api/tags`. Restart: `powershell.exe -NoProfile -Command "$env:OLLAMA_HOST='127.0.0.1:18436'; $env:OLLAMA_MODELS='D:\tmp\cast-walks\ollama-models'; $env:OLLAMA_KEEP_ALIVE='2m'; Start-Process -FilePath 'D:\tools\ollama\ollama.exe' -ArgumentList 'serve' -WindowStyle Hidden"` (the call may hang the shell; run it with `run_in_background`). Ports 11434-11436 are taken. |
 | node | `/usr/bin/node` is broken: `export PATH=~/.local/node22/bin:$PATH` then `corepack pnpm ...` |
 | ffmpeg | `~/.local/bin/ffmpeg`, `~/.local/bin/ffprobe` |
 | judge metrics | `/mnt/d/Projects/sporefall-art` (`sprites/judge.py`), imported read-only by `cast_walk.py`. That repo is production: never write there. |
@@ -90,9 +90,12 @@ python3 scripts/assets/cast_walk.py sheet x --kind <char>   # contact sheet + GI
 | 1 | loop seam per direction | <= 0.5; n <= 1.0 (`seam_max_dir`, Aaron 2026-09-29) |
 | 2 | colour drift vs s-idle | <= 1% of pixels in colours > 40 RGB from every s-idle colour (frog 0.5%, ranger 0.9%) |
 | 3 | `consistency.py <kind> --check` | the per-character silhouette spec |
-| 4 | `verify.py` per frame (s/se face, e profile, **ne/n no face**), `--pairs`, `--same` | all ok, on the hi-res pack |
-| 5 | judge-sprite-mp4 metrics per loop | `sprites.judge.GATES` |
-| 6 | `verify.py --style` vs the frog | all ok |
+| 4 | `verify.py` per frame: the view against its own s-idle/n-idle (`VIEWS_OK`: e side, n/ne never front, s/se never back) and **ne/n no face**; `--pairs`, `--same` | all ok, on the hi-res pack |
+| 5 | judge-sprite-mp4 identity/sharpness/coverage per loop; `boil` (motion-compensated residual / contrast, 16 frames per stride) in place of flicker; head drift | `sprites.judge.GATES`; boil <= 0.3, head_drift <= 0.14 (the frog's shipped loops) |
+| 6 | `verify.py --style` vs the frog: rendering only, not colour | all ok |
+| 6b | pixels off the locked 34 colours (`palette.py`) | 0 |
+
+The controls every gate must still catch: `python3 scripts/assets/cast_gate_selftest.py` (0 wrong, ~3 min). Run it after any gate change. The full gate takes ~3-4 min.
 
 A failure means a retake (max 3 per direction). **A gate that fails on good art, or any tooling bug, is a finding you FIX (Aaron, 09-29):** take WORKTREE.lock, fix the measurement or script at its root, prove it (test or before/after run), commit + push, and report the finding to the coordinator in one line (symptom, root cause, fix, commit). Never loosen a numeric threshold just to pass.
 
@@ -152,6 +155,7 @@ Other traps: a clip can turn around late (mycologist n from ~frame 56); the loop
 ## Lessons log
 
 - **09-29 bog-mutant Step 0** (stopped after batch 1): cloning the r2 raw's embedded graph (`info['prompt']`) and swapping text + seed is the fastest proven still route, but its IPAdapter style ref is the vine-ranger at 0.3, so keep the r2 negatives (`helmet, visor, orange cap, teal suit`): I dropped them and all 6 came back as the player ranger. Put the distinctive hook in the first ~40 words. `2cb` could print a dead link as "exists"; fixed to re-fetch and sha-match every link.
+- **09-29 mycologist** (gates): the first full gate failed 4a, 5 and 6 on art that is right. Before changing a gate, run it on the approved frog; it failed gate 5 too, which proved the gate wrong in one step. Two traps in the VLM: `qwen3-vl:8b` is the thinking tag and ignores `think: false` (use `-instruct`), and at temperature 0 extra votes repeat one read. A negative control must be checked by eye first: my first two style negatives were pixel art, and the VLM was right to pass them.
 - **09-29 mycologist** (first through): the r2 hazmat design passed Step 0. n failed the 0.5 seam on all three takes (0.79 / 0.56 / 0.91) until Aaron set n to 1.0. The colour gate caught a per-direction visor hue change the silhouette spec cannot see; the s-idle palette lock fixes it but dulls a glow that only the walk frames had.
 
 ## Locks (added 09-29 after the crash; coordinator + one worker share one worktree and one GPU)

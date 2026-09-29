@@ -53,7 +53,7 @@ palette (`scripts/assets/palette.py`), no dither, hard alpha.
 | player | vine-ranger | teal EVA suit, amber cap-visor, vine arm — full 5-dir × idle/step set |
 | cop | spore-drone | hovering jellyfish-drone, green sensor mass (bouncer shares) |
 | thug | bog-mutant | hulking moss-crusted olive brute (boss/gangster share) |
-| scientist | mycologist | pale hazmat, green shoulder pods, sample tube |
+| scientist | mycologist | pale hazmat, green shoulder pods, sample tube; **full 5-dir idle/step + 8-frame walk**, 2026-09-29, Wan 2.2 I2V, see below |
 | robot | derelict-bot | dark boxy machine, orange eye lenses |
 | civilian | frog-settler | cloaked swamp frog in a brown hood — **full 5-dir idle/step + 8-frame walk**, 2026-09-25, Wan 2.2 I2V, see below (shopkeeper shares) |
 
@@ -179,3 +179,43 @@ The **cloak is deliberate** — the owner approved it on the turnaround. It made
 the committed silhouette spec wrong, because that spec was measured off the
 old bare-headed front frog; `consistency-spec.json` is re-anchored on
 `se-idle`, whose build sits on the median of all ten pose frames.
+
+## mycologist, 2026-09-29: the video route in this repo
+
+The second video-route character, and the first made with this repo's own
+tools (`spritesheet.py --method video`, then `scripts/assets/cast_walk.py`
+assemble, export and gate) rather than puck-sprites. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 kept the r2 in-game design: cream hazmat suit, teal visor and gloves, brown pack |
+| input | `D:\tmp\sprite-stage-0822\cast\anchors\mycologist-s-idle.png`, the 768 px matted r2 anchor, sha256 `fd3fecb93f70…98128f`. Not `scripts/assets/anchors/mycologist-s-idle.png`, which is the older dark-green hooded July design |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848×480, 81 frames at 16 fps |
+| takes | take1 seed 3 for all five directions; n retaken with seed 11 and seed 23. s, se, e and ne ship from take1, n from take2 |
+| loops | the shortest full stride: s period 24 (seam .434), se 18 (.254), e 20 (.177), ne 18 (.398), n 15 (.559) |
+| colour lock | `assemble` snaps every frame onto the s-idle's 16 colours, all of them in the locked 34. Take1 drew the visor green in s and cyan in e |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.scientist.*` |
+
+n, the back view, failed the 0.5 seam on all three takes (.791, .559, .91).
+The owner set n's limit to 1.0 on 2026-09-29, and take2 ships.
+
+Gates (`cast_walk.py gate`, thresholds in `scripts/assets/cast-gate-spec.json`),
+2026-09-29, all PASS in 194 s:
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .434 / .254 / .177 / .398 / .559 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .108-.173, head .070-.121 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Gates 4a, 5 and 6 were re-measured during this run (b981cbb, 1272b21):
+their first version failed art that is right, and the approved frog failed
+gate 5 as well. `scripts/assets/cast_gate_selftest.py` holds the controls
+each gate must still catch.

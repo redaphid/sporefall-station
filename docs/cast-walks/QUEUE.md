@@ -3,8 +3,9 @@
 | # | character | archetype(s) | anchor | status |
 |---|---|---|---|---|
 | 0 | bog-mutant | thug, gangster | r2 (Hulk look) | Step 0 round 1 FAILED (https://2cb.pw/candidates-390b42): all 6 lost the fungus hook and read as the player ranger (slim teal suit, orange visor). Next agent: keep the r2 negatives that block the vine-ranger IPAdapter bleed; put the fungus hook first in a short prompt ("stooped heavy labourer, a shelf of ochre bracket fungus bursting from one shoulder seam"), add `orange` to the negatives, drop the vine-ranger IPAdapter ref to ~0.15 or swap it for the mycologist r2 anchor. Round 1 prompt/graph/script: /mnt/d/tmp/cast-walks/bog-mutant/step0-prompt.json, step0.py. Then Aaron veto, then walk. |
-| 1 | mycologist | scientist | r2 | **SHIPPED to main** e82df71+5a2dd1e, live build 714, e-walk-3 sha f865617a verified 03:30. n accepted at seam 0.559 (limit 1.0). Gate fixes 4a/5/6 still landing (tooling, not art). |
+| 1 | mycologist | scientist | r2 | **DONE e2e**: main f24515d (build 723), gates 9/9 in 194 s, in-game video https://2cb.pw/mycologist-walk-ingame-9e945d, e-walk-3 sha f865617a live == commit |
 | 2 | spore-drone | cop | r2 | **IN PROGRESS** (fresh agent 03:31). generate.py says `cop` is a hovering drone with NO legs, but the r2 sprite has dangling limbs: use a hover/bob `--describe`. |
+| 2b | vine-ranger | player | key art hero (Aaron 04:3x rework) | Step 0 done: pick 4A https://2cb.pw/old-vs-new-2bb513, all 16 https://2cb.pw/candidates-d44dd4. WAITING on Aaron: '4A' / 'refine' (img2img from 4A adding braid, patches, hip lantern) / another number. Walk render after spore-drone. |
 | 3 | mireclaw-stalker | stalker | r2 | queued |
 | 4 | sporeling-mite | sporeling | r2 | queued |
 | 5 | carapace-brute | brute | r2 | queued |

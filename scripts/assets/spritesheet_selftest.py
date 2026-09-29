@@ -314,6 +314,20 @@ def main():
             ks = [n for n in wf["nodes"] if n["type"] == "KSampler"]
             check(f"{label}: KSampler widgets = seed, control, steps, cfg, sampler, scheduler, denoise",
                   all(len(n["widgets_values"]) == 7 and n["widgets_values"][1] == "fixed" for n in ks))
+        g = S.video_graph("c.png", "e", 3, q, S.WAN)
+        adv = [n for n in g.nodes.values() if n["class_type"] == "KSamplerAdvanced"]
+
+        def upstream(nid, cls):  # follow the model input back to the loader
+            while True:
+                n = g.nodes[nid]
+                if n["class_type"] == cls:
+                    return n
+                if "model" not in n["inputs"]:
+                    return None
+                nid = n["inputs"]["model"][0]
+        check("video: both Wan experts compute in bf16 (the frog's graph; fp16 dies on 0.37)",
+              all((upstream(k["inputs"]["model"][0], "ModelComputeDtype") or {}).get("inputs", {}).get("dtype") == "bf16"
+                  for k in adv) and len(adv) == 2)
         g = S.qwen_graph("c.png", dirs, poses, 7, {**q, "lightning": None})
         ks = [n["inputs"] for n in g.nodes.values() if n["class_type"] == "KSampler"]
         check("no lightning -> 20 steps, CFG 2.5", all(k["steps"] == 20 and k["cfg"] == 2.5 for k in ks))

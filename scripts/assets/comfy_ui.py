@@ -55,6 +55,7 @@ BUILTIN = {
                                [("IMAGE", "IMAGE")]),
     # Wan 2.2 I2V (the frog route): two experts, KSamplerAdvanced split, frames out as an IMAGE batch
     "ModelSamplingSD3": ([("model", "MODEL")], ["shift"], [("MODEL", "MODEL")]),
+    "ModelComputeDtype": ([("model", "MODEL")], ["dtype"], [("MODEL", "MODEL")]),
     "WanImageToVideo": (
         [("positive", "CONDITIONING"), ("negative", "CONDITIONING"), ("vae", "VAE"),
          ("clip_vision_output", "CLIP_VISION_OUTPUT"), ("start_image", "IMAGE")],

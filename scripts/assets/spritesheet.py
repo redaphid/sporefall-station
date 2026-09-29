@@ -558,6 +558,9 @@ def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="spr
             u = g.add("UnetLoaderGGUF", {"unet_name": w[part]}, f"Wan 2.2 I2V {part} noise", col=0)
         else:
             u = g.add("UNETLoader", {"unet_name": w[part], "weight_dtype": "default"}, f"Wan 2.2 I2V {part} noise", col=0)
+        # bf16 compute, as the frog's graph ran. Without it ComfyUI 0.37 takes the fp16 cutlass
+        # path for the GGUF experts + LoRA and the first sampler dies: "cutlass_fp16_linear: K mismatch".
+        u = g.add("ModelComputeDtype", {"model": [u, 0], "dtype": "bf16"}, col=0)
         u = g.add("LoraLoaderModelOnly", {"model": [u, 0], "lora_name": w["lora_" + part], "strength_model": 1.0},
                   f"lightx2v 4-step {part}", col=0)
         experts.append(g.add("ModelSamplingSD3", {"model": [u, 0], "shift": w["shift"]}, col=0))
@@ -1139,7 +1142,8 @@ def cmd_doctor(_a):
     need = {"qwen": ["TextEncodeQwenImageEditPlus", "FluxKontextMultiReferenceLatentMethod", "CFGNorm",
                      "ModelSamplingAuraFlow", "EmptySD3LatentImage"],
             "sdxl": ["IPAdapterAdvanced", "IPAdapterModelLoader", "PrepImageForClipVision"],
-            "video": ["WanImageToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "UnetLoaderGGUF", "ImageScale",
+            "video": ["WanImageToVideo", "KSamplerAdvanced", "ModelSamplingSD3", "ModelComputeDtype", "UnetLoaderGGUF",
+                      "ImageScale",
                       "CreateVideo", "SaveVideo"],
             "flow sheet preview": ["ImageStitch"]}
     for route, nodes in need.items():

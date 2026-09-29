@@ -342,6 +342,27 @@ def main():
         check("object_info: LoadImage gets its upload widget", sp["LoadImage"][1] == ["image", "upload"])
         check("object_info: link inputs keep their order",
               [n for n, _ in sp["KSampler"][0]] == ["model", "positive", "negative", "latent_image"])
+        # ComfyUI 0.37: optional widgets the API graph leaves unset, a dynamic combo, an empty combo
+        info = {"ModelSamplingAuraFlow": {"input": {"required": {"model": ["MODEL"], "shift": ["FLOAT"]}, "optional": {
+            "sampling": [["flow", "img_to_img_velocity"], {"default": "flow", "advanced": True}]}},
+            "output": ["MODEL"], "output_name": ["MODEL"]},
+            "SaveVideo": {"input": {"required": {"video": ["VIDEO"], "filename_prefix": ["STRING"],
+                                                 "format": ["COMFY_DYNAMICCOMBO_V3", {"options": [
+                                                     {"key": "auto", "inputs": {}}, {"key": "mp4", "inputs": {}}]}]},
+                                    "optional": {"codec": ["COMBO", {"options": ["auto", "h264"]}]}},
+                          "output": [], "output_name": []},
+            "Pick": {"input": {"required": {"name": [[]]}}, "output": [], "output_name": []}}
+        sp = comfy_ui.specs_from_object_info(info)
+        wf = comfy_ui.to_workflow({"1": {"class_type": "ModelSamplingAuraFlow", "inputs": {"shift": 3.1}},
+                                   "2": {"class_type": "SaveVideo", "inputs": {"filename_prefix": "x", "format": "mp4",
+                                                                               "codec": "h264"}}}, specs=sp)
+        by = {n["type"]: n for n in wf["nodes"]}
+        check("object_info: an unset optional widget gets its default, not null",
+              by["ModelSamplingAuraFlow"]["widgets_values"] == [3.1, "flow"], by["ModelSamplingAuraFlow"]["widgets_values"])
+        check("object_info: a dynamic combo is a widget, not a link socket",
+              by["SaveVideo"]["widgets_values"] == ["x", "mp4", "h264"]
+              and [i["name"] for i in by["SaveVideo"]["inputs"]] == ["video"], by["SaveVideo"])
+        check("object_info: an empty combo does not crash the spec read", sp["Pick"][1] == ["name"])
 
         print("end to end: qwen, 5 dirs x idle+step")
         out = os.path.join(tmp, "run")

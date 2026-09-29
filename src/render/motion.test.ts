@@ -209,6 +209,7 @@ describe('locomotion styles — non-bipedal bodies', () => {
     expect(locomotionFor('')).toBe('stride')
     expect(locomotionFor('spore-drone')).toBe('hover')
     expect(locomotionFor('brood-sac')).toBe('pulse')
+    expect(locomotionFor('sporeling-mite')).toBe('waddle')
   })
 
   it('locomotionFor: a kind named after an Object.prototype member is just unknown', () => {
@@ -271,7 +272,7 @@ describe('locomotion styles — non-bipedal bodies', () => {
   it('style does NOT touch attack, hurt or death — those are body-plan agnostic', () => {
     for (const state of OTHER) {
       const stride = composeMotion(base({ state, start: 100, t: 102.5, facing: 0.7 }))
-      for (const style of ['hover', 'pulse'] as const) {
+      for (const style of ['hover', 'pulse', 'waddle'] as const) {
         expect(composeMotion(base({ state, start: 100, t: 102.5, facing: 0.7, style }))).toEqual(stride)
       }
     }
@@ -290,8 +291,55 @@ describe('locomotion styles — non-bipedal bodies', () => {
   })
 })
 
+describe('WADDLE — short legs rock the body instead of bobbing it', () => {
+  const walking = (over: Partial<MotionInput>): MotionPose =>
+    composeMotion(base({ state: 'walk', style: 'waddle', moving: true, ...over }))
+
+  it('rocks both ways over a stride, by up to its angle, and only ever rises', () => {
+    const rots: number[] = []
+    for (let t = 100; t < 140; t += 0.25) {
+      const p = walking({ t })
+      expect(p.dy, `t=${t}`).toBeLessThanOrEqual(0)
+      expect(p.dy, `t=${t}`).toBeGreaterThanOrEqual(-MOTION.waddle.rise)
+      expect(Math.abs(p.rot), `t=${t}`).toBeLessThanOrEqual(MOTION.waddle.rad + 1e-12)
+      expect({ sx: p.sx, sy: p.sy }).toEqual({ sx: 1, sy: 1 })
+      rots.push(p.rot)
+    }
+    expect(Math.min(...rots)).toBeLessThan(-0.9 * MOTION.waddle.rad)
+    expect(Math.max(...rots)).toBeGreaterThan(0.9 * MOTION.waddle.rad)
+  })
+
+  it('rises highest where it leans furthest over the planted foot', () => {
+    for (let t = 100; t < 140; t += 0.25) {
+      const p = walking({ t })
+      expect(-p.dy / MOTION.waddle.rise).toBeCloseTo(Math.abs(p.rot) / MOTION.waddle.rad, 9)
+    }
+  })
+
+  it('still leans into its heading, on top of the rock', () => {
+    const t = 104.2
+    const still = walking({ t })
+    const heading = walking({ t, vx: 3 })
+    expect(heading.rot - still.rot).toBeCloseTo(MOTION.lean.rad)
+  })
+
+  it('stands and breathes exactly like a strider', () => {
+    for (let t = 100; t < 130; t += 0.7) {
+      expect(composeMotion(base({ state: 'idle', style: 'waddle', t, id: 5 }))).toEqual(
+        composeMotion(base({ state: 'idle', style: 'stride', t, id: 5 })),
+      )
+    }
+  })
+
+  it('is deterministic and phase-shifted per entity, so a swarm never rocks in unison', () => {
+    expect(walking({ id: 3, t: 111.1 })).toEqual(walking({ id: 3, t: 111.1 }))
+    const readings = [0, 1, 2, 3, 4].map((id) => walking({ id, t: 111.1 }).rot.toFixed(6))
+    expect(new Set(readings).size).toBe(5)
+  })
+})
+
 describe('drawnCycle — the frames carry the loop', () => {
-  const STYLES = ['stride', 'hover', 'pulse'] as const
+  const STYLES = ['stride', 'hover', 'pulse', 'waddle'] as const
 
   it('walk and idle add no cycle of their own, for every body', () => {
     for (const style of STYLES) {
@@ -304,10 +352,14 @@ describe('drawnCycle — the frames carry the loop', () => {
     }
   })
 
-  it('a striding lean still answers the heading on top of drawn walk frames', () => {
-    const p = composeMotion(base({ state: 'walk', moving: true, vx: 3, t: 104.2, drawnCycle: true }))
-    expect(p.rot).toBeCloseTo(MOTION.lean.rad)
-    expect(p.dy).toBe(0)
+  it('a striding or waddling lean still answers the heading on top of drawn walk frames', () => {
+    for (const style of ['stride', 'waddle'] as const) {
+      for (let t = 100; t < 130; t += 0.7) {
+        const p = composeMotion(base({ state: 'walk', style, moving: true, vx: 3, t, drawnCycle: true }))
+        expect(p.rot, `${style} t=${t}`).toBeCloseTo(MOTION.lean.rad)
+        expect(p.dy, `${style} t=${t}`).toBe(0)
+      }
+    }
   })
 
   it('attack, hurt, death and the landing squash are responses, not cycles: unchanged', () => {

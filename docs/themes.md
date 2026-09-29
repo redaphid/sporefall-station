@@ -173,9 +173,10 @@ weapon-mod gems and pickup-outline shapes are procedural (themeable via
   `<kind>-<dir>-<state>.png`, and the renderer reads the kind from the file
   mapped to `char.<name>.s-idle` (`chars/spore-drone-s-idle.png` is a
   `spore-drone`). Kinds listed in `LOCOMOTION` (`src/render/motion.ts`) move
-  their own way: `spore-drone` and `gloom-lurker` hover, `brood-sac` and
-  `sporeling-mite` pulse. Any other kind or file name walks with the stride
-  bob and lean. A bouncer or shopkeeper borrowing another body moves like it.
+  their own way: `spore-drone` and `gloom-lurker` hover, `brood-sac` pulses,
+  and `sporeling-mite` waddles (rocks side to side over its short legs, with
+  the stride's lean). Any other kind or file name walks with the stride bob
+  and lean. A bouncer or shopkeeper borrowing another body moves like it.
 - **A drawn loop carries its own motion.** When a state plays a clip of 2+
   drawn frames (`…-walk-0`…), the renderer adds no procedural bob, float,
   pulse or breath on top of it. The legacy idle/step pair still gets them.

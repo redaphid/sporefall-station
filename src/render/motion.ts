@@ -17,8 +17,8 @@
  * facing mirror's sign composes outside); `rot` adds to sprite rotation in
  * parent space (visually identical whether or not the sprite is mirrored);
  * `alpha` multiplies the sprite alpha. Only the deliberate hop components
- * (walk bob, attack lunge) ever move `dy` — every other state keeps dy = 0 so
- * the feet never leave the ground.
+ * (walk bob, waddle rise, attack lunge) ever move `dy` — every other state
+ * keeps dy = 0 so the feet never leave the ground.
  *
  * That last sentence holds for `stride`, which is every character with legs and
  * the default for anything not listed in LOCOMOTION. It is deliberately NOT true
@@ -64,6 +64,10 @@ export const MOTION = {
   /** PULSE locomotion: volume-ish-preserving radial breath (sx up as sy down).
    * Never touches dy — a sac sitting on the ground stays on the ground. */
   pulse: { amp: 0.06, freq: 0.13, movingScale: 1.6 },
+  /** WADDLE locomotion: short legs, so the gait reads as the whole body rocking
+   * over each foot in turn (rot ±rad around the feet) and rising up to `rise` px
+   * over the planted one. One rock left and right is two steps. */
+  waddle: { rad: 0.13, freq: 0.4, rise: 1 },
 } as const
 
 /** How a character's body carries itself. The 48px canvas is the reason this
@@ -75,8 +79,10 @@ export const MOTION = {
  *   and the only style that assumes legs.
  * - `hover`  — never touches the floor: continuous float in every state. Feet
  *   deliberately DO leave the ground; that is the point.
- * - `pulse`  — grounded but boneless: radial breath, no vertical travel. */
-export type LocomotionStyle = 'stride' | 'hover' | 'pulse'
+ * - `pulse`  — grounded but boneless: radial breath, no vertical travel.
+ * - `waddle` — a stride on legs too short to read: the body rocks side to side
+ *   with each step instead of bobbing. Leans and breathes like `stride`. */
+export type LocomotionStyle = 'stride' | 'hover' | 'pulse' | 'waddle'
 
 /** Locomotion per drawn body, keyed by ART KIND (ArtRegistry.artKind), not by
  * sim archetype: the swampspace `cop` is a spore-drone, the city `cop` is a
@@ -86,7 +92,7 @@ export const LOCOMOTION: ReadonlyMap<string, LocomotionStyle> = new Map([
   ['spore-drone', 'hover'],
   ['gloom-lurker', 'hover'],
   ['brood-sac', 'pulse'],
-  ['sporeling-mite', 'pulse'],
+  ['sporeling-mite', 'waddle'],
 ])
 
 export const locomotionFor = (kind: string | undefined): LocomotionStyle =>
@@ -142,7 +148,7 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
  * have feet. A drone that plants itself on the floor reads as a bug. */
 const applyLocomotion = (
   p: MotionPose,
-  style: Exclude<LocomotionStyle, 'stride'>,
+  style: 'hover' | 'pulse',
   m: MotionInput,
   moving: boolean,
 ): void => {
@@ -165,11 +171,19 @@ const applyLocomotion = (
 export const composeMotion = (m: MotionInput): MotionPose => {
   const p: MotionPose = { ...IDENTITY_POSE }
   const style = m.style ?? 'stride'
+  const legged = style === 'stride' || style === 'waddle'
 
   switch (m.state) {
     case 'walk': {
-      if (style === 'stride') {
-        if (!m.drawnCycle) p.dy += walkBob(m.t)
+      if (legged) {
+        if (!m.drawnCycle && style === 'waddle') {
+          // Phase-shifted per entity so a swarm does not rock in unison.
+          const rock = Math.sin(m.t * MOTION.waddle.freq + (m.id % 32))
+          p.rot += rock * MOTION.waddle.rad
+          p.dy -= Math.abs(rock) * MOTION.waddle.rise
+        } else if (!m.drawnCycle) {
+          p.dy += walkBob(m.t)
+        }
         const lean = Math.max(-1, Math.min(1, m.vx / MOTION.lean.refSpeed))
         p.rot += lean * MOTION.lean.rad
       } else if (!m.drawnCycle) {
@@ -182,7 +196,7 @@ export const composeMotion = (m: MotionInput): MotionPose => {
     }
     case 'idle': {
       if (m.drawnCycle) break
-      if (style === 'stride') {
+      if (legged) {
         // Slow breathe, phase-shifted per entity so crowds don't sync.
         p.sy += Math.sin(m.t * MOTION.breathe.freq + (m.id % 32)) * MOTION.breathe.amp
       } else {

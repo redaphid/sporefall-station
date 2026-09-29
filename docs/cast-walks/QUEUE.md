@@ -47,17 +47,20 @@ Not yet animated, in critic order (A/B first, C/D/F last; all get animated for t
 Redesign references: the critic's concept-art picks, /mnt/d/tmp/cast-walks/critique/concept-picks.md (in progress).
 Cleanup (critic): legacy step/attack frames for bog-mutant, derelict-bot and spore-drone are an older design, not in the manifest; delete them so nobody animates from them.
 
-## Rounds (Aaron, 2026-09-29 ~10:25)
+## Rounds (Aaron, 2026-09-29 ~10:25, corrected ~10:30)
 
-"Reviewed the critic score. We'll go through another pass once we're done animations stuff this time
-and get concept art characters in the next full round of characters. Hopefully our pipeline is faster now"
+Aaron: "We'll go through another pass once we're done animations stuff this time and get concept art
+characters in the next full round" ... then: "I meant for it to select ones for those we haven't
+animated yet".
 
-- **Round 1 (now): animate the whole cast with the CURRENT designs**, in the critic order above. No
-  redesigns block this round. For speed, a character whose body can't loop cleanly (many legs, hover,
-  pulse) gets ONE take per direction and ships its least-bad loop under the rule-11 seam exception;
-  no retakes. Bipeds keep the 3-take budget.
-- **Round 2 (next): concept-art redesigns**, from the critic's v2 picks (`/mnt/d/tmp/cast-walks/critique/concept-picks-v2.md`,
-  aesthetic priority, `CRITIC.md`), anchor-free, each vetoed by Aaron, then animated. Prep already made:
-  bog-mutant candidates from pod-carrier (`/mnt/d/tmp/cast-walks/bog-mutant/`), the sameness
-  experiment (`/mnt/d/tmp/cast-walks/sameness/`).
-
+- **This round:** every character NOT yet animated gets a critic-picked concept-art design first
+  (`CRITIC.md`: aesthetic priority, any lore-sensible character that can fill the gameplay role), then
+  its walk. That's bellwether, mireclaw-alpha, gloom-lurker, carapace-brute, spore-mortar, derelict-bot,
+  gloam-hound, bog-mender, spore-drone, brood-sac, hive-spire, bog-mutant (pod-carrier). The critic
+  delivers picks in that order, a few at a time. Route: concept -> Qwen-Image-Edit to a clean
+  full-body 3/4 pixel-art front on white (4 seeds, checked at 96 px after the palette lock) -> the
+  normal video route. Aaron sees each design sheet as it lands; it proceeds unless he vetoes.
+  Characters whose body can't loop cleanly (many legs, hover, pulse): one take per direction, least-bad
+  loop, rule-11 seam exception.
+- **Next pass:** the characters already animated (mycologist, vine-ranger, drowned-diver, blast-diver,
+  frog-settler, mireclaw-stalker, sporeling-mite, cinder-husk) get the same concept-art treatment.

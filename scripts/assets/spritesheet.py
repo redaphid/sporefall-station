@@ -1158,8 +1158,8 @@ def cmd_flows(a):
     try:
         specs = comfy_ui.fetch_specs(HOST)
         print(f"widget specs from {HOST}/object_info")
-    except Exception:
-        print("server not reachable: widget specs from comfy_ui.BUILTIN")
+    except (urllib.error.URLError, OSError) as e:  # unreachable only; a parse bug must not pass as offline
+        print(f"server not reachable ({e}): widget specs from comfy_ui.BUILTIN")
     os.makedirs(a.to, exist_ok=True)
     q = dict(QWEN)
     if specs is not None:

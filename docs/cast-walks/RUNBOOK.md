@@ -43,6 +43,7 @@ Procedure:
 1. Read the character's lore entry (lore check 1). Look at its current anchor (below).
 2. Passes the lore check? Keep it, log one line, move on. Generic, off-lore, or a known IP (Hulk, Predator, stock orc)? Redesign.
 3. Redesign: one lore-grounded prompt (outline shapes, materials, palette colours, one distinctive hook; readable at 96 px; clear primary/secondary shapes; limited palette). ONE batch of 4-8 candidates with a proven still route: juggernautXL (`spritesheet.py ... --method sdxl` graph or `generate.py`), or Qwen-Image for a clean 3/4 front on white. Pick one that passes the lore check; save `old-vs-new.png` in `/mnt/d/tmp/cast-walks/<char>/`; one-line reason in PROGRESS.md; `2cb` it.
+3b. From a concept image (round 2): `python3 scripts/assets/concept_to_input.py CONCEPT --kind K --out /mnt/d/tmp/cast-walks/K/concept --describe "..." [--scale 1.5] --lineup mireclaw-stalker,vine-ranger` redraws it with Qwen-Image-Edit as a 3/4-front pixel sprite (4 seeds, ~1 min each), reduces each to 96 px in the locked 34 and draws them on the game floor beside the cast. Read `thin` (silhouette share under 3 px): humanoids 0-.014, stalker .061, clamp-brute .065-.075 (Aaron rejected it as too thin).
 4. None clearly better? Keep the old one and say so.
 5. Archive the old anchor (never delete): `/mnt/d/tmp/cast-walks/archive/<char>/anchor-<date>/`.
 6. The chosen anchor is the colour/style reference for the gates. Record a redesign in the CURATION.md lineage entry.

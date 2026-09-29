@@ -1,0 +1,38 @@
+{
+ "kind": "bog-mutant",
+ "out": "/mnt/d/tmp/cast-walks/bog-mutant/redesign",
+ "sheet": "/mnt/d/tmp/cast-walks/bog-mutant/redesign.png",
+ "graph": "/mnt/d/tmp/sprite-stage-0822/cast/raw/char.bog-mutant.s-idle/cast-char-bog-mutant-s-idle-s880000_00001_.png",
+ "concept": "/mnt/d/Projects/sporefall-art/assets/identity/lore/_candidates/pod-carrier_seed412.png",
+ "concept_crop": [
+  100,
+  110,
+  690,
+  1110
+ ],
+ "seeds": [
+  884100,
+  884101,
+  884102,
+  884103
+ ],
+ "routes": {
+  "A": {
+   "ipa": null
+  },
+  "I": {
+   "ipa": {
+    "weight": 0.5,
+    "end_at": 0.7
+   }
+  }
+ },
+ "prompt": "masterpiece, pixpix, 8-bit, pixel_art, 2d video game character concept art, hand-drawn, full body game character sprite, (a cluster of four round glowing pale mint-green translucent fungus pods on thick stalks growing out of the upper back and rising above both shoulders:1.3), a hunched hooded colony dredge worker still on shift, (stocky chibi proportions, oversized hooded head, only 4 heads tall:1.2), a deep baggy hood pulled low over a gaunt grey human face, a puffy quilted drab khaki liner parka with visible hand stitching and mismatched patched panels, the back seam split open where the pods grow through, black webbing shoulder straps and two bulging canvas chest pouches, black rubber work gloves, charcoal work trousers with dark knee pads, heavy black rubber boots, standing facing the viewer, three-quarter front view, single character centered on plain flat white background, full body, feet on the ground, broad padded bulky body, wide planted stance, thick sturdy limbs, bold dark outlines, chunky readable shapes, muted drab khaki, ochre, charcoal and bone palette, the glowing pale green pods are the only bright colour, moody",
+ "neg": "hulk, green skin, bare skin, bare chest, muscles, muscular, bodybuilder, ogre, orc, troll, loincloth, monster, zombie, helmet, visor, space helmet, diving helmet, spacesuit, armor, armour, pauldron, hazmat suit, white suit, teal suit, teal jacket, orange cap, glowing eyes, yellow eyes, red eyes, horns, spikes, tentacles, steampunk, gears, cogs, clockwork, victorian, ornate, filigree, goggles, brass, polished copper, gun, rifle, pistol, knife, sword, bat, weapon, robe, cloak, cape, monk, reaper, scythe, photograph, photorealistic, photoreal, dslr photo, product photo, stock photo, 3d render, octane render, cgi, ray traced, hyperrealistic skin, studio photography, depth of field, bokeh, slim, thin, two characters, crowd, cropped, close-up, portrait, photorealistic, 3d render, smooth gradient, soft shading, text, watermark, signature, blurry, jpeg artifacts, bright cheerful, pastel, sprite sheet, grid, multiple views, turnaround, duplicate, two copies, several objects side by side, faded ghost copy, ground, dirt patch, mound, terrain, soil, grass, rocks, base, pedestal, plinth, cast shadow on the ground, diorama, puddle, sand, gravel, drop shadow, shadow ellipse, contact shadow, dark ellipse under the object, shadow blob, reflection, mirrored reflection, wet floor, standing water, spilled liquid, water pooling at the base, floor, floor plane, ground plane, surface beneath the object, stilts, legs propping it up, elongated, slender, lanky, skinny, thin limbs, spindly, long legs, tall thin figure, realistic human proportions, 8 heads tall, fashion model, willowy, narrow shoulders, stretched, anorexic",
+ "compare": [
+  "blast-diver",
+  "drowned-diver",
+  "mycologist"
+ ],
+ "caption": "bog-mutant redesign, Step 0 (for Aaron's veto).  Concept: pod-carrier_seed412.  Chibi, 4 heads, like blast-diver, drowned-diver and mycologist.\nLore 1. Family C, spore-warped colonist still on shift: a dredge-line worker whose back has split open into a clutch of glowing spore pods. He still wears the hood, the pouches and the boots.\nLore 2. Not any other swamp: an heirloom quilted liner parka (G1) that the swamp is fruiting out of, the pods its one glow (G3). At 96 px: a hunched hood under a crown of lit bulbs, not a brute.\nRoutes at held seeds.  A = anchor off (txt2img, prompt from the concept).  I = the concept as IPAdapter ref (style transfer, weight 0.5, end_at 0.7).  Graph: r2 bog-mutant raw, texts swapped."
+}

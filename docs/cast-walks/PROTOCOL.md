@@ -45,9 +45,20 @@ Files in this folder:
    (`preview/cast-walks`) stays available for looks before a merge.
 6. **Show Aaron a redesign before the long render.** Before a redesigned
    character's Wan run, Aaron sees the candidates and can veto the look.
-7. **Report every half hour when asked.** Before each report, the coordinator
-   queries every running agent and reads the tail of `PROGRESS.md`. It never
-   reports from memory.
+7. **Report every half hour as an executive briefing with proof.** Before
+   each report, the coordinator queries every running agent for a 1-4 line
+   status and reads the tail of `PROGRESS.md`. It never reports from memory.
+   Aaron (2026-09-29 04:15): "roll those in to an executive briefing, with
+   proof of work and deployments. I don't trust you with these things." So
+   every shipped claim carries proof the coordinator checked itself: the
+   commit sha on `origin/main`, the deploy run id, the live build number,
+   and a frame's sha from the live site matching the commit. Anything it
+   did not verify is labelled "claimed, unverified". Each briefing also
+   attaches the newest images and video (contact sheets, walk GIFs, in-game
+   captures) with SendUserFile: "Showing the images during your report
+   serves as grounding and proof" (Aaron, 04:25). Workers save every visual
+   they make under `/mnt/d/tmp/cast-walks/<char>/` so the coordinator can
+   attach it.
 8. **Finish one character end to end before the next.** Aaron has to see
    the whole path work on the beta (the mycologist first, 2026-09-29). A
    character in progress takes priority over every queued one.

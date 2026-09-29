@@ -1,0 +1,18 @@
+# cast-walks progress
+2026-09-28T22:40:41-07:00 | setup | worktree ~/Worktrees/sporefall-station/cast-walks on art/cast-walk-cycles @ 1a15785 (origin/main; frog branch already merged)
+2026-09-28T22:41:16-07:00 | cli | doctor OK: server 0.37.0, 4090 22.5/24GB free, qwen/sdxl/video routes all ok
+2026-09-28T22:48:52-07:00 | cli | flows OK after 3 fixes (78ac714 VAE detect, aea6512 flows swallowed errors, fa8354e comfy_ui 0.37 null widgets/dynamic combo/empty combo); selftest 123/123 PASS; flows regenerated
+2026-09-28T22:50:22-07:00 | mycologist | take1 launched: input = r2 in-game design (D:/tmp/sprite-stage-0822/cast/anchors/mycologist-s-idle.png, sha fd3fecb9), NOT scripts/assets/anchors/mycologist-s-idle.png (an older dark-green hooded design that doesn't match the shipped sprite); out /mnt/d/tmp/cast-walks/runs/mycologist/take1
+2026-09-28T22:56:21-07:00 | cli | Wan crashed 'cutlass_fp16_linear: K mismatch' (no bf16 ModelComputeDtype) -> fixed af4acc4; orphaned queued prompts -> fixed fc96837; selftest 125/125 PASS; pushed
+2026-09-28T22:56:21-07:00 | mycologist | take1 relaunched with bf16 fix
+2026-09-28T22:59:27-07:00 | infra | Ollama for verify.py: localhost:11434 is a python gateway (pid 28512) returning HTTP 500; Aaron's Ollama (11433) is down and its store no longer has qwen3-vl:8b. Started a private ollama.exe serve on 127.0.0.1:18436 (pid 35020, models D:/tmp/cast-walks/ollama-models) and pulling qwen3-vl:8b
+2026-09-28T23:01:40-07:00 | gates | verify.py fixed: it printed ok/exit 0 with Ollama returning 500 (every vote unparsed) -> now FAILs 'no VLM answer'; --kind filter added. qwen3-vl:8b ready on private :18436
+2026-09-28T23:05:57-07:00 | mycologist | take1 s: period 57 seam 0.334; se: period 36 seam 0.327 (562s; check full-stride)
+2026-09-28T23:17:26-07:00 | mycologist | take1 done (~20 min GPU): e period 40 seam 0.299; ne 36 seam 0.283; n 34 seam 2.26 (BAD). sheet /mnt/d/tmp/cast-walks/runs/mycologist/take1/video-s3/sheet@4x.png
+2026-09-29T00:26:12-07:00 | mycologist | take2 n only (seed 11) launched: take1 n seam 2.26 (clip turns around after ~f56); auto re-cut 0.791 still > 0.5 gate
+2026-09-29T00:30:25-07:00 | mycologist | take2 n (seed 11, 118s): period 15 seam 0.559 -> FAIL seam gate (0.5). launching take3 n seed 23
+2026-09-29T00:33:27-07:00 | mycologist | take3 n (seed 23, 138s): seam 0.91 FAIL. n PARKED after 3 takes: best seams 0.791 (t1 auto), 0.559 (t2), 0.91 (t3); alt period ranges 12:20/20:40/30:64 none <= 0.5
+2026-09-29T00:46:45-07:00 | cli | flow embedding verified on a post-fix run (/mnt/d/tmp/cast-walks/runs/mycologist/flowcheck/video-s3, e only, 96s, same loop as take1 e: P20 s22 seam 0.177): raw/e-keyframe-comfy.png workflow 36 nodes/44 links + prompt 35 nodes; raw/e-walk-comfy.mp4 ffprobe tags workflow 36 nodes + prompt 35; frames/mycologist-e-walk-3.png tEXt workflow 36 nodes + prompt 35
+2026-09-29T01:00:34-07:00 | mycologist | contact sheet https://2cb.pw/contact-96-vs-frog-settler-7da17e (/mnt/d/tmp/cast-walks/mycologist/contact-96-vs-frog-settler.png), walk GIF https://2cb.pw/walk-96-vs-frog-settler-b82aae
+2026-09-29T02:21:36-07:00 | mycologist | session resumed after crash; ComfyUI + private Ollama restarted; WIP export committed c4ba2cb; gate re-run launched (pre-crash run: seam PASS, colour PASS, silhouette FAIL 7 = step frames are strides + side views vs s-idle ref)
+2026-09-29T02:26:36-07:00 | gates | gate 3 view-aware (step = walk frame for walk chars; width/head_h same-view only); frog tol back to default; selftest 9/9 (old code 7/9); vitest charConsistency+themeManifestSync 57/57; cast --check 0 violations; 6f7136e

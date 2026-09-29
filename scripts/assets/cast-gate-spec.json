@@ -1,0 +1,26 @@
+{
+ "_doc": "Ship gates for a video-route character (scripts/assets/cast_walk.py gate). Every gate must PASS. Thresholds are the frog-settler's accepted numbers (CURATION.md, 2026-09-25), not taste.",
+ "seam_max": 0.5,
+ "_seam": "loop seam / ordinary frame step, per direction. The frog shipped 0.16-0.48.",
+ "colour": {
+  "anchor": "s-idle",
+  "anchor_share": 0.005,
+  "min_share": 0.003,
+  "far_rgb": 40,
+  "drift_max": 0.01,
+  "_": "share of a direction's opaque pixels (all 10 frames) in colours that are >= min_share of the direction and farther than far_rgb from every colour making up >= anchor_share of the s-idle. The frog measures 0.005 at worst, the shipped vine-ranger 0.009; the mycologist's cyan e-visor measured 0.030."
+ },
+ "consistency": "consistency.py <kind> --check exits 0 (silhouette spec in consistency-spec.json, 48 px pack)",
+ "verify": {
+  "theme": "swampspace-hires",
+  "frames": "every frame, job = its direction's idle: s/se face visible, e a profile, ne/n no face",
+  "pairs": "verify.py --pairs --kind",
+  "same": "verify.py --same --kind"
+ },
+ "judge": "sprites.judge GATES (judge-sprite-mp4) on each direction's raw loop frames",
+ "style": {
+  "theme": "swampspace-hires",
+  "anchors": ["chars/frog-settler-s-idle.png", "chars/frog-settler-se-idle.png"],
+  "_": "verify.py --style --kind against the frog, the pack's reference video-route character"
+ }
+}

@@ -72,6 +72,19 @@ Files in this folder:
 8. **Finish one character end to end before the next.** Aaron has to see
    the whole path work on the beta (the mycologist first, 2026-09-29). A
    character in progress takes priority over every queued one.
+11. **The full cast gets animated for testing; weak designs go last** (Aaron, 2026-09-29 ~10:05:
+   "Have a separate agent, one with the role of an incredibly experienced, talented and critical
+   pixel art artist critique each character. And queue the bad ones up at the end of the queue so we
+   still end up with the full cast animated for testing"). A critic agent grades every character
+   A-F (`/mnt/d/tmp/cast-walks/critique/`). QUEUE.md order: A/B first, C/D/F last. Weak designs are
+   still animated (for testing), then redesigned. For testing, a character whose body can't make a
+   clean loop (hover, many legs) ships its least-bad loop with a per-kind seam exception, the way
+   Aaron accepted the stalker's ("Let's use what we have for now"), flagged in CURATION for a redo.
+12. **Never use the old player sprite as a style anchor** (Aaron: "Using the original player
+   character as the anchor is a bad idea. It's not a great image."). The r2 cast converged on its
+   teal suit via IPAdapter 0.3 + one shared LOOK suffix + shared seeds
+   (`/mnt/d/tmp/cast-walks/research/art-docs-2026-09-29.md`). New designs: anchor off, each character
+   its own build, palette and seed, drawing-medium words, photo negatives.
 9. **Keep notes in the repo.** A new standing instruction goes into this file
    and is pushed the same turn.
 10. **Design on-lore.** Every character design and every redesign prompt

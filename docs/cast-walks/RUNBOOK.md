@@ -64,7 +64,7 @@ setsid nohup python3 -u scripts/assets/spritesheet.py /mnt/d/tmp/cast-walks/runs
   `until tr '\r' '\n' < LOG | grep -q -E "→|rror|Traceback"; do sleep 30; done; tr '\r' '\n' < LOG | grep -E "loop of|rror|→"` (Bash, long `timeout`).
 - It prints each direction's loop: `period`, `start`, `seam`, `candidates`. The CLI picks the loop itself (the shortest full stride, `--period 12:64`). Do not hand-tune periods.
 - Retake one direction: add `--dirs n --seeds 11 --out .../take2-n`. **Max 3 takes per direction**, then park it and record why.
-- Non-walkers (hive-spire speed 0; brood-sac and gloom-lurker dormant until woken): still run the full set; pass a `--describe` that asks for an in-place idle pulse ("breathes and pulses in place, never moves its base") and note it. The game requests walk from displacement only (`src/render/sprites.ts:288`); hive-spire never enters walk.
+- Non-walkers (hive-spire speed 0; brood-sac and gloom-lurker dormant until woken): still run the full set with `--motion pulse` and note it. Fliers (spore-drone) take `--motion hover`: the keyframe floats and Wan bobs it, limbs trailing. A `--describe` alone cannot change the motion, because the Wan motion sentence (`MOTIONS` in spritesheet.py) comes after it in the prompt; the default `walk` asks for full strides. The game requests walk from displacement only (`src/render/sprites.ts:288`); hive-spire never enters walk.
 
 ## Step 2: assemble, export, gate
 

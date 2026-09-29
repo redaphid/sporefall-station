@@ -380,10 +380,10 @@ def _qwen_loaders(g, q, input_name, angles=False):
     return m, clip, vae, src, neg
 
 
-def _idle_prompt(d, describe, style):
+def _idle_prompt(d, describe, style, pose=POSES["idle"]):
     who = f" The character: {describe}." if describe else ""
     return (f"Redraw the character from image 1 as a single full-body video game sprite: {DIRS[d]}, "
-            f"{POSES['idle']}. Keep the exact same character design, outfit, colors, markings and "
+            f"{pose}. Keep the exact same character design, outfit, colors, markings and "
             f"proportions.{who} {FRAME} {style}")
 
 
@@ -534,8 +534,22 @@ WAN = {
     "width": 848, "height": 480, "length": 81, "fps": 16, "shift": 5.0, "steps": 4, "split": 2,
 }
 KEY_W, KEY_H = 1280, 720
-WALK = ("walks in place like a video game walk cycle: the legs step forward and back one after another with big, "
-        "clear, full strides, the arms swing, the body bobs gently, and it never moves across the frame")
+# How the character moves in place: (keyframe pose, Wan motion sentence). The game plays these
+# frames as its walk whatever they show, so a flier or a rooted thing gets its own motion here;
+# a --describe cannot override the sentence, because the sentence follows it in the prompt.
+MOTIONS = {
+    "walk": (POSES["idle"],
+             "walks in place like a video game walk cycle: the legs step forward and back one after another with "
+             "big, clear, full strides, the arms swing, the body bobs gently, and it never moves across the frame"),
+    "hover": ("floating in the air in a relaxed idle pose, nothing touching the ground, everything below the "
+              "body hanging loose",
+              "hovers in place like a video game flying idle: the whole body bobs slowly up and down and sways a "
+              "little, everything hanging below the body swings loosely together, nothing ever touches the "
+              "ground, it takes no steps, and it never moves across the frame"),
+    "pulse": ("resting in place in a relaxed idle pose",
+              "stays rooted in place like a video game idle: it breathes and pulses slowly, swelling and "
+              "settling, its base never moves, and it never moves across the frame"),
+}
 WAN_RULES = ("The camera is completely static and locked off: no zoom, no pan, no rotation. The character stays "
              "centred and the same size, keeps facing the same direction the whole time, never turns around, and the "
              "whole body stays in frame. Plain flat white background, no shadow, no ground, crisp pixel art, flat "
@@ -573,8 +587,10 @@ def detect_wan(overrides: dict) -> tuple[dict, list[str]]:
     return w, notes
 
 
-def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="sprite-sheet/video") -> Graph:
-    """ONE direction: Qwen keyframe (1280x720 on white) -> Wan 2.2 I2V walk-in-place, 81 frames."""
+def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="sprite-sheet/video",
+                motion="walk") -> Graph:
+    """ONE direction: Qwen keyframe (1280x720 on white) -> Wan 2.2 I2V, 81 frames of MOTIONS[motion] in place."""
+    pose, moves = MOTIONS[motion]
     g = Graph()
     g.band("models + input", "#335")
     m, clip, vae, src, neg = _qwen_loaders(g, q, input_name)
@@ -582,7 +598,7 @@ def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="spr
     steps, cfg = (4, 1.0) if q.get("lightning") else (20, 2.5)
     g.band(f"keyframe {d} (Qwen-Image-Edit)")
     pos = g.add("TextEncodeQwenImageEditPlus", {"clip": [clip, 0], "vae": [vae, 0], "image1": [src, 0],
-                                                "prompt": _idle_prompt(d, describe, style)}, f"{d} keyframe prompt", col=0)
+                                                "prompt": _idle_prompt(d, describe, style, pose)}, f"{d} keyframe prompt", col=0)
     pos = g.add("FluxKontextMultiReferenceLatentMethod",
                 {"conditioning": [pos, 0], "reference_latents_method": "index_timestep_zero"}, col=0)
     ks = g.add("KSampler", {"model": [m, 0], "positive": [pos, 0], "negative": [neg, 0], "latent_image": [lat, 0],
@@ -608,7 +624,7 @@ def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="spr
     wclip = g.add("CLIPLoader", {"clip_name": w["clip"], "type": "wan", "device": "default"}, col=1)
     wvae = g.add("VAELoader", {"vae_name": w["vae"]}, col=1)
     who = describe or "The character from the start image"
-    text = (f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {DIRS[d]}, {WALK}. {WAN_RULES}")
+    text = (f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {DIRS[d]}, {moves}. {WAN_RULES}")
     wpos = g.add("CLIPTextEncode", {"clip": [wclip, 0], "text": text}, f"{d} walk prompt", col=2)
     wneg = g.add("CLIPTextEncode", {"clip": [wclip, 0], "text": WAN_NEG}, "walk negative (inert at cfg 1)", col=2)
     i2v = g.add("WanImageToVideo", {"positive": [wpos, 0], "negative": [wneg, 0], "vae": [wvae, 0],
@@ -1114,7 +1130,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
         out = os.path.join(root, f"video-s{seed}")
         os.makedirs(f"{out}/raw", exist_ok=True)
         graphs = {d: video_graph(input_name, d, seed, q, w, a.describe, a.style or STYLE,
-                                 f"sprite-sheet/{kind}/video-s{seed}") for d in dirs}
+                                 f"sprite-sheet/{kind}/video-s{seed}", a.motion) for d in dirs}
         for d, g in graphs.items():
             json.dump(g.nodes, open(f"{out}/flow-{d}_api.json", "w"), indent=1)
             json.dump(g.workflow(), open(f"{out}/flow-{d}.json", "w"), indent=1)
@@ -1166,7 +1182,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
         if not dirs_run:
             continue
         runs.append(finish(out, raws, dirs_run, WALK_POSES, a, kind, pal,
-                           {"method": "video", "seed": seed, "input": a.image, "kind": kind, "loops": loops,
+                           {"method": "video", "seed": seed, "input": a.image, "kind": kind, "motion": a.motion, "loops": loops,
                             "models": {"qwen": q, "wan": w}, "mirrored": a.mirror}))
     if runs:
         print("\n".join(runs))
@@ -1371,6 +1387,8 @@ def main(argv=None):
                                                           "the flow's own seeds)")
     ap.add_argument("--describe", default="", help="one line about the character; helps side/back views, "
                                                    "needed by --method sdxl")
+    ap.add_argument("--motion", choices=list(MOTIONS), default="walk",
+                    help="video: how it moves in place; hover = fliers (bob, never step), pulse = rooted things")
     ap.add_argument("--style", help=f"style sentence (default: {STYLE!r})")
     ap.add_argument("--name", help="run name (default: image file name)")
     ap.add_argument("--kind", help="frame file prefix (default: the name, slugged)")

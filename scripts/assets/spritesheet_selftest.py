@@ -525,6 +525,26 @@ def main():
               json.load(open(f"{v}/flow-e_api.json")))
         check("video: editor + API flow per direction written",
               os.path.exists(f"{v}/flow-e.json") and os.path.exists(f"{v}/flow-s_api.json"))
+
+        def queued_prompts(api):
+            by_title = {n.get("_meta", {}).get("title", ""): n["inputs"] for n in api.values()}
+            return by_title["e keyframe prompt"]["prompt"], by_title["e walk prompt"]["text"]
+        key, wan = queued_prompts(Fake.prompts[-1])
+        check("motion: the default is the frog's walk (strides, standing keyframe)",
+              "full strides" in wan and "standing still" in key and vm.get("motion") == "walk", (vm.get("motion"), wan))
+        S.main([src, "--out", os.path.join(tmp, "hover"), "--method", "video", "--dirs", "e", "--motion", "hover",
+                "--describe", "a domed drone with limbs hanging beneath it"])
+        key, wan = queued_prompts(Fake.prompts[-1])
+        hm = json.load(open(os.path.join(tmp, "hover", "video-s3", "sheet.json")))
+        check("motion: hover asks Wan for a bob and no steps, after the describe",
+              "bobs slowly up and down" in wan and "strides" not in wan and "step forward" not in wan
+              and wan.index("domed drone") < wan.index("hovers in place"), wan)
+        check("motion: hover keyframe floats, it does not stand", "floating in the air" in key and "standing" not in key, key)
+        check("motion: the run records its motion", hm.get("motion") == "hover", hm.get("motion"))
+        n1 = len(Fake.prompts)
+        check("motion: an unknown motion is refused before anything is queued",
+              raises(lambda: S.main([src, "--out", os.path.join(tmp, "swim"), "--method", "video", "--motion", "swim"]))
+              and len(Fake.prompts) == n1)
         n2 = len(Fake.prompts)
         Fake.fail = {str(n2)}  # the first direction dies on the GPU
         died = raises(lambda: S.main([src, "--out", os.path.join(tmp, "vfail"), "--method", "video", "--dirs", "s,se,e"]))

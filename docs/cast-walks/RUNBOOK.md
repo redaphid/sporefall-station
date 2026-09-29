@@ -125,8 +125,9 @@ Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a
 ## Every image carries its flow
 
 - The CLI sends the editor graph as `extra_data.extra_pnginfo.workflow`, so ComfyUI's keyframe PNG and walk MP4 embed `workflow` + `prompt`; they are kept untouched as `raw/<dir>-keyframe-comfy.png` and `raw/<dir>-walk-comfy.mp4`.
-- Every post-processed frame, `sheet.png` and the contact sheet get tEXt `prompt` + `workflow` from the run's `flow-<dir>.json`; `repack --to` and `assemble` carry the flows along. Cost: ~25 KB per sprite.
-- Check one of each: `python3 -c "import json;from PIL import Image;print(len(json.loads(Image.open('F.png').info['workflow'])['nodes']))"`; MP4: `~/.local/bin/ffprobe -v error -show_entries format_tags=workflow -of json F.mp4`.
+- Every post-processed frame in a run, `sheet.png` and the contact sheet get tEXt `prompt` + `workflow` from the run's `flow-<dir>.json`; `repack --to` and `assemble` carry the flows along. The run dirs keep these embedded copies.
+- Shipped frames carry no flow. At ~25 KB a frame, 400 frames pushed the APK past Cloudflare's 25 MiB asset cap and every web deploy failed. `export` ends with `strip`: each direction's flow goes to `scripts/assets/flows/cast/<kind>/<dir>.json` (editor graph, drag it into ComfyUI) and `<dir>_api.json` (API prompt), the same pair as the run's `flow-<dir>*.json`, and the frames lose their text chunks with every other chunk kept byte for byte. `sheet` re-embeds the flow from there. A frame exported before this: `python3 scripts/assets/cast_walk.py strip --kind <kind>`. `src/render/themePngText.test.ts` fails on any text chunk over 1 KB under `public/themes/`.
+- Check one of each: run frame `python3 -c "import json;from PIL import Image;print(len(json.loads(Image.open('F.png').info['workflow'])['nodes']))"`; shipped flow `python3 -c "import json;print(len(json.load(open('scripts/assets/flows/cast/K/D.json'))['nodes']))"`; MP4 `~/.local/bin/ffprobe -v error -show_entries format_tags=workflow -of json F.mp4`.
 
 ## Gotchas already fixed (commit on `art/cast-walk-cycles`)
 
@@ -143,6 +144,7 @@ Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a
 | `verify.py` printed ok with Ollama down | fails closed: `no VLM answer` (9c518ef) |
 | a gate run hung 20+ min | qwen3-vl rambled 7000 tokens; `num_predict 256` (1f0fa8c) |
 | a drag-in didn't rebuild the graph | flows embedded everywhere (7fa5255) |
+| deploy failed: APK 27 MiB > 25 MiB asset cap | shipped frames stripped, flows in `scripts/assets/flows/cast/` (`strip`) |
 
 Other traps: a clip can turn around late (mycologist n from ~frame 56); the loop search usually avoids it but check the n row. Each direction's keyframe is an independent edit of the input, so colour can drift per direction (gate 2 + palette lock). `anim.walk: 4` plays 8 frames in 32 ticks: one stride per loop is right.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""VLM gate for the swampspace pack (Ollama qwen3-vl on localhost:11434).
+"""VLM gate for the swampspace pack (Ollama qwen3-vl-instruct; OLLAMA picks the server).
 
 Checks each candidate/curated asset against its job spec:
   * props/items/tiles must NOT read as a person/creature (the
@@ -14,7 +14,7 @@ Usage:
   python3 verify.py --pairs                              # idle/step consistency
   python3 verify.py --same [a.png b.png]                 # cross-direction identity
                                                          # (pack-wide vs each s-idle)
-Exit code = number of failures (CI-gate style). Majority vote over 3 reads.
+Exit code = number of failures (CI-gate style). Majority vote over VOTES reads (default 1).
 """
 import base64
 import io
@@ -41,8 +41,12 @@ KIND = sys.argv[sys.argv.index("--kind") + 1] if "--kind" in sys.argv else None
 
 def _wanted(spec):
     return KIND is None or spec.get("kind") == KIND
-MODEL = os.environ.get("VLM", "qwen3-vl:8b")
-VOTES = int(os.environ.get("VOTES", "3"))
+# The instruct tag answers in ~45 tokens. The plain qwen3-vl:8b tag is the thinking variant: it
+# ignores "think": false and thinks 140-1500 tokens first, 10-20 s a call, which made a cast gate
+# take an hour. At temperature 0 the instruct tag gives the same answer every time, so extra votes
+# repeat one read; VOTES > 1 is for a sampling model.
+MODEL = os.environ.get("VLM", "qwen3-vl:8b-instruct")
+VOTES = int(os.environ.get("VOTES", "1"))
 
 PROMPT = (
     "You are a QA inspector for 2D game sprites. Look at the image and answer ONLY with "
@@ -54,9 +58,9 @@ PROMPT = (
 )
 
 
-# qwen3-vl:8b thinks before it answers even with "think": false (~1500 tokens on a style
-# question); at num_predict 1536 it ran out mid-thought and the gate read "no VLM answer".
-NUM_PREDICT = 4096
+# A thinking model needs ~1500 tokens before its answer (VLM=qwen3-vl:8b NUM_PREDICT=4096); the
+# instruct default answers in ~45, so the cap only bounds a reply that rambles.
+NUM_PREDICT = int(os.environ.get("NUM_PREDICT", "512"))
 
 
 def _generate(prompt, images):

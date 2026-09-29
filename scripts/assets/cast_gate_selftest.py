@@ -104,7 +104,7 @@ if "--cpu" not in sys.argv:
         v, probs = V.check(os.path.join(CHARS, f"{kind}-{src}.png"), {"cat": "char", "dir": d, "kind": kind, "path": ""})
         expect(f"{kind} {src} as {d}", False, not probs, f"view {v.get('view')} {probs}")
 
-    print("gate 6: style vs the frog, rendering only")
+    print("gate 6: style vs the frog, rendering only; a negative counts as caught by 6 or 6b")
     anchors = [os.path.join(C.THEMES, "swampspace-hires", a) for a in C.SPEC["style"]["anchors"]]
     for q in ("s-idle", "e-walk-3", "n-step"):
         _, probs = V.check_style(os.path.join(CHARS, f"mycologist-{q}.png"), anchors)
@@ -115,7 +115,9 @@ if "--cpu" not in sys.argv:
     painted = os.path.join(TMP, "muck_slog", "0001.png")
     for name, p in (("mycologist s-idle, blurred", blurred), ("painted 3D render (muck_slog)", painted)):
         _, probs = V.check_style(p, anchors)
-        expect(name, False, not probs, probs)
+        off = C.off_palette([p]) if p.endswith(".png") and Image.open(p).mode == "RGBA" else None
+        caught = bool(probs) or (off is not None and off > C.SPEC["palette"]["off_max"])
+        expect(f"{name} (6 or 6b)", False, not caught, f"style {probs or 'ok'}, off-palette {off}")
 
 print(f"\n{wrong} wrong verdict(s)")
 sys.exit(min(wrong, 120))

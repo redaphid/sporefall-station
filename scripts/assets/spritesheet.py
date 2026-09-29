@@ -236,8 +236,10 @@ def detect_qwen(overrides: dict) -> tuple[dict, list[str]]:
     if vl:
         cfg["clip"] = sorted(vl, key=lambda e: ("fp8" not in e, e))[0]
     vaes = listing("vae") or []
+    # The Edit models use the original Qwen-Image VAE. A server can also hold a newer one
+    # (`qwen_image_2.1_vae_bf16`, which sorts first), so keep the default when it's installed.
     qv = [v for v in vaes if "qwen" in v.lower()]
-    if qv:
+    if qv and cfg["vae"] not in vaes:
         cfg["vae"] = qv[0]
     for k, v in overrides.items():
         if v is not None:

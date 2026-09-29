@@ -93,7 +93,8 @@ class Fake:
                   "wan2.2\\wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
                   "pixel_art_style_by_skormino_v7.05_test_72img.safetensors"],
         "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
-        "vae": ["qwen_image_vae.safetensors", "wan_2.1_vae.safetensors"],
+        # the real server (0.37) also has the Qwen-Image 2.1 VAE, which sorts before the Edit VAE
+        "vae": ["qwen_image_2.1_vae_bf16.safetensors", "qwen_image_vae.safetensors", "wan_2.1_vae.safetensors"],
         "checkpoints": ["SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"],
     }
 
@@ -284,6 +285,8 @@ def main():
         check("detect: rank puts an 'Edit-2' release above 2511",
               S._qwen_rank("Qwen-Image-Edit-2_fp8.safetensors") > S._qwen_rank("qwen_image_edit_2511_fp8.safetensors"))
         check("detect: 2511 is not mistaken for 'Edit-2'", S._qwen_rank("qwen_image_edit_2511.safetensors")[0] == 3)
+        check("detect: the Edit VAE, not the 2.1 VAE that sorts first", q["vae"] == "qwen_image_vae.safetensors",
+              q["vae"])
         check("detect: --lightning none wins", S.detect_qwen({"lightning": "none"})[0]["lightning"] is None)
 
         print("graphs")

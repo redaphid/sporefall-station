@@ -102,7 +102,8 @@ Files in this folder:
 
 **Auto-resume (since 2026-09-29, Aaron: "set up Windows to restart this session if it crashes").**
 At Windows login, `Startup\claude-crash-resume.cmd` checks `D:\tmp\claude-resume\active`. If it
-exists, it opens Windows Terminal -> WSL `survivor` -> `~/.local/bin/claude-crash-resume`, which runs
+exists, it shows a 15-minute countdown window (Aaron: "in case I want to shut it down"; close the
+window or delete the marker to cancel, press a key to start now), re-checks the marker, then opens Windows Terminal -> WSL `survivor` -> `~/.local/bin/claude-crash-resume`, which runs
 `claude --resume <SESSION> --remote-control --permission-mode auto` with a prompt pointing at the steps
 below. The marker holds `SESSION=`, `CWD=`, `EXPIRES=` (epoch). An expired marker is deleted, not
 resumed. The coordinator writes the marker when a run starts and deletes it when the run ends.

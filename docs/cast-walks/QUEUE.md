@@ -25,3 +25,47 @@ Next humanoids, in order: drowned-diver (drowner), blast-diver (breacher), bog-m
 | 15 | spore-mortar | lobber | shipped s-idle | queued |
 | 16 | gloom-lurker | lurker | shipped s-idle | queued (non-walker) |
 | 17 | hive-spire | hivespire | shipped s-idle | queued (non-walker, speed 0) |
+
+## Order from 10:10 (critic grades, PROTOCOL rules 11-12)
+
+Grades: /mnt/d/tmp/cast-walks/critique/CRITIQUE.md, lineup https://2cb.pw/sporefall-cast-grades.
+Done or in flight: mycologist B, vine-ranger B, drowned-diver C, blast-diver B (all on main);
+mireclaw-stalker C (shipping, Aaron's loop exception), sporeling-mite C (waddle; motion fix 028ee9a),
+cinder-husk C (rendering), bellwether B (staged).
+Not yet animated, in critic order (A/B first, C/D/F last; all get animated for testing, weak ones then redesigned):
+1. mireclaw-alpha B (many legs: least-bad loop for testing, rule 11)
+2. gloom-lurker B (hover: least-bad loop for testing)
+3. carapace-brute C (quadruped)
+4. spore-mortar C
+5. derelict-bot C
+6. gloam-hound C (quadruped)
+7. bog-mender C (Step 0 prep saved in /mnt/d/tmp/cast-walks/bog-mender/)
+8. spore-drone C (parked hover; least-bad loop for testing)
+9. brood-sac D (stationary: pulse loop)
+10. hive-spire D (stationary: pulse loop)
+11. bog-mutant F (the Hulk; redesign first, Aaron veto)
+Redesign references: the critic's concept-art picks, /mnt/d/tmp/cast-walks/critique/concept-picks.md (in progress).
+Cleanup (critic): legacy step/attack frames for bog-mutant, derelict-bot and spore-drone are an older design, not in the manifest; delete them so nobody animates from them.
+
+## Rounds (Aaron, 2026-09-29 ~10:25, corrected ~10:30)
+
+Aaron: "We'll go through another pass once we're done animations stuff this time and get concept art
+characters in the next full round" ... then: "I meant for it to select ones for those we haven't
+animated yet".
+
+- **This round:** every character NOT yet animated gets a critic-picked concept-art design first
+  (`CRITIC.md`: aesthetic priority, any lore-sensible character that can fill the gameplay role), then
+  its walk. That's bellwether, mireclaw-alpha, gloom-lurker, carapace-brute, spore-mortar, derelict-bot,
+  gloam-hound, bog-mender, spore-drone, brood-sac, hive-spire, bog-mutant (pod-carrier). The critic
+  delivers picks in that order, a few at a time. Route: concept -> Qwen-Image-Edit to a clean
+  full-body 3/4 pixel-art front on white (4 seeds, checked at 96 px after the palette lock) -> the
+  normal video route. Aaron sees each design sheet as it lands; it proceeds unless he vetoes.
+  Characters whose body can't loop cleanly (many legs, hover, pulse): one take per direction, least-bad
+  loop, rule-11 seam exception.
+- **Next pass:** the characters already animated (mycologist, vine-ranger, drowned-diver, blast-diver,
+  frog-settler, mireclaw-stalker, sporeling-mite, cinder-husk) get the same concept-art treatment.
+
+**10:55 update (Aaron):** the v2 concept picks are rejected ("It needs to focus more on pixel art and
+how thin some of those would be"). The critic re-picks under the pixel-art / thickness-first CRITIC.md.
+**Keep, never redesign:** frog-settler, sporeling-mite, mycologist.
+

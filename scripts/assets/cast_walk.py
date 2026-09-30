@@ -174,6 +174,7 @@ def cmd_assemble(a):
     os.makedirs(f"{out}/raw", exist_ok=True)
     meta = json.load(open(f"{base}/sheet.json"))
     meta["takes"] = takes
+    meta["dirs"] = list(DIRS)  # a partial retake as the base would drop the directions only a --take supplies
     for d, src in takes.items():
         m = json.load(open(f"{src}/sheet.json"))
         meta["loops"][d] = m["loops"][d]

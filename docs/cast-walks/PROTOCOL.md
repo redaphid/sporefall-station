@@ -28,7 +28,17 @@ Files in this folder:
 
 1. **Commit and push after every step.** The machine crashes. Unpushed work is lost.
    The branch is `art/cast-walk-cycles`.
-2. **Delegate everything.** Each character gets a fresh agent, in serial.
+2. **Delegate everything.** Each character gets a fresh agent. The GPU is serial (one job at a
+   time), the characters are not: start the next character's agent while the previous one is in
+   its CPU-only shipping steps (merge, CI, in-game video). Strict serial left the GPU idle ~25 min
+   per character on 09-29, and Aaron was "surprised we finished so few characters".
+   **Order by risk:** two-legged humanoids first (they loop on take 1-2, ~30 min each); anything
+   that hovers, pulses or has many legs is R&D with a hard 1-hour cap, never ahead of humanoids.
+   On 09-29 the drone and the stalker ate ~2 h each and shipped nothing.
+   **The GPU is never idle** (Aaron, 09-29 09:46: "The GPU should literally never be idle"). Always
+   keep one character staged (Step 0 done on CPU, waiting on `GPU-WAN.lock`) behind the one on the
+   GPU. The coordinator runs an idle watchdog (util < 15% for 60 s alerts) and answers every alert
+   by staging work. A lock holder with no GPU process is released by the coordinator.
 3. **Workers fix what they find.** A gate that fails good art, a script bug or
    a wrong default is fixed at its root by whoever finds it. They prove the fix
    (a test, or a before/after run), commit, push, and report the finding in one
@@ -62,6 +72,20 @@ Files in this folder:
 8. **Finish one character end to end before the next.** Aaron has to see
    the whole path work on the beta (the mycologist first, 2026-09-29). A
    character in progress takes priority over every queued one.
+11. **The full cast gets animated for testing; weak designs go last** (Aaron, 2026-09-29 ~10:05:
+   "Have a separate agent, one with the role of an incredibly experienced, talented and critical
+   pixel art artist critique each character. And queue the bad ones up at the end of the queue so we
+   still end up with the full cast animated for testing"). A critic agent grades every character
+   A-F (`/mnt/d/tmp/cast-walks/critique/`), briefed by `CRITIC.md` (aesthetic priority; any
+   lore-sensible character that can fill the role will do). QUEUE.md order: A/B first, C/D/F last. Weak designs are
+   still animated (for testing), then redesigned. For testing, a character whose body can't make a
+   clean loop (hover, many legs) ships its least-bad loop with a per-kind seam exception, the way
+   Aaron accepted the stalker's ("Let's use what we have for now"), flagged in CURATION for a redo.
+12. **Never use the old player sprite as a style anchor** (Aaron: "Using the original player
+   character as the anchor is a bad idea. It's not a great image."). The r2 cast converged on its
+   teal suit via IPAdapter 0.3 + one shared LOOK suffix + shared seeds
+   (`/mnt/d/tmp/cast-walks/research/art-docs-2026-09-29.md`). New designs: anchor off, each character
+   its own build, palette and seed, drawing-medium words, photo negatives.
 9. **Keep notes in the repo.** A new standing instruction goes into this file
    and is pushed the same turn.
 10. **Design on-lore.** Every character design and every redesign prompt
@@ -89,6 +113,16 @@ Files in this folder:
     - 2026-09-29 02:33, after the crash: "Remember the lore stuff as well"
 
 ## After a crash
+
+**Auto-resume (since 2026-09-29, Aaron: "set up Windows to restart this session if it crashes").**
+At Windows login, `Startup\claude-crash-resume.cmd` checks `D:\tmp\claude-resume\active`. If it
+exists, it shows a 15-minute countdown window (Aaron: "in case I want to shut it down"; close the
+window or delete the marker to cancel, press a key to start now), re-checks the marker, then opens Windows Terminal -> WSL `survivor` -> `~/.local/bin/claude-crash-resume`, which runs
+`claude --resume <SESSION> --remote-control --permission-mode auto` with a prompt pointing at the steps
+below. The marker holds `SESSION=`, `CWD=`, `EXPIRES=` (epoch). An expired marker is deleted, not
+resumed. The coordinator writes the marker when a run starts and deletes it when the run ends.
+Subagents, crons and monitors die with the crash; the resumed coordinator re-creates them.
+It needs a Windows login: if the box boots to a password screen it waits until Aaron logs in.
 
 1. Read this file, then `QUEUE.md` and the tail of `PROGRESS.md`. Then read
    `git log origin/art/cast-walk-cycles -10` and `git status` in

@@ -55,7 +55,11 @@ Files in this folder:
    play this in the morning with the new sprites." A finished character is
    merged into `main` (no PR needed) after `pnpm run build`, `pnpm exec
    vitest run` and `pnpm run lint` pass on the merge, then pushed. Verify
-   the sha of one of its frames from the live site. The beta
+   the sha of one of its frames from the live site. Before the merge, the coordinator itself
+   views the 5-direction contact sheet (idle, step, walk 0-7) and checks it is one creature in one
+   style from every side, with each idle matching its own walk. The 09-29 audit found a sporeling
+   whose back views were a different render and a stalker whose idles faced the wrong way, and
+   every gate passed them. The beta
    (`preview/cast-walks`) stays available for looks before a merge.
 6. **Show Aaron a redesign before the long render.** Before a redesigned
    character's Wan run, Aaron sees the candidates and can veto the look.

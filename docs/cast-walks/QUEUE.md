@@ -14,7 +14,7 @@ Next humanoids, in order: drowned-diver (drowner), blast-diver (breacher), bog-m
 | 4 | sporeling-mite | sporeling | r2 | queued |
 | 5 | carapace-brute | brute | r2 | queued |
 | 6 | derelict-bot | robot | r2 | queued |
-| 7 | cinder-husk | cinder | r2 | queued |
+| 7 | cinder-husk | cinder | r2 | gating; Aaron 09-29 20:2x "fine for now, revisit later": ships for testing, redesign later (thin, reads nude) |
 | 8 | brood-sac | pod | r2 | queued (non-walker: idle pulse) |
 | 9 | gloam-hound | gloamhound | shipped s-idle | queued |
 | 10 | drowned-diver | drowner | shipped s-idle | queued |

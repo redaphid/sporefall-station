@@ -561,6 +561,13 @@ MOTIONS = {
                     "once as one rigid piece, everything hanging below the body stays still and moves only with the "
                     "body, nothing ever touches the ground, it takes no steps, and it never moves across the frame",
                     closed=True),
+    # A crouched runner (gloom-lurker): `walk` keys a standing pose, which stands a crouch up.
+    "prowl": Motion("crouched low mid-stride in a fast prowl: knees deeply bent, one foot forward and one foot "
+                    "back, the body leaning forward, the arms bent and ready",
+                    "runs in place like a video game run cycle, low and fast: it stays crouched with the knees deeply "
+                    "bent the whole time, the legs step forward and back one after another in a clear repeating "
+                    "gait, the arms swing opposite the legs, the body stays low and bobs slightly, and it never "
+                    "moves across the frame", closed=False),
     "pulse": Motion("resting in place in a relaxed idle pose",
                     "stays rooted in place like a video game idle: it slowly swells and settles back once, its base "
                     "never moves, and it never moves across the frame", closed=True),

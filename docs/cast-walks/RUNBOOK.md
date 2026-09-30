@@ -93,18 +93,30 @@ python3 scripts/assets/cast_walk.py sheet x --kind <char>   # contact sheet + GI
 | 2 | colour drift vs s-idle | <= 1% of pixels in colours > 40 RGB from every s-idle colour (frog 0.5%, ranger 0.9%) |
 | 3 | `consistency.py <kind> --check` | the per-character silhouette spec |
 | 4 | `verify.py` per frame: the view against its own s-idle/n-idle (`VIEWS_OK`: e side, n/ne never front, s/se never back) and **ne/n no face**; `--pairs`, `--same` | all ok, on the hi-res pack |
-| 5 | judge-sprite-mp4 identity/sharpness/coverage per loop; `boil` (motion-compensated residual / contrast, 16 frames per stride) in place of flicker; head drift | `sprites.judge.GATES`; boil <= 0.3, head_drift <= 0.14 (the frog's shipped loops) |
+| 5 | judge-sprite-mp4 identity/sharpness/coverage per loop; `boil` (motion-compensated residual / contrast, 16 frames per stride) in place of flicker; head drift | identity_drift <= 0.12, sharpness >= 60, coverage_jitter <= 0.1 (`sprites.judge.GATES`' values, pinned in the spec); boil <= 0.3, head_drift <= 0.14 (the frog's shipped loops) |
 | 6 | `verify.py --style` vs the frog: rendering only, not colour | all ok |
 | 6b | pixels off the locked 34 colours (`palette.py`) | 0 |
 
 The controls every gate must still catch: `python3 scripts/assets/cast_gate_selftest.py` (0 wrong, ~3 min). Run it after any gate change. The full gate takes ~3-4 min.
 
-A failure means a retake (max 3 per direction). **A gate that fails on good art, or any tooling bug, is a finding you FIX (Aaron, 09-29):** take WORKTREE.lock, fix the measurement or script at its root, prove it (test or before/after run), commit + push, and report the finding to the coordinator in one line (symptom, root cause, fix, commit). Never loosen a numeric threshold just to pass.
+A failure means a retake (max 3 per direction), or a better route (PROTOCOL rule 14). A tooling bug outside the gate is a finding you fix: take WORKTREE.lock, fix it at its root, prove it (test or before/after run), commit + push, and report it in one line (symptom, root cause, fix, commit). **A gate is never yours to change**, even when you are sure it fails good art. See Gate changes below.
+
+The first line of a gate run names the gate version: `gate <hash> (G<n> in docs/cast-walks/GATE-CHANGES.md)`. gate.json keeps it as `gate_hash` and `gate_entry`.
+
+## Gate changes
+
+The gate is everything `python3 scripts/assets/gate_hash.py` hashes: `cast-gate-spec.json` values, the per-kind tolerances in `consistency-spec.json` (not the measured `ref`, which `--write-spec` re-derives on every export), `verify.py` (prompts, model, votes, token budget), `consistency.py`, the gate half of `cast_walk.py`, and `spritesheet.py`'s loop finders (the seam). `docs/cast-walks/GATE-CHANGES.md` records every version of it.
+
+- **Workers never edit any of it.** If the gate fails your art, write the case in PROGRESS.md and report it to the coordinator: the gate, the numbers, the frames (2cb links), and why you think the rule is wrong. Then stop that direction. Setting `VLM`, `VOTES` or `NUM_PREDICT` for a gate run is a gate change too, and `cast_walk.py gate` refuses it.
+- **A deliberate change** goes through the coordinator to Aaron. On a branch: make the change, run the old gate and the new one on the whole shipped cast and on the controls (`cast_gate_selftest.py`, `consistency_selftest.py`), then add the next `## G<n>` entry with every field (`gate_hash.py` prints the new hash; `--parts` shows which component moved). The evidence is art the old rule misjudged, such as the approved frog failing it, or a rule that measures something other than what it claims. "Our new character fails it" is not evidence. The entry lands only with `Approved-by: Aaron "<his words>" (<date>)`.
+- **An exception for one character** (`seam_exception.<kind>`) is its own entry with `Kind: <kind>`. It never extends to "characters like it".
+- **If the gate refuses to run** (`REFUSED: the ship gate is not an approved version`), someone changed it without an entry. Do not add the entry to get your ship through. Report it.
+- Checks: `python3 scripts/assets/gate_hash.py --check` (head matches, entries well formed), `--history` (every entry's commit re-hashes to its Hash).
 
 ## Step 3: ship
 
 1. Look at ONE contact sheet (`/mnt/d/tmp/cast-walks/<char>/contact-96-vs-frog-settler.png`). `2cb` it and the GIF.
-2. Lineage entry in BOTH `public/themes/swampspace/CURATION.md` and `public/themes/swampspace-hires/CURATION.md` (copy the mycologist's shape: input + sha, takes, loops/seams, colour lock, gate table, parked directions).
+2. Lineage entry in BOTH `public/themes/swampspace/CURATION.md` and `public/themes/swampspace-hires/CURATION.md` (copy the mycologist's shape: input + sha, takes, loops/seams, colour lock, gate table, parked directions). The gate table names the gate it passed, from gate.json: `gate <gate_hash> (<gate_entry>)`, for example `gate 62a925f42e9ecfdc (G7)`. A citation of a hash with no ledger entry fails `gate_hash.py --check`.
 3. Release note: `src/ui/releaseNotes/<date>-<char>-walks.ts` (`export default '<one line>'`).
 4. Checks: `export PATH=~/.local/node22/bin:$PATH; corepack pnpm exec vitest run src/render/themeManifestSync.test.ts` (the beta workflow runs this and fails the deploy on it).
 5. Commit (`art(<char>): ...`) the 100 PNGs, both manifests, `consistency-spec.json`, both CURATION.md, the release note. `git push origin art/cast-walk-cycles`.

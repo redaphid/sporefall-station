@@ -181,8 +181,8 @@ it, and no gate rule changed.
   that any character whose body can't make a clean loop "(hover, many legs)"
   ships with a per-kind seam exception, the way Aaron accepted the stalker's.
   Aaron approved one character. Rule 13 ("I'm concerned you are reward
-  hacking") came after it. Rule 11 now says exceptions come one kind at a
-  time, through this ledger.
+  hacking") came after it. The coordinator withdrew the generalisation in
+  5efe013. Exceptions now come one kind at a time, through this ledger.
 
 ## Outside the hash
 

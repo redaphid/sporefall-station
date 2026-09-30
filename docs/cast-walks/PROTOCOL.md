@@ -39,13 +39,17 @@ Files in this folder:
    keep one character staged (Step 0 done on CPU, waiting on `GPU-WAN.lock`) behind the one on the
    GPU. The coordinator runs an idle watchdog (util < 15% for 60 s alerts) and answers every alert
    by staging work. A lock holder with no GPU process is released by the coordinator.
-3. **Workers fix what they find.** A gate that fails good art, a script bug or
-   a wrong default is fixed at its root by whoever finds it. They prove the fix
-   (a test, or a before/after run), commit, push, and report the finding in one
+3. **Workers fix what they find, except a gate.** A script bug or a wrong
+   default is fixed at its root by whoever finds it. They prove the fix (a
+   test, or a before/after run), commit, push, and report the finding in one
    line: symptom, root cause, fix, commit. They don't hold or work around it.
-4. **Gates block shipping.** Workers make reasonable changes to the gates
-   themselves ("You wrote the gate"). Fix a measurement that is wrong. Never
-   loosen a number just to pass.
+   A gate that seems to fail good art is not theirs to fix: rule 14.
+4. **Gates block shipping, and workers never change them.** A gate is its
+   code, thresholds, prompts, VLM model and per-kind exceptions: everything
+   `scripts/assets/gate_hash.py` hashes. A worker whose art fails reports the
+   failing gate, numbers and frames, and stops that direction. On 09-29 the
+   gates were redefined seven times after our own art failed them
+   (`GATE-CHANGES.md` G1-G6 and a rule-11 exception).
 5. **Ship each character to `main` once it passes.** Aaron (2026-09-29
    03:05): "You are free to merge straight to main. I want to be able to
    play this in the morning with the new sprites." A finished character is
@@ -105,7 +109,12 @@ Files in this folder:
    the case (symptom, measurement, evidence, proposed change) and stops. The coordinator takes it to
    Aaron. When a take fails, try a better route first: a new take, a different motion or pose
    source, or the sporefall-art/cyber-puck methods (`/mnt/d/tmp/cast-walks/research/sprite-routes.md`).
-   An approved change is recorded in `GATE-CHANGES.md`.
+   An approved change is recorded in `GATE-CHANGES.md`: one entry per gate version, holding its
+   hash, the evidence that the old rule was wrong (art the old rule misjudged, not "our art failed
+   it"), old vs new on the shipped cast, the negative controls, and `Approved-by: Aaron "<his
+   words>" (<date>)`. A per-kind exception is its own entry naming that one kind. This is enforced:
+   `cast_walk.py gate` refuses to run, and `pnpm exec vitest run` fails
+   (`src/render/castGateLedger.test.ts`), when the gate's hash is not the ledger's head.
 9. **Keep notes in the repo.** A new standing instruction goes into this file
    and is pushed the same turn.
 10. **Design on-lore.** Every character design and every redesign prompt

@@ -78,9 +78,11 @@ Files in this folder:
    still end up with the full cast animated for testing"). A critic agent grades every character
    A-F (`/mnt/d/tmp/cast-walks/critique/`), briefed by `CRITIC.md` (aesthetic priority; any
    lore-sensible character that can fill the role will do). QUEUE.md order: A/B first, C/D/F last. Weak designs are
-   still animated (for testing), then redesigned. For testing, a character whose body can't make a
-   clean loop (hover, many legs) ships its least-bad loop with a per-kind seam exception, the way
-   Aaron accepted the stalker's ("Let's use what we have for now"), flagged in CURATION for a redo.
+   still animated (for testing), then redesigned. There is **no** standing "least-bad loop"
+   exception. The stalker's shipped I2V takes ("Let's use what we have for now") were Aaron's one
+   explicit call for that character. The coordinator widened it into a blanket rule, which let a
+   pulse loop stand in for a walk; Aaron called that reward hacking (09-29), and it is withdrawn. A
+   body that can't loop is redesigned (rule 13). Gates change only as rule 14 says.
 12. **Never use the old player sprite as a style anchor** (Aaron: "Using the original player
    character as the anchor is a bad idea. It's not a great image."). The r2 cast converged on its
    teal suit via IPAdapter 0.3 + one shared LOOK suffix + shared seeds
@@ -95,6 +97,15 @@ Files in this folder:
    moves, change the character (the critic picks one that can). Passing a gate with an exception
    is not the goal; the character moving convincingly in game is. Stationary (speed 0) only:
    hive-spire.
+14. **Gate changes are deliberate, reasoned and signed off** (Aaron, 2026-09-29 ~17:00: "find a way
+   to prevent gate bypassing like this. If we have to change them, it should be deliberate and
+   reasoned. We should explore other solutions to generating sprites that we came up with in
+   sporefall-art before cheap fixes"). Until Aaron signs off, gate code, thresholds and per-kind
+   exceptions are frozen, and this narrows rules 3-4. A worker who thinks a gate is wrong writes
+   the case (symptom, measurement, evidence, proposed change) and stops. The coordinator takes it to
+   Aaron. When a take fails, try a better route first: a new take, a different motion or pose
+   source, or the sporefall-art/cyber-puck methods (`/mnt/d/tmp/cast-walks/research/sprite-routes.md`).
+   An approved change is recorded in `GATE-CHANGES.md`.
 9. **Keep notes in the repo.** A new standing instruction goes into this file
    and is pushed the same turn.
 10. **Design on-lore.** Every character design and every redesign prompt

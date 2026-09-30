@@ -24,7 +24,9 @@ gate    every ship gate, thresholds in cast-gate-spec.json: loop seam; colour dr
         "ne/n must not show a face" covers the walk frames too), --pairs and --same; the
         judge-sprite-mp4 metric gates on each loop, with boil in place of flicker; verify.py
         --style against the frog; every pixel on the pack's locked palette.
-        Runs on what export wrote into the packs. Exit 0 only on all-PASS; gate.json has it all.
+        Runs on what export wrote into the packs. Exit 0 only on all-PASS; gate.json has it all,
+        with gate_hash, the gate version it ran (scripts/assets/gate_hash.py). It refuses to run a
+        gate that is not the head of docs/cast-walks/GATE-CHANGES.md.
 
 Outputs for a human go to $CAST_OUT/<kind>/ (default /mnt/d/tmp/cast-walks/<kind>/).
 """
@@ -305,11 +307,11 @@ def judge_loop(paths, start, period):
     n = min(BOIL_N, period)
     rep = judge.measure(frames)
     rep["boil"] = boil(_rgb([paths[start + round(i * period / n)] for i in range(n)]))
-    gates = {"identity_drift": rep["identity_drift"] <= judge.GATES["identity_drift"],
+    gates = {"identity_drift": rep["identity_drift"] <= lim["identity_drift_max"],
              "head_drift": rep["head_drift"] <= lim["head_drift_max"],
              "boil": rep["boil"] <= lim["boil_max"],
-             "sharpness": rep["sharpness"] >= judge.GATES["sharpness_min"],
-             "coverage_jitter": rep["coverage_jitter"] <= judge.GATES["coverage_jitter"]}
+             "sharpness": rep["sharpness"] >= lim["sharpness_min"],
+             "coverage_jitter": rep["coverage_jitter"] <= lim["coverage_jitter_max"]}
     return frames, {"pass": all(gates.values()), "gates": gates,
                     **{k: rep[k] for k in ("identity_drift", "head_drift", "boil", "flicker", "sharpness", "coverage_jitter")}}
 
@@ -370,8 +372,15 @@ def colour_drift(kind, pack="swampspace-hires"):
 
 def cmd_gate(a):
     """Every ship gate, thresholds from cast-gate-spec.json. Exit 0 only if every one passes."""
+    import gate_hash
+    version, entry = gate_hash.require_head()
+    overridden = [v for v in ("VLM", "VOTES", "NUM_PREDICT") if v in os.environ]
+    if overridden:
+        raise SystemExit(f"REFUSED: {', '.join(overridden)} set; the VLM model, votes and token budget are part of "
+                         "the gate (verify.py), so a ship gate runs with verify.py's own values")
+    print(f"gate {version} ({entry} in docs/cast-walks/GATE-CHANGES.md)", flush=True)
     run, kind = os.path.abspath(a.run), a.kind
-    out, ok = {"kind": kind, "run": run, "spec": SPEC}, {}
+    out, ok = {"kind": kind, "run": run, "gate_hash": version, "gate_entry": entry, "spec": SPEC}, {}
 
     def say(name, passed, detail):
         ok[name] = passed
@@ -425,7 +434,7 @@ def cmd_gate(a):
     out["gates"] = ok
     path = os.path.join(out_dir(kind), "gate.json")
     json.dump(out, open(path, "w"), indent=1, default=float)
-    print(f"GATES {'PASS' if out['pass'] else 'FAIL'} ({sum(ok.values())}/{len(ok)}) -> {path}")
+    print(f"GATES {'PASS' if out['pass'] else 'FAIL'} ({sum(ok.values())}/{len(ok)}) on gate {version} -> {path}")
     sys.exit(0 if out["pass"] else 1)
 
 

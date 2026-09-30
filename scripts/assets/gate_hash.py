@@ -5,6 +5,7 @@
     python3 scripts/assets/gate_hash.py --check      # exit 1 unless it is the head of GATE-CHANGES.md
     python3 scripts/assets/gate_hash.py --rev c0c1e77  # the hash of the gate at a git revision
     python3 scripts/assets/gate_hash.py --parts      # one hash per component, to see which moved
+    python3 scripts/assets/gate_hash.py --history    # every ledger entry's Commit re-hashes to its Hash
 
 Hashed (the gate definition):
   cast-gate-spec.json    every value; keys starting with "_" are notes and are left out
@@ -15,6 +16,7 @@ Hashed (the gate definition):
                          and its top-level imports
   verify.py              the whole module: prompts, model, votes, num_predict, job rules
   consistency.py         the module minus NON_GATE (report, write_spec)
+  spritesheet.py         GATE_ONLY: the loop finders that measure gate 1's seam
 Python is compared as its syntax tree, so comments, docstrings, blank lines, indentation and
 spacing do not move the hash; a changed number, string, name or branch does. JSON is compared
 parsed, so its whitespace and key order do not move it either.
@@ -41,6 +43,9 @@ NON_GATE = {
     "verify.py": (),
     "consistency.py": ("report", "write_spec"),
 }
+# spritesheet.py is mostly generation. Only the functions that measure gate 1's loop seam (which
+# sheet.json carries to cast_walk.py gate) are part of the gate.
+GATE_ONLY = {"spritesheet.py": ("_small", "closed_loop", "find_loop")}
 FIELDS = ("Hash", "Commit", "Kind", "Changed", "Why the old rule was wrong", "Old gate vs new on the shipped cast",
           "Negative controls", "Approved-by")
 # Entries up to and including this one were written after the fact, on 2026-09-29, and may say
@@ -98,6 +103,12 @@ def python_def(src, skip):
     return _tree(tree)
 
 
+def python_only(src, names):
+    tree = _without_docstrings(ast.parse(src))
+    found = {name: n for n in tree.body for name in _names(n) & set(names)}
+    return [[name, _tree(found[name]) if name in found else None] for name in sorted(names)]
+
+
 def default_tol(consistency_src):
     for n in ast.parse(consistency_src).body:
         if isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "DEFAULT_TOL" for t in n.targets):
@@ -127,7 +138,9 @@ def parts(read):
         "consistency-spec.json": consistency_def(json.loads(read(f"{ASSETS}/consistency-spec.json")),
                                                  default_tol(cons_src)),
         **{f: python_def(read(f"{ASSETS}/{f}"), skip) for f, skip in NON_GATE.items()},
+        **{f: python_only(read(f"{ASSETS}/{f}"), names) for f, names in GATE_ONLY.items()},
         "non-gate": {f: sorted(skip) for f, skip in NON_GATE.items()},
+        "gate-only": {f: sorted(names) for f, names in GATE_ONLY.items()},
     }
 
 
@@ -156,7 +169,7 @@ def ledger(text):
         end = text.find("\n## ", m.end())
         body = text[m.end():] if end < 0 else text[m.end():end]
         e = {"n": int(m.group(1)), "title": m.group(2).strip(" .")}
-        for f in re.finditer(r"^- ([A-Za-z][A-Za-z -]*?): (.+?)(?=^- [A-Z]|\Z)", body, re.M | re.S):
+        for f in re.finditer(r"^- ([A-Za-z][A-Za-z -]*?): (.+?)(?=\n- [A-Z]|\n\s*\n|\Z)", body, re.M | re.S):
             e[f.group(1)] = " ".join(f.group(2).split())
         entries.append(e)
     for i, e in enumerate(entries):
@@ -215,6 +228,23 @@ def check(read=None, ledger_text=None):
     return probs
 
 
+def history():
+    """Problems where an entry's Commit, hashed with this script, is not the entry's Hash."""
+    entries, probs = ledger(_read_file("docs/cast-walks/GATE-CHANGES.md"))
+    for e in entries:
+        rev = e.get("Commit", "").split()[0] if e.get("Commit") else ""
+        if not re.fullmatch(r"[0-9a-f]{7,40}", rev):
+            continue  # "this ledger's commit": the head, which --check covers
+        try:
+            h = gate_hash(_read_rev(rev))
+        except subprocess.CalledProcessError as err:
+            probs.append(f"G{e['n']}: cannot read {rev}: {err.stderr.strip()[:80]}")
+            continue
+        if f"`{h}`" != e["Hash"]:
+            probs.append(f"G{e['n']}: {rev} hashes to {h}, the entry says {e['Hash']}")
+    return probs
+
+
 def require_head():
     """For cast_walk.py gate: the current hash and its ledger entry, or exit with the reason."""
     probs = check()
@@ -229,8 +259,15 @@ def main():
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--rev")
     ap.add_argument("--parts", action="store_true")
+    ap.add_argument("--history", action="store_true", help="re-hash every entry's Commit")
     a = ap.parse_args()
     read = _read_rev(a.rev) if a.rev else _read_file
+    if a.history:
+        probs = history()
+        for p in probs:
+            print("FAIL", p)
+        print("ok  every entry's commit hashes to its Hash" if not probs else f"{len(probs)} entries disagree")
+        sys.exit(1 if probs else 0)
     if a.check:
         probs = check(read)
         for p in probs:

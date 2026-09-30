@@ -55,10 +55,13 @@ APPROVAL = re.compile(r'^Aaron "[^"]{3,}" \(\d{4}-\d{2}-\d{2}[^)]*\)')
 
 
 def _strip_notes(v):
+    """JSON without its "_" notes; 60 and 60.0 are one number, as they are to the gate."""
     if isinstance(v, dict):
         return {k: _strip_notes(x) for k, x in v.items() if not k.startswith("_")}
     if isinstance(v, list):
         return [_strip_notes(x) for x in v]
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v)
     return v
 
 
@@ -117,6 +120,7 @@ def default_tol(consistency_src):
 
 
 def consistency_def(spec, defaults):
+    spec, defaults = _strip_notes(spec), _strip_notes(defaults)
     out = {}
     for kind, entry in spec.items():
         e = {k: v for k, v in entry.items() if k != "ref"}

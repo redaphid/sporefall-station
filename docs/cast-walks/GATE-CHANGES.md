@@ -19,14 +19,14 @@ to change them, it should be deliberate and reasoned."
 
 | entry | commit | gate hash | what | approved |
 |---|---|---|---|---|
-| G0 | c0c1e77 | `052480d04b13414c` | baseline: the gate before the night's changes | n seam 1.0 only (Aaron) |
-| G1 | 6f7136e | `473e7a55207c4b2f` | silhouette: width and head judged only within the reference's own view | **pending** |
-| G2 | b981cbb | `01d7ed55acc6a6c2` | 4a view votes, gate 5 boil for flicker and head_drift .08 to .14, gate 6 style prompt, new 6b | **pending** |
-| G3 | 1272b21 | `a7e1608cd8cf3716` | VLM model to qwen3-vl:8b-instruct, 3 votes to 1 | **pending** |
-| G4 | e78be05 | `0fda1db8022bf139` | seam for hover/pulse clips measured on a first=last-frame clip | **pending** |
-| G5 | fed84b6 | `1a69448ed28e6851` | silhouette: side-view mass and centroid from the character's own walk | **pending** |
-| G6 | 7046bba | `56b36ff7e776c832` | 4b same: a back view no longer answers for front-only features | **pending** |
-| G7 | this ledger | `62a925f42e9ecfdc` | the guard itself; judge thresholds pinned in-repo; no number moved | **pending** |
+| G0 | c0c1e77 | `1dd76b99bdabab0e` | baseline: the gate before the night's changes | n seam 1.0 only (Aaron) |
+| G1 | 6f7136e | `8c0b6fe0040ab027` | silhouette: width and head judged only within the reference's own view | **pending** |
+| G2 | b981cbb | `7eeacee97ec9002a` | 4a view votes, gate 5 boil for flicker and head_drift .08 to .14, gate 6 style prompt, new 6b | **pending** |
+| G3 | 1272b21 | `ffdc4134b54b24ee` | VLM model to qwen3-vl:8b-instruct, 3 votes to 1 | **pending** |
+| G4 | e78be05 | `b10b9db9073ae273` | seam for hover/pulse clips measured on a first=last-frame clip | **pending** |
+| G5 | fed84b6 | `2e7346656d9ac752` | silhouette: side-view mass and centroid from the character's own walk | **pending** |
+| G6 | 7046bba | `decd7afc1cfe899a` | 4b same: a back view no longer answers for front-only features | **pending** |
+| G7 | this ledger | `938319cdcc807028` | the guard itself; judge thresholds pinned in-repo; no number moved | **pending** |
 
 Pending means nobody asked Aaron before the change landed. Each pending entry
 is his to approve or revert. To approve, replace its `Approved-by` with his
@@ -52,7 +52,7 @@ Aaron.
    `gate_hash.py --check` fails a `seam_exception` for a kind with no entry.
 5. **Every ship names its gate.** `cast_walk.py gate` writes `gate_hash` and
    `gate_entry` into gate.json. The CURATION.md entry for the ship cites it
-   (`gate 56b36ff7e776c832`), and `--check` fails a CURATION citation of a hash
+   (`gate decd7afc1cfe899a`), and `--check` fails a CURATION citation of a hash
    that has no entry here.
 
 ## Adding an entry
@@ -77,7 +77,7 @@ need the GPU, which stays on the cast.
 
 ## G0 · 2026-09-29 00:59 · baseline
 
-- Hash: `052480d04b13414c`
+- Hash: `1dd76b99bdabab0e`
 - Commit: c0c1e77
 - Kind: all
 - Changed: Nothing new. This is the gate as it stood before the night's redefinitions. It is the first gate (6d6f3ce, 00:30) plus Aaron's n seam limit (4addfe4, 00:46: `seam_max_dir.n` 1.0, every other direction 0.5) plus c0c1e77 (verify.py `num_predict` 256 to 1536, so the thinking qwen3-vl:8b could answer at all). The frog-settler's silhouette tolerances were already widened to width 7 and head 6, and the vine-ranger's to head 15, cx 1.7 and mass .23. Both predate this ledger.
@@ -88,7 +88,7 @@ need the GPU, which stays on the cast.
 
 ## G1 · 2026-09-29 02:26 · silhouette is view-aware
 
-- Hash: `473e7a55207c4b2f`
+- Hash: `8c0b6fe0040ab027`
 - Commit: 6f7136e
 - Kind: all
 - Changed: consistency.py. For a walk character, `step` is judged with the walk family. Width and head block (VIEW_DEPENDENT) are compared only on frames drawn from the reference's own direction. Height, mass, centroid and foot line still gate every pose frame. The frog's tolerances go back to the defaults (width 3, head 2).
@@ -99,7 +99,7 @@ need the GPU, which stays on the cast.
 
 ## G2 · 2026-09-29 03:58 · gates 4a, 5 and 6 re-measured; gate 6b added
 
-- Hash: `01d7ed55acc6a6c2`
+- Hash: `7eeacee97ec9002a`
 - Commit: b981cbb
 - Kind: all
 - Changed: Four rules in one commit. 4a asks front/back/side against the character's own s-idle and n-idle (VIEWS_OK per direction) instead of "which way does it face" alone. Gate 5 replaces the judge's flicker (max 5) with boil (max 0.3) and raises head_drift from 0.08 to 0.14. Gate 6's style prompt judges rendering only, not colour. New gate 6b: every opaque pixel on the locked 34 colours (off_max 0). num_predict goes to 4096 behind one `_generate()` helper.
@@ -110,7 +110,7 @@ need the GPU, which stays on the cast.
 
 ## G3 · 2026-09-29 04:25 · the VLM runs on the instruct model, one vote
 
-- Hash: `a7e1608cd8cf3716`
+- Hash: `ffdc4134b54b24ee`
 - Commit: 1272b21
 - Kind: all
 - Changed: verify.py. Default model `qwen3-vl:8b` to `qwen3-vl:8b-instruct`, VOTES 3 to 1, num_predict 4096 to 512.
@@ -121,7 +121,7 @@ need the GPU, which stays on the cast.
 
 ## G4 · 2026-09-29 05:29 · hover and pulse clips loop on their first frame
 
-- Hash: `0fda1db8022bf139`
+- Hash: `b10b9db9073ae273`
 - Commit: e78be05
 - Kind: all
 - Changed: spritesheet.py adds `closed_loop`. For a hover or pulse clip, generated by Wan's first-last-frame node with the keyframe at both ends, gate 1's seam is frame 0 against the last frame, and the whole clip is the loop.
@@ -132,7 +132,7 @@ need the GPU, which stays on the cast.
 
 ## G5 · 2026-09-29 07:14 · side-view poses answer to their own walk
 
-- Hash: `1a69448ed28e6851`
+- Hash: `2e7346656d9ac752`
 - Commit: fed84b6
 - Kind: all
 - Changed: consistency.py. A walk character's side-view (e) poses take mass and centroid from the median of that view's walk frames, not from the front s-idle. Height and foot line still cross every view.
@@ -143,7 +143,7 @@ need the GPU, which stays on the cast.
 
 ## G6 · 2026-09-29 09:28 · identity check stops asking a back view for a visor
 
-- Hash: `56b36ff7e776c832`
+- Hash: `decd7afc1cfe899a`
 - Commit: 7046bba
 - Kind: all
 - Changed: verify.py SAME_PROMPT (gate 4b same). A back or three-quarter-back view hides the face, visor and chest and may show a tank or pack. The model judges what both views share.
@@ -158,7 +158,7 @@ it, and no gate rule changed.
 
 ## G7 · 2026-09-29 · the guard
 
-- Hash: `62a925f42e9ecfdc`
+- Hash: `938319cdcc807028`
 - Commit: this ledger's commit on art/cast-walk-cycles
 - Kind: all
 - Changed: `cast_walk.py gate` refuses to run unless the gate is this ledger's head. It refuses when VLM, VOTES or NUM_PREDICT are set in the environment, since those override verify.py's model, votes and token budget. It writes gate_hash and gate_entry into gate.json. Gate 5's identity_drift, sharpness and coverage_jitter limits move from sprites.judge.GATES in the art repo into cast-gate-spec.json at the same values (0.12, 60.0, 0.1).
@@ -170,7 +170,7 @@ it, and no gate rule changed.
 ## Not in the gate yet
 
 - **mireclaw-stalker seam exception** (wip/stalker-ship, 4698de0, hash
-  `3f96c6d368a5060f` on that branch). It adds `seam_exception` for
+  `898886134467a3d5` on that branch). It adds `seam_exception` for
   mireclaw-stalker: s 1.6, se 1.4, e 0.6, ne 1.4. The ceilings are the shipped
   loops' measured seams rounded up. Aaron accepted this character's loop:
   "Let's use what we have for now. The earlier stalker animations were pretty

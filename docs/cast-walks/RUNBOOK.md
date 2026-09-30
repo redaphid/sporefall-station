@@ -116,7 +116,7 @@ The gate is everything `python3 scripts/assets/gate_hash.py` hashes: `cast-gate-
 ## Step 3: ship
 
 1. Look at ONE contact sheet (`/mnt/d/tmp/cast-walks/<char>/contact-96-vs-frog-settler.png`). `2cb` it and the GIF.
-2. Lineage entry in BOTH `public/themes/swampspace/CURATION.md` and `public/themes/swampspace-hires/CURATION.md` (copy the mycologist's shape: input + sha, takes, loops/seams, colour lock, gate table, parked directions). The gate table names the gate it passed, from gate.json: `gate <gate_hash> (<gate_entry>)`, for example `gate 62a925f42e9ecfdc (G7)`. A citation of a hash with no ledger entry fails `gate_hash.py --check`.
+2. Lineage entry in BOTH `public/themes/swampspace/CURATION.md` and `public/themes/swampspace-hires/CURATION.md` (copy the mycologist's shape: input + sha, takes, loops/seams, colour lock, gate table, parked directions). The gate table names the gate it passed, from gate.json: `gate <gate_hash> (<gate_entry>)`, for example `gate 938319cdcc807028 (G7)`. A citation of a hash with no ledger entry fails `gate_hash.py --check`.
 3. Release note: `src/ui/releaseNotes/<date>-<char>-walks.ts` (`export default '<one line>'`).
 4. Checks: `export PATH=~/.local/node22/bin:$PATH; corepack pnpm exec vitest run src/render/themeManifestSync.test.ts` (the beta workflow runs this and fails the deploy on it).
 5. Commit (`art(<char>): ...`) the 100 PNGs, both manifests, `consistency-spec.json`, both CURATION.md, the release note. `git push origin art/cast-walk-cycles`.

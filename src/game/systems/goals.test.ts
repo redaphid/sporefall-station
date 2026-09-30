@@ -9,7 +9,7 @@ const ARCH: Record<Faction, string> = { cop: 'cop', gang: 'gangster', neutral: '
 const npc = (w: World, faction: Faction, x: number, y: number, hp = 40, max = 40): Entity => {
   const e = addEntity(w, makeEntity('npc', ARCH[faction], x, y))
   e.health = { hp, max, iframes: 0 }
-  e.combat = { weapon: 'bat', cooldown: 0 }
+  e.combat = { weapon: 'pipeWrench', cooldown: 0 }
   e.ai = { mode: 'idle', faction, home: { x, y }, thinkAt: 0, sightRange: 8 }
   return e
 }

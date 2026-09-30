@@ -160,7 +160,7 @@ describe('hunter', () => {
     const w = arena()
     const player = spawnPlayer(w, 0, 10.5, 20.5)
     const hunter = spawnNpc(w, 'gangster', 15.5, 20.5)
-    hunter.combat!.weapon = 'bat' // melee, so the demo is a chase not a shootout
+    hunter.combat!.weapon = 'pipeWrench' // melee, so the demo is a chase not a shootout
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
     return { w, player, hunter }
   }
@@ -387,7 +387,7 @@ describe('determinism (the sacred invariant)', () => {
     const sp = w.level.spawn
     const player = spawnPlayer(w, 0, sp.x, sp.y)
     const hunter = spawnNpc(w, 'gangster', sp.x + 4, sp.y)
-    hunter.combat!.weapon = 'bat'
+    hunter.combat!.weapon = 'pipeWrench'
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
     const civ = spawnNpc(w, 'civilian', sp.x + 2, sp.y + 2)
     const cop = spawnNpc(w, 'cop', sp.x + 12, sp.y)

@@ -25,7 +25,7 @@ import {
 } from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
 import { weaponStack } from '../game/systems/inventory'
-import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
+import { hasHeldWeapon, isMeleeWeapon, WEAPON_ANCHOR } from './weaponArt'
 import { recoilKick, weaponPose } from './weaponPose'
 import { composeWeaponSkin } from './weaponSkin'
 
@@ -61,8 +61,6 @@ interface View {
   weapon?: Sprite
   /** Additive glow halo behind a MOD-lit weapon (absent when unmodded). */
   weaponGlow?: Sprite
-  /** Shape key of the weapon texture currently shown (skip redundant swaps). */
-  weaponShapeKey?: string
 }
 
 /** A character that just died: the entity is swept from the snapshot the same
@@ -455,14 +453,12 @@ export class EntityViews {
       spr.anchor.set(WEAPON_ANCHOR.x, WEAPON_ANCHOR.y)
       this.root.addChild(spr)
       view.weapon = spr
-      view.weaponShapeKey = undefined
     }
     const weapon = view.weapon
-    const shapeKey = weaponShape(weaponId)
-    if (view.weaponShapeKey !== shapeKey) {
-      weapon.texture = this.art.weaponTexture(weaponId)
-      view.weaponShapeKey = shapeKey
-    }
+    // The registry caches one texture per rendered id or procedural shape, so an
+    // identity check is the whole "did the held art change" test.
+    const tex = this.art.weaponTexture(weaponId)
+    if (weapon.texture !== tex) weapon.texture = tex
 
     // Mods → skin (tint keyed off the pickup palette; NPCs carry no inventory so
     // `weaponStack` is undefined → the untinted base look).
@@ -532,7 +528,6 @@ export class EntityViews {
       view.weaponGlow.destroy()
       view.weaponGlow = undefined
     }
-    view.weaponShapeKey = undefined
   }
 
   /** Advance death ghosts: play the death clip (theme frames or the held last

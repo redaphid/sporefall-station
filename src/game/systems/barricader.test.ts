@@ -69,7 +69,7 @@ const buildingWorld = (doorSpots: { x: number; y: number }[]): { w: World; b: Bu
 
 const barricaderAt = (w: World, x: number, y: number) => {
   const e = spawnNpc(w, 'thug', x, y)
-  e.combat!.weapon = 'bat'
+  e.combat!.weapon = 'pipeWrench'
   e.ai!.behavior = 'barricader'
   e.ai!.zone = { building: 0, role: 'warehouse' }
   return e

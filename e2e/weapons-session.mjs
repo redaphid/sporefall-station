@@ -94,7 +94,7 @@ const main = async () => {
   const start = await state(page)
   log('loadout', JSON.stringify(start))
   await screenshot(page, 'loadout')
-  check(start.weapon === 'bat', 'starts equipped with the bat (slot 0)')
+  check(start.weapon === 'pipeWrench', 'starts equipped with the bat (slot 0)')
   check(start.pistolAmmo === 3 && start.grenades === 2, 'hotbar holds pistol (3) + grenade (2)')
 
   // EQUIP the pistol via hotbar key "2".

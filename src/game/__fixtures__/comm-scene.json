@@ -101,7 +101,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "status": {
@@ -150,7 +150,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "status": {
@@ -248,7 +248,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "status": {

@@ -62,7 +62,7 @@ describe('mod pickup — applies to the equipped weapon', () => {
   })
 
   it('a mod applies to a MELEE weapon too (any slotted weapon is moddable)', () => {
-    const p = arm(player(w), 'bat')
+    const p = arm(player(w), 'pipeWrench')
     dropMod(w, 'overload', p)
     step(w)
     expect(mods(p)).toEqual([{ id: 'overload', stacks: 1 }])

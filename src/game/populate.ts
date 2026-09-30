@@ -36,8 +36,8 @@ export const SPAWN_SAFE_RADIUS = 9
  * (see populateWorld) so weapon rolls never perturb the loot/position stream —
  * same seed → same layout, whatever the arsenal does. */
 const NPC_ARSENAL: [string, number][] = [
-  ['knife', 5],
-  ['bat', 5],
+  ['gaugeShiv', 5],
+  ['pipeWrench', 5],
   ['pistol', 5],
   ['shotgun', 2],
   ['machinegun', 2],

@@ -99,7 +99,7 @@ describe('item behavior — new guns', () => {
 
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
-    arm(e, 'bat')
+    arm(e, 'pipeWrench')
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
@@ -199,7 +199,7 @@ describe('item behavior — freeze then shatter (element combo through items)', 
     // ties the literal back to a source the game really has.
     const e = player(w, 20, 20)
     const target = dummy(w, 26, 20)
-    arm(e, 'bat')
+    arm(e, 'pipeWrench')
     expect(WEAPONS.freezeRay.onHit!.status).toBe('frozen') // a real, surviving source
     // Applied from a distance — a blast radius would freeze the thrower too —
     // then the player closes in and swings.

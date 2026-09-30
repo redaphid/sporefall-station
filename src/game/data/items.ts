@@ -52,8 +52,23 @@ export interface WeaponDef {
 
 export const WEAPONS: Record<string, WeaponDef> = {
   fists: { id: 'fists', name: 'Fists', kind: 'melee', damage: 8, range: 1.1, cooldownTicks: 12, knockback: 4, natural: true },
-  bat: { id: 'bat', name: 'Bat', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
-  knife: { id: 'knife', name: 'Knife', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 },
+  // The colony's melee kit is its maintenance kit (LORE_CHARACTERS G2: "a
+  // weapon is a stolen section of an essence still"; everything else is the
+  // tool someone was already carrying). These replaced the Streets-of-Rogue
+  // `bat` and `knife` 1:1 on STATS, so no balance moved: the three heavy tools
+  // are the old bat's numbers exactly, the shiv is the old knife's. They differ
+  // in who carries them and what they look like, not in how they hit.
+  //
+  // Heavy/slow (the old bat profile). The pipe wrench is the colony's everyday
+  // tool (the roster's wrench-echo core; LORE_GROUNDING: wrench essence =
+  // weight/knockback), so it is the one the arsenal and loot hand out.
+  pipeWrench: { id: 'pipeWrench', name: 'Pipe Wrench', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
+  // The warden's catch-pole (G2 names net-poles). Same heavy profile.
+  netPole: { id: 'netPole', name: 'Net-Pole', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
+  // The blast diver's hatch-forcing pry bar. Same heavy profile.
+  hatchBar: { id: 'hatchBar', name: 'Hatch Bar', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
+  // Quick/light (the old knife profile): a broken gauge-glass tube, taped.
+  gaugeShiv: { id: 'gaugeShiv', name: 'Gauge Shiv', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 },
   sledgehammer: {
     id: 'sledgehammer',
     name: 'Sledgehammer',
@@ -76,9 +91,25 @@ export const WEAPONS: Record<string, WeaponDef> = {
   // fewer, heavier, longer-reach blows — a hit you feel and roll away from
   // rather than a chip you tank.
   claws: { id: 'claws', name: 'Claws', kind: 'melee', damage: 22, range: 1.5, cooldownTicks: 20, knockback: 12, natural: true },
+  // Fauna fight with their bodies. A gloam hound with a knife, a spider-legged
+  // Mireclaw stalker with a knife, a shelled lurker with a knife and a
+  // carapace beast swinging a bat all read as a thug in a costume, exactly the
+  // tell `claws` fixed on the Alpha. Each natural attack keeps the old held
+  // weapon's numbers (DPS, reach, knockback) so the fights are unchanged; what
+  // they lose is durability, since a body does not break, and the loot drop,
+  // since a jaw is not a pickup.
+  // Gloam hound and gloom lurker: the old knife's quick, light profile.
+  bite: { id: 'bite', name: 'Bite', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, natural: true },
+  // Mireclaw stalker: the same lineage as the Alpha's claws, at the old knife's numbers.
+  talons: { id: 'talons', name: 'Talons', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, natural: true },
+  // Carapace brute: a shell-first charge at the old bat's numbers.
+  ram: { id: 'ram', name: 'Carapace Ram', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, natural: true },
   pistol: {
     id: 'pistol',
-    name: 'Pistol',
+    // PR #133 shortlist #5: canon tie #2 says weapons are bubble-burst plumbing,
+    // not guns. The id stays `pistol` (saves, fixtures and replays carry it);
+    // only the name and the held art changed. Stats untouched.
+    name: 'Launcher',
     kind: 'ranged',
     damage: 14,
     range: 10,

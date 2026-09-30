@@ -199,12 +199,12 @@ const setupInventory = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
-      { itemId: 'bat', qty: WEAPONS.bat.durability! },
+      { itemId: 'pipeWrench', qty: WEAPONS.pipeWrench.durability! },
       { itemId: 'pistol', qty: 3 },
       { itemId: 'grenade', qty: 2 },
     ]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'bat'
+    if (player.combat) player.combat.weapon = 'pipeWrench'
   }
   crate(w, x + 4, y)
   crate(w, x + 5, y)
@@ -542,8 +542,8 @@ const setupNpcCombat = (w: World): void => {
   }
 
   const ring: [string, string][] = [
-    ['thug', 'bat'],
-    ['thug', 'knife'],
+    ['thug', 'pipeWrench'],
+    ['thug', 'gaugeShiv'],
     ['gangster', 'pistol'],
     ['gangster', 'shotgun'],
     ['gangster', 'machinegun'],
@@ -608,7 +608,7 @@ const setupNpcAi = (w: World): void => {
 
   // Hunter: sees far, holds a grudge, carries a bat (a chase, not a shootout).
   const hunter = spawnNpc(w, 'gangster', cx + 8.5, cy + 0.5)
-  hunter.combat!.weapon = 'bat'
+  hunter.combat!.weapon = 'pipeWrench'
   hunter.ai!.sightRange = 14
   if (player) hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
 
@@ -696,7 +696,7 @@ const setupNpcDeliberate = (w: World): void => {
     solidify(cx - 5, y) // east face x=27
   }
   const hunter = spawnNpc(w, 'gangster', cx - 8 + 0.5, cy - 5 + 0.5) // (24.5, 27.5)
-  hunter.combat!.weapon = 'bat'
+  hunter.combat!.weapon = 'pipeWrench'
   hunter.ai!.sightRange = 14
   if (player) {
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
@@ -714,7 +714,7 @@ const setupNpcDeliberate = (w: World): void => {
   addEntity(w, door)
   const squaddie = (x: number, y: number, role: 'lead' | 'flank' | 'rear'): Entity => {
     const e = spawnNpc(w, 'thug', x, y)
-    e.combat!.weapon = 'bat'
+    e.combat!.weapon = 'pipeWrench'
     e.ai!.behavior = 'squad'
     e.ai!.squad = { id: 1, role }
     e.ai!.sightRange = 12
@@ -760,9 +760,9 @@ const stageArtCompare = (w: World): void => {
     player.pos = { x: 8 + 0.5, y: LANE_Y + 0.5 }
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = Math.PI / 2 // idle facing south (toward camera)
-    player.loadout!.inventory = [{ itemId: 'bat', qty: 1 }]
+    player.loadout!.inventory = [{ itemId: 'pipeWrench', qty: 1 }]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'bat'
+    if (player.combat) player.combat.weapon = 'pipeWrench'
   }
   stageThug(w, 18, LANE_Y)
   stageThug(w, 19, LANE_Y)

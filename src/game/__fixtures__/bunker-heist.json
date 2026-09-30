@@ -50,13 +50,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -247,13 +247,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -310,13 +310,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -441,13 +441,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -638,13 +638,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -701,13 +701,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -1011,13 +1011,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -1197,13 +1197,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -1323,13 +1323,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -1582,13 +1582,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -1641,13 +1641,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -1713,13 +1713,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -1857,13 +1857,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -2738,13 +2738,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -3293,13 +3293,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -10291,13 +10291,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -10365,13 +10365,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -10439,13 +10439,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -10513,13 +10513,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -10587,13 +10587,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -10655,13 +10655,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -10723,13 +10723,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -10791,13 +10791,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -10859,13 +10859,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],
@@ -10927,13 +10927,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -10994,13 +10994,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],
@@ -11061,13 +11061,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "gaugeShiv",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "gaugeShiv",
             "qty": 20
           }
         ],

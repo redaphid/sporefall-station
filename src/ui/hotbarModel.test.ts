@@ -25,7 +25,7 @@ describe('hotbarSlots', () => {
     // this list, so a shown weapon would also be a cyclable dead end.
     const inv = [
       { itemId: 'pistol', qty: 1 },
-      { itemId: 'bat', qty: 16 },
+      { itemId: 'pipeWrench', qty: 16 },
       { itemId: 'shotgun', qty: 1 },
       { itemId: 'molotov', qty: 1 },
     ]

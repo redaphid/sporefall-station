@@ -17,8 +17,10 @@ export type WeaponShape = 'hammer' | 'club' | 'blade' | 'gun' | 'rod'
  * (see `hasHeldWeapon`) — bare hands hold nothing. */
 const MELEE_SHAPE: Record<string, WeaponShape> = {
   sledgehammer: 'hammer',
-  bat: 'club',
-  knife: 'blade',
+  pipeWrench: 'club',
+  netPole: 'rod',
+  hatchBar: 'club',
+  gaugeShiv: 'blade',
   fists: 'rod',
   claws: 'blade',
 }
@@ -53,3 +55,11 @@ export const WEAPON_CANVAS = { w: 44, h: 18, grip: 5 } as const
 /** The grip anchor (fraction of the canvas) the renderer pins to the hand and
  * rotates the swing around: horizontally at the grip, vertically centred. */
 export const WEAPON_ANCHOR = { x: WEAPON_CANVAS.grip / WEAPON_CANVAS.w, y: 0.5 } as const
+
+/** The themed held-art keys to try for a weapon, most specific first: the
+ * weapon's own `weapon.<id>` render, then — for a ranged weapon — the launcher
+ * (`weapon.pistol`), because every ranged weapon shares the launcher body until
+ * each gets its own (PR #133 §3.1). Melee has no shared fallback: an unrendered
+ * melee id falls through to its procedural shape, never to another tool's art. */
+export const heldArtKeys = (id: string): string[] =>
+  isMeleeWeapon(id) || id === 'pistol' ? [id] : [id, 'pistol']

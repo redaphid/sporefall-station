@@ -102,13 +102,13 @@
         "lastHurtTick": 20
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 6
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 15
           }
         ],
@@ -172,13 +172,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "pipeWrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "pipeWrench",
             "qty": 16
           }
         ],

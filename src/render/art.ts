@@ -1,7 +1,7 @@
 import { Container, Graphics, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js'
 import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
-import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
+import { heldArtKeys, WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
@@ -158,8 +158,11 @@ export interface SpriteTextures {
   grenade?: Texture
   /** Directional character sets (5 drawn dirs), keyed by archetype. */
   chars?: Record<string, CharSet>
-  /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
+  /** Per-item pickup sprites, keyed by item id (pipeWrench/medkit/…). */
   items?: Record<string, Texture>
+  /** Rendered HELD weapon art, keyed by weapon id (`weapon.<id>`), baked to the
+   * 44×18 WEAPON_CANVAS with the grip on WEAPON_ANCHOR. Absent → procedural. */
+  weapons?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/atm/…). */
   props?: Record<string, Texture>
   /** Fire flicker frames, cycled by the animator. */
@@ -362,7 +365,7 @@ export const ITEM_ALIAS: Record<string, string> = {
   tranquilizer: 'pistol',
   stunGun: 'pistol',
   // Blunt melee wears the root-club.
-  sledgehammer: 'bat',
+  sledgehammer: 'pipeWrench',
 }
 
 // Archetypes with a dedicated character sprite; the rest reuse the cop body.
@@ -1382,7 +1385,12 @@ export const createArt = (
 
   const weaponCache = new Map<string, Texture>()
   const weaponTexture = (weaponId: string): Texture => {
-    // Key by SHAPE, not id — every gun shares one texture, tinted per mod skin.
+    // A theme's RENDERED held art wins (weapon.<id>, ranged → the launcher).
+    for (const k of heldArtKeys(weaponId)) {
+      const themed = sprites.weapons?.[k]
+      if (themed) return themed
+    }
+    // Otherwise key by SHAPE, not id — every gun shares one texture, tinted per mod skin.
     const shape = weaponShape(weaponId)
     let tex = weaponCache.get(shape)
     if (!tex) {

@@ -167,8 +167,8 @@ describe('fire button — a weapon in hand fires as before', () => {
   })
 
   it('active melee weapon → swings (sets cooldown), never rolls even with no target', () => {
-    p.combat!.weapon = 'bat'
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 16 }]
+    p.combat!.weapon = 'pipeWrench'
+    p.loadout!.inventory = [{ itemId: 'pipeWrench', qty: 16 }]
     p.loadout!.activeSlot = 0
     combatSystem(w, fire())
     expect(p.combat!.cooldown).toBeGreaterThan(0) // a swing happened

@@ -69,14 +69,14 @@ describe('the player melee multiplier', () => {
   it('a player swings a melee weapon harder than an NPC with the same weapon', () => {
     const w = createWorld(3, 1)
     const p = spawnPlayer(w, 0, 20, 20)
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 100 }]
+    p.loadout!.inventory = [{ itemId: 'pipeWrench', qty: 100 }]
     p.loadout!.activeSlot = 0
-    p.combat = { weapon: 'bat', cooldown: 0 }
+    p.combat = { weapon: 'pipeWrench', cooldown: 0 }
     p.facing = 0
     const victim = spawnNpc(w, 'thug', 20.9, 20)
     const before = victim.health!.hp
     expect(fireWeapon(w, p)).toBe(true)
-    expect(before - victim.health!.hp).toBe(Math.round(WEAPONS.bat.damage * PLAYER_MELEE_MULT))
+    expect(before - victim.health!.hp).toBe(Math.round(WEAPONS.pipeWrench.damage * PLAYER_MELEE_MULT))
   })
 })
 

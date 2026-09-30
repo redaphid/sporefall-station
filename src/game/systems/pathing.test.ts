@@ -66,7 +66,7 @@ const sealedArena = (seed = 7, hostile = true): World => {
 /** A hostile melee chaser with a standing grudge on the player. */
 const chaser = (w: World, player: Entity, x: number, y: number): Entity => {
   const npc = spawnNpc(w, 'thug', x, y)
-  npc.combat!.weapon = 'bat'
+  npc.combat!.weapon = 'pipeWrench'
   npc.ai!.sightRange = 20
   npc.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
   return npc
@@ -106,7 +106,7 @@ describe('routing around walls', () => {
       const sp = w.level.spawn
       const player = spawnPlayer(w, 0, sp.x, sp.y)
       const npc = spawnNpc(w, 'thug', sp.x + 6, sp.y + 4)
-      npc.combat!.weapon = 'bat'
+      npc.combat!.weapon = 'pipeWrench'
       npc.ai!.sightRange = 30
       npc.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
       npc.ai!.mode = 'aggro'
@@ -272,7 +272,7 @@ describe('deliberateness: arrive, pause, scan', () => {
   it('an urgent threat cancels the scan instantly (responsiveness unchanged)', () => {
     const w = arena(7, true)
     const npc = spawnNpc(w, 'thug', 10.5, 20.5)
-    npc.combat!.weapon = 'bat'
+    npc.combat!.weapon = 'pipeWrench'
     npc.ai!.scanUntil = w.tick + 1000 // deep in a scan
     const player = spawnPlayer(w, 0, 14.5, 20.5)
     player.health!.iframes = 0

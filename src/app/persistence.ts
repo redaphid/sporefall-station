@@ -39,6 +39,11 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  * interpreted. Independent of `WorldJson.v` (which serialize.ts owns): a version
  * mismatch here discards the save and starts a fresh run rather than crashing.
  *
+ * 4 — lore weapons. `bat` and `knife` were renamed to colony tools
+ *     (pipeWrench/gaugeShiv; the cop, shopkeeper and breacher carry their own)
+ *     and fauna switched to natural armament. A pre-rename save holds `bat` and
+ *     `knife` ids in loadouts, NPC combat and `pickup.<id>` entities, which
+ *     would class as unknown items. Discard, same reasoning as 2.
  * 3 — storeys (docs/design/stairs-and-storeys.md). Complex floors gained a
  *     loft slot in the level atlas, so a pre-storey complex-floor save would
  *     already fail the levelChecksum and be dropped; the bump makes that
@@ -55,7 +60,7 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  *     be interpreted, not in its shape.
  * 1 — initial.
  */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 /** Versioned on-disk wrapper around a WorldJson snapshot. */
 export interface SaveEnvelope {

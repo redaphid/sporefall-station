@@ -74,7 +74,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   it('a lone downed player bleeds the timer down and self-revives at low hp, dropping cash + items', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.cash = 120
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 8 }]
+    p.loadout!.inventory = [{ itemId: 'pipeWrench', qty: 8 }]
     p.loadout!.activeSlot = 0
     down(w, p)
     p.playerCtl!.downed!.bleedTicks = 4 // shorten the wait
@@ -228,7 +228,7 @@ describe('casual mode — forgiving (kid mode)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0 // even with an empty pool, casual downs (never a real death)
     p.playerCtl!.cash = 77
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 3 }]
+    p.loadout!.inventory = [{ itemId: 'pipeWrench', qty: 3 }]
     down(w, p)
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toBeDefined()

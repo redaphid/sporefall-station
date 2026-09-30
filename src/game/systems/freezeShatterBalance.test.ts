@@ -131,7 +131,7 @@ describe('freeze + shatter is a hard hit, not an execute', () => {
       w.tick++
     }
 
-    const dealt = applyDamage(w, boss, WEAPONS.bat.damage, 6, 5, 0, thug.id)
+    const dealt = applyDamage(w, boss, WEAPONS.pipeWrench.damage, 6, 5, 0, thug.id)
 
     expect(boss.dead).toBeFalsy()
     expect(dealt).toBe(60) // round(16 x 5 x 0.75)

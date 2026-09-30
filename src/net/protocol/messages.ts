@@ -54,8 +54,8 @@ export const ARCHETYPES = [
   'projectile',
   'grenade',
   'door',
-  'pickup.bat',
-  'pickup.knife',
+  'pickup.bat', // RETIRED (→ pickup.pipeWrench)
+  'pickup.knife', // RETIRED (→ pickup.gaugeShiv)
   'pickup.pistol',
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
@@ -157,6 +157,15 @@ export const ARCHETYPES = [
   'lobber',
   'gloamhound',
   'hivespire',
+  // PROTOCOL_VERSION 6 — lore weapons: the bat and knife became colony tools,
+  // and fauna fight with natural armament. APPEND ONLY, at the end.
+  'pickup.pipeWrench',
+  'pickup.netPole',
+  'pickup.hatchBar',
+  'pickup.gaugeShiv',
+  'pickup.bite',
+  'pickup.talons',
+  'pickup.ram',
 ] as const
 
 /** The wing keycard's archetype carries a dynamic `.wing<n>` suffix

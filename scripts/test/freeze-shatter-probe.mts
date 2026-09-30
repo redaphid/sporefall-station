@@ -97,6 +97,6 @@ console.log('\n=== enemy-on-enemy: can an NPC freeze ray + any impact execute an
   for (let i = 0; i < 20; i++) { statusSystem(w); w.tick++ }
   console.log(`boss frozen by an NPC freeze ray: ${isFrozen(victim)} (hp ${victim.health!.hp}/${victim.health!.max})`)
   // ...then any other enemy lands a bat swing on it
-  const dealt = applyDamage(w, victim, WEAPONS.bat.damage, 6, 5, 0, shooter.id)
+  const dealt = applyDamage(w, victim, WEAPONS.pipeWrench.damage, 6, 5, 0, shooter.id)
   console.log(`after one 16-dmg bat swing from another NPC: dead=${victim.dead} shattered=${!!victim.shattered} reported=${dealt}`)
 }

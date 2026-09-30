@@ -65,7 +65,13 @@ export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'ga
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
   // The group roster (systems/groups.ts) — canonical for the same reason.
   'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
-export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
+/** Weapons with rendered HELD art (`weapon.<id>`): drawn pointing +x on the
+ * 44×18 WEAPON_CANVAS (×artScale), grip at x=5, so the renderer pins the grip to
+ * the hand exactly as it does the procedural silhouettes (render/weaponArt).
+ * Natural armament has none — a body holds nothing — and every ranged weapon
+ * without its own falls back to `weapon.pistol` (weaponArt.heldArtKeys). */
+export const HELD_WEAPON_IDS = ['pistol', 'pipeWrench', 'netPole', 'hatchBar', 'gaugeShiv'] as const
+export const ITEM_IDS = ['pistol', 'pipeWrench', 'netPole', 'hatchBar', 'gaugeShiv', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
 // The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
 // `crate` are canonical for the same reason `boss` is above: a prop key that is
 // not listed here is not canonical, so validateManifest DROPS the mapping and
@@ -147,6 +153,7 @@ const buildSpriteKeys = (): Set<string> => {
   for (const u of UNIT_SINGLES) keys.add(`unit.${u}`)
   for (const u of UNIT_WALKERS) for (const f of ['idle', 'step']) keys.add(`unit.${u}.${f}`)
   for (const i of ITEM_IDS) keys.add(`item.${i}`)
+  for (const i of HELD_WEAPON_IDS) keys.add(`weapon.${i}`)
   for (const p of PROP_NAMES) keys.add(`prop.${p}`)
   for (const k of FX_KEYS) keys.add(k)
   return keys

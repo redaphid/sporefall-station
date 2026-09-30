@@ -276,7 +276,7 @@ describe('createGamepadCoop', () => {
       'button %i joins the pad and stays fully inert while held',
       (i) => {
         coop.update(
-          viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'bat', qty: 1 }], activeSlot: 0 }]),
+          viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'pipeWrench', qty: 1 }], activeSlot: 0 }]),
         )
         pads = [pad(0, { buttons: press(i) })]
         const first = coop.sample()

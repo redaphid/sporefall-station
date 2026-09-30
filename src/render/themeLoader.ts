@@ -13,6 +13,7 @@ import {
   DEFAULT_THEME_ID,
   DIRS5,
   ITEM_IDS,
+  HELD_WEAPON_IDS,
   isValidThemeId,
   PROP_NAMES,
   resolveMacroTiles,
@@ -24,6 +25,7 @@ import {
   type ThemeChain,
 } from './theme'
 import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type SpriteTextures, type WallCapTextures } from './art'
+import { WEAPON_CANVAS } from './weaponArt'
 import { ANIM_STATES, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
 const BASE = import.meta.env.BASE_URL
@@ -44,7 +46,7 @@ const GRENADE_PX = 14
 const bake = async (
   renderer: Renderer,
   url: string,
-  size: number,
+  size: number | { w: number; h: number },
   artScale = 1,
 ): Promise<Texture | undefined> => {
   try {
@@ -55,8 +57,8 @@ const bake = async (
     // art is authored at `size * artScale` px is then captured 1:1 and reads
     // crisp, while the sprite still measures `size` logical px so nothing in the
     // layout/camera/draw code changes.
-    sprite.width = size
-    sprite.height = size
+    sprite.width = typeof size === 'number' ? size : size.w
+    sprite.height = typeof size === 'number' ? size : size.h
     const holder = new Container()
     holder.addChild(sprite)
     const tex = renderer.generateTexture({ target: holder, resolution: artScale })
@@ -126,7 +128,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   // bake; the base pack in the chain is only a fallback for missing keys.
   const artScale = chain[0]?.manifest.artScale ?? 1
   const urls = (key: string): string[] | undefined => resolveSpritePaths(key, chain)?.map((p) => BASE + p)
-  const one = async (key: string, size: number): Promise<Texture | undefined> => {
+  const one = async (key: string, size: number | { w: number; h: number }): Promise<Texture | undefined> => {
     const u = urls(key)
     return u && u.length > 0 ? bake(renderer, u[0], size, artScale) : undefined
   }
@@ -174,7 +176,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     return Object.values(set).some((p) => p.idle || p.clips?.idle?.length) ? set : undefined
   }
 
-  const record = async (keys: readonly string[], size: number, prefix: string): Promise<Record<string, Texture>> => {
+  const record = async (keys: readonly string[], size: number | { w: number; h: number }, prefix: string): Promise<Record<string, Texture>> => {
     const loaded = await Promise.all(keys.map((k) => one(`${prefix}.${k}`, size)))
     const out: Record<string, Texture> = {}
     keys.forEach((k, i) => {
@@ -215,7 +217,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood,
-    charSets, items, props,
+    charSets, items, props, weapons,
   ] = await Promise.all([
     tilePools(''), tilePools('.accent'), tilePools('.overlay'), tileCapPairs(),
     one('unit.player', CHAR_CANVAS_PX), one('unit.cop', CHAR_CANVAS_PX),
@@ -231,6 +233,7 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     Promise.all(CHAR_NAMES.map((n) => charSet(n))),
     record(ITEM_IDS, ITEM_PX, 'item'),
     record(PROP_NAMES, TILE_PX, 'prop'),
+    record(HELD_WEAPON_IDS, { w: WEAPON_CANVAS.w, h: WEAPON_CANVAS.h }, 'weapon'),
   ])
 
   const chars: Record<string, CharSet> = {}
@@ -243,6 +246,6 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
     tiles, tileAccents, tileOverlays, tileCaps, tileMacro: resolveMacroTiles(chain), player, cop, item, prop,
     thug, scientist, robot, thugStep, scientistStep, robotStep,
     projectile, grenade,
-    flames, hit, explosion, pickup, blood, chars, items, props,
+    flames, hit, explosion, pickup, blood, chars, items, props, weapons,
   }
 }

@@ -47,7 +47,7 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number 
 
 const squaddie = (w: World, x: number, y: number, role: 'lead' | 'flank' | 'rear', id = 1): Entity => {
   const e = spawnNpc(w, 'thug', x, y)
-  e.combat!.weapon = 'bat'
+  e.combat!.weapon = 'pipeWrench'
   e.ai!.behavior = 'squad'
   e.ai!.squad = { id, role }
   e.ai!.sightRange = 12 // a trained pack watches further than street rabble

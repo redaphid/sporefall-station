@@ -59,8 +59,8 @@ const cuts = [
   },
   {
     name: 'weapon-swing-bat',
-    world: armed('bat', undefined),
-    expect: (s) => [s.weapon !== 'bat' && 'not wielding the bat', s.gameOver && 'unexpected game over'],
+    world: armed('pipeWrench', undefined),
+    expect: (s) => [s.weapon !== 'pipeWrench' && 'not wielding the bat', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'weapon-swing-sledgehammer-incendiary',

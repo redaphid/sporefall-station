@@ -30,8 +30,9 @@ MOVES = ("walks in place like a video game walk cycle, stepping on all of its le
          "motion shows, the carapace level, and it never moves across the frame")
 
 
-def control_video(depth_dir, length, out_mp4):
-    frames = sorted(glob.glob(os.path.join(depth_dir, "depth-*.png")))
+def control_video(depth_dir, length, out_mp4, pattern="depth-*.png"):
+    frames = sorted(glob.glob(os.path.join(depth_dir, pattern)))
+    assert frames, f"no {pattern} in {depth_dir}"
     seq = os.path.join(os.path.dirname(out_mp4), "control")
     os.makedirs(seq, exist_ok=True)
     for i in range(length):
@@ -105,7 +106,9 @@ def adopt(base, out, d, raw):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--depth", required=True)
+    ap.add_argument("--depth", required=True, help="the control frames' dir (depth, legs-only depth or skel)")
+    ap.add_argument("--glob", default="depth-*.png", help="control frames in --depth, e.g. skel-*.png")
+    ap.add_argument("--dry-run", action="store_true", help="write control.mp4 and flow_api.json only, no ComfyUI")
     ap.add_argument("--ref", required=True)
     ap.add_argument("--describe-file", required=True)
     ap.add_argument("--dir", default="se")
@@ -121,14 +124,20 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     tag = os.path.basename(a.out.rstrip("/"))
-    period = control_video(a.depth, a.length, os.path.join(a.out, "control.mp4"))
-    vname = upload_file(os.path.join(a.out, "control.mp4"), f"rnd-multileg-{tag}.mp4")
-    rname = S.upload(Image.open(a.ref).convert("RGB"), f"rnd-multileg-{tag}-ref.png")
+    period = control_video(a.depth, a.length, os.path.join(a.out, "control.mp4"), a.glob)
+    if a.dry_run:
+        vname, rname = f"rnd-multileg-{tag}.mp4", f"rnd-multileg-{tag}-ref.png"
+    else:
+        vname = upload_file(os.path.join(a.out, "control.mp4"), f"rnd-multileg-{tag}.mp4")
+        rname = S.upload(Image.open(a.ref).convert("RGB"), f"rnd-multileg-{tag}-ref.png")
     who = open(a.describe_file).read().strip()
     text = f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {S.DIRS[a.dir]}, {MOVES}. {S.WAN_RULES}"
     g = graph(rname, vname, text, a.seed, f"sprite-sheet/rnd-multileg/{tag}", S.WAN["width"], S.WAN["height"],
               a.length, a.shift, a.steps, a.split, not a.no_lora)
     json.dump(g, open(os.path.join(a.out, "flow_api.json"), "w"), indent=1)
+    if a.dry_run:
+        print(f"dry run: period {period}, {len(g)} nodes -> {a.out}")
+        return
     pid = S.queue(g)
     print(f"queued {pid} period {period}", flush=True)
     try:

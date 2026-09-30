@@ -10,12 +10,20 @@ Runs INSIDE Blender (Windows binary, D:/ paths), CPU Cycles only (the GPU is sha
   blender.exe -b -P rig_multileg.py -- --out D:/tmp/cast-walks/rnd-multileg/proxy --dirs se --frames 16
 
 Output per direction: <out>/<dir>/depth-NN.png (white near, far body 0.2, background black),
-<out>/<dir>/color-NN.png (RGBA, transparent). Frame NN is phase NN/frames of one full cycle.
+<out>/<dir>/color-NN.png (RGBA, transparent), <out>/<dir>/joints-NN.json (every joint projected to
+pixels, with its view depth). Frame NN is phase NN/frames of one full cycle.
+
+--mode depth (default) renders every mesh. --mode legs hides the carapace, head and crest, so the depth
+carries only the legs and the keyframe alone supplies the body. --mode skeleton renders nothing and only
+writes the joints; skeleton.py draws them as a stick control.
 """
+import json
 import math
+import os
 import sys
 
 import bpy
+from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Matrix, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -37,6 +45,8 @@ STRIDE = float(arg("--stride", "0.55"))
 LIFT = float(arg("--lift", "0.32"))
 DUTY = float(arg("--duty", "0.5"))
 SAMPLES = int(arg("--samples", "16"))
+MODE = arg("--mode", "depth")
+assert MODE in ("depth", "legs", "skeleton"), MODE
 
 
 def lin(hexstr):
@@ -232,10 +242,15 @@ def aim(ob, a, b):
     ob.rotation_quaternion = Vector((0, 0, -1)).rotation_difference((b - a).normalized())
 
 
+JOINTS = {}
+# body axis in the body's frame, head to tail: fang tips, head, carapace middle, abdomen end
+BODY_AXIS = [(0, -1.14, -0.3), (0, -0.82, 0.1), (0, 0.1, 0.3), (0, 1.35, 0.05)]
+
+
 def pose(t):
     """t in [0, 1): one full gait cycle. Body height bobs twice per cycle (once per tetrapod swap)."""
     body.location = (0, 0, BODY_Z + 0.025 * math.cos(4 * math.pi * t))
-    for sx, hip, foot, phase, fem, tib, spur in LEG_SET:
+    for n, (sx, hip, foot, phase, fem, tib, spur) in enumerate(LEG_SET):
         h = hip + Vector((0, 0, body.location.z - BODY_Z))
         f = foot_at(foot, (t + phase) % 1.0)
         d = f - h
@@ -253,7 +268,9 @@ def pose(t):
         seg = (tip - knee).length
         c2 = knee + (tip - knee) * 0.35 + out * CURL * seg
         c3 = tip + out * CURL * 1.1 * seg + up * 0.35 * CURL * seg
-        lay(tib, [bez([knee, c2, c3, tip], k / TIB_N) for k in range(TIB_N + 1)])
+        tib_pts = [bez([knee, c2, c3, tip], k / TIB_N) for k in range(TIB_N + 1)]
+        lay(tib, tib_pts)
+        JOINTS[f"{'L' if sx < 0 else 'R'}{n % len(LEGS)}"] = [h, knee, tib_pts[TIB_N // 2], tip]
         spur.location = knee
         spur.rotation_quaternion = Vector((0, 0, 1)).rotation_difference((out * 1.0 - up * 0.5 - (knee - h).normalized() * 0.3).normalized())
 
@@ -306,12 +323,29 @@ def depth_window():
     return lo - pad, hi + pad
 
 
+if MODE == "legs":
+    for ob in [ob for ob in MESHES if ob.parent == body]:
+        ob.hide_render = True
+        MESHES.remove(ob)
 near, far = depth_window()
 DEPTH_MAT = depth_material(near, far)
 print(f"depth window {near:.3f}..{far:.3f}")
 
 
 BASE_MAT = {ob.name: ob.data.materials[0] for ob in MESHES}
+
+
+def dump_joints(path):
+    """Each joint as [x px, y px, view depth]: the body axis, then per leg hip, knee, mid-tibia, tip."""
+    bpy.context.view_layer.update()
+
+    def px(v):
+        c = world_to_camera_view(sc, cam, v)
+        return [round(c.x * W, 2), round((1 - c.y) * H, 2), round(c.z, 4)]
+    js = {"w": W, "h": H, "body": [px(body.matrix_world @ Vector(p)) for p in BODY_AXIS],
+          "legs": {k: [px(root.matrix_world @ v) for v in pts] for k, pts in JOINTS.items()}}
+    with open(path, "w") as f:
+        json.dump(js, f)
 
 
 def render(path, depth):
@@ -329,6 +363,10 @@ for d in DIRS:
     root.rotation_euler = (0, 0, math.radians(DIRS_ALL[d]))
     for f in (ONLY or range(FRAMES)):
         pose(f / FRAMES)
+        os.makedirs(f"{OUT}/{d}", exist_ok=True)
+        dump_joints(f"{OUT}/{d}/joints-{f:02d}.json")
+        if MODE == "skeleton":
+            continue
         if not ONLY:
             render(f"{OUT}/{d}/depth-{f:02d}.png", depth=True)
         render(f"{OUT}/{d}/color-{f:02d}.png", depth=False)

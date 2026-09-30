@@ -174,10 +174,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 43,
-   "width": 20,
-   "head_h": 8,
-   "mass": 374,
-   "cx": -0.31,
+   "width": 17,
+   "head_h": 7,
+   "mass": 331,
+   "cx": -0.38,
    "foot_y": 45
   },
   "tol": {

@@ -80,7 +80,8 @@ for (const { step, arg } of steps) {
     else if (step === 'until-tick')
       await page.waitForFunction((n) => (window.world?.tick ?? 0) >= n, Number(arg), { timeout: 60000 })
     else if (step === 'until')
-      await page.waitForFunction((src) => (0, eval)(src), arg, { timeout: 60000 })
+      // A throw (e.g. `sporefall` not defined yet mid-boot) means "not yet", not failure.
+      await page.waitForFunction((src) => { try { return (0, eval)(src) } catch { return false } }, arg, { timeout: 60000 })
     else if (step === 'eval') entry.result = await evalExpr(arg)
     else if (step === 'assert') {
       entry.result = await evalExpr(arg)

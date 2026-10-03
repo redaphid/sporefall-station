@@ -19,7 +19,7 @@ import { selectedEntities } from '../game/select'
 import { FLOOR_MODIFIER_KINDS, type FloorModifierKind } from '../game/floorModifiers'
 import { startFloorModifier } from '../game/systems/modifierSystem'
 import { emptyInput, type InputCmd, type SimEvent } from '../game/types'
-import { addEntity, tickWorld, type World } from '../game/world'
+import { addEntity, replaceWorldInPlace, tickWorld, type World } from '../game/world'
 import { decodeArg } from './protocol'
 
 /** Verbs that mutate the world — the channel defers these onto the sim step so
@@ -228,11 +228,9 @@ export const heldCmd = (w: World, h: HeldInput, i: number): InputCmd => {
 }
 
 /** Replace a live world's contents in place so every closed-over reference (the
- * channel holds one) keeps pointing at the same object. World is a flat record,
- * so copying its own fields from a freshly-deserialized world is a full swap. */
-const loadWorldInto = (target: World, fresh: World): void => {
-  Object.assign(target, fresh)
-}
+ * channel holds one) keeps pointing at the same object. Fields the snapshot
+ * lacks are cleared, not left over (see `replaceWorldInPlace`). */
+const loadWorldInto = (target: World, fresh: World): void => replaceWorldInPlace(target, fresh)
 
 const jsonType = (v: unknown): string => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v)
 

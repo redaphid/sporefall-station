@@ -311,6 +311,18 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 70 }, // final beat, resting on the ne facing
   ],
 
+  // The crafted `castle-siege` save (an authored world, no seed-derived map):
+  // cross the drawbridge firing the split/frost/pierce/homing pistol, then
+  // sweep the courtyard garrison.
+  'castle-siege': [
+    { ticks: 20 },
+    { ticks: 55, y: -1, attack: true }, // over the drawbridge, through the gate
+    { ticks: 40, x: -1, attack: true }, // strafe west along the inner wall
+    { ticks: 40, x: 1, attack: true }, // and back east
+    { ticks: 40, y: -1, attack: true }, // up the courtyard toward the keep
+    { ticks: 60, x: 1, y: -1, attack: true },
+  ],
+
   // The bunker heist (fixture `bunker-heist`: seed 7 floor 3, player staged
   // east of the bunker airlock). The previously-blocked mission path, end to
   // end: PICK the two L2 airlock doors (deterministic 3.5s channels, progress

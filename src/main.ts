@@ -224,17 +224,18 @@ const boot = async (): Promise<void> => {
     showBootError(uiMount, msg)
     return
   }
-  // A `?state=` link IS the intent: someone was sent an exact world to look at,
-  // so boot straight into it rather than making them pick Solo from the menu
-  // first (which would also build a throwaway world before replacing it).
-  // Shared states restore into SINGLE-PLAYER — see the `?state=` block below.
+  // A `?state=` link or a `?world=` save IS the intent: someone was sent an
+  // exact world to play, so boot straight into it rather than making them pick
+  // Solo from the menu first (which would also build a throwaway world before
+  // replacing it). Both restore into SINGLE-PLAYER — see the blocks below.
   const sharedState = params.get('state')
+  const exactWorld = sharedState ?? params.get('world')
   const mode =
     (params.get('mode') as GameMode | null) ??
     // The third argument adds the Settings entry (opens the panel over the menu
     // with controller navigation armed) — the pad-only player's route to button
     // remapping, e.g. binding the zoom buttons.
-    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
+    (exactWorld ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
   // Past the picker, nothing between here and the frame loop can honestly
   // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
   // conservative one until the loop starts reporting real ones.

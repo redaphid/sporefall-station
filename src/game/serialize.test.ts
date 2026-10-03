@@ -46,6 +46,7 @@ describe('serializeWorld / deserializeWorld', () => {
 
   it('rejects a fixture whose level checksum drifts from seed+floor', () => {
     const j = serializeWorld(buildMidRun(7))
+    if (j.levelChecksum === undefined) throw new Error('a seeded world serializes its level by checksum')
     expect(() => deserializeWorld({ ...j, levelChecksum: j.levelChecksum ^ 1 })).toThrow(/checksum drift/)
   })
 

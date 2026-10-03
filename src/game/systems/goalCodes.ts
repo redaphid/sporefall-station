@@ -1,9 +1,19 @@
-// The goal codes the registry behaviors propose (behaviors.ts) and the AI
-// executor steers by (ai.ts). A leaf module on purpose: ai.ts and behaviors.ts
-// import each other, and ai.ts builds Sets of these codes at load. Read through
-// that cycle, the codes could still be undefined when the Sets were built
-// (vitest's loader hit this; tsx did not), so tests ran different group AI
-// from the game. Nothing here imports anything.
+// Every goal code the AI can adopt: the core drives goals.ts scores, the codes
+// the registry behaviors propose (behaviors.ts), and the ones the AI executor
+// steers by (ai.ts). A leaf module on purpose: ai.ts, goals.ts and behaviors.ts
+// sit on import cycles through world.ts, and ai.ts and behaviors.ts build
+// values from these at load. Read through a cycle, a code could still be
+// undefined when read (vitest) or throw (native ESM), so tests ran different
+// AI from the game. Nothing here imports anything; scripts/check-init-order.mts
+// (run by initOrder.test.ts) catches a load-time read across a cycle.
+
+export const WANDER = 'wander'
+export const BATTLE = 'battle'
+export const PURSUE = 'pursue'
+export const FLEE = 'flee'
+export const INVESTIGATE = 'investigate'
+/** Baseline desirability of wandering — the floor every drive competes against. */
+export const WANDER_SCORE = 1
 
 export const PATROL = 'patrol'
 export const SEARCH = 'search'

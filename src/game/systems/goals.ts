@@ -27,16 +27,8 @@ import { initialPlayerHate } from './relationships'
 import { hasStatus } from './statusFx'
 import { vlen } from '../simMath'
 
-export const WANDER = 'wander'
-export const BATTLE = 'battle'
-export const PURSUE = 'pursue'
-export const FLEE = 'flee'
-export const INVESTIGATE = 'investigate'
-
 /** Within this distance a Hostile target is fought rather than chased. */
 export const ENGAGE_RANGE = 13
-/** Baseline desirability of wandering — the floor every drive competes against. */
-export const WANDER_SCORE = 1
 /** Desirability of investigating a heard noise — beats wander, loses to a fight. */
 export const INVESTIGATE_SCORE = 3
 /** Shared distance divisor for battle & flee scores (the game's dist·100/40). */

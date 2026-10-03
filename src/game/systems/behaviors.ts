@@ -37,15 +37,9 @@ import type { Entity } from '../entity'
 import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, stationAlerted, type FearPulse, type World } from '../world'
 import {
-  BATTLE,
   ENGAGE_RANGE,
-  FLEE,
-  INVESTIGATE,
   INVESTIGATE_SCORE,
   LEASH,
-  PURSUE,
-  WANDER,
-  WANDER_SCORE,
   battleScore,
   canSeeEntity,
   fleeScore,
@@ -56,8 +50,9 @@ import {
 } from './goals'
 import {
   HEAL_RANGE,
-  LOB_MAX,
-  LOB_MIN,
+  LOB_HOLD_MAX,
+  LOB_HOLD_MIN,
+  LOB_IDEAL,
   centroid,
   groupOf,
   livePlayers,
@@ -91,6 +86,12 @@ import {
   STAGE,
   TEND,
   WORK,
+  BATTLE,
+  FLEE,
+  INVESTIGATE,
+  PURSUE,
+  WANDER,
+  WANDER_SCORE,
 } from './goalCodes'
 export {
   ALERT,
@@ -938,16 +939,6 @@ const RING_SCORE = 12
 const RAGE_SCORE = 20
 /** How far behind the line a medic with nobody to patch hangs back. */
 const MEDIC_HANG_BACK = 3
-/** The siege gun's firing band (holds inside it, walks to the ideal range outside
- * it). The far edge sits INSIDE the gun's own sight (lobber sightRange 11): a
- * battery that parks just past what it can see has no spotter and never fires —
- * which is exactly what the first cut of this did, holding at 11.8 tiles in silence.
- * Read at call time, not module load: groups.ts and this file import each other
- * (via populate), so a top-level `LOB_MIN + 3` hits the TDZ whenever populate is
- * the first module loaded (tsx scripts, a worker entry). */
-const lobHoldMin = (): number => LOB_MIN + 3
-const lobHoldMax = (): number => Math.min(LOB_MAX - 2, 10)
-const lobIdeal = (): number => (lobHoldMin() + lobHoldMax()) / 2
 /** How far a sapper backs off its planted charge. */
 const SAPPER_CLEAR = 3.5
 
@@ -1088,10 +1079,9 @@ const siegeGun: Consideration = (w, e) => {
   const t = g.targetId !== undefined ? w.byId.get(g.targetId) : undefined
   if (t && !t.dead && dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) < 1.6) return [] // cornered: bite
   const d = dist2d(g.mark.x, g.mark.y, e.pos.x, e.pos.y)
-  if (d >= lobHoldMin() && d <= lobHoldMax()) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
+  if (d >= LOB_HOLD_MIN && d <= LOB_HOLD_MAX) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
   const u = away(e.pos, g.mark)
-  const ideal = lobIdeal()
-  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * ideal, y: g.mark.y + u.y * ideal } }]
+  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * LOB_IDEAL, y: g.mark.y + u.y * LOB_IDEAL } }]
 }
 
 // The MEDIC walks to whoever is hurt worst (the retreating first), and with

@@ -71,16 +71,51 @@ import { determineRel, dispositionToward, initialFactionHate } from './relations
 import { strongestStimulus } from './stimulus'
 import { isPanicking } from './statusFx'
 import { vlen } from '../simMath'
+import {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+} from './goalCodes'
+export {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+} from './goalCodes'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
-export const PATROL = 'patrol'
-export const SEARCH = 'search'
-export const ALERT = 'alert'
-export const SCAVENGE = 'scavenge'
 // Squad choreography (see the `squad` behavior below).
-export const FORMUP = 'formup'
-export const STACK = 'stack'
-export const FLANK = 'flank'
 
 // ── Decision tiers (see header) ────────────────────────────────────────────
 export const TIER_AMBIENT = 0
@@ -299,7 +334,6 @@ const fleeMemory: Consideration = (w, e) => {
 // swarm pools on a shared focus and can be baited off the players. A flocking
 // bias at MEMORY tier: it beats wander/investigate but any perceived target
 // (threat/infest, THREAT tier) still overrides it. ────────────────────────────
-export const DRAWN = 'drawn'
 const DRAW_RANGE = 16
 const DRAW_SCORE = WANDER_SCORE + 0.6
 
@@ -452,8 +486,6 @@ const scavenge: Consideration = (w, e) => {
 // intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (street life,
 // test/scenario spawns) fall through untouched. All pure lookups over the level
 // geometry + ascending-id scans; no `Date`/`Math.random`.
-export const WORK = 'work'
-export const GARRISON = 'garrison'
 
 /** A resident holds its room over aimless wander (beats WANDER, loses to
  * investigate/patrol so a real disturbance or beat still wins). */
@@ -653,7 +685,6 @@ const squadFlank: Consideration = (w, e) => {
 // lane (bunkerLaneKeys — the same contract furniture honors), capped per
 // building, and — because a barricade is an ENTITY, never a solid tile — BFS
 // reachability over `level.solid` is untouched by construction.
-export const FORTIFY = 'fortify'
 /** Above garrison (2.5): plug the doors first, THEN mass on the core. */
 const FORTIFY_SCORE = 2.6
 /** Hard ceiling on live barricades per building. */
@@ -825,7 +856,6 @@ const packAvoid: Consideration = (w, e) => {
 export const MIRECLAW_RETREAT_FRAC = 0.5
 /** Below this HP fraction it ENRAGES — drops all self-preservation, goes faster. */
 export const MIRECLAW_ENRAGE_FRAC = 0.2
-export const RETREAT = 'retreat'
 
 const nearestPlayer = (w: World, e: Entity): Entity | undefined => {
   let best: Entity | undefined
@@ -884,13 +914,6 @@ const retreatToSpore: Consideration = (w, e) => {
 // raid's intel mark — and proposes a goal for this one member. None of them
 // mutates the group: phase changes, heals, shells and charges all happen in
 // the group system, so arbitration stays a pure scoring pass like the rest.
-export const STAGE = 'stage'
-export const GUARD = 'guard'
-export const EMPLACE = 'emplace'
-export const BREACH = 'breach'
-export const FALLBACK = 'fallback'
-export const TEND = 'tend'
-export const RING = 'ring'
 
 /** Gathering at the staging point: above every hunt/formation memory, so a
  * staging raider walks to the muster instead of freelancing — but at MEMORY

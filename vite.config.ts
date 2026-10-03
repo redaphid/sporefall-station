@@ -13,6 +13,7 @@ import {
   SW_TAKEOVER,
 } from './src/app/swConfig'
 import { SITE_ORIGIN } from './capacitor.config'
+import { PAGES } from './src/app/pages'
 import { BETAS_PREFIX, resolveBetaSlug } from './src/app/betaSlug'
 
 // BETA BUILD SWITCH. `BETA_SLUG=<branch name> pnpm run build` produces a bundle
@@ -137,13 +138,12 @@ export default defineConfig({
   server: { host: true },
   build: {
     target: 'es2022',
-    // Two pages: the game, and the scene gallery (/scenes.html), whose cards
-    // link back into the game at /?world=<name>.
+    // Two pages, listed in src/app/pages.ts (see there for why the game's
+    // key must stay `index`).
     rollupOptions: {
-      input: {
-        main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        scenes: fileURLToPath(new URL('./scenes.html', import.meta.url)),
-      },
+      input: Object.fromEntries(
+        Object.entries(PAGES).map(([key, file]) => [key, fileURLToPath(new URL(`./${file}`, import.meta.url))]),
+      ),
     },
   },
   test: {

@@ -23,7 +23,7 @@ export const SCENES: readonly Scene[] = [
     name: 'castle-siege',
     title: 'Castle Siege',
     hook: 'A moated castle, four towers, a garrison, and a lord in the keep.',
-    tryThis: 'Cross the drawbridge with split, frost, pierce and homing. The keep door opens when the lord falls.',
+    tryThis: 'Cross the drawbridge with split, frost, pierce and homing. Mortars flank the keep; its door opens when the lord falls.',
     tags: ['assassinate', 'garrison', 'frost'],
   },
   {

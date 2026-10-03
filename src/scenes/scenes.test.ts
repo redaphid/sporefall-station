@@ -126,6 +126,15 @@ describe.each(NAMES)('scene %s', (name) => {
 })
 
 describe('each scene plays the beat its card promises', () => {
+  it('castle-siege: the mortars shell the bailey, and the lord falling opens the keep', () => {
+    const w = loadFixture('castle-siege')
+    const route = [{ x: 21.5, y: 26 }, { x: 21.5, y: 19 }, { x: 21.5, y: 14 }, { x: 21.5, y: 8 }]
+    const events = play(w, 2400, { route, focus: ids(w, 'boss') }, (w) => w.mission.complete)
+    expect(count(events, 'lob')).toBeGreaterThan(0)
+    expect(w.mission).toMatchObject({ complete: true, exitUnlocked: true })
+    expect(w.gameOver).toBe(false)
+  })
+
   it('pillared-hall: fighting through the colonnade reaches the exit', () => {
     const w = loadFixture('pillared-hall')
     play(w, 1200, { route: [{ x: 12, y: 11.5 }, { x: 36, y: 9 }, { x: 42, y: 8.5 }, { x: 43.5, y: 11.5 }, { x: 47.5, y: 11.5 }] }, (w) => w.floor === 2)

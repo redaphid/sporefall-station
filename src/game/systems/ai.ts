@@ -31,10 +31,14 @@ import {
   STAGE,
   TEND,
   WORK,
+  BATTLE,
+  FLEE,
+  INVESTIGATE,
+  PURSUE,
 } from './goalCodes'
 import { decide } from './behaviors'
 import { fireWeapon } from './combat'
-import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
+import { perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
 import { vlen } from '../simMath'

@@ -134,6 +134,13 @@ export const healAmount = (floor: number): number => 7 + floor
 /** Siege gun. */
 export const LOB_MIN = 4
 export const LOB_MAX = 14
+/** The band a siege gun holds inside (it walks to LOB_IDEAL from outside it).
+ * The far edge sits INSIDE the gun's own sight (lobber sightRange 11): a
+ * battery that parks just past what it can see has no spotter and never fires,
+ * which is exactly what the first cut did, holding at 11.8 tiles in silence. */
+export const LOB_HOLD_MIN = LOB_MIN + 3
+export const LOB_HOLD_MAX = Math.min(LOB_MAX - 2, 10)
+export const LOB_IDEAL = (LOB_HOLD_MIN + LOB_HOLD_MAX) / 2
 export const LOB_INTERVAL = Math.round(3.5 * S)
 export const LOB_SCATTER = 1.2
 export const LOB_RADIUS = 1.7

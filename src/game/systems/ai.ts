@@ -31,8 +31,8 @@ import {
   STAGE,
   TEND,
   WORK,
-  decide,
-} from './behaviors'
+} from './goalCodes'
+import { decide } from './behaviors'
 import { fireWeapon } from './combat'
 import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'

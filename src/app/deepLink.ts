@@ -85,3 +85,9 @@ export const unknownScenarioMessage = (name: string, known: readonly string[], v
   `Unknown scenario "${name}" — this build (${version}) cannot start it, so nothing was loaded and your saved run is untouched. ` +
   `If the scenario is new, this copy of the game may be out of date: reload once while online. ` +
   `Known scenarios: ${known.join(', ')}.`
+
+/** The visible error for a `?world=` save this build does not carry. */
+export const unknownWorldMessage = (name: string, scenes: readonly string[], version: string): string =>
+  `No saved world named "${name}" in this build (${version}), so nothing was loaded and your saved run is untouched. ` +
+  `If it is new, this copy of the game may be out of date: reload once while online. ` +
+  `Scenes you can open: ${scenes.join(', ')} (or browse them at scenes.html).`

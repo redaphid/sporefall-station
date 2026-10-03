@@ -19,7 +19,7 @@ import type { WorldHistory } from './debug/verbs'
 // replay nor the upload code reaches the initial boot chunk.
 import type { StateReplay } from './app/stateReplay'
 import type { ShareResult } from './app/stateShare'
-import { loadFixtureJson } from './game/fixtures'
+import { hasFixture, loadFixtureJson } from './game/fixtures'
 import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './game/scenarios'
 import {
   DEEP_LINK_FRESHEN_MS,
@@ -28,8 +28,10 @@ import {
   readDeepLink,
   resumesSave,
   unknownScenarioMessage,
+  unknownWorldMessage,
   wantsFreshBuild,
 } from './app/deepLink'
+import { SCENES } from './scenes/registry'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
@@ -220,6 +222,13 @@ const boot = async (): Promise<void> => {
     // Never fall back to an ordinary run (or to the save): that is what made a
     // stale build look like "it just took me to my existing game".
     const msg = unknownScenarioMessage(link.scenario, SCENARIO_NAMES, APP_VERSION)
+    console.error(`sporefall: ${msg}`)
+    showBootError(uiMount, msg)
+    return
+  }
+  // `@inline` waits for a WorldJson handed over by `window.__loadWorld`.
+  if (link.world !== null && link.world !== '@inline' && !hasFixture(link.world)) {
+    const msg = unknownWorldMessage(link.world, SCENES.map((s) => s.name), APP_VERSION)
     console.error(`sporefall: ${msg}`)
     showBootError(uiMount, msg)
     return

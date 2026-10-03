@@ -278,6 +278,17 @@ export const worldFromSeed = (seed: number, floor: number, mode: RunMode = 'norm
 export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
   worldFromState(worldFromSeed(seed, floor, mode, hostile))
 
+/** Replace `target`'s whole state with `fresh`'s, in place, so every holder of
+ * the `target` reference sees the new world. Every field `fresh` lacks (a
+ * director, groups, modifier, a seeded level's checksum) is cleared rather than
+ * left over. `aiFlags` is not part of a snapshot, so the running world's A/B
+ * toggles survive. The debug `load` verb and `applyFixture` both use this. */
+export const replaceWorldInPlace = (target: World, fresh: World): void => {
+  const { aiFlags } = target
+  for (const k of Object.keys(target)) delete (target as unknown as Record<string, unknown>)[k]
+  Object.assign(target, fresh, aiFlags ? { aiFlags } : {})
+}
+
 /** Is any wing's power currently cut? Robots (Derelict Units) turn hostile while
  * so (behaviors.ts) — the standing cost of the power-cut infiltration path. */
 export const anyPowerCut = (w: World): boolean => {

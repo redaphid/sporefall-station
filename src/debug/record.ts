@@ -11,7 +11,7 @@ import { populateWorld } from '../game/populate'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import { setupFloor } from '../game/systems/missions'
 import type { InputCmd, SimEvent } from '../game/types'
-import { createWorld, tickWorld, type World } from '../game/world'
+import { createWorld, replaceWorldInPlace, tickWorld, type World } from '../game/world'
 import { serializeEntity } from './verbs'
 
 /** A player's genesis state — enough to respawn it identically on replay. */
@@ -124,13 +124,5 @@ export type WorldFixture = WorldJson
 export const saveWorld = (w: World): WorldFixture => serializeWorld(w)
 
 /** Restore a fixture into an existing world in place, so readonly holders of
- * `w` keep their reference. Every serialized field is replaced, and an optional
- * one the fixture lacks (director, groups, modifier, a seeded level's checksum)
- * is cleared rather than left over from the previous world. `aiFlags` is not
- * part of a snapshot, so the running world's A/B toggles survive the load. */
-export const applyFixture = (w: World, fx: WorldFixture): void => {
-  const restored = deserializeWorld(fx)
-  const { aiFlags } = w
-  for (const k of Object.keys(w)) delete (w as unknown as Record<string, unknown>)[k]
-  Object.assign(w, restored, aiFlags ? { aiFlags } : {})
-}
+ * `w` keep their reference (see `replaceWorldInPlace`). */
+export const applyFixture = (w: World, fx: WorldFixture): void => replaceWorldInPlace(w, deserializeWorld(fx))

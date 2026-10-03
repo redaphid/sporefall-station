@@ -18,7 +18,10 @@ import { emptyInput, type InputCmd } from '../types'
  * generated layout — the arena the combat plays out in. */
 const carve = (w: World, x0: number, y0: number, x1: number, y1: number): void => {
   for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) w.level.tiles[y * w.level.w + x] = Tile.Floor
+    for (let x = x0; x <= x1; x++) {
+      w.level.tiles[y * w.level.w + x] = Tile.Floor
+      w.level.solid[y * w.level.w + x] = 0
+    }
   }
 }
 

@@ -79,8 +79,26 @@ for (const { step, arg } of steps) {
     else if (step === 'click') await page.getByRole('button', { name: arg }).first().click()
     else if (step === 'until-tick')
       await page.waitForFunction((n) => (window.world?.tick ?? 0) >= n, Number(arg), { timeout: 60000 })
-    else if (step === 'until')
-      await page.waitForFunction((src) => (0, eval)(src), arg, { timeout: 60000 })
+    else if (step === 'until') {
+      // A throw (e.g. `sporefall` not defined yet mid-boot) means "not yet", but a
+      // SyntaxError never resolves, and a timeout reports the last throw it swallowed.
+      const until = (src) => {
+        try {
+          return (0, eval)(src) ? { ok: true } : false
+        } catch (e) {
+          window.__untilErr = String(e)
+          return e instanceof SyntaxError ? { ok: false, error: String(e) } : false
+        }
+      }
+      try {
+        const res = await (await page.waitForFunction(until, arg, { timeout: 60000 })).jsonValue()
+        if (!res.ok) throw new Error(res.error)
+      } catch (e) {
+        if (!String(e).includes('Timeout')) throw e
+        const last = await page.evaluate(() => window.__untilErr).catch(() => undefined)
+        throw new Error(`timed out after 60 s${last ? `; last error: ${last}` : ''}`)
+      }
+    }
     else if (step === 'eval') entry.result = await evalExpr(arg)
     else if (step === 'assert') {
       entry.result = await evalExpr(arg)

@@ -48,6 +48,16 @@ export interface VerbCtx {
    * owns a renderer (main.ts / the debug channel); themes are render-side only,
    * so the verb never touches the world and is a no-op in headless contexts. */
   setTheme?: (id: string) => void
+  /** Whoever keeps a replayable history of the world (the share link's
+   * `StateRing`). It assumes the world changes only by ticks it observed, so
+   * verbs must report theirs: `step` hands it every tick with its inputs, and
+   * any other write restarts it, since no input sequence reproduces an edit. */
+  history?: WorldHistory
+}
+
+export interface WorldHistory {
+  observe(w: World, inputs: ReadonlyMap<number, InputCmd>): void
+  reset(w: World): void
 }
 
 /** The effective verb name, unwrapping the `command` escape hatch. */
@@ -275,6 +285,15 @@ export const buildSchema = (w: { entities: readonly Entity[] }): {
 /** Run one verb line against the world and return a text reply. Throws on a bad
  * verb/argument; the transport turns that into an `ok:false` reply. */
 export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
+  const { history } = ctx
+  const name = verbName(line)
+  // In `finally`: a write that throws may already have half-applied.
+  if (history && WRITE_VERBS.has(name) && name !== 'step' && name !== 'tick')
+    try {
+      return runVerb(w, line, { ...ctx, history: undefined })
+    } finally {
+      history.reset(w)
+    }
   const trimmed = line.trim()
   const sp = trimmed.indexOf(' ')
   const verb = sp < 0 ? trimmed : trimmed.slice(0, sp)
@@ -424,7 +443,9 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       const held = json.length ? parseHeldInput(w, decodeArg(json.join(' '))) : undefined
       const events: Record<string, number> = {}
       for (let i = 0; i < n; i++) {
-        tickWorld(w, held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map())
+        const inputs = held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map<number, InputCmd>()
+        tickWorld(w, inputs)
+        ctx.history?.observe(w, inputs)
         for (const ev of w.events) events[ev.type] = (events[ev.type] ?? 0) + 1
       }
       const aimAtGone = held?.aimAt !== undefined && !w.byId.has(held.aimAt) ? true : undefined

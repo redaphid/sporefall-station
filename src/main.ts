@@ -14,6 +14,7 @@ import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
+import type { WorldHistory } from './debug/verbs'
 // Type-only: the implementations are dynamically imported, so neither the
 // replay nor the upload code reaches the initial boot chunk.
 import type { StateReplay } from './app/stateReplay'
@@ -414,6 +415,14 @@ const boot = async (): Promise<void> => {
   // stays dev-gated: only `?debug`/`?e2e` enable it; otherwise it refuses with
   // an explanation. All getters, so world replacement (?world=, load, restart)
   // is tracked automatically.
+  //
+  // `verbHistory` forwards to the share ring armed further down, so a link
+  // staged with `step`/`teleport`/... replays: see `VerbCtx.history`.
+  let shareHistory: WorldHistory | undefined
+  const verbHistory: WorldHistory = {
+    observe: (w, inputs) => shareHistory?.observe(w, inputs),
+    reset: (w) => shareHistory?.reset(w),
+  }
   const inspect = createInspect({
     getWorld: () => ('world' in session ? (session as HostSession).world : undefined),
     getView: () => session.renderView(),
@@ -425,6 +434,7 @@ const boot = async (): Promise<void> => {
     devWrites: params.has('debug') || params.has('e2e'),
     version: APP_VERSION,
     setTheme: (id) => void renderer.setTheme(id),
+    history: verbHistory,
   })
   installInspect(inspect, window)
   console.log(`sporefall build ${APP_VERSION}: window.world + window.sporefall.help() for inspection`)
@@ -499,6 +509,7 @@ const boot = async (): Promise<void> => {
     debug = startDebugLink((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
       name,
       setTheme: (id) => void renderer.setTheme(id),
+      history: verbHistory,
     })
   }
   // Shareable states (`?state=`). Arm a rolling ring of the last second or two
@@ -553,6 +564,16 @@ const boot = async (): Promise<void> => {
         seen = host.world
         ring = new StateRing(host.world)
       }
+    }
+    shareHistory = {
+      observe: (w, inputs) => {
+        rebindRing()
+        ring.observe(w, inputs)
+      },
+      reset: (w) => {
+        rebindRing()
+        ring.reset(w)
+      },
     }
     // The one capture path. The button and the console verb both land here, so
     // there is nothing to keep in sync and no second implementation to drift.

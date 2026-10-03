@@ -23,7 +23,7 @@ import type { Entity } from '../game/entity'
 import { serializeWorld } from '../game/serialize'
 import type { SimEvent } from '../game/types'
 import type { World } from '../game/world'
-import { buildSchema, runVerb, serializeEntity } from '../debug/verbs'
+import { buildSchema, runVerb, serializeEntity, type WorldHistory } from '../debug/verbs'
 import type { RenderView } from './session'
 
 /** A sim event tagged with the tick it happened on (world.events is wiped every
@@ -88,6 +88,8 @@ export interface InspectDeps {
   version: string
   /** Renderer hook for the `theme` verb (presentation-only). */
   setTheme?: (id: string) => void
+  /** Told about every tick and edit a verb makes; see `VerbCtx.history`. */
+  history?: WorldHistory
 }
 
 export interface Inspect {
@@ -305,7 +307,7 @@ export const createInspect = (deps: InspectDeps): Inspect => {
       const w = deps.getWorld()
       if (!w)
         return 'sporefall.verb needs the authoritative world — this is a join (client) session; run verbs on the host device (or a solo session).'
-      return runVerb(w, full, { events, setTheme: deps.setTheme })
+      return runVerb(w, full, { events, setTheme: deps.setTheme, history: deps.history })
     },
 
     rec: makeCanvasRecorder(),

@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 // The caching plan lives in src/ as plain data so it can be unit-tested — three
@@ -134,7 +135,17 @@ export default defineConfig({
     }),
   ],
   server: { host: true },
-  build: { target: 'es2022' },
+  build: {
+    target: 'es2022',
+    // Two pages: the game, and the scene gallery (/scenes.html), whose cards
+    // link back into the game at /?world=<name>.
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        scenes: fileURLToPath(new URL('./scenes.html', import.meta.url)),
+      },
+    },
+  },
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',

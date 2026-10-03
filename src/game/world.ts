@@ -1,7 +1,7 @@
 import type { Entity } from './entity'
 import type { FloorModifier } from './floorModifiers'
 import { generateLevel } from './levelgen/generate'
-import { isSolidTile, type Level } from './levelgen/level'
+import { isSolidTile, levelChecksum, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
@@ -134,6 +134,12 @@ export interface World {
   seed: number
   floor: number
   level: Level
+  /** Checksum of the level `generateLevel(seed, floor)` produced, present when
+   * the level came from the generator (worldFromSeed, missions.nextFloor). While
+   * the live level still hashes to it, a snapshot omits the level and
+   * regenerates it on load. An authored level, or a generated one a scenario
+   * has carved, travels inside the snapshot instead (serialize.ts). */
+  levelChecksumFromSeed?: number
   entities: Entity[]
   byId: Map<EntityId, Entity>
   nextId: EntityId
@@ -204,13 +210,39 @@ export interface World {
   modifier?: FloorModifier
 }
 
-export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
+/**
+ * A world's starting state: everything the engine needs to run, and nothing it
+ * derives. The level is DATA here, so a test, a crafted save or a level editor
+ * hands the engine a map directly and no seed is involved. `worldFromSeed` is
+ * the generator that produces one of these from seed+floor.
+ */
+export interface WorldInit {
+  level: Level
+  /** Root of the sim's dice (AI rolls, loot, group and hunt streams), not the
+   * source of the level. The generator uses one number for both, and the next
+   * floor of any run is generated from it (missions.nextFloor). Default 1. */
+  seed?: number
+  /** Default 1. Floor-gated rules (complex director, boss floors, drafts) read it. */
+  floor?: number
+  mode?: RunMode
+  hostile?: boolean
+  /** Set by `worldFromSeed` only: the level is `generateLevel(seed, floor)`
+   * untouched, so a snapshot may leave it out and regenerate it. */
+  levelChecksumFromSeed?: number
+}
+
+/** The engine's entry: a live world from a starting state. Deterministic in
+ * `init`; no seed or generator is consulted. */
+export const worldFromState = (init: WorldInit): World => {
+  const seed = init.seed ?? 1
+  const floor = init.floor ?? 1
   const baseRng = mulberry32(seed)
   return {
     tick: 0,
     seed,
     floor,
-    level: generateLevel(seed, floor),
+    level: init.level,
+    ...(init.levelChecksumFromSeed !== undefined ? { levelChecksumFromSeed: init.levelChecksumFromSeed } : {}),
     entities: [],
     byId: new Map(),
     nextId: 1,
@@ -228,12 +260,23 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     noises: [],
     fear: [],
     gameOver: false,
-    mode,
+    mode: init.mode ?? 'normal',
     revivesLeft: REVIVES_PER_RUN,
-    hostile,
+    hostile: init.hostile ?? true,
     annotations: [],
   }
 }
+
+/** The generator: seed+floor to a starting state, via the level generator. */
+export const worldFromSeed = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): WorldInit => {
+  const level = generateLevel(seed, floor)
+  return { level, seed, floor, mode, hostile, levelChecksumFromSeed: levelChecksum(level) }
+}
+
+/** Convenience for the app and tests: generate floor `floor` of run `seed` and
+ * start it. Exactly `worldFromState(worldFromSeed(...))`. */
+export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
+  worldFromState(worldFromSeed(seed, floor, mode, hostile))
 
 /** Is any wing's power currently cut? Robots (Derelict Units) turn hostile while
  * so (behaviors.ts) — the standing cost of the power-cut infiltration path. */

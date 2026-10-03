@@ -137,7 +137,7 @@ export interface Building {
    * EXPLICITLY by the generator that carved the building (bunker core, vault,
    * loop core, …). This is the contract missions.ts places targets by; never
    * infer it from `rooms` array order. Not part of tiles/solid, so it is
-   * levelChecksum- and wire-invisible (levels regenerate from seed+floor). */
+   * levelChecksum- and wire-invisible. */
   objectiveRoom?: Rect
 }
 
@@ -284,17 +284,16 @@ export interface Level {
   exit: { x: number; y: number }
   /** District theme this floor was generated with. */
   theme?: ThemeName
-  /** Open plaza lots (themed floors): paved squares with a green heart. Not
-   * serialized — the level regenerates from seed+floor like everything else. */
+  /** Open plaza lots (themed floors): paved squares with a green heart. */
   plazas?: Rect[]
   /** Present ONLY on indoor-complex floors (3+): the corridor network, vents,
    * wings and biome the complex generator laid down. Its presence is THE
    * switch the complex-aware systems (populate, complexDirector, render) key
-   * off. Regenerated from seed+floor, never serialized. */
+   * off. */
   complex?: ComplexInfo
   /** The storeys of this floor (levelgen/storeys.ts). Absent means a single
    * storey — every city floor, and a complex floor the structural rule gave no
-   * loft. Regenerated from seed+floor, never serialized. */
+   * loft. */
   storeys?: Storey[]
   /** Stair links, one per direction (see StairLink). Present with `storeys`. */
   stairs?: StairLink[]

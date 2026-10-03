@@ -123,22 +123,14 @@ export type WorldFixture = WorldJson
 
 export const saveWorld = (w: World): WorldFixture => serializeWorld(w)
 
-/** Restore a fixture into an existing world in place (its `level`/`rng` are
- * regenerated/resumed from the snapshot, so the reference stays valid). */
+/** Restore a fixture into an existing world in place, so readonly holders of
+ * `w` keep their reference. Every serialized field is replaced, and an optional
+ * one the fixture lacks (director, groups, modifier, a seeded level's checksum)
+ * is cleared rather than left over from the previous world. `aiFlags` is not
+ * part of a snapshot, so the running world's A/B toggles survive the load. */
 export const applyFixture = (w: World, fx: WorldFixture): void => {
   const restored = deserializeWorld(fx)
-  w.seed = restored.seed
-  w.floor = restored.floor
-  w.level = restored.level
-  w.tick = restored.tick
-  w.nextId = restored.nextId
-  w.alarm = restored.alarm
-  w.gameOver = restored.gameOver
-  w.mission = restored.mission
-  w.noises = restored.noises
-  w.events = restored.events
-  w.rng = restored.rng
-  w.baseRng = restored.baseRng
-  w.entities = restored.entities
-  w.byId = restored.byId
+  const { aiFlags } = w
+  for (const k of Object.keys(w)) delete (w as unknown as Record<string, unknown>)[k]
+  Object.assign(w, restored, aiFlags ? { aiFlags } : {})
 }

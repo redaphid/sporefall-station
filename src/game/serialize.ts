@@ -2,32 +2,57 @@
 // function of (seed → forked RNG) + per-tick InputCmd, and entities are plain
 // data, so the ONLY thing standing between a snapshot and byte-identical replay
 // on the next tick is the RNG stream position — captured here via `rng.state()`
-// and resumed on load. The level is NOT stored (it is regenerable from
-// seed+floor and never mutated at runtime); its `levelChecksum` rides along so a
-// seed/floor drift is caught on load instead of silently producing a wrong map.
+// and resumed on load.
+//
+// The level travels one of two ways. A level the generator built from
+// seed+floor, still untouched, is NOT stored: only its `levelChecksum` rides
+// along, so a seed/floor drift is caught on load instead of silently producing
+// a wrong map, and seeded snapshots stay as small as they always were. Any
+// other level (authored by hand, or a generated one a scenario carved) is
+// stored whole as level text (`level`, see levelgen/levelText.ts), which is
+// what makes a world loadable with no seed involved.
 
 import { serializeEntity } from '../debug/verbs'
 import type { Entity } from './entity'
+import { generateLevel } from './levelgen/generate'
 import { levelChecksum } from './levelgen/level'
+import { levelFromJson, levelToJson, type LevelJson } from './levelgen/levelText'
 import { hashLabel, mulberry32 } from './rng'
 import type { FloorModifier } from './floorModifiers'
 import type { DirectorState } from './systems/complexDirector'
 import type { GroupsState } from './systems/groups'
 import type { Annotation, SimEvent } from './types'
 import {
-  createWorld,
   REVIVES_PER_RUN,
+  worldFromState,
   type FearPulse,
   type MissionState,
   type Noise,
   type RunMode,
   type World,
+  type WorldInit,
 } from './world'
 
-/** The versioned on-disk shape of a whole world. Stable and JSON-safe: every
- * field is a scalar, a plain record, or a verbatim entity clone. `level` is
- * intentionally absent — `levelChecksum` validates the regenerated one. */
-export interface WorldJson {
+/** How a snapshot carries its level: by reference to the generator, or whole. */
+export type WorldJsonLevel =
+  | {
+      /** FNV-1a of `generateLevel(seed, floor)`. The level is regenerated on
+       * load, and a mismatch means seed/floor drift. */
+      levelChecksum: number
+      level?: undefined
+    }
+  | {
+      /** The level itself, as hand-editable level text. */
+      level: LevelJson
+      levelChecksum?: undefined
+    }
+
+/** The versioned on-disk shape of a whole world: tests' fixtures, crafted
+ * saves and `?state=` links alike. Stable and JSON-safe: every field is a
+ * scalar, a plain record, or a verbatim entity clone. */
+export type WorldJson = WorldJsonFields & WorldJsonLevel
+
+interface WorldJsonFields {
   v: 1
   seed: number
   floor: number
@@ -46,8 +71,6 @@ export interface WorldJson {
   rng: number
   /** Root run PRNG position; per-floor sim streams fork from it. */
   baseRng: number
-  /** FNV-1a of the regenerated level — a mismatch means seed/floor drift. */
-  levelChecksum: number
   /** Combat "all NPCs are enemies" tunable. Omitted when true (the default) so
    * pre-feature snapshots round-trip byte-for-byte and load as hostile. */
   hostile?: boolean
@@ -80,6 +103,11 @@ export interface WorldJson {
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
+const levelOf = (w: World): WorldJsonLevel => {
+  const sum = levelChecksum(w.level)
+  return sum === w.levelChecksumFromSeed ? { levelChecksum: sum } : { level: levelToJson(w.level) }
+}
+
 /** Snapshot a world to a plain JSON object with full fidelity. */
 export const serializeWorld = (w: World): WorldJson => ({
   v: 1,
@@ -96,7 +124,7 @@ export const serializeWorld = (w: World): WorldJson => ({
   events: clone(w.events),
   rng: w.rng.state(),
   baseRng: w.baseRng.state(),
-  levelChecksum: levelChecksum(w.level),
+  ...levelOf(w),
   entities: w.entities.map(serializeEntity),
   // Omit when at the hostile default so pre-existing snapshots stay byte-for-byte
   // unchanged; only a peaceful (false) world writes the field.
@@ -121,13 +149,20 @@ export const serializeWorld = (w: World): WorldJson => ({
   ...(w.modifier ? { modifier: { ...w.modifier } } : {}),
 })
 
+const initOf = (j: WorldJson): WorldInit => {
+  if (j.level) return { level: levelFromJson(j.level), seed: j.seed, floor: j.floor }
+  if (j.levelChecksum === undefined) throw new Error('snapshot carries neither a level nor a levelChecksum')
+  const level = generateLevel(j.seed, j.floor)
+  if (levelChecksum(level) !== j.levelChecksum) {
+    throw new Error(`level checksum drift for seed ${j.seed} floor ${j.floor} — cannot restore`)
+  }
+  return { level, seed: j.seed, floor: j.floor, levelChecksumFromSeed: j.levelChecksum }
+}
+
 /** Rebuild a fresh, standalone world from a snapshot — byte-identical on every
  * subsequent tick to the world it was captured from (given the same inputs). */
 export const deserializeWorld = (j: WorldJson): World => {
-  const w = createWorld(j.seed, j.floor) // regenerates the level from seed+floor
-  if (levelChecksum(w.level) !== j.levelChecksum) {
-    throw new Error(`level checksum drift for seed ${j.seed} floor ${j.floor} — cannot restore`)
-  }
+  const w = worldFromState(initOf(j))
   w.tick = j.tick
   w.nextId = j.nextId
   w.alarm = j.alarm

@@ -16,12 +16,13 @@ export type PeerId = string
  *     Input carries a bundle of the last few records instead of one command,
  *     snapshots and GameStart carry the host's run epoch, and every relay frame
  *     from an online peer starts with a lane tag (rtcTransport.ts).
- * 10 — Ping/Pong (21/22) for online link health, and Bye (20) (#156). A peer
- *     that does not know a message type reads it as a framing desync.
+ * 10 — Ping/Pong (21/22) for online link health, and Bye (20). A peer that
+ *     does not know a message type reads it as a framing desync. Above 9 so
+ *     a build with this and 9's trailer never matches one with only 9.
  * 9 — snapshots gain a sparse activity trailer after the status one: which
  *     settlers sit at a card table, bench or bunk, and whether play is on, so
  *     a client draws the card game. An old peer would never see it.
- * 8 — unused: held for #156 while it was in flight.
+ * 8 — reserved for #156 while 9 was assigned; #156 landed as 10.
  * 7 — no wire change, but floor 2 now draws its district (slums, Still Row
  *     or the Culture Beds) from the seed, and the two reworked districts lay
  *     out differently. Layout is regenerated locally, as in 6.

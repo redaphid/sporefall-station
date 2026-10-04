@@ -324,3 +324,65 @@ describe('an announced leave is never shown as a lost connection first', () => {
     expect(ended(seen)).toEqual([{ phase: 'ended', hostLeft: true }])
   })
 })
+
+describe('the net menu title', () => {
+  it('reads MENU mid-run, HOST LEFT once the host leaves, CONNECTION LOST when the link dies', async () => {
+    const live = rig('online')
+    await admit(live)
+    expect(live.client.menuTitle()).toBe('MENU')
+
+    const left = rig('online')
+    await admit(left)
+    left.hostSays(encodeJson(MsgType.Bye, {}))
+    expect(left.client.menuTitle()).toBe('HOST LEFT')
+
+    const lost = rig('bluetooth')
+    await admit(lost)
+    ;(lost.client as unknown as { transport: Transport }).transport.reconnect = undefined
+    lost.drop('error')
+    expect(lost.client.menuTitle()).toBe('CONNECTION LOST')
+  })
+
+  it('quitting from the HOST LEFT menu keeps HOST LEFT, never flashing CONNECTION LOST', async () => {
+    const r = rig('online')
+    await admit(r)
+    r.drop('left')
+    const titles: string[] = [r.client.menuTitle()]
+    const closing = r.client.close()
+    titles.push(r.client.menuTitle())
+    r.drop('local')
+    await closing
+    titles.push(r.client.menuTitle())
+    expect(titles).toEqual(['HOST LEFT', 'HOST LEFT', 'HOST LEFT'])
+    expect(r.client.hostLeft).toBe(true)
+  })
+
+  it('a guest quitting a live run reads LEAVING…, and its own hang-up is not a lost connection', async () => {
+    const r = rig('online')
+    await admit(r)
+    const closing = r.client.close()
+    r.drop('local')
+    await closing
+    await r.advance(6000)
+    expect(r.client.menuTitle()).toBe('LEAVING…')
+    expect(r.client.phase).not.toBe('reconnecting')
+    expect(r.reconnects).toBe(0)
+  })
+})
+
+describe('host-left while already reconnecting', () => {
+  it('a departure reported mid-reconnect ends the run as host left, and the loop stops', async () => {
+    const r = rig('online')
+    await admit(r)
+    r.onReopen.value = 'silent'
+    await r.advance(STALLED_AFTER_MS + 3500)
+    expect(r.client.phase).toBe('reconnecting')
+    const attempts = r.reconnects
+    r.drop('left')
+    expect(r.client.phase).toBe('ended')
+    expect(r.client.hostLeft).toBe(true)
+    await r.advance(10_000)
+    expect(r.reconnects).toBe(attempts)
+    expect(r.client.menuTitle()).toBe('HOST LEFT')
+  })
+})

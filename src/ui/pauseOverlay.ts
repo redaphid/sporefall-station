@@ -133,6 +133,11 @@ export const createPauseOverlay = (
       nsBtn.style.background = '#5a1f22'
     })
     nsBtn.addEventListener('blur', () => disarmNewSeed())
+    // A held Enter autorepeats its keydown, and each one clicks: one hold
+    // would arm and then wipe. Only a fresh keypress may count.
+    nsBtn.addEventListener('keydown', (e) => {
+      if (e.repeat) e.preventDefault()
+    })
     row.appendChild(nsBtn)
   }
   if (actions.onRestart) {

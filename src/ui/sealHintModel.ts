@@ -26,8 +26,10 @@ const KEY_STEP: Record<SealKind, (nameOf: (archetype: string) => string) => stri
   overgrown: (nameOf) => `Overgrown. Kill its ${nameOf('sporeNode')}`,
 }
 
-export const sealHintText = (kind: SealKind, nameOf: (archetype: string) => string): string =>
-  `${KEY_STEP[kind](nameOf)}, or blast it with a ${SPECIAL_NAME}`
+/** Names the special, not "a grenade": only the special's blast breaches a
+ * door (combat.detonate); a thrown Grenade item's blast does not. */
+export const sealHintText =(kind: SealKind, nameOf: (archetype: string) => string): string =>
+  `${KEY_STEP[kind](nameOf)}, or blast it with your ${SPECIAL_NAME} special`
 
 /** The seal on a shut door, if it has one. A plain lock is not a seal. */
 const sealOf = (d: Entity): SealKind | undefined => {

@@ -47,9 +47,9 @@ const idle = {}
 
 describe('sealed-door hint on a press', () => {
   it.each([
-    [{ sealKind: 'keycard' } as const, 'Sealed. Find the keycard, or blast it with a Grenade'],
-    [{ sealKind: 'power' } as const, 'Sealed. Hack the Generator, or blast it with a Grenade'],
-    [{ overgrown: true } as const, 'Overgrown. Kill its Spore Node, or blast it with a Grenade'],
+    [{ sealKind: 'keycard' } as const, 'Sealed. Find the keycard, or blast it with your Grenade special'],
+    [{ sealKind: 'power' } as const, 'Sealed. Hack the Generator, or blast it with your Grenade special'],
+    [{ overgrown: true } as const, 'Overgrown. Kill its Spore Node, or blast it with your Grenade special'],
   ])('%o names what opens it', (seal, text) => {
     const { w, p } = corridor(seal)
     const hint = createSealHint(nameOf)
@@ -103,7 +103,7 @@ describe('sealed-door hint on walking into the door', () => {
       if (text) shown.push(text)
     }
     expect(p.pos.x, 'the shut hatch stopped the walk').toBeLessThan(DOOR_X)
-    expect(shown).toEqual(['Overgrown. Kill its Spore Node, or blast it with a Grenade'])
+    expect(shown).toEqual(['Overgrown. Kill its Spore Node, or blast it with your Grenade special'])
   })
 
   it('shows again after the player steps away and comes back, once the cooldown is up', () => {
@@ -131,7 +131,7 @@ describe('sealed-door hint on walking into the door', () => {
     const hint = createSealHint(nameOf)
     let text: string | undefined
     for (let t = 0; t < 40 && !text; t++) text = step(w, p, hint, walk)
-    expect(text).toBe('Sealed. Find the keycard, or blast it with a Grenade')
+    expect(text).toBe('Sealed. Find the keycard, or blast it with your Grenade special')
   })
 
   it('stays quiet against a plain locked door', () => {

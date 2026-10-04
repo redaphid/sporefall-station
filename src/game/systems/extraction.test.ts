@@ -67,25 +67,46 @@ const grab = (w: World, slot = 0): void => {
 }
 
 describe('adding extraction leaves the RNG stream alone', () => {
+  /** Build a world twice, rolled and with the extraction roll denied, and
+   * assert they differ only in the mission rules. True if it rolled one. */
+  const expectOnlyRulesDiffer = (make: () => World, ctx: string): boolean => {
+    const rolled = runTicks(setUp(make()), idle(0), 30)
+    const denied = runTicks(setUpWithoutExtraction(make()), idle(0), 30)
+    const converted = rolled.mission.template === 'extraction'
+    if (converted) {
+      expect(denied.mission.template, ctx).toBe('steal')
+      const wing = /in the (.+), then get out/.exec(rolled.mission.description)![1]
+      rolled.mission.template = 'steal'
+      rolled.mission.description = `Extract the specimen canister from the ${wing}`
+      delete rolled.mission.extractPoint
+    }
+    expect(serializeWorld(rolled), ctx).toEqual(serializeWorld(denied))
+    return converted
+  }
+
   it('an extraction world is the same world with the roll denied, apart from its mission rules', () => {
     let converted = 0
     let kept = 0
     for (const fixture of ['frozen-1-3', 'frozen-2-4', 'frozen-42-5', 'frozen-9-4']) {
       for (let seed = 1; seed <= 6; seed++) {
         for (const floor of [2, 3, 5]) {
-          const ctx = `${fixture} seed ${seed} floor ${floor}`
-          const rolled = runTicks(setUp(authoredAt(fixture, seed, floor)), idle(0), 30)
-          const denied = runTicks(setUpWithoutExtraction(authoredAt(fixture, seed, floor)), idle(0), 30)
-          if (rolled.mission.template === 'extraction') {
-            converted++
-            expect(denied.mission.template, ctx).toBe('steal')
-            const wing = /in the (.+), then get out/.exec(rolled.mission.description)![1]
-            rolled.mission.template = 'steal'
-            rolled.mission.description = `Extract the specimen canister from the ${wing}`
-            delete rolled.mission.extractPoint
-          } else kept++
-          expect(serializeWorld(rolled), ctx).toEqual(serializeWorld(denied))
+          if (expectOnlyRulesDiffer(() => authoredAt(fixture, seed, floor), `${fixture} seed ${seed} floor ${floor}`)) converted++
+          else kept++
         }
+      }
+    }
+    expect(converted).toBeGreaterThan(0)
+    expect(kept).toBeGreaterThan(0)
+  })
+
+  // The generator is the subject here, so these worlds come from the seed.
+  it('the same holds on generated floors 2-5, seeds 1-12', () => {
+    let converted = 0
+    let kept = 0
+    for (let seed = 1; seed <= 12; seed++) {
+      for (let floor = 2; floor <= 5; floor++) {
+        if (expectOnlyRulesDiffer(() => createWorld(seed, floor), `seed ${seed} floor ${floor}`)) converted++
+        else kept++
       }
     }
     expect(converted).toBeGreaterThan(0)

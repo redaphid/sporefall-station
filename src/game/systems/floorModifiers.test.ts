@@ -212,6 +212,21 @@ describe('floor modifiers: the roll', () => {
       expect(kinds.size, 'the sample rolls more than one kind of modifier').toBeGreaterThan(1)
     })
 
+    // The generator is the subject here, so these worlds come from the seed.
+    it('the same holds on generated floors 2-5, seeds 1-12', () => {
+      const kinds = new Set<string>()
+      for (let seed = 1; seed <= 12; seed++) {
+        for (let floor = 2; floor <= 5; floor++) {
+          const w = direct(seed, floor)
+          if (w.modifier) kinds.add(w.modifier.kind)
+          const clean = switchedOff('roll', () => direct(seed, floor))
+          expect(clean.modifier).toBeUndefined()
+          expect(digestWithoutModifier(w), `seed ${seed} floor ${floor}`).toBe(fnv1a(worldDigest(clean)))
+        }
+      }
+      expect([...kinds].sort()).toEqual([...FLOOR_MODIFIER_KINDS].sort())
+    })
+
     it('a modifier rolled on the way down the stairs moves nothing else either', () => {
       let rolled = 0
       for (let seed = 1; seed <= 8; seed++) {

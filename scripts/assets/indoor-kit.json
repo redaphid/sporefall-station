@@ -1,0 +1,104 @@
+{
+ "deck": {
+  "seeds": [
+   1002,
+   1006
+  ],
+  "raws": [
+   "raws/indoor/deck-s1002.png",
+   "raws/indoor/deck-s1006.png"
+  ]
+ },
+ "bulkhead": {
+  "seeds": [
+   1000,
+   1005
+  ],
+  "raws": [
+   "raws/indoor/bulkhead-s1000.png",
+   "raws/indoor/bulkhead-s1005.png"
+  ]
+ },
+ "door": {
+  "seeds": [
+   1000
+  ],
+  "raws": [
+   "raws/indoor/door-s1000.png"
+  ]
+ },
+ "stair_up": {
+  "seeds": [
+   1004,
+   1005,
+   1002
+  ],
+  "raws": [
+   "raws/indoor/stair_up-s1004.png",
+   "raws/indoor/stair_up-s1005.png",
+   "raws/indoor/stair_up-s1002.png"
+  ]
+ },
+ "pillar": {
+  "seeds": [
+   1017,
+   1013
+  ],
+  "raws": [
+   "raws/indoor/pillar-s1017.png",
+   "raws/indoor/pillar-s1013.png"
+  ]
+ },
+ "stair_down": {
+  "seeds": [
+   1000,
+   1003,
+   1005
+  ],
+  "raws": [
+   "raws/indoor/stair_down-s1000.png",
+   "raws/indoor/stair_down-s1003.png",
+   "raws/indoor/stair_down-s1005.png"
+  ]
+ },
+ "generator": {
+  "seeds": [
+   1000
+  ],
+  "raws": [
+   "raws/indoor/generator-s1000.png"
+  ]
+ },
+ "coolant-tank": {
+  "seeds": [
+   1002
+  ],
+  "raws": [
+   "raws/indoor/coolant-tank-s1002.png"
+  ]
+ },
+ "freight-case": {
+  "seeds": [
+   1006
+  ],
+  "raws": [
+   "raws/indoor/freight-case-s1006.png"
+  ]
+ },
+ "parts-rack": {
+  "seeds": [
+   1000
+  ],
+  "raws": [
+   "raws/indoor/parts-rack-s1000.png"
+  ]
+ },
+ "cryo-bunk": {
+  "seeds": [
+   1011
+  ],
+  "raws": [
+   "raws/indoor/cryo-bunk-s1011.png"
+  ]
+ }
+}

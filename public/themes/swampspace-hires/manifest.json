@@ -735,7 +735,35 @@
   "char.hivespire.ne-idle": "chars/hive-spire-s-idle.png",
   "char.hivespire.ne-step": "chars/hive-spire-s-idle.png",
   "char.hivespire.n-idle": "chars/hive-spire-s-idle.png",
-  "char.hivespire.n-step": "chars/hive-spire-s-idle.png"
+  "char.hivespire.n-step": "chars/hive-spire-s-idle.png",
+  "tile.bulkhead.cap": "tiles/bulkhead-cap.png",
+  "tile.bulkhead.cap.inner": "tiles/bulkhead-cap-inner.png",
+  "prop.bulkhead-door": "props/bulkhead-door.png",
+  "prop.bulkhead-door-open": "props/bulkhead-door-open.png",
+  "prop.generator": "props/generator.png",
+  "prop.coolant-tank": "props/coolant-tank.png",
+  "prop.freight-case": "props/freight-case.png",
+  "prop.parts-rack": "props/parts-rack.png",
+  "tile.deck": [
+   "tiles/deck-0.png",
+   "tiles/deck-1.png",
+   "tiles/deck-2.png",
+   "tiles/deck-3.png",
+   "tiles/deck-4.png",
+   "tiles/deck-5.png",
+   "tiles/deck-6.png",
+   "tiles/deck-7.png"
+  ],
+  "tile.bulkhead": [
+   "tiles/bulkhead-0.png",
+   "tiles/bulkhead-1.png"
+  ],
+  "tile.pillar": [
+   "tiles/pillar-0.png",
+   "tiles/pillar-1.png"
+  ],
+  "prop.bulkhead-door-locked": "props/bulkhead-door-locked.png",
+  "prop.cryo-bunk": "props/cryo-bunk.png"
  },
  "anim": {
   "walk": 4
@@ -746,7 +774,8 @@
   "grass": 4,
   "hall": 2,
   "plating": 2,
-  "bog": 2
+  "bog": 2,
+  "deck": 2
  },
  "artScale": 2
 }

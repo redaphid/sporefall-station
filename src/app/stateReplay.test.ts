@@ -139,3 +139,38 @@ describe('a replay that genuinely diverges', () => {
     expect(runReplay(payload).banner).not.toContain('captured on build')
   })
 })
+
+describe('a still link (no run-up)', () => {
+  const capturedStill = (): { payload: StateLinkPayload; world: World } => {
+    const w = buildMidRun(0x5717)
+    const payload = JSON.parse(JSON.stringify(captureState(w, { note: 'still' }))) as StateLinkPayload
+    return { payload, world: deserializeWorld(payload.world) }
+  }
+  const published = () =>
+    (window as unknown as { __stateReplay?: { ok: boolean; still: boolean; tick: number } }).__stateReplay
+
+  it('publishes a green verdict flagged as a still, at once, with nothing to step', () => {
+    ;(window as unknown as { __stateReplay?: unknown }).__stateReplay = undefined
+    const { payload, world } = capturedStill()
+    let check: StateLinkCheck | undefined
+    const mount = document.createElement('div')
+    const replay = startStateReplay(payload, () => world, mount, (c) => (check = c))
+    expect(replay.active).toBe(false)
+    expect(check).toEqual({ ok: true, rewindTicks: 0 })
+    expect(published()).toMatchObject({ ok: true, still: true, tick: world.tick })
+    expect(mount.textContent).toContain('captured frame')
+  })
+
+  it('is red when the loaded frame is not the captured one', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { payload, world } = capturedStill()
+    world.entities[0]!.pos.x += 3
+    startStateReplay(payload, () => world, document.createElement('div'))
+    expect(published()).toMatchObject({ ok: false, still: true })
+  })
+
+  it('a replayed link is not flagged as a still', () => {
+    runReplay(captureWithRewind(0xb0b))
+    expect(published()?.still).toBe(false)
+  })
+})

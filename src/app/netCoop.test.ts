@@ -26,6 +26,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -56,6 +57,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.deliverToHost(peer, bytes),
@@ -799,6 +801,7 @@ const makeCapturingClientTransport = (): {
   const transport: Transport = {
     role: 'client',
     maxPacket: 180,
+    medium: 'local',
     start: async () => {},
     stop: async () => {},
     sendPacket: async () => {},
@@ -907,6 +910,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     const hostTransport: Transport = {
       role: 'host',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_peer, bytes) => deliver(() => h.client?.({ type: 'data', peer: 'host', bytes })),
@@ -919,6 +923,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: async (_peer, bytes) => {

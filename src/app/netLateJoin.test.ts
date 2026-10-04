@@ -29,6 +29,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -55,6 +56,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.deliverToHost(peer, bytes),
@@ -236,7 +238,7 @@ describe('late join: the joiner lands on the host’s floor', () => {
     const legacy = hub as unknown as { centrals: Map<PeerId, (b: Uint8Array) => void> }
     const deliver = legacy.centrals.get('central-1')!
     for (const p of frameMessage(encodeJson(MsgType.Welcome, { slot: 1, token: 't' }), 180)) deliver(p)
-    for (const p of frameMessage(encodeJson(MsgType.GameStart, { seed, players: [] }), 180)) deliver(p)
+    for (const p of frameMessage(encodeJson(MsgType.GameStart, { epoch: 0, seed, players: [] }), 180)) deliver(p)
     await flush()
 
     expect(tilesOf(bob.session.renderView().level)).toBe(tilesOf(generateLevel(seed, 1)))

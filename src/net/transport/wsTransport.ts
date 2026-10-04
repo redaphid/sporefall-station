@@ -1,7 +1,7 @@
 import { SITE_ORIGIN } from '../../app/version'
 import { workerOrigin } from '../../app/workerOrigin'
 import type { PeerId, Transport, TransportEvent } from '../types'
-import { decodeAddressed, encodeAddressed, parseControl } from './wsWire'
+import { decodeAddressed, encodeAddressed, parseControl, type WsHostCommand } from './wsWire'
 
 /** The slice of the browser WebSocket API this transport uses — narrowed so tests
  * can inject a fake socket without a DOM. The real `WebSocket` structurally
@@ -33,12 +33,16 @@ const OPEN = 1
 export class WsTransport implements Transport {
   // A real network link — no BLE MTU. Framing still chunks to this, so keep it
   // comfortably above a full snapshot to avoid needless fragmentation.
+  readonly medium = 'online'
   readonly maxPacket = 65536
 
   private socket: WsLike | null = null
   private handlers = new Set<(e: TransportEvent) => void>()
   private connected = new Set<PeerId>()
   private stopping = false
+  /** This client has been in a room with its host before. The relay's 'nohost'
+   * then means the host left, not that it has yet to arrive. */
+  private metHost = false
 
   constructor(
     readonly role: 'host' | 'client',
@@ -69,11 +73,16 @@ export class WsTransport implements Transport {
         opened = true
         resolve()
       }
-      sock.onmessage = (ev) => this.onMessage(ev.data)
+      // A socket replaced by reconnect() closes AFTER its successor opened.
+      // Its late close or stray frame must not touch the new link.
+      const current = (): boolean => this.socket === sock
+      sock.onmessage = (ev) => {
+        if (current()) this.onMessage(ev.data)
+      }
       sock.onclose = (ev) => {
         // A close before onopen means the upgrade itself failed.
         if (!opened) reject(new Error(`can't reach the online server (closed with code ${ev.code ?? '?'})`))
-        this.onClose()
+        if (current()) this.onClose()
       }
       sock.onerror = () => {
         if (!opened) reject(new Error("can't reach the online server"))
@@ -102,14 +111,23 @@ export class WsTransport implements Transport {
     if (!msg) return
     switch (msg.t) {
       case 'host+':
+        if (this.role === 'client') this.metHost = true
         if (this.role === 'client' && !this.connected.has('host')) {
           this.connected.add('host')
           this.emit({ type: 'peerConnected', peer: 'host' })
         }
         break
       case 'host-':
+        // The relay saw the host's socket close. Host transports never
+        // reconnect, so whatever the cause, nobody will answer a rejoin.
         if (this.role === 'client' && this.connected.delete('host')) {
-          this.emit({ type: 'peerDisconnected', peer: 'host', reason: msg.reason })
+          this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'left' })
+        }
+        break
+      case 'nohost':
+        // Back in a room the host has left: the session must end, not wait.
+        if (this.role === 'client' && this.metHost) {
+          this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'left' })
         }
         break
       case 'peer+':
@@ -142,6 +160,14 @@ export class WsTransport implements Transport {
     // Client → relay: bare payload (the relay knows it's for the host).
     // Host → relay: prefix the target client's id so the relay can route it.
     sock.send(this.role === 'client' ? bytes : encodeAddressed(peer, bytes))
+  }
+
+  /** Ask the relay to close a refused client's socket (see WsHostCommand). */
+  async drop(peer: PeerId): Promise<void> {
+    if (this.role !== 'host') return
+    const sock = this.socket
+    if (!sock || sock.readyState !== OPEN) return
+    sock.send(JSON.stringify({ t: 'drop', id: peer } satisfies WsHostCommand))
   }
 
   async reconnect(): Promise<void> {

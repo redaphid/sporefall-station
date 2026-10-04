@@ -28,6 +28,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -54,6 +55,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.deliverToHost(peer, bytes),
@@ -164,27 +166,26 @@ describe('sequenced mods over co-op', () => {
   })
 })
 
-describe('input wire: the reorder tail is additive', () => {
+describe('input wire: the mod swap is an optional record tail', () => {
   const base: InputCmd = { ...emptyInput(), seq: 42, attack: true, hotbar: 1, aimX: 0, aimY: 1 }
   const edges = { attack: true, interact: false, special: false }
 
-  it('a command without a swap encodes exactly as before (no tail)', () => {
+  it('a command without a swap carries no swap bytes', () => {
     const plain = encodeInput(base, edges)
-    expect(plain.length).toBe(9)
+    expect(plain.length).toBe(11)
     expect(decodeInput(plain).cmd.modSwap).toBeUndefined()
   })
 
-  it('a swap appends two bytes after the unchanged legacy body, and round-trips', () => {
+  it('a swap costs two bytes and round-trips', () => {
     const plain = encodeInput(base, edges)
     const withSwap = encodeInput({ ...base, modSwap: packModSwap(2, 5) }, edges)
     expect(withSwap.length).toBe(plain.length + 2)
-    expect([...withSwap.subarray(0, plain.length)]).toEqual([...plain])
     const { cmd } = decodeInput(withSwap)
     expect(cmd.modSwap).toBe(packModSwap(2, 5))
     expect(cmd.hotbar).toBe(1)
   })
 
-  it('swap 0<->0 packs to 0 and still survives the +1 bias', () => {
+  it('swap 0<->0 packs to 0 and still round-trips', () => {
     expect(decodeInput(encodeInput({ ...base, modSwap: 0 }, edges)).cmd.modSwap).toBe(0)
   })
 

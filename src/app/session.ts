@@ -1,3 +1,4 @@
+import type { LinkStatus } from './linkHealth'
 import type { Entity } from '../game/entity'
 import type { ModifierView } from '../game/floorModifiers'
 import type { Level } from '../game/levelgen/level'
@@ -76,4 +77,6 @@ export interface Session {
   /** Leave the net session on purpose (Main menu). A host tells its peers it
    * left; a client hangs up. Solo has nothing to close and leaves it undefined. */
   close?(): Promise<void>
+  /** Net sessions: the health of the link, for the online HUD chip. */
+  linkStatus?(): LinkStatus
 }

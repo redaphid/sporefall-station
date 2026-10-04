@@ -51,7 +51,12 @@ await host.evaluate(() => (window.__oldPage = true))
 const phases = []
 await client.exposeFunction('__phase', (p) => phases.push(p))
 await client.evaluate(() => {
-  const title = () => document.querySelector('[data-role="pause-title"]')?.textContent
+  // Only a title the player can SEE counts: a hidden overlay keeps whatever
+  // text it last painted.
+  const title = () => {
+    const h = document.querySelector('[data-role="pause-title"]')
+    return h && h.offsetParent !== null ? h.textContent : null
+  }
   const seen = new Set()
   setInterval(() => {
     const t = title()
@@ -86,6 +91,7 @@ const checks = [
   ['a net host gets a menu (not PAUSED) with a two-press Main menu', r.hostMenuTitle === 'MENU' && r.hostArmed === 'Quit to the menu? Press again'],
   ['the host lands on a fresh start menu with no params', r.hostSearch === ''],
   ['the client is told the host left, and never tries to reconnect', r.clientTitle === 'HOST LEFT' && !phases.includes('reconnecting')],
+  ['HOST LEFT is the first thing the client shows: no CONNECTION LOST on the way', phases[0] === 'HOST LEFT' && !phases.includes('CONNECTION LOST')],
   ['the HOST LEFT menu has no Resume, and the cursor sits on Main menu', !r.clientButtons.includes('Resume') && r.clientFocus === 'Main menu'],
   ["the client's Main menu takes it home too", r.clientSearch === ''],
   ['no page errors (besides headless no-WebGL)', realErrors.length === 0],

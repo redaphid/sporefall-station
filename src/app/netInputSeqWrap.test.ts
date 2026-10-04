@@ -36,6 +36,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -58,6 +59,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) =>
@@ -76,6 +78,13 @@ class MockHub {
       },
     }
   }
+}
+
+/** A fast-forwarded counter needs a fast-forwarded history: each Input message
+ * repeats the last few records, and 36 real minutes would have left those at the
+ * new counter too, not 65 000 seqs behind it. */
+const forgetSentRecords = (client: NetClientSession): void => {
+  ;(client as unknown as { sentRecords: unknown[] }).sentRecords = []
 }
 
 const flush = async (): Promise<void> => {
@@ -156,6 +165,7 @@ describe('input sequence u16 wrap — the ack and the counter must be in the sam
     // of real play would leave them, then walk across it.
     const anyC = client as unknown as { inputSeq: number }
     anyC.inputSeq = 65_500
+    forgetSentRecords(client)
     const peer = [...host.peersBySlot.values()][0]
     peer.lastInputSeq = 65_500 & 0xffff
     await step(120)
@@ -190,6 +200,7 @@ describe('input sequence u16 wrap — the ack and the counter must be in the sam
     }
 
     anyC.inputSeq = 65_500
+    forgetSentRecords(client)
     const peer = [...host.peersBySlot.values()][0]
     peer.lastInputSeq = 65_500 & 0xffff
     await step(120) // walks across 2^16
@@ -205,6 +216,7 @@ describe('input sequence u16 wrap — the ack and the counter must be in the sam
     const { host, client, step } = await playingPair(99)
     const anyC = client as unknown as { inputSeq: number }
     anyC.inputSeq = 65_530
+    forgetSentRecords(client)
     const peer = [...host.peersBySlot.values()][0]
     peer.lastInputSeq = 65_530 & 0xffff
     await step(60)

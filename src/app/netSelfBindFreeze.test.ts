@@ -52,6 +52,7 @@ const makeClient = () => {
   const transport: Transport = {
     role: 'client',
     maxPacket: 180,
+    medium: 'local',
     start: async () => {},
     stop: async () => {},
     sendPacket: (_p: PeerId, bytes: Uint8Array) => {
@@ -94,10 +95,10 @@ describe('a client survives a snapshot that arrives between GameStart and Go', (
 
     // --- run 1: normal admission -------------------------------------------
     c.deliver(encodeJson(MsgType.Welcome, { slot: 1, token: 'tok' }))
-    c.deliver(encodeJson(MsgType.GameStart, { seed: 1, players: [{ slot: 1, name: 'Friend' }], floor: 1 }))
+    c.deliver(encodeJson(MsgType.GameStart, { epoch: 0, seed: 1, players: [{ slot: 1, name: 'Friend' }], floor: 1 }))
     c.deliver(encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: STALE_SELF_ID } }))
     c.deliver(
-      encodeSnapshot({ tick: 10, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(STALE_SELF_ID, 'player')] }),
+      encodeSnapshot({ tick: 10, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire(STALE_SELF_ID, 'player')] }),
     )
     c.deliver(
       encodeJson(MsgType.State, {
@@ -117,7 +118,7 @@ describe('a client survives a snapshot that arrives between GameStart and Go', (
     // GameStart re-baselines the level, the entity map and lastSnapTick — but
     // NOT selfId. Then a snapshot of the NEW world arrives before Go, and in
     // that world id 257 is a door (measured: oldSeed=1 -> newSeed=48).
-    c.deliver(encodeJson(MsgType.GameStart, { seed: 48, players: [{ slot: 1, name: 'Friend' }], floor: 1 }))
+    c.deliver(encodeJson(MsgType.GameStart, { epoch: 0, seed: 48, players: [{ slot: 1, name: 'Friend' }], floor: 1 }))
     await flush()
     // The ROOT CAUSE, pinned on its own. GameStart re-baselines the level, the
     // entity map, the floor and lastSnapTick — everything about the run except,
@@ -129,7 +130,7 @@ describe('a client survives a snapshot that arrives between GameStart and Go', (
       "GameStart left the PREVIOUS run's entity id armed",
     ).toBe(-1)
     c.deliver(
-      encodeSnapshot({ tick: 3, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(STALE_SELF_ID, 'door')] }),
+      encodeSnapshot({ tick: 3, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire(STALE_SELF_ID, 'door')] }),
     )
     await flush()
 
@@ -149,7 +150,7 @@ describe('a client survives a snapshot that arrives between GameStart and Go', (
     // carries it, `self` is a real player again. (Without this leg the test would
     // also pass if the client simply never bound `self` to anything ever again.)
     c.deliver(encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: 512 } }))
-    c.deliver(encodeSnapshot({ tick: 4, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(512, 'player')] }))
+    c.deliver(encodeSnapshot({ tick: 4, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire(512, 'player')] }))
     await flush()
     const healed = (c.session as unknown as { self?: { archetype: string; playerCtl?: unknown } }).self
     expect(healed?.archetype, 'client never re-bound self after the new run started').toBe('player')

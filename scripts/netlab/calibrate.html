@@ -1,0 +1,100 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>netlab calibrate</title>
+<script>
+  // Driven by calibrate.mjs through page.evaluate. Host and guest each load this page.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+  // Send n numbered pings every intervalMs; a reply carries the seq back. Returns per-ping RTTs.
+  const pingLoop = async (send, onReply, { n = 200, intervalMs = 20, size = 64, timeoutMs = 3000 } = {}) => {
+    const sentAt = new Float64Array(n)
+    const rtts = []
+    onReply((buf) => {
+      const seq = new DataView(buf).getUint32(0)
+      if (seq < n && sentAt[seq] > 0) {
+        rtts.push(performance.now() - sentAt[seq])
+        sentAt[seq] = -1
+      }
+    })
+    for (let i = 0; i < n; i++) {
+      const b = new ArrayBuffer(size)
+      new DataView(b).setUint32(0, i)
+      sentAt[i] = performance.now()
+      send(b)
+      await sleep(intervalMs)
+    }
+    const end = performance.now() + timeoutMs
+    while (rtts.length < n && performance.now() < end) await sleep(20)
+    return { sent: n, rtts }
+  }
+
+  const openWs = (url) =>
+    new Promise((resolve, reject) => {
+      const ws = new WebSocket(url)
+      ws.binaryType = 'arraybuffer'
+      ws.onopen = () => resolve(ws)
+      ws.onerror = () => reject(new Error(`ws error ${url}`))
+    })
+
+  const waitGathered = (pc) =>
+    pc.iceGatheringState === 'complete'
+      ? Promise.resolve()
+      : new Promise((r) => pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()))
+
+  const waitOpen = (dc) => (dc.readyState === 'open' ? Promise.resolve() : new Promise((r) => (dc.onopen = r)))
+
+  const S = {}
+  window.netlab = {
+    // Host: echo every addressed frame back to the client it came from ([idLen][id][payload] is also the reply shape).
+    wsHostEcho: async (url) => {
+      S.hostWs = await openWs(url)
+      S.hostWs.onmessage = (e) => typeof e.data !== 'string' && S.hostWs.send(e.data)
+    },
+    wsClientPing: async (url, opts) => {
+      const ws = await openWs(url)
+      await new Promise((r) => {
+        ws.onmessage = (e) => typeof e.data === 'string' && JSON.parse(e.data).t === 'host+' && r()
+      })
+      const out = await pingLoop((b) => ws.send(b), (fn) => (ws.onmessage = (e) => typeof e.data !== 'string' && fn(e.data)), opts)
+      ws.close()
+      return out
+    },
+
+    dcOffer: async () => {
+      S.pc = new RTCPeerConnection({ iceServers: [] })
+      S.dc = S.pc.createDataChannel('ping', { ordered: false, maxRetransmits: 0 })
+      S.dc.binaryType = 'arraybuffer'
+      await S.pc.setLocalDescription(await S.pc.createOffer())
+      await waitGathered(S.pc)
+      return S.pc.localDescription.sdp
+    },
+    dcAnswer: async (offer) => {
+      S.pc = new RTCPeerConnection({ iceServers: [] })
+      S.pc.ondatachannel = (e) => {
+        e.channel.binaryType = 'arraybuffer'
+        e.channel.onmessage = (m) => e.channel.send(m.data)
+      }
+      await S.pc.setRemoteDescription({ type: 'offer', sdp: offer })
+      await S.pc.setLocalDescription(await S.pc.createAnswer())
+      await waitGathered(S.pc)
+      return S.pc.localDescription.sdp
+    },
+    dcAccept: async (answer) => {
+      await S.pc.setRemoteDescription({ type: 'answer', sdp: answer })
+      await waitOpen(S.dc)
+    },
+    dcPing: (opts) => pingLoop((b) => S.dc.send(b), (fn) => (S.dc.onmessage = (e) => fn(e.data)), opts),
+    dcSelectedPair: async () => {
+      const stats = [...(await S.pc.getStats()).values()]
+      const byId = new Map(stats.map((s) => [s.id, s]))
+      const transport = stats.find((s) => s.type === 'transport' && s.selectedCandidatePairId)
+      const pair = byId.get(transport?.selectedCandidatePairId)
+      if (!pair) return null
+      const cand = (id) => {
+        const c = byId.get(id)
+        return { type: c.candidateType, address: c.address, port: c.port, protocol: c.protocol }
+      }
+      return { state: pair.state, local: cand(pair.localCandidateId), remote: cand(pair.remoteCandidateId) }
+    },
+  }
+</script>

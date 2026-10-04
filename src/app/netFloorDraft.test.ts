@@ -22,6 +22,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -41,6 +42,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) =>
@@ -147,18 +149,18 @@ describe('floor draft over co-op', () => {
   })
 })
 
-describe('input wire: the draft tail is additive', () => {
+describe('input wire: the draft pick is an optional record tail', () => {
   const base: InputCmd = { ...emptyInput(), seq: 42, attack: true, hotbar: 1, aimX: 0, aimY: 1 }
   const edges = { attack: true, interact: false, special: false }
 
-  it('a command without a pick encodes exactly as before', () => {
-    expect(encodeInput(base, edges).length).toBe(9)
+  it('a command without a pick carries no pick byte', () => {
+    expect(encodeInput(base, edges).length).toBe(11)
     expect(decodeInput(encodeInput(base, edges)).cmd.draftPick).toBeUndefined()
-    expect(encodeInput({ ...base, modSwap: 5 }, edges).length).toBe(11)
+    expect(encodeInput({ ...base, modSwap: 5 }, edges).length).toBe(13)
   })
 
-  it('a pick rides after an empty swap slot and round-trips, card 0 included', () => {
-    for (const pick of [0, 1, 2, 254]) {
+  it('a pick costs one byte and round-trips, card 0 included', () => {
+    for (const pick of [0, 1, 2, 254, 255]) {
       const bytes = encodeInput({ ...base, draftPick: pick }, edges)
       expect(bytes.length).toBe(12)
       const { cmd } = decodeInput(bytes)
@@ -175,7 +177,7 @@ describe('input wire: the draft tail is additive', () => {
   })
 
   it('an unencodable pick is dropped, and a stray byte is never read as one', () => {
-    for (const bad of [-1, 255, 1000]) expect(encodeInput({ ...base, draftPick: bad }, edges).length).toBe(9)
+    for (const bad of [-1, 256, 1000]) expect(encodeInput({ ...base, draftPick: bad }, edges).length).toBe(11)
     const plain = encodeInput(base, edges)
     expect(decodeInput(new Uint8Array([...plain, 3])).cmd.draftPick).toBeUndefined()
   })

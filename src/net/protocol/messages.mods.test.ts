@@ -37,7 +37,7 @@ const wire = (over: Partial<WireEntity> = {}): WireEntity => ({
   ...over,
 })
 
-const snap = (entities: WireEntity[]): WireSnapshot => ({ tick: 10, floor: 1, alarm: 0, lastInputSeq: 0, entities })
+const snap = (entities: WireEntity[]): WireSnapshot => ({ tick: 10, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities })
 
 const roundTrip = (entities: WireEntity[]): WireSnapshot => decodeSnapshot(encodeSnapshot(snap(entities)))
 

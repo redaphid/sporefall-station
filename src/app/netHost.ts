@@ -13,18 +13,31 @@ import { decodeJson, encodeJson } from '../net/framing/codec'
 import { StreamReader } from '../net/framing/chunkedStream'
 import {
   encodeSnapshot,
-  decodeInput,
+  decodeInputBundle,
   toWireEntity,
   type GameStartMsg,
   type GoMsg,
   type HelloMsg,
   type InventoryMsg,
   type LobbyPlayer,
+  type PingMsg,
+  type PongMsg,
   type StateMsg,
   type WireEntity,
 } from '../net/protocol/messages'
-import { isKnownMsgType, MsgType, PROTOCOL_VERSION, SNAPSHOT_INTERVAL_TICKS, type PeerId, type Transport } from '../net/types'
+import {
+  isKnownMsgType,
+  MAX_PLAYERS,
+  MsgType,
+  PROTOCOL_VERSION,
+  SNAPSHOT_INTERVAL_TICKS,
+  type LinkPath,
+  type PeerId,
+  type Transport,
+} from '../net/types'
 import type { RenderView, Session } from './session'
+import { foldInputRecord, newInputState, takeTickInput, type InputState } from './inputGate'
+import { linkHealth, type LinkStatus } from './linkHealth'
 
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
 const STATE_INTERVAL_TICKS = 15 // 2Hz
@@ -36,38 +49,22 @@ const STATE_INTERVAL_TICKS = 15 // 2Hz
  */
 export const SNAPSHOT_ENTITY_CAP = 48
 
-/**
- * Max simultaneous players in one run (host + clients). Slots run 0..MAX_PLAYERS-1;
- * the host always owns slot 0, so up to MAX_PLAYERS-1 remote clients may join.
- * Raised from 4→8 for large local groups (stress/8-players). NOTE: over BLE the
- * host peripheral's radio caps concurrent centrals well below this (commonly ~7,
- * device-specific) — this constant is the protocol/sim ceiling, not a promise the
- * transport can carry it. The BroadcastChannel/web path has no such radio limit.
- */
-export const MAX_PLAYERS = 8
 const MAX_SLOT = MAX_PLAYERS - 1
 
-interface PeerState {
+interface PeerState extends InputState {
+  peer: PeerId
   slot: number
   name: string
   token: string
   queue: SendQueue
   reader: StreamReader
-  lastInputSeq: number
-  latestCmd: InputCmd
-  pendingEdges: number
-  /** Hotbar slot the client tapped since the last tick consumed one (-1 = none).
-   * Edge-triggered like the button edges: applied once, then reset, so a single
-   * tap equips exactly once instead of re-equipping every tick. */
-  pendingHotbar: number
-  /** Mod reorder the client asked for since the last tick consumed one
-   * (undefined = none). Edge-latched exactly like `pendingHotbar`. */
-  pendingModSwap?: number
-  /** Floor-draft card the client tapped (undefined = none), latched like `pendingModSwap`. */
-  pendingDraftPick?: number
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
+  /** Clock reading of this peer's newest byte. */
+  lastHeardAt: number
+  /** The round trip this client last reported in its Ping. */
+  rttMs: number | null
 }
 
 /** A dropped mid-game player who may still rejoin. */
@@ -97,6 +94,9 @@ export class NetHostSession implements Session {
   started = false
   private runEpoch = 0
   onLobbyChange?: (players: LobbyPlayer[]) => void
+  /** Fires just before each tick with the slot → command map it will run,
+   * remote players included, so a state-share ring can record it. */
+  onTickInputs?: (inputs: Map<number, InputCmd>) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
   debugInventorySends = 0
 
@@ -109,12 +109,17 @@ export class NetHostSession implements Session {
     private transport: Transport,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
+    private now: () => number = () => performance.now(),
+    /** Floor 1 of a run. An authored world (one not built from its seed) is
+     * played as given; a seeded one is populated at Start. */
+    private makeWorld: (seed: number, mode: RunMode) => World = (seed, mode) => createWorld(seed, 1, mode),
   ) {
     this.world = this.freshWorld()
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onPeerConnected(ev.peer)
       else if (ev.type === 'peerDisconnected') this.onPeerLost(ev.peer)
-      else if (ev.type === 'data') this.onData(ev.peer, ev.bytes)
+      else if (ev.type === 'data') this.onData(ev.peer, ev.bytes, ev.datagram === true)
+      else if (ev.type === 'pathChanged') this.onPathChanged(ev.peer, ev.path)
     })
   }
 
@@ -132,6 +137,23 @@ export class NetHostSession implements Session {
     await Promise.all(peers.map((p) => p.queue.flushed()))
     for (const p of peers) p.queue.stop()
     await this.transport.stop()
+  }
+
+  /** The host's link chip: its worst admitted player. Online clients ping once a
+   * second and the host streams to them, so a quiet peer is a struggling one. */
+  linkStatus(): LinkStatus {
+    let silent = 0
+    let rtt: number | null = null
+    let path: LinkPath | undefined
+    for (const p of this.peers.values()) {
+      if (p.slot < 0) continue
+      silent = Math.max(silent, this.now() - p.lastHeardAt)
+      if (p.rttMs !== null) rtt = Math.max(rtt ?? 0, p.rttMs)
+      // Anyone on the relay makes the chip say Relay: they set the pace.
+      const via = this.transport.pathOf?.(p.peer)
+      if (via && path !== 'relay') path = via
+    }
+    return { health: this.started ? linkHealth(silent) : 'good', rttMs: rtt, path, session: 'live' }
   }
 
   lobbyPlayers(): LobbyPlayer[] {
@@ -156,6 +178,7 @@ export class NetHostSession implements Session {
   private gameStartMsg(): GameStartMsg {
     return {
       seed: this.seed,
+      epoch: this.runEpoch & 0xff,
       players: this.lobbyPlayers(),
       mode: this.world.mode,
       floor: this.world.floor,
@@ -163,15 +186,17 @@ export class NetHostSession implements Session {
   }
 
   private freshWorld(): World {
-    return createWorld(this.seed, 1, this.mode)
+    return this.makeWorld(this.seed, this.mode)
   }
 
   /** Host presses Start: build the world, spawn everyone, tell clients. */
   beginGame(): void {
     if (this.started) return
     this.started = true
-    populateWorld(this.world)
-    setupFloor(this.world)
+    if (this.world.levelChecksumFromSeed !== undefined) {
+      populateWorld(this.world)
+      setupFloor(this.world)
+    }
     const hostAt = playerSpawnPoint(this.world.level, 0)
     this.self = spawnPlayer(this.world, 0, hostAt.x, hostAt.y)
     const entityIds: Record<number, number> = { 0: this.self.id }
@@ -223,31 +248,8 @@ export class NetHostSession implements Session {
     if (!this.started) return
     this.inputs.clear()
     this.inputs.set(0, this.localInput.sample())
-    for (const p of this.peers.values()) {
-      // Edges accumulated between input packets get OR-ed into this tick's command.
-      const cmd = { ...p.latestCmd }
-      cmd.attack ||= (p.pendingEdges & 1) !== 0
-      cmd.interact ||= (p.pendingEdges & 2) !== 0
-      cmd.special ||= (p.pendingEdges & 4) !== 0
-      cmd.roll = (p.pendingEdges & 8) !== 0 // edge only — never a sticky held bit
-      cmd.throwItem = (p.pendingEdges & 16) !== 0 // Use/Throw is a tap, not a sticky held bit
-      // Hotbar equip is edge-triggered too: apply the tapped slot once, then clear
-      // it, so a single tap doesn't re-equip every tick until the next packet.
-      cmd.hotbar = p.pendingHotbar
-      p.pendingHotbar = -1
-      delete cmd.modSwap
-      if (p.pendingModSwap !== undefined) {
-        cmd.modSwap = p.pendingModSwap
-        p.pendingModSwap = undefined
-      }
-      delete cmd.draftPick
-      if (p.pendingDraftPick !== undefined) {
-        cmd.draftPick = p.pendingDraftPick
-        p.pendingDraftPick = undefined
-      }
-      p.pendingEdges = 0
-      this.inputs.set(p.slot, cmd)
-    }
+    for (const p of this.peers.values()) this.inputs.set(p.slot, takeTickInput(p))
+    this.onTickInputs?.(this.inputs)
     tickWorld(this.world, this.inputs)
     this.expireGhosts()
 
@@ -338,6 +340,7 @@ export class NetHostSession implements Session {
       p.queue.queueSnapshot(
         encodeSnapshot({
           tick: this.world.tick,
+          epoch: this.runEpoch,
           floor: this.world.floor,
           alarm: this.world.alarm,
           lastInputSeq: p.lastInputSeq,
@@ -401,6 +404,8 @@ export class NetHostSession implements Session {
   private onPeerConnected(peer: PeerId): void {
     // Slot assigned on HELLO; until then just track the queue/reader.
     const state: PeerState = {
+      ...newInputState(),
+      peer,
       slot: -1,
       name: '',
       token: '',
@@ -409,11 +414,9 @@ export class NetHostSession implements Session {
         isValidStart: isKnownMsgType,
         onDesync: () => this.streamDesyncs++,
       }),
-      lastInputSeq: 0,
-      latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false, roll: false },
-      pendingEdges: 0,
-      pendingHotbar: -1,
       lastInvSig: '',
+      lastHeardAt: this.now(),
+      rttMs: null,
     }
     this.peers.set(peer, state)
   }
@@ -451,10 +454,21 @@ export class NetHostSession implements Session {
     }
   }
 
-  private onData(peer: PeerId, bytes: Uint8Array): void {
+  private onData(peer: PeerId, bytes: Uint8Array, datagram: boolean): void {
     const p = this.peers.get(peer)
     if (!p) return
-    p.reader.push(bytes, (msg) => this.onMessage(peer, p, msg))
+    p.lastHeardAt = this.now()
+    if (datagram) this.onMessage(peer, p, bytes)
+    else p.reader.push(bytes, (msg) => this.onMessage(peer, p, msg))
+  }
+
+  /** The peer's direct link died, and reliable messages in flight on it are
+   * gone: a "play again" GameStart/Go among them would leave the guest refusing
+   * every snapshot of the new run. Say the admission again (it is idempotent,
+   * and resends the inventory too); State repeats on its own. */
+  private onPathChanged(peer: PeerId, path: LinkPath): void {
+    const p = this.peers.get(peer)
+    if (p && p.slot >= 0 && path === 'relay') this.reanswerAdmission(p)
   }
 
   private onMessage(_peer: PeerId, p: PeerState, msg: Uint8Array): void {
@@ -466,30 +480,31 @@ export class NetHostSession implements Session {
     }
   }
 
+  /** Tell a peer no, then hang up on it where the transport can, so a refused
+   * player does not keep holding a seat on the relay. */
+  private refuse(p: PeerState, reason: string): void {
+    p.queue.queueReliable(encodeJson(MsgType.Reject, { reason }))
+    const transport = this.transport
+    if (transport.drop) void p.queue.flushed().then(() => transport.drop?.(p.peer))
+  }
+
   private handleMessage(p: PeerState, msg: Uint8Array): void {
     const type = msg[0]
+    if (type === MsgType.Ping) {
+      const ping = decodeJson<PingMsg>(msg)
+      if (typeof ping.rtt === 'number' && Number.isFinite(ping.rtt)) p.rttMs = ping.rtt
+      const pong: PongMsg = { t: ping.t }
+      p.queue.queueProbe(encodeJson(MsgType.Pong, pong))
+      return
+    }
     if (type === MsgType.Input) {
-      const { cmd, edges } = decodeInput(msg)
-      // Only fold in a packet that actually advances the input sequence (u16 wrap
-      // allowed). A stale/reordered/duplicated packet must NOT re-arm its edges —
-      // OR-ing them in again would dodge-roll / throw / equip a SECOND time the
-      // player never asked for (edges must fire once, not re-fire on a re-delivery).
-      if (cmd.seq > p.lastInputSeq || p.lastInputSeq - cmd.seq > 30000) {
-        p.lastInputSeq = cmd.seq
-        p.latestCmd = cmd
-        p.pendingEdges |= edges
-        // A hotbar tap is an edge: latch the requested slot so the next tick equips
-        // it once even if the packet arrived between ticks (OR-ed like the edges).
-        if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
-        if (cmd.modSwap !== undefined) p.pendingModSwap = cmd.modSwap
-        if (cmd.draftPick !== undefined) p.pendingDraftPick = cmd.draftPick
-      }
+      for (const rec of decodeInputBundle(msg)) foldInputRecord(p, rec)
       return
     }
     if (type === MsgType.Hello) {
       const hello = decodeJson<HelloMsg>(msg)
       if (hello.v !== PROTOCOL_VERSION) {
-        p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'version mismatch — update the game' }))
+        this.refuse(p, 'version mismatch — update the game')
         return
       }
 
@@ -520,7 +535,7 @@ export class NetHostSession implements Session {
       if (this.started && hello.rejoin) {
         const ghost = this.ghosts.get(hello.rejoin.slot)
         if (!ghost || ghost.token !== hello.rejoin.token) {
-          p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'rejoin window expired' }))
+          this.refuse(p, 'rejoin window expired')
           return
         }
         // The parked avatar is STUNNED, not invulnerable, so a patrol can finish
@@ -533,9 +548,7 @@ export class NetHostSession implements Session {
         const parked = this.world.byId.get(ghost.entityId)
         if (!parked || parked.dead) {
           this.ghosts.delete(ghost.slot)
-          p.queue.queueReliable(
-            encodeJson(MsgType.Reject, { reason: 'your character did not survive — rejoin for a fresh one' }),
-          )
+          this.refuse(p, 'your character did not survive — rejoin for a fresh one')
           return
         }
         this.ghosts.delete(ghost.slot)
@@ -572,7 +585,7 @@ export class NetHostSession implements Session {
         let slot = 1
         while (used.has(slot)) slot++
         if (slot > MAX_SLOT) {
-          p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
+          this.refuse(p, 'lobby full')
           return
         }
         p.slot = slot
@@ -601,7 +614,7 @@ export class NetHostSession implements Session {
       let slot = 1
       while (used.has(slot)) slot++
       if (slot > MAX_SLOT) {
-        p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
+        this.refuse(p, 'lobby full')
         return
       }
       p.slot = slot

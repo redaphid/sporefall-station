@@ -1,96 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { type Conn, planClose, planData, planOpen } from '../../worker/roomRelay'
 import type { TransportEvent } from '../types'
+import { CLOSED, Hub } from './testRelay'
 import { type WsLike, WsTransport } from './wsTransport'
-
-// ---------------------------------------------------------------------------
-// In-memory relay harness: fake sockets wired through the SAME pure planner the
-// Durable Object uses (roomRelay.ts). This exercises the full WsTransport <-> relay
-// loop deterministically, no workerd. The real DO adapter is covered by e2e.
-// ---------------------------------------------------------------------------
-
-const CONNECTING = 0
-const OPEN = 1
-const CLOSED = 3
-
-class FakeSocket implements WsLike {
-  binaryType = 'blob'
-  readyState = CONNECTING
-  onopen: ((ev: unknown) => void) | null = null
-  onmessage: ((ev: { data: unknown }) => void) | null = null
-  onclose: ((ev: { code?: number; reason?: string }) => void) | null = null
-  onerror: ((ev: unknown) => void) | null = null
-  constructor(
-    readonly url: string,
-    private hub: Hub,
-  ) {}
-  send(data: ArrayBufferView | ArrayBuffer | string): void {
-    this.hub.onSend(this, data)
-  }
-  close(code?: number, reason?: string): void {
-    if (this.readyState === CLOSED) return
-    this.readyState = CLOSED
-    this.hub.onClose(this)
-    this.onclose?.({ code, reason })
-  }
-}
-
-class Hub {
-  private conns = new Map<FakeSocket, Conn>()
-  private seq = 0
-
-  /** The makeSocket factory handed to each transport. Parses ?role, registers the
-   * connection, then (async, like a real upgrade) opens it and fans out planOpen. */
-  connect = (url: string): WsLike => {
-    const sock = new FakeSocket(url, this)
-    const role = new URL(url).searchParams.get('role') === 'host' ? 'host' : 'client'
-    const conn: Conn = { conn: `k${++this.seq}`, role, clientId: role === 'client' ? `c-${this.seq}` : undefined }
-    this.conns.set(sock, conn)
-    queueMicrotask(() => {
-      sock.readyState = OPEN
-      sock.onopen?.({})
-      this.dispatch(planOpen(this.state(), conn.conn))
-    })
-    return sock
-  }
-
-  private state(): Conn[] {
-    return [...this.conns.values()]
-  }
-
-  private find(connId: string): FakeSocket | undefined {
-    for (const [sock, c] of this.conns) if (c.conn === connId) return sock
-    return undefined
-  }
-
-  onSend(sock: FakeSocket, data: ArrayBufferView | ArrayBuffer | string): void {
-    const conn = this.conns.get(sock)
-    if (!conn || typeof data === 'string') return
-    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-    this.dispatch(planData(this.state(), conn.conn, bytes))
-  }
-
-  onClose(sock: FakeSocket): void {
-    const conn = this.conns.get(sock)
-    if (!conn) return
-    const actions = planClose(this.state(), conn.conn)
-    this.conns.delete(sock)
-    this.dispatch(actions)
-  }
-
-  private dispatch(actions: ReturnType<typeof planData>): void {
-    for (const a of actions) {
-      if (a.kind !== 'send') continue
-      const target = this.find(a.conn)
-      if (!target || target.readyState !== OPEN) continue
-      const data = a.data instanceof Uint8Array ? bufferOf(a.data) : JSON.stringify(a.data)
-      queueMicrotask(() => target.onmessage?.({ data }))
-    }
-  }
-}
-
-/** Copy into a standalone ArrayBuffer (what a real arraybuffer-typed socket yields). */
-const bufferOf = (u: Uint8Array): ArrayBuffer => u.slice().buffer
 
 /** Let all queued microtasks drain (open handshakes, control fan-out, delivery). */
 const flush = async (): Promise<void> => {
@@ -113,7 +24,7 @@ describe('WsTransport over the relay planner', () => {
 
     await client.start()
     await flush()
-    // Client waits silently until the host arrives.
+    // A first-time joiner waits for the host: 'nohost' is not a departure.
     expect(cEvents).toEqual([])
 
     await host.start()
@@ -203,7 +114,7 @@ describe('WsTransport over the relay planner', () => {
     expect(host.peers()).toEqual([])
   })
 
-  it('the host dropping notifies each client', async () => {
+  it('the host dropping tells each client the host LEFT, not a link error', async () => {
     const hub = new Hub()
     const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
     const client = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
@@ -214,8 +125,116 @@ describe('WsTransport over the relay planner', () => {
 
     await host.stop()
     await flush()
-    expect(cEvents).toContainEqual({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
+    expect(cEvents).toContainEqual({ type: 'peerDisconnected', peer: 'host', reason: 'left' })
     expect(client.peers()).toEqual([])
+  })
+
+  it("the client's own socket dying is an error drop, never 'left'", async () => {
+    const hub = new Hub()
+    const sockets: WsLike[] = []
+    const connect = (url: string): WsLike => {
+      const s = hub.connect(url)
+      sockets.push(s)
+      return s
+    }
+    const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
+    const client = new WsTransport('client', 'r', 'ws://x/ws', connect)
+    const cEvents = collect(client)
+    await host.start()
+    await client.start()
+    await flush()
+
+    sockets[0].close(1006)
+    await flush()
+    expect(cEvents.filter((e) => e.type === 'peerDisconnected')).toEqual([
+      { type: 'peerDisconnected', peer: 'host', reason: 'error' },
+    ])
+  })
+
+  it("a replaced socket's late close cannot tear down the link that replaced it", async () => {
+    const hub = new Hub()
+    const sockets: WsLike[] = []
+    const connect = (url: string): WsLike => {
+      const s = hub.connect(url)
+      sockets.push(s)
+      return s
+    }
+    const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
+    const client = new WsTransport('client', 'r', 'ws://x/ws', connect)
+    const hEvents = collect(host)
+    await host.start()
+    await client.start()
+    await flush()
+
+    // A browser fires `close` some time after close() is called; by then the
+    // reconnect has opened its successor.
+    const old = sockets[0] as WsLike & { readyState: number }
+    const lateClose: { fire?: () => void } = {}
+    old.close = () => {
+      old.readyState = CLOSED
+      hub.onClose(old as never)
+      lateClose.fire = () => old.onclose?.({ code: 1000 })
+    }
+    await client.reconnect()
+    await flush()
+    lateClose.fire!()
+    await flush()
+
+    expect(client.peers()).toEqual(['host'])
+    await client.sendPacket('host', new Uint8Array([7, 7]))
+    await flush()
+    expect(hEvents.filter((e) => e.type === 'data').map((e) => (e.type === 'data' ? [...e.bytes] : []))).toEqual([[7, 7]])
+  })
+
+  it("a host's drop makes the relay hang up on that client, and only that client", async () => {
+    const hub = new Hub()
+    const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
+    const refused = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
+    const kept = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
+    const refusedEvents = collect(refused)
+    await host.start()
+    await refused.start()
+    await kept.start()
+    await flush()
+    const [refusedId] = host.peers()
+
+    await host.drop(refusedId)
+    await flush()
+    expect(refusedEvents).toContainEqual({ type: 'peerDisconnected', peer: 'host', reason: 'error' })
+    expect(refused.peers()).toEqual([])
+    expect(kept.peers()).toEqual(['host'])
+    expect(host.peers()).toHaveLength(1)
+  })
+
+  it('a client transport cannot drop anyone', async () => {
+    const hub = new Hub()
+    const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
+    const a = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
+    const b = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
+    await host.start()
+    await a.start()
+    await b.start()
+    await flush()
+    for (const id of host.peers()) await a.drop(id)
+    await flush()
+    expect(host.peers()).toHaveLength(2)
+  })
+
+  it("a client that comes back to a room its host has left hears it as 'left' at once", async () => {
+    const hub = new Hub()
+    const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
+    const client = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
+    const cEvents = collect(client)
+    await host.start()
+    await client.start()
+    await flush()
+    await host.stop()
+    await flush()
+    cEvents.length = 0
+
+    await client.reconnect()
+    await flush()
+    expect(cEvents).toEqual([{ type: 'peerDisconnected', peer: 'host', reason: 'left' }])
   })
 
   it('sendPacket rejects before the socket is open', async () => {

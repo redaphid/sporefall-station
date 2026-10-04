@@ -42,6 +42,7 @@ class ReplayHub {
   constructor() {
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -72,6 +73,7 @@ class ReplayHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) =>
@@ -179,7 +181,7 @@ const descend = async (host: NetHostSession, bob: ClientHandle): Promise<number>
 
 /** A snapshot the host never sent: one player entity, at `tick`, on `floor`. */
 const fakeSnapshot = (tick: number, floor: number, self: WireEntity): Uint8Array =>
-  encodeSnapshot({ tick, floor, alarm: 0, lastInputSeq: 0, entities: [self] })
+  encodeSnapshot({ tick, floor, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [self] })
 
 const wireSelf = (id: number, x: number, y: number): WireEntity => ({
   id,

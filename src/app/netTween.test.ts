@@ -40,6 +40,7 @@ class Hub {
   constructor() {
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -62,6 +63,7 @@ class Hub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => Promise.resolve().then(() => this.hostHandler?.({ type: 'data', peer, bytes })),
@@ -147,7 +149,7 @@ const rig = async (seed = 4242): Promise<Rig> => {
           tick,
           floor: 1,
           alarm: 0,
-          lastInputSeq: 0,
+          epoch: 0, lastInputSeq: 0,
           entities: [wire(selfId, selfPos.x, selfPos.y), ...others],
         }),
       )

@@ -24,6 +24,7 @@ const makeClient = () => {
   let handler: ((e: TransportEvent) => void) | null = null
   const transport: Transport = {
     role: 'client',
+    medium: 'local',
     maxPacket: 180,
     start: async () => {},
     stop: async () => {},
@@ -47,9 +48,10 @@ const SELF = 7
 const BOSS = 42
 const wire = (id: number, archetype: string): WireEntity => ({ id, archetype, x: 5, y: 5, facing: 0, hpPct: 1, flags: 0 })
 const snapshot = (tick: number, bossArchetype = 'boss'): Uint8Array =>
-  encodeSnapshot({ tick, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(SELF, 'player'), wire(BOSS, bossArchetype)] })
-const gameStart = (seed: number): Uint8Array =>
-  encodeJson(MsgType.GameStart, { seed, players: [{ slot: 1, name: 'Friend' }], floor: 1 })
+  encodeSnapshot({ tick, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire(SELF, 'player'), wire(BOSS, bossArchetype)] })
+/** `epoch` is the host's run counter: a new run, same seed or not, bumps it. */
+const gameStart = (seed: number, epoch = 0): Uint8Array =>
+  encodeJson(MsgType.GameStart, { epoch, seed, players: [{ slot: 1, name: 'Friend' }], floor: 1 })
 const go = (): Uint8Array => encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: SELF } })
 
 const admitted = async () => {
@@ -93,17 +95,29 @@ describe('a net client changes runEpoch only on a fresh run', () => {
     expect(c.session.renderView().runEpoch).toBe(epoch)
   })
 
+  it('keeps it, and the world, when the host repeats the admission mid-run', async () => {
+    const c = await admitted()
+    const epoch = c.session.renderView().runEpoch
+    c.deliver(encodeJson(MsgType.Welcome, { slot: 1, token: 'tok' }))
+    c.deliver(gameStart(1))
+    c.deliver(go())
+    await flush()
+    expect(c.session.phase).toBe('playing')
+    expect(c.session.renderView().runEpoch).toBe(epoch)
+    expect(c.session.renderView().entities.map((e) => e.id)).toContain(BOSS)
+  })
+
   it('changes it when the host starts a new run, same seed or new', async () => {
     const c = await admitted()
     const first = c.session.renderView().runEpoch
 
-    c.deliver(gameStart(1))
+    c.deliver(gameStart(1, 1))
     c.deliver(go())
     await flush()
     const second = c.session.renderView().runEpoch
     expect(second).not.toBe(first)
 
-    c.deliver(gameStart(48))
+    c.deliver(gameStart(48, 2))
     c.deliver(go())
     await flush()
     expect(c.session.renderView().runEpoch).not.toBe(second)
@@ -141,6 +155,7 @@ describe('a host changes runEpoch only on a fresh run', () => {
   it('a NET host changes it on "Run it back" and on "New Seed", and not while the run plays', () => {
     const transport: Transport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},

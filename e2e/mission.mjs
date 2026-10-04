@@ -1,13 +1,13 @@
 import { record } from './lib.mjs'
 
-// A full mission, start to finish: steal the briefcase (objective complete →
+// A full mission, start to finish: steal the canister (objective complete →
 // MISSION COMPLETE banner, exit unlocks), then reach the exit to clear the floor.
 await record({
   name: 'e2e-mission',
   params: { mode: 'solo', seed: 7, scenario: 'mission', script: 'mission' },
   stills: [
     { tick: 20, label: '01-spawn' },
-    { tick: 170, label: '02-approach-briefcase' },
+    { tick: 170, label: '02-approach-canister' },
     { tick: 205, label: '03-mission-complete' },
     { tick: 245, label: '04-exit-open' },
     { tick: 292, label: '05-reach-exit' },

@@ -57,7 +57,7 @@ export const SCENES: readonly Scene[] = [
   {
     name: 'tide-and-thunder',
     title: 'Tide and Thunder',
-    hook: 'Three hound packs in a flooding street grid, and a shock pistol.',
+    hook: 'Three hound packs in a flooding causeway grid, and a shock pistol.',
     tryThis: 'Hold the dry island and wait for the tide. Shock a wet hound and the arc jumps through the pack.',
     tags: ['hound packs', 'bog tide', 'shock'],
   },

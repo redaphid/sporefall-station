@@ -11,8 +11,8 @@ import { createWorld, tickWorld } from './world'
  * Spawn safety — the "beaten to death at spawn before your first input" bug.
  *
  * With `world.hostile` (default), every NPC engages players on sight. Before
- * the SPAWN_SAFE_RADIUS guard, street life could populate right next to the
- * fixed floor-1 spawn: on seed 7 a bat-wielding civilian spawned 2.2 tiles
+ * the SPAWN_SAFE_RADIUS guard, causeway life could populate right next to the
+ * fixed floor-1 spawn: on seed 7 a wrench-wielding civilian spawned 2.2 tiles
  * away and downed an idle player by tick ~111. Sweeping seeds 1..100, 8%
  * died within 10 idle seconds. These tests pin the guard and the grace.
  */
@@ -39,17 +39,17 @@ const buildRun = (seed: number) => {
   return { w, p }
 }
 
-const streetTile = (t: number): boolean => t === Tile.Street || t === Tile.Sidewalk
+const causewayTile = (t: number): boolean => t === Tile.Causeway || t === Tile.Boardwalk
 
-describe('street life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => {
-  it('no street/sidewalk NPC within the radius, seeds 1..60', () => {
+describe('causeway life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => {
+  it('no causeway/boardwalk NPC within the radius, seeds 1..60', () => {
     for (let seed = 1; seed <= 60; seed++) {
       const w = createWorld(seed, 1, 'normal')
       populateWorld(w)
       for (const e of w.entities) {
         if (e.kind !== 'npc') continue
         const tile = w.level.tiles[Math.floor(e.pos.y) * w.level.w + Math.floor(e.pos.x)]
-        if (!streetTile(tile)) continue // interior NPCs are exempt: walls block sight
+        if (!causewayTile(tile)) continue // interior NPCs are exempt: walls block sight
         const d = Math.hypot(e.pos.x - w.level.spawn.x, e.pos.y - w.level.spawn.y)
         expect(d, `seed ${seed}: ${e.archetype}#${e.id} at ${e.pos.x},${e.pos.y}`).toBeGreaterThanOrEqual(
           SPAWN_SAFE_RADIUS,
@@ -58,7 +58,7 @@ describe('street life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => 
     }
   })
 
-  it('street patrol beats never route a waypoint into the spawn-safe zone', () => {
+  it('causeway patrol beats never route a waypoint into the spawn-safe zone', () => {
     for (let seed = 1; seed <= 60; seed++) {
       const w = createWorld(seed, 1, 'normal')
       populateWorld(w)

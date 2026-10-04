@@ -79,7 +79,7 @@ const FACTION_LABEL: Record<string, string> = {
 
 /** Human name for whichever weapon/throwable/consumable id we can resolve. */
 const itemName = (id: string): string =>
-  id === 'briefcase'
+  id === 'canister'
     ? 'Specimen Canister'
     : (WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id))
 
@@ -293,7 +293,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
         card.tagline = 'Use it to patch up'
       } else if (e.pickup.itemId === 'cash') {
         card.tagline = 'Money — grab it'
-      } else if (e.pickup.itemId === 'briefcase') {
+      } else if (e.pickup.itemId === 'canister') {
         card.tagline = 'The specimen canister — this is what you came for'
       }
     }

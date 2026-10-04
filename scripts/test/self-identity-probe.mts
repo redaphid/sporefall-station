@@ -14,7 +14,7 @@ const fakeSelfFromWire = (archetype: string) =>
 
 for (const arch of ['player', 'boss', 'mutant', 'table']) {
   const self: any = fakeSelfFromWire(arch)
-  const hud = { cash: 5, weapon: 'pistol', abilityCd: 0, bandages: 0, briefcase: false }
+  const hud = { cash: 5, weapon: 'pistol', abilityCd: 0, bandages: 0, canister: false }
   let threw: string | null = null
   try {
     // VERBATIM netClient.ts:472-477

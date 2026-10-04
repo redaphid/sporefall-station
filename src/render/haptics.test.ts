@@ -77,7 +77,7 @@ const harness = (over: Partial<GameSettings> = {}): Harness => {
     hapticsIntensity: 0.7,
     effectsQuality: 'high',
     shaderFx: 'full',
-    theme: 'city',
+    theme: 'settlement',
     flags: {},
     fullscreen: true,
     ...over,

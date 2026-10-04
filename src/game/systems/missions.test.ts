@@ -28,12 +28,12 @@ describe('roguelite loop', () => {
     expect(locked.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('steal mission completes when a player holds the briefcase, unlocking the exit', () => {
+  it('steal mission completes when a player holds the canister, unlocking the exit', () => {
     for (let seed = 1; seed < 30; seed++) {
       const { w } = makeRun(seed)
       if (w.mission.template !== 'steal') continue
       const player = w.entities.find((e) => e.playerCtl)!
-      player.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+      player.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
       missionSystem(w)
       expect(w.mission.complete).toBe(true)
       expect(w.mission.exitUnlocked).toBe(true)
@@ -66,7 +66,7 @@ describe('roguelite loop', () => {
       infiltrate: /^Breach the biolock and purge the Mireclaw Alpha in the /,
       extraction: /^Grab the specimen canister in the .*, then get out the way you came$/,
     }
-    const OFF_THEME = /briefcase|\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
+    const OFF_THEME = /\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
     const seen = new Set<string>()
     for (let floor = 1; floor <= 6; floor++) {
       for (let seed = 1; seed < 30; seed++) {

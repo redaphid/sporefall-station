@@ -20,12 +20,12 @@ import { floodLinked, stairReservedKeys } from './stairs'
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
 export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
 
-/** No street-life NPC (or street patrol waypoint) may be placed closer than this
+/** No causeway-life NPC (or causeway patrol waypoint) may be placed closer than this
  * to the player spawn. Sized past the LONGEST NPC sight range (8) so that with
  * `world.hostile` (every NPC engages players on sight) nobody can already see —
  * and beeline for — the spawn tile on tick 0. Before this guard, ~8% of seeds
  * beat an idle just-spawned player to death within 10 seconds (seed 7 among
- * them: a bat civilian 2.2 tiles from spawn). Building interiors are exempt —
+ * them: a wrench civilian 2.2 tiles from spawn). Building interiors are exempt —
  * walls block sight, and the door is the player's choice to open. */
 export const SPAWN_SAFE_RADIUS = 9
 
@@ -37,7 +37,7 @@ export const SPAWN_SAFE_RADIUS = 9
  * same seed → same layout, whatever the arsenal does. */
 const NPC_ARSENAL: [string, number][] = [
   ['knife', 5],
-  ['bat', 5],
+  ['wrench', 5],
   ['pistol', 5],
   ['shotgun', 2],
   ['machinegun', 2],
@@ -116,10 +116,10 @@ export const populateWorld = (w: World): void => {
   for (let i = 0; i < w.level.buildings.length; i++) {
     populateBuilding(w, rng, wrng, w.level.buildings[i], i)
   }
-  // Indoor complex floors have no streets: the corridors get crew and
+  // Indoor complex floors have no causeways: the corridors get crew and
   // security beats instead (same `populate` stream position, own logic).
   if (w.level.complex) spawnCorridorLife(w, rng, wrng)
-  else spawnStreetLife(w, rng, wrng)
+  else spawnCausewayLife(w, rng, wrng)
   sprinkleLoot(w, rng)
   scatterModPickups(w)
   // #78 follow-up: seed the resist-differentiated Sporefall roster into normal
@@ -743,7 +743,7 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
 }
 
 // WEAPONS ARE NOT LOOT. The player carries ONE permanent weapon and cannot pick
-// another up, so a gun on the floor would be a dead sparkle. The bat/knife that
+// another up, so a gun on the floor would be a dead sparkle. The wrench/knife that
 // used to open the basic table are simply GONE from it; the depth gate is
 // otherwise untouched, so floor 1 stays basic and the element throwables still
 // fold in as you descend, bringing the frost/fire/shock/sleep/poison systems
@@ -808,31 +808,31 @@ const stockShop = (w: World, rng: Rng, building: Building): void => {
   }
 }
 
-const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
+const spawnCausewayLife = (w: World, rng: Rng, wrng: Rng): void => {
   const wanderers = rng.int(4, 7)
   for (let i = 0; i < wanderers; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
+    const spot = randomCausewaySpot(w, rng, Tile.Boardwalk) ?? randomCausewaySpot(w, rng, Tile.Causeway)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
   // Scavengers: a couple of civ-faction gleaners drawn to loose loot, so the
-  // street competes with the players for unclaimed pickups.
+  // causeway competes with the players for unclaimed pickups.
   const scavengers = rng.int(1, 2)
   for (let i = 0; i < scavengers; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
+    const spot = randomCausewaySpot(w, rng, Tile.Boardwalk) ?? randomCausewaySpot(w, rng, Tile.Causeway)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng).ai!.behavior = 'scavenger'
   }
   const wardenPairs = 1 + Math.floor(w.floor / 3)
   for (let i = 0; i < wardenPairs; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Street)
+    const spot = randomCausewaySpot(w, rng, Tile.Causeway)
     if (spot) {
       const a = spawnNpc(w, 'warden', spot.x, spot.y, wrng)
       const b = spawnNpc(w, 'warden', spot.x + 0.8, spot.y, wrng)
-      // The pair walks a shared street beat instead of loitering at one corner.
+      // The pair walks a shared causeway beat instead of loitering at one corner.
       // Waypoints respect the spawn-safe radius too, so a beat never marches
       // the pair straight through the player's landing zone.
       const beat = [{ x: spot.x, y: spot.y }]
       for (let j = 0; j < 2; j++) {
-        const p = randomStreetSpot(w, rng, Tile.Street)
+        const p = randomCausewaySpot(w, rng, Tile.Causeway)
         if (p) beat.push(p)
       }
       assignPatrol(a, beat)
@@ -871,14 +871,14 @@ const distToSegment = (p: { x: number; y: number }, a: { x: number; y: number },
   return vlen(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
 }
 
-/** Indoor-complex replacement for street life: a few crew echoes drifting the
+/** Indoor-complex replacement for causeway life: a few crew echoes drifting the
  * corridors, and station-security pairs walking corridor beats. A beat is only
  * eligible when its WHOLE centreline stays outside the spawn-safe radius, so a
  * patrol never marches through the landing zone. */
 const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
   const wanderers = rng.int(CORRIDOR_WANDERERS[0], CORRIDOR_WANDERERS[1])
   for (let i = 0; i < wanderers; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Hall)
+    const spot = randomCausewaySpot(w, rng, Tile.Hall)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
   const beats = (w.level.complex?.corridors ?? [])
@@ -1080,7 +1080,7 @@ const randomFloorInBuilding = (
   rng: Rng,
   building: Building,
   /** An occupant: on a complex floor the gatehouse rooms sit right by the
-   * airlock, so keep the spawn-safe radius clear (as street life does). */
+   * airlock, so keep the spawn-safe radius clear (as causeway life does). */
   occupant = false,
 ): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -1099,7 +1099,7 @@ const randomFloorInBuilding = (
 /** A random tile of `tile` type outside the spawn-safe radius, as a tile-centre
  * world coord, or null. Every attempt draws the same two ints whether or not it
  * is rejected — determinism is per-seed, not per-layout. */
-const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: number } | null => {
+const randomCausewaySpot = (w: World, rng: Rng, tile: number): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 20; attempt++) {
     const tx = rng.int(1, w.level.w - 2)
     const ty = rng.int(1, w.level.h - 2)

@@ -5,8 +5,8 @@
     "background": "#0c1416",
     "uiAccent": "#46e078",
     "tiles": {
-      "street": "#16282c",
-      "sidewalk": "#23323a",
+      "causeway": "#16282c",
+      "boardwalk": "#23323a",
       "floor": "#2a3626",
       "wall": "#141a16",
       "grass": "#35511a",
@@ -56,30 +56,30 @@
     "exit": "Launch Bay"
   },
   "sprites": {
-    "tile.street": [
-      "tiles/street-0.png",
-      "tiles/street-1.png",
-      "tiles/street-2.png",
-      "tiles/street-3.png",
-      "tiles/street-4.png",
-      "tiles/street-5.png",
-      "tiles/street-6.png",
-      "tiles/street-7.png",
-      "tiles/street-8.png",
-      "tiles/street-9.png",
-      "tiles/street-10.png",
-      "tiles/street-11.png"
+    "tile.causeway": [
+      "tiles/causeway-0.png",
+      "tiles/causeway-1.png",
+      "tiles/causeway-2.png",
+      "tiles/causeway-3.png",
+      "tiles/causeway-4.png",
+      "tiles/causeway-5.png",
+      "tiles/causeway-6.png",
+      "tiles/causeway-7.png",
+      "tiles/causeway-8.png",
+      "tiles/causeway-9.png",
+      "tiles/causeway-10.png",
+      "tiles/causeway-11.png"
     ],
-    "tile.street.accent": [
-      "tiles/street-accent-0.png",
-      "tiles/street-accent-1.png",
-      "tiles/street-accent-2.png"
+    "tile.causeway.accent": [
+      "tiles/causeway-accent-0.png",
+      "tiles/causeway-accent-1.png",
+      "tiles/causeway-accent-2.png"
     ],
-    "tile.sidewalk": [
-      "tiles/sidewalk-0.png",
-      "tiles/sidewalk-1.png",
-      "tiles/sidewalk-2.png",
-      "tiles/sidewalk-3.png"
+    "tile.boardwalk": [
+      "tiles/boardwalk-0.png",
+      "tiles/boardwalk-1.png",
+      "tiles/boardwalk-2.png",
+      "tiles/boardwalk-3.png"
     ],
     "tile.floor": [
       "tiles/floor-0.png",
@@ -527,7 +527,7 @@
     "prop.spore-node": "props/spore-node.png",
     "item.default": "items/biogel-kit.png",
     "item.pistol": "items/spore-pistol.png",
-    "item.bat": "items/root-club.png",
+    "item.wrench": "items/root-club.png",
     "item.knife": "items/shard-knife.png",
     "item.medkit": "items/biogel-kit.png",
     "item.cash": "items/credit-chits.png",
@@ -601,6 +601,6 @@
   },
   "macroTiles": {
     "floor": 2,
-    "street": 2
+    "causeway": 2
   }
 }

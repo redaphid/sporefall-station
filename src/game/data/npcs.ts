@@ -21,7 +21,7 @@ export interface NpcDef {
   retaliates?: boolean
   /** Behavior registry id (systems/behaviors.ts) newly spawned NPCs of this
    * archetype think with. Absent → 'basic'. Populate may override per-spawn
-   * (street wardens get a patrol beat, some civilians scavenge). */
+   * (causeway wardens get a patrol beat, some civilians scavenge). */
   behavior?: string
   /** #78 — damage AFFINITY table copied to `Entity.resist` at spawn: incoming
    * damage multiplier keyed by `'physical'` (impact/explosion) or an element id
@@ -44,7 +44,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'feral',
     hp: 40,
     speed: 3.4,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 7,
     hostility: 'always',
     fleesOnDamage: false,
@@ -53,7 +53,7 @@ export const NPCS: Record<string, NpcDef> = {
     // #69 Mireclaw Alpha: a phased apex predator, not a fat acolyte. Lives in
     // the spore (immune) and uses it as a lifeline in phase 2.
     //
-    // BALANCE (was hp 80 / bat / no physical resist — measured, not guessed;
+    // BALANCE (was hp 80 / wrench / no physical resist — measured, not guessed;
     // see scripts/test/boss-ttk-probe.ts). At 80hp the "apex predator" died in
     // 1.9s of pistol fire while an ORDINARY brute took 4.2s, so the boss was a
     // QUARTER of the fight of a rank-and-file enemy. Worse, its own three-phase
@@ -92,7 +92,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'warden',
     hp: 60,
     speed: 4.0,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 8,
     hostility: 'watchful',
     fleesOnDamage: false,
@@ -135,7 +135,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'civ',
     hp: 45,
     speed: 3.2,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 6,
     hostility: 'never',
     fleesOnDamage: false,
@@ -178,7 +178,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'feral',
     hp: 95,
     speed: 2.5,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -325,7 +325,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'feral',
     hp: 62,
     speed: 3.0,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,

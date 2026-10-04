@@ -5,8 +5,8 @@
     "background": "#200020",
     "uiAccent": "#ff00ff",
     "tiles": {
-      "street": "#3a003a",
-      "sidewalk": "#550055",
+      "causeway": "#3a003a",
+      "boardwalk": "#550055",
       "grass": "#660066",
       "wall": "#12001a"
     },

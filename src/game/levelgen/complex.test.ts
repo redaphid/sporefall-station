@@ -23,7 +23,7 @@ const spawnReach = (level: Level): Uint8Array => floodLinked(level, Math.floor(l
 const tile = (level: Level, x: number, y: number): number => level.tiles[y * level.w + x]
 
 /** Every tile a CITY floor may lay and a complex floor may not. */
-const CITY_TILES: ReadonlySet<number> = new Set([Tile.Street, Tile.Sidewalk, Tile.WallCutNW, Tile.WallCutNE, Tile.WallCutSE, Tile.WallCutSW])
+const CITY_TILES: ReadonlySet<number> = new Set([Tile.Causeway, Tile.Boardwalk, Tile.WallCutNW, Tile.WallCutNE, Tile.WallCutSE, Tile.WallCutSW])
 
 /**
  * Index of the first tile failing `bad`, or -1 — the whole-grid sweeps below
@@ -140,7 +140,7 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
     }
   })
 
-  it('never lays a city tile: no street, sidewalk or bevelled corner indoors', () => {
+  it('never lays a city tile: no causeway, boardwalk or bevelled corner indoors', () => {
     for (const { level, tag } of sweep(60)) {
       // ASSERT PER FLOOR, NOT PER TILE — see the note above `firstTile`.
       const bad = firstTile(level, (t) => CITY_TILES.has(t))
@@ -540,7 +540,7 @@ describe('complex generator: adversarial inputs', () => {
   })
 
   it('overwrites whatever was in the grid (a dirty buffer cannot leak through)', () => {
-    const tilesA = new Uint8Array(LEVEL_W * LEVEL_H).fill(Tile.Street)
+    const tilesA = new Uint8Array(LEVEL_W * LEVEL_H).fill(Tile.Causeway)
     const tilesB = new Uint8Array(LEVEL_W * LEVEL_H)
     for (let i = 0; i < tilesB.length; i++) tilesB[i] = i % 10
     carveComplex(mulberry32(9).fork('x'), new TileGrid(LEVEL_W, LEVEL_H, tilesA), 'habitation')

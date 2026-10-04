@@ -8,7 +8,7 @@ variant): a fixed-seed PRNG, so re-running the script reproduces the pack
 byte-for-byte.
 
 Usage:  python3 scripts/assets/tilesets.py [outdir]
-Writes <outdir>/(grass|street|sidewalk|floor|wall|exit)-N.png and *-accent-N.png
+Writes <outdir>/(grass|causeway|boardwalk|floor|wall|exit)-N.png and *-accent-N.png
 Default outdir: public/themes/swampspace/tiles/
 """
 
@@ -187,9 +187,9 @@ def grass_accent(n: int) -> Image.Image:
     return p.im
 
 
-# ---- STREET: bog-water channel -------------------------------------------
+# ---- CAUSEWAY: bog-water channel -------------------------------------------
 
-def street(variant: int) -> Image.Image:
+def causeway(variant: int) -> Image.Image:
     p = TilePainter(2000 + variant, BOG_BASE)
     # Depth mottle
     for _ in range(p.rng.randint(3, 5)):
@@ -220,7 +220,7 @@ def street(variant: int) -> Image.Image:
     return p.im
 
 
-def street_accent(n: int) -> Image.Image:
+def causeway_accent(n: int) -> Image.Image:
     if n == 0:
         # Drifting spore bloom on the water
         p = TilePainter(2500, BOG_BASE)
@@ -258,9 +258,9 @@ def street_accent(n: int) -> Image.Image:
     return p.im
 
 
-# ---- SIDEWALK: raised deck plating ---------------------------------------
+# ---- BOARDWALK: raised deck plating ---------------------------------------
 
-def sidewalk(variant: int) -> Image.Image:
+def boardwalk(variant: int) -> Image.Image:
     p = TilePainter(3000 + variant, STEEL_BASE)
     # Two plates per tile, offset per variant, each with a lit top edge
     seam_y = 15 if variant % 2 == 0 else 11
@@ -451,8 +451,8 @@ def exit_tile(variant: int) -> Image.Image:
 
 GENERATORS = {
     "grass": (grass, 4, grass_accent, 3),
-    "street": (street, 4, street_accent, 2),
-    "sidewalk": (sidewalk, 4, None, 0),
+    "causeway": (causeway, 4, causeway_accent, 2),
+    "boardwalk": (boardwalk, 4, None, 0),
     "floor": (floor, 4, floor_accent, 2),
     "wall": (wall, 3, None, 0),
     "exit": (exit_tile, 1, None, 0),

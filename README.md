@@ -9,7 +9,7 @@ offline in a Capacitor Android app.
 > Shipping/CI setup lives in **[docs/deploy.md](docs/deploy.md)**.
 
 Procedurally generated city floors ·
-missions (steal the briefcase, take out the boss) · wardens, misdeed and alarm ·
+missions (steal the canister, take out the boss) · wardens, misdeed and alarm ·
 lockpicking, chloroform, grenades, downed-teammate revives.
 
 ## Play in a browser (dev)

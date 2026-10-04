@@ -9,7 +9,7 @@ import { populateWorld } from './populate'
 import { Tile, type Building, type Level } from './levelgen/level'
 import { itemClass } from './data/items'
 
-// The basic table lost its bat/knife when weapons stopped being loot, then lost
+// The basic table lost its wrench/knife when weapons stopped being loot, then lost
 // bandage/medkit to the nine-item cull — so "basic" is now cash alone. The depth
 // gate itself is unchanged (floor 1 basic, elements from floor 2); the element
 // pool is just down to the one throwable that survived.
@@ -171,7 +171,7 @@ describe('adversarial bounds — must not crash', () => {
   it('a level with zero buildings populates without throwing and drops no building loot', () => {
     const w = worldFromRows(walledRoom(12, 10), { seed: 3, floor: 4 })
     expect(() => populateWorld(w)).not.toThrow()
-    // No buildings => sprinkleLoot has nowhere to place; only street life spawns.
+    // No buildings => sprinkleLoot has nowhere to place; only causeway life spawns.
     expect(w.entities.some((e) => e.pickup)).toBe(false)
   })
 

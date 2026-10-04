@@ -41,13 +41,13 @@ describe('#77 territory — NPCs are bound to the module they spawn in', () => {
     }
   })
 
-  it('street-life roamers (spawned outside every building) carry no zone', () => {
+  it('causeway-life roamers (spawned outside every building) carry no zone', () => {
     // Any NPC the lookup places outside all buildings must be an unbound roamer.
     for (const seed of [2, 3, 13]) {
       const w = floor(seed)
       const roamers = allNpcs(w).filter((e) => buildingAt(w.level, e.pos.x, e.pos.y) === -1)
       for (const e of roamers) expect(e.ai!.zone, `seed ${seed} roamer ${e.id}`).toBeUndefined()
-      expect(roamers.length).toBeGreaterThanOrEqual(1) // street life exists
+      expect(roamers.length).toBeGreaterThanOrEqual(1) // causeway life exists
     }
   })
 })

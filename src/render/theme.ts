@@ -16,7 +16,7 @@ export const DEFAULT_THEME_ID = 'swampspace-hires'
 
 // The original 48px pack stays the fallback BASE of every resolution chain, so
 // any sprite the active pack doesn't map falls through to it (and then to
-// procedural art) rather than going blank. The old city/test packs are no
+// procedural art) rather than going blank. The old settlement/test packs are no
 // longer supported.
 export const BASE_THEME_ID = 'swampspace'
 
@@ -65,7 +65,7 @@ export const CHAR_NAMES = ['player', 'warden', 'mutant', 'civilian', 'scientist'
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
   // The group roster (systems/groups.ts) — canonical for the same reason.
   'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
-export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
+export const ITEM_IDS = ['pistol', 'wrench', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
 // The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
 // `crate` are canonical for the same reason `boss` is above: a prop key that is
 // not listed here is not canonical, so validateManifest DROPS the mapping and
@@ -86,8 +86,8 @@ export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.e
  * corridor `hall`, vent `grate`, ceramic `tiled`, tread `plating`, the outer
  * pressure `hull` (wall family) and the `bog` seep flooding the deck. */
 export const TILE_NAMES = [
-  'street',
-  'sidewalk',
+  'causeway',
+  'boardwalk',
   'floor',
   'wall',
   'grass',
@@ -192,14 +192,14 @@ export interface ThemeManifest {
 }
 
 /** A manifest bound to the folder it loaded from (dir is app-root-relative,
- * with trailing slash, e.g. "themes/city/"). */
+ * with trailing slash, e.g. "themes/settlement/"). */
 export interface LoadedTheme {
   id: string
   dir: string
   manifest: ThemeManifest
 }
 
-/** Resolution order: active theme first, default (city) last. May be empty —
+/** Resolution order: active theme first, default (settlement) last. May be empty —
  * everything then falls back to built-in procedural art + built-in names. */
 export type ThemeChain = readonly LoadedTheme[]
 
@@ -428,7 +428,7 @@ export const resolveSpritePaths = (key: string, chain: ThemeChain): string[] | u
  * art pipeline names frames `<kind>-<dir>-<state>.png` (spritesheet.py
  * --kind), so the file mapped to `char.<name>.s-idle` names the body:
  * `chars/spore-drone-s-idle.png` is a `spore-drone`. A name whose file breaks
- * the convention (city's `warden/front-idle.png`) or is unmapped gets no entry. */
+ * the convention (settlement's `warden/front-idle.png`) or is unmapped gets no entry. */
 export const charArtKinds = (chain: ThemeChain): Record<string, string> => {
   const out: Record<string, string> = {}
   for (const name of CHAR_NAMES) {

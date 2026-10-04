@@ -355,8 +355,8 @@ export class NetHostSession implements Session {
         cash: e.playerCtl.cash,
         weapon: e.combat?.weapon ?? 'fists',
         abilityCd: e.playerCtl.abilityCooldown,
-        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
-        briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'canister').reduce((n, s) => n + s.qty, 0),
+        canister: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister'),
         ...(e.playerCtl.draft ? { draft: e.playerCtl.draft } : {}),
       }
     }

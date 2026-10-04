@@ -42,6 +42,6 @@ them.
   emergent crowd-control fights — lean into **environmental combos** (electrified
   + wet, burning + oil) for co-op set-pieces (ties into the gameplay-experiments
   skill).
-- The `steal the briefcase` mission with a locked exit is a clean salvage skeleton —
+- The `steal the canister` mission with a locked exit is a clean salvage skeleton —
   idea: **alarm-gated exit** where raising the alarm locks more doors, rewarding
   stealth, punishing the run-and-gun that currently gets you swarmed.

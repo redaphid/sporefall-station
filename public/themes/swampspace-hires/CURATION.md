@@ -60,7 +60,7 @@ palette (`scripts/assets/palette.py`), no dither, hard alpha.
 Characters: 48×48, feet bottom-center. The player and **frog-settler** have all
 5 drawn directions with 8-frame walk cycles; the other NPCs ship s-idle/s-step and borrow the rest via manifest fallback chains
 (`manifest.py` mentions every one of the 70 char keys so nothing falls back to
-the city theme's human sprites mid-walk).
+the settlement theme's human sprites mid-walk).
 
 **Step frames are img2img from that direction's curated idle** (denoise 0.38,
 prompt delta only "mid-stride, one leg forward") — txt2img steps flickered
@@ -92,7 +92,7 @@ like costume changes against their idles in the walk cycle.
 Contact sheets: `docs/assets/swampspace/{pack,tiles,chars,props,items,fx}.png`;
 in-game capture: `docs/assets/swampspace/ingame-swampspace.png`.
 
-## Floor/street macro redesign (fix/floor-tile-structure)
+## Floor/causeway macro redesign (fix/floor-tile-structure)
 
 The original interior floors shipped as uniform bright-green speckle over dark
 plates ("confetti moss") and the bog repeated identical ripple dash clusters.
@@ -104,16 +104,16 @@ Both surfaces were rebuilt by `scripts/assets/tilesets_floor.py`:
   denoise 0.3, seeds 90210/90223, seamless offset+heal) → k-centroid 64 →
   heal to the close-valued FLOOR_FAMILY ramp → `restamp_floor` re-asserts
   seams/rivets/buckled-plate roots. (Denoise 0.4 washed the plates — rejected.)
-- `tile.street` (12 variants) = three procedural 64px macros (seeds 8000-8002;
+- `tile.causeway` (12 variants) = three procedural 64px macros (seeds 8000-8002;
   ring / drift / calm — the big ripple bloom lands on ~1/3 of cells). The SD
-  pass was A/B'd and REJECTED for streets: it broke ring containment at macro
+  pass was A/B'd and REJECTED for causeways: it broke ring containment at macro
   borders and brightened the calm water.
 - `tile.floor.overlay` (4 RGBA decals, seeds 9500+37n) — context-placed moss
   (wall bases / corners / door thresholds / plate seams) via
   `src/render/tileSelect.ts planTileOverlays`; art is procedural (clumps with
   dark MOSS_DEEP rims, mass biased to the tile's top edge).
 - `floor-accent-{0,1}` rebased onto the plate deck (seeds 9000/9100);
-  `street-accent-2` is a new lily/scum feature tile (seed 8500).
+  `causeway-accent-2` is a new lily/scum feature tile (seed 8500).
 - Whole-screen judgement shots (seed 11, zoom 0.5/1/2):
   `~/Videos/backseat/floor-redesign-*.png`.
 

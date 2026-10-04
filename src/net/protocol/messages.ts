@@ -54,13 +54,13 @@ export const ARCHETYPES = [
   'projectile',
   'grenade',
   'door',
-  'pickup.bat',
+  'pickup.wrench',
   'pickup.knife',
   'pickup.pistol',
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
   'pickup.cash',
-  'pickup.briefcase',
+  'pickup.canister',
   'acolyte',
   'lockkeeper',
   // Everything below was spawnable but MISSING from this registry, so
@@ -579,14 +579,14 @@ export interface StateMsg {
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
-   * with the total quantity of every carried stack except the briefcase, which
+   * with the total quantity of every carried stack except the canister, which
    * is what it always was. Bandages themselves were culled. The field survives
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<
     number,
-    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+    { cash: number; weapon: string; abilityCd: number; bandages: number; canister: boolean; draft?: DraftHand }
   >
 }
 

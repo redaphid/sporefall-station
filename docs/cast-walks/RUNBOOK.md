@@ -36,7 +36,7 @@ Rules that bite: G1 heirloom gear, re-tailored, quilted liners, stitches, old pa
 1. **Family and hook.** Name the family (§5 A-E) and one line on what only this character does in the colony. Canon uses four of the queue as family anchors (§6): mycologist and bog-mutant for C, derelict-bot for D, spore-drone for E. §5C is written against the green hulk: the warp is asymmetric and partial, it respects the gear it eats, and the person stays legible inside it. The other fourteen have no canon entry: take the role from the archetype's comment in `src/game/data/npcs.ts` and choose the family yourself.
 2. **"Could this exist in any other swamp?"** The answer is no, and the reason reads in the outline at 96 px (L3), not only in the name.
 3. **Not the archetype id.** `mutant`, `warden`, `acolyte` and `shopkeeper` are Streets of Rogue leftovers, not briefs (Aaron: "not lore-appropriate names"). `generate.py` briefs `mutant` as "a huge hulking swamp mutant brute": that is the Hulk.
-4. **No stock weapon in the sprite.** No bat, knife or pistol; the renderer draws the held weapon (`src/render/weaponArt.ts`). A beast holds nothing and bites or claws (Aaron: "dogs shouldn't have knives").
+4. **No stock weapon in the sprite.** No wrench, knife or pistol; the renderer draws the held weapon (`src/render/weaponArt.ts`). A beast holds nothing and bites or claws (Aaron: "dogs shouldn't have knives").
 5. **Prompt laws.** Describe shapes, materials and colours; never name a familiar creature or object you do not want drawn literally (L2). Never write "silhouette" in a prompt (LORE_GROUNDING: it renders a black figure). It stays a drawing, never a photo (§8.3). Echoes follow G6, G7 and L1.
 
 Procedure:

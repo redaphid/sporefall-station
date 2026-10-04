@@ -3,7 +3,7 @@
 // MELEE weapon, replays the `meleeSwing` timeline (march into the mutant line and
 // hold the attack), and captures a still per beat + an asserted mp4. Three cuts:
 //   1. a plain SLEDGEHAMMER (big hammer silhouette, wide overhead arc),
-//   2. a plain BAT (tapered club, faster cadence),
+//   2. a plain WRENCH (tapered club, faster cadence),
 //   3. a sledgehammer with the INCENDIARY mod — the weapon wears the fire-orange
 //      pickup hue + a glow, proving mods mutate the held sprite.
 // The swing is deterministic (a pure function of the attack window), so the same
@@ -28,7 +28,7 @@ const armed = (weaponId, mods) => {
 }
 
 // Stills straddle the swing window so at least one lands mid-arc (attack cadence
-// is deterministic: sledgehammer 28 ticks, bat 15 — several swings across 150).
+// is deterministic: sledgehammer 28 ticks, wrench 15 — several swings across 150).
 const stills = [
   { tick: 20, label: '01-armed' },
   { tick: 150, label: '02-marching' },
@@ -58,9 +58,9 @@ const cuts = [
     expect: (s) => [s.weapon !== 'sledgehammer' && 'not wielding the sledgehammer', s.mutantsAlive === 3 && 'sledge never connected', s.gameOver && 'unexpected game over'],
   },
   {
-    name: 'weapon-swing-bat',
-    world: armed('bat', undefined),
-    expect: (s) => [s.weapon !== 'bat' && 'not wielding the bat', s.gameOver && 'unexpected game over'],
+    name: 'weapon-swing-wrench',
+    world: armed('wrench', undefined),
+    expect: (s) => [s.weapon !== 'wrench' && 'not wielding the wrench', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'weapon-swing-sledgehammer-incendiary',

@@ -65,7 +65,7 @@ export interface ArtRegistry {
    * and for themes whose wall art carries no cap. Bevelled corners bake their
    * own caps into `tile()`. */
   wallCap(tileId: number): WallCapTextures | undefined
-  /** Soft seam strip for a boundary where a LOWER surface (street water) meets
+  /** Soft seam strip for a boundary where a LOWER surface (causeway water) meets
    * a higher one (deck/grass) — drawn on the lower tile's edge. */
   groundSeam(side: OverlaySide): Texture
   entity(archetype: string): Texture
@@ -132,7 +132,7 @@ export interface WallCapTextures {
 }
 
 export interface SpriteTextures {
-  /** Themed tile art, keyed by tile NAME (street/sidewalk/floor/wall/grass/
+  /** Themed tile art, keyed by tile NAME (causeway/boardwalk/floor/wall/grass/
    * exit): each entry is a non-empty variant pool the tilemap alternates by
    * coordinate hash. Absent name → procedural art for that tile. */
   tiles?: Record<string, Texture[]>
@@ -164,7 +164,7 @@ export interface SpriteTextures {
   chars?: Record<string, CharSet>
   /** The drawn body behind each set in `chars`, same keys (theme.charArtKinds). */
   charKinds?: Record<string, string>
-  /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
+  /** Per-item pickup sprites, keyed by item id (wrench/knife/medkit/…). */
   items?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/atm/…). */
   props?: Record<string, Texture>
@@ -200,7 +200,7 @@ export interface ArtPalette {
  * at a glance. Do NOT trim this to 'compensate' for the art having landed.
  *
  * Deliberately NOT the collision radius: entity radius stays 0.35 so the boss
- * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the bat's
+ * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the wrench's
  * 1.3) is what makes the extra bulk felt in the fight.
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
@@ -223,7 +223,7 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   // characterSet() below tries sprites.chars[archetype] BEFORE sprites.chars[alias]
   // — so the Alpha already uses its own set with no change on this line. Pointing
   // this at 'boss' instead would gain nothing and would cost the graceful
-  // degradation: packs without the Alpha art (city, test) fall back to the mutant
+  // degradation: packs without the Alpha art (settlement, test) fall back to the mutant
   // body here rather than to a procedural blob. Membership of this map is also
   // what isCharacterSprite() tests, so the key cannot simply be removed.
   boss: 'mutant',
@@ -306,7 +306,7 @@ export const PROP_SPRITE: Record<string, string> = {
   // The mess chair now has art of its own, so it stops drawing procedurally.
   // FURNITURE_SHAPE.chair stays exactly where it is: the sprite wins when the
   // theme ships one, and the bespoke silhouette is still the right fallback for
-  // packs (city, test) that do not.
+  // packs (settlement, test) that do not.
   chair: 'chair',
   // Station machinery reuses the terminal/console art (previously fell through
   // to the character eyeball). The Cryo Terminal object is literally that art.
@@ -321,7 +321,7 @@ export const PROP_SPRITE: Record<string, string> = {
   crate: 'crate',
   // The sporeforge furnishings. Each of these has a FURNITURE_SHAPE entry
   // directly below and KEEPS it: the sprite wins wherever a theme ships one,
-  // and the drawn silhouette stays the fallback for the packs (city, test)
+  // and the drawn silhouette stays the fallback for the packs (settlement, test)
   // that do not. Deleting those would regress every theme without prop art.
   shelf: 'shelf',
   bunk: 'bunk',
@@ -368,7 +368,7 @@ export const ITEM_ALIAS: Record<string, string> = {
   tranquilizer: 'pistol',
   stunGun: 'pistol',
   // Blunt melee wears the root-club.
-  sledgehammer: 'bat',
+  sledgehammer: 'wrench',
 }
 
 // Archetypes with a dedicated character sprite; the rest reuse the warden body.
@@ -389,8 +389,8 @@ const STEP_ARCHETYPES: Record<string, keyof SpriteTextures> = {
 
 /** palette.tiles is name-keyed (pure layer, no Tile enum); map back to ids. */
 const TILE_ID_BY_NAME: Record<string, number> = {
-  street: Tile.Street,
-  sidewalk: Tile.Sidewalk,
+  causeway: Tile.Causeway,
+  boardwalk: Tile.Boardwalk,
   floor: Tile.Floor,
   wall: Tile.Wall,
   grass: Tile.Grass,
@@ -408,8 +408,8 @@ const TILE_ID_BY_NAME: Record<string, number> = {
 }
 
 const TILE_COLORS: Record<number, number> = {
-  [Tile.Street]: 0x33333c,
-  [Tile.Sidewalk]: 0x4c4c56,
+  [Tile.Causeway]: 0x33333c,
+  [Tile.Boardwalk]: 0x4c4c56,
   [Tile.Floor]: 0x63523f,
   [Tile.Wall]: 0x1b1b24,
   [Tile.Grass]: 0x2e5d3a,
@@ -620,7 +620,7 @@ export const createArt = (
         }
         break
       }
-      case Tile.Street: {
+      case Tile.Causeway: {
         // Asphalt speckle (cracks tile too visibly with only 3 variants)
         for (let i = 0; i < 8; i++) {
           const x = hash2(i, variant * 17) * T
@@ -629,7 +629,7 @@ export const createArt = (
         }
         break
       }
-      case Tile.Sidewalk: {
+      case Tile.Boardwalk: {
         g.rect(0, 0, T, 1).fill({ color: 0xffffff, alpha: 0.08 })
         g.rect(0, 0, 1, T).fill({ color: 0xffffff, alpha: 0.06 })
         break
@@ -1345,7 +1345,7 @@ export const createArt = (
         break
       }
       case 'club': {
-        // Tapered bat: thin at the grip, fat at the business end.
+        // Tapered wrench: thin at the grip, fat at the business end.
         g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).fill(wood)
         g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).stroke({ width: 1, color: 0x3a2410, alpha: 0.5 })
         g.circle(grip + 2, my, 2.5).fill(0x5a3a1a) // pommel knob

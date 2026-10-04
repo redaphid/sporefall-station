@@ -9,7 +9,7 @@
 // this script after changing the setup below. Copy this file to craft another.
 //
 // Legend (src/game/levelgen/levelText.ts): # wall  . floor  + tiled floor
-// ~ bog  , grass  - sidewalk  E exit  @ player spawn  1-4 bevelled corners
+// ~ bog  , grass  - boardwalk  E exit  @ player spawn  1-4 bevelled corners
 
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'

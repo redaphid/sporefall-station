@@ -55,12 +55,12 @@ NAMES = {
 
 PALETTE_SECTION = {
     # canvas + procedural colors keep the Flashback Titan mood for anything
-    # that has no sprite (streets, grass, exit pad, procedural blobs).
+    # that has no sprite (causeways, grass, exit pad, procedural blobs).
     "background": "#0c1416",
     "uiAccent": "#46e078",
     "tiles": {
-        "street": "#16282c",     # phosphorescent shallows / flooded deck
-        "sidewalk": "#23323a",   # walkway grating
+        "causeway": "#16282c",     # phosphorescent shallows / flooded deck
+        "boardwalk": "#23323a",   # walkway grating
         "floor": "#2a3626",      # (procedural fallback under tile.floor)
         "wall": "#141a16",
         "grass": "#35511a",      # bog overgrowth
@@ -101,7 +101,7 @@ CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
 CHAR_FILES["boss"] = "mireclaw-alpha"
 
 ITEM_KEYS = {  # engine item id -> our themed file (items table key)
-    "pistol": "spore-pistol", "bat": "root-club", "knife": "shard-knife",
+    "pistol": "spore-pistol", "wrench": "root-club", "knife": "shard-knife",
     "medkit": "biogel-kit", "cash": "credit-chits", "shotgun": "scatter-blaster",
     "molotov": "phosphor-flask", "grenade-item": "spore-grenade",
 }
@@ -163,12 +163,12 @@ def build():
             sprites[key] = rels
         return len(rels)
 
-    for tile_name in ("street", "sidewalk", "floor", "wall", "grass", "exit"):
+    for tile_name in ("causeway", "boardwalk", "floor", "wall", "grass", "exit"):
         put_pool(f"tile.{tile_name}", f"tiles/{tile_name}-{{}}.png")
         put_pool(f"tile.{tile_name}.accent", f"tiles/{tile_name}-accent-{{}}.png")
         put_pool(f"tile.{tile_name}.overlay", f"tiles/{tile_name}-overlay-{{}}.png")
     # Character keys resolve *per key* against the theme chain, so any key we
-    # omit falls back to CITY's art — a spore-drone warden facing south would turn
+    # omit falls back to SETTLEMENT's art — a spore-drone warden facing south would turn
     # into a human warden when walking east. Mention every direction key
     # explicitly, borrowing within the theme (se→s, e→s, ne→e→s, n→s; step→idle)
     # until real art for that pose lands.
@@ -236,10 +236,10 @@ def build():
         "names": NAMES,
         "sprites": sprites,
         "anim": ANIM_SECTION,
-        # floor + street pools are sliced from 2x2-tile macro images
+        # floor + causeway pools are sliced from 2x2-tile macro images
         # (tilesets_floor.py); the renderer places slices by position so plate
         # seams / ripple rings span tiles (docs/themes.md "macroTiles").
-        "macroTiles": {name: 2 for name in ("floor", "street")
+        "macroTiles": {name: 2 for name in ("floor", "causeway")
                        if len(sprites.get(f"tile.{name}", [])) >= 4},
     }
     out = os.path.join(THEME, "manifest.json")

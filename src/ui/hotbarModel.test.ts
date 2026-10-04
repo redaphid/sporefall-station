@@ -3,12 +3,12 @@ import { hasThrowable, hotbarSlots, modBadge } from './hotbarModel'
 
 describe('hotbarSlots', () => {
   it('keeps each item pointing at its real inventory index across the filter', () => {
-    // Slot 0 is the permanent weapon and slot 1 the briefcase — both hidden — so
+    // Slot 0 is the permanent weapon and slot 1 the canister — both hidden — so
     // the surviving items must still carry their TRUE indices, or a tapped strip
     // position equips the wrong slot.
     const inv = [
       { itemId: 'pistol', qty: 1 },
-      { itemId: 'briefcase', qty: 1 },
+      { itemId: 'canister', qty: 1 },
       { itemId: 'grenade', qty: 2 },
       { itemId: 'bandage', qty: 3 },
     ]
@@ -25,7 +25,7 @@ describe('hotbarSlots', () => {
     // this list, so a shown weapon would also be a cyclable dead end.
     const inv = [
       { itemId: 'pistol', qty: 1 },
-      { itemId: 'bat', qty: 16 },
+      { itemId: 'wrench', qty: 16 },
       { itemId: 'shotgun', qty: 1 },
       { itemId: 'molotov', qty: 1 },
     ]

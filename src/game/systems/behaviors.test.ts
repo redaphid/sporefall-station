@@ -160,7 +160,7 @@ describe('hunter', () => {
     const w = arena()
     const player = spawnPlayer(w, 0, 10.5, 20.5)
     const hunter = spawnNpc(w, 'acolyte', 15.5, 20.5)
-    hunter.combat!.weapon = 'bat' // melee, so the demo is a chase not a shootout
+    hunter.combat!.weapon = 'wrench' // melee, so the demo is a chase not a shootout
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
     return { w, player, hunter }
   }
@@ -219,7 +219,7 @@ describe('hunter', () => {
     run(w, 400)
     // It went around the L, found the player hiding at the remembered spot and
     // engaged — deliberate pursuit, not a wall-grind, and never NaN. (Assert
-    // against the LIVE player: bat knockback herds the fighting pair around.)
+    // against the LIVE player: wrench knockback herds the fighting pair around.)
     expect(dist(hunter.pos, player.pos)).toBeLessThan(2.5)
     expect(['battle', 'pursue']).toContain(hunter.ai!.goal)
     expect(Number.isFinite(hunter.pos.x)).toBe(true)
@@ -336,7 +336,7 @@ describe('scavenger', () => {
   it('never loots the mission objective', () => {
     const w = arena()
     const s = scavenger(w, 20.5, 20.5)
-    const brief = pickupAt(w, 'briefcase', 22.5, 20.5)
+    const brief = pickupAt(w, 'canister', 22.5, 20.5)
     w.mission.targetEntityId = brief.id
     run(w, 300)
     expect(w.byId.has(brief.id)).toBe(true) // still on the floor for the players
@@ -387,7 +387,7 @@ describe('determinism (the sacred invariant)', () => {
     const sp = w.level.spawn
     const player = spawnPlayer(w, 0, sp.x, sp.y)
     const hunter = spawnNpc(w, 'acolyte', sp.x + 4, sp.y)
-    hunter.combat!.weapon = 'bat'
+    hunter.combat!.weapon = 'wrench'
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
     const civ = spawnNpc(w, 'civilian', sp.x + 2, sp.y + 2)
     const warden = spawnNpc(w, 'warden', sp.x + 12, sp.y)

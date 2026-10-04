@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 THEME = os.path.join(ROOT, "public/themes/swampspace-hires")
-TILE_ID = {"street": 0, "sidewalk": 1, "floor": 2, "wall": 3, "grass": 4, "exit": 5,
+TILE_ID = {"causeway": 0, "boardwalk": 1, "floor": 2, "wall": 3, "grass": 4, "exit": 5,
            "hall": 10, "grate": 11, "tiled": 12, "plating": 13, "hull": 14, "bog": 15}
 WALLS = {3, 6, 7, 8, 9, 14}
 INDOOR = ["hall", "grate", "tiled", "plating", "hull", "bog"]

@@ -1,7 +1,7 @@
 // Hero-art review recorder (art-cn1): drives the deterministic `artcompare`
 // script over the seed-7 / floor-1 combat-stage — the vine-ranger idles facing
 // the camera, walks a full compass circle showing every drawn facing, then
-// marches east into the frozen mutant line and swings a bat (the combat beat).
+// marches east into the frozen mutant line and swings a wrench (the combat beat).
 // One run captures idle + all 8 facings + combat, so the owner can A/B the hero
 // across builds at IDENTICAL on-screen framing:
 //   A) shipped engine (CHAR_PX 48) at zoom 2  -> 48px hero drawn 96px on screen

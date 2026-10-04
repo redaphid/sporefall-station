@@ -897,7 +897,7 @@ the threat level in a way that fits the arcade pace: every arena downs a passive
 player in 3.8 to 5.6 s, and the plain pistol loses at least half its fights.
 That is threat per fight, not longer fights. Carry the same calibration into the
 level generator: pack sizes, ranged foes that answer fire (#101), and wet
-streets where a stun gun is dangerous.
+causeways where a stun gun is dangerous.
 
 Prediction: once real floor-1 fights meet the arena calibration, the persona
 variety score rises without any change to the mod system, because the same

@@ -74,7 +74,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   it('a lone downed player bleeds the timer down and self-revives at low hp, dropping cash + items', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.playerCtl!.cash = 120
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 8 }]
+    p.loadout!.inventory = [{ itemId: 'wrench', qty: 8 }]
     p.loadout!.activeSlot = 0
     down(w, p)
     p.playerCtl!.downed!.bleedTicks = 4 // shorten the wait
@@ -84,7 +84,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
     expect(p.playerCtl!.cash).toBe(0)
-    // The carried bat drops, but the comeback re-grants a real slotted starter
+    // The carried wrench drops, but the comeback re-grants a real slotted starter
     // pistol (no phantom weapon) so mod pickups keep working post-revive.
     expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
     expect(p.loadout!.activeSlot).toBe(0)
@@ -95,7 +95,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
   it('a KEY item survives the comeback penalty (only non-key items drop)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.loadout!.inventory = [
-      { itemId: 'briefcase', qty: 1 }, // key
+      { itemId: 'canister', qty: 1 }, // key
       { itemId: 'pistol', qty: 6 }, // non-key
     ]
     down(w, p)
@@ -106,7 +106,7 @@ describe('solo: down → bleed-out → self-revive with penalty', () => {
     // re-granted starter pistol slotted ahead of the key.
     expect(p.loadout!.inventory).toEqual([
       { itemId: 'pistol', qty: 1 },
-      { itemId: 'briefcase', qty: 1 },
+      { itemId: 'canister', qty: 1 },
     ])
   })
 
@@ -228,7 +228,7 @@ describe('casual mode — forgiving (kid mode)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     w.revivesLeft = 0 // even with an empty pool, casual downs (never a real death)
     p.playerCtl!.cash = 77
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 3 }]
+    p.loadout!.inventory = [{ itemId: 'wrench', qty: 3 }]
     down(w, p)
     expect(p.dead).toBeFalsy()
     expect(p.playerCtl!.downed).toBeDefined()

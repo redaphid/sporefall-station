@@ -50,7 +50,7 @@ enough to **coach a plan on screen** (annotation-driven tutorials) or to run an
 
 1. **Design** the stages and role dependencies (each stage gated on the last).
 2. **Build a fixture:** seed a world, `applyScenario`/`spawn`/`set`/`teleport` the
-   guards, vault (`door.locked`, `lockLevel`), loot (briefcase), and crew, then
+   guards, vault (`door.locked`, `lockLevel`), loot (canister), and crew, then
    `serializeWorld` → `src/game/__fixtures__/<name>.json` from a
    `scripts/test/gen-*.mts` generator (fixed seed).
 3. **Script inputs** (`src/input/scripted.ts`, `?script=`) for the beats you want
@@ -69,7 +69,7 @@ await record({
     await page.evaluate(() => {
       window.__annotate('text "SALVAGE 1/6 — Case the joint"')
       window.__annotate('label target=VAULT_ID "VAULT — lockLevel 2"')
-      window.__annotate('pin target=LOOT_ID "LOOT: briefcase"')
+      window.__annotate('pin target=LOOT_ID "LOOT: canister"')
     })
   },
   stills: [
@@ -84,7 +84,7 @@ await record({
   }),
   expect: (s) => [
     ...(s.vaultOpen ? [] : ['vault never opened']),
-    ...(s.stolen ? [] : ['briefcase never stolen']),
+    ...(s.stolen ? [] : ['canister never stolen']),
   ],
 })
 ```

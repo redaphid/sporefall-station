@@ -86,8 +86,8 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
 describe('buildInfoCard — the weapon an NPC is carrying', () => {
   const weaponRow = (e: Entity): string | undefined => rowMap(buildInfoCard(e).rows).Weapon
 
-  it('an armed NPC names its weapon — a mutant swings a Bat, an acolyte a Pistol', () => {
-    expect(weaponRow(spawnNpc(world(), 'mutant', 5, 5))).toBe('Bat')
+  it('an armed NPC names its weapon — a mutant swings a Wrench, an acolyte a Pistol', () => {
+    expect(weaponRow(spawnNpc(world(), 'mutant', 5, 5))).toBe('Wrench')
     expect(weaponRow(spawnNpc(world(), 'acolyte', 5, 5))).toBe('Pistol')
   })
 
@@ -287,9 +287,9 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
     })
   }
 
-  it('cash and the mission briefcase read as flavor, quantity shows for stacks', () => {
+  it('cash and the mission canister read as flavor, quantity shows for stacks', () => {
     expect(buildInfoCard(pickup('cash', 1)).tagline).toMatch(/[Mm]oney/)
-    expect(buildInfoCard(pickup('briefcase')).tagline).toMatch(/goods|came for/)
+    expect(buildInfoCard(pickup('canister')).tagline).toMatch(/goods|came for/)
     expect(rowMap(buildInfoCard(pickup('medkit', 2)).rows).Item).toBe('Medkit ×2')
   })
 })

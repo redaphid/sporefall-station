@@ -99,7 +99,7 @@ describe('item behavior — new guns', () => {
 
   it('an electrified player cannot act (combat gated on immobilize)', () => {
     const e = player(w)
-    arm(e, 'bat')
+    arm(e, 'wrench')
     const target = dummy(w, 21, 20)
     e.fx = { electrified: { until: w.tick + 30 } }
     combatSystem(w, attack())
@@ -187,7 +187,7 @@ describe('item behavior — freeze then shatter (element combo through items)', 
 
   it('a thrown freeze followed by an impact from the permanent weapon shatters the target', () => {
     // Retargeted TWICE. First for ONE PERMANENT WEAPON: this used to freeze with
-    // a freeze RAY and then swap to a bat — two carried weapons, which a player
+    // a freeze RAY and then swap to a wrench — two carried weapons, which a player
     // can no longer have. Then for the item cull, which took freezeGrenade and
     // with it the thrown source of `frozen` this used as its stand-in.
     //
@@ -199,7 +199,7 @@ describe('item behavior — freeze then shatter (element combo through items)', 
     // ties the literal back to a source the game really has.
     const e = player(w, 20, 20)
     const target = dummy(w, 26, 20)
-    arm(e, 'bat')
+    arm(e, 'wrench')
     expect(WEAPONS.freezeRay.onHit!.status).toBe('frozen') // a real, surviving source
     // Applied from a distance — a blast radius would freeze the thrower too —
     // then the player closes in and swings.

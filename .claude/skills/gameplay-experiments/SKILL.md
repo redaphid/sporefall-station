@@ -63,7 +63,7 @@ Kinds (all accept an optional `text` rendered beside the shape):
 - `label` — **entity-anchored, engine-positioned**: `{kind:'label', targetId, text}`
   with no x/y → follows the sprite. Use for roles/targets ("Hacker: cut cameras",
   "VAULT — lockLevel 2", "Guard — posted at vault").
-- `pin` — a marker at a point/entity ("LOOT: briefcase").
+- `pin` — a marker at a point/entity ("LOOT: canister").
 - `arrow` — `{x,y,x2,y2,text}` for routes ("escape →").
 - `circle` — `{x,y,radius,text}` for zones ("danger zone").
 

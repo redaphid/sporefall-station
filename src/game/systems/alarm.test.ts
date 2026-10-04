@@ -4,7 +4,7 @@
 // systems (`runTicks` → `tickWorld`) and asserts on the world. The floor is the
 // seed-1 floor-1 city with `hostile = false`, so crew and watch stay calm and the
 // only thing moving the alarm is what the test does. The player stands on the
-// open street at y=1.5 aiming +x; witnesses stand behind it, out of the line of
+// open causeway at y=1.5 aiming +x; witnesses stand behind it, out of the line of
 // fire, so no bullet ever lands on one (that would be a misdeed, a different path).
 
 import { describe, expect, it } from 'vitest'
@@ -202,7 +202,7 @@ describe('an attack on a player, seen', () => {
   })
 
   it('nobody in sight → nothing (the only witness is behind a wall)', () => {
-    // (4.5, 5.5) is inside the building south of the street, walled off.
+    // (4.5, 5.5) is inside the building south of the causeway, walled off.
     const w = stage([['civilian', 4.5, 5.5], ['mutant', 7.5, 1.5]])
     const mutant = w.entities.find((e) => e.archetype === 'mutant')!
     applyDamage(w, player(w), 5, mutant.pos.x, mutant.pos.y, 0, mutant.id)
@@ -370,7 +370,7 @@ describe('the salvage finale maxes the alarm without a lockdown', () => {
 
   it('taking the prize (station alert) raises no lockdown on a quiet run', () => {
     const w = salvage()
-    player(w).loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    player(w).loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     idle(w, 2)
     expect(w.mission.complete).toBe(true)
     expect(w.mission.lockdownTick).toBeUndefined()
@@ -385,7 +385,7 @@ describe('the salvage finale maxes the alarm without a lockdown', () => {
     idle(w, LOCKDOWN_TICKS + 50) // long past the first cycle
     expect(exitSealed(w)).toBe(false)
     expect(lockdownView(w)).toEqual({}) // still shown: it waits on the objective
-    player(w).loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    player(w).loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     idle(w, 1)
     expect(w.mission.complete).toBe(true)
     expect(w.mission.lockdownTick).toBeGreaterThan(latched)

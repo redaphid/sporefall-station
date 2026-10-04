@@ -95,10 +95,10 @@ const write = (name: string, w: World, px: number, py: number, notes: Annotation
   ])
 }
 
-// ── Scene 4: downtown floor 5 — bevelled street corner + boulevard ───────────
+// ── Scene 4: downtown floor 5 — bevelled causeway corner + boulevard ───────────
 {
   const w = buildFloor(11, 5)
-  // First cut-corner tile with open street around it.
+  // First cut-corner tile with open causeway around it.
   let cut: { x: number; y: number } | null = null
   outer: for (let y = 0; y < w.level.h; y++) {
     for (let x = 0; x < w.level.w; x++) {

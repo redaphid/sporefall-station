@@ -166,7 +166,7 @@ export interface SpriteTextures {
   charKinds?: Record<string, string>
   /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
   items?: Record<string, Texture>
-  /** World prop sprites, keyed by archetype (barrel/atm/…). */
+  /** World prop sprites, keyed by archetype (barrel/vending-machine/…). */
   props?: Record<string, Texture>
   /** Fire flicker frames, cycled by the animator. */
   flames?: Texture[]
@@ -296,7 +296,6 @@ const NEW_ENEMY_CHARSET: Record<string, string> = {
 // draw (FURNITURE_SHAPE) instead of a bespoke texture.
 export const PROP_SPRITE: Record<string, string> = {
   barrel: 'barrel',
-  atm: 'atm',
   vending: 'vending-machine',
   tv: 'tv',
   toilet: 'toilet',
@@ -310,7 +309,7 @@ export const PROP_SPRITE: Record<string, string> = {
   chair: 'chair',
   // Station machinery reuses the terminal/console art (previously fell through
   // to the character eyeball). The Cryo Terminal object is literally that art.
-  cryoTerminal: 'atm',
+  cryoTerminal: 'cryo-terminal',
   generator: 'tv',
   // `crate` is not new art: public/themes/swampspace/props/cargo-crate.png has
   // shipped since the pack landed, but `crate` was never a registered sprite

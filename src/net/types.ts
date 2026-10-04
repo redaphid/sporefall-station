@@ -12,6 +12,9 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 10 — `StateMsg.extraction` is gone with the extraction mission, and `atm` is
+ *     a tombstone in `ARCHETYPES` (indices unchanged). 9 is claimed by a
+ *     pending branch.
  * 8 — four `ARCHETYPES` strings renamed in place (lore-rename codemod), and
  *     the `Faction` ids with them. Indices are unchanged, but an old peer would
  *     decode index 1 as an archetype this build no longer defines.
@@ -34,7 +37,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 8
+export const PROTOCOL_VERSION = 10
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

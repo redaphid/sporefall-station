@@ -3,7 +3,7 @@ import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { spawnObject } from '../game/systems/objects'
 import { makeEntity, type Entity } from '../game/entity'
-import { createWorld } from '../game/world'
+import { walledRoom, worldFromRows } from '../game/testkit'
 import { NPCS } from '../game/data/npcs'
 import { OBJECTS } from '../game/data/objects'
 import { THROWABLES, WEAPONS, CONSUMABLES } from '../game/data/items'
@@ -13,7 +13,7 @@ import { aiPhrase, buildInfoCard } from './inspectModel'
 const rowMap = (rows: { label: string; value: string }[]): Record<string, string> =>
   Object.fromEntries(rows.map((r) => [r.label, r.value]))
 
-const world = () => createWorld(1, 1)
+const world = () => worldFromRows(walledRoom(12, 12))
 
 describe('buildInfoCard — every NPC archetype in the game gets a full card', () => {
   for (const archetype of Object.keys(NPCS)) {
@@ -306,20 +306,19 @@ describe('buildInfoCard — world objects (every OBJECTS entry)', () => {
   }
 
   // The vending machine named a Burger until the item cull took it; it now
-  // returns change, so both dispensers state a cash amount. The row itself is
-  // what matters — a dispenser must always say what it pays out.
-  it('both dispensers say what they dispense', () => {
+  // returns change. The row itself is what matters — a dispenser must always
+  // say what it pays out.
+  it('a dispenser says what it dispenses', () => {
     const w = world()
-    expect(rowMap(buildInfoCard(spawnObject(w, 'atm', 1, 1)).rows).Dispenses).toBe('$50')
     expect(rowMap(buildInfoCard(spawnObject(w, 'vending', 2, 2)).rows).Dispenses).toBe('$10')
   })
 
   it('explosive props warn; a used dispenser says so', () => {
     const w = world()
     expect(buildInfoCard(spawnObject(w, 'barrel', 1, 1)).tagline).toMatch(/[Ee]xplosive/)
-    const atm = spawnObject(w, 'atm', 2, 2)
-    atm.used = true
-    expect(rowMap(buildInfoCard(atm).rows).State).toBe('Already used')
+    const vending = spawnObject(w, 'vending', 2, 2)
+    vending.used = true
+    expect(rowMap(buildInfoCard(vending).rows).State).toBe('Already used')
   })
 })
 

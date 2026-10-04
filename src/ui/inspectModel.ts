@@ -299,7 +299,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
     }
   }
 
-  // Interactive / destructible world object (crate, barrel, ATM, vending, …).
+  // Interactive / destructible world object (crate, barrel, vending, …).
   const obj = OBJECTS[e.archetype]
   if (obj) {
     if (obj.use) rows.push({ label: 'Dispenses', value: obj.use.gives === 'cash' ? `$${obj.use.amount ?? 0}` : itemName(obj.use.gives) })

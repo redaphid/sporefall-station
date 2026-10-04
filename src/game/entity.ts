@@ -436,7 +436,7 @@ export interface Entity {
   fire?: { fuel: number }
   /** Destroyed by shattering a frozen body — an ice gib, not a corpse. */
   shattered?: boolean
-  /** A usable object (ATM/vending) that has already dispensed once. */
+  /** A usable object (vending) that has already dispensed once. */
   used?: boolean
   dead?: boolean
   // ── #64 spore contamination (gated by systems/infection.ts INFECTION_ENABLED) ──

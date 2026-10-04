@@ -8,6 +8,7 @@ import { deserializeWorld, serializeWorld } from '../serialize'
 import { applyDamage, detonate } from './combat'
 import { interactionSystem, nearestInteractable, pickTicks } from './interaction'
 import { spawnObject } from './objects'
+import { walledRoom, worldFromRows } from '../testkit'
 
 const inputs = (...pairs: [number, InputCmd][]): Map<number, InputCmd> => new Map(pairs)
 const idleFor = (...ids: number[]): Map<number, InputCmd> => new Map(ids.map((id) => [id, emptyInput()]))
@@ -491,7 +492,7 @@ describe('auto-pickup', () => {
 describe('nearestInteractable', () => {
   let w: World
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = worldFromRows(walledRoom(30, 30))
   })
 
   it('returns null when nothing carries an interact component in range', () => {
@@ -509,7 +510,7 @@ describe('nearestInteractable', () => {
 
   it('respects each entity\'s own interact.range and ignores dead ones', () => {
     const p = spawnPlayer(w, 0, 20, 20)
-    const inRange = spawnObject(w, 'atm', 20, 20) // range 1.3, at ~20.5,20.5
+    const inRange = spawnObject(w, 'vending', 20, 20) // range 1.3, at ~20.5,20.5
     inRange.interact = { verb: 'use', range: 1.3 }
     const wideButDead = lockedDoor(w, 20.1, 20)
     wideButDead.dead = true

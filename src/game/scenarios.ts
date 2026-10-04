@@ -291,7 +291,7 @@ const setupShowcase = (w: World): void => {
   walker('acolyte', 8, 2, 3)
 
   // World props (real sprites, not shapes): a barrel by the fire that catches,
-  // plus an ATM and a vending machine as set dressing.
+  // plus a vending machine as set dressing.
   const prop = (arch: string, ox: number, oy: number, flammable = false): void => {
     const e = makeEntity('interactable', arch, x + ox + 0.5, y + oy + 0.5, 0.4)
     if (flammable) {
@@ -301,7 +301,6 @@ const setupShowcase = (w: World): void => {
     addEntity(w, e)
   }
   prop('barrel', 3, -1, true)
-  prop('atm', 1, -2)
   prop('vending', 2, -2)
 
   // Player and pickup both sit on the guaranteed-open stage row so a short walk

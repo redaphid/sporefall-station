@@ -15,9 +15,9 @@ import { MsgType } from '../types'
  *
  * ## `// RETIRED` entries are TOMBSTONES. Do not compact this list.
  *
- * Fourteen entries are marked `// RETIRED`: the nine culled items in every form
+ * Fifteen entries are marked `// RETIRED`: the nine culled items in every form
  * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
- * the floor). They name content that no longer exists, and a dead-code tool
+ * the floor), and the removed `atm`. They name content that no longer exists, and a dead-code tool
  * will call them unused. They are CLAIMED, not unused — the same argument as
  * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
  * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag
@@ -85,7 +85,7 @@ export const ARCHETYPES = [
   // from what one seed happened to spawn — see messages.archetypes.test.ts,
   // which now fails if any registry grows without this list growing with it.
   // Appended alphabetically in one block. APPEND ONLY, NEVER REORDER.
-  'atm',
+  'atm', // RETIRED
   'banana', // RETIRED
   'barrel',
   'barricade',
@@ -559,8 +559,6 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
-  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
-  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional

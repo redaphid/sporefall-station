@@ -52,13 +52,13 @@ const propInfo = await p1.evaluate(() => {
   const me = w.entities.find((e) => e.playerCtl && !e.dead)
   // Preference order: furniture first, then doors (themed "Bulkhead Hatch") —
   // some floors (e.g. seed 424242) spawn no crates/barrels at all.
-  const PROPS = ['crate', 'barrel', 'vending', 'atm', 'tv', 'toilet', 'door']
+  const PROPS = ['crate', 'barrel', 'vending', 'tv', 'toilet', 'door']
   const prop = PROPS.map((k) => w.entities.find((e) => !e.dead && e.archetype === k)).find(Boolean)
   if (!me || !prop) return null
   window.__verb(`teleport ${me.id} ${prop.pos.x + 1.2} ${prop.pos.y}`)
   return { prop: prop.archetype, x: prop.pos.x, y: prop.pos.y }
 })
-if (!propInfo) failures.push('no prop (crate/barrel/vending/atm/tv/toilet) found on floor to frame the prop shot')
+if (!propInfo) failures.push('no prop (crate/barrel/vending/tv/toilet) found on floor to frame the prop shot')
 await p1.waitForTimeout(500)
 const propShot = await snap(p1, 'swampspace-props')
 if (propInfo && spawnShot.equals(propShot)) failures.push('prop-framed shot identical to spawn shot — teleport did nothing')

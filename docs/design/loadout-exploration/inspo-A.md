@@ -465,7 +465,8 @@ power-cut biolocks, "breach-is-loud", and the `contain` / `infiltrate` templates
   it *"the highest ratio of new-feeling to lines-changed in the document."* Today
   `stationAlert` fires **after** the objective, so the escape it builds is a
   victory lap.
-- **Status: discussed only.** `src/game/systems/missions.ts` has no `extraction`.
+- **Status: shipped as #85, then removed (2026-10-04).** Ending a floor where it
+  began read as backtracking, so every floor's exit is the Launch Bay again.
 
 ### Floor modifiers — orthogonal to template
 

@@ -108,9 +108,7 @@ export const exitSealed = (w: World): boolean => {
 export const lockdownView = (w: World): { secondsLeft?: number } | undefined => {
   const at = w.mission.lockdownTick
   if (at === undefined) return undefined
-  // An extraction's cycle restarts at the grab, so it counts down while the prize is carried.
-  const running = w.mission.complete || (w.mission.template === 'extraction' && w.mission.alertTick !== undefined)
-  if (!running) return {}
+  if (!w.mission.complete) return {}
   if (!exitSealed(w)) return undefined
   return { secondsLeft: Math.ceil((at + LOCKDOWN_TICKS - w.tick) / 30) }
 }

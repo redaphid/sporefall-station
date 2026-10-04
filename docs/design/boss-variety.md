@@ -573,6 +573,9 @@ The machinery is identical — only the ordering changes. **The highest ratio of
 new-feeling to lines-changed in this document.** It also finally uses
 `broadcastAlert`, which is already built and barely exercised. **Small.**
 
+*Status (2026-10-04): shipped as #85, then removed. Walking back to the entry
+made every floor end where it began, so every floor's exit is now the Launch Bay.*
+
 **B. `holdout` — defend a point for N ticks.** Reuses `bloomTick` (a serialized
 countdown), `spawnEncounters` (`populate.ts:542`, already weighted by floor and
 theme), and `raiseFloorAggro`. The first mission the party cannot win by

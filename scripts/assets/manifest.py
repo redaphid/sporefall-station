@@ -43,7 +43,6 @@ NAMES = {
     "hivespire": "Hive Spire",
     "crate": "Cargo Pod",
     "barrel": "Spore Barrel",
-    "atm": "Cryo Terminal",
     "vending": "Nutrient Dispenser",
     "tv": "Console",
     "toilet": "Hydro Recycler",
@@ -106,7 +105,7 @@ ITEM_KEYS = {  # engine item id -> our themed file (items table key)
     "molotov": "phosphor-flask", "grenade-item": "spore-grenade",
 }
 PROP_KEYS = {  # engine prop name -> props table key
-    "barrel": "spore-barrel", "atm": "cryo-terminal",
+    "barrel": "spore-barrel", "cryo-terminal": "cryo-terminal",
     "vending-machine": "nutrient-dispenser", "tv": "wall-screen",
     "toilet": "hydro-recycler",
     # Furniture that USED to reuse another prop's art: a weapons locker wore the
@@ -117,7 +116,7 @@ PROP_KEYS = {  # engine prop name -> props table key
     # silent-revert hazard as prop.default below: this table is what `build()`
     # writes, so leaving it pointing at the old shared art means the next
     # regeneration quietly undoes the dedicated sprites and every locker goes
-    # back to being an ATM. Change art here and in the manifest together.
+    # back to being a cryo terminal. Change art here and in the manifest together.
     "locker": "weapons-locker", "cabinet": "supply-cabinet",
     "desk": "work-desk",
     # The mess chair. Same hazard as the line above: the `chair` archetype only

@@ -25,6 +25,7 @@ import { spawnPlayer } from '../../src/game/player'
 import { populateWorld } from '../../src/game/populate'
 import { applyScenario } from '../../src/game/scenarios'
 import { playerSpawnPoint } from '../../src/game/spawnPlacement'
+import { nearestInteractable } from '../../src/game/systems/interaction'
 import { setupFloor } from '../../src/game/systems/missions'
 import { emptyInput, type InputCmd } from '../../src/game/types'
 
@@ -196,6 +197,9 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
   const breachOnly = new Set<number>()
   const gateTicks = new Map<number, number>()
   const pickTries = new Map<number, number>()
+  let fireTarget = -1
+  let fireHp: number | undefined
+  let fireSince = 0
   let wasDowned = false
 
   while (floors.length < floorsToClear) {
@@ -236,7 +240,15 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
     const d = dist(p.pos, goal.at)
     const sees = clearShot(w, p.pos, goal.at)
     const busy = w.tick < waitUntil || !!p.playerCtl!.channel
-    if (goal.act === 'shoot' && d < SHOOT_RANGE && sees) {
+    // A shot that lands nothing for 3 s is clipping a wall corner: close in.
+    const hp = goal.ent?.health?.hp
+    if (goal.act === 'shoot' && goal.ent && (goal.ent.id !== fireTarget || hp !== fireHp)) {
+      fireTarget = goal.ent.id
+      fireHp = hp
+      fireSince = w.tick
+    }
+    const shotStalled = goal.act === 'shoot' && w.tick - fireSince > 90
+    if (goal.act === 'shoot' && d < SHOOT_RANGE && sees && !(shotStalled && d > 1.5)) {
       cmd.aimX = goal.at.x - p.pos.x
       cmd.aimY = goal.at.y - p.pos.y
       cmd.attack = true
@@ -274,8 +286,9 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
       if (stuckTicks > 15 || (doorOnRoute && dist(next, p.pos) < 1.6)) {
         const door = closedDoorAhead(w, p, next)
         const dd = door?.door
-        if (dd && !dd.locked && !dd.overgrown && dist(door!.pos, p.pos) > 1.2) {
-          // Out of reach of the panel: step up to the door first.
+        if (dd && !dd.locked && !dd.overgrown && (dist(door!.pos, p.pos) > 1.2 || nearestInteractable(w.entities, p) !== door)) {
+          // Out of reach of the panel, or something else would take the press:
+          // step up to the door first.
           const len2 = dist(door!.pos, p.pos)
           cmd.moveX = (door!.pos.x - p.pos.x) / len2
           cmd.moveY = (door!.pos.y - p.pos.y) / len2

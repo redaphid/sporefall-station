@@ -8,7 +8,8 @@
 // mutant ran AWAY from the player while marked, and the spore mutant was blinded.
 //
 // Needs a WebGL-capable browser: headless WSL chromium renders a black canvas,
-// so run it against a headed Chrome with E2E_CDP=http://localhost:9333.
+// so run it against a headed Chrome from `node scripts/own-chrome.mjs launch`,
+// with E2E_CDP set to the cdpUrl it prints.
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

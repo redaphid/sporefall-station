@@ -73,7 +73,11 @@ export const ITEM_IDS = ['pistol', 'wrench', 'knife', 'medkit', 'cash', 'shotgun
 // new art at all -- cargo-crate.png has shipped since the pack landed and was
 // only ever reachable as prop.default.
 export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
-  'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node'] as const
+  'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node',
+  // Indoor-complex dressing (render/indoorSkin.ts INDOOR_PROP_ART): drawn in
+  // place of the outdoor prop/door art on complex floors when a pack ships it.
+  'bulkhead-door', 'bulkhead-door-open', 'bulkhead-door-locked', 'generator', 'coolant-tank', 'cryo-bunk',
+  'freight-case', 'parts-rack'] as const
 const UNIT_SINGLES = ['player', 'warden'] as const
 const UNIT_WALKERS = ['mutant', 'scientist', 'robot'] as const
 
@@ -82,9 +86,9 @@ export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.e
 
 /** Tile names addressable from palette.tiles and tile.* sprite keys (mirrors the
  * Tile enum by name — the render layer maps them back to ids; the pure layer
- * stays game-free). The last six are the indoor-complex decks (floors 3+):
- * corridor `hall`, vent `grate`, ceramic `tiled`, tread `plating`, the outer
- * pressure `hull` (wall family) and the `bog` seep flooding the deck. */
+ * stays game-free). `hall` through `bog` are the indoor-complex decks (floors
+ * 3+): corridor `hall`, vent `grate`, ceramic `tiled`, tread `plating`, the
+ * outer pressure `hull` (wall family) and the `bog` seep flooding the deck. */
 export const TILE_NAMES = [
   'causeway',
   'boardwalk',
@@ -102,10 +106,17 @@ export const TILE_NAMES = [
   // niche at the top, open side south); the tilemap rotates them per shaft.
   'stair_up',
   'stair_down',
-  // Not a tile of its own: `tile.landing.overlay` is the chevron decal laid on
-  // the deck tile in front of a stair.
+  // The rest are not tiles of their own. `tile.landing.overlay` is the chevron
+  // decal laid on the deck tile in front of a stair; `deck`, `bulkhead` and
+  // `pillar` are SKINS an indoor-complex floor draws its Floor, Wall and lone
+  // pillar Wall tiles as (render/indoorSkin.ts), falling back to the plain
+  // tile's art when a pack ships none.
   'landing',
+  'deck',
+  'bulkhead',
+  'pillar',
 ] as const
+export type TileName = (typeof TILE_NAMES)[number]
 
 /** Wall-family tile names that take an autotiled cap (render/wallCaps.ts):
  * `tile.<name>.cap` is the lit top strip authored along the tile's NORTH edge
@@ -113,7 +124,7 @@ export const TILE_NAMES = [
  * the NW corner for concave corners. The tilemap rotates both to whichever
  * edges face open ground, so the cap line runs continuously; the wall body
  * art itself must then carry no cap. */
-export const WALL_CAP_NAMES = ['wall', 'hull'] as const
+export const WALL_CAP_NAMES = ['wall', 'hull', 'bulkhead'] as const
 
 /** tile.* sprite keys accept a single path OR an array: the array's entries are
  * VARIANTS the tilemap alternates deterministically by tile coordinate, so big

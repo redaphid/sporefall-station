@@ -42,6 +42,7 @@ import { Sound } from './sound'
 import { EntityViews } from './sprites'
 import { StatusFxLayer } from './statusShaders'
 import { TilemapView } from './tilemap'
+import { isIndoorLevel } from './indoorSkin'
 
 /** World-space label style for the lockpick prompt/toast (small, outlined). */
 const pickTextStyle = (fill: number): TextStyleOptions => ({
@@ -138,12 +139,12 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // a stable reference across runtime theme changes.
   let inner: ArtRegistry = await buildArt(chain)
   const art: ArtRegistry = {
-    tile: (id, v, tx, ty) => inner.tile(id, v, tx, ty),
-    tileOverlayPool: (id) => inner.tileOverlayPool(id),
+    tile: (id, v, tx, ty, skin) => inner.tile(id, v, tx, ty, skin),
+    tileOverlayPool: (id, skin) => inner.tileOverlayPool(id, skin),
     landingOverlay: (h) => inner.landingOverlay(h),
     tileMacro: (id) => inner.tileMacro(id),
     wallShadow: (s) => inner.wallShadow(s),
-    wallCap: (id) => inner.wallCap(id),
+    wallCap: (id, skin) => inner.wallCap(id, skin),
     groundSeam: (s) => inner.groundSeam(s),
     entity: (a) => inner.entity(a),
     entityFlash: (a, d) => inner.entityFlash(a, d),
@@ -481,6 +482,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     setLevel(level: Level): void {
       currentLevel = level
       tilemap.build(level, art)
+      entities.setIndoor(isIndoorLevel(level))
       tilemap.root.tint = floorTintFor(level, themeFloorTint)
       darkWing = null
       tideLayer.clear()

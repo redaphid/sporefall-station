@@ -95,6 +95,7 @@ export class NetHostSession implements Session {
   private ghosts = new Map<number, Ghost>()
   private inputs = new Map<number, InputCmd>()
   started = false
+  private runEpoch = 0
   onLobbyChange?: (players: LobbyPlayer[]) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
   debugInventorySends = 0
@@ -119,6 +120,18 @@ export class NetHostSession implements Session {
 
   async start(): Promise<void> {
     await this.transport.start()
+  }
+
+  /** Leave on purpose (Main menu): tell every peer the host left, let that
+   * reach the radio, then hang up. Peers end their run instead of waiting on a
+   * reconnect that can never come. */
+  async close(): Promise<void> {
+    const bye = encodeJson(MsgType.Bye, {})
+    const peers = [...this.peers.values()]
+    for (const p of peers) p.queue.queueReliable(bye)
+    await Promise.all(peers.map((p) => p.queue.flushed()))
+    for (const p of peers) p.queue.stop()
+    await this.transport.stop()
   }
 
   lobbyPlayers(): LobbyPlayer[] {
@@ -196,6 +209,7 @@ export class NetHostSession implements Session {
    */
   restart(seed?: number): void {
     if (seed !== undefined) this.seed = seed >>> 0
+    this.runEpoch++
     this.world = this.freshWorld()
     this.ghosts.clear()
     // Force a fresh inventory push after respawn: the new loadout must reach every
@@ -369,6 +383,7 @@ export class NetHostSession implements Session {
       entities: this.world.entities,
       events: this.world.events,
       tick: this.world.tick,
+      runEpoch: this.runEpoch,
       level: this.world.level,
       floor: this.world.floor,
       missionText: this.world.mission.description,

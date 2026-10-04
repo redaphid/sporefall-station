@@ -57,7 +57,7 @@ export const arm = (e: Entity, weaponId: string): ItemStack => {
 }
 
 /** A world on the sunken-streets CITY generator (raw-floor theme) for any floor.
- * Floors 3, 5, 7… build the indoor complex in play; tests of the city set-pieces
+ * Every floor from 3 builds the indoor complex in play; tests of the city set-pieces
  * (bunkers, courtyard compounds, vaults, industrial squads) use this to keep
  * them covered on any floor. To the engine this level is authored (it is not
  * what seed+floor generates), so a snapshot carries it whole. */

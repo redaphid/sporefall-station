@@ -8,7 +8,7 @@ import { spawnPlayer } from './player'
 import { deserializeWorld, serializeWorld, type WorldJson } from './serialize'
 import { playerSpawnPoint } from './spawnPlacement'
 import { nextFloor, setupFloor } from './systems/missions'
-import { createCityWorld, expectWorldEqual, loadFixtureJson, runTicks } from './testkit'
+import { createCityWorld, expectWorldEqual, loadFixture, loadFixtureJson, runTicks } from './testkit'
 import { emptyInput, type InputCmd } from './types'
 import { createWorld, tickWorld, worldFromSeed, worldFromState, type World } from './world'
 
@@ -134,38 +134,51 @@ describe('level text', () => {
 })
 
 describe('seeded worlds: the generator path is unchanged', () => {
-  const fnv = (s: string): number => {
-    let h = 0x811c9dc5
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i)
-      h = Math.imul(h, 0x01000193)
-    }
-    return h >>> 0
-  }
-
-  // FNV-1a and length of the serialized world after a populated 120-tick run,
-  // captured on main at b29a651, before the engine took authored state.
-  const MAIN: Array<[seed: number, floor: number, hash: number, length: number]> = [
-    [1, 1, 0x42622a9f, 82071],
-    [7, 2, 0x94e68ce0, 61403],
-    [1003, 3, 0x68bf4a0d, 107189],
-    [42, 5, 0xc07dc4f2, 163312],
-    [9, 4, 0xa4a8ac08, 125955],
-  ]
-
-  it.each(MAIN)('seed %i floor %i serializes byte-identically to main', (seed, floor, hash, length) => {
-    const w = createWorld(seed, floor)
+  const setUp = (w: World): World => {
     populateWorld(w)
     setupFloor(w)
     const at = playerSpawnPoint(w.level, 0)
     spawnPlayer(w, 0, at.x, at.y)
-    for (let t = 0; t < 120; t++) {
+    return w
+  }
+
+  /** Play ticks `from`..`from + n` with a fixed walk-and-shoot script. */
+  const play = (w: World, from: number, n: number): World => {
+    for (let t = from; t < from + n; t++) {
       const cmd = { ...emptyInput(), seq: t, moveX: t % 40 < 20 ? 1 : -1, moveY: t % 60 < 30 ? 0.5 : -0.5, attack: t % 7 === 0 }
       tickWorld(w, new Map([[0, cmd]]))
     }
-    const s = JSON.stringify(serializeWorld(w))
-    expect(s.length).toBe(length)
-    expect(fnv(s)).toBe(hash)
+    return w
+  }
+
+  /** A save minus how it carries its level: a seeded world saves a checksum,
+   * an authored one its rows. Everything else must agree. */
+  const withoutLevel = (w: World): Partial<WorldJson> => {
+    const j: Partial<WorldJson> = serializeWorld(w)
+    delete j.level
+    delete j.levelChecksum
+    return j
+  }
+
+  it.each([
+    [1, 1],
+    [7, 2],
+    [1003, 3],
+    [42, 5],
+  ])('seed %i floor %i plays 120 ticks the same from its seed as from its level written out as text', (seed, floor) => {
+    const seeded = play(setUp(createWorld(seed, floor)), 0, 120)
+    const level = levelFromJson(levelToJson(generateLevel(seed, floor)))
+    const authored = play(setUp(worldFromState({ level, seed, floor })), 0, 120)
+    expect(withoutLevel(authored)).toEqual(withoutLevel(seeded))
+  })
+
+  // Deeper floors on levels frozen as authored fixtures: a run saved halfway
+  // and reloaded finishes exactly where an unbroken run does.
+  it.each(['frozen-1003-3', 'frozen-42-5', 'frozen-9-4'])('%s saved at tick 60 and reloaded finishes the run unchanged', (fixture) => {
+    const straight = play(setUp(loadFixture(fixture)), 0, 120)
+    const half = play(setUp(loadFixture(fixture)), 0, 60)
+    const resumed = play(reload(serializeWorld(half)), 60, 60)
+    expectWorldEqual(resumed, straight)
   })
 
   it('createWorld is exactly worldFromState(worldFromSeed(...))', () => {
@@ -195,9 +208,18 @@ describe('seeded worlds: the generator path is unchanged', () => {
   })
 
   it('every committed seeded fixture still loads and re-saves to itself exactly', () => {
-    for (const name of ['mid-run', 'mid-run-plus-10', 'combat-stage', 'comm-scene', 'fire-stage', 'crew-scene', 'crew-scene-8', 'bunker-heist']) {
+    for (const name of ['mid-run', 'mid-run-plus-10', 'combat-stage', 'comm-scene', 'fire-stage', 'crew-scene', 'crew-scene-8']) {
       const j = loadFixtureJson(name)
       expect(j.level, name).toBeUndefined()
+      expect(serializeWorld(deserializeWorld(j)), name).toEqual(loadFixtureJson(name))
+    }
+  })
+
+  it('every committed frozen-level fixture carries its level whole and re-saves to itself exactly', () => {
+    for (const name of ['bunker-heist', 'frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) {
+      const j = loadFixtureJson(name)
+      expect(j.level, name).toBeDefined()
+      expect(j.levelChecksum, name).toBeUndefined()
       expect(serializeWorld(deserializeWorld(j)), name).toEqual(loadFixtureJson(name))
     }
   })

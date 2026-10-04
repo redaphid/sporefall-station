@@ -4,7 +4,7 @@
 // stuck behind locked doors" progression blocker: locks may cost time, never
 // the run.
 //
-// For 100 seeds x floors 1-3 (300 worlds) it asserts:
+// For 100 seeds x floors 1-4 (400 worlds) it asserts:
 //   1. every locked door's lock level clamps into the pick table (finite pick
 //      time — no lock is unpickable now that class perks are gone),
 //   2. BFS from spawn reaches the mission objective through wall-free tiles
@@ -21,7 +21,7 @@ import { pickTicks, PICK_TICKS_BY_LEVEL } from './interaction'
 import { setupFloor } from './missions'
 
 const SEEDS = 100
-const FLOORS = [1, 2, 3]
+const FLOORS = [1, 2, 3, 4]
 /** Balance budget: total pick-channel ticks crossed en route to the objective. */
 const MAX_PATH_PICK_TICKS = 20 * 30
 

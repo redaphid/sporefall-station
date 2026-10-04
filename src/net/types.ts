@@ -12,6 +12,14 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 7 — no wire change, but floor 2 now draws its district (slums, Still Row
+ *     or the Culture Beds) from the seed, and the two reworked districts lay
+ *     out differently. Layout is regenerated locally, as in 6.
+ * 6 — no wire change, but every floor from 3 now builds as the indoor complex
+ *     (4, 6, 8… were city) with a seeded biome order. Layout never crosses the
+ *     wire (a client regenerates it from seed+floor), so an old client would
+ *     walk a different map from its host on those floors with nothing on
+ *     screen saying so.
  * 5 — snapshots gain a sparse element-status trailer (frozen/burning/wet/...),
  *     so a client draws statused enemies. An old peer would ignore it silently.
  * 4 — the group roster appended (88 -> 95): drowner, bellwether, mender,
@@ -23,7 +31,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 5
+export const PROTOCOL_VERSION = 7
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'
@@ -63,6 +71,10 @@ export const MsgType = {
   /** Host → one client: that client's OWN full authoritative inventory
    * (slots/activeSlot/mods/ammo). Reliable, sent only on change. */
   Inventory: 19,
+  /** Host → every client: the host left on purpose (Main menu). The client
+   * ends the run and does not try to reconnect. An older client that does not
+   * know it simply sees the link drop. */
+  Bye: 20,
 } as const
 
 const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))

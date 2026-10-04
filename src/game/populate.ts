@@ -1,7 +1,7 @@
 import { WEAPONS } from './data/items'
 import { NPCS } from './data/npcs'
 import { makeEntity, type Entity, type ItemStack, type Loadout, type WeaponMod } from './entity'
-import { bunkerLaneKeys, isFloorTile, isSolidTile, isWallTile, STOREY_SIZE, Tile, tileAt, type Building, type Corridor, type RoomType } from './levelgen/level'
+import { bunkerLaneKeys, isFloorTile, isSolidTile, isWallTile, STOREY_SIZE, themeNamed, Tile, tileAt, type Building, type Corridor, type RoomType } from './levelgen/level'
 import { groupProps, planRoom, PROP_PLACEMENT, ROOM_LAYOUT, type FreeTile, type Placement } from './levelgen/furnish'
 import { assignRoomTypes, roomOwningTile } from './levelgen/roomTypes'
 import type { Rect } from './levelgen/rooms'
@@ -147,6 +147,41 @@ export const populateWorld = (w: World): void => {
   populateGroups(w)
   // Storeys (Phase 1): stock each loft with its loot cache. Own fork, last.
   stockLofts(w)
+  // The district's open squares: Still Row's barrel yards, the Culture Beds'
+  // planter rows. Own fork, after everything, so nothing above moves.
+  dressPlazas(w)
+}
+
+/** Stand each open square's district props on its heart (the paved ring stays
+ * clear, so a square can never wall anything in). One prop per tile, no two
+ * touching, never on the spawn or exit. Own `plazas` fork. */
+const dressPlazas = (w: World): void => {
+  const props = w.level.theme ? themeNamed(w.level.theme).plazaProps : []
+  if (props.length === 0 || !w.level.plazas) return
+  const rng = w.rng.fork('plazas')
+  const spawnKey = Math.floor(w.level.spawn.y) * w.level.w + Math.floor(w.level.spawn.x)
+  const exitKey = w.level.exit.y * w.level.w + w.level.exit.x
+  for (const sq of w.level.plazas) {
+    const taken = new Set<number>()
+    const free = (x: number, y: number): boolean => {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (taken.has((y + dy) * w.level.w + x + dx)) return false
+      const key = y * w.level.w + x
+      return key !== spawnKey && key !== exitKey && !isSolidTile(w.level, x, y)
+    }
+    for (const { prop, count } of props) {
+      const n = rng.int(count[0], count[1])
+      for (let i = 0; i < n; i++) {
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const x = rng.int(sq.x + 2, sq.x + sq.w - 3)
+          const y = rng.int(sq.y + 2, sq.y + sq.h - 3)
+          if (!free(x, y)) continue
+          taken.add(y * w.level.w + x)
+          spawnObject(w, prop, x, y)
+          break
+        }
+      }
+    }
+  }
 }
 
 /** Room types a lurker haunts — dark back-of-house corners, never the front. */
@@ -545,7 +580,7 @@ const spawnPlanned = (w: World, p: Placement): void => {
  * weapon roll (creatures keep their signature weapon), so the npc-weapons stream
  * is untouched too. */
 const spawnEncounters = (w: World, erng: Rng): void => {
-  const theme = w.level.theme
+  const district = w.level.theme ? themeNamed(w.level.theme).encounters : {}
   const floor = w.floor
   for (const b of w.level.buildings) {
     // A complex floor is ~3x as many (single-room) modules as a city floor has
@@ -555,17 +590,19 @@ const spawnEncounters = (w: World, erng: Rng): void => {
     // Spore-vermin: a swarm that thickens with depth (and where blooms grow).
     let sporelings = 0
     if (erng.chance(floor >= 2 ? 0.45 : 0.2)) sporelings += erng.int(1, 1 + Math.min(3, floor))
-    // Cinders: industrial fire-dwellers (a fireproof answer to a flame build).
+    // Cinders: ash-dwellers, thick in Still Row's cold stills (a fireproof
+    // answer to a flame build).
     let cinders = 0
-    if (theme === 'industrial' && erng.chance(0.5)) cinders += erng.int(1, 2)
+    if (district.cinders !== undefined && erng.chance(district.cinders)) cinders += erng.int(1, 2)
     else if (erng.chance(0.12)) cinders += 1
     // Brutes: armoured spikes on deeper floors — bring fire, not bullets.
     let brutes = 0
     if (floor >= 3 && erng.chance(0.35)) brutes += 1
     else if (floor >= 2 && erng.chance(0.12)) brutes += 1
-    // Derelict Units: industrial/deep — armour + bio-inert, servos cook to fire.
+    // Derelict Units: still on shift in Still Row, and deep — armour +
+    // bio-inert, servos cook to fire.
     let robots = 0
-    if ((theme === 'industrial' || floor >= 4) && erng.chance(0.3)) robots += 1
+    if ((district.robotsOnShift || floor >= 4) && erng.chance(0.3)) robots += 1
     // Stalkers (#67): a scavenger that culls the wounded — a lone opportunist,
     // deeper floors, low count (a pack of them would just avoid each other).
     let stalkers = 0
@@ -573,6 +610,10 @@ const spawnEncounters = (w: World, erng: Rng): void => {
     // Spore pods (#68): a dormant nest — a stealth set-piece to tiptoe past or trip.
     let pods = 0
     if (floor >= 2 && erng.chance(0.3)) pods += erng.int(2, 4)
+    // The Culture Beds' own: brood sacs in the furrows, mites in the moss.
+    // Drawn only there, so every other district's dice stay put.
+    if (district.broodSacs !== undefined && erng.chance(district.broodSacs)) pods += erng.int(2, 3)
+    if (district.sporeMites !== undefined && erng.chance(district.sporeMites)) sporelings += erng.int(1, 2)
     for (const [arch, n] of [
       ['sporeling', sporelings],
       ['cinder', cinders],
@@ -609,7 +650,7 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
     { archetype: 'thug', count: [1, 2] },
     { archetype: 'gangster', count: [1, 2] },
   ],
-  // Indoor complex modules (floors 3, 5, 7…). The essence-echoes of the crew still
+  // Indoor complex modules (floors 3+). The essence-echoes of the crew still
   // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
   // swarms are layered on separately (spawnComplexSleepers, complexDirector).
   // A complex has ~3x as many (single-room) modules as a city floor has

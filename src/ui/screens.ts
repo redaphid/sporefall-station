@@ -2,13 +2,15 @@ import type { RenderView } from '../app/session'
 import { cameraRect, onViewerStorey } from '../game/stairs'
 import { MODS } from '../game/data/mods'
 import { themeDisplayName } from '../render/themeState'
-import { bossBar, bossRevealName, latchBossId } from './bossModel'
+import { bossBar, bossRevealName, latchBossId, playerOutOfFight } from './bossModel'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout, selfModVerdict } from './loadoutModel'
 import { installGamepadMenuNav } from './gamepadMenu'
+import { createTwoPressGroup, MAIN_MENU_ARMED_LABEL, MAIN_MENU_LABEL } from './twoPress'
 import { ANNOUNCE_MS, modifierKey, modifierStripText, modifierToast } from './modifierModel'
+import { createSealHint } from './sealHintModel'
 
 export interface Screens {
   update(view: RenderView): void
@@ -61,6 +63,9 @@ export const createScreens = (
   onNewSeed?: () => void,
   /** Procedural weapon-art thumbnail provider for the loadout panel. */
   weaponThumb?: WeaponThumb,
+  /** Abandon the run and go to the start menu. Host and client alike: for a
+   * client it is the only way off this screen. */
+  onMainMenu?: () => void,
 ): Screens => {
   const banner = document.createElement('div')
   banner.style.cssText =
@@ -70,6 +75,16 @@ export const createScreens = (
 
   const overlay = document.createElement('div')
   markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
+  // KNOWN HAZARD — this overlay carries NO z-index, so it stacks at 0 while the
+  // in-game HUD layers sit at 55..72 (pad hint 55, pause 60, locator 65, boss
+  // bar 66, inspect card 69, boss card 70, mission chip 72). Every one of them
+  // therefore paints ON TOP of the YOU DIED scrim. The boss bar and entrance
+  // card are gated off in code below (bossModel.playerOutOfFight), which is what
+  // fixes the reported bug; the REST of that list is still unguarded, and the
+  // next HUD element added will inherit the same fault by default.
+  // Raising this to ~80 is the general fix and is deliberately NOT done here:
+  // it would also put the death screen above the PAUSE overlay (60), which is a
+  // separate interaction to think through and test. Do it in its own change.
   overlay.style.cssText =
     'position:absolute;inset:0;background:#000a;display:none;flex-direction:column;align-items:center;' +
     'justify-content:center;color:#eee;font:16px system-ui;pointer-events:auto;text-align:center;gap:12px'
@@ -137,7 +152,19 @@ export const createScreens = (
   // between "Run it back" / "New Seed" and confirm. The nav loop lives for the
   // overlay's lifetime; it idles cheaply while the overlay is hidden (its buttons
   // report no offsetParent) and skips the disabled/hidden client variants.
-  installGamepadMenuNav(() => [restartBtn, newseedBtn])
+  // Main menu ends the run for everyone at this table, so it takes two presses
+  // (twoPress.ts) like the pause menu's copy.
+  const quitGroup = createTwoPressGroup()
+  const mainMenuBtn = document.createElement('button')
+  if (onMainMenu) {
+    mainMenuBtn.textContent = MAIN_MENU_LABEL
+    mainMenuBtn.dataset.role = 'gameover-main-menu'
+    mainMenuBtn.style.cssText = newseedBtn.style.cssText
+    mainMenuBtn.style.display = ''
+    quitGroup.wire(mainMenuBtn, MAIN_MENU_ARMED_LABEL, onMainMenu)
+    overlay.querySelector<HTMLElement>('#btnRow')!.appendChild(mainMenuBtn)
+  }
+  installGamepadMenuNav(() => [restartBtn, newseedBtn, mainMenuBtn])
   const stats = overlay.querySelector<HTMLElement>('#stats')!
 
   let bannerTimer: ReturnType<typeof setTimeout> | undefined
@@ -156,12 +183,13 @@ export const createScreens = (
     'text-shadow:0 2px 6px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;white-space:nowrap'
   mount.appendChild(toast)
   let toastTimer: ReturnType<typeof setTimeout> | undefined
-  const showToast = (text: string): void => {
+  const showToast = (text: string, ms = 1800): void => {
     toast.textContent = text
     toast.style.opacity = '1'
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => (toast.style.opacity = '0'), 1800)
+    toastTimer = setTimeout(() => (toast.style.opacity = '0'), ms)
   }
+  const sealHint = createSealHint(themeDisplayName)
 
   // Floor modifier strip: a small line just under the mission chip. It reads out
   // the modifier in full when it takes hold, then shrinks to a live readout
@@ -193,6 +221,7 @@ export const createScreens = (
   // they had never met a boss. The card is the "this is a boss" moment; the bar
   // is the "and it is still alive" moment that lasts the whole fight.
   const bossCard = document.createElement('div')
+  bossCard.dataset.role = 'boss-card'
   bossCard.style.cssText =
     'position:absolute;top:30%;left:50%;transform:translate(-50%,-50%) scale(.85);color:#c98ae8;' +
     'font:900 34px system-ui;letter-spacing:.04em;text-shadow:0 0 18px #a05ae0,0 3px 8px #000;pointer-events:none;' +
@@ -204,14 +233,24 @@ export const createScreens = (
     bossCard.style.opacity = '1'
     bossCard.style.transform = 'translate(-50%,-50%) scale(1)'
     clearTimeout(bossCardTimer)
-    bossCardTimer = setTimeout(() => {
-      bossCard.style.opacity = '0'
-      bossCard.style.transform = 'translate(-50%,-50%) scale(.85)'
-    }, 2600)
+    bossCardTimer = setTimeout(hideBossCard, 2600)
+  }
+  /** Drop the card NOW, cancelling its dwell timer.
+   *
+   * Not merely the timeout's body: the card lives 2.6s, so dying just after the
+   * entrance leaves it hanging over the death screen (z-index:70 vs the
+   * overlay's none) where it collides with YOU DIED into unreadable mush.
+   * Suppressing the *reveal* is not enough — a card that is ALREADY up has to be
+   * taken down. */
+  const hideBossCard = (): void => {
+    clearTimeout(bossCardTimer)
+    bossCard.style.opacity = '0'
+    bossCard.style.transform = 'translate(-50%,-50%) scale(.85)'
   }
 
   // Top-centre health bar, clear of the notch and of the top-left player HUD.
   const bossHud = document.createElement('div')
+  bossHud.dataset.role = 'boss-bar'
   bossHud.style.cssText =
     // --sf-safe-top: stage-space safe area (ui/orientation.ts) — follows the
     // rotation when the landscape-always fallback turns the stage.
@@ -230,8 +269,14 @@ export const createScreens = (
   const bossPhaseEl = bossHud.querySelector<HTMLElement>('#bossPhase')!
   let bossId: number | undefined
   let lastBossKey = ''
+  let bossRunEpoch: number | undefined
 
   const updateBoss = (view: RenderView): void => {
+    // A new run recycles entity ids, so the latch must not outlive its run.
+    if (view.runEpoch !== bossRunEpoch) bossId = undefined
+    bossRunEpoch = view.runEpoch
+    // Take down an entrance card that was already up when the player went down.
+    if (playerOutOfFight(view) && bossCard.style.opacity !== '0') hideBossCard()
     bossId = latchBossId(bossId, view.events)
     const bar = bossBar(view, bossId, themeDisplayName('boss'))
     const key = bar ? `${bar.name}|${bar.hpFrac.toFixed(3)}|${bar.phase}` : ''
@@ -300,8 +345,11 @@ export const createScreens = (
     update(view: RenderView): void {
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
+        // Suppressed while the local player is out of the fight: in co-op a
+        // teammate can trigger the entrance AFTER you go down, and the card
+        // (z-index:70) would flash across your YOU DIED overlay.
         const revealed = bossRevealName(view.events, themeDisplayName('boss'))
-        if (revealed !== undefined) showBossCard(revealed)
+        if (revealed !== undefined && !playerOutOfFight(view)) showBossCard(revealed)
         for (const ev of view.events) {
           // `stationAlert` lands on the same tick as `missionComplete` and is
           // ordered after it, so the alert banner deliberately overwrites the
@@ -326,6 +374,8 @@ export const createScreens = (
           if (modToast) showToast(modToast)
         }
       }
+      const sealToast = sealHint.update(view)
+      if (sealToast) showToast(sealToast, 3000)
       updateBoss(view)
       updateLocator(view)
       updateModifier(view)
@@ -349,6 +399,7 @@ export const createScreens = (
         } else {
           // Revived / fresh run began — drop back into play.
           overlay.style.display = 'none'
+          quitGroup.disarmAll()
         }
       }
     },

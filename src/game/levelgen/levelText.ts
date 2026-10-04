@@ -11,6 +11,7 @@
 // `solid` is not stored: it is derived from the tiles exactly as the generators
 // derive it (`isWallTile`), so a hand edit cannot leave the two layers disagreeing.
 
+import { BIOMES } from './floors'
 import { isWallTile, Tile, type Building, type Level, type TileId } from './level'
 
 /** The legend. One printable, JSON-safe ASCII glyph per tile id. */
@@ -112,8 +113,7 @@ const BUILDING_ROLES = [
   'washroom', 'lab', 'medbay', 'reactor', 'depot', 'security',
 ] as const
 const POIS = ['courtyard', 'vault', 'hallway', 'bunker', 'module'] as const
-const THEMES = ['downtown', 'slums', 'industrial', 'park'] as const
-const BIOMES = ['habitation', 'flooded', 'reactor', 'overgrown'] as const
+const THEMES = ['downtown', 'slums', 'stillworks', 'culturebeds'] as const
 const STOREY_KINDS = ['ground', 'upper', 'tower', 'basement'] as const
 const STAIR_DIRS = ['n', 'e', 's', 'w'] as const
 

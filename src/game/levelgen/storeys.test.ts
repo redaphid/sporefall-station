@@ -38,7 +38,7 @@ import {
 } from './storeys'
 
 const S = STOREY_SIZE
-const FLOORS = [3, 5, 7, 9, 11]
+const FLOORS = [3, 4, 5, 6, 7]
 const N8 = [
   [-1, -1],
   [0, -1],
@@ -181,7 +181,7 @@ const groundDiff = (level: Level, ref: Level): string[] => {
   return out
 }
 
-describe('storeys: the structural rule over 200 seeds x floors 3-11', () => {
+describe('storeys: the structural rule over 200 seeds x floors 3-7', () => {
   const levels: { tag: string; level: Level; seed: number; floor: number }[] = []
   for (let seed = 1; seed <= 200; seed++)
     for (const floor of FLOORS) levels.push({ tag: `seed ${seed} floor ${floor}`, level: generateLevel(seed, floor), seed, floor })
@@ -228,7 +228,7 @@ describe('storeys: the structural rule over 200 seeds x floors 3-11', () => {
       expect(level.storeys.map((s) => s.z), tag).toEqual([0, 1])
       expect(level.stairs, tag).toHaveLength(2)
     }
-    for (const f of [1, 2, 4, 6]) {
+    for (const f of [1, 2]) {
       const city = generateLevel(3, f)
       expect(city.storeys).toBeUndefined()
       expect(city.w).toBe(S)
@@ -237,7 +237,7 @@ describe('storeys: the structural rule over 200 seeds x floors 3-11', () => {
 
   it('generation stays inside the phone budget (< 15 ms per complex floor on average)', () => {
     const t0 = performance.now()
-    for (let seed = 500; seed < 540; seed++) generateLevel(seed, 3 + 2 * (seed % 5))
+    for (let seed = 500; seed < 540; seed++) generateLevel(seed, 3 + (seed % 5))
     expect((performance.now() - t0) / 40).toBeLessThan(15)
   })
 })

@@ -348,7 +348,7 @@ export const tickWorld = (w: World, rawInputs: Map<number, InputCmd>): void => {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
-  complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
+  complexDirectorSystem(w) // floors 3+: vent swarms, bunk ambushes, lights-out
   groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
   modifierSystem(w) // floor modifier: tracker-pack arrivals, the tide wetting whoever wades
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick

@@ -6,11 +6,17 @@
 import { describe, expect, it } from 'vitest'
 import type { RenderView } from '../app/session'
 import { makeEntity, type Entity } from '../game/entity'
-import { generateLevel } from '../game/levelgen/generate'
+import { levelFromJson } from '../game/levelgen/levelText'
 import type { SimEvent } from '../game/types'
 import { createPickTracker, promptText } from './pickModel'
 
-const level = generateLevel(1, 1)
+const level = levelFromJson({
+  rows: [
+    '################',
+    ...Array.from({ length: 12 }, (_, y) => (y === 2 ? '#.....@........#' : '#..............#')),
+    '################',
+  ],
+})
 
 const player = (id: number, x: number, y: number): Entity => {
   const e = makeEntity('player', 'player', x, y)
@@ -32,6 +38,7 @@ const view = (over: Partial<RenderView>): RenderView => ({
   entities: [],
   events: [],
   tick: 0,
+  runEpoch: 1,
   level,
   floor: 1,
   missionText: '',
@@ -58,6 +65,18 @@ describe('pick prompt (before committing)', () => {
     closed.door!.locked = false
     const t = createPickTracker()
     expect(t.update(view({ entities: [self, closed], self })).prompt).toBeUndefined()
+  })
+
+  it('a biolock or an overgrown hatch offers no pick, because a press cannot pick it', () => {
+    const self = player(1, 10, 10)
+    for (const seal of [{ sealKind: 'keycard' as const }, { sealKind: 'power' as const }, { overgrown: true }]) {
+      const door = lockedDoor(2, 10.8, 10)
+      Object.assign(door.door!, seal)
+      expect(createPickTracker().update(view({ entities: [self, door], self })).prompt, JSON.stringify(seal)).toBeUndefined()
+    }
+    const pickable = lockedDoor(2, 10.8, 10)
+    pickable.door!.sealKind = 'pick'
+    expect(createPickTracker().update(view({ entities: [self, pickable], self })).prompt?.text).toBe('Lock II · Use to pick (3.5s)')
   })
 
   it('prompt text covers every lock level and clamps degenerate ones', () => {

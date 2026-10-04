@@ -68,8 +68,6 @@ export const COMPLEX_ROOM_TYPE: Partial<Record<BuildingRole, RoomType>> = {
 }
 
 export const assignRoomTypes = (b: Building): RoomType[] => {
-  const moduleType = COMPLEX_ROOM_TYPE[b.role]
-  if (moduleType) return b.rooms.map(() => moduleType)
   const rooms = b.rooms
   const n = rooms.length
   const area = (i: number): number => rooms[i].w * rooms[i].h
@@ -84,6 +82,12 @@ export const assignRoomTypes = (b: Building): RoomType[] => {
           (r.x === b.objectiveRoom!.x && r.y === b.objectiveRoom!.y && r.w === b.objectiveRoom!.w && r.h === b.objectiveRoom!.h),
       )
     : -1
+
+  // A station role names every room after its purpose: one module on a
+  // complex floor, a whole still house or lab in a city district. A vault's
+  // sealed chamber stays a vault whatever the building is for.
+  const moduleType = COMPLEX_ROOM_TYPE[b.role]
+  if (moduleType) return rooms.map((_, i) => (b.poi === 'vault' && i === objIdx ? 'vault' : moduleType))
 
   // Bunkers have a fixed anatomy: guard band first, the sealed core deepest.
   if (b.role === 'bunker') {

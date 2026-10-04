@@ -32,7 +32,7 @@ import {
 import type { Rect } from './rooms'
 
 /**
- * INDOOR COMPLEX generator — floors 3, 5, 7… leave the sunken streets and dive into
+ * INDOOR COMPLEX generator — from floor 3 the run leaves the sunken streets for
  * the station ring itself: a pressure hull packed with modules (mess hall,
  * bunk rooms, galley, labs, infirmary, reactor hall, stores, security) laid
  * out like a real building's floorplan (docs/design/floorplan-principles.md,
@@ -64,38 +64,9 @@ import type { Rect } from './rooms'
  *      wet rooms clustered (P11) and reactors kept off beds (P12).
  *   8. Per-role deck tiles; vents and biome dressing.
  *
- * A pure function of (rng, floor): the layout regenerates bit-exact from
+ * A pure function of (rng, biome): the layout regenerates bit-exact from
  * seed+floor on every peer, like every other level.
  */
-
-/** First floor built as an indoor complex. Floors below keep the city. */
-export const COMPLEX_MIN_FLOOR = 3
-
-/**
- * Does this floor use the indoor-complex generator? From floor 3 the run
- * ALTERNATES station complex and sunken city: 3, 5, 7… are complexes, 4, 6, 8…
- * stay city (so bunkers, courtyards, vaults and every district theme keep
- * turning up deep into a run).
- */
-export const isComplexFloor = (floor: number): boolean =>
-  floor >= COMPLEX_MIN_FLOOR && (floor - COMPLEX_MIN_FLOOR) % 2 === 0
-
-/** 0-based position of a complex floor among complex floors (3 -> 0, 5 -> 1, …). */
-const complexOrdinal = (floor: number): number => Math.floor((floor - COMPLEX_MIN_FLOOR) / 2)
-
-/**
- * 1-based position of a city floor among CITY floors only (1 -> 1, 2 -> 2,
- * 4 -> 3, 6 -> 4, …). The city's district theme cycles on this, so the
- * alternation never starves a theme (cycling on the raw floor would only ever
- * land city floors on half of the themes).
- */
-export const cityFloorOrdinal = (floor: number): number => (floor < COMPLEX_MIN_FLOOR ? floor : Math.floor(floor / 2) + 1)
-
-/** Biomes cycle across COMPLEX floors, so consecutive complex floors never match. */
-export const BIOMES: readonly BiomeName[] = ['habitation', 'flooded', 'reactor', 'overgrown']
-
-export const biomeForFloor = (floor: number): BiomeName =>
-  BIOMES[((complexOrdinal(floor) % BIOMES.length) + BIOMES.length) % BIOMES.length]
 
 interface BiomeDef {
   /** Weights for the purpose of an ordinary zone (after entry and commons). */
@@ -315,10 +286,9 @@ const pickWeighted = <T>(rng: Rng, items: readonly (readonly [T, number])[]): T 
 const inRect = (r: Rect, x: number, y: number): boolean => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h
 
 /** Carve the whole indoor complex into `grid` (which it overwrites entirely). */
-export const carveComplex = (rng: Rng, grid: TileGrid, floor: number): ComplexPlan => {
+export const carveComplex = (rng: Rng, grid: TileGrid, biome: BiomeName): ComplexPlan => {
   const w = grid.w
   const h = grid.h
-  const biome = biomeForFloor(floor)
   const def = BIOME_DEFS[biome]
   grid.fillRect(0, 0, w, h, Tile.Hull)
 

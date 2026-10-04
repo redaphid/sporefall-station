@@ -27,12 +27,16 @@ import {
   storeyZ,
 } from './stairs'
 import { nextFloor, setupFloor } from './systems/missions'
-import { expectWorldEqual, runTicks } from './testkit'
+import { expectWorldEqual, loadFixture, runTicks } from './testkit'
 import type { InputCmd } from './types'
-import { createWorld, tickWorld, type World } from './world'
+import { tickWorld, type World } from './world'
 
 const SEED = 1
-const FLOOR = 3
+
+/** The loft floor every stair test stands on: an authored world whose level is
+ * frozen in `__fixtures__/frozen-1-3.json` (a station floor with one loft), so
+ * these tests never move when the floor generator does. */
+const loftWorld = (): World => loadFixture('frozen-1-3')
 
 const DV = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const
 
@@ -46,7 +50,7 @@ const shaft = (level: Level): { up: StairLink; down: StairLink } => {
 /** A bare world (no population) with one player two tiles in front of the
  * ground stair, facing it. */
 const stairWorld = (): { w: World; p: Entity; up: StairLink; down: StairLink; toward: Partial<InputCmd>; away: Partial<InputCmd> } => {
-  const w = createWorld(SEED, FLOOR)
+  const w = loftWorld()
   expect(w.level.stairs, 'the fixture floor must have a loft').toBeDefined()
   const { up, down } = shaft(w.level)
   const [dx, dy] = DV[up.dir]
@@ -59,7 +63,7 @@ const run = (w: World, cmd: Partial<InputCmd>, n: number): void => {
 }
 
 describe('stairs: pure queries', () => {
-  const level = generateLevel(SEED, FLOOR)
+  const level = loftWorld().level
   const { up, down } = shaft(level)
 
   it('storeys are a function of x alone', () => {
@@ -232,7 +236,7 @@ describe('stairs: stairSystem in the real tick', () => {
 
 describe('stairs: the atlas never leaks (R2)', () => {
   it('a populated floor runs 30 s with a player upstairs: no entity enters the gutter, nothing hostile reaches the loft', () => {
-    const w = createWorld(SEED, FLOOR)
+    const w = loftWorld()
     populateWorld(w)
     setupFloor(w)
     const { up } = shaft(w.level)

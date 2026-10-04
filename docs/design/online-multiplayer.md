@@ -116,7 +116,7 @@ The behaviour below is measured by `e2e/ws-online-reliability.mjs`, which puts
 `e2e/ws-fault-proxy.mjs` between the pages and the relay.
 
 - **Link watchdog (online only).** The guest pings the host once a second on
-  the data lane (`Ping`/`Pong`, protocol 7) and counts silence from the host's
+  the data lane (`Ping`/`Pong`, protocol 8) and counts silence from the host's
   last byte (`src/app/linkHealth.ts`). After 2 s of silence the HUD chip reads
   "Weak connection". After 5 s the guest reconnects even though its socket is
   still open. With the socket frozen for 15 s, the chip warned at 2.4 s, the

@@ -377,6 +377,28 @@ describe('divergence detector — proving it can fail (red before green)', () =>
     expectFires(diffHostClient(host.world, patch(view, { entities }), { selfEntityId: selfId() }), 'entity.archetype')
   })
 
+  it("folds only the wire's keycard family: a wing keycard drawn as a keycard is fine, any other mismatch still fires", async () => {
+    const { host, bob, selfId } = await startPair(4014)
+    await step(host, [bob], 18)
+    const view = bob.session.renderView()
+    const target = view.entities.find((e) => e.id !== selfId())!
+    const drawnAs = (archetype: string): DivergenceReport =>
+      diffHostClient(
+        host.world,
+        patch(view, { entities: view.entities.map((e) => (e.id === target.id ? { ...e, archetype } : e)) }),
+        { selfEntityId: selfId() },
+      )
+    const archetypeIssues = (r: DivergenceReport) => r.issues.filter((i) => i.kind === 'entity.archetype')
+
+    host.world.byId.get(target.id)!.archetype = 'pickup.keycard.wing3'
+    expect(archetypeIssues(drawnAs('pickup.keycard'))).toEqual([])
+    expectFires(drawnAs('pickup.briefcase'), 'entity.archetype')
+    expectFires(drawnAs('pickup.keycard.wing3'), 'entity.archetype')
+
+    host.world.byId.get(target.id)!.archetype = 'pickup.briefcase'
+    expectFires(drawnAs('pickup.keycard'), 'entity.archetype')
+  })
+
   it('fires entity.position when a remote entity is adrift beyond smoothing', async () => {
     const { host, bob, selfId } = await startPair(4012)
     await step(host, [bob], 18)

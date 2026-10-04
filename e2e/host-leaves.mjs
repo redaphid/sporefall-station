@@ -65,6 +65,10 @@ r.hostSearch = await host.evaluate(() => location.search)
 await until(client, 'the client to hear the host leave', () => document.querySelector('[data-role="pause-title"]')?.textContent === 'HOST LEFT')
 await sleep(1500) // long enough for a drop to start its reconnect loop, if it were going to
 r.clientTitle = await client.textContent('[data-role="pause-title"]')
+r.clientButtons = await client.evaluate(() =>
+  [...document.querySelectorAll('button')].filter((b) => b.offsetParent !== null).map((b) => b.textContent),
+)
+r.clientFocus = await client.evaluate(() => document.activeElement?.textContent)
 r.clientPhasesSeen = phases
 await client.screenshot({ path: join(OUT, 'client-host-left.png') })
 // Client: its own Main menu takes it home.
@@ -82,6 +86,7 @@ const checks = [
   ['a net host gets a menu (not PAUSED) with a two-press Main menu', r.hostMenuTitle === 'MENU' && r.hostArmed === 'Quit to the menu? Press again'],
   ['the host lands on a fresh start menu with no params', r.hostSearch === ''],
   ['the client is told the host left, and never tries to reconnect', r.clientTitle === 'HOST LEFT' && !phases.includes('reconnecting')],
+  ['the HOST LEFT menu has no Resume, and the cursor sits on Main menu', !r.clientButtons.includes('Resume') && r.clientFocus === 'Main menu'],
   ["the client's Main menu takes it home too", r.clientSearch === ''],
   ['no page errors (besides headless no-WebGL)', realErrors.length === 0],
 ]

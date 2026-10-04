@@ -63,7 +63,7 @@ afterEach(() => {
 })
 
 /** A solo run wired the way main.ts wires it, with a pistol carrying three mods. */
-const rig = () => {
+const rig = (opts: { canResume?: () => boolean } = {}) => {
   const session = new HostSession(18, { sample: () => emptyInput() }, createGamepadCoop(() => pads))
   arm(session.self, 'pistol').mods = [
     { id: 'frost', stacks: 1 },
@@ -92,6 +92,7 @@ const rig = () => {
       return new Promise(() => {})
     },
     modSwaps: swaps,
+    canResume: opts.canResume,
   })
   /** One app frame: the pad state, a sim tick, the overlay repaint, then the menu poll. */
   const frame = (held: readonly number[] | null): void => {
@@ -407,6 +408,33 @@ describe('Main menu takes two presses', () => {
     r.newSeedBtn().click()
     expect(r.mainMenuBtn().dataset.armed).toBeUndefined()
     expect(r.calls).toEqual([])
+  })
+})
+
+describe('when there is nothing to resume (a client whose host left)', () => {
+  it('Resume is gone, the cursor opens on Main menu, and A and B never resume', () => {
+    const r = rig({ canResume: () => false })
+    r.open()
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Resume' && b.offsetParent !== null)).toBe(false)
+    expect(r.focused()).toBe('Main menu')
+    r.press(B)
+    expect(r.calls).toEqual([])
+    r.press(A)
+    expect(r.calls).toEqual([])
+    expect(r.mainMenuBtn().textContent).toBe('Quit to the menu? Press again')
+    r.press(A)
+    expect(r.calls).toEqual(['mainMenu'])
+  })
+
+  it('Resume comes back if resuming becomes possible again', () => {
+    let can = false
+    const r = rig({ canResume: () => can })
+    r.open()
+    can = true
+    r.frame([])
+    r.press(START) // close
+    r.open()
+    expect(r.focused()).toBe('Resume')
   })
 })
 

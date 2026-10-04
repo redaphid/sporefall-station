@@ -62,6 +62,9 @@ export const createPauseOverlay = (
     onRestart?: () => void
     /** Abandon the run and go to the start menu. */
     onMainMenu?: () => void
+    /** False when there is no run to go back to (a client whose host left):
+     * Resume is hidden, so the cursor opens on Main menu. Read each frame. */
+    canResume?: () => boolean
     /** The heading, read each frame. A net session's menu does not stop the
      * shared sim, so it is not "PAUSED", and a client's says why it opened. */
     title?: () => string
@@ -129,7 +132,8 @@ export const createPauseOverlay = (
   }
   if (actions.onNewSeed) row.appendChild(twoPress('pause-new-seed', '🎲 New Seed', '🎲 Wipe this run? Press again', actions.onNewSeed))
   if (actions.onRestart) row.appendChild(twoPress('pause-run-it-back', 'Run it back', 'Restart this run? Press again', actions.onRestart))
-  if (actions.onMainMenu) row.appendChild(twoPress('pause-main-menu', MAIN_MENU_LABEL, MAIN_MENU_ARMED_LABEL, actions.onMainMenu))
+  const mainMenuBtn = actions.onMainMenu ? twoPress('pause-main-menu', MAIN_MENU_LABEL, MAIN_MENU_ARMED_LABEL, actions.onMainMenu) : null
+  if (mainMenuBtn) row.appendChild(mainMenuBtn)
   el.appendChild(row)
   const onRefresh = actions.onRefresh
   if (onRefresh) {
@@ -240,16 +244,20 @@ export const createPauseOverlay = (
   mount.appendChild(el)
   // Controller: the wand strip is the top row and the actions the bottom one.
   // Up/Down change row, Left/Right walk it, A presses, B resumes. Start is not
-  // a confirm here: it already toggles pause. Every open lands on Resume, and a
-  // button still held from the press that opened the menu cannot act.
+  // a confirm here: it already toggles pause. Every open lands on Resume, or on
+  // Main menu when there is nothing to resume, and a button still held from
+  // the press that opened the menu cannot act.
+  const resumable = (): boolean => resumeBtn.style.display !== 'none'
   installGamepadMenuNav(() => [stripChips(seq), [...row.querySelectorAll('button')]], {
     suppress: () => el.style.display === 'none',
     confirmButtons: [PAD_A],
-    back: { buttons: [PAD_B], run: () => {
-        if (!resumeBtn.disabled) resumeBtn.click()
+    back: {
+      buttons: [PAD_B],
+      run: () => {
+        if (!resumeBtn.disabled && resumable()) resumeBtn.click()
       },
     },
-    home: { row: 1, col: 0 },
+    home: () => (resumable() ? resumeBtn : mainMenuBtn),
   })
   let wasPaused = false
   return {
@@ -263,6 +271,8 @@ export const createPauseOverlay = (
         paintSeq()
         const text = title()
         if (heading.textContent !== text) heading.textContent = text
+        // Hidden, not disabled: Refresh's lockout owns `disabled`.
+        resumeBtn.style.display = (actions.canResume?.() ?? true) ? '' : 'none'
       }
       wasPaused = show
       el.style.display = show ? 'flex' : 'none'

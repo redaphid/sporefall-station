@@ -12,8 +12,9 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
- * 7 — Ping/Pong (21/22) for online link health, and Bye (20). A peer that
- *     does not know a message type reads it as a framing desync.
+ * 8 — Ping/Pong (21/22) for online link health, and Bye (20). A peer that
+ *     does not know a message type reads it as a framing desync. (7 is the
+ *     floor-2 district change in #154.)
  * 6 — no wire change, but every floor from 3 now builds as the indoor complex
  *     (4, 6, 8… were city) with a seeded biome order. Layout never crosses the
  *     wire (a client regenerates it from seed+floor), so an old client would
@@ -30,7 +31,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 7
+export const PROTOCOL_VERSION = 8
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

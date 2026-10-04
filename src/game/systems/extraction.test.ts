@@ -1,17 +1,14 @@
 // `extraction` missions (#85): grab the prize → station alert → get back out
-// the way you came. Covers the RNG-stream guarantee against a baseline of the
-// pre-extraction world (regenerate with scripts/test/gen-mission-baseline.mts,
-// extraction selection switched off; re-captured after #92 moved 10 idle worlds, after #114 moved 6:8 and 16:3, and after #130 moved 1:5, 6:8, 10:4, 16:3, and 18:5 and #131 moved 19:7), the full loop, carrier loss in solo and co-op, a
-// mid-floor late join, and the empty floor. Baseline keys are `seed:floor` for
-// the seeded city floors 1-2, and a fixture name for the deeper floors, which
-// run on levels frozen as authored fixtures.
+// the way you came. Covers the RNG-stream guarantee (an extraction world is the
+// same world with its extraction roll denied, apart from the mission rules),
+// the full loop, carrier loss in solo and co-op, a mid-floor late join, and the
+// empty floor.
 
 import { describe, expect, it } from 'vitest'
-import baseline from '../__fixtures__/mission-baseline.json'
 import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
-import { createWorld, stationAlerted, tickWorld, type World } from '../world'
+import { createWorld, stationAlerted, tickWorld, worldFromState, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { expectWorldEqual, loadFixture, runTicks } from '../testkit'
 import type { Entity } from '../entity'
@@ -28,16 +25,19 @@ const setUp = (w: World): World => {
 
 const idle = (...slots: number[]): Map<number, Partial<InputCmd>> => new Map(slots.map((s) => [s, emptyInput()]))
 
-const fnv = (s: string): string => {
-  let h = 0x811c9dc5
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return (h >>> 0).toString(16)
-}
+/** A world on an authored level (one of the frozen fixtures' maps). */
+const authoredAt = (fixture: string, seed: number, floor: number): World =>
+  worldFromState({ level: loadFixture(fixture).level, seed, floor })
 
-const frozen = baseline as Record<string, { template: string; hash: string }>
+/** `setUp`, with the extraction roll denied: the world as it was before
+ * extraction missions existed. */
+const setUpWithoutExtraction = (w: World): World => {
+  const fork = w.rng.fork
+  w.rng.fork = (label) => (label === 'extraction' ? { ...fork(label), chance: () => false } : fork(label))
+  setUp(w)
+  w.rng.fork = fork
+  return w
+}
 
 /** First seed whose floor-2 mission rolled an extraction. */
 const extractionSeed = (() => {
@@ -67,23 +67,50 @@ const grab = (w: World, slot = 0): void => {
 }
 
 describe('adding extraction leaves the RNG stream alone', () => {
-  it('every seed matches the pre-extraction baseline; extractions differ only in their mission rules', () => {
+  /** Build a world twice, rolled and with the extraction roll denied, and
+   * assert they differ only in the mission rules. True if it rolled one. */
+  const expectOnlyRulesDiffer = (make: () => World, ctx: string): boolean => {
+    const rolled = runTicks(setUp(make()), idle(0), 30)
+    const denied = runTicks(setUpWithoutExtraction(make()), idle(0), 30)
+    const converted = rolled.mission.template === 'extraction'
+    if (converted) {
+      expect(denied.mission.template, ctx).toBe('steal')
+      const wing = /in the (.+), then get out/.exec(rolled.mission.description)![1]
+      rolled.mission.template = 'steal'
+      rolled.mission.description = `Extract the specimen canister from the ${wing}`
+      delete rolled.mission.extractPoint
+    }
+    expect(serializeWorld(rolled), ctx).toEqual(serializeWorld(denied))
+    return converted
+  }
+
+  it('an extraction world is the same world with the roll denied, apart from its mission rules', () => {
     let converted = 0
-    for (const [key, want] of Object.entries(frozen)) {
-      const [seed, floor] = key.split(':').map(Number)
-      const w = key.startsWith('frozen-') ? setUp(loadFixture(key)) : boot(seed, floor)
-      runTicks(w, idle(0), 30)
-      if (w.mission.template === 'extraction') {
-        converted++
-        expect(want.template, key).toBe('steal')
-        const wing = /in the (.+), then get out/.exec(w.mission.description)![1]
-        w.mission.template = 'steal'
-        w.mission.description = `Extract the specimen canister from the ${wing}`
-        delete w.mission.extractPoint
+    let kept = 0
+    for (const fixture of ['frozen-1-3', 'frozen-2-4', 'frozen-42-5', 'frozen-9-4']) {
+      for (let seed = 1; seed <= 6; seed++) {
+        for (const floor of [2, 3, 5]) {
+          if (expectOnlyRulesDiffer(() => authoredAt(fixture, seed, floor), `${fixture} seed ${seed} floor ${floor}`)) converted++
+          else kept++
+        }
       }
-      expect({ key, template: w.mission.template, hash: fnv(JSON.stringify(serializeWorld(w))) }).toEqual({ key, ...want })
     }
     expect(converted).toBeGreaterThan(0)
+    expect(kept).toBeGreaterThan(0)
+  })
+
+  // The generator is the subject here, so these worlds come from the seed.
+  it('the same holds on generated floors 2-5, seeds 1-12', () => {
+    let converted = 0
+    let kept = 0
+    for (let seed = 1; seed <= 12; seed++) {
+      for (let floor = 2; floor <= 5; floor++) {
+        if (expectOnlyRulesDiffer(() => createWorld(seed, floor), `seed ${seed} floor ${floor}`)) converted++
+        else kept++
+      }
+    }
+    expect(converted).toBeGreaterThan(0)
+    expect(kept).toBeGreaterThan(0)
   })
 
   it('floor 1 never rolls an extraction, and the roll is a pure function of seed+floor', () => {

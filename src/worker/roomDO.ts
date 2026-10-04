@@ -24,6 +24,12 @@ interface Attachment {
 export class RoomDO extends DurableObject {
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket') {
+      // PROTOTYPE probe (proto/webrtc-vs-relay): where does this DO run?
+      if (new URL(request.url).searchParams.get('probe') === 'colo') {
+        const trace = await (await fetch('https://www.cloudflare.com/cdn-cgi/trace')).text()
+        const cf = request.cf as { colo?: string; city?: string; country?: string } | undefined
+        return Response.json({ requestCfColo: cf?.colo, city: cf?.city, country: cf?.country, outboundTrace: trace })
+      }
       return new Response('expected websocket', { status: 426 })
     }
     const role = new URL(request.url).searchParams.get('role')

@@ -31,6 +31,7 @@ import {
   MsgType,
   PROTOCOL_VERSION,
   SNAPSHOT_INTERVAL_TICKS,
+  type LinkPath,
   type PeerId,
   type Transport,
 } from '../net/types'
@@ -143,12 +144,16 @@ export class NetHostSession implements Session {
   linkStatus(): LinkStatus {
     let silent = 0
     let rtt: number | null = null
+    let path: LinkPath | undefined
     for (const p of this.peers.values()) {
       if (p.slot < 0) continue
       silent = Math.max(silent, this.now() - p.lastHeardAt)
       if (p.rttMs !== null) rtt = Math.max(rtt ?? 0, p.rttMs)
+      // Anyone on the relay makes the chip say Relay: they set the pace.
+      const via = this.transport.pathOf?.(p.peer)
+      if (via && path !== 'relay') path = via
     }
-    return { health: this.started ? linkHealth(silent) : 'good', rttMs: rtt, session: 'live' }
+    return { health: this.started ? linkHealth(silent) : 'good', rttMs: rtt, path, session: 'live' }
   }
 
   lobbyPlayers(): LobbyPlayer[] {

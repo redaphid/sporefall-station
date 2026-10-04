@@ -258,6 +258,8 @@ export class NetClientSession implements Session {
   private inputSeq = 0
   /** The newest records sent, oldest first: each Input message repeats them. */
   private sentRecords: InputRecord[] = []
+  /** Records per Input message. Tests and the netlab set 1 to measure without the repeats. */
+  inputRedundancy = INPUT_REDUNDANCY
   /** Unacked inputs, each with the predicted stair lock AFTER it ran — so a
    * reconcile can resume the lock exactly where the acked input left it. */
   private pendingInputs: { seq: number; cmd: InputCmd; lock: boolean }[] = []
@@ -391,6 +393,7 @@ export class NetClientSession implements Session {
     return {
       health: this.phase === 'playing' ? linkHealth(this.now() - this.lastHeardAt) : 'good',
       rttMs: this.rttMs,
+      path: this.transport.pathOf?.('host'),
       session: this.phase === 'reconnecting' ? 'reconnecting' : this.phase === 'ended' ? 'ended' : 'live',
     }
   }
@@ -829,7 +832,7 @@ export class NetClientSession implements Session {
       if (this.pendingDraftPick !== undefined) out.draftPick = this.pendingDraftPick
       const record: InputRecord = { cmd: out, edges: edgeBits(this.pendingEdges) }
       this.sentRecords.push(record)
-      if (this.sentRecords.length > INPUT_REDUNDANCY) this.sentRecords.shift()
+      if (this.sentRecords.length > this.inputRedundancy) this.sentRecords.shift()
       const hasPureEdge =
         this.pendingEdges.roll ||
         this.pendingEdges.throwItem ||

@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { BleClientTransport } from '../net/transport/bleTransport'
 import { BroadcastChannelTransport } from '../net/transport/broadcastChannelTransport'
-import { WsTransport } from '../net/transport/wsTransport'
+import { RtcTransport } from '../net/transport/rtcTransport'
 import type { Transport } from '../net/types'
 import { openJoinTransport, type JoinTransportDeps } from './openJoinTransport'
 
@@ -143,7 +143,7 @@ describe('openJoinTransport', () => {
 
   it('?transport=ws opens a WebSocket transport, and the native build opens the BLE plugin', async () => {
     const ws = await run(deps({ search: '?transport=ws', bluetooth: {} }))
-    expect(ws.kind === 'returned' && ws.transport instanceof WsTransport).toBe(true)
+    expect(ws.kind === 'returned' && ws.transport instanceof RtcTransport).toBe(true)
     const native = await run(deps({ native: true, ua: 'iPhoneSafari', bluetooth: {} }))
     expect(native.kind === 'returned' && native.transport instanceof BleClientTransport).toBe(true)
   })
@@ -151,7 +151,7 @@ describe('openJoinTransport', () => {
   it('Play online opens the relay transport even in the native app and on an iPhone', async () => {
     for (const d of [deps({ online: true, native: true }), deps({ online: true, ua: 'iPhoneSafari' })]) {
       const out = await run(d)
-      expect(out.kind === 'returned' && out.transport instanceof WsTransport).toBe(true)
+      expect(out.kind === 'returned' && out.transport instanceof RtcTransport).toBe(true)
     }
   })
 })

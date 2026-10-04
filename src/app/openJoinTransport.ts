@@ -2,7 +2,7 @@ import type { Transport } from '../net/types'
 import { BleClientTransport } from '../net/transport/bleTransport'
 import { BroadcastChannelTransport } from '../net/transport/broadcastChannelTransport'
 import { WebBluetoothClientTransport } from '../net/transport/webBluetoothTransport'
-import { resolveWsBaseUrl, WsTransport } from '../net/transport/wsTransport'
+import { onlineTransport } from '../net/transport/rtcTransport'
 import { pickJoinTransport, showJoinUnsupported } from '../ui/menu'
 import { JOIN_UNSUPPORTED, isAppleMobile, planJoinTransport, probeWebBluetooth } from './joinTransport'
 
@@ -41,7 +41,7 @@ export const openJoinTransport = async (deps: JoinTransportDeps): Promise<Transp
     case 'native-ble':
       return new BleClientTransport(deps.log)
     case 'ws':
-      return new WsTransport('client', deps.room, resolveWsBaseUrl(deps.search))
+      return onlineTransport('client', deps.room, deps.search, deps.log)
     case 'tabs':
       return new BroadcastChannelTransport('client', deps.room)
     case 'web-ble': {

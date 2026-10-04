@@ -124,6 +124,13 @@ describe('linkHealth', () => {
     expect(linkChip({ health: 'good', rttMs: 40, session: 'reconnecting' }).text).toBe('Reconnecting…')
     expect(linkChip({ health: 'good', rttMs: 40, session: 'ended' })).toEqual({ tone: 'bad', text: 'Disconnected' })
   })
+
+  it('the chip names the path when the transport has one', () => {
+    expect(linkChip({ health: 'good', rttMs: 41.7, path: 'p2p', session: 'live' })).toEqual({ tone: 'good', text: 'P2P 42 ms' })
+    expect(linkChip({ health: 'good', rttMs: 88, path: 'relay', session: 'live' })).toEqual({ tone: 'good', text: 'Relay 88 ms' })
+    expect(linkChip({ health: 'good', rttMs: null, path: 'relay', session: 'live' })).toEqual({ tone: 'fair', text: 'Relay' })
+    expect(linkChip({ health: 'degraded', rttMs: 40, path: 'p2p', session: 'live' }).text).toBe('Weak connection')
+  })
 })
 
 describe('online client: silence on an open socket', () => {

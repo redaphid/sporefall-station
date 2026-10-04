@@ -73,7 +73,7 @@ import { startUpdates, type Updates } from './app/updates'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
 import { WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
-import { resolveWsBaseUrl, WsTransport } from './net/transport/wsTransport'
+import { onlineTransport, RtcTransport } from './net/transport/rtcTransport'
 import { betaSlugFromBase, namespaceRoom } from './app/betaSlug'
 import type { Transport } from './net/types'
 import { createRenderer, type GameRenderer } from './render/renderer'
@@ -464,6 +464,10 @@ const boot = async (): Promise<void> => {
       mode,
       paused: session.isPaused ?? false,
       ...(session instanceof NetHostSession ? { peers: session.lobbyPlayers() } : {}),
+      ...(session instanceof NetHostSession || session instanceof NetClientSession
+        ? { link: session.linkStatus(), pairs: { ...linkPairs } }
+        : {}),
+      ...(session instanceof NetClientSession ? { predictionCorrections: session.predictionCorrections } : {}),
     }),
     devWrites: params.has('debug') || params.has('e2e'),
     version: APP_VERSION,
@@ -731,6 +735,16 @@ const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
   return { weapon, mods: weaponStack(view.self)?.mods ?? [] }
 }
 
+/** The ICE candidate pair under each direct online link ("host" to "host" on
+ * one wifi network), refreshed every second for `sporefall.session().pairs`. */
+const linkPairs: Record<string, { local: string; remote: string; rttMs: number | null } | null> = {}
+const watchLinkPairs = (transport: Transport): void => {
+  if (!(transport instanceof RtcTransport)) return
+  setInterval(() => {
+    for (const peer of transport.peers()) void transport.selectedPair(peer).then((pair) => (linkPairs[peer] = pair))
+  }, 1000)
+}
+
 const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
     const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal')
@@ -764,14 +778,14 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
         throw err
       }
       stopTransportOnPagehide(transport)
+      watchLinkPairs(transport)
       return session
     }
     let session: NetHostSession
     if (deps.online) {
-      const relay = resolveWsBaseUrl(location.search)
       const hosted = await hostOnline({
         firstCode: deps.online,
-        goLive: (code) => goLive(new WsTransport('host', onlineRelayRoom(code), relay)),
+        goLive: (code) => goLive(onlineTransport('host', onlineRelayRoom(code), location.search, dbg.log)),
         lobby,
         backToMenu: backToStartMenu,
       })
@@ -781,7 +795,7 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
       // `?transport=ws&room=` is the dev path onto the relay under a named room.
       const transport =
         new URLSearchParams(location.search).get('transport') === 'ws'
-          ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
+          ? onlineTransport('host', deps.room, location.search, dbg.log)
           : native
             ? new BleHostTransport(deps.name, dbg.log)
             : new BroadcastChannelTransport('host', deps.room)
@@ -823,6 +837,7 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
   })
   if (!transport) return null
   stopTransportOnPagehide(transport)
+  watchLinkPairs(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
 
   // The lobby is built BEFORE the connect attempt, not after it.

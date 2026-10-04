@@ -23,9 +23,12 @@ POOLS = [
     ("tile.{n}.accent", "{n}-accent-*.png"),
     ("tile.{n}.overlay", "{n}-overlay-*.png"),
 ]
+# Must equal TILE_NAMES in src/render/theme.ts (themeManifestSync.test.ts
+# fails when they drift).
 SURFACES = ["street", "sidewalk", "floor", "wall", "grass", "exit",
             "hall", "grate", "tiled", "plating", "hull", "bog",  # + indoor complex
-            "stair_up", "stair_down", "landing"]  # + stairs between storeys
+            "stair_up", "stair_down", "landing",  # + stairs between storeys
+            "deck", "bulkhead", "pillar"]  # + indoor skins (render/indoorSkin.ts)
 
 
 def num(path):

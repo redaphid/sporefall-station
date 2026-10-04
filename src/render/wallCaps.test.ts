@@ -193,15 +193,28 @@ const rowLum = (img: ReturnType<typeof decodePng>, y: number): number => {
   return sum / img.w
 }
 
+// A cap family joins the file checks below as soon as the pack maps either
+// piece, so a half-mapped pair fails here instead of loading no caps.
+const HIRES_CAP_FAMILIES = WALL_CAP_NAMES.filter(
+  (name) => `tile.${name}.cap` in hires.sprites || `tile.${name}.cap.inner` in hires.sprites,
+)
+
 describe('swampspace-hires wall caps', () => {
-  it.each(WALL_CAP_NAMES)('%s: cap keys are canonical and mapped', (name) => {
+  it.each(WALL_CAP_NAMES)('%s: cap keys are canonical', (name) => {
     expect(SPRITE_KEYS.has(`tile.${name}.cap`)).toBe(true)
     expect(SPRITE_KEYS.has(`tile.${name}.cap.inner`)).toBe(true)
+  })
+
+  it('caps the plain wall and the hull', () => {
+    expect(HIRES_CAP_FAMILIES).toEqual(expect.arrayContaining(['wall', 'hull']))
+  })
+
+  it.each(HIRES_CAP_FAMILIES)('%s: both cap pieces are mapped by convention', (name) => {
     expect(hires.sprites[`tile.${name}.cap`]).toBe(`tiles/${name}-cap.png`)
     expect(hires.sprites[`tile.${name}.cap.inner`]).toBe(`tiles/${name}-cap-inner.png`)
   })
 
-  it.each(WALL_CAP_NAMES)('%s: the edge strip hugs the top edge, transparent below', (name) => {
+  it.each(HIRES_CAP_FAMILIES)('%s: the edge strip hugs the top edge, transparent below', (name) => {
     const img = decodePng(join(HIRES, 'tiles', `${name}-cap.png`))
     expect(img.ch).toBe(4)
     const alpha = (x: number, y: number): number => img.px[(y * img.w + x) * 4 + 3]
@@ -220,7 +233,7 @@ describe('swampspace-hires wall caps', () => {
     expect(na(0, depth)).toBe(0)
   })
 
-  it.each(WALL_CAP_NAMES)('%s: body tiles carry NO baked cap along their top edge', (name) => {
+  it.each(HIRES_CAP_FAMILIES)('%s: body tiles carry NO baked cap along their top edge', (name) => {
     const bodies = [hires.sprites[`tile.${name}`], hires.sprites[`tile.${name}.accent`] ?? []].flat()
     expect(bodies.length).toBeGreaterThan(0)
     for (const f of bodies) {

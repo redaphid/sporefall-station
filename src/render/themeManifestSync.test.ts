@@ -11,6 +11,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { TILE_NAMES } from './theme'
 
 const THEMES_DIR = join(__dirname, '..', '..', 'public', 'themes')
 
@@ -37,8 +38,11 @@ const referencedFiles = (m: Manifest): string[] => {
   return out.filter((f) => f.endsWith('.png'))
 }
 
-// Mirrors sync_manifest.py: pooled tile art discovered from the tiles/ dir.
-const SURFACES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit', 'hall', 'grate', 'tiled', 'plating', 'hull', 'bog', 'stair_up', 'stair_down', 'landing'] as const
+// Pooled tile art discovered from the tiles/ dir, for every tile name the
+// engine loads. sync_manifest.py keeps its own copy of the list; the first test
+// below holds the two equal.
+const SURFACES = TILE_NAMES
+const SYNC_SCRIPT = join(__dirname, '..', '..', 'scripts', 'assets', 'sync_manifest.py')
 const POOLS: readonly { key: (n: string) => string; pattern: (n: string) => RegExp }[] = [
   { key: (n) => `tile.${n}`, pattern: (n) => new RegExp(`^${n}-(\\d+)\\.png$`) },
   { key: (n) => `tile.${n}.accent`, pattern: (n) => new RegExp(`^${n}-accent-(\\d+)\\.png$`) },
@@ -46,6 +50,13 @@ const POOLS: readonly { key: (n: string) => string; pattern: (n: string) => RegE
 ]
 
 describe('theme manifests stay in sync with the assets on disk', () => {
+  it('sync_manifest.py syncs exactly the tile names the engine loads', () => {
+    const block = /^SURFACES = \[([^\]]*)\]/m.exec(readFileSync(SYNC_SCRIPT, 'utf8'))
+    expect(block, 'SURFACES list in sync_manifest.py').not.toBeNull()
+    const names = [...block![1].replace(/#.*$/gm, '').matchAll(/"([^"]+)"/g)].map((m) => m[1])
+    expect(names).toEqual([...TILE_NAMES])
+  })
+
   it('found the shipped themes', () => {
     expect(themes).toContain('swampspace-hires')
     expect(themes).toContain('swampspace')

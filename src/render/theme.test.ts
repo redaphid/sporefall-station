@@ -97,6 +97,55 @@ describe('validateManifest', () => {
     expect(manifest.sprites['tile.grass.overlay']).toEqual(['clump.png'])
   })
 
+  it('keeps the indoor-complex skin and prop keys, and still drops their near-misses', () => {
+    const { manifest, warnings } = validateManifest({
+      macroTiles: { deck: 2, hatch: 2 },
+      sprites: {
+        'tile.deck': ['deck-0.png', 'deck-1.png', 'deck-2.png', 'deck-3.png'],
+        'tile.deck.accent': 'deck-accent-0.png',
+        'tile.bulkhead': ['bulkhead-0.png'],
+        'tile.bulkhead.cap': 'bulkhead-cap.png',
+        'tile.bulkhead.cap.inner': 'bulkhead-cap-inner.png',
+        'tile.pillar': 'pillar-0.png',
+        'prop.bulkhead-door': 'props/bulkhead-door.png',
+        'prop.bulkhead-door-open': 'props/bulkhead-door-open.png',
+        'prop.bulkhead-door-locked': 'props/bulkhead-door-locked.png',
+        'prop.generator': 'props/generator.png',
+        'prop.coolant-tank': 'props/coolant-tank.png',
+        'prop.cryo-bunk': 'props/cryo-bunk.png',
+        'prop.freight-case': 'props/freight-case.png',
+        'prop.parts-rack': 'props/parts-rack.png',
+        'tile.pillar.cap': 'pillar-cap.png',
+        'tile.decks': 'typo.png',
+        'prop.bulkhead_door': 'props/typo.png',
+      },
+    })
+    expect(Object.keys(manifest.sprites).sort()).toEqual([
+      'prop.bulkhead-door',
+      'prop.bulkhead-door-locked',
+      'prop.bulkhead-door-open',
+      'prop.coolant-tank',
+      'prop.cryo-bunk',
+      'prop.freight-case',
+      'prop.generator',
+      'prop.parts-rack',
+      'tile.bulkhead',
+      'tile.bulkhead.cap',
+      'tile.bulkhead.cap.inner',
+      'tile.deck',
+      'tile.deck.accent',
+      'tile.pillar',
+    ])
+    expect(manifest.sprites['tile.deck']).toHaveLength(4)
+    expect(manifest.macroTiles).toEqual({ deck: 2 })
+    // A pillar wears the bulkhead caps; it has no cap pair of its own.
+    expect(warnings.filter((w) => w.includes('"tile.pillar.cap"'))).toHaveLength(1)
+    expect(warnings.filter((w) => w.includes('"tile.decks"'))).toHaveLength(1)
+    expect(warnings.filter((w) => w.includes('"prop.bulkhead_door"'))).toHaveLength(1)
+    expect(warnings.filter((w) => w.includes('hatch'))).toHaveLength(1)
+    expect(warnings).toHaveLength(4)
+  })
+
   it('accepts a macroTiles section and drops bad entries with warnings', () => {
     const { manifest, warnings } = validateManifest({
       macroTiles: { floor: 2, street: 4, lava: 2, wall: 5, grass: 2.5, exit: '2' },

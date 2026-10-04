@@ -2,7 +2,9 @@
 // (e2e/levelgen-tour.mjs): themed-floor worlds with the player teleported to
 // each new set-piece — bunker airlock, hallway spine, courtyard pit — with
 // annotation labels narrating what the camera is looking at. Deterministic:
-// fixed seeds through the real createWorld/populate/setupFloor path.
+// fixed seeds through the city generator (raw-floor district) and the real
+// populate/setupFloor path. Play builds floors 3+ indoors, so the tour's
+// set-pieces live on the city generator, which a saved world carries whole.
 //
 //   pnpm exec tsx scripts/test/gen-levelgen-tour.mts [outDir]
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -12,14 +14,15 @@ import { populateWorld } from '../../src/game/populate'
 import { serializeWorld } from '../../src/game/serialize'
 import { setupFloor } from '../../src/game/systems/missions'
 import { WALL_CUT_OUTSIDE, type Building } from '../../src/game/levelgen/level'
-import { createWorld, type World } from '../../src/game/world'
+import { generateCityLevel } from '../../src/game/levelgen/generate'
+import { worldFromState, type World } from '../../src/game/world'
 import type { Annotation } from '../../src/game/types'
 
 const OUT = process.argv[2] ?? 'e2e/output/tour-fixtures'
 mkdirSync(OUT, { recursive: true })
 
 const buildFloor = (seed: number, floor: number): World => {
-  const w = createWorld(seed, floor)
+  const w = worldFromState({ level: generateCityLevel(seed, floor), seed, floor })
   populateWorld(w)
   setupFloor(w)
   return w
@@ -51,7 +54,7 @@ const write = (name: string, w: World, px: number, py: number, notes: Annotation
   console.log(`${name}: player at ${px},${py}, ${notes.length} labels`)
 }
 
-// ── Scene 1: industrial floor 3 — bunker airlock ─────────────────────────────
+// ── Scene 1: Still Row floor 3 — bunker airlock ─────────────────────────────
 {
   const w = buildFloor(7, 3)
   const b = byPoi(w, 'bunker')!

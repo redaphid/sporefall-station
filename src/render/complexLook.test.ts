@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { generateLevel } from '../game/levelgen/generate'
 import { BIOMES } from '../game/levelgen/floors'
 import type { SimEvent } from '../game/types'
-import { BIOME_TINT, floorTintFor, mulTint, updateDarkWing, type DarkWing } from './complexLook'
+import { BIOME_TINT, DISTRICT_TINT, floorTintFor, mulTint, updateDarkWing, type DarkWing } from './complexLook'
+import { levelFromJson } from '../game/levelgen/levelText'
+import type { Level, ThemeName } from '../game/levelgen/level'
 
 describe('complex look: biome floor grade', () => {
   it('mulTint is a channel-wise multiply with white as identity and black as zero', () => {
@@ -13,10 +15,23 @@ describe('complex look: biome floor grade', () => {
     expect(mulTint(0xff0000, 0x00ff00)).toBe(0)
   })
 
-  it('city floors keep the theme tint untouched; every biome grades it distinctly', () => {
-    expect(floorTintFor(generateLevel(1, 1), 0xabcdef)).toBe(0xabcdef)
-    expect(floorTintFor(generateLevel(1, 2), 0xffffff)).toBe(0xffffff)
+  it('downtown and the slums keep the theme tint; Still Row and the Culture Beds grade it, each its own way', () => {
+    const city = (theme: ThemeName): Level => levelFromJson({ rows: ['@..'], theme })
+    expect(floorTintFor(city('downtown'), 0xabcdef)).toBe(0xabcdef)
+    expect(floorTintFor(city('slums'), 0xabcdef)).toBe(0xabcdef)
+    expect(floorTintFor(levelFromJson({ rows: ['@..'] }), 0xabcdef)).toBe(0xabcdef)
     expect(floorTintFor(undefined, 0x445566)).toBe(0x445566)
+    const still = floorTintFor(city('stillworks'), 0xffffff)
+    const beds = floorTintFor(city('culturebeds'), 0xffffff)
+    expect(still).toBe(DISTRICT_TINT.stillworks)
+    expect(beds).toBe(DISTRICT_TINT.culturebeds)
+    expect(new Set([0xffffff, still, beds]).size).toBe(3)
+    // Still Row runs warm (more red than blue); the Culture Beds run green.
+    expect((still >> 16) & 0xff).toBeGreaterThan(still & 0xff)
+    expect((beds >> 8) & 0xff).toBeGreaterThan((beds >> 16) & 0xff)
+  })
+
+  it('every station biome grades the floor distinctly', () => {
     const tints = new Set<number>()
     for (let f = 3; f <= 6; f++) {
       const level = generateLevel(1, f)

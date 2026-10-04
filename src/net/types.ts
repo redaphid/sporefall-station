@@ -13,8 +13,10 @@ export type PeerId = string
  * as another copy of the player. Nothing errors; the game just lies.
  *
  * 8 — Ping/Pong (21/22) for online link health, and Bye (20). A peer that
- *     does not know a message type reads it as a framing desync. (7 is the
- *     floor-2 district change in #154.)
+ *     does not know a message type reads it as a framing desync.
+ * 7 — no wire change, but floor 2 now draws its district (slums, Still Row
+ *     or the Culture Beds) from the seed, and the two reworked districts lay
+ *     out differently. Layout is regenerated locally, as in 6.
  * 6 — no wire change, but every floor from 3 now builds as the indoor complex
  *     (4, 6, 8… were city) with a seeded biome order. Layout never crosses the
  *     wire (a client regenerates it from seed+floor), so an old client would

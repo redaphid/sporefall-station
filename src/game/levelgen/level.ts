@@ -142,7 +142,27 @@ export interface Building {
 }
 
 /** A floor's district flavour — drives density, footprints and role palette. */
-export type ThemeName = 'downtown' | 'slums' | 'industrial' | 'park'
+export type ThemeName = 'downtown' | 'slums' | 'stillworks' | 'culturebeds'
+
+/** One prop a district stands in its open squares (populate.dressPlazas). */
+export interface PlazaProp {
+  prop: string
+  /** How many per square, inclusive range. */
+  count: [number, number]
+}
+
+/** A district's own encounters on top of the shared roster (populate.ts). A
+ * field left out draws no dice, so the other districts' streams never move. */
+export interface DistrictEncounters {
+  /** Chance a building hosts 1-2 Cinder Husks (else the shared 12%). */
+  cinders?: number
+  /** Derelict Units still on shift here from floor 1 (elsewhere from floor 4). */
+  robotsOnShift?: boolean
+  /** Chance a building hosts an extra Brood Sac clutch of 2-3. */
+  broodSacs?: number
+  /** Chance a building hosts an extra 1-2 Spore Mites. */
+  sporeMites?: number
+}
 
 export interface Theme {
   name: ThemeName
@@ -167,11 +187,19 @@ export interface Theme {
   bunkerChance: number
   /** Role palette (repeats bias the weighting). */
   roles: readonly BuildingRole[]
+  /** Ground of a courtyard compound's open pit. */
+  courtyardGround: TileId
+  /** Heart of an open square (a plaza): the paved ring keeps Sidewalk. */
+  plazaHeart: TileId
+  /** What stands in an open square. */
+  plazaProps: readonly PlazaProp[]
+  encounters: DistrictEncounters
 }
 
 /**
- * District themes cycle by floor so consecutive floors read differently.
- * Index 0 (floor 1) is intentionally dense so early floors feel like a city.
+ * The sunken city's districts. Index 0 is intentionally dense so the landing
+ * floor feels like a city. Still Row and the Culture Beds are the colony's
+ * dead essence trade and its gone-feral spore farms (docs/design/districts.md).
  */
 export const THEMES: readonly Theme[] = [
   {
@@ -186,6 +214,10 @@ export const THEMES: readonly Theme[] = [
     hallwayChance: 0.6,
     bunkerChance: 0.06,
     roles: ['office', 'office', 'shop', 'apartment'],
+    courtyardGround: Tile.Grass,
+    plazaHeart: Tile.Grass,
+    plazaProps: [],
+    encounters: {},
   },
   {
     name: 'slums',
@@ -199,22 +231,40 @@ export const THEMES: readonly Theme[] = [
     hallwayChance: 0.35,
     bunkerChance: 0.12,
     roles: ['apartment', 'apartment', 'shop', 'warehouse'],
+    courtyardGround: Tile.Grass,
+    plazaHeart: Tile.Grass,
+    plazaProps: [],
+    encounters: {},
   },
+  // STILL ROW: the essence trade's distilleries. Big still houses (the
+  // reactor-hall room kit: barrel banks, lockers), cage-works and export
+  // sheds round flooded settling yards. Cinder Husks haunt the cold stills and
+  // Derelict Units are still on shift.
   {
-    name: 'industrial',
+    name: 'stillworks',
     minLots: 3,
     maxLots: 3,
     buildingChance: 0.82,
-    yard: Tile.Sidewalk,
+    yard: Tile.Bog,
     courtyardChance: 0.45,
     setbackChance: 0.25,
     vaultChance: 0.15,
     hallwayChance: 0.55,
     bunkerChance: 0.35,
-    roles: ['warehouse', 'warehouse', 'office', 'shop'],
+    roles: ['reactor', 'warehouse', 'depot', 'warehouse', 'reactor'],
+    courtyardGround: Tile.Bog,
+    plazaHeart: Tile.Bog,
+    plazaProps: [
+      { prop: 'barrel', count: [2, 4] },
+      { prop: 'crate', count: [1, 3] },
+    ],
+    encounters: { cinders: 0.5, robotsOnShift: true },
   },
+  // THE CULTURE BEDS: the mycologists' grow terraces, gone feral. Low,
+  // scattered labs and infirmaries among open beds where planters stand in
+  // rows on the moss and brood sacs have taken the furrows.
   {
-    name: 'park',
+    name: 'culturebeds',
     minLots: 4,
     maxLots: 5,
     buildingChance: 0.55,
@@ -224,9 +274,21 @@ export const THEMES: readonly Theme[] = [
     vaultChance: 0.05,
     hallwayChance: 0.3,
     bunkerChance: 0.05,
-    roles: ['clinic', 'apartment', 'shop', 'clinic'],
+    roles: ['lab', 'medbay', 'apartment', 'lab', 'shop'],
+    courtyardGround: Tile.Grass,
+    plazaHeart: Tile.Grass,
+    plazaProps: [
+      { prop: 'plant', count: [3, 6] },
+      { prop: 'vending', count: [0, 1] },
+    ],
+    encounters: { broodSacs: 0.35, sporeMites: 0.4 },
   },
 ]
+
+const THEME_BY_NAME = new Map(THEMES.map((t) => [t.name, t]))
+
+/** The district called `name`. */
+export const themeNamed = (name: ThemeName): Theme => THEME_BY_NAME.get(name)!
 
 /** Deterministic theme for a floor (1-based); consecutive floors always differ. */
 export const themeForFloor = (floor: number): Theme => THEMES[(floor - 1) % THEMES.length]

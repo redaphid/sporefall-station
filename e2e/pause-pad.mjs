@@ -6,14 +6,15 @@
 // run from there ticks at 30 Hz. Screenshots land in e2e/output/pause-pad/.
 //
 //   BASE_URL=http://127.0.0.1:4990 node e2e/pause-pad.mjs
-//   CDP_URL=http://localhost:<port> BASE_URL=http://localhost:4990 node e2e/pause-pad.mjs
-// CDP_URL drives a Chrome you launched yourself (real GPU), with its own
-// --remote-debugging-port and a throwaway --user-data-dir, never someone's
-// everyday browser. The run uses a fresh context of its own inside it.
+//   CDP_URL=<cdpUrl> BASE_URL=http://localhost:4990 node e2e/pause-pad.mjs
+// CDP_URL drives a Chrome from `node scripts/own-chrome.mjs launch` (real GPU),
+// never someone's everyday browser; :9222 is refused. The run uses a fresh
+// context of its own inside it.
 
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { assertNotPersonalChrome } from '../scripts/own-chrome.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:4990'
 const OUT = join(process.env.E2E_OUT ?? 'e2e/output', 'pause-pad')
@@ -64,6 +65,7 @@ const until = async (page, what, fn, ms = 20000) => {
   }
 }
 
+if (process.env.CDP_URL) assertNotPersonalChrome(process.env.CDP_URL)
 const browser = process.env.CDP_URL
   ? await chromium.connectOverCDP(process.env.CDP_URL)
   : await chromium.launch({ headless: true, args: ['--disable-gpu', '--disable-software-rasterizer'] })

@@ -5,18 +5,20 @@
 // per scene (landscape, as the game is played) plus the gallery (portrait and
 // landscape), and report.json, to e2e/output/scenes/.
 //
-//   node scripts/scenes-render-check.mjs [--base http://localhost:4991] [--cdp http://localhost:9222]
+//   node scripts/scenes-render-check.mjs [--base http://localhost:4991] [--cdp <cdpUrl from own-chrome>]
 //
 // Headless Chromium on WSL has no working WebGL (the tab crashes or draws
-// black), so point --cdp (or E2E_CDP) at a headed Chrome started with
-// --remote-debugging-port. The check opens its own browser context there and
-// closes it at the end; it never touches the browser's other tabs.
+// black), so point --cdp (or E2E_CDP) at a headed Chrome you launched with
+// `node scripts/own-chrome.mjs launch`; :9222 (the owner's Chrome) is refused.
+// The check opens its own browser context there and closes it at the end; it
+// never touches the browser's other tabs.
 // Exit code 0 only when every scene passes.
 
 import { chromium } from 'playwright'
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertNotPersonalChrome } from './own-chrome.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const arg = (name, fallback) => {
@@ -79,6 +81,7 @@ const pixelStats = (page, png, rect) =>
 
 const main = async () => {
   mkdirSync(OUT, { recursive: true })
+  if (CDP) assertNotPersonalChrome(CDP)
   const browser = CDP ? await chromium.connectOverCDP(CDP) : await chromium.launch({ headless: true })
   const context = await browser.newContext({ viewport: PORTRAIT, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
   const report = { base: BASE, via: CDP ? `cdp ${CDP}` : 'headless chromium', gallery: {}, scenes: [] }

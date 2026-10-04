@@ -8,7 +8,9 @@
 // A and the draft closes.
 //
 //   pnpm run build && pnpm exec vite preview --port 4899 --strictPort &
-//   E2E_CDP=http://127.0.0.1:9333 BASE_URL=http://localhost:4899 node e2e/feature-floor-draft-couch.mjs
+//   node scripts/own-chrome.mjs launch     # prints cdpUrl and lockfile
+//   E2E_CDP=<cdpUrl> BASE_URL=http://localhost:4899 node e2e/feature-floor-draft-couch.mjs
+//   node scripts/own-chrome.mjs kill <lockfile>
 
 import { record } from './lib.mjs'
 

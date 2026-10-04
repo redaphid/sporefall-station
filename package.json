@@ -34,6 +34,8 @@
     "e2e:ws:mp": "node e2e/ws-multiplayer.mjs",
     "e2e:ws:online": "node e2e/ws-online-menu.mjs",
     "e2e:ws:reliability": "node e2e/ws-online-reliability.mjs",
+    "e2e:ws:p2p": "node e2e/ws-p2p.mjs",
+    "netlab:measure": "node scripts/netlab/measure.mjs",
     "e2e:beta:rooms": "node e2e/beta-room-isolation.mjs",
     "e2e:play": "node e2e/play-session.mjs",
     "e2e:showcase": "node e2e/record-showcase.mjs",

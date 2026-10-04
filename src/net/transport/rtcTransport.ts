@@ -19,7 +19,7 @@ import { resolveWsBaseUrl, WsTransport } from './wsTransport'
  * that peer to the relay without dropping the session. The switch is one-way,
  * and each side tells the other over the relay so both stop using the link.
  *
- * The relay stays the session's anchor: a relay drop is a peer drop, as before.
+ * The relay stays the session's anchor: a relay drop is a peer drop.
  */
 
 /** First byte of every frame this transport puts on the relay. */

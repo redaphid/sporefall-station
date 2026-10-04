@@ -125,7 +125,7 @@ export class FakeRtcNet {
   pcs: FakePeerConnection[] = []
   /** ICE never finds a working pair: every peer must fall back to the relay. */
   blocked = false
-  /** Datagrams on unreliable channels vanish, nothing closes. */
+  /** Every channel goes quiet; nothing closes. */
   silent = false
   /** Fraction of unreliable datagrams lost, drawn from a seeded stream. */
   lossRate = 0

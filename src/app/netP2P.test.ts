@@ -114,7 +114,6 @@ describe('online play over WebRTC with the relay as fallback', () => {
     expect(r.client.renderView().self).toBe(avatar)
     expect(avatar.pos.x).toBeGreaterThan(xBefore + 3)
     expect(r.host.peersBySlot.size).toBe(1)
-    // Inventory goes out only on change, so the host sends it again after the switch.
     expect(r.host.debugInventorySends).toBeGreaterThan(invBefore)
     await r.stop()
   })

@@ -1,11 +1,9 @@
 import { type Conn, planClose, planFrame, planOpen } from '../../worker/roomRelay'
 import type { WsLike } from './wsTransport'
 
-// ---------------------------------------------------------------------------
 // In-memory relay harness: fake sockets wired through the SAME pure planner the
 // Durable Object uses (roomRelay.ts). This exercises the full WsTransport <-> relay
 // loop deterministically, no workerd. The real DO adapter is covered by e2e.
-// ---------------------------------------------------------------------------
 
 const CONNECTING = 0
 export const OPEN = 1

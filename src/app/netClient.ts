@@ -258,7 +258,7 @@ export class NetClientSession implements Session {
   private inputSeq = 0
   /** The newest records sent, oldest first: each Input message repeats them. */
   private sentRecords: InputRecord[] = []
-  /** Records per Input message. Tests and the netlab set 1 to measure without the repeats. */
+  /** Records per Input message. Tests set 1 to measure without the repeats. */
   inputRedundancy = INPUT_REDUNDANCY
   /** Unacked inputs, each with the predicted stair lock AFTER it ran — so a
    * reconcile can resume the lock exactly where the acked input left it. */
@@ -818,8 +818,8 @@ export class NetClientSession implements Session {
     if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
     if (cmd.draftPick !== undefined) this.pendingDraftPick = cmd.draftPick
 
-    // Send at ~15Hz (every 2nd tick). Each Input message carries this record
-    // and the INPUT_REDUNDANCY-1 before it, on the newest-wins lane (unreliable
+    // Each Input message carries this record and the inputRedundancy-1 before
+    // it, on the newest-wins lane (unreliable
     // where the link has one): a lost packet's records ride in the next one, and
     // the host folds each record once by seq. Pure taps (roll, throw, hotbar, mod
     // swap, draft pick) have no held state to re-convey them if more packets than

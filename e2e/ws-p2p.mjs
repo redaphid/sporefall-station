@@ -61,7 +61,6 @@ const main = async () => {
   }
   const shot = (page, label) => page.screenshot({ path: join(OUT, `ws-p2p-${label}.png`) })
 
-  /** Host a room, join it, start the run; returns both pages once both tick. */
   const playPair = async (tag, hostQuery) => {
     const host = await open(`${tag}Host`, hostQuery)
     await host.getByRole('button', { name: 'Host online game' }).click()

@@ -28,4 +28,7 @@ node e2e/ws-online-menu.mjs
 echo "[run-ws] online reliability proof (fault proxy: freeze, host vanishes, held code)…"
 node e2e/ws-online-reliability.mjs
 
+echo "[run-ws] peer-to-peer proof (WebRTC link between two contexts, then the relay with ?p2p=0)…"
+node e2e/ws-p2p.mjs
+
 echo "[run-ws] done. screenshots in e2e/output"

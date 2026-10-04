@@ -384,7 +384,7 @@ const EXT_MOD_SWAP = 1
 const EXT_DRAFT_PICK = 2
 
 const writeRecord = (w: ByteWriter, { cmd, edges }: InputRecord): void => {
-  // Bit 8 of `held` says whether aim is active: the angle byte can't encode a
+  // `held & 8` says whether aim is active: the angle byte can't encode a
   // centred stick (atan2(0,0)=0 looks like "aim right").
   const aimActive = Math.hypot(cmd.aimX, cmd.aimY) > 0.01
   const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0) | (aimActive ? 8 : 0)
@@ -396,7 +396,6 @@ const writeRecord = (w: ByteWriter, { cmd, edges }: InputRecord): void => {
     .u8(held)
     .u8(edges & 0xff)
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
-    // Hotbar slot as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
     .u8((swap ? EXT_MOD_SWAP : 0) | (pick ? EXT_DRAFT_PICK : 0))
   if (swap) w.u16(cmd.modSwap!)
@@ -430,7 +429,7 @@ const readRecord = (r: ByteReader): InputRecord => {
  * Input: [type][count u8] then `count` records, oldest first. A record is
  * seq u16, moveX, moveY, held, edges, aim, hotbar, ext (all u8), then a u16 mod
  * swap if ext&1 and a u8 draft pick if ext&2. The host folds each record once by
- * its seq (`InputGate`), so a repeated record is free and a lost packet's
+ * its seq (`foldInputRecord`, app/inputGate.ts), so a repeated record is free and a lost packet's
  * records arrive in the next one.
  */
 export const encodeInputBundle = (records: readonly InputRecord[]): Uint8Array => {
@@ -450,7 +449,6 @@ export const decodeInputBundle = (bytes: Uint8Array): InputRecord[] => {
   return out
 }
 
-/** A one-record Input message. */
 export const encodeInput = (cmd: InputCmd, edges: InputEdges): Uint8Array => encodeInputBundle([{ cmd, edges: edgeBits(edges) }])
 
 /** The newest record of an Input message. */

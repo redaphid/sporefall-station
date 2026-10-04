@@ -736,7 +736,7 @@ const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
 }
 
 /** The ICE candidate pair under each direct online link ("host" to "host" on
- * one wifi network), refreshed every second for `sporefall.session().pairs`. */
+ * one wifi network), for `sporefall.session().pairs`. */
 const linkPairs: Record<string, { local: string; remote: string; rttMs: number | null } | null> = {}
 const watchLinkPairs = (transport: Transport): void => {
   if (!(transport instanceof RtcTransport)) return

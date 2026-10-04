@@ -21,7 +21,7 @@ export const EDGE_WINDOW = 256
 export interface InputState {
   /** Newest seq whose continuous state is in `latestCmd`. The snapshot acks it. */
   lastInputSeq: number
-  /** False until the first record lands, so any first seq is accepted. */
+  /** Lets any first seq through. */
   hasInput: boolean
   latestCmd: InputCmd
   /** Edge bits folded since the last tick took them. */
@@ -51,7 +51,7 @@ const isNewer = (seq: number, than: number): boolean => {
   return d !== 0 && d < 0x8000
 }
 
-/** Fold one record into `s`. Records may arrive in any order and any number of times. */
+/** Records may arrive in any order and any number of times. */
 export const foldInputRecord = (s: InputState, { cmd, edges }: InputRecord): void => {
   const seq = cmd.seq & 0xffff
   if (!s.hasInput || isNewer(seq, s.lastInputSeq)) {

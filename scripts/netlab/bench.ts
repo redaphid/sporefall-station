@@ -27,7 +27,6 @@ interface RoleOpts {
 const TICK_MS = 1000 / 30
 const now = (): number => performance.now()
 
-/** Run `tick` at 30 Hz on a fixed step, catching up after a late timer. */
 const loop = (tick: () => void): (() => void) => {
   let next = now()
   const timer = setInterval(() => {

@@ -1,9 +1,12 @@
 // Drives a CDP-attached Chrome through Join co-op with Web Bluetooth stubbed
 // away and screenshots the can't-join screen (#15).
-// Usage: node scripts/test/join-unsupported-cdp.mjs <baseUrl> <outDir> [cdpUrl]
+// Usage: node scripts/test/join-unsupported-cdp.mjs <baseUrl> <outDir> <cdpUrl>
+// Point cdpUrl at a Chrome you launched for this (own port, throwaway
+// --user-data-dir), never someone's everyday browser.
 import { chromium } from 'playwright-core'
 
-const [BASE, OUT, CDP = 'http://localhost:9222'] = process.argv.slice(2)
+const [BASE, OUT, CDP] = process.argv.slice(2)
+if (!BASE || !OUT || !CDP) throw new Error('usage: join-unsupported-cdp.mjs <baseUrl> <outDir> <cdpUrl>')
 const assert = (ok, msg) => {
   if (!ok) throw new Error(`FAIL: ${msg}`)
   console.log(`ok   ${msg}`)

@@ -85,6 +85,10 @@
     // The loadout census CLI, run as `npx tsx scripts/census.mts` (docs/design/arena-census.md).
     "scripts/census.mts",
 
+    // The network lab (scripts/netlab/README.md): node entry points, and the
+    // bench page measure.mjs bundles with Vite.
+    "scripts/netlab/*.{ts,mjs}",
+
     // --- Playwright/ffmpeg e2e scenarios (e2e/) -----------------------------
     // Every e2e/*.mjs is a standalone Playwright scenario launched by node from
     // a shell script, which Knip cannot parse. Several are reached only by a
@@ -107,6 +111,7 @@
     "src/**/*.ts",
     "tools/**/*.ts",
     "scripts/test/**/*.{ts,mts,mjs}",
+    "scripts/netlab/*.{ts,mjs}",
     "e2e/**/*.mjs",
     "*.{ts,js}"
   ],

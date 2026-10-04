@@ -38,8 +38,10 @@ export default tseslint.config(
     // #15: joining used to build its own BroadcastChannel here as a silent
     // fallback, which reaches no phone. Every join transport comes from
     // openJoinTransport (src/app/openJoinTransport.ts), where it is tested.
+    // src/game is left out: a later no-restricted-syntax replaces an earlier
+    // one, which would switch off the sim's hp rule above.
     files: ['src/**/*.ts'],
-    ignores: ['src/app/openJoinTransport.ts', '**/*.test.ts'],
+    ignores: ['src/game/**', 'src/app/openJoinTransport.ts', '**/*.test.ts'],
     rules: {
       'no-restricted-syntax': ['error', {
         selector: "NewExpression[callee.name='BroadcastChannelTransport'][arguments.0.value='client']",

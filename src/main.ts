@@ -465,7 +465,7 @@ const boot = async (): Promise<void> => {
       paused: session.isPaused ?? false,
       ...(session instanceof NetHostSession ? { peers: session.lobbyPlayers() } : {}),
       ...(session instanceof NetHostSession || session instanceof NetClientSession
-        ? { link: session.linkStatus(), pairs: { ...linkPairs } }
+        ? { link: session.linkStatus(), pairs: onlineLink?.pairs() ?? {} }
         : {}),
       ...(session instanceof NetClientSession ? { predictionCorrections: session.predictionCorrections } : {}),
     }),
@@ -735,14 +735,11 @@ const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
   return { weapon, mods: weaponStack(view.self)?.mods ?? [] }
 }
 
-/** The ICE candidate pair under each direct online link ("host" to "host" on
- * one wifi network), for `sporefall.session().pairs`. */
-const linkPairs: Record<string, { local: string; remote: string; rttMs: number | null } | null> = {}
+/** The online transport of this page's session, for `sporefall.session().pairs`:
+ * the ICE candidate pair under each direct link ("host" to "host" on one wifi). */
+let onlineLink: RtcTransport | null = null
 const watchLinkPairs = (transport: Transport): void => {
-  if (!(transport instanceof RtcTransport)) return
-  setInterval(() => {
-    for (const peer of transport.peers()) void transport.selectedPair(peer).then((pair) => (linkPairs[peer] = pair))
-  }, 1000)
+  if (transport instanceof RtcTransport) onlineLink = transport
 }
 
 const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDeps): Promise<Session | null> => {

@@ -35,6 +35,10 @@ export class Hub {
   private conns = new Map<FakeSocket, Conn>()
   private seq = 0
 
+  /** One-way delay of every relayed frame, in ms. 0 delivers on a microtask.
+   * Frames stay in order, as on one TCP connection. */
+  constructor(readonly latencyMs = 0) {}
+
   /** The makeSocket factory handed to each transport. Parses ?role, registers the
    * connection, then (async, like a real upgrade) opens it and fans out planOpen. */
   connect = (url: string): WsLike => {
@@ -88,7 +92,9 @@ export class Hub {
       }
       if (!target || target.readyState !== OPEN) continue
       const data = a.data instanceof Uint8Array ? bufferOf(a.data) : JSON.stringify(a.data)
-      queueMicrotask(() => target.onmessage?.({ data }))
+      const deliver = (): void => target.onmessage?.({ data })
+      if (this.latencyMs > 0) setTimeout(deliver, this.latencyMs)
+      else queueMicrotask(deliver)
     }
   }
 }

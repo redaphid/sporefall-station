@@ -200,9 +200,22 @@ fallback (`src/net/transport/rtcTransport.ts`, #155).
   candidates fail and the router does not hairpin), and a browser without
   WebRTC. A link that closes, fails ICE, or goes 2 s without a byte moves that
   peer to the relay mid-run. Heartbeats keep an idle link's clock fed. The
-  session does not drop: the peer keeps its slot and avatar, the host resends
-  its inventory, and both sides stop using the link. `?p2p=0` keeps every peer
-  on the relay.
+  session does not drop: the peer keeps its slot and avatar, and both sides
+  stop using the link. `?p2p=0` keeps every peer on the relay.
+- **Back to P2P.** A peer on the relay does not stay there. The host retries a
+  direct link after 5 s, 15 s, then every 60 s, and the peer moves back the
+  moment one opens, so a wifi blip or a locked phone costs seconds of relay
+  play, not the rest of the run. A link that held for a minute starts the
+  next round of retries from 5 s again.
+- **Nothing reordered, little lost.** Moving down to the relay loses what was
+  in flight on the dying link. The host says the admission again (Welcome,
+  GameStart, Go, inventory), so a "play again" lost in the switch still lands;
+  the guest resends taps the host has not acknowledged; the host folds each
+  record once, so the repeats are harmless. As a backstop, a guest that sees
+  a second of snapshots from another run asks for its admission again. Moving
+  back up, the direct link is faster than the relay, so each side sends a
+  `p2p` marker behind its last relay frame, and the other side holds its
+  `ctl` messages until the marker lands.
 - **What the player sees.** The link chip reads "P2P 42 ms" or "Relay 88 ms".
   `sporefall.session()` reports `link.path`, the ICE candidate types per link
   (`pairs`), and the guest's `predictionCorrections`.

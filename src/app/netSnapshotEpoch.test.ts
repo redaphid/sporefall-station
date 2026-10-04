@@ -94,4 +94,25 @@ describe('snapshot run epoch', () => {
     expect(snaps.length).toBeGreaterThan(0)
     for (const s of snaps) expect(s[5]).toBe(2)
   })
+
+  it('asks for its admission again when the GameStart of a new run never came', async () => {
+    const { host, client, outbox, deliver } = await pair()
+    for (let i = 0; i < 30; i++) host.tick()
+    await flush()
+    deliver(outbox.splice(0))
+    host.restart()
+    await flush()
+    outbox.splice(0) // the new run's GameStart and Go are lost
+    for (let i = 0; i < 60; i++) {
+      host.tick()
+      await flush()
+      deliver(outbox.splice(0))
+    }
+    const view = client.renderView()
+    expect(client.phase).toBe('playing')
+    expect(view.simTick).toBeGreaterThan(30)
+    expect(view.simTick).toBeLessThan(70)
+    expect(view.self?.playerCtl).toBeDefined()
+  })
 })
+

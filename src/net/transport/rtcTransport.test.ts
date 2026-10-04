@@ -9,8 +9,8 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const FAST: RtcOptions = { iceTimeoutMs: 60, silenceMs: 120, heartbeatMs: 20 }
 
-const setup = async (opts: { net?: FakeRtcNet; host?: RtcOptions; client?: RtcOptions } = {}) => {
-  const hub = new Hub()
+const setup = async (opts: { net?: FakeRtcNet; host?: RtcOptions; client?: RtcOptions; relayMs?: number } = {}) => {
+  const hub = new Hub(opts.relayMs)
   const net = opts.net ?? new FakeRtcNet()
   const relayFrames = { count: 0 }
   const make = (role: 'host' | 'client', o: RtcOptions = {}) => {
@@ -60,7 +60,7 @@ describe('RtcTransport', () => {
     expect(dataOf(t.hostEvents)).toContainEqual({ bytes: [1, 2, 3], datagram: false })
     expect(dataOf(t.clientEvents)).toContainEqual({ bytes: [9, 8], datagram: true })
     expect(t.relayFrames.count).toBe(relayBefore)
-    expect(await t.host.selectedPair(guest)).toEqual({ local: 'host', remote: 'host', rttMs: 2 })
+    expect(t.host.pairs()[guest]).toEqual({ local: 'host', remote: 'host', rttMs: 2 })
     await t.stop()
   })
 
@@ -153,6 +153,73 @@ describe('RtcTransport', () => {
     await wait(10)
     expect(t.host.pathOf(t.guest())).toBe('p2p')
     expect(dataOf(t.hostEvents)).toEqual([])
+    await t.stop()
+  })
+
+  it('goes back to a direct link after a blip, without dropping the peer', async () => {
+    const t = await setup({ host: { retryDelaysMs: [300] } })
+    await wait(10)
+    const guest = t.guest()
+    t.net.silent = true
+    await wait(200)
+    expect(t.host.pathOf(guest)).toBe('relay')
+    expect(t.client.pathOf('host')).toBe('relay')
+    t.net.silent = false
+    await wait(400)
+    expect(t.host.pathOf(guest)).toBe('p2p')
+    expect(t.client.pathOf('host')).toBe('p2p')
+    expect(t.hostEvents.filter((e) => e.type === 'pathChanged').map((e) => e.type === 'pathChanged' && e.path)).toEqual(['relay', 'p2p'])
+    expect([...t.hostEvents, ...t.clientEvents].some((e) => e.type === 'peerDisconnected')).toBe(false)
+    expect(t.host.sendDatagram(guest, new Uint8Array([3]))).toBe(true)
+    await t.stop()
+  })
+
+  it('backs off between retries while the direct path stays blocked, then takes it when it clears', async () => {
+    const t = await setup({ host: { retryDelaysMs: [50, 150, 400] } })
+    await wait(10)
+    const guest = t.guest()
+    t.net.kill()
+    t.net.blocked = true
+    const pcsAt = (ms: number) => wait(ms).then(() => t.net.pcs.length)
+    const before = t.net.pcs.length
+    // Each attempt opens one pc per side; attempts land at about 50, 50+60+150, ...
+    expect(await pcsAt(80)).toBe(before + 2)
+    expect(await pcsAt(120)).toBe(before + 2)
+    expect(await pcsAt(150)).toBe(before + 4)
+    t.net.blocked = false
+    await wait(700)
+    expect(t.host.pathOf(guest)).toBe('p2p')
+    expect(t.client.pathOf('host')).toBe('p2p')
+    await t.stop()
+  })
+
+  it('keeps the reliable stream in order across a switch down to the relay and back up', async () => {
+    const t = await setup({ relayMs: 15, host: { retryDelaysMs: [150] } })
+    await wait(60)
+    const guest = t.guest()
+    expect(t.host.pathOf(guest)).toBe('p2p')
+    let n = 0
+    const pump = setInterval(() => {
+      const v = n++
+      void t.host.sendPacket(guest, new Uint8Array([v & 0xff, v >> 8])).catch(() => {})
+    }, 2)
+    await wait(30)
+    t.net.silent = true
+    await wait(180)
+    expect(t.host.pathOf(guest)).toBe('relay')
+    const sentOnRelayFrom = n
+    t.net.silent = false
+    await wait(300)
+    expect(t.host.pathOf(guest)).toBe('p2p')
+    await wait(40)
+    clearInterval(pump)
+    await wait(60)
+    const got = dataOf(t.clientEvents).map((d) => d.bytes[0] | (d.bytes[1] << 8))
+    // Messages sent into the silent link are lost. Everything sent from the
+    // switch to the relay on arrives, once, and nothing is ever out of order.
+    for (let i = 1; i < got.length; i++) expect(got[i], `message ${i}`).toBeGreaterThan(got[i - 1])
+    const seen = new Set(got)
+    for (let v = sentOnRelayFrom; v < n; v++) expect(seen.has(v), `message ${v}`).toBe(true)
     await t.stop()
   })
 })

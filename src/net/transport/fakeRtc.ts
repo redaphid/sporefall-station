@@ -1,5 +1,3 @@
-import { mulberry32 } from '../../game/rng'
-
 /**
  * An in-memory stand-in for the browser's RTCPeerConnection, for tests of
  * RtcTransport and the sessions over it. Two connections pair up through the
@@ -31,7 +29,7 @@ export class FakeChannel {
     if (this.readyState !== 'open') throw new Error(`channel ${this.label} is ${this.readyState}`)
     const target = this.peer
     if (!target || this.net.silent) return
-    if (!this.reliable && this.net.drop()) return
+    if (!this.reliable && this.net.drop(data)) return
     const copy = data.slice().buffer
     this.net.sent[this.reliable ? 'reliable' : 'unreliable']++
     queueMicrotask(() => {
@@ -127,16 +125,22 @@ export class FakeRtcNet {
   blocked = false
   /** Every channel goes quiet; nothing closes. */
   silent = false
-  /** Fraction of unreliable datagrams lost, drawn from a seeded stream. */
+  /** Fraction of unreliable datagrams lost. Which ones is a hash of their
+   * bytes, not a random stream: the order sends interleave in depends on
+   * timers, and a test must lose the same messages on a busy machine. */
   lossRate = 0
   sent = { reliable: 0, unreliable: 0 }
-  private rng = mulberry32(0x5eed)
 
   readonly makePeerConnection = (config: RTCConfiguration): RTCPeerConnection =>
     new FakePeerConnection(this, config) as unknown as RTCPeerConnection
 
-  drop(): boolean {
-    return this.lossRate > 0 && this.rng.next() < this.lossRate
+  drop(bytes: Uint8Array): boolean {
+    if (this.lossRate <= 0) return false
+    let h = 0x811c9dc5
+    for (const b of bytes) h = Math.imul(h ^ b, 0x01000193)
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d)
+    h ^= h >>> 13
+    return (h >>> 0) / 0x1_0000_0000 < this.lossRate
   }
 
   connect(offerer: FakePeerConnection, answerer: FakePeerConnection): void {

@@ -119,7 +119,7 @@ export class NetHostSession implements Session {
       if (ev.type === 'peerConnected') this.onPeerConnected(ev.peer)
       else if (ev.type === 'peerDisconnected') this.onPeerLost(ev.peer)
       else if (ev.type === 'data') this.onData(ev.peer, ev.bytes, ev.datagram === true)
-      else if (ev.type === 'pathChanged') this.onPathChanged(ev.peer)
+      else if (ev.type === 'pathChanged') this.onPathChanged(ev.peer, ev.path)
     })
   }
 
@@ -464,12 +464,13 @@ export class NetHostSession implements Session {
     else p.reader.push(bytes, (msg) => this.onMessage(peer, p, msg))
   }
 
-  /** The peer's link switched paths, and reliable messages in flight on the old
-   * one may be gone. Inventory is sent only on change, so send it again; State
-   * repeats on its own. */
-  private onPathChanged(peer: PeerId): void {
+  /** The peer's direct link died, and reliable messages in flight on it are
+   * gone: a "play again" GameStart/Go among them would leave the guest refusing
+   * every snapshot of the new run. Say the admission again (it is idempotent,
+   * and resends the inventory too); State repeats on its own. */
+  private onPathChanged(peer: PeerId, path: LinkPath): void {
     const p = this.peers.get(peer)
-    if (p) p.lastInvSig = ''
+    if (p && p.slot >= 0 && path === 'relay') this.reanswerAdmission(p)
   }
 
   private onMessage(_peer: PeerId, p: PeerState, msg: Uint8Array): void {

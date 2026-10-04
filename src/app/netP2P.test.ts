@@ -134,7 +134,8 @@ describe('online play over WebRTC with the relay as fallback', () => {
     const net = new FakeRtcNet()
     net.lossRate = 0.05
     const input = tapper(9)
-    const r = await rig({ net, input: input.src })
+    // A slow test runner must not read as a silent link and move play to the relay.
+    const r = await rig({ net, input: input.src, rtc: { silenceMs: 10_000 } })
     await r.play(960)
     expect(r.client.linkStatus().path).toBe('p2p')
     expect(input.taps()).toBe(100)
@@ -146,9 +147,11 @@ describe('online play over WebRTC with the relay as fallback', () => {
     const net = new FakeRtcNet()
     net.lossRate = 0.05
     const input = tapper(9)
-    const r = await rig({ net, input: input.src })
+    // A slow test runner must not read as a silent link and move play to the relay.
+    const r = await rig({ net, input: input.src, rtc: { silenceMs: 10_000 } })
     r.client.inputRedundancy = 1
     await r.play(960)
+    expect(r.client.linkStatus().path).toBe('p2p')
     expect(risingEdges(r.ran)).toBeLessThan(input.taps())
     await r.stop()
   })
@@ -170,4 +173,60 @@ describe('online play over WebRTC with the relay as fallback', () => {
     expect(r.net.pcs).toHaveLength(0)
     await r.stop()
   })
+
+  it('a "play again" lost on a dying link still reaches the guest over the relay', async () => {
+    const r = await rig({ rtc: { retryDelaysMs: [60_000] } })
+    await r.play(30)
+    r.net.silent = true
+    r.host.restart()
+    await r.play(6)
+    await wait(250)
+    expect(r.client.linkStatus().path).toBe('relay')
+    // Fewer ticks than the guest's own backstop needs: this is the host
+    // saying the admission again on the path change.
+    await r.play(15)
+    const view = r.client.renderView()
+    expect(r.client.phase).toBe('playing')
+    expect(view.simTick).toBeLessThan(40)
+    expect(view.simTick).toBeGreaterThan(15)
+    expect(view.self?.playerCtl).toBeDefined()
+    await r.stop()
+  })
+
+  it('a roll tapped into a dying link fires once, after the switch to the relay', async () => {
+    let t = 0
+    let rollAt = -1
+    const input: InputSource = { sample: () => (t++, { ...emptyInput(), moveX: 1, roll: t === rollAt }) }
+    const r = await rig({ input, rtc: { retryDelaysMs: [60_000] } })
+    await r.play(30)
+    r.net.silent = true
+    rollAt = t + 1
+    // Long enough that the roll's record falls out of the repeated four.
+    await r.play(20)
+    await wait(250)
+    expect(r.client.linkStatus().path).toBe('relay')
+    await r.play(30)
+    expect(r.ran.filter((c) => c.roll)).toHaveLength(1)
+    await r.stop()
+  })
+
+  it('a blip ends back on the direct link, with the run going throughout', async () => {
+    const r = await rig({ rtc: { retryDelaysMs: [300] } })
+    await r.play(30)
+    const avatar = r.client.renderView().self
+    r.net.silent = true
+    await wait(220)
+    expect(r.client.linkStatus().path).toBe('relay')
+    r.net.silent = false
+    await r.play(20)
+    await wait(350)
+    await r.play(30)
+    expect(r.client.linkStatus().path).toBe('p2p')
+    expect(r.host.linkStatus().path).toBe('p2p')
+    expect(r.client.phase).toBe('playing')
+    expect(r.client.renderView().self).toBe(avatar)
+    expect(r.client.renderView().simTick).toBeGreaterThan(70)
+    await r.stop()
+  })
 })
+

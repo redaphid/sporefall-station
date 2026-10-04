@@ -209,9 +209,14 @@ def build_graph(
     return g
 
 
-def run(graph, dest_dir, timeout=900):
-    """Queue a graph, wait, download every produced image to dest_dir. Returns paths."""
-    pid = post("/prompt", {"prompt": graph})["prompt_id"]
+def run(graph, dest_dir, timeout=900, workflow=None):
+    """Queue a graph, wait, download every produced image to dest_dir. Returns paths.
+    `workflow` (editor format) rides along as extra_pnginfo, so SaveImage embeds it next
+    to `prompt` and the raw can be dragged back into ComfyUI."""
+    body = {"prompt": graph}
+    if workflow is not None:
+        body["extra_data"] = {"extra_pnginfo": {"workflow": workflow}}
+    pid = post("/prompt", body)["prompt_id"]
     os.makedirs(dest_dir, exist_ok=True)
     for _ in range(timeout):
         time.sleep(1)

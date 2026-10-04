@@ -69,8 +69,8 @@ describe('sequenced casting: golden digests', () => {
   // except that `misdeedUntilTick` now sorts after `downed`. The city-word
   // pass (5c2b17a6, 1378fed3 before it) renamed weapon and tile ids only.
   // Seed 1234 re-pinned again when the ATM left the shopfloor layout: putting
-  // back `{ g: 'one', prop: 'atm' }` in furnish.ts and `OBJECTS.atm`
-  // reproduces f257474f. The floor is an authored city level
+  // it back (the shopfloor `one` group in furnish.ts, its wall placement, and
+  // its OBJECTS entry) reproduces f257474f. The floor is an authored city level
   // (createCityWorld), which digests the same as the seeded one did.
   const GOLDEN: Record<number, string> = {
     7: 'ee4057c8',

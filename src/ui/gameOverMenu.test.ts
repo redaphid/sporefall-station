@@ -39,6 +39,19 @@ describe('run-over screen: Main menu', () => {
     expect(quits).toBe(1)
   })
 
+  it('a tap-armed Main menu does not carry over to the next time the screen comes up', () => {
+    let quits = 0
+    const screens = createScreens(document.body, () => {}, undefined, () => {}, undefined, () => quits++)
+    screens.update(gameOverView())
+    mainMenu()!.click() // a tap: armed, never focused, so never blurred
+    expect(mainMenu()!.dataset.armed).toBe('')
+    screens.update({ ...gameOverView(), gameOver: false }) // revived: the screen goes away
+    screens.update(gameOverView()) // downed again later
+    expect(mainMenu()!.textContent).toBe('Main menu')
+    mainMenu()!.click()
+    expect(quits).toBe(0)
+  })
+
   it('a held Enter on it cannot quit', () => {
     const screens = createScreens(document.body, () => {}, undefined, () => {}, undefined, () => {})
     screens.update(gameOverView())

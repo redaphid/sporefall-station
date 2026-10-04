@@ -29,6 +29,14 @@ export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
  * walls block sight, and the door is the player's choice to open. */
 export const SPAWN_SAFE_RADIUS = 9
 
+/** The landing floor's wider berth: nothing that roams or patrols starts, or
+ * walks a beat, this close to the floor-1 spawn, so an idle player is not
+ * found inside their first ten seconds whichever district they land in. */
+export const LANDING_SAFE_RADIUS = 16
+
+/** The spawn berth on floor `w.floor`. */
+const safeRadius = (w: World): number => (w.floor === 1 ? LANDING_SAFE_RADIUS : SPAWN_SAFE_RADIUS)
+
 /** A weighted arsenal every populated NPC draws from, so a floor fields a fun
  * SPREAD of weapons rather than one archetype-locked stick. Common melee/pistol
  * dominate; heavy and elemental guns are the rarer spice (so freeze/fire/shock
@@ -709,7 +717,7 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
       // On the landing a beat that passes within the spawn-safe radius is
       // walked by no one: its first guard keeps to the building instead.
       const planned = patrolBeat(building, spec === specs[0] && i === 0)
-      const beat = planned && w.floor === 1 && planned.some((q) => vlen(q.x - w.level.spawn.x, q.y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) ? undefined : planned
+      const beat = planned && w.floor === 1 && planned.some((q) => vlen(q.x - w.level.spawn.x, q.y - w.level.spawn.y) < safeRadius(w)) ? undefined : planned
       const pos = beat ? beat[0] : spot
       const npc = spawnNpc(w, spec.archetype, pos.x, pos.y, wrng)
       // #77 — bind the NPC to the module it lives/works/guards in, so its brain
@@ -844,11 +852,15 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
       // The pair walks a shared street beat instead of loitering at one corner.
       // Waypoints respect the spawn-safe radius too, so a beat never marches
       // the pair straight through the player's landing zone.
+      // A leg is kept only if its whole line stays outside the berth: the
+      // waypoints alone do not, since a leg can cut right past the spawn.
       const beat = [{ x: spot.x, y: spot.y }]
       for (let j = 0; j < 2; j++) {
         const p = randomStreetSpot(w, rng, Tile.Street)
-        if (p) beat.push(p)
+        if (p && distToSegment(w.level.spawn, beat[beat.length - 1], p) >= safeRadius(w)) beat.push(p)
       }
+      // The beat loops, so its closing leg back to the start must clear too.
+      if (beat.length > 2 && distToSegment(w.level.spawn, beat[beat.length - 1], beat[0]) < safeRadius(w)) beat.pop()
       assignPatrol(a, beat)
       assignPatrol(b, beat)
     }
@@ -1105,7 +1117,7 @@ const randomFloorInBuilding = (
     // A complex module may be L-shaped: its bounding rect then takes in a
     // neighbour's floor, so only a tile of one of its OWN rooms counts.
     if (w.level.complex && !building.rooms.some((r) => rectContains(r, tx, ty))) continue
-    if (occupant && (w.level.complex || w.floor === 1) && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (occupant && (w.level.complex || w.floor === 1) && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < safeRadius(w)) continue
     if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }
@@ -1122,7 +1134,7 @@ const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: num
     if (w.level.tiles[ty * w.level.w + tx] !== tile) continue
     const x = tx + 0.5
     const y = ty + 0.5
-    if (vlen(x - w.level.spawn.x, y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (vlen(x - w.level.spawn.x, y - w.level.spawn.y) < safeRadius(w)) continue
     return { x, y }
   }
   return null

@@ -297,12 +297,8 @@ describe('tide-medic: the wounded fall back to the Bog Mender, are patched, and 
       for (const b of walked) expect(b.walkedIn!, story).toBeLessThan(b.rejoinDist! - 1)
       // A fighter may well break the raid afterwards (catching the wounded is
       // the counter); the player who only watches must see it hold together.
-      // That includes the Bog Mender: a fighter who has shot the grunts down
-      // finds it the nearest raider and kills it too.
-      if (pilot === idle) {
-        expect(log.some((e) => e.type === 'raidRouted')).toBe(false)
-        expect(medic.dead).toBeFalsy()
-      }
+      if (pilot === idle) expect(log.some((e) => e.type === 'raidRouted')).toBe(false)
+      expect(medic.dead).toBeFalsy()
     })
   }
 })

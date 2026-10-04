@@ -232,8 +232,8 @@ export const THEMES: readonly Theme[] = [
     courtyardGround: Tile.Bog,
     plazaHeart: Tile.Bog,
     plazaProps: [
-      { prop: 'atm', count: [1, 2] },
-      { prop: 'bench', count: [1, 3] },
+      { prop: 'bench', count: [2, 4] },
+      { prop: 'table', count: [1, 2] },
       { prop: 'vending', count: [0, 1] },
     ],
     encounters: { stalkers: 0.3 },

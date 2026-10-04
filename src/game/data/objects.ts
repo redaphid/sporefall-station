@@ -38,7 +38,7 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // a fraction of the amount. FLAGGED for review: this is the one substitution
   // in the cull rather than a straight deletion.
   vending: { id: 'vending', name: 'Nutrient Dispenser', hp: 40, loot: ['cash'], use: { gives: 'cash', amount: 10 } },
-  atm: { id: 'atm', name: 'Payout Terminal', hp: 50, hackable: true, use: { gives: 'cash', amount: 50 } },
+  atm: { id: 'atm', name: 'ATM', hp: 50, hackable: true, use: { gives: 'cash', amount: 50 } },
   generator: { id: 'generator', name: 'Generator', hp: 30, hackable: true, explode: { radius: 1.6, damage: 15 }, ignite: true },
   // Sporefall Station power plant — same hackable behavior as `generator`, dressed
   // as the station's Cryo Terminal so a power-cut objective reads in-fiction.

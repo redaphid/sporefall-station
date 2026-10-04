@@ -17,7 +17,7 @@ The colony's company core is where every catch was weighed, tallied and paid out
 
 - **Layout.** Dense paved blocks (3-4 lots per axis), arcades (corridor spines in 65% of halls) and payroll strongrooms (vaults, 30%). Courtyard pits and plaza hearts are drowned basins (`Tile.Bog`), and yards stay paved.
 - **Roles and names.** It has tally halls (`office`), weigh-houses (`shop`), company lodging (`apartment`), the company infirmary (`clinic`) and a bond store (`warehouse`).
-- **Squares.** Each square holds 1-2 Payout Terminals (the `atm` archetype), 1-3 benches and sometimes a Nutrient Dispenser.
+- **Squares.** Each square holds 2-4 benches, 1-2 tally tables and sometimes a Nutrient Dispenser.
 - **Encounters.** From floor 2, Mireclaw Stalkers scavenge the counters (30% of buildings).
 - **Look.** Station white gone yellow, `0xf6eccc`.
 
@@ -65,7 +65,6 @@ These are the props and tiles the districts would use. Today they borrow the pro
 | `prop.grow-lamp` | Culture Beds | A hanging spore-lamp on a bent pole that casts one olive pool of light (the frame's one hot light). |
 | `prop.irrigation-trough` | Culture Beds | A copper trough on trestles, overflowing onto the moss and furred with mycelium. |
 | `tile.furrow` | Culture Beds | Tilled moss in parallel furrows with root threads; it would replace `grass` in beds. |
-| `prop.payout-terminal` | Concourse | A brass-cased company terminal with a slotted payout tray, a cracked glass tally dial and a company logo half under a painted waterline stripe. It would replace the borrowed cryo-terminal art on `atm`. |
 | `prop.weigh-scale` | Concourse | A hanging brass catch-scale with a hook and a jar cage, its needle stuck, the "monger's thumb" counterweight still on it. |
 | `tile.waterline-wall` | Concourse | Wall art carrying stacked, hand-painted high-water stripes, each one cruder than the last, over faded corporate lettering. |
 | `tile.drowned-basin` | Concourse | A fountain basin's tiled rim around bog water, with a dry spout. It would replace `bog` in its squares and courts. |

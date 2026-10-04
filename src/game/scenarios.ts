@@ -807,6 +807,16 @@ const clearCast = (w: World): Entity | undefined => {
   w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Hold out against the tide' }
   const player = w.entities.find((e) => e.playerCtl)
   if (player?.health) player.health = { hp: 100000, max: 100000, iframes: 0 }
+  // AI rhythms phase on entity id (the think stagger is `id % 5`), and these
+  // set-pieces were tuned with the player on an id ≡ 0 (mod 5) and the cast
+  // numbered straight after it. Re-key the player onto that phase so the beat
+  // holds whatever the floor's population happened to number.
+  if (player) {
+    w.byId.delete(player.id)
+    w.nextId = Math.ceil(w.nextId / 5) * 5
+    player.id = w.nextId++
+    w.byId.set(player.id, player)
+  }
   return player
 }
 

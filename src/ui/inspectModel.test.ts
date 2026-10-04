@@ -46,11 +46,11 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
     expect(label('stalker')).toBe('Unaligned')
   })
 
-  it('no NPC card shows a bare faction id', () => {
+  it('every NPC card names its faction with a lore label, never a bare faction id', () => {
     const w = world()
-    const raw = new Set(['Civ', 'Warden', 'Rootcult', 'Neutral'])
+    const lore = ['Settlers', 'Spore Wardens', 'Rootcult', 'Unaligned']
     for (const a of Object.keys(NPCS)) {
-      expect(raw.has(rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction), a).toBe(false)
+      expect(lore, a).toContain(rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction)
     }
   })
 

@@ -28,6 +28,7 @@ __pycache__/
 
 # transient art sweep staging (never committed)
 .art-stage/
+sprite-sheets/
 
 # Generated A/B baseline for the tween harness (see tools/tween/make-baseline.sh)
 tools/tween/baseline/

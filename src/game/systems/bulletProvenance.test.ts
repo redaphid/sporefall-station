@@ -1,13 +1,13 @@
-// A default-mode bullet's provenance (`projectile.mods`) is what the renderer and
-// every co-op peer build its look from, so it must list only what the shot
-// executes. A gun holds every element the player picked, but a hit applies only
-// the newest one (#106). The overridden elements must not ride the bullet, or a
-// Tesla-then-Cryo round (which freezes) looks exactly like a Cryo-then-Tesla
-// round (which zaps).
+// A bullet's provenance (`projectile.mods`) is what the renderer and every
+// co-op peer build its look from, so it must list only what the shot executes
+// (#118). A gun holds every mod the player picked, but each pull fires one cast:
+// the modifiers before an element plus that element. A round carries only its
+// own cast's mods, so a Tesla round never looks like it freezes.
 //
 // Every case sets exact world state and fires through the real combat system.
 
 import { describe, expect, it } from 'vitest'
+import { WEAPONS } from '../data/items'
 import { MODS } from '../data/mods'
 import { makeEntity, type Entity, type WeaponMod } from '../entity'
 import { spawnPlayer } from '../player'
@@ -16,17 +16,18 @@ import { arm } from '../testkit'
 import { emptyInput } from '../types'
 import { addEntity, createWorld, type World } from '../world'
 import { combatSystem } from './combat'
+import { cycleCasts, liveEntries, sequenceShape } from './modSequence'
 import { projectileSystem } from './projectiles'
-import { weaponStack } from './inventory'
 
 const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
 
-const rig = (weapon = 'pistol', mods?: WeaponMod[]): { w: World; p: Entity } => {
+const rig = (weapon = 'pistol', mods?: WeaponMod[], castIndex?: number): { w: World; p: Entity } => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
   const stack = arm(p, weapon)
   if (mods) stack.mods = mods.map((x) => ({ ...x }))
+  if (castIndex !== undefined) stack.castIndex = castIndex
   p.facing = 0
   return { w, p }
 }
@@ -39,10 +40,10 @@ const pull = (w: World, p: Entity): Entity[] => {
   return w.entities.filter((e) => !before.has(e.id) && e.kind === 'projectile')
 }
 
-const shoot = (mods: WeaponMod[], weapon = 'pistol'): Entity => {
+/** The first round of each of `n` consecutive pulls. */
+const rounds = (mods: WeaponMod[], n: number, weapon = 'pistol'): Entity[] => {
   const { w, p } = rig(weapon, mods)
-  const [b] = pull(w, p)
-  return b
+  return Array.from({ length: n }, () => pull(w, p)[0])
 }
 
 const isElement = (id: string): boolean => MODS[id]?.onHit !== undefined
@@ -55,45 +56,37 @@ const landingElement = (b: Entity): string[] => {
   return Object.values(MODS).filter((d) => d.onHit?.status === status).map((d) => d.id)
 }
 
-describe('default-mode bullet provenance lists only what executes', () => {
-  it('Tesla then Cryo: the round freezes and carries frost, not shock', () => {
-    const b = shoot([m('shock'), m('frost')])
+describe("a round's provenance lists only its own cast", () => {
+  it('Tesla then Cryo: the first round zaps and carries only shock, the second freezes and carries only frost', () => {
+    const [a, b] = rounds([m('shock'), m('frost')], 2)
+    expect(a.projectile!.onHit?.status).toBe('electrified')
+    expect(a.projectile!.mods).toEqual([m('shock')])
     expect(b.projectile!.onHit?.status).toBe('frozen')
     expect(b.projectile!.mods).toEqual([m('frost')])
   })
 
-  it('Cryo then Tesla: the round zaps and carries shock, not frost', () => {
-    const b = shoot([m('frost'), m('shock')])
-    expect(b.projectile!.onHit?.status).toBe('electrified')
-    expect(b.projectile!.mods).toEqual([m('shock')])
-  })
-
-  it('the two orders no longer carry the same provenance', () => {
-    expect(shoot([m('shock'), m('frost')]).projectile!.mods).not.toEqual(shoot([m('frost'), m('shock')]).projectile!.mods)
-  })
-
-  it('non-element mods all stay, with their stacks, around the winning element', () => {
-    const b = shoot([m('shock'), m('pierce', 2), m('incendiary'), m('rapid', 3), m('frost'), m('overload')])
-    expect(b.projectile!.onHit?.status).toBe('frozen')
-    expect(b.projectile!.mods).toEqual([m('frost'), m('overload'), m('pierce', 2), m('rapid', 3)])
+  it('modifiers, with their stacks, ride only the element after them', () => {
+    const [a, b, c] = rounds([m('shock'), m('pierce', 2), m('incendiary'), m('rapid', 3), m('frost')], 3, 'machinegun')
+    expect(a.projectile!.mods).toEqual([m('shock')])
+    expect(a.projectile!.pierceLeft).toBeUndefined()
+    expect(b.projectile!.mods).toEqual([m('incendiary'), m('pierce', 2)])
     expect(b.projectile!.pierceLeft).toBe(2)
+    expect(c.projectile!.mods).toEqual([m('frost'), m('rapid', 3)])
   })
 
-  it('a gun with only non-element mods keeps every one', () => {
-    const b = shoot([m('pierce'), m('bounce'), m('lifesteal')])
-    expect(b.projectile!.mods).toEqual([m('bounce'), m('lifesteal'), m('pierce')])
+  it('a gun with only non-element mods keeps every one on every round', () => {
+    for (const b of rounds([m('pierce'), m('bounce'), m('lifesteal')], 3)) expect(b.projectile!.mods).toEqual([m('bounce'), m('lifesteal'), m('pierce')])
   })
 
-  it('a newer element overrides the base weapon element, and only the mod shows', () => {
-    const b = shoot([m('shock')], 'freezeRay')
+  it("a cast's element overrides the base weapon element, and only the mod shows", () => {
+    const [b] = rounds([m('shock')], 1, 'freezeRay')
     expect(b.projectile!.onHit?.status).toBe('electrified')
     expect(b.projectile!.mods).toEqual([m('shock')])
   })
 
-  it('a repeated winning element still shows once, capped', () => {
-    const b = shoot([m('frost'), m('shock'), m('frost')])
-    expect(b.projectile!.onHit?.status).toBe('frozen')
-    expect(b.projectile!.mods).toEqual([m('frost')])
+  it('a repeated element entry is a cast of its own each time', () => {
+    const got = rounds([m('frost'), m('shock'), m('frost')], 3)
+    expect(got.map((b) => b.projectile!.mods)).toEqual([[m('frost')], [m('shock')], [m('frost')]])
   })
 
   it.each([
@@ -101,33 +94,39 @@ describe('default-mode bullet provenance lists only what executes', () => {
     ['a negative-stack element', [m('frost'), m('shock', -2)]],
     ['a NaN-stack element', [m('frost'), m('shock', NaN)]],
     ['an unknown id', [m('frost'), m('no-such-mod')]],
-  ])('%s after the winner neither lands nor shows', (_label, mods) => {
-    const b = shoot(mods)
-    expect(b.projectile!.onHit?.status).toBe('frozen')
-    expect(b.projectile!.mods).toEqual([m('frost')])
+  ])('%s after an element neither lands nor shows, on any pull', (_label, mods) => {
+    for (const b of rounds(mods, 3)) {
+      expect(b.projectile!.onHit?.status).toBe('frozen')
+      expect(b.projectile!.mods).toEqual([m('frost')])
+    }
   })
 
-  it('every ordering of every subset: the element shown is the element that lands', () => {
+  it('every ordering of every subset, every pull of the cycle: the element shown is the element that lands', () => {
     const pool = ['frost', 'incendiary', 'shock', 'pierce', 'rapid']
     const arrangements = (xs: string[]): string[][] =>
       [[] as string[]].concat(xs.flatMap((x, i) => arrangements([...xs.slice(0, i), ...xs.slice(i + 1)]).map((rest) => [x, ...rest])))
-    const { w, p } = rig('pistol')
-    const stack = weaponStack(p)!
+    const shape = sequenceShape(WEAPONS.pistol)
     const lists = arrangements(pool)
     expect(lists).toHaveLength(326)
     for (const list of lists) {
-      stack.mods = list.map((id) => m(id))
-      const [b] = pull(w, p)
-      const label = list.join(' > ') || '(none)'
-      expect(shownElements(b), label).toEqual(landingElement(b))
-      expect(ids(b).filter((id) => !isElement(id)), label).toEqual(list.filter((id) => !isElement(id)).sort())
+      const mods = list.map((id) => m(id))
+      const cycle = Math.max(1, cycleCasts(mods, shape))
+      const shown: string[] = []
+      for (const b of rounds(mods, cycle)) {
+        const label = list.join(' > ') || '(none)'
+        expect(shownElements(b), label).toEqual(landingElement(b))
+        expect(shownElements(b).length, label).toBeLessThanOrEqual(1)
+        shown.push(...ids(b))
+      }
+      // Across one cycle the rounds show exactly the live window, each mod once.
+      expect(shown.sort(), list.join(' > ')).toEqual(liveEntries(mods, shape.slots).map((i) => list[i]).sort())
     }
   })
 })
 
 describe('provenance survives the paths a round takes after it spawns', () => {
-  it('split shards inherit the filtered provenance, never the overridden element', () => {
-    const { w, p } = rig('pistol', [m('shock'), m('split'), m('frost')])
+  it("split shards carry their cast's provenance, never another cast's element", () => {
+    const { w, p } = rig('pistol', [m('shock'), m('split'), m('frost')], 1)
     const victim = addEntity(w, makeEntity('npc', 'civilian', 22, 20))
     victim.health = { hp: 1, max: 40, iframes: 0 }
     const [parent] = pull(w, p)
@@ -141,8 +140,8 @@ describe('provenance survives the paths a round takes after it spawns', () => {
     for (const s of shards) expect(ids(s)).not.toContain('shock')
   })
 
-  it('splinter fragments carry the winning element and only its provenance', () => {
-    const { w, p } = rig('pistol', [m('frost'), m('splinterShot'), m('shock')])
+  it("splinter fragments carry their cast's element and only its provenance", () => {
+    const { w, p } = rig('pistol', [m('frost'), m('splinterShot'), m('shock')], 1)
     const [parent] = pull(w, p)
     parent.projectile!.ttl = 1
     projectileSystem(w)
@@ -154,8 +153,8 @@ describe('provenance survives the paths a round takes after it spawns', () => {
     }
   })
 
-  it('the filtered provenance round-trips through world serialization byte for byte', () => {
-    const { w, p } = rig('pistol', [m('shock'), m('pierce'), m('frost')])
+  it("a cast's provenance round-trips through world serialization byte for byte", () => {
+    const { w, p } = rig('pistol', [m('shock'), m('pierce'), m('frost')], 1)
     pull(w, p)
     const json = serializeWorld(w)
     const back = deserializeWorld(json)

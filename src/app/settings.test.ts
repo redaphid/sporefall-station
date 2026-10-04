@@ -49,7 +49,7 @@ describe('clampSettings', () => {
       effectsQuality: 'low' as const,
       shaderFx: 'reduced' as const,
       theme: 'swamp',
-      flags: { newEnemyArt: false, sequencedMods: true },
+      flags: { newEnemyArt: false },
       fullscreen: false,
     }
     expect(clampSettings(s)).toEqual(s)

@@ -525,7 +525,10 @@ const setupNpcCombat = (w: World): void => {
   const R = 8 // half-size of the carved clearing
   for (let y = cy - R; y <= cy + R; y++) {
     for (let x = cx - R; x <= cx + R; x++) {
-      if (x > 0 && y > 0 && x < w.level.w - 1 && y < w.level.h - 1) w.level.tiles[y * w.level.w + x] = Tile.Floor
+      if (x > 0 && y > 0 && x < w.level.w - 1 && y < w.level.h - 1) {
+        w.level.tiles[y * w.level.w + x] = Tile.Floor
+        w.level.solid[y * w.level.w + x] = 0
+      }
     }
   }
   // Blank the randomly-populated crowd/loot so only the staged fight is on screen.
@@ -771,10 +774,9 @@ const stageArtCompare = (w: World): void => {
 // ── The group layer's set-pieces (systems/groups.ts, docs/design/enemy-groups.md)
 //
 // Unlike the carved stages above, these NEVER touch a tile: they run on the
-// seed's own generated level, so a moment captured from one with
-// `sporefallShare()` restores through `?state=` (deserializeWorld regenerates the
-// level from seed+floor and refuses a checksum drift — a carved stage cannot be
-// shared). They clear the random cast (NPCs only — doors and furniture stay, the
+// seed's own generated level, so a snapshot of one carries only the level's
+// checksum and regenerates it from seed+floor. (A carved stage shares too: its
+// snapshot carries the carved level whole, see serialize.ts.) They clear the random cast (NPCs only — doors and furniture stay, the
 // sapper needs its door), make the player a tank so the clip never ends on a
 // down, and stage one group against it through the same spawners play uses.
 // Placement is a pure function of the seed (findArrival + a scenario fork), so

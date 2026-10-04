@@ -1,0 +1,195 @@
+{
+ "1": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "qwen_image_edit_2511_fp8_e4m3fn.safetensors",
+   "weight_dtype": "default"
+  },
+  "_meta": {
+   "title": "Qwen-Image-Edit"
+  }
+ },
+ "2": {
+  "class_type": "LoraLoaderModelOnly",
+  "inputs": {
+   "model": [
+    "1",
+    0
+   ],
+   "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+   "strength_model": 1.0
+  },
+  "_meta": {
+   "title": "Lightning 4-step LoRA (bypass = 20 steps, CFG 2.5)"
+  }
+ },
+ "3": {
+  "class_type": "ModelSamplingAuraFlow",
+  "inputs": {
+   "model": [
+    "2",
+    0
+   ],
+   "shift": 3.1
+  }
+ },
+ "4": {
+  "class_type": "CFGNorm",
+  "inputs": {
+   "model": [
+    "3",
+    0
+   ],
+   "strength": 1.0
+  }
+ },
+ "5": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  }
+ },
+ "6": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_vae.safetensors"
+  }
+ },
+ "7": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "character.png"
+  },
+  "_meta": {
+   "title": "character (square, on white)"
+  }
+ },
+ "8": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "image1": [
+    "7",
+    0
+   ],
+   "prompt": ""
+  },
+  "_meta": {
+   "title": "negative (ignored at CFG 1)"
+  }
+ },
+ "9": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "8",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "10": {
+  "class_type": "EmptySD3LatentImage",
+  "inputs": {
+   "width": 2000,
+   "height": 800,
+   "batch_size": 1
+  }
+ },
+ "11": {
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "inputs": {
+   "clip": [
+    "5",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ],
+   "prompt": "Create a character turnaround sprite sheet of this exact character: 5 full-body views in one row, evenly spaced, the same size, standing on the same baseline. Left to right: 1 front view, facing the viewer, 2 three-quarter front view, body turned 45 degrees toward the right side of the image, 3 full side profile facing the right side of the image, nose pointing right, 4 three-quarter back view, turned away from the viewer toward the upper right of the image, back and shoulder visible, face hidden, 5 back view seen from directly behind, back of the head visible, face hidden. Keep the exact same design, outfit, colors and proportions in every view. Plain flat pure white background, no shadow, no text, no labels, no grid lines. Crisp pixel art, thick dark outline, flat cel shading, bold readable shapes.",
+   "image1": [
+    "7",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "turnaround prompt"
+  }
+ },
+ "12": {
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "inputs": {
+   "conditioning": [
+    "11",
+    0
+   ],
+   "reference_latents_method": "index_timestep_zero"
+  }
+ },
+ "13": {
+  "class_type": "KSampler",
+  "inputs": {
+   "model": [
+    "4",
+    0
+   ],
+   "positive": [
+    "12",
+    0
+   ],
+   "negative": [
+    "9",
+    0
+   ],
+   "latent_image": [
+    "10",
+    0
+   ],
+   "seed": 1004,
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1.0
+  },
+  "_meta": {
+   "title": "s idle sampler"
+  }
+ },
+ "14": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "13",
+    0
+   ],
+   "vae": [
+    "6",
+    0
+   ]
+  }
+ },
+ "15": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "images": [
+    "14",
+    0
+   ],
+   "filename_prefix": "sprite-sheet/grid/grid"
+  },
+  "_meta": {
+   "title": "grid s se e ne n"
+  }
+ }
+}

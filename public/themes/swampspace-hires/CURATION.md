@@ -50,10 +50,10 @@ palette (`scripts/assets/palette.py`), no dither, hard alpha.
 
 | archetype | kind | notes |
 |---|---|---|
-| player | vine-ranger | teal EVA suit, amber cap-visor, vine arm — full 5-dir × idle/step set |
+| player | vine-ranger | bareheaded, long copper braid, quilted grey liner vest, orange sleeves, caged rust-orange jar at the hip; **full 5-dir idle/step + 8-frame walk**, 2026-09-29, redesigned toward the key art, Wan 2.2 I2V, see below |
 | cop | spore-drone | hovering jellyfish-drone, green sensor mass (bouncer shares) |
 | thug | bog-mutant | hulking moss-crusted olive brute (boss/gangster share) |
-| scientist | mycologist | pale hazmat, green shoulder pods, sample tube |
+| scientist | mycologist | pale hazmat, green shoulder pods, sample tube; **full 5-dir idle/step + 8-frame walk**, 2026-09-29, Wan 2.2 I2V, see below |
 | robot | derelict-bot | dark boxy machine, orange eye lenses |
 | civilian | frog-settler | cloaked swamp frog in a brown hood — **full 5-dir idle/step + 8-frame walk**, 2026-09-25, Wan 2.2 I2V, see below (shopkeeper shares) |
 
@@ -119,6 +119,8 @@ Both surfaces were rebuilt by `scripts/assets/tilesets_floor.py`:
 
 ## Rotoscoped walk cycles (feat/rotoscoped-walk)
 
+Superseded 2026-09-29 by the vine-ranger redesign below. All 50 frames of this set per pack are archived at `/mnt/d/tmp/cast-walks/archive/vine-ranger/pre-walk/`.
+
 `char.player.<dir>-walk-0..7` — 40 frames, `chars/vine-ranger-<dir>-walk-<n>.png`,
 built by `scripts/assets/rotoscope/` (docs/sprite-generation.md §6):
 
@@ -179,3 +181,153 @@ The **cloak is deliberate** — the owner approved it on the turnaround. It made
 the committed silhouette spec wrong, because that spec was measured off the
 old bare-headed front frog; `consistency-spec.json` is re-anchored on
 `se-idle`, whose build sits on the median of all ten pose frames.
+
+## mycologist, 2026-09-29: the video route in this repo
+
+The second video-route character, and the first made with this repo's own
+tools (`spritesheet.py --method video`, then `scripts/assets/cast_walk.py`
+assemble, export and gate) rather than puck-sprites. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 kept the r2 in-game design: cream hazmat suit, teal visor and gloves, brown pack |
+| input | `D:\tmp\sprite-stage-0822\cast\anchors\mycologist-s-idle.png`, the 768 px matted r2 anchor, sha256 `fd3fecb93f70…98128f`. Not `scripts/assets/anchors/mycologist-s-idle.png`, which is the older dark-green hooded July design |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848×480, 81 frames at 16 fps |
+| takes | take1 seed 3 for all five directions; n retaken with seed 11 and seed 23. s, se, e and ne ship from take1, n from take2 |
+| loops | the shortest full stride: s period 24 (seam .434), se 18 (.254), e 20 (.177), ne 18 (.398), n 15 (.559) |
+| colour lock | `assemble` snaps every frame onto the s-idle's 16 colours, all of them in the locked 34. Take1 drew the visor green in s and cyan in e |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.scientist.*` |
+
+n, the back view, failed the 0.5 seam on all three takes (.791, .559, .91).
+The owner set n's limit to 1.0 on 2026-09-29, and take2 ships.
+
+Gates (`cast_walk.py gate`, thresholds in `scripts/assets/cast-gate-spec.json`),
+2026-09-29, all PASS in 194 s:
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .434 / .254 / .177 / .398 / .559 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .108-.173, head .070-.121 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Gates 4a, 5 and 6 were re-measured during this run (b981cbb, 1272b21):
+their first version failed art that is right, and the approved frog failed
+gate 5 as well. `scripts/assets/cast_gate_selftest.py` holds the controls
+each gate must still catch.
+
+## vine-ranger (player), 2026-09-29: redesigned toward the key art
+
+The owner asked for "a rework to be closer to the hero image", the key art
+`sporefall-art/wip/identity/530-poster-wardrobe-fix/painterly_seed412.png` (a
+figure on a jetty in a quilted grey heirloom liner, waders, a long pole, a
+rust-orange lantern, a copper braid in the prompt). Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign, lore family A (salvage caste; canon anchor and motion donor). The next diver in the family line, in the re-sewn liner. Bareheaded with a long copper braid over the right shoulder, quilted grey liner vest, orange sleeves, caged rust-orange jar at the right hip. No pole: the renderer draws the held weapon at the hand |
+| candidates | juggernautXL on the ranger's own r2 graph (no IPAdapter, so nothing pulls back the teal suit): 16 stills in two batches, then img2img from the best (4A, seed 882003) with paint-over hints for the braid, jar and sleeve patches, widened 1.18x. R1 (denoise .50, seed 883000) chosen; sheets https://2cb.pw/candidates-d44dd4, https://2cb.pw/refine-46a277 |
+| input | `/mnt/d/tmp/cast-walks/vine-ranger/raw3/cast-walks-vine-ranger-refine-d50-s883000_00001_.png`, 768 px rembg matte, sha256 `27b4a0e32708…5d449396`. The old r2 anchor is archived at `/mnt/d/tmp/cast-walks/archive/vine-ranger/anchor-2026-09-29/` |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction; `--describe` for s/se/e, a face-free `--describe-back` (braid down the back, jar strap) for ne/n |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848x480, 81 frames at 16 fps, `--motion walk` |
+| takes | take1 seed 3 for all five directions; s retaken with seed 11. se, e, ne and n ship from take1, s from take2 |
+| loops | the shortest full stride: s period 19 (seam .294), se 25 (.287), e 20 (.288), ne 24 (.353), n 22 (.525) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.player.*`, the only archetype on `vine-ranger` |
+
+Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .294 / .287 / .288 / .353 / .525 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .100-.225, head .059-.096 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Gate 3 first failed the e-idle (mass 34% under the front, centroid 2.33 px
+off). The e view is a true side profile, 11 px wide against 21 in front, and a
+slim figure in profile keeps about 60% of its front mass. fed84b6 measures a
+walk character's side-view poses against their own view's walk frames.
+
+Known nit: the s frames stand 43 px on the 48 px pack against 45-46 in the other
+views, because the s retake's keyframe drew the figure about 4% smaller and one
+scale covers the sheet. It is inside the height tolerance (3); the old set
+varied by 2 px.
+
+## drowned-diver (drowner), 2026-09-29: the shipped design, walking, rifle removed
+
+The raid rank-and-file (`npcs.ts` `drowner`) had one frame, the August hires
+s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 kept the shipped design, lore family D (drowned machinery): a security diver's hard suit still walking a patrol nobody rescinded, dark visor, no face. It failed one check: it held a rifle, and the renderer already draws the drowner's pistol at the hand (`weaponArt.ts`), so in play it carried two guns. Coordinator ruling: removing the rifle is a cleanup, not a redesign. Before/after https://2cb.pw/old-vs-new-ef9cf8 |
+| input | Qwen-Image-Edit-2511 (Lightning 4-step) removed only the rifle from the NEAREST-upscaled s-idle; 4 seeds, all clean, seed 3 kept. Its blocks were sampled back onto the shipped 96 px grid and snapped to the s-idle's own colours (95% of shared pixels land on the exact old colour). sha256 `00543eb5c23029ea…`. The old s-idle is archived at `/mnt/d/tmp/cast-walks/archive/drowned-diver/anchor-2026-09-29/` |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction; `--describe` (visor, rust stain on the crown, mould patch on one shoulder pad, air tank) for s/se/e, a face-free `--describe-back` (smooth helmet back, tank between the pads) for ne/n |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848x480, 81 frames at 16 fps, `--motion walk` |
+| takes | take1 seed 3 for all five directions; every direction ships from it |
+| loops | the shortest full stride: s period 19 (seam .385), se 24 (.231), e 20 (.21), ne 21 (.411), n 22 (.378) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.drowner.*`, the only archetype on `drowned-diver` |
+
+Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .385 / .231 / .21 / .411 / .378 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .100-.183, head .055-.075 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. Frame heights: 88-92 px on the hi-res pack, 43-46 on the 48 px
+pack, every direction.
+
+## blast-diver (breacher), 2026-09-29: the shipped design, walking
+
+The raid's sapper (`npcs.ts` `breacher`) had one frame, the August hires
+s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 kept the shipped design, lore family A (salvage caste): the colony's hatch-breacher in the station's heirloom blast hard suit, a huge round charcoal helmet with one orange visor (the single hot accent), tan canvas cuffs. It holds nothing, so no cleanup was needed; the renderer draws its weapon at the hand (`weaponArt.ts`) |
+| input | the shipped hires s-idle as is, sha256 `f47c7de3f5bb9ab7…`, archived at `/mnt/d/tmp/cast-walks/archive/blast-diver/anchor-2026-09-29/` |
+| keyframes | Qwen-Image-Edit-2511 fp8 + Lightning 4-step + multiple-angles LoRA, one per direction; `--describe` (visor, valve canisters, tan cuffs, belt lights) for s/se/e. ne/n: the first face-free `--describe-back` named no back gear and Qwen drew twin slim tanks that the VLM read as a front view; the second names one upright air tank with two hoses into the helmet, matching the tank the e view drew |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, bf16 compute, 848x480, 81 frames at 16 fps, `--motion walk` |
+| takes | s and e from take1 (seed 3). se take3 (seed 23): take1 turned to face front mid-clip (1.093), take2 missed by .032 (.532). n take3 and ne take2 (seed 11, second back describe) |
+| loops | the shortest full stride: s period 17 (seam .356), se 19 (.327), e 22 (.287), ne 24 (.297), n 21 (.679) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.breacher.*`, the only archetype on `blast-diver` |
+
+Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .356 / .327 / .287 / .297 / .679 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .085-.193, head .028-.068 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Gate 4b same was fixed on the way (7046bba): it counted the front's visor
+against every back view. Nothing parked. Frame heights: 84-90 px on the
+hi-res pack, 42-45 on the 48 px pack.

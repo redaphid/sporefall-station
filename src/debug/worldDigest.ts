@@ -15,18 +15,20 @@
 // Excluded, deliberately:
 //   byId       — a derived index into `entities` (comparing it is redundant and
 //                would serialize each entity twice).
-//   level      — regenerated from seed+floor and never mutated at runtime;
+//   level      — large and (bar scenario carving) fixed for the floor;
 //                represented by its checksum instead, which is what would
 //                actually catch drift.
 //   rng/baseRng— closures, not data. Their STREAM POSITIONS are what matter and
 //                are folded in explicitly below; those positions are the whole
 //                determinism story.
+//   levelChecksumFromSeed — where the level came from, not what it is. The
+//                level itself is folded in below; the sim never reads this.
 
 import { levelChecksum } from '../game/levelgen/level'
 import type { World } from '../game/world'
 
 /** Derived/none-data fields handled explicitly below rather than enumerated. */
-const DERIVED = new Set(['byId', 'level', 'rng', 'baseRng'])
+const DERIVED = new Set(['byId', 'level', 'levelChecksumFromSeed', 'rng', 'baseRng'])
 
 /**
  * JSON with every object's keys sorted, recursively.

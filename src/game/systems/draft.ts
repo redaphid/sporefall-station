@@ -70,7 +70,6 @@ export const floorDraftOffer = (seed: number, floor: number, count = 3): string[
 export interface DraftLoadout {
   weapon: WeaponDef
   mods: readonly WeaponMod[]
-  sequenced: boolean
 }
 
 /** What picking `id` would do to `loadout`'s weapon. A mod already at its stack
@@ -78,7 +77,7 @@ export interface DraftLoadout {
 const draftVerdict = (loadout: DraftLoadout, id: string): ModVerdict => {
   const held = loadout.mods.find((m) => m.id === id)
   if (held && held.stacks >= modMaxStacks(id)) return { kind: 'inert', reason: 'already maxed' }
-  return modVerdict(loadout.weapon, loadout.mods, id, loadout.sequenced)
+  return modVerdict(loadout.weapon, loadout.mods, id)
 }
 
 /** Presentation data for a set of offered mod ids (kid-readable blurbs/icons),

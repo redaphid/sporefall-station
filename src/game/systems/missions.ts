@@ -1,9 +1,10 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
-import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, levelChecksum, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
+import { applyFloorModifier } from './modifierSystem'
 import { spawnObject } from './objects'
 import { spawnSporeBurst } from './spore'
 import { dealFloorDraft } from './draft'
@@ -23,6 +24,8 @@ export const setupFloor = (w: World): void => {
   // floor hostile — runs on EVERY floor (even floor 1's plain locks), unlike the
   // access gate which only dresses floors >= 2.
   tagObjectiveGate(w)
+  // Last, and on its own stream: nothing above moves with or without it.
+  applyFloorModifier(w)
 }
 
 /** Sporefall flavour for each generic building role: the derelict station's
@@ -641,7 +644,10 @@ const completeMission = (w: World, focus?: Entity): void => {
 export const nextFloor = (w: World): void => {
   const players = w.entities.filter((e) => e.playerCtl)
   w.floor++
+  // A floor transition is worldgen: the next floor of any run, authored or
+  // not, is generated from the run's seed.
   w.level = generateLevel(w.seed, w.floor)
+  w.levelChecksumFromSeed = levelChecksum(w.level)
   w.entities = []
   w.byId.clear()
   w.rng = w.baseRng.fork(`sim:${w.floor}`)

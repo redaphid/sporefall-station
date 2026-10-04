@@ -14,11 +14,12 @@ import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
+import type { WorldHistory } from './debug/verbs'
 // Type-only: the implementations are dynamically imported, so neither the
 // replay nor the upload code reaches the initial boot chunk.
 import type { StateReplay } from './app/stateReplay'
 import type { ShareResult } from './app/stateShare'
-import { loadFixtureJson } from './game/fixtures'
+import { hasFixture, loadFixtureJson } from './game/fixtures'
 import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './game/scenarios'
 import {
   DEEP_LINK_FRESHEN_MS,
@@ -27,17 +28,17 @@ import {
   readDeepLink,
   resumesSave,
   unknownScenarioMessage,
+  unknownWorldMessage,
   wantsFreshBuild,
 } from './app/deepLink'
+import { SCENES } from './scenes/registry'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { loadSettings } from './app/settings'
-import { flagOn } from './app/featureFlags'
-import type { ModCasting } from './game/world'
 import { createModSwapQueue, previewSwaps, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
 import { buildSequence } from './ui/sequenceModel'
-import { createSequenceStrip } from './ui/sequenceStrip'
+import { createSequenceStrip, installStripPadNav } from './ui/sequenceStrip'
 import {
   canRequestFullscreen,
   enterFullscreen,
@@ -225,17 +226,25 @@ const boot = async (): Promise<void> => {
     showBootError(uiMount, msg)
     return
   }
-  // A `?state=` link IS the intent: someone was sent an exact world to look at,
-  // so boot straight into it rather than making them pick Solo from the menu
-  // first (which would also build a throwaway world before replacing it).
-  // Shared states restore into SINGLE-PLAYER — see the `?state=` block below.
+  // `@inline` waits for a WorldJson handed over by `window.__loadWorld`.
+  if (link.world !== null && link.world !== '@inline' && !hasFixture(link.world)) {
+    const msg = unknownWorldMessage(link.world, SCENES.map((s) => s.name), APP_VERSION)
+    console.error(`sporefall: ${msg}`)
+    showBootError(uiMount, msg)
+    return
+  }
+  // A `?state=` link or a `?world=` save IS the intent: someone was sent an
+  // exact world to play, so boot straight into it rather than making them pick
+  // Solo from the menu first (which would also build a throwaway world before
+  // replacing it). Both restore into SINGLE-PLAYER — see the blocks below.
   const sharedState = params.get('state')
+  const exactWorld = sharedState ?? params.get('world')
   const mode =
     (params.get('mode') as GameMode | null) ??
     // The third argument adds the Settings entry (opens the panel over the menu
     // with controller navigation armed) — the pad-only player's route to button
     // remapping, e.g. binding the zoom buttons.
-    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
+    (exactWorld ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
   // Past the picker, nothing between here and the frame loop can honestly
   // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
   // conservative one until the loop starts reporting real ones.
@@ -295,16 +304,19 @@ const boot = async (): Promise<void> => {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
-  // Sequenced-mods reorder requests from the HUD strip / pause menu ride out on
-  // the local player's next command (see input/modSwapQueue.ts).
+  // Mod reorder requests from the HUD strip / pause menu ride out on the local
+  // player's next command (see input/modSwapQueue.ts). `paused` is bound to the
+  // session once it exists: a paused session samples and drops commands.
   const modSwaps = createModSwapQueue()
-  input = withModSwaps(input, modSwaps)
+  let paused = (): boolean => false
+  input = withModSwaps(input, modSwaps, () => !paused())
   const draftPicks = withDraftPicks(input)
   input = draftPicks
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
   if (!session) return
+  paused = () => session.isPaused ?? false
 
   // ── Save-game persistence (feat/localstorage-resume) ──────────────────────
   // Persist the AUTHORITATIVE world to localStorage so a full-page reload
@@ -413,6 +425,14 @@ const boot = async (): Promise<void> => {
   // stays dev-gated: only `?debug`/`?e2e` enable it; otherwise it refuses with
   // an explanation. All getters, so world replacement (?world=, load, restart)
   // is tracked automatically.
+  //
+  // `verbHistory` forwards to the share ring armed further down, so a link
+  // staged with `step`/`teleport`/... replays: see `VerbCtx.history`.
+  let shareHistory: WorldHistory | undefined
+  const verbHistory: WorldHistory = {
+    observe: (w, inputs) => shareHistory?.observe(w, inputs),
+    reset: (w) => shareHistory?.reset(w),
+  }
   const inspect = createInspect({
     getWorld: () => ('world' in session ? (session as HostSession).world : undefined),
     getView: () => session.renderView(),
@@ -424,6 +444,7 @@ const boot = async (): Promise<void> => {
     devWrites: params.has('debug') || params.has('e2e'),
     version: APP_VERSION,
     setTheme: (id) => void renderer.setTheme(id),
+    history: verbHistory,
   })
   installInspect(inspect, window)
   console.log(`sporefall build ${APP_VERSION}: window.world + window.sporefall.help() for inspection`)
@@ -498,6 +519,7 @@ const boot = async (): Promise<void> => {
     debug = startDebugLink((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
       name,
       setTheme: (id) => void renderer.setTheme(id),
+      history: verbHistory,
     })
   }
   // Shareable states (`?state=`). Arm a rolling ring of the last second or two
@@ -552,6 +574,16 @@ const boot = async (): Promise<void> => {
         seen = host.world
         ring = new StateRing(host.world)
       }
+    }
+    shareHistory = {
+      observe: (w, inputs) => {
+        rebindRing()
+        ring.observe(w, inputs)
+      },
+      reset: (w) => {
+        rebindRing()
+        ring.reset(w)
+      },
     }
     // The one capture path. The button and the console verb both land here, so
     // there is nothing to keep in sync and no second implementation to drift.
@@ -671,16 +703,12 @@ const stopTransportOnPagehide = (transport: Transport): void => {
 const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
   const weapon = view.self?.combat && WEAPONS[view.self.combat.weapon]
   if (!weapon || !view.self) return undefined
-  return { weapon, mods: weaponStack(view.self)?.mods ?? [], sequenced: view.modCasting === 'sequence' }
+  return { weapon, mods: weaponStack(view.self)?.mods ?? [] }
 }
-
-/** The `sequencedMods` flag, resolved to the run rule a host latches into each
- * run it builds. Read per run, so toggling applies from the next run. */
-const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal')
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -704,7 +732,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     stopTransportOnPagehide(transport)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
@@ -936,14 +964,16 @@ const createPauseOverlay = (
   el.appendChild(panel.el)
   // Sequenced mods: the wand order, reorderable while paused. The sim is
   // stopped, so swaps queue and apply on the first tick after Resume; the strip
-  // previews the queued order meanwhile.
+  // previews the queued order meanwhile. Touch and mouse tap two chips; a pad
+  // walks the chips with the d-pad or stick and taps with a face button (Start
+  // stays Resume, so it never taps a chip on the way out).
   const swaps = actions.modSwaps
   let lastView: RenderView | undefined
   const paintSeq = (): void => {
     const v = lastView
     seq.update(
       v && swaps
-        ? buildSequence(v.self, v.modCasting, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
+        ? buildSequence(v.self, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
         : null,
     )
   }
@@ -953,6 +983,7 @@ const createPauseOverlay = (
   })
   seq.el.style.cssText += ';width:min(340px,86vw);box-sizing:border-box;padding:8px 10px;border-radius:10px;background:#141822f2;text-align:left;color:#e7e7ee;font:12px system-ui'
   el.appendChild(seq.el)
+  installStripPadNav(seq, () => el.style.display === 'none')
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center'
   const btn = (label: string, primary: boolean): HTMLButtonElement => {
@@ -1089,7 +1120,7 @@ const createPauseOverlay = (
     update(paused, view) {
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
-      if (show && !wasPaused) panel.update(buildLoadout(view.self, view.modCasting)) // refresh on open
+      if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
       if (show) {
         lastView = view
         paintSeq()

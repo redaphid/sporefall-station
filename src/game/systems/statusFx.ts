@@ -58,7 +58,7 @@ const diminishedGrant = (baseTicks: number, tier: number): number =>
  * back to back and holds the victim longer than any single element can. */
 const CONTROL_KINDS = ['frozen', 'electrified', 'panic'] as const
 
-const controlBlocked = (w: World, e: Entity): boolean =>
+export const controlBlocked = (w: World, e: Entity): boolean =>
   isImmobilized(e) || isPanicking(w, e) || CONTROL_KINDS.some((k) => w.tick < (e.lockout?.[k]?.guardUntil ?? 0))
 
 /** Land an immobilize under the anti-chain-lock rules (see the block comment). */

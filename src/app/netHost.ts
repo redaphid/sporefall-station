@@ -3,8 +3,9 @@ import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { extractionView, setupFloor } from '../game/systems/missions'
 import { lockdownView } from '../game/systems/alarm'
-import { createWorld, stationAlerted, tickWorld, type ModCasting, type RunMode, type World } from '../game/world'
+import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
+import { modifierView } from '../game/floorModifiers'
 import type { InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import { SendQueue } from '../net/channel/sendQueue'
@@ -107,8 +108,6 @@ export class NetHostSession implements Session {
     private transport: Transport,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
-    /** Mod casting rule for runs this host builds (see HostSession). */
-    private modCasting?: ModCasting | (() => ModCasting | undefined),
   ) {
     this.world = this.freshWorld()
     transport.on((ev) => {
@@ -147,17 +146,11 @@ export class NetHostSession implements Session {
       players: this.lobbyPlayers(),
       mode: this.world.mode,
       floor: this.world.floor,
-      // Additive and optional: an older client ignores the key, and a host
-      // without the rule never writes it, so the message is unchanged by default.
-      ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
     }
   }
 
   private freshWorld(): World {
-    const w = createWorld(this.seed, 1, this.mode)
-    const casting = typeof this.modCasting === 'function' ? this.modCasting() : this.modCasting
-    if (casting) w.modCasting = casting
-    return w
+    return createWorld(this.seed, 1, this.mode)
   }
 
   /** Host presses Start: build the world, spawn everyone, tell clients. */
@@ -365,6 +358,7 @@ export class NetHostSession implements Session {
       lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
+      ...(this.world.modifier ? { modifier: { ...this.world.modifier } } : {}),
       huds,
     }
     this.broadcastJson(MsgType.State, state)
@@ -386,7 +380,7 @@ export class NetHostSession implements Session {
       lockdown: lockdownView(this.world),
       mode: this.world.mode,
       revivesLeft: this.world.revivesLeft,
-      ...(this.world.modCasting ? { modCasting: this.world.modCasting } : {}),
+      ...(this.world.modifier ? { modifier: modifierView(this.world.modifier, this.world.tick) } : {}),
       self: this.self,
     }
   }

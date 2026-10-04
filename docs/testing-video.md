@@ -152,3 +152,58 @@ different problem and is deliberately not attempted.
 ```
 pnpm run e2e:state    # full browser round-trip against `wrangler dev`
 ```
+
+## Authored worlds and crafted saves
+
+The engine starts from state, not from a seed. `worldFromState({ level, ... })`
+(`src/game/world.ts`) takes the level as data. `worldFromSeed(seed, floor)` is
+the generator that builds that state from seed+floor, and `createWorld(seed,
+floor)` chains the two for the app and most tests. The next floor of any run,
+authored or not, is still generated from `World.seed`.
+
+A level is written as text, one glyph per tile (`src/game/levelgen/levelText.ts`):
+
+```ts
+const w = worldFromState({
+  level: levelFromJson({
+    rows: [
+      '##########',
+      '#..@..#..#',
+      '#.....#..#',
+      '#........#',
+      '####E#####',
+    ],
+  }),
+})
+```
+
+Legend: `#` wall, `.` floor, `+` tiled floor, `=` hall, `%` plating, `x` grate,
+`~` bog, `,` grass, `-` sidewalk, `:` street, `H` hull, `E` exit, `^`/`v` stairs,
+`1`-`4` bevelled wall corners (NW, NE, SE, SW), `@` the player spawn (a floor tile).
+`spawn`, `exit`, `buildings`, `theme` and the complex/storey fields are optional
+JSON fields beside `rows`. Without an `E` the level has no exit.
+
+**One save format.** `serializeWorld` writes the level into `WorldJson.level`
+whenever it is not what seed+floor generates (an authored level, or a generated
+one a scenario carved). An untouched generated level still travels as
+`levelChecksum` only, so seeded snapshots, fixtures and `?state=` links are
+byte-identical to before. Tests, crafted saves and share links all use this one
+format. A hand-edited `level.rows` needs no checksum fix-up.
+
+**Crafting a save to play on a phone.** Copy `scripts/saves/castle-siege.mts`,
+draw the rows, place the player (weapon, mods) and the enemies, and run it with
+`pnpm exec tsx`. It writes `src/game/__fixtures__/<name>.json`. Fixtures ship in
+the bundle, so after deploy the save plays at
+`https://sporefall.hypnodroid.com/?world=<name>`. That URL boots straight into
+solo and does not touch the player's own autosave. The JSON is the save, so you
+can also edit it by hand. Pin it with a test like `src/game/saves.test.ts`.
+
+To share a crafted save as a `?state=` link: open `/?world=<name>`, play a
+second or two, then press Share state in the pause menu (or run
+`await sporefallShare('<label>')`). Links live 30 days in KV and are capped at
+512 KiB gzipped; the castle with its run-up measured 3.5 KiB. Do not stage with
+the `step` debug verb before sharing: the rewind ring does not record ticks that
+`step` advances, so the capture fails its own replay check.
+
+Authored worlds are single-player. Net clients still regenerate the level from
+seed+floor, so a host must not load an authored world into a co-op session.

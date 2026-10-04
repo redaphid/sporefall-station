@@ -20,7 +20,8 @@ $S/serve.sh start 4990        # vite build, then vite preview on 127.0.0.1:4990 
 SKIP_BUILD=1 $S/serve.sh start 4990   # reuse dist/ when nothing changed since the last build
 ```
 
-`serve.sh start` finishes by running the doctor. Ready means every doctor line is `ok`.
+In a checkout with no `node_modules` (every fresh git worktree), `serve.sh start` runs
+`pnpm install --frozen-lockfile` first. `serve.sh start` finishes by running the doctor. Ready means every doctor line is `ok`.
 Pick a different port per concurrent run. The e2e suites already use 4977, 4978, and
 8123, so stay at 4990 and up.
 
@@ -42,16 +43,17 @@ means a dirty tree). Run it first whenever a result looks wrong.
 ## Playtest headless (preferred for judging a build)
 
 The sim is pure TypeScript, so a playtester needs no browser, no server, and no desktop.
-Each playtester owns one state file, and every call is one verb against it:
+Each playtester owns one name, and every call is one verb against that name's world.
+`$S/pt.sh` wraps `scripts/playtest.mts` and keeps the world and a transcript of every call
+and reply in `e2e/output/verify/pt-<name>/`, so the run is its own evidence:
 
 ```sh
-pt() { npx tsx scripts/playtest.mts "$@"; }        # zsh does not word-split a $VAR command
-pt run.json new --seed 31337                        # the real solo floor 1 (HostSession), prints `look`
-pt run.json new --seed 5 --scenario armed --floor 3 # or any ?scenario= name; --sequenced for the wand flag
-pt run.json look 10                                 # player build + nearby entities, nearest first (hp, fx, resist, ai mode)
-pt run.json spawn npc brute 1.5 6                   # stage a situation with any debug verb
-pt run.json addMod 222 incendiary
-pt run.json step 90 '{"aimAt":223,"attack":true}'   # hold an input for 90 ticks (3 s); returns event counts
+$S/pt.sh brute new --seed 31337                        # the real solo floor 1 (HostSession), prints `look`
+$S/pt.sh armed new --seed 5 --scenario armed --floor 3 # or any ?scenario= name
+$S/pt.sh brute look 10                                 # player build + nearby entities, nearest first (hp, fx, resist, ai mode)
+$S/pt.sh brute spawn npc brute 1.5 6                   # stage a situation with any debug verb
+$S/pt.sh brute addMod 222 incendiary
+$S/pt.sh brute step 90 '{"aimAt":223,"attack":true}'   # hold an input for 90 ticks (3 s); returns event counts
 ```
 
 A run split across calls is byte-identical to one continuous run. The PRNG position is
@@ -60,10 +62,11 @@ Lane A below. If the `aimAt` target dies mid-burst, aim holds and the reply says
 `aimAtGone`. Play in bursts of 15 to 90 ticks and `look` between them, like a player
 reacting.
 
-Measured example (seed 31337, a brute placed 4.5 tiles away): a plain pistol did 25 of 95
-HP in 3 s against the brute's `physical: 0.35`. Adding `incendiary` did 52 more in the next
-3 s and left it `burning`, while it closed in and took the player from 120 to 40. That is
-the shape of evidence a fun or variety verdict should rest on.
+Measured example (seed 31337, a brute placed 4.5 tiles away, build 771+): a plain pistol
+did 25 of 95 HP in 3 s against the brute's `physical: 0.35`. Adding `incendiary` did 47 more
+in the next 3 s and left it `burning`, and it broke off in `flee` mode with the player at
+106/120. That is the shape of evidence a fun or variety verdict should rest on. The recipe
+is [combat and weapon mods](features/combat-mods.md).
 
 Limits: there is no picture (take stills in Lane A), and co-op is one held player per call
 (use `"player":N`).
@@ -131,7 +134,9 @@ $S/drive.mjs --name solo-from-menu --video \
 
 Steps run in argv order. The full list is in the header of `drive.mjs`: `--open`,
 `--reload`, `--click`, `--until-tick`, `--until`, `--eval`, `--assert`, `--shot`, and
-`--wait-ms`. The exit code is 0 only if every `--assert` held and the page threw nothing.
+`--wait-ms`. `--until` treats a throw as "not yet", so `--until "sporefall.session().seed === 18"`
+right after a `--reload` waits for boot instead of failing. The exit code is 0 only if every
+`--assert` held and the page threw nothing.
 
 Useful URL parameters: `mode=solo|host|join`, `seed=N`, `floor=N`, `scenario=<name>`
 (from `src/game/scenarios.ts`), `script=<name>` (from `src/input/scripted.ts`),
@@ -139,6 +144,10 @@ Useful URL parameters: `mode=solo|host|join`, `seed=N`, `floor=N`, `scenario=<na
 `zoom`. The feature files say which ones apply.
 
 ## Evidence
+
+Every headless playtest writes `e2e/output/verify/pt-<name>/`: `transcript.log` (each call
+and its reply) and `world.json` (the exact end state; `$S/pt.sh <name> look` reloads it).
+Quote the replies that carry the claim, with their ticks.
 
 Every Lane B run writes `e2e/output/verify/<timestamp>-<name>/`. It holds `run.json`
 (every step with its result and sim tick, plus the verdict, page errors, and console
@@ -169,8 +178,12 @@ $S/serve.sh status        # anything left over from this checkout
 ```
 
 Stop any `wrangler dev` you started by its own pid. Close every claude-in-chrome tab you
-created. Cleanup never touches `e2e/output/verify/`, because that is
-where the proof lives.
+created. The headless playtest starts no process, so it has nothing to stop. Cleanup never
+touches `e2e/output/verify/`, because that is where the proof lives.
+
+`e2e/output/verify/` lives inside the checkout. In a git worktree it dies with the worktree,
+so before the worktree is removed, copy the evidence dirs you cited into the main checkout's
+`e2e/output/verify/` and cite that path instead.
 
 ## Gotchas
 

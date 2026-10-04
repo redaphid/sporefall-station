@@ -23,7 +23,7 @@ import type { Entity } from '../game/entity'
 import { serializeWorld } from '../game/serialize'
 import type { SimEvent } from '../game/types'
 import type { World } from '../game/world'
-import { buildSchema, runVerb, serializeEntity } from '../debug/verbs'
+import { buildSchema, runVerb, serializeEntity, type WorldHistory } from '../debug/verbs'
 import type { RenderView } from './session'
 
 /** A sim event tagged with the tick it happened on (world.events is wiped every
@@ -88,6 +88,8 @@ export interface InspectDeps {
   version: string
   /** Renderer hook for the `theme` verb (presentation-only). */
   setTheme?: (id: string) => void
+  /** Told about every tick and edit a verb makes; see `VerbCtx.history`. */
+  history?: WorldHistory
 }
 
 export interface Inspect {
@@ -115,7 +117,7 @@ const HELP: readonly { sig: string; doc: string }[] = [
   { sig: 'events(sinceTick?)', doc: `recent sim events tagged {tick, type, ...} — ring buffer of the last ~${EVENT_TICK_WINDOW} ticks` },
   { sig: 'schema()', doc: 'live component/archetype reflection derived from the entities actually present' },
   { sig: 'serialize()', doc: 'lossless WorldJson string (replayable via the load verb or ?world=)' },
-  { sig: "verb(line, args?)", doc: "debug verbs — get/set/spawn/kill/teleport/step/load/annotate/ai/setBehavior/… e.g. verb('teleport 12 5 5'); verb('step 30 {\"moveX\":1,\"aimAt\":42,\"attack\":true}') holds a player's input for 30 ticks (works in a hidden tab) and returns event counts. Dev-gated: needs ?debug (or ?e2e); returns a refusal string in production." },
+  { sig: "verb(line, args?)", doc: "debug verbs — get/set/spawn/kill/teleport/step/load/annotate/ai/setBehavior/modifier/… e.g. verb('teleport 12 5 5'); verb('step 30 {\"moveX\":1,\"aimAt\":42,\"attack\":true}') holds a player's input for 30 ticks (works in a hidden tab) and returns event counts. Dev-gated: needs ?debug (or ?e2e); returns a refusal string in production." },
   { sig: 'rec.start() / rec.stop()', doc: 'record the live canvas — shaders and all — to a downloadable .webm. Persisted in the build, so it survives page refreshes.' },
 ]
 
@@ -305,7 +307,7 @@ export const createInspect = (deps: InspectDeps): Inspect => {
       const w = deps.getWorld()
       if (!w)
         return 'sporefall.verb needs the authoritative world — this is a join (client) session; run verbs on the host device (or a solo session).'
-      return runVerb(w, full, { events, setTheme: deps.setTheme })
+      return runVerb(w, full, { events, setTheme: deps.setTheme, history: deps.history })
     },
 
     rec: makeCanvasRecorder(),

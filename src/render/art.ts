@@ -80,6 +80,10 @@ export interface ArtRegistry {
    * the procedural fallback set, so no theme gap can break a facing. Missing
    * drawn directions borrow a neighbor at draw time (DIR_FALLBACK). */
   characterSet(archetype: string): CharSet | undefined
+  /** The drawn body this archetype wears (theme.charArtKinds, e.g.
+   * `spore-drone`), picked the way characterSet picks its set. Undefined for a
+   * procedural body, art off the naming convention, or a non-character. */
+  artKind(archetype: string): string | undefined
   /** The walking (step) pose for an archetype, if a step frame exists. */
   walkStep(archetype: string): Texture | undefined
   /** Fire flicker frames (empty → caller falls back to the procedural flame). */
@@ -158,6 +162,8 @@ export interface SpriteTextures {
   grenade?: Texture
   /** Directional character sets (5 drawn dirs), keyed by archetype. */
   chars?: Record<string, CharSet>
+  /** The drawn body behind each set in `chars`, same keys (theme.charArtKinds). */
+  charKinds?: Record<string, string>
   /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
   items?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/atm/…). */
@@ -1254,15 +1260,29 @@ export const createArt = (
     return set
   }
 
-  const characterSet = (archetype: string): CharSet | undefined => {
+  /** The `chars` key of the themed set an archetype draws; undefined when it
+   * draws procedurally or is not a character. An archetype's OWN art wins over
+   * the set it borrows, so dropping `char.boss.*` files into a theme pack
+   * promotes the Mireclaw Alpha off the thug body with no code change (same
+   * for bouncer/shopkeeper/gangster). */
+  const themedSetName = (archetype: string): string | undefined => {
     const alias = CHARSET_ALIAS[archetype]
     if (!alias) return undefined
-    // An archetype's OWN art wins over the set it borrows, so dropping
-    // `char.boss.*` files into a theme pack promotes the Mireclaw Alpha off the
-    // thug body with no code change (same for bouncer/shopkeeper/gangster).
-    // Then the alias' art; then the procedural set, which guarantees every
-    // character archetype renders in all five drawn directions with zero files.
-    return sprites.chars?.[archetype] ?? sprites.chars?.[alias] ?? procCharSet(archetype)
+    if (sprites.chars?.[archetype]) return archetype
+    return sprites.chars?.[alias] ? alias : undefined
+  }
+
+  const characterSet = (archetype: string): CharSet | undefined => {
+    if (!CHARSET_ALIAS[archetype]) return undefined
+    // No themed set: the procedural one guarantees every character archetype
+    // renders in all five drawn directions with zero files.
+    const name = themedSetName(archetype)
+    return name ? sprites.chars?.[name] : procCharSet(archetype)
+  }
+
+  const artKind = (archetype: string): string | undefined => {
+    const name = themedSetName(archetype)
+    return name ? sprites.charKinds?.[name] : undefined
   }
 
   const isCharacterSprite = (archetype: string): boolean => archetype in CHARSET_ALIAS
@@ -1463,6 +1483,7 @@ export const createArt = (
     entityFlash,
     isCharacterSprite,
     characterSet,
+    artKind,
     walkStep,
     flameFrames,
     effectFrames,

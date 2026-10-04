@@ -2,12 +2,12 @@
  "vine-ranger": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 41,
+   "height": 43,
    "width": 21,
-   "head_h": 26,
-   "mass": 544,
-   "cx": -0.43,
-   "foot_y": 43
+   "head_h": 28,
+   "mass": 562,
+   "cx": 0.63,
+   "foot_y": 45
   },
   "tol": {
    "height": 3,
@@ -87,8 +87,8 @@
   },
   "tol": {
    "height": 2,
-   "width": 7,
-   "head_h": 6,
+   "width": 3,
+   "head_h": 2,
    "mass_frac": 0.22,
    "cx": 2.5,
    "foot_y": 1
@@ -97,12 +97,12 @@
  "mycologist": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
+   "height": 45,
    "width": 23,
-   "head_h": 35,
-   "mass": 541,
-   "cx": -2.24,
-   "foot_y": 45
+   "head_h": 36,
+   "mass": 707,
+   "cx": 0.86,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,
@@ -249,12 +249,12 @@
  "drowned-diver": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 30,
-   "head_h": 36,
-   "mass": 672,
-   "cx": 2.65,
-   "foot_y": 45
+   "height": 45,
+   "width": 24,
+   "head_h": 31,
+   "mass": 660,
+   "cx": 1.29,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,
@@ -306,12 +306,12 @@
  "blast-diver": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 34,
+   "height": 45,
+   "width": 32,
    "head_h": 31,
-   "mass": 956,
-   "cx": -0.12,
-   "foot_y": 45
+   "mass": 943,
+   "cx": -0.07,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

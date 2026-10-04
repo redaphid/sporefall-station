@@ -25,10 +25,9 @@ export interface InputCmd {
   throwItem: boolean
   /** Dodge-roll this tick (edge-triggered): a burst + i-frames in the move dir. */
   roll: boolean
-  /** Sequenced mods only: swap two entries of the wielded weapon's mod list this
-   * tick, packed `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered
-   * and OPTIONAL: absent on every input that does not ask, so default-mode
-   * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
+  /** Swap two entries of the wielded weapon's mod list this tick, packed
+   * `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered and
+   * OPTIONAL: absent on every input that does not ask. */
   modSwap?: number
   /** Floor draft: take card N of this player's hand this tick (a tap or click on
    * the card). Optional and edge-triggered like `modSwap`; pad and keyboard
@@ -210,6 +209,12 @@ export type SimEvent =
   | { type: 'sapperCharge'; entityId: EntityId; doorId: EntityId; x: number; y: number; fuse: number }
   /** A hound pack spotted `targetId` and began to encircle it. */
   | { type: 'packHunt'; groupId: number; targetId: EntityId; count: number }
+  /** A floor modifier took hold on floor entry (floorModifiers.ts). */
+  | { type: 'floorModifier'; kind: 'bogTide' | 'brownout' | 'hunted' }
+  /** Bog tide turned: `rising` = the low ground is flooding now. */
+  | { type: 'tide'; rising: boolean }
+  /** A tracker pack landed on a `hunted` floor, already on `targetId`'s scent. */
+  | { type: 'huntersArrive'; groupId: number; x: number; y: number; count: number; targetId: EntityId }
   /** A pack's ring closed (or timed out) on `targetId` — now it goes in. */
   | { type: 'packClose'; groupId: number; targetId: EntityId; closed: boolean }
   /** A pack went MANHUNTER on `targetId` (someone hurt one of them, or a howl carried). */

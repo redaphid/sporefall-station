@@ -53,7 +53,7 @@ npx tsx tools/debug-cli/cli.ts schema                   # live component/archety
 npx tsx tools/debug-cli/cli.ts entities                 # every entity, verbatim JSON
 npx tsx tools/debug-cli/cli.ts get 5                    # one entity
 npx tsx tools/debug-cli/cli.ts set 5 '{"health":{"hp":1}}'   # deep-merge a patch
-npx tsx tools/debug-cli/cli.ts spawn npc cop 20 20
+npx tsx tools/debug-cli/cli.ts spawn npc warden 20 20
 npx tsx tools/debug-cli/cli.ts teleport 5 30 30
 npx tsx tools/debug-cli/cli.ts kill 5
 npx tsx tools/debug-cli/cli.ts --watch                  # tail the live event stream

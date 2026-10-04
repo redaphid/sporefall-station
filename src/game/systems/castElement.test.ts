@@ -248,7 +248,7 @@ describe('a carried element does what that element does (#92 verbs)', () => {
   it('[explosive, rapid, incendiary]: the blast sets the pack burning and panicking, lit by the shooter', () => {
     const { w, p } = rig(['explosive', 'rapid', 'incendiary'])
     body(w, 24, 20, 1)
-    const pack = [spawnNpc(w, 'thug', 24.8, 20.9), spawnNpc(w, 'thug', 24.8, 19.1), spawnNpc(w, 'thug', 23.4, 21.1)]
+    const pack = [spawnNpc(w, 'mutant', 24.8, 20.9), spawnNpc(w, 'mutant', 24.8, 19.1), spawnNpc(w, 'mutant', 23.4, 21.1)]
     tickWorld(w, new Map([[0, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 }]]))
     for (let i = 0; i < 20 && !blasts(w.events).length; i++) tickWorld(w, new Map([[0, emptyInput()]]))
     expect(blasts(w.events)[0].element).toBe('incendiary')
@@ -263,9 +263,9 @@ describe('a carried element does what that element does (#92 verbs)', () => {
   it('[split, rapid, shock]: a shard carrying shock stuns what it reaches and leaps to the next NPC', () => {
     const { w, p } = rig(['split', 'rapid', 'shock'])
     const first = body(w, 24, 20, 1)
-    const reached = spawnNpc(w, 'thug', 23.5 + 2.5 * Math.cos(0.45), 20 + 2.5 * Math.sin(0.45))
+    const reached = spawnNpc(w, 'mutant', 23.5 + 2.5 * Math.cos(0.45), 20 + 2.5 * Math.sin(0.45))
     reached.health!.hp = reached.health!.max = 400
-    const beside = spawnNpc(w, 'thug', reached.pos.x + 0.6, reached.pos.y + 1.4)
+    const beside = spawnNpc(w, 'mutant', reached.pos.x + 0.6, reached.pos.y + 1.4)
     const events = fire(w, 12)
     expect(first.dead).toBe(true)
     expect(reached.health!.hp).toBeLessThan(400)

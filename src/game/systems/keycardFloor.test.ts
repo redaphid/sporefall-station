@@ -60,10 +60,10 @@ describe('keycards stay on their floor', () => {
     expect(activeStack(guest)?.itemId).toBe('pistol')
   })
 
-  it('the briefcase goes too: no key-class item survives the exit', () => {
+  it('the canister goes too: no key-class item survives the exit', () => {
     const w = worldFromState({ level: levelFromJson({ rows: CORRIDOR }) })
     const p = spawnPlayer(w, 0, 9.5, 1.5)
-    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 }, { itemId: 'keycard', qty: 1 }, { itemId: 'grenade', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'canister', qty: 1 }, { itemId: 'keycard', qty: 1 }, { itemId: 'grenade', qty: 1 })
     p.loadout!.activeSlot = 3
     for (let t = 0; t < 60 && w.floor === 1; t++) runTicks(w, new Map([[0, { moveX: 1 }]]), 1)
     expect(w.floor).toBe(2)

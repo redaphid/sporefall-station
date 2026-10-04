@@ -48,13 +48,13 @@ what the Striker lands. The grammar is in §3.
 
 ### A normal floor (about two minutes)
 
-1. **Enter a room.** Four thugs and a brute, spread out.
+1. **Enter a room.** Four mutants and a brute, spread out.
 2. **Prime.** Squeeze left trigger once. The Primer (say `[explosive][soak]`)
    lobs a glob that splashes the group wet and leaves a puddle cell on the floor.
 3. **Strike.** Squeeze right trigger. The Striker (`[pierce][shock]`) sends a
    spark into the nearest wet body. Soak conducts Spark, so the arc floods the
    wet cluster through the existing `shock()` flood in
-   `src/game/systems/interactions.ts`. Four thugs are stunned and hurt. The
+   `src/game/systems/interactions.ts`. Four mutants are stunned and hurt. The
    brute, standing two tiles off the puddle, is not wet and is not in the chain.
 4. **Adapt.** The brute resists physical hard (`resist.physical: 0.35` in
    `src/game/data/npcs.ts`). Plain Striker bullets barely scratch it. The player
@@ -242,7 +242,7 @@ can be one or the other. The build they settle on:
   Soak glob, because `explosive` rode the first payload only)
 - Striker: `[pierce][frost][heavy][rapid]`
 
-What a player discovers: Soak+Spark failed in the big hall because the thugs
+What a player discovers: Soak+Spark failed in the big hall because the mutants
 stood 3 tiles apart. Magnet first pulls them into a clump over about two
 seconds. Now the Soak glob wets a tight ball. But the Spark is gone (it became
 the Magnet). The Striker carries Frost instead, and **Frost's medium is also
@@ -902,7 +902,7 @@ and want to reorganize, or do they just hold right trigger?
    `src/input/padProfile.ts` and right mouse in `src/input/keyboard.ts`.
 6. **Scenario.** `?scenario=primer` in `src/game/scenarios.ts`: the `armed` kit
    (`setupArmed`) with a Striker `[pierce][shock][heavy]` and a Lobber
-   `[explosive][soak]`, plus a spread pack of 6 thugs in an open hall and a
+   `[explosive][soak]`, plus a spread pack of 6 mutants in an open hall and a
    corridor with 4. Magnet is left **on the floor** as a cartridge so the player
    can find the aha by picking it up (no bench needed yet; a walked-over
    cartridge goes into the first empty Primer slot in this slice).

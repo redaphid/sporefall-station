@@ -4,7 +4,7 @@ import { decodeSnapshot, encodeSnapshot, WIRE_STATUSES, type WireEntity, type Wi
 
 const npc = (id: number, statuses?: string[]): WireEntity => ({
   id,
-  archetype: 'thug',
+  archetype: 'mutant',
   x: 10 + id,
   y: 12,
   facing: 0,

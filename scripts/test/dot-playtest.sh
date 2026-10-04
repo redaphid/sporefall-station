@@ -7,7 +7,7 @@
 #
 # stand   The player stands still in a burning cell until the burn ends.
 # roll    The player catches fire, steps out east, and rolls the burn out.
-# cinders An Incendiary pistol against a pack of 4 cinders, then 4 thugs.
+# cinders An Incendiary pistol against a pack of 4 cinders, then 4 mutants.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 out=${1:-$(mktemp -d)}
@@ -76,7 +76,7 @@ pack_ttk() { # file archetype
   echo "$arch pack (4, Incendiary pistol): kills by tick:$kills (3-tick steps), player hp $(hp "$f" 171)"
 }
 
-echo "== cinders vs thugs: time to kill a pack of 4 =="
+echo "== cinders vs mutants: time to kill a pack of 4 =="
 pack_ttk "$out/cinders.json" cinder
-pack_ttk "$out/thugs.json" thug
+pack_ttk "$out/mutants.json" mutant
 echo "state files: $out"

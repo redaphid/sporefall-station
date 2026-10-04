@@ -143,7 +143,7 @@ PID and creation time.
 
 | Test | Fixture | Drives | Adversarial final-state assertions |
 |------|---------|--------|-------------------------------------|
-| `feature-combat` | `combat-stage` (3 thugs, hp 24, on the pistol lane) | `shooting` script | every pinned thug id is gone (killed + swept); player alive, not downed; no game over |
+| `feature-combat` | `combat-stage` (3 mutants, hp 24, on the pistol lane) | `shooting` script | every pinned mutant id is gone (killed + swept); player alive, not downed; no game over |
 | `feature-fire` | `fire-stage` (lit crate row → flammable bystander, hp 12) | `burn` (no input) | the pinned bystander id is gone (burned to death ~tick 100); NO flammable civilian survives; player at full hp and hasn't moved; no game over |
 
 ## `?state=<id>` — shareable debug links
@@ -218,7 +218,7 @@ const w = worldFromState({
 ```
 
 Legend: `#` wall, `.` floor, `+` tiled floor, `=` hall, `%` plating, `x` grate,
-`~` bog, `,` grass, `-` sidewalk, `:` street, `H` hull, `E` exit, `^`/`v` stairs,
+`~` bog, `,` grass, `-` boardwalk, `:` causeway, `H` hull, `E` exit, `^`/`v` stairs,
 `1`-`4` bevelled wall corners (NW, NE, SE, SW), `@` the player spawn (a floor tile).
 `spawn`, `exit`, `buildings`, `theme` and the complex/storey fields are optional
 JSON fields beside `rows`. Without an `E` the level has no exit.

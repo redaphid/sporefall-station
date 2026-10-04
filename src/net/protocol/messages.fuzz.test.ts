@@ -148,7 +148,7 @@ describe('snapshot codec — degenerate and out-of-range field values', () => {
     // REGRESSION: 300 entities wrote a count byte of 44 (300 & 0xff), so the
     // decoder returned 44 and silently ignored 256 records it never knew existed.
     const entities: WireEntity[] = Array.from({ length: 300 }, (_, i) => ({
-      id: i, archetype: 'thug', x: 1, y: 1, facing: 0, hpPct: 1, flags: 0,
+      id: i, archetype: 'mutant', x: 1, y: 1, facing: 0, hpPct: 1, flags: 0,
     }))
     const d = decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities }))
     expect(d.entities).toHaveLength(255)
@@ -273,7 +273,7 @@ describe('a hostile client cannot reach the simulation through the input codec',
     const e = addEntity(w, makeEntity('player', 'player', 20, 20))
     e.health = { hp: 100, max: 100, iframes: 0 }
     e.speed = 4.5
-    e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+    e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
     e.loadout = { inventory: [], activeSlot: -1 }
     return e
   }

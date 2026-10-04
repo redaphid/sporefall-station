@@ -83,7 +83,7 @@ const main = async () => {
   const hub = new MockHub()
   const clientInput = makeInput()
   const host = new NetHostSession(4242, 'Alice', makeInput().source, hub.hostTransport)
-  const bob = hub.addClient('Bob', 'thief', clientInput.source)
+  const bob = hub.addClient('Bob', 'scrounger', clientInput.source)
   await host.start()
   await bob.session.start()
   bob.connect()

@@ -884,7 +884,7 @@ describe('connection lifecycle — a legitimate reclaim keeps the player whole',
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
     const avatar = host.world.byId.get(entityId)!
-    avatar.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    avatar.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     avatar.playerCtl!.cash = 777
     const inventoryBefore = JSON.stringify(avatar.loadout!.inventory)
     const players = playerCount(host)

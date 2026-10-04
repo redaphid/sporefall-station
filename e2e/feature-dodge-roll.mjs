@@ -1,5 +1,5 @@
 // #54 — DODGE-ROLL headline video (exact world state + real systems).
-// Injects the committed `combat-stage` snapshot with the thugs cleared, the
+// Injects the committed `combat-stage` snapshot with the mutants cleared, the
 // player parked on the open lane at full hp, and a single fast bullet inbound.
 // Two runs off the SAME world prove the mechanic:
 //   • dodge-roll : the player rolls INTO the bullet — i-frames carry them

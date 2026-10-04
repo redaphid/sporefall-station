@@ -318,13 +318,13 @@ describe('extractSample', () => {
   const playerEnt = {
     id: 7, kind: 'player', archetype: 'player', pos: { x: 10.123, y: 11.987 }, vel: { x: 0.5, y: 0 }, intent: { x: 1, y: 0 },
     health: { hp: 22, max: 30 }, combat: { weapon: 'pistol', cooldown: 0 },
-    playerCtl: { playerId: 0, abilityCooldown: 0, cash: 55, crimeUntilTick: 0 },
+    playerCtl: { playerId: 0, abilityCooldown: 0, cash: 55, misdeedUntilTick: 0 },
     loadout: { inventory: [{ itemId: 'pistol', qty: 60, mods: [{ id: 'homing', stacks: 2 }] }], activeSlot: 0 },
     fx: { burning: { until: 600 } },
   }
-  const nearNpc = { id: 41, kind: 'npc', archetype: 'brute', pos: { x: 14, y: 11 }, health: { hp: 18, max: 26 }, ai: { mode: 'aggro', goal: 'battle', faction: 'gang' } }
+  const nearNpc = { id: 41, kind: 'npc', archetype: 'brute', pos: { x: 14, y: 11 }, health: { hp: 18, max: 26 }, ai: { mode: 'aggro', goal: 'battle', faction: 'rootcult' } }
   const farNpc = { id: 60, kind: 'npc', archetype: 'skitter', pos: { x: 60, y: 60 }, ai: { mode: 'idle', faction: 'civ' } }
-  const farBoss = { id: 90, kind: 'npc', archetype: 'boss', pos: { x: 60, y: 60 }, health: { hp: 200, max: 200 }, ai: { mode: 'sleep', faction: 'gang' } }
+  const farBoss = { id: 90, kind: 'npc', archetype: 'boss', pos: { x: 60, y: 60 }, health: { hp: 200, max: 200 }, ai: { mode: 'sleep', faction: 'rootcult' } }
 
   it('extracts compact players (mods, fx status, cash) and 12-tile threats + far boss', () => {
     const { sample, index } = extractSample(stateJson, [playerEnt, nearNpc, farNpc, farBoss], 5_000, false)
@@ -335,7 +335,7 @@ describe('extractSample', () => {
     expect(p.mods).toEqual([{ id: 'homing', stacks: 2 }])
     expect(p.status).toContain('burning')
     expect(sample.threats.map((t) => t.id)).toEqual([41, 90]) // near brute + far boss; far skitter excluded
-    expect(sample.threats[0]).toMatchObject({ archetype: 'brute', mode: 'aggro', goal: 'battle', faction: 'gang', hp: 18 })
+    expect(sample.threats[0]).toMatchObject({ archetype: 'brute', mode: 'aggro', goal: 'battle', faction: 'rootcult', hp: 18 })
     expect(index).toContainEqual({ id: 60, kind: 'npc', archetype: 'skitter' })
   })
 

@@ -25,8 +25,8 @@ describe('snapshot codec', () => {
     epoch: 0, lastInputSeq: 4242,
     entities: [
       { id: 7, archetype: 'player', x: 12.34, y: 56.78, facing: 1.5, hpPct: 0.5, flags: 0b10001 },
-      { id: 900, archetype: 'thug', x: 0.5, y: 63.5, facing: 4.7, hpPct: 1, flags: 0 },
-      { id: 12, archetype: 'pickup.briefcase', x: 33, y: 44, facing: 0, hpPct: 1, flags: 0 },
+      { id: 900, archetype: 'mutant', x: 0.5, y: 63.5, facing: 4.7, hpPct: 1, flags: 0 },
+      { id: 12, archetype: 'pickup.canister', x: 33, y: 44, facing: 0, hpPct: 1, flags: 0 },
     ],
   }
 

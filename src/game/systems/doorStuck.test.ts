@@ -38,7 +38,7 @@ const openDoorAt2020 = (w: World): Entity => {
 }
 
 const npcAt = (w: World, x: number, y: number): Entity => {
-  const e = addEntity(w, makeEntity('npc', 'thug', x, y, 0.35))
+  const e = addEntity(w, makeEntity('npc', 'mutant', x, y, 0.35))
   e.health = { hp: 40, max: 40, iframes: 0 }
   e.speed = 4
   return e

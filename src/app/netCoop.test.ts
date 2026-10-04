@@ -996,7 +996,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
 
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
     for (let i = 0; i < 60; i++) {
-      addEntity(host.world, makeEntity('npc', 'thug', avatar.pos.x, avatar.pos.y))
+      addEntity(host.world, makeEntity('npc', 'mutant', avatar.pos.x, avatar.pos.y))
     }
 
     for (let i = 0; i < 6; i++) {

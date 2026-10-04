@@ -1,6 +1,6 @@
 // COMPLEX DIRECTOR — the indoor event AI for station-complex floors (3+).
 //
-// The city floors get their tension from open streets and roaming packs; the
+// The city floors get their tension from open causeways and roaming packs; the
 // complex gets it from the building itself. A small, deterministic director
 // watches the party and stages three kinds of set-piece:
 //

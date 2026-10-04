@@ -49,7 +49,7 @@ const row = (label: string, hp: number, resist: number, frozen: boolean): void =
 
 row('plain hit', 320, 1, false)
 row('SHATTER (frozen)', 320, 1, true)
-row('SHATTER on a 40hp thug', 40, 1, true)
+row('SHATTER on a 40hp mutant', 40, 1, true)
 row('plain hit, armoured', 320, 0.35, false)
 row('SHATTER, armoured', 320, 0.35, true)
 
@@ -57,4 +57,4 @@ console.log('\nThe two things this has to prove:')
 console.log('  1. a shatter pays the SAME as a plain hit — no execute amplification,')
 console.log('     and no silent zero that punishes frost + lifesteal.')
 console.log('  2. the payout is independent of the victim HP POOL: a 320hp boss and a')
-console.log('     40hp thug pay identically, so no lifebar can ever be harvested.')
+console.log('     40hp mutant pay identically, so no lifebar can ever be harvested.')

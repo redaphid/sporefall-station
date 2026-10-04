@@ -85,7 +85,7 @@ export const MOTION = {
 export type LocomotionStyle = 'stride' | 'hover' | 'pulse' | 'waddle'
 
 /** Locomotion per drawn body, keyed by ART KIND (ArtRegistry.artKind), not by
- * sim archetype: the swampspace `cop` is a spore-drone, the city `cop` is a
+ * sim archetype: the swampspace `warden` is a spore-drone, the settlement `warden` is a
  * human. Anything absent is `stride`, so adding a character never silently
  * changes how it moves — you opt in. */
 export const LOCOMOTION: ReadonlyMap<string, LocomotionStyle> = new Map([

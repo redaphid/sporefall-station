@@ -150,7 +150,7 @@ export interface World {
   baseRng: Rng
   /** Per-tick FX/net events; consumed after each tick. */
   events: SimEvent[]
-  /** City heat 0..3 — cop aggro threshold. */
+  /** City heat 0..3 — warden aggro threshold. */
   alarm: number
   /** Per-wing power state: `powerCut[wing] === true` means that wing's grid is
    * down (a hacked generator/Cryo Terminal), which auto-unseals its `'power'`

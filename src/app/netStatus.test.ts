@@ -109,7 +109,7 @@ describe('element statuses reach a co-op client', () => {
   it('a frozen, burning enemy on the host is drawn frozen and burning on the client', async () => {
     const { host, bob, step, near } = await coop()
     const p = near()
-    const npc = spawnNpc(host.world, 'thug', p.x, p.y)
+    const npc = spawnNpc(host.world, 'mutant', p.x, p.y)
     addStatus(host.world, npc, 'frozen', 300)
     addStatus(host.world, npc, 'burning', 300)
     await step(6)
@@ -123,8 +123,8 @@ describe('element statuses reach a co-op client', () => {
     // One body per kind: #87 makes elements interact on one body (wet douses
     // burning, a panic blocks a freeze), and this test is about the wire.
     const kinds = ['burning', 'electrified', 'frozen', 'poisoned', 'spore', 'wet']
-    const hits = kinds.map((_, i) => spawnNpc(host.world, 'thug', p.x + (i % 3) - 1, p.y - 1 - Math.floor(i / 3)))
-    const bystander = spawnNpc(host.world, 'thug', p.x, p.y + 1)
+    const hits = kinds.map((_, i) => spawnNpc(host.world, 'mutant', p.x + (i % 3) - 1, p.y - 1 - Math.floor(i / 3)))
+    const bystander = spawnNpc(host.world, 'mutant', p.x, p.y + 1)
     await step(1)
     kinds.forEach((k, i) => addStatus(host.world, hits[i], k, 300))
     await step(6)
@@ -138,7 +138,7 @@ describe('element statuses reach a co-op client', () => {
   it('a status that ends on the host stops drawing on the client (no phantom)', async () => {
     const { host, bob, step, near } = await coop()
     const p = near()
-    const npc = spawnNpc(host.world, 'thug', p.x, p.y)
+    const npc = spawnNpc(host.world, 'mutant', p.x, p.y)
     addStatus(host.world, npc, 'wet', 300)
     addStatus(host.world, npc, 'poisoned', 300)
     await step(6)

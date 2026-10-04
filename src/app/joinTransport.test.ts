@@ -20,6 +20,7 @@ const ANDROID_CHROME =
   'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36'
 
 const env = (over: Partial<JoinEnvironment>): JoinEnvironment => ({
+  online: false,
   native: false,
   transport: null,
   webBluetooth: 'available',
@@ -152,7 +153,15 @@ describe('planJoinTransport: deliberate dev transports', () => {
       for (const webBluetooth of ['available', 'unavailable', 'absent'] as const)
         for (const appleMobile of [false, true])
           for (const transport of [null, 'ws', 'bogus'])
-            expect(planJoinTransport({ native, webBluetooth, appleMobile, transport }).kind).not.toBe('tabs')
+            expect(planJoinTransport({ online: false, native, webBluetooth, appleMobile, transport }).kind).not.toBe('tabs')
+  })
+
+  it('Play online joins over the relay on every device, phones and iPhones included', () => {
+    for (const native of [false, true])
+      for (const webBluetooth of ['available', 'unavailable', 'absent'] as const)
+        for (const appleMobile of [false, true])
+          for (const transport of [null, 'tabs', 'bogus'])
+            expect(planJoinTransport({ online: true, native, webBluetooth, appleMobile, transport })).toEqual({ kind: 'ws' })
   })
 })
 

@@ -20,11 +20,22 @@ import {
   type HelloMsg,
   type InventoryMsg,
   type LobbyPlayer,
+  type PingMsg,
+  type PongMsg,
   type StateMsg,
   type WireEntity,
 } from '../net/protocol/messages'
-import { isKnownMsgType, MsgType, PROTOCOL_VERSION, SNAPSHOT_INTERVAL_TICKS, type PeerId, type Transport } from '../net/types'
+import {
+  isKnownMsgType,
+  MAX_PLAYERS,
+  MsgType,
+  PROTOCOL_VERSION,
+  SNAPSHOT_INTERVAL_TICKS,
+  type PeerId,
+  type Transport,
+} from '../net/types'
 import type { RenderView, Session } from './session'
+import { linkHealth, type LinkStatus } from './linkHealth'
 
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
 const STATE_INTERVAL_TICKS = 15 // 2Hz
@@ -36,18 +47,10 @@ const STATE_INTERVAL_TICKS = 15 // 2Hz
  */
 export const SNAPSHOT_ENTITY_CAP = 48
 
-/**
- * Max simultaneous players in one run (host + clients). Slots run 0..MAX_PLAYERS-1;
- * the host always owns slot 0, so up to MAX_PLAYERS-1 remote clients may join.
- * Raised from 4→8 for large local groups (stress/8-players). NOTE: over BLE the
- * host peripheral's radio caps concurrent centrals well below this (commonly ~7,
- * device-specific) — this constant is the protocol/sim ceiling, not a promise the
- * transport can carry it. The BroadcastChannel/web path has no such radio limit.
- */
-export const MAX_PLAYERS = 8
 const MAX_SLOT = MAX_PLAYERS - 1
 
 interface PeerState {
+  peer: PeerId
   slot: number
   name: string
   token: string
@@ -68,6 +71,10 @@ interface PeerState {
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
+  /** Clock reading of this peer's newest byte. */
+  lastHeardAt: number
+  /** The round trip this client last reported in its Ping. */
+  rttMs: number | null
 }
 
 /** A dropped mid-game player who may still rejoin. */
@@ -97,6 +104,9 @@ export class NetHostSession implements Session {
   started = false
   private runEpoch = 0
   onLobbyChange?: (players: LobbyPlayer[]) => void
+  /** Fires just before each tick with the slot → command map it will run,
+   * remote players included, so a state-share ring can record it. */
+  onTickInputs?: (inputs: Map<number, InputCmd>) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
   debugInventorySends = 0
 
@@ -109,6 +119,7 @@ export class NetHostSession implements Session {
     private transport: Transport,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
+    private now: () => number = () => performance.now(),
   ) {
     this.world = this.freshWorld()
     transport.on((ev) => {
@@ -132,6 +143,19 @@ export class NetHostSession implements Session {
     await Promise.all(peers.map((p) => p.queue.flushed()))
     for (const p of peers) p.queue.stop()
     await this.transport.stop()
+  }
+
+  /** The host's link chip: its worst admitted player. Online clients ping once a
+   * second and the host streams to them, so a quiet peer is a struggling one. */
+  linkStatus(): LinkStatus {
+    let silent = 0
+    let rtt: number | null = null
+    for (const p of this.peers.values()) {
+      if (p.slot < 0) continue
+      silent = Math.max(silent, this.now() - p.lastHeardAt)
+      if (p.rttMs !== null) rtt = Math.max(rtt ?? 0, p.rttMs)
+    }
+    return { health: this.started ? linkHealth(silent) : 'good', rttMs: rtt, session: 'live' }
   }
 
   lobbyPlayers(): LobbyPlayer[] {
@@ -248,6 +272,7 @@ export class NetHostSession implements Session {
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
+    this.onTickInputs?.(this.inputs)
     tickWorld(this.world, this.inputs)
     this.expireGhosts()
 
@@ -401,6 +426,7 @@ export class NetHostSession implements Session {
   private onPeerConnected(peer: PeerId): void {
     // Slot assigned on HELLO; until then just track the queue/reader.
     const state: PeerState = {
+      peer,
       slot: -1,
       name: '',
       token: '',
@@ -414,6 +440,8 @@ export class NetHostSession implements Session {
       pendingEdges: 0,
       pendingHotbar: -1,
       lastInvSig: '',
+      lastHeardAt: this.now(),
+      rttMs: null,
     }
     this.peers.set(peer, state)
   }
@@ -454,6 +482,7 @@ export class NetHostSession implements Session {
   private onData(peer: PeerId, bytes: Uint8Array): void {
     const p = this.peers.get(peer)
     if (!p) return
+    p.lastHeardAt = this.now()
     p.reader.push(bytes, (msg) => this.onMessage(peer, p, msg))
   }
 
@@ -466,8 +495,23 @@ export class NetHostSession implements Session {
     }
   }
 
+  /** Tell a peer no, then hang up on it where the transport can, so a refused
+   * player does not keep holding a seat on the relay. */
+  private refuse(p: PeerState, reason: string): void {
+    p.queue.queueReliable(encodeJson(MsgType.Reject, { reason }))
+    const transport = this.transport
+    if (transport.drop) void p.queue.flushed().then(() => transport.drop?.(p.peer))
+  }
+
   private handleMessage(p: PeerState, msg: Uint8Array): void {
     const type = msg[0]
+    if (type === MsgType.Ping) {
+      const ping = decodeJson<PingMsg>(msg)
+      if (typeof ping.rtt === 'number' && Number.isFinite(ping.rtt)) p.rttMs = ping.rtt
+      const pong: PongMsg = { t: ping.t }
+      p.queue.queueReliable(encodeJson(MsgType.Pong, pong))
+      return
+    }
     if (type === MsgType.Input) {
       const { cmd, edges } = decodeInput(msg)
       // Only fold in a packet that actually advances the input sequence (u16 wrap
@@ -489,7 +533,7 @@ export class NetHostSession implements Session {
     if (type === MsgType.Hello) {
       const hello = decodeJson<HelloMsg>(msg)
       if (hello.v !== PROTOCOL_VERSION) {
-        p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'version mismatch — update the game' }))
+        this.refuse(p, 'version mismatch — update the game')
         return
       }
 
@@ -520,7 +564,7 @@ export class NetHostSession implements Session {
       if (this.started && hello.rejoin) {
         const ghost = this.ghosts.get(hello.rejoin.slot)
         if (!ghost || ghost.token !== hello.rejoin.token) {
-          p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'rejoin window expired' }))
+          this.refuse(p, 'rejoin window expired')
           return
         }
         // The parked avatar is STUNNED, not invulnerable, so a patrol can finish
@@ -533,9 +577,7 @@ export class NetHostSession implements Session {
         const parked = this.world.byId.get(ghost.entityId)
         if (!parked || parked.dead) {
           this.ghosts.delete(ghost.slot)
-          p.queue.queueReliable(
-            encodeJson(MsgType.Reject, { reason: 'your character did not survive — rejoin for a fresh one' }),
-          )
+          this.refuse(p, 'your character did not survive — rejoin for a fresh one')
           return
         }
         this.ghosts.delete(ghost.slot)
@@ -572,7 +614,7 @@ export class NetHostSession implements Session {
         let slot = 1
         while (used.has(slot)) slot++
         if (slot > MAX_SLOT) {
-          p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
+          this.refuse(p, 'lobby full')
           return
         }
         p.slot = slot
@@ -601,7 +643,7 @@ export class NetHostSession implements Session {
       let slot = 1
       while (used.has(slot)) slot++
       if (slot > MAX_SLOT) {
-        p.queue.queueReliable(encodeJson(MsgType.Reject, { reason: 'lobby full' }))
+        this.refuse(p, 'lobby full')
         return
       }
       p.slot = slot

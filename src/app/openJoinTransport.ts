@@ -7,6 +7,8 @@ import { pickJoinTransport, showJoinUnsupported } from '../ui/menu'
 import { JOIN_UNSUPPORTED, isAppleMobile, planJoinTransport, probeWebBluetooth } from './joinTransport'
 
 export interface JoinTransportDeps {
+  /** Play online: join `room` on the relay, whatever the device. */
+  online: boolean
   /** Capacitor native build. */
   native: boolean
   /** `location.search`. */
@@ -28,6 +30,7 @@ export interface JoinTransportDeps {
  */
 export const openJoinTransport = async (deps: JoinTransportDeps): Promise<Transport | null> => {
   const plan = planJoinTransport({
+    online: deps.online,
     native: deps.native,
     transport: new URLSearchParams(deps.search).get('transport'),
     webBluetooth: await probeWebBluetooth(deps.nav),

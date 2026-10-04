@@ -95,18 +95,61 @@ describe('pickOnline', () => {
   })
 })
 
-describe('createLobbyUi room code', () => {
+describe('createLobbyUi', () => {
+  const buttons = (root: HTMLElement): string[] => Array.from(root.querySelectorAll('button')).map((b) => b.textContent ?? '')
+
   it('shows an online room code as text under the title', () => {
     const root = mount()
-    createLobbyUi(root, true, '<b>X</b>')
-    const code = root.querySelector('#room-code')!
+    createLobbyUi(root, true).setRoomCode('<b>X</b>')
+    const code = root.querySelector<HTMLElement>('#room-code')!
     expect(code.textContent).toBe('<b>X</b>')
     expect(code.querySelector('b')).toBeNull()
+    expect(code.style.display).toBe('block')
   })
 
-  it('has no code block for a Bluetooth lobby', () => {
+  it('has no visible code block for a Bluetooth lobby', () => {
     const root = mount()
     createLobbyUi(root, true)
-    expect(root.querySelector('#room-code')).toBeNull()
+    expect(root.querySelector<HTMLElement>('#room-code')!.style.display).toBe('none')
+  })
+
+  it('offers Start only once the host waits for it, so a failed host never shows it', async () => {
+    const root = mount()
+    const lobby = createLobbyUi(root, true)
+    expect(buttons(root)).toEqual([])
+    let started = false
+    void lobby.waitForStart().then(() => (started = true))
+    expect(buttons(root)).toEqual(['Start game'])
+    root.querySelector('button')!.click()
+    await flush()
+    expect(started).toBe(true)
+  })
+
+  it('a joiner never gets a Start button', () => {
+    const root = mount()
+    void createLobbyUi(root, false).waitForStart()
+    expect(buttons(root)).toEqual([])
+  })
+
+  it.each(['retry', 'back'] as const)('offerRetry shows the reason and resolves %s', async (choice) => {
+    const root = mount()
+    const lobby = createLobbyUi(root, true)
+    let picked: string | undefined
+    void lobby.offerRetry("Couldn't open an online room").then((c) => (picked = c))
+    expect(root.querySelector('#status')!.textContent).toBe("Couldn't open an online room")
+    expect(buttons(root)).toEqual(['Retry', 'Back to menu'])
+    Array.from(root.querySelectorAll('button'))
+      .find((b) => b.textContent === (choice === 'retry' ? 'Retry' : 'Back to menu'))!
+      .click()
+    await flush()
+    expect(picked).toBe(choice)
+    expect(buttons(root)).toEqual([])
+  })
+
+  it('renders player names as text, since they come off the wire', () => {
+    const root = mount()
+    createLobbyUi(root, true).setPlayers([{ slot: 1, name: '<img src=x onerror=alert(1)>' }])
+    expect(root.querySelector('#players img')).toBeNull()
+    expect(root.querySelector('#players')!.textContent).toBe('P2 · <img src=x onerror=alert(1)>')
   })
 })

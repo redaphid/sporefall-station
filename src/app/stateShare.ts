@@ -12,7 +12,7 @@
 // (`fetchState`) is likewise only called when `?state=` is actually present.
 
 import {
-  captureState,
+  captureReproducible,
   isStateLinkPayload,
   StateRing,
   verifyStateLink,
@@ -48,6 +48,9 @@ export interface ShareResult {
   rawBytes: number
   /** Ticks of run-up bundled with the capture (0 when no ring was armed). */
   rewindTicks: number
+  /** Set when an online host's run-up could not replay and a still went up
+   * instead: the reason, for the player and the console. */
+  runUpDropped?: string
 }
 
 /**
@@ -63,11 +66,18 @@ export const shareState = async (
   meta: StateLinkMeta = {},
   ring?: StateRing,
   origin: string = stateOrigin(location.search, location.origin),
+  /** Online host: share a still rather than nothing when the run-up does not
+   * replay (see captureReproducible). Solo keeps refusing, since there a
+   * failed replay is a determinism bug worth hearing about. */
+  stillIfRunUpFails = false,
 ): Promise<ShareResult> => {
-  const payload = captureState(world, { capturedAt: Date.now(), build: APP_VERSION, ...meta }, ring?.rewind())
-
-  const check = verifyStateLink(payload)
-  if (!check.ok) throw new Error(`refusing to share a state that does not reproduce itself: ${check.reason}`)
+  const { payload, check, runUpDropped } = captureReproducible(
+    world,
+    { capturedAt: Date.now(), build: APP_VERSION, ...meta },
+    ring?.rewind(),
+  )
+  const failure = !check.ok ? check.reason : runUpDropped && !stillIfRunUpFails ? runUpDropped : undefined
+  if (failure) throw new Error(`refusing to share a state that does not reproduce itself: ${failure}`)
 
   const json = JSON.stringify(payload)
   const body = await gzip(json)
@@ -93,7 +103,14 @@ export const shareState = async (
     )
 
   const { id, url } = (await res.json()) as { id: string; url: string }
-  return { id, url, bytes: body.size, rawBytes: json.length, rewindTicks: check.rewindTicks }
+  return {
+    id,
+    url,
+    bytes: body.size,
+    rawBytes: json.length,
+    rewindTicks: check.rewindTicks,
+    ...(runUpDropped ? { runUpDropped } : {}),
+  }
 }
 
 /**

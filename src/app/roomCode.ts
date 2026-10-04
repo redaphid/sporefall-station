@@ -34,3 +34,29 @@ export const parseRoomCode = (input: string): RoomCode | null => {
 /** The relay room a code names. The prefix keeps coded rooms apart from the
  * `?room=` names that dev links and e2e runs use. */
 export const onlineRoom = (code: RoomCode): string => `online-${code}`
+
+/** Codes an online host tries before it asks the player what to do. */
+export const ROOM_ATTEMPTS = 3
+
+/**
+ * Open a room under `first`, falling back to fresh codes. The browser cannot
+ * see why a WebSocket upgrade failed, so a code another host already holds (the
+ * relay answers 409) and a dropped network look the same; a fresh code fixes
+ * the first and costs nothing on the second. Rejects with the last error.
+ */
+export const claimRoom = async <T>(
+  first: RoomCode,
+  open: (code: RoomCode) => Promise<T>,
+  fresh: () => RoomCode = newRoomCode,
+  attempts = ROOM_ATTEMPTS,
+): Promise<{ code: RoomCode; value: T }> => {
+  let code = first
+  for (let i = 1; ; i++) {
+    try {
+      return { code, value: await open(code) }
+    } catch (err) {
+      if (i >= attempts) throw err
+      code = fresh()
+    }
+  }
+}

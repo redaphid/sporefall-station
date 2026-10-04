@@ -8,6 +8,7 @@ const heldTransport = () => {
   let sent = 0
   const transport: Transport = {
     role: 'host',
+    medium: 'local',
     maxPacket: 180,
     start: async () => {},
     stop: async () => {},

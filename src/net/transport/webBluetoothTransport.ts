@@ -51,6 +51,7 @@ const MAX_PACKET = 180
  */
 export class WebBluetoothClientTransport implements Transport {
   readonly role = 'client' as const
+  readonly medium = 'bluetooth'
   readonly maxPacket = MAX_PACKET
   private handlers = new Set<(e: TransportEvent) => void>()
   private device: BluetoothDevice | null = null

@@ -68,6 +68,10 @@ export const createPauseOverlay = (
     /** The heading, read each frame. A net session's menu does not stop the
      * shared sim, so it is not "PAUSED", and a client's says why it opened. */
     title?: () => string
+    /** True once the session itself is over (a client whose host left or whose
+     * link died). The menu then shows even over the death or game-over screen,
+     * which would otherwise wait for a host that is gone. Read each frame. */
+    sessionOver?: () => boolean
     /** Save, fetch the newest build, go to the picker. `show` paints its status. */
     onRefresh?: (show: (text: string) => void) => void
     onShare?: (note?: string) => Promise<ShareResult>
@@ -262,8 +266,13 @@ export const createPauseOverlay = (
   let wasPaused = false
   return {
     update(paused, view) {
-      // Never over the death/game-over overlay — that screen owns its own panel.
-      const show = paused && !view.gameOver && !view.self?.dead
+      // Never over the death/game-over overlay — that screen owns its own panel —
+      // unless the session is over, when only this menu has a way out.
+      const over = actions.sessionOver?.() ?? false
+      const show = paused && (over || (!view.gameOver && !view.self?.dead))
+      // Opaque when it covers a death screen, so its "Waiting for the host…"
+      // does not show through.
+      el.style.background = over ? '#0b0b12' : '#0009'
       if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
       if (!show) runEnders.disarmAll()
       if (show) {

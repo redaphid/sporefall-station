@@ -7,7 +7,8 @@ import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import { decodeSnapshot, type WelcomeMsg } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
 import { NetClientSession } from './netClient'
-import { MAX_PLAYERS, NetHostSession } from './netHost'
+import { NetHostSession } from './netHost'
+import { MAX_PLAYERS } from '../net/types'
 
 /**
  * 8-player stress of the offline netcode (stress/8-players). Same in-memory
@@ -26,6 +27,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -60,6 +62,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.deliverToHost(peer, bytes),

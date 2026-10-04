@@ -16,6 +16,8 @@ export type WebBluetoothSupport = 'available' | 'unavailable' | 'absent'
 export type UnsupportedReason = 'apple-mobile' | 'no-web-bluetooth' | 'no-adapter'
 
 export interface JoinEnvironment {
+  /** The player picked Play online: the relay, on any device, phones included. */
+  online: boolean
   /** Capacitor native build: joins through the BLE plugin, never Web Bluetooth. */
   native: boolean
   /** Raw `?transport=` value. */
@@ -33,6 +35,7 @@ export type JoinPlan =
   | { kind: 'unsupported'; reason: UnsupportedReason }
 
 export const planJoinTransport = (env: JoinEnvironment): JoinPlan => {
+  if (env.online) return { kind: 'ws' }
   if (env.native) return { kind: 'native-ble' }
   if (env.transport === 'ws') return { kind: 'ws' }
   if (env.transport === 'tabs') return { kind: 'tabs' }

@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { encodeAddressed } from '../net/transport/wsWire'
-import { type Action, CLOSE_HOST_TAKEN, type Conn, planClose, planData, planOpen } from './roomRelay'
+import {
+  type Action,
+  admit,
+  CLOSE_HOST_TAKEN,
+  CLOSE_REJECTED,
+  CLOSE_TOO_BIG,
+  type Conn,
+  MAX_CONTROL_FRAME,
+  MAX_DATA_FRAME,
+  MAX_ROOM_CLIENTS,
+  planClose,
+  planData,
+  planFrame,
+  planOpen,
+} from './roomRelay'
+import { MAX_PLAYERS } from '../net/types'
 
 const host = (conn: string): Conn => ({ conn, role: 'host' })
 const client = (conn: string, clientId: string): Conn => ({ conn, role: 'client', clientId })
@@ -16,8 +31,8 @@ describe('planOpen — membership introductions', () => {
     expect(planOpen([host('H')], 'H')).toEqual([])
   })
 
-  it('client joining before the host waits silently', () => {
-    expect(planOpen([client('A', 'c-a')], 'A')).toEqual([])
+  it('client joining a room with no host is told so at once', () => {
+    expect(planOpen([client('A', 'c-a')], 'A')).toEqual([{ kind: 'send', conn: 'A', data: { t: 'nohost' } }])
   })
 
   it('client joining an occupied room introduces both directions', () => {
@@ -113,5 +128,61 @@ describe('planClose — departures', () => {
   it('defaults the drop reason to remote', () => {
     const out = planClose([host('H'), client('A', 'c-a')], 'A')
     expect(out[0]).toMatchObject({ data: { reason: 'remote' } })
+  })
+})
+
+describe('admit — refused before the upgrade', () => {
+  const room = (n: number): Conn[] => [host('H'), ...Array.from({ length: n }, (_, i) => client(`C${i}`, `c-${i}`))]
+
+  it('the room holds the game ceiling of clients and refuses the next with 409', () => {
+    expect(MAX_ROOM_CLIENTS).toBe(MAX_PLAYERS)
+    expect(admit(room(MAX_ROOM_CLIENTS - 1), 'client')).toEqual({ ok: true })
+    expect(admit(room(MAX_ROOM_CLIENTS), 'client')).toEqual({ ok: false, status: 409, reason: 'room is full' })
+  })
+
+  it('a second host is refused, and a full room still takes its host back', () => {
+    expect(admit(room(0), 'host')).toEqual({ ok: false, status: 409, reason: 'room already has a host' })
+    expect(admit(room(MAX_ROOM_CLIENTS).slice(1), 'host')).toEqual({ ok: true })
+  })
+})
+
+describe('planFrame — sizes and host commands', () => {
+  const state = [host('H'), client('A', 'c-a'), client('B', 'c-b')]
+
+  it('routes a data frame right at the limit and closes the sender one byte over', () => {
+    const atLimit = encodeAddressed('c-a', new Uint8Array(MAX_DATA_FRAME - 1 - 'c-a'.length))
+    expect(atLimit.length).toBe(MAX_DATA_FRAME)
+    const routed = planFrame(state, 'H', atLimit)
+    expect(routed).toHaveLength(1)
+    expect(routed[0]).toMatchObject({ kind: 'send', conn: 'A' })
+    expect(planFrame(state, 'A', new Uint8Array(MAX_DATA_FRAME + 1))).toEqual([
+      { kind: 'close', conn: 'A', code: CLOSE_TOO_BIG, reason: 'frame too big' },
+    ])
+  })
+
+  it('closes the sender of an oversized text frame, host or client', () => {
+    const big = 'x'.repeat(MAX_CONTROL_FRAME + 1)
+    for (const conn of ['H', 'A'])
+      expect(planFrame(state, conn, big)).toEqual([{ kind: 'close', conn, code: CLOSE_TOO_BIG, reason: 'frame too big' }])
+    expect(planFrame(state, 'A', 'x'.repeat(MAX_CONTROL_FRAME))).toEqual([])
+  })
+
+  it("a host's drop closes exactly that client", () => {
+    expect(planFrame(state, 'H', JSON.stringify({ t: 'drop', id: 'c-b' }))).toEqual([
+      { kind: 'close', conn: 'B', code: CLOSE_REJECTED, reason: 'refused by host' },
+    ])
+  })
+
+  it.each([
+    ['from a client', 'A', { t: 'drop', id: 'c-b' }],
+    ['naming an unknown peer', 'H', { t: 'drop', id: 'c-zz' }],
+    ['naming no peer', 'H', { t: 'drop' }],
+    ['of another kind', 'H', { t: 'host-', reason: 'remote' }],
+  ])('a drop %s does nothing', (_label, from, cmd) => {
+    expect(planFrame(state, from, JSON.stringify(cmd))).toEqual([])
+  })
+
+  it('garbage text is ignored, not routed', () => {
+    expect(planFrame(state, 'H', '{not json')).toEqual([])
   })
 })

@@ -25,4 +25,7 @@ node e2e/ws-multiplayer.mjs
 echo "[run-ws] Play online proof (start menu → room code → relay)…"
 node e2e/ws-online-menu.mjs
 
+echo "[run-ws] online reliability proof (fault proxy: freeze, host vanishes, held code)…"
+node e2e/ws-online-reliability.mjs
+
 echo "[run-ws] done. screenshots in e2e/output"

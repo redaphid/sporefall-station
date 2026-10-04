@@ -578,6 +578,16 @@ export interface GameStartMsg {
    * standing on floor 3. Optional for back-compat: absent means 1. */
   floor?: number
 }
+export interface PingMsg {
+  t: number
+  /** The sender's newest round trip in ms, absent before its first Pong. */
+  rtt?: number
+}
+
+export interface PongMsg {
+  t: number
+}
+
 export interface GoMsg {
   startTick: number
   /** slot → entity id of that player's avatar */

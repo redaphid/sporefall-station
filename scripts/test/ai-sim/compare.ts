@@ -22,7 +22,7 @@ const crowd = (seed: number): World => {
   const c = center(w)
   addPlayer(w, c.x, c.y)
   let i = 0
-  for (const arch of ['thug', 'gangster', 'cop', 'civilian', 'thug', 'gangster', 'robot', 'thug']) {
+  for (const arch of ['mutant', 'acolyte', 'warden', 'civilian', 'mutant', 'acolyte', 'robot', 'mutant']) {
     const a = (i / 8) * Math.PI * 2
     addNpc(w, arch, c.x + Math.cos(a) * 10, c.y + Math.sin(a) * 10, { sight: 12 })
     i++
@@ -36,7 +36,7 @@ const boundaryDuel = (seed: number): World => {
   const w = makeArena(seed, 20)
   const c = center(w)
   addPlayer(w, c.x, c.y)
-  const g = addNpc(w, 'gangster', c.x + 13, c.y, { sight: 16, weapon: 'pistol' })
+  const g = addNpc(w, 'acolyte', c.x + 13, c.y, { sight: 16, weapon: 'pistol' })
   g.health = { hp: Math.round(g.health!.max / 3) + 1, max: g.health!.max, iframes: 0 } // near the flee edge too
   return w
 }
@@ -44,8 +44,8 @@ const boundaryDuel = (seed: number): World => {
 const factionClash = (seed: number): World => {
   const w = makeArena(seed, 24)
   const c = center(w)
-  for (let i = 0; i < 6; i++) addNpc(w, 'cop', c.x - 8, c.y - 5 + i * 2, { sight: 13, weapon: 'pistol' })
-  for (let i = 0; i < 6; i++) addNpc(w, 'gangster', c.x + 8, c.y - 5 + i * 2, { sight: 13, weapon: 'pistol' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'warden', c.x - 8, c.y - 5 + i * 2, { sight: 13, weapon: 'pistol' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'acolyte', c.x + 8, c.y - 5 + i * 2, { sight: 13, weapon: 'pistol' })
   return w
 }
 
@@ -55,7 +55,7 @@ const chokepoint = (seed: number): World => {
   const wx = Math.floor(c.x)
   for (let y = Math.floor(c.y) - 10; y <= Math.floor(c.y) + 10; y++) if (y !== Math.floor(c.y)) wall(w, wx, y, wx, y)
   addPlayer(w, c.x - 6, c.y)
-  for (let i = 0; i < 12; i++) addNpc(w, 'thug', c.x + 4 + (i % 4), c.y - 4 + Math.floor(i / 4) * 3, { sight: 16 })
+  for (let i = 0; i < 12; i++) addNpc(w, 'mutant', c.x + 4 + (i % 4), c.y - 4 + Math.floor(i / 4) * 3, { sight: 16 })
   return w
 }
 
@@ -91,7 +91,7 @@ console.log('\n═══ #62 analytic (battle/flee 1-hp jitter) ═══')
     const w = makeArena(1)
     const c = center(w)
     addPlayer(w, c.x, c.y)
-    const g = addNpc(w, 'gangster', c.x + 6, c.y, { sight: 12 })
+    const g = addNpc(w, 'acolyte', c.x + 6, c.y, { sight: 12 })
     w.aiFlags = { hysteresis: hyst }
     const b = 11 // the crossover hp from probe-decide
     let flips = 0

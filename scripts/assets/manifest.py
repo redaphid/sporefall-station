@@ -17,11 +17,11 @@ THEME = G.THEME
 
 NAMES = {
     "player": "Ranger",
-    "cop": "Spore Warden",
-    "bouncer": "Airlock Warden",
-    "thug": "Bog Mutant",
+    "warden": "Spore Warden",
+    "lockkeeper": "Airlock Warden",
+    "mutant": "Bog Mutant",
     "boss": "Mireclaw Alpha",
-    "gangster": "Rootcult Enforcer",
+    "acolyte": "Rootcult Acolyte",
     "civilian": "Settler",
     "shopkeeper": "Barter Frog",
     "scientist": "Mycologist",
@@ -55,12 +55,12 @@ NAMES = {
 
 PALETTE_SECTION = {
     # canvas + procedural colors keep the Flashback Titan mood for anything
-    # that has no sprite (streets, grass, exit pad, procedural blobs).
+    # that has no sprite (causeways, grass, exit pad, procedural blobs).
     "background": "#0c1416",
     "uiAccent": "#46e078",
     "tiles": {
-        "street": "#16282c",     # phosphorescent shallows / flooded deck
-        "sidewalk": "#23323a",   # walkway grating
+        "causeway": "#16282c",     # phosphorescent shallows / flooded deck
+        "boardwalk": "#23323a",   # walkway grating
         "floor": "#2a3626",      # (procedural fallback under tile.floor)
         "wall": "#141a16",
         "grass": "#35511a",      # bog overgrowth
@@ -68,8 +68,8 @@ PALETTE_SECTION = {
     },
     "entities": {
         "boss": "#a05ae0",
-        "gangster": "#7b8791",
-        "bouncer": "#59636d",
+        "acolyte": "#7b8791",
+        "lockkeeper": "#59636d",
         "shopkeeper": "#b08d50",
         "crate": "#6b4d26",
     },
@@ -85,23 +85,23 @@ ANIM_SECTION = {"walk": 4}
 
 CHAR_FILES = {arch: kind for arch, (kind, *_rest) in G.CHARS.items()}
 CHAR_FILES.update({arch: CHAR_FILES[t] for arch, t in G.CHAR_ALIASES.items()
-                   if t in CHAR_FILES and arch in ("gangster",)})
+                   if t in CHAR_FILES and arch in ("acolyte",)})
 # The Mireclaw Alpha has its own body now, so it is listed EXPLICITLY rather
 # than through CHAR_ALIASES. It cannot come from the alias update above: that
 # line resolves an alias to the TARGET's files, and CHAR_ALIASES maps
-# boss -> thug, so the Alpha would silently be handed the bog-mutant art again
+# boss -> mutant, so the Alpha would silently be handed the bog-mutant art again
 # -- the pixel-identical bug ARCHETYPE_SCALE exists to paper over.
 #
 # Same silent-revert hazard as PROP_KEYS below: char.boss.* only reaches the
 # shipped manifest because this table names it, so omitting it here means the
-# next regeneration drops all ten keys and the boss falls back to the thug.
+# next regeneration drops all ten keys and the boss falls back to the mutant.
 #
 # Only s-idle and s-step exist; the per-direction BORROW below fills se/e/ne/n
 # from the s art, which is exactly what every other non-player NPC does.
 CHAR_FILES["boss"] = "mireclaw-alpha"
 
 ITEM_KEYS = {  # engine item id -> our themed file (items table key)
-    "pistol": "spore-pistol", "bat": "root-club", "knife": "shard-knife",
+    "pistol": "spore-pistol", "wrench": "root-club", "knife": "shard-knife",
     "medkit": "biogel-kit", "cash": "credit-chits", "shotgun": "scatter-blaster",
     "molotov": "phosphor-flask", "grenade-item": "spore-grenade",
 }
@@ -163,13 +163,13 @@ def build():
             sprites[key] = rels
         return len(rels)
 
-    for tile_name in ("street", "sidewalk", "floor", "wall", "grass", "exit"):
+    for tile_name in ("causeway", "boardwalk", "floor", "wall", "grass", "exit"):
         put_pool(f"tile.{tile_name}", f"tiles/{tile_name}-{{}}.png")
         put_pool(f"tile.{tile_name}.accent", f"tiles/{tile_name}-accent-{{}}.png")
         put_pool(f"tile.{tile_name}.overlay", f"tiles/{tile_name}-overlay-{{}}.png")
     # Character keys resolve *per key* against the theme chain, so any key we
-    # omit falls back to CITY's art — a spore-drone cop facing south would turn
-    # into a human cop when walking east. Mention every direction key
+    # omit falls back to SETTLEMENT's art — a spore-drone warden facing south would turn
+    # into a human warden when walking east. Mention every direction key
     # explicitly, borrowing within the theme (se→s, e→s, ne→e→s, n→s; step→idle)
     # until real art for that pose lands.
     BORROW = {"s": ["s"], "se": ["se", "s"], "e": ["e", "s"],
@@ -236,10 +236,10 @@ def build():
         "names": NAMES,
         "sprites": sprites,
         "anim": ANIM_SECTION,
-        # floor + street pools are sliced from 2x2-tile macro images
+        # floor + causeway pools are sliced from 2x2-tile macro images
         # (tilesets_floor.py); the renderer places slices by position so plate
         # seams / ripple rings span tiles (docs/themes.md "macroTiles").
-        "macroTiles": {name: 2 for name in ("floor", "street")
+        "macroTiles": {name: 2 for name in ("floor", "causeway")
                        if len(sprites.get(f"tile.{name}", [])) >= 4},
     }
     out = os.path.join(THEME, "manifest.json")

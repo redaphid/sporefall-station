@@ -66,7 +66,7 @@ const probe = () => {
     rechargeUntil: stack?.rechargeUntil ?? null,
     recharging: stack?.rechargeUntil !== undefined && stack.rechargeUntil > w.tick,
     order: (stack?.mods ?? []).map((m) => m.id),
-    thugsAlive: w.entities.filter((e) => e.archetype === 'thug' && !e.dead).length,
+    mutantsAlive: w.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length,
     frozen: w.entities.filter((e) => e.fx && e.fx.frozen).length,
     stripChips: document.querySelectorAll('[data-role="mod-sequence"] button[data-i]').length,
     rechargeBar: !!document.querySelector('[data-role="mod-recharge"]'),

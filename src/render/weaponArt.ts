@@ -17,7 +17,7 @@ export type WeaponShape = 'hammer' | 'club' | 'blade' | 'gun' | 'rod'
  * (see `hasHeldWeapon`) — bare hands hold nothing. */
 const MELEE_SHAPE: Record<string, WeaponShape> = {
   sledgehammer: 'hammer',
-  bat: 'club',
+  wrench: 'club',
   knife: 'blade',
   fists: 'rod',
   claws: 'blade',
@@ -38,7 +38,7 @@ export const weaponShape = (id: string): WeaponShape => {
 
 /** Does this weapon draw a held sprite at all? NATURAL armament does not — bare
  * fists, or a Mireclaw's claws (a boss swinging a floating blade in its fist was
- * exactly the tell that it was a reskinned thug). Everything else — including an
+ * exactly the tell that it was a reskinned mutant). Everything else — including an
  * unknown id, which falls back to the rod — does. */
 export const hasHeldWeapon = (id: string): boolean => WEAPONS[id]?.natural !== true
 

@@ -10,21 +10,21 @@ const world = (): World => createWorld(1234, 1)
 describe('runVerb', () => {
   it('lists every entity with its verbatim component JSON', () => {
     const w = world()
-    const npc = spawnNpc(w, 'cop', 5, 6)
+    const npc = spawnNpc(w, 'warden', 5, 6)
     const list = JSON.parse(runVerb(w, 'entities')) as Record<string, unknown>[]
     expect(list).toHaveLength(1)
     const row = list[0]
     // Verbatim mirror: id/kind/archetype AND every component field survive.
     expect(row.id).toBe(npc.id)
     expect(row.kind).toBe('npc')
-    expect(row.archetype).toBe('cop')
+    expect(row.archetype).toBe('warden')
     expect(row.health).toEqual(npc.health)
-    expect((row.ai as { faction: string }).faction).toBe('cop')
+    expect((row.ai as { faction: string }).faction).toBe('warden')
   })
 
   it('serializes UNKNOWN/future component fields (verbatim mirror)', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 1, 1)
+    const e = spawnNpc(w, 'mutant', 1, 1)
     // A component no verb knows about — it must still appear in the mirror.
     ;(e as unknown as { futureThing: { z: number } }).futureThing = { z: 42 }
     const dump = serializeEntity(e)
@@ -41,10 +41,10 @@ describe('runVerb', () => {
 
   it('set deep-merges a JSON patch and coerces scalar types', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     runVerb(w, `set ${e.id} {"health":{"hp":7}}`)
     expect(e.health!.hp).toBe(7)
-    expect(e.health!.max).toBe(spawnNpc(world(), 'thug', 0, 0).health!.max) // untouched
+    expect(e.health!.max).toBe(spawnNpc(world(), 'mutant', 0, 0).health!.max) // untouched
     // String coerced to the field's existing number type.
     runVerb(w, `set ${e.id} {"speed":"3.5"}`)
     expect(e.speed).toBe(3.5)
@@ -52,7 +52,7 @@ describe('runVerb', () => {
 
   it('set accepts a base64-wrapped payload (whitespace-safe)', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     runVerb(w, `set ${e.id} ${encodeArg('{ "health": { "hp": 3 } }')}`)
     expect(e.health!.hp).toBe(3)
   })
@@ -60,9 +60,9 @@ describe('runVerb', () => {
   it('spawn creates a fully-wired NPC', () => {
     const w = world()
     const before = w.entities.length
-    const out = JSON.parse(runVerb(w, 'spawn npc cop 10 12'))
+    const out = JSON.parse(runVerb(w, 'spawn npc warden 10 12'))
     expect(w.entities.length).toBe(before + 1)
-    expect(out.archetype).toBe('cop')
+    expect(out.archetype).toBe('warden')
     expect(out.pos).toEqual({ x: 10, y: 12 })
     expect(out.ai).toBeTruthy()
     expect(out.health).toBeTruthy()
@@ -70,7 +70,7 @@ describe('runVerb', () => {
 
   it('kill marks an npc dead and downs a co-op player', () => {
     const w = world()
-    const npc = spawnNpc(w, 'thug', 0, 0)
+    const npc = spawnNpc(w, 'mutant', 0, 0)
     expect(JSON.parse(runVerb(w, `kill ${npc.id}`)).dead).toBe(true)
     // Two players = co-op: a killed player is downed (a teammate can revive).
     // A solo player would instead respawn in place, so spawn a second one.
@@ -83,7 +83,7 @@ describe('runVerb', () => {
 
   it('teleport moves pos and clears interpolation', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     runVerb(w, `teleport ${e.id} 20 30`)
     expect(e.pos).toEqual({ x: 20, y: 30 })
     expect(e.prevPos).toEqual({ x: 20, y: 30 })
@@ -91,8 +91,8 @@ describe('runVerb', () => {
 
   it('state summarizes the world with per-kind counts', () => {
     const w = world()
-    spawnNpc(w, 'cop', 0, 0)
-    spawnNpc(w, 'thug', 1, 1)
+    spawnNpc(w, 'warden', 0, 0)
+    spawnNpc(w, 'mutant', 1, 1)
     spawnPlayer(w, 0, 2, 2)
     const s = JSON.parse(runVerb(w, 'state'))
     expect(s.tick).toBe(0)
@@ -110,7 +110,7 @@ describe('runVerb', () => {
 
   it('command is a verbatim escape hatch onto another verb', () => {
     const w = world()
-    spawnNpc(w, 'cop', 0, 0)
+    spawnNpc(w, 'warden', 0, 0)
     expect(JSON.parse(runVerb(w, 'command state')).total).toBe(1)
   })
 
@@ -123,7 +123,7 @@ describe('verbName / WRITE_VERBS', () => {
   it('classifies reads and writes, unwrapping command', () => {
     expect(verbName('entities')).toBe('entities')
     expect(verbName('set 5 {}')).toBe('set')
-    expect(verbName('command spawn npc cop 1 2')).toBe('spawn')
+    expect(verbName('command spawn npc warden 1 2')).toBe('spawn')
     expect(WRITE_VERBS.has(verbName('command kill 3'))).toBe(true)
     expect(WRITE_VERBS.has(verbName('state'))).toBe(false)
   })

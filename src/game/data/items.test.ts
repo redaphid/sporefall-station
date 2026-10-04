@@ -13,7 +13,7 @@ const IDS_BY_CLASS: Record<Exclude<ItemClass, 'unknown'>, readonly string[]> = {
   throwable: Object.keys(THROWABLES),
   consumable: Object.keys(CONSUMABLES),
   cash: ['cash'],
-  key: ['briefcase', 'keycard', keycardId('wing14', 'essence lab'), keycardId('wing3', 'med-bay'), 'keycard.wing0', 'keycard.wing14', 'keycard.north'],
+  key: ['canister', 'keycard', keycardId('wing14', 'essence lab'), keycardId('wing3', 'med-bay'), 'keycard.wing0', 'keycard.wing14', 'keycard.north'],
 }
 
 const ALL = Object.entries(IDS_BY_CLASS).flatMap(([c, ids]) => ids.map((id) => [c, id] as const))
@@ -53,7 +53,7 @@ describe('itemName', () => {
   it('names weapons and throwables from their tables', () => {
     expect(itemName('shotgun')).toBe(WEAPONS.shotgun.name)
     expect(itemName('grenade')).toBe(THROWABLES.grenade.name)
-    expect(itemName('briefcase')).toBe('Specimen Canister')
+    expect(itemName('canister')).toBe('Specimen Canister')
   })
 
   it.each([

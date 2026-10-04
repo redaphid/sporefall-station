@@ -42,7 +42,7 @@ describe('theme verb', () => {
 
   it('works through the `command` escape hatch', () => {
     const seen: string[] = []
-    runVerb(world(), 'command theme city', { setTheme: (id) => seen.push(id) })
-    expect(seen).toEqual(['city'])
+    runVerb(world(), 'command theme settlement', { setTheme: (id) => seen.push(id) })
+    expect(seen).toEqual(['settlement'])
   })
 })

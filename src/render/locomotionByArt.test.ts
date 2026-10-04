@@ -1,6 +1,6 @@
 // How a character's body moves (motion.ts LOCOMOTION) is a property of the ART
-// it is drawn with, not of its sim archetype: the swampspace `cop` is a
-// spore-drone and must hover, while the city pack's `cop` is a human and must
+// it is drawn with, not of its sim archetype: the swampspace `warden` is a
+// spore-drone and must hover, while the settlement pack's `warden` is a human and must
 // not. These tests drive the entity layer the game draws with (EntityViews over
 // a real createArt registry, fed from the real theme manifests) and read the
 // sprite transform it produces, so a lookup keyed by the wrong string fails
@@ -122,39 +122,39 @@ const walkLift = (chain: ThemeChain, archetype: string): number => observe(chain
 
 const HIRES = chainFor(DEFAULT_THEME_ID)
 const BASE = chainFor(BASE_THEME_ID)
-const CITY = chainFor('city')
+const SETTLEMENT = chainFor('settlement')
 
 describe('locomotion follows the drawn body, at the entity layer', () => {
-  it('the swampspace packs draw cop/lurker as fliers (hover) and pod as a sac (pulse)', () => {
+  it('the swampspace packs draw warden/lurker as fliers (hover) and pod as a sac (pulse)', () => {
     for (const [name, chain] of [['swampspace-hires', HIRES], ['swampspace', BASE]] as const) {
-      expect(idleGait(chain, 'cop'), `${name} cop = spore-drone`).toBe('hover')
+      expect(idleGait(chain, 'warden'), `${name} warden = spore-drone`).toBe('hover')
       expect(idleGait(chain, 'lurker'), `${name} lurker = gloom-lurker`).toBe('hover')
       expect(idleGait(chain, 'pod'), `${name} pod = brood-sac`).toBe('pulse')
     }
   })
 
   it('a moving drone floats harder instead of acquiring a walk bob', () => {
-    expect(walkLift(HIRES, 'cop')).toBeGreaterThan(4)
+    expect(walkLift(HIRES, 'warden')).toBeGreaterThan(4)
   })
 
-  it('the Airlock Warden borrows the cop body, so in swampspace it hovers too', () => {
-    expect(idleGait(HIRES, 'bouncer')).toBe('hover')
+  it('the Airlock Warden borrows the warden body, so in swampspace it hovers too', () => {
+    expect(idleGait(HIRES, 'lockkeeper')).toBe('hover')
   })
 
   it('walkers stride', () => {
-    for (const a of ['player', 'thug', 'civilian', 'scientist', 'brute', 'boss', 'gangster', 'robot']) {
+    for (const a of ['player', 'mutant', 'civilian', 'scientist', 'brute', 'boss', 'acolyte', 'robot']) {
       expect(idleGait(HIRES, a), a).toBe('stride')
     }
   })
 
-  it("the city pack's cop is a human: it strides, and so does the bouncer wearing its body", () => {
-    expect(idleGait(CITY, 'cop')).toBe('stride')
-    expect(idleGait(CITY, 'bouncer')).toBe('stride')
+  it("the settlement pack's warden is a human: it strides, and so does the lockkeeper wearing its body", () => {
+    expect(idleGait(SETTLEMENT, 'warden')).toBe('stride')
+    expect(idleGait(SETTLEMENT, 'lockkeeper')).toBe('stride')
   })
 
   it('an archetype the active pack does not draw moves like the art it falls through to', () => {
-    // city maps no lurker, so the chain draws the swampspace gloom-lurker.
-    expect(idleGait(CITY, 'lurker')).toBe('hover')
+    // settlement maps no lurker, so the chain draws the swampspace gloom-lurker.
+    expect(idleGait(SETTLEMENT, 'lurker')).toBe('hover')
   })
 
   it('an odd, missing or hostile idle path strides and never throws', () => {
@@ -173,21 +173,21 @@ describe('locomotion follows the drawn body, at the entity layer', () => {
       'chars/hasOwnProperty-s-idle.png',
     ]
     for (const path of odd) {
-      const chain = overlay({ 'char.cop.s-idle': [path] }, [])
-      expect(() => idleGait(chain, 'cop'), path).not.toThrow()
-      expect(idleGait(chain, 'cop'), path).toBe('stride')
-      expect(() => walkLift(chain, 'cop'), path).not.toThrow()
+      const chain = overlay({ 'char.warden.s-idle': [path] }, [])
+      expect(() => idleGait(chain, 'warden'), path).not.toThrow()
+      expect(idleGait(chain, 'warden'), path).toBe('stride')
+      expect(() => walkLift(chain, 'warden'), path).not.toThrow()
     }
     // null forces procedural art; an empty chain has no art at all.
-    expect(idleGait(overlay({ 'char.cop.s-idle': null }, HIRES), 'cop')).toBe('stride')
-    expect(idleGait([], 'cop')).toBe('stride')
+    expect(idleGait(overlay({ 'char.warden.s-idle': null }, HIRES), 'warden')).toBe('stride')
+    expect(idleGait([], 'warden')).toBe('stride')
   })
 
   it('the directory part of the path is not the kind', () => {
-    expect(idleGait(overlay({ 'char.thug.s-idle': ['/sprites/any/where/spore-drone-s-idle.png'] }, []), 'thug')).toBe(
+    expect(idleGait(overlay({ 'char.mutant.s-idle': ['/sprites/any/where/spore-drone-s-idle.png'] }, []), 'mutant')).toBe(
       'hover',
     )
-    expect(idleGait(overlay({ 'char.thug.s-idle': ['/sprites/spore-drone-s-idle/thug.png'] }, []), 'thug')).toBe(
+    expect(idleGait(overlay({ 'char.mutant.s-idle': ['/sprites/spore-drone-s-idle/mutant.png'] }, []), 'mutant')).toBe(
       'stride',
     )
   })
@@ -221,9 +221,9 @@ describe('the sporeling-mite walks on two short legs, with a waddle', () => {
     expect(o.widen).toBe(0)
   })
 
-  it('the waddle belongs to the mite: a striding frog-settler, a thug and a moving brood-sac do not rock', () => {
+  it('the waddle belongs to the mite: a striding frog-settler, a mutant and a moving brood-sac do not rock', () => {
     expect(observe(HIRES, 'civilian', true).rock).toBe(0)
-    expect(observe(HIRES, 'thug', true).rock).toBe(0)
+    expect(observe(HIRES, 'mutant', true).rock).toBe(0)
     const sac = observe(HIRES, 'pod', true)
     expect(sac.rock).toBe(0)
     expect(sac.lift).toBe(0)
@@ -247,21 +247,21 @@ describe('drawn cycles are not bobbed twice', () => {
 
   it('a walker whose pack draws its walk cycle gets no procedural bob on top of it', () => {
     // The frog-settler ships 8 drawn walk frames that already carry a head bob;
-    // the thug still walks on the legacy idle/step pair and keeps the bob.
+    // the mutant still walks on the legacy idle/step pair and keeps the bob.
     expect(walkLift(HIRES, 'civilian')).toBe(0)
     expect(walkLift(HIRES, 'player')).toBe(0)
-    expect(walkLift(HIRES, 'thug')).toBeGreaterThan(2)
+    expect(walkLift(HIRES, 'mutant')).toBeGreaterThan(2)
   })
 
   it('a drone whose walk is drawn hover frames floats procedurally only while it stands', () => {
-    const chain = overlay(walkFrames('cop', 'spore-drone', 8), HIRES)
-    expect(idleGait(chain, 'cop')).toBe('hover')
-    expect(walkLift(chain, 'cop')).toBe(0)
+    const chain = overlay(walkFrames('warden', 'spore-drone', 8), HIRES)
+    expect(idleGait(chain, 'warden')).toBe('hover')
+    expect(walkLift(chain, 'warden')).toBe(0)
   })
 
   it('a pack that draws the idle loop owns the idle motion too', () => {
-    const drone = overlay(drawnLoop('cop', 'spore-drone', 'idle', 4), HIRES)
-    expect(observe(drone, 'cop', false)).toEqual({ lift: 0, widen: 0, breathe: 0, rock: 0, tilt: 0 })
+    const drone = overlay(drawnLoop('warden', 'spore-drone', 'idle', 4), HIRES)
+    expect(observe(drone, 'warden', false)).toEqual({ lift: 0, widen: 0, breathe: 0, rock: 0, tilt: 0 })
     const ranger = overlay(drawnLoop('player', 'vine-ranger', 'idle', 4), HIRES)
     expect(observe(ranger, 'player', false).breathe).toBe(0)
     expect(observe(HIRES, 'player', false).breathe).toBeGreaterThan(0)
@@ -275,7 +275,7 @@ describe('drawn cycles are not bobbed twice', () => {
   })
 
   it('a one-frame drawn clip is a held pose, not a cycle: the procedural motion stays', () => {
-    expect(walkLift(overlay(walkFrames('cop', 'spore-drone', 1), HIRES), 'cop')).toBeGreaterThan(4)
-    expect(walkLift(overlay(walkFrames('thug', 'bog-mutant', 1), HIRES), 'thug')).toBeGreaterThan(2)
+    expect(walkLift(overlay(walkFrames('warden', 'spore-drone', 1), HIRES), 'warden')).toBeGreaterThan(4)
+    expect(walkLift(overlay(walkFrames('mutant', 'bog-mutant', 1), HIRES), 'mutant')).toBeGreaterThan(2)
   })
 })

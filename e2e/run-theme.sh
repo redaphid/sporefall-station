@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Theme hot-swap proof: build, serve on an ephemeral port, screenshot the same
-# seeded scene under city vs the magenta test theme (runtime swap), assert the
+# seeded scene under settlement vs the magenta test theme (runtime swap), assert the
 # pixels changed and nothing crashed. Serves on its OWN port (never 5173/4173).
 set -euo pipefail
 cd "$(dirname "$0")/.."

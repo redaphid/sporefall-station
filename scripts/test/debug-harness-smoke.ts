@@ -39,7 +39,7 @@ const main = async (): Promise<void> => {
   const world = createWorld(4242, 1)
   spawnPlayer(world, 0, world.level.spawn.x, world.level.spawn.y)
   const civ = spawnNpc(world, 'civilian', 8, 8)
-  spawnNpc(world, 'thug', 12, 12)
+  spawnNpc(world, 'mutant', 12, 12)
   const channel = startDebugChannel(world, URL, () => {})
   const loop = setInterval(() => {
     tickWorld(world, new Map())
@@ -71,8 +71,8 @@ const main = async (): Promise<void> => {
   check('set mutates a component', afterSet.health.hp === 1, `hp=${afterSet.health.hp}`)
 
   // 4. spawn — a new entity appears
-  const spawned = JSON.parse(await dbg.raw('spawn npc cop 20 20')) as { id: number; archetype: string }
-  check('spawn creates an entity', spawned.archetype === 'cop' && spawned.id > 0)
+  const spawned = JSON.parse(await dbg.raw('spawn npc warden 20 20')) as { id: number; archetype: string }
+  check('spawn creates an entity', spawned.archetype === 'warden' && spawned.id > 0)
   const after = JSON.parse(await dbg.raw('state')) as { total: number }
   check('spawn grows the world', after.total > state.total, `${state.total} -> ${after.total}`)
 

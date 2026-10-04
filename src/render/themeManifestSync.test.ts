@@ -38,7 +38,7 @@ const referencedFiles = (m: Manifest): string[] => {
 }
 
 // Mirrors sync_manifest.py: pooled tile art discovered from the tiles/ dir.
-const SURFACES = ['street', 'sidewalk', 'floor', 'wall', 'grass', 'exit', 'hall', 'grate', 'tiled', 'plating', 'hull', 'bog', 'stair_up', 'stair_down', 'landing'] as const
+const SURFACES = ['causeway', 'boardwalk', 'floor', 'wall', 'grass', 'exit', 'hall', 'grate', 'tiled', 'plating', 'hull', 'bog', 'stair_up', 'stair_down', 'landing'] as const
 const POOLS: readonly { key: (n: string) => string; pattern: (n: string) => RegExp }[] = [
   { key: (n) => `tile.${n}`, pattern: (n) => new RegExp(`^${n}-(\\d+)\\.png$`) },
   { key: (n) => `tile.${n}.accent`, pattern: (n) => new RegExp(`^${n}-accent-(\\d+)\\.png$`) },
@@ -64,7 +64,7 @@ describe('theme manifests stay in sync with the assets on disk', () => {
 
   it.each(themes)('%s: tile pools list EXACTLY the numbered tiles on disk, in numeric order', (theme) => {
     const tilesDir = join(THEMES_DIR, theme, 'tiles')
-    if (!existsSync(tilesDir)) return // single-file themes (city/test) have no pools
+    if (!existsSync(tilesDir)) return // single-file themes (settlement/test) have no pools
     const m = load(theme)
     const disk = readdirSync(tilesDir)
     for (const surface of SURFACES) {

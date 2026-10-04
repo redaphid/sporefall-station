@@ -335,7 +335,7 @@ describe('divergence detector — proving it can fail (red before green)', () =>
     const { host, bob, selfId } = await startPair(4008)
     await step(host, [bob], 18)
     const view = bob.session.renderView()
-    const ghost = makeEntity('npc', 'thug', 5, 5)
+    const ghost = makeEntity('npc', 'mutant', 5, 5)
     ghost.id = 60000
     expectFires(
       diffHostClient(host.world, patch(view, { entities: [...view.entities, ghost] }), { selfEntityId: selfId() }),
@@ -392,10 +392,10 @@ describe('divergence detector — proving it can fail (red before green)', () =>
 
     host.world.byId.get(target.id)!.archetype = 'pickup.keycard.wing3'
     expect(archetypeIssues(drawnAs('pickup.keycard'))).toEqual([])
-    expectFires(drawnAs('pickup.briefcase'), 'entity.archetype')
+    expectFires(drawnAs('pickup.canister'), 'entity.archetype')
     expectFires(drawnAs('pickup.keycard.wing3'), 'entity.archetype')
 
-    host.world.byId.get(target.id)!.archetype = 'pickup.briefcase'
+    host.world.byId.get(target.id)!.archetype = 'pickup.canister'
     expectFires(drawnAs('pickup.keycard'), 'entity.archetype')
   })
 
@@ -692,7 +692,7 @@ describe('divergence hunt — seed mismatch', () => {
     // whatever tick the loop ends on. Whether one is in the air then is pure
     // happenstance of the floor's fights (it flipped when the group layer grew
     // floor 3's cast, which re-rolled the shared AI dice and so who shoots whom
-    // when — here a cop and a gangster trading shots at tick 31). That is
+    // when — here a warden and an acolyte trading shots at tick 31). That is
     // snapshot cadence, not a late-join defect, so in-flight projectiles are
     // excused here and ONLY here; every other kind still has to be clean.
     settled.issues = settled.issues.filter(

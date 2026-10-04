@@ -126,13 +126,13 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 0
+        "misdeedUntilTick": 0
       }
     },
     {
       "id": 2,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 13.5,
         "y": 5.5
@@ -158,13 +158,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -178,7 +178,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 13.5,
           "y": 5.5
@@ -190,7 +190,7 @@
     {
       "id": 3,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 19.5,
         "y": 5.5
@@ -216,13 +216,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -236,7 +236,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 19.5,
           "y": 5.5
@@ -248,7 +248,7 @@
     {
       "id": 4,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 13.5,
         "y": 10.5
@@ -294,7 +294,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 13.5,
           "y": 10.5
@@ -307,7 +307,7 @@
     {
       "id": 5,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 25.5,
         "y": 5.5
@@ -333,13 +333,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -353,7 +353,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 25.5,
           "y": 5.5
@@ -365,7 +365,7 @@
     {
       "id": 6,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 31.5,
         "y": 9.5
@@ -411,7 +411,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 31.5,
           "y": 9.5
@@ -424,7 +424,7 @@
     {
       "id": 7,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 30.5,
         "y": 4.5
@@ -450,13 +450,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -470,7 +470,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 30.5,
           "y": 4.5
@@ -482,7 +482,7 @@
     {
       "id": 8,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 13.5,
         "y": 23.5
@@ -508,13 +508,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -528,7 +528,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 13.5,
           "y": 23.5
@@ -540,7 +540,7 @@
     {
       "id": 9,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 19.5,
         "y": 18.5
@@ -586,7 +586,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 19.5,
           "y": 18.5
@@ -625,13 +625,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -650,7 +650,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 41.5,
           "y": 3.5

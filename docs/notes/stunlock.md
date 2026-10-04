@@ -34,7 +34,7 @@ swing, so melee stun is escapable. Only the stunGun's cooldown<duration inverts.
 
 ## Where stunGuns come from
 `src/game/populate.ts`: `stunGun` is in the NPC weapon pools (`ELEMENT_WEAPONS`,
-the ranged pool) — so ordinary thugs/cops can roll it. Observed live: NPC id 1, a
+the ranged pool) — so ordinary mutants/wardens can roll it. Observed live: NPC id 1, a
 `civ`-faction "skittish" civilian, was carrying a `stunGun` and had gone aggro on
 the player. So even civilians can chain-lock.
 
@@ -52,7 +52,7 @@ the player. So even civilians can chain-lock.
    max of remaining vs a reduced re-apply, or ignore re-apply while already active.
 
 ## Live repro to run when the session is idle (snapshot-protected)
-1. `dump` snapshot. 2. Heal player, spawn a stunGun thug adjacent w/ LOS.
+1. `dump` snapshot. 2. Heal player, spawn a stunGun mutant adjacent w/ LOS.
 3. `step` ~150 ticks sampling `player.fx.electrified.until - world.tick` (never
    drops to <=0) and `player.intent`-vs-`pos` (never moves). 4. Apply fix #1 in a
    scratch build or via `set` on the weapon, repeat, confirm free windows appear.

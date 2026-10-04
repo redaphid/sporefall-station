@@ -901,7 +901,7 @@ export class NetClientSession implements Session {
     // Our OWN player carries the FULL authoritative inventory the host streams us
     // (slots / activeSlot / per-weapon mods / ammo) so weapon switching, item use
     // and mod badges all work as a joiner. Until that first inventory arrives, fall
-    // back to the HUD bandage/briefcase summary so nothing phantom-floods the hotbar.
+    // back to the HUD bandage/canister summary so nothing phantom-floods the hotbar.
     if (this.self?.playerCtl) {
       const ld = (this.self.loadout ??= { inventory: [], activeSlot: -1 })
       if (this.localInv) {
@@ -917,7 +917,7 @@ export class NetClientSession implements Session {
         // it. The count itself stays on the wire (see StateMsg.huds); it is the
         // total carried-item tally, not a bandage tally, and dropping the FIELD
         // would change the shape of a message an older host still sends.
-        ld.inventory = hud.briefcase ? [{ itemId: 'briefcase', qty: 1 }] : []
+        ld.inventory = hud.canister ? [{ itemId: 'canister', qty: 1 }] : []
       }
     }
     const missionText =

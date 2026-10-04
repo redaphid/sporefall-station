@@ -141,18 +141,18 @@ describe('hostile peer — the host survives hand-crafted messages', () => {
     expect(host.peersBySlot.has(1)).toBe(false)
 
     // The attacker knows the slot (it is in every LobbyState) but guesses the token.
-    t.connect('thief')
+    t.connect('scrounger')
     for (const guess of ['', 'token', '0', 'null', 'undefined', 'a'.repeat(32)]) {
       for (const p of frameMessage(
-        encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Thief', rejoin: { slot: 1, token: guess } }),
+        encodeJson(MsgType.Hello, { v: PROTOCOL_VERSION, name: 'Scrounger', rejoin: { slot: 1, token: guess } }),
         180,
       )) {
-        t.inject('thief', p)
+        t.inject('scrounger', p)
       }
     }
     // Not one guess may hand over the victim's slot or their avatar.
     expect(host.peersBySlot.has(1)).toBe(false)
-    expect(host.lobbyPlayers().map((p) => p.name)).not.toContain('Thief')
+    expect(host.lobbyPlayers().map((p) => p.name)).not.toContain('Scrounger')
   })
 
   it('counts a desync for a well-formed frame carrying an unknown type byte', () => {

@@ -1,8 +1,8 @@
 // @ts-check
 // Parity M7 proof: drives the relationships scenario in a real browser with real
-// KEYBOARD input. The player shoots a civilian in front of two cops and a
-// bouncer; the harness asserts the cops (law) flip Neutral -> Hostile and aggro,
-// while the unrelated bouncer stays Neutral and calm. Video + before/after shots.
+// KEYBOARD input. The player shoots a civilian in front of two wardens and a
+// lockkeeper; the harness asserts the wardens (wardens) flip Neutral -> Hostile and aggro,
+// while the unrelated lockkeeper stays Neutral and calm. Video + before/after shots.
 import { chromium } from 'playwright-core'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -43,13 +43,13 @@ const factions = (page) =>
   page.evaluate(() => {
     const v = window.__sporefall.renderView()
     const selfId = v.self.id
-    const out = { cops: [], bouncer: null }
+    const out = { wardens: [], lockkeeper: null }
     for (const e of v.entities) {
       if (e.kind !== 'npc' || e.dead || !e.ai) continue
       const rel = e.ai.rel && e.ai.rel[selfId]
       const info = { id: e.id, mode: e.ai.mode, code: rel ? rel.code : 'Neutral', dist: Math.hypot(e.pos.x - v.self.pos.x, e.pos.y - v.self.pos.y) }
-      if (e.ai.faction === 'cop' && info.dist < 12) out.cops.push(info)
-      if (e.ai.faction === 'neutral' && info.dist < 12) out.bouncer = info
+      if (e.ai.faction === 'warden' && info.dist < 12) out.wardens.push(info)
+      if (e.ai.faction === 'neutral' && info.dist < 12) out.lockkeeper = info
     }
     return out
   })
@@ -83,23 +83,23 @@ const main = async () => {
   const before = await factions(page)
   log('before', JSON.stringify(before))
   await screenshot(page, 'before-calm')
-  check(before.cops.length >= 1, 'scenario has cops nearby')
-  check(before.cops.every((c) => c.code !== 'Hostile' && c.mode !== 'aggro'), 'cops start neutral and calm')
-  check(!!before.bouncer && before.bouncer.code !== 'Hostile', 'bouncer starts neutral')
+  check(before.wardens.length >= 1, 'scenario has wardens nearby')
+  check(before.wardens.every((c) => c.code !== 'Hostile' && c.mode !== 'aggro'), 'wardens start neutral and calm')
+  check(!!before.lockkeeper && before.lockkeeper.code !== 'Hostile', 'lockkeeper starts neutral')
 
-  // Commit the crime: shoot the civilian in front of the cops.
+  // Commit the misdeed: shoot the civilian in front of the wardens.
   for (let i = 0; i < 3; i++) {
     await page.keyboard.press('Space')
     await sleep(250)
   }
-  await sleep(1200) // let the cops react and charge
+  await sleep(1200) // let the wardens react and charge
   const after = await factions(page)
   log('after', JSON.stringify(after))
-  await screenshot(page, 'cops-hostile')
+  await screenshot(page, 'wardens-hostile')
 
-  check(after.cops.some((c) => c.code === 'Hostile'), 'a witnessing cop turns Hostile after the crime')
-  check(after.cops.some((c) => c.mode === 'aggro'), 'a cop aggroes the player after the crime')
-  check(!!after.bouncer && after.bouncer.code !== 'Hostile' && after.bouncer.mode !== 'aggro', 'the unrelated bouncer stays neutral and calm')
+  check(after.wardens.some((c) => c.code === 'Hostile'), 'a witnessing warden turns Hostile after the misdeed')
+  check(after.wardens.some((c) => c.mode === 'aggro'), 'a warden aggroes the player after the misdeed')
+  check(!!after.lockkeeper && after.lockkeeper.code !== 'Hostile' && after.lockkeeper.mode !== 'aggro', 'the unrelated lockkeeper stays neutral and calm')
 
   await page.close()
   await context.close()
@@ -118,7 +118,7 @@ const main = async () => {
     log('FAILURES:', failures.join('; '))
     process.exit(1)
   }
-  log('SUCCESS: witnessed crime flipped cops hostile, bouncer stayed neutral, zero page errors')
+  log('SUCCESS: witnessed misdeed flipped wardens hostile, lockkeeper stayed neutral, zero page errors')
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

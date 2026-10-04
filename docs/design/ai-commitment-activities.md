@@ -42,7 +42,7 @@ RNG noise and score ties played no part: the loops are deterministic limit cycle
 **Commitment.** A goal holds for `commitTicks(code, tier)` ticks. While it
 holds and its candidate is no longer offered, a candidate on a lower tier never
 replaces it, and one on the same tier only does if it names a new target: a
-thug that loses sight of one player turns on another at once. A goal that is
+mutant that loses sight of one player turns on another at once. A goal that is
 still offered competes as before, through the margin, so a wounded fighter
 still turns to flee. Flight only commits when panic started it (a scream, a
 pack too strong to face). Flight from an enemy seen at the threat tier ends by

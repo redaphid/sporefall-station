@@ -78,7 +78,7 @@ describe('applyDamage reports HOW MUCH it dealt, or null if it never landed', ()
       playerId: 0,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
       roll: { untilTick: w.tick + 10, cooldownUntilTick: w.tick + 99, dirX: 1, dirY: 0 },
     }
     expect(isRolling(e, w.tick)).toBe(true)
@@ -221,7 +221,7 @@ describe('callers read the result correctly (the bugs lived here, not in applyDa
     // truthiness instead of `!== null` would silently break every weapon like it.
     const w = createWorld(3, 1)
     const sp = w.level.spawn
-    const shooter = spawnNpc(w, 'gangster', sp.x + 3, sp.y)
+    const shooter = spawnNpc(w, 'acolyte', sp.x + 3, sp.y)
     const victim = spawnNpc(w, 'civilian', sp.x + 5, sp.y)
     if (!shooter || !victim) throw new Error('probe setup failed')
     shooter.combat!.weapon = 'freezeRay'

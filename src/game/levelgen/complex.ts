@@ -32,7 +32,7 @@ import {
 import type { Rect } from './rooms'
 
 /**
- * INDOOR COMPLEX generator — from floor 3 the run leaves the sunken streets for
+ * INDOOR COMPLEX generator — from floor 3 the run leaves the sunken causeways for
  * the station ring itself: a pressure hull packed with modules (mess hall,
  * bunk rooms, galley, labs, infirmary, reactor hall, stores, security) laid
  * out like a real building's floorplan (docs/design/floorplan-principles.md,

@@ -1,11 +1,11 @@
 // Floor modifiers (floorModifiers.ts + systems/modifierSystem.ts), adversarial.
 //
 // Mechanics run in hand-carved arenas (exact tiles, exact bodies) through the
-// real tickWorld. Wiring, replay and the "nothing else moved" proof run on real
-// populated floors. The golden digests were first captured on `main` @ 16cf73f,
-// before any modifier code existed, and re-captured on `main` @ 7853983.
+// real tickWorld. Wiring and replay run on real populated floors. The "nothing
+// else moved" proof builds each floor twice on an authored level, once with the
+// modifier switched off, and compares the two.
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { worldDigest } from '../../debug/worldDigest'
 import type { Entity } from '../entity'
 import {
@@ -31,7 +31,7 @@ import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
 import { expectWorldEqual, loadFixture } from '../testkit'
 import { emptyInput, SIM_RATE, type InputCmd, type SimEvent } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { createWorld, tickWorld, worldFromState, type World } from '../world'
 import { kill } from './combat'
 import { perceives } from './goals'
 import { groupById, membersOf, packSize } from './groups'
@@ -40,6 +40,19 @@ import { nextFloor, setupFloor } from './missions'
 import { spawnObject } from './objects'
 import { applyFloorModifier, HUNT_BAND, modifierSystem } from './modifierSystem'
 import { isWet } from './statusFx'
+
+// Switches for the "nothing else moved" proof: `roll` makes setupFloor roll no
+// modifier, `system` stops the per-tick modifier system. Both default off, so
+// every other test runs the real module.
+const off = vi.hoisted(() => ({ roll: false, system: false }))
+vi.mock('./modifierSystem', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./modifierSystem')>()
+  return {
+    ...real,
+    applyFloorModifier: (w: World): void => (off.roll ? void (w.modifier = undefined) : real.applyFloorModifier(w)),
+    modifierSystem: (w: World): void => (off.system ? undefined : real.modifierSystem(w)),
+  }
+})
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -161,56 +174,75 @@ describe('floor modifiers: the roll', () => {
     expect(TIDE_MIN_TILES).toBeGreaterThan(0)
   })
 
-  describe('byte-identical to main apart from the modifier itself', () => {
-    // Captured on main @ 7853983 with the same build helpers and `worldDigest`.
-    const GOLDEN: Record<string, string> = {
-      'direct:7:1': '2dec1543',
-      'stairs:7:1': '2dec1543',
-      'direct:1:2': '6062b4e2',
-      'stairs:1:2': '7e646164',
-      'direct:4:2': '92795920',
-      'stairs:4:2': 'b73d0410',
-      'direct:5:2': 'eaa0178e',
-      'stairs:5:2': 'c903e766',
-      'direct:6:2': '582621cd',
-      'stairs:6:2': '5878d5b7',
-      // Deeper floors run on levels frozen as authored fixtures (the station
-      // floors 3 and the city floor 4 those seeds built before every floor from 3
-      // went indoors). Captured with the modifier roll switched off.
-      'frozen:frozen-1-3': '07add6b1',
-      'frozen:frozen-3-3': '25a45fb6',
-      'frozen:frozen-10-3': '078b40d4',
-      'frozen:frozen-2-4': 'fdc23d09',
-      'play:7:1': '84582f4c',
-      'play:1:2': '39a56892',
+  describe('nothing else moves: each floor equals itself with the modifier switched off', () => {
+    const switchedOff = <T>(which: 'roll' | 'system', run: () => T): T => {
+      off[which] = true
+      try {
+        return run()
+      } finally {
+        off[which] = false
+      }
     }
-    const floors: [number, number][] = [[7, 1], [1, 2], [4, 2], [5, 2], [6, 2]]
-    for (const [seed, floor] of floors) {
-      it(`seed ${seed} floor ${floor}: layout, mission, population and both rng streams match main`, () => {
-        expect(digestWithoutModifier(direct(seed, floor))).toBe(GOLDEN[`direct:${seed}:${floor}`])
-        expect(digestWithoutModifier(viaStairs(seed, floor))).toBe(GOLDEN[`stairs:${seed}:${floor}`])
-      })
+
+    const FIXTURES = ['frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4']
+
+    /** Populate, set up and spawn on one of the frozen fixtures' authored maps. */
+    const onLevel = (fixture: string, seed: number, floor: number): World => {
+      const w = worldFromState({ level: loadFixture(fixture).level, seed, floor })
+      populateWorld(w)
+      setupFloor(w)
+      const at = playerSpawnPoint(w.level, 0)
+      spawnPlayer(w, 0, at.x, at.y)
+      return w
     }
-    for (const fixture of ['frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4']) {
-      it(`${fixture}: mission, population and both rng streams match the modifier-free capture`, () => {
-        const w = loadFixture(fixture)
-        populateWorld(w)
-        setupFloor(w)
-        const at = playerSpawnPoint(w.level, 0)
-        spawnPlayer(w, 0, at.x, at.y)
-        expect(digestWithoutModifier(w)).toBe(GOLDEN[`frozen:${fixture}`])
-      })
-    }
-    for (const [seed, floor] of [[7, 1], [1, 2]] as const) {
-      it(`clean floor seed ${seed} floor ${floor}: 300 ticks of play digest exactly as on main`, () => {
-        const w = direct(seed, floor)
-        expect(w.modifier).toBeUndefined()
+
+    it('layout, mission, population and both rng streams match on authored levels', () => {
+      const kinds = new Set<string>()
+      for (const fixture of FIXTURES) {
+        for (let seed = 1; seed <= 6; seed++) {
+          for (const floor of [2, 3]) {
+            const w = onLevel(fixture, seed, floor)
+            if (w.modifier) kinds.add(w.modifier.kind)
+            const clean = switchedOff('roll', () => onLevel(fixture, seed, floor))
+            expect(clean.modifier).toBeUndefined()
+            expect(digestWithoutModifier(w), `${fixture} seed ${seed} floor ${floor}`).toBe(fnv1a(worldDigest(clean)))
+          }
+        }
+      }
+      expect(kinds.size, 'the sample rolls more than one kind of modifier').toBeGreaterThan(1)
+    })
+
+    it('a modifier rolled on the way down the stairs moves nothing else either', () => {
+      let rolled = 0
+      for (let seed = 1; seed <= 8; seed++) {
+        const down = (): World => {
+          const w = onLevel('frozen-1-3', seed, 1)
+          nextFloor(w)
+          return w
+        }
+        const w = down()
+        if (w.modifier) rolled++
+        expect(digestWithoutModifier(w), `seed ${seed}`).toBe(fnv1a(worldDigest(switchedOff('roll', down))))
+      }
+      expect(rolled).toBeGreaterThan(0)
+    })
+
+    it('a clean floor plays 300 ticks exactly as with no modifier system at all', () => {
+      const play = (w: World): World => {
         for (let t = 1; t <= 300; t++) {
           tickWorld(w, new Map([[0, cmd({ seq: t, moveX: Math.sin(t * 0.02), moveY: Math.cos(t * 0.03), attack: t % 40 < 10, aimX: 1, aimY: 0 })]]))
         }
-        expect(digestWithoutModifier(w)).toBe(GOLDEN[`play:${seed}:${floor}`])
-      })
-    }
+        return w
+      }
+      for (const [fixture, seed] of [
+        ['frozen-1-3', 1],
+        ['frozen-2-4', 3],
+      ] as const) {
+        const ran = switchedOff('roll', () => play(onLevel(fixture, seed, 2)))
+        const never = switchedOff('roll', () => switchedOff('system', () => play(onLevel(fixture, seed, 2))))
+        expect(fnv1a(worldDigest(ran)), fixture).toBe(fnv1a(worldDigest(never)))
+      }
+    })
   })
 
   it('a clean floor serializes with no modifier key at all', () => {

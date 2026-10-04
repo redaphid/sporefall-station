@@ -22,7 +22,7 @@ pnpm run dev            # http://localhost:5173
 - **Move** WASD/arrows · **Attack** J/Space · **Interact** K/E · **Ability** L/Shift
 - URL params skip menus: `?mode=solo&seed=7`
 - **Local co-op test**: open two tabs — `?mode=host&room=x` and
-  `?mode=join&room=x` (BroadcastChannel transport with fake latency).
+  `?mode=join&room=x&transport=tabs` (BroadcastChannel transport with fake latency).
 
 ## Android build
 

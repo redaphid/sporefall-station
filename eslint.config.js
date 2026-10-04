@@ -29,4 +29,17 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // #15: joining used to build its own BroadcastChannel here as a silent
+    // fallback, which reaches no phone. Every join transport comes from
+    // openJoinTransport (src/app/openJoinTransport.ts), where it is tested.
+    files: ['src/**/*.ts'],
+    ignores: ['src/app/openJoinTransport.ts', '**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: "NewExpression[callee.name='BroadcastChannelTransport'][arguments.0.value='client']",
+        message: 'Open join transports with openJoinTransport (src/app/openJoinTransport.ts), never a BroadcastChannel directly.',
+      }],
+    },
+  },
 )

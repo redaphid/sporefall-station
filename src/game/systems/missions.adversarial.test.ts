@@ -27,11 +27,11 @@ const onExit = (w: World, playerId: number): void => {
 }
 
 describe('mission completion edges', () => {
-  it('steal completes the moment any player holds the briefcase, unlocking the exit', () => {
+  it('steal completes the moment any player holds the canister, unlocking the exit', () => {
     const w = firstOf(1, 'steal')
     const p = w.entities.find((e) => e.playerCtl)!
     expect(w.mission.exitUnlocked).toBe(false)
-    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     missionSystem(w)
     expect(w.mission.complete).toBe(true)
     expect(w.mission.exitUnlocked).toBe(true)
@@ -57,7 +57,7 @@ describe('mission completion edges', () => {
   it('completing is idempotent — a second pass does not re-emit missionComplete', () => {
     const w = firstOf(1, 'steal')
     const p = w.entities.find((e) => e.playerCtl)!
-    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     missionSystem(w)
     w.events.length = 0
     missionSystem(w)
@@ -125,14 +125,14 @@ describe('nextFloor carry-over', () => {
     expect(p.health!.hp).toBe(p.health!.max)
   })
 
-  it('the briefcase (key item) does not survive the floor transition, other items do', () => {
+  it('the canister (key item) does not survive the floor transition, other items do', () => {
     const w = makeRun(12)
     const p = w.entities.find((e) => e.playerCtl)!
-    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
-    p.loadout!.inventory.push({ itemId: 'bat', qty: 16 })
+    p.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'wrench', qty: 16 })
     nextFloor(w)
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'briefcase')).toBe(false)
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'canister')).toBe(false)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'wrench')).toBe(true)
   })
 
   it('descending CLEARS a downed state and its channel/misdeed bookkeeping (a downed teammate is carried alive)', () => {
@@ -165,7 +165,7 @@ describe('run-over vs the mission system guard', () => {
     const w = firstOf(1, 'steal')
     w.gameOver = true
     const p = w.entities.find((e) => e.playerCtl)!
-    p.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    p.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     missionSystem(w)
     expect(w.mission.complete).toBe(false) // never processed under the guard
   })

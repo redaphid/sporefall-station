@@ -1,10 +1,10 @@
 // Theme hot-swap proof: the SAME seeded scene screenshotted under the default
-// `city` theme and the `test` (magenta) theme, swapped at runtime via the
+// `settlement` theme and the `test` (magenta) theme, swapped at runtime via the
 // __setTheme hook (the awaitable twin of the `theme` debug verb). Asserts:
 //   1. the two screenshots actually differ (the theme changed pixels),
 //   2. the deliberately-broken tile.wall ref in the test theme only degrades
 //      (procedural fallback) — no page errors, sim keeps ticking,
-//   3. swapping back to city still works.
+//   3. swapping back to settlement still works.
 import { chromium } from 'playwright'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -39,7 +39,7 @@ const snap = async (label) => {
   console.log(`[theme-swap] captured ${path}`)
 }
 
-await snap('city')
+await snap('settlement')
 
 // Runtime hot-swap to the magenta test theme (awaits asset baking).
 await page.evaluate(() => window.__setTheme('test'))
@@ -53,15 +53,15 @@ const themedTitle = await page.evaluate(() => {
 })
 
 // Swap back via the debug-verb path (fire-and-forget), then settle.
-const verbReply = await page.evaluate(() => window.__verb('theme city'))
+const verbReply = await page.evaluate(() => window.__verb('theme settlement'))
 await page.waitForTimeout(800)
-await snap('city-restored')
+await snap('settlement-restored')
 
 const tickAfter = await tick()
 
 const failures = []
-if (shots.city.equals(shots.test)) failures.push('city and test screenshots are identical — theme swap changed nothing')
-if (shots.test.equals(shots['city-restored'])) failures.push('test and restored-city screenshots are identical — swap-back failed')
+if (shots.settlement.equals(shots.test)) failures.push('settlement and test screenshots are identical — theme swap changed nothing')
+if (shots.test.equals(shots['settlement-restored'])) failures.push('test and restored-settlement screenshots are identical — swap-back failed')
 if (!JSON.parse(verbReply || '{}').theme) failures.push(`theme verb reply malformed: ${verbReply}`)
 if (tickAfter < 30) failures.push(`sim stopped ticking after theme swaps (tick=${tickAfter})`)
 if (themedTitle === 'no-warden') console.log('[theme-swap] note: no warden on this floor, name-lookup smoke skipped')
@@ -76,4 +76,4 @@ if (failures.length) {
   process.exit(1)
 }
 writeFileSync(join(OUT, 'theme-swap.txt'), `ok tick=${tickAfter}\n`)
-console.log('[theme-swap] PASS — city vs test vs restored screenshots differ, no errors, sim alive')
+console.log('[theme-swap] PASS — settlement vs test vs restored screenshots differ, no errors, sim alive')

@@ -178,7 +178,7 @@ const w = worldFromState({
 ```
 
 Legend: `#` wall, `.` floor, `+` tiled floor, `=` hall, `%` plating, `x` grate,
-`~` bog, `,` grass, `-` sidewalk, `:` street, `H` hull, `E` exit, `^`/`v` stairs,
+`~` bog, `,` grass, `-` boardwalk, `:` causeway, `H` hull, `E` exit, `^`/`v` stairs,
 `1`-`4` bevelled wall corners (NW, NE, SE, SW), `@` the player spawn (a floor tile).
 `spawn`, `exit`, `buildings`, `theme` and the complex/storey fields are optional
 JSON fields beside `rows`. Without an `E` the level has no exit.

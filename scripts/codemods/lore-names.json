@@ -31,11 +31,50 @@
     "thieves": { "to": "scavengers", "why": "Plural of thief." },
     "dcop": { "to": "dwarden", "why": "Test-local delta variable fused with cop." },
     "dthug": { "to": "dmutant", "why": "Test-local delta variable fused with thug." },
-    "dgang": { "to": "dferal", "why": "Test-local delta variable fused with gang." }
+    "dgang": { "to": "dferal", "why": "Test-local delta variable fused with gang." },
+    "street": { "to": "causeway", "why": "The outdoor floors are a sunken colony; its open ground is raised causeways over bog, not Earth streets." },
+    "streets": { "to": "causeways", "why": "Plural of street." },
+    "sidewalk": { "to": "boardwalk", "why": "The walkway beside a causeway is a boardwalk over the swamp." },
+    "sidewalks": { "to": "boardwalks", "why": "Plural of sidewalk." },
+    "briefcase": { "to": "canister", "why": "The objective already reads 'Specimen Canister' to players; 'keycard' is taken by the wing keycard archetype." },
+    "briefcases": { "to": "canisters", "why": "Plural of briefcase." },
+    "bat": { "to": "wrench", "why": "Colony melee is its maintenance kit; the lore-weapons work makes the bat a pipe wrench (wrench essence = weight/knockback)." },
+    "bats": { "to": "wrenches", "why": "Plural of bat." }
   },
+  "scoped": [
+    {
+      "from": "city",
+      "to": "settlement",
+      "why": "The old base theme pack: the drowned settlement as built, before the swamp (LORE: a colony 'physically sinking into the swamp'). Scoped because 'city' elsewhere names the sunken-city floors, which stay.",
+      "files": [
+        "public/themes/city/manifest.json",
+        "docs/themes.md",
+        "e2e/run-theme.sh",
+        "e2e/theme-swampspace.mjs",
+        "e2e/theme-swap.mjs",
+        "public/themes/swampspace-hires/CURATION.md",
+        "public/themes/swampspace/CURATION.md",
+        "scripts/assets/manifest.py",
+        "scripts/assets/pack_guard_selftest.py",
+        "src/app/swConfig.ts",
+        "src/debug/verbs.theme.test.ts",
+        "src/render/art.ts",
+        "src/render/haptics.test.ts",
+        "src/render/locomotionByArt.test.ts",
+        "src/render/motion.ts",
+        "src/render/settingsPanel.test.ts",
+        "src/render/theme.test.ts",
+        "src/render/theme.ts",
+        "src/render/themeManifestSync.test.ts",
+        "src/render/tileSelect.test.ts",
+        "src/render/tileSelect.ts"
+      ]
+    }
+  ],
   "phrases": [
     { "from": " * Lore names for the four sim FACTION ids. The ids themselves are load-bearing\n * (`entity.Faction`, the disposition matrix, the BLE snapshot), so they stay —\n * this is the player-facing half only. Without it the inspect card printed a\n * bare `Faction: Gang` on a derelict swamp station, which is exactly the\n * cops-and-robbers vocabulary the theme has otherwise moved past. Wording is\n * taken from the shipped manifest so the card agrees with the name plates:\n * `Rootcult Enforcer`, `Spore Warden`, `Settler`.", "to": " * Lore names for the four sim FACTION ids (`entity.Faction`, the disposition\n * matrix, the BLE snapshot). The ids are terse; this is the player-facing half.\n * Wording is taken from the shipped manifest so the card agrees with the name\n * plates: `Rootcult Acolyte`, `Spore Warden`, `Settler`.", "why": "inspectModel.ts: the old comment explained the label by quoting the old id, which the rename makes untrue." },
     { "from": "  // The card used to print a bare `Faction: Gang` — cops-and-robbers wording on\n  // a derelict swamp station, and the same vocabulary the theme names moved\n  // past. The sim ids are unchanged; only the label is lore.\n", "to": "  // The card prints the faction's lore name, never the terse sim id.\n", "why": "inspectModel.test.ts: same comment as above." },
+    { "from": "/briefcase|\\bboss\\b", "to": "/\\bboss\\b", "why": "missions.test.ts bans the old word from mission text; renaming it would ban the new word instead, so drop it from the ban list (the lint check now bans it repo-wide)." },
     { "from": "cops-and-robbers", "to": "Earth-city", "why": "Names the rejected fiction without repeating its words." },
     { "from": "street-crime", "to": "Earth-city", "why": "Same as cops-and-robbers." },
     { "from": "police line", "to": "warden line", "why": "Adjectival police reads as singular warden." },
@@ -47,7 +86,9 @@
     { "pattern": "\\b[A-Z]:[\\\\/][^\\s)\"'`|]*", "why": "Windows paths point at files outside this repo." },
     { "pattern": "/mnt/[a-z]/[^\\s)\"'`|]*", "why": "WSL paths point at files outside this repo." },
     { "pattern": "hooded officer|officer'?s? (?:great)?coat", "why": "Garment wording in an image-model prompt and a record of what the model drew, not a faction." },
-    { "pattern": "applicable law|as a law\\b", "why": "Legal boilerplate and the scientific sense of law, unrelated to the warden faction." }
+    { "pattern": "applicable law|as a law\\b", "why": "Legal boilerplate and the scientific sense of law, unrelated to the warden faction." },
+    { "pattern": "[Ss]treets[- ]of[- ][Rr]ogue|Sesame Street", "why": "Cited works and a project path, not the colony's ground." },
+    { "pattern": "baseball bat|[Nn]ot a '?bat'?", "why": "A description of the old art and the owner's own words about it; renaming would falsify the record." }
   ],
   "skipPaths": [
     { "prefix": "scripts/codemods/", "why": "The mapping and the codemod must name the old terms." },

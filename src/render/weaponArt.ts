@@ -17,7 +17,7 @@ export type WeaponShape = 'hammer' | 'club' | 'blade' | 'gun' | 'rod'
  * (see `hasHeldWeapon`) — bare hands hold nothing. */
 const MELEE_SHAPE: Record<string, WeaponShape> = {
   sledgehammer: 'hammer',
-  bat: 'club',
+  wrench: 'club',
   knife: 'blade',
   fists: 'rod',
   claws: 'blade',

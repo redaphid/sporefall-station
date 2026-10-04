@@ -1,6 +1,6 @@
 // How a character's body moves (motion.ts LOCOMOTION) is a property of the ART
 // it is drawn with, not of its sim archetype: the swampspace `warden` is a
-// spore-drone and must hover, while the city pack's `warden` is a human and must
+// spore-drone and must hover, while the settlement pack's `warden` is a human and must
 // not. These tests drive the entity layer the game draws with (EntityViews over
 // a real createArt registry, fed from the real theme manifests) and read the
 // sprite transform it produces, so a lookup keyed by the wrong string fails
@@ -122,7 +122,7 @@ const walkLift = (chain: ThemeChain, archetype: string): number => observe(chain
 
 const HIRES = chainFor(DEFAULT_THEME_ID)
 const BASE = chainFor(BASE_THEME_ID)
-const CITY = chainFor('city')
+const SETTLEMENT = chainFor('settlement')
 
 describe('locomotion follows the drawn body, at the entity layer', () => {
   it('the swampspace packs draw warden/lurker as fliers (hover) and pod as a sac (pulse)', () => {
@@ -147,14 +147,14 @@ describe('locomotion follows the drawn body, at the entity layer', () => {
     }
   })
 
-  it("the city pack's warden is a human: it strides, and so does the lockkeeper wearing its body", () => {
-    expect(idleGait(CITY, 'warden')).toBe('stride')
-    expect(idleGait(CITY, 'lockkeeper')).toBe('stride')
+  it("the settlement pack's warden is a human: it strides, and so does the lockkeeper wearing its body", () => {
+    expect(idleGait(SETTLEMENT, 'warden')).toBe('stride')
+    expect(idleGait(SETTLEMENT, 'lockkeeper')).toBe('stride')
   })
 
   it('an archetype the active pack does not draw moves like the art it falls through to', () => {
-    // city maps no lurker, so the chain draws the swampspace gloom-lurker.
-    expect(idleGait(CITY, 'lurker')).toBe('hover')
+    // settlement maps no lurker, so the chain draws the swampspace gloom-lurker.
+    expect(idleGait(SETTLEMENT, 'lurker')).toBe('hover')
   })
 
   it('an odd, missing or hostile idle path strides and never throws', () => {

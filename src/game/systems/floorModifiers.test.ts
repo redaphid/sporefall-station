@@ -181,7 +181,7 @@ describe('floor modifiers: the roll', () => {
   it('never rolls a bog tide on a floor with too little low ground to flood', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const lv = generateLevel(seed, 2)
-      lv.tiles.fill(Tile.Floor) // no street, hall, grate or bog anywhere
+      lv.tiles.fill(Tile.Floor) // no causeway, hall, grate or bog anywhere
       expect(rollFloorModifier(seed, 2, lv)).not.toBe('bogTide')
     }
     expect(TIDE_MIN_TILES).toBeGreaterThan(0)
@@ -351,10 +351,10 @@ describe('bog tide', () => {
     ])
   })
 
-  /** Street (low) on the left half, sidewalk (high) on the right. */
+  /** Causeway (low) on the left half, boardwalk (high) on the right. */
   const shore = (): World => {
-    const w = arena(2, 2, 50, 30, Tile.Sidewalk)
-    paint(w, 2, 2, 25, 30, Tile.Street)
+    const w = arena(2, 2, 50, 30, Tile.Boardwalk)
+    paint(w, 2, 2, 25, 30, Tile.Causeway)
     w.modifier = mod('bogTide', 0)
     return w
   }
@@ -365,7 +365,7 @@ describe('bog tide', () => {
     return p.pos.x - x0
   }
 
-  it('wading through a flooded street is slower and leaves you wet; the same walk at low tide is not', () => {
+  it('wading through a flooded causeway is slower and leaves you wet; the same walk at low tide is not', () => {
     const dry = shore()
     const pd = spawnPlayer(dry, 0, 5.5, 10.5)
     const dryDist = walked(dry, pd, 30)

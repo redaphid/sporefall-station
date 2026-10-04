@@ -1,6 +1,6 @@
 // Regenerate src/game/__fixtures__/bunker-salvage.json — the previously-blocked
-// bunker mission (seed 7 floor 3, steal-the-briefcase, objective behind three
-// locked doors) with the player staged on the street east of the airlock.
+// bunker mission (seed 7 floor 3, steal-the-canister, objective behind three
+// locked doors) with the player staged on the causeway east of the airlock.
 // Backs the lockpick-progression e2e video. Deterministic: same output always.
 // Usage: pnpm exec tsx scripts/test/gen-bunker-salvage-fixture.mts
 import { writeFileSync } from 'node:fs'

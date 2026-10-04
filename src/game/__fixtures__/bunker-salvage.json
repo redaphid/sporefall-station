@@ -2109,13 +2109,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -2303,13 +2303,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -3185,13 +3185,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -3444,13 +3444,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -3503,13 +3503,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -3575,13 +3575,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -3719,13 +3719,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -4600,13 +4600,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -5155,13 +5155,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -12449,13 +12449,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -12517,13 +12517,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -12585,13 +12585,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -12653,13 +12653,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -12721,13 +12721,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -13050,7 +13050,7 @@
     {
       "id": 308,
       "kind": "pickup",
-      "archetype": "pickup.briefcase",
+      "archetype": "pickup.canister",
       "pos": {
         "x": 5.5,
         "y": 58.5
@@ -13071,7 +13071,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "briefcase",
+        "itemId": "canister",
         "qty": 1
       }
     },

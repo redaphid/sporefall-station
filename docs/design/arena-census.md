@@ -145,11 +145,11 @@ floors apply `wet` (`modifierSystem.ts`).
 
 | foe | pistol hits to kill | player's time to kill | foe's time to down 120 hp once in reach |
 |---|---|---|---|
-| mutant | 3 | 1.2 s | 3.5 s (bat) |
+| mutant | 3 | 1.2 s | 3.5 s (wrench) |
 | acolyte | 3 | 1.2 s | about 6 s (pistol) |
 | cinder | 3 | 1.2 s | 5.6 s (fists) |
 | sporeling | 2 | 0.6 s | 5.6 s (fists) |
-| brute | 19 | 10.8 s | 3.5 s (bat) |
+| brute | 19 | 10.8 s | 3.5 s (wrench) |
 | Mireclaw Alpha | 30 | 17.4 s | 3.3 s (claws) |
 
 The reach probe measures the same ratio for an acolyte given 5000 hp. At 4 to 7
@@ -520,7 +520,7 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 
 ### Reach probe: does an acolyte fight back?
 
-The acolyte stands on an open street row with 5000 hp. The player holds still for 10.0 s.
+The acolyte stands on an open causeway row with 5000 hp. The player holds still for 10.0 s.
 
 | distance (tiles) | player fires | foe first shot (s) | foe shots | closest approach | dmg taken | dmg dealt to foe |
 |---|---|---|---|---|---|---|

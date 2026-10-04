@@ -188,7 +188,7 @@ const setupElementVerbs = (w: World): void => {
   applyStatus(w, mutant(8, 3), 'spore', 150)
 }
 
-/** A loaded loadout (bat / pistol / grenades) and destructible targets downrange:
+/** A loaded loadout (wrench / pistol / grenades) and destructible targets downrange:
  * equip the gun and fire it dry, then throw a grenade to blow the crates apart.
  * The molotov this staged before the item cull is gone; fire is still reachable
  * here by shooting a barrel or with the `incendiary` mod. */
@@ -200,12 +200,12 @@ const setupInventory = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
-      { itemId: 'bat', qty: WEAPONS.bat.durability! },
+      { itemId: 'wrench', qty: WEAPONS.wrench.durability! },
       { itemId: 'pistol', qty: 3 },
       { itemId: 'grenade', qty: 2 },
     ]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'bat'
+    if (player.combat) player.combat.weapon = 'wrench'
   }
   crate(w, x + 4, y)
   crate(w, x + 5, y)
@@ -460,11 +460,11 @@ const stageHomingDemo = (w: World): void => {
   if (stack) stack.mods = [{ id: 'homing', stacks: 2 }]
 }
 
-// a real steal mission: grab the briefcase (objective done) then reach the exit
+// a real steal mission: grab the canister (objective done) then reach the exit
 const stageMission = (w: World): void => {
   clearStage(w)
-  const brief = makeEntity('pickup', 'pickup.briefcase', 10, LANE_Y, 0.3)
-  brief.pickup = { itemId: 'briefcase', qty: 1 }
+  const brief = makeEntity('pickup', 'pickup.canister', 10, LANE_Y, 0.3)
+  brief.pickup = { itemId: 'canister', qty: 1 }
   addEntity(w, brief)
   w.level.exit = { x: 15, y: LANE_Y }
   w.level.tiles[LANE_Y * w.level.w + 15] = Tile.Exit
@@ -514,7 +514,7 @@ const setupObjects = (w: World): void => {
 }
 
 /** A ring of ARMED, HOSTILE NPCs closing on the player, each with a visibly
- * different weapon (bat / knife / pistol / shotgun / machinegun / sledgehammer /
+ * different weapon (wrench / knife / pistol / shotgun / machinegun / sledgehammer /
  * freeze ray / flamethrower). Leaves the world's `hostile` default ON so every
  * ring member engages regardless of faction — the "make them all enemies" demo.
  * The player is made tanky so the swarm converges and fires without ending the
@@ -545,7 +545,7 @@ const setupNpcCombat = (w: World): void => {
   }
 
   const ring: [string, string][] = [
-    ['mutant', 'bat'],
+    ['mutant', 'wrench'],
     ['mutant', 'knife'],
     ['acolyte', 'pistol'],
     ['acolyte', 'shotgun'],
@@ -609,9 +609,9 @@ const setupNpcAi = (w: World): void => {
   // spot (guard) so the scripted punch lands regardless of wander dice.
   spawnNpc(w, 'civilian', cx - 2.3, cy + 0.5).ai!.guard = true
 
-  // Hunter: sees far, holds a grudge, carries a bat (a chase, not a shootout).
+  // Hunter: sees far, holds a grudge, carries a wrench (a chase, not a shootout).
   const hunter = spawnNpc(w, 'acolyte', cx + 8.5, cy + 0.5)
-  hunter.combat!.weapon = 'bat'
+  hunter.combat!.weapon = 'wrench'
   hunter.ai!.sightRange = 14
   if (player) hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
 
@@ -699,7 +699,7 @@ const setupNpcDeliberate = (w: World): void => {
     solidify(cx - 5, y) // east face x=27
   }
   const hunter = spawnNpc(w, 'acolyte', cx - 8 + 0.5, cy - 5 + 0.5) // (24.5, 27.5)
-  hunter.combat!.weapon = 'bat'
+  hunter.combat!.weapon = 'wrench'
   hunter.ai!.sightRange = 14
   if (player) {
     hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
@@ -717,7 +717,7 @@ const setupNpcDeliberate = (w: World): void => {
   addEntity(w, door)
   const squaddie = (x: number, y: number, role: 'lead' | 'flank' | 'rear'): Entity => {
     const e = spawnNpc(w, 'mutant', x, y)
-    e.combat!.weapon = 'bat'
+    e.combat!.weapon = 'wrench'
     e.ai!.behavior = 'squad'
     e.ai!.squad = { id: 1, role }
     e.ai!.sightRange = 12
@@ -763,9 +763,9 @@ const stageArtCompare = (w: World): void => {
     player.pos = { x: 8 + 0.5, y: LANE_Y + 0.5 }
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = Math.PI / 2 // idle facing south (toward camera)
-    player.loadout!.inventory = [{ itemId: 'bat', qty: 1 }]
+    player.loadout!.inventory = [{ itemId: 'wrench', qty: 1 }]
     player.loadout!.activeSlot = 0
-    if (player.combat) player.combat.weapon = 'bat'
+    if (player.combat) player.combat.weapon = 'wrench'
   }
   stageMutant(w, 18, LANE_Y)
   stageMutant(w, 19, LANE_Y)
@@ -795,7 +795,7 @@ const clearCast = (w: World): Entity | undefined => {
   // alert / gate-breach release): the prize picked up, or the target "gone" —
   // and clearing the cast above deletes an assassinate/infiltrate boss outright.
   // On seed 3 the sapper scenario seals the player into the prize room, so the
-  // player picked the briefcase up on tick 1 and the locked doors the Blast
+  // player picked the canister up on tick 1 and the locked doors the Blast
   // Diver came to blow were all open before it arrived. The set-piece is the
   // raid, not the salvage: the mission reads as done (like floor 10's `reach`), so
   // nothing in missionSystem can unseal the map under it.

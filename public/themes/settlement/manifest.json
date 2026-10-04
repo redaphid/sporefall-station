@@ -1,12 +1,12 @@
 {
-  "name": "City",
+  "name": "Settlement",
   "version": 1,
   "palette": {
     "background": "#0b0b12",
     "uiAccent": "#d4af37",
     "tiles": {
-      "street": "#33333c",
-      "sidewalk": "#4c4c56",
+      "causeway": "#33333c",
+      "boardwalk": "#4c4c56",
       "floor": "#63523f",
       "wall": "#1b1b24",
       "grass": "#2e5d3a",
@@ -99,7 +99,7 @@
     "unit.robot.step": "/sprites/robot-step.png",
     "item.default": "/sprites/pistol.png",
     "item.pistol": "/sprites/pistol.png",
-    "item.bat": "/sprites/items/bat.png",
+    "item.wrench": "/sprites/items/wrench.png",
     "item.knife": "/sprites/items/knife.png",
     "item.medkit": "/sprites/items/medkit.png",
     "item.cash": "/sprites/items/cash.png",

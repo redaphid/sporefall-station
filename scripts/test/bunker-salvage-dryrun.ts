@@ -31,5 +31,5 @@ console.log('END:', {
   exitUnlocked: w.mission.exitUnlocked,
   hp: p.health!.hp,
   downed: !!p.playerCtl!.downed,
-  briefcase: p.playerCtl!.inventory.some((s) => s.itemId === 'briefcase'),
+  canister: p.playerCtl!.inventory.some((s) => s.itemId === 'canister'),
 })

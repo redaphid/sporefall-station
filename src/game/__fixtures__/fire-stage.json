@@ -98,7 +98,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -245,7 +245,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -595,7 +595,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -693,7 +693,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -742,7 +742,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -938,7 +938,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1183,7 +1183,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1486,7 +1486,7 @@
     {
       "id": 33,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.wrench",
       "pos": {
         "x": 8.5,
         "y": 4.5
@@ -1507,14 +1507,14 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "wrench",
         "qty": 1
       }
     },
     {
       "id": 34,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.wrench",
       "pos": {
         "x": 33.5,
         "y": 24.5
@@ -1535,14 +1535,14 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "wrench",
         "qty": 1
       }
     },
     {
       "id": 35,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.wrench",
       "pos": {
         "x": 15.5,
         "y": 7.5
@@ -1563,7 +1563,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "wrench",
         "qty": 1
       }
     },
@@ -1990,7 +1990,7 @@
     {
       "id": 51,
       "kind": "pickup",
-      "archetype": "pickup.briefcase",
+      "archetype": "pickup.canister",
       "pos": {
         "x": 57.5,
         "y": 40.5
@@ -2011,7 +2011,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "briefcase",
+        "itemId": "canister",
         "qty": 1
       }
     },

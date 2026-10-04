@@ -148,7 +148,7 @@ const run = async () => {
   await shot(page, 'card-npc-expanded')
 
   // --- 3. tap empty space → dismissed -------------------------------------
-  await tap(640, 650) // street south of the scene
+  await tap(640, 650) // causeway south of the scene
   await settle(page)
   p = await popup(page)
   !p.visible && p.selected.length === 0 ? ok('tap on empty space dismissed popup + selection') : fail(`not dismissed: ${JSON.stringify(p)}`)

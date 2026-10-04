@@ -13,7 +13,7 @@ Player entity: id 86, archetype `player`. Input signal observed via:
 - `player.combat {weapon, cooldown}` and `playerCtl.activeSlot` / `inventory`
 - `player.status {stun, sleep, cloakUntil, hitFlashUntil}`
 
-Mission (seed 2602185732, floor 1): `steal` — "Steal the briefcase from the
+Mission (seed 2602185732, floor 1): `steal` — "Steal the canister from the
 apartment", target entity **53**, target building **10**.
 
 Initial schema kinds: door 32, npc 31, pickup 22, player 1.
@@ -30,7 +30,7 @@ facing 0. No events yet. Alarm 0.
 Level makeup (seed 2602185732, floor 1), from `entities()` by archetype:
 - npc/civilian 20, npc/mutant 9, npc/warden 2 (factions: civ 20, feral 9, warden 2)
 - door 32
-- pickups: briefcase 1 (the mission target, id 53 @ (56.5,58)), bandage 4,
+- pickups: canister 1 (the mission target, id 53 @ (56.5,58)), bandage 4,
   medkit 2, cash 2, knife 2
 - weapon mods on the ground: bulk 2, velocity 2, heavy 2, choke 1, frost 1,
   overload 1, shock 1, split 1
@@ -90,7 +90,7 @@ the player forever. Did NOT run the destructive repro (user was live-playing;
 snapshot/restore would rewind their game).
 
 ### Pass 3 — loop cycle (tick 7256, new run)
-New run generated (still floor 1, but mission is now "steal the briefcase from the
+New run generated (still floor 1, but mission is now "steal the canister from the
 clinic", building 9 / target 49 — different seed). Player id 88, hp 68 @ (51.7,30),
 weapon pistol, no status fx, not stunned. **Alarm = 3** (has risen this run) with
 NPCs 13 (down from 31): modes 1 aggro / 3 flee / 7 wander / 2 patrol — civilians

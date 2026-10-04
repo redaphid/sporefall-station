@@ -468,7 +468,7 @@ const scavenge: Consideration = (w, e) => {
   for (const p of w.entities) {
     if (p.dead || !p.pickup) continue
     // Never loot the mission objective or a weapon-mod gem — those belong to the
-    // players' run, and a scavenged briefcase would soft-lock the floor.
+    // players' run, and a scavenged canister would soft-lock the floor.
     if (p.id === w.mission.targetEntityId || p.archetype.startsWith('mod.')) continue
     const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
     if (d > ai.sightRange || d >= bestD) continue
@@ -484,7 +484,7 @@ const scavenge: Consideration = (w, e) => {
 // A zoned NPC (populate stamps `ai.zone`) doesn't wander the whole map: it holds
 // its own building (`workMyRoom`), and — if it belongs to the objective wing —
 // masses on the objective room as a garrison (`garrison`) and turns on any
-// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (street life,
+// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (causeway life,
 // test/scenario spawns) fall through untouched. All pure lookups over the level
 // geometry + ascending-id scans; no `Date`/`Math.random`.
 

@@ -153,7 +153,7 @@ Open `/?mode=solo&seed=3&scenario=<name>`. The player is made unkillable, and
 the floor's mission is stood down to a completed `reach`. Completing a real
 mission opens every door on the floor. On seed 3 the sapper scenario seals the
 player into the prize room, so on the live build the player picked up the
-briefcase on tick 1 and the station alert unsealed the building.
+canister on tick 1 and the station alert unsealed the building.
 
 On screen (`src/render/groupFx.ts`): the planted charge blinks faster as its
 fuse burns and shows a countdown and its blast ring, and the breach throws a

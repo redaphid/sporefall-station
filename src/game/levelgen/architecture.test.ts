@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { generateCityLevel, generateLevel } from './generate'
 import { isWallTile, themeNamed, Tile, TileGrid, WALL_CUT_OUTSIDE, type Building, type Level } from './level'
-import { ALLEY_W, BOULEVARD_W, cutLotsVaried, STREET_W } from './lots'
+import { ALLEY_W, BOULEVARD_W, cutLotsVaried, CAUSEWAY_W } from './lots'
 import { mulberry32 } from '../rng'
 import type { Rect } from './rooms'
 
 /**
  * Adversarial property tests for the levelgen architecture work: hallway-first
- * interiors, bunkers, courtyard compounds, bevelled corners, street variety.
+ * interiors, bunkers, courtyard compounds, bevelled corners, causeway variety.
  * Everything runs over MANY seeds (property style) because a generator bug is
  * a needle — one seed in fifty traps a courtyard or seals a vestibule.
  */
@@ -116,15 +116,15 @@ describe('hallway-first interiors', () => {
     }
   })
 
-  it('the spine always connects to an exterior door (walk in from the street)', () => {
+  it('the spine always connects to an exterior door (walk in from the causeway)', () => {
     for (const { seed, floor, level, b } of hallwayBuildings(40)) {
       const reach = spawnReach(level)
-      // From street level, every room (spine included — it is rooms[0..]) is
+      // From causeway level, every room (spine included — it is rooms[0..]) is
       // walkable without opening anything but doors (tiles are already floor).
       for (const room of b.rooms) {
         expect(
           rectHasReachable(level, reach, room, Tile.Floor),
-          `seed ${seed} floor ${floor}: hallway room ${room.x},${room.y} cut off from street`,
+          `seed ${seed} floor ${floor}: hallway room ${room.x},${room.y} cut off from causeway`,
         ).toBe(true)
       }
       // An exterior door: some door position on the building's wall rectangle.
@@ -234,7 +234,7 @@ describe('courtyard compound archetype', () => {
     expect(compounds(40).length).toBeGreaterThan(10)
   })
 
-  it('the pit is open ground, reachable from the street — it can never trap', () => {
+  it('the pit is open ground, reachable from the causeway — it can never trap', () => {
     for (const { seed, floor, level, b } of compounds(40)) {
       const tag = `seed ${seed} floor ${floor}`
       const reach = spawnReach(level)
@@ -266,7 +266,7 @@ describe('bevelled corners', () => {
   })
 
   it('every cut faces outdoor ground diagonally (the bevel exposes pavement, not a room)', () => {
-    const outdoor = (t: number): boolean => t === Tile.Street || t === Tile.Sidewalk || t === Tile.Grass
+    const outdoor = (t: number): boolean => t === Tile.Causeway || t === Tile.Boardwalk || t === Tile.Grass
     for (const { seed, floor, level } of themedLevels(30)) {
       for (let y = 0; y < level.h; y++) {
         for (let x = 0; x < level.w; x++) {
@@ -284,8 +284,8 @@ describe('bevelled corners', () => {
   })
 })
 
-describe('street variety', () => {
-  it('cutLotsVaried mixes alleys, streets and boulevards; every lot stays >= 8', () => {
+describe('causeway variety', () => {
+  it('cutLotsVaried mixes alleys, causeways and boulevards; every lot stays >= 8', () => {
     const widths = new Set<number>()
     for (let seed = 1; seed <= 200; seed++) {
       const segs = cutLotsVaried(mulberry32(seed).fork('cols'), 64, 3, 4)
@@ -297,9 +297,9 @@ describe('street variety', () => {
       expect(last.start + last.size).toBeLessThanOrEqual(62) // border ring intact
     }
     expect(widths.has(ALLEY_W)).toBe(true)
-    expect(widths.has(STREET_W)).toBe(true)
+    expect(widths.has(CAUSEWAY_W)).toBe(true)
     expect(widths.has(BOULEVARD_W)).toBe(true)
-    expect([...widths].every((w) => [ALLEY_W, STREET_W, BOULEVARD_W].includes(w))).toBe(true)
+    expect([...widths].every((w) => [ALLEY_W, CAUSEWAY_W, BOULEVARD_W].includes(w))).toBe(true)
   })
 
   it('plazas appear on themed floors and are open (no walls inside)', () => {
@@ -317,7 +317,7 @@ describe('street variety', () => {
     expect(plazaCount).toBeGreaterThan(10)
   })
 
-  it('floor 1 keeps uniform 3-wide streets (frozen)', () => {
+  it('floor 1 keeps uniform 3-wide causeways (frozen)', () => {
     for (let seed = 1; seed <= 50; seed++) {
       const level = generateLevel(seed, 1)
       expect(level.plazas ?? []).toHaveLength(0)

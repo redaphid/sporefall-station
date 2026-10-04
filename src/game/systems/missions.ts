@@ -108,8 +108,8 @@ const generateMission = (w: World): void => {
 
   if (rng.chance(0.5)) {
     const spot = roomCenter(building)
-    const item = makeEntity('pickup', 'pickup.briefcase', spot.x, spot.y, 0.3)
-    item.pickup = { itemId: 'briefcase', qty: 1 }
+    const item = makeEntity('pickup', 'pickup.canister', spot.x, spot.y, 0.3)
+    item.pickup = { itemId: 'canister', qty: 1 }
     addEntity(w, item)
     w.mission = {
       template: 'steal',
@@ -550,7 +550,7 @@ export const missionSystem = (w: World): void => {
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
       const holder = w.entities.find(
-        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister'),
       )
       if (holder) completeMission(w, holder)
     } else if (
@@ -616,7 +616,7 @@ const maybeBloom = (w: World, node: Entity): void => {
  * Taking the prize is stage two of the salvage finale: the mission completes,
  * the exit unlocks — and the whole STATION goes to alert for the escape run
  * (`raiseStationAlert`: every door thrown open, alarm maxed, every non-allied
- * NPC hostile and hunting). `focus` is who they hunt: the briefcase holder, or
+ * NPC hostile and hunting). `focus` is who they hunt: the canister holder, or
  * whoever stood closest to the kill. A floor with no live players (posthumous
  * completion) skips the alert — there is nobody to hunt, and an alert with no
  * focus would leave the manhunt broadcasting at a corpse. Latched by
@@ -663,7 +663,7 @@ export const nextFloor = (w: World): void => {
       p.playerCtl.channel = undefined
       p.playerCtl.misdeedUntilTick = 0
       // Key items don't carry across floors
-      if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'briefcase')
+      if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'canister')
     }
     p.dead = false
     w.entities.push(p)

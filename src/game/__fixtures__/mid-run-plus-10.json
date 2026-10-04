@@ -109,13 +109,13 @@
         "lastHurtTick": 38
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 11
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 14
           }
         ],
@@ -179,13 +179,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],

@@ -11,7 +11,7 @@ UI *calls* it ("Bog Warden" in a swamp theme).
   (active-theme name lookup for the UI).
 - Theme packages live in `public/themes/<themeId>/` — one `manifest.json` plus
   the asset files it references.
-- The current look is the default theme **`city`** (`public/themes/city/manifest.json`),
+- The current look is the default theme **`settlement`** (`public/themes/settlement/manifest.json`),
   which points at the legacy `public/sprites/` files.
 
 ## Selecting a theme
@@ -32,7 +32,7 @@ The settings panel lists themes from `public/themes/index.json`:
 
 ```json
 [
-  { "id": "city", "name": "City" },
+  { "id": "settlement", "name": "Settlement" },
   { "id": "test", "name": "Test (magenta)" }
 ]
 ```
@@ -48,15 +48,15 @@ still loadable by id without an index entry).
   "version": 1,                  // schema version; currently 1 (number)
 
   // Every field below is OPTIONAL. Anything you omit falls back (see
-  // "Fallback semantics"). An empty manifest {} is valid: it renders as city.
+  // "Fallback semantics"). An empty manifest {} is valid: it renders as settlement.
 
   "palette": {
     "background": "#0b120b",     // canvas clear color
     "uiAccent":  "#7fd17f",      // exposed as CSS var --theme-accent on <html>
     "floorTint": "#c8ffc8",      // multiplied over the whole tile layer
     "tiles": {                   // procedural tile colors (used when a tile has
-      "street":   "#1e2a1e",     //   no sprite); keys: the six below plus
-      "sidewalk": "#2a3a2a",     //   hall grate tiled plating hull bog
+      "causeway":   "#1e2a1e",     //   no sprite); keys: the six below plus
+      "boardwalk": "#2a3a2a",     //   hall grate tiled plating hull bog
       "floor":    "#3a4a2a",
       "wall":     "#101a10",
       "grass":    "#2e5d3a",
@@ -109,7 +109,7 @@ the console and in `validateManifest` unit tests.
 
 | Key | What / notes |
 |---|---|
-| `tile.<name>` | ground/wall tile art, `<name>` ∈ `street sidewalk floor wall grass exit` plus the indoor-complex decks `hall grate tiled plating hull bog` (floors 3+; `hull` is wall-family). A single path OR an **array of variant paths** — the tilemap alternates variants by a deterministic per-coordinate hash, so big surfaces read as texture instead of one repeated stamp (same seed → same ground on every device). Should tile seamlessly. The wall's first variant is also clipped onto the bevelled corner-cut tiles. |
+| `tile.<name>` | ground/wall tile art, `<name>` ∈ `causeway boardwalk floor wall grass exit` plus the indoor-complex decks `hall grate tiled plating hull bog` (floors 3+; `hull` is wall-family). A single path OR an **array of variant paths** — the tilemap alternates variants by a deterministic per-coordinate hash, so big surfaces read as texture instead of one repeated stamp (same seed → same ground on every device). Should tile seamlessly. The wall's first variant is also clipped onto the bevelled corner-cut tiles. |
 | `tile.<name>.accent` | OPTIONAL rare-detail pool for that surface (root cluster, vent grate, glowing spore patch…). One accent replaces the base variant on ~1/17 tiles, picked on the same coordinate hash. Array or single path. |
 | `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `tile.<name>.cap` / `tile.<name>.cap.inner` | OPTIONAL, wall family only (`wall`, `hull`). The lit top strip of the wall, authored as RGBA along the tile's TOP edge (transparent below), plus the matching cap-sized nub in the top-left corner. The tilemap lays the strip on every edge of a wall tile that faces open ground, rotated to that edge, and the nub in concave corners (`src/render/wallCaps.ts`), so the cap line runs continuously along runs, corners and T-junctions; bevelled corners bake it along the 45° cut too. When a theme ships these, its wall BODY art must carry no cap of its own (`scripts/assets/wall_caps.py` splits a baked cap off existing art). Both keys or neither. |
@@ -118,14 +118,14 @@ the console and in `validateManifest` unit tests.
 | `unit.player`, `unit.warden` | single-sprite billboard fallback (no directions) |
 | `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `mutant scientist robot` |
 | `item.default` | generic ground-item sprite |
-| `item.<id>` | per-item pickup, `<id>` ∈ `pistol bat knife medkit cash shotgun molotov grenade-item` |
+| `item.<id>` | per-item pickup, `<id>` ∈ `pistol wrench knife medkit cash shotgun molotov grenade-item` |
 | `prop.default` | generic prop (crates etc.) |
 | `prop.<name>` | `<name>` ∈ `barrel cryo-terminal vending-machine tv toilet` |
 | `projectile` | bullet base texture (small, oriented flying +x; rotated to heading). Weapon-mod visual traits (elemental tints etc.) are applied ON TOP of this texture at runtime — themes provide the base art, mods compose over it. |
 | `grenade` | thrown grenade base texture (same composition rule) |
-| `fx.flame` | **array** — looping fire frames (3 in city) |
-| `fx.hit` | **array** — hit-spark clip (1 frame in city) |
-| `fx.explosion` | **array** — explosion clip (3 frames in city) |
+| `fx.flame` | **array** — looping fire frames (3 in settlement) |
+| `fx.hit` | **array** — hit-spark clip (1 frame in settlement) |
+| `fx.explosion` | **array** — explosion clip (3 frames in settlement) |
 | `fx.pickup` | **array** — pickup sparkle clip |
 | `fx.blood` | **array** — death splat (drawn under actors, not additive) |
 
@@ -180,7 +180,7 @@ weapon-mod gems and pickup-outline shapes are procedural (themeable via
 - **A drawn loop carries its own motion.** When a state plays a clip of 2+
   drawn frames (`…-walk-0`…), the renderer adds no procedural bob, float,
   pulse or breath on top of it. The legacy idle/step pair still gets them.
-- The `city` theme predates this convention: its legacy 3-direction art
+- The `settlement` theme predates this convention: its legacy 3-direction art
   (front/side/back) is mapped onto `s`/`e`/`n` in its manifest and the diagonals
   fall back per the rules above.
 
@@ -249,26 +249,26 @@ composes with any frames you ship. Tuning lives in `src/render/motion.ts`
 
 ## Fallback semantics (exact)
 
-For each sprite key, resolution walks a **theme chain**: `[active theme, city]`
-(just `[city]` when city is active):
+For each sprite key, resolution walks a **theme chain**: `[active theme, settlement]`
+(just `[settlement]` when settlement is active):
 
 1. First manifest in the chain that **mentions** the key wins.
    - value is a path → use that file.
    - value is `null` → use the built-in procedural art (explicit opt-out; the
-     chain stops, city's art is NOT used).
+     chain stops, settlement's art is NOT used).
 2. No manifest mentions the key → built-in procedural art.
 3. A resolved file that **fails to load** (404, corrupt) logs a warning and
    degrades to the built-in procedural art for that key only. Nothing crashes;
    nothing renders blank.
 
-Names: `active.names[archetype]` → `city.names[archetype]` → title-cased
+Names: `active.names[archetype]` → `settlement.names[archetype]` → title-cased
 archetype key (`door.open` → "Door Open"). Palette scalars (`background`,
 `uiAccent`, `floorTint`) and per-key `tiles`/`entities` colors resolve the same
-way: active → city → built-in constant. `anim` cadences too: active theme's
-`anim.<state>` → city's → the engine default.
+way: active → settlement → built-in constant. `anim` cadences too: active theme's
+`anim.<state>` → settlement's → the engine default.
 
 So a **partial theme is always safe**: theme five sprites and two names and
-everything else stays city.
+everything else stays settlement.
 
 ## Adding a new theme, end to end
 
@@ -285,10 +285,10 @@ everything else stays city.
 5. Verify: `pnpm exec vitest run src/render/theme.test.ts` (schema guards), then
    `pnpm run dev` and open `http://localhost:5173/?theme=<id>` — the console
    warns about every dropped/failed key. Runtime hot-swap for A/B eyeballing:
-   open with `?e2e` and run `window.__setTheme('<id>')` / `window.__setTheme('city')`
+   open with `?e2e` and run `window.__setTheme('<id>')` / `window.__setTheme('settlement')`
    in devtools, or `theme <id>` via the debug CLI/MCP.
 6. Screenshot proof: `bash e2e/run-theme.sh` records the same seeded scene in
-   city vs your theme (set `THEME_ID=<id>`).
+   settlement vs your theme (set `THEME_ID=<id>`).
 
 ## Engine invariants (do not break)
 

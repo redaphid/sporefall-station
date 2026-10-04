@@ -243,7 +243,7 @@ describe('taking the prize (stage 2) — every unit in town aggros the taker', (
     expect(before.some((n) => dispositionToward(n, player.id) !== 'Hostile')).toBe(true)
 
     // The canister lands in the holder's loadout — exactly what auto-pickup does.
-    player.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    player.loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0), 1)
 
     expect(w.mission.complete).toBe(true)
@@ -272,7 +272,7 @@ describe('taking the prize (stage 2) — every unit in town aggros the taker', (
     const w = bootTemplate('steal', [1, 2, 3], 2)
     const players = w.entities.filter((e) => e.playerCtl)
     expect(players.length).toBe(2)
-    players[0].loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    players[0].loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0, 1), 1)
 
     // Allies gain no brain and are never targeted by their own party's NPCs.
@@ -285,7 +285,7 @@ describe('taking the prize (stage 2) — every unit in town aggros the taker', (
 
   it('fires exactly once — the completion latch holds', () => {
     const w = bootTemplate('steal', [1, 2, 3])
-    firstPlayer(w).loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    firstPlayer(w).loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0), 1)
     expect(w.mission.complete).toBe(true)
     // Wind the alarm back down; completion must not re-raise it. (Individual

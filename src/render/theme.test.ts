@@ -79,13 +79,13 @@ describe('validateManifest', () => {
       sprites: {
         'tile.floor': ['a.png', 'b.png'],
         'tile.grass.accent': ['roots.png', 'spores.png'],
-        'tile.street': 's.png', // single path still coerces to a 1-variant pool
+        'tile.causeway': 's.png', // single path still coerces to a 1-variant pool
       },
     })
     expect(warnings).toEqual([])
     expect(manifest.sprites['tile.floor']).toEqual(['a.png', 'b.png'])
     expect(manifest.sprites['tile.grass.accent']).toEqual(['roots.png', 'spores.png'])
-    expect(manifest.sprites['tile.street']).toEqual(['s.png'])
+    expect(manifest.sprites['tile.causeway']).toEqual(['s.png'])
   })
 
   it('accepts overlay decal pools on tile.* keys', () => {
@@ -99,9 +99,9 @@ describe('validateManifest', () => {
 
   it('accepts a macroTiles section and drops bad entries with warnings', () => {
     const { manifest, warnings } = validateManifest({
-      macroTiles: { floor: 2, street: 4, lava: 2, wall: 5, grass: 2.5, exit: '2' },
+      macroTiles: { floor: 2, causeway: 4, lava: 2, wall: 5, grass: 2.5, exit: '2' },
     })
-    expect(manifest.macroTiles).toEqual({ floor: 2, street: 4 })
+    expect(manifest.macroTiles).toEqual({ floor: 2, causeway: 4 })
     expect(warnings.join('\n')).toContain('lava')
     expect(warnings.join('\n')).toContain('macroTiles.wall')
     expect(warnings.join('\n')).toContain('macroTiles.grass')
@@ -169,14 +169,14 @@ describe('validateManifest', () => {
         background: '#0b0b12',
         uiAccent: 'red',
         floorTint: '#ff00ff',
-        tiles: { street: '#010203', lava: '#010203', wall: 'nope' },
+        tiles: { causeway: '#010203', lava: '#010203', wall: 'nope' },
         entities: { warden: '#4a7a5a', mutant: 12345 },
       },
     })
     expect(manifest.palette.background).toBe(0x0b0b12)
     expect(manifest.palette.uiAccent).toBeUndefined()
     expect(manifest.palette.floorTint).toBe(0xff00ff)
-    expect(manifest.palette.tiles).toEqual({ street: 0x010203 })
+    expect(manifest.palette.tiles).toEqual({ causeway: 0x010203 })
     expect(manifest.palette.entities).toEqual({ warden: 0x4a7a5a })
     expect(warnings.length).toBe(4) // uiAccent, lava, wall, mutant
   })
@@ -202,7 +202,7 @@ describe('parseColor', () => {
 
 // ---------------------------------------------------------------------------
 describe('resolveSpritePaths (fallback order)', () => {
-  const base = theme('city', {
+  const base = theme('settlement', {
     sprites: { 'tile.floor': ['/sprites/concrete-floor.png'], 'tile.wall': ['/sprites/brick-wall.png'] },
   })
   const active = theme('swamp', {
@@ -240,7 +240,7 @@ describe('resolveSpritePaths (fallback order)', () => {
 describe('themedName', () => {
   const chain: ThemeChain = [
     theme('swamp', { names: { warden: 'Bog Warden' } }),
-    theme('city', { names: { warden: 'Warden', mutant: 'Mutant' } }),
+    theme('settlement', { names: { warden: 'Warden', mutant: 'Mutant' } }),
   ]
   it('active theme name wins', () => expect(themedName('warden', chain)).toBe('Bog Warden'))
   it('falls back to the default theme', () => expect(themedName('mutant', chain)).toBe('Mutant'))
@@ -262,13 +262,13 @@ describe('prettyArchetype', () => {
 describe('resolvePalette', () => {
   it('merges with the active theme winning per key', () => {
     const chain: ThemeChain = [
-      theme('a', { palette: { background: 1, tiles: { street: 2 }, entities: {} } }),
-      theme('b', { palette: { background: 3, uiAccent: 4, tiles: { street: 5, wall: 6 }, entities: { warden: 7 } } }),
+      theme('a', { palette: { background: 1, tiles: { causeway: 2 }, entities: {} } }),
+      theme('b', { palette: { background: 3, uiAccent: 4, tiles: { causeway: 5, wall: 6 }, entities: { warden: 7 } } }),
     ]
     expect(resolvePalette(chain)).toEqual({
       background: 1,
       uiAccent: 4,
-      tiles: { street: 2, wall: 6 },
+      tiles: { causeway: 2, wall: 6 },
       entities: { warden: 7 },
     })
   })
@@ -282,19 +282,19 @@ describe('resolveMacroTiles', () => {
   it('active theme wins per tile name; undeclared names fall through', () => {
     const chain: ThemeChain = [
       theme('swamp', { macroTiles: { floor: 2 } }),
-      theme('city', { macroTiles: { floor: 3, street: 2 } }),
+      theme('settlement', { macroTiles: { floor: 3, causeway: 2 } }),
     ]
-    expect(resolveMacroTiles(chain)).toEqual({ floor: 2, street: 2 })
+    expect(resolveMacroTiles(chain)).toEqual({ floor: 2, causeway: 2 })
   })
   it('empty chain declares nothing', () => expect(resolveMacroTiles([])).toEqual({}))
 })
 
 describe('theme id selection', () => {
-  it('URL param beats setting', () => expect(resolveThemeId('swamp', 'city')).toBe('swamp'))
+  it('URL param beats setting', () => expect(resolveThemeId('swamp', 'settlement')).toBe('swamp'))
   it('invalid param falls to setting', () => expect(resolveThemeId('../x', 'swamp')).toBe('swamp'))
   it('invalid both falls to default', () => expect(resolveThemeId('__proto__', 'NOPE!')).toBe(DEFAULT_THEME_ID))
   it('missing param uses setting', () => expect(resolveThemeId(null, 'test')).toBe('test'))
-  it.each(['city', 'swamp-2', 'a'])('accepts id %s', (id) => expect(isValidThemeId(id)).toBe(true))
+  it.each(['settlement', 'swamp-2', 'a'])('accepts id %s', (id) => expect(isValidThemeId(id)).toBe(true))
   it.each(['', 'Swamp', '-x', 'a b', 'a/b', 'a'.repeat(65), 42, null])('rejects id %j', (id) =>
     expect(isValidThemeId(id)).toBe(false),
   )
@@ -307,21 +307,21 @@ describe('shipped theme packs', () => {
   const load = (id: string): unknown =>
     JSON.parse(readFileSync(join(process.cwd(), 'public', 'themes', id, 'manifest.json'), 'utf8'))
 
-  it('city manifest validates with zero warnings', () => {
-    const { warnings } = validateManifest(load('city'))
+  it('settlement manifest validates with zero warnings', () => {
+    const { warnings } = validateManifest(load('settlement'))
     expect(warnings).toEqual([])
   })
 
-  it('city maps every character direction it has art for (s/e/n × idle/step)', () => {
-    const { manifest } = validateManifest(load('city'))
+  it('settlement maps every character direction it has art for (s/e/n × idle/step)', () => {
+    const { manifest } = validateManifest(load('settlement'))
     for (const c of ['player', 'warden', 'mutant', 'civilian', 'scientist', 'acolyte', 'robot'])
       for (const d of ['s', 'e', 'n'])
         for (const f of ['idle', 'step']) expect(manifest.sprites[`char.${c}.${d}-${f}`], `char.${c}.${d}-${f}`).toBeDefined()
   })
 
-  it('every file the city manifest references exists on disk', () => {
-    const { manifest } = validateManifest(load('city'))
-    const chain: ThemeChain = [{ id: 'city', dir: 'themes/city/', manifest }]
+  it('every file the settlement manifest references exists on disk', () => {
+    const { manifest } = validateManifest(load('settlement'))
+    const chain: ThemeChain = [{ id: 'settlement', dir: 'themes/settlement/', manifest }]
     for (const key of Object.keys(manifest.sprites)) {
       for (const p of resolveSpritePaths(key, chain) ?? [])
         expect(existsSync(join(process.cwd(), 'public', p)), `${key} → ${p}`).toBe(true)
@@ -377,7 +377,7 @@ describe('shipped theme packs', () => {
     const raw = JSON.parse(readFileSync(join(process.cwd(), 'public', 'themes', 'index.json'), 'utf8')) as Array<{
       id: string
     }>
-    // Only Sporefall Station is shipped now (city/test are gone), advertised as
+    // Only Sporefall Station is shipped now (settlement/test are gone), advertised as
     // two packs — the base art and the hi-res art — so the settings picker
     // offers exactly that one toggle.
     expect(raw.map((t) => t.id).sort()).toEqual(['swampspace', 'swampspace-hires'])
@@ -468,14 +468,14 @@ describe('manifest anim section (per-state ticks-per-frame)', () => {
   })
 
   it('a manifest with no anim section resolves every state to the engine default', () => {
-    const chain: ThemeChain = [theme('city', {})]
+    const chain: ThemeChain = [theme('settlement', {})]
     for (const s of ANIM_STATES) expect(resolveAnimTpf(s, chain)).toBe(DEFAULT_TPF[s])
   })
 
-  it('resolves through the chain: active theme wins, city fills, default backstops', () => {
-    const chain: ThemeChain = [theme('swamp', { anim: { walk: 3 } }), theme('city', { anim: { walk: 9, attack: 4 } })]
+  it('resolves through the chain: active theme wins, settlement fills, default backstops', () => {
+    const chain: ThemeChain = [theme('swamp', { anim: { walk: 3 } }), theme('settlement', { anim: { walk: 9, attack: 4 } })]
     expect(resolveAnimTpf('walk', chain)).toBe(3) // active wins
-    expect(resolveAnimTpf('attack', chain)).toBe(4) // city fills
+    expect(resolveAnimTpf('attack', chain)).toBe(4) // settlement fills
     expect(resolveAnimTpf('hurt', chain)).toBe(DEFAULT_TPF.hurt) // default backstops
     expect(resolveAnimTpfs(chain)).toMatchObject({ walk: 3, attack: 4, hurt: DEFAULT_TPF.hurt })
   })

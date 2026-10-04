@@ -99,8 +99,8 @@ describe('NPC loadout: degenerate + round-trip', () => {
     const civ = spawnNpc(w, 'civilian', 20, 20) // civilian wields fists
     expect(civ.combat!.weapon).toBe('fists')
     expect(civ.loadout).toBeUndefined()
-    const bat = spawnNpc(w, 'mutant', 21, 21) // mutant wields a bat (durable melee → slotted)
-    expect(bat.loadout).toEqual({ inventory: [{ itemId: 'bat', qty: 16 }], activeSlot: 0 })
+    const wrench = spawnNpc(w, 'mutant', 21, 21) // mutant wields a wrench (durable melee → slotted)
+    expect(wrench.loadout).toEqual({ inventory: [{ itemId: 'wrench', qty: 16 }], activeSlot: 0 })
   })
 
   it("serialize→deserialize round-trips an NPC's loadout + weapon mods byte-for-byte", () => {

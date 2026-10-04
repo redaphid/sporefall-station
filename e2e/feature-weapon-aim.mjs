@@ -69,7 +69,7 @@ ok =
 ok =
   (await recordFeature({
     name: 'weapon-aim-down-swing',
-    world: staged('bat', undefined),
+    world: staged('wrench', undefined),
     script: 'aimDownSwing',
     params: { zoom: 2 },
     stills: [
@@ -77,7 +77,7 @@ ok =
       { tick: 120, label: '02-swing-b' },
     ],
     readState,
-    expect: (s) => [s.weapon !== 'bat' && 'lost the bat', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
+    expect: (s) => [s.weapon !== 'wrench' && 'lost the wrench', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
   })) && ok
 
 if (!ok) process.exitCode = 1

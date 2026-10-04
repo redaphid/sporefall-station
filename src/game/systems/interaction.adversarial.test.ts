@@ -98,7 +98,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     const p = spawnPlayer(w, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.cash = 50
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 10 }]
+    p.loadout!.inventory = [{ itemId: 'wrench', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 3, reviveProgress: 0 }
     settle(p)
     const ids = idleFor(0)
@@ -111,10 +111,10 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.health!.hp).toBe(Math.floor(p.health!.max * 0.3))
     expect(p.playerCtl!.cash).toBe(0) // penalty: cash dropped
-    // penalty: the carried bat is dropped, but the comeback re-grants the starter
+    // penalty: the carried wrench is dropped, but the comeback re-grants the starter
     // loadout so the player is NOT stuck with a phantom weapon (issue: revived
     // players couldn't pick up mods). The pistol starter is real + slotted.
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'wrench')).toBe(false)
     expect(p.loadout!.inventory).toEqual([{ itemId: 'pistol', qty: 1 }])
     expect(p.loadout!.activeSlot).toBe(0)
     expect(p.combat!.weapon).toBe('pistol')
@@ -142,7 +142,7 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     const p = spawnPlayer(cw, 0, 20, 20)
     p.health!.hp = 0
     p.playerCtl!.cash = 50
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 10 }]
+    p.loadout!.inventory = [{ itemId: 'wrench', qty: 10 }]
     p.playerCtl!.downed = { bleedTicks: 2, reviveProgress: 0 }
     settle(p)
     const ids = idleFor(0)
@@ -430,13 +430,13 @@ describe('auto-pickup', () => {
     // Refused rather than swallowed: the entity survives, so nothing vanishes.
     const p = spawnPlayer(w, 0, 20, 20)
     const before = p.loadout!.inventory.length
-    const bat = pickup('bat', 20, 20)
+    const wrench = pickup('wrench', 20, 20)
     settle(p)
     interactionSystem(w, idleFor(0))
-    expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(false)
+    expect(p.loadout!.inventory.some((s) => s.itemId === 'wrench')).toBe(false)
     expect(p.loadout!.inventory).toHaveLength(before)
     expect(p.combat!.weapon).toBe(PLAYER_START_WEAPON)
-    expect(bat.dead).toBeFalsy()
+    expect(wrench.dead).toBeFalsy()
   })
 
   // `collect`'s auto-heal branch (itemClass === 'consumable' → top up instead of

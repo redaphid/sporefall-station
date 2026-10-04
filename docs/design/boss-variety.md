@@ -531,7 +531,7 @@ what happens.
 | Template | Objective | Completion | Fail |
 |---|---|---|---|
 | `reach` | get to the Launch Bay | born complete (fallback when there is no building) | — |
-| `steal` | grab the specimen canister | any player holds `briefcase` (`:462`) | none |
+| `steal` | grab the specimen canister | any player holds `canister` (`:462`) | none |
 | `assassinate` | kill the Mireclaw Alpha | target dead (`:467`) | none |
 | `contain` (floor 5+) | burn the Spore Node before `bloomTick` | node dead by any cause | **soft** — it blooms |
 | `infiltrate` (floor 5+) | breach a biolock, kill the Mireclaw | boss dead | none |

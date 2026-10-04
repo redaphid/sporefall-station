@@ -173,7 +173,7 @@ const removeSlot = (e: Entity, index: number): void => {
  *
  * A PLAYER's weapon is permanent — it is the only one they will ever carry, and
  * there is no replacement to pick up — so it never wears and never breaks.
- * NPC melee is untouched: enemy bats and sledgehammers still wear down and snap. */
+ * NPC melee is untouched: enemy wrenches and sledgehammers still wear down and snap. */
 export const wearMelee = (e: Entity): void => {
   if (e.playerCtl) return
   const index = weaponSlotIndex(e)

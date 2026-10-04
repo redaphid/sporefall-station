@@ -66,14 +66,15 @@ describe('sequenced casting: golden digests', () => {
   // Re-pinned by the lore rename (ee39480f, 5930fe81 before it). The digest
   // hashes archetype, faction and field names, so only the strings moved: the
   // pre-rename digest text, passed through the codemod, equals today's text
-  // except that `misdeedUntilTick` now sorts after `downed`.
-  // Seed 1234 re-pinned when the ATM left the shopfloor layout: putting back
-  // `{ g: 'one', prop: 'atm' }` in furnish.ts and `OBJECTS.atm` reproduces
-  // 1378fed3. The floor is an authored city level (createCityWorld), which
-  // digests the same as the seeded one did.
+  // except that `misdeedUntilTick` now sorts after `downed`. The city-word
+  // pass (5c2b17a6, 1378fed3 before it) renamed weapon and tile ids only.
+  // Seed 1234 re-pinned again when the ATM left the shopfloor layout: putting
+  // back `{ g: 'one', prop: 'atm' }` in furnish.ts and `OBJECTS.atm`
+  // reproduces f257474f. The floor is an authored city level
+  // (createCityWorld), which digests the same as the seeded one did.
   const GOLDEN: Record<number, string> = {
-    7: '5c2b17a6',
-    1234: 'fa02a317',
+    7: 'ee4057c8',
+    1234: '1b4cbe93',
   }
 
   for (const seed of [7, 1234]) {

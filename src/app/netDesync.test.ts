@@ -389,10 +389,10 @@ describe('divergence detector — proving it can fail (red before green)', () =>
 
     host.world.byId.get(target.id)!.archetype = 'pickup.keycard.wing3'
     expect(archetypeIssues(drawnAs('pickup.keycard'))).toEqual([])
-    expectFires(drawnAs('pickup.briefcase'), 'entity.archetype')
+    expectFires(drawnAs('pickup.canister'), 'entity.archetype')
     expectFires(drawnAs('pickup.keycard.wing3'), 'entity.archetype')
 
-    host.world.byId.get(target.id)!.archetype = 'pickup.briefcase'
+    host.world.byId.get(target.id)!.archetype = 'pickup.canister'
     expectFires(drawnAs('pickup.keycard'), 'entity.archetype')
   })
 

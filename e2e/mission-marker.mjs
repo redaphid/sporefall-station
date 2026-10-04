@@ -1,11 +1,11 @@
 import { record } from './lib.mjs'
 
 // Mission-marker parity proof (the "icon points at empty ground" bug, fixed):
-// on the REAL generated floor 1 of seed 7 the mission briefcase sits at
+// on the REAL generated floor 1 of seed 7 the mission canister sits at
 // (58,58) — deep in the map's SE corner, exactly where the camera's soft
 // overscan clamp reshapes the view and where the old duplicated overlay clamp
 // drifted by up to 0.4*half-view. The clip follows the 🎯 marker from spawn to
-// the actual briefcase (teleport hops + a real final walk-on pickup), and the
+// the actual canister (teleport hops + a real final walk-on pickup), and the
 // asserts compare the DOM marker against `__renderedProject` — the pixi world
 // container's LIVE transform, not any re-derived camera math:
 //
@@ -13,7 +13,7 @@ import { record } from './lib.mjs'
 //      target bearing, with the true tile distance.
 //   2. mid-map hop: same invariant holds while the clamp is inactive.
 //   3. inside the objective room (SE corner, BOTH clamp axes active): the
-//      caret sits ON the briefcase's rendered pixel — pre-fix it floated
+//      caret sits ON the canister's rendered pixel — pre-fix it floated
 //      ~(256,144)px past it, over empty ground.
 //   4. the final hop lands inside pickup range and the REAL autoPickup system
 //      completes the mission: the chip flips to "EXIT is open" and the SAME
@@ -50,7 +50,7 @@ const installHelpers = (page) =>
       const p = selfEnt()
       return window.__verb(`teleport ${p.id} ${best.x} ${best.y}`)
     }
-    /** The final approach: land INSIDE pickup range of the briefcase (player
+    /** The final approach: land INSIDE pickup range of the canister (player
      * r=0.35 + item r=0.3), so the next sim tick runs the REAL autoPickup path.
      * Returns a diagnostic string either way — never throws mid-recording. */
     window.__hopOnto = () => {
@@ -166,14 +166,14 @@ const ok = await record({
     { tick: 30, label: '01-spawn-edge-arrow', act: snap('spawn') },
     { tick: 60, label: '02-hop-mid-map', act: seq(hop(32.5, 30.5), settleCamera, snap('mid')) },
     { tick: 120, label: '03-hop-se-district', act: seq(hop(52.5, 55.5), settleCamera, snap('near')) },
-    // Inside the objective room, 1.5 tiles west of the briefcase. The camera
+    // Inside the objective room, 1.5 tiles west of the canister. The camera
     // follow needs ~a second to settle onto the corner clamp before the shot.
-    { tick: 180, label: '04-caret-on-briefcase-corner-clamped', act: seq(hop(56.5, 58.0), settleCamera, snap('corner')) },
+    { tick: 180, label: '04-caret-on-canister-corner-clamped', act: seq(hop(56.5, 58.0), settleCamera, snap('corner')) },
     // The final approach lands inside pickup range → the REAL autoPickup system
-    // grabs the briefcase on the next sim tick; wait for the completion, don't
+    // grabs the canister on the next sim tick; wait for the completion, don't
     // guess a tick (every beat here is act-sequenced, immune to wall-clock).
     // The exit (62,62) is on-screen from there: the 🏁 caret must sit on ITS
-    // rendered pixel — same rigor as the briefcase money shot.
+    // rendered pixel — same rigor as the canister money shot.
     {
       tick: 210,
       label: '05-exit-caret-takes-over',
@@ -216,9 +216,9 @@ const ok = await record({
     // 2) Mid-map: the invariant holds en route.
     if (!s.mid?.edgeVisible || !bearingOk(s.mid)) f.push(`mid: edge arrow wrong (${JSON.stringify(s.mid)})`)
     // 3) THE MONEY SHOT — SE corner, both clamp axes engaged: the caret must
-    // sit on the briefcase's RENDERED pixel (tolerance covers px rounding).
+    // sit on the canister's RENDERED pixel (tolerance covers px rounding).
     const c = s.corner
-    if (!c?.caretVisible) f.push('corner: caret not visible over the briefcase')
+    if (!c?.caretVisible) f.push('corner: caret not visible over the canister')
     if (c?.caretVisible && c.renderedTarget) {
       const dx = Math.abs(c.caretLeft - c.renderedTarget.x)
       const dy = Math.abs(c.caretTop - (c.renderedTarget.y - 18))

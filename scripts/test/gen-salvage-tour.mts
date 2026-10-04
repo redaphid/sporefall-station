@@ -74,7 +74,7 @@ console.log(`  released doors now open: ${releasedCount}`)
 // ── Stage 3: prize grab → the whole town aggros the holder ───────────────────
 const w3 = deserializeWorld(serializeWorld(w2))
 const p3 = w3.entities.find((e) => e.playerCtl)!
-p3.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+p3.loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
 tickWorld(w3, idle()) // missionSystem completes + raises the manhunt
 if (!w3.mission.complete || w3.alarm !== 3) throw new Error('prize did not raise the manhunt')
 write('salvage-3-manhunt', w3, [

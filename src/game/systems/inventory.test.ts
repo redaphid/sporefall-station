@@ -45,7 +45,7 @@ describe('inventory', () => {
   it('a weapon slot can NEVER be equipped — the weapon is permanent', () => {
     const e = player(w)
     e.loadout!.inventory = [
-      { itemId: 'bat', qty: 12 },
+      { itemId: 'wrench', qty: 12 },
       { itemId: 'pistol', qty: 1 },
     ]
     expect(equipSlot(e, 0)).toBe(false)
@@ -56,11 +56,11 @@ describe('inventory', () => {
 
   it('equipping a throwable holds it without touching the swung weapon', () => {
     const e = player(w)
-    arm(e, 'bat')
+    arm(e, 'wrench')
     e.loadout!.inventory.push({ itemId: 'grenade', qty: 2 })
     expect(equipSlot(e, 1)).toBe(true)
     expect(e.loadout!.activeSlot).toBe(1)
-    expect(e.combat!.weapon).toBe('bat')
+    expect(e.combat!.weapon).toBe('wrench')
   })
 
   it("a PLAYER's melee weapon never wears out — it is the only one they get", () => {

@@ -1,7 +1,7 @@
 // The blast diver (archetype `breacher`, drawn as `blast-diver` on
 // swampspace-hires) walking every compass sector, in the engine, on the theme
 // the game actually loads. Each walker holds its real weapon from npcs.ts, the
-// bat, which the renderer draws at the hand. Brains are off and the faction is
+// wrench, which the renderer draws at the hand. Brains are off and the faction is
 // civ, so nobody swings; the real player idles at the centre facing the camera.
 //
 // The theme draws 5 directions x (idle, step, walk-0..7); the engine mirrors
@@ -52,7 +52,7 @@ const walker = (id, dx, dy) => {
     radius: 0.35,
     facing: Math.atan2(dy, dx),
     health: { hp: 30, max: 30, iframes: 0 },
-    combat: { weapon: 'bat', cooldown: 0 },
+    combat: { weapon: 'wrench', cooldown: 0 },
     status: { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 },
     ai: {
       mode: 'wander',

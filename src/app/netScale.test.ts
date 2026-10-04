@@ -886,7 +886,7 @@ describe('inventory change-gating at 8 players', () => {
     await tickHost(host, 4)
     const before = host.debugInventorySends
     const avatar = host.world.byId.get(host.peersBySlot.get(3)!.entityId!)!
-    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'briefcase', qty: 1 }]
+    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'canister', qty: 1 }]
     await tickHost(host, 2)
     expect(host.debugInventorySends).toBe(before + 1)
   })

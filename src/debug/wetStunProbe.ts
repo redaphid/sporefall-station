@@ -1,7 +1,7 @@
 // The wet stun-lock probe, ported from integration PR #122 (substrateProbes.ts
-// `stunProbe`, flooded street). One acolyte armed with a stun gun starts
-// STUN_GUNNER_DIST tiles down an open street row from the players. On a flooded
-// street the bog tide is in from the first tick, so everyone there is wet and
+// `stunProbe`, flooded causeway). One acolyte armed with a stun gun starts
+// STUN_GUNNER_DIST tiles down an open causeway row from the players. On a flooded
+// causeway the bog tide is in from the first tick, so everyone there is wet and
 // each stun hit on a wet player is a `shock` that floods the wet cluster.
 //
 //   npx tsx scripts/wet-stun-probe.mts
@@ -25,7 +25,7 @@ export const STUN_PROBE_TICKS = 10 * SIM_RATE
 export const STUN_GUNNER_DIST = 4
 export const REACT_TICKS = SIM_RATE / 2
 
-export type Ground = 'dry street' | 'flooded street'
+export type Ground = 'dry causeway' | 'flooded causeway'
 /** What each player does on every tick it can act.
  * - `stand`: nothing, as in #122.
  * - `fight`: stand and shoot the gunner.
@@ -62,9 +62,9 @@ export interface StunRun {
   downedAt: (number | undefined)[]
 }
 
-/** The open 3-wide street row of `n` cells nearest the level's centre (#122's
- * census `openStreetRow`). */
-const openStreetRow = (w: World, n: number): Rect => {
+/** The open 3-wide causeway row of `n` cells nearest the level's centre (#122's
+ * census `openCausewayRow`). */
+const openCausewayRow = (w: World, n: number): Rect => {
   const { level } = w
   const indoors = (x: number, y: number): boolean => level.buildings.some((b) => rectContains(b.rect, x, y))
   const standing = w.entities.filter((e) => e.kind === 'interactable' || e.kind === 'door')
@@ -83,7 +83,7 @@ const openStreetRow = (w: World, n: number): Rect => {
       }
     }
   }
-  if (!best) throw new Error(`probe: seed ${w.seed} has no ${n}-cell open street row`)
+  if (!best) throw new Error(`probe: seed ${w.seed} has no ${n}-cell open causeway row`)
   return best
 }
 
@@ -131,9 +131,9 @@ const policyInput = (policy: Policy, p: Entity, gunner: Entity, t: number, hitAt
 
 export const stunProbe = (seed: number, ground: Ground, policy: Policy, team: Team): StunRun => {
   const w = new HostSession(seed, { sample: emptyInput }).world
-  const row = openStreetRow(w, STUN_GUNNER_DIST + 2)
+  const row = openCausewayRow(w, STUN_GUNNER_DIST + 2)
   const first = stage(w, row)
-  if (ground === 'flooded street') startFloorModifier(w, 'bogTide', TIDE_PERIOD - TIDE_FLOOD)
+  if (ground === 'flooded causeway') startFloorModifier(w, 'bogTide', TIDE_PERIOD - TIDE_FLOOD)
   if (team === 2) addTeammate(w, first)
   const players = playersOf(w)
   const gunner = spawnNpc(w, 'acolyte', first.pos.x + STUN_GUNNER_DIST, first.pos.y)
@@ -240,7 +240,7 @@ export const summarize = (runs: readonly StunRun[]): StunSummary => {
 
 export const probeTable = (seeds: readonly number[] = PROBE_SEEDS): StunSummary[] => {
   const out: StunSummary[] = []
-  for (const ground of ['dry street', 'flooded street'] as const)
+  for (const ground of ['dry causeway', 'flooded causeway'] as const)
     for (const policy of POLICIES)
       for (const team of [1, 2] as const) out.push(summarize(seeds.map((s) => stunProbe(s, ground, policy, team))))
   return out

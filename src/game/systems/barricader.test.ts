@@ -51,7 +51,7 @@ const buildingWorld = (doorSpots: { x: number; y: number }[]): { w: World; b: Bu
   const w = createWorld(7, 1, 'normal', false)
   w.level.tiles.fill(Tile.Wall)
   w.level.solid.fill(1)
-  carve(w, 4, 4, 36, 30) // surrounding street
+  carve(w, 4, 4, 36, 30) // surrounding causeway
   // Building shell 10..18 × 10..16 (walls), interior 11..17 × 11..15.
   for (let x = 10; x <= 18; x++) for (let y = 10; y <= 16; y++) wall(w, x, y)
   carve(w, 11, 11, 17, 15)
@@ -69,7 +69,7 @@ const buildingWorld = (doorSpots: { x: number; y: number }[]): { w: World; b: Bu
 
 const barricaderAt = (w: World, x: number, y: number) => {
   const e = spawnNpc(w, 'mutant', x, y)
-  e.combat!.weapon = 'bat'
+  e.combat!.weapon = 'wrench'
   e.ai!.behavior = 'barricader'
   e.ai!.zone = { building: 0, role: 'warehouse' }
   return e

@@ -73,8 +73,8 @@ describe('combat AI — acquire, chase, attack', () => {
   it('a melee NPC closes to swinging range; a ranged NPC holds its distance', () => {
     const { w } = arena()
     const player = spawnPlayer(w, 0, 15.5, 20.5)
-    const melee = spawnNpc(w, 'mutant', 21.5, 19.5) // bat, sightRange 7 → perceives at ~6
-    melee.combat!.weapon = 'bat'
+    const melee = spawnNpc(w, 'mutant', 21.5, 19.5) // wrench, sightRange 7 → perceives at ~6
+    melee.combat!.weapon = 'wrench'
     const shooter = spawnNpc(w, 'mutant', 21.5, 21.5) // pistol
     shooter.combat!.weapon = 'pistol'
 
@@ -133,7 +133,7 @@ describe('combat AI — exemptions (a downed/asleep NPC does not fight)', () => 
     const { w } = arena()
     const player = spawnPlayer(w, 0, 12.5, 20.5)
     const sleeper = spawnNpc(w, 'mutant', 16.5, 20.5)
-    sleeper.combat!.weapon = 'bat'
+    sleeper.combat!.weapon = 'wrench'
     sleeper.status!.sleep = 300
     const startDist = dist(sleeper.pos.x, sleeper.pos.y, player.pos.x, player.pos.y)
 
@@ -161,7 +161,7 @@ describe('combat AI — determinism', () => {
       const w = createWorld(42, 1, 'normal', true)
       carve(w, 8, 18, 40, 22)
       spawnPlayer(w, 0, 12.5, 20.5)
-      spawnNpc(w, 'mutant', 22.5, 19.5).combat!.weapon = 'bat'
+      spawnNpc(w, 'mutant', 22.5, 19.5).combat!.weapon = 'wrench'
       spawnNpc(w, 'acolyte', 24.5, 21.5).combat!.weapon = 'pistol'
       return w
     }

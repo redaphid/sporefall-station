@@ -348,7 +348,7 @@ export const createTouch = (mount: HTMLElement, zoom?: ZoomSink): TouchInput => 
         ';color:' +
         (slot.active ? '#e8c96a' : '#cfcfcf')
       // Equip the tapped slot's REAL inventory index (display order skips the
-      // briefcase, so never send the strip position).
+      // canister, so never send the strip position).
       el.addEventListener('pointerdown', (ev) => {
         ev.preventDefault()
         hotbarEdge = slot.index

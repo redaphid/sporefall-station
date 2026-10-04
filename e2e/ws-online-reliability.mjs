@@ -129,6 +129,37 @@ const main = async () => {
     check((await until(host, () => /\d+ ms$/.test(document.querySelector('[data-role="link-chip"]')?.textContent ?? ''), undefined, 8000)) !== null, `host chip shows its worst player's round trip ("${await chip(host)}")`)
     await shot(guest, '03-guest-chip-rtt')
     proxy.delay(0)
+
+    // The host can share an online moment, and the link replays green.
+    await guest.keyboard.down('KeyD')
+    await sleep(1500)
+    const shared = await host.evaluate(async () => {
+      const share = globalThis.sporefallShare
+      if (typeof share !== 'function') return { armed: false }
+      const r = await share('online two-player moment')
+      return { armed: true, url: r.url, rewindTicks: r.rewindTicks, runUpDropped: r.runUpDropped ?? null }
+    })
+    await guest.keyboard.up('KeyD')
+    check(shared.armed, 'window.sporefallShare is armed on an online host')
+    check(shared.rewindTicks >= 30, `the share carries the guest's run-up (${shared.rewindTicks} ticks, dropped: ${shared.runUpDropped})`)
+    const viewerCtx = await browser.newContext({ viewport: SIZE })
+    contexts.push({ ctx: viewerCtx, tag: 'Viewer', videoDir: join(OUT, 'video-ws-reliability-viewer-none') })
+    const viewer = await viewerCtx.newPage()
+    viewer.on('pageerror', (e) => errs.push(`viewer pageerror: ${e}`))
+    // The Worker names the canonical site in the link; the capture lives in this
+    // wrangler's local KV, so open the same ?state= here.
+    await viewer.goto(`${BASE}/${new URL(shared.url).search}`, { waitUntil: 'networkidle' })
+    const verdict = await until(viewer, () => globalThis.__stateReplay !== undefined, undefined, 20000)
+    const replay = await viewer.evaluate(() => ({
+      ok: globalThis.__stateReplay?.ok,
+      reason: globalThis.__stateReplay?.reason,
+      players: globalThis.__stateReplay?.world?.entities?.filter((e) => e.playerCtl).length,
+    }))
+    check(verdict !== null && replay.ok === true, `the shared link replays green on a fresh page (${replay.reason ?? 'ok'})`)
+    check(replay.players === 2, `and the replayed world holds both players (${replay.players})`)
+    await shot(viewer, '03b-shared-online-moment')
+    await viewerCtx.close()
+
     const playersBefore = await host.evaluate(() => globalThis.world.entities.filter((e) => e.playerCtl).map((e) => e.id).join(','))
 
     // 4. Fifteen seconds of silence with the socket open.

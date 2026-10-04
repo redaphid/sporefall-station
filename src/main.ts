@@ -571,11 +571,16 @@ const boot = async (): Promise<void> => {
   // that matters — zero run-up. The module is still a DYNAMIC import, so the
   // compressor/uploader stay out of the initial parse.
   //
-  // Host/solo only: `NetClientSession` does not own the world it would upload,
-  // and (like the pause menu itself) has nowhere to put the button.
+  // Host/solo only: `NetClientSession` does not own the world it would upload.
+  // An online or Bluetooth HOST does: its ring records every player's commands,
+  // so a guest replays as one more scripted slot. When the run-up cannot
+  // replay (the host also edits its world between ticks, e.g. a dropped
+  // player's body expiring), the share goes up as a still and says why.
   let stateRing: StateSharing | undefined
-  if (session instanceof HostSession) {
-    const host = session
+  const sharingHost = session instanceof HostSession || session instanceof NetHostSession ? session : undefined
+  if (sharingHost) {
+    const host = sharingHost
+    const netHost = session instanceof NetHostSession
     const { StateRing, shareState } = await import('./app/stateShare')
     let ring = new StateRing(host.world)
     // ORDER MATTERS, and getting it wrong is exactly the bug this feature is
@@ -613,13 +618,14 @@ const boot = async (): Promise<void> => {
     // there is nothing to keep in sync and no second implementation to drift.
     const share = async (note?: string): Promise<ShareResult> => {
       rebindRing()
-      return shareState(host.world, { note }, ring)
+      return shareState(host.world, { note }, ring, undefined, netHost)
     }
     ;(window as unknown as { sporefallShare: unknown }).sporefallShare = async (note?: string) => {
       const r = await share(note)
       console.log(
         `sporefall: shared ${r.url}\n  ${(r.bytes / 1024).toFixed(1)} KiB uploaded ` +
-          `(${(r.rawBytes / 1024).toFixed(1)} KiB raw), ${r.rewindTicks} ticks of run-up`,
+          `(${(r.rawBytes / 1024).toFixed(1)} KiB raw), ${r.rewindTicks} ticks of run-up` +
+          (r.runUpDropped ? `\n  shared as a still: the run-up did not replay (${r.runUpDropped})` : ''),
       )
       return r
     }

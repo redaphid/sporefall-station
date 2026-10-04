@@ -24,6 +24,7 @@ const makeClient = () => {
   let handler: ((e: TransportEvent) => void) | null = null
   const transport: Transport = {
     role: 'client',
+    medium: 'local',
     maxPacket: 180,
     start: async () => {},
     stop: async () => {},
@@ -141,6 +142,7 @@ describe('a host changes runEpoch only on a fresh run', () => {
   it('a NET host changes it on "Run it back" and on "New Seed", and not while the run plays', () => {
     const transport: Transport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},

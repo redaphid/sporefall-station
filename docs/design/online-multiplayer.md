@@ -148,6 +148,13 @@ The behaviour below is measured by `e2e/ws-online-reliability.mjs`, which puts
   closes that socket with 4003. `e2e/ws-relay.mjs` checks each of these against
   the real Durable Object.
 
+- **Sharing online moments.** An online host arms the `?state=` ring like a
+  solo run. Its ring records every player's commands, so the guest replays as
+  a scripted slot, and the e2e link replayed green with both players. When a
+  run-up cannot replay (the host edits its world between ticks, as when a
+  dropped guest's body expires), the share goes up as a still and the console
+  says why. Guests do not share; they do not own the world.
+
 ## What's left
 
 1. **Share link.** Add `?join=CODE` so a host can send a link instead of reading

@@ -112,6 +112,25 @@ const main = async () => {
     await shot(host, '05-host-playing')
     await shot(guest, '06-guest-playing')
 
+    // The host just closes its tab: no Main menu, so no Bye. The relay's
+    // host-left signal must still land the guest on HOST LEFT, fast.
+    const closedAt = Date.now()
+    await host.close()
+    const hostLeft = await until(
+      guest,
+      () => document.querySelector('[data-role="pause-title"]')?.textContent === 'HOST LEFT',
+      undefined,
+      10000,
+    )
+    const leftMs = Date.now() - closedAt
+    check(hostLeft && leftMs <= 2500, `closing the host tab shows HOST LEFT on the guest in ${leftMs} ms`)
+    check(
+      await guest.evaluate(() => !!document.querySelector('[data-role="pause-main-menu"]')),
+      'with a Main menu button to leave by',
+    )
+    check(!(await guest.evaluate(() => document.body.innerText.includes('reconnecting'))), 'and no reconnecting banner')
+    await shot(guest, '07-guest-host-tab-closed')
+
     const back = await open('Backer')
     await back.getByRole('button', { name: 'Back' }).click()
     check(

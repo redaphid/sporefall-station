@@ -104,6 +104,9 @@ export class NetHostSession implements Session {
   started = false
   private runEpoch = 0
   onLobbyChange?: (players: LobbyPlayer[]) => void
+  /** Fires just before each tick with the slot → command map it will run,
+   * remote players included, so a state-share ring can record it. */
+  onTickInputs?: (inputs: Map<number, InputCmd>) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
   debugInventorySends = 0
 
@@ -269,6 +272,7 @@ export class NetHostSession implements Session {
       p.pendingEdges = 0
       this.inputs.set(p.slot, cmd)
     }
+    this.onTickInputs?.(this.inputs)
     tickWorld(this.world, this.inputs)
     this.expireGhosts()
 

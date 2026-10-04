@@ -112,15 +112,17 @@ A failure means a retake (max 3 per direction). **A gate that fails on good art,
 
 ## In-game video (Step 3 proof)
 
-Headless Chromium on this box has no GL context (ANGLE `xcb_connect failed`; `--use-angle=swiftshader` closes the page), so record through the headed Windows Chrome already listening on `127.0.0.1:9222`, against a local preview of the build, never the live site:
+Headless Chromium on this box has no GL context (ANGLE `xcb_connect failed`; `--use-angle=swiftshader` closes the page), so record through a headed Windows Chrome you launch yourself with `scripts/own-chrome.mjs`, against a local preview of the build, never the live site. Never use the Chrome on `:9222`: it is Aaron's own browser, and `e2e/lib.mjs` refuses it.
 
 ```sh
 export PATH=~/.local/bin:~/.local/node22/bin:$PATH
 corepack pnpm exec vite build && (corepack pnpm exec vite preview --port 4917 --strictPort --host 127.0.0.1 &)
-BASE_URL=http://127.0.0.1:4917 E2E_CDP=http://127.0.0.1:9222 E2E_OUT=/mnt/d/tmp/cast-walks/<char>/ingame node e2e/feature-<arch>-walk.mjs
+node scripts/own-chrome.mjs launch     # note cdpUrl and lockfile from the JSON
+BASE_URL=http://127.0.0.1:4917 E2E_CDP=<cdpUrl> E2E_OUT=/mnt/d/tmp/cast-walks/<char>/ingame node e2e/feature-<arch>-walk.mjs
+node scripts/own-chrome.mjs kill <lockfile>
 ```
 
-Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a39): 8 of the archetype on a ring, each pacing one compass sector, NPC brains off, speed halved so each leg reads. Look at a still yourself before sending; `2cb` the MP4, a 4 s GIF and a still; save them under `/mnt/d/tmp/cast-walks/<char>/ingame/`. It opens a visible context in Aaron's Chrome while it records.
+Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a39): 8 of the archetype on a ring, each pacing one compass sector, NPC brains off, speed halved so each leg reads. Look at a still yourself before sending; `2cb` the MP4, a 4 s GIF and a still; save them under `/mnt/d/tmp/cast-walks/<char>/ingame/`. It opens a visible window on the desktop while it records.
 
 ## Every image carries its flow
 

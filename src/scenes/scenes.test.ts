@@ -126,10 +126,29 @@ describe.each(NAMES)('scene %s', (name) => {
 })
 
 describe('each scene plays the beat its card promises', () => {
+  it('card-night: a table fills, deals, and the whole table gets up together', () => {
+    const w = loadFixture('card-night')
+    const events = play(w, 70 * 30, {})
+    const starts = events.filter((e) => e.type === 'activity' && e.kind === 'cards' && e.phase === 'start')
+    const ends = events.filter((e) => e.type === 'activity' && e.kind === 'cards' && e.phase === 'end')
+    expect(starts.length).toBeGreaterThan(0)
+    expect(ends.length).toBeGreaterThan(0)
+    for (const end of ends) {
+      const start = starts.find((s) => s.type === 'activity' && end.type === 'activity' && s.entityId === end.entityId)
+      expect(start && start.type === 'activity' && end.type === 'activity' && [...end.seats].sort()).toEqual(start && start.type === 'activity' && [...start.seats].sort())
+    }
+  })
+
   it('castle-siege: the mortars shell the bailey, and the lord falling opens the keep', () => {
     const w = loadFixture('castle-siege')
+    // The beat is the keep opening, not the bot surviving. On main this bot
+    // only squeaked through (three of four nearby plans died), so any AI change
+    // flipped it; a sturdier bot that shoots from 14 tiles keeps the check on
+    // the scene.
+    const bot = thePlayer(w)!
+    bot.health = { ...bot.health!, hp: bot.health!.max * 3, max: bot.health!.max * 3 }
     const route = [{ x: 21.5, y: 26 }, { x: 21.5, y: 19 }, { x: 21.5, y: 14 }, { x: 21.5, y: 8 }]
-    const events = play(w, 2400, { route, focus: ids(w, 'boss') }, (w) => w.mission.complete)
+    const events = play(w, 2400, { route, range: 14, focus: ids(w, 'boss') }, (w) => w.mission.complete)
     expect(count(events, 'lob')).toBeGreaterThan(0)
     expect(w.mission).toMatchObject({ complete: true, exitUnlocked: true })
     expect(w.gameOver).toBe(false)

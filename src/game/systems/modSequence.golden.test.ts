@@ -65,10 +65,11 @@ describe('sequenced casting: golden digests', () => {
   // Re-pinned by the lore rename (ee39480f, 5930fe81 before it). The digest
   // hashes archetype, faction and field names, so only the strings moved: the
   // pre-rename digest text, passed through the codemod, equals today's text
-  // except that `misdeedUntilTick` now sorts after `downed`.
+  // except that `misdeedUntilTick` now sorts after `downed`. The city-word
+  // pass (5c2b17a6, 1378fed3 before it) renamed weapon and tile ids only.
   const GOLDEN: Record<number, string> = {
-    7: '5c2b17a6',
-    1234: '1378fed3',
+    7: 'ee4057c8',
+    1234: 'f257474f',
   }
 
   for (const seed of [7, 1234]) {

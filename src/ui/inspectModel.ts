@@ -9,7 +9,7 @@
 import type { AiState, Entity, ItemStack } from '../game/entity'
 import { NPCS } from '../game/data/npcs'
 import { OBJECTS } from '../game/data/objects'
-import { CONSUMABLES, THROWABLES, WEAPONS } from '../game/data/items'
+import { CONSUMABLES, THROWABLES, WEAPONS, itemName } from '../game/data/items'
 import { MODS } from '../game/data/mods'
 import { BEHAVIORS, DEFAULT_BEHAVIOR } from '../game/systems/behaviors'
 import { dispositionToward, initialPlayerHate, determineRel } from '../game/systems/relationships'
@@ -79,12 +79,6 @@ const FACTION_LABEL: Record<string, string> = {
   gang: 'Rootcult',
   neutral: 'Unaligned',
 }
-
-/** Human name for whichever weapon/throwable/consumable id we can resolve. */
-const itemName = (id: string): string =>
-  id === 'briefcase'
-    ? 'Specimen Canister'
-    : (WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id))
 
 /** One row per weapon mod on a stack: "❄️ Cryo Rounds" → "×N". Empty for a
  * vanilla / absent stack, so an unmodded gun shows just the Weapon row. */
@@ -211,7 +205,7 @@ const areaPhrase = (t: (typeof THROWABLES)[string]): string => {
 export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archetype: string) => string = pretty): InfoCard => {
   const rows: InfoRow[] = []
   const card: InfoCard = {
-    title: nameFor(e.archetype),
+    title: e.pickup && !MODS[e.pickup.itemId] ? itemName(e.pickup.itemId) : nameFor(e.archetype),
     kind: e.kind,
     archetype: e.archetype,
     artKey: e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype,

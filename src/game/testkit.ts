@@ -7,7 +7,12 @@ import { expect } from 'vitest'
 import { WEAPONS } from './data/items'
 import type { Entity, ItemStack } from './entity'
 import { generateCityLevel } from './levelgen/generate'
-import { levelFromJson } from './levelgen/levelText'
+import { levelFromJson, type LevelJson } from './levelgen/levelText'
+import { spawnPlayer } from './player'
+import { populateWorld } from './populate'
+import { playerSpawnPoint } from './spawnPlacement'
+import { LANDING_STAGE } from './stages/landing'
+import { setupFloor } from './systems/missions'
 import { serializeWorld } from './serialize'
 import { emptyInput, type InputCmd } from './types'
 import { tickWorld, worldFromState, type RunMode, type World, type WorldInit } from './world'
@@ -76,6 +81,18 @@ export const walledRoom = (w: number, h: number): string[] =>
       x === 0 || y === 0 || x === w - 1 || y === h - 1 ? '#' : x === 2 && y === 2 ? '@' : '.',
     ).join(''),
   )
+
+/** A world on an authored stage (stages/, the landing stage by default),
+ * populated, its floor set up and player 0 at its spawn, the way HostSession
+ * builds a run. Seed only rolls the dice. */
+export const stageWorld = (seed: number, mode: RunMode = 'normal', stage: LevelJson = LANDING_STAGE): World => {
+  const w = worldFromState({ level: levelFromJson(stage), seed, floor: 1, mode })
+  populateWorld(w)
+  setupFloor(w)
+  const at = playerSpawnPoint(w.level, 0)
+  spawnPlayer(w, 0, at.x, at.y)
+  return w
+}
 
 /** Assert two worlds are in an identical state by comparing their snapshots. */
 export const expectWorldEqual = (a: World, b: World): void => {

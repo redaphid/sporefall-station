@@ -14,14 +14,11 @@ import { themeNamed, type BiomeName, type Theme, type ThemeName } from './level'
  */
 export type FloorSetting = { kind: 'city'; theme: Theme } | { kind: 'complex'; biome: BiomeName }
 
-/** The district pool of floors 1 and 2, in order.
- *
- * Floor 1 is the landing: the classic downtown grid, byte-frozen because the
- * in-game demos, every committed floor-1 world and every shared floor-1
- * `?state=` link replay on it (levelgen/floor1.frozen.test.ts). Widening its
- * pool is a one-line change here once those move to authored worlds; the
- * no-repeat rule below already covers it. */
-export const OPENING_POOLS: readonly (readonly ThemeName[])[] = [['downtown'], ['slums', 'stillworks', 'culturebeds']]
+const EVERY_DISTRICT: readonly ThemeName[] = ['concourse', 'moorings', 'stillworks', 'culturebeds']
+
+/** The district pool of floors 1 and 2, in order: either can be any district,
+ * and the no-repeat rule below keeps the two apart. */
+export const OPENING_POOLS: readonly (readonly ThemeName[])[] = [EVERY_DISTRICT, EVERY_DISTRICT]
 
 /** Run `seed`'s opening districts, one per opening floor: each a seeded pick
  * from its pool, never the floor before's district. Its own rng fork, so it

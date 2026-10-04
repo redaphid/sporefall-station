@@ -10,38 +10,12 @@ export interface Seg {
   size: number
 }
 
-/**
- * Partition one axis of the map interior into lot segments separated by streets.
- * Deterministic: lot count per axis drawn from [minLots, maxLots], jittered sizes.
- */
-export const cutLots = (rng: Rng, total: number, minLots = 3, maxLots = 4): Seg[] => {
-  const interior = total - BORDER * 2
-  const nLots = rng.int(minLots, maxLots)
-  const space = interior - (nLots - 1) * STREET_W
-  const base = Math.floor(space / nLots)
-  const sizes = Array.from({ length: nLots }, (_, i) => base + (i < space - base * nLots ? 1 : 0))
-  for (let i = 0; i < nLots - 1; i++) {
-    const d = rng.int(-2, 2)
-    if (sizes[i] + d >= 8 && sizes[i + 1] - d >= 8) {
-      sizes[i] += d
-      sizes[i + 1] -= d
-    }
-  }
-  const segs: Seg[] = []
-  let pos = BORDER
-  for (const size of sizes) {
-    segs.push({ start: pos, size })
-    pos += size + STREET_W
-  }
-  return segs
-}
-
 /** Narrow alley · standard street · wide boulevard (tile widths). */
 export const ALLEY_W = 2
 export const BOULEVARD_W = 5
 
 /**
- * Themed-floor lot cutter: like `cutLots`, but each street between lots rolls
+ * District lot cutter: partitions one axis into lots, and each street between lots rolls
  * its own width — occasional wide boulevards and tight alleys, so districts
  * stop reading as a uniform grid. Falls back to uniform streets if the varied
  * widths would squeeze any lot under the 8-tile minimum, so connectivity and

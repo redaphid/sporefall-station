@@ -11,7 +11,7 @@ This is where the colony distilled essence for export, and it went cold when the
 - **Layout.** The three-lot grid stays, with dense big halls, high bunker and courtyard odds, and a corridor spine in most halls. Open lots and setback yards are bog shallows. Courtyard pits are settling ponds, and plaza hearts are sumps, all `Tile.Bog`. More low ground also gives the bog-tide modifier more to flood.
 - **Roles.** The role mix is still houses (role `reactor`, furnished with barrel banks, lockers and cabinets), cargo holds (`warehouse`) and stores depots (`depot`). A vault's sealed chamber stays a vault.
 - **Yards.** Open squares hold 2-4 spore barrels and 1-3 cargo crates, never touching and never on the spawn or exit. Barrels explode, so a yard fight is a hazard.
-- **Encounters.** Cinder Husks are thick (50% of buildings host 1-2), and Derelict Units are on shift from floor 1.
+- **Encounters.** Cinder Husks are thick (50% of buildings host 1-2), and Derelict Units are on shift from floor 2.
 - **Look.** A brass and ember grade, `0xf4d8b0` (`DISTRICT_TINT` in `src/render/complexLook.ts`).
 
 ## The Culture Beds (`culturebeds`, was `park`)

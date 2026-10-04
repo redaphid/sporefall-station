@@ -580,7 +580,9 @@ const spawnPlanned = (w: World, p: Placement): void => {
  * weapon roll (creatures keep their signature weapon), so the npc-weapons stream
  * is untouched too. */
 const spawnEncounters = (w: World, erng: Rng): void => {
-  const district = w.level.theme ? themeNamed(w.level.theme).encounters : {}
+  // A district's own threats wait for floor 2: floor 1 is the landing and
+  // stays gentle whichever district it is.
+  const district = w.level.theme && w.floor >= 2 ? themeNamed(w.level.theme).encounters : {}
   const floor = w.floor
   for (const b of w.level.buildings) {
     // A complex floor is ~3x as many (single-room) modules as a city floor has
@@ -614,6 +616,10 @@ const spawnEncounters = (w: World, erng: Rng): void => {
     // Drawn only there, so every other district's dice stay put.
     if (district.broodSacs !== undefined && erng.chance(district.broodSacs)) pods += erng.int(2, 3)
     if (district.sporeMites !== undefined && erng.chance(district.sporeMites)) sporelings += erng.int(1, 2)
+    // The Concourse's scavengers and the Moorings' drowned, likewise only there.
+    if (district.stalkers !== undefined && erng.chance(district.stalkers)) stalkers += 1
+    let drowners = 0
+    if (district.drowners !== undefined && erng.chance(district.drowners)) drowners += erng.int(1, 2)
     for (const [arch, n] of [
       ['sporeling', sporelings],
       ['cinder', cinders],
@@ -621,6 +627,7 @@ const spawnEncounters = (w: World, erng: Rng): void => {
       ['robot', robots],
       ['stalker', stalkers],
       ['pod', pods],
+      ['drowner', drowners],
     ] as const) {
       for (let i = 0; i < n; i++) {
         const spot = randomFloorInBuilding(w, erng, b, true)
@@ -679,8 +686,12 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   ],
 }
 
+/** Heavies the landing floor never fields, whatever its buildings are for: a
+ * Still Row still house or a Culture Beds lab on floor 1 is crewed, not armoured. */
+const HEAVIES: ReadonlySet<string> = new Set(['robot', 'brute'])
+
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, buildingIdx: number): void => {
-  const specs = [...ROLE_SPAWNS[building.role]]
+  const specs = ROLE_SPAWNS[building.role].filter((s) => w.floor >= 2 || !HEAVIES.has(s.archetype))
   // Difficulty ramp: deeper floors gang up
   if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'gangster', count: [1, 2] })
   if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'gangster', count: [0, 1] })

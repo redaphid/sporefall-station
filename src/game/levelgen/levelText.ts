@@ -113,7 +113,7 @@ const BUILDING_ROLES = [
   'washroom', 'lab', 'medbay', 'reactor', 'depot', 'security',
 ] as const
 const POIS = ['courtyard', 'vault', 'hallway', 'bunker', 'module'] as const
-const THEMES = ['downtown', 'slums', 'stillworks', 'culturebeds'] as const
+const THEMES = ['concourse', 'moorings', 'stillworks', 'culturebeds'] as const
 const STOREY_KINDS = ['ground', 'upper', 'tower', 'basement'] as const
 const STAIR_DIRS = ['n', 'e', 's', 'w'] as const
 

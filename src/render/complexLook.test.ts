@@ -15,17 +15,17 @@ describe('complex look: biome floor grade', () => {
     expect(mulTint(0xff0000, 0x00ff00)).toBe(0)
   })
 
-  it('downtown and the slums keep the theme tint; Still Row and the Culture Beds grade it, each its own way', () => {
+  it('a level with no district keeps the theme tint; every district grades it its own way', () => {
     const city = (theme: ThemeName): Level => levelFromJson({ rows: ['@..'], theme })
-    expect(floorTintFor(city('downtown'), 0xabcdef)).toBe(0xabcdef)
-    expect(floorTintFor(city('slums'), 0xabcdef)).toBe(0xabcdef)
     expect(floorTintFor(levelFromJson({ rows: ['@..'] }), 0xabcdef)).toBe(0xabcdef)
     expect(floorTintFor(undefined, 0x445566)).toBe(0x445566)
-    const still = floorTintFor(city('stillworks'), 0xffffff)
-    const beds = floorTintFor(city('culturebeds'), 0xffffff)
-    expect(still).toBe(DISTRICT_TINT.stillworks)
-    expect(beds).toBe(DISTRICT_TINT.culturebeds)
-    expect(new Set([0xffffff, still, beds]).size).toBe(3)
+    const names: ThemeName[] = ['concourse', 'moorings', 'stillworks', 'culturebeds']
+    const tints = names.map((n) => floorTintFor(city(n), 0xffffff))
+    names.forEach((n, i) => expect(tints[i], n).toBe(DISTRICT_TINT[n]))
+    expect(new Set([0xffffff, ...tints]).size).toBe(5)
+    const [, moorings, still, beds] = tints
+    // The Moorings run teal (blue over red).
+    expect(moorings & 0xff).toBeGreaterThan((moorings >> 16) & 0xff)
     // Still Row runs warm (more red than blue); the Culture Beds run green.
     expect((still >> 16) & 0xff).toBeGreaterThan(still & 0xff)
     expect((beds >> 8) & 0xff).toBeGreaterThan((beds >> 16) & 0xff)

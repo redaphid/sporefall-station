@@ -20,10 +20,11 @@ describe('the floor plan', () => {
     expect(COMPLEX_MIN_FLOOR).toBe(3)
     expect(OPENING_POOLS).toHaveLength(2)
     for (const seed of SEEDS) {
-      expect(floorSetting(seed, 1)).toEqual({ kind: 'city', theme: themeNamed('downtown') })
-      const second = floorSetting(seed, 2)
-      expect(second.kind).toBe('city')
-      expect(OPENING_POOLS[1]).toContain(second.kind === 'city' ? second.theme.name : undefined)
+      for (const f of [1, 2]) {
+        const s = floorSetting(seed, f)
+        expect(s.kind).toBe('city')
+        expect(OPENING_POOLS[f - 1]).toContain(s.kind === 'city' ? s.theme.name : undefined)
+      }
       for (let f = 3; f <= 30; f++) expect(floorSetting(seed, f).kind, `seed ${seed} floor ${f}`).toBe('complex')
     }
   })
@@ -82,15 +83,23 @@ describe('the floor plan', () => {
 })
 
 describe('the opening districts', () => {
-  it('floor 1 is the landing downtown; floor 2 is a seeded pick of the other three, never a repeat', () => {
-    const seen = new Map<string, number>()
-    for (let seed = 0; seed < 3000; seed++) {
-      const [first, second] = openingDistricts(seed)
-      expect(first.name, `seed ${seed}`).toBe('downtown')
-      expect(second.name, `seed ${seed}`).not.toBe(first.name)
-      seen.set(second.name, (seen.get(second.name) ?? 0) + 1)
+  it('floors 1 and 2 are seeded picks of all four districts, never the same one twice', () => {
+    const first = new Map<string, number>()
+    const second = new Map<string, number>()
+    const pairs = new Set<string>()
+    for (let seed = 0; seed < 4000; seed++) {
+      const [a, b] = openingDistricts(seed)
+      expect(b.name, `seed ${seed}`).not.toBe(a.name)
+      first.set(a.name, (first.get(a.name) ?? 0) + 1)
+      second.set(b.name, (second.get(b.name) ?? 0) + 1)
+      pairs.add(`${a.name}>${b.name}`)
     }
-    for (const name of ['slums', 'stillworks', 'culturebeds']) expect(seen.get(name) ?? 0, name).toBeGreaterThan(850)
+    for (const t of THEMES) {
+      expect(first.get(t.name) ?? 0, `floor 1 ${t.name}`).toBeGreaterThan(850)
+      expect(second.get(t.name) ?? 0, `floor 2 ${t.name}`).toBeGreaterThan(850)
+    }
+    // All 12 ordered pairs of distinct districts turn up.
+    expect(pairs.size).toBe(12)
   })
 
   it('every district a run can open on is reachable, and every district in THEMES is in some pool', () => {

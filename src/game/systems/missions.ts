@@ -1,7 +1,7 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
-import { isFloorTile, levelChecksum, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, levelChecksum, themeNamed, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { applyFloorModifier } from './modifierSystem'
@@ -50,8 +50,10 @@ const WING_NAMES: Record<BuildingRole, string> = {
   security: 'security post',
 }
 
-/** Themed module name for a building role (falls back to the raw role, defensively). */
-const wingName = (role: BuildingRole): string => WING_NAMES[role] ?? role
+/** What a building of `role` is called on this floor: the city district's own
+ * name for it, else the station-wide one (else the raw role, defensively). */
+const wingNameOn = (w: World, role: BuildingRole): string =>
+  (w.level.theme ? themeNamed(w.level.theme).wingNames[role] : undefined) ?? WING_NAMES[role] ?? role
 
 /** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
  * enough to fight to it and burn it back; short enough that dawdling floods the
@@ -122,7 +124,7 @@ const generateMission = (w: World): void => {
           targetBuilding: buildingIdx,
           complete: false,
           exitUnlocked: false,
-          description: `Grab the specimen canister in the ${wingName(building.role)}, then get out the way you came`,
+          description: `Grab the specimen canister in the ${wingNameOn(w, building.role)}, then get out the way you came`,
           extractPoint: { x: Math.floor(w.level.spawn.x), y: Math.floor(w.level.spawn.y) },
         }
       : {
@@ -131,7 +133,7 @@ const generateMission = (w: World): void => {
           targetBuilding: buildingIdx,
           complete: false,
           exitUnlocked: false,
-          description: `Extract the specimen canister from the ${wingName(building.role)}`,
+          description: `Extract the specimen canister from the ${wingNameOn(w, building.role)}`,
         }
   } else {
     const spot = roomCenter(building)
@@ -142,7 +144,7 @@ const generateMission = (w: World): void => {
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Purge the Mireclaw Alpha in the ${wingName(building.role)}`,
+      description: `Purge the Mireclaw Alpha in the ${wingNameOn(w, building.role)}`,
     }
   }
 }
@@ -162,7 +164,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Burn back the Spore Node in the ${wingName(building.role)} before it blooms`,
+      description: `Burn back the Spore Node in the ${wingNameOn(w, building.role)} before it blooms`,
       bloomTick: w.tick + BLOOM_TICKS,
     }
   } else {
@@ -173,7 +175,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingName(building.role)}`,
+      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingNameOn(w, building.role)}`,
     }
   }
   return true

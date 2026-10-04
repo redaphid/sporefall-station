@@ -19,15 +19,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Entity } from './entity'
 import { levelChecksum } from './levelgen/level'
-import { spawnPlayer } from './player'
-import { populateWorld } from './populate'
 import { applyScenario, GROUP_SCENARIOS } from './scenarios'
 import { deserializeWorld, serializeWorld } from './serialize'
-import { playerSpawnPoint } from './spawnPlacement'
 import { HEAL_RANGE, RETREAT_FRAC, RETURN_FRAC } from './systems/groups'
-import { setupFloor } from './systems/missions'
 import { emptyInput, SIM_RATE, type InputCmd, type SimEvent } from './types'
-import { createWorld, tickWorld, type World } from './world'
+import { tickWorld, type World } from './world'
+import { TIDE_GROUND } from './stages/tideGround'
+import { stageWorld } from './testkit'
 
 /** The seed every group scenario is documented against (docs/design/enemy-groups.md). */
 const GROUP_SCENARIO_SEED = 3
@@ -37,11 +35,7 @@ const S = SIM_RATE
  * HostSession.buildRun (populate, setupFloor, the free spawn tile), then
  * applyScenario on top (main.ts). */
 const stage = (name: string, seed = GROUP_SCENARIO_SEED): World => {
-  const w = createWorld(seed, 1)
-  populateWorld(w)
-  setupFloor(w)
-  const at = playerSpawnPoint(w.level, 0)
-  spawnPlayer(w, 0, at.x, at.y)
+  const w = stageWorld(seed, 'normal', TIDE_GROUND)
   applyScenario(w, name)
   return w
 }
@@ -96,7 +90,7 @@ const firsts = (w: World, n: number, log?: SimEvent[], pilot: Pilot = idle, each
 describe('group scenarios are shareable', () => {
   for (const name of Object.keys(GROUP_SCENARIOS)) {
     it(`${name}: leaves the level untouched and restores from a mid-scene capture`, () => {
-      const fresh = createWorld(GROUP_SCENARIO_SEED, 1)
+      const fresh = stageWorld(GROUP_SCENARIO_SEED, 'normal', TIDE_GROUND)
       const w = stage(name)
       expect(levelChecksum(w.level)).toBe(levelChecksum(fresh.level))
       firsts(w, 150)

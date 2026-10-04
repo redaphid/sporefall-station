@@ -37,15 +37,9 @@ import type { Entity } from '../entity'
 import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, stationAlerted, type FearPulse, type World } from '../world'
 import {
-  BATTLE,
   ENGAGE_RANGE,
-  FLEE,
-  INVESTIGATE,
   INVESTIGATE_SCORE,
   LEASH,
-  PURSUE,
-  WANDER,
-  WANDER_SCORE,
   battleScore,
   canSeeEntity,
   fleeScore,
@@ -56,8 +50,9 @@ import {
 } from './goals'
 import {
   HEAL_RANGE,
-  LOB_MAX,
-  LOB_MIN,
+  LOB_HOLD_MAX,
+  LOB_HOLD_MIN,
+  LOB_IDEAL,
   centroid,
   groupOf,
   livePlayers,
@@ -71,16 +66,57 @@ import { determineRel, dispositionToward, initialFactionHate } from './relations
 import { strongestStimulus } from './stimulus'
 import { isPanicking } from './statusFx'
 import { vlen } from '../simMath'
+import {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+  BATTLE,
+  FLEE,
+  INVESTIGATE,
+  PURSUE,
+  WANDER,
+  WANDER_SCORE,
+} from './goalCodes'
+export {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+} from './goalCodes'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
-export const PATROL = 'patrol'
-export const SEARCH = 'search'
-export const ALERT = 'alert'
-export const SCAVENGE = 'scavenge'
 // Squad choreography (see the `squad` behavior below).
-export const FORMUP = 'formup'
-export const STACK = 'stack'
-export const FLANK = 'flank'
 
 // ── Decision tiers (see header) ────────────────────────────────────────────
 export const TIER_AMBIENT = 0
@@ -299,7 +335,6 @@ const fleeMemory: Consideration = (w, e) => {
 // swarm pools on a shared focus and can be baited off the players. A flocking
 // bias at MEMORY tier: it beats wander/investigate but any perceived target
 // (threat/infest, THREAT tier) still overrides it. ────────────────────────────
-export const DRAWN = 'drawn'
 const DRAW_RANGE = 16
 const DRAW_SCORE = WANDER_SCORE + 0.6
 
@@ -452,8 +487,6 @@ const scavenge: Consideration = (w, e) => {
 // intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (street life,
 // test/scenario spawns) fall through untouched. All pure lookups over the level
 // geometry + ascending-id scans; no `Date`/`Math.random`.
-export const WORK = 'work'
-export const GARRISON = 'garrison'
 
 /** A resident holds its room over aimless wander (beats WANDER, loses to
  * investigate/patrol so a real disturbance or beat still wins). */
@@ -653,7 +686,6 @@ const squadFlank: Consideration = (w, e) => {
 // lane (bunkerLaneKeys — the same contract furniture honors), capped per
 // building, and — because a barricade is an ENTITY, never a solid tile — BFS
 // reachability over `level.solid` is untouched by construction.
-export const FORTIFY = 'fortify'
 /** Above garrison (2.5): plug the doors first, THEN mass on the core. */
 const FORTIFY_SCORE = 2.6
 /** Hard ceiling on live barricades per building. */
@@ -825,7 +857,6 @@ const packAvoid: Consideration = (w, e) => {
 export const MIRECLAW_RETREAT_FRAC = 0.5
 /** Below this HP fraction it ENRAGES — drops all self-preservation, goes faster. */
 export const MIRECLAW_ENRAGE_FRAC = 0.2
-export const RETREAT = 'retreat'
 
 const nearestPlayer = (w: World, e: Entity): Entity | undefined => {
   let best: Entity | undefined
@@ -884,13 +915,6 @@ const retreatToSpore: Consideration = (w, e) => {
 // raid's intel mark — and proposes a goal for this one member. None of them
 // mutates the group: phase changes, heals, shells and charges all happen in
 // the group system, so arbitration stays a pure scoring pass like the rest.
-export const STAGE = 'stage'
-export const GUARD = 'guard'
-export const EMPLACE = 'emplace'
-export const BREACH = 'breach'
-export const FALLBACK = 'fallback'
-export const TEND = 'tend'
-export const RING = 'ring'
 
 /** Gathering at the staging point: above every hunt/formation memory, so a
  * staging raider walks to the muster instead of freelancing — but at MEMORY
@@ -915,16 +939,6 @@ const RING_SCORE = 12
 const RAGE_SCORE = 20
 /** How far behind the line a medic with nobody to patch hangs back. */
 const MEDIC_HANG_BACK = 3
-/** The siege gun's firing band (holds inside it, walks to the ideal range outside
- * it). The far edge sits INSIDE the gun's own sight (lobber sightRange 11): a
- * battery that parks just past what it can see has no spotter and never fires —
- * which is exactly what the first cut of this did, holding at 11.8 tiles in silence.
- * Read at call time, not module load: groups.ts and this file import each other
- * (via populate), so a top-level `LOB_MIN + 3` hits the TDZ whenever populate is
- * the first module loaded (tsx scripts, a worker entry). */
-const lobHoldMin = (): number => LOB_MIN + 3
-const lobHoldMax = (): number => Math.min(LOB_MAX - 2, 10)
-const lobIdeal = (): number => (lobHoldMin() + lobHoldMax()) / 2
 /** How far a sapper backs off its planted charge. */
 const SAPPER_CLEAR = 3.5
 
@@ -1065,10 +1079,9 @@ const siegeGun: Consideration = (w, e) => {
   const t = g.targetId !== undefined ? w.byId.get(g.targetId) : undefined
   if (t && !t.dead && dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) < 1.6) return [] // cornered: bite
   const d = dist2d(g.mark.x, g.mark.y, e.pos.x, e.pos.y)
-  if (d >= lobHoldMin() && d <= lobHoldMax()) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
+  if (d >= LOB_HOLD_MIN && d <= LOB_HOLD_MAX) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
   const u = away(e.pos, g.mark)
-  const ideal = lobIdeal()
-  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * ideal, y: g.mark.y + u.y * ideal } }]
+  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * LOB_IDEAL, y: g.mark.y + u.y * LOB_IDEAL } }]
 }
 
 // The MEDIC walks to whoever is hurt worst (the retreating first), and with

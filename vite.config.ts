@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 // The caching plan lives in src/ as plain data so it can be unit-tested — three
@@ -12,6 +13,7 @@ import {
   SW_TAKEOVER,
 } from './src/app/swConfig'
 import { SITE_ORIGIN } from './capacitor.config'
+import { PAGES } from './src/app/pages'
 import { BETAS_PREFIX, resolveBetaSlug } from './src/app/betaSlug'
 
 // BETA BUILD SWITCH. `BETA_SLUG=<branch name> pnpm run build` produces a bundle
@@ -134,7 +136,16 @@ export default defineConfig({
     }),
   ],
   server: { host: true },
-  build: { target: 'es2022' },
+  build: {
+    target: 'es2022',
+    // Two pages, listed in src/app/pages.ts (see there for why the game's
+    // key must stay `index`).
+    rollupOptions: {
+      input: Object.fromEntries(
+        Object.entries(PAGES).map(([key, file]) => [key, fileURLToPath(new URL(`./${file}`, import.meta.url))]),
+      ),
+    },
+  },
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',

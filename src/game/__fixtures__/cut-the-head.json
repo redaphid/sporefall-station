@@ -1,0 +1,507 @@
+{
+  "v": 1,
+  "seed": 1,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 7,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Break the raid, take the north gate"
+  },
+  "noises": [
+    {
+      "x": 20.5,
+      "y": 5.5,
+      "expires": 90
+    }
+  ],
+  "events": [
+    {
+      "type": "raidArrive",
+      "groupId": 1,
+      "strategy": "staging",
+      "x": 20.5,
+      "y": 5.5,
+      "count": 5,
+      "targetId": 1
+    }
+  ],
+  "rng": 1092533862,
+  "baseRng": 1,
+  "level": {
+    "rows": [
+      "########################################",
+      "#,,,,,,,,,,,,,,,,,,,E,,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..............~~~~~~..............,,#",
+      "#,,..............~~~~~~..............,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,...~~~~~~.................####....,,#",
+      "#,,...~~~~~~.........................,,#",
+      "#,,...~~~~~~.......##................,,#",
+      "#,,...~~~~~~.........................,,#",
+      "#,,...~~~~~~.........................,,#",
+      "#,,.........##.......................,,#",
+      "#,,.........................~~~~~~...,,#",
+      "#,,.........................~~~~~~...,,#",
+      "#,,.........................~~~~~~...,,#",
+      "#,,.............###.........~~~~~~...,,#",
+      "#,,.........................~~~~~~...,,#",
+      "#,,..................................,,#",
+      "#,,...#####..........................,,#",
+      "#,,..................................,,#",
+      "#,,......................#####.......,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,..................................,,#",
+      "#,,...............----...............,,#",
+      "#,,,,,,,,,,,,,,,,,----,,,,,,,,,,,,,,,,,#",
+      "#,,,,,,,,,,,,,,,,,----,,,,,,,,,,,,,,,,,#",
+      "##################----##################"
+    ],
+    "spawn": {
+      "x": 19.5,
+      "y": 30.5
+    },
+    "exit": {
+      "x": 20,
+      "y": 1
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 19.5,
+        "y": 30.5
+      },
+      "prevPos": {
+        "x": 19.5,
+        "y": 30.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "machinegun",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "machinegun",
+            "qty": 1,
+            "mods": [
+              {
+                "id": "heavy",
+                "stacks": 2
+              },
+              {
+                "id": "pierce",
+                "stacks": 1
+              },
+              {
+                "id": "lifesteal",
+                "stacks": 2
+              },
+              {
+                "id": "rapid",
+                "stacks": 1
+              }
+            ]
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "crimeUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "bellwether",
+      "pos": {
+        "x": 20.5,
+        "y": 5.5
+      },
+      "prevPos": {
+        "x": 20.5,
+        "y": 5.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 90,
+        "max": 90,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "physical": 0.8,
+        "burning": 1.2
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 20.5,
+          "y": 5.5
+        },
+        "thinkAt": 0,
+        "sightRange": 10,
+        "behavior": "raider",
+        "group": {
+          "id": 1,
+          "role": "leader"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "mender",
+      "pos": {
+        "x": 17.5,
+        "y": 10.5
+      },
+      "prevPos": {
+        "x": 17.5,
+        "y": 10.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.3,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 44,
+        "max": 44,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "poisoned": 0.2,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 17.5,
+          "y": 10.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "mender",
+        "group": {
+          "id": 1,
+          "role": "medic"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "kind": "npc",
+      "archetype": "drowner",
+      "pos": {
+        "x": 17.5,
+        "y": 8.5
+      },
+      "prevPos": {
+        "x": 17.5,
+        "y": 8.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 38,
+        "max": 38,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.7,
+        "spore": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 17.5,
+          "y": 8.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "raider",
+        "group": {
+          "id": 1,
+          "role": "grunt"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "kind": "npc",
+      "archetype": "drowner",
+      "pos": {
+        "x": 19.5,
+        "y": 12.5
+      },
+      "prevPos": {
+        "x": 19.5,
+        "y": 12.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 38,
+        "max": 38,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.7,
+        "spore": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 19.5,
+          "y": 12.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "raider",
+        "group": {
+          "id": 1,
+          "role": "grunt"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "kind": "npc",
+      "archetype": "drowner",
+      "pos": {
+        "x": 13.5,
+        "y": 3.5
+      },
+      "prevPos": {
+        "x": 13.5,
+        "y": 3.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 3.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 38,
+        "max": 38,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "pistol",
+        "cooldown": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "pistol",
+            "qty": 1
+          }
+        ],
+        "activeSlot": 0
+      },
+      "resist": {
+        "poisoned": 0.7,
+        "spore": 0.5
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 13.5,
+          "y": 3.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "raider",
+        "group": {
+          "id": 1,
+          "role": "grunt"
+        }
+      }
+    }
+  ],
+  "groups": {
+    "seq": 1,
+    "list": [
+      {
+        "id": 1,
+        "kind": "raid",
+        "strategy": "staging",
+        "phase": "staging",
+        "since": 0,
+        "size": 5,
+        "rally": {
+          "x": 20.5,
+          "y": 5.5
+        },
+        "targetId": 1,
+        "mark": {
+          "x": 19.5,
+          "y": 30.5
+        },
+        "markAt": 0,
+        "hadLeader": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b12" />
+    <title>Sporefall Scenes</title>
+    <meta name="description" content="Crafted Sporefall Station scenes you can open and play from a link." />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <style>
+      html, body { margin: 0; background: #0b0b12; color: #eee; font: 16px/1.4 system-ui, sans-serif; }
+      body { overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+      .sf-scenes {
+        box-sizing: border-box; max-width: 640px; margin: 0 auto;
+        padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+          max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      }
+      .sf-scenes__kicker { font: 800 13px system-ui; letter-spacing: 2px; color: #7fd17f; text-transform: uppercase; }
+      .sf-scenes__title { font: 800 28px/1.15 system-ui; margin: 4px 0 6px; }
+      .sf-scenes__lede { margin: 0 0 18px; color: #ffffffa0; font-size: 15px; }
+      .sf-scenes__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+      .sf-scene {
+        display: block; box-sizing: border-box; min-height: 48px; padding: 14px 16px;
+        border-radius: 10px; border: 2px solid #ffffff2e; background: #ffffff10; color: #eee;
+        text-decoration: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+        overflow-wrap: anywhere;
+      }
+      .sf-scene:hover, .sf-scene:focus-visible { border-color: #7fd17f; background: #7fd17f14; outline: none; }
+      .sf-scene:active { background: #7fd17f26; }
+      .sf-scene__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+      .sf-scene__title { font: 700 18px/1.25 system-ui; }
+      .sf-scene__play { flex: none; font: 800 13px system-ui; letter-spacing: 1px; color: #7fd17f; }
+      .sf-scene__hook { margin: 6px 0 0; font-size: 15px; }
+      .sf-scene__try { margin: 6px 0 0; font-size: 14px; color: #ffffff99; }
+      .sf-scene__try b { color: #ffffffc0; font-weight: 600; }
+      .sf-scene__tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+      .sf-scene__tag { font: 600 12px system-ui; padding: 3px 8px; border-radius: 999px; background: #ffffff14; color: #ffffffb0; }
+      .sf-scenes__foot { margin-top: 22px; text-align: center; }
+      .sf-scenes__home {
+        display: inline-block; min-height: 48px; box-sizing: border-box; padding: 13px 22px; border-radius: 10px;
+        border: 2px solid #ffffff2e; color: #eee; text-decoration: none; font: 600 16px system-ui;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sf-scenes">
+      <div class="sf-scenes__kicker">Sporefall Station</div>
+      <h1 class="sf-scenes__title">Scenes</h1>
+      <p class="sf-scenes__lede">Hand-built moments. Tap one to drop straight into it. Your own run is not touched.</p>
+      <ul class="sf-scenes__list" id="scenes" data-role="scene-list"></ul>
+      <div class="sf-scenes__foot"><a class="sf-scenes__home" href="./">Main menu</a></div>
+    </main>
+    <script type="module" src="/src/scenes/page.ts"></script>
+  </body>
+</html>

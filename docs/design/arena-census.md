@@ -97,11 +97,24 @@ The census compares `arena-boss` with `arena-boss-lightning`, and `arena-boss-we
 with `arena-boss-lightning-wet`. In the dry pair, all 13 builds have identical hp
 traces on all 8 seeds. In the wet pair, every build without `shock` has identical
 traces, and six of the seven builds with `shock` fight differently on 6 to 8 of
-the 8 seeds. The seventh, `hand fire-lead`, casts `shock` last and has identical
-traces on all 8. The census does not explain that one.
+the 8 seeds. The seventh, `hand fire-lead`, has identical traces on all 8. Its
+first cast is `pierce` plus `incendiary`. When burning lands on a wet body,
+`addStatus` (`statusFx.ts:94`) removes `wet` and does not light the body. Every
+later shock then hits a dry body, and `shock` skips its damage for a dry body
+(`interactions.ts:95`). On seed 5, fire-lead's first hit at tick 10 removes
+`wet` and takes the boss from 320 to 309 hp. Its shock lands at tick 38 on a dry
+boss and deals nothing. Shock-lead's first hit at tick 10 takes the boss from 320
+to 269. When a probe re-wets the boss every tick, fire-lead's traces differ on 7
+of 8 seeds.
 
-The code shows why. A Tesla hit goes through `interactions.shock` (`statusFx.ts`
-routes `electrified` there). `shock` deals `ELEC_DAMAGE` scaled by
+A fire round on a wet target does nothing but dry it, so a build that leads with
+fire throws away its later shocks. The arena wets its foes once, for good
+(`arenas.ts:134`), so one fire hit dries the boss for the rest of the fight. In a
+flooded level the tide wets bodies again, so the loss is probably smaller there.
+That is inferred, not measured.
+
+The code shows why lightning weakness needs water. A Tesla hit goes through
+`interactions.shock` (`statusFx.ts` routes `electrified` there). `shock` deals `ELEC_DAMAGE` scaled by
 `resist.electrified` only to a wet body. A dry body is immobilized and takes
 nothing, and `ELEMENTS.electrified.dot` is 0, so the damage-over-time path has
 nothing to multiply either. Play can now reach the wet case, because #132's flooded

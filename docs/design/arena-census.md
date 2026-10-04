@@ -107,8 +107,9 @@ boss and deals nothing. Shock-lead's first hit at tick 10 takes the boss from 32
 to 269. When a probe re-wets the boss every tick, fire-lead's traces differ on 7
 of 8 seeds.
 
-A fire round on a wet target does nothing but dry it, so a build that leads with
-fire throws away its later shocks. The arena wets its foes once, for good
+A fire round on a wet target still deals its hit damage, but it dries the target
+without lighting it. That denies the shock bonus for the rest of the fight, so a
+build that leads with fire throws away its later shocks. The arena wets its foes once, for good
 (`arenas.ts:134`), so one fire hit dries the boss for the rest of the fight. In a
 flooded level the tide wets bodies again, so the loss is probably smaller there.
 That is inferred, not measured.

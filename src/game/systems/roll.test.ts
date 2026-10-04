@@ -4,12 +4,13 @@ import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { SnapFlags, snapEntity } from '../snapshot'
 import { emptyInput, SIM_DT, type InputCmd } from '../types'
-import { addEntity, createWorld, isBlocked, type World } from '../world'
+import { addEntity, isBlocked, type World } from '../world'
 import { applyDamage, combatSystem } from './combat'
 import { movementSystem } from './movement'
 import { addStatus } from './statusFx'
 import { isRolling, ROLL_COOLDOWN, ROLL_SPEED, ROLL_TICKS, rollSystem } from './roll'
 import { tickWorld } from '../world'
+import { frozenWorld } from '../testkit'
 
 /** One-slot input map with `roll` pressed and an optional move vector. */
 const rollCmd = (moveX = 0, moveY = 0, extra: Partial<InputCmd> = {}): Map<number, InputCmd> =>
@@ -26,7 +27,7 @@ const player = (w: World): Entity => {
 describe('rollSystem — start conditions & direction', () => {
   let w: World
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
   })
 
   it('a roll press starts a roll with tick-based windows and the move direction', () => {
@@ -70,7 +71,7 @@ describe('rollSystem — the constraints', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
   })
 
@@ -109,7 +110,7 @@ describe('rollSystem — cooldown gate (no chain-rolling)', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
   })
 
@@ -154,7 +155,7 @@ describe('applyDamage — dodge-roll i-frames (exact window)', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
     p.health = { hp: 100, max: 100, iframes: 0 }
   })
@@ -195,7 +196,7 @@ describe('combatSystem — cannot act mid-roll', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
     p.combat = { weapon: 'pistol', cooldown: 0 }
   })
@@ -220,7 +221,7 @@ describe('movementSystem — the roll burst', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
   })
 
@@ -256,7 +257,7 @@ describe('movementSystem — the roll burst', () => {
 
 describe('dodge-roll — determinism & serialization', () => {
   it('a mid-roll world round-trips through serialize and replays byte-identically', () => {
-    const w = createWorld(7, 1)
+    const w = frozenWorld(7, 1)
     player(w)
     // Drive real ticks: press roll on tick 0, then keep moving.
     rollSystem(w, rollCmd(1, 0))
@@ -277,7 +278,7 @@ describe('dodge-roll — determinism & serialization', () => {
   })
 
   it('the roll object survives a serialize/deserialize round-trip intact', () => {
-    const w = createWorld(3, 1)
+    const w = frozenWorld(3, 1)
     const p = player(w)
     p.playerCtl!.roll = { untilTick: w.tick + 9, cooldownUntilTick: w.tick + 40, dirX: Math.SQRT1_2, dirY: -Math.SQRT1_2 }
     const restored = deserializeWorld(serializeWorld(w))
@@ -288,7 +289,7 @@ describe('dodge-roll — determinism & serialization', () => {
 
 describe('dodge-roll — multiplayer i-frame agreement (snapshot flag)', () => {
   it('the Rolling snapshot flag is set EXACTLY when the host is invulnerable', () => {
-    const w = createWorld(1, 1)
+    const w = frozenWorld(1, 1)
     const p = player(w)
     p.health = { hp: 100, max: 100, iframes: 0 }
     p.playerCtl!.roll = { untilTick: w.tick + ROLL_TICKS, cooldownUntilTick: w.tick + 99, dirX: 1, dirY: 0 }
@@ -303,7 +304,7 @@ describe('dodge-roll — multiplayer i-frame agreement (snapshot flag)', () => {
   })
 
   it('host: a player rolling through a bullet takes no damage; a hit after does', () => {
-    const w = createWorld(1, 1)
+    const w = frozenWorld(1, 1)
     const p = player(w)
     p.health = { hp: 100, max: 100, iframes: 0 }
     p.playerCtl!.roll = { untilTick: w.tick + ROLL_TICKS, cooldownUntilTick: w.tick + 99, dirX: 1, dirY: 0 }
@@ -322,7 +323,7 @@ describe('dodge-roll — headline: roll THROUGH a bullet (mirrors the e2e world)
   // and an inbound bullet share a clear line. This is the exact world the e2e
   // recorder injects (e2e/feature-dodge-roll.mjs).
   const duel = (): { w: World; p: Entity } => {
-    const w = createWorld(7, 1)
+    const w = frozenWorld(7, 1)
     const p = spawnPlayer(w, 0, 6, 11)
     p.health = { hp: 120, max: 120, iframes: 0 }
     p.facing = 0

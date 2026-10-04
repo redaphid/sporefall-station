@@ -54,20 +54,22 @@ describe('district squares', () => {
     }
   })
 
-  it('the Culture Beds plant planters; downtown and the slums leave the square bare', () => {
+  it('every district stands only its own props in a square', () => {
     const beds = square('culturebeds', ',')
     populateWorld(beds)
     expect(props(beds).filter((e) => e.archetype === 'plant').length).toBeGreaterThanOrEqual(3)
-    for (const theme of ['downtown', 'slums'] as const) {
-      const w = square(theme, ',')
+    for (const theme of ['concourse', 'moorings'] as const) {
+      const w = square(theme, theme === 'concourse' ? '~' : ',')
       populateWorld(w)
-      expect(props(w), theme).toHaveLength(0)
+      const allowed = themeNamed(theme).plazaProps.map((p) => p.prop)
+      expect(props(w).length, theme).toBeGreaterThan(0)
+      for (const e of props(w)) expect(allowed, theme).toContain(e.archetype)
     }
   })
 
   it('a square never walls anything in: with every prop solid, the whole yard stays reachable', () => {
     for (let seed = 1; seed <= 40; seed++) {
-      for (const [theme, glyph] of [['stillworks', '~'], ['culturebeds', ',']] as const) {
+      for (const [theme, glyph] of [['stillworks', '~'], ['culturebeds', ','], ['concourse', '~'], ['moorings', ',']] as const) {
         const w = square(theme, glyph, seed)
         populateWorld(w)
         const blocked = new Set(props(w).map((e) => Math.floor(e.pos.y) * w.level.w + Math.floor(e.pos.x)))
@@ -113,6 +115,10 @@ describe('district squares', () => {
     populateWorld(b)
     expect(serializeWorld(a)).toEqual(serializeWorld(b))
     const bare = worldFromState({ level: levelFromJson({ rows: ['#####', '#@..#', '#####'], theme: 'stillworks' }) })
+    const unnamed = square('concourse', '~')
+    delete unnamed.level.theme
+    populateWorld(unnamed)
+    expect(props(unnamed)).toHaveLength(0)
     populateWorld(bare)
     expect(props(bare)).toHaveLength(0)
   })

@@ -4,26 +4,18 @@ import type { Entity } from './entity'
 import { isSolidTile, rectContains } from './levelgen/level'
 import type { Rect } from './levelgen/rooms'
 import { populateWorld } from './populate'
-import { spawnPlayer } from './player'
 import { ARENAS, arenaRoom, stageArena } from './arenas'
 import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './scenarios'
-import { playerSpawnPoint } from './spawnPlacement'
-import { setupFloor } from './systems/missions'
-import { expectWorldEqual, runTicks } from './testkit'
+import { expectWorldEqual, runTicks, stageWorld } from './testkit'
 import { SIM_RATE } from './types'
 import { createWorld, type World } from './world'
 
 // The census seeds plus three with rooms 12 to 13 tiles deep, where a foe on the far wall would stand out of sight.
 const SEEDS = [303, 5, 4, 2, 44, 18, 51, 10, 1, 8, 112]
 
-const run = (seed: number): World => {
-  const w = createWorld(seed, 1)
-  populateWorld(w)
-  setupFloor(w)
-  const at = playerSpawnPoint(w.level, 0)
-  spawnPlayer(w, 0, at.x, at.y)
-  return w
-}
+/** Arenas stand on the authored landing stage whatever the seed (scenarios.ts),
+ * so the seed only rolls the fight's dice. */
+const run = (seed: number): World => stageWorld(seed)
 
 const arena = (seed: number, name: string): { w: World; room: Rect } => {
   const w = run(seed)

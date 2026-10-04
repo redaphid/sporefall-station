@@ -657,7 +657,7 @@ export class NetHostSession implements Session {
     p.queue.queueReliable(encodeJson(MsgType.LobbyState, { players: this.lobbyPlayers() }))
     // Pre-start lobby peers have no avatar yet; `beginGame` will send them the
     // GameStart/Go. A peer WITH an entityId is in the run and needs both, or it
-    // sits on "Generating city…" watching snapshots it can't join.
+    // sits on "Surfacing the colony…" watching snapshots it can't join.
     if (this.started && p.entityId !== undefined) {
       p.queue.queueReliable(encodeJson(MsgType.GameStart, this.gameStartMsg()))
       p.queue.queueReliable(encodeJson(MsgType.Go, { startTick: this.world.tick, entityIds: { [p.slot]: p.entityId } }))

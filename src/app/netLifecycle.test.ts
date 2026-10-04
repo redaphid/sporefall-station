@@ -390,6 +390,7 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
     const host = new NetHostSession(12, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { entityId } = await seedGhost(hub, host)
+    host.world.entities = host.world.entities.filter((e) => !e.ai) // only the grace window may end it
     for (let i = 0; i < REJOIN_GRACE_TICKS; i++) host.tick()
     expect(host.world.byId.get(entityId)).toBeDefined() // flagged dead, not yet swept
     host.tick()

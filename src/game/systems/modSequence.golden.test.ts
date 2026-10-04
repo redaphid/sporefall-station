@@ -10,10 +10,10 @@ import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { playerSpawnPoint } from '../spawnPlacement'
 import { emptyInput, type InputCmd } from '../types'
-import { createCityWorld } from '../testkit'
 import { tickWorld, type World } from '../world'
 import { weaponStack } from './inventory'
 import { setupFloor } from './missions'
+import { frozenWorld } from '../testkit'
 
 /** FNV-1a over a string: a short, stable fingerprint of a (long) digest. */
 const fnv1a = (s: string): string => {
@@ -29,7 +29,7 @@ const fnv1a = (s: string): string => {
  * pickup order, the way a draft would have left it: three casts,
  * [incendiary] [overload x2, frost] [pierce]. */
 const buildRun = (seed: number): World => {
-  const w = createCityWorld(seed, 1)
+  const w = frozenWorld(seed, 1)
   populateWorld(w)
   setupFloor(w)
   const at = playerSpawnPoint(w.level, 0)
@@ -65,19 +65,13 @@ describe('sequenced casting: golden digests', () => {
   // resolveWeapon's newest-element pick) reproduces both old digests.
   // Re-pinned when NPC goals gained commitment and settlers took seats at
   // props (was ee39480f / 5930fe81): the fire path is unchanged, the crowd
-  // around it moves differently.
-  // Re-pinned by the lore rename (was c5354a88 / 93a464b3). The digest hashes
-  // archetype, faction, item and field names; the pre-rename digest text,
-  // passed through the codemod, equals today's except that `misdeedUntilTick`
-  // now sorts after `downed`.
-  // Seed 1234 re-pinned when the cash terminal left the shopfloor (was
-  // b80e2df3): putting it back (the shopfloor `one` group in furnish.ts, its
-  // wall placement, and its OBJECTS entry) reproduces it. The floor is an
-  // authored city level (createCityWorld), which digests the same as the
-  // seeded one did.
+  // around it moves differently. Re-pinned by the lore rename, and again when
+  // the cash terminal left the shopfloor. Both run on frozen landing maps (the
+  // classic floor-1 grid, as authored state). Seed 7 equals main's; 1234 also
+  // moves with the landing berth, which shifts where that floor's crew stands.
   const GOLDEN: Record<number, string> = {
     7: 'f0f577c1',
-    1234: '423f77b8',
+    1234: 'b5f38eca',
   }
 
   for (const seed of [7, 1234]) {

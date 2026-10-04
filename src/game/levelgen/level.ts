@@ -142,7 +142,7 @@ export interface Building {
 }
 
 /** A floor's district flavour — drives density, footprints and role palette. */
-export type ThemeName = 'downtown' | 'slums' | 'stillworks' | 'culturebeds'
+export type ThemeName = 'concourse' | 'moorings' | 'stillworks' | 'culturebeds'
 
 /** One prop a district stands in its open squares (populate.dressPlazas). */
 export interface PlazaProp {
@@ -151,17 +151,22 @@ export interface PlazaProp {
   count: [number, number]
 }
 
-/** A district's own encounters on top of the shared roster (populate.ts). A
- * field left out draws no dice, so the other districts' streams never move. */
+/** A district's own encounters on top of the shared roster (populate.ts),
+ * from floor 2 (the landing floor stays gentle). A field left out draws no
+ * dice, so the other districts' streams never move. */
 export interface DistrictEncounters {
   /** Chance a building hosts 1-2 Cinder Husks (else the shared 12%). */
   cinders?: number
-  /** Derelict Units still on shift here from floor 1 (elsewhere from floor 4). */
+  /** Derelict Units still on shift here from floor 2 (elsewhere from floor 4). */
   robotsOnShift?: boolean
   /** Chance a building hosts an extra Brood Sac clutch of 2-3. */
   broodSacs?: number
   /** Chance a building hosts an extra 1-2 Spore Mites. */
   sporeMites?: number
+  /** Chance a building hosts an extra Mireclaw Stalker, scavenging. */
+  stalkers?: number
+  /** Chance a building hosts 1-2 Drowned Divers. */
+  drowners?: number
 }
 
 export interface Theme {
@@ -194,47 +199,82 @@ export interface Theme {
   /** What stands in an open square. */
   plazaProps: readonly PlazaProp[]
   encounters: DistrictEncounters
+  /** What this district calls a building of each role in mission text, over
+   * the station-wide names (missions.WING_NAMES). */
+  wingNames: Partial<Record<BuildingRole, string>>
 }
 
 /**
- * The sunken city's districts. Index 0 is intentionally dense so the landing
- * floor feels like a city. Still Row and the Culture Beds are the colony's
- * dead essence trade and its gone-feral spore farms (docs/design/districts.md).
+ * The sunken city's districts (docs/design/districts.md): the Concourse, the
+ * colony's company core where catches were weighed and paid out; the
+ * Moorings, the survivors' shacks lashed to the old catch-jetties; Still Row,
+ * the dead essence trade's distilleries; and the Culture Beds, the
+ * mycologists' grow terraces gone feral.
  */
 export const THEMES: readonly Theme[] = [
+  // THE CONCOURSE: the company core, where every catch was weighed, tallied
+  // and paid out under corporate signage now striped with waterline
+  // calendars. Dense paved blocks of tally offices and weigh-houses with
+  // arcades (corridor spines) and payroll strongrooms (vaults); its forecourt
+  // fountains have drowned into bog basins. Stalkers scavenge the counters.
   {
-    name: 'downtown',
+    name: 'concourse',
     minLots: 3,
     maxLots: 4,
     buildingChance: 0.85,
     yard: Tile.Boardwalk,
     courtyardChance: 0.35,
     setbackChance: 0.15,
-    vaultChance: 0.2,
-    hallwayChance: 0.6,
+    vaultChance: 0.3,
+    hallwayChance: 0.65,
     bunkerChance: 0.06,
-    roles: ['office', 'office', 'shop', 'apartment'],
-    courtyardGround: Tile.Grass,
-    plazaHeart: Tile.Grass,
-    plazaProps: [],
-    encounters: {},
+    roles: ['office', 'office', 'shop', 'apartment', 'clinic'],
+    courtyardGround: Tile.Bog,
+    plazaHeart: Tile.Bog,
+    plazaProps: [
+      { prop: 'bench', count: [2, 4] },
+      { prop: 'table', count: [1, 2] },
+      { prop: 'vending', count: [0, 1] },
+    ],
+    encounters: { stalkers: 0.3 },
+    wingNames: {
+      office: 'tally hall',
+      shop: 'weigh-house',
+      apartment: 'company lodging',
+      clinic: 'company infirmary',
+      warehouse: 'bond store',
+    },
   },
+  // THE MOORINGS: where the generational survivors live, shacks lashed to
+  // the old catch-jetties and rebuilt a stripe higher every generation. Many
+  // small lots with bog water between them, moss-mat kitchen gardens on the
+  // squares; the families' drowned divers still walk the jetties.
   {
-    name: 'slums',
+    name: 'moorings',
     minLots: 4,
     maxLots: 5,
     buildingChance: 0.8,
-    yard: Tile.Grass,
+    yard: Tile.Bog,
     courtyardChance: 0.05,
     setbackChance: 0.4,
     vaultChance: 0.05,
     hallwayChance: 0.35,
     bunkerChance: 0.12,
     roles: ['apartment', 'apartment', 'shop', 'warehouse'],
-    courtyardGround: Tile.Grass,
+    courtyardGround: Tile.Bog,
     plazaHeart: Tile.Grass,
-    plazaProps: [],
-    encounters: {},
+    plazaProps: [
+      { prop: 'plant', count: [2, 4] },
+      { prop: 'crate', count: [1, 2] },
+      { prop: 'table', count: [0, 1] },
+    ],
+    encounters: { drowners: 0.35 },
+    wingNames: {
+      apartment: 'stilt shack',
+      shop: 'barter stall',
+      warehouse: 'net loft',
+      office: 'stripe-painters\' hall',
+    },
   },
   // STILL ROW: the essence trade's distilleries. Big still houses (the
   // reactor-hall room kit: barrel banks, lockers), cage-works and export
@@ -259,6 +299,7 @@ export const THEMES: readonly Theme[] = [
       { prop: 'crate', count: [1, 3] },
     ],
     encounters: { cinders: 0.5, robotsOnShift: true },
+    wingNames: { reactor: 'still house', warehouse: 'cage-works', depot: 'export shed' },
   },
   // THE CULTURE BEDS: the mycologists' grow terraces, gone feral. Low,
   // scattered labs and infirmaries among open beds where planters stand in
@@ -282,6 +323,7 @@ export const THEMES: readonly Theme[] = [
       { prop: 'vending', count: [0, 1] },
     ],
     encounters: { broodSacs: 0.35, sporeMites: 0.4 },
+    wingNames: { lab: 'culture house', medbay: 'spore ward', shop: 'seed store' },
   },
 ]
 

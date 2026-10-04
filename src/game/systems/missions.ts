@@ -2,7 +2,7 @@ import { itemClass, itemName, keycardId } from '../data/items'
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type Loadout } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
-import { isFloorTile, isSolidTile, levelChecksum, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, isSolidTile, levelChecksum, themeNamed, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { applyFloorModifier } from './modifierSystem'
@@ -51,14 +51,16 @@ const WING_NAMES: Record<BuildingRole, string> = {
   security: 'security post',
 }
 
-/** Themed module name for a building role (falls back to the raw role, defensively). */
-const wingName = (role: BuildingRole): string => WING_NAMES[role] ?? role
+/** What a building of `role` is called on this floor: the city district's own
+ * name for it, else the station-wide one (else the raw role, defensively). */
+const wingNameOn = (w: World, role: BuildingRole): string =>
+  (w.level.theme ? themeNamed(w.level.theme).wingNames[role] : undefined) ?? WING_NAMES[role] ?? role
 
 /** The keycard for `building`'s gate, named as the objective banner names the
  * building. A name another keycard seal on this floor already uses gets a
  * number ("essence lab 2"); a building with no role falls back to its wing. */
 export const keycardFor = (w: World, building: Building, wing: string): string => {
-  const base = building.role ? wingName(building.role) : ''
+  const base = building.role ? wingNameOn(w, building.role) : ''
   if (!base) return keycardId(wing)
   const taken = new Set(
     w.entities.filter((e) => e.door?.sealKind === 'keycard' && e.door.keyId).map((e) => itemName(e.door!.keyId!)),
@@ -132,7 +134,7 @@ const generateMission = (w: World): void => {
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Extract the specimen canister from the ${wingName(building.role)}`,
+      description: `Extract the specimen canister from the ${wingNameOn(w, building.role)}`,
     }
   } else {
     const spot = roomCenter(building)
@@ -143,7 +145,7 @@ const generateMission = (w: World): void => {
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Purge the Mireclaw Alpha in the ${wingName(building.role)}`,
+      description: `Purge the Mireclaw Alpha in the ${wingNameOn(w, building.role)}`,
     }
   }
 }
@@ -163,7 +165,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Burn back the Spore Node in the ${wingName(building.role)} before it blooms`,
+      description: `Burn back the Spore Node in the ${wingNameOn(w, building.role)} before it blooms`,
       bloomTick: w.tick + BLOOM_TICKS,
     }
   } else {
@@ -174,7 +176,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingName(building.role)}`,
+      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingNameOn(w, building.role)}`,
     }
   }
   return true

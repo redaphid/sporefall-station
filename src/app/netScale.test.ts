@@ -274,10 +274,11 @@ const crowdBeforePlayers = (host: NetHostSession, n: number, cx: number, cy: num
 
 describe('interest cap — players are unconditionally included', () => {
   it('ships all 8 players even when 80+ props crowd the interest window', async () => {
-    // Seed 1 floor 1 has rooms holding 80+ props inside one 14-tile window; the
-    // avatars spawn LAST in `world.entities`, so an array-order cap never
-    // reaches them. This is a live-play state, not a synthetic one.
+    // 80 props inside one 14-tile window, ordered before the avatars exactly as
+    // a furnished floor lays them out, so an array-order cap never reaches the
+    // players.
     const { host, centrals } = await start8(1)
+    crowdBeforePlayers(host, 80, 18, 18)
     const players = huddleAt(host, 18, 18)
     const playerIds = new Set(players.map((p) => p.id))
     const inWindow = host.world.entities.filter(

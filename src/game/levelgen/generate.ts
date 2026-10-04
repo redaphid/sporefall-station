@@ -6,16 +6,14 @@ import { carveCompound } from './compound'
 import { applyCornerCuts } from './corners'
 import { carveHallways } from './corridors'
 import { biomeForFloor, floorSetting } from './floors'
-import { isWallTile, Tile, TileGrid, themeForFloor, type Building, type BuildingRole, type Level, type Theme } from './level'
-import { BORDER, cutLots, cutLotsVaried } from './lots'
+import { isWallTile, Tile, TileGrid, themeForFloor, type Building, type Level, type Theme } from './level'
+import { BORDER, cutLotsVaried } from './lots'
 import { assignRoomTypes } from './roomTypes'
 import { splitRooms, type Rect } from './rooms'
 import { addStoreys } from './storeys'
 
 /** Chance an empty themed lot becomes a paved plaza with a green heart. */
 const PLAZA_CHANCE = 0.3
-
-const CLASSIC_ROLES: readonly BuildingRole[] = ['shop', 'apartment', 'office', 'warehouse', 'clinic']
 
 /** Floor `floor` of run `seed`, built as the floor plan (floors.ts) says. */
 export const generateLevel = (seed: number, floor: number): Level => {
@@ -69,16 +67,9 @@ export const generateCityLevel = (seed: number, floor: number, theme: Theme = th
   const tiles = new Uint8Array(w * h).fill(Tile.Causeway)
   const grid = new TileGrid(w, h, tiles)
 
-  // Floor 1 is the familiar surface city, kept byte-for-byte with the original
-  // generator so the scripted-demo regression guards (which replay fixed inputs
-  // on a specific seed/floor-1 map) stay valid. Deeper floors mutate by theme.
   const plazas: Rect[] = []
-  const buildings = floor === 1 ? buildClassicCity(rng, grid, w, h) : buildThemedCity(rng, grid, w, h, theme, floor, plazas)
-
-  const { spawn, exit } =
-    floor === 1
-      ? { spawn: { x: 1.5, y: 1.5 }, exit: { x: w - 2, y: h - 2 } }
-      : varyEndpoints(rng.fork('spawnExit'), w, h)
+  const buildings = buildThemedCity(rng, grid, w, h, theme, floor, plazas)
+  const { spawn, exit } = varyEndpoints(rng.fork('spawnExit'), w, h)
   grid.set(exit.x, exit.y, Tile.Exit)
 
   const level: Level = { w, h, tiles, solid: buildSolid(tiles), buildings, spawn, exit, theme: theme.name, plazas }
@@ -86,50 +77,17 @@ export const generateCityLevel = (seed: number, floor: number, theme: Theme = th
   // Connectivity safety net: every building interior must be reachable on foot.
   repairConnectivity(rng.fork('repair'), grid, level)
   // Name every room (shopfloor/bedroom/ward/…) AFTER all doors exist, so entry
-  // detection sees repair-punched causeway doors too. Pure geometry, no rng —
-  // tiles and every stream stay byte-identical (floor 1 included).
+  // detection sees repair-punched causeway doors too. Pure geometry, no rng.
   for (const b of level.buildings) b.roomTypes = assignRoomTypes(b)
   // Bevel causeway-facing building corners LAST — pure retexture of wall tiles
   // (still fully solid), after every pass that reasons about Tile.Wall.
-  if (floor !== 1) applyCornerCuts(grid)
+  applyCornerCuts(grid)
   level.solid = buildSolid(tiles)
   return level
 }
 
-/** The original uniform grid-of-boxes city. Kept intact for floor 1. */
-const buildClassicCity = (rng: Rng, grid: TileGrid, w: number, h: number): Building[] => {
-  const colSegs = cutLots(rng.fork('cols'), w)
-  const rowSegs = cutLots(rng.fork('rows'), h)
-  const lots: Rect[] = []
-  for (const rs of rowSegs) {
-    for (const cs of colSegs) {
-      lots.push({ x: cs.start, y: rs.start, w: cs.size, h: rs.size })
-      grid.fillRect(cs.start, rs.start, cs.size, rs.size, Tile.Boardwalk)
-    }
-  }
-  const buildings: Building[] = []
-  const brng = rng.fork('buildings')
-  for (const lot of lots) {
-    const rect: Rect = { x: lot.x + 1, y: lot.y + 1, w: lot.w - 2, h: lot.h - 2 }
-    if (rect.w < 7 || rect.h < 7 || !brng.chance(0.8)) {
-      grid.fillRect(rect.x, rect.y, rect.w, rect.h, Tile.Grass)
-      continue
-    }
-    grid.fillRect(rect.x, rect.y, rect.w, rect.h, Tile.Wall)
-    grid.fillRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, Tile.Floor)
-    const interior: Rect = { x: rect.x + 1, y: rect.y + 1, w: rect.w - 2, h: rect.h - 2 }
-    const rooms: Rect[] = []
-    const doors = splitRooms(brng, grid, interior, rooms)
-    doors.push(...punchExteriorDoors(brng, grid, rect))
-    // Objective room: the last BSP leaf — explicit, and pinned by regression
-    // tests so floor-1 mission placements stay byte-identical.
-    buildings.push({ rect, rooms, doors, role: brng.pick(CLASSIC_ROLES), objectiveRoom: rooms[rooms.length - 1] })
-  }
-  return buildings
-}
-
 /**
- * Themed district for floors >= 2. Density, footprints, role palette and
+ * A city district. Density, footprints, role palette and
  * set-pieces (courtyards, vaults, setbacks) all vary by theme so consecutive
  * floors read differently. Each lot forks its own RNG stream (by position) so
  * generation is order-independent and stays deterministic.

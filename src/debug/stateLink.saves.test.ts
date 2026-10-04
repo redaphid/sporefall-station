@@ -3,15 +3,18 @@ import { describe, expect, it } from 'vitest'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import { loadFixture, loadFixtureJson, runTicks } from '../game/testkit'
 import { emptyInput, type InputCmd } from '../game/types'
-import { tickWorld } from '../game/world'
+import { populateWorld } from '../game/populate'
+import { spawnPlayer } from '../game/player'
+import { setupFloor } from '../game/systems/missions'
+import { createWorld, tickWorld } from '../game/world'
 import { applyFixture } from './record'
 import { captureState, isStateLinkPayload, replayRewindChecked, StateRing, verifyStateLink, type StateLinkPayload } from './stateLink'
 import { compareWorlds } from './worldCompare'
 
 // `?state=` links and crafted saves are one format: a StateLinkPayload around a
 // WorldJson. These pin that an authored world (its own level, no seed-derived
-// map) travels through it, and that links captured before authored worlds
-// existed still verify.
+// map) travels through it, and that a seed-generated world travels as a
+// checksum.
 
 const STORM: InputCmd = { ...emptyInput(), moveY: -1, aimX: 0, aimY: -1, attack: true }
 
@@ -70,28 +73,32 @@ describe('state links over authored worlds', () => {
   })
 })
 
-describe('state links captured before authored worlds', () => {
-  // Built only from fixtures written by the pre-authored-world serializer:
-  // mid-run.json plus the 10 ticks gen-serialize-fixtures.mts drives, landing on
-  // mid-run-plus-10.json. This is a v1 link exactly as main captured them.
-  const legacyLink = (): StateLinkPayload => {
-    const start = loadFixtureJson('mid-run')
-    const frames = Array.from({ length: 10 }, (_, i) => ({
-      tick: start.tick + i + 1,
-      inputs: [[0, { ...emptyInput(), moveX: -1, attack: true }]] as Array<[number, InputCmd]>,
-    }))
-    return { v: 1, world: loadFixtureJson('mid-run-plus-10'), rewind: { world: start, frames }, meta: {} }
+describe('state links over seed-generated worlds', () => {
+  // A world still on the map its seed+floor generates saves a checksum, not its
+  // level, and the link regenerates the map on load.
+  const seededLink = (): StateLinkPayload => {
+    const w = createWorld(20260715, 1)
+    populateWorld(w)
+    setupFloor(w)
+    spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
+    const ring = new StateRing(w)
+    for (let t = 0; t < 10; t++) {
+      const inputs = new Map([[0, { ...emptyInput(), seq: t, moveX: -1, attack: true }]])
+      tickWorld(w, inputs)
+      ring.observe(w, inputs)
+    }
+    return viaJson(captureState(w, {}, ring.rewind()))
   }
 
-  it('still verifies, and neither world carries a level', () => {
-    const p = viaJson(legacyLink())
+  it('verifies, and neither world carries a level', () => {
+    const p = seededLink()
     expect(p.world.level).toBeUndefined()
     expect(p.rewind?.world.level).toBeUndefined()
     expect(verifyStateLink(p)).toEqual({ ok: true, rewindTicks: 10 })
   })
 
-  it('a corrupted legacy checksum still refuses to load', () => {
-    const p = viaJson(legacyLink())
+  it('a corrupted checksum refuses to load', () => {
+    const p = seededLink()
     const world = p.rewind!.world as WorldJson & { levelChecksum: number }
     world.levelChecksum = (world.levelChecksum ^ 1) >>> 0
     expect(verifyStateLink(p)).toMatchObject({ ok: false, reason: expect.stringMatching(/checksum drift/) })

@@ -13,19 +13,18 @@
 
 import { describe, expect, it } from 'vitest'
 import { Tile } from '../levelgen/level'
-import { populateWorld, spawnNpc } from '../populate'
+import { spawnNpc } from '../populate'
 import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { arm, expectWorldEqual, frozenWorld, runTicks, walledRoom, worldFromRows } from '../testkit'
 import type { Entity } from '../entity'
-import { createWorld, type World } from '../world'
+import { type World } from '../world'
 import { vlen } from '../simMath'
 import { fireAt, fireSystem } from './fire'
 import { perceives, SPORE_BLIND_RANGE } from './goals'
 import { ARC_JUMP_RADIUS, shock } from './interactions'
 import { spawnObject } from './objects'
-import { setupFloor } from './missions'
 import { statusSystem } from './status'
 import {
   IMMOBILIZE_IMMUNE_TICKS,
@@ -48,7 +47,7 @@ const carve = (w: World, x0: number, y0: number, x1: number, y1: number, tile: n
 
 /** A sealed 25x13 room in a hostile world: the fight is real, nothing else interferes. */
 const arena = (): { w: World; cx: number; cy: number } => {
-  const w = createWorld(1, 1, 'normal', true)
+  const w = frozenWorld(1, 1, 'normal', true)
   const cx = Math.floor(w.level.w / 2)
   const cy = Math.floor(w.level.h / 2)
   carve(w, 0, 0, w.level.w - 1, w.level.h - 1, Tile.Wall)
@@ -162,7 +161,7 @@ describe('burning PANICS', () => {
   })
 
   it('a mid-panic snapshot replays byte-identically', () => {
-    const w = createWorld(5, 1, 'normal', true)
+    const w = frozenWorld(5, 1, 'normal', true)
     const at = playerSpawnPoint(w.level, 0)
     const p = tough(spawnPlayer(w, 0, at.x, at.y))
     const mutant = tough(spawnNpc(w, 'mutant', at.x + 1, at.y))
@@ -286,30 +285,19 @@ describe('electrified JUMPS', () => {
     expect([victim, shooter, other].map(isImmobilized)).toEqual([true, false, true])
   })
 
-  it('ambient seed 43: the stun-gun warden fighting from leap range never shocks itself', () => {
-    // Seed 43's warden (stunGun) duels a sporeling from inside ARC_JUMP_RADIUS with
-    // the player idle. Before the fix its own bolt leapt back onto it several
-    // times in 300 ticks. Nothing else on this floor fires a shock, so any shock
-    // event naming a stun gunner is self-inflicted.
-    const w = createWorld(43, 1, 'normal')
-    populateWorld(w)
-    setupFloor(w)
-    const at = playerSpawnPoint(w.level, 0)
-    spawnPlayer(w, 0, at.x, at.y)
-    const shooters = new Set(w.entities.filter((e) => e.combat?.weapon === 'stunGun').map((e) => e.id))
-    expect(shooters.size).toBeGreaterThan(0)
-    let selfShocks = 0
-    let shocks = 0
-    for (let t = 0; t < 300; t++) {
-      runTicks(w, idle, 1)
-      for (const ev of w.events) {
-        if (ev.type !== 'shock') continue
-        shocks++
-        if (ev.targetId !== undefined && shooters.has(ev.targetId)) selfShocks++
-      }
-    }
-    expect(shocks).toBeGreaterThan(0) // the warden really does land bolts
-    expect(selfShocks).toBe(0)
+  it("a stun gunner's bolt never leaps back onto the gunner", () => {
+    // A stun bolt lands on a settler with its gunner standing nearer than any
+    // other body, inside ARC_JUMP_RADIUS. Before the fix the arc leapt back
+    // onto the gunner. It must take the bystander instead.
+    const w = worldFromRows(walledRoom(14, 9), { seed: 43 })
+    const gunner = spawnNpc(w, 'drowner', 5.5, 4.5)
+    arm(gunner, 'stunGun')
+    const settler = spawnNpc(w, 'civilian', 6.5, 4.5)
+    const bystander = spawnNpc(w, 'civilian', 8.5, 4.5)
+    expect(vlen(gunner.pos.x - settler.pos.x, gunner.pos.y - settler.pos.y)).toBeLessThan(ARC_JUMP_RADIUS)
+    applyStatus(w, settler, 'electrified', 30, gunner.id)
+    const leaps = w.events.filter((e) => e.type === 'shock')
+    expect(leaps.map((e) => (e.type === 'shock' ? e.targetId : -1))).toEqual([bystander.id])
   })
 
   it('a leap into a wet body floods the wet cluster behind it', () => {
@@ -387,7 +375,7 @@ const pressure = (a: string, b: string): Pressure => {
   for (const c1 of CADENCES)
     for (const c2 of CADENCES)
       for (const phase of PHASES) {
-        const w = createWorld(3, 1)
+        const w = frozenWorld(3, 1)
         const e = tough(spawnNpc(w, 'mutant', 10, 10))
         let held = 0
         let out = 0
@@ -430,7 +418,7 @@ describe('element pair sweep: no stun-lock, no dominant pair', () => {
     }
 
   it('the shared guard: a shock landing as the ice melts waits out the immunity gap', () => {
-    const w = createWorld(3, 1)
+    const w = frozenWorld(3, 1)
     const e = spawnNpc(w, 'mutant', 10, 10)
     applyStatus(w, e, 'frozen', 30)
     for (let i = 0; i <= 30; i++) {

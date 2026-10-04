@@ -12,6 +12,10 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 14 — no wire change, but floor 1 now draws its district too, every
+ *     district lays out its own way (the Concourse and the Moorings replace
+ *     the old downtown and slums districts), and floor 1's map is no longer the
+ *     classic grid.
  * 13 — online play goes peer to peer over WebRTC, with the relay as fallback.
  *     Input carries a bundle of the last few records instead of one command,
  *     snapshots and GameStart carry the host's run epoch, and every relay frame
@@ -47,7 +51,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 13
+export const PROTOCOL_VERSION = 14
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

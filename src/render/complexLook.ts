@@ -15,12 +15,12 @@ export const BIOME_TINT: Record<BiomeName, number> = {
   overgrown: 0xc9e6b0, // spore-lit green
 }
 
-/** Multiplicative floor tint per city district. Downtown and the slums keep
- * the pack's own look; Still Row burns under sodium and brass, the Culture
- * Beds glow spore-olive. */
+/** Multiplicative floor tint per city district: the Concourse is station
+ * white gone yellow, the Moorings sit in teal mist, Still Row burns under
+ * sodium and brass, the Culture Beds glow spore-olive. */
 export const DISTRICT_TINT: Record<ThemeName, number> = {
-  downtown: 0xffffff,
-  slums: 0xffffff,
+  concourse: 0xf6eccc, // yellowed station white under old signage
+  moorings: 0xc6e2e2, // teal swamp mist over the jetties
   stillworks: 0xf4d8b0, // brass and ember over the settling ponds
   culturebeds: 0xcfe8b4, // olive grow-light over the moss
 }

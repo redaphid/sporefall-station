@@ -62,7 +62,7 @@ describe('computeTouchLabels', () => {
   it('USE names a usable object', () => {
     const vending = makeEntity('interactable', 'vending', 0.5, 0)
     vending.interact = { verb: 'use', range: 1.3 }
-    expect(computeTouchLabels(view(player(), [vending])).use).toBe('Vending Machine')
+    expect(computeTouchLabels(view(player(), [vending])).use).toBe('Nutrient Dispenser')
   })
 
   it('ignores interactables out of range', () => {

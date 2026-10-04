@@ -29,14 +29,14 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // is the hook a future spillable item hangs on.
   crate: { id: 'crate', name: 'Crate', hp: 20, flammable: true, loot: ['cash'] },
   barrel: { id: 'barrel', name: 'Barrel', hp: 15, damageThreshold: 5, flammable: true, explode: { radius: 2.4, damage: 40 }, ignite: true },
-  tv: { id: 'tv', name: 'TV', hp: 12, loot: ['cash'] },
-  toilet: { id: 'toilet', name: 'Toilet', hp: 10 },
+  tv: { id: 'tv', name: 'Console', hp: 12, loot: ['cash'] },
+  toilet: { id: 'toilet', name: 'Hydro Recycler', hp: 10 },
   // The burger was this machine's ONLY payout, and the cull took it. Rather than
   // delete the E-interact — which would quietly turn the one usable furnishing
   // on the floor into scenery, a player-facing loss the cull never asked for —
   // it now pays out its change: a small `cash` dispense. FLAGGED for review: this is the one substitution
   // in the cull rather than a straight deletion.
-  vending: { id: 'vending', name: 'Vending Machine', hp: 40, loot: ['cash'], use: { gives: 'cash', amount: 10 } },
+  vending: { id: 'vending', name: 'Nutrient Dispenser', hp: 40, loot: ['cash'], use: { gives: 'cash', amount: 10 } },
   generator: { id: 'generator', name: 'Generator', hp: 30, hackable: true, explode: { radius: 1.6, damage: 15 }, ignite: true },
   // Sporefall Station power plant — same hackable behavior as `generator`, dressed
   // as the station's Cryo Terminal so a power-cut objective reads in-fiction.

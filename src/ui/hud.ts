@@ -64,7 +64,7 @@ export const createHud = (mount: HTMLElement, onModSwap?: (a: number, b: number)
       const cd = self.playerCtl?.abilityCooldown ?? 0
       const ability = self.playerCtl ? ` · ${SPECIAL_NAME}${cd > 0 ? ` ${Math.ceil(cd / 30)}s` : ' ✓'}` : ''
       const canister = self.loadout?.inventory.some((s) => s.itemId === 'canister') ? ' · 🧪' : ''
-      const text = `${weapon}${weaponMods ? ` ${weaponMods}` : ''} · $${cash}${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${canister}`
+      const text = `${weapon}${weaponMods ? ` ${weaponMods}` : ''} · ${cash} scrip${bandages > 0 ? ` · ${bandages}🩹` : ''}${ability}${canister}`
       if (text !== lastInfo) {
         lastInfo = text
         info.textContent = text

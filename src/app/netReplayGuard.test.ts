@@ -141,6 +141,14 @@ const startPair = async (
   return { hub, host, bob, selfId: () => host.peersBySlot.get(1)!.entityId! }
 }
 
+/** A walk that stays on the open border road from the spawn: the spawn sits on
+ * one edge of the map, so head along that edge toward the middle. */
+const alongTheRing = (host: NetHostSession): Partial<InputCmd> => {
+  const { spawn, w, h } = host.world.level
+  const onSideEdge = spawn.x < 3 || spawn.x > w - 3
+  return onSideEdge ? { moveY: spawn.y < h / 2 ? 1 : -1 } : { moveX: spawn.x < w / 2 ? 1 : -1 }
+}
+
 const step = async (host: NetHostSession, bob: ClientHandle, n = 1): Promise<void> => {
   for (let i = 0; i < n; i++) {
     host.tick()
@@ -211,7 +219,7 @@ describe('replayed snapshots', () => {
   it('IGNORES a stale snapshot instead of yanking the predicted avatar backwards', async () => {
     const walk = driven()
     const { host, bob, selfId } = await startPair(8001, walk.source)
-    walk.set({ moveX: 1 })
+    walk.set(alongTheRing(host))
     await step(host, bob, 12)
 
     const snaps = bob.heard().filter((m) => m[0] === MsgType.Snapshot)
@@ -220,7 +228,7 @@ describe('replayed snapshots', () => {
 
     await step(host, bob, 30)
     const before = bob.session.renderView()
-    const wasX = before.self!.pos.x
+    const was = { x: before.self!.pos.x, y: before.self!.pos.y }
     const wasCount = before.entities.length
     expect(wasCount).toBeGreaterThan(1)
 
@@ -228,13 +236,14 @@ describe('replayed snapshots', () => {
     await flush()
 
     const after = bob.session.renderView()
-    expect(after.self!.pos.x).toBeCloseTo(wasX, 6)
+    expect(after.self!.pos.x).toBeCloseTo(was.x, 6)
+    expect(after.self!.pos.y).toBeCloseTo(was.y, 6)
     expect(after.entities.length).toBe(wasCount)
     // Sanity: the injected frame really WAS a rewind, and really did arrive. A
     // test whose "replay" carried today's position, or never reached the client,
     // would pass with the guard deleted.
     const carried = decodeSnapshot(old).entities.find((e) => e.id === selfId())!
-    expect(wasX - carried.x).toBeGreaterThan(1) // ≥1 tile of rewind on offer
+    expect(Math.hypot(was.x - carried.x, was.y - carried.y)).toBeGreaterThan(1) // ≥1 tile of rewind on offer
     expect(decodeSnapshot(old).tick).toBeLessThan(host.world.tick)
   })
 

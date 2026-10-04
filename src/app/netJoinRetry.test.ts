@@ -188,7 +188,7 @@ describe('join handshake — retried until answered, then given up on OUT LOUD',
     expect(host.world.entities.filter((e) => e.playerCtl)).toHaveLength(0)
   })
 
-  it('recovers a start whose Go never reached the client (stuck on “Generating city…”)', async () => {
+  it('recovers a start whose Go never reached the client (stuck on “Surfacing the colony…”)', async () => {
     const hub = new LossyHub()
     const host = new NetHostSession(13, 'Alice', stubInput(), hub.hostTransport)
     await host.start()

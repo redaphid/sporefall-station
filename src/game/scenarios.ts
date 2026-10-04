@@ -5,9 +5,13 @@ import { ARENAS, stageArena } from './arenas'
 import { WEAPONS } from './data/items'
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from './entity'
 import { isSolidTile, Tile } from './levelgen/level'
-import { assignPatrol, spawnNpc } from './populate'
+import { levelFromJson, type LevelJson } from './levelgen/levelText'
+import { assignPatrol, populateWorld, spawnNpc } from './populate'
+import { playerSpawnPoint } from './spawnPlacement'
+import { LANDING_STAGE } from './stages/landing'
+import { TIDE_GROUND } from './stages/tideGround'
 import { igniteCell } from './systems/fire'
-import { nextFloor } from './systems/missions'
+import { nextFloor, setupFloor } from './systems/missions'
 import { findPath } from './path'
 import { vlen } from './simMath'
 import {
@@ -1040,10 +1044,46 @@ export const SCENARIO_NAMES: readonly string[] = Object.keys(SCENARIOS)
 
 export const isKnownScenario = (name: string): boolean => Object.hasOwn(SCENARIOS, name)
 
+/** Scenarios that play a real generated floor of the run (the floor plan's
+ * station decks), standing on no stage. */
+const ON_GENERATED_FLOORS: ReadonlySet<string> = new Set(['armed', 'stairs-demo'])
+
+/** The authored map a scenario stands on: the group set-pieces on the tide
+ * ground, everything else on the landing stage (stages/). */
+export const stageFor = (name: string): LevelJson => (Object.hasOwn(GROUP_SCENARIOS, name) ? TIDE_GROUND : LANDING_STAGE)
+
+/** Swap the world onto an authored stage: its map, populated and with its
+ * floor set up, every player at a stage spawn point and numbered after the
+ * population, exactly as a fresh run on that map would be (AI rhythms phase
+ * on entity ids). The stage's choreography then holds whatever district the
+ * seed generated. Solo only: main.ts applies scenarios to a HostSession. */
+const installStage = (w: World, stage: LevelJson): void => {
+  const players = w.entities.filter((e) => e.playerCtl)
+  w.level = levelFromJson(stage)
+  delete w.levelChecksumFromSeed
+  w.entities = []
+  w.byId.clear()
+  w.nextId = 1
+  w.director = undefined
+  w.groups = undefined
+  w.modifier = undefined
+  populateWorld(w)
+  setupFloor(w)
+  for (const p of players) {
+    const at = playerSpawnPoint(w.level, p.playerCtl!.playerId)
+    p.pos = { x: at.x, y: at.y }
+    p.prevPos = { x: at.x, y: at.y }
+    p.id = w.nextId++
+    w.entities.push(p)
+    w.byId.set(p.id, p)
+  }
+}
+
 /** Apply a named scenario. Returns false — and leaves the world untouched —
  * for a name this build does not know. */
 export const applyScenario = (w: World, name: string, opts: ScenarioOpts = {}): boolean => {
   if (!isKnownScenario(name)) return false
+  if (!ON_GENERATED_FLOORS.has(name)) installStage(w, stageFor(name))
   SCENARIOS[name]!(w, opts)
   return true
 }

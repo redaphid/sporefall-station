@@ -12,13 +12,14 @@ import { spawnNpc } from '../populate'
 import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { emptyInput } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { tickWorld, type World } from '../world'
 import { setupFloor } from './missions'
 import { decide } from './behaviors'
+import { frozenWorld } from '../testkit'
 
 /** Boot a full, real floor exactly as a run does (populate → mission setup). */
 const floor = (seed: number, f = 1): World => {
-  const w = createWorld(seed, f)
+  const w = frozenWorld(seed, f)
   populateWorld(w)
   setupFloor(w)
   return w
@@ -106,7 +107,7 @@ describe('#77 territory — a fighter defends its own wing (localized, not globa
   // `defendMyWing` can turn the warden on a trespassing player — and only while the
   // player is INSIDE the wing.
   const carved = (seed: number): { w: World; cx: number; cy: number } => {
-    const w = createWorld(seed, 1, 'normal', false) // peaceful
+    const w = frozenWorld(seed, 1, 'normal', false) // peaceful
     const cx = Math.floor(w.level.w / 2)
     const cy = Math.floor(w.level.h / 2)
     for (let y = cy - 10; y <= cy + 10; y++)
@@ -147,7 +148,7 @@ describe('#77 territory — a fighter defends its own wing (localized, not globa
 
 describe('#77 territory — inert without a zone (regression / adversarial)', () => {
   it('a directly-spawned NPC with no zone still just wanders', () => {
-    const w = createWorld(5, 1)
+    const w = frozenWorld(5, 1)
     const cx = Math.floor(w.level.w / 2)
     const cy = Math.floor(w.level.h / 2)
     for (let y = cy - 6; y <= cy + 6; y++)

@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest'
 import { isFloorTile, isWallTile, Tile, tileAt } from '../levelgen/level'
 import { populateWorld } from '../populate'
 import { emptyInput } from '../types'
-import { createCityWorld } from '../testkit'
+import { createCityWorld, frozenWorld } from '../testkit'
 import { createWorld, tickWorld, type World } from '../world'
 import { setupFloor } from './missions'
 
@@ -33,6 +33,14 @@ const isDeck = (w: World, x: number, y: number): boolean => {
 
 const buildFloor = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)
+  populateWorld(w)
+  setupFloor(w)
+  return w
+}
+
+/** The floor-1 map these placements were pinned on, frozen as authored state. */
+const buildFrozenFloor = (seed: number, floor: number): World => {
+  const w = frozenWorld(seed, floor)
   populateWorld(w)
   setupFloor(w)
   return w
@@ -231,10 +239,10 @@ const PINNED: { seed: number; floor: number; tpl: string; bld: number; pos: [num
 describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor table)', () => {
   it('reproduces every pinned mission placement byte-identically', () => {
     for (const row of PINNED) {
-      // These rows pin the raw-floor-themed CITY generator's placements. Play
-      // now draws floor 2's district from the seed and builds 3+ indoors, so
-      // every row past the landing replays on that city world.
-      const w = row.floor >= 2 ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
+      // These rows pin placements on the maps of their day: floor 1 rows on
+      // the frozen landing maps, later rows on the raw-floor-themed CITY
+      // generator (play draws floors 1-2's districts and builds 3+ indoors).
+      const w = row.floor >= 2 ? buildCityFloor(row.seed, row.floor) : buildFrozenFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
       expect(w.mission.template, ctx).toBe(row.tpl)
       expect(w.mission.targetBuilding, ctx).toBe(row.bld)

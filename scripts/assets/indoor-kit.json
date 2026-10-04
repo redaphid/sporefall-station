@@ -1,12 +1,12 @@
 {
  "deck": {
   "seeds": [
-   1002,
-   1006
+   1104,
+   1107
   ],
   "raws": [
-   "raws/indoor/deck-s1002.png",
-   "raws/indoor/deck-s1006.png"
+   "raws/indoor/deck-s1104.png",
+   "raws/indoor/deck-s1107.png"
   ]
  },
  "bulkhead": {
@@ -31,22 +31,22 @@
   "seeds": [
    1004,
    1005,
-   1002
+   1003
   ],
   "raws": [
    "raws/indoor/stair_up-s1004.png",
    "raws/indoor/stair_up-s1005.png",
-   "raws/indoor/stair_up-s1002.png"
+   "raws/indoor/stair_up-s1003.png"
   ]
  },
  "pillar": {
   "seeds": [
-   1017,
-   1013
+   1013,
+   1016
   ],
   "raws": [
-   "raws/indoor/pillar-s1017.png",
-   "raws/indoor/pillar-s1013.png"
+   "raws/indoor/pillar-s1013.png",
+   "raws/indoor/pillar-s1016.png"
   ]
  },
  "stair_down": {

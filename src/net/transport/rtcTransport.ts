@@ -78,6 +78,7 @@ interface Link {
   /** Data that arrived on an open channel before the link was announced. */
   early: TransportEvent[]
   deadline?: ReturnType<typeof setTimeout>
+  born: number
   lastRx: number
   lastTx: number
 }
@@ -256,8 +257,9 @@ export class RtcTransport implements Transport {
     const old = this.links.get(peer)
     if (old) this.closeLink(old)
     const now = this.opts.now()
-    const link: Link = { phase: 'negotiating', announced: false, remoteSet: false, pendingIce: [], early: [], lastRx: now, lastTx: now }
+    const link: Link = { phase: 'negotiating', announced: false, remoteSet: false, pendingIce: [], early: [], born: now, lastRx: now, lastTx: now }
     this.links.set(peer, link)
+    this.log(`${peer} joined the room`)
     if (!this.opts.p2p) {
       this.toRelay(peer, link, 'p2p off')
       return
@@ -285,6 +287,7 @@ export class RtcTransport implements Transport {
     }
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState
+      this.log(`${peer} connection ${s}`)
       if ((s === 'failed' || s === 'disconnected' || s === 'closed') && link.phase === 'p2p') this.toRelay(peer, link, `ice ${s}`)
     }
     return pc
@@ -361,7 +364,7 @@ export class RtcTransport implements Transport {
     link.phase = 'p2p'
     clearTimeout(link.deadline)
     link.lastRx = link.lastTx = this.opts.now()
-    this.log(`${peer} direct`)
+    this.log(`${peer} direct after ${Math.round(this.opts.now() - link.born)} ms`)
     this.announce(peer, link)
   }
 

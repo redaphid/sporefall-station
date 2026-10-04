@@ -222,7 +222,7 @@ export const itemClass = (itemId: string): ItemClass => {
   if (itemId === 'briefcase') return 'key'
   // Wing keycards ('keycard' or 'keycard.<wing>[.<name>]'): a key-class item, so they
   // ignore slot limits, survive a down (recover keeps only 'key' items), and
-  // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
+  // stay behind at the exit (nextFloor drops every key item). See interaction.ts.
   if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
   if (WEAPONS[itemId]) return WEAPONS[itemId].kind
   if (THROWABLES[itemId]) return 'throwable'

@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertNotPersonalChrome } from '../scripts/own-chrome.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 export const BASE = process.env.BASE_URL ?? 'http://localhost:4173'
@@ -25,15 +26,16 @@ const WANT_WEBM = process.env.E2E_VIDEO === 'webm'
  * `E2E_HEADFUL=1` launches the SAME chromium headed — the real compositor path,
  * which is what a human actually sees. It needs a display; on a box whose
  * display server is unusable (WSL2 with a wedged WSLg is the case that forced
- * this), point `E2E_CDP` at an already-running headed browser's DevTools
- * endpoint instead (e.g. a Windows-side `chrome.exe --remote-debugging-port=9333`,
- * reachable from WSL when networkingMode=mirrored) and every recording runs in
- * that real window. The connection is shared across recordings in one process,
+ * this), point `E2E_CDP` at a headed Windows Chrome you launched with
+ * `scripts/own-chrome.mjs launch` (reachable from WSL when
+ * networkingMode=mirrored) and every recording runs in that real window.
+ * `E2E_CDP` on :9222 is refused: that is the owner's own Chrome. The connection is shared across recordings in one process,
  * so the script — not `record()` — owns the browser's lifetime.
  */
 let sharedBrowser = null
 export const acquireBrowser = async () => {
   if (process.env.E2E_CDP) {
+    assertNotPersonalChrome(process.env.E2E_CDP)
     sharedBrowser ??= await chromium.connectOverCDP(process.env.E2E_CDP)
     return { browser: sharedBrowser, shared: true }
   }

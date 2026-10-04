@@ -69,16 +69,28 @@ cooldown between sessions already gives the rhythm.
 
 ## Results (census, 19 worlds × 90 s)
 
-| variant | switches/min | median dwell | A→B→A <2 s /min | settler A→B→A | settler time in activity |
-|---|---:|---:|---:|---:|---:|
-| main | 2.13 | 0.33 s | 1.30 | 1.59 | 0% |
-| commitment only | 1.03 | 3.03 s | 0.13 | 0.05 | 0% |
-| activities only | 2.03 | 1.80 s | 0.85 | 0.35 | 36% |
-| **both (shipped)** | **1.38** | **4.00 s** | **0.18** | **0.06** | **35%** |
-| both + routine (earlier build) | 1.35 | 3.60 s | 0.20 | 0.04 | 23% |
+On main as of ed65863 (every floor from 3 is the indoor station):
 
-Settler switches stay about where they were (1.75 → 1.63 per minute), but they
-are now deliberate: the median settler goal lasts 20.7 s instead of 0.2 s.
+| variant | switches/min | median dwell | A→B→A <2 s /min | settler A→B→A | settler median dwell | settler time in activity |
+|---|---:|---:|---:|---:|---:|---:|
+| main | 1.23 | 3.00 s | 0.32 | 0.06 | 3.0 s | 0% |
+| commitment only | 1.03 | 3.20 s | 0.11 | 0.03 | 3.2 s | 0% |
+| activities only | 2.11 | 2.80 s | 0.80 | 0.62 | 8.0 s | 38% |
+| **both (shipped)** | **1.44** | **4.20 s** | **0.13** | **0.09** | **20.0 s** | **39%** |
+
+Activities alone bring back a settler loop (work→flee→work, 60 times) that
+commitment then removes, which is why the two ship together. Total switches
+rise with activities because settlers now go and do things: each of those
+switches starts a goal that lasts about 20 s.
+
+On the station floors main built before #149 the same census measured a far
+worse baseline, dominated by the loops described above: 2.13 switches/min,
+0.33 s median dwell and 1.30 flip-flops/min, falling to 1.38, 4.00 s and 0.18
+with both shipped (settler flip-flops 1.59 → 0.06 per minute).
+
+The authored regression in `systems/commitment.test.ts` (the scream and pack
+loops, 60 s each) falls from 74.7 to 4.6 switches/min and from 72.8 to 0.9
+flip-flops/min.
 
 ## Co-op
 

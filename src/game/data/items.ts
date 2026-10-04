@@ -229,3 +229,40 @@ export const itemClass = (itemId: string): ItemClass => {
   if (CONSUMABLES[itemId]) return 'consumable'
   return 'unknown'
 }
+
+/** `east-annex` → "East Annex": every word of an id, capitalized. */
+const titleCase = (id: string): string =>
+  id
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+/** 'keycard' → "Keycard"; 'keycard.wing14' → "Wing 14 keycard" (missions.ts
+ * names a wing after its building index); any other suffix is title-cased. */
+const keycardName = (itemId: string): string => {
+  const wing = titleCase(itemId.slice('keycard.'.length).replace(/^wing(\d+)$/, 'wing.$1'))
+  return wing ? `${wing} keycard` : 'Keycard'
+}
+
+/** The player-facing name of any item id: the one source for every label the
+ * HUD, hotbar, inspect card and seal toast show. An unregistered id (a retired
+ * item from an old snapshot) is title-cased rather than shown raw. */
+export const itemName = (itemId: string): string => {
+  const c = itemClass(itemId)
+  switch (c) {
+    case 'melee':
+    case 'ranged':
+      return WEAPONS[itemId].name
+    case 'throwable':
+      return THROWABLES[itemId].name
+    case 'consumable':
+      return CONSUMABLES[itemId].name
+    case 'cash':
+      return 'Cash'
+    case 'key':
+      return itemId === 'briefcase' ? 'Specimen Canister' : keycardName(itemId)
+    case 'unknown':
+      return titleCase(itemId)
+  }
+}

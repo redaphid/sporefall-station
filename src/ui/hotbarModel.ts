@@ -1,10 +1,6 @@
-import { CONSUMABLES, THROWABLES, WEAPONS, itemClass } from '../game/data/items'
+import { itemClass, itemName } from '../game/data/items'
 import { MODS } from '../game/data/mods'
 import type { ItemStack } from '../game/entity'
-
-/** Human-readable name for any carried item id. */
-export const itemLabel = (itemId: string): string =>
-  WEAPONS[itemId]?.name ?? THROWABLES[itemId]?.name ?? CONSUMABLES[itemId]?.name ?? itemId
 
 /** The mod-badge string for a slot: each mod's icon, repeated is shown as
  * `icon×N` for a stack. Empty when the slot carries no mods, so a vanilla gun
@@ -44,7 +40,7 @@ const hidden = (itemId: string): boolean => {
  */
 export const hotbarSlots = (inv: ItemStack[], activeSlot: number): HotbarSlot[] =>
   inv
-    .map((s, index) => ({ index, itemId: s.itemId, label: itemLabel(s.itemId), qty: s.qty, active: index === activeSlot, mods: modBadge(s) }))
+    .map((s, index) => ({ index, itemId: s.itemId, label: itemName(s.itemId), qty: s.qty, active: index === activeSlot, mods: modBadge(s) }))
     .filter((s) => !hidden(s.itemId))
 
 /** Whether the player is carrying anything throwable (grenade/molotov/etc). */

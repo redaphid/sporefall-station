@@ -210,7 +210,7 @@ export const ROOM_LAYOUT: Record<RoomType, readonly FurnishGroup[]> = {
     { g: 'one', prop: 'locker' },
     { g: 'block', prop: 'crate', min: 1, max: 2 },
   ],
-  // ── Indoor complex rooms (floors 3, 5, 7…) ──────────────────────────────────
+  // ── Indoor complex rooms (floors 3+) ──────────────────────────────────
   // The crew eats together: tables with chairs round them, benches along the
   // wall, a machine.
   messhall: [

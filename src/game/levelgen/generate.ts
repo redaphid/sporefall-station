@@ -1,10 +1,11 @@
 import { mulberry32, type Rng } from '../rng'
 import { LEVEL_H, LEVEL_W } from '../types'
 import { carveBunker } from './bunker'
-import { carveComplex, cityFloorOrdinal, isComplexFloor } from './complex'
+import { carveComplex } from './complex'
 import { carveCompound } from './compound'
 import { applyCornerCuts } from './corners'
 import { carveHallways } from './corridors'
+import { biomeForFloor, floorSetting } from './floors'
 import { isWallTile, Tile, TileGrid, themeForFloor, type Building, type BuildingRole, type Level, type Theme } from './level'
 import { BORDER, cutLots, cutLotsVaried } from './lots'
 import { assignRoomTypes } from './roomTypes'
@@ -16,12 +17,13 @@ const PLAZA_CHANCE = 0.3
 
 const CLASSIC_ROLES: readonly BuildingRole[] = ['shop', 'apartment', 'office', 'warehouse', 'clinic']
 
-export const generateLevel = (seed: number, floor: number): Level =>
-  isComplexFloor(floor)
-    ? generateComplexLevel(seed, floor)
-    : generateCityLevel(seed, floor, themeForFloor(cityFloorOrdinal(floor)))
+/** Floor `floor` of run `seed`, built as the floor plan (floors.ts) says. */
+export const generateLevel = (seed: number, floor: number): Level => {
+  const setting = floorSetting(seed, floor)
+  return setting.kind === 'complex' ? generateComplexLevel(seed, floor) : generateCityLevel(seed, floor, setting.theme)
+}
 
-/** The indoor station complex (levelgen/complex.ts) — what floors 3, 5, 7… use. */
+/** The indoor station complex (levelgen/complex.ts) — what every floor from 3 uses. */
 export interface ComplexLevelOpts {
   /** Build upper storeys (default true). `false` yields the ground storey
    * alone — the byte-identity reference the storey tests compare against. */
@@ -34,7 +36,7 @@ export const generateComplexLevel = (seed: number, floor: number, opts: ComplexL
   const h = LEVEL_H
   const tiles = new Uint8Array(w * h).fill(Tile.Street)
   const grid = new TileGrid(w, h, tiles)
-  const plan = carveComplex(rng.fork('complex'), grid, floor)
+  const plan = carveComplex(rng.fork('complex'), grid, biomeForFloor(seed, floor))
   const level: Level = {
     w,
     h,
@@ -56,11 +58,10 @@ export const generateComplexLevel = (seed: number, floor: number, opts: ComplexL
 
 /**
  * The sunken-streets city generator (themed lots, bunkers, courtyards, vaults).
- * `generateLevel` uses it for floors 1, 2, 4, 6, 8… (the city floors between
- * complexes), passing a theme that cycles over city floors only. With no theme
- * it themes on the raw floor; it stays exported for ANY floor so the
- * city set-pieces remain testable on every floor, including the odd floors that
- * build the indoor complex in play.
+ * `generateLevel` uses it for the opening floors 1 and 2 only. With no theme it
+ * themes on the raw floor; it stays exported for ANY floor so the city
+ * set-pieces remain testable on every floor, though play builds the indoor
+ * complex from floor 3.
  */
 export const generateCityLevel = (seed: number, floor: number, theme: Theme = themeForFloor(floor)): Level => {
   const rng = mulberry32(seed).fork(`levelgen:${floor}`)

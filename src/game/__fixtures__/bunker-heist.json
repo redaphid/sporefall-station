@@ -19,7 +19,1870 @@
   "events": [],
   "rng": 639189870,
   "baseRng": 7,
-  "levelChecksum": 3288238219,
+  "level": {
+    "rows": [
+      "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#########HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH############HHHHHHHHHHHHHHHHHHHHHHHHHHHH#####HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H###%%%###HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH==############HHHHHHHHHHHHHHHHHHHHHHHHHHH##%%%##HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H##%%%%%##HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH==############HHHHHHHHHHHHHHHHHHHHHHHHHH##%%%%%##HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHH#%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#%%%%%%%#############HHHHHHHHHHHHHHHHHHH==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHH#%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#%%%%%%%#%%%%%%%%%%%%==HHHHHHHHHHHHHHHHH==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHH#%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H^%%%%%%%#%%%%%%%%%%%%==HHHHHHHHHHHHHHHHH==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHHv%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#%%%%%%%####.########==HHHHHHHHHHHHHHHHH==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHH#%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H####.####+++++#+++++#==#################==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHH#########HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++.+++++.==%%%%%%%%%%%%%%%%%==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++#+++++#==#################==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++###+++#==#%%%%%%#%%%%%%%%#=x#..........#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......##++++###+++#==#%%%%%%#%%%%%%%%#==...........#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#############==#%%%%%%#%%%%%%%%#==#..........#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......###+++#+++++#==#%%%%%%#%%%%%%%%#==############HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......##++++#+++++.==#%%%%%%#%%%%%%%%#==#++++++++++#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++#+++++#=x#%%%%%%##%%%%%%%#==.++++++++++#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H##.######+++++##..###==#%%%%%%%#%%%%%%%#==#++++++++++#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++++++++#==#%%%%%%%#%%%%%%%#==#++++++++++#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++++++++.==#%%%%%%%#%%%%%%%#==#++++++++++#####HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......#+++++++++++#=x#%%%%%%%#%%%%%%%#==#++++++++++#...#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......##+++++++++##==#%%%%%%%#%%%%%%%.==#++++++++++#...#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#.......###+++++++###==#%%%%%%%#%%%%%%%#==#++++++++++#...#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H######.#########.####==##.#########.####==##.##########.##HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "HE=========================================================#===HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H===============xx===============x====x=======x================HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H==========================================================#===HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H######.#########==#######.##==##########.#####.########.##HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==#%%%%%%%%#==###+++++++++###%%%%%%%%#...#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==#%%%%%%%%#==##+++++++++++##%%%%%%%%#...#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#.......==#%%%%%%%%#==#+++++++++++++#%%%%%%%%#...#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==#%%%%%%%%.==#+++++++++++++#%%%%%%%%#####HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H###.#####..##.##==#%%%%%%%%#==.+++++++++++++#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#..#+++#==##########==.+++++++++++++#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#..#+++#==#++++++++#==#..##+++++++++#####.####HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#..#+++#==#++++++++#==#+++#+++++++++#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++########==#++++++++#==.+++#++++++++##%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==#++++++++.==#+++#+++++++###%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#.......==#++++++++#==###############%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H##.######......#==#++++++++#==#%%%%%#%%%%%%%.%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#..##.##==##########==.%%%%%#%%%%%%%##%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#..#+++#==#++++++++#==#%%%%%#%%%%%%%##########HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++...#+++#==#++++++++#==#%%%%%#%%%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#..#+++#==#++++++++#==#%%%%%#.#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H####.###########==#++++++++#==#%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#=x#++++++++.==#%%%%%%%#%%%%%.%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==#++++++++#==#%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==#++++++++#==#%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#.......==#++++++++#==#%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==##########==#%%%%%%%#%%%%%#####.####HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==###++++++#==###############%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#......#==##+++++++.==#%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++####.###=x#++++++++#=x#%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H####.#######.###==#++++++++#==.%%%%%%%#%%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++########==#++++++++#==#%%%%%%%#%%%%%.%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#HHHHHHH==.++++++++#=x##########%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#HHHHHHH==#++++++++#==#%%%%%%%%#%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#HHHHHHH==#++++++++#==#%%%%%%%%#%%%%#%%%%%%%%#HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#+++++++#HHHHHHH==#++++++++#==.%%%%%%%%.%%%%##########HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H##+++++##HHHHHHH==##########==#%%%%%%%%#%%%%##########HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H###+++###HHHHHHH==##########==###%####################HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "H#########HHHHHHHHH##########HH########################HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+      "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"
+    ],
+    "spawn": {
+      "x": 61.5,
+      "y": 26.5
+    },
+    "exit": {
+      "x": 1,
+      "y": 25
+    },
+    "buildings": [
+      {
+        "rect": {
+          "x": 1,
+          "y": 28,
+          "w": 9,
+          "h": 6
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 29,
+            "w": 7,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 4,
+            "y": 33
+          },
+          {
+            "x": 7,
+            "y": 28
+          }
+        ],
+        "role": "lab",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 29,
+          "w": 7,
+          "h": 4
+        },
+        "roomTypes": [
+          "lab"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 33,
+          "w": 9,
+          "h": 8
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 34,
+            "w": 7,
+            "h": 6
+          }
+        ],
+        "doors": [
+          {
+            "x": 4,
+            "y": 33
+          },
+          {
+            "x": 3,
+            "y": 40
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 34,
+          "w": 7,
+          "h": 6
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 40,
+          "w": 9,
+          "h": 6
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 41,
+            "w": 7,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 3,
+            "y": 40
+          },
+          {
+            "x": 5,
+            "y": 45
+          },
+          {
+            "x": 9,
+            "y": 43
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 41,
+          "w": 7,
+          "h": 4
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 45,
+          "w": 9,
+          "h": 10
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 46,
+            "w": 7,
+            "h": 8
+          }
+        ],
+        "doors": [
+          {
+            "x": 5,
+            "y": 45
+          },
+          {
+            "x": 5,
+            "y": 54
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 46,
+          "w": 7,
+          "h": 8
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 54,
+          "w": 9,
+          "h": 9
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 55,
+            "w": 7,
+            "h": 7
+          }
+        ],
+        "doors": [
+          {
+            "x": 5,
+            "y": 54
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 55,
+          "w": 7,
+          "h": 7
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 9,
+          "y": 28,
+          "w": 8,
+          "h": 10
+        },
+        "rooms": [
+          {
+            "x": 10,
+            "y": 29,
+            "w": 6,
+            "h": 4
+          },
+          {
+            "x": 10,
+            "y": 33,
+            "w": 2,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 14,
+            "y": 33
+          },
+          {
+            "x": 16,
+            "y": 31
+          }
+        ],
+        "role": "quarters",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 10,
+          "y": 29,
+          "w": 6,
+          "h": 4
+        },
+        "roomTypes": [
+          "bunkroom",
+          "bunkroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 12,
+          "y": 33,
+          "w": 5,
+          "h": 5
+        },
+        "rooms": [
+          {
+            "x": 13,
+            "y": 34,
+            "w": 3,
+            "h": 3
+          }
+        ],
+        "doors": [
+          {
+            "x": 14,
+            "y": 33
+          }
+        ],
+        "role": "washroom",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 13,
+          "y": 34,
+          "w": 3,
+          "h": 3
+        },
+        "roomTypes": [
+          "washroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 9,
+          "y": 37,
+          "w": 8,
+          "h": 9
+        },
+        "rooms": [
+          {
+            "x": 10,
+            "y": 38,
+            "w": 6,
+            "h": 3
+          },
+          {
+            "x": 10,
+            "y": 41,
+            "w": 2,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 14,
+            "y": 41
+          },
+          {
+            "x": 16,
+            "y": 39
+          },
+          {
+            "x": 9,
+            "y": 43
+          }
+        ],
+        "role": "quarters",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 10,
+          "y": 38,
+          "w": 6,
+          "h": 3
+        },
+        "roomTypes": [
+          "bunkroom",
+          "bunkroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 12,
+          "y": 41,
+          "w": 5,
+          "h": 5
+        },
+        "rooms": [
+          {
+            "x": 13,
+            "y": 42,
+            "w": 3,
+            "h": 3
+          }
+        ],
+        "doors": [
+          {
+            "x": 14,
+            "y": 41
+          }
+        ],
+        "role": "washroom",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 13,
+          "y": 42,
+          "w": 3,
+          "h": 3
+        },
+        "roomTypes": [
+          "washroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 9,
+          "y": 45,
+          "w": 8,
+          "h": 11
+        },
+        "rooms": [
+          {
+            "x": 10,
+            "y": 46,
+            "w": 6,
+            "h": 7
+          },
+          {
+            "x": 13,
+            "y": 53,
+            "w": 1,
+            "h": 2
+          }
+        ],
+        "doors": [
+          {
+            "x": 16,
+            "y": 49
+          }
+        ],
+        "role": "quarters",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 10,
+          "y": 46,
+          "w": 6,
+          "h": 7
+        },
+        "roomTypes": [
+          "bunkroom",
+          "bunkroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 19,
+          "y": 28,
+          "w": 10,
+          "h": 7
+        },
+        "rooms": [
+          {
+            "x": 20,
+            "y": 29,
+            "w": 8,
+            "h": 5
+          }
+        ],
+        "doors": [
+          {
+            "x": 28,
+            "y": 32
+          },
+          {
+            "x": 26,
+            "y": 28
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 20,
+          "y": 29,
+          "w": 8,
+          "h": 5
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 19,
+          "y": 34,
+          "w": 10,
+          "h": 8
+        },
+        "rooms": [
+          {
+            "x": 20,
+            "y": 35,
+            "w": 8,
+            "h": 6
+          }
+        ],
+        "doors": [
+          {
+            "x": 28,
+            "y": 38
+          }
+        ],
+        "role": "lab",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 20,
+          "y": 35,
+          "w": 8,
+          "h": 6
+        },
+        "roomTypes": [
+          "lab"
+        ]
+      },
+      {
+        "rect": {
+          "x": 19,
+          "y": 41,
+          "w": 10,
+          "h": 10
+        },
+        "rooms": [
+          {
+            "x": 20,
+            "y": 42,
+            "w": 8,
+            "h": 8
+          }
+        ],
+        "doors": [
+          {
+            "x": 28,
+            "y": 46
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 20,
+          "y": 42,
+          "w": 8,
+          "h": 8
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 19,
+          "y": 50,
+          "w": 10,
+          "h": 11
+        },
+        "rooms": [
+          {
+            "x": 20,
+            "y": 51,
+            "w": 8,
+            "h": 9
+          }
+        ],
+        "doors": [
+          {
+            "x": 28,
+            "y": 52
+          },
+          {
+            "x": 19,
+            "y": 56
+          }
+        ],
+        "role": "lab",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 20,
+          "y": 51,
+          "w": 8,
+          "h": 9
+        },
+        "roomTypes": [
+          "lab"
+        ]
+      },
+      {
+        "rect": {
+          "x": 31,
+          "y": 28,
+          "w": 15,
+          "h": 12
+        },
+        "rooms": [
+          {
+            "x": 32,
+            "y": 29,
+            "w": 13,
+            "h": 6
+          },
+          {
+            "x": 36,
+            "y": 35,
+            "w": 9,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 31,
+            "y": 33
+          },
+          {
+            "x": 31,
+            "y": 34
+          },
+          {
+            "x": 41,
+            "y": 28
+          }
+        ],
+        "role": "mess",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 32,
+          "y": 29,
+          "w": 13,
+          "h": 6
+        },
+        "roomTypes": [
+          "messhall",
+          "messhall"
+        ]
+      },
+      {
+        "rect": {
+          "x": 31,
+          "y": 35,
+          "w": 5,
+          "h": 5
+        },
+        "rooms": [
+          {
+            "x": 32,
+            "y": 36,
+            "w": 3,
+            "h": 3
+          }
+        ],
+        "doors": [
+          {
+            "x": 31,
+            "y": 37
+          }
+        ],
+        "role": "galley",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 32,
+          "y": 36,
+          "w": 3,
+          "h": 3
+        },
+        "roomTypes": [
+          "galley"
+        ]
+      },
+      {
+        "rect": {
+          "x": 31,
+          "y": 39,
+          "w": 9,
+          "h": 13
+        },
+        "rooms": [
+          {
+            "x": 32,
+            "y": 40,
+            "w": 5,
+            "h": 4
+          },
+          {
+            "x": 32,
+            "y": 45,
+            "w": 7,
+            "h": 6
+          },
+          {
+            "x": 32,
+            "y": 44,
+            "w": 5,
+            "h": 1
+          }
+        ],
+        "doors": [
+          {
+            "x": 31,
+            "y": 41
+          },
+          {
+            "x": 38,
+            "y": 44
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 32,
+          "y": 45,
+          "w": 7,
+          "h": 6
+        },
+        "roomTypes": [
+          "depot",
+          "depot",
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 37,
+          "y": 39,
+          "w": 9,
+          "h": 13
+        },
+        "rooms": [
+          {
+            "x": 38,
+            "y": 40,
+            "w": 7,
+            "h": 4
+          },
+          {
+            "x": 40,
+            "y": 45,
+            "w": 5,
+            "h": 6
+          },
+          {
+            "x": 40,
+            "y": 44,
+            "w": 5,
+            "h": 1
+          }
+        ],
+        "doors": [
+          {
+            "x": 38,
+            "y": 44
+          },
+          {
+            "x": 45,
+            "y": 40
+          },
+          {
+            "x": 45,
+            "y": 46
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 40,
+          "y": 45,
+          "w": 5,
+          "h": 6
+        },
+        "roomTypes": [
+          "depot",
+          "depot",
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 31,
+          "y": 51,
+          "w": 9,
+          "h": 6
+        },
+        "rooms": [
+          {
+            "x": 32,
+            "y": 52,
+            "w": 7,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 31,
+            "y": 54
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 32,
+          "y": 52,
+          "w": 7,
+          "h": 4
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 39,
+          "y": 51,
+          "w": 7,
+          "h": 11
+        },
+        "rooms": [
+          {
+            "x": 40,
+            "y": 52,
+            "w": 5,
+            "h": 4
+          },
+          {
+            "x": 41,
+            "y": 57,
+            "w": 4,
+            "h": 4
+          },
+          {
+            "x": 41,
+            "y": 56,
+            "w": 4,
+            "h": 1
+          }
+        ],
+        "doors": [
+          {
+            "x": 40,
+            "y": 59
+          },
+          {
+            "x": 45,
+            "y": 55
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 40,
+          "y": 52,
+          "w": 5,
+          "h": 4
+        },
+        "roomTypes": [
+          "depot",
+          "depot",
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 31,
+          "y": 56,
+          "w": 10,
+          "h": 7
+        },
+        "rooms": [
+          {
+            "x": 32,
+            "y": 57,
+            "w": 8,
+            "h": 4
+          },
+          {
+            "x": 34,
+            "y": 61,
+            "w": 1,
+            "h": 1
+          }
+        ],
+        "doors": [
+          {
+            "x": 31,
+            "y": 59
+          },
+          {
+            "x": 40,
+            "y": 59
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 32,
+          "y": 57,
+          "w": 8,
+          "h": 4
+        },
+        "roomTypes": [
+          "depot",
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 45,
+          "y": 28,
+          "w": 10,
+          "h": 8
+        },
+        "rooms": [
+          {
+            "x": 46,
+            "y": 29,
+            "w": 8,
+            "h": 6
+          }
+        ],
+        "doors": [
+          {
+            "x": 47,
+            "y": 28
+          },
+          {
+            "x": 50,
+            "y": 35
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 46,
+          "y": 29,
+          "w": 8,
+          "h": 6
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 45,
+          "y": 35,
+          "w": 10,
+          "h": 8
+        },
+        "rooms": [
+          {
+            "x": 46,
+            "y": 36,
+            "w": 8,
+            "h": 6
+          }
+        ],
+        "doors": [
+          {
+            "x": 45,
+            "y": 40
+          },
+          {
+            "x": 50,
+            "y": 35
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 46,
+          "y": 36,
+          "w": 8,
+          "h": 6
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 45,
+          "y": 42,
+          "w": 10,
+          "h": 9
+        },
+        "rooms": [
+          {
+            "x": 46,
+            "y": 43,
+            "w": 8,
+            "h": 7
+          }
+        ],
+        "doors": [
+          {
+            "x": 45,
+            "y": 46
+          },
+          {
+            "x": 50,
+            "y": 50
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 46,
+          "y": 43,
+          "w": 8,
+          "h": 7
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 45,
+          "y": 50,
+          "w": 10,
+          "h": 10
+        },
+        "rooms": [
+          {
+            "x": 46,
+            "y": 51,
+            "w": 8,
+            "h": 8
+          }
+        ],
+        "doors": [
+          {
+            "x": 50,
+            "y": 50
+          },
+          {
+            "x": 45,
+            "y": 55
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 46,
+          "y": 51,
+          "w": 8,
+          "h": 8
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 18,
+          "w": 9,
+          "h": 7
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 19,
+            "w": 7,
+            "h": 5
+          }
+        ],
+        "doors": [
+          {
+            "x": 3,
+            "y": 18
+          },
+          {
+            "x": 7,
+            "y": 24
+          }
+        ],
+        "role": "quarters",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 19,
+          "w": 7,
+          "h": 5
+        },
+        "roomTypes": [
+          "bunkroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 9,
+          "w": 9,
+          "h": 10
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 10,
+            "w": 7,
+            "h": 8
+          }
+        ],
+        "doors": [
+          {
+            "x": 3,
+            "y": 18
+          },
+          {
+            "x": 5,
+            "y": 9
+          }
+        ],
+        "role": "quarters",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 10,
+          "w": 7,
+          "h": 8
+        },
+        "roomTypes": [
+          "bunkroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 1,
+          "y": 1,
+          "w": 9,
+          "h": 9
+        },
+        "rooms": [
+          {
+            "x": 2,
+            "y": 2,
+            "w": 7,
+            "h": 7
+          }
+        ],
+        "doors": [
+          {
+            "x": 5,
+            "y": 9
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 2,
+          "y": 2,
+          "w": 7,
+          "h": 7
+        },
+        "roomTypes": [
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 9,
+          "y": 14,
+          "w": 13,
+          "h": 11
+        },
+        "rooms": [
+          {
+            "x": 10,
+            "y": 19,
+            "w": 11,
+            "h": 5
+          },
+          {
+            "x": 10,
+            "y": 15,
+            "w": 5,
+            "h": 4
+          }
+        ],
+        "doors": [
+          {
+            "x": 21,
+            "y": 20
+          },
+          {
+            "x": 17,
+            "y": 24
+          }
+        ],
+        "role": "lab",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 10,
+          "y": 19,
+          "w": 11,
+          "h": 5
+        },
+        "roomTypes": [
+          "lab",
+          "lab"
+        ]
+      },
+      {
+        "rect": {
+          "x": 15,
+          "y": 14,
+          "w": 7,
+          "h": 5
+        },
+        "rooms": [
+          {
+            "x": 16,
+            "y": 15,
+            "w": 5,
+            "h": 3
+          }
+        ],
+        "doors": [
+          {
+            "x": 21,
+            "y": 16
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 16,
+          "y": 15,
+          "w": 5,
+          "h": 3
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 9,
+          "y": 8,
+          "w": 7,
+          "h": 7
+        },
+        "rooms": [
+          {
+            "x": 10,
+            "y": 9,
+            "w": 5,
+            "h": 5
+          }
+        ],
+        "doors": [
+          {
+            "x": 15,
+            "y": 10
+          },
+          {
+            "x": 13,
+            "y": 8
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 10,
+          "y": 9,
+          "w": 5,
+          "h": 5
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 15,
+          "y": 8,
+          "w": 7,
+          "h": 7
+        },
+        "rooms": [
+          {
+            "x": 16,
+            "y": 9,
+            "w": 5,
+            "h": 5
+          }
+        ],
+        "doors": [
+          {
+            "x": 21,
+            "y": 10
+          },
+          {
+            "x": 15,
+            "y": 10
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 16,
+          "y": 9,
+          "w": 5,
+          "h": 5
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 24,
+          "y": 11,
+          "w": 9,
+          "h": 14
+        },
+        "rooms": [
+          {
+            "x": 25,
+            "y": 18,
+            "w": 7,
+            "h": 6
+          },
+          {
+            "x": 25,
+            "y": 12,
+            "w": 6,
+            "h": 5
+          },
+          {
+            "x": 25,
+            "y": 17,
+            "w": 6,
+            "h": 1
+          }
+        ],
+        "doors": [
+          {
+            "x": 26,
+            "y": 24
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 25,
+          "y": 18,
+          "w": 7,
+          "h": 6
+        },
+        "roomTypes": [
+          "depot",
+          "depot",
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 31,
+          "y": 11,
+          "w": 10,
+          "h": 14
+        },
+        "rooms": [
+          {
+            "x": 33,
+            "y": 18,
+            "w": 7,
+            "h": 6
+          },
+          {
+            "x": 32,
+            "y": 12,
+            "w": 8,
+            "h": 5
+          },
+          {
+            "x": 33,
+            "y": 17,
+            "w": 7,
+            "h": 1
+          }
+        ],
+        "doors": [
+          {
+            "x": 40,
+            "y": 22
+          },
+          {
+            "x": 36,
+            "y": 24
+          }
+        ],
+        "role": "depot",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 33,
+          "y": 18,
+          "w": 7,
+          "h": 6
+        },
+        "roomTypes": [
+          "depot",
+          "depot",
+          "depot"
+        ]
+      },
+      {
+        "rect": {
+          "x": 43,
+          "y": 15,
+          "w": 12,
+          "h": 10
+        },
+        "rooms": [
+          {
+            "x": 44,
+            "y": 16,
+            "w": 10,
+            "h": 8
+          }
+        ],
+        "doors": [
+          {
+            "x": 43,
+            "y": 17
+          },
+          {
+            "x": 45,
+            "y": 24
+          }
+        ],
+        "role": "medbay",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 44,
+          "y": 16,
+          "w": 10,
+          "h": 8
+        },
+        "roomTypes": [
+          "medbay"
+        ]
+      },
+      {
+        "rect": {
+          "x": 43,
+          "y": 3,
+          "w": 12,
+          "h": 13
+        },
+        "rooms": [
+          {
+            "x": 44,
+            "y": 4,
+            "w": 10,
+            "h": 11
+          }
+        ],
+        "doors": [
+          {
+            "x": 43,
+            "y": 13
+          }
+        ],
+        "role": "quarters",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 44,
+          "y": 4,
+          "w": 10,
+          "h": 11
+        },
+        "roomTypes": [
+          "bunkroom"
+        ]
+      },
+      {
+        "rect": {
+          "x": 54,
+          "y": 28,
+          "w": 5,
+          "h": 5
+        },
+        "rooms": [
+          {
+            "x": 55,
+            "y": 29,
+            "w": 3,
+            "h": 3
+          }
+        ],
+        "doors": [
+          {
+            "x": 56,
+            "y": 28
+          }
+        ],
+        "role": "security",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 55,
+          "y": 29,
+          "w": 3,
+          "h": 3
+        },
+        "roomTypes": [
+          "security"
+        ]
+      },
+      {
+        "rect": {
+          "x": 54,
+          "y": 20,
+          "w": 5,
+          "h": 5
+        },
+        "rooms": [
+          {
+            "x": 55,
+            "y": 21,
+            "w": 3,
+            "h": 3
+          }
+        ],
+        "doors": [
+          {
+            "x": 56,
+            "y": 24
+          }
+        ],
+        "role": "security",
+        "poi": "module",
+        "objectiveRoom": {
+          "x": 55,
+          "y": 21,
+          "w": 3,
+          "h": 3
+        },
+        "roomTypes": [
+          "security"
+        ]
+      }
+    ],
+    "theme": "industrial",
+    "complex": {
+      "biome": "habitation",
+      "corridors": [
+        {
+          "axis": "h",
+          "rect": {
+            "x": 60,
+            "y": 25,
+            "w": 3,
+            "h": 3
+          }
+        },
+        {
+          "axis": "h",
+          "rect": {
+            "x": 1,
+            "y": 25,
+            "w": 58,
+            "h": 3
+          }
+        },
+        {
+          "axis": "v",
+          "rect": {
+            "x": 17,
+            "y": 28,
+            "w": 2,
+            "h": 34
+          }
+        },
+        {
+          "axis": "v",
+          "rect": {
+            "x": 29,
+            "y": 28,
+            "w": 2,
+            "h": 34
+          }
+        },
+        {
+          "axis": "v",
+          "rect": {
+            "x": 22,
+            "y": 6,
+            "w": 2,
+            "h": 19
+          }
+        },
+        {
+          "axis": "v",
+          "rect": {
+            "x": 41,
+            "y": 2,
+            "w": 2,
+            "h": 23
+          }
+        }
+      ],
+      "vents": [
+        {
+          "x": 16,
+          "y": 26
+        },
+        {
+          "x": 38,
+          "y": 26
+        },
+        {
+          "x": 33,
+          "y": 26
+        },
+        {
+          "x": 17,
+          "y": 26
+        },
+        {
+          "x": 46,
+          "y": 26
+        },
+        {
+          "x": 18,
+          "y": 46
+        },
+        {
+          "x": 18,
+          "y": 53
+        },
+        {
+          "x": 30,
+          "y": 53
+        },
+        {
+          "x": 30,
+          "y": 56
+        },
+        {
+          "x": 23,
+          "y": 21
+        },
+        {
+          "x": 23,
+          "y": 17
+        },
+        {
+          "x": 42,
+          "y": 12
+        }
+      ],
+      "wings": [
+        {
+          "rect": {
+            "x": 1,
+            "y": 28,
+            "w": 9,
+            "h": 35
+          },
+          "buildings": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "rect": {
+            "x": 9,
+            "y": 28,
+            "w": 8,
+            "h": 28
+          },
+          "buildings": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        {
+          "rect": {
+            "x": 19,
+            "y": 28,
+            "w": 10,
+            "h": 35
+          },
+          "buildings": [
+            10,
+            11,
+            12,
+            13
+          ]
+        },
+        {
+          "rect": {
+            "x": 31,
+            "y": 28,
+            "w": 15,
+            "h": 35
+          },
+          "buildings": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ]
+        },
+        {
+          "rect": {
+            "x": 45,
+            "y": 28,
+            "w": 10,
+            "h": 35
+          },
+          "buildings": [
+            21,
+            22,
+            23,
+            24
+          ]
+        },
+        {
+          "rect": {
+            "x": 1,
+            "y": 1,
+            "w": 9,
+            "h": 24
+          },
+          "buildings": [
+            25,
+            26,
+            27
+          ]
+        },
+        {
+          "rect": {
+            "x": 9,
+            "y": 5,
+            "w": 13,
+            "h": 20
+          },
+          "buildings": [
+            28,
+            29,
+            30,
+            31
+          ]
+        },
+        {
+          "rect": {
+            "x": 24,
+            "y": 9,
+            "w": 17,
+            "h": 16
+          },
+          "buildings": [
+            32,
+            33
+          ]
+        },
+        {
+          "rect": {
+            "x": 43,
+            "y": 1,
+            "w": 12,
+            "h": 24
+          },
+          "buildings": [
+            34,
+            35
+          ]
+        },
+        {
+          "rect": {
+            "x": 54,
+            "y": 28,
+            "w": 5,
+            "h": 5
+          },
+          "buildings": [
+            36
+          ]
+        },
+        {
+          "rect": {
+            "x": 54,
+            "y": 20,
+            "w": 5,
+            "h": 5
+          },
+          "buildings": [
+            37
+          ]
+        }
+      ],
+      "archetype": "spine",
+      "objective": 4
+    },
+    "storeys": [
+      {
+        "slot": 0,
+        "z": 0,
+        "kind": "ground",
+        "ox": 0
+      },
+      {
+        "slot": 1,
+        "z": 1,
+        "kind": "tower",
+        "ox": 80
+      }
+    ],
+    "stairs": [
+      {
+        "from": {
+          "x": 1,
+          "y": 7
+        },
+        "to": {
+          "x": 81,
+          "y": 7
+        },
+        "landing": {
+          "x": 82,
+          "y": 7
+        },
+        "dir": "e"
+      },
+      {
+        "from": {
+          "x": 81,
+          "y": 7
+        },
+        "to": {
+          "x": 1,
+          "y": 7
+        },
+        "landing": {
+          "x": 2,
+          "y": 7
+        },
+        "dir": "e"
+      }
+    ]
+  },
   "entities": [
     {
       "id": 1,

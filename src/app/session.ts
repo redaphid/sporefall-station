@@ -39,6 +39,12 @@ export interface RenderView {
    * frame counter). Compared against host-tick deadlines such as a weapon's
    * `rechargeUntil`. Optional: absent means `tick`. */
   simTick?: number
+  /** Which run this view belongs to. Changes each time the session starts a
+   * fresh run (restart / New Seed on a host, a non-rejoin GameStart on a
+   * client) and at no other time: not on a floor change, a rejoin, or a late
+   * snapshot. A new run recycles entity ids, so per-run UI state such as the
+   * boss latch keys on this, never on a drop in the tick. */
+  runEpoch: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
   /** This floor's modifier as the HUD and renderer show it. Absent = clean floor. */

@@ -3,7 +3,7 @@ import { markUiChrome } from './chrome'
 import { formatReleaseNotes } from './releaseNotes'
 import { installGamepadMenuNav } from './gamepadMenu'
 
-export type GameMode = 'solo' | 'host' | 'join'
+export type GameMode = 'solo' | 'host' | 'join' | 'online'
 
 /** The settings panel, as the start menu drives it (renderer.settingsUi):
  * `open` shows it with controller navigation armed; `isOpen` lets the menu's
@@ -94,8 +94,9 @@ export const pickMode = (
     overlay.appendChild(inner)
     const options: [GameMode, string, string][] = [
       ['solo', 'Solo run', 'Just you vs the spores'],
-      ['host', 'Host co-op', 'Others join your game'],
+      ['host', 'Host co-op', 'Nearby players join over Bluetooth'],
       ['join', 'Join co-op', 'Find a nearby host'],
+      ['online', 'Play online', 'Host or join with a room code'],
     ]
     const navButtons: HTMLButtonElement[] = []
     let stopNav: () => void = () => {}
@@ -211,6 +212,39 @@ export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Pr
     mount.appendChild(overlay)
   })
 
+/** The join screen for a device that cannot join (joinTransport.ts). It replaces
+ * the lobby, which would otherwise read "Looking for a host…" forever. */
+export const showJoinUnsupported = (
+  mount: HTMLElement,
+  message: { title: string; detail: string },
+  onBack: () => void,
+): void => {
+  const overlay = document.createElement('div')
+  markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
+  overlay.dataset.role = 'join-unsupported'
+  overlay.style.cssText =
+    'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;gap:14px;padding:0 16px;pointer-events:auto;color:#eee;font:16px system-ui;text-align:center'
+  const title = document.createElement('div')
+  title.style.cssText = 'font:800 22px system-ui'
+  title.textContent = message.title
+  const detail = document.createElement('div')
+  detail.style.cssText = 'max-width:min(360px,85vw);line-height:1.4;opacity:.85'
+  detail.textContent = message.detail
+  const back = document.createElement('button')
+  back.textContent = 'Back to menu'
+  back.style.cssText =
+    'font:600 16px system-ui;padding:12px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
+    'background:#ffffff10;color:#eee;cursor:pointer;margin-top:6px'
+  const stopNav = installGamepadMenuNav(() => [back])
+  back.addEventListener('click', () => {
+    stopNav()
+    onBack()
+  })
+  overlay.append(title, detail, back)
+  mount.appendChild(overlay)
+}
+
 /** BLE join: list hosts as they're discovered; resolves with the chosen deviceId. */
 export const pickHost = (
   mount: HTMLElement,
@@ -278,7 +312,9 @@ export interface LobbyUi {
   close(): void
 }
 
-export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
+/** `roomCode` puts an online room's code under the title, big enough to read
+ * out across a room. */
+export const createLobbyUi = (mount: HTMLElement, isHost: boolean, roomCode?: string): LobbyUi => {
   const overlay = document.createElement('div')
   markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
   overlay.style.cssText =
@@ -286,9 +322,13 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
     'justify-content:center;gap:12px;pointer-events:auto;color:#eee;font:16px system-ui'
   overlay.innerHTML = `
     <div style="font:800 22px system-ui">${isHost ? 'HOSTING' : 'LOBBY'}</div>
+    <div id="room-code" style="font:800 44px ui-monospace,monospace;letter-spacing:8px;color:#7fd17f"></div>
     <div id="status" style="opacity:.7"></div>
     <div id="players" style="display:flex;flex-direction:column;gap:6px;min-width:min(300px,75vw)"></div>
   `
+  const codeEl = overlay.querySelector<HTMLElement>('#room-code')!
+  if (roomCode) codeEl.textContent = roomCode
+  else codeEl.remove()
   const playersEl = overlay.querySelector<HTMLElement>('#players')!
   const statusEl = overlay.querySelector<HTMLElement>('#status')!
 

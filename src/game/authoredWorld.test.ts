@@ -13,7 +13,7 @@ import { emptyInput, type InputCmd } from './types'
 import { createWorld, tickWorld, worldFromSeed, worldFromState, type World } from './world'
 
 // A walled hall split by a wall with a one-tile gap. The gap is the only way
-// from the player's side to the thug's, so the geometry is the test's subject.
+// from the player's side to the mutant's, so the geometry is the test's subject.
 const HALL = [
   '############',
   '#....#.....#',
@@ -28,7 +28,7 @@ const DRIVE = new Map<number, Partial<InputCmd>>([[0, { moveX: 1, aimX: 1, attac
 const authoredHall = (): World => {
   const w = worldFromState({ level: levelFromJson({ rows: HALL }) })
   spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-  spawnNpc(w, 'thug', 8.5, 2.5)
+  spawnNpc(w, 'mutant', 8.5, 2.5)
   return w
 }
 
@@ -216,7 +216,7 @@ describe('seeded worlds: the generator path is unchanged', () => {
   })
 
   it('every committed frozen-level fixture carries its level whole and re-saves to itself exactly', () => {
-    for (const name of ['bunker-heist', 'frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) {
+    for (const name of ['bunker-salvage', 'frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) {
       const j = loadFixtureJson(name)
       expect(j.level, name).toBeDefined()
       expect(j.levelChecksum, name).toBeUndefined()

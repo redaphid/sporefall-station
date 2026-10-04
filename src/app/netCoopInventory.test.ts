@@ -135,12 +135,12 @@ const richLoadout = (): { inventory: ItemStack[]; activeSlot: number } => ({
   // 1..n are held items (throwables/consumables), the only selectable ones.
   // Post-cull this is what a rich inventory actually looks like: the permanent
   // modded weapon, the one surviving throwable in a deep stack, and the mission
-  // briefcase. It used to run pistol/molotov/grenade/bandage; three of those four
+  // canister. It used to run pistol/molotov/grenade/bandage; three of those four
   // ids no longer exist, and a wire test that round-trips dead content proves
   // less than one that round-trips what a player can really be carrying.
   inventory: [
     { itemId: 'pistol', qty: 1, mods: [{ id: 'frost', stacks: 2 }] },
-    { itemId: 'briefcase', qty: 1 },
+    { itemId: 'canister', qty: 1 },
     { itemId: 'grenade', qty: 37 },
   ],
   activeSlot: 2, // the grenade is HELD; a weapon slot can never be the active one
@@ -168,7 +168,7 @@ describe('co-op client inventory (issue #57)', () => {
     const self = bob.session.renderView().self!
     const inv = self.loadout!.inventory
     // Full slot list arrives — the modded permanent weapon plus every held item.
-    expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(self.loadout!.activeSlot).toBe(2)
     // Per-slot qty rides along.
     expect(inv.find((s) => s.itemId === 'pistol')!.qty).toBe(1)
@@ -258,7 +258,7 @@ describe('co-op client inventory (issue #57)', () => {
     await tickN(host, late, 6)
 
     const self = late.session.renderView().self!
-    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(self.loadout!.activeSlot).toBe(2)
   })
 
@@ -385,7 +385,7 @@ describe('co-op client inventory (issue #57)', () => {
     const invMsg = b.received().find((m) => m[0] === MsgType.Inventory)
     expect(invMsg).toBeDefined()
     const inv = decodeJson<InventoryMsg>(invMsg!)
-    expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(inv.inventory.find((s) => s.itemId === 'pistol')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
   })
 

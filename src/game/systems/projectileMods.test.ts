@@ -47,7 +47,7 @@ describe('projectile mod provenance', () => {
   })
 
   it('an NPC shot carries no mods (enemy fire stays visually vanilla)', () => {
-    const npc = addEntity(w, makeEntity('npc', 'thug', 20, 20))
+    const npc = addEntity(w, makeEntity('npc', 'mutant', 20, 20))
     npc.combat = { weapon: 'pistol', cooldown: 0 }
     npc.health = { hp: 40, max: 40, iframes: 0 }
     // NPCs route through the same fire site with no inventory stack.

@@ -62,14 +62,14 @@ crew.forEach((p, i) => spawnPlayer(w, i, p.x + 0.5, p.y + 0.5))
 // One hostile in the same frame — the render must prove player markers do not
 // out-shout a threat.
 const foe = near[near.length - 1]
-const thug = spawnNpc(w, 'thug', foe.x + 0.5, foe.y + 0.5)
-thug.ai!.mode = 'idle'
+const mutant = spawnNpc(w, 'mutant', foe.x + 0.5, foe.y + 0.5)
+mutant.ai!.mode = 'idle'
 
 const json = serializeWorld(w)
 writeFileSync(`${dir}crew-scene.json`, JSON.stringify(json, null, 2) + '\n')
 console.log(
   `crew-scene: seed 7, centre ${best.x},${best.y}, ${best.score} props in radius, ` +
-    `crew ${crew.map((c) => `${c.x},${c.y}`).join(' ')}, thug ${foe.x},${foe.y}`,
+    `crew ${crew.map((c) => `${c.x},${c.y}`).join(' ')}, mutant ${foe.x},${foe.y}`,
 )
 
 // ── crew-scene-8: the WORST case the markers have to survive — a full
@@ -80,8 +80,8 @@ populateWorld(w8)
 setupFloor(w8)
 const eight = near.slice(0, 8)
 eight.forEach((p, i) => spawnPlayer(w8, i, p.x + 0.5, p.y + 0.5))
-const thug8 = spawnNpc(w8, 'thug', foe.x + 0.5, foe.y + 0.5)
-thug8.ai!.mode = 'idle'
+const mutant8 = spawnNpc(w8, 'mutant', foe.x + 0.5, foe.y + 0.5)
+mutant8.ai!.mode = 'idle'
 // Player 6 (slot 5) is bleeding out: the downed cue is red PLUS a struck-through
 // X, so it stays legible with no colour vision at all.
 const fallen = w8.entities.find((e) => e.playerCtl?.playerId === 5)!

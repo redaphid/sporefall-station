@@ -261,7 +261,7 @@ Sweep 200 seeds x floors {3, 5, 7, 9, 11}. For every storey `k` with `z ≠ 0`, 
   - Because of this, the teleport edge never enters A*'s heuristic.
   - `ai.ts` stores only the current leg, and repath staggering is unchanged.
 - **Who follows.** `usesStairs` is an archetype trait:
-  - on for crew and humanoid hostiles (thug, cop, scientist, infected);
+  - on for crew and humanoid hostiles (mutant, warden, scientist, infected);
   - off for bosses (Mireclaw), turrets, spore nodes, vent swarms and Derelict Units.
 
   A boss that could leave its arena breaks the boss room.
@@ -334,7 +334,7 @@ Sweep 200 seeds x floors {3, 5, 7, 9, 11}. For every storey `k` with `z ≠ 0`, 
 - **Save.** Nothing new. Positions encode storeys, and `levelChecksum` covers the atlas.
   - Bump `SAVE_VERSION` to 3 so pre-storey complex-floor saves are discarded cleanly. They would
     already fail the checksum and be dropped, but the bump makes the intent explicit.
-  - Regenerate the `bunker-heist.json` fixture (floor 3).
+  - Regenerate the `bunker-salvage.json` fixture (floor 3).
 
 ---
 
@@ -393,7 +393,7 @@ uses the whole structural algorithm for that single component, so the rule is en
 - `src/ui/locatorModel.ts`: the storey badge.
 - `src/render/art.ts`, `theme.ts`: the procedural stair tiles.
 - `src/app/persistence.ts`: `SAVE_VERSION = 3`.
-- `src/game/__fixtures__/bunker-heist.json`: regenerate.
+- `src/game/__fixtures__/bunker-salvage.json`: regenerate.
 - `src/ui/releaseNotes/<date>-stairs.ts`.
 - e2e: walk up, grab the cache, walk down. Also a two-client run with one player upstairs.
 
@@ -455,7 +455,7 @@ Files: `storeys.ts`, a new `src/render/fog.ts`, `renderer.ts`, and `generate.ts`
   red/green proofs.
 - **R5 Churn.**
   - `levelChecksum` changes for every complex floor that gains a storey. That breaks old saves (a
-    clean discard), the `bunker-heist` fixture, and any test that pins complex checksums or populate
+    clean discard), the `bunker-salvage` fixture, and any test that pins complex checksums or populate
     counts.
   - Keep the ground slice byte-identical so that only atlas-aware tests move.
 - **R6 Cost on phones.**

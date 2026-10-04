@@ -73,19 +73,19 @@ describe('fire sets creatures alight (#114)', () => {
     s = findStage(w)
   })
 
-  it('a thug standing in a burning cell catches fire and takes the burn', () => {
-    const thug = npc(w, 'thug', s.x, s.y)
+  it('a mutant standing in a burning cell catches fire and takes the burn', () => {
+    const mutant = npc(w, 'mutant', s.x, s.y)
     igniteCell(w, s.x, s.y)
     const t0 = w.tick
     runTicks(w, noInput, 1)
-    expect(thug.fx?.burning).toEqual({ until: t0 + ELEMENTS.burning.durationTicks })
+    expect(mutant.fx?.burning).toEqual({ until: t0 + ELEMENTS.burning.durationTicks })
     runTicks(w, noInput, 45)
-    expect(thug.health!.hp).toBeLessThan(40)
+    expect(mutant.health!.hp).toBeLessThan(40)
   })
 
   it('burns exactly as hard as a burning round does, scaled by resist.burning', () => {
     // Floor fire and an Incendiary hit must agree tick for tick, per archetype.
-    const pairs = (['thug', 'sporeling', 'brute'] as const).map((arch, i) => {
+    const pairs = (['mutant', 'sporeling', 'brute'] as const).map((arch, i) => {
       const inFire = npc(w, arch, s.x + i, s.y, 500)
       const shot = npc(w, arch, s.x + i, s.y + 1, 500)
       igniteCell(w, s.x + i, s.y)
@@ -96,12 +96,12 @@ describe('fire sets creatures alight (#114)', () => {
     const lost = pairs.map(({ arch, inFire, shot }) => ({ arch, fire: 500 - inFire.health!.hp, round: 500 - shot.health!.hp }))
     for (const l of lost) expect(l.fire, l.arch).toBe(l.round)
     const byArch = Object.fromEntries(lost.map((l) => [l.arch, l.fire]))
-    expect(byArch.sporeling).toBeGreaterThan(byArch.thug)
-    expect(byArch.brute).toBeGreaterThan(byArch.thug)
+    expect(byArch.sporeling).toBeGreaterThan(byArch.mutant)
+    expect(byArch.brute).toBeGreaterThan(byArch.mutant)
   })
 
   it.each([
-    ['an NPC', (w: World, x: number, y: number) => npc(w, 'thug', x, y)],
+    ['an NPC', (w: World, x: number, y: number) => npc(w, 'mutant', x, y)],
     ['a player', (w: World, x: number, y: number) => player(w, x + 0.5, y + 0.5)],
   ])('%s immune to burning (resist 0) never ignites and loses no hp', (_label, make) => {
     const e = make(w, s.x, s.y)
@@ -115,22 +115,22 @@ describe('fire sets creatures alight (#114)', () => {
   })
 
   it('keeps burning for the full status duration after leaving the fire, then goes out', () => {
-    const thug = npc(w, 'thug', s.x, s.y, 1000)
-    thug.speed = 0
+    const mutant = npc(w, 'mutant', s.x, s.y, 1000)
+    mutant.speed = 0
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 10)
-    expect(cellOf(thug)).toEqual([s.x, s.y])
+    expect(cellOf(mutant)).toEqual([s.x, s.y])
     const lastLit = w.tick - 1
-    moveTo(thug, s.x + 6, s.y)
-    const hpOut = thug.health!.hp
+    moveTo(mutant, s.x + 6, s.y)
+    const hpOut = mutant.health!.hp
     runTicks(w, noInput, lastLit + ELEMENTS.burning.durationTicks - w.tick)
-    expect(hasStatus(thug, 'burning')).toBe(true)
-    expect(thug.health!.hp).toBeLessThan(hpOut)
+    expect(hasStatus(mutant, 'burning')).toBe(true)
+    expect(mutant.health!.hp).toBeLessThan(hpOut)
     runTicks(w, noInput, 1)
-    expect(hasStatus(thug, 'burning')).toBe(false)
-    const hpDone = thug.health!.hp
+    expect(hasStatus(mutant, 'burning')).toBe(false)
+    const hpDone = mutant.health!.hp
     runTicks(w, noInput, 60)
-    expect(thug.health!.hp).toBe(hpDone)
+    expect(mutant.health!.hp).toBe(hpDone)
   })
 
   it('a player in the fire ignites, walks out still burning, and rolls it out', () => {
@@ -169,32 +169,32 @@ describe('fire sets creatures alight (#114)', () => {
   })
 
   it('a frozen body in the fire catches and burns, stays frozen, and never shatters', () => {
-    const thug = npc(w, 'thug', s.x, s.y, 200)
-    freeze(w, thug)
-    const thawAt = thug.fx!.frozen.until
+    const mutant = npc(w, 'mutant', s.x, s.y, 200)
+    freeze(w, mutant)
+    const thawAt = mutant.fx!.frozen.until
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 1)
-    expect(hasStatus(thug, 'burning')).toBe(true)
-    expect(thug.fx!.frozen.until).toBe(thawAt)
+    expect(hasStatus(mutant, 'burning')).toBe(true)
+    expect(mutant.fx!.frozen.until).toBe(thawAt)
     runTicks(w, noInput, 60)
-    expect(hasStatus(thug, 'frozen')).toBe(true)
-    expect(thug.health!.hp).toBeLessThan(200)
-    expect(thug.shattered).toBeUndefined()
+    expect(hasStatus(mutant, 'frozen')).toBe(true)
+    expect(mutant.health!.hp).toBeLessThan(200)
+    expect(mutant.shattered).toBeUndefined()
   })
 
-  it('a cinder catches fire (0.2 resists, it does not immunise) and loses less to it than a thug', () => {
+  it('a cinder catches fire (0.2 resists, it does not immunise) and loses less to it than a mutant', () => {
     const cinder = npc(w, 'cinder', s.x, s.y, 500)
-    const thug = npc(w, 'thug', s.x + 2, s.y, 500)
+    const mutant = npc(w, 'mutant', s.x + 2, s.y, 500)
     igniteCell(w, s.x, s.y)
     igniteCell(w, s.x + 2, s.y)
     runTicks(w, noInput, 120)
     expect(hasStatus(cinder, 'burning')).toBe(true)
-    expect(500 - cinder.health!.hp).toBeLessThan(500 - thug.health!.hp)
+    expect(500 - cinder.health!.hp).toBeLessThan(500 - mutant.health!.hp)
   })
 
   it('a wet body meets floor fire exactly as it meets a burning round', () => {
-    const inFire = npc(w, 'thug', s.x, s.y)
-    const shot = npc(w, 'thug', s.x + 3, s.y)
+    const inFire = npc(w, 'mutant', s.x, s.y)
+    const shot = npc(w, 'mutant', s.x + 3, s.y)
     wet(w, inFire)
     wet(w, shot)
     igniteCell(w, s.x, s.y)
@@ -205,23 +205,23 @@ describe('fire sets creatures alight (#114)', () => {
   })
 
   it('a burning creature lays no fire of its own on bare floor', () => {
-    const thug = npc(w, 'thug', s.x, s.y, 1000)
+    const mutant = npc(w, 'mutant', s.x, s.y, 1000)
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 1)
-    moveTo(thug, s.x + 6, s.y)
+    moveTo(mutant, s.x + 6, s.y)
     runTicks(w, noInput, 18 * 4)
-    expect(hasStatus(thug, 'burning')).toBe(true)
+    expect(hasStatus(mutant, 'burning')).toBe(true)
     expect(fireCount(w)).toBe(1)
     expect(fireAt(w, s.x + 6, s.y)).toBe(false)
   })
 
   it('fire never leaps to a creature in the neighbouring cell', () => {
-    const thug = npc(w, 'thug', s.x + 1, s.y)
+    const mutant = npc(w, 'mutant', s.x + 1, s.y)
     const p = player(w, s.x - 0.5, s.y + 0.5)
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 18 * 4)
     expect(fireCount(w)).toBe(1)
-    expect(hasStatus(thug, 'burning')).toBe(false)
+    expect(hasStatus(mutant, 'burning')).toBe(false)
     expect(hasStatus(p, 'burning')).toBe(false)
   })
 
@@ -236,7 +236,7 @@ describe('fire sets creatures alight (#114)', () => {
   it('is byte-identical across a serialize/deserialize taken mid-fire', () => {
     const stage = (): World => {
       const v = createWorld(1, 1)
-      npc(v, 'thug', s.x, s.y)
+      npc(v, 'mutant', s.x, s.y)
       npc(v, 'sporeling', s.x + 1, s.y)
       npc(v, 'cinder', s.x + 2, s.y)
       player(v, s.x + 3.5, s.y + 0.5)
@@ -267,18 +267,18 @@ describe('floor fire meets the #92 element verbs', () => {
   })
 
   it('an NPC lit by floor fire panics and bolts out of the flames, still burning', () => {
-    const thug = spawnNpc(w, 'thug', s.x + 0.5, s.y + 0.5)
+    const mutant = spawnNpc(w, 'mutant', s.x + 0.5, s.y + 0.5)
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 1)
-    expect(isPanicking(w, thug)).toBe(true)
+    expect(isPanicking(w, mutant)).toBe(true)
     runTicks(w, noInput, 30)
-    expect(thug.ai!.goal).toBe('flee')
-    expect(fireAt(w, ...cellOf(thug))).toBe(false)
-    expect(hasStatus(thug, 'burning')).toBe(true)
+    expect(mutant.ai!.goal).toBe('flee')
+    expect(fireAt(w, ...cellOf(mutant))).toBe(false)
+    expect(hasStatus(mutant, 'burning')).toBe(true)
   })
 
   it.each([
-    ['an NPC', (w: World, x: number, y: number) => npc(w, 'thug', x, y)],
+    ['an NPC', (w: World, x: number, y: number) => npc(w, 'mutant', x, y)],
     ['a player', (w: World, x: number, y: number) => player(w, x + 0.5, y + 0.5)],
   ])('%s that is wet is dried by its first tick in the fire and lit by the next', (_label, make) => {
     const e = make(w, s.x, s.y)
@@ -293,13 +293,13 @@ describe('floor fire meets the #92 element verbs', () => {
   })
 
   it('an NPC lit by floor fire carries it to a crate it brushes past', () => {
-    const thug = npc(w, 'thug', s.x, s.y, 1000)
-    thug.speed = 0
+    const mutant = npc(w, 'mutant', s.x, s.y, 1000)
+    mutant.speed = 0
     igniteCell(w, s.x, s.y)
     runTicks(w, noInput, 1)
     const crate = spawnObject(w, 'crate', s.x + 8, s.y)
-    moveTo(thug, s.x + 7, s.y)
-    thug.pos.x += 0.3
+    moveTo(mutant, s.x + 7, s.y)
+    mutant.pos.x += 0.3
     runTicks(w, noInput, 1)
     expect(fireAt(w, ...cellOf(crate))).toBe(true)
   })

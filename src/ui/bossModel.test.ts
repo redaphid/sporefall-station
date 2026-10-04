@@ -96,10 +96,10 @@ describe('bossBar', () => {
   })
 
   it('draws nothing when the latched id now names a living non-boss', () => {
-    const thug = makeEntity('npc', 'thug', 9, 9)
-    thug.id = 1
-    thug.health = { hp: 30, max: 30, iframes: 0 }
-    expect(bossBar(view([thug]), 1, NAME)).toBeNull()
+    const mutant = makeEntity('npc', 'mutant', 9, 9)
+    mutant.id = 1
+    mutant.health = { hp: 30, max: 30, iframes: 0 }
+    expect(bossBar(view([mutant]), 1, NAME)).toBeNull()
   })
 
   it('drops the bar the instant the boss dies', () => {

@@ -65,9 +65,13 @@ describe('sequenced casting: golden digests', () => {
   // Re-pinned when NPC goals gained commitment and settlers took seats at
   // props (was ee39480f / 5930fe81): the fire path is unchanged, the crowd
   // around it moves differently.
+  // Re-pinned by the lore rename (was c5354a88 / 93a464b3). The digest hashes
+  // archetype, faction, item and field names; the pre-rename digest text,
+  // passed through the codemod, equals today's except that `misdeedUntilTick`
+  // now sorts after `downed`.
   const GOLDEN: Record<number, string> = {
-    7: 'c5354a88',
-    1234: '93a464b3',
+    7: 'f0f577c1',
+    1234: 'b80e2df3',
   }
 
   for (const seed of [7, 1234]) {

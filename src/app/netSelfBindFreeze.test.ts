@@ -106,7 +106,7 @@ describe('a client survives a snapshot that arrives between GameStart and Go', (
         missionComplete: false,
         gameOver: false,
         alarm: 0,
-        huds: { 1: { cash: 0, weapon: 'pistol', abilityCd: 0, bandages: 0, briefcase: false } },
+        huds: { 1: { cash: 0, weapon: 'pistol', abilityCd: 0, bandages: 0, canister: false } },
       }),
     )
     await flush()

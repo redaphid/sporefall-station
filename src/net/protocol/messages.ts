@@ -47,23 +47,23 @@ import { MsgType } from '../types'
  */
 export const ARCHETYPES = [
   'player',
-  'thug',
-  'cop',
+  'mutant',
+  'warden',
   'civilian',
   'shopkeeper',
   'boss',
   'projectile',
   'grenade',
   'door',
-  'pickup.bat',
+  'pickup.wrench',
   'pickup.knife',
   'pickup.pistol',
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
   'pickup.cash',
-  'pickup.briefcase',
-  'gangster',
-  'bouncer',
+  'pickup.canister',
+  'acolyte',
+  'lockkeeper',
   // Everything below was spawnable but MISSING from this registry, so
   // `archetypeIndex.get(...) ?? 0` encoded it as index 0 and the remote client
   // decoded it back as 'player' — i.e. a spore pod, a lurker or a burning tile
@@ -527,7 +527,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       playerId: -1,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
     // slots from the InventoryMsg, this is just the render-side placeholder.
@@ -614,14 +614,14 @@ export interface StateMsg {
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
-   * with the total quantity of every carried stack except the briefcase, which
+   * with the total quantity of every carried stack except the canister, which
    * is what it always was. Bandages themselves were culled. The field survives
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<
     number,
-    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+    { cash: number; weapon: string; abilityCd: number; bandages: number; canister: boolean; draft?: DraftHand }
   >
 }
 

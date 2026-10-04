@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT / "scripts" / "assets"))
 from palette import PALETTE  # noqa: E402
 
 HOT = {"#46e078", "#a6ffbe", "#3ce0d8", "#ffd83e", "#ff9032", "#e04a2a", "#a05ae0"}
-FLOOR_KEYS = ("street", "floor", "grass", "bog", "hall", "plating", "grate", "tiled")
+FLOOR_KEYS = ("causeway", "floor", "grass", "bog", "hall", "plating", "grate", "tiled")
 PROPOSED = {
     "glass round": "#7ecbd2",
     "bone round": "#f2f6ea",

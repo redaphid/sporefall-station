@@ -6,7 +6,7 @@ import { coordHash, pickTileVariant, planTileOverlays, type OverlayLevelView } f
 // pickTileVariant — variant selection, including macro slice-coherence.
 
 describe('pickTileVariant (no macro — the historical pure-hash pick)', () => {
-  it('matches the pre-macro formula exactly (city regression: bit-identical ground)', () => {
+  it('matches the pre-macro formula exactly (settlement regression: bit-identical ground)', () => {
     for (let tx = -3; tx < 9; tx++) {
       for (let ty = -3; ty < 9; ty++) {
         const h = coordHash(tx, ty)

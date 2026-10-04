@@ -35,16 +35,16 @@ arm(player, 'pistol', [
 ])
 
 const cast: Array<[archetype: string, x: number, y: number]> = [
-  ['gangster', 16.5, 4.5],
-  ['gangster', 23.5, 19.5],
-  ['gangster', 30.5, 4.5],
-  ['gangster', 37.5, 19.5],
+  ['acolyte', 16.5, 4.5],
+  ['acolyte', 23.5, 19.5],
+  ['acolyte', 30.5, 4.5],
+  ['acolyte', 37.5, 19.5],
   ['stalker', 22.5, 7.5],
   ['stalker', 36.5, 16.5],
-  ['thug', 29.5, 11.5],
+  ['mutant', 29.5, 11.5],
   ['cinder', 42.5, 6.5],
-  ['gangster', 42.5, 18.5],
-  ['gangster', 17.5, 12.5],
+  ['acolyte', 42.5, 18.5],
+  ['acolyte', 17.5, 12.5],
   ['brute', 41.5, 11.5],
 ]
 for (const [archetype, x, y] of cast) spawnNpc(w, archetype, x, y)

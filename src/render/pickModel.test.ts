@@ -21,7 +21,7 @@ const level = levelFromJson({
 const player = (id: number, x: number, y: number): Entity => {
   const e = makeEntity('player', 'player', x, y)
   e.id = id
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }

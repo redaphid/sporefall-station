@@ -59,7 +59,7 @@ export const createScriptedInput = (steps: ScriptStep[]): InputSource => {
 
 // 30 ticks = 1s. Player moves ~0.15 tiles/tick. Tuned against the `demo`
 // scenario (spawn 1.5,1.5; lane y=11; grenade pickup x5.5; civilians x8/9; door x12;
-// thugs x19,20 on the lane). Every segment is deterministic.
+// mutants x19,20 on the lane). Every segment is deterministic.
 export const SCRIPTS: Record<string, ScriptStep[]> = {
   // Deliberate-AI showcase (scenario `npc-deliberate`, stage centre 32,32):
   // the player only strolls and stands — every beat on stage is the AI's own.
@@ -81,7 +81,7 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // sweeps. The rest of the clip watches the behaviors play out.
   'npc-ai': [
     { ticks: 40 }, // establish: patrol walks its beat, scavenger heads for loot
-    { ticks: 12, attack: true }, // punch the civilian east of us (a crime!)
+    { ticks: 12, attack: true }, // punch the civilian east of us (a misdeed!)
     { ticks: 60, x: -1 }, // flee west along the lane, hunter in pursuit
     { ticks: 54, y: -1 }, // cut north past the wall's open west end
     { ticks: 12, x: 1 }, // tuck into the pocket behind the L-wall
@@ -95,11 +95,11 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 45 }, // pause over the pickup
     { ticks: 20, x: 1 }, // continue toward the civilians (~x9)
     { ticks: 80 }, // mingle with the civilians
-    { ticks: 17, x: 1 }, // step up to the door (stops at x≈11.5, thugs still unaware)
+    { ticks: 17, x: 1 }, // step up to the door (stops at x≈11.5, mutants still unaware)
     { ticks: 30 }, // pause at the door
     { ticks: 1, interact: true }, // open the door
     { ticks: 75 }, // watch it swing open
-    { ticks: 30, x: 1 }, // advance on the thugs; they spot the player and charge
+    { ticks: 30, x: 1 }, // advance on the mutants; they spot the player and charge
     { ticks: 1, special: true, x: 1 }, // lob a grenade into them
     { ticks: 26, x: 1, attack: true }, // press in firing the pistol
     { ticks: 24, attack: true }, // hold ground, finish them off
@@ -137,13 +137,13 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   ],
 
   // Melee-swing headline (feat/weapon-sprites): drop onto the lane, march east
-  // into the thug line (combat-stage: thugs at x=12/15/18, y=11), then HOLD the
+  // into the mutant line (combat-stage: mutants at x=12/15/18, y=11), then HOLD the
   // attack — the equipped melee weapon swings on its cooldown cadence, arcing
   // through the crowd. Backs the weapon-swing feature video (plain + modded).
   meleeSwing: [
     { ticks: 30 }, // settle on spawn
     { ticks: 64, y: 1 }, // drop down onto the lane (y≈11)
-    { ticks: 66, x: 1 }, // march east into melee range of the first thug (~x11.5)
+    { ticks: 66, x: 1 }, // march east into melee range of the first mutant (~x11.5)
     { ticks: 6, x: 1 }, // face east, planted
     { ticks: 150, x: 1, attack: true }, // press in swinging — arcs land, crowd reels
     { ticks: 40 }, // aftermath beat
@@ -213,16 +213,16 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
 
   // Animation-state showcase (feat/sprite-animation): cycle a character through
   // every animation state against the `anim-stage` inline world (player on the
-  // lane at x6, one guard thug at x12, a slow bullet inbound from the west that
+  // lane at x6, one guard mutant at x12, a slow bullet inbound from the west that
   // stings the player ~tick 138). idle breathe → walk → attack (pistol shots
-  // lunge; the thug flinches HURT then topples DEATH ~tick 104) → the west
+  // lunge; the mutant flinches HURT then topples DEATH ~tick 104) → the west
   // bullet lands (player HURT flinch) → dodge ROLL east + landing squash →
   // final idle. Every beat is deterministic from this timeline + the world.
   animStates: [
     { ticks: 30 }, // idle: breathe
     { ticks: 20, x: 1 }, // walk east 6 → 9 (lean + bob + stride)
     { ticks: 30 }, // idle again, facing east
-    { ticks: 40, attack: true }, // pistol: shots at 80/98/116 — thug hurt, then dies
+    { ticks: 40, attack: true }, // pistol: shots at 80/98/116 — mutant hurt, then dies
     { ticks: 100 }, // stand: the west bullet arrives ~138 → player hurt flinch
     { ticks: 1, roll: true, x: 1 }, // dodge-roll east (tumble, tick 220)
     { ticks: 59 }, // landing squash, settle back to idle breathe
@@ -244,14 +244,14 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
 
   // Playtest fix #1 proof: the DEFAULT starter pistol (now a real slotted, 40-round
   // ItemStack) grabs a Cryo Rounds gem off the lane, then fires the frozen rounds
-  // into the thug line — freezing then shattering them. Paired with the
-  // `starter-mod-fire` inline world (frost gem at x≈5.5, thugs at x=12/15/18).
+  // into the mutant line — freezing then shattering them. Paired with the
+  // `starter-mod-fire` inline world (frost gem at x≈5.5, mutants at x=12/15/18).
   modFrostFire: [
     { ticks: 36 }, // settle on spawn
     { ticks: 64, y: 1 }, // drop down onto the lane (y≈11)
     { ticks: 27, x: 1 }, // walk right onto the frost gem (~x5.5) → pistol gains Cryo Rounds
     { ticks: 34 }, // pause: the badge appears on the equipped pistol
-    { ticks: 2, x: 1 }, // face east toward the thug line
+    { ticks: 2, x: 1 }, // face east toward the mutant line
     { ticks: 150, attack: true }, // stand and empty frozen rounds into them — freeze then shatter
     { ticks: 40 }, // aftermath on the frosted/shattered line
   ],
@@ -270,7 +270,7 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // autoPickup system: the final hop just lands inside pickup range.
   missionMarker: [{ ticks: 400 }],
 
-  // Mission-UI progress states: the `mission` walk to the briefcase, then a LONG
+  // Mission-UI progress states: the `mission` walk to the canister, then a LONG
   // stand-still beat (600 ticks) so the e2e can open the panel and tap the exit
   // link with generous wall-clock slack (screenshots are slow under video
   // recording), then finish the floor.
@@ -278,7 +278,7 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 40 },
     { ticks: 64, y: 1 }, // down onto the lane
     { ticks: 30 },
-    { ticks: 57, x: 1 }, // onto the briefcase (~tick 190: objective completes)
+    { ticks: 57, x: 1 }, // onto the canister (~tick 190: objective completes)
     { ticks: 600 }, // hold: panel/link interactions land in this window
     { ticks: 34, x: 1 }, // head for the open exit
     { ticks: 90 }, // floor 2 beat
@@ -333,14 +333,14 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 60, x: 1, y: -1, attack: true },
   ],
 
-  // The bunker heist (fixture `bunker-heist`: seed 7 floor 3, player staged
+  // The bunker salvage (fixture `bunker-salvage`: seed 7 floor 3, player staged
   // east of the bunker airlock). The previously-blocked mission path, end to
   // end: PICK the two L2 airlock doors (deterministic 3.5s channels, progress
   // ring on screen), circuit the guard band, BREACH the core door with the
-  // grenade special (loud — the boom pulls investigators), grab the briefcase
+  // grenade special (loud — the boom pulls investigators), grab the canister
   // → MISSION COMPLETE. Geometry from levelgen seed 7 floor 3: outer door
-  // (40.5,53.5), inner (38.5,53.5), core door (26.5,55.5), briefcase (31.5,53).
-  'bunker-heist': [
+  // (40.5,53.5), inner (38.5,53.5), core door (26.5,55.5), canister (31.5,53).
+  'bunker-salvage': [
     { ticks: 30 }, // settle on the approach
     { ticks: 14, x: -1 }, // west up to the OUTER airlock door
     { ticks: 90 }, // stand — the "Lock II · Use to pick (3.5s)" prompt shows
@@ -358,9 +358,9 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 1, special: true }, // GRENADE — breach the core door
     { ticks: 45 }, // fuse, boom, door blown open (we eat some blast — loud is costly)
     { ticks: 22, x: 1 }, // step through the breach
-    { ticks: 26, x: 1, y: -1 }, // angle up toward the briefcase
+    { ticks: 26, x: 1, y: -1 }, // angle up toward the canister
     { ticks: 10, x: 1 },
-    { ticks: 80 }, // briefcase auto-grabs → MISSION COMPLETE banner
+    { ticks: 80 }, // canister auto-grabs → MISSION COMPLETE banner
   ],
 
   // Weapon-AIM showcase (fix/weapon-aim-and-pistol-art): the held weapon points
@@ -401,8 +401,8 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // hold after each leg so a screenshot lands cleanly on that facing (captures
   // lag the sim ~60 ticks under video recording; 90-tick holds absorb it). The
   // eight legs cancel pairwise so the walker returns to centre, then it marches
-  // east into the thug pair and swings the bat — the combat beat. Pairs with the
-  // `artcompare` scenario (player on the lane at x8, thugs at x18/19). Backs the
+  // east into the mutant pair and swings the wrench — the combat beat. Pairs with the
+  // `artcompare` scenario (player on the lane at x8, mutants at x18/19). Backs the
   // 48px-downscale-vs-hi-res A/B hero-art comparison videos.
   artcompare: [
     { ticks: 90 }, // idle, facing south (toward camera)
@@ -422,13 +422,13 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 90 },
     { ticks: 14, x: 1, y: -1 }, // NE
     { ticks: 90 },
-    { ticks: 10, x: 1 }, // face east, staying on the lane clear of the thug line
-    { ticks: 160, attack: true }, // plant and fire east down the lane into the thug line
+    { ticks: 10, x: 1 }, // face east, staying on the lane clear of the mutant line
+    { ticks: 160, attack: true }, // plant and fire east down the lane into the mutant line
     { ticks: 40 }, // aftermath beat
   ],
 
   // Weapon-combo showcase (demo/weapon-combos): the player is PRE-POSITIONED on
-  // the lane just west of the stationary dummy row (thugs at x=12/15/18, y=11),
+  // the lane just west of the stationary dummy row (mutants at x=12/15/18, y=11),
   // so there is no walk-in preamble — a tight ~6.4s clip that is almost entirely
   // "aim + hold fire + watch the on-hit effect". Face east for a beat (so aim
   // holds the east heading), then plant and empty the weapon down the row; the
@@ -441,12 +441,12 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 26 }, // aftermath beat on the on-hit effect
   ],
 
-  // A full mission: grab the briefcase (objective complete), then reach the exit.
+  // A full mission: grab the canister (objective complete), then reach the exit.
   mission: [
     { ticks: 40 },
     { ticks: 64, y: 1 }, // down onto the lane
     { ticks: 30 },
-    { ticks: 57, x: 1 }, // walk to the briefcase at x=10 and pick it up
+    { ticks: 57, x: 1 }, // walk to the canister at x=10 and pick it up
     { ticks: 70 }, // MISSION COMPLETE — hold on the banner
     { ticks: 34, x: 1 }, // head for the now-open exit at x=15
     { ticks: 60 }, // step onto it → next floor

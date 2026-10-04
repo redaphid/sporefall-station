@@ -22,12 +22,12 @@ export interface HotbarSlot {
   mods: string
 }
 
-/** Slots the hotbar must never show: the briefcase (a mission item, not
+/** Slots the hotbar must never show: the canister (a mission item, not
  * equippable) and WEAPONS. The player's weapon is permanent and cannot be
  * swapped, so its slot exists only to hold weapon-mods — showing it would offer
  * a switch that does nothing, and gamepad cycling walks exactly this list. */
 const hidden = (itemId: string): boolean => {
-  if (itemId === 'briefcase') return true
+  if (itemId === 'canister') return true
   const c = itemClass(itemId)
   return c === 'melee' || c === 'ranged'
 }

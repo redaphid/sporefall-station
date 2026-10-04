@@ -3,7 +3,7 @@
 //   1. `?theme=swampspace` (dev/session URL param) — spawn shot with themed
 //      characters + tiles, plus a second framing teleported next to a prop
 //      (crate/barrel) so tiles + chars + props are all visible in one image.
-//   2. The settings-picker path a player uses: boot on default city, open the
+//   2. The settings-picker path a player uses: boot on default settlement, open the
 //      gear panel, pick "Sporefall Station" from the Theme select, and assert
 //      the pixels change (hot-swap) with no page errors and the sim ticking.
 import { chromium } from 'playwright'
@@ -69,10 +69,10 @@ await p1.close()
 // --- Path 2: settings picker -------------------------------------------------
 const p2 = await newPage()
 await p2.goto(`${BASE}/?mode=solo&e2e&seed=424242&zoom=2`, { waitUntil: 'networkidle' })
-await p2.evaluate(() => localStorage.clear()) // no persisted theme — boot city next load
+await p2.evaluate(() => localStorage.clear()) // no persisted theme — boot settlement next load
 await p2.goto(`${BASE}/?mode=solo&e2e&seed=424242&zoom=2`, { waitUntil: 'networkidle' })
 await waitTicks(p2, 30)
-const cityShot = await snap(p2, 'city-before-picker')
+const settlementShot = await snap(p2, 'settlement-before-picker')
 
 await p2.click('button[aria-label="Settings"]')
 const options = await p2.$$eval('#th option', (os) => os.map((o) => ({ id: o.value, name: o.textContent })))
@@ -84,7 +84,7 @@ await p2.waitForTimeout(1200) // asset bake + hot swap
 await p2.click('button[aria-label="Settings"]') // close panel so the shot is clean
 await p2.waitForTimeout(200)
 const pickedShot = await snap(p2, 'swampspace-via-picker')
-if (pickedShot.equals(cityShot)) failures.push('picker swap changed nothing — city and swampspace shots identical')
+if (pickedShot.equals(settlementShot)) failures.push('picker swap changed nothing — settlement and swampspace shots identical')
 const tick2 = await p2.evaluate(() => window.__world.tick)
 if (tick2 < 30) failures.push(`sim stopped after picker swap (tick=${tick2})`)
 await p2.close()

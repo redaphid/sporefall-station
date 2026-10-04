@@ -11,8 +11,8 @@ import { createWorld, tickWorld } from './world'
  * Spawn safety — the "beaten to death at spawn before your first input" bug.
  *
  * With `world.hostile` (default), every NPC engages players on sight. Before
- * the SPAWN_SAFE_RADIUS guard, street life could populate right next to the
- * fixed floor-1 spawn: on seed 7 a bat-wielding civilian spawned 2.2 tiles
+ * the SPAWN_SAFE_RADIUS guard, causeway life could populate right next to the
+ * fixed floor-1 spawn: on seed 7 a wrench-wielding civilian spawned 2.2 tiles
  * away and downed an idle player by tick ~111. Sweeping seeds 1..100, 8%
  * died within 10 idle seconds. These tests pin the guard and the grace.
  */
@@ -39,17 +39,17 @@ const buildRun = (seed: number) => {
   return { w, p }
 }
 
-const streetTile = (t: number): boolean => t === Tile.Street || t === Tile.Sidewalk
+const causewayTile = (t: number): boolean => t === Tile.Causeway || t === Tile.Boardwalk
 
-describe('street life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => {
-  it('no street/sidewalk NPC within the radius, seeds 1..60', () => {
+describe('causeway life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => {
+  it('no causeway/boardwalk NPC within the radius, seeds 1..60', () => {
     for (let seed = 1; seed <= 60; seed++) {
       const w = createWorld(seed, 1, 'normal')
       populateWorld(w)
       for (const e of w.entities) {
         if (e.kind !== 'npc') continue
         const tile = w.level.tiles[Math.floor(e.pos.y) * w.level.w + Math.floor(e.pos.x)]
-        if (!streetTile(tile)) continue // interior NPCs are exempt: walls block sight
+        if (!causewayTile(tile)) continue // interior NPCs are exempt: walls block sight
         const d = Math.hypot(e.pos.x - w.level.spawn.x, e.pos.y - w.level.spawn.y)
         expect(d, `seed ${seed}: ${e.archetype}#${e.id} at ${e.pos.x},${e.pos.y}`).toBeGreaterThanOrEqual(
           SPAWN_SAFE_RADIUS,
@@ -58,15 +58,15 @@ describe('street life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => 
     }
   })
 
-  it('street patrol beats never route a waypoint into the spawn-safe zone', () => {
+  it('causeway patrol beats never route a waypoint into the spawn-safe zone', () => {
     for (let seed = 1; seed <= 60; seed++) {
       const w = createWorld(seed, 1, 'normal')
       populateWorld(w)
       for (const e of w.entities) {
-        if (e.archetype !== 'cop' || !e.ai?.params?.waypoints) continue
+        if (e.archetype !== 'warden' || !e.ai?.params?.waypoints) continue
         for (const wp of e.ai.params.waypoints) {
           const d = Math.hypot(wp.x - w.level.spawn.x, wp.y - w.level.spawn.y)
-          expect(d, `seed ${seed}: cop#${e.id} waypoint`).toBeGreaterThanOrEqual(SPAWN_SAFE_RADIUS)
+          expect(d, `seed ${seed}: warden#${e.id} waypoint`).toBeGreaterThanOrEqual(SPAWN_SAFE_RADIUS)
         }
       }
     }
@@ -104,23 +104,23 @@ describe('an idle just-spawned player survives (the seed-7 regression)', () => {
 })
 
 describe('spawn grace iframes', () => {
-  it('a hostile thug in melee range cannot touch the player during grace', () => {
+  it('a hostile mutant in melee range cannot touch the player during grace', () => {
     const w = createWorld(123, 1, 'normal')
     setupFloor(w)
     const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     expect(p.health!.iframes).toBe(SPAWN_GRACE_TICKS)
     // Adversarial: hostile melee NPC ALREADY in swing range at tick 0.
-    spawnNpc(w, 'thug', w.level.spawn.x + 0.8, w.level.spawn.y)
+    spawnNpc(w, 'mutant', w.level.spawn.x + 0.8, w.level.spawn.y)
     const inputs = new Map([[0, idle]])
     for (let t = 0; t < SPAWN_GRACE_TICKS - 1; t++) tickWorld(w, inputs)
     expect(p.health!.hp).toBe(p.health!.max)
   })
 
-  it('grace expires: the same thug connects once iframes run out', () => {
+  it('grace expires: the same mutant connects once iframes run out', () => {
     const w = createWorld(123, 1, 'normal')
     setupFloor(w)
     const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-    spawnNpc(w, 'thug', w.level.spawn.x + 0.8, w.level.spawn.y)
+    spawnNpc(w, 'mutant', w.level.spawn.x + 0.8, w.level.spawn.y)
     const inputs = new Map([[0, idle]])
     for (let t = 0; t < SPAWN_GRACE_TICKS + 120; t++) tickWorld(w, inputs)
     expect(p.health!.hp).toBeLessThan(p.health!.max)

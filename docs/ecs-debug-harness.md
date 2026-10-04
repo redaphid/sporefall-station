@@ -56,7 +56,7 @@ flag is set) and only attaches to sessions that own an authoritative world
 pnpm exec tsx tools/debug-cli/cli.ts state
 pnpm exec tsx tools/debug-cli/cli.ts entities
 pnpm exec tsx tools/debug-cli/cli.ts get 5
-pnpm exec tsx tools/debug-cli/cli.ts spawn npc cop 20 20
+pnpm exec tsx tools/debug-cli/cli.ts spawn npc warden 20 20
 pnpm exec tsx tools/debug-cli/cli.ts set 5 '{"health":{"hp":1}}'
 pnpm exec tsx tools/debug-cli/cli.ts teleport 5 30 30
 pnpm exec tsx tools/debug-cli/cli.ts kill 5

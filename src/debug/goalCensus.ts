@@ -6,8 +6,8 @@
 //   A→B→A within 2 s          a goal left and re-adopted inside 60 ticks: the
 //                             visible flip-flop
 //
-// Broken down by class: settler (the civ faction), warden (cop), hostile
-// (gang), and neutral. Pure over the world it is handed, so the CLI
+// Broken down by class: settler (the civ faction), warden (warden), hostile
+// (rootcult), and neutral. Pure over the world it is handed, so the CLI
 // (scripts/goal-census.mts) and the regression test share one measurement.
 
 import type { Entity } from '../game/entity'
@@ -21,9 +21,9 @@ export const classOf = (e: Entity): CensusClass => {
   switch (e.ai?.faction) {
     case 'civ':
       return 'settler'
-    case 'cop':
+    case 'warden':
       return 'warden'
-    case 'gang':
+    case 'rootcult':
       return 'hostile'
     default:
       return 'neutral'

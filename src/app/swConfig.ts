@@ -17,7 +17,7 @@
  * The app shell precache: HTML, hashed JS/CSS, icons and the DEFAULT theme
  * chain (swampspace-hires falls back to swampspace, so offline play needs
  * both). Deliberately EXCLUDES public/sprites/** — 7.1 MB used only by the
- * legacy `city` theme and the dev asset-showcase page, picked up on demand by
+ * legacy `settlement` theme and the dev asset-showcase page, picked up on demand by
  * the runtime rule below instead of bloating the install.
  *
  * Note there is no `ota/**` pattern, and there must never be one: precaching

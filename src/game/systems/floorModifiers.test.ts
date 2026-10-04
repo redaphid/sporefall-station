@@ -181,7 +181,7 @@ describe('floor modifiers: the roll', () => {
   it('never rolls a bog tide on a floor with too little low ground to flood', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const lv = generateLevel(seed, 2)
-      lv.tiles.fill(Tile.Floor) // no street, hall, grate or bog anywhere
+      lv.tiles.fill(Tile.Floor) // no causeway, hall, grate or bog anywhere
       expect(rollFloorModifier(seed, 2, lv)).not.toBe('bogTide')
     }
     expect(TIDE_MIN_TILES).toBeGreaterThan(0)
@@ -351,10 +351,10 @@ describe('bog tide', () => {
     ])
   })
 
-  /** Street (low) on the left half, sidewalk (high) on the right. */
+  /** Causeway (low) on the left half, boardwalk (high) on the right. */
   const shore = (): World => {
-    const w = arena(2, 2, 50, 30, Tile.Sidewalk)
-    paint(w, 2, 2, 25, 30, Tile.Street)
+    const w = arena(2, 2, 50, 30, Tile.Boardwalk)
+    paint(w, 2, 2, 25, 30, Tile.Causeway)
     w.modifier = mod('bogTide', 0)
     return w
   }
@@ -365,7 +365,7 @@ describe('bog tide', () => {
     return p.pos.x - x0
   }
 
-  it('wading through a flooded street is slower and leaves you wet; the same walk at low tide is not', () => {
+  it('wading through a flooded causeway is slower and leaves you wet; the same walk at low tide is not', () => {
     const dry = shore()
     const pd = spawnPlayer(dry, 0, 5.5, 10.5)
     const dryDist = walked(dry, pd, 30)
@@ -409,9 +409,9 @@ describe('bog tide', () => {
   it('NPCs wade too, and a shock arcs through everyone standing in the flood', () => {
     const w = shore()
     w.tick = FLOOD_AT
-    const a = spawnNpc(w, 'thug', 10.5, 10.5)
-    const b = spawnNpc(w, 'thug', 11.5, 10.5)
-    const c = spawnNpc(w, 'thug', 12.5, 10.5)
+    const a = spawnNpc(w, 'mutant', 10.5, 10.5)
+    const b = spawnNpc(w, 'mutant', 11.5, 10.5)
+    const c = spawnNpc(w, 'mutant', 12.5, 10.5)
     tickN(w, 1)
     expect([a, b, c].every(isWet)).toBe(true)
     const hp = c.health!.hp
@@ -421,8 +421,8 @@ describe('bog tide', () => {
 
   it('the same trio on dry ground at low tide stops the arc at the first body', () => {
     const w = shore()
-    const a = spawnNpc(w, 'thug', 10.5, 10.5)
-    const b = spawnNpc(w, 'thug', 11.5, 10.5)
+    const a = spawnNpc(w, 'mutant', 10.5, 10.5)
+    const b = spawnNpc(w, 'mutant', 11.5, 10.5)
     tickN(w, 1)
     expect(isWet(a) || isWet(b)).toBe(false)
     const hp = b.health!.hp
@@ -435,7 +435,7 @@ describe('bog tide', () => {
     w.tick = FLOOD_AT
     const p = spawnPlayer(w, 0, 5.5, 10.5)
     p.dead = true
-    const n = spawnNpc(w, 'thug', 6.5, 12.5)
+    const n = spawnNpc(w, 'mutant', 6.5, 12.5)
     kill(w, n)
     tickN(w, 1)
     expect(isWet(p)).toBe(false)
@@ -445,13 +445,13 @@ describe('bog tide', () => {
   it('props in the flood stay dry, so an arc through the water never erases a barrel or crate', () => {
     const w = shore()
     w.tick = FLOOD_AT
-    const thug = spawnNpc(w, 'thug', 10.5, 10.5)
+    const mutant = spawnNpc(w, 'mutant', 10.5, 10.5)
     const barrel = spawnObject(w, 'barrel', 11, 10)
     const crate = spawnObject(w, 'crate', 10, 11)
     tickN(w, 1)
-    expect(isWet(thug)).toBe(true)
+    expect(isWet(mutant)).toBe(true)
     expect([isWet(barrel), isWet(crate)]).toEqual([false, false])
-    shock(w, thug)
+    shock(w, mutant)
     expect([barrel.dead ?? false, crate.dead ?? false]).toEqual([false, false])
     expect([barrel.health!.hp, crate.health!.hp]).toEqual([barrel.health!.max, crate.health!.max])
   })
@@ -469,7 +469,7 @@ describe('brownout', () => {
   const stage = (kind?: FloorModifierKind): { w: World; guard: Entity; p: Entity } => {
     const w = arena()
     if (kind) w.modifier = mod(kind)
-    const guard = spawnNpc(w, 'thug', 10.5, 10.5)
+    const guard = spawnNpc(w, 'mutant', 10.5, 10.5)
     const p = spawnPlayer(w, 0, 10.5, 10.5)
     return { w, guard, p }
   }

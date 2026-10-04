@@ -57,7 +57,7 @@ const place = (e: Entity, x: number, y: number): void => {
   e.pos.y = e.prevPos.y = y
   e.vel.x = e.vel.y = 0
 }
-const holds = (e: Entity): boolean => (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase')
+const holds = (e: Entity): boolean => (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister')
 /** A fresh world rebuilt from its own JSON: every scenario below runs on state set exactly. */
 const exact = (w: World): World => deserializeWorld(serializeWorld(w))
 const grab = (w: World, slot = 0): void => {
@@ -130,7 +130,7 @@ describe('extraction loop', () => {
   it('generates a prize in the target building and an extraction point on the entry', () => {
     const w = boot(extractionSeed, 2)
     expect(w.mission.extractPoint).toEqual({ x: Math.floor(w.level.spawn.x), y: Math.floor(w.level.spawn.y) })
-    expect(prize(w).pickup?.itemId).toBe('briefcase')
+    expect(prize(w).pickup?.itemId).toBe('canister')
     expect(extractionView(w)).toEqual({ ...w.mission.extractPoint, held: false })
     expect(stationAlerted(w)).toBe(false)
   })
@@ -263,7 +263,7 @@ describe('extraction loop', () => {
     grab(w)
     const p = player(w)
     const ld = p.loadout!
-    ld.inventory = [{ itemId: 'briefcase', qty: 1 }, ...ld.inventory.filter((s) => s.itemId !== 'briefcase')]
+    ld.inventory = [{ itemId: 'canister', qty: 1 }, ...ld.inventory.filter((s) => s.itemId !== 'canister')]
     ld.activeSlot = ld.inventory.length - 1
     const active = ld.inventory[ld.activeSlot]
     p.playerCtl!.downed = { bleedTicks: 90, reviveProgress: 0 }

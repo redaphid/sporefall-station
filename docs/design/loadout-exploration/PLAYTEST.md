@@ -35,7 +35,7 @@ Retreat when hurt. A playtest where you stand still and hold fire is not a playt
 
 **S1. The roster (variety).** Seed 101. Stage four fights, one at a time, each about 6 tiles
 away: a `brute` (bullets bounce off it), a `cinder` (shrugs off fire), a `sporeling` swarm
-of 3, and a mixed pack (`thug` ×2 + `stalker`). Give yourself the same **starting hand of 4
+of 3, and a mixed pack (`mutant` ×2 + `stalker`). Give yourself the same **starting hand of 4
 mods** each time: `shock`, `incendiary`, `frost`, `pierce` (or the prototype's equivalents
 per its PLAYBOOK). Before each fight, **rearrange or reconfigure the build for that enemy**
 using only player actions. Record whether the best setup was **different per enemy**. If

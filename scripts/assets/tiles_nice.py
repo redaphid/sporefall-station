@@ -133,7 +133,7 @@ def _moss_along(img, mask, rng, col, edge=0.55):
     img[near & speck] = col
 
 
-def street_tile(T, v):
+def causeway_tile(T, v):
     rng = np.random.default_rng(4000 + v)
     img = base_field(T, rng, hexc("#3c444d"), hexc("#59636d"), sigma=T / 4, ramp=0.15)
     cracks = np.zeros((T, T), bool)
@@ -149,7 +149,7 @@ def street_tile(T, v):
     return snap(img)
 
 
-def sidewalk_tile(T, v):
+def boardwalk_tile(T, v):
     rng = np.random.default_rng(5000 + v)
     img = base_field(T, rng, hexc("#454e57"), hexc("#59636d"), sigma=T / 4, ramp=0.15)
     seam = hexc("#23282e")
@@ -166,8 +166,8 @@ def sidewalk_tile(T, v):
 
 
 GENS = {"floor": floor_tile, "grass": bog_tile, "wall": wall_tile,
-        "street": street_tile, "sidewalk": sidewalk_tile}
-COUNTS = {"floor": 8, "grass": 8, "wall": 3, "street": 12, "sidewalk": 4}
+        "causeway": causeway_tile, "boardwalk": boardwalk_tile}
+COUNTS = {"floor": 8, "grass": 8, "wall": 3, "causeway": 12, "boardwalk": 4}
 
 if __name__ == "__main__":
     import os

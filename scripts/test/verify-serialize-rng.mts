@@ -12,8 +12,8 @@ const build = () => {
   const w = createWorld(0xdecaf, 1)
   const sp = w.level.spawn
   spawnPlayer(w, 0, sp.x, sp.y)
-  spawnNpc(w, 'cop', sp.x + 3, sp.y)
-  spawnNpc(w, 'thug', sp.x - 3, sp.y)
+  spawnNpc(w, 'warden', sp.x + 3, sp.y)
+  spawnNpc(w, 'mutant', sp.x - 3, sp.y)
   for (let i = 0; i < 50; i++) tickWorld(w, new Map([[0, { ...emptyInput(), moveX: -1, attack: true }]]))
   return w
 }

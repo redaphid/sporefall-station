@@ -10,7 +10,7 @@ const player = (opts: { weapon?: string; cd?: number } = {}): Entity => {
     playerId: 0,
     abilityCooldown: opts.cd ?? 0,
     cash: 0,
-    crimeUntilTick: 0,
+    misdeedUntilTick: 0,
   }
   p.loadout = { inventory: [], activeSlot: -1 }
   return p
@@ -72,7 +72,7 @@ describe('computeTouchLabels — USE verb selection', () => {
     talker.interact = { verb: 'talk', range: 1.3 }
     expect(computeTouchLabels(view(player(), [talker])).use).toBe('Talk')
 
-    const loot = makeEntity('pickup', 'pickup.bat', 0.5, 0)
+    const loot = makeEntity('pickup', 'pickup.wrench', 0.5, 0)
     loot.interact = { verb: 'pickup', range: 1.3 }
     expect(computeTouchLabels(view(player(), [loot])).use).toBe('Grab')
   })

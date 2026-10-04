@@ -12,6 +12,10 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 10 — `ARCHETYPES` strings and the `Faction` ids renamed in place by the
+ *     lore-rename codemod (mutant, warden, acolyte, lockkeeper, pickup.wrench,
+ *     pickup.canister; rootcult). Indices are unchanged, but an old peer would
+ *     decode them as archetypes this build no longer defines.
  * 9 — snapshots gain a sparse activity trailer after the status one: which
  *     settlers sit at a card table, bench or bunk, and whether play is on, so
  *     a client draws the card game. An old peer would never see it.
@@ -35,7 +39,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 9
+export const PROTOCOL_VERSION = 10
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

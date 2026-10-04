@@ -1,6 +1,6 @@
-// Craft the `tide-and-thunder` save: a sunken street grid on a bog tide, three
+// Craft the `tide-and-thunder` save: a sunken causeway grid on a bog tide, three
 // gloamhound packs denned in the flood lanes, and the player on a raised
-// sidewalk island with a shock pistol. When the tide is in, every hound in the
+// boardwalk island with a shock pistol. When the tide is in, every hound in the
 // water is wet, and a shock round arcs from one wet body to the next.
 // The first flood comes about three seconds in.
 //
@@ -17,7 +17,7 @@ const W = 46
 const H = 38
 const s = new Sketch(W, H, '#')
 s.fill(1, 1, W - 2, H - 2, ':')
-// City blocks between the flood lanes; each keeps a dry sidewalk lip.
+// City blocks between the flood lanes; each keeps a dry boardwalk lip.
 for (const bx of [4, 18, 32]) {
   for (const by of [4, 22]) {
     s.fill(bx, by, bx + 9, by + 11, '-')

@@ -17,7 +17,7 @@
  },
  "1:5": {
   "template": "contain",
-  "hash": "f76fc119"
+  "hash": "38dbbcf7"
  },
  "1:6": {
   "template": "infiltrate",
@@ -189,7 +189,7 @@
  },
  "6:8": {
   "template": "infiltrate",
-  "hash": "68ae00aa"
+  "hash": "ba2b57b1"
  },
  "7:1": {
   "template": "steal",
@@ -301,7 +301,7 @@
  },
  "10:4": {
   "template": "steal",
-  "hash": "3201b9f"
+  "hash": "7dd5c0b2"
  },
  "10:5": {
   "template": "contain",
@@ -489,7 +489,7 @@
  },
  "16:3": {
   "template": "assassinate",
-  "hash": "949ca4e1"
+  "hash": "b9ba3b76"
  },
  "16:4": {
   "template": "assassinate",
@@ -561,7 +561,7 @@
  },
  "18:5": {
   "template": "infiltrate",
-  "hash": "2284475c"
+  "hash": "556f8966"
  },
  "18:6": {
   "template": "infiltrate",
@@ -601,7 +601,7 @@
  },
  "19:7": {
   "template": "contain",
-  "hash": "3cedced1"
+  "hash": "323ecf9"
  },
  "19:8": {
   "template": "contain",

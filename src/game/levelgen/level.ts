@@ -238,7 +238,7 @@ export const THEMES: readonly Theme[] = [
     ],
     encounters: { stalkers: 0.3 },
     wingNames: {
-      office: 'tally office',
+      office: 'tally hall',
       shop: 'weigh-house',
       apartment: 'company lodging',
       clinic: 'company infirmary',
@@ -323,7 +323,7 @@ export const THEMES: readonly Theme[] = [
       { prop: 'vending', count: [0, 1] },
     ],
     encounters: { broodSacs: 0.35, sporeMites: 0.4 },
-    wingNames: { lab: 'culture house', medbay: 'spore clinic', shop: 'seed store' },
+    wingNames: { lab: 'culture house', medbay: 'spore ward', shop: 'seed store' },
   },
 ]
 

@@ -14,10 +14,11 @@ import type { Entity } from '../entity'
 import { spawnPlayer } from '../player'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { emptyInput, type InputCmd } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { tickWorld, type World } from '../world'
 import { combatSystem } from './combat'
 import { CONSUMABLES } from '../data/items'
 import { ROLL_COOLDOWN, ROLL_TICKS } from './roll'
+import { frozenWorld } from '../testkit'
 
 // The item cull emptied the CONSUMABLE class outright (bandage/medkit/burger/
 // adrenaline were all of it), but this file tests BUTTON ARBITRATION -- FIRE vs
@@ -59,7 +60,7 @@ describe('fire button — FIRE ALWAYS fires the permanent weapon', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
     p.health = { hp: 50, max: 120, iframes: 0 }
   })
@@ -102,7 +103,7 @@ describe('use button — the held item is what the USE button spends', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
     p.health = { hp: 50, max: 120, iframes: 0 }
   })
@@ -153,7 +154,7 @@ describe('fire button — a weapon in hand fires as before', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
   })
 
@@ -192,7 +193,7 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
   })
 
@@ -226,7 +227,7 @@ describe('use button — nothing usable → dodge-roll (the backflip)', () => {
   let w: World
   let p: Entity
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     p = player(w)
   })
 
@@ -292,7 +293,7 @@ describe('use button — nothing usable → dodge-roll (the backflip)', () => {
 
 describe('use→roll fallback — integration through the full tick pipeline', () => {
   it('holding use with empty hands rolls, waits out the cooldown, then rolls again', () => {
-    const w = createWorld(1, 1)
+    const w = frozenWorld(1, 1)
     const p = player(w)
     p.loadout!.inventory = []
     p.loadout!.activeSlot = -1
@@ -314,7 +315,7 @@ describe('use→roll fallback — integration through the full tick pipeline', (
 
 describe('fire button — co-op resolves per player independently', () => {
   it('one player heals off a consumable while the other fires a gun, same tick', () => {
-    const w = createWorld(1, 1)
+    const w = frozenWorld(1, 1)
     const s = w.level.spawn
     const healer = spawnPlayer(w, 0, s.x, s.y)
     healer.facing = 0
@@ -344,7 +345,7 @@ describe('fire button — co-op resolves per player independently', () => {
   })
 
   it('co-op USE: one player rolls (empty hands) while the other uses an item, same tick', () => {
-    const w = createWorld(1, 1)
+    const w = frozenWorld(1, 1)
     const s = w.level.spawn
     const roller = spawnPlayer(w, 0, s.x, s.y)
     roller.facing = 0
@@ -373,7 +374,7 @@ describe('fire button — co-op resolves per player independently', () => {
 
 describe('use→roll fallback — determinism / serialization', () => {
   it('a use-triggered roll round-trips and replays byte-identically', () => {
-    const w = createWorld(9, 1)
+    const w = frozenWorld(9, 1)
     const p = player(w)
     p.loadout!.inventory = []
     p.loadout!.activeSlot = -1

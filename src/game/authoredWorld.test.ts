@@ -207,16 +207,10 @@ describe('seeded worlds: the generator path is unchanged', () => {
     expect(back.level.complex).toBeUndefined()
   })
 
-  it('every committed seeded fixture still loads and re-saves to itself exactly', () => {
-    for (const name of ['mid-run', 'mid-run-plus-10', 'combat-stage', 'comm-scene', 'fire-stage', 'crew-scene', 'crew-scene-8']) {
-      const j = loadFixtureJson(name)
-      expect(j.level, name).toBeUndefined()
-      expect(serializeWorld(deserializeWorld(j)), name).toEqual(loadFixtureJson(name))
-    }
-  })
-
-  it('every committed frozen-level fixture carries its level whole and re-saves to itself exactly', () => {
-    for (const name of ['bunker-heist', 'frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) {
+  it('every committed fixture carries its level whole and re-saves to itself exactly', () => {
+    const committed = Object.keys(import.meta.glob('./__fixtures__/*.json')).map((p) => p.replace('./__fixtures__/', '').replace('.json', ''))
+    expect(committed.length).toBeGreaterThan(30)
+    for (const name of committed) {
       const j = loadFixtureJson(name)
       expect(j.level, name).toBeDefined()
       expect(j.levelChecksum, name).toBeUndefined()

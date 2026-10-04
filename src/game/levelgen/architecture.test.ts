@@ -316,11 +316,4 @@ describe('street variety', () => {
     }
     expect(plazaCount).toBeGreaterThan(10)
   })
-
-  it('floor 1 keeps uniform 3-wide streets (frozen)', () => {
-    for (let seed = 1; seed <= 50; seed++) {
-      const level = generateLevel(seed, 1)
-      expect(level.plazas ?? []).toHaveLength(0)
-    }
-  })
 })

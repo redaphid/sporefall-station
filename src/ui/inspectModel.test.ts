@@ -183,7 +183,7 @@ describe('buildInfoCard — players', () => {
     const card = buildInfoCard(p)
     const rows = rowMap(card.rows)
     expect(rows.Player).toBe('P1')
-    expect(rows.Cash).toBe('$120')
+    expect(rows.Scrip).toBe('120')
     expect(rows.Weapon).toBe('Shotgun')
     expect(rows['❄️ Cryo Rounds']).toBe('×1')
     expect(rows['🪃 Bouncy']).toBe('×2')
@@ -312,8 +312,8 @@ describe('buildInfoCard — world objects (every OBJECTS entry)', () => {
   // what matters — a dispenser must always say what it pays out.
   it('both dispensers say what they dispense', () => {
     const w = world()
-    expect(rowMap(buildInfoCard(spawnObject(w, 'atm', 1, 1)).rows).Dispenses).toBe('$50')
-    expect(rowMap(buildInfoCard(spawnObject(w, 'vending', 2, 2)).rows).Dispenses).toBe('$10')
+    expect(rowMap(buildInfoCard(spawnObject(w, 'atm', 1, 1)).rows).Dispenses).toBe('50 scrip')
+    expect(rowMap(buildInfoCard(spawnObject(w, 'vending', 2, 2)).rows).Dispenses).toBe('10 scrip')
   })
 
   it('explosive props warn; a used dispenser says so', () => {

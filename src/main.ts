@@ -862,7 +862,7 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
     session.onPhaseChange = (phase) => {
       dbg.log(`join: phase → ${phase}`)
       if (phase === 'lobby') lobby.setStatus('Connected — waiting for host to start')
-      else if (phase === 'starting') lobby.setStatus('Generating city…')
+      else if (phase === 'starting') lobby.setStatus('Surfacing the colony…')
       else if (phase === 'playing') resolve(true)
       else if (phase === 'rejected') {
         lobby.setStatus(`Rejected: ${session.rejectReason}`)

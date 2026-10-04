@@ -21,12 +21,13 @@ import { makeEntity, type Entity } from '../entity'
 import { spawnPlayer } from '../player'
 import { spawnNpc } from '../populate'
 import { emptyInput } from '../types'
-import { addEntity, createWorld, tickWorld, type World } from '../world'
+import { addEntity, tickWorld, type World } from '../world'
 import { SHATTER_DAMAGE_MULT, applyDamage, fireWeapon } from './combat'
 import { applyModPickup, weaponStack } from './inventory'
 import { resolveWeapon } from './resolveWeapon'
 import { isRolling } from './roll'
 import { addStatus, applyStatus, hasStatus } from './statusFx'
+import { frozenWorld } from '../testkit'
 
 const body = (w: World, hp = 100): Entity => {
   const e = addEntity(w, makeEntity('npc', 'civilian', 20, 20))
@@ -38,7 +39,7 @@ const body = (w: World, hp = 100): Entity => {
 describe('applyDamage reports HOW MUCH it dealt, or null if it never landed', () => {
   let w: World
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
   })
 
   it('returns the damage actually applied for an ordinary hit', () => {
@@ -158,7 +159,7 @@ describe('callers read the result correctly (the bugs lived here, not in applyDa
    * the sum of two effects rather than the one under test.
    */
   const fireAt = (mods: string[], arch: string, ticks: number) => {
-    const w = createWorld(9, 1)
+    const w = frozenWorld(9, 1)
     const sp = w.level.spawn
     const p = spawnPlayer(w, 0, sp.x, sp.y)
     let foe: Entity | undefined
@@ -219,7 +220,7 @@ describe('callers read the result correctly (the bugs lived here, not in applyDa
   it('a 0-damage utility hit STILL applies its status through the real fire path', () => {
     // The freeze ray deals 0 and exists only for its status. A caller that tested
     // truthiness instead of `!== null` would silently break every weapon like it.
-    const w = createWorld(3, 1)
+    const w = frozenWorld(3, 1)
     const sp = w.level.spawn
     const shooter = spawnNpc(w, 'gangster', sp.x + 3, sp.y)
     const victim = spawnNpc(w, 'civilian', sp.x + 5, sp.y)
@@ -241,7 +242,7 @@ describe('callers read the result correctly (the bugs lived here, not in applyDa
 describe('the legacy stun/sleep counters get the anti-chain-lock too', () => {
   let w: World
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
   })
 
   it('a single isolated stun still bites for its full duration', () => {

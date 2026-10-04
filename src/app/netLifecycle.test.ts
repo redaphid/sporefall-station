@@ -344,6 +344,9 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
     const host = new NetHostSession(10, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
+    // The subject is the grace window, not a fight: clear the floor's crew so
+    // nothing finds the parked avatar in 90 seconds.
+    host.world.entities = host.world.entities.filter((e) => !e.ai)
 
     for (let i = 0; i < REJOIN_GRACE_TICKS - 1; i++) host.tick()
 
@@ -382,6 +385,7 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
     const host = new NetHostSession(12, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { entityId } = await seedGhost(hub, host)
+    host.world.entities = host.world.entities.filter((e) => !e.ai) // only the grace window may end it
     for (let i = 0; i < REJOIN_GRACE_TICKS; i++) host.tick()
     expect(host.world.byId.get(entityId)).toBeDefined() // flagged dead, not yet swept
     host.tick()

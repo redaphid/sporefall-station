@@ -19,6 +19,7 @@ import { tickWorld, worldFromState, type RunMode, type World, type WorldInit } f
 
 // The fixture loaders live in the vitest-free `./fixtures.ts` (the app's
 // `?world=` boot hook imports them too); re-export so tests keep one import site.
+import { loadFixtureJson } from './fixtures'
 export { loadFixture, loadFixtureJson } from './fixtures'
 
 /** Tick a world `n` times, feeding a fresh, defaulted clone of `inputs` each tick
@@ -81,6 +82,16 @@ export const walledRoom = (w: number, h: number): string[] =>
       x === 0 || y === 0 || x === w - 1 || y === h - 1 ? '#' : x === 2 && y === 2 ? '@' : '.',
     ).join(''),
   )
+
+/** A bare world on the frozen level `__fixtures__/frozen-<seed>-<floor>.json`:
+ * the map that seed+floor built before the districts were reworked, carried
+ * whole as authored state. For tests written against one specific layout;
+ * the seed still rolls every die. */
+export const frozenWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
+  const j = loadFixtureJson(`frozen-${seed}-${floor}`)
+  if (!j.level) throw new Error(`frozen-${seed}-${floor} carries no level`)
+  return worldFromState({ level: levelFromJson(j.level), seed, floor, mode, hostile })
+}
 
 /** A world on an authored stage (stages/, the landing stage by default),
  * populated, its floor set up and player 0 at its spawn, the way HostSession

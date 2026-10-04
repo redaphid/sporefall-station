@@ -706,7 +706,10 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
       // (no pathfinder), so the patroller spawns ON its first waypoint and
       // every leg runs along an unobstructed row/col. No rng drawn for either
       // (the position dice above are still rolled), so streams stay put.
-      const beat = patrolBeat(building, spec === specs[0] && i === 0)
+      // On the landing a beat that passes within the spawn-safe radius is
+      // walked by no one: its first guard keeps to the building instead.
+      const planned = patrolBeat(building, spec === specs[0] && i === 0)
+      const beat = planned && w.floor === 1 && planned.some((q) => vlen(q.x - w.level.spawn.x, q.y - w.level.spawn.y) < SPAWN_SAFE_RADIUS) ? undefined : planned
       const pos = beat ? beat[0] : spot
       const npc = spawnNpc(w, spec.archetype, pos.x, pos.y, wrng)
       // #77 — bind the NPC to the module it lives/works/guards in, so its brain
@@ -1091,7 +1094,9 @@ const randomFloorInBuilding = (
   rng: Rng,
   building: Building,
   /** An occupant: on a complex floor the gatehouse rooms sit right by the
-   * airlock, so keep the spawn-safe radius clear (as street life does). */
+   * airlock, and on the landing floor any district's buildings can stand by
+   * the edge the run starts on, so keep the spawn-safe radius clear (as street
+   * life does). */
   occupant = false,
 ): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 12; attempt++) {
@@ -1100,7 +1105,7 @@ const randomFloorInBuilding = (
     // A complex module may be L-shaped: its bounding rect then takes in a
     // neighbour's floor, so only a tile of one of its OWN rooms counts.
     if (w.level.complex && !building.rooms.some((r) => rectContains(r, tx, ty))) continue
-    if (occupant && w.level.complex && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
+    if (occupant && (w.level.complex || w.floor === 1) && vlen(tx + 0.5 - w.level.spawn.x, ty + 0.5 - w.level.spawn.y) < SPAWN_SAFE_RADIUS) continue
     if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
     if (isFloorTile(w.level.tiles[ty * w.level.w + tx])) return { x: tx + 0.5, y: ty + 0.5 }
   }

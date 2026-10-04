@@ -16,9 +16,9 @@ import type { Entity } from '../entity'
 import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
-import { createWorld, stationAlerted, tickWorld, type World } from '../world'
+import { stationAlerted, tickWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { expectWorldEqual, frozenWorld, runTicks } from '../testkit'
 import { ALERT_BROADCAST_TICKS, setupFloor } from './missions'
 import { ALERT_BATTLE_MULT, arbitrateGoal, decide } from './behaviors'
 import { BATTLE, PURSUE, FLEE } from './goalCodes'
@@ -26,7 +26,7 @@ import { BATTLE, PURSUE, FLEE } from './goalCodes'
 const idle = (...ids: number[]): Map<number, InputCmd> => new Map(ids.map((id) => [id, emptyInput()]))
 
 const boot = (seed: number, floor: number, players = 1): World => {
-  const w = createWorld(seed, floor)
+  const w = frozenWorld(seed, floor)
   populateWorld(w)
   setupFloor(w)
   for (let i = 0; i < players; i++) spawnPlayer(w, i, w.level.spawn.x, w.level.spawn.y)

@@ -80,7 +80,7 @@ describe('computeTouchLabels — USE verb selection', () => {
   it('a usable OBJECT name wins over its door/verb fallback on the same entity', () => {
     const vending = makeEntity('interactable', 'vending', 0.5, 0)
     vending.interact = { verb: 'use', range: 1.3 }
-    expect(computeTouchLabels(view(player(), [vending])).use).toBe('Vending Machine')
+    expect(computeTouchLabels(view(player(), [vending])).use).toBe('Nutrient Dispenser')
   })
 
   it('an unrecognized interact verb falls back to the generic Use label (still enabled)', () => {

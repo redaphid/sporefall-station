@@ -10,9 +10,9 @@ import { isSolidTile } from '../levelgen/level'
 import { spawnPlayer } from '../player'
 import { spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { expectWorldEqual, frozenWorld, runTicks } from '../testkit'
 import type { InputCmd, SimEvent } from '../types'
-import { addEntity, createWorld, type World } from '../world'
+import { addEntity, type World } from '../world'
 import { fireAt, igniteCell } from './fire'
 import { freeze, wet } from './interactions'
 import { spawnObject } from './objects'
@@ -69,7 +69,7 @@ describe('fire sets creatures alight (#114)', () => {
   let w: World
   let s: { x: number; y: number }
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     s = findStage(w)
   })
 
@@ -235,7 +235,7 @@ describe('fire sets creatures alight (#114)', () => {
 
   it('is byte-identical across a serialize/deserialize taken mid-fire', () => {
     const stage = (): World => {
-      const v = createWorld(1, 1)
+      const v = frozenWorld(1, 1)
       npc(v, 'thug', s.x, s.y)
       npc(v, 'sporeling', s.x + 1, s.y)
       npc(v, 'cinder', s.x + 2, s.y)
@@ -262,7 +262,7 @@ describe('floor fire meets the #92 element verbs', () => {
   let w: World
   let s: { x: number; y: number }
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = frozenWorld(1, 1)
     s = findStage(w)
   })
 

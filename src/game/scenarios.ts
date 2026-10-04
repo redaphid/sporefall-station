@@ -1054,14 +1054,17 @@ const ON_GENERATED_FLOORS: ReadonlySet<string> = new Set(['armed', 'stairs-demo'
 export const stageFor = (name: string): LevelJson => (Object.hasOwn(GROUP_SCENARIOS, name) ? TIDE_GROUND : LANDING_STAGE)
 
 /** Swap the world onto an authored stage: its map, populated and with its
- * floor set up, every player at a stage spawn point. The stage's choreography
- * then holds whatever district the seed generated. */
+ * floor set up, every player at a stage spawn point and numbered after the
+ * population, exactly as a fresh run on that map would be (AI rhythms phase
+ * on entity ids). The stage's choreography then holds whatever district the
+ * seed generated. Solo only: main.ts applies scenarios to a HostSession. */
 const installStage = (w: World, stage: LevelJson): void => {
   const players = w.entities.filter((e) => e.playerCtl)
   w.level = levelFromJson(stage)
   delete w.levelChecksumFromSeed
   w.entities = []
   w.byId.clear()
+  w.nextId = 1
   w.director = undefined
   w.groups = undefined
   w.modifier = undefined
@@ -1071,6 +1074,7 @@ const installStage = (w: World, stage: LevelJson): void => {
     const at = playerSpawnPoint(w.level, p.playerCtl!.playerId)
     p.pos = { x: at.x, y: at.y }
     p.prevPos = { x: at.x, y: at.y }
+    p.id = w.nextId++
     w.entities.push(p)
     w.byId.set(p.id, p)
   }

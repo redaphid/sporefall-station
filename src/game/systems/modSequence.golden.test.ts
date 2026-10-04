@@ -10,9 +10,10 @@ import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { playerSpawnPoint } from '../spawnPlacement'
 import { emptyInput, type InputCmd } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { tickWorld, type World } from '../world'
 import { weaponStack } from './inventory'
 import { setupFloor } from './missions'
+import { frozenWorld } from '../testkit'
 
 /** FNV-1a over a string: a short, stable fingerprint of a (long) digest. */
 const fnv1a = (s: string): string => {
@@ -28,7 +29,7 @@ const fnv1a = (s: string): string => {
  * pickup order, the way a draft would have left it: three casts,
  * [incendiary] [overload x2, frost] [pierce]. */
 const buildRun = (seed: number): World => {
-  const w = createWorld(seed, 1)
+  const w = frozenWorld(seed, 1)
   populateWorld(w)
   setupFloor(w)
   const at = playerSpawnPoint(w.level, 0)
@@ -61,10 +62,13 @@ describe('sequenced casting: golden digests', () => {
   // this exact scenario were the flag-off goldens (a13b7b25, e92bcf60), which
   // pinned the old fold-everything-into-every-shot path. Restoring that fold
   // (fireWeapon firing the whole list as one cast, the reorder input ignored,
-  // resolveWeapon's newest-element pick) reproduces both old digests.
+  // resolveWeapon's newest-element pick) reproduces both old digests. Both run
+  // on frozen landing maps; 1234's digest was re-captured when the landing
+  // started keeping its spawn-safe radius clear of building residents, which
+  // moves where that floor's crew stands.
   const GOLDEN: Record<number, string> = {
     7: 'ee39480f',
-    1234: '5930fe81',
+    1234: '64cdcaa9',
   }
 
   for (const seed of [7, 1234]) {

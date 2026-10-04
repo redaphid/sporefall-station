@@ -10,7 +10,7 @@ import { buildLoadout } from './ui/loadoutModel'
 import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
 import { joinFailureMessage } from './app/joinError'
-import { JOIN_UNSUPPORTED, isAppleMobile, planJoinTransport, probeWebBluetooth, type JoinPlan } from './app/joinTransport'
+import { openJoinTransport } from './app/openJoinTransport'
 import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
@@ -100,7 +100,7 @@ import {
   shareUrl,
   type ShareState,
 } from './ui/shareModel'
-import { createLobbyUi, pickHost, pickJoinTransport, pickMode, showJoinUnsupported, type GameMode } from './ui/menu'
+import { createLobbyUi, pickHost, pickMode, type GameMode } from './ui/menu'
 import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
 import { installStage, lockLandscape, toStage } from './ui/orientation'
@@ -662,38 +662,6 @@ interface SessionDeps {
 }
 
 /**
- * Open the transport `planJoinTransport` chose, or show why this device cannot
- * join and return null. Picking Bluetooth runs Chrome's requestDevice chooser
- * inside the picker button's click handler (gesture required).
- */
-const openJoinTransport = async (
-  plan: JoinPlan,
-  deps: SessionDeps,
-  log: (msg: string) => void,
-): Promise<Transport | null> => {
-  switch (plan.kind) {
-    case 'native-ble':
-      return new BleClientTransport(log)
-    case 'ws':
-      return new WsTransport('client', deps.room, resolveWsBaseUrl(location.search))
-    case 'tabs':
-      return new BroadcastChannelTransport('client', deps.room)
-    case 'web-ble': {
-      const webBle = new WebBluetoothClientTransport()
-      const choice = await pickJoinTransport(deps.uiMount, () => webBle.requestDevice())
-      return choice === 'ble' ? webBle : new BroadcastChannelTransport('client', deps.room)
-    }
-    case 'unsupported':
-      showJoinUnsupported(deps.uiMount, JOIN_UNSUPPORTED[plan.reason], () => {
-        const menu = new URL(location.href)
-        menu.searchParams.delete('mode')
-        location.assign(menu)
-      })
-      return null
-  }
-}
-
-/**
  * Hand the radio back when the page goes away.
  *
  * `Transport.stop()` existed but had NO call site anywhere in the app, so a
@@ -780,14 +748,19 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
 
   // join
   dbg.log(`join: mode start, native=${native}`)
-  const plan = planJoinTransport({
+  const transport = await openJoinTransport({
     native,
-    transport: new URLSearchParams(location.search).get('transport'),
-    webBluetooth: await probeWebBluetooth(navigator),
-    appleMobile: isAppleMobile(navigator.userAgent, navigator.maxTouchPoints),
+    search: location.search,
+    nav: navigator,
+    room: deps.room,
+    uiMount: deps.uiMount,
+    log: dbg.log,
+    backToMenu: () => {
+      const menu = new URL(location.href)
+      menu.searchParams.delete('mode')
+      location.assign(menu)
+    },
   })
-  dbg.log(`join: plan ${plan.kind}${plan.kind === 'unsupported' ? ` (${plan.reason})` : ''}`)
-  const transport = await openJoinTransport(plan, deps, dbg.log)
   if (!transport) return null
   stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)

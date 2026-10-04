@@ -165,7 +165,15 @@ const connectWithBackoff = (
   }
 
   const open = (): void => {
-    ws = new WS(url)
+    try {
+      ws = new WS(url)
+    } catch (e) {
+      // The constructor throws only for a URL the browser will never dial, such as
+      // ws:// from an HTTPS page. Retrying cannot help, and letting it escape froze boot.
+      stopped = true
+      log(`[debug] hub unavailable (${url}): ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`)
+      return
+    }
     ws.onopen = () => {
       ready = true
       attempt = 0

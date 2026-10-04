@@ -13,7 +13,7 @@ import { decodeJson, encodeJson } from '../net/framing/codec'
 import { StreamReader } from '../net/framing/chunkedStream'
 import {
   encodeSnapshot,
-  decodeInput,
+  decodeInputBundle,
   toWireEntity,
   type GameStartMsg,
   type GoMsg,
@@ -35,6 +35,7 @@ import {
   type Transport,
 } from '../net/types'
 import type { RenderView, Session } from './session'
+import { foldInputRecord, newInputState, takeTickInput, type InputState } from './inputGate'
 import { linkHealth, type LinkStatus } from './linkHealth'
 
 const INTEREST_RADIUS = 14 // tiles around each player's avatar
@@ -49,25 +50,13 @@ export const SNAPSHOT_ENTITY_CAP = 48
 
 const MAX_SLOT = MAX_PLAYERS - 1
 
-interface PeerState {
+interface PeerState extends InputState {
   peer: PeerId
   slot: number
   name: string
   token: string
   queue: SendQueue
   reader: StreamReader
-  lastInputSeq: number
-  latestCmd: InputCmd
-  pendingEdges: number
-  /** Hotbar slot the client tapped since the last tick consumed one (-1 = none).
-   * Edge-triggered like the button edges: applied once, then reset, so a single
-   * tap equips exactly once instead of re-equipping every tick. */
-  pendingHotbar: number
-  /** Mod reorder the client asked for since the last tick consumed one
-   * (undefined = none). Edge-latched exactly like `pendingHotbar`. */
-  pendingModSwap?: number
-  /** Floor-draft card the client tapped (undefined = none), latched like `pendingModSwap`. */
-  pendingDraftPick?: number
   /** Signature of the last inventory we shipped this peer — send only on change. */
   lastInvSig: string
   entityId?: number
@@ -120,12 +109,16 @@ export class NetHostSession implements Session {
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
     private now: () => number = () => performance.now(),
+    /** Floor 1 of a run. An authored world (one not built from its seed) is
+     * played as given; a seeded one is populated at Start. */
+    private makeWorld: (seed: number, mode: RunMode) => World = (seed, mode) => createWorld(seed, 1, mode),
   ) {
     this.world = this.freshWorld()
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onPeerConnected(ev.peer)
       else if (ev.type === 'peerDisconnected') this.onPeerLost(ev.peer)
-      else if (ev.type === 'data') this.onData(ev.peer, ev.bytes)
+      else if (ev.type === 'data') this.onData(ev.peer, ev.bytes, ev.datagram === true)
+      else if (ev.type === 'pathChanged') this.onPathChanged(ev.peer)
     })
   }
 
@@ -180,6 +173,7 @@ export class NetHostSession implements Session {
   private gameStartMsg(): GameStartMsg {
     return {
       seed: this.seed,
+      epoch: this.runEpoch & 0xff,
       players: this.lobbyPlayers(),
       mode: this.world.mode,
       floor: this.world.floor,
@@ -187,15 +181,17 @@ export class NetHostSession implements Session {
   }
 
   private freshWorld(): World {
-    return createWorld(this.seed, 1, this.mode)
+    return this.makeWorld(this.seed, this.mode)
   }
 
   /** Host presses Start: build the world, spawn everyone, tell clients. */
   beginGame(): void {
     if (this.started) return
     this.started = true
-    populateWorld(this.world)
-    setupFloor(this.world)
+    if (this.world.levelChecksumFromSeed !== undefined) {
+      populateWorld(this.world)
+      setupFloor(this.world)
+    }
     const hostAt = playerSpawnPoint(this.world.level, 0)
     this.self = spawnPlayer(this.world, 0, hostAt.x, hostAt.y)
     const entityIds: Record<number, number> = { 0: this.self.id }
@@ -247,31 +243,7 @@ export class NetHostSession implements Session {
     if (!this.started) return
     this.inputs.clear()
     this.inputs.set(0, this.localInput.sample())
-    for (const p of this.peers.values()) {
-      // Edges accumulated between input packets get OR-ed into this tick's command.
-      const cmd = { ...p.latestCmd }
-      cmd.attack ||= (p.pendingEdges & 1) !== 0
-      cmd.interact ||= (p.pendingEdges & 2) !== 0
-      cmd.special ||= (p.pendingEdges & 4) !== 0
-      cmd.roll = (p.pendingEdges & 8) !== 0 // edge only — never a sticky held bit
-      cmd.throwItem = (p.pendingEdges & 16) !== 0 // Use/Throw is a tap, not a sticky held bit
-      // Hotbar equip is edge-triggered too: apply the tapped slot once, then clear
-      // it, so a single tap doesn't re-equip every tick until the next packet.
-      cmd.hotbar = p.pendingHotbar
-      p.pendingHotbar = -1
-      delete cmd.modSwap
-      if (p.pendingModSwap !== undefined) {
-        cmd.modSwap = p.pendingModSwap
-        p.pendingModSwap = undefined
-      }
-      delete cmd.draftPick
-      if (p.pendingDraftPick !== undefined) {
-        cmd.draftPick = p.pendingDraftPick
-        p.pendingDraftPick = undefined
-      }
-      p.pendingEdges = 0
-      this.inputs.set(p.slot, cmd)
-    }
+    for (const p of this.peers.values()) this.inputs.set(p.slot, takeTickInput(p))
     this.onTickInputs?.(this.inputs)
     tickWorld(this.world, this.inputs)
     this.expireGhosts()
@@ -363,6 +335,7 @@ export class NetHostSession implements Session {
       p.queue.queueSnapshot(
         encodeSnapshot({
           tick: this.world.tick,
+          epoch: this.runEpoch,
           floor: this.world.floor,
           alarm: this.world.alarm,
           lastInputSeq: p.lastInputSeq,
@@ -428,6 +401,7 @@ export class NetHostSession implements Session {
   private onPeerConnected(peer: PeerId): void {
     // Slot assigned on HELLO; until then just track the queue/reader.
     const state: PeerState = {
+      ...newInputState(),
       peer,
       slot: -1,
       name: '',
@@ -437,10 +411,6 @@ export class NetHostSession implements Session {
         isValidStart: isKnownMsgType,
         onDesync: () => this.streamDesyncs++,
       }),
-      lastInputSeq: 0,
-      latestCmd: { seq: 0, moveX: 0, moveY: 0, attack: false, interact: false, special: false, aimX: 1, aimY: 0, hotbar: -1, throwItem: false, roll: false },
-      pendingEdges: 0,
-      pendingHotbar: -1,
       lastInvSig: '',
       lastHeardAt: this.now(),
       rttMs: null,
@@ -481,11 +451,20 @@ export class NetHostSession implements Session {
     }
   }
 
-  private onData(peer: PeerId, bytes: Uint8Array): void {
+  private onData(peer: PeerId, bytes: Uint8Array, datagram: boolean): void {
     const p = this.peers.get(peer)
     if (!p) return
     p.lastHeardAt = this.now()
-    p.reader.push(bytes, (msg) => this.onMessage(peer, p, msg))
+    if (datagram) this.onMessage(peer, p, bytes)
+    else p.reader.push(bytes, (msg) => this.onMessage(peer, p, msg))
+  }
+
+  /** The peer's link switched paths, and reliable messages in flight on the old
+   * one may be gone. Inventory is sent only on change, so send it again; State
+   * repeats on its own. */
+  private onPathChanged(peer: PeerId): void {
+    const p = this.peers.get(peer)
+    if (p) p.lastInvSig = ''
   }
 
   private onMessage(_peer: PeerId, p: PeerState, msg: Uint8Array): void {
@@ -511,25 +490,11 @@ export class NetHostSession implements Session {
       const ping = decodeJson<PingMsg>(msg)
       if (typeof ping.rtt === 'number' && Number.isFinite(ping.rtt)) p.rttMs = ping.rtt
       const pong: PongMsg = { t: ping.t }
-      p.queue.queueReliable(encodeJson(MsgType.Pong, pong))
+      p.queue.queueProbe(encodeJson(MsgType.Pong, pong))
       return
     }
     if (type === MsgType.Input) {
-      const { cmd, edges } = decodeInput(msg)
-      // Only fold in a packet that actually advances the input sequence (u16 wrap
-      // allowed). A stale/reordered/duplicated packet must NOT re-arm its edges —
-      // OR-ing them in again would dodge-roll / throw / equip a SECOND time the
-      // player never asked for (edges must fire once, not re-fire on a re-delivery).
-      if (cmd.seq > p.lastInputSeq || p.lastInputSeq - cmd.seq > 30000) {
-        p.lastInputSeq = cmd.seq
-        p.latestCmd = cmd
-        p.pendingEdges |= edges
-        // A hotbar tap is an edge: latch the requested slot so the next tick equips
-        // it once even if the packet arrived between ticks (OR-ed like the edges).
-        if (cmd.hotbar >= 0) p.pendingHotbar = cmd.hotbar
-        if (cmd.modSwap !== undefined) p.pendingModSwap = cmd.modSwap
-        if (cmd.draftPick !== undefined) p.pendingDraftPick = cmd.draftPick
-      }
+      for (const rec of decodeInputBundle(msg)) foldInputRecord(p, rec)
       return
     }
     if (type === MsgType.Hello) {

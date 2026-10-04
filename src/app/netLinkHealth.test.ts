@@ -87,7 +87,7 @@ const admit = async (r: Rig): Promise<void> => {
   await vi.advanceTimersByTimeAsync(0)
   const welcome: WelcomeMsg = { slot: 1, token: 'tok', players: [] } as unknown as WelcomeMsg
   r.hostSays(encodeJson(MsgType.Welcome, welcome))
-  const start: GameStartMsg = { seed: 7, players: [], floor: 1 } as unknown as GameStartMsg
+  const start: GameStartMsg = { seed: 7, epoch: 0, players: [], floor: 1 }
   r.hostSays(encodeJson(MsgType.GameStart, start))
   const go: GoMsg = { startTick: 0, entityIds: { 1: 42 } }
   r.hostSays(encodeJson(MsgType.Go, go))
@@ -211,7 +211,7 @@ describe('online client: silence on an open socket', () => {
     await r.advance(STALLED_AFTER_MS + 2500)
     expect(r.client.phase).toBe('reconnecting')
     r.hostSays(encodeJson(MsgType.Welcome, { slot: 1, token: 'tok', players: [] }))
-    r.hostSays(encodeJson(MsgType.GameStart, { seed: 7, players: [], floor: 1 }))
+    r.hostSays(encodeJson(MsgType.GameStart, { epoch: 0, seed: 7, players: [], floor: 1 }))
     r.hostSays(encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: 42 } }))
     expect(r.client.phase).toBe('playing')
     await r.advance(1000)

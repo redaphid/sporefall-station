@@ -22,7 +22,7 @@ describe('snapshot codec', () => {
     tick: 123456,
     floor: 3,
     alarm: 2,
-    lastInputSeq: 4242,
+    epoch: 0, lastInputSeq: 4242,
     entities: [
       { id: 7, archetype: 'player', x: 12.34, y: 56.78, facing: 1.5, hpPct: 0.5, flags: 0b10001 },
       { id: 900, archetype: 'thug', x: 0.5, y: 63.5, facing: 4.7, hpPct: 1, flags: 0 },
@@ -49,7 +49,7 @@ describe('snapshot codec', () => {
 
   it('stays compact: ~10 bytes per entity', () => {
     const bytes = encodeSnapshot(snap)
-    expect(bytes.length).toBeLessThanOrEqual(10 + snap.entities.length * 10)
+    expect(bytes.length).toBeLessThanOrEqual(11 + snap.entities.length * 10)
   })
 
   it('survives BLE-sized fragmentation via the stream reader', () => {
@@ -172,11 +172,11 @@ const wire = (over: Partial<WireEntity> = {}): WireEntity => ({
 })
 
 const oneEntity = (over: Partial<WireEntity>): WireEntity =>
-  decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(over)] })).entities[0]
+  decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire(over)] })).entities[0]
 
 describe('snapshot codec — boundary values', () => {
   it('round-trips an empty entity list', () => {
-    const out = decodeSnapshot(encodeSnapshot({ tick: 5, floor: 2, alarm: 1, lastInputSeq: 99, entities: [] }))
+    const out = decodeSnapshot(encodeSnapshot({ tick: 5, floor: 2, alarm: 1, epoch: 0, lastInputSeq: 99, entities: [] }))
     expect(out.entities).toHaveLength(0)
     expect(out.lastInputSeq).toBe(99)
   })
@@ -226,7 +226,7 @@ describe('snapshot codec — boundary values', () => {
 
   it('round-trips a full 32-bit tick counter past 2^31', () => {
     const big = 4_000_000_000
-    expect(decodeSnapshot(encodeSnapshot({ tick: big, floor: 1, alarm: 0, lastInputSeq: 0, entities: [] })).tick).toBe(big)
+    expect(decodeSnapshot(encodeSnapshot({ tick: big, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [] })).tick).toBe(big)
   })
 
   it('keeps position within 1/32-tile quantization error', () => {
@@ -247,7 +247,7 @@ describe('door lock state over the wire', () => {
   it('a locked door ships the DoorLocked flag and its lock level (hp byte), and the client rebuilds both', () => {
     const wire = toWireEntity(doorEntity(true, 2), 100)
     expect(wire.flags & SnapFlags.DoorLocked).not.toBe(0)
-    const [rt] = decodeSnapshot(encodeSnapshot({ tick: 1, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire] })).entities
+    const [rt] = decodeSnapshot(encodeSnapshot({ tick: 1, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire] })).entities
     const client = applyWireEntity(undefined, rt, 1)
     expect(client.door).toEqual({ open: false, locked: true, lockLevel: 2 })
   })

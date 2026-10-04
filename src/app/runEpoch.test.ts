@@ -48,9 +48,9 @@ const SELF = 7
 const BOSS = 42
 const wire = (id: number, archetype: string): WireEntity => ({ id, archetype, x: 5, y: 5, facing: 0, hpPct: 1, flags: 0 })
 const snapshot = (tick: number, bossArchetype = 'boss'): Uint8Array =>
-  encodeSnapshot({ tick, floor: 1, alarm: 0, lastInputSeq: 0, entities: [wire(SELF, 'player'), wire(BOSS, bossArchetype)] })
+  encodeSnapshot({ tick, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [wire(SELF, 'player'), wire(BOSS, bossArchetype)] })
 const gameStart = (seed: number): Uint8Array =>
-  encodeJson(MsgType.GameStart, { seed, players: [{ slot: 1, name: 'Friend' }], floor: 1 })
+  encodeJson(MsgType.GameStart, { epoch: 0, seed, players: [{ slot: 1, name: 'Friend' }], floor: 1 })
 const go = (): Uint8Array => encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: SELF } })
 
 const admitted = async () => {

@@ -15,7 +15,10 @@ import { StreamReader } from '../net/framing/chunkedStream'
 import {
   applyWireEntity,
   decodeSnapshot,
-  encodeInput,
+  edgeBits,
+  encodeInputBundle,
+  INPUT_REDUNDANCY,
+  type InputRecord,
   type EventsMsg,
   type GameStartMsg,
   type GoMsg,
@@ -236,6 +239,10 @@ export class NetClientSession implements Session {
    * rebuilds its world at tick 0).
    */
   private lastSnapTick = -1
+  /** The host run epoch of our newest GameStart; snapshots must carry it. */
+  private snapEpoch = -1
+  /** Snapshots that moved our predicted avatar by a visible amount: rubber-banding. */
+  predictionCorrections = 0
   /** The exact Hello bytes for this link, kept so a retry re-asks identically. */
   private helloBytes: Uint8Array | null = null
   private helloAttempts = 0
@@ -249,6 +256,8 @@ export class NetClientSession implements Session {
    */
   private sawSnapshot = false
   private inputSeq = 0
+  /** The newest records sent, oldest first: each Input message repeats them. */
+  private sentRecords: InputRecord[] = []
   /** Unacked inputs, each with the predicted stair lock AFTER it ran — so a
    * reconcile can resume the lock exactly where the acked input left it. */
   private pendingInputs: { seq: number; cmd: InputCmd; lock: boolean }[] = []
@@ -302,7 +311,8 @@ export class NetClientSession implements Session {
       else if (ev.type === 'peerDisconnected') this.onDisconnected(ev.reason)
       else if (ev.type === 'data') {
         this.lastHeardAt = this.now()
-        this.reader.push(ev.bytes, (m) => this.onMessage(m))
+        if (ev.datagram) this.onMessage(ev.bytes)
+        else this.reader.push(ev.bytes, (m) => this.onMessage(m))
       }
     })
   }
@@ -368,7 +378,7 @@ export class NetClientSession implements Session {
     if (this.queue && t - this.lastPingAt >= PING_INTERVAL_MS) {
       this.lastPingAt = t
       const ping: PingMsg = this.rttMs === null ? { t } : { t, rtt: Math.round(this.rttMs) }
-      this.queue.queueReliable(encodeJson(MsgType.Ping, ping))
+      this.queue.queueProbe(encodeJson(MsgType.Ping, ping))
     }
     if (linkHealth(silent) === 'stalled' && this.rejoinToken && this.transport.reconnect) {
       this.setPhase('reconnecting')
@@ -530,6 +540,7 @@ export class NetClientSession implements Session {
       case MsgType.GameStart: {
         const start = decodeJson<GameStartMsg>(msg)
         const sameRun = start.seed === this.seed
+        this.snapEpoch = start.epoch & 0xff
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
         // A GameStart while we are reconnecting normally replays the run we were
@@ -673,6 +684,10 @@ export class NetClientSession implements Session {
     // (measured at 5.56 tiles). `lastInputSeq` is stale too, so it would re-arm
     // inputs the host has long since consumed. Drop anything not strictly newer —
     // duplicates included — and let the next real snapshot self-heal as before.
+    // A snapshot from another run than our GameStart's is stale, whatever its
+    // tick says: "play again" restarts the host's ticks at 0, so a late one from
+    // the old run would look newer than the first of the new run.
+    if (snap.epoch !== this.snapEpoch) return
     if (this.lastSnapTick >= 0 && !isNewerTick(snap.tick, this.lastSnapTick)) return
     this.lastSnapTick = snap.tick
     this.tickAtSnap = this.tickCount
@@ -743,6 +758,8 @@ export class NetClientSession implements Session {
     if (Math.hypot(self.pos.x - px, self.pos.y - py) < 0.5) {
       self.pos.x = px
       self.pos.y = py
+    } else {
+      this.predictionCorrections++
     }
   }
 
@@ -798,30 +815,29 @@ export class NetClientSession implements Session {
     if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
     if (cmd.draftPick !== undefined) this.pendingDraftPick = cmd.draftPick
 
-    // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
-    // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
-    // hotbar are PURE edges with no held-state fallback: if their packet were
-    // dropped by a newer one overwriting the slot during a BLE stall, the tap would
-    // be silently lost (the #57 class of bug). Ship those on the reliable lane so
-    // they can never be overwritten; the host still gates them by seq so a delayed
-    // reliable input can't re-fire. attack/interact/special keep the snapshot lane —
-    // their held bit re-conveys intent on the next packet, and sustained fire would
-    // otherwise flood the reliable FIFO every tick.
+    // Send at ~15Hz (every 2nd tick). Each Input message carries this record
+    // and the INPUT_REDUNDANCY-1 before it, on the newest-wins lane (unreliable
+    // where the link has one): a lost packet's records ride in the next one, and
+    // the host folds each record once by seq. Pure taps (roll, throw, hotbar, mod
+    // swap, draft pick) have no held state to re-convey them if more packets than
+    // that go missing, so their record also goes on the reliable lane.
     if (this.tickCount % 2 === 0 && this.queue) {
       const out: InputCmd = { ...cmd, hotbar: this.pendingHotbar }
       delete out.modSwap
       if (this.pendingModSwap !== undefined) out.modSwap = this.pendingModSwap
       delete out.draftPick
       if (this.pendingDraftPick !== undefined) out.draftPick = this.pendingDraftPick
-      const packet = encodeInput(out, this.pendingEdges)
+      const record: InputRecord = { cmd: out, edges: edgeBits(this.pendingEdges) }
+      this.sentRecords.push(record)
+      if (this.sentRecords.length > INPUT_REDUNDANCY) this.sentRecords.shift()
       const hasPureEdge =
         this.pendingEdges.roll ||
         this.pendingEdges.throwItem ||
         this.pendingHotbar >= 0 ||
         this.pendingModSwap !== undefined ||
         this.pendingDraftPick !== undefined
-      if (hasPureEdge) this.queue.queueReliable(packet)
-      else this.queue.queueSnapshot(packet)
+      if (hasPureEdge) this.queue.queueReliable(encodeInputBundle([record]))
+      this.queue.queueSnapshot(encodeInputBundle(this.sentRecords))
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
       this.pendingModSwap = undefined

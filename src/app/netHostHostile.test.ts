@@ -378,7 +378,7 @@ describe('hostile peer — a client cannot spoof the host-authored snapshot', ()
       tick: 999999,
       floor: 9,
       alarm: 255,
-      lastInputSeq: 0,
+      epoch: 0, lastInputSeq: 0,
       entities: Array.from({ length: 48 }, (_, i) => ({
         id: 50000 + i, archetype: 'boss', x: 5, y: 5, facing: 0, hpPct: 1, flags: 0,
       })),

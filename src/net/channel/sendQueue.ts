@@ -49,11 +49,21 @@ export class SendQueue {
     void this.pump()
   }
 
+  /** Newest-wins state (snapshots, input bundles): a datagram where the
+   * transport has an unreliable lane, else the capacity-1 slot. */
   queueSnapshot(msg: Uint8Array): void {
+    if (!this.stopped && this.transport.sendDatagram?.(this.peer, msg)) return
     if (this.snapshotSlot !== null) this.overwrites++
     else this.overwrites = 0
     this.snapshotSlot = msg
     void this.pump()
+  }
+
+  /** A round-trip probe (Ping/Pong): a lost one is only a missing sample, so it
+   * rides the unreliable lane where there is one and never waits on a resend. */
+  queueProbe(msg: Uint8Array): void {
+    if (!this.stopped && this.transport.sendDatagram?.(this.peer, msg)) return
+    this.queueReliable(msg)
   }
 
   stop(): void {

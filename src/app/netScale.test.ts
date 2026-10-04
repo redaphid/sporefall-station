@@ -799,7 +799,7 @@ describe('stale snapshot arrival', () => {
       tick,
       floor: 1,
       alarm: 0,
-      lastInputSeq: tick,
+      epoch: 0, lastInputSeq: tick,
       entities: [{ id: selfId, archetype: 'player', x, y: 20, facing: 0, hpPct: 1, flags: 0 }],
     })
 
@@ -835,7 +835,7 @@ describe('stale snapshot arrival', () => {
       tick,
       floor,
       alarm: 0,
-      lastInputSeq: 1,
+      epoch: 0, lastInputSeq: 1,
       entities: [{ id: selfId, archetype: 'player', x: 20, y: 20, facing: 0, hpPct: 1, flags: 0 }],
     })
     await push(mk(2000, 2)) // party took the lift to floor 2
@@ -940,7 +940,7 @@ describe('8-player wire budget', () => {
       hpPct: 1,
       flags: 0,
     }))
-    const bytes = encodeSnapshot({ tick: 1, floor: 1, alarm: 0, lastInputSeq: 1, entities })
+    const bytes = encodeSnapshot({ tick: 1, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 1, entities })
     // 10B header + 10B/entity = 490B. At the 20-byte BLE floor that is 25
     // packets for ONE peer's ONE snapshot; at 244B MTU it is 3.
     expect(bytes.length).toBeLessThanOrEqual(512)

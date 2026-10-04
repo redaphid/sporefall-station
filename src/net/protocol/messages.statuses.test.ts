@@ -13,7 +13,7 @@ const npc = (id: number, statuses?: string[]): WireEntity => ({
   ...(statuses ? { statuses } : {}),
 })
 
-const snap = (entities: WireEntity[]): WireSnapshot => ({ tick: 900, floor: 2, alarm: 0, lastInputSeq: 7, entities })
+const snap = (entities: WireEntity[]): WireSnapshot => ({ tick: 900, floor: 2, alarm: 0, epoch: 0, lastInputSeq: 7, entities })
 
 describe('snapshot status trailer', () => {
   it('registers every element in data/elements.ts within one byte', () => {
@@ -24,7 +24,7 @@ describe('snapshot status trailer', () => {
   it('costs nothing when no entity is statused', () => {
     const quiet = snap(Array.from({ length: 48 }, (_, i) => npc(i + 1)))
     const bytes = encodeSnapshot(quiet)
-    expect(bytes.length).toBe(10 + 48 * 10)
+    expect(bytes.length).toBe(11 + 48 * 10)
     expect(decodeSnapshot(bytes).entities.every((e) => e.statuses === undefined)).toBe(true)
   })
 
@@ -59,7 +59,7 @@ describe('snapshot status trailer', () => {
 
   it('drops unknown status keys instead of mis-mapping them', () => {
     const bytes = encodeSnapshot(snap([npc(1, ['chilly', 'stun'])]))
-    expect(bytes.length).toBe(10 + 10)
+    expect(bytes.length).toBe(11 + 10)
     expect(decodeSnapshot(bytes).entities[0].statuses).toBeUndefined()
   })
 

@@ -18,6 +18,7 @@ import { MsgType } from '../types'
 import {
   ARCHETYPES,
   decodeInput,
+  decodeInputBundle,
   decodeSnapshot,
   encodeInput,
   encodeSnapshot,
@@ -54,7 +55,7 @@ const randomSnapshot = (seed: number, n: number): WireSnapshot => {
     }
     entities.push(e)
   }
-  return { tick: rng.int(0, 0xffffffff), floor: rng.int(0, 255), alarm: rng.int(0, 255), lastInputSeq: rng.int(0, 65535), entities }
+  return { tick: rng.int(0, 0xffffffff), floor: rng.int(0, 255), alarm: rng.int(0, 255), epoch: 0, lastInputSeq: rng.int(0, 65535), entities }
 }
 
 describe('snapshot codec — seeded fuzz round-trip', () => {
@@ -93,7 +94,7 @@ describe('snapshot codec — seeded fuzz round-trip', () => {
     const entities: WireEntity[] = Array.from({ length: 48 }, (_, i) => ({
       id: i, archetype: 'projectile', x: 10.5, y: 20.25, facing: 1, hpPct: 1, flags: 0, mods: [...mods],
     }))
-    const bytes = encodeSnapshot({ tick: 9, floor: 2, alarm: 0, lastInputSeq: 1, entities })
+    const bytes = encodeSnapshot({ tick: 9, floor: 2, alarm: 0, epoch: 0, lastInputSeq: 1, entities })
     expect(bytes.length).toBeGreaterThan(16 + 48 * 12) // it really did outgrow the prealloc
     const d = decodeSnapshot(bytes)
     expect(d.entities).toHaveLength(48)
@@ -102,7 +103,7 @@ describe('snapshot codec — seeded fuzz round-trip', () => {
 
   it('collapses a dynamic keycard archetype onto its registered wire index', () => {
     const snap: WireSnapshot = {
-      tick: 1, floor: 1, alarm: 0, lastInputSeq: 0,
+      tick: 1, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0,
       entities: [{ id: 1, archetype: 'pickup.keycard.wing3', x: 1, y: 1, facing: 0, hpPct: 1, flags: 0 }],
     }
     // Without normalisation this falls to index 0 and arrives as a second Ranger.
@@ -115,7 +116,7 @@ describe('snapshot codec — degenerate and out-of-range field values', () => {
     id: 1, archetype: 'player', x: 0, y: 0, facing: 0, hpPct: 1, flags: 0, ...over,
   })
   const rt = (e: WireEntity): WireEntity =>
-    decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, lastInputSeq: 0, entities: [e] })).entities[0]
+    decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [e] })).entities[0]
 
   it('never throws on NaN / Infinity coordinates and never emits NaN', () => {
     for (const v of [NaN, Infinity, -Infinity]) {
@@ -149,7 +150,7 @@ describe('snapshot codec — degenerate and out-of-range field values', () => {
     const entities: WireEntity[] = Array.from({ length: 300 }, (_, i) => ({
       id: i, archetype: 'thug', x: 1, y: 1, facing: 0, hpPct: 1, flags: 0,
     }))
-    const d = decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, lastInputSeq: 0, entities }))
+    const d = decodeSnapshot(encodeSnapshot({ tick: 0, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities }))
     expect(d.entities).toHaveLength(255)
     expect(d.entities[254].id).toBe(254)
   })
@@ -159,22 +160,22 @@ describe('snapshot codec — hostile buffers', () => {
   const hostile = (bytes: number[]): (() => WireSnapshot) => () => decodeSnapshot(new Uint8Array(bytes))
 
   it('a header-only snapshot with count 0 decodes to an empty entity list', () => {
-    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 0])().entities).toEqual([])
+    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])().entities).toEqual([])
   })
 
   it('throws (rather than returning garbage) when the entity count runs past the buffer', () => {
     // The session wrappers catch this; what must NEVER happen is a silent decode
     // into fabricated entities.
-    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 255])).toThrow(RangeError)
+    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255])).toThrow(RangeError)
   })
 
   it('throws on a truncated entity record', () => {
-    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, 3])).toThrow(RangeError)
+    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, 3])).toThrow(RangeError)
   })
 
   it("throws when a projectile's mod count runs past the buffer", () => {
     const projectileIdx = ARCHETYPES.indexOf('projectile')
-    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, projectileIdx, 0, 0, 0, 0, 0, 0, 0, 200])).toThrow(RangeError)
+    expect(hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, projectileIdx, 0, 0, 0, 0, 0, 0, 0, 200])).toThrow(RangeError)
   })
 
   it('throws on an empty or type-byte-only buffer', () => {
@@ -183,7 +184,7 @@ describe('snapshot codec — hostile buffers', () => {
   })
 
   it('decodes an unknown archetype index to a safe default rather than undefined', () => {
-    const d = hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, 254, 0, 0, 0, 0, 0, 0, 0])()
+    const d = hostile([MsgType.Snapshot, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 0, 254, 0, 0, 0, 0, 0, 0, 0])()
     expect(d.entities[0].archetype).toBe('player')
   })
 
@@ -247,17 +248,18 @@ describe('input codec — hostile buffers and out-of-contract values', () => {
     }
   })
 
-  it('tolerates a legacy 8-byte input packet with no hotbar byte', () => {
-    const { cmd } = decodeInput(new Uint8Array([MsgType.Input, 0, 0, 127, 127, 0, 0, 0]))
-    expect(cmd.hotbar).toBe(-1)
+  it('a bundle of zero records decodes to none, and a record cut short throws', () => {
+    expect(decodeInputBundle(new Uint8Array([MsgType.Input, 0]))).toEqual([])
+    expect(() => decodeInputBundle(new Uint8Array([MsgType.Input, 2, 0, 0, 127, 127, 0, 0, 0, 0, 0]))).toThrow(RangeError)
   })
 
-  it('never throws on 2000 seeded-random input buffers', () => {
+  it('never throws on 2000 seeded-random one-record input buffers', () => {
     const rng = mulberry32(0x111)
     for (let i = 0; i < 2000; i++) {
-      const b = new Uint8Array(rng.int(9, 32))
+      const b = new Uint8Array(rng.int(14, 40))
       for (let j = 0; j < b.length; j++) b[j] = rng.int(0, 255)
       b[0] = MsgType.Input
+      b[1] = 1
       const { cmd } = decodeInput(b)
       expect(Number.isFinite(cmd.moveX), `iter ${i}`).toBe(true)
       expect(Number.isFinite(cmd.aimX), `iter ${i}`).toBe(true)
@@ -279,7 +281,7 @@ describe('a hostile client cannot reach the simulation through the input codec',
   /** The worst move vector the wire can carry: byte 255 on both axes. A legitimate
    * encoder tops out at 254 (`round((1+1)*127)`), so 255 only ever comes from a
    * corrupt or malicious peer — and it decodes to 1.0079 per axis, hypot 1.425. */
-  const maxMoveCmd = (): InputCmd => decodeInput(new Uint8Array([MsgType.Input, 0, 0, 255, 255, 0, 0, 0, 0])).cmd
+  const maxMoveCmd = (): InputCmd => decodeInput(new Uint8Array([MsgType.Input, 1, 0, 0, 255, 255, 0, 0, 0, 0, 0])).cmd
 
   it('an over-range move vector does NOT move a player further than a legal one', () => {
     const hostile = maxMoveCmd()
@@ -310,7 +312,7 @@ describe('a hostile client cannot reach the simulation through the input codec',
 
   it('an out-of-range hotbar slot is refused instead of equipping something absent', () => {
     // The wire carries a +1-biased byte, so 255 decodes to slot 254.
-    const { cmd } = decodeInput(new Uint8Array([MsgType.Input, 0, 0, 127, 127, 0, 0, 0, 255]))
+    const { cmd } = decodeInput(new Uint8Array([MsgType.Input, 1, 0, 0, 127, 127, 0, 0, 0, 255, 0]))
     expect(cmd.hotbar).toBe(254)
     const w = createWorld(1, 1)
     const e = makePlayer(w)
@@ -326,7 +328,7 @@ describe('JSON cold path — hostile payloads', () => {
       [MsgType.Welcome, { slot: 1, token: 'tok' }],
       [MsgType.Reject, { reason: 'version mismatch' }],
       [MsgType.LobbyState, { players: [{ slot: 0, name: 'Host' }, { slot: 1, name: 'Bob' }] }],
-      [MsgType.GameStart, { seed: 12345, players: [{ slot: 0, name: 'Host' }], mode: 'casual' }],
+      [MsgType.GameStart, { epoch: 0, seed: 12345, players: [{ slot: 0, name: 'Host' }], mode: 'casual' }],
       [MsgType.Go, { startTick: 90, entityIds: { 0: 1, 1: 2 } }],
       [MsgType.Events, { tick: 7, events: [{ type: 'hit', x: 1, y: 2, targetId: 3, amount: 4 }] }],
       [MsgType.State, { floor: 2, missionText: 'Escape', missionComplete: false, gameOver: false, alarm: 1, huds: {} }],

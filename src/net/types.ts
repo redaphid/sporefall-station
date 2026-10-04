@@ -68,6 +68,10 @@ export const MsgType = {
   /** Host → one client: that client's OWN full authoritative inventory
    * (slots/activeSlot/mods/ammo). Reliable, sent only on change. */
   Inventory: 19,
+  /** Host → every client: the host left on purpose (Main menu). The client
+   * ends the run and does not try to reconnect. An older client that does not
+   * know it simply sees the link drop. */
+  Bye: 20,
 } as const
 
 const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))

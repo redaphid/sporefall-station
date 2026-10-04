@@ -1057,3 +1057,31 @@ describe('connection lifecycle — the host restarts or vanishes', () => {
     expect(bob.session.renderView().missionText).toMatch(/lost/i)
   })
 })
+
+describe('connection lifecycle — the host quits to the main menu', () => {
+  it('tells a playing client the host left, and the client does not try to reconnect', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(74, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput()) // reconnect-capable: a drop would retry
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+    for (let i = 0; i < 4; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+    expect(bob.session.phase).toBe('playing')
+    const phases: string[] = []
+    bob.session.onPhaseChange = (p) => phases.push(p)
+
+    await host.close()
+    await flush()
+    expect(bob.session.phase).toBe('ended')
+    expect(phases).not.toContain('reconnecting')
+    expect(bob.session.renderView().missionText).toBe('The host left the game')
+  })
+})

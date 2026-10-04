@@ -20,10 +20,12 @@ export type SealKind = Extract<SimEvent, { type: 'sealDenied' }>['sealKind']
 /** Fewest sim ticks between two seal hints (3 s at 30 tps). */
 export const SEAL_HINT_COOLDOWN_TICKS = 90
 
+const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)
+
 /** What opens each seal, besides a breach. The keycard step names the card the
  * way the hotbar will once it is picked up. */
 const KEY_STEP: Record<SealKind, (nameOf: (archetype: string) => string, keyId?: string) => string> = {
-  keycard: (_nameOf, keyId) => `Sealed. Find the ${keyId ? itemName(keyId) : 'keycard'}`,
+  keycard: (_nameOf, keyId) => `Sealed. Find the ${keyId ? lowerFirst(itemName(keyId)) : 'keycard'}`,
   power: (nameOf) => `Sealed. Hack the ${nameOf('generator')}`,
   overgrown: (nameOf) => `Overgrown. Kill its ${nameOf('sporeNode')}`,
 }

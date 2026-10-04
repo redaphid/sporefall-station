@@ -220,7 +220,7 @@ export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' 
 export const itemClass = (itemId: string): ItemClass => {
   if (itemId === 'cash') return 'cash'
   if (itemId === 'briefcase') return 'key'
-  // Wing keycards ('keycard' or 'keycard.<wing>'): a key-class item, so they
+  // Wing keycards ('keycard' or 'keycard.<wing>[.<name>]'): a key-class item, so they
   // ignore slot limits, survive a down (recover keeps only 'key' items), and
   // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
   if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
@@ -238,10 +238,20 @@ const titleCase = (id: string): string =>
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
 
-/** 'keycard' → "Keycard"; 'keycard.wing14' → "Wing 14 keycard" (missions.ts
- * names a wing after its building index); any other suffix is title-cased. */
+/** A wing keycard's id: `keycard.<wing>.<name>`, the name being what the
+ * objective banner calls the building it opens, spaces written as `_`. The id
+ * carries the name so a joiner's hotbar, which sees only item ids, names it too.
+ * Without a name the card falls back to its wing: `keycard.wing14`. */
+export const keycardId = (wing: string, name?: string): string =>
+  name ? `keycard.${wing}.${name.replace(/ /g, '_')}` : `keycard.${wing}`
+
+/** `keycard.wing14.essence_lab` → "Essence lab keycard"; `keycard.wing14` →
+ * "Wing 14 keycard"; any other suffix is title-cased; bare `keycard` → "Keycard". */
 const keycardName = (itemId: string): string => {
-  const wing = titleCase(itemId.slice('keycard.'.length).replace(/^wing(\d+)$/, 'wing.$1'))
+  const [wingId, ...rest] = itemId.slice('keycard.'.length).split('.')
+  const name = rest.join('.').replace(/_/g, ' ').trim()
+  if (name) return `${name.charAt(0).toUpperCase()}${name.slice(1)} keycard`
+  const wing = titleCase(wingId.replace(/^wing(\d+)$/, 'wing.$1'))
   return wing ? `${wing} keycard` : 'Keycard'
 }
 

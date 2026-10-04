@@ -1,1 +1,1 @@
-export default 'Keycards name their wing on the HUD'
+export default 'Keycards name the room they open'

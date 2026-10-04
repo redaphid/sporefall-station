@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { LOOT_ITEM_IDS } from '../populate'
-import { CONSUMABLES, THROWABLES, WEAPONS, itemClass, itemName, type ItemClass } from './items'
+import { CONSUMABLES, THROWABLES, WEAPONS, itemClass, itemName, keycardId, type ItemClass } from './items'
 
 /** Every id of every class. Keyed by ItemClass, so a new class fails the
  * typecheck here until it has ids to name. */
@@ -13,7 +13,7 @@ const IDS_BY_CLASS: Record<Exclude<ItemClass, 'unknown'>, readonly string[]> = {
   throwable: Object.keys(THROWABLES),
   consumable: Object.keys(CONSUMABLES),
   cash: ['cash'],
-  key: ['briefcase', 'keycard', 'keycard.wing0', 'keycard.wing14', 'keycard.wing999', 'keycard.north'],
+  key: ['briefcase', 'keycard', keycardId('wing14', 'essence lab'), keycardId('wing3', 'med-bay'), 'keycard.wing0', 'keycard.wing14', 'keycard.north'],
 }
 
 const ALL = Object.entries(IDS_BY_CLASS).flatMap(([c, ids]) => ids.map((id) => [c, id] as const))
@@ -32,6 +32,13 @@ describe('itemName', () => {
   })
 
   it.each([
+    [keycardId('wing14', 'essence lab'), 'Essence lab keycard'],
+    [keycardId('wing2', 'reactor core'), 'Reactor core keycard'],
+    [keycardId('wing2', 'med-bay'), 'Med-bay keycard'],
+    [keycardId('wing2', 'essence lab 2'), 'Essence lab 2 keycard'],
+    [keycardId('wing2', ''), 'Wing 2 keycard'],
+    ['keycard.wing2.', 'Wing 2 keycard'],
+    ['keycard.wing2._', 'Wing 2 keycard'],
     ['keycard', 'Keycard'],
     ['keycard.', 'Keycard'],
     ['keycard.wing0', 'Wing 0 keycard'],
@@ -58,5 +65,18 @@ describe('itemName', () => {
   ])('title-cases the retired or unknown id %o as "%s"', (id, name) => {
     expect(itemClass(id)).toBe('unknown')
     expect(itemName(id)).toBe(name)
+  })
+})
+
+describe('keycardId', () => {
+  it('writes the building name into the id with no spaces, and itemName reads it back', () => {
+    const id = keycardId('wing14', 'essence lab')
+    expect(id).toBe('keycard.wing14.essence_lab')
+    expect(id).not.toMatch(/\s/)
+    expect(itemClass(id)).toBe('key')
+  })
+
+  it('keeps cards for two wings apart even when their buildings share a name', () => {
+    expect(keycardId('wing3', 'essence lab')).not.toBe(keycardId('wing4', 'essence lab'))
   })
 })

@@ -296,6 +296,7 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
   })
 
   it.each([
+    ['keycard.wing14.essence_lab', 'Essence lab keycard'],
     ['keycard.wing14', 'Wing 14 keycard'],
     ['grenade', 'Grenade'],
     ['briefcase', 'Specimen Canister'],

@@ -3,6 +3,7 @@
 // it, at most once per cooldown.
 
 import { describe, expect, it } from 'vitest'
+import { keycardId } from '../game/data/items'
 import { OBJECTS } from '../game/data/objects'
 import { makeEntity, type Entity } from '../game/entity'
 import { levelFromJson } from '../game/levelgen/levelText'
@@ -19,7 +20,9 @@ const DOOR_X = 6
 
 type Seal = { sealKind: 'keycard' | 'power'; overgrown?: never } | { overgrown: true; sealKind?: never } | { plain: true }
 
-const corridor = (seal: Seal, keyId = 'keycard.wing1'): { w: World; p: Entity; door: Entity } => {
+const LAB_CARD = keycardId('wing1', 'essence lab')
+
+const corridor = (seal: Seal, keyId = LAB_CARD): { w: World; p: Entity; door: Entity } => {
   const w = worldFromState({ level: levelFromJson({ rows: ROWS }), floor: 3 })
   const door = makeEntity('door', 'door', DOOR_X + 0.5, 1.5, 0.5)
   door.door = { open: false, locked: true, lockLevel: 2 }
@@ -48,7 +51,7 @@ const idle = {}
 
 describe('sealed-door hint on a press', () => {
   it.each([
-    [{ sealKind: 'keycard' } as const, 'Sealed. Find the Wing 1 keycard, or blast it with your Grenade special'],
+    [{ sealKind: 'keycard' } as const, 'Sealed. Find the essence lab keycard, or blast it with your Grenade special'],
     [{ sealKind: 'power' } as const, 'Sealed. Hack the Generator, or blast it with your Grenade special'],
     [{ overgrown: true } as const, 'Overgrown. Kill its Spore Node, or blast it with your Grenade special'],
   ])('%o names what opens it', (seal, text) => {
@@ -119,20 +122,20 @@ describe('sealed-door hint on walking into the door', () => {
 
   it('stays quiet while the player holds the right keycard, and the press opens it', () => {
     const { w, p, door } = corridor({ sealKind: 'keycard' })
-    p.loadout!.inventory.push({ itemId: 'keycard.wing1', qty: 1 })
+    p.loadout!.inventory.push({ itemId: LAB_CARD, qty: 1 })
     const hint = createSealHint(nameOf)
     for (let t = 0; t < 40; t++) expect(step(w, p, hint, walk)).toBeUndefined()
     expect(step(w, p, hint, press)).toBeUndefined()
     expect(door.door!.open).toBe(true)
   })
 
-  it('still hints when the keycard held is for another wing', () => {
+  it("still hints when the keycard held is another wing's, even one whose building shares the name", () => {
     const { w, p } = corridor({ sealKind: 'keycard' })
-    p.loadout!.inventory.push({ itemId: 'keycard.wing2', qty: 1 })
+    p.loadout!.inventory.push({ itemId: keycardId('wing2', 'essence lab'), qty: 1 })
     const hint = createSealHint(nameOf)
     let text: string | undefined
     for (let t = 0; t < 40 && !text; t++) text = step(w, p, hint, walk)
-    expect(text).toBe('Sealed. Find the Wing 1 keycard, or blast it with your Grenade special')
+    expect(text).toBe('Sealed. Find the essence lab keycard, or blast it with your Grenade special')
   })
 
   it('stays quiet against a plain locked door', () => {
@@ -157,13 +160,14 @@ describe('the toast and the hotbar name the same keycard', () => {
     hotbarSlots(p.loadout!.inventory, p.loadout!.activeSlot).find((s) => s.itemId === keyId)?.label
 
   it.each([
-    ['keycard.wing14', 'Wing 14 keycard'],
-    ['keycard.wing0', 'Wing 0 keycard'],
-    ['keycard.wing1', 'Wing 1 keycard'],
-  ])('%s reads as "%s" on the toast and, once carried, on the hotbar', (keyId, name) => {
+    [keycardId('wing14', 'essence lab'), 'essence lab keycard', 'Essence lab keycard'],
+    [keycardId('wing3', 'med-bay'), 'med-bay keycard', 'Med-bay keycard'],
+    [keycardId('wing5', 'essence lab 2'), 'essence lab 2 keycard', 'Essence lab 2 keycard'],
+    ['keycard.wing0', 'wing 0 keycard', 'Wing 0 keycard'],
+  ])('%s: the toast says "find the %s", the hotbar "%s"', (keyId, onToast, name) => {
     const { w, p, door } = corridor({ sealKind: 'keycard' }, keyId)
     const hint = createSealHint(nameOf)
-    expect(step(w, p, hint, press)).toBe(`Sealed. Find the ${name}, or blast it with your Grenade special`)
+    expect(step(w, p, hint, press)).toBe(`Sealed. Find the ${onToast}, or blast it with your Grenade special`)
     pickUp(w, p, keyId)
     expect(hotbarLabel(p, keyId)).toBe(name)
     expect(hotbarSlots(p.loadout!.inventory, -1).map((s) => `${s.label} ${s.qty}`)).toEqual([`${name} 1`])

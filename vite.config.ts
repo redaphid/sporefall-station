@@ -147,7 +147,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
     environment: 'node',
     // This repo's testing mandate leans on exhaustive property sweeps (hundreds
     // of worldgens per test). Under the 5s default they pass in isolation but

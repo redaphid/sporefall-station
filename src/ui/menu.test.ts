@@ -4,7 +4,8 @@
 // own navigator suppression is exercised in gamepadMenu.test.ts).
 
 import { describe, expect, it, vi } from 'vitest'
-import { pickMode, type SettingsControl } from './menu'
+import { pickMode, showJoinUnsupported, type SettingsControl } from './menu'
+import { JOIN_UNSUPPORTED } from '../app/joinTransport'
 
 const mount = (): HTMLElement => {
   document.body.innerHTML = ''
@@ -117,5 +118,34 @@ describe('pickMode — fits a phone', () => {
     void pickMode(mount())
     void pickMode(mount())
     expect(document.querySelectorAll('#sf-start-menu-style')).toHaveLength(1)
+  })
+})
+
+describe('showJoinUnsupported: a device that cannot join says so', () => {
+  it('shows the reason in words instead of an empty lobby', () => {
+    const root = mount()
+    showJoinUnsupported(root, JOIN_UNSUPPORTED['apple-mobile'], () => {})
+    const screen = root.querySelector<HTMLElement>('[data-role="join-unsupported"]')!
+    expect(screen).not.toBeNull()
+    expect(screen.textContent).toContain(JOIN_UNSUPPORTED['apple-mobile'].title)
+    expect(screen.textContent).toContain(JOIN_UNSUPPORTED['apple-mobile'].detail)
+    expect(screen.textContent).not.toMatch(/Looking for a host|LOBBY/)
+  })
+
+  it('offers exactly one way out, Back to menu, which calls onBack', () => {
+    const root = mount()
+    const onBack = vi.fn()
+    showJoinUnsupported(root, JOIN_UNSUPPORTED['no-adapter'], onBack)
+    const buttons = menuButtons(root)
+    expect(buttons.map((b) => b.textContent)).toEqual(['Back to menu'])
+    buttons[0]!.click()
+    expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats the copy as text, never markup', () => {
+    const root = mount()
+    showJoinUnsupported(root, { title: '<b>x</b>', detail: '<img src=x onerror=alert(1)>' }, () => {})
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.textContent).toContain('<img src=x onerror=alert(1)>')
   })
 })

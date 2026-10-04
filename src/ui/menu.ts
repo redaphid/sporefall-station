@@ -3,7 +3,7 @@ import { markUiChrome } from './chrome'
 import { formatReleaseNotes } from './releaseNotes'
 import { installGamepadMenuNav } from './gamepadMenu'
 
-export type GameMode = 'solo' | 'host' | 'join'
+export type GameMode = 'solo' | 'host' | 'join' | 'online'
 
 /** The settings panel, as the start menu drives it (renderer.settingsUi):
  * `open` shows it with controller navigation armed; `isOpen` lets the menu's
@@ -94,8 +94,9 @@ export const pickMode = (
     overlay.appendChild(inner)
     const options: [GameMode, string, string][] = [
       ['solo', 'Solo run', 'Just you vs the spores'],
-      ['host', 'Host co-op', 'Others join your game'],
+      ['host', 'Host co-op', 'Nearby players join over Bluetooth'],
       ['join', 'Join co-op', 'Find a nearby host'],
+      ['online', 'Play online', 'Host or join with a room code'],
     ]
     const navButtons: HTMLButtonElement[] = []
     let stopNav: () => void = () => {}
@@ -311,7 +312,9 @@ export interface LobbyUi {
   close(): void
 }
 
-export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
+/** `roomCode` puts an online room's code under the title, big enough to read
+ * out across a room. */
+export const createLobbyUi = (mount: HTMLElement, isHost: boolean, roomCode?: string): LobbyUi => {
   const overlay = document.createElement('div')
   markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
   overlay.style.cssText =
@@ -319,9 +322,13 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
     'justify-content:center;gap:12px;pointer-events:auto;color:#eee;font:16px system-ui'
   overlay.innerHTML = `
     <div style="font:800 22px system-ui">${isHost ? 'HOSTING' : 'LOBBY'}</div>
+    <div id="room-code" style="font:800 44px ui-monospace,monospace;letter-spacing:8px;color:#7fd17f"></div>
     <div id="status" style="opacity:.7"></div>
     <div id="players" style="display:flex;flex-direction:column;gap:6px;min-width:min(300px,75vw)"></div>
   `
+  const codeEl = overlay.querySelector<HTMLElement>('#room-code')!
+  if (roomCode) codeEl.textContent = roomCode
+  else codeEl.remove()
   const playersEl = overlay.querySelector<HTMLElement>('#players')!
   const statusEl = overlay.querySelector<HTMLElement>('#status')!
 

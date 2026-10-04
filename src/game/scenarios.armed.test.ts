@@ -4,7 +4,7 @@
 // kitted out, and the exit must be reachable from where they land.
 
 import { describe, expect, it } from 'vitest'
-import { biomeForFloor, isComplexFloor } from './levelgen/complex'
+import { biomeForFloor, floorSetting } from './levelgen/floors'
 import { generateLevel } from './levelgen/generate'
 import { levelChecksum, type Level } from './levelgen/level'
 import { populateWorld } from './populate'
@@ -63,10 +63,10 @@ const reachFrom = (level: Level, sx: number, sy: number): Uint8Array => {
 
 // The showcase links handed to the owner: seed/floor → the layout they promise.
 const SHOWCASE = [
-  { seed: 16, floor: 3, archetype: 'palladian' }, // habitation: symmetric grand axis, gatehouse to great hall
+  { seed: 16, floor: 3, archetype: 'palladian' }, // overgrown: symmetric grand axis, gatehouse to great hall
   { seed: 5, floor: 5, archetype: 'cloister' }, // flooded: a court ringed by its cloister walk
-  { seed: 1, floor: 7, archetype: 'ship' }, // reactor: one long keel corridor, decks either side
-  { seed: 8, floor: 9, archetype: 'pavilion' }, // overgrown: hospital pavilions round garden courts
+  { seed: 1, floor: 7, archetype: 'ship' }, // overgrown: one long keel corridor, decks either side
+  { seed: 8, floor: 9, archetype: 'pavilion' }, // habitation: hospital pavilions round garden courts
 ] as const
 
 describe('armed scenario', () => {
@@ -74,8 +74,8 @@ describe('armed scenario', () => {
     it(`seed ${seed} floor ${floor}: lands on the real complex, armed, with the exit reachable`, () => {
       const w = armedRun(seed, floor)
       expect(w.floor).toBe(floor)
-      expect(isComplexFloor(floor)).toBe(true)
-      expect(w.level.complex?.biome).toBe(biomeForFloor(floor))
+      expect(floorSetting(seed, floor).kind).toBe('complex')
+      expect(w.level.complex?.biome).toBe(biomeForFloor(seed, floor))
       // Bit-identical to the level a run reaching this floor generates.
       expect(levelChecksum(w.level)).toBe(levelChecksum(generateLevel(seed, floor)))
       expect(w.mission.template).toBeDefined()

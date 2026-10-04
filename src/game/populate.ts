@@ -609,7 +609,7 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
     { archetype: 'thug', count: [1, 2] },
     { archetype: 'gangster', count: [1, 2] },
   ],
-  // Indoor complex modules (floors 3, 5, 7…). The essence-echoes of the crew still
+  // Indoor complex modules (floors 3+). The essence-echoes of the crew still
   // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
   // swarms are layered on separately (spawnComplexSleepers, complexDirector).
   // A complex has ~3x as many (single-room) modules as a city floor has

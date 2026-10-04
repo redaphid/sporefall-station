@@ -47,11 +47,13 @@ export const JOIN_UNSUPPORTED: Record<UnsupportedReason, { title: string; detail
     title: "Can't join from this device",
     detail:
       "Safari and Chrome on iPhone and iPad can't use Bluetooth for this. " +
-      'Join from an Android phone or a laptop running Chrome.',
+      'Use Play online on the start menu instead, or join from an Android phone or a laptop running Chrome.',
   },
   'no-web-bluetooth': {
     title: "Can't join from this browser",
-    detail: "This browser can't join over Bluetooth. Open the game in Chrome or Edge on Android or a laptop.",
+    detail:
+      "This browser can't join over Bluetooth. Use Play online on the start menu instead, " +
+      'or open the game in Chrome or Edge on Android or a laptop.',
   },
   'no-adapter': {
     title: 'Bluetooth unavailable',

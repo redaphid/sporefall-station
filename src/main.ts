@@ -9,6 +9,8 @@ import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
 import { joinFailureMessage } from './app/joinError'
 import { openJoinTransport } from './app/openJoinTransport'
+import { onlineRoom, type RoomCode } from './app/roomCode'
+import { pickOnline } from './ui/onlineMenu'
 import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
@@ -226,12 +228,23 @@ const boot = async (): Promise<void> => {
   // replacing it). Both restore into SINGLE-PLAYER — see the blocks below.
   const sharedState = params.get('state')
   const exactWorld = sharedState ?? params.get('world')
-  const mode =
-    (params.get('mode') as GameMode | null) ??
-    // The third argument adds the Settings entry (opens the panel over the menu
-    // with controller navigation armed) — the pad-only player's route to button
-    // remapping, e.g. binding the zoom buttons.
-    (exactWorld ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
+  // The third argument adds the Settings entry (opens the panel over the menu
+  // with controller navigation armed) — the pad-only player's route to button
+  // remapping, e.g. binding the zoom buttons.
+  const startMenu = (): Promise<GameMode> => pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi)
+  let mode = (params.get('mode') as GameMode | null) ?? (exactWorld ? 'solo' : await startMenu())
+  // "Play online" settles into hosting or joining a coded room on the relay;
+  // backing out of it returns to the start menu.
+  let online: RoomCode | undefined
+  while (mode === 'online') {
+    const pick = await pickOnline(uiMount)
+    if (!pick) {
+      mode = await startMenu()
+      continue
+    }
+    mode = pick.role
+    online = pick.code
+  }
   // Past the picker, nothing between here and the frame loop can honestly
   // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
   // conservative one until the loop starts reporting real ones.
@@ -311,7 +324,16 @@ const boot = async (): Promise<void> => {
   }
   const coop = createGamepadCoop()
 
-  const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
+  const session = await createSession(mode, {
+    seed,
+    room: online ? namespaceRoom(onlineRoom(online), betaSlugFromBase(import.meta.env.BASE_URL)) : room,
+    online,
+    name,
+    input,
+    coop,
+    uiMount,
+    renderer,
+  })
   if (!session) return
   paused = () => session.isPaused ?? false
 
@@ -651,6 +673,8 @@ const browserStore = (): KeyValueStore | undefined => {
 interface SessionDeps {
   seed: number
   room: string
+  /** Set when the player picked "Play online": the code of the relay room. */
+  online?: RoomCode
   name: string
   input: InputSource
   coop: ReturnType<typeof createGamepadCoop>
@@ -685,7 +709,7 @@ const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
   return { weapon, mods: weaponStack(view.self)?.mods ?? [] }
 }
 
-const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
+const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
     const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal')
     deps.renderer.setLevel(session.world.level)
@@ -703,7 +727,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
     // put it on and killed discovery). Joining phones tag the row 'Sporefall'
     // themselves — see toHostLabel — which needs no advertisement bytes and works
     // against hosts running older builds too.
-    const wsHost = new URLSearchParams(location.search).get('transport') === 'ws'
+    const wsHost = deps.online !== undefined || new URLSearchParams(location.search).get('transport') === 'ws'
     const transport = wsHost
       ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
       : native
@@ -712,8 +736,8 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     stopTransportOnPagehide(transport)
     const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
-    const lobby = createLobbyUi(deps.uiMount, true)
-    lobby.setStatus('Waiting for players…')
+    const lobby = createLobbyUi(deps.uiMount, true, deps.online)
+    lobby.setStatus(deps.online ? 'Friends join with this code from Play online' : 'Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
     session.onLobbyChange = (players) => {
       dbg.log(`host: lobby now ${players.length} player(s)`)
@@ -745,19 +769,22 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
 
   // join
   dbg.log(`join: mode start, native=${native}`)
-  const transport = await openJoinTransport({
-    native,
-    search: location.search,
-    nav: navigator,
-    room: deps.room,
-    uiMount: deps.uiMount,
-    log: dbg.log,
-    backToMenu: () => {
-      const menu = new URL(location.href)
-      menu.searchParams.delete('mode')
-      location.assign(menu)
-    },
-  })
+  // An online pick is a deliberate choice of link, not a device probe.
+  const transport = deps.online
+    ? new WsTransport('client', deps.room, resolveWsBaseUrl(location.search))
+    : await openJoinTransport({
+        native,
+        search: location.search,
+        nav: navigator,
+        room: deps.room,
+        uiMount: deps.uiMount,
+        log: dbg.log,
+        backToMenu: () => {
+          const menu = new URL(location.href)
+          menu.searchParams.delete('mode')
+          location.assign(menu)
+        },
+      })
   if (!transport) return null
   stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
@@ -828,7 +855,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       return null
     }
   }
-  lobby.setStatus('Looking for a host…')
+  lobby.setStatus(deps.online ? `Waiting for the host of ${deps.online}…` : 'Looking for a host…')
   session.onLobbyChange = (msg) => lobby.setPlayers(msg.players)
   session.onLevelChange = (level) => deps.renderer.setLevel(level)
   const ready = new Promise<boolean>((resolve) => {
@@ -853,7 +880,14 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
       }
     }
   })
-  await session.start()
+  try {
+    await session.start()
+  } catch (err) {
+    console.error('join: start failed', err)
+    dbg.log(`join: START FAILED — ${err instanceof Error ? err.message : String(err)}`)
+    lobby.setStatus(joinFailureMessage(err))
+    return null
+  }
   const ok = await ready
   if (!ok) return null
   lobby.close()

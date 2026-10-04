@@ -17,7 +17,25 @@ import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from '../game/systems/beh
 export interface BossViewLike {
   entities: readonly Entity[]
   events: readonly SimEvent[]
+  /** The entity this device controls. Absent on a spectator/pre-spawn frame. */
+  self?: Entity
+  /** The run is over. */
+  gameOver?: boolean
 }
+
+/**
+ * True while the LOCAL player is out of the fight — dead, bleeding out, or the
+ * run is over.
+ *
+ * This is the same condition that raises the restart overlay
+ * (`screens.restartAffordance`), and the `playerOutOfFight tracks
+ * restartAffordance exactly` suite in `bossHud.death.test.ts` pins the two
+ * together over the same eight views so they cannot drift apart. It is stated
+ * here rather than imported from `screens.ts` because `screens.ts` imports
+ * *this* module.
+ */
+export const playerOutOfFight = (view: BossViewLike): boolean =>
+  !!view.gameOver || !!view.self?.dead || !!view.self?.playerCtl?.downed
 
 /** What to draw. `null` from `bossBar` means: draw nothing at all. */
 export interface BossBar {
@@ -83,9 +101,16 @@ export const bossRevealName = (events: readonly SimEvent[], name: string): strin
  * same way).
  */
 export const bossBar = (view: BossViewLike, bossId: number | undefined, name: string): BossBar | null => {
+  // The player is down / dead / the run is over: the restart overlay owns the
+  // screen now. The bar is not merely redundant here, it is a rendering fault —
+  // the HUD carries `z-index:66` and the overlay carries none, so the bar paints
+  // ON TOP of the YOU DIED scrim instead of behind it (screens.ts).
+  if (playerOutOfFight(view)) return null
   if (bossId === undefined) return null
   const boss = view.entities.find((e) => e.id === bossId)
-  if (!boss || boss.dead || !boss.health || boss.health.max <= 0) return null
+  // The id must still name a boss: a new world recycles ids, so the Alpha's
+  // old id can belong to a thug after a restart.
+  if (!boss || boss.archetype !== 'boss' || boss.dead || !boss.health || boss.health.max <= 0) return null
   const hp = Math.max(0, boss.health.hp)
   if (hp <= 0) return null
   const hpFrac = Math.min(1, hp / boss.health.max)

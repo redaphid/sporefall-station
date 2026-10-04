@@ -1,13 +1,14 @@
 // Regenerates src/game/__fixtures__/mission-baseline.json for the extraction
-// RNG-neutrality test (#85): 160 worlds, 30 idle ticks each, hashed. Run it
-// with extraction selection switched OFF so the baseline is the pre-extraction
-// world on the current code:  npx tsx scripts/test/gen-mission-baseline.mts <out.json>
-import { writeFileSync } from 'node:fs'
+// RNG-neutrality test (#85): 40 seeded city worlds (floors 1-2) plus the
+// frozen-level fixtures standing in for deeper floors, 30 idle ticks each,
+// hashed. Run it with extraction selection switched OFF so the baseline is the
+// pre-extraction world on the current code:  npx tsx scripts/test/gen-mission-baseline.mts <out.json>
+import { readFileSync, writeFileSync } from 'node:fs'
 import { populateWorld } from '../../src/game/populate'
 import { spawnPlayer } from '../../src/game/player'
 import { emptyInput } from '../../src/game/types'
-import { createWorld, tickWorld } from '../../src/game/world'
-import { serializeWorld } from '../../src/game/serialize'
+import { createWorld, tickWorld, type World } from '../../src/game/world'
+import { deserializeWorld, serializeWorld, type WorldJson } from '../../src/game/serialize'
 import { setupFloor } from '../../src/game/systems/missions'
 
 const fnv = (s: string): string => {
@@ -19,15 +20,14 @@ const fnv = (s: string): string => {
   return (h >>> 0).toString(16)
 }
 const out: Record<string, { template: string; hash: string }> = {}
-for (let seed = 1; seed <= 20; seed++) {
-  for (let floor = 1; floor <= 8; floor++) {
-    const w = createWorld(seed, floor)
-    populateWorld(w)
-    setupFloor(w)
-    spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-    for (let i = 0; i < 30; i++) tickWorld(w, new Map([[0, emptyInput()]]))
-    out[`${seed}:${floor}`] = { template: w.mission.template, hash: fnv(JSON.stringify(serializeWorld(w))) }
-  }
+const record = (key: string, w: World): void => {
+  populateWorld(w)
+  setupFloor(w)
+  spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
+  for (let i = 0; i < 30; i++) tickWorld(w, new Map([[0, emptyInput()]]))
+  out[key] = { template: w.mission.template, hash: fnv(JSON.stringify(serializeWorld(w))) }
 }
+for (let seed = 1; seed <= 20; seed++) for (let floor = 1; floor <= 2; floor++) record(`${seed}:${floor}`, createWorld(seed, floor))
+for (const name of ['frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) record(name, deserializeWorld(JSON.parse(readFileSync(`src/game/__fixtures__/${name}.json`, 'utf8')) as WorldJson))
 writeFileSync(process.argv[2], JSON.stringify(out, null, 1) + '\n')
 console.log(`${Object.keys(out).length} worlds`)

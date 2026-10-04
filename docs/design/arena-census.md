@@ -1,6 +1,6 @@
 # Arena census: do different builds win different fights?
 
-Status: **measured** on `main` at `ccf5a56`, after #92, #99, #101, #132 and #134.
+Status: **measured** on `main` at `2d8fd8c`, after #92, #99, #101, #132, #134 and #146.
 Code: `src/game/arenas.ts` (`ARENAS`, `stageArena`), `src/debug/census.ts` (the
 bot, `runFight`, `reachProbe`), `scripts/census.mts` (the CLI). Tests:
 `src/game/arenas.test.ts`, `src/debug/census.test.ts`.
@@ -35,18 +35,23 @@ in the verdict comes from the generated tables at the end of this doc.
     damage and `pierce>shock` 8/8 on 40. The builds whose only elements are fire
     and frost win 0/8 or 1/8. The weakness is what decides it. Against the stock
     wet boss the same two shock builds win only 3/8 and 4/8.
-- **No build is best everywhere.** The best total is `hand frost-lead` with 46 of
-  72 fights won, and it wins the wet lightning boss only 4/8. The fire builds that
-  sweep the brute pair win that boss 0/8.
+- **No build is best everywhere.** The best total is `pierce>frost>shock` with 45
+  of 72 fights won. It wins the wet lightning boss only 6/8, and the brute pair
+  7/8 on 105 damage, where `incendiary` alone takes 0. The four builds
+  with fire that sweep the brute pair and are not four-mod hands win the wet
+  lightning boss 0/8, `pierce>shock>incendiary` included. The three hands win it
+  1/8 or 2/8.
 - **Three arenas do not separate builds by outcome.** Against one brute, the swarm
   and the cinders, 12 of 13 builds win 8/8. Only `none` loses. The builds differ
-  only in damage taken. Against one brute, every build with fire takes 0 damage
-  and `shock` takes 82.
+  only in damage taken. Against one brute, every build with fire except
+  `hand frost-lead` takes 0 damage. `hand frost-lead` takes 12 and `shock` 82.
 - **Fire answers the cinders.** A cinder takes 20% from fire, but a burning body
   panics unless it is the boss or fully fire-immune (`statusFx.ts`, #92). A
   panicking cinder runs away instead of hitting. `incendiary` wins 8/8 on 9 damage.
-  The plain pistol wins 4/8 on 115.
-- **The dry boss beats every build.** No build wins `arena-boss` more than 1/8.
+  The plain pistol wins 4/8 on 115. The best cinder build is `hand shock-lead`,
+  8/8 on 5 damage.
+- **The dry boss beats every build.** No build wins `arena-boss` more than 1/8,
+  and only `pierce>frost` and `pierce>incendiary>frost` win it at all.
   `resist.electrified: 2` changes nothing there. All 13 builds have identical hp
   traces on all 8 seeds.
 
@@ -54,6 +59,17 @@ The premise holds where an arena asks a question. Fire answers closers, frost
 answers shooters, and shock answers a wet boss that is weak to lightning. A loadout
 mechanic has real choices to vary between. There is no answer yet for the dry
 boss. Half the arenas reward any element over none and do not care which.
+
+#146 routes burning through `hurt()`, scales it by resist without per-tick
+rounding, and stops regen while a body burns. Against the census run at
+`ccf5a56`, it changed win counts only for the four-mod hands. Every other build
+kept its wins and its damage taken, and moved only in kill time and the boss's
+hp left. `hand frost-lead` lost its dry boss wins (1/8 to 0/8) and half its wet
+lightning boss wins (4/8 to 2/8), so it fell from the best total (46) to 42.
+`hand fire-lead` and `hand shock-lead` each gained a win against the stock wet
+boss, and `hand fire-lead` one against the wet lightning boss. Against the
+cinders, the seven builds with fire kill 0.1 to 0.5 s slower, and
+`hand fire-lead` takes 21 damage instead of 29.
 
 ## How the census works
 
@@ -105,7 +121,8 @@ later shock then hits a dry body, and `shock` skips its damage for a dry body
 `wet` and takes the boss from 320 to 309 hp. Its shock lands at tick 38 on a dry
 boss and deals nothing. Shock-lead's first hit at tick 10 takes the boss from 320
 to 269. When a probe re-wets the boss every tick, fire-lead's traces differ on 7
-of 8 seeds.
+of 8 seeds. Because its two wet fights match, fire-lead wins both wet bosses on
+the same 1 of 8 seeds.
 
 A fire round on a wet target still deals its hit damage, but it dries the target
 without lighting it. That denies the shock bonus for the rest of the fight, so a
@@ -233,9 +250,9 @@ Each cell is fights won out of seeds, then mean damage taken. The player has 120
 | pierce>incendiary>frost | **8/8 · 0** | 8/8 · 38 | 8/8 · 68 | 8/8 · 56 | 8/8 · 10 | 1/8 · 118 | 1/8 · 118 | 0/8 · 120 | 0/8 · 120 |
 | pierce>shock>incendiary | 8/8 · 0 | 8/8 · 94 | 7/8 · 71 | 8/8 · 48 | 8/8 · 31 | 0/8 · 121 | 0/8 · 121 | 0/8 · 121 | 0/8 · 121 |
 | pierce>frost>shock | 8/8 · 74 | 7/8 · 105 | 7/8 · 57 | 8/8 · 63 | 8/8 · 28 | 0/8 · 122 | 0/8 · 122 | 1/8 · 118 | 6/8 · 96 |
-| hand shock-lead | 8/8 · 0 | 8/8 · 2 | 7/8 · 73 | 8/8 · 56 | **8/8 · 5** | 0/8 · 120 | 0/8 · 120 | 0/8 · 120 | 2/8 · 104 |
-| hand fire-lead | 8/8 · 0 | 8/8 · 42 | 7/8 · 66 | 8/8 · 55 | 8/8 · 29 | 0/8 · 120 | 0/8 · 120 | 0/8 · 120 | 0/8 · 120 |
-| hand frost-lead | 8/8 · 12 | 8/8 · 0 | 8/8 · 74 | 8/8 · 67 | 8/8 · 14 | 1/8 · 119 | 1/8 · 119 | 0/8 · 120 | 4/8 · 105 |
+| hand shock-lead | 8/8 · 0 | 8/8 · 2 | 7/8 · 73 | 8/8 · 56 | **8/8 · 5** | 0/8 · 120 | 0/8 · 120 | 1/8 · 118 | 2/8 · 104 |
+| hand fire-lead | 8/8 · 0 | 8/8 · 42 | 7/8 · 66 | 8/8 · 55 | 8/8 · 21 | 0/8 · 120 | 0/8 · 120 | 1/8 · 118 | 1/8 · 118 |
+| hand frost-lead | 8/8 · 12 | 8/8 · 0 | 8/8 · 74 | 8/8 · 67 | 8/8 · 14 | 0/8 · 120 | 0/8 · 120 | 0/8 · 120 | 2/8 · 108 |
 
 ### Best and worst build per arena
 
@@ -247,7 +264,7 @@ Builds joined by `=` tie on every ranking key.
 | arena-brute-pair | incendiary = pierce>incendiary: 8/8 won, 7.7 s, 0 dmg | none: 0/8 won, n/a s, 120 dmg | 6/13 |
 | arena-kiter | pierce>frost: 8/8 won, 2.4 s, 44 dmg | none: 3/8 won, 6.6 s, 115 dmg | 9/13 |
 | arena-swarm | pierce>incendiary: 8/8 won, 3.3 s, 33 dmg | none: 3/8 won, 4.9 s, 111 dmg | 1/13 |
-| arena-cinder | hand shock-lead: 8/8 won, 6.4 s, 5 dmg | none: 4/8 won, 6.6 s, 115 dmg | 1/13 |
+| arena-cinder | hand shock-lead: 8/8 won, 6.5 s, 5 dmg | none: 4/8 won, 6.6 s, 115 dmg | 1/13 |
 | arena-boss | pierce>frost: 1/8 won, 18.6 s, 122 dmg | none: 0/8 won, n/a s, 120 dmg | 13/13 |
 | arena-boss-lightning | pierce>frost: 1/8 won, 18.6 s, 122 dmg | none: 0/8 won, n/a s, 120 dmg | 13/13 |
 | arena-boss-wet | pierce>shock: 4/8 won, 8.2 s, 108 dmg | none: 0/8 won, n/a s, 120 dmg | 13/13 |
@@ -363,16 +380,16 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 4
 
 | build | won | downed | timed out | distinct fights | median TTK (s) | mean dmg taken | mean foe HP left when not won |
 |---|---|---|---|---|---|---|---|
-| hand shock-lead | 8 | 0 | 0 | 7 | 6.4 | 5 |  |
-| pierce>incendiary | 8 | 0 | 0 | 8 | 5.2 | 9 |  |
-| incendiary | 8 | 0 | 0 | 8 | 6.8 | 9 |  |
+| hand shock-lead | 8 | 0 | 0 | 7 | 6.5 | 5 |  |
+| pierce>incendiary | 8 | 0 | 0 | 8 | 5.3 | 9 |  |
+| incendiary | 8 | 0 | 0 | 8 | 7.1 | 9 |  |
 | pierce>frost | 8 | 0 | 0 | 3 | 4.5 | 10 |  |
 | frost | 8 | 0 | 0 | 3 | 5.1 | 10 |  |
-| pierce>incendiary>frost | 8 | 0 | 0 | 7 | 5.5 | 10 |  |
-| hand frost-lead | 8 | 0 | 0 | 8 | 7.0 | 14 |  |
+| pierce>incendiary>frost | 8 | 0 | 0 | 7 | 5.6 | 10 |  |
+| hand frost-lead | 8 | 0 | 0 | 7 | 7.3 | 14 |  |
+| hand fire-lead | 8 | 0 | 0 | 8 | 7.1 | 21 |  |
 | pierce>frost>shock | 8 | 0 | 0 | 4 | 5.2 | 28 |  |
-| hand fire-lead | 8 | 0 | 0 | 8 | 6.6 | 29 |  |
-| pierce>shock>incendiary | 8 | 0 | 0 | 7 | 6.8 | 31 |  |
+| pierce>shock>incendiary | 8 | 0 | 0 | 8 | 7.1 | 31 |  |
 | pierce>shock | 8 | 0 | 0 | 4 | 5.5 | 38 |  |
 | shock | 8 | 0 | 0 | 5 | 6.7 | 67 |  |
 | none | 4 | 4 | 0 | 5 | 6.6 | 115 | 45 |
@@ -386,15 +403,15 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 | build | won | downed | timed out | distinct fights | median TTK (s) | mean dmg taken | mean foe HP left when not won |
 |---|---|---|---|---|---|---|---|
 | pierce>frost | 1 | 7 | 0 | 8 | 18.6 | 122 | 90 |
-| hand frost-lead | 1 | 7 | 0 | 8 | 14.4 | 119 | 92 |
-| pierce>incendiary>frost | 1 | 7 | 0 | 8 | 9.1 | 118 | 135 |
+| pierce>incendiary>frost | 1 | 7 | 0 | 8 | 9.3 | 118 | 145 |
+| hand frost-lead | 0 | 8 | 0 | 8 | n/a | 120 | 107 |
 | hand fire-lead | 0 | 8 | 0 | 8 | n/a | 120 | 126 |
 | frost | 0 | 8 | 0 | 8 | n/a | 123 | 139 |
-| hand shock-lead | 0 | 8 | 0 | 8 | n/a | 120 | 167 |
+| hand shock-lead | 0 | 8 | 0 | 8 | n/a | 120 | 174 |
 | pierce>frost>shock | 0 | 8 | 0 | 8 | n/a | 122 | 183 |
-| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 192 |
-| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 196 |
-| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 199 |
+| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 200 |
+| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 204 |
+| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 207 |
 | pierce>shock | 0 | 8 | 0 | 8 | n/a | 120 | 231 |
 | shock | 0 | 8 | 0 | 8 | n/a | 120 | 245 |
 | none | 0 | 8 | 0 | 8 | n/a | 120 | 266 |
@@ -408,15 +425,15 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 | build | won | downed | timed out | distinct fights | median TTK (s) | mean dmg taken | mean foe HP left when not won |
 |---|---|---|---|---|---|---|---|
 | pierce>frost | 1 | 7 | 0 | 8 | 18.6 | 122 | 90 |
-| hand frost-lead | 1 | 7 | 0 | 8 | 14.4 | 119 | 92 |
-| pierce>incendiary>frost | 1 | 7 | 0 | 8 | 9.1 | 118 | 135 |
+| pierce>incendiary>frost | 1 | 7 | 0 | 8 | 9.3 | 118 | 145 |
+| hand frost-lead | 0 | 8 | 0 | 8 | n/a | 120 | 107 |
 | hand fire-lead | 0 | 8 | 0 | 8 | n/a | 120 | 126 |
 | frost | 0 | 8 | 0 | 8 | n/a | 123 | 139 |
-| hand shock-lead | 0 | 8 | 0 | 8 | n/a | 120 | 167 |
+| hand shock-lead | 0 | 8 | 0 | 8 | n/a | 120 | 174 |
 | pierce>frost>shock | 0 | 8 | 0 | 8 | n/a | 122 | 183 |
-| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 192 |
-| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 196 |
-| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 199 |
+| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 200 |
+| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 204 |
+| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 207 |
 | pierce>shock | 0 | 8 | 0 | 8 | n/a | 120 | 231 |
 | shock | 0 | 8 | 0 | 8 | n/a | 120 | 245 |
 | none | 0 | 8 | 0 | 8 | n/a | 120 | 266 |
@@ -433,14 +450,14 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 | shock | 3 | 5 | 0 | 8 | 7.9 | 110 | 70 |
 | pierce>frost | 1 | 7 | 0 | 8 | 18.6 | 122 | 90 |
 | pierce>frost>shock | 1 | 7 | 0 | 8 | 12.5 | 118 | 92 |
-| hand frost-lead | 0 | 8 | 0 | 8 | n/a | 120 | 105 |
-| hand shock-lead | 0 | 8 | 0 | 8 | n/a | 120 | 136 |
+| hand shock-lead | 1 | 7 | 0 | 8 | 13.5 | 118 | 149 |
+| hand fire-lead | 1 | 7 | 0 | 8 | 14.2 | 118 | 186 |
+| hand frost-lead | 0 | 8 | 0 | 8 | n/a | 120 | 109 |
 | frost | 0 | 8 | 0 | 8 | n/a | 123 | 139 |
-| pierce>incendiary>frost | 0 | 8 | 0 | 8 | n/a | 120 | 147 |
-| hand fire-lead | 0 | 8 | 0 | 8 | n/a | 120 | 161 |
-| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 174 |
-| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 205 |
-| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 213 |
+| pierce>incendiary>frost | 0 | 8 | 0 | 8 | n/a | 120 | 151 |
+| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 178 |
+| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 212 |
+| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 219 |
 | none | 0 | 8 | 0 | 8 | n/a | 120 | 266 |
 
 ### arena-boss-lightning-wet
@@ -454,15 +471,15 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 | pierce>shock | 8 | 0 | 0 | 8 | 5.2 | 40 |  |
 | shock | 8 | 0 | 0 | 8 | 7.5 | 44 |  |
 | pierce>frost>shock | 6 | 2 | 0 | 8 | 9.2 | 96 | 61 |
-| hand frost-lead | 4 | 4 | 0 | 8 | 10.3 | 105 | 143 |
-| hand shock-lead | 2 | 6 | 0 | 8 | 9.2 | 104 | 84 |
+| hand shock-lead | 2 | 6 | 0 | 8 | 9.2 | 104 | 80 |
+| hand frost-lead | 2 | 6 | 0 | 8 | 10.2 | 108 | 109 |
 | pierce>frost | 1 | 7 | 0 | 8 | 18.6 | 122 | 90 |
-| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 115 |
+| hand fire-lead | 1 | 7 | 0 | 8 | 14.2 | 118 | 186 |
+| pierce>shock>incendiary | 0 | 8 | 0 | 8 | n/a | 121 | 117 |
 | frost | 0 | 8 | 0 | 8 | n/a | 123 | 139 |
-| pierce>incendiary>frost | 0 | 8 | 0 | 8 | n/a | 120 | 147 |
-| hand fire-lead | 0 | 8 | 0 | 8 | n/a | 120 | 161 |
-| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 205 |
-| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 213 |
+| pierce>incendiary>frost | 0 | 8 | 0 | 8 | n/a | 120 | 151 |
+| pierce>incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 212 |
+| incendiary | 0 | 8 | 0 | 8 | n/a | 120 | 219 |
 | none | 0 | 8 | 0 | 8 | n/a | 120 | 266 |
 
 ### arena-boss vs arena-boss-lightning
@@ -476,12 +493,12 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 | pierce>shock | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
 | pierce>incendiary | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
 | pierce>frost | 1/8 won, 18.6 s, 122 dmg | 1/8 won, 18.6 s, 122 dmg | 8/8 |
-| pierce>incendiary>frost | 1/8 won, 9.1 s, 118 dmg | 1/8 won, 9.1 s, 118 dmg | 8/8 |
+| pierce>incendiary>frost | 1/8 won, 9.3 s, 118 dmg | 1/8 won, 9.3 s, 118 dmg | 8/8 |
 | pierce>shock>incendiary | 0/8 won, n/a s, 121 dmg | 0/8 won, n/a s, 121 dmg | 8/8 |
 | pierce>frost>shock | 0/8 won, n/a s, 122 dmg | 0/8 won, n/a s, 122 dmg | 8/8 |
 | hand shock-lead | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
 | hand fire-lead | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
-| hand frost-lead | 1/8 won, 14.4 s, 119 dmg | 1/8 won, 14.4 s, 119 dmg | 8/8 |
+| hand frost-lead | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
 
 ### arena-boss-wet vs arena-boss-lightning-wet
 
@@ -497,9 +514,9 @@ A passive player (no fire, no movement) is downed on 8/8 seeds, after a median 5
 | pierce>incendiary>frost | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
 | pierce>shock>incendiary | 0/8 won, n/a s, 121 dmg | 0/8 won, n/a s, 121 dmg | 0/8 |
 | pierce>frost>shock | 1/8 won, 12.5 s, 118 dmg | 6/8 won, 9.2 s, 96 dmg | 0/8 |
-| hand shock-lead | 0/8 won, n/a s, 120 dmg | 2/8 won, 9.2 s, 104 dmg | 0/8 |
-| hand fire-lead | 0/8 won, n/a s, 120 dmg | 0/8 won, n/a s, 120 dmg | 8/8 |
-| hand frost-lead | 0/8 won, n/a s, 120 dmg | 4/8 won, 10.3 s, 105 dmg | 2/8 |
+| hand shock-lead | 1/8 won, 13.5 s, 118 dmg | 2/8 won, 9.2 s, 104 dmg | 0/8 |
+| hand fire-lead | 1/8 won, 14.2 s, 118 dmg | 1/8 won, 14.2 s, 118 dmg | 8/8 |
+| hand frost-lead | 0/8 won, n/a s, 120 dmg | 2/8 won, 10.2 s, 108 dmg | 2/8 |
 
 ### Reach probe: does a gangster fight back?
 

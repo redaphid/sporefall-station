@@ -60,21 +60,31 @@ const BLOOM_TICKS = 40 * 30
 /** Bog integrity of an overgrown gateway hatch — fire erodes it (interaction). */
 const GATEWAY_GROWTH_HP = 12
 
-/** Door entities on every building door tile. Mission building's exterior doors are locked. */
+/** One door entity on every building door tile. Mission building's exterior doors are locked. */
 const spawnDoors = (w: World): void => {
+  const byTile = new Map<number, Entity>()
   for (let i = 0; i < w.level.buildings.length; i++) {
     const b = w.level.buildings[i]
     for (const d of b.doors) {
-      const e = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
       const isMissionBuilding = i === w.mission.targetBuilding
       // Locks harden with depth: the lock level sets the pick-channel LENGTH
       // (see interaction.pickTicks) — L1 on floors 1-2, L2 from floor 3. Every
       // level is pickable by the default player; grenades breach as the loud
       // alternative (combat.detonate), so mission doors never dead-end a run.
       const lockLevel = isMissionBuilding ? Math.min(2, 1 + Math.floor((w.floor - 1) / 2)) : 0
+      // Neighbouring complex modules share a doorway and both list it. Two
+      // doors stacked on one tile are a softlock: a press only ever toggles
+      // the first, and the second stays shut. The mission building's lock wins.
+      const shared = byTile.get(d.y * w.level.w + d.x)
+      if (shared) {
+        if (isMissionBuilding) shared.door = { open: false, locked: true, lockLevel }
+        continue
+      }
+      const e = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
       e.door = { open: false, locked: isMissionBuilding, lockLevel }
       e.interact = { verb: 'open', range: 1.3 }
       addEntity(w, e)
+      byTile.set(d.y * w.level.w + d.x, e)
     }
   }
 }

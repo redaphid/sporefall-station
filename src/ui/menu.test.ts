@@ -34,18 +34,18 @@ const menuButtons = (root: HTMLElement): HTMLButtonElement[] =>
   Array.from(root.querySelectorAll<HTMLButtonElement>('button'))
 
 describe('pickMode — the Settings entry', () => {
-  it('without a settings control there are exactly the three mode buttons (no dead entry)', () => {
+  it('without a settings control there are exactly the four mode buttons (no dead entry)', () => {
     const root = mount()
     void pickMode(root)
-    expect(menuButtons(root)).toHaveLength(3)
+    expect(menuButtons(root)).toHaveLength(4)
     expect(root.querySelector('[data-role="menu-settings"]')).toBeNull()
   })
 
-  it('with a settings control a fourth Settings entry appears', () => {
+  it('with a settings control a fifth Settings entry appears', () => {
     const root = mount()
     void pickMode(root, undefined, fakeSettings())
     const btns = menuButtons(root)
-    expect(btns).toHaveLength(4)
+    expect(btns).toHaveLength(5)
     expect(root.querySelector('[data-role="menu-settings"]')?.textContent).toContain('Settings')
   })
 
@@ -90,7 +90,7 @@ describe('pickMode — fits a phone', () => {
     const overlay = root.querySelector<HTMLElement>('[data-role="start-menu"]')!
     expect(overlay).not.toBeNull()
     expect(overlay.classList.contains('sf-start')).toBe(true)
-    expect(Array.from(overlay.querySelectorAll('button'))).toHaveLength(4)
+    expect(Array.from(overlay.querySelectorAll('button'))).toHaveLength(5)
     expect(css()).toMatch(/\.sf-start\{[^}]*container-type:size/)
     expect(css()).toMatch(/\.sf-start\{[^}]*overflow-y:auto/)
     // Centring must not be on the scroller itself: a centred flex overflow is

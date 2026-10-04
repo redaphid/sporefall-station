@@ -25,6 +25,7 @@ interface Mapping {
   phrases: { from: string; to: string; why: string }[]
   keep: { pattern: string; why: string }[]
   skipPaths: { prefix: string; why: string }[]
+  scoped: { from: string; to: string; files: string[]; why: string }[]
 }
 
 type Category = 'identifiers' | 'archetype ids' | 'id strings' | 'prose strings' | 'comments' | 'docs' | 'data' | 'other code' | 'file names'
@@ -34,6 +35,12 @@ interface Edit { start: number; end: number; text: string; term: string; categor
 
 const mapping = JSON.parse(readFileSync(fileURLToPath(new URL('./lore-names.json', import.meta.url)), 'utf8')) as Mapping
 const terms = new Map(Object.entries(mapping.terms).map(([k, v]) => [k.toLowerCase(), v.to]))
+/** Terms for one file: the global ones plus any scoped to it. A scoped term is a
+ * word that is off-theme only in some files, such as `city` naming the theme pack. */
+const termsFor = (path: string): Map<string, string> => {
+  const here = mapping.scoped.filter((s) => s.files.includes(path))
+  return here.length ? new Map([...terms, ...here.map((s): [string, string] => [s.from.toLowerCase(), s.to])]) : terms
+}
 const keepRes = mapping.keep.map((k) => new RegExp(k.pattern, 'g'))
 
 const TS_EXT = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/
@@ -52,7 +59,7 @@ const startsWithVowel = (s: string): boolean => /^[aeiou]/i.test(s)
 const overlaps = (ranges: [number, number][], s: number, e: number): boolean => ranges.some(([a, b]) => s < b && e > a)
 
 /** Every edit that brings `text` on theme. Spans say where to look and how to class a hit. */
-const planEdits = (text: string, spans: Span[]): Edit[] => {
+const planEdits = (text: string, spans: Span[], terms: Map<string, string>): Edit[] => {
   const masked: [number, number][] = []
   for (const re of keepRes) for (const m of text.matchAll(re)) masked.push([m.index, m.index + m[0].length])
   const spanAt = (i: number): Span | undefined => spans.find((s) => i >= s.start && i < s.end)
@@ -153,7 +160,8 @@ const files = [...new Set([...tracked, ...listed(['-o', '--exclude-standard'])])
   .sort()
 
 const plan = (path: string): FilePlan => {
-  const pathEdits = planEdits(path, [{ start: 0, end: path.length, category: 'file names' }])
+  const here = termsFor(path)
+  const pathEdits = planEdits(path, [{ start: 0, end: path.length, category: 'file names' }], here)
   const newPath = applyEdits(path, pathEdits)
   const buf = readFileSync(join(root, path))
   if (buf.subarray(0, 8000).includes(0)) return { path, newPath, edits: [], pathEdits, collisions: [] }
@@ -161,9 +169,9 @@ const plan = (path: string): FilePlan => {
   let spans: Span[] = [{ start: 0, end: text.length, category: categoryOf(path) }]
   let identifiers = new Set<string>()
   if (TS_EXT.test(path)) ({ spans, identifiers } = tsSpans(path, text))
-  const edits = planEdits(text, spans)
+  const edits = planEdits(text, spans, here)
   const collisions = [...identifiers]
-    .map((id) => [id, applyEdits(id, planEdits(id, [{ start: 0, end: id.length, category: 'identifiers' }]))])
+    .map((id) => [id, applyEdits(id, planEdits(id, [{ start: 0, end: id.length, category: 'identifiers' }], here))])
     .filter(([id, renamed]) => renamed !== id && identifiers.has(renamed))
     .map(([id, renamed]) => `${id} -> ${renamed}`)
   return { path, newPath, content: edits.length ? applyEdits(text, edits) : undefined, edits, pathEdits, collisions }

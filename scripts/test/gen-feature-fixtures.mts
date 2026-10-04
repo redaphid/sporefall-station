@@ -48,13 +48,13 @@ const ticksUntil = (json: WorldJson, pred: (w: World) => boolean, cap = 1200): n
   return -1
 }
 
-// ── combat-stage: three frozen-in-place thugs down the pistol lane. The proven
+// ── combat-stage: three frozen-in-place mutants down the pistol lane. The proven
 // `shooting` script walks into range and empties the player's pistol into them.
 const combat = buildRun(7)
 applyScenario(combat, 'shooting')
 const combatJson = write('combat-stage', combat)
 console.log(
-  `combat-stage: seed 7, ${combat.entities.filter((e) => e.archetype === 'thug').length} thugs, ` +
+  `combat-stage: seed 7, ${combat.entities.filter((e) => e.archetype === 'mutant').length} mutants, ` +
     `player hp ${combat.entities.find((e) => e.playerCtl)?.health?.hp}`,
 )
 

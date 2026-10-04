@@ -369,10 +369,10 @@ describe('interest cap — selection quality and stability', () => {
       addEntity(host.world, e)
       far.push(e)
     }
-    // The thing that matters: a thug standing on top of the party.
-    const thug = makeEntity('npc', 'thug', 30.3, 30.3, 0.35)
-    thug.health = { hp: 40, max: 40, iframes: 0 }
-    addEntity(host.world, thug)
+    // The thing that matters: a mutant standing on top of the party.
+    const mutant = makeEntity('npc', 'mutant', 30.3, 30.3, 0.35)
+    mutant.health = { hp: 40, max: 40, iframes: 0 }
+    addEntity(host.world, mutant)
     // Real floor order: everything the level made comes before the avatars.
     const ids = new Set(avatars.map((a) => a.id))
     const props = host.world.entities.filter((e) => !ids.has(e.id))
@@ -384,7 +384,7 @@ describe('interest cap — selection quality and stability', () => {
 
     for (const c of centrals) {
       const snap = c.snapshots.at(-1)!
-      expect(snap.entities.some((e) => e.id === thug.id), `${c.peer} lost the point-blank thug`).toBe(true)
+      expect(snap.entities.some((e) => e.id === mutant.id), `${c.peer} lost the point-blank mutant`).toBe(true)
     }
   })
 
@@ -447,7 +447,7 @@ describe('interest boundary — the client must not keep ghosts', () => {
   it('removes an entity from the client when it leaves the 14-tile window', async () => {
     const { host, client } = await bootClient(7)
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    const mover = makeEntity('npc', 'thug', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
+    const mover = makeEntity('npc', 'mutant', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
     mover.health = { hp: 40, max: 40, iframes: 0 }
     mover.ai = undefined
     addEntity(host.world, mover)
@@ -475,7 +475,7 @@ describe('interest boundary — the client must not keep ghosts', () => {
   it('re-adds an entity that leaves the window and comes back', async () => {
     const { host, client } = await bootClient(7)
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    const mover = makeEntity('npc', 'thug', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
+    const mover = makeEntity('npc', 'mutant', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
     mover.health = { hp: 40, max: 40, iframes: 0 }
     mover.ai = undefined
     addEntity(host.world, mover)
@@ -500,7 +500,7 @@ describe('interest boundary — the client must not keep ghosts', () => {
   it('leaves no ghost for an entity that DIES while outside the window', async () => {
     const { host, client } = await bootClient(7)
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    const doomed = makeEntity('npc', 'thug', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
+    const doomed = makeEntity('npc', 'mutant', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
     doomed.health = { hp: 40, max: 40, iframes: 0 }
     doomed.ai = undefined
     addEntity(host.world, doomed)
@@ -886,7 +886,7 @@ describe('inventory change-gating at 8 players', () => {
     await tickHost(host, 4)
     const before = host.debugInventorySends
     const avatar = host.world.byId.get(host.peersBySlot.get(3)!.entityId!)!
-    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'briefcase', qty: 1 }]
+    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'canister', qty: 1 }]
     await tickHost(host, 2)
     expect(host.debugInventorySends).toBe(before + 1)
   })
@@ -930,7 +930,7 @@ describe('8-player wire budget', () => {
   it('a full 48-entity snapshot fits the BLE packet budget it claims', async () => {
     const entities = Array.from({ length: SNAPSHOT_ENTITY_CAP }, (_, i) => ({
       id: i + 1,
-      archetype: 'thug',
+      archetype: 'mutant',
       x: i,
       y: i,
       facing: 0,

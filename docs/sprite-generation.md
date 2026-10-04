@@ -93,7 +93,7 @@ Python 3.10+, `pip install pillow numpy`. No other deps.
 | `consistency.py` | Silhouette-metric consistency harness + per-character spec gate (§5b). |
 | `consistency-spec.json` | Committed per-character proportion envelopes (ref frame + tolerances). |
 | `procedural.py` | Deterministic PIL sprites for sparse particles/FX. |
-| `tilesets_floor.py` | Macro-tile floor/street redesign: 64px (2×2-tile) procedural macros (`proc`) → SD img2img refine (`sd`; floors get `restamp_floor` to re-assert seams/rivets/roots after the paint pass) → slice into the shipped variant pools + moss overlay decals (`final`). Pairs with the manifest `macroTiles` section and `tile.<name>.overlay` keys (docs/themes.md). |
+| `tilesets_floor.py` | Macro-tile floor/causeway redesign: 64px (2×2-tile) procedural macros (`proc`) → SD img2img refine (`sd`; floors get `restamp_floor` to re-assert seams/rivets/roots after the paint pass) → slice into the shipped variant pools + moss overlay decals (`final`). Pairs with the manifest `macroTiles` section and `tile.<name>.overlay` keys (docs/themes.md). |
 | `manifest.py` | Emits `manifest.json` against the schema in `docs/themes.md`, with within-theme direction borrowing, and registers the theme in `public/themes/index.json`. |
 | `sheets.py` | Contact sheets + 4×4 tiling proofs into `docs/assets/swampspace/`. |
 | `curation.json` | Lineage: per job `{seed, batch, index, raw, size, ckpt}` of the curated pick. |
@@ -187,8 +187,8 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
   heuristic, §5b) and `verify.py` before curating, and if a good candidate
   faces left, mirror the RAW (record it in `curation.json`) so
   `generate.py final` stays reproducible. Manifest keys
-  `char.<archetype>.<dir>-<frame>` (archetypes: `player cop thug civilian
-  scientist gangster robot`); file naming here is `chars/<kind>-<dir>-<frame>.png`
+  `char.<archetype>.<dir>-<frame>` (archetypes: `player warden mutant civilian
+  scientist acolyte robot`); file naming here is `chars/<kind>-<dir>-<frame>.png`
   with thematic kind names — the manifest maps keys to files.
 - **Tiles: 32×32 px**, opaque, must tile seamlessly (`tile.floor`, `tile.wall`).
 - **Props/items: 32×32 px**, transparent background, centered.
@@ -196,7 +196,7 @@ The LOST list is the exact re-curation backlog: each entry needs a fresh
   `fx.*` manifest keys take **arrays** of frames.
 - Full key list and fallback semantics: `docs/themes.md`. One critical rule
   learned in-game: sprite keys resolve per key against `[theme, city]` — any
-  char key your manifest **omits** shows CITY's art for that pose (a human cop
+  char key your manifest **omits** shows CITY's art for that pose (a human warden
   walking east between spore-drone frames). `manifest.py` therefore mentions
   every direction key, borrowing within the theme (`se→s`, `e→s`, `ne→e→s`,
   `n→s`, `step→idle`) until real art lands.

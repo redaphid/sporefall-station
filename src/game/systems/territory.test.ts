@@ -41,13 +41,13 @@ describe('#77 territory — NPCs are bound to the module they spawn in', () => {
     }
   })
 
-  it('street-life roamers (spawned outside every building) carry no zone', () => {
+  it('causeway-life roamers (spawned outside every building) carry no zone', () => {
     // Any NPC the lookup places outside all buildings must be an unbound roamer.
     for (const seed of [2, 3, 13]) {
       const w = floor(seed)
       const roamers = allNpcs(w).filter((e) => buildingAt(w.level, e.pos.x, e.pos.y) === -1)
       for (const e of roamers) expect(e.ai!.zone, `seed ${seed} roamer ${e.id}`).toBeUndefined()
-      expect(roamers.length).toBeGreaterThanOrEqual(1) // street life exists
+      expect(roamers.length).toBeGreaterThanOrEqual(1) // causeway life exists
     }
   })
 })
@@ -102,8 +102,8 @@ describe('#77 territory — the objective wing garrisons its core', () => {
 
 describe('#77 territory — a fighter defends its own wing (localized, not global)', () => {
   // Controlled fixture: a peaceful world (so the shipped `threat` drive stays
-  // silent for a player-neutral cop) with one injected office module. Only
-  // `defendMyWing` can turn the cop on a trespassing player — and only while the
+  // silent for a player-neutral warden) with one injected office module. Only
+  // `defendMyWing` can turn the warden on a trespassing player — and only while the
   // player is INSIDE the wing.
   const carved = (seed: number): { w: World; cx: number; cy: number } => {
     const w = createWorld(seed, 1, 'normal', false) // peaceful
@@ -118,29 +118,29 @@ describe('#77 territory — a fighter defends its own wing (localized, not globa
     return { w, cx: cx + 0.5, cy: cy + 0.5 }
   }
 
-  it('a cop turns on a player who breaches its wing, and stands down when they leave', () => {
+  it('a warden turns on a player who breaches its wing, and stands down when they leave', () => {
     const { w, cx, cy } = carved(9)
     const rect = { x: Math.floor(cx) - 6, y: Math.floor(cy) - 6, w: 12, h: 12 }
     const b: Building = { rect, rooms: [rect], doors: [], role: 'office', objectiveRoom: rect }
     w.level.buildings = [b]
     w.mission = { ...w.mission, targetBuilding: 0 }
 
-    const cop = spawnNpc(w, 'cop', cx, cy)
-    cop.ai!.zone = { building: 0, role: 'office' }
-    cop.ai!.sightRange = 16
+    const warden = spawnNpc(w, 'warden', cx, cy)
+    warden.ai!.zone = { building: 0, role: 'office' }
+    warden.ai!.sightRange = 16
     const player = spawnPlayer(w, 0, cx + 3, cy)
     player.health = { hp: 1e6, max: 1e6, iframes: 0 }
 
-    // Peaceful world → a player-neutral cop wouldn't otherwise fight; the breach
+    // Peaceful world → a player-neutral warden wouldn't otherwise fight; the breach
     // of its wing is the sole reason it engages.
-    const inWing = decide(w, cop).goal
+    const inWing = decide(w, warden).goal
     expect(['battle', 'pursue']).toContain(inWing.code)
     expect(inWing.target).toBe(player.id)
 
     // Player steps OUT of the module → the garrison stands down (holds the core).
     player.pos.x = rect.x - 4
     player.prevPos.x = player.pos.x
-    const outOfWing = decide(w, cop).goal
+    const outOfWing = decide(w, warden).goal
     expect(['battle', 'pursue']).not.toContain(outOfWing.code)
   })
 })

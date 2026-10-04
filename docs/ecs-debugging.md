@@ -105,12 +105,12 @@ rot). It returns:
 {
   "entityCount": 4,
   "kinds":      { "npc": 3, "player": 1 },
-  "archetypes": { "cop": { "kind": "npc", "count": 2 }, "player": { "kind": "player", "count": 1 }, ... },
+  "archetypes": { "warden": { "kind": "npc", "count": 2 }, "player": { "kind": "player", "count": 1 }, ... },
   "fields": {
     "pos":       { "count": 4, "types": ["object"], "keys": ["x","y"] },
     "health":    { "count": 4, "types": ["object"], "keys": ["hp","iframes","max"] },
     "ai":        { "count": 3, "types": ["object"], "keys": ["faction","goal","home","mode","sightRange","thinkAt","waypoint"] },
-    "playerCtl": { "count": 1, "types": ["object"], "keys": ["abilityCooldown","activeSlot","cash","crimeUntilTick",...] },
+    "playerCtl": { "count": 1, "types": ["object"], "keys": ["abilityCooldown","activeSlot","cash","misdeedUntilTick",...] },
     "futureThing": { "count": 1, "types": ["object"], "keys": ["tags","z"] }   // a component no tool knew about — enumerated anyway
   }
 }

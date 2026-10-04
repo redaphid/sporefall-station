@@ -150,7 +150,7 @@ export interface ReachResult {
 const REACH_FOE_HP = 5000
 const REACH_TICKS = 10 * SIM_RATE
 
-const openStreetRow = (w: World, n: number): Rect => {
+const openCausewayRow = (w: World, n: number): Rect => {
   const { level } = w
   const indoors = (x: number, y: number): boolean => level.buildings.some((b) => rectContains(b.rect, x, y))
   const standing = w.entities.filter((e) => e.kind === 'interactable' || e.kind === 'door')
@@ -169,13 +169,13 @@ const openStreetRow = (w: World, n: number): Rect => {
       }
     }
   }
-  if (!best) throw new Error(`census: seed ${w.seed} has no ${n}-cell open street row`)
+  if (!best) throw new Error(`census: seed ${w.seed} has no ${n}-cell open causeway row`)
   return best
 }
 
 export const reachProbe = (archetype: string, seed: number, distance: number, playerFires: boolean): ReachResult => {
   const w = newRun(seed)
-  stageArena(w, { question: 'reach probe', foes: [] }, openStreetRow(w, distance + 2))
+  stageArena(w, { question: 'reach probe', foes: [] }, openCausewayRow(w, distance + 2))
   const me = firstPlayer(w)
   const foe = spawnNpc(w, archetype, me.pos.x + distance, me.pos.y)
   foe.health = { hp: REACH_FOE_HP, max: REACH_FOE_HP, iframes: 0 }
@@ -355,7 +355,7 @@ export const renderCensus = (r: CensusReport): string => {
 
   if (r.reach.length) {
     out.push(`### Reach probe: does a ${r.reachArchetype} fight back?`, '')
-    out.push(`The ${r.reachArchetype} stands on an open street row with ${REACH_FOE_HP} hp. The player holds still for ${secs(REACH_TICKS)} s.`, '')
+    out.push(`The ${r.reachArchetype} stands on an open causeway row with ${REACH_FOE_HP} hp. The player holds still for ${secs(REACH_TICKS)} s.`, '')
     out.push('| distance (tiles) | player fires | foe first shot (s) | foe shots | closest approach | dmg taken | dmg dealt to foe |', '|---|---|---|---|---|---|---|')
     for (const p of r.reach) {
       out.push(`| ${p.distance} | ${p.playerFires ? 'yes' : 'no'} | ${p.firstShot === undefined ? 'never' : secs(p.firstShot)} | ${p.shots} | ${p.closest} | ${p.damageTaken} | ${p.foeDamage} |`)

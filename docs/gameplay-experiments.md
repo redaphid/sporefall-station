@@ -8,7 +8,7 @@ is also a test, and Claude can compose, narrate, and verify a scene end-to-end.
 
 ## Why this exists
 
-The heist experiment (issue #55) showed the engine can already express
+The salvage experiment (issue #55) showed the engine can already express
 **planned, interdependent co-op play** (cloak → sleep-takedown → hack the vault →
 grab loot → alarmed getaway) and surprising **emergent mechanics** (noise lures,
 wet+shock chains, deep-freeze crowd control) — all driven purely from the debug
@@ -50,7 +50,7 @@ enough to **coach a plan on screen** (annotation-driven tutorials) or to run an
 
 1. **Design** the stages and role dependencies (each stage gated on the last).
 2. **Build a fixture:** seed a world, `applyScenario`/`spawn`/`set`/`teleport` the
-   guards, vault (`door.locked`, `lockLevel`), loot (briefcase), and crew, then
+   guards, vault (`door.locked`, `lockLevel`), loot (canister), and crew, then
    `serializeWorld` → `src/game/__fixtures__/<name>.json` from a
    `scripts/test/gen-*.mts` generator (fixed seed).
 3. **Script inputs** (`src/input/scripted.ts`, `?script=`) for the beats you want
@@ -63,13 +63,13 @@ enough to **coach a plan on screen** (annotation-driven tutorials) or to run an
 ```js
 import { record } from './lib.mjs'
 await record({
-  name: 'heist',
-  params: { world: 'heist-stage', script: 'heist', e2e: '1', mode: 'solo' },
+  name: 'salvage',
+  params: { world: 'salvage-stage', script: 'salvage', e2e: '1', mode: 'solo' },
   beforeTicks: async (page) => {
     await page.evaluate(() => {
-      window.__annotate('text "HEIST 1/6 — Case the joint"')
+      window.__annotate('text "SALVAGE 1/6 — Case the joint"')
       window.__annotate('label target=VAULT_ID "VAULT — lockLevel 2"')
-      window.__annotate('pin target=LOOT_ID "LOOT: briefcase"')
+      window.__annotate('pin target=LOOT_ID "LOOT: canister"')
     })
   },
   stills: [
@@ -84,7 +84,7 @@ await record({
   }),
   expect: (s) => [
     ...(s.vaultOpen ? [] : ['vault never opened']),
-    ...(s.stolen ? [] : ['briefcase never stolen']),
+    ...(s.stolen ? [] : ['canister never stolen']),
   ],
 })
 ```
@@ -99,7 +99,7 @@ In a headless run only **one** local player provides input. So in a staged
 multi-player scene, the crew's motion *between* scripted beats is teleported —
 it's narration, a puppet. Always say which parts are real. The **systems** —
 cloak halving sight, chloroform `status.sleep`, the hacker beating a lockLevel the
-thief's autopick can't, pickup→`missionSystem`, crime→alarm→LOS cop chase — are
+scrounger's autopick can't, pickup→`missionSystem`, misdeed→alarm→LOS warden chase — are
 genuine and asserted. Single-mechanic reels (noise lure, wet+shock, freeze) are
 fully real system behavior.
 

@@ -65,7 +65,7 @@ export interface ArtRegistry {
    * and for themes whose wall art carries no cap. Bevelled corners bake their
    * own caps into `tile()`. */
   wallCap(tileId: number): WallCapTextures | undefined
-  /** Soft seam strip for a boundary where a LOWER surface (street water) meets
+  /** Soft seam strip for a boundary where a LOWER surface (causeway water) meets
    * a higher one (deck/grass) — drawn on the lower tile's edge. */
   groundSeam(side: OverlaySide): Texture
   entity(archetype: string): Texture
@@ -132,7 +132,7 @@ export interface WallCapTextures {
 }
 
 export interface SpriteTextures {
-  /** Themed tile art, keyed by tile NAME (street/sidewalk/floor/wall/grass/
+  /** Themed tile art, keyed by tile NAME (causeway/boardwalk/floor/wall/grass/
    * exit): each entry is a non-empty variant pool the tilemap alternates by
    * coordinate hash. Absent name → procedural art for that tile. */
   tiles?: Record<string, Texture[]>
@@ -145,15 +145,15 @@ export interface SpriteTextures {
   /** Macro-slicing declarations per tile name (manifest `macroTiles`). */
   tileMacro?: Record<string, number>
   player?: Texture
-  cop?: Texture
+  warden?: Texture
   item?: Texture
   prop?: Texture
   /** New character idle textures, keyed by archetype. */
-  thug?: Texture
+  mutant?: Texture
   scientist?: Texture
   robot?: Texture
   /** Walk (step) frames, keyed by archetype. */
-  thugStep?: Texture
+  mutantStep?: Texture
   scientistStep?: Texture
   robotStep?: Texture
   /** Themed projectile/grenade base textures — weapon-mod visual traits (tints,
@@ -164,7 +164,7 @@ export interface SpriteTextures {
   chars?: Record<string, CharSet>
   /** The drawn body behind each set in `chars`, same keys (theme.charArtKinds). */
   charKinds?: Record<string, string>
-  /** Per-item pickup sprites, keyed by item id (bat/knife/medkit/…). */
+  /** Per-item pickup sprites, keyed by item id (wrench/knife/medkit/…). */
   items?: Record<string, Texture>
   /** World prop sprites, keyed by archetype (barrel/atm/…). */
   props?: Record<string, Texture>
@@ -187,7 +187,7 @@ export interface ArtPalette {
 /**
  * Per-archetype sprite BULK — a multiplier on the drawn billboard only.
  *
- * The Mireclaw Alpha USED TO borrow the thug's directional set (see
+ * The Mireclaw Alpha USED TO borrow the mutant's directional set (see
  * CHARSET_ALIAS below) and was therefore PIXEL-IDENTICAL to the commonest enemy
  * in the game: same body, same palette, same size. It now has art of its own — a
  * violet armoured crab, see docs/assets/boss-art-brief.md — which fixes the body
@@ -200,33 +200,33 @@ export interface ArtPalette {
  * at a glance. Do NOT trim this to 'compensate' for the art having landed.
  *
  * Deliberately NOT the collision radius: entity radius stays 0.35 so the boss
- * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the bat's
+ * still fits through a one-tile hatch. Its longer claw reach (1.5 vs the wrench's
  * 1.3) is what makes the extra bulk felt in the fight.
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
   boss: 1.5,
-  // A rooted hive spire towers over the sporelings it buds; the officer stands a
+  // A rooted hive spire towers over the sporelings it buds; the overseer stands a
   // head above its raid, which is what makes it findable in a crowd.
   hivespire: 1.3,
   bellwether: 1.15,
 }
 
-// Archetypes that borrow another archetype's directional set (bouncers use the
-// cop body; the boss uses the thug; shopkeepers use the civilian).
+// Archetypes that borrow another archetype's directional set (lockkeepers use the
+// warden body; the boss uses the mutant; shopkeepers use the civilian).
 const CHARSET_ALIAS_BASE: Record<string, string> = {
   player: 'player',
-  cop: 'cop',
-  gangster: 'gangster',
-  bouncer: 'cop',
-  thug: 'thug',
+  warden: 'warden',
+  acolyte: 'acolyte',
+  lockkeeper: 'warden',
+  mutant: 'mutant',
   // FALLBACK ONLY, and it must stay. The pack now ships char.boss.* files, and
   // characterSet() below tries sprites.chars[archetype] BEFORE sprites.chars[alias]
   // — so the Alpha already uses its own set with no change on this line. Pointing
   // this at 'boss' instead would gain nothing and would cost the graceful
-  // degradation: packs without the Alpha art (city, test) fall back to the thug
+  // degradation: packs without the Alpha art (settlement, test) fall back to the mutant
   // body here rather than to a procedural blob. Membership of this map is also
   // what isCharacterSprite() tests, so the key cannot simply be removed.
-  boss: 'thug',
+  boss: 'mutant',
   civilian: 'civilian',
   scientist: 'scientist',
   robot: 'robot',
@@ -237,7 +237,7 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
   // enemies rendering as the same grey eyeball in normal play.
   //
   // Each maps to ITSELF, not to a borrowed body: they are the creatures the pack
-  // has bespoke art for, and aliasing e.g. brute->thug would just reintroduce the
+  // has bespoke art for, and aliasing e.g. brute->mutant would just reintroduce the
   // pixel-identical problem ARCHETYPE_SCALE exists to paper over. If a kind's art
   // is missing the lookup still falls through to its own procedural set, which is
   // per-archetype distinct — so a partial art drop degrades, it does not break.
@@ -259,7 +259,7 @@ const CHARSET_ALIAS_BASE: Record<string, string> = {
  * (0xcccccc). That is what "the enemies the boss spawns are white circles" was —
  * the boss's brood is `sporeling`, and the art had been shipping all along.
  *
- * Each maps to ITSELF, not a borrowed body: aliasing e.g. brute->thug would just
+ * Each maps to ITSELF, not a borrowed body: aliasing e.g. brute->mutant would just
  * reintroduce the pixel-identical problem. A missing file still falls through to
  * the per-archetype procedural set, so a partial art drop degrades rather than
  * breaks.
@@ -306,7 +306,7 @@ export const PROP_SPRITE: Record<string, string> = {
   // The mess chair now has art of its own, so it stops drawing procedurally.
   // FURNITURE_SHAPE.chair stays exactly where it is: the sprite wins when the
   // theme ships one, and the bespoke silhouette is still the right fallback for
-  // packs (city, test) that do not.
+  // packs (settlement, test) that do not.
   chair: 'chair',
   // Station machinery reuses the terminal/console art (previously fell through
   // to the character eyeball). The Cryo Terminal object is literally that art.
@@ -321,7 +321,7 @@ export const PROP_SPRITE: Record<string, string> = {
   crate: 'crate',
   // The sporeforge furnishings. Each of these has a FURNITURE_SHAPE entry
   // directly below and KEEPS it: the sprite wins wherever a theme ships one,
-  // and the drawn silhouette stays the fallback for the packs (city, test)
+  // and the drawn silhouette stays the fallback for the packs (settlement, test)
   // that do not. Deleting those would regress every theme without prop art.
   shelf: 'shelf',
   bunk: 'bunk',
@@ -368,29 +368,29 @@ export const ITEM_ALIAS: Record<string, string> = {
   tranquilizer: 'pistol',
   stunGun: 'pistol',
   // Blunt melee wears the root-club.
-  sledgehammer: 'bat',
+  sledgehammer: 'wrench',
 }
 
-// Archetypes with a dedicated character sprite; the rest reuse the cop body.
+// Archetypes with a dedicated character sprite; the rest reuse the warden body.
 const SPRITE_ARCHETYPES: Record<string, keyof SpriteTextures> = {
   player: 'player',
-  thug: 'thug',
+  mutant: 'mutant',
   scientist: 'scientist',
   robot: 'robot',
-  cop: 'cop',
-  gangster: 'cop',
-  bouncer: 'cop',
+  warden: 'warden',
+  acolyte: 'warden',
+  lockkeeper: 'warden',
 }
 const STEP_ARCHETYPES: Record<string, keyof SpriteTextures> = {
-  thug: 'thugStep',
+  mutant: 'mutantStep',
   scientist: 'scientistStep',
   robot: 'robotStep',
 }
 
 /** palette.tiles is name-keyed (pure layer, no Tile enum); map back to ids. */
 const TILE_ID_BY_NAME: Record<string, number> = {
-  street: Tile.Street,
-  sidewalk: Tile.Sidewalk,
+  causeway: Tile.Causeway,
+  boardwalk: Tile.Boardwalk,
   floor: Tile.Floor,
   wall: Tile.Wall,
   grass: Tile.Grass,
@@ -408,8 +408,8 @@ const TILE_ID_BY_NAME: Record<string, number> = {
 }
 
 const TILE_COLORS: Record<number, number> = {
-  [Tile.Street]: 0x33333c,
-  [Tile.Sidewalk]: 0x4c4c56,
+  [Tile.Causeway]: 0x33333c,
+  [Tile.Boardwalk]: 0x4c4c56,
   [Tile.Floor]: 0x63523f,
   [Tile.Wall]: 0x1b1b24,
   [Tile.Grass]: 0x2e5d3a,
@@ -437,16 +437,16 @@ const WALL_CUT_POLY: Record<number, number[]> = {
 
 const ENTITY_COLORS: Record<string, number> = {
   player: 0x7fd17f,
-  thug: 0xd17f7f,
+  mutant: 0xd17f7f,
   boss: 0xe0483f,
-  gangster: 0xc95fa0,
-  bouncer: 0x8f7a5a,
-  cop: 0x7f9fd1,
+  acolyte: 0xc95fa0,
+  lockkeeper: 0x8f7a5a,
+  warden: 0x7f9fd1,
   civilian: 0xd1c47f,
   shopkeeper: 0xb87fd1,
   lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
   // The group roster's procedural fallbacks: distinct hues so a raid with no art
-  // shipped still reads as officer / medic / sapper / gun / grunt at a glance.
+  // shipped still reads as overseer / medic / sapper / gun / grunt at a glance.
   drowner: 0x59636d, // waterlogged slate
   bellwether: 0xcbb277, // brass
   mender: 0x8f6c38, // rust apron (its green tank is the art's job)
@@ -620,7 +620,7 @@ export const createArt = (
         }
         break
       }
-      case Tile.Street: {
+      case Tile.Causeway: {
         // Asphalt speckle (cracks tile too visibly with only 3 variants)
         for (let i = 0; i < 8; i++) {
           const x = hash2(i, variant * 17) * T
@@ -629,7 +629,7 @@ export const createArt = (
         }
         break
       }
-      case Tile.Sidewalk: {
+      case Tile.Boardwalk: {
         g.rect(0, 0, T, 1).fill({ color: 0xffffff, alpha: 0.08 })
         g.rect(0, 0, 1, T).fill({ color: 0xffffff, alpha: 0.06 })
         break
@@ -1246,7 +1246,7 @@ export const createArt = (
   }
 
   // Procedural directional sets, cached per ARCHETYPE (not alias) so aliased
-  // bodies keep their own colour (boss red, bouncer tan, …).
+  // bodies keep their own colour (boss red, lockkeeper tan, …).
   const procCharCache = new Map<string, CharSet>()
   const procCharSet = (archetype: string): CharSet => {
     let set = procCharCache.get(archetype)
@@ -1263,8 +1263,8 @@ export const createArt = (
   /** The `chars` key of the themed set an archetype draws; undefined when it
    * draws procedurally or is not a character. An archetype's OWN art wins over
    * the set it borrows, so dropping `char.boss.*` files into a theme pack
-   * promotes the Mireclaw Alpha off the thug body with no code change (same
-   * for bouncer/shopkeeper/gangster). */
+   * promotes the Mireclaw Alpha off the mutant body with no code change (same
+   * for lockkeeper/shopkeeper/acolyte). */
   const themedSetName = (archetype: string): string | undefined => {
     const alias = CHARSET_ALIAS[archetype]
     if (!alias) return undefined
@@ -1345,7 +1345,7 @@ export const createArt = (
         break
       }
       case 'club': {
-        // Tapered bat: thin at the grip, fat at the business end.
+        // Tapered wrench: thin at the grip, fat at the business end.
         g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).fill(wood)
         g.poly([grip, my - 2, w - 3, my - 6, w - 3, my + 6, grip, my + 2]).stroke({ width: 1, color: 0x3a2410, alpha: 0.5 })
         g.circle(grip + 2, my, 2.5).fill(0x5a3a1a) // pommel knob

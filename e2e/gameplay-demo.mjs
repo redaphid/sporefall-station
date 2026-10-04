@@ -19,12 +19,12 @@ await record({
     const pl = w.entities.find((e) => e.playerCtl)
     // Inventory lives on the shared `loadout` component since the npc-inventory
     // merge — playerCtl no longer carries it.
-    return { gameOver: w.gameOver, thugs: live('thug'), doorOpen: !!door?.door.open, bag: (pl.loadout?.inventory ?? []).reduce((n, i) => n + i.qty, 0), hp: pl.health.hp }
+    return { gameOver: w.gameOver, mutants: live('mutant'), doorOpen: !!door?.door.open, bag: (pl.loadout?.inventory ?? []).reduce((n, i) => n + i.qty, 0), hp: pl.health.hp }
   },
   expect: (s) => [
     !s.doorOpen && 'door never opened',
     s.bag < 1 && 'floor pickup missed',
-    s.thugs !== 0 && `${s.thugs} thug(s) left alive`,
+    s.mutants !== 0 && `${s.mutants} mutant(s) left alive`,
     (s.gameOver || !(s.hp > 0)) && 'player did not survive',
   ].filter(Boolean),
 })

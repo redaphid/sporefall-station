@@ -43,7 +43,7 @@ describe('castle-siege save', () => {
     const w = loadFixture('castle-siege')
     const npcs = w.entities.filter((e) => !e.playerCtl)
     expect(npcs.map((e) => e.archetype).sort()).toEqual(
-      ['boss', 'brute', 'gangster', 'gangster', 'lobber', 'lobber', 'thug', 'thug', 'thug', 'thug'].sort(),
+      ['boss', 'brute', 'acolyte', 'acolyte', 'lobber', 'lobber', 'mutant', 'mutant', 'mutant', 'mutant'].sort(),
     )
     for (const e of npcs) {
       const tx = Math.floor(e.pos.x)

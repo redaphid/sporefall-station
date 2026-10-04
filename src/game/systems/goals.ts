@@ -36,7 +36,7 @@ export const DIST_K = 2.5
 /** How far an NPC can hear a noise to investigate it. */
 export const HEAR_RANGE = 12
 /** Baseline hate a `w.hostile` world imputes toward players for an NPC with no
- * stored opinion — the `CRIME_HATE` threshold, so battleScore clears WANDER. */
+ * stored opinion — the `MISDEED_HATE` threshold, so battleScore clears WANDER. */
 export const WORLD_HOSTILE_HATE = 5
 /** Multiple of sightRange an NPC keeps chasing a remembered target before giving up. */
 export const LEASH = 1.5

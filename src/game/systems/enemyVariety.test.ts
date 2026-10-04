@@ -45,29 +45,29 @@ const damageBy = (arch: string, tool: (typeof TOOLS)[number]): number =>
 
 describe('#78 affinity — the two damage sites honour resist multipliers', () => {
   it('impact damage scales by physical resist (armour) and is rounded', () => {
-    expect(physDamage('thug')).toBe(20) // neutral baseline — unchanged
+    expect(physDamage('mutant')).toBe(20) // neutral baseline — unchanged
     expect(physDamage('brute')).toBe(7) // 0.35 armour → bullets ping off
     expect(physDamage('cinder')).toBe(22) // 1.1 → soft to impact
     expect(physDamage('robot')).toBe(8) // 0.4 plating
   })
 
   it('element DOT scales by that element’s resist; immunity (0) does nothing', () => {
-    const thugBurn = elemDamage('thug', 'burning')
-    expect(thugBurn).toBeGreaterThan(0)
-    expect(elemDamage('brute', 'burning')).toBeGreaterThan(thugBurn) // 1.5 flammable
+    const mutantBurn = elemDamage('mutant', 'burning')
+    expect(mutantBurn).toBeGreaterThan(0)
+    expect(elemDamage('brute', 'burning')).toBeGreaterThan(mutantBurn) // 1.5 flammable
     // Resistant, NOT immune (#131): the resisted fraction lands, rounded up.
     const cinderBurn = elemDamage('cinder', 'burning') // 0.2 fireproof
     expect(cinderBurn).toBeGreaterThan(0)
-    expect(cinderBurn).toBeLessThanOrEqual(Math.ceil(0.2 * thugBurn))
+    expect(cinderBurn).toBeLessThanOrEqual(Math.ceil(0.2 * mutantBurn))
     const sporelingPoison = elemDamage('sporeling', 'poisoned') // 0.15 toxin-resist
     expect(sporelingPoison).toBeGreaterThan(0)
-    expect(sporelingPoison).toBeLessThanOrEqual(Math.ceil(0.15 * elemDamage('thug', 'poisoned')))
+    expect(sporelingPoison).toBeLessThanOrEqual(Math.ceil(0.15 * elemDamage('mutant', 'poisoned')))
     expect(elemDamage('sporeling', 'spore')).toBe(0) // spore-immune (matters for the bloom)
     expect(elemDamage('robot', 'spore')).toBe(0) // bio-inert
   })
 
   it('resistMult is neutral (×1) for anything without a table', () => {
-    const { e } = spawn('thug')
+    const { e } = spawn('mutant')
     expect(resistMult(e, 'physical')).toBe(1)
     expect(resistMult(e, 'burning')).toBe(1)
     expect(resistMult(e, 'anything')).toBe(1)
@@ -76,9 +76,9 @@ describe('#78 affinity — the two damage sites honour resist multipliers', () =
 
 describe('#78 anti-dominance — no single tool clears the whole roster', () => {
   const ENEMIES = ['brute', 'cinder', 'sporeling', 'robot'] as const
-  // Baselines = the neutral townsfolk (thug) per tool.
+  // Baselines = the neutral townsfolk (mutant) per tool.
   const baseline: Record<string, number> = {}
-  for (const t of TOOLS) baseline[t] = damageBy('thug', t)
+  for (const t of TOOLS) baseline[t] = damageBy('mutant', t)
   const strong = (arch: string, t: (typeof TOOLS)[number]): boolean => damageBy(arch, t) >= 0.9 * baseline[t]
   const weak = (arch: string, t: (typeof TOOLS)[number]): boolean => damageBy(arch, t) <= 0.4 * baseline[t]
 

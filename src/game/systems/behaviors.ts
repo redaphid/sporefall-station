@@ -154,8 +154,8 @@ const dist2d = (ax: number, ay: number, bx: number, by: number): number => vlen(
  * the `threat` scan uses. Players keep the exact pre-#63 rule. NPC-vs-NPC (ON by
  * default; `w.aiFlags.npcVsNpc === false` restores the players-only scan) reads
  * a stored opinion first, then the FACTION MATRIX (`initialFactionHate`), so
- * sworn enemies (cop↔gang) are mutually Hostile, same-faction stays Friendly,
- * and unrelated factions ignore each other — the crew, the law, and the gangs
+ * sworn enemies (warden↔rootcult) are mutually Hostile, same-faction stays Friendly,
+ * and unrelated factions ignore each other — the crew, the wardens, and the rootcults
  * tear into each OTHER, not just the players. Pure lookups, ascending-id caller. */
 const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
   const ai = e.ai!
@@ -171,12 +171,12 @@ const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
     return (
       w.hostile ||
       dispositionToward(e, target.id) === 'Hostile' ||
-      (ai.faction === 'cop' && w.alarm >= 2) ||
+      (ai.faction === 'warden' && w.alarm >= 2) ||
       (!!ai.wakeOn?.includes('power-cut') && anyPowerCut(w))
     )
   }
   if (w.aiFlags?.npcVsNpc === false || !target.ai || target === e) return false
-  // A stored grudge (a witnessed crime, retaliation) wins; else the opening
+  // A stored grudge (a witnessed misdeed, retaliation) wins; else the opening
   // faction stance decides — this is what wakes the dormant sworn-enemy matrix.
   const stored = ai.rel?.[target.id]
   if (stored) return stored.code === 'Hostile'
@@ -333,7 +333,7 @@ const manhunt: Consideration = (w, e) => {
   return [{ code: PURSUE, score: MANHUNT_SCORE, tier: TIER_MEMORY, target: focusId, at: { x: mark.x, y: mark.y } }]
 }
 
-// A frightened NPC (e.g. a civilian who saw a crime) keeps fleeing its scarer
+// A frightened NPC (e.g. a civilian who saw a misdeed) keeps fleeing its scarer
 // until it's well clear, even with no hostile disposition to score.
 const fleeMemory: Consideration = (w, e) => {
   const ai = e.ai!
@@ -461,7 +461,7 @@ const alertGuards: Consideration = (w, e) => {
   let guard: Entity | undefined
   let bestD = Infinity
   for (const g of w.entities) {
-    if (g === e || g.dead || !g.ai || g.ai.faction !== 'cop') continue
+    if (g === e || g.dead || !g.ai || g.ai.faction !== 'warden') continue
     const d = dist2d(g.pos.x, g.pos.y, e.pos.x, e.pos.y)
     if (d > ALERT_RANGE || d >= bestD) continue
     bestD = d
@@ -481,7 +481,7 @@ const scavenge: Consideration = (w, e) => {
   for (const p of w.entities) {
     if (p.dead || !p.pickup) continue
     // Never loot the mission objective or a weapon-mod gem — those belong to the
-    // players' run, and a scavenged briefcase would soft-lock the floor.
+    // players' run, and a scavenged canister would soft-lock the floor.
     if (p.id === w.mission.targetEntityId || p.archetype.startsWith('mod.')) continue
     const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
     if (d > ai.sightRange || d >= bestD) continue
@@ -497,7 +497,7 @@ const scavenge: Consideration = (w, e) => {
 // A zoned NPC (populate stamps `ai.zone`) doesn't wander the whole map: it holds
 // its own building (`workMyRoom`), and — if it belongs to the objective wing —
 // masses on the objective room as a garrison (`garrison`) and turns on any
-// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (street life,
+// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (causeway life,
 // test/scenario spawns) fall through untouched. All pure lookups over the level
 // geometry + ascending-id scans; no `Date`/`Math.random`.
 

@@ -35,74 +35,72 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
     })
   }
 
-  // The card used to print a bare `Faction: Gang` — cops-and-robbers wording on
-  // a derelict swamp station, and the same vocabulary the theme names moved
-  // past. The sim ids are unchanged; only the label is lore.
+  // The card prints the faction's lore name, never the terse sim id.
   it('labels factions with lore names, never the raw sim id', () => {
     const w = world()
     const label = (a: string): string => rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction
-    expect(label('thug')).toBe('Rootcult')
+    expect(label('mutant')).toBe('Rootcult')
     expect(label('boss')).toBe('Rootcult')
-    expect(label('cop')).toBe('Spore Wardens')
+    expect(label('warden')).toBe('Spore Wardens')
     expect(label('civilian')).toBe('Settlers')
     expect(label('stalker')).toBe('Unaligned')
   })
 
   it('no NPC card shows a bare faction id', () => {
     const w = world()
-    const raw = new Set(['Civ', 'Cop', 'Gang', 'Neutral'])
+    const raw = new Set(['Civ', 'Warden', 'Rootcult', 'Neutral'])
     for (const a of Object.keys(NPCS)) {
       expect(raw.has(rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction), a).toBe(false)
     }
   })
 
-  it('gang NPCs open Hostile toward the player; cops/civilians Neutral', () => {
+  it('rootcult NPCs open Hostile toward the player; wardens/civilians Neutral', () => {
     const w = world()
-    expect(rowMap(buildInfoCard(spawnNpc(w, 'thug', 1, 1)).rows)['Toward you']).toBe('Hostile')
-    expect(rowMap(buildInfoCard(spawnNpc(w, 'cop', 2, 2)).rows)['Toward you']).toBe('Neutral')
+    expect(rowMap(buildInfoCard(spawnNpc(w, 'mutant', 1, 1)).rows)['Toward you']).toBe('Hostile')
+    expect(rowMap(buildInfoCard(spawnNpc(w, 'warden', 2, 2)).rows)['Toward you']).toBe('Neutral')
     expect(rowMap(buildInfoCard(spawnNpc(w, 'civilian', 3, 3)).rows)['Toward you']).toBe('Neutral')
   })
 
   it('a stored rel entry toward the local player overrides the faction stance', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
-    const cop = spawnNpc(w, 'cop', 5, 5)
-    cop.ai!.rel = { [p.id]: { hate: 9, code: 'Hostile' } }
-    expect(rowMap(buildInfoCard(cop, { selfId: p.id }).rows)['Toward you']).toBe('Hostile')
+    const warden = spawnNpc(w, 'warden', 5, 5)
+    warden.ai!.rel = { [p.id]: { hate: 9, code: 'Hostile' } }
+    expect(rowMap(buildInfoCard(warden, { selfId: p.id }).rows)['Toward you']).toBe('Hostile')
     // Without ctx.selfId the faction-derived stance still shows (never blank).
-    expect(rowMap(buildInfoCard(cop).rows)['Toward you']).toBe('Neutral')
+    expect(rowMap(buildInfoCard(warden).rows)['Toward you']).toBe('Neutral')
   })
 
   it('non-default brains get a Brain row; the default basic brain is implied', () => {
     const w = world()
     const boss = spawnNpc(w, 'boss', 5, 5) // #69 Mireclaw Alpha phased boss brain
     expect(rowMap(buildInfoCard(boss).rows).Brain).toBe('Mireclaw')
-    const thug = spawnNpc(w, 'thug', 6, 6) // basic
-    expect(rowMap(buildInfoCard(thug).rows).Brain).toBeUndefined()
+    const mutant = spawnNpc(w, 'mutant', 6, 6) // basic
+    expect(rowMap(buildInfoCard(mutant).rows).Brain).toBeUndefined()
     // An unknown behavior id (stale snapshot) degrades to no Brain row, no throw.
-    thug.ai!.behavior = 'not-a-real-brain'
-    expect(rowMap(buildInfoCard(thug).rows).Brain).toBeUndefined()
+    mutant.ai!.behavior = 'not-a-real-brain'
+    expect(rowMap(buildInfoCard(mutant).rows).Brain).toBeUndefined()
   })
 })
 
 describe('buildInfoCard — the weapon an NPC is carrying', () => {
   const weaponRow = (e: Entity): string | undefined => rowMap(buildInfoCard(e).rows).Weapon
 
-  it('an armed NPC names its weapon — a thug swings a Bat, a gangster a Pistol', () => {
-    expect(weaponRow(spawnNpc(world(), 'thug', 5, 5))).toBe('Bat')
-    expect(weaponRow(spawnNpc(world(), 'gangster', 5, 5))).toBe('Pistol')
+  it('an armed NPC names its weapon — a mutant swings a Wrench, an acolyte a Pistol', () => {
+    expect(weaponRow(spawnNpc(world(), 'mutant', 5, 5))).toBe('Wrench')
+    expect(weaponRow(spawnNpc(world(), 'acolyte', 5, 5))).toBe('Pistol')
   })
 
   it('a fists-only NPC reads as "Unarmed", not the "Fists" item name', () => {
     expect(weaponRow(spawnNpc(world(), 'civilian', 5, 5))).toBe('Unarmed')
-    expect(weaponRow(spawnNpc(world(), 'bouncer', 5, 5))).toBe('Unarmed')
+    expect(weaponRow(spawnNpc(world(), 'lockkeeper', 5, 5))).toBe('Unarmed')
   })
 
   it('a blank or missing weapon still reads "Unarmed" — never blank/undefined', () => {
-    const empty = spawnNpc(world(), 'thug', 5, 5)
+    const empty = spawnNpc(world(), 'mutant', 5, 5)
     empty.combat!.weapon = ''
     expect(weaponRow(empty)).toBe('Unarmed')
-    const gone = spawnNpc(world(), 'thug', 5, 5)
+    const gone = spawnNpc(world(), 'mutant', 5, 5)
     delete (gone.combat as unknown as Record<string, unknown>).weapon // combat present, weapon absent
     expect(weaponRow(gone)).toBe('Unarmed')
   })
@@ -289,9 +287,9 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
     })
   }
 
-  it('cash and the mission briefcase read as flavor, quantity shows for stacks', () => {
+  it('cash and the mission canister read as flavor, quantity shows for stacks', () => {
     expect(buildInfoCard(pickup('cash', 1)).tagline).toMatch(/[Mm]oney/)
-    expect(buildInfoCard(pickup('briefcase')).tagline).toMatch(/goods|came for/)
+    expect(buildInfoCard(pickup('canister')).tagline).toMatch(/goods|came for/)
     expect(rowMap(buildInfoCard(pickup('medkit', 2)).rows).Item).toBe('Medkit ×2')
   })
 
@@ -299,7 +297,7 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
     ['keycard.wing14.essence_lab', 'Essence lab keycard'],
     ['keycard.wing14', 'Wing 14 keycard'],
     ['grenade', 'Grenade'],
-    ['briefcase', 'Specimen Canister'],
+    ['canister', 'Specimen Canister'],
   ])('a floor pickup of %s is titled "%s", not by its pickup.<id> archetype', (itemId, name) => {
     const e = makeEntity('pickup', `pickup.${itemId}`, 1, 1)
     e.pickup = { itemId, qty: 1 }
@@ -356,7 +354,7 @@ describe('buildInfoCard — hazards, mission targets, death, theming, fallback',
   it('the mission target carries the mission link; other entities never do', () => {
     const w = world()
     const boss = spawnNpc(w, 'boss', 5, 5)
-    const bystander = spawnNpc(w, 'cop', 6, 6)
+    const bystander = spawnNpc(w, 'warden', 6, 6)
     expect(buildInfoCard(boss, { missionTargetId: boss.id }).mission).toEqual({ targetId: boss.id })
     expect(buildInfoCard(bystander, { missionTargetId: boss.id }).mission).toBeUndefined()
     expect(buildInfoCard(boss, {}).mission).toBeUndefined()
@@ -364,22 +362,22 @@ describe('buildInfoCard — hazards, mission targets, death, theming, fallback',
 
   it('a dead entity reads as destroyed (card shows it briefly, then closes)', () => {
     const w = world()
-    const thug = spawnNpc(w, 'thug', 5, 5)
-    thug.dead = true
-    thug.health!.hp = 0
-    const card = buildInfoCard(thug, { missionTargetId: thug.id })
+    const mutant = spawnNpc(w, 'mutant', 5, 5)
+    mutant.dead = true
+    mutant.health!.hp = 0
+    const card = buildInfoCard(mutant, { missionTargetId: mutant.id })
     expect(card.destroyed).toBe(true)
     expect(card.tagline).toBe('Destroyed')
     expect(card.mission).toBeUndefined() // no locate action on a corpse
-    expect(card.hp).toEqual({ hp: 0, max: thug.health!.max })
+    expect(card.hp).toEqual({ hp: 0, max: mutant.health!.max })
   })
 
   it('the title uses the theme resolver — same sim entity, themed presentation', () => {
     const w = world()
-    const cop = spawnNpc(w, 'cop', 5, 5)
-    const card = buildInfoCard(cop, {}, (a) => (a === 'cop' ? 'Bog Warden' : a))
+    const warden = spawnNpc(w, 'warden', 5, 5)
+    const card = buildInfoCard(warden, {}, (a) => (a === 'warden' ? 'Bog Warden' : a))
     expect(card.title).toBe('Bog Warden')
-    expect(card.archetype).toBe('cop') // the sim identity is still exposed
+    expect(card.archetype).toBe('warden') // the sim identity is still exposed
   })
 
   it('an unknown/modded kind falls back to component reflection — never a blank card', () => {

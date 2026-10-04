@@ -532,7 +532,7 @@ Why not two guns anyway:
 of the four sequence shapes (pistol, shotgun, machine gun, sledgehammer) as their
 permanent weapon on the start screen. This is not weapon loot, so the one-weapon
 rule holds. It gives two kids complementary roles: the shotgun eats lenses in one
-pull, the pistol gets the most out of one, and the sledgehammer can **bat** a
+pull, the pistol gets the most out of one, and the sledgehammer can **wrench** a
 planted bubble (a melee hit on a bubble launches it along the swing, where it
 bursts on the first body). Weapon identity becomes "what I do with bubbles",
 which is INSPO's "weapon identity and combination depth are one system" (§1).

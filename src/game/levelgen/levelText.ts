@@ -16,8 +16,8 @@ import { isWallTile, Tile, type Building, type Level, type TileId } from './leve
 
 /** The legend. One printable, JSON-safe ASCII glyph per tile id. */
 export const TILE_GLYPH: Readonly<Record<TileId, string>> = {
-  [Tile.Street]: ':',
-  [Tile.Sidewalk]: '-',
+  [Tile.Causeway]: ':',
+  [Tile.Boardwalk]: '-',
   [Tile.Floor]: '.',
   [Tile.Wall]: '#',
   [Tile.Grass]: ',',

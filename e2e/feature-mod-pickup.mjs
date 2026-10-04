@@ -12,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/combat-stage.json'), 'utf8'))
 
 // combat-stage, but: player armed with a SLOTTED pistol (so the mod has a mod-list
-// to land on), the thug crowd cleared to a calm plaza, and two mod-gems on the lane
+// to land on), the mutant crowd cleared to a calm plaza, and two mod-gems on the lane
 // at x≈5.5 (Cryo Rounds) and x≈8.5 (Overload) right where `modGrab` walks.
 const world = () => {
   const w = JSON.parse(JSON.stringify(base))
@@ -20,7 +20,7 @@ const world = () => {
   p.combat.weapon = 'pistol'
   p.playerCtl.inventory = [{ itemId: 'pistol', qty: 99 }]
   p.playerCtl.activeSlot = 0
-  w.entities = w.entities.filter((e) => e.archetype !== 'thug')
+  w.entities = w.entities.filter((e) => e.archetype !== 'mutant')
   let id = w.nextId
   const gem = (modId, x) => {
     w.entities.push({

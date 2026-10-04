@@ -25,8 +25,8 @@ const buildMidRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   const sp = w.level.spawn
   spawnPlayer(w, 0, sp.x, sp.y)
-  spawnNpc(w, 'cop', sp.x + 3, sp.y)
-  spawnNpc(w, 'thug', sp.x - 3, sp.y)
+  spawnNpc(w, 'warden', sp.x + 3, sp.y)
+  spawnNpc(w, 'mutant', sp.x - 3, sp.y)
   return runTicks(w, new Map([[0, { moveX: -1, attack: true }]]), 50)
 }
 
@@ -226,7 +226,7 @@ describe('StateRing x debug verbs (stage a link with sporefall.verb, then share)
     for (const edit of [
       `teleport ${playerId(w)} ${sp.x + 2} ${sp.y}`,
       `set ${playerId(w)} {"health":{"hp":3,"max":10}}`,
-      `spawn npc thug ${sp.x + 4} ${sp.y}`,
+      `spawn npc mutant ${sp.x + 4} ${sp.y}`,
       `load ${dump}`,
     ]) {
       frames(w, ring, 40)

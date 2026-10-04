@@ -62,7 +62,7 @@ const ticksUntilDowned = (w: World, p: Entity, cmd: Partial<InputCmd>, cap: numb
 
 describe('revive grace: standing back up next to the attacker', () => {
   for (const mode of ['normal', 'casual'] as const) {
-    for (const archetype of ['thug', 'gangster', 'cop']) {
+    for (const archetype of ['mutant', 'acolyte', 'warden']) {
       it(`${mode} / ${archetype}: an idle player is untouchable for the whole grace window`, () => {
         const { w, p } = downedThenSelfRevived(mode, archetype)
         let hp = p.health!.hp
@@ -86,7 +86,7 @@ describe('revive grace: standing back up next to the attacker', () => {
   }
 
   it('casual: the down/up loop is broken: a fleeing player is not downed again for many seconds', () => {
-    const { w, p } = downedThenSelfRevived('casual', 'thug')
+    const { w, p } = downedThenSelfRevived('casual', 'mutant')
     const hp = p.health!.hp
     expect(ticksUntilDowned(w, p, {}, REACTION_TICKS)).toBe(REACTION_TICKS)
     expect(ticksUntilDowned(w, p, { moveX: -1 }, 300)).toBe(300)
@@ -94,7 +94,7 @@ describe('revive grace: standing back up next to the attacker', () => {
   })
 
   it('grace wears off: an idle player next to the attacker is downed again after it', () => {
-    const { w, p } = downedThenSelfRevived('casual', 'thug')
+    const { w, p } = downedThenSelfRevived('casual', 'mutant')
     const t = ticksUntilDowned(w, p, {}, 600)
     expect(t).toBeGreaterThanOrEqual(SPAWN_GRACE_TICKS)
     expect(t).toBeLessThan(600)

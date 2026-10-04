@@ -118,12 +118,12 @@ describe('runFight (a tiny census subset)', () => {
 
 describe('reachProbe', () => {
   it('starts the foe the given distance away and credits hits on it only when the player fires', () => {
-    const still = reachProbe('gangster', 303, 6, false)
-    const firing = reachProbe('gangster', 303, 6, true)
+    const still = reachProbe('acolyte', 303, 6, false)
+    const firing = reachProbe('acolyte', 303, 6, true)
     expect(still.closest).toBeLessThanOrEqual(6)
     expect(still.foeDamage).toBe(0)
     expect(firing.foeDamage).toBeGreaterThan(0)
-    expect(reachProbe('gangster', 303, 6, true)).toEqual(firing)
+    expect(reachProbe('acolyte', 303, 6, true)).toEqual(firing)
   })
 })
 
@@ -167,7 +167,7 @@ describe('summarize and renderCensus', () => {
       rooms: ['seed 1: test room'],
       fights: [fight('none', 'downed', 90, 120, 40), fight('frost', 'won', 150, 30), fight('pierce>frost', 'won', 150, 30)],
       reach: [],
-      reachArchetype: 'gangster',
+      reachArchetype: 'acolyte',
     })
     expect(md).toContain('| build | arena-brute |')
     expect(md).toContain('| frost | **1/1 · 30** |')

@@ -72,7 +72,7 @@ const roomCentre = (b: Building): { x: number; y: number } => ({
 
 /** A dormant crew sleeper, as populate.spawnComplexSleepers makes one. */
 const sleeper = (w: World, bi: number, x: number, y: number): Entity => {
-  const e = spawnNpc(w, 'thug', x, y)
+  const e = spawnNpc(w, 'mutant', x, y)
   e.ai!.zone = { building: bi, role: w.level.buildings[bi].role }
   e.ai!.dormant = true
   e.ai!.wakeOn = ['damage', 'noise']

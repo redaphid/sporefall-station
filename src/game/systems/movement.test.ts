@@ -8,7 +8,7 @@ const makePlayer = (w: World): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', 20, 20))
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.speed = 4.5
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
@@ -154,7 +154,7 @@ describe('movementSystem — collision cost stays bounded with a large crowd + m
     }
     // 300 moving NPCs, each with a live move intent so the collision path runs.
     for (let i = 0; i < 300; i++) {
-      const n = addEntity(w, makeEntity('npc', 'thug', 10 + (i % 30) * 0.7, 10 + Math.floor(i / 30) * 0.7, 0.3))
+      const n = addEntity(w, makeEntity('npc', 'mutant', 10 + (i % 30) * 0.7, 10 + Math.floor(i / 30) * 0.7, 0.3))
       n.speed = 3
       n.intent = { x: 1, y: 0 }
     }

@@ -32,7 +32,7 @@ export const ARENAS: Readonly<Record<string, ArenaSpec>> = {
   },
   'arena-kiter': {
     question: 'Shooters that hold range and fire back: stop them shooting or lose the trade.',
-    foes: [{ archetype: 'gangster', count: 3 }],
+    foes: [{ archetype: 'acolyte', count: 3 }],
   },
   'arena-swarm': {
     question: 'A fast swarm: one bullet per body is too slow.',

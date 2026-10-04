@@ -32,7 +32,7 @@ const arena = (seed: number, hostile = true): { w: World; cx: number; cy: number
   return { w, cx: cx + 0.5, cy: cy + 0.5 }
 }
 
-// gangster: hp 35 → battle/flee crossover at max/3 ≈ 11.67 (battle at 12, flee at 11).
+// acolyte: hp 35 → battle/flee crossover at max/3 ≈ 11.67 (battle at 12, flee at 11).
 const ABOVE = 12
 const BELOW = 11
 
@@ -43,7 +43,7 @@ describe('#62 goal hysteresis — analytic decide() 1-hp boundary jitter', () =>
     const { w, cx, cy } = arena(1)
     const player = spawnPlayer(w, 0, cx, cy)
     player.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    const g = spawnNpc(w, 'gangster', cx + 6, cy)
+    const g = spawnNpc(w, 'acolyte', cx + 6, cy)
     g.ai!.sightRange = 12
     w.aiFlags = { hysteresis }
     let flips = 0
@@ -71,7 +71,7 @@ describe('#62 goal hysteresis — analytic decide() 1-hp boundary jitter', () =>
     const { w, cx, cy } = arena(1)
     const player = spawnPlayer(w, 0, cx, cy)
     player.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    const g = spawnNpc(w, 'gangster', cx + 6, cy)
+    const g = spawnNpc(w, 'acolyte', cx + 6, cy)
     g.ai!.sightRange = 12
     // no aiFlags set at all
     let flips = 0
@@ -96,7 +96,7 @@ describe('#62 goal hysteresis — full-sim goal-change rate collapses', () => {
     const { w, cx, cy } = arena(2)
     const player = spawnPlayer(w, 0, cx, cy)
     player.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    const g = spawnNpc(w, 'gangster', cx + 6, cy)
+    const g = spawnNpc(w, 'acolyte', cx + 6, cy)
     g.ai!.sightRange = 12
     g.speed = 0 // pin it so distance can't drift off the boundary
     w.aiFlags = { hysteresis }
@@ -131,7 +131,7 @@ describe('#62 goal hysteresis — a higher tier still preempts instantly', () =>
     const { w, cx, cy } = arena(3)
     const player = spawnPlayer(w, 0, cx, cy)
     player.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    const g = spawnNpc(w, 'gangster', cx + 6, cy) // full hp → wants to battle
+    const g = spawnNpc(w, 'acolyte', cx + 6, cy) // full hp → wants to battle
     g.ai!.sightRange = 12
     g.ai!.goal = 'wander' // standing ambient goal (gets no cross-tier protection)
     const goal = decide(w, g).goal // shipped default: hysteresis on
@@ -143,7 +143,7 @@ describe('#62 goal hysteresis — a higher tier still preempts instantly', () =>
     const { w, cx, cy } = arena(4)
     const player = spawnPlayer(w, 0, cx, cy)
     player.health = { hp: 1e6, max: 1e6, iframes: 0 }
-    const g = spawnNpc(w, 'gangster', cx + 6, cy)
+    const g = spawnNpc(w, 'acolyte', cx + 6, cy)
     g.ai!.sightRange = 12
     g.ai!.goal = 'battle'
     g.ai!.targetId = player.id

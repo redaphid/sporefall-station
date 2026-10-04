@@ -26,7 +26,7 @@ const gearOf = (root: HTMLElement): HTMLButtonElement => root.querySelector<HTML
 const panelOf = (root: HTMLElement): HTMLElement => gearOf(root).nextElementSibling as HTMLElement
 
 const THEMES = [
-  { id: 'city', name: 'City' },
+  { id: 'settlement', name: 'Settlement' },
   { id: 'swampspace', name: 'Sporefall Station' },
 ]
 
@@ -86,7 +86,7 @@ describe('settings gear — press-exempt chrome', () => {
   })
 
   it('no theme picker with a single installed theme (nothing to pick)', () => {
-    createSettingsPanel(root, false, () => {}, [{ id: 'city', name: 'City' }])
+    createSettingsPanel(root, false, () => {}, [{ id: 'settlement', name: 'Settlement' }])
     expect(panelOf(root).querySelector('#th')).toBeNull()
   })
 

@@ -1,7 +1,7 @@
 // The boss health bar / name plate MODEL — pure, DOM-free, unit-testable.
 //
 // Why this exists: the Mireclaw Alpha shipped with no name plate, no health bar
-// and no entrance. It shared the thug's sprite, so the only way to know you had
+// and no entrance. It shared the mutant's sprite, so the only way to know you had
 // met the floor's boss was to read the mission chip and infer it. Players
 // killed it repeatedly without ever registering that a boss had happened.
 //
@@ -109,7 +109,7 @@ export const bossBar = (view: BossViewLike, bossId: number | undefined, name: st
   if (bossId === undefined) return null
   const boss = view.entities.find((e) => e.id === bossId)
   // The id must still name a boss: a new world recycles ids, so the Alpha's
-  // old id can belong to a thug after a restart.
+  // old id can belong to a mutant after a restart.
   if (!boss || boss.archetype !== 'boss' || boss.dead || !boss.health || boss.health.max <= 0) return null
   const hp = Math.max(0, boss.health.hp)
   if (hp <= 0) return null

@@ -61,8 +61,9 @@ type Signal =
   | { t: 'offer'; sdp: string }
   | { t: 'answer'; sdp: string }
   | { t: 'ice'; c: RTCIceCandidateInit }
-  /** The sender has stopped using the link to this peer; use the relay. */
-  | { t: 'relay' }
+  /** The sender has stopped using the link to this peer; use the relay.
+   * `off`: it plays over the relay only (`?p2p=0`), so offer it nothing more. */
+  | { t: 'relay'; off?: true }
   /** The sender's stream moves to `ctl` after this; nothing more follows on the relay. */
   | { t: 'p2p' }
 
@@ -116,6 +117,8 @@ interface Link {
   deadline?: ReturnType<typeof setTimeout>
   retry?: ReturnType<typeof setTimeout>
   retries: number
+  /** The peer has P2P off: never offer it a direct link. */
+  declined: boolean
   pair: CandidatePair | null
   born: number
   directSince: number
@@ -290,6 +293,7 @@ export class RtcTransport implements Transport {
       held: null,
       peerMarked: false,
       retries: 0,
+      declined: false,
       pair: null,
       born: now,
       directSince: now,
@@ -337,11 +341,19 @@ export class RtcTransport implements Transport {
     this.log(`${peer} retry failed: ${why}`)
     clearTimeout(link.deadline)
     this.closePc(link)
+    // The peer's ctl messages held since its marker landed are in order now:
+    // its next frames come over the relay, behind them. Kept, they would surface
+    // at the next upgrade, after newer relay frames.
+    if (link.peerMarked) {
+      const held = link.held ?? []
+      link.held = []
+      for (const bytes of held) this.emit({ type: 'data', peer, bytes })
+    }
     this.scheduleRetry(peer, link)
   }
 
   private scheduleRetry(peer: PeerId, link: Link): void {
-    if (this.role !== 'host' || !this.opts.p2p || link.phase !== 'relay') return
+    if (this.role !== 'host' || !this.opts.p2p || link.declined || link.phase !== 'relay') return
     clearTimeout(link.retry)
     const delays = this.opts.retryDelaysMs
     const wait = delays[Math.min(link.retries, delays.length - 1)]
@@ -395,6 +407,11 @@ export class RtcTransport implements Transport {
 
   private async onSignal(peer: PeerId, link: Link, sig: Signal): Promise<void> {
     if (sig.t === 'relay') {
+      if (sig.off) {
+        link.declined = true
+        clearTimeout(link.retry)
+        link.retry = undefined
+      }
       if (link.phase !== 'relay') {
         this.toRelay(peer, link, 'peer asked for the relay', false)
       } else if (link.pc) {
@@ -408,6 +425,10 @@ export class RtcTransport implements Transport {
       return
     }
     if (link.phase === 'p2p') return
+    if (sig.t === 'offer' && !this.opts.p2p) {
+      this.signal(peer, { t: 'relay', off: true })
+      return
+    }
     try {
       if (sig.t === 'offer' && this.role === 'client') {
         if (link.phase === 'relay') this.attempt(peer, link)
@@ -528,7 +549,7 @@ export class RtcTransport implements Transport {
     // must wait for its marker before passing ctl data on.
     link.held ??= []
     link.pair = null
-    if (tellPeer) this.signal(peer, { t: 'relay' })
+    if (tellPeer) this.signal(peer, this.opts.p2p ? { t: 'relay' } : { t: 'relay', off: true })
     this.announce(peer, link)
     this.scheduleRetry(peer, link)
   }

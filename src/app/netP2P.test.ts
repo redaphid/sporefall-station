@@ -228,5 +228,25 @@ describe('online play over WebRTC with the relay as fallback', () => {
     expect(r.client.renderView().simTick).toBeGreaterThan(70)
     await r.stop()
   })
+
+  it('three taps into a dying link all run after the switch, one tick each, in order', async () => {
+    let t = 0
+    const taps = new Map<number, number>()
+    const input: InputSource = {
+      sample: () => (t++, { ...emptyInput(), moveX: 1, hotbar: taps.get(t) ?? -1, throwItem: taps.has(t) }),
+    }
+    const r = await rig({ input, rtc: { retryDelaysMs: [60_000] } })
+    await r.play(30)
+    r.net.silent = true
+    for (const [k, slot] of [[2, 0], [8, 1], [14, 2]]) taps.set(t + k, slot)
+    await r.play(30)
+    await wait(250)
+    expect(r.client.linkStatus().path).toBe('relay')
+    await r.play(30)
+    const fired = r.ran.filter((c) => c.throwItem || c.hotbar >= 0)
+    expect(fired.map((c) => c.hotbar)).toEqual([0, 1, 2])
+    expect(fired.every((c) => c.throwItem)).toBe(true)
+    await r.stop()
+  })
 })
 

@@ -201,7 +201,8 @@ fallback (`src/net/transport/rtcTransport.ts`, #155).
   WebRTC. A link that closes, fails ICE, or goes 2 s without a byte moves that
   peer to the relay mid-run. Heartbeats keep an idle link's clock fed. The
   session does not drop: the peer keeps its slot and avatar, and both sides
-  stop using the link. `?p2p=0` keeps every peer on the relay.
+  stop using the link. `?p2p=0` on the host keeps every peer on the relay; on a guest it keeps that
+  guest there, and the host stops offering it a direct link.
 - **Back to P2P.** A peer on the relay does not stay there. The host retries a
   direct link after 5 s, 15 s, then every 60 s, and the peer moves back the
   moment one opens, so a wifi blip or a locked phone costs seconds of relay

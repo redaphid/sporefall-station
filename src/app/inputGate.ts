@@ -8,6 +8,22 @@ import type { InputRecord } from '../net/protocol/messages'
  */
 export const EDGE_WINDOW = 256
 
+/** Pure taps: no held state re-conveys them, so each one must reach the sim. */
+const TAP_EDGES = 8 | 16
+
+/** Taps waiting for a tick: a few seconds of tapping, far past any real blip. */
+const MAX_QUEUED_TAPS = 16
+
+/** One record's pure taps (roll, throw, hotbar, mod swap, draft pick). */
+export interface Tap {
+  seq: number
+  /** Roll 8, Use/Throw 16. */
+  edges: number
+  hotbar: number
+  modSwap?: number
+  draftPick?: number
+}
+
 /**
  * One remote player's input as the host holds it. Continuous state (move, aim,
  * held buttons) and edges (taps) are gated separately:
@@ -24,12 +40,13 @@ export interface InputState {
   /** Lets any first seq through. */
   hasInput: boolean
   latestCmd: InputCmd
-  /** Edge bits folded since the last tick took them. */
+  /** Attack, interact and special edges folded since the last tick took them.
+   * A held bit re-conveys these, so several may share one tick. */
   pendingEdges: number
-  /** Hotbar slot tapped since the last tick (-1 = none). */
-  pendingHotbar: number
-  pendingModSwap?: number
-  pendingDraftPick?: number
+  /** Records with pure taps, oldest seq first. A tick takes one: taps resent
+   * together after a blip would otherwise merge, and a second throw, hotbar
+   * change or mod swap would be lost. */
+  taps: Tap[]
   /** `edgeSeen[seq % EDGE_WINDOW] === seq` iff that record's edges were folded. */
   edgeSeen: Int32Array
 }
@@ -39,7 +56,7 @@ export const newInputState = (): InputState => ({
   hasInput: false,
   latestCmd: { ...emptyInput(), aimX: 1 },
   pendingEdges: 0,
-  pendingHotbar: -1,
+  taps: [],
   edgeSeen: new Int32Array(EDGE_WINDOW).fill(-1),
 })
 
@@ -71,29 +88,32 @@ export const foldInputRecord = (s: InputState, { cmd, edges }: InputRecord): voi
   const slot = seq % EDGE_WINDOW
   if (s.edgeSeen[slot] === seq) return
   s.edgeSeen[slot] = seq
-  s.pendingEdges |= edges
-  if (cmd.hotbar >= 0) s.pendingHotbar = cmd.hotbar
-  if (cmd.modSwap !== undefined) s.pendingModSwap = cmd.modSwap
-  if (cmd.draftPick !== undefined) s.pendingDraftPick = cmd.draftPick
+  s.pendingEdges |= edges & ~TAP_EDGES
+  if ((edges & TAP_EDGES) === 0 && cmd.hotbar < 0 && cmd.modSwap === undefined && cmd.draftPick === undefined) return
+  const tap: Tap = { seq, edges: edges & TAP_EDGES, hotbar: cmd.hotbar }
+  if (cmd.modSwap !== undefined) tap.modSwap = cmd.modSwap
+  if (cmd.draftPick !== undefined) tap.draftPick = cmd.draftPick
+  let at = s.taps.length
+  while (at > 0 && isNewer(s.taps[at - 1].seq, seq)) at--
+  s.taps.splice(at, 0, tap)
+  if (s.taps.length > MAX_QUEUED_TAPS) s.taps.shift()
 }
 
-/** This tick's command: the newest held state plus every edge folded since the
- * last tick, each applied once. Clears the edges. */
+/** This tick's command: the newest held state, the attack/interact/special
+ * edges folded since the last tick, and the oldest queued tap, each applied once. */
 export const takeTickInput = (s: InputState): InputCmd => {
   const cmd: InputCmd = { ...s.latestCmd }
   cmd.attack ||= (s.pendingEdges & 1) !== 0
   cmd.interact ||= (s.pendingEdges & 2) !== 0
   cmd.special ||= (s.pendingEdges & 4) !== 0
-  cmd.roll = (s.pendingEdges & 8) !== 0
-  cmd.throwItem = (s.pendingEdges & 16) !== 0
-  cmd.hotbar = s.pendingHotbar
+  s.pendingEdges = 0
+  const tap = s.taps.shift()
+  cmd.roll = ((tap?.edges ?? 0) & 8) !== 0
+  cmd.throwItem = ((tap?.edges ?? 0) & 16) !== 0
+  cmd.hotbar = tap?.hotbar ?? -1
   delete cmd.modSwap
   delete cmd.draftPick
-  if (s.pendingModSwap !== undefined) cmd.modSwap = s.pendingModSwap
-  if (s.pendingDraftPick !== undefined) cmd.draftPick = s.pendingDraftPick
-  s.pendingEdges = 0
-  s.pendingHotbar = -1
-  s.pendingModSwap = undefined
-  s.pendingDraftPick = undefined
+  if (tap?.modSwap !== undefined) cmd.modSwap = tap.modSwap
+  if (tap?.draftPick !== undefined) cmd.draftPick = tap.draftPick
   return cmd
 }

@@ -1,4 +1,4 @@
-import type { BiomeName, Level } from '../game/levelgen/level'
+import type { BiomeName, Level, ThemeName } from '../game/levelgen/level'
 import type { SimEvent } from '../game/types'
 
 /**
@@ -15,16 +15,28 @@ export const BIOME_TINT: Record<BiomeName, number> = {
   overgrown: 0xc9e6b0, // spore-lit green
 }
 
+/** Multiplicative floor tint per city district. Downtown and the slums keep
+ * the pack's own look; Still Row burns under sodium and brass, the Culture
+ * Beds glow spore-olive. */
+export const DISTRICT_TINT: Record<ThemeName, number> = {
+  downtown: 0xffffff,
+  slums: 0xffffff,
+  stillworks: 0xf4d8b0, // brass and ember over the settling ponds
+  culturebeds: 0xcfe8b4, // olive grow-light over the moss
+}
+
 /** Channel-wise multiply of two 0xRRGGBB tints. */
 export const mulTint = (a: number, b: number): number => {
   const ch = (s: number): number => Math.round((((a >> s) & 0xff) * ((b >> s) & 0xff)) / 255)
   return (ch(16) << 16) | (ch(8) << 8) | ch(0)
 }
 
-/** The tint the tile layer should wear: theme floor tint, graded by biome. */
+/** The tint the tile layer should wear: theme floor tint, graded by the
+ * station biome or the city district. */
 export const floorTintFor = (level: Level | undefined, themeTint: number): number => {
   const biome = level?.complex?.biome
-  return biome ? mulTint(themeTint, BIOME_TINT[biome]) : themeTint
+  if (biome) return mulTint(themeTint, BIOME_TINT[biome])
+  return level?.theme ? mulTint(themeTint, DISTRICT_TINT[level.theme]) : themeTint
 }
 
 /** Darkness overlay alpha for a blacked-out wing. */

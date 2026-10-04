@@ -76,4 +76,7 @@ export interface Session {
    * Omitted → the run rebuilds from the current seed (plain "play again").
    */
   restart?(seed?: number): void
+  /** Leave the net session on purpose (Main menu). A host tells its peers it
+   * left; a client hangs up. Solo has nothing to close and leaves it undefined. */
+  close?(): Promise<void>
 }

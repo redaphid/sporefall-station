@@ -122,6 +122,18 @@ export class NetHostSession implements Session {
     await this.transport.start()
   }
 
+  /** Leave on purpose (Main menu): tell every peer the host left, let that
+   * reach the radio, then hang up. Peers end their run instead of waiting on a
+   * reconnect that can never come. */
+  async close(): Promise<void> {
+    const bye = encodeJson(MsgType.Bye, {})
+    const peers = [...this.peers.values()]
+    for (const p of peers) p.queue.queueReliable(bye)
+    await Promise.all(peers.map((p) => p.queue.flushed()))
+    for (const p of peers) p.queue.stop()
+    await this.transport.stop()
+  }
+
   lobbyPlayers(): LobbyPlayer[] {
     const players: LobbyPlayer[] = [{ slot: 0, name: this.hostName }]
     // Only admitted peers belong in the lobby; a peer that has connected but not

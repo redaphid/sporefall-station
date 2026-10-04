@@ -8,7 +8,9 @@ import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout, selfModVerdict } from './loadoutModel'
 import { installGamepadMenuNav } from './gamepadMenu'
+import { createTwoPressGroup, MAIN_MENU_ARMED_LABEL, MAIN_MENU_LABEL } from './twoPress'
 import { ANNOUNCE_MS, modifierKey, modifierStripText, modifierToast } from './modifierModel'
+import { createSealHint } from './sealHintModel'
 
 export interface Screens {
   update(view: RenderView): void
@@ -61,6 +63,9 @@ export const createScreens = (
   onNewSeed?: () => void,
   /** Procedural weapon-art thumbnail provider for the loadout panel. */
   weaponThumb?: WeaponThumb,
+  /** Abandon the run and go to the start menu. Host and client alike: for a
+   * client it is the only way off this screen. */
+  onMainMenu?: () => void,
 ): Screens => {
   const banner = document.createElement('div')
   banner.style.cssText =
@@ -147,7 +152,19 @@ export const createScreens = (
   // between "Run it back" / "New Seed" and confirm. The nav loop lives for the
   // overlay's lifetime; it idles cheaply while the overlay is hidden (its buttons
   // report no offsetParent) and skips the disabled/hidden client variants.
-  installGamepadMenuNav(() => [restartBtn, newseedBtn])
+  // Main menu ends the run for everyone at this table, so it takes two presses
+  // (twoPress.ts) like the pause menu's copy.
+  const quitGroup = createTwoPressGroup()
+  const mainMenuBtn = document.createElement('button')
+  if (onMainMenu) {
+    mainMenuBtn.textContent = MAIN_MENU_LABEL
+    mainMenuBtn.dataset.role = 'gameover-main-menu'
+    mainMenuBtn.style.cssText = newseedBtn.style.cssText
+    mainMenuBtn.style.display = ''
+    quitGroup.wire(mainMenuBtn, MAIN_MENU_ARMED_LABEL, onMainMenu)
+    overlay.querySelector<HTMLElement>('#btnRow')!.appendChild(mainMenuBtn)
+  }
+  installGamepadMenuNav(() => [restartBtn, newseedBtn, mainMenuBtn])
   const stats = overlay.querySelector<HTMLElement>('#stats')!
 
   let bannerTimer: ReturnType<typeof setTimeout> | undefined
@@ -166,12 +183,13 @@ export const createScreens = (
     'text-shadow:0 2px 6px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;white-space:nowrap'
   mount.appendChild(toast)
   let toastTimer: ReturnType<typeof setTimeout> | undefined
-  const showToast = (text: string): void => {
+  const showToast = (text: string, ms = 1800): void => {
     toast.textContent = text
     toast.style.opacity = '1'
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => (toast.style.opacity = '0'), 1800)
+    toastTimer = setTimeout(() => (toast.style.opacity = '0'), ms)
   }
+  const sealHint = createSealHint(themeDisplayName)
 
   // Floor modifier strip: a small line just under the mission chip. It reads out
   // the modifier in full when it takes hold, then shrinks to a live readout
@@ -356,6 +374,8 @@ export const createScreens = (
           if (modToast) showToast(modToast)
         }
       }
+      const sealToast = sealHint.update(view)
+      if (sealToast) showToast(sealToast, 3000)
       updateBoss(view)
       updateLocator(view)
       updateModifier(view)
@@ -379,6 +399,7 @@ export const createScreens = (
         } else {
           // Revived / fresh run began — drop back into play.
           overlay.style.display = 'none'
+          quitGroup.disarmAll()
         }
       }
     },

@@ -1,6 +1,6 @@
-// Headless bot playthrough: a run dropped on floor 3 (built by the real floor
-// transition, armed kit), then played through the real systems with per-tick
-// inputs only. It fights, opens and picks doors, works the objective's access
+// Headless bot playthrough: a run from floor 1 (FROM=1, the starting kit), or
+// dropped on floor 3 by the armed scenario (the default), played through the
+// real systems with per-tick inputs only. It fights, opens and picks doors, works the objective's access
 // gate (fetches the keycard, hacks the generator, kills the Spore Node, or
 // breaches with the special's grenade), completes the mission and walks onto
 // the exit.
@@ -10,12 +10,16 @@
 // `casual` (endless self-revives) separates "the floor cannot be finished"
 // from "the bot lost the fight": a casual run that times out is stuck.
 //
-// A seed passes when it clears `floorsToClear` floors from 3, i.e. arrives on
-// floor 3 + floorsToClear through the exit. Exit code 1 when any seed fails.
+// A seed passes when it clears `floorsToClear` floors from its start floor,
+// arriving on the next one through the exit. Exit code 1 when any seed fails.
 // BOT_HP=1 logs hp and goal every second; BOT_TRACE=1 logs blasts and breaches.
-import { tickWorld, createWorld, type World } from '../../src/game/world' // FIRST: breaks the world↔ai import cycle under tsx
+import { tickWorld, createWorld, doorClosedAt, type World } from '../../src/game/world' // FIRST: breaks the world↔ai import cycle under tsx
 import type { Entity } from '../../src/game/entity'
 import { hasLineOfSight } from '../../src/game/los'
+
+/** Line of sight a bullet actually has: closed doors stop it too. */
+const clearShot = (w: World, a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
+  hasLineOfSight(w.level, a.x, a.y, b.x, b.y, (tx, ty) => doorClosedAt(w, tx, ty))
 import { findPath } from '../../src/game/path'
 import { spawnPlayer } from '../../src/game/player'
 import { populateWorld } from '../../src/game/populate'
@@ -28,7 +32,7 @@ const seeds = (process.argv[2] ?? '1,2,3').split(',').map(Number)
 const floorsToClear = Number(process.argv[3] ?? 2)
 const maxTicks = Number(process.argv[4] ?? 12000)
 const mode = process.argv[5] === 'casual' ? 'casual' : 'normal'
-const START_FLOOR = 3
+const START_FLOOR = Number(process.env.FROM ?? 3)
 const FIGHT_RANGE = 8
 const SHOOT_RANGE = 5
 const THROW_STANDOFF = 3.2
@@ -43,7 +47,7 @@ const boot = (seed: number): { w: World; p: Entity } => {
   setupFloor(w)
   const at = playerSpawnPoint(w.level, 0)
   const p = spawnPlayer(w, 0, at.x, at.y)
-  applyScenario(w, 'armed', { floor: START_FLOOR })
+  if (START_FLOOR > 1) applyScenario(w, 'armed', { floor: START_FLOOR })
   return { w, p }
 }
 
@@ -52,7 +56,7 @@ const boot = (seed: number): { w: World; p: Entity } => {
  * `breach` target gets a grenade from a standoff. */
 type Goal = { at: Pt; act: 'walk' | 'shoot' | 'use' | 'breach'; what: string; ent?: Entity; gate?: Entity }
 
-/** Ticks the bot works one way into a gate before it gives up and breaches. */
+/** Ticks the bot spends at one way into a gate before it gives up and breaches. */
 const GATE_PATIENCE = 900
 
 const gateOf = (w: World): Entity | undefined => {
@@ -72,7 +76,7 @@ const sealedDoors = (w: World, p: Entity): Set<number> => {
   for (const e of w.entities) {
     const d = e.door
     if (!d || e.dead || d.open) continue
-    const sealed = d.overgrown || d.sealKind === 'power' || (d.sealKind === 'keycard' && !(d.keyId && holds(p, d.keyId)))
+    const sealed = d.overgrown || (d.locked && (d.sealKind === 'power' || (d.sealKind === 'keycard' && !(d.keyId && holds(p, d.keyId)))))
     if (sealed) out.add(tileKey(w, e.pos))
   }
   return out
@@ -118,7 +122,7 @@ const nearestFoe = (w: World, p: Entity): Entity | undefined => {
   for (const e of w.entities) {
     if (e.kind !== 'npc' || e.dead || !e.health) continue
     const d = dist(e.pos, p.pos)
-    if (d < bestD && hasLineOfSight(w.level, p.pos.x, p.pos.y, e.pos.x, e.pos.y)) {
+    if (d < bestD && clearShot(w, p.pos, e.pos)) {
       best = e
       bestD = d
     }
@@ -143,6 +147,7 @@ const closedDoorAhead = (w: World, p: Entity, toward: Pt): Entity | undefined =>
 interface FloorReport {
   floor: number
   biome: string
+  kit: string
   archetype: string
   mission: string
   gate: string
@@ -167,6 +172,7 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
     return {
       floor: w.floor,
       biome: w.level.complex?.biome ?? `city:${w.level.theme}`,
+      kit: p.combat?.weapon ?? '-',
       archetype: w.level.complex?.archetype ?? '-',
       mission: w.mission.template,
       gate: gate ? (gate.overgrown ? 'overgrown' : (gate.sealKind ?? (gate.locked ? 'pick' : 'open'))) : 'none',
@@ -196,6 +202,18 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
     if (floorTick > maxTicks || w.gameOver) {
       const g = pickGoal(w, p, breachOnly)
       cur.stuck = `${w.gameOver ? 'run over' : 'out of time'} at (${p.pos.x.toFixed(1)},${p.pos.y.toFixed(1)}) going for ${g.what}@(${g.at.x.toFixed(1)},${g.at.y.toFixed(1)})`
+      if (process.env.BOT_DEBUG) {
+        for (const e of w.entities) if (e !== p && dist(e.pos, p.pos) < 3) cur.stuck += `\n      near ${e.archetype} (${e.pos.x.toFixed(1)},${e.pos.y.toFixed(1)}) dead=${!!e.dead} ${e.door ? JSON.stringify(e.door) : ''}`
+        const r = 4
+        for (let y = Math.floor(p.pos.y) - r; y <= Math.floor(p.pos.y) + r; y++) {
+          let row = '      '
+          for (let x = Math.floor(p.pos.x) - r; x <= Math.floor(p.pos.x) + r; x++) {
+            const ent = w.entities.find((e) => e !== p && !e.dead && Math.floor(e.pos.x) === x && Math.floor(e.pos.y) === y)
+            row += x === Math.floor(p.pos.x) && y === Math.floor(p.pos.y) ? '@' : ent?.door ? 'D' : ent?.kind === 'interactable' ? 'o' : ent?.pickup ? '$' : w.level.solid[y * w.level.w + x] ? '#' : '.'
+          }
+          cur.stuck += '\n' + row
+        }
+      }
       floors.push(cur)
       return { ok: false, floors }
     }
@@ -203,7 +221,7 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
     if (p.playerCtl!.draft) cmd.draftPick = 0
 
     const goal = pickGoal(w, p, breachOnly)
-    if (goal.gate) {
+    if (goal.gate && dist(p.pos, goal.at) < 3) {
       const key = tileKey(w, goal.gate.pos)
       gateTicks.set(key, (gateTicks.get(key) ?? 0) + 1)
       if (gateTicks.get(key)! > GATE_PATIENCE) breachOnly.add(key)
@@ -216,7 +234,7 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
     }
 
     const d = dist(p.pos, goal.at)
-    const sees = hasLineOfSight(w.level, p.pos.x, p.pos.y, goal.at.x, goal.at.y)
+    const sees = clearShot(w, p.pos, goal.at)
     const busy = w.tick < waitUntil || !!p.playerCtl!.channel
     if (goal.act === 'shoot' && d < SHOOT_RANGE && sees) {
       cmd.aimX = goal.at.x - p.pos.x
@@ -226,7 +244,7 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
       cmd.interact = true
       if (goal.ent?.door) cur.picks++
       waitUntil = w.tick + (goal.ent?.door ? 170 : 15)
-    } else if (goal.act === 'breach' && d < THROW_STANDOFF + 1.5 && d > THROW_STANDOFF - 1 && sees && !busy) {
+    } else if (goal.act === 'breach' && d < THROW_STANDOFF + 1.5 && d > 1.6 && sees && !busy) {
       cmd.aimX = goal.at.x - p.pos.x
       cmd.aimY = goal.at.y - p.pos.y
       cmd.attack = false
@@ -236,7 +254,7 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
         waitUntil = w.tick + 50
       }
     } else if (!busy) {
-      const away = goal.act === 'breach' && d <= THROW_STANDOFF - 1
+      const away = goal.act === 'breach' && d <= 1.6
       const aim = away ? { x: p.pos.x + (p.pos.x - goal.at.x), y: p.pos.y + (p.pos.y - goal.at.y) } : goal.at
       const key = `${goal.what}:${Math.floor(aim.x)},${Math.floor(aim.y)}`
       if (key !== routeKey || route.length === 0 || stuckTicks === 30) {
@@ -244,22 +262,33 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
         routeKey = key
       }
       while (route.length > 0 && dist(p.pos, route[0]) < 0.35) route.shift()
-      const next = route[0] ?? centre(aim)
+      // Close in on the exact spot: a pickup can sit on a tile corner, out of
+      // grab reach from the tile centre.
+      const next = goal.act === 'walk' && dist(p.pos, aim) < 1.5 ? aim : (route[0] ?? centre(aim))
       const len = dist(next, p.pos) || 1
       cmd.moveX = (next.x - p.pos.x) / len
       cmd.moveY = (next.y - p.pos.y) / len
-      if (stuckTicks > 15) {
+      // A closed door on the next steps of the route is dealt with at once;
+      // anything else only once the walk has stalled.
+      const doorOnRoute = route.slice(0, 2).some((r) => w.entities.some((e) => e.door && !e.dead && !e.door.open && Math.floor(e.pos.x) === Math.floor(r.x) && Math.floor(e.pos.y) === Math.floor(r.y)))
+      if (stuckTicks > 15 || (doorOnRoute && dist(next, p.pos) < 1.6)) {
         const door = closedDoorAhead(w, p, next)
         const dd = door?.door
-        if (dd && !dd.locked && !dd.overgrown) {
+        if (dd && !dd.locked && !dd.overgrown && dist(door!.pos, p.pos) > 1.2) {
+          // Out of reach of the panel: step up to the door first.
+          const len2 = dist(door!.pos, p.pos)
+          cmd.moveX = (door!.pos.x - p.pos.x) / len2
+          cmd.moveY = (door!.pos.y - p.pos.y) / len2
+          waitUntil = w.tick + 12
+        } else if (dd && !dd.locked && !dd.overgrown) {
           cmd.interact = true
           cur.doors++
           waitUntil = w.tick + 10
         } else if (dd && dd.locked && !dd.overgrown && (dd.sealKind === undefined || dd.sealKind === 'pick')) {
           const tries = (pickTries.get(door!.id) ?? 0) + 1
           pickTries.set(door!.id, tries)
-          if (tries > 2 && p.playerCtl!.abilityCooldown <= 0) {
-            // Picks keep getting interrupted: blow it from where we stand.
+          if ((tries > 2 || foe) && p.playerCtl!.abilityCooldown <= 0) {
+            // Picks keep getting interrupted, or something is on us: blow it.
             cmd.aimX = door!.pos.x - p.pos.x
             cmd.aimY = door!.pos.y - p.pos.y
             cmd.attack = false
@@ -272,11 +301,11 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
             waitUntil = w.tick + 170
           }
         }
-        if (dd) {
+        if (dd && cmd.interact) {
           cmd.moveX = 0
           cmd.moveY = 0
-          stuckTicks = 0
         }
+        if (dd) stuckTicks = 0
       }
     }
 
@@ -293,7 +322,7 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
     cur.minHp = Math.min(cur.minHp, p.health!.hp)
     if (process.env.BOT_HP && floorTick % 30 === 0) {
       const near = w.entities.filter((e) => e.kind === 'npc' && !e.dead && dist(e.pos, p.pos) < 6).map((e) => e.archetype)
-      console.log(`    t${floorTick} hp=${p.health!.hp} downed=${!!p.playerCtl!.downed} p=(${p.pos.x.toFixed(1)},${p.pos.y.toFixed(1)}) goal=${goal.what}@(${goal.at.x.toFixed(1)},${goal.at.y.toFixed(1)}) fx=${JSON.stringify(p.fx ?? {})} near=${near.join(',')}`)
+      console.log(`    t${floorTick} hp=${p.health!.hp} downed=${!!p.playerCtl!.downed} p=(${p.pos.x.toFixed(1)},${p.pos.y.toFixed(1)}) goal=${goal.what}@(${goal.at.x.toFixed(1)},${goal.at.y.toFixed(1)}) fx=${JSON.stringify(p.fx ?? {})} near=${near.join(',')} route=${route.slice(0, 3).map((r) => `${r.x},${r.y}`).join(' ')} mv=${cmd.moveX.toFixed(2)},${cmd.moveY.toFixed(2)} stuck=${stuckTicks} busy=${w.tick < waitUntil}`)
     }
     if (w.mission.complete && cur.completedAt === undefined) cur.completedAt = floorTick
     if (w.floor !== floorBefore) {

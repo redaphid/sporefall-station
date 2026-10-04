@@ -45,7 +45,6 @@ export const generateComplexLevel = (seed: number, floor: number, opts: ComplexL
     buildings: plan.buildings,
     spawn: plan.spawn,
     exit: plan.exit,
-    theme: themeForFloor(floor).name,
     complex: plan.complex,
   }
   for (const b of level.buildings) b.roomTypes = assignRoomTypes(b)
@@ -166,10 +165,10 @@ const buildThemedCity = (
     const inset: Rect = { x: lot.x + 1, y: lot.y + 1, w: lot.w - 2, h: lot.h - 2 }
     if (inset.w < 7 || inset.h < 7 || !lrng.chance(buildChance)) {
       grid.fillRect(inset.x, inset.y, inset.w, inset.h, theme.yard)
-      // Some empty lots become plazas: paved square, green heart.
+      // Some empty lots become plazas: a paved ring round the district's heart.
       if (inset.w >= 7 && inset.h >= 7 && lrng.chance(PLAZA_CHANCE)) {
         grid.fillRect(inset.x, inset.y, inset.w, inset.h, Tile.Sidewalk)
-        grid.fillRect(inset.x + 2, inset.y + 2, inset.w - 4, inset.h - 4, Tile.Grass)
+        grid.fillRect(inset.x + 2, inset.y + 2, inset.w - 4, inset.h - 4, theme.plazaHeart)
         plazas.push(inset)
       }
       continue
@@ -210,7 +209,7 @@ const buildThemedCity = (
     const large = interior.w >= 11 && interior.h >= 11
     if (large && lrng.chance(theme.courtyardChance)) {
       // Courtyard compound: a ring of rooms around an open pit, with a street gate.
-      const plan = carveCompound(lrng, grid, rect, interior, Tile.Grass)
+      const plan = carveCompound(lrng, grid, rect, interior, theme.courtyardGround)
       rooms.push(...plan.rooms)
       doors.push(...plan.doors)
       courtyard = plan.courtyard

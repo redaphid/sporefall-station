@@ -115,7 +115,7 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
       statuses: WIRE_STATUSES.length,
       activities: WIRE_ACTIVITIES.length,
     }).toEqual({
-      version: 10,
+      version: 11,
       archetypes: 95,
       mods: 18,
       statuses: 6,

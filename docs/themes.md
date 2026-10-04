@@ -120,7 +120,7 @@ the console and in `validateManifest` unit tests.
 | `item.default` | generic ground-item sprite |
 | `item.<id>` | per-item pickup, `<id>` ∈ `pistol wrench knife medkit cash shotgun molotov grenade-item` |
 | `prop.default` | generic prop (crates etc.) |
-| `prop.<name>` | `<name>` ∈ `barrel atm vending-machine tv toilet` |
+| `prop.<name>` | `<name>` ∈ `barrel cryo-terminal vending-machine tv toilet` |
 | `projectile` | bullet base texture (small, oriented flying +x; rotated to heading). Weapon-mod visual traits (elemental tints etc.) are applied ON TOP of this texture at runtime — themes provide the base art, mods compose over it. |
 | `grenade` | thrown grenade base texture (same composition rule) |
 | `fx.flame` | **array** — looping fire frames (3 in settlement) |

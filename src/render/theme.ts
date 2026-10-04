@@ -72,7 +72,7 @@ export const ITEM_IDS = ['pistol', 'wrench', 'knife', 'medkit', 'cash', 'shotgun
 // the PNG is silently discarded however correct the file is. `crate` needed no
 // new art at all -- cargo-crate.png has shipped since the pack landed and was
 // only ever reachable as prop.default.
-export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
+export const PROP_NAMES = ['barrel', 'cryo-terminal', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
   'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node'] as const
 const UNIT_SINGLES = ['player', 'warden'] as const
 const UNIT_WALKERS = ['mutant', 'scientist', 'robot'] as const

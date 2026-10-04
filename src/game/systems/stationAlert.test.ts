@@ -2,8 +2,8 @@
 // into an escape run: every door unseals and pops open, and the whole floor
 // commits to hunting the intruder across rooms.
 //
-// These tests drive the REAL systems through `tickWorld`/`runTicks` on real
-// generated floors and assert on observable outcomes (door state, chosen goals,
+// These tests drive the REAL systems through `tickWorld`/`runTicks` on
+// authored city floors (testkit `createCityWorld`) and assert on observable outcomes (door state, chosen goals,
 // distance closed) rather than internals. The adversarial cases are the ones
 // that matter here:
 //   • the door sweep must never CLOSE anything (the stuck-in-a-door bug, 795d336),
@@ -16,9 +16,9 @@ import type { Entity } from '../entity'
 import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
-import { createWorld, stationAlerted, tickWorld, type World } from '../world'
+import { stationAlerted, tickWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { createCityWorld, expectWorldEqual, runTicks } from '../testkit'
 import { ALERT_BROADCAST_TICKS, setupFloor } from './missions'
 import { ALERT_BATTLE_MULT, arbitrateGoal, decide } from './behaviors'
 import { BATTLE, PURSUE, FLEE } from './goalCodes'
@@ -26,7 +26,7 @@ import { BATTLE, PURSUE, FLEE } from './goalCodes'
 const idle = (...ids: number[]): Map<number, InputCmd> => new Map(ids.map((id) => [id, emptyInput()]))
 
 const boot = (seed: number, floor: number, players = 1): World => {
-  const w = createWorld(seed, floor)
+  const w = createCityWorld(seed, floor)
   populateWorld(w)
   setupFloor(w)
   for (let i = 0; i < players; i++) spawnPlayer(w, i, w.level.spawn.x, w.level.spawn.y)
@@ -38,12 +38,6 @@ const bootTemplate = (template: string, floors: number[], players = 1): World =>
   for (let seed = 1; seed <= 300; seed++) {
     for (const floor of floors) {
       const w = boot(seed, floor, players)
-      // An extraction is a re-ruled steal on an identical world; turn it back
-      // so these tests keep the exact floors they were written against.
-      if (template === 'steal' && w.mission.template === 'extraction') {
-        w.mission.template = 'steal'
-        delete w.mission.extractPoint
-      }
       if (w.mission.template !== template) continue
       if (!w.entities.some((e) => e.ai && !e.dead && !e.playerCtl)) continue
       return w

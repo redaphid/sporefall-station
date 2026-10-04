@@ -3,7 +3,7 @@ import { modifierView } from '../game/floorModifiers'
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { extractionView, setupFloor } from '../game/systems/missions'
+import { setupFloor } from '../game/systems/missions'
 import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
@@ -171,7 +171,6 @@ export class HostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
-      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
       lockdown: lockdownView(this.world),

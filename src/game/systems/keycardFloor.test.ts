@@ -97,7 +97,7 @@ describe('generator sweep: no player arrives on a floor holding an earlier floor
           carried++
         }
         const from = w.floor
-        const exit = w.mission.extractPoint ?? w.level.exit
+        const exit = w.level.exit
         w.mission.exitUnlocked = true
         players[0].pos = { x: exit.x + 0.5, y: exit.y + 0.5 }
         players[0].prevPos = { ...players[0].pos }

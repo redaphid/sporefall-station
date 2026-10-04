@@ -20,7 +20,7 @@ mkdirSync(OUT, { recursive: true })
 const WITH_ART: [string, string][] = [
   ['crate', 'cargo-crate'], ['cabinet', 'supply-cabinet'], ['barrel', 'spore-barrel'],
   ['desk', 'work-desk'], ['tv', 'wall-screen'], ['vending', 'nutrient-dispenser'],
-  ['locker', 'weapons-locker'], ['toilet', 'hydro-recycler'], ['atm', 'cryo-terminal'],
+  ['locker', 'weapons-locker'], ['toilet', 'hydro-recycler'], ['cryoTerminal', 'cryo-terminal'],
 ]
 const NO_ART: [string, string][] = [
   ['shelf', '20.8/floor'], ['chair', '13.1/floor'], ['bunk', '7.9/floor'],

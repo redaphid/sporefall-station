@@ -126,7 +126,6 @@ export const ROOM_LAYOUT: Record<RoomType, readonly FurnishGroup[]> = {
   shopfloor: [
     { g: 'run', prop: 'shelf', min: 2, max: 4 },
     { g: 'one', prop: 'vending' },
-    { g: 'one', prop: 'atm' },
     { g: 'block', prop: 'crate', min: 1, max: 2 },
   ],
   // Back of house: racking down one wall, stock heaped in the corner.
@@ -312,7 +311,6 @@ export const PROP_PLACEMENT: Record<string, 'wall' | 'corner' | 'center' | 'any'
   bunk: 'wall',
   tv: 'wall',
   vending: 'wall',
-  atm: 'wall',
   bench: 'wall',
   desk: 'wall',
   toilet: 'corner',

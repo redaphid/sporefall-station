@@ -241,8 +241,7 @@ const armDescent = (host: NetHostSession): void => {
   // descent means any lockdown has already run its course.
   host.world.mission.lockdownTick = -LOCKDOWN_TICKS
   const player = host.world.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)!
-  // An extraction floor's way out is the entry, not the Launch Bay.
-  const exit = host.world.mission.extractPoint ?? host.world.level.exit
+  const exit = host.world.level.exit
   player.pos.x = exit.x + 0.5
   player.pos.y = exit.y + 0.5
   player.prevPos.x = player.pos.x

@@ -507,7 +507,7 @@ TILES = {
 #
 # Ranked by measured encounter rate (200 seeds x floors 1-5, 120,736 objects —
 # see _mycel-results/sprite-inventory.md): crate 23.0/floor, desk 13.3,
-# cabinet 11.7, barrel 8.2, vending 5.0, tv 4.4, locker 3.3, toilet 3.1, atm 2.4.
+# cabinet 11.7, barrel 8.2, vending 5.0, tv 4.4, locker 3.3, toilet 3.1.
 PROPS = {
     # #1 object in the game. Nothing has ever been generated for it: it was
     # recorded as an unreachable orphan, so it was never on any queue.

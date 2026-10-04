@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateLevel } from '../game/levelgen/generate'
+import { walledRoom, worldFromRows } from '../game/testkit'
 import { emptyInput, type InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import { decodeJson, encodeJson } from '../net/framing/codec'
@@ -342,8 +343,12 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
   it('still accepts a rejoin on the LAST tick of the grace window', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(10, 'Alice', stubInput(), hub.hostTransport)
+    // An authored empty room: nothing on it can kill the idle host or the ghost
+    // before the window's last tick, so the test turns on the window alone.
+    host.world = worldFromRows(walledRoom(16, 16), { seed: 10 })
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
+    expect(host.world.entities.filter((e) => e.ai && !e.playerCtl)).toEqual([])
 
     for (let i = 0; i < REJOIN_GRACE_TICKS - 1; i++) host.tick()
 

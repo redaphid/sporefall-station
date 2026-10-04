@@ -7,9 +7,10 @@ import { expect } from 'vitest'
 import { WEAPONS } from './data/items'
 import type { Entity, ItemStack } from './entity'
 import { generateCityLevel } from './levelgen/generate'
+import { levelFromJson } from './levelgen/levelText'
 import { serializeWorld } from './serialize'
 import { emptyInput, type InputCmd } from './types'
-import { tickWorld, worldFromState, type RunMode, type World } from './world'
+import { tickWorld, worldFromState, type RunMode, type World, type WorldInit } from './world'
 
 // The fixture loaders live in the vitest-free `./fixtures.ts` (the app's
 // `?world=` boot hook imports them too); re-export so tests keep one import site.
@@ -62,6 +63,19 @@ export const arm = (e: Entity, weaponId: string): ItemStack => {
  * what seed+floor generates), so a snapshot carries it whole. */
 export const createCityWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
   worldFromState({ level: generateCityLevel(seed, floor), seed, floor, mode, hostile })
+
+/** An authored world from ASCII level rows (levelText glyphs, `@` marks the
+ * spawn). The map is the test's own state, so no generator change can move it. */
+export const worldFromRows = (rows: readonly string[], init: Omit<WorldInit, 'level'> = {}): World =>
+  worldFromState({ ...init, level: levelFromJson({ rows: [...rows] }) })
+
+/** Rows for a `w` x `h` room: a wall ring around open floor, spawn at tile (2, 2). */
+export const walledRoom = (w: number, h: number): string[] =>
+  Array.from({ length: h }, (_, y) =>
+    Array.from({ length: w }, (_, x) =>
+      x === 0 || y === 0 || x === w - 1 || y === h - 1 ? '#' : x === 2 && y === 2 ? '@' : '.',
+    ).join(''),
+  )
 
 /** Assert two worlds are in an identical state by comparing their snapshots. */
 export const expectWorldEqual = (a: World, b: World): void => {

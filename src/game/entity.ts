@@ -9,6 +9,13 @@ export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | '
 export interface StatusEntry {
   until: number
   source?: EntityId
+  /** Damage over time dealt ahead of what this status has owed so far, in
+   * whole millionths of an hp, [0, 1_000_000). hp stays whole, so each damage
+   * tick deals what it owes rounded UP and keeps the overpayment here (fire.ts
+   * elementSystem). Over any window a body takes the exact resisted damage
+   * rounded up, so a resist above 0 always hurts (#131). A refresh keeps it.
+   * Absent when nothing is prepaid, so a whole-number burn snapshots as before. */
+  prepaidMicroHp?: number
 }
 
 export type Fx = Record<string, StatusEntry>
@@ -264,9 +271,9 @@ export interface Entity {
     hp: number
     max: number
     iframes: number
-    /** Absolute tick of the last LANDED blow (set by combat.applyDamage and the
-     * shock arc). Drives passive regen: the "unharmed" clock (systems/regen.ts)
-     * counts from here. Optional/absent until first hurt, so pre-feature snapshots
+    /** Absolute tick of the last LANDED blow, damage over time included (set by
+     * combat.hurt, which every damage source calls). Drives passive regen: the
+     * "unharmed" clock (systems/regen.ts) counts from here. Optional/absent until first hurt, so pre-feature snapshots
      * round-trip byte-for-byte (same discipline as `mods`/`annotations`). */
     lastHurtTick?: number
     /** Lifesteal earned but not yet paid, in [-0.5, 0.5). hp stays whole, so each

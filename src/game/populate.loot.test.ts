@@ -3,10 +3,10 @@
 // populate.test.ts, which covers the happy-path element surfacing.
 
 import { describe, expect, it } from 'vitest'
-import { createWorld, worldFromState, type World } from './world'
+import { createWorld, type World } from './world'
+import { walledRoom, worldFromRows } from './testkit'
 import { populateWorld } from './populate'
 import { Tile, type Building, type Level } from './levelgen/level'
-import { levelFromJson } from './levelgen/levelText'
 import { itemClass } from './data/items'
 
 // The basic table lost its bat/knife when weapons stopped being loot, then lost
@@ -169,8 +169,7 @@ describe('depth gating', () => {
 
 describe('adversarial bounds — must not crash', () => {
   it('a level with zero buildings populates without throwing and drops no building loot', () => {
-    const rows = ['############', ...Array.from({ length: 8 }, () => '#..........#'), '############']
-    const w = worldFromState({ level: levelFromJson({ rows }), seed: 3, floor: 4 })
+    const w = worldFromRows(walledRoom(12, 10), { seed: 3, floor: 4 })
     expect(() => populateWorld(w)).not.toThrow()
     // No buildings => sprinkleLoot has nowhere to place; only street life spawns.
     expect(w.entities.some((e) => e.pickup)).toBe(false)

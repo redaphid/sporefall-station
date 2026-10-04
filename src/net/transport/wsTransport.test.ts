@@ -265,13 +265,21 @@ describe('WsTransport over the relay planner', () => {
 })
 
 describe('resolveWsBaseUrl', () => {
-  it('prefers a ?ws= override', async () => {
+  const SITE = 'https://sporefall.hypnodroid.com'
+  it('prefers a ?ws= override, even inside the native shell', async () => {
     const { resolveWsBaseUrl } = await import('./wsTransport')
-    expect(resolveWsBaseUrl('?ws=wss://relay.example/ws')).toBe('wss://relay.example/ws')
+    expect(resolveWsBaseUrl('?ws=wss://relay.example/ws', 'https://localhost', SITE)).toBe('wss://relay.example/ws')
   })
-  it('derives same-origin wss/ws from the page location', async () => {
+  it('derives same-origin wss/ws from the page origin', async () => {
     const { resolveWsBaseUrl } = await import('./wsTransport')
-    expect(resolveWsBaseUrl('', { protocol: 'https:', host: 'game.example' })).toBe('wss://game.example/ws')
-    expect(resolveWsBaseUrl('', { protocol: 'http:', host: 'localhost:5173' })).toBe('ws://localhost:5173/ws')
+    expect(resolveWsBaseUrl('', 'https://game.example', SITE)).toBe('wss://game.example/ws')
+    expect(resolveWsBaseUrl('', 'http://localhost:8787', SITE)).toBe('ws://localhost:8787/ws')
   })
+  it.each(['https://localhost', 'http://localhost', 'capacitor://localhost', 'null', ''])(
+    'dials the deployed relay from the native shell origin %j, not the APK itself',
+    async (origin) => {
+      const { resolveWsBaseUrl } = await import('./wsTransport')
+      expect(resolveWsBaseUrl('', origin, SITE)).toBe('wss://sporefall.hypnodroid.com/ws')
+    },
+  )
 })

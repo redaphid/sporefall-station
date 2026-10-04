@@ -1,3 +1,5 @@
+import { SITE_ORIGIN } from '../../app/version'
+import { workerOrigin } from '../../app/workerOrigin'
 import type { PeerId, Transport, TransportEvent } from '../types'
 import { decodeAddressed, encodeAddressed, parseControl } from './wsWire'
 
@@ -70,11 +72,11 @@ export class WsTransport implements Transport {
       sock.onmessage = (ev) => this.onMessage(ev.data)
       sock.onclose = (ev) => {
         // A close before onopen means the upgrade itself failed.
-        if (!opened) reject(new Error(`ws closed before open (code ${ev.code ?? '?'})`))
+        if (!opened) reject(new Error(`can't reach the online server (closed with code ${ev.code ?? '?'})`))
         this.onClose()
       }
       sock.onerror = () => {
-        if (!opened) reject(new Error('ws error before open'))
+        if (!opened) reject(new Error("can't reach the online server"))
       }
     })
   }
@@ -183,16 +185,14 @@ export class WsTransport implements Transport {
   }
 }
 
-/** Resolve the relay base URL (origin + `/ws`) for the current page. Same-origin
- * when served by the Worker; overridable via `?ws=` (dev pointing at
- * `wrangler dev`) or a `VITE_WS_URL` build-time default (native builds, which
- * load from file:// and have no same-origin server). */
-export const resolveWsBaseUrl = (search = '', loc?: { protocol: string; host: string }): string => {
+/** Resolve the relay base URL (Worker origin + `/ws`) for the current page.
+ * Same-origin when served by the Worker; the site the bundle was built for
+ * inside the native shell (see workerOrigin.ts); overridable via `?ws=` (dev
+ * pointing at `wrangler dev`) or a `VITE_WS_URL` build-time default. */
+export const resolveWsBaseUrl = (search = '', origin = location.origin, siteOrigin = SITE_ORIGIN): string => {
   const override = new URLSearchParams(search).get('ws')
   if (override) return override
   const envUrl = (import.meta.env?.VITE_WS_URL as string | undefined) ?? ''
   if (envUrl) return envUrl.replace(/\/$/, '')
-  const l = loc ?? location
-  const scheme = l.protocol === 'https:' ? 'wss' : 'ws'
-  return `${scheme}://${l.host}/ws`
+  return `${workerOrigin(origin, siteOrigin).replace(/^http/, 'ws')}/ws`
 }

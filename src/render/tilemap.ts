@@ -132,7 +132,7 @@ export class TilemapView {
             // grounding shadows (so AO still darkens moss at wall bases).
             const placements = overlayAt.get(ty * level.w + tx)
             if (placements) {
-              const pool = art.tileOverlayPool(tileId)
+              const pool = art.tileOverlayPool(tileId, skin)
               for (const p of placements) {
                 const tex = pool[p.idx]
                 if (!tex) continue

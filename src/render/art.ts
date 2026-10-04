@@ -50,8 +50,10 @@ export interface ArtRegistry {
    * the skin draws the plain tile exactly as without one. */
   tile(tileId: number, hash?: number, tx?: number, ty?: number, skin?: TileName): Texture
   /** Context-placed RGBA decal pool for a surface (`tile.<name>.overlay`) —
-   * empty when the theme ships none. Placement: tileSelect.planTileOverlays. */
-  tileOverlayPool(tileId: number): readonly Texture[]
+   * empty when the theme ships none. Placement: tileSelect.planTileOverlays.
+   * Also empty for a tile `tile()` draws from its `skin`'s pool: the skin
+   * replaces the surface, and the plain tile's decals belong to that one. */
+  tileOverlayPool(tileId: number, skin?: TileName): readonly Texture[]
   /** The chevron decal for a stair's landing tile, authored pointing NORTH at
    * the stair (the tilemap rotates it with the shaft). */
   landingOverlay(hash?: number): Texture
@@ -1486,7 +1488,8 @@ export const createArt = (
   }
 
   const EMPTY_POOL: readonly Texture[] = []
-  const tileOverlayPool = (tileId: number): readonly Texture[] => {
+  const tileOverlayPool = (tileId: number, skin?: TileName): readonly Texture[] => {
+    if (skinPool(skin)) return EMPTY_POOL
     const name = TILE_NAME_BY_ID[tileId]
     return (name ? sprites.tileOverlays?.[name] : undefined) ?? EMPTY_POOL
   }

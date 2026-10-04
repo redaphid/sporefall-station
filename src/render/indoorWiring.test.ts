@@ -95,6 +95,27 @@ describe('TilemapView on an authored complex floor', () => {
   })
 })
 
+describe('overlay decals on an authored complex floor', () => {
+  const decalsDrawn = (complex: ComplexInfo | undefined, shipDeck: boolean): number => {
+    const moss = pool(3)
+    const tiles: Record<string, Texture[]> = { floor: pool(1), wall: pool(1) }
+    if (shipDeck) tiles.deck = pool(1)
+    const view = new TilemapView()
+    view.build(authored(complex).level, createArt(fakeRenderer, { tiles, tileOverlays: { floor: moss } }))
+    return drawnFrom(view, moss)
+  }
+
+  it('a deck the theme ships gets none of the plain floor moss', () => {
+    expect(decalsDrawn(COMPLEX, true)).toBe(0)
+  })
+
+  it('without deck art the complex floor keeps exactly the moss the plain floor gets', () => {
+    const outdoors = decalsDrawn(undefined, true)
+    expect(outdoors).toBeGreaterThan(0)
+    expect(decalsDrawn(COMPLEX, false)).toBe(outdoors)
+  })
+})
+
 describe('EntityViews on an authored complex floor', () => {
   const props = () => ({
     door: new Texture(),

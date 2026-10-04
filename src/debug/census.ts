@@ -354,7 +354,7 @@ export const renderCensus = (r: CensusReport): string => {
   }
 
   if (r.reach.length) {
-    out.push(`### Reach probe: does a ${r.reachArchetype} fight back?`, '')
+    out.push(`### Reach probe: does ${/^[aeiou]/i.test(r.reachArchetype) ? 'an' : 'a'} ${r.reachArchetype} fight back?`, '')
     out.push(`The ${r.reachArchetype} stands on an open causeway row with ${REACH_FOE_HP} hp. The player holds still for ${secs(REACH_TICKS)} s.`, '')
     out.push('| distance (tiles) | player fires | foe first shot (s) | foe shots | closest approach | dmg taken | dmg dealt to foe |', '|---|---|---|---|---|---|---|')
     for (const p of r.reach) {

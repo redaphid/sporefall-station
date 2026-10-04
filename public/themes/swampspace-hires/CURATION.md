@@ -1,7 +1,7 @@
 # Sporefall Station (swampspace) — curation & lineage
 
 Fused swamp/space theme: an alien bog overtaking a derelict space station.
-Mangrove roots through deck plating, spore drones instead of wardens, phosphor
+Mangrove roots through deck plating, spore drones walking the patrol beat, phosphor
 water, overgrown tech. Art direction: dominant-color study of *Flashback*
 (Amiga 1992) Titan jungle — teal mist, olive overgrowth, tan/gray tech, hot
 accents (inspiration only; no Flashback art used as input or reproduced).

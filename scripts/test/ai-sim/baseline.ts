@@ -32,7 +32,7 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   run(`#59 duel hp=${(frac * 100).toFixed(0)}%`, w, 300, input)
 }
 
-// ── 2. Faction clash: wardens vs feral, lots of mutual HP crossing thresholds ────
+// ── 2. Faction clash: wardens vs rootcult, lots of mutual HP crossing thresholds ────
 {
   const w = makeArena(22, 24)
   const c = center(w)

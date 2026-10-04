@@ -28,7 +28,7 @@ Fresh solo run started by the observer (no human at the controls yet). Player at
 facing 0. No events yet. Alarm 0.
 
 Level makeup (seed 2602185732, floor 1), from `entities()` by archetype:
-- npc/civilian 20, npc/mutant 9, npc/warden 2 (factions: civ 20, feral 9, warden 2)
+- npc/civilian 20, npc/mutant 9, npc/warden 2 (factions: civ 20, rootcult 9, warden 2)
 - door 32
 - pickups: canister 1 (the mission target, id 53 @ (56.5,58)), bandage 4,
   medkit 2, cash 2, knife 2

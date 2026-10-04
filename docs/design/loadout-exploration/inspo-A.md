@@ -291,7 +291,7 @@ binding constraint on every feature below.
 
 - **Taken:** a planned, interdependent, multi-role operation rather than a
   firefight.
-- **Owner ask:** *"think about a multi-stage bank salvage or something. that
+- **Owner ask:** *"think about a multi-stage bank heist or something. that
   requires careful planning amongst my nephews. an 'oceans 11' type thing."*
   (mindmeld 2847/497336).
 - **Status: partly shipped.** It produced the `gameplay-experiments` skill and
@@ -425,7 +425,7 @@ interiors (cover tiles 0 → 86-174), room-role metadata, chokepoints, typed roo
 > *"sophisticated AI ⇄ meaningful buildings, each giving the other a reason to
 > exist."* (mindmeld 2965/530317)
 
-A feral holds a wing, workers are in labs, guards defend the objective wing,
+A rootcult holds a wing, workers are in labs, guards defend the objective wing,
 civilians flee home. Rooms being anonymous was diagnosed as the reason NPCs had
 no functional reason to occupy any of them.
 
@@ -500,7 +500,7 @@ Adding a mission template **must not perturb the RNG stream**
   > *"We can't call it `streets-of-rogue` related name anymore. we must use a
   > code name"* (mindmeld 2847/496992, 2966/530870)
 - **Still outstanding, recorded but explicitly not to be implemented yet:**
-  re-fiction the character vocabulary — there are no "wardens" or "mutants" anymore.
+  re-fiction the character vocabulary — the old Earth-city enemy names are gone.
   Rename player-facing language (and eventually the `faction` values in
   `src/game/entity.ts` and the `relationships.ts` matrix) to station roles —
   security/wardens, scavengers/raiders, crew/civilians — keeping the mechanical
@@ -545,7 +545,7 @@ notice because **nothing goes red for "too easy."**
 ### Enemy groups — tides, packs and hives
 
 `docs/design/enemy-groups.md` adds a group layer above individual AI: raid
-strategies by depth (assault / staging / sappers / siege), bellwether-and-morale
+strategies by depth (assault / staging / sappers / siege), overseer-and-morale
 with a rout on decapitation, retreat-to-medic, encirclement, manhunter rage on a
 hit, and spire infestation. Each names its **player verb** — react, catch them
 gathering, stop the breacher, charge the battery, decapitate, break the ring,

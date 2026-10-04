@@ -1,3 +1,4 @@
+import { itemName, keycardId } from '../data/items'
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
@@ -52,6 +53,20 @@ const WING_NAMES: Record<BuildingRole, string> = {
 
 /** Themed module name for a building role (falls back to the raw role, defensively). */
 const wingName = (role: BuildingRole): string => WING_NAMES[role] ?? role
+
+/** The keycard for `building`'s gate, named as the objective banner names the
+ * building. A name another keycard seal on this floor already uses gets a
+ * number ("essence lab 2"); a building with no role falls back to its wing. */
+export const keycardFor = (w: World, building: Building, wing: string): string => {
+  const base = building.role ? wingName(building.role) : ''
+  if (!base) return keycardId(wing)
+  const taken = new Set(
+    w.entities.filter((e) => e.door?.sealKind === 'keycard' && e.door.keyId).map((e) => itemName(e.door!.keyId!)),
+  )
+  let name = base
+  for (let n = 2; taken.has(itemName(keycardId(wing, name))); n++) name = `${base} ${n}`
+  return keycardId(wing, name)
+}
 
 /** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
  * enough to fight to it and burn it back; short enough that dawdling floods the
@@ -210,11 +225,12 @@ const applyAccessGate = (w: World): void => {
 
   if (scheme === 0) {
     // Keycard biolock: card carried in a cargo pod elsewhere in the building.
+    const keyId = keycardFor(w, building, wing)
     gate.door!.locked = true
     gate.door!.sealKind = 'keycard'
-    gate.door!.keyId = `keycard.${wing}`
+    gate.door!.keyId = keyId
     gate.door!.wing = wing
-    placeKeycard(w, building, `keycard.${wing}`, rng)
+    placeKeycard(w, building, keyId, rng)
   } else if (scheme === 1) {
     // Power biolock: cut the wing at its generator (the loud, systemic key).
     gate.door!.locked = true

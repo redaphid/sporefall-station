@@ -213,7 +213,7 @@ describe('populate wiring', () => {
     return w
   }
 
-  it('a feral pack in a warehouse/bunker links into a squad with legal roles and size 2-4', () => {
+  it('a rootcult pack in a warehouse/bunker links into a squad with legal roles and size 2-4', () => {
     // Scan a few seeds: squads form (SQUAD_CHANCE < 1, so not necessarily the
     // first candidate), always well-formed when they do.
     let sawSquad = false

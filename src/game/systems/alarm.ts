@@ -1,4 +1,4 @@
-// The station's EAR (#86). Gunfire and attacks the crew or the watch notice build
+// The station's EAR (#86). Gunfire and attacks the crew or the wardens notice build
 // HEAT; enough heat raises the alarm one level; an alarm raised all the way
 // the loud way LOCKS DOWN the Launch Bay.
 //
@@ -30,15 +30,15 @@ export const HEAT_PER_ALARM = 300
 /** Heat bleeds off 1 per this many ticks (6/s). A pistol at 18-tick cadence
  * nets +24/s while firing; a lone shot is gone in ~3 s. */
 export const HEAT_DECAY_EVERY = 5
-/** Heat a crew/watch witness adds by SEEING a player get hit. One second of fire. */
+/** Heat a crew/wardens witness adds by SEEING a player get hit. One second of fire. */
 export const ATTACK_SEEN_HEAT = 30
 /** The alarm level that seals the Launch Bay. */
 export const LOCKDOWN_ALARM = 3
 /** How long the bay stays sealed once the seal cycle runs (20 s at 30 tps). */
 export const LOCKDOWN_TICKS = 600
 
-/** Can `e` notice a disturbance for the station? The crew and the watch only —
- * vermin and ferals don't call it in — and only while awake. */
+/** Can `e` notice a disturbance for the station? The crew and the wardens only —
+ * vermin and rootcults don't call it in — and only while awake. */
 const isWitness = (e: Entity): boolean =>
   !!e.ai &&
   !e.dead &&
@@ -60,7 +60,7 @@ const addHeat = (w: World, amount: number, cause: 'gunfire' | 'attack'): void =>
 
 /**
  * A player fired a gun. The shot is a real noise (guards come to investigate
- * it, dormant pods wake to it) and, if any crew/watch member is within earshot,
+ * it, dormant pods wake to it) and, if any crew/wardens member is within earshot,
  * `loudness` heat. Pass the shot's cadence in ticks, so heat tracks time spent
  * firing and a machinegun is not 3.6x louder than a pistol per second.
  */
@@ -81,8 +81,8 @@ export const hearGunfire = (w: World, shooter: Entity, loudness: number): void =
   }
 }
 
-/** An NPC landed a blow on a player. If a crew/watch member other than the
- * attacker SEES it, heat rises. The watch beating you up is not news. */
+/** An NPC landed a blow on a player. If a crew/wardens member other than the
+ * attacker SEES it, heat rises. The wardens beating you up is not news. */
 export const seeAttackOnPlayer = (w: World, victim: Entity, attackerId: EntityId): void => {
   const attacker = w.byId.get(attackerId)
   if (!attacker || attacker.playerCtl || attacker.ai?.faction === 'warden') return

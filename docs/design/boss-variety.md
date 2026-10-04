@@ -30,7 +30,7 @@ same three.
 
 ```ts
 archetype: 'boss',
-faction: 'feral',
+faction: 'rootcult',
 hp: 320,
 speed: 3.2,
 weapon: 'claws',

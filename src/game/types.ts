@@ -152,7 +152,7 @@ export type SimEvent =
    * they had no gun to hold it). `timedOut` = the hand ran out of time and took
    * the card under the cursor. */
   | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
-  /** #86 — the crew/watch noticed enough gunfire (or an attack on a player) to
+  /** #86 — the crew/wardens noticed enough gunfire (or an attack on a player) to
    * raise `w.alarm` to `level`. */
   | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
   /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
@@ -170,6 +170,16 @@ export type SimEvent =
   /** An NPC's AI adopted a new goal worth noting (aggro/flee/alert/search/…) —
    * `prev` is the goal it left, `targetId` who/what the new goal concerns. */
   | { type: 'aiGoal'; entityId: EntityId; goal: string; prev: string; targetId?: EntityId }
+  /** An activity at site `entityId` (a card table, bench, bunk) began or ended
+   * for the NPCs in `seats`. `why` says how an end came about. */
+  | {
+      type: 'activity'
+      entityId: EntityId
+      kind: 'cards' | 'tinker' | 'rest'
+      phase: 'start' | 'end'
+      seats: EntityId[]
+      why?: 'done' | 'broken' | 'timeout'
+    }
   /** A frightened NPC reached a guard and reported its scarer: the guard
    * (`entityId`) now hunts `targetId`, tipped off by `byId`. */
   | { type: 'alerted'; entityId: EntityId; byId: EntityId; targetId: EntityId }

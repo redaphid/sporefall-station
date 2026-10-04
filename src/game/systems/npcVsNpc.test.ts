@@ -1,6 +1,6 @@
 // #63 — wake the faction matrix: the `threat` consideration scores ANY Hostile
 // entity, not only players, so factions fight each OTHER autonomously. Sworn
-// enemies (warden↔feral) engage from disposition alone; same-faction never turns on
+// enemies (warden↔rootcult) engage from disposition alone; same-faction never turns on
 // its own; forcing `aiFlags.npcVsNpc = false` restores the old players-only scan.
 //
 // Sets exact state, runs the REAL decide()/tickWorld, asserts the behaviour.
@@ -32,14 +32,14 @@ describe('#63 NPC-vs-NPC — decide() scores hostile NPCs, not only players', ()
     const { w, cx, cy } = arena(1)
     const warden = spawnNpc(w, 'warden', cx, cy)
     warden.ai!.sightRange = 14
-    const feral = spawnNpc(w, 'acolyte', cx + 4, cy)
-    feral.ai!.sightRange = 14
+    const rootcult = spawnNpc(w, 'acolyte', cx + 4, cy)
+    rootcult.ai!.sightRange = 14
     const wardenGoal = decide(w, warden).goal
-    const feralGoal = decide(w, feral).goal
+    const rootcultGoal = decide(w, rootcult).goal
     expect(['battle', 'pursue']).toContain(wardenGoal.code)
-    expect(wardenGoal.target).toBe(feral.id)
-    expect(['battle', 'pursue']).toContain(feralGoal.code)
-    expect(feralGoal.target).toBe(warden.id)
+    expect(wardenGoal.target).toBe(rootcult.id)
+    expect(['battle', 'pursue']).toContain(rootcultGoal.code)
+    expect(rootcultGoal.target).toBe(warden.id)
   })
 
   it('same-faction pair never turns on its own (no friendly fire)', () => {
@@ -63,10 +63,10 @@ describe('#63 NPC-vs-NPC — decide() scores hostile NPCs, not only players', ()
     w.aiFlags = { npcVsNpc: false }
     const warden = spawnNpc(w, 'warden', cx, cy)
     warden.ai!.sightRange = 14
-    const feral = spawnNpc(w, 'acolyte', cx + 4, cy)
-    feral.ai!.sightRange = 14
+    const rootcult = spawnNpc(w, 'acolyte', cx + 4, cy)
+    rootcult.ai!.sightRange = 14
     expect(decide(w, warden).goal.code).toBe('wander')
-    expect(decide(w, feral).goal.code).toBe('wander')
+    expect(decide(w, rootcult).goal.code).toBe('wander')
   })
 })
 
@@ -76,25 +76,25 @@ describe('#63 NPC-vs-NPC — a real firefight erupts from disposition alone', ()
     const warden = spawnNpc(w, 'warden', cx, cy)
     warden.ai!.sightRange = 14
     warden.combat!.weapon = 'pistol'
-    const feral = spawnNpc(w, 'acolyte', cx + 4, cy)
-    feral.ai!.sightRange = 14
-    feral.combat!.weapon = 'pistol'
+    const rootcult = spawnNpc(w, 'acolyte', cx + 4, cy)
+    rootcult.ai!.sightRange = 14
+    rootcult.combat!.weapon = 'pistol'
     const input = new Map([[0, emptyInput()]])
     let hits = 0
-    let wardenAggroedFeral = false
-    let feralAggroedWarden = false
+    let wardenAggroedRootcult = false
+    let rootcultAggroedWarden = false
     for (let t = 0; t < 60; t++) {
       tickWorld(w, input)
       for (const ev of w.events) if (ev.type === 'hit') hits++
-      if (warden.ai!.mode === 'aggro' && warden.ai!.targetId === feral.id) wardenAggroedFeral = true
-      if (feral.ai!.mode === 'aggro' && feral.ai!.targetId === warden.id) feralAggroedWarden = true
+      if (warden.ai!.mode === 'aggro' && warden.ai!.targetId === rootcult.id) wardenAggroedRootcult = true
+      if (rootcult.ai!.mode === 'aggro' && rootcult.ai!.targetId === warden.id) rootcultAggroedWarden = true
     }
     // Both reach aggro on each other from disposition alone (a wounded one may
     // then flee — the #62 fight-or-flight drive, still targeting its enemy).
-    expect(wardenAggroedFeral).toBe(true)
-    expect(feralAggroedWarden).toBe(true)
-    expect(warden.ai!.targetId).toBe(feral.id)
-    expect(feral.ai!.targetId).toBe(warden.id)
+    expect(wardenAggroedRootcult).toBe(true)
+    expect(rootcultAggroedWarden).toBe(true)
+    expect(warden.ai!.targetId).toBe(rootcult.id)
+    expect(rootcult.ai!.targetId).toBe(warden.id)
     expect(hits).toBeGreaterThanOrEqual(1)
   })
 
@@ -104,9 +104,9 @@ describe('#63 NPC-vs-NPC — a real firefight erupts from disposition alone', ()
     const warden = spawnNpc(w, 'warden', cx, cy)
     warden.ai!.sightRange = 14
     warden.combat!.weapon = 'pistol'
-    const feral = spawnNpc(w, 'acolyte', cx + 4, cy)
-    feral.ai!.sightRange = 14
-    feral.combat!.weapon = 'pistol'
+    const rootcult = spawnNpc(w, 'acolyte', cx + 4, cy)
+    rootcult.ai!.sightRange = 14
+    rootcult.combat!.weapon = 'pistol'
     const input = new Map([[0, emptyInput()]])
     let hits = 0
     for (let t = 0; t < 60; t++) {
@@ -115,6 +115,6 @@ describe('#63 NPC-vs-NPC — a real firefight erupts from disposition alone', ()
     }
     expect(hits).toBe(0)
     expect(warden.ai!.mode).not.toBe('aggro')
-    expect(feral.ai!.mode).not.toBe('aggro')
+    expect(rootcult.ai!.mode).not.toBe('aggro')
   })
 })

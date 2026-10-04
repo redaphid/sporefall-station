@@ -236,7 +236,7 @@ const setupItems = (w: World): void => {
 }
 
 /** A civilian in front of two wardens and a lockkeeper: shoot the civilian and the
- * wardens (watch) turn hostile and charge, while the unrelated lockkeeper stays calm. */
+ * wardens (wardens) turn hostile and charge, while the unrelated lockkeeper stays calm. */
 const setupRelationships = (w: World): void => {
   const { x, y } = findStage(w, 10)
   const player = w.entities.find((e) => e.playerCtl)
@@ -350,7 +350,7 @@ const STAGE_ID_BASE = 2
 
 const clearStage = (w: World): void => {
   // Scripted stages are hand-choreographed around faction stances (ambient
-  // civilians amble, only the feral mutants charge), so opt out of the global
+  // civilians amble, only the rootcult mutants charge), so opt out of the global
   // "everyone's an enemy" default — hostility here comes from disposition alone.
   w.hostile = false
   // The player is spawned AFTER populateWorld, so its id — and every stage id
@@ -665,7 +665,7 @@ const setupNpcDeliberate = (w: World): void => {
   w.entities = players
   w.byId.clear()
   for (const e of players) w.byId.set(e.id, e)
-  w.hostile = true // feral cast — everyone on stage engages the player on sight
+  w.hostile = true // rootcult cast — everyone on stage engages the player on sight
 
   const solidify = (x: number, y: number): void => {
     w.level.tiles[y * w.level.w + x] = Tile.Wall
@@ -887,7 +887,7 @@ const sealBuilding = (w: World): { x: number; y: number } | null => {
 }
 
 export const GROUP_SCENARIOS: Record<string, (w: World) => void> = {
-  /** A bellwether-led tide musters out of sight, then commits as one. Shoot the
+  /** An overseer-led tide musters out of sight, then commits as one. Shoot the
    * Bellwether (the tall brass-headed one) and watch the raid rout. */
   'tide-staging': (w) => stageTide(w, 'staging', ['leader', 'medic', 'grunt', 'grunt', 'grunt'], 'tide-staging'),
   /** A mortar battery sets up at range and shells the player over the walls;

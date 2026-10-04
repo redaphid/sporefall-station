@@ -1,7 +1,7 @@
 // @ts-check
 // Parity M7 proof: drives the relationships scenario in a real browser with real
 // KEYBOARD input. The player shoots a civilian in front of two wardens and a
-// lockkeeper; the harness asserts the wardens (watch) flip Neutral -> Hostile and aggro,
+// lockkeeper; the harness asserts the wardens (wardens) flip Neutral -> Hostile and aggro,
 // while the unrelated lockkeeper stays Neutral and calm. Video + before/after shots.
 import { chromium } from 'playwright-core'
 import { fileURLToPath } from 'node:url'

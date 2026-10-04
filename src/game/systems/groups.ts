@@ -4,7 +4,7 @@
 // (behaviors.ts) and acts. That is enough for a mob, and it is why a mob reads as
 // a mob. RimWorld's raids read as an ENEMY instead because a layer above the
 // individual owns the shared decisions — when to go, where to gather, who is
-// the bellwether, when the nerve breaks — and the individuals execute them.
+// the overseer, when the nerve breaks — and the individuals execute them.
 //
 // This module is that layer. It owns `World.groups` (plain JSON, serialized), a
 // per-tick `groupSystem` that advances each group's PHASE and applies the

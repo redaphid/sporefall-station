@@ -19,6 +19,7 @@ import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './compl
 import { EffectsLayer } from './effects'
 import { darknessRuns, easeTide, lowTileRuns, TIDE_COLOR } from './modifierLook'
 import { GroupFxLayer } from './groupFx'
+import { ActivityFxLayer } from './activityFx'
 import { VerbMarkerLayer } from './verbMarkerLayer'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
@@ -175,6 +176,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // retreat cross): drawn over the effects sprites, inside the same layer.
   const groupFx = new GroupFxLayer()
   effects.root.addChild(groupFx.root)
+  const activityFx = new ActivityFxLayer()
+  effects.root.addChild(activityFx.root)
   // #87 element verbs with no body look of their own: panic "!!" and a slashed
   // eye for spore blindness, over the head, above every sprite.
   const verbMarkers = new VerbMarkerLayer()
@@ -592,6 +595,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       }
       // Outside the hitstop freeze: the tracker must see every tick's events.
       groupFx.update(view, elapsed)
+      activityFx.update(shown, view.tick)
       drawReticles()
       drawPickUi(view)
       if (bounds) camera.apply(world, app.screen.width, app.screen.height, bounds.w, bounds.h, bounds.x0, bounds.y0)

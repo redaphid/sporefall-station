@@ -39,7 +39,7 @@ const wrapAngle = (a: number): number => {
  *  - NPC-owned rounds seek players the NPC hates (the enemy-fire symmetry the
  *    old global-nearest scan got backwards: it excluded players outright, so an
  *    enemy's homing gun chased its own allies), and NPCs it holds a Hostile
- *    stance toward (stored rel, else the faction matrix — warden vs feral).
+ *    stance toward (stored rel, else the faction matrix — warden vs rootcult).
  * Downed players are out of the fight (their hits void anyway) — skipped. */
 const isHomingPrey = (w: World, owner: Entity, t: Entity): boolean => {
   if (t.id === owner.id || t.dead || !t.health) return false

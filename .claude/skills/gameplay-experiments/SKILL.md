@@ -81,7 +81,7 @@ into the fixture or pushed via `beforeTicks(page)` using `__annotate`/`__loadWor
 ```js
 await record({
   name: 'salvage',
-  params: { world: 'salvage-stage', script: 'salvage', e2e: '1', mode: 'solo', class: 'scavenger' },
+  params: { world: 'salvage-stage', script: 'salvage', e2e: '1', mode: 'solo', class: 'scrounger' },
   beforeTicks: async (page) => { /* page.evaluate(() => window.__annotate(...)) per stage */ },
   stills: [{ tick: 30, label: '1-recon' }, { tick: 220, label: '4-vault' }],
   readState: () => ({ vaultOpen: !window.__world.byId.get(VAULT).door.locked }),

@@ -3,6 +3,7 @@
 // it, at most once per cooldown.
 
 import { describe, expect, it } from 'vitest'
+import { keycardId } from '../game/data/items'
 import { OBJECTS } from '../game/data/objects'
 import { makeEntity, type Entity } from '../game/entity'
 import { levelFromJson } from '../game/levelgen/levelText'
@@ -10,6 +11,7 @@ import { spawnPlayer } from '../game/player'
 import { runTicks } from '../game/testkit'
 import type { InputCmd } from '../game/types'
 import { addEntity, worldFromState, type World } from '../game/world'
+import { hotbarSlots } from './hotbarModel'
 import { createSealHint, SEAL_HINT_COOLDOWN_TICKS, type SealHint } from './sealHintModel'
 
 // A corridor with a hatch at (6,1). The player starts on the tile before it.
@@ -18,13 +20,15 @@ const DOOR_X = 6
 
 type Seal = { sealKind: 'keycard' | 'power'; overgrown?: never } | { overgrown: true; sealKind?: never } | { plain: true }
 
-const corridor = (seal: Seal): { w: World; p: Entity; door: Entity } => {
+const LAB_CARD = keycardId('wing1', 'essence lab')
+
+const corridor = (seal: Seal, keyId = LAB_CARD): { w: World; p: Entity; door: Entity } => {
   const w = worldFromState({ level: levelFromJson({ rows: ROWS }), floor: 3 })
   const door = makeEntity('door', 'door', DOOR_X + 0.5, 1.5, 0.5)
   door.door = { open: false, locked: true, lockLevel: 2 }
   if ('sealKind' in seal && seal.sealKind) {
     door.door.sealKind = seal.sealKind
-    door.door.keyId = 'keycard.wing1'
+    door.door.keyId = keyId
     door.door.wing = 'wing1'
   }
   if ('overgrown' in seal) door.door.overgrown = true
@@ -47,7 +51,7 @@ const idle = {}
 
 describe('sealed-door hint on a press', () => {
   it.each([
-    [{ sealKind: 'keycard' } as const, 'Sealed. Find the keycard, or blast it with your Grenade special'],
+    [{ sealKind: 'keycard' } as const, 'Sealed. Find the essence lab keycard, or blast it with your Grenade special'],
     [{ sealKind: 'power' } as const, 'Sealed. Hack the Generator, or blast it with your Grenade special'],
     [{ overgrown: true } as const, 'Overgrown. Kill its Spore Node, or blast it with your Grenade special'],
   ])('%o names what opens it', (seal, text) => {
@@ -118,20 +122,20 @@ describe('sealed-door hint on walking into the door', () => {
 
   it('stays quiet while the player holds the right keycard, and the press opens it', () => {
     const { w, p, door } = corridor({ sealKind: 'keycard' })
-    p.loadout!.inventory.push({ itemId: 'keycard.wing1', qty: 1 })
+    p.loadout!.inventory.push({ itemId: LAB_CARD, qty: 1 })
     const hint = createSealHint(nameOf)
     for (let t = 0; t < 40; t++) expect(step(w, p, hint, walk)).toBeUndefined()
     expect(step(w, p, hint, press)).toBeUndefined()
     expect(door.door!.open).toBe(true)
   })
 
-  it('still hints when the keycard held is for another wing', () => {
+  it("still hints when the keycard held is another wing's, even one whose building shares the name", () => {
     const { w, p } = corridor({ sealKind: 'keycard' })
-    p.loadout!.inventory.push({ itemId: 'keycard.wing2', qty: 1 })
+    p.loadout!.inventory.push({ itemId: keycardId('wing2', 'essence lab'), qty: 1 })
     const hint = createSealHint(nameOf)
     let text: string | undefined
     for (let t = 0; t < 40 && !text; t++) text = step(w, p, hint, walk)
-    expect(text).toBe('Sealed. Find the keycard, or blast it with your Grenade special')
+    expect(text).toBe('Sealed. Find the essence lab keycard, or blast it with your Grenade special')
   })
 
   it('stays quiet against a plain locked door', () => {
@@ -139,5 +143,43 @@ describe('sealed-door hint on walking into the door', () => {
     const hint = createSealHint(nameOf)
     for (let t = 0; t < 60; t++) expect(step(w, p, hint, walk)).toBeUndefined()
     expect(p.pos.x).toBeLessThan(DOOR_X)
+  })
+})
+
+describe('the toast and the hotbar name the same keycard', () => {
+  /** Drop `keyId` as a floor pickup one tile behind the player and walk back onto it. */
+  const pickUp = (w: World, p: Entity, keyId: string): void => {
+    const card = makeEntity('pickup', `pickup.${keyId}`, p.pos.x - 1, p.pos.y, 0.3)
+    card.pickup = { itemId: keyId, qty: 1 }
+    addEntity(w, card)
+    for (let t = 0; t < 30 && !card.dead; t++) runTicks(w, new Map([[0, { moveX: -1 }]]), 1)
+    expect(card.dead, 'the real pickup system collected the card').toBe(true)
+  }
+
+  const hotbarLabel = (p: Entity, keyId: string): string | undefined =>
+    hotbarSlots(p.loadout!.inventory, p.loadout!.activeSlot).find((s) => s.itemId === keyId)?.label
+
+  it.each([
+    [keycardId('wing14', 'essence lab'), 'essence lab keycard', 'Essence lab keycard'],
+    [keycardId('wing3', 'med-bay'), 'med-bay keycard', 'Med-bay keycard'],
+    [keycardId('wing5', 'essence lab 2'), 'essence lab 2 keycard', 'Essence lab 2 keycard'],
+    ['keycard.wing0', 'wing 0 keycard', 'Wing 0 keycard'],
+  ])('%s: the toast says "find the %s", the hotbar "%s"', (keyId, onToast, name) => {
+    const { w, p, door } = corridor({ sealKind: 'keycard' }, keyId)
+    const hint = createSealHint(nameOf)
+    expect(step(w, p, hint, press)).toBe(`Sealed. Find the ${onToast}, or blast it with your Grenade special`)
+    pickUp(w, p, keyId)
+    expect(hotbarLabel(p, keyId)).toBe(name)
+    expect(hotbarSlots(p.loadout!.inventory, -1).map((s) => `${s.label} ${s.qty}`)).toEqual([`${name} 1`])
+    for (let t = 0; t < 30; t++) runTicks(w, new Map([[0, { moveX: 1 }]]), 1)
+    runTicks(w, new Map([[0, press]]), 1)
+    expect(door.door!.open, 'the card the hotbar names opens the door the toast named').toBe(true)
+  })
+
+  it('says "the keycard" when the door does not name its key, as on a joiner', () => {
+    const { w, p, door } = corridor({ sealKind: 'keycard' })
+    delete door.door!.keyId
+    const hint = createSealHint(nameOf)
+    expect(step(w, p, hint, press)).toBe('Sealed. Find the keycard, or blast it with your Grenade special')
   })
 })

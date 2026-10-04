@@ -1,4 +1,4 @@
-// Craft the `barracks-blaze` save: a feral barracks asleep in rows of bunks,
+// Craft the `barracks-blaze` save: a rootcult barracks asleep in rows of bunks,
 // with crates stacked between them and fuel barrels along the back wall. The
 // player stands in the west doorway with an incendiary pistol. Fire spreads
 // bunk to bunk; a burning sleeper wakes, panics, and carries the fire into

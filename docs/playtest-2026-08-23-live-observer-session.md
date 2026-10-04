@@ -12,7 +12,7 @@ screen: full-floor zoomed-out view; 6 large rooms visible; objective arrow "76m"
 player sprite tiny at top-left edge. Player likely still orienting.
 
 Objective geometry: canister #222 at (55.5,56.5) bottom-right, behind LOCKED objective
-door #259 (lockLevel 1) at (55.5,52.5). Feral patrols + squad at y54-59; vermin nearby.
+door #259 (lockLevel 1) at (55.5,52.5). Rootcult patrols + squad at y54-59; vermin nearby.
 Player spawned top-left (1.5,3.1) → diagonal-opposite corner run, ~76m.
 
 ### tick ~2390-2810  (floor 1 · steal · alarm 0)
@@ -21,7 +21,7 @@ motion: vel 0 in this frame but pos has advanced steadily — moving fine overal
 hp: 112/120, lastHurtTick 2810, hitFlash active — took 8 dmg from EXPLOSION at
 (5.67,21.50) r=1.8 (event ring). Cause unknown from notes — hazard? mine? Watch for tell.
 events: many doorToggles (NPCs), npc#28 scavenged a cash pickup (aiGoal wander→scavenge→wander).
-threat: none aggroed on player. wardens patrol N (y1-5), feral patrols S (y54-59). civ#24 fleeing near player (0.4,56.3).
+threat: none aggroed on player. wardens patrol N (y1-5), rootcult patrols S (y54-59). civ#24 fleeing near player (0.4,56.3).
 signal: DAMAGE with unclear source — explosion hit player mid-route with no visible
 attacker in notes; check readability of hazard tells.
 signal: route = wall-hug along map edge; corridors between buildings may be the de-facto
@@ -212,8 +212,8 @@ prune behavior worth a look if it grows unbounded).
   the floor is, (b) objective-directed reward stream so full-clear isn't the
   obvious line. Pairs with the mod-economy finding.
 - Floor 3 reached (~t35.9k): 56 npc, alarm 0, hp 72, $323, same god-pistol.
-  New-to-observer archetypes this run: stalker, sporeling, "acolyte" (rename
-  list). A stalker was observed FLEEING the player on floor 3.
+  New-to-observer archetypes this run: stalker, sporeling, and the Rootcult pistol
+  hunter (its name was then on the rename list). A stalker was observed FLEEING the player on floor 3.
 
 ### Runs 5-6 rapid-fire
 - Run 5 (2602197177): commissary Alpha. Player hit 13hp in a SPORELING SWARM +
@@ -255,7 +255,7 @@ prune behavior worth a look if it grows unbounded).
 - NEW: LOS-gated raycast steering (walls/closed doors block; LOS break freezes
   heading), 10-tile forward cone, smallest-angular-deviation acquisition
   ("bullets go where you aim"), hostility-aware prey (co-op-safe, no auto-misdeed
-  vs neutral civs, warden/feral matrix honored for NPC rounds), turn cap unchanged,
+  vs neutral civs, warden/rootcult matrix honored for NPC rounds), turn cap unchanged,
   STATELESS — zero new serialized fields, vanilla shots byte-identical.
 - 17 adversarial tests (homing.test.ts), full suite 3504 green over the combined
   tree, lint+build clean, deterministic e2e demo video:
@@ -298,12 +298,12 @@ prune behavior worth a look if it grows unbounded).
   Coordinator-me stays on observation + conversation.
 
 ## Player directive (recorded mid-session, do not implement yet)
-- **Re-fiction the character vocabulary: there are no "wardens", "mutants", etc. anymore.**
+- **Re-fiction the character vocabulary: the old Earth-city enemy names are gone.**
   The station fiction has moved on from the Streets-of-Rogue-style Earth-city cast.
-  Code + docs + my own notes still say warden/feral/civ (`faction` values in
+  Code + docs + my own notes still say warden/rootcult/civ (`faction` values in
   `src/game/entity.ts`, `relationships.ts` matrix, NPC archetypes, and any
   player-facing strings). Idea on record: rename the player-facing language (and
   eventually the internal vocabulary) to station-appropriate roles — e.g. security/
   wardens, scavengers/raiders, crew/civilians — keeping the mechanical matrix
-  (watch faction, hostile-on-sight faction, neutral bystanders) intact. Observer notes
+  (wardens faction, hostile-on-sight faction, neutral bystanders) intact. Observer notes
   from here on should prefer fiction-neutral terms: "security", "raiders", "crew".

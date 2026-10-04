@@ -8,24 +8,31 @@
 //   tsx scripts/codemods/lore-rename.mts --near     words that contain a term but were left alone
 //
 // Matching is per identifier segment: `copAfter`, `char.cop.s-idle`, `COP_X` and
-// `fellowCop` all hit `cop`, while `copy`, `scope` and `Copley` do not. TS/JS is
-// walked through the compiler's AST so every hit is classed as an identifier, an
-// id string, a prose string or a comment, and so a rename that would land on a
-// different identifier already in the file is refused. The replacement words
-// never contain an old term, so a second run finds nothing to do.
+// `fellowCop` all hit `cop`, while `copy`, `scope` and `Copley` do not, and a
+// segment that joins its neighbour into a `keepCompounds` word (`gangWay`) is left
+// alone. TS/JS is walked through the compiler's AST so every hit is classed as an
+// identifier, an id string, a prose string or a comment, and so a rename that
+// would land on a different identifier already in the file is refused. A mapping
+// whose target was already an identifier or string id at `baseline` (the last
+// pre-rename main) is refused outright. The replacement words never contain an
+// old term, so a second run finds nothing to do. Only tracked files are read.
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 
 interface Mapping {
+  baseline: string
   terms: Record<string, { to: string; why: string }>
   phrases: { from: string; to: string; why: string }[]
   keep: { pattern: string; why: string }[]
+  keepCompounds: { words: string[]; why: string }
   skipPaths: { prefix: string; why: string }[]
   scoped: { from: string; to: string; files: string[]; why: string }[]
+  /** A target that already exists at the baseline but already means the same thing. */
+  sameMeaning: { word: string; file: string; why: string }[]
 }
 
 type Category = 'identifiers' | 'archetype ids' | 'id strings' | 'prose strings' | 'comments' | 'docs' | 'data' | 'other code' | 'file names'
@@ -42,6 +49,7 @@ const termsFor = (path: string): Map<string, string> => {
   return here.length ? new Map([...terms, ...here.map((s): [string, string] => [s.from.toLowerCase(), s.to])]) : terms
 }
 const keepRes = mapping.keep.map((k) => new RegExp(k.pattern, 'g'))
+const keepCompounds = new Set(mapping.keepCompounds.words.map((w) => w.toLowerCase()))
 
 const TS_EXT = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/
 const categoryOf = (path: string): Category =>
@@ -78,9 +86,12 @@ const planEdits = (text: string, spans: Span[], terms: Map<string, string>): Edi
     const slice = text.slice(span.start, span.end)
     for (const w of slice.matchAll(/[A-Za-z]+/g)) {
       const wordStart = span.start + w.index
-      for (const seg of w[0].matchAll(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+/g)) {
+      const segs = [...w[0].matchAll(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+/g)]
+      for (const [i, seg] of segs.entries()) {
         const to = terms.get(seg[0].toLowerCase())
         if (!to) continue
+        const joined = (a: number, b: number): string => segs.slice(a, b + 1).map((x) => x[0]).join('').toLowerCase()
+        if (keepCompounds.has(joined(i - 1, i)) || keepCompounds.has(joined(i, i + 1))) continue
         const s = wordStart + seg.index
         const e = s + seg[0].length
         if (overlaps(masked, s, e)) continue
@@ -151,13 +162,56 @@ const tsSpans = (path: string, text: string): { spans: Span[]; identifiers: Set<
 interface FilePlan { path: string; newPath: string; content?: string; edits: Edit[]; pathEdits: Edit[]; collisions: string[] }
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
-const listed = (args: string[]): string[] =>
-  execFileSync('git', ['ls-files', '-z', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 }).split('\0').filter(Boolean)
-const tracked = new Set(listed([]))
-const files = [...new Set([...tracked, ...listed(['-o', '--exclude-standard'])])]
+const git = (args: string[]): string => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 })
+const files = git(['ls-files', '-z'])
+  .split('\0')
+  .filter(Boolean)
   .filter((p) => !mapping.skipPaths.some((s) => p.startsWith(s.prefix)))
-  .filter((p) => existsSync(join(root, p)))
+  .filter((p) => existsSync(join(root, p)) && lstatSync(join(root, p)).isFile())
   .sort()
+
+/** Mapping targets that were already an identifier or a whole string id at the
+ * pre-rename baseline. Renaming onto one would merge two different things. */
+const baselineCollisions = (): string[] => {
+  try {
+    git(['cat-file', '-e', `${mapping.baseline}^{commit}`])
+  } catch {
+    console.error(`baseline ${mapping.baseline} is not in this clone; run \`git fetch origin\` and retry`)
+    process.exit(2)
+  }
+  const targets = new Set([...terms.values(), ...mapping.scoped.map((s) => s.to)].map((t) => t.toLowerCase()))
+  const pattern = [...targets].join('|')
+  let hits: string[] = []
+  try {
+    hits = git(['grep', '-l', '-w', '-E', pattern, mapping.baseline, '--', '*.ts', '*.tsx', '*.mts', '*.mjs', '*.js', '*.json'])
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => l.slice(mapping.baseline.length + 1))
+      .filter((p) => !mapping.skipPaths.some((s) => p.startsWith(s.prefix)))
+  } catch {
+    return []
+  }
+  const found: string[] = []
+  const sameMeaning = (path: string, word: string): boolean => mapping.sameMeaning.some((s) => s.file === path && s.word === word)
+  const hit = (path: string, word: string, what: string): void => {
+    if (targets.has(word) && !sameMeaning(path, word)) found.push(`${path}: ${what}`)
+  }
+  for (const path of hits) {
+    const text = git(['show', `${mapping.baseline}:${path}`])
+    if (TS_EXT.test(path)) {
+      const { spans, identifiers } = tsSpans(path, text)
+      for (const id of identifiers) hit(path, id, `identifier ${id}`)
+      for (const s of spans) {
+        if (s.category === 'identifiers' || s.category === 'comments' || s.category === 'prose strings') continue
+        const inner = text.slice(s.start + 1, s.end - 1)
+        hit(path, inner, `string '${inner}'`)
+      }
+    } else {
+      for (const m of text.matchAll(/"([A-Za-z]+)"/g)) hit(path, m[1], `string "${m[1]}"`)
+    }
+  }
+  return [...new Set(found)]
+}
 
 const plan = (path: string): FilePlan => {
   const here = termsFor(path)
@@ -183,6 +237,15 @@ const mode = process.argv[2] ?? '--write'
 if (!['--write', '--check', '--census', '--near'].includes(mode)) {
   console.error(`unknown flag ${mode}; use --check, --census or --near`)
   process.exit(2)
+}
+
+if (mode === '--write' || mode === '--census') {
+  const collided = baselineCollisions()
+  if (collided.length) {
+    for (const c of collided) console.error(`mapping target already in use at baseline ${mapping.baseline}: ${c}`)
+    console.error('nothing written; pick a target word that names nothing yet')
+    process.exit(2)
+  }
 }
 
 if (mode === '--near') {
@@ -254,12 +317,10 @@ for (const p of plans) {
   if (p.newPath === p.path) continue
   const to = join(root, p.newPath)
   if (existsSync(to)) {
-    if (tracked.has(p.path)) execFileSync('git', ['rm', '-q', '-f', '--', p.path], { cwd: root })
-    else execFileSync('rm', ['--', join(root, p.path)])
+    git(['rm', '-q', '-f', '--', p.path])
   } else {
     mkdirSync(dirname(to), { recursive: true })
-    if (tracked.has(p.path)) execFileSync('git', ['mv', '--', p.path, p.newPath], { cwd: root })
-    else execFileSync('mv', ['--', join(root, p.path), to])
+    git(['mv', '--', p.path, p.newPath])
   }
   for (let d = dirname(join(root, p.path)); d.startsWith(root + '/') && existsSync(d) && readdirSync(d).length === 0; d = dirname(d)) rmdirSync(d)
 }

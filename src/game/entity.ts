@@ -44,8 +44,32 @@ export interface LockoutEntry {
   activeUntil?: number
 }
 
-export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
+export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep' | 'perform'
 export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
+
+/** An ambient activity a prop offers (systems/activities.ts): cards at a
+ * table, tinkering at a lab bench, resting in a bunk. */
+export type ActivityKind = 'cards' | 'tinker' | 'rest'
+
+/** Where a claim stands: walking to the seat, sitting and waiting for the
+ * others, or performing (every seat at the site shares one `until`). */
+export type ActivityPhase = 'going' | 'seated' | 'playing'
+
+/** One NPC's claim on one seat of an activity site. The claim lives only on the
+ * NPC; a site's occupancy is the set of live NPCs claiming it, so a death or an
+ * interrupt frees the seat with no second record to keep in step. */
+export interface ActivityClaim {
+  kind: ActivityKind
+  /** The prop that offers the activity (table, bench, bunk). */
+  site: EntityId
+  /** The prop sat at: a chair round the table, or the site itself. */
+  seat: EntityId
+  phase: ActivityPhase
+  /** Tick the current phase began. */
+  since: number
+  /** Playing: the tick the game ends, identical across the site's seats. */
+  until?: number
+}
 
 /** A disposition band, derived from numeric hate by `determineRel`. */
 export type RelStatus = 'Friendly' | 'Neutral' | 'Annoyed' | 'Hostile'
@@ -175,6 +199,13 @@ export interface AiState {
   provokedBy?: EntityId
   /** Lobber (siege gun): next absolute tick it may fire a shell. */
   lobAt?: number
+  /** Goal commitment (behaviors.decide): until `until`, only a candidate on a
+   * tier above `tier` may replace the current goal. Absent when uncommitted. */
+  commit?: { until: number; tier: number }
+  /** The activity seat this NPC has claimed (systems/activities.ts). */
+  activity?: ActivityClaim
+  /** Earliest tick this NPC looks for another activity. Absent: any time. */
+  leisureAt?: number
 }
 
 /** A member's job inside its group (systems/groups.ts). */
@@ -266,6 +297,11 @@ export interface Entity {
    * straight back. Omitted when clear, so every pre-stairs snapshot
    * round-trips byte-for-byte. */
   stairLock?: true
+
+  /** CLIENT render mirror of a seated NPC's activity (net/protocol). The host
+   * never sets it: there the truth is `ai.activity`, read through
+   * activities.shownActivity. */
+  activityShown?: { kind: ActivityKind; playing: boolean }
 
   health?: {
     hp: number

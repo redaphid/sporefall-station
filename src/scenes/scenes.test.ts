@@ -126,6 +126,20 @@ describe.each(NAMES)('scene %s', (name) => {
 })
 
 describe('each scene plays the beat its card promises', () => {
+  it('card-night: a table fills, deals, and the whole table gets up together', () => {
+    const w = loadFixture('card-night')
+    // The bot shoots whatever it sees, and gunfire breaks up a game: it holds fire.
+    const events = play(w, 70 * 30, { spare: ['civilian', 'scientist', 'shopkeeper'] })
+    const starts = events.filter((e) => e.type === 'activity' && e.kind === 'cards' && e.phase === 'start')
+    const ends = events.filter((e) => e.type === 'activity' && e.kind === 'cards' && e.phase === 'end')
+    expect(starts.length).toBeGreaterThan(0)
+    expect(ends.length).toBeGreaterThan(0)
+    for (const end of ends) {
+      const start = starts.find((s) => s.type === 'activity' && end.type === 'activity' && s.entityId === end.entityId)
+      expect(start && start.type === 'activity' && end.type === 'activity' && [...end.seats].sort()).toEqual(start && start.type === 'activity' && [...start.seats].sort())
+    }
+  })
+
   it('castle-siege: the mortars shell the bailey, and the lord falling opens the keep', () => {
     const w = loadFixture('castle-siege')
     const route = [{ x: 21.5, y: 26 }, { x: 21.5, y: 19 }, { x: 21.5, y: 14 }, { x: 21.5, y: 8 }]

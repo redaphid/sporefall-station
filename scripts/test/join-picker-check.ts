@@ -1,6 +1,6 @@
 // Verifies the browser join flow around the Bluetooth-vs-tabs picker:
 // with Web Bluetooth present the picker must appear and the tabs option must
-// proceed to the lobby; without it, join goes straight to the lobby.
+// proceed to the lobby; without it, join shows the can't-join screen (#15).
 // Usage: npx tsx scripts/test/join-picker-check.ts [baseUrl]
 import { chromium } from 'playwright-core'
 
@@ -18,8 +18,8 @@ const main = async (): Promise<void> => {
     await plain.waitForSelector('text=JOIN VIA', { timeout: 5000 })
     console.log('✓ picker shown when Web Bluetooth exists')
   } else {
-    await plain.waitForSelector('text=Looking for a host', { timeout: 5000 })
-    console.log('✓ no Web Bluetooth -> straight to lobby (no picker)')
+    await plain.waitForSelector('[data-role="join-unsupported"]', { timeout: 5000 })
+    console.log("✓ no Web Bluetooth -> can't-join screen (no silent tabs fallback)")
   }
 
   // Path 2: stub navigator.bluetooth to force the picker; cancel the chooser,

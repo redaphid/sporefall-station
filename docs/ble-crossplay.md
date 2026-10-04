@@ -33,6 +33,11 @@ and the **laptop browser joins** as a client over
 flow; `?transport=tabs` in the URL skips the picker entirely (used by
 `scripts/test/mp-smoke.ts`).
 
+A browser with no usable Web Bluetooth (every iOS browser, Firefox, or a
+`getAvailability()` that says no) gets a "can't join" screen that names the
+reason. It never falls back to tabs on its own; `?transport=tabs` is the only
+way in. The decision is `planJoinTransport` in `src/app/joinTransport.ts`.
+
 ## Notes / limits
 
 - Web Bluetooth never exposes the negotiated MTU, so the transport caps

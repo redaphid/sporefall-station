@@ -211,6 +211,39 @@ export const pickJoinTransport = (mount: HTMLElement, requestBleDevice: () => Pr
     mount.appendChild(overlay)
   })
 
+/** The join screen for a device that cannot join (joinTransport.ts). It replaces
+ * the lobby, which would otherwise read "Looking for a host…" forever. */
+export const showJoinUnsupported = (
+  mount: HTMLElement,
+  message: { title: string; detail: string },
+  onBack: () => void,
+): void => {
+  const overlay = document.createElement('div')
+  markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
+  overlay.dataset.role = 'join-unsupported'
+  overlay.style.cssText =
+    'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
+    'justify-content:center;gap:14px;padding:0 16px;pointer-events:auto;color:#eee;font:16px system-ui;text-align:center'
+  const title = document.createElement('div')
+  title.style.cssText = 'font:800 22px system-ui'
+  title.textContent = message.title
+  const detail = document.createElement('div')
+  detail.style.cssText = 'max-width:min(360px,85vw);line-height:1.4;opacity:.85'
+  detail.textContent = message.detail
+  const back = document.createElement('button')
+  back.textContent = 'Back to menu'
+  back.style.cssText =
+    'font:600 16px system-ui;padding:12px 18px;border-radius:10px;border:2px solid #ffffff2e;' +
+    'background:#ffffff10;color:#eee;cursor:pointer;margin-top:6px'
+  const stopNav = installGamepadMenuNav(() => [back])
+  back.addEventListener('click', () => {
+    stopNav()
+    onBack()
+  })
+  overlay.append(title, detail, back)
+  mount.appendChild(overlay)
+}
+
 /** BLE join: list hosts as they're discovered; resolves with the chosen deviceId. */
 export const pickHost = (
   mount: HTMLElement,

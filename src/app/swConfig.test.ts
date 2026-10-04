@@ -57,6 +57,13 @@ describe('the navigation fallback never swallows a real download', () => {
 
   it('keeps the multiplayer relay off the fallback', () => expect(denied('/ws/car')).toBe(true))
 
+  it('serves the scene gallery as its own page, precached, never as the game shell', () => {
+    expect(SW_GLOB_PATTERNS).toContain('scenes.html')
+    expect(denied('/scenes.html')).toBe(true)
+    expect(denied('/scenes')).toBe(true)
+    expect(denied('/scenes-of-a-crime')).toBe(false)
+  })
+
   it('still falls back for ordinary deep links', () => {
     expect(SW_NAVIGATE_FALLBACK).toBe('index.html')
     expect(denied('/')).toBe(false)

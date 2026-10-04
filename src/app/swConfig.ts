@@ -25,6 +25,10 @@
  */
 export const SW_GLOB_PATTERNS: readonly string[] = [
   'index.html',
+  // The scene gallery is a second page. Precached so it opens offline, and so
+  // the precache route answers /scenes.html before the navigation fallback
+  // could hand back the game's index.html instead.
+  'scenes.html',
   'manifest.webmanifest',
   'assets/**/*.{js,css}',
   'icons/**/*.{png,svg,ico}',
@@ -56,6 +60,7 @@ export const SW_NAVIGATE_FALLBACK_DENYLIST: readonly RegExp[] = [
   /^\/download/,
   /^\/get$/,
   /^\/asset-showcase/,
+  /^\/scenes(\.html)?$/,
   /^\/betas(\/|$)/,
 ]
 

@@ -1,5 +1,5 @@
 // Craft the `castle-siege` save: a hand-drawn castle with a moat, four towers
-// and a keep, a player at the drawbridge carrying a split/frost/pierce/homing
+// and a keep, mortars either side of it, a player at the drawbridge carrying a split/frost/pierce/homing
 // pistol, and a garrison inside. No seed builds any of it.
 //
 // Run: pnpm exec tsx scripts/saves/castle-siege.mts
@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { levelFromJson } from '../../src/game/levelgen/levelText'
 import { spawnNpc } from '../../src/game/populate'
 import { spawnPlayer } from '../../src/game/player'
+import { spawnRaid } from '../../src/game/systems/groups'
 import { serializeWorld } from '../../src/game/serialize'
 import { worldFromState } from '../../src/game/world'
 
@@ -70,12 +71,20 @@ const garrison: Array<[archetype: string, x: number, y: number]> = [
   ['thug', 28.5, 21.5],
   ['thug', 33.5, 14.5],
   ['brute', 21.5, 15.5],
-  ['lobber', 5.5, 4.5],
-  ['lobber', 38.5, 4.5],
   ['gangster', 18.5, 10.5],
   ['gangster', 25.5, 10.5],
 ]
 for (const [archetype, x, y] of garrison) spawnNpc(w, archetype, x, y)
+
+// A mortar either side of the keep. A lobber only lobs as a raid's artillery
+// (its brain reads the group), so each is a one-gun siege raid: it shells the
+// player whenever it can see them in range, and joins the fight when rushed.
+for (const [x, y] of [
+  [9.5, 8.5],
+  [34.5, 8.5],
+]) {
+  spawnRaid(w, 'siege', { x, y }, player, ['artillery'])
+}
 
 // The keep's exit opens when the castle lord falls; it leads on to floor 2.
 const lord = spawnNpc(w, 'boss', 21.5, 9.5)

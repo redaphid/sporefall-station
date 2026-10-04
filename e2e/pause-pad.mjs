@@ -120,6 +120,21 @@ await page.keyboard.up('Enter')
 await sleep(300)
 r.heldEnter = await page.evaluate(look)
 r.heldEnterLabel = await page.evaluate(() => document.querySelector('[data-role="pause-new-seed"]')?.textContent)
+// The same hold on Run it back: it arms (and New Seed disarms), nothing restarts.
+await page.focus('[data-role="pause-run-it-back"]')
+await page.keyboard.down('Enter')
+for (let i = 0; i < 8; i++) {
+  await sleep(40)
+  await page.keyboard.down('Enter')
+}
+await page.keyboard.up('Enter')
+await sleep(300)
+r.heldEnterRb = await page.evaluate(look)
+r.heldEnterRbLabels = await page.evaluate(() => ({
+  runItBack: document.querySelector('[data-role="pause-run-it-back"]')?.textContent,
+  newSeed: document.querySelector('[data-role="pause-new-seed"]')?.textContent,
+}))
+await shot('4-run-it-back-armed')
 // Headless WSL Chromium has no WebGL, and pixi throws this whenever it gets to
 // it; on a real GPU (CDP_URL) every page error counts.
 const NO_WEBGL = /reading 'updateRenderable'/
@@ -135,6 +150,13 @@ const checks = [
   ['Up climbs to the wand strip', r.strip.rings.length === 1 && r.strip.rings[0].startsWith('chip:')],
   ['B resumes the same run', !r.resumed.paused && r.resumed.seed === r.opened.seed && r.resumed.tick > r.strip.tick],
   ['held Enter on New Seed only arms it', r.heldEnter.paused && r.heldEnter.seed === r.opened.seed && r.heldEnterLabel === '🎲 Wipe this run? Press again'],
+  [
+    'held Enter on Run it back only arms it, and disarms New Seed',
+    r.heldEnterRb.paused &&
+      r.heldEnterRb.tick === r.heldEnter.tick &&
+      r.heldEnterRbLabels.runItBack === 'Restart this run? Press again' &&
+      r.heldEnterRbLabels.newSeed === '🎲 New Seed',
+  ],
   ['no page errors after boot', r.errors.length === 0],
 ]
 writeFileSync(join(OUT, 'result.json'), JSON.stringify({ r, checks }, null, 2))

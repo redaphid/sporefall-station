@@ -111,7 +111,8 @@ const rig = () => {
   const newSeedBtn = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-role="pause-new-seed"]')!
   frame([])
   press(A) // the first press joins the pad to the local player's slot
-  return { session, swaps, calls, frame, press, focused, rings, newSeedBtn, open: () => press(START) }
+  const runItBackBtn = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-role="pause-run-it-back"]')!
+  return { session, swaps, calls, frame, press, focused, rings, newSeedBtn, runItBackBtn, open: () => press(START) }
 }
 
 describe('pause menu with only a controller', () => {
@@ -278,6 +279,82 @@ describe('New Seed takes a second press', () => {
     expect(keydown(false)).toBe(true) // a fresh press goes through to the click
     expect(keydown(true)).toBe(false)
     expect(keydown(true)).toBe(false)
+  })
+})
+
+describe('Run it back takes a second press too', () => {
+  const ARMED = 'Restart this run? Press again'
+
+  it('the first A arms it and restarts nothing; the second A restarts', () => {
+    const r = rig()
+    r.open()
+    r.press(RIGHT)
+    r.press(RIGHT)
+    expect(r.focused()).toBe('Run it back')
+    r.press(A)
+    expect(r.calls).toEqual([])
+    expect(r.session.isPaused).toBe(true)
+    expect(r.runItBackBtn().textContent).toBe(ARMED)
+    r.press(A)
+    expect(r.calls).toEqual(['restart'])
+  })
+
+  it('one mouse click or tap does not restart; a second does', () => {
+    const r = rig()
+    r.open()
+    r.runItBackBtn().click()
+    expect(r.calls).toEqual([])
+    r.runItBackBtn().click()
+    expect(r.calls).toEqual(['restart'])
+  })
+
+  it('a held Enter cannot count as the second press: its repeats are cancelled', () => {
+    const r = rig()
+    r.open()
+    const rb = r.runItBackBtn()
+    const keydown = (repeat: boolean): boolean =>
+      rb.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat, bubbles: true, cancelable: true }))
+    expect(keydown(false)).toBe(true)
+    expect(keydown(true)).toBe(false)
+  })
+
+  it('walking off an armed Run it back disarms it', () => {
+    const r = rig()
+    r.open()
+    r.press(RIGHT)
+    r.press(RIGHT)
+    r.press(A)
+    r.press(LEFT)
+    r.press(RIGHT)
+    expect(r.runItBackBtn().textContent).toBe('Run it back')
+    r.press(A)
+    expect(r.calls).toEqual([])
+  })
+
+  it('a tap that never focuses it is disarmed by closing the menu', () => {
+    const r = rig()
+    r.open()
+    r.runItBackBtn().click()
+    expect(r.runItBackBtn().dataset.armed).toBe('')
+    r.press(START)
+    r.open()
+    expect(r.runItBackBtn().textContent).toBe('Run it back')
+    r.runItBackBtn().click()
+    expect(r.calls).toEqual([])
+  })
+
+  it('arming one of New Seed and Run it back disarms the other', () => {
+    const r = rig()
+    r.open()
+    r.newSeedBtn().click()
+    r.runItBackBtn().click()
+    expect(r.newSeedBtn().dataset.armed).toBeUndefined()
+    expect(r.newSeedBtn().textContent).toBe('🎲 New Seed')
+    expect(r.runItBackBtn().dataset.armed).toBe('')
+    r.newSeedBtn().click()
+    expect(r.runItBackBtn().dataset.armed).toBeUndefined()
+    expect(r.newSeedBtn().dataset.armed).toBe('')
+    expect(r.calls).toEqual([])
   })
 })
 

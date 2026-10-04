@@ -82,6 +82,13 @@ export const SCENES: readonly Scene[] = [
     tryThis: 'Every kill bursts into the ones beside it. Burn the spires or they keep budding more.',
     tags: ['horde', 'hive', 'detonator'],
   },
+  {
+    name: 'card-night',
+    title: 'Card Night',
+    hook: 'The settlers’ mess on a quiet shift: two card tables, benches and bunks.',
+    tryThis: 'Watch a table fill and the cards go down. Hurt one player and the whole table scatters.',
+    tags: ['settlers', 'cards', 'peaceful'],
+  },
 ]
 
 /** The link that opens a scene in play. Relative, so a beta build served under

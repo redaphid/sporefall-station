@@ -294,6 +294,19 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
     expect(buildInfoCard(pickup('briefcase')).tagline).toMatch(/goods|came for/)
     expect(rowMap(buildInfoCard(pickup('medkit', 2)).rows).Item).toBe('Medkit ×2')
   })
+
+  it.each([
+    ['keycard.wing14.essence_lab', 'Essence lab keycard'],
+    ['keycard.wing14', 'Wing 14 keycard'],
+    ['grenade', 'Grenade'],
+    ['briefcase', 'Specimen Canister'],
+  ])('a floor pickup of %s is titled "%s", not by its pickup.<id> archetype', (itemId, name) => {
+    const e = makeEntity('pickup', `pickup.${itemId}`, 1, 1)
+    e.pickup = { itemId, qty: 1 }
+    const card = buildInfoCard(e)
+    expect(card.title).toBe(name)
+    expect(rowMap(card.rows).Item).toBe(name)
+  })
 })
 
 describe('buildInfoCard — world objects (every OBJECTS entry)', () => {

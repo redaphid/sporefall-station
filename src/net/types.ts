@@ -12,9 +12,13 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
- * 8 — no wire change, but floor 1 now draws its district too, every
+ * 10 — no wire change, but floor 1 now draws its district too, every
  *     district lays out its own way (the Concourse and the Moorings replace
  *     downtown and the slums), and floor 1's map is no longer the classic grid.
+ * 9 — snapshots gain a sparse activity trailer after the status one: which
+ *     settlers sit at a card table, bench or bunk, and whether play is on, so
+ *     a client draws the card game. An old peer would never see it.
+ * 8 — taken by #156, in flight when 9 was assigned.
  * 7 — no wire change, but floor 2 now draws its district (slums, Still Row
  *     or the Culture Beds) from the seed, and the two reworked districts lay
  *     out differently. Layout is regenerated locally, as in 6.
@@ -34,7 +38,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 8
+export const PROTOCOL_VERSION = 10
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'

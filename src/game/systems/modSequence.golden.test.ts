@@ -62,13 +62,15 @@ describe('sequenced casting: golden digests', () => {
   // this exact scenario were the flag-off goldens (a13b7b25, e92bcf60), which
   // pinned the old fold-everything-into-every-shot path. Restoring that fold
   // (fireWeapon firing the whole list as one cast, the reorder input ignored,
-  // resolveWeapon's newest-element pick) reproduces both old digests. Both run
-  // on frozen landing maps; 1234's digest was re-captured when the landing
-  // started keeping its spawn-safe radius clear of building residents, which
-  // moves where that floor's crew stands.
+  // resolveWeapon's newest-element pick) reproduces both old digests.
+  // Re-pinned when NPC goals gained commitment and settlers took seats at
+  // props (was ee39480f / 5930fe81): the fire path is unchanged, the crowd
+  // around it moves differently. Both run on frozen landing maps; 1234 was
+  // re-captured (was 93a464b3) when the landing floor started keeping its
+  // berth clear of residents and patrols, which moves where that crew stands.
   const GOLDEN: Record<number, string> = {
-    7: 'ee39480f',
-    1234: '64cdcaa9',
+    7: 'c5354a88',
+    1234: '0188aa7e',
   }
 
   for (const seed of [7, 1234]) {

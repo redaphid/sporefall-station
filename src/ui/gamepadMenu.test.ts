@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emptyNavMemory,
+  FOCUS_SHADOW,
   installGamepadMenuNav,
   MENU_STICK_DEADZONE,
   readMenuPad,
@@ -205,6 +206,35 @@ describe('installGamepadMenuNav (DOM driver)', () => {
       teardown()
       ;(navigator as unknown as { getGamepads?: typeof orig }).getGamepads = orig
     }
+  })
+
+  it("gives a control back its own shadow when the cursor leaves it, and on teardown", () => {
+    const { a, b } = setup()
+    const glow = 'rgb(255, 215, 106) 0px 0px 8px'
+    a.style.boxShadow = glow // e.g. the wand strip's next-chip glow
+    const clock = makeClock()
+    const pads: (PadLike | null)[] = [null]
+    const orig = navigator.getGamepads
+    ;(navigator as unknown as { getGamepads: () => (PadLike | null)[] }).getGamepads = () => pads
+    const teardown = installGamepadMenuNav(() => [a, b], { schedule: clock.schedule, cancel: clock.cancel })
+    try {
+      clock.tick()
+      expect(a.style.boxShadow).toBe(FOCUS_SHADOW)
+      pads[0] = pad([15]) // right → b
+      clock.tick()
+      expect(a.style.boxShadow).toBe(glow)
+      expect(b.style.boxShadow).toBe(FOCUS_SHADOW)
+      pads[0] = pad([])
+      clock.tick()
+      pads[0] = pad([14]) // left → back to a
+      clock.tick()
+      expect(a.style.boxShadow).toBe(FOCUS_SHADOW)
+      expect(b.style.boxShadow).toBe('')
+    } finally {
+      teardown()
+      ;(navigator as unknown as { getGamepads?: typeof orig }).getGamepads = orig
+    }
+    expect(a.style.boxShadow).toBe(glow)
   })
 
   it('a custom activate receives the focused control instead of .click()', () => {

@@ -103,6 +103,23 @@ await shot('3-up-to-strip')
 await press(B)
 await sleep(400)
 r.resumed = await page.evaluate(look)
+// Keyboard: focus New Seed and HOLD Enter. Chrome autorepeats the keydown and
+// each one is a click, so a held key must not count as the second press.
+await press(START)
+await until(page, 'the pause menu again', () => {
+  const s = document.querySelectorAll('[data-role="mod-sequence"]')
+  return s.length > 1 && s[s.length - 1].offsetParent !== null
+})
+await page.focus('[data-role="pause-new-seed"]')
+await page.keyboard.down('Enter')
+for (let i = 0; i < 8; i++) {
+  await sleep(40)
+  await page.keyboard.down('Enter') // a repeat: Playwright sets repeat=true while held
+}
+await page.keyboard.up('Enter')
+await sleep(300)
+r.heldEnter = await page.evaluate(look)
+r.heldEnterLabel = await page.evaluate(() => document.querySelector('[data-role="pause-new-seed"]')?.textContent)
 // Headless WSL Chromium has no WebGL, and pixi throws this whenever it gets to
 // it; on a real GPU (CDP_URL) every page error counts.
 const NO_WEBGL = /reading 'updateRenderable'/
@@ -117,6 +134,7 @@ const checks = [
   ['one A arms New Seed and keeps the run', r.armed.paused && r.armed.seed === r.opened.seed && r.armedLabel === '🎲 Wipe this run? Press again'],
   ['Up climbs to the wand strip', r.strip.rings.length === 1 && r.strip.rings[0].startsWith('chip:')],
   ['B resumes the same run', !r.resumed.paused && r.resumed.seed === r.opened.seed && r.resumed.tick > r.strip.tick],
+  ['held Enter on New Seed only arms it', r.heldEnter.paused && r.heldEnter.seed === r.opened.seed && r.heldEnterLabel === '🎲 Wipe this run? Press again'],
   ['no page errors after boot', r.errors.length === 0],
 ]
 writeFileSync(join(OUT, 'result.json'), JSON.stringify({ r, checks }, null, 2))

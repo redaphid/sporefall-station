@@ -255,6 +255,30 @@ describe('New Seed takes a second press', () => {
     ns.click()
     expect(r.calls).toEqual(['newSeed'])
   })
+
+  it('a tap that never focuses the button is disarmed by closing the menu', () => {
+    const r = rig()
+    r.open()
+    r.newSeedBtn().click() // a touch tap: armed, but focus stays on Resume
+    expect(r.newSeedBtn().dataset.armed).toBe('')
+    expect(r.focused()).toBe('Resume')
+    r.press(START) // close
+    r.open()
+    expect(r.newSeedBtn().textContent).toBe('🎲 New Seed')
+    r.newSeedBtn().click()
+    expect(r.calls).toEqual([])
+  })
+
+  it('a held Enter cannot count as the second press: its repeats are cancelled', () => {
+    const r = rig()
+    r.open()
+    const ns = r.newSeedBtn()
+    const keydown = (repeat: boolean): boolean =>
+      ns.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat, bubbles: true, cancelable: true }))
+    expect(keydown(false)).toBe(true) // a fresh press goes through to the click
+    expect(keydown(true)).toBe(false)
+    expect(keydown(true)).toBe(false)
+  })
 })
 
 describe('adversarial', () => {

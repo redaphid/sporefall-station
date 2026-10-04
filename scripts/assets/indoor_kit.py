@@ -57,8 +57,9 @@ OLLAMA = os.environ.setdefault("OLLAMA", "http://127.0.0.1:18436")
 
 PX = 64  # hi-res pack: 32 px logical tile at artScale 2
 
-TILE_CKPT = "SDXL1.0\\juggernautXL_ragnarokBy.safetensors"
-PROP_CKPT = "SDXL1.0\\juggernautXL_juggXIByRundiffusion.safetensors"
+# ONE checkpoint for every job, props included (owner, 2026-10-04): ComfyUI never
+# swaps models mid-run, which is easier on the shared GPU.
+CKPT = "SDXL1.0\\juggernautXL_ragnarokBy.safetensors"
 PROP_LORA = "pixel_art_style_by_skormino_v7.05_test_72img.safetensors"
 TRIGGER = "masterpiece, pixpix, 8-bit, pixel_art"
 
@@ -103,6 +104,8 @@ class Job:
     init: str | None = None  # a job whose first pick seeds img2img
     denoise: float = 1.0
     accept: tuple[str, ...] = ()
+    # When set, the subject gate rejects these reads instead of requiring an accepted one.
+    deny: tuple[str, ...] = ()
     replaces: str | None = None  # props: first-biome prop whose footprint the skin must keep
     ramp: tuple[str, ...] = ()
     accent: str | None = None
@@ -137,13 +140,20 @@ JOBS: dict[str, Job] = {
                 "machinery", "floor", "grate", "armor", "hull")),
     "pillar": Job(
         "tile",
-        # Round, not square: the first sweep's square capital read as a door 2 of 6 times,
-        # and a pillar a player mistakes for a hatch is a gameplay bug.
-        "top-down view looking straight down onto the round top of one thick cylindrical steel "
-        "support column, a circular capital ring of heavy bolts around a central hub, thick pipes and "
-        "conduits hugging its sides, dark gunmetal with teal trim, glowing green spore fungus crusted "
-        "on one side, on a dark steel deck, the column fills most of the frame",
+        # Third premise. A square capital with a centre hub read as a door (2/6); a round
+        # top read as an eye or a skull (6/6). Both shared a centred radial motif, so
+        # this one has none: a solid block crossed by an X brace.
+        "top-down view looking straight down onto the top of one solid square steel girder support "
+        "block, a heavy riveted frame with a thick diagonal X cross brace from corner to corner, "
+        "hazard stripes along the outer edges, dark gunmetal with teal trim, a crust of glowing green "
+        "spore fungus in one corner, the block fills the whole frame, no hub, no circle",
         ref="deck",
+        # A column seen from straight above has no identity of its own: three shape premises
+        # in a row drew no 'pillar' read (door, eye, crate, shield...), and the shipped stair
+        # tile itself reads 'server'. What a pillar must never read as is something a player
+        # walks through, or a face. So it is judged standing in the deck, against a deny list.
+        deny=("door", "hatch", "window", "gate", "portal", "entrance", "opening", "hole", "stair",
+              "ladder", "eye", "face", "skull", "head", "mask"),
         accept=("pillar", "column", "plate", "metal", "panel", "hatch", "square", "box", "tile",
                 "lid", "block", "steel", "vent", "cover")),
     "stair_up": Job(
@@ -173,10 +183,15 @@ JOBS: dict[str, Job] = {
         accept=("door", "hatch", "blast door", "gate", "panel", "airlock", "vent", "metal")),
     "door-locked": Job(
         "door",
-        "top-down view of a sealed square sci-fi blast door hatch, a heavy steel slab split down the "
-        "middle, red and black hazard stripes, a glowing red warning light, a thick red locking bar "
-        "clamped across the middle seam, dark gunmetal metal, rivets, fills the whole frame",
-        init="door", denoise=0.5,
+        # Kept for the record, never picked: at denoise .5 every take came back the green-lit
+        # closed door, and at .68 with red first the lights drew but did not survive the
+        # reduction to 64 px. The shipped locked door is the `door` pick plus locked_door().
+        "bright red locked sci-fi blast door hatch seen from directly above, glowing bright red "
+        "warning lights, a thick bright red locking bar clamped across the middle seam, red and black "
+        "hazard stripes around the frame, heavy steel slab, dark gunmetal metal, rivets, fills the "
+        "whole frame",
+        neg="green lights, green glow, open door",
+        init="door", denoise=0.68,
         accept=("door", "hatch", "blast door", "gate", "panel", "airlock", "vent", "metal")),
     # Props: shape from diffusion, colour from the ramp (install_props.py's division of labour).
     "generator": Job(
@@ -187,8 +202,8 @@ JOBS: dict[str, Job] = {
         "slightly wider than tall",
         neg="screen, monitor, television, computer, tv, display, arcade cabinet",
         replaces="cryo-terminal",
-        ramp=("#08080c", "#141a16", "#23282e", "#3c444d", "#163a3e", "#24565c", "#3a7a80",
-              "#59636d", "#7b8791", "#a2adb4"),
+        ramp=("#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
+              "#67873c", "#86a750", "#a8c46a", "#c2b184"),
         accent="#46e078",
         accept=("generator", "machine", "engine", "reactor", "power", "device", "battery", "box",
                 "console", "unit", "furnace", "pump", "heater", "cell")),
@@ -200,19 +215,23 @@ JOBS: dict[str, Job] = {
         "is tall",
         neg="barrel of wood, wooden barrel, keg, tree, planter, pot, tall, narrow",
         replaces="spore-barrel",
-        ramp=("#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80", "#59636d", "#5aa4ae",
-              "#7ecbd2", "#a2adb4"),
+        ramp=("#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26",
+              "#8f6c38", "#b08d50", "#cbb277", "#e0d3ae"),
         accent="#46e078",
         accept=("tank", "canister", "barrel", "cylinder", "container", "drum", "keg", "boiler",
                 "pressure", "can", "vessel")),
     "cryo-bunk": Job(
         "prop",
-        "a sci-fi cryo sleep pod bunk, a low long rectangular capsule bed with a frosted glass canopy "
-        "over the mattress, a chunky metal frame, a small control panel at the head end, wider than tall",
-        neg="coffin, casket, sarcophagus, wooden bed, blanket, pillow, person sleeping",
+        # The first sweep drew tall upright capsules at ~2x the crew bunk's mass (7/8 out of
+        # the footprint gate): a bunkroom of those is a wall of pods. Low and flat is the ask.
+        "a very low flat sci-fi cryo sleep bunk, a long shallow rectangular bed tray with a thin "
+        "frosted glass lid lying flat over the mattress, a slim metal frame, a small control panel at "
+        "the head end, about three times wider than it is tall, seen from a high angle",
+        neg="coffin, casket, sarcophagus, wooden bed, blanket, pillow, person sleeping, tall, upright, "
+            "capsule standing up, dome, booth, cabinet, two objects",
         replaces="crew-bunk",
-        ramp=("#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80", "#5aa4ae", "#7ecbd2",
-              "#a2adb4", "#bcc5c8"),
+        ramp=("#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80",
+              "#5aa4ae", "#7ecbd2", "#a2adb4", "#c6d6d4"),
         accent="#46e078",
         accept=("pod", "bed", "bunk", "capsule", "cryo", "chamber", "stretcher", "cot", "tank",
                 "machine", "bench", "container")),
@@ -235,22 +254,20 @@ JOBS: dict[str, Job] = {
         "green spore fungus growing on the bottom shelf, taller than wide",
         neg="bookshelf, books, wooden shelf, cabinet doors, closed cabinet, ladder",
         replaces="storage-rack",
-        ramp=("#08080c", "#141a16", "#23282e", "#2e343b", "#3c444d", "#59636d", "#7b8791",
-              "#a2adb4", "#d8a878"),
+        ramp=("#08080c", "#141a16", "#1c1420", "#163a3e", "#24565c",
+              "#3a7a80", "#5aa4ae", "#d8a878", "#7ecbd2"),
         accent="#46e078",
         accept=("shelf", "rack", "shelving", "shelves", "cabinet", "storage", "unit", "cart",
                 "trolley", "bookcase")),
 }
 
-# What the VLM calls the shipped indoor surfaces (hall, plating, tiled read 'wall' / 'tile'),
-# so a surface that reads the same way is not a wrong read. Measured with the calibration
-# run over the shipped tiles; 'container', 'building', 'character' stay rejections.
-SURFACE_WORDS = ("tile", "grid", "pattern", "wall", "floor", "panel", "texture", "metal", "plate")
-
 # Style anchor PAIRS. One qwen3-vl style read is noisy: against the Genesis floor/wall
 # pair it failed the shipped street tile, and against the flat indoor hall/plating pair
 # it fails anything with glow. A candidate passes when it matches the pack's style
 # against either pair (calibrated on shipped art outside both pairs).
+PROP_DENY = ("person", "man", "woman", "character", "creature", "robot", "face", "skull", "grave",
+             "tomb", "headstone", "boulder", "rock", "stone", "planter", "plant", "tree", "mushroom")
+
 STYLE_REFS = {"prop": (("chars/vine-ranger-s-idle.png", "props/spore-barrel.png"),
                        ("props/cargo-crate.png", "props/storage-rack.png")),
               "tile": (("tiles/floor-0.png", "tiles/wall-0.png"),
@@ -309,12 +326,12 @@ def graph_for(name, seed):
                f"object fills at least 80% of the frame height, tightly cropped, centered, upright, "
                f"slight high three-quarter game angle, {PROP_LOOK}")
         neg = f"{NEG_PROP}, {j.neg}" if j.neg else NEG_PROP
-        kw = dict(ckpt=PROP_CKPT, cfg=7.0, size=768, alpha=True)
+        kw = dict(ckpt=CKPT, cfg=7.0, size=768, alpha=True)
     else:
         comfy.LORA = ""  # tiles: Ragnarok without the pixel LoRA; k-centroid + palette is the pixel step
         pos = f"{j.subject}, {BG_TILE if j.kind in ('floor', 'wall') else 'top-down game tile'}, {INDOOR_LOOK}"
         neg = f"{NEG_TILE}, {j.neg}" if j.neg else NEG_TILE
-        kw = dict(ckpt=TILE_CKPT, cfg=5.0, size=1024, alpha=False)
+        kw = dict(ckpt=CKPT, cfg=5.0, size=1024, alpha=False)
     refs = None
     if j.ref == "env":
         refs = [str(HERE / "anchors" / "env-b.png")]
@@ -365,15 +382,21 @@ def _band(img, surface, ref=None):
 MAX_COLOURS = 10
 
 
-def _limit(a, k=MAX_COLOURS):
-    q = Image.fromarray(np.asarray(a, np.uint8), "RGB").quantize(k, Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-    return TI.snap(np.asarray(q.convert("RGB"), np.float32))
+def _limit(a, k=MAX_COLOURS, lights=False):
+    a = np.asarray(a, np.uint8)
+    q = Image.fromarray(a, "RGB").quantize(k, Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    out = TI.snap(np.asarray(q.convert("RGB"), np.float32))
+    if lights:  # a status light is a few hot pixels; the median cut folds them into grey
+        rgb = a.astype(int)
+        hot = rgb.max(-1) - rgb.min(-1) > 110
+        out[hot] = a[hot]
+    return out
 
 
-def _tile(raw, surface, res=PX, seamless=False):
+def _tile(raw, surface, res=PX, seamless=False, lights=False):
     im = Image.open(raw).convert("RGB")
     small = TI.seamless_kcentroid(im, res) if seamless else np.asarray(P.kcentroid(im, res, res).convert("RGB"))
-    return _limit(_band(TI.despeckle(small, passes=2).astype(np.float32), surface))
+    return _limit(_band(TI.despeckle(small, passes=2).astype(np.float32), surface), lights=lights)
 
 
 def bulkhead_caps(body):
@@ -392,6 +415,24 @@ def bulkhead_caps(body):
     inner = np.zeros_like(cap)
     inner[:k, :k] = cap[:k, :k]
     return Image.fromarray(cap, "RGBA"), Image.fromarray(inner, "RGBA")
+
+
+def locked_door(closed):
+    """The closed hatch with a red-and-black hazard locking bar clamped across its
+    middle. Diffused red lock lights never survived the 1024 -> 64 px reduction
+    (12 takes, at most 0.6% red pixels), and locked must read at a glance."""
+    a = np.asarray(closed.convert("RGBA")).copy()
+    y0, y1 = PX // 2 - 5, PX // 2 + 5
+    for x in range(3, PX - 3):
+        for y in range(y0, y1):
+            a[y, x, :3] = TI.C["red"] if ((x + y) // 4) % 2 == 0 else TI.C["black"]
+    a[y0 - 1, 2:PX - 2, :3] = TI.C["black"]
+    a[y1, 2:PX - 2, :3] = TI.C["black"]
+    c = PX // 2
+    a[c - 7:c + 7, c - 6:c + 6, :3] = TI.C["black"]
+    a[c - 6:c + 6, c - 5:c + 5, :3] = TI.C["amber"]
+    a[c - 2:c + 3, c - 1:c + 1, :3] = TI.C["black"]
+    return Image.fromarray(a, "RGBA")
 
 
 def prop_sprite(raw, j, content=60):
@@ -433,7 +474,7 @@ def post_candidate(name, raw, index=0):
     if j.kind == "tile":
         return {f"tiles/{name}-{index}.png": Image.fromarray(_tile(raw, name), "RGB")}
     if name == "door":
-        closed = Image.fromarray(_tile(raw, "door"), "RGB").convert("RGBA")
+        closed = Image.fromarray(_tile(raw, "door", lights=True), "RGB").convert("RGBA")
         # Open: the slabs have slid into the frame, leaving the hatch's outer ring.
         # A ring reads open on both door axes (doors never rotate; a west-jamb slab
         # lay across half the doorways).
@@ -445,9 +486,10 @@ def post_candidate(name, raw, index=0):
         slab[ring - 1:PX - ring + 1, ring - 1, :3] = TI.C["black"]
         slab[ring - 1:PX - ring + 1, PX - ring, :3] = TI.C["black"]
         return {"props/bulkhead-door.png": closed,
-                "props/bulkhead-door-open.png": Image.fromarray(slab, "RGBA")}
+                "props/bulkhead-door-open.png": Image.fromarray(slab, "RGBA"),
+                "props/bulkhead-door-locked.png": locked_door(closed)}
     if name == "door-locked":
-        return {"props/bulkhead-door-locked.png": Image.fromarray(_tile(raw, "door"), "RGB").convert("RGBA")}
+        return {"props/bulkhead-door-locked.png": Image.fromarray(_tile(raw, "door", lights=True), "RGB").convert("RGBA")}
     return {f"props/{name}.png": prop_sprite(raw, j)}
 
 
@@ -471,7 +513,7 @@ def harness(name, files):
             if abs(m - t) > 0.25 * t + 6:
                 probs.append(f"{rel}: luminance {m:.0f} outside band {t:.0f}")
             n = len(np.unique(a[..., :3].reshape(-1, 3), axis=0))
-            if n > MAX_COLOURS + 2:
+            if n > MAX_COLOURS + 2 and not rel.endswith("door-locked.png"):  # + the drawn lock bar
                 probs.append(f"{rel}: {n} colours > {MAX_COLOURS + 2}")
             if TI.detail_energy(a[..., :3]) < 4:
                 probs.append(f"{rel}: flat (detail {TI.detail_energy(a[..., :3]):.1f})")
@@ -485,6 +527,11 @@ def harness(name, files):
         e = P.seam_energy(Image.fromarray(master))
         if e > 30:
             probs.append(f"deck master wrap seam energy {e:.1f} > 30")
+    if "props/bulkhead-door-locked.png" in files:  # locked must read at a glance
+        a = np.asarray(files["props/bulkhead-door-locked.png"].convert("RGB")).astype(int)
+        red = ((a[..., 0] > 150) & (a[..., 0] > a[..., 1] + 60) & (a[..., 0] > a[..., 2] + 60)).mean()
+        if red < 0.01:
+            probs.append(f"no red lock signal ({red:.1%} red pixels < 1%)")
     if j.kind == "prop":
         rel, im = next(iter(files.items()))
         tmp = STAGE / name / "_m.png"
@@ -518,6 +565,15 @@ def field(name, files):
             unit.paste(t, ((k % 2) * PX, (k // 2) * PX))
     elif j.kind in ("floor", "wall"):
         unit = next(iter(files.values())).convert("RGB")
+    elif name == "pillar":  # standing in the deck, as a lone wall tile does
+        hero = STAGE / "deck" / "post" / str(load_curation()["deck"]["seeds"][0])
+        deck = Image.open(next(hero.glob("*deck-0.png")))
+        out = Image.new("RGB", (3 * PX, 3 * PX))
+        for y in range(3):
+            for x in range(3):
+                out.paste(deck.convert("RGB"), (x * PX, y * PX))
+        out.paste(next(iter(files.values())).convert("RGB"), (PX, PX))
+        return out
     else:
         return next(iter(files.values()))
     n = 3 if unit.width == PX else 2
@@ -541,8 +597,13 @@ def vlm(name, files):
     vote, p = V.check(str(tmp), {"cat": cat, "path": path})
     probs += p
     subject = str(vote.get("subject", "?")).lower()
-    accept = j.accept + (SURFACE_WORDS if j.kind in ("floor", "wall") else ())
-    if not any(w in subject for w in accept):
+    accept = j.accept
+    if j.kind in ("floor", "wall"):
+        pass  # a surface is not an object: only "is there a figure" (verify.check) gates it
+    elif j.deny or j.kind == "prop":
+        if any(w in subject for w in (j.deny or PROP_DENY)):
+            probs.append(f"VLM reads it as {subject!r}")
+    elif not any(w in subject for w in accept):
         probs.append(f"VLM reads it as {subject!r}")
     reasons = []
     for pair in STYLE_REFS[cat]:
@@ -637,6 +698,9 @@ def ship():
         if name not in cur:
             print(f"SKIP {name}: no pick")
             continue
+        if JOBS[name].kind in ("floor", "wall", "tile"):  # the pool is exactly the picks
+            for old in (THEME / "tiles").glob(f"{name}-[0-9]*.png"):
+                old.unlink()
         for index, seed in enumerate(cur[name]["seeds"]):
             raw = RAWS / f"{name}-s{seed}.png"
             text = png_text(raw)
@@ -651,6 +715,28 @@ def ship():
                 embed(dst, prompt, workflow)
                 shipped[rel] = flow
     (FLOWS / "shipped.json").write_text(json.dumps(dict(sorted(shipped.items())), indent=1) + "\n")
+    # Keys the pool sync does not own: caps, props, and the deck's macro side.
+    mpath = THEME / "manifest.json"
+    m = json.loads(mpath.read_text())
+    pools = {}
+    for rel in shipped:
+        stem = Path(rel).stem
+        if rel.startswith("props/"):
+            m["sprites"][f"prop.{stem}"] = rel
+        elif stem.endswith("-cap") or stem.endswith("-cap-inner"):
+            fam, _, part = stem.partition("-")
+            m["sprites"][f"tile.{fam}.{part.replace('-', '.')}"] = rel
+        else:  # pool tile: tiles/<surface>-N.png or <surface>-accent-N.png
+            surface = stem.rpartition("-")[0]
+            key = f"tile.{surface[:-len('-accent')]}.accent" if surface.endswith("-accent") else f"tile.{surface}"
+            pools.setdefault(key, []).append(rel)
+    for key, files in pools.items():  # a shipped pool is exactly its picks
+        m["sprites"][key] = sorted(files, key=lambda p: int(Path(p).stem.rpartition("-")[2]))
+    if "deck" in cur:
+        m.setdefault("macroTiles", {})["deck"] = 2
+    mpath.write_text(json.dumps(m, indent=1) + "\n")
+    import subprocess
+    subprocess.run([sys.executable, str(HERE / "sync_manifest.py"), "--theme", str(THEME)], check=True)
     print(f"shipped {len(shipped)} files, flows in {FLOWS.relative_to(REPO)}")
 
 
@@ -727,6 +813,21 @@ def main():
                 ImageDraw.Draw(im).text((i * 260 + 4, 262), f"s{seed}", fill=(230, 230, 230))
             im.save(STAGE / f"{name}-raws.png")
             print(STAGE / f"{name}-raws.png")
+    elif verb == "tally":  # swept / passed / rejected / picked, per job
+        cur = load_curation()
+        for name in JOBS:
+            g = STAGE / name / "gate.json"
+            if g.exists():
+                v = json.loads(g.read_text()).values()
+                n, p = len(v), sum(x["pass"] for x in v)
+                print(f"{name:13s} swept {n:2d} pass {p:2d} reject {n - p:2d} picks {cur.get(name, {}).get('seeds', [])}")
+    elif verb == "veto":  # veto <job> <reason> <seed>...: a by-eye reject the gates passed
+        g = STAGE / rest[0] / "gate.json"
+        verdicts = json.loads(g.read_text())
+        for s in rest[2:]:
+            verdicts[s]["pass"] = False
+            verdicts[s]["problems"].insert(0, f"by eye: {rest[1]}")
+        g.write_text(json.dumps(verdicts, indent=1))
     elif verb == "pick":
         pick(rest[0], [int(s) for s in rest[1:]])
     elif verb == "ship":

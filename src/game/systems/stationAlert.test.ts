@@ -21,7 +21,7 @@ import { deserializeWorld, serializeWorld } from '../serialize'
 import { expectWorldEqual, runTicks } from '../testkit'
 import { ALERT_BROADCAST_TICKS, setupFloor } from './missions'
 import { ALERT_BATTLE_MULT, arbitrateGoal, decide } from './behaviors'
-import { BATTLE, FLEE, PURSUE } from './goals'
+import { BATTLE, PURSUE, FLEE } from './goalCodes'
 
 const idle = (...ids: number[]): Map<number, InputCmd> => new Map(ids.map((id) => [id, emptyInput()]))
 

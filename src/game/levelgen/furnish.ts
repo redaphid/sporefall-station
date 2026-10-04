@@ -122,11 +122,10 @@ export const groupProps = (groups: readonly FurnishGroup[]): string[] => {
  */
 export const ROOM_LAYOUT: Record<RoomType, readonly FurnishGroup[]> = {
   // Front of house: shelving ranked along a wall for customers to walk, the
-  // machines against the wall, a delivery still boxed up by the door.
+  // dispenser against the wall, a delivery still boxed up by the door.
   shopfloor: [
     { g: 'run', prop: 'shelf', min: 2, max: 4 },
     { g: 'one', prop: 'vending' },
-    { g: 'one', prop: 'atm' },
     { g: 'block', prop: 'crate', min: 1, max: 2 },
   ],
   // Back of house: racking down one wall, stock heaped in the corner.

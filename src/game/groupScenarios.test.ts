@@ -34,11 +34,31 @@ const S = SIM_RATE
 /** Stage a scenario exactly as the app does for `?mode=solo&seed=N&scenario=…`:
  * HostSession.buildRun (populate, setupFloor, the free spawn tile), then
  * applyScenario on top (main.ts). */
-const stage = (name: string, seed = GROUP_SCENARIO_SEED): World => {
+const stage = (name: string, seed = GROUP_SCENARIO_SEED, phase?: number): World => {
   const w = stageWorld(seed, 'normal', TIDE_GROUND)
-  applyScenario(w, name)
+  if (phase === undefined) {
+    applyScenario(w, name)
+    return w
+  }
+  // The world already stands on the tide ground, so run the set-piece itself
+  // (applyScenario would re-stage it and renumber everyone).
+  rekeyPlayer(w, phase)
+  GROUP_SCENARIOS[name](w)
   return w
 }
+
+/** Re-key the player onto an id ≡ `phase` (mod 5), the cast numbered after it.
+ * AI rhythms phase on entity id (the think stagger is `id % 5`), so a beat that
+ * holds on every phase holds whatever a floor's population happened to number. */
+const rekeyPlayer = (w: World, phase: number): void => {
+  const p = w.entities.find((e) => e.playerCtl)!
+  w.byId.delete(p.id)
+  w.nextId = Math.ceil(w.nextId / 5) * 5 + phase
+  p.id = w.nextId++
+  w.byId.set(p.id, p)
+}
+
+const PHASES = [0, 1, 2, 3, 4] as const
 
 const player = (w: World) => w.entities.find((e) => e.playerCtl)!
 const raiders = (w: World): Entity[] => w.entities.filter((e) => !e.dead && e.ai?.group)
@@ -249,8 +269,8 @@ describe('tide-medic: the wounded fall back to the Bog Mender, are patched, and 
   })
 
   for (const [who, pilot] of PILOTS) {
-    it(`with ${who}: a grunt runs back, is healed to 80% and walks back in, all inside 15s`, () => {
-      const w = stage('tide-medic')
+    it.each(PHASES)(`with ${who}, id phase %i: a grunt runs back, is healed to 80% and walks back in, all inside 15s`, (phase) => {
+      const w = stage('tide-medic', GROUP_SCENARIO_SEED, phase)
       const p0 = { ...player(w).pos }
       const raid = w.groups!.list[0]
       const medic = raiders(w).find((r) => r.ai!.group!.role === 'medic')!
@@ -298,7 +318,17 @@ describe('tide-medic: the wounded fall back to the Bog Mender, are patched, and 
       // A fighter may well break the raid afterwards (catching the wounded is
       // the counter); the player who only watches must see it hold together.
       if (pilot === idle) expect(log.some((e) => e.type === 'raidRouted')).toBe(false)
-      expect(medic.dead).toBeFalsy()
+      // The Bog Mender is never shot down: it hangs back past the pistol's
+      // reach. Once a fighter has broken the raid, the routed survivors
+      // dissolve wherever the player is not watching them, the medic included
+      // (groups.dissolveRouted); that is the rout, not a kill. Which phase the
+      // rout lands in depends on the AI's id-staggered thinking, so the check
+      // is on how the medic left, never on whether it is still standing.
+      expect(log.some((e) => e.type === 'death' && e.entityId === medic.id), story).toBe(false)
+      if (medic.dead) {
+        expect(log.some((e) => e.type === 'raidRouted'), story).toBe(true)
+        expect(log.some((e) => e.type === 'dissolve' && e.entityId === medic.id), story).toBe(true)
+      }
     })
   }
 })

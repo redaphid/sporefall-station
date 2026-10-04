@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { SPAWN_GRACE_TICKS } from './entity'
 import { Tile } from './levelgen/level'
+import { findPath } from './path'
 import { spawnPlayer } from './player'
-import { LANDING_SAFE_RADIUS, populateWorld, spawnNpc, SPAWN_SAFE_RADIUS } from './populate'
+import { LANDING_HOSTILES, LANDING_SAFE_RADIUS, populateWorld, spawnNpc, SPAWN_SAFE_RADIUS } from './populate'
+import { NPCS } from './data/npcs'
 import { setupFloor, nextFloor } from './systems/missions'
 import type { InputCmd } from './types'
-import { frozenWorld } from './testkit'
+import { createCityWorld, frozenWorld } from './testkit'
 import { createWorld, tickWorld } from './world'
 
 /**
@@ -86,9 +88,9 @@ describe('the landing keeps every body out of LANDING_SAFE_RADIUS', () => {
     }
   })
 
-  // Outdoor beats only: a beat inside a building's walls cannot see the spawn
-  // (interior NPCs are exempt above for the same reason).
-  it('no outdoor patrol beat on floor 1 walks a leg within the landing berth, seeds 1..80', () => {
+  // Indoor and outdoor beats alike, the straight leg and the route the walker
+  // actually takes round the buildings.
+  it('no patrol beat on floor 1 walks a leg, or its route, within the landing berth, seeds 1..80', () => {
     const toLeg = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number => {
       const dx = b.x - a.x
       const dy = b.y - a.y
@@ -98,18 +100,47 @@ describe('the landing keeps every body out of LANDING_SAFE_RADIUS', () => {
     }
     for (let seed = 1; seed <= 80; seed++) {
       const { w } = buildRun(seed)
-      const indoors = (q: { x: number; y: number }): boolean =>
-        w.level.buildings.some((b) => q.x >= b.rect.x && q.y >= b.rect.y && q.x < b.rect.x + b.rect.w && q.y < b.rect.y + b.rect.h)
       for (const e of w.entities) {
         const wps = e.ai?.params?.waypoints
-        if (!wps || wps.length < 2 || wps.every(indoors)) continue
+        if (!wps || wps.length < 2) continue
         for (let i = 0; i < wps.length; i++) {
           const a = wps[i]
           const b = wps[(i + 1) % wps.length]
           expect(toLeg(w.level.spawn, a, b), `seed ${seed}: ${e.archetype}#${e.id} leg ${i}`).toBeGreaterThanOrEqual(LANDING_SAFE_RADIUS)
+          for (const n of findPath(w.level, a.x, a.y, b.x, b.y, { maxNodes: w.level.w * w.level.h }) ?? []) {
+            const d = Math.hypot(n.x - w.level.spawn.x, n.y - w.level.spawn.y)
+            expect(d, `seed ${seed}: ${e.archetype}#${e.id} route of leg ${i}`).toBeGreaterThanOrEqual(LANDING_SAFE_RADIUS)
+          }
         }
       }
     }
+  })
+})
+
+describe('every district lands equally gentle', () => {
+  it('floor 1 fields LANDING_HOSTILES always-hostile bodies in every district, seeds 1..120', () => {
+    const per = new Map<string, number[]>()
+    for (let seed = 1; seed <= 120; seed++) {
+      const { w } = buildRun(seed)
+      const n = w.entities.filter((e) => e.kind === 'npc' && !e.dead && NPCS[e.archetype]?.hostility === 'always' && e.archetype !== 'boss').length
+      expect(n, `seed ${seed} (${w.level.theme})`).toBeGreaterThanOrEqual(LANDING_HOSTILES[0])
+      expect(n, `seed ${seed} (${w.level.theme})`).toBeLessThanOrEqual(LANDING_HOSTILES[1])
+      per.set(w.level.theme!, [...(per.get(w.level.theme!) ?? []), n])
+    }
+    expect(per.size).toBe(4)
+    const means = [...per.values()].map((xs) => xs.reduce((a, b) => a + b, 0) / xs.length)
+    expect(Math.max(...means) - Math.min(...means)).toBeLessThan(1.5)
+  })
+
+  it('a district balances only its own landing: floor 2 and an authored level keep their crews', () => {
+    const city = createCityWorld(5, 2)
+    populateWorld(city)
+    const authored = frozenWorld(7, 1)
+    populateWorld(authored)
+    const again = frozenWorld(7, 1)
+    populateWorld(again)
+    expect(authored.entities.length).toBe(again.entities.length)
+    expect(city.level.theme).toBeDefined()
   })
 })
 

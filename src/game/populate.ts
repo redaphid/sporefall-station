@@ -11,6 +11,7 @@ export { roomOwningTile }
 import type { Rng } from './rng'
 import { weightedModId } from './systems/draft'
 import { populateGroups } from './systems/groups'
+import { findPath } from './path'
 import { spawnObject } from './systems/objects'
 import { addEntity, type World } from './world'
 import { vlen } from './simMath'
@@ -134,6 +135,10 @@ export const populateWorld = (w: World): void => {
   // encounters on its OWN rng fork, so the loot/position/weapon dice above stay
   // byte-identical per seed — only the entity list grows.
   spawnEncounters(w, w.rng.fork('encounters'))
+  // The landing floor holds every district to one band of hostiles. Before
+  // the mods and tactical passes below, so a body added here is armed and
+  // drilled like any other.
+  balanceLanding(w)
   // #78 payoff: once every enemy carries a real, moddable loadout, hand some of
   // the armed ones a weapon-mod so "build matters" cuts both ways — on its own
   // `npc-mods` fork, so it never disturbs the layout/loot/weapon streams above.
@@ -645,6 +650,42 @@ const spawnEncounters = (w: World, erng: Rng): void => {
   }
 }
 
+/** How many always-hostile bodies a district's landing floor fields: the
+ * band main's downtown landing averaged (9.5 a floor). Every district lands
+ * inside it, so floor 1 is equally gentle wherever the run starts. */
+export const LANDING_HOSTILES: readonly [number, number] = [7, 12]
+
+const isHostile = (e: Entity): boolean => e.kind === 'npc' && !e.dead && NPCS[e.archetype]?.hostility === 'always'
+
+/** Hold a district's landing floor to LANDING_HOSTILES: past the band, the
+ * hostiles nearest the spawn go first; short of it, Bog Mutants move into the
+ * district's buildings, outside the berth. An authored level with no district
+ * keeps the population its author gave it. Own `landing` fork. */
+const balanceLanding = (w: World): void => {
+  if (w.floor !== 1 || !w.level.theme) return
+  const rng = w.rng.fork('landing')
+  const target = rng.int(LANDING_HOSTILES[0], LANDING_HOSTILES[1])
+  const hostiles = w.entities.filter(isHostile)
+  if (hostiles.length > target) {
+    const nearFirst = [...hostiles].sort(
+      (a, b) => vlen(a.pos.x - w.level.spawn.x, a.pos.y - w.level.spawn.y) - vlen(b.pos.x - w.level.spawn.x, b.pos.y - w.level.spawn.y) || a.id - b.id,
+    )
+    const gone = new Set(nearFirst.slice(0, hostiles.length - target).map((e) => e.id))
+    w.entities = w.entities.filter((e) => !gone.has(e.id))
+    for (const id of gone) w.byId.delete(id)
+    return
+  }
+  const homes = w.level.buildings.map((b, i) => ({ b, i })).filter(({ b }) => b.role !== 'bunker')
+  for (let n = hostiles.length, tries = 0; n < target && homes.length > 0 && tries < 40; tries++) {
+    const { b, i } = homes[rng.int(0, homes.length - 1)]
+    const spot = randomFloorInBuilding(w, rng, b, true)
+    if (!spot) continue
+    const npc = spawnNpc(w, 'thug', spot.x, spot.y, rng)
+    if (npc.ai) npc.ai.zone = { building: i, role: b.role }
+    n++
+  }
+}
+
 /** Share of complex modules that roll the Sporefall encounter table. */
 export const COMPLEX_ENCOUNTER_SHARE = 0.25
 
@@ -717,7 +758,7 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
       // On the landing a beat that passes within the spawn-safe radius is
       // walked by no one: its first guard keeps to the building instead.
       const planned = patrolBeat(building, spec === specs[0] && i === 0)
-      const beat = planned && w.floor === 1 && planned.some((q) => vlen(q.x - w.level.spawn.x, q.y - w.level.spawn.y) < safeRadius(w)) ? undefined : planned
+      const beat = planned && w.floor === 1 && !beatClearsBerth(w, planned) ? undefined : planned
       const pos = beat ? beat[0] : spot
       const npc = spawnNpc(w, spec.archetype, pos.x, pos.y, wrng)
       // #77 — bind the NPC to the module it lives/works/guards in, so its brain
@@ -734,12 +775,29 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
           const p = randomFloorInBuilding(w, rng, building)
           if (p) wbeat.push(p)
         }
-        assignPatrol(npc, wbeat)
+        if (w.floor !== 1 || beatClearsBerth(w, wbeat)) assignPatrol(npc, wbeat)
       }
     }
   }
   if (building.role === 'shop') stockShop(w, rng, building)
 }
+
+/** Does a patrol leg from `a` to `b` stay outside the floor's spawn berth?
+ * Both the straight line and the route a walker actually takes (the AI paths
+ * round buildings along the streets) must clear it. */
+const legClearsBerth = (w: World, a: { x: number; y: number }, b: { x: number; y: number }): boolean => {
+  const r = safeRadius(w)
+  if (distToSegment(w.level.spawn, a, b) < r) return false
+  // The whole route, not the pathfinder's capped per-think budget: a walker
+  // short of a full route presses toward the goal along the same streets.
+  const route = findPath(w.level, a.x, a.y, b.x, b.y, { maxNodes: w.level.w * w.level.h }) ?? []
+  return route.every((n) => vlen(n.x - w.level.spawn.x, n.y - w.level.spawn.y) >= r)
+}
+
+/** Does every leg of the looping beat `beat`, the closing one included, stay
+ * outside the floor's spawn berth? */
+const beatClearsBerth = (w: World, beat: readonly { x: number; y: number }[]): boolean =>
+  beat.every((a, i) => legClearsBerth(w, a, beat[(i + 1) % beat.length]))
 
 /** A rectangular circuit of tile-centre waypoints along `r`'s inner ring. */
 const ringBeat = (r: Rect): { x: number; y: number }[] => [
@@ -857,10 +915,11 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
       const beat = [{ x: spot.x, y: spot.y }]
       for (let j = 0; j < 2; j++) {
         const p = randomStreetSpot(w, rng, Tile.Street)
-        if (p && distToSegment(w.level.spawn, beat[beat.length - 1], p) >= safeRadius(w)) beat.push(p)
+        if (p && legClearsBerth(w, beat[beat.length - 1], p)) beat.push(p)
       }
-      // The beat loops, so its closing leg back to the start must clear too.
-      if (beat.length > 2 && distToSegment(w.level.spawn, beat[beat.length - 1], beat[0]) < safeRadius(w)) beat.pop()
+      // The beat loops, so every leg, the way back included, must clear too
+      // (a route there and the route back can take different streets).
+      while (beat.length > 1 && !beatClearsBerth(w, beat)) beat.pop()
       assignPatrol(a, beat)
       assignPatrol(b, beat)
     }

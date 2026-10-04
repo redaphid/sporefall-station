@@ -3,7 +3,7 @@
 //   1. `?theme=swampspace` (dev/session URL param) — spawn shot with themed
 //      characters + tiles, plus a second framing teleported next to a prop
 //      (crate/barrel) so tiles + chars + props are all visible in one image.
-//   2. The settings-picker path a player uses: boot on default city, open the
+//   2. The settings-picker path a player uses: boot on default settlement, open the
 //      gear panel, pick "Sporefall Station" from the Theme select, and assert
 //      the pixels change (hot-swap) with no page errors and the sim ticking.
 import { chromium } from 'playwright'
@@ -52,13 +52,13 @@ const propInfo = await p1.evaluate(() => {
   const me = w.entities.find((e) => e.playerCtl && !e.dead)
   // Preference order: furniture first, then doors (themed "Bulkhead Hatch") —
   // some floors (e.g. seed 424242) spawn no crates/barrels at all.
-  const PROPS = ['crate', 'barrel', 'vending', 'atm', 'tv', 'toilet', 'door']
+  const PROPS = ['crate', 'barrel', 'vending', 'tv', 'toilet', 'door']
   const prop = PROPS.map((k) => w.entities.find((e) => !e.dead && e.archetype === k)).find(Boolean)
   if (!me || !prop) return null
   window.__verb(`teleport ${me.id} ${prop.pos.x + 1.2} ${prop.pos.y}`)
   return { prop: prop.archetype, x: prop.pos.x, y: prop.pos.y }
 })
-if (!propInfo) failures.push('no prop (crate/barrel/vending/atm/tv/toilet) found on floor to frame the prop shot')
+if (!propInfo) failures.push('no prop (crate/barrel/vending/tv/toilet) found on floor to frame the prop shot')
 await p1.waitForTimeout(500)
 const propShot = await snap(p1, 'swampspace-props')
 if (propInfo && spawnShot.equals(propShot)) failures.push('prop-framed shot identical to spawn shot — teleport did nothing')
@@ -69,10 +69,10 @@ await p1.close()
 // --- Path 2: settings picker -------------------------------------------------
 const p2 = await newPage()
 await p2.goto(`${BASE}/?mode=solo&e2e&seed=424242&zoom=2`, { waitUntil: 'networkidle' })
-await p2.evaluate(() => localStorage.clear()) // no persisted theme — boot city next load
+await p2.evaluate(() => localStorage.clear()) // no persisted theme — boot settlement next load
 await p2.goto(`${BASE}/?mode=solo&e2e&seed=424242&zoom=2`, { waitUntil: 'networkidle' })
 await waitTicks(p2, 30)
-const cityShot = await snap(p2, 'city-before-picker')
+const settlementShot = await snap(p2, 'settlement-before-picker')
 
 await p2.click('button[aria-label="Settings"]')
 const options = await p2.$$eval('#th option', (os) => os.map((o) => ({ id: o.value, name: o.textContent })))
@@ -84,7 +84,7 @@ await p2.waitForTimeout(1200) // asset bake + hot swap
 await p2.click('button[aria-label="Settings"]') // close panel so the shot is clean
 await p2.waitForTimeout(200)
 const pickedShot = await snap(p2, 'swampspace-via-picker')
-if (pickedShot.equals(cityShot)) failures.push('picker swap changed nothing — city and swampspace shots identical')
+if (pickedShot.equals(settlementShot)) failures.push('picker swap changed nothing — settlement and swampspace shots identical')
 const tick2 = await p2.evaluate(() => window.__world.tick)
 if (tick2 < 30) failures.push(`sim stopped after picker swap (tick=${tick2})`)
 await p2.close()

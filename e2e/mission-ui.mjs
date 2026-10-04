@@ -3,7 +3,7 @@ import { record } from './lib.mjs'
 // Mission-UI feature proof (feat/mission-ui-links), three deterministic clips:
 //
 //   1. mission-ui           — the headline: chip → expanded panel → tap the
-//      objective HYPERLINK → the camera GLIDES to the briefcase (pulsing ring),
+//      objective HYPERLINK → the camera GLIDES to the canister (pulsing ring),
 //      dwells, glides home; the off-screen 🎯 edge indicator brackets both ends.
 //   2. mission-ui-progress  — progress states over a real playthrough: active
 //      objective → MISSION COMPLETE (done row, link dropped because the target
@@ -112,7 +112,7 @@ const dist = (p) => (p ? Math.hypot(p.x - CENTER.x, p.y - CENTER.y) : Infinity)
 
 // ---------------------------------------------------------------------------
 // 1) Headline: hyperlink tap → animated camera pan + highlight + edge indicator.
-// zoom=2 keeps the briefcase (10,11) OFF-SCREEN from spawn (1.5,1.5) so the
+// zoom=2 keeps the canister (10,11) OFF-SCREEN from spawn (1.5,1.5) so the
 // edge indicator has something to do, and makes the glide unmistakable.
 const ok1 = await record({
   name: 'mission-ui',

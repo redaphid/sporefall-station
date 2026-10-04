@@ -11,7 +11,7 @@
 //
 // Promise 3 is the one that was missing. The old harness skipped setupFloor, so
 // the floor had no mission: on the live link the player was sealed into the
-// room holding the briefcase, picked it up on tick 1, and the mission's station
+// room holding the canister, picked it up on tick 1, and the mission's station
 // alert threw every "locked" door open before the Blast Diver arrived. The
 // medic's grunts spawned already beside the medic (no retreat to see) and were
 // then shot dead by their own raid. The test passed throughout.

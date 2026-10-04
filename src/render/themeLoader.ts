@@ -212,17 +212,17 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   }
 
   const [
-    tiles, tileAccents, tileOverlays, tileCaps, player, cop, item, prop,
-    thug, scientist, robot, thugStep, scientistStep, robotStep,
+    tiles, tileAccents, tileOverlays, tileCaps, player, warden, item, prop,
+    mutant, scientist, robot, mutantStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood,
     charSets, items, props,
   ] = await Promise.all([
     tilePools(''), tilePools('.accent'), tilePools('.overlay'), tileCapPairs(),
-    one('unit.player', CHAR_CANVAS_PX), one('unit.cop', CHAR_CANVAS_PX),
+    one('unit.player', CHAR_CANVAS_PX), one('unit.warden', CHAR_CANVAS_PX),
     one('item.default', ITEM_PX), one('prop.default', TILE_PX),
-    one('unit.thug.idle', CHAR_CANVAS_PX), one('unit.scientist.idle', CHAR_CANVAS_PX), one('unit.robot.idle', CHAR_CANVAS_PX),
-    one('unit.thug.step', CHAR_CANVAS_PX), one('unit.scientist.step', CHAR_CANVAS_PX), one('unit.robot.step', CHAR_CANVAS_PX),
+    one('unit.mutant.idle', CHAR_CANVAS_PX), one('unit.scientist.idle', CHAR_CANVAS_PX), one('unit.robot.idle', CHAR_CANVAS_PX),
+    one('unit.mutant.step', CHAR_CANVAS_PX), one('unit.scientist.step', CHAR_CANVAS_PX), one('unit.robot.step', CHAR_CANVAS_PX),
     one('projectile', PROJECTILE_PX), one('grenade', GRENADE_PX),
     many('fx.flame', FLAME_PX),
     many('fx.hit', FX_PX),
@@ -241,8 +241,8 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
   })
 
   return {
-    tiles, tileAccents, tileOverlays, tileCaps, tileMacro: resolveMacroTiles(chain), player, cop, item, prop,
-    thug, scientist, robot, thugStep, scientistStep, robotStep,
+    tiles, tileAccents, tileOverlays, tileCaps, tileMacro: resolveMacroTiles(chain), player, warden, item, prop,
+    mutant, scientist, robot, mutantStep, scientistStep, robotStep,
     projectile, grenade,
     flames, hit, explosion, pickup, blood, chars, charKinds: charArtKinds(chain), items, props,
   }

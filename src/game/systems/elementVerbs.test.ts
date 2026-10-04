@@ -65,47 +65,47 @@ const dist = (a: Entity, b: Entity): number => vlen(a.pos.x - b.pos.x, a.pos.y -
 const idle = new Map([[0, {}]])
 
 describe('burning PANICS', () => {
-  it('a thug closing on a player turns and runs the moment the player lights it', () => {
+  it('a mutant closing on a player turns and runs the moment the player lights it', () => {
     const { w, cx, cy } = arena()
     const p = tough(spawnPlayer(w, 0, cx - 4 + 0.5, cy + 0.5))
-    const thug = tough(spawnNpc(w, 'thug', cx + 0.5, cy + 0.5))
+    const mutant = tough(spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5))
     runTicks(w, idle, 20) // it engages
-    expect(thug.ai!.mode).toBe('aggro')
-    const closing = dist(thug, p)
+    expect(mutant.ai!.mode).toBe('aggro')
+    const closing = dist(mutant, p)
 
-    applyStatus(w, thug, 'burning', 240, p.id)
-    expect(isPanicking(w, thug)).toBe(true)
+    applyStatus(w, mutant, 'burning', 240, p.id)
+    expect(isPanicking(w, mutant)).toBe(true)
     runTicks(w, idle, 40)
-    expect(thug.ai!.goal).toBe('flee')
-    expect(dist(thug, p)).toBeGreaterThan(closing + 2)
+    expect(mutant.ai!.goal).toBe('flee')
+    expect(dist(mutant, p)).toBeGreaterThan(closing + 2)
   })
 
-  it('panic ends after PANIC_TICKS and the burning thug comes back for you', () => {
+  it('panic ends after PANIC_TICKS and the burning mutant comes back for you', () => {
     const { w, cx, cy } = arena()
     const p = tough(spawnPlayer(w, 0, cx - 4 + 0.5, cy + 0.5))
-    const thug = tough(spawnNpc(w, 'thug', cx + 0.5, cy + 0.5))
+    const mutant = tough(spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5))
     runTicks(w, idle, 5)
-    applyStatus(w, thug, 'burning', 600, p.id)
+    applyStatus(w, mutant, 'burning', 600, p.id)
     runTicks(w, idle, PANIC_TICKS + 20)
-    expect(isPanicking(w, thug)).toBe(false)
-    expect(hasStatus(thug, 'burning')).toBe(true) // still on fire, just no longer scared
-    expect(thug.ai!.goal).not.toBe('flee')
-    expect(thug.ai!.panicFrom).toBeUndefined()
+    expect(isPanicking(w, mutant)).toBe(false)
+    expect(hasStatus(mutant, 'burning')).toBe(true) // still on fire, just no longer scared
+    expect(mutant.ai!.goal).not.toBe('flee')
+    expect(mutant.ai!.panicFrom).toBeUndefined()
     // It ran out of sight; step back into view and it fights again.
-    p.pos = { x: thug.pos.x - 3, y: thug.pos.y }
+    p.pos = { x: mutant.pos.x - 3, y: mutant.pos.y }
     p.prevPos = { ...p.pos }
     runTicks(w, idle, 20)
-    expect(thug.ai!.mode).toBe('aggro')
-    expect(thug.ai!.targetId).toBe(p.id)
+    expect(mutant.ai!.mode).toBe('aggro')
+    expect(mutant.ai!.targetId).toBe(p.id)
   })
 
   it('a flamethrower held on one target panics it once, then barely: total panic is bounded', () => {
     const { w, cx, cy } = arena()
-    const thug = tough(spawnNpc(w, 'thug', cx + 0.5, cy + 0.5))
+    const mutant = tough(spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5))
     let panicked = 0
     for (let t = 0; t < 900; t++) {
-      if (t % 6 === 0) applyStatus(w, thug, 'burning', 240, 999)
-      if (isPanicking(w, thug)) panicked++
+      if (t % 6 === 0) applyStatus(w, mutant, 'burning', 240, 999)
+      if (isPanicking(w, mutant)) panicked++
       statusSystem(w)
       statusFxSystem(w)
       w.tick++
@@ -118,10 +118,10 @@ describe('burning PANICS', () => {
   it('bosses, fireproof bodies, players and the dead never panic', () => {
     const { w, cx, cy } = arena()
     const boss = spawnNpc(w, 'boss', cx, cy)
-    const fireproof = spawnNpc(w, 'thug', cx + 3, cy)
+    const fireproof = spawnNpc(w, 'mutant', cx + 3, cy)
     fireproof.resist = { burning: 0 }
     const p = spawnPlayer(w, 0, cx - 3, cy)
-    const corpse = spawnNpc(w, 'thug', cx + 5, cy)
+    const corpse = spawnNpc(w, 'mutant', cx + 5, cy)
     corpse.dead = true
     for (const e of [boss, fireproof, p, corpse]) applyStatus(w, e, 'burning', 240)
     for (const e of [boss, fireproof, p, corpse]) expect(isPanicking(w, e)).toBe(false)
@@ -130,32 +130,32 @@ describe('burning PANICS', () => {
 
   it('with no lighter (a fire cell) it bolts ahead — never frozen in place fleeing itself', () => {
     const { w, cx, cy } = arena()
-    const thug = tough(spawnNpc(w, 'thug', cx + 0.5, cy + 0.5))
-    thug.facing = 0 // looking east
-    applyStatus(w, thug, 'burning', 240)
-    const x0 = thug.pos.x
+    const mutant = tough(spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5))
+    mutant.facing = 0 // looking east
+    applyStatus(w, mutant, 'burning', 240)
+    const x0 = mutant.pos.x
     runTicks(w, new Map(), 30)
-    expect(thug.pos.x - x0).toBeGreaterThan(1.5)
+    expect(mutant.pos.x - x0).toBeGreaterThan(1.5)
   })
 
   it('a lighter who died since the hit is no problem: it runs from where they stood', () => {
     const { w, cx, cy } = arena()
     const p = tough(spawnPlayer(w, 0, cx - 3 + 0.5, cy + 0.5))
-    const thug = tough(spawnNpc(w, 'thug', cx + 0.5, cy + 0.5))
-    applyStatus(w, thug, 'burning', 240, p.id)
+    const mutant = tough(spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5))
+    applyStatus(w, mutant, 'burning', 240, p.id)
     p.dead = true
-    const x0 = thug.pos.x
+    const x0 = mutant.pos.x
     runTicks(w, new Map(), 30)
-    expect(thug.pos.x).toBeGreaterThan(x0 + 1.5)
+    expect(mutant.pos.x).toBeGreaterThan(x0 + 1.5)
   })
 
   it('a burning NPC lights the crate it brushes past; a dry one does not', () => {
     const { w, cx, cy } = arena()
     const crate = spawnObject(w, 'crate', cx + 1, cy)
-    const thug = spawnNpc(w, 'thug', cx + 0.9, cy + 0.5) // touching the crate
+    const mutant = spawnNpc(w, 'mutant', cx + 0.9, cy + 0.5) // touching the crate
     fireSystem(w)
     expect(fireAt(w, Math.floor(crate.pos.x), Math.floor(crate.pos.y))).toBe(false)
-    addStatus(w, thug, 'burning', 240)
+    addStatus(w, mutant, 'burning', 240)
     fireSystem(w)
     expect(fireAt(w, Math.floor(crate.pos.x), Math.floor(crate.pos.y))).toBe(true)
   })
@@ -164,11 +164,11 @@ describe('burning PANICS', () => {
     const w = frozenWorld(5, 1, 'normal', true)
     const at = playerSpawnPoint(w.level, 0)
     const p = tough(spawnPlayer(w, 0, at.x, at.y))
-    const thug = tough(spawnNpc(w, 'thug', at.x + 1, at.y))
+    const mutant = tough(spawnNpc(w, 'mutant', at.x + 1, at.y))
     runTicks(w, idle, 3)
-    applyStatus(w, thug, 'burning', 240, p.id)
+    applyStatus(w, mutant, 'burning', 240, p.id)
     runTicks(w, idle, 10)
-    expect(isPanicking(w, thug)).toBe(true)
+    expect(isPanicking(w, mutant)).toBe(true)
     const copy = deserializeWorld(serializeWorld(w))
     runTicks(w, idle, 60)
     runTicks(copy, idle, 60)
@@ -179,32 +179,32 @@ describe('burning PANICS', () => {
 describe('wet DOUSES', () => {
   it('fire on a wet body only dries it: no burn, no panic', () => {
     const { w, cx, cy } = arena()
-    const thug = spawnNpc(w, 'thug', cx, cy)
-    addStatus(w, thug, 'wet', 150)
-    applyStatus(w, thug, 'burning', 240, 999)
-    expect(hasStatus(thug, 'burning')).toBe(false)
-    expect(hasStatus(thug, 'wet')).toBe(false)
-    expect(isPanicking(w, thug)).toBe(false)
-    applyStatus(w, thug, 'burning', 240, 999) // now dry: it catches
-    expect(hasStatus(thug, 'burning')).toBe(true)
+    const mutant = spawnNpc(w, 'mutant', cx, cy)
+    addStatus(w, mutant, 'wet', 150)
+    applyStatus(w, mutant, 'burning', 240, 999)
+    expect(hasStatus(mutant, 'burning')).toBe(false)
+    expect(hasStatus(mutant, 'wet')).toBe(false)
+    expect(isPanicking(w, mutant)).toBe(false)
+    applyStatus(w, mutant, 'burning', 240, 999) // now dry: it catches
+    expect(hasStatus(mutant, 'burning')).toBe(true)
   })
 
   it('soaking a burning body puts the fire out', () => {
     const { w, cx, cy } = arena()
-    const thug = spawnNpc(w, 'thug', cx, cy)
-    applyStatus(w, thug, 'burning', 240)
-    addStatus(w, thug, 'wet', 150)
-    expect(hasStatus(thug, 'burning')).toBe(false)
-    expect(hasStatus(thug, 'wet')).toBe(true)
+    const mutant = spawnNpc(w, 'mutant', cx, cy)
+    applyStatus(w, mutant, 'burning', 240)
+    addStatus(w, mutant, 'wet', 150)
+    expect(hasStatus(mutant, 'burning')).toBe(false)
+    expect(hasStatus(mutant, 'wet')).toBe(true)
   })
 })
 
 describe('electrified JUMPS', () => {
   it('a Tesla hit leaps to the nearest other NPC, skipping a closer player', () => {
     const { w, cx, cy } = arena()
-    const a = spawnNpc(w, 'thug', cx, cy)
+    const a = spawnNpc(w, 'mutant', cx, cy)
     const p = spawnPlayer(w, 0, cx + 1, cy) // nearer than b
-    const b = spawnNpc(w, 'thug', cx - 2, cy)
+    const b = spawnNpc(w, 'mutant', cx - 2, cy)
     applyStatus(w, a, 'electrified', 45, p.id)
     expect(isImmobilized(a)).toBe(true)
     expect(isImmobilized(b)).toBe(true)
@@ -214,17 +214,17 @@ describe('electrified JUMPS', () => {
 
   it('it leaps ONCE: the third body in a line stays free', () => {
     const { w, cx, cy } = arena()
-    const a = spawnNpc(w, 'thug', cx, cy)
-    const b = spawnNpc(w, 'thug', cx + 2, cy)
-    const c = spawnNpc(w, 'thug', cx + 4, cy)
+    const a = spawnNpc(w, 'mutant', cx, cy)
+    const b = spawnNpc(w, 'mutant', cx + 2, cy)
+    const c = spawnNpc(w, 'mutant', cx + 4, cy)
     applyStatus(w, a, 'electrified', 45)
     expect([a, b, c].map(isImmobilized)).toEqual([true, true, false])
   })
 
   it('nothing within ARC_JUMP_RADIUS: it is an ordinary stun (an empty floor)', () => {
     const { w, cx, cy } = arena()
-    const a = spawnNpc(w, 'thug', cx, cy)
-    const far = spawnNpc(w, 'thug', cx + ARC_JUMP_RADIUS + 0.6, cy)
+    const a = spawnNpc(w, 'mutant', cx, cy)
+    const far = spawnNpc(w, 'mutant', cx + ARC_JUMP_RADIUS + 0.6, cy)
     applyStatus(w, a, 'electrified', 45)
     expect(isImmobilized(a)).toBe(true)
     expect(isImmobilized(far)).toBe(false)
@@ -235,7 +235,7 @@ describe('electrified JUMPS', () => {
     const { w, cx, cy } = arena()
     const p1 = spawnPlayer(w, 0, cx, cy)
     const p2 = spawnPlayer(w, 1, cx + 1, cy)
-    const npc = spawnNpc(w, 'thug', cx - 1, cy)
+    const npc = spawnNpc(w, 'mutant', cx - 1, cy)
     applyStatus(w, p1, 'electrified', 45, npc.id)
     expect(isImmobilized(p1)).toBe(true)
     expect(isImmobilized(p2)).toBe(false)
@@ -244,7 +244,7 @@ describe('electrified JUMPS', () => {
 
   it('a player who joins mid-floor right beside the target is still never a leap target', () => {
     const { w, cx, cy } = arena()
-    const a = spawnNpc(w, 'thug', cx, cy)
+    const a = spawnNpc(w, 'mutant', cx, cy)
     runTicks(w, new Map(), 30)
     const late = spawnPlayer(w, 1, a.pos.x + 0.8, a.pos.y)
     applyStatus(w, a, 'electrified', 45)
@@ -253,8 +253,8 @@ describe('electrified JUMPS', () => {
 
   it('the leap goes through the same anti-chain-lock: it cannot re-lock a body in its immunity gap', () => {
     const { w, cx, cy } = arena()
-    const a = spawnNpc(w, 'thug', cx, cy)
-    const b = spawnNpc(w, 'thug', cx + 2, cy)
+    const a = spawnNpc(w, 'mutant', cx, cy)
+    const b = spawnNpc(w, 'mutant', cx + 2, cy)
     applyStatus(w, b, 'frozen', 10)
     for (let i = 0; i < 12; i++) {
       statusFxSystem(w)
@@ -267,8 +267,8 @@ describe('electrified JUMPS', () => {
 
   it('the leap never jumps back onto whoever fired the shock (an NPC stun gunner)', () => {
     const { w, cx, cy } = arena()
-    const shooter = spawnNpc(w, 'thug', cx, cy)
-    const victim = spawnNpc(w, 'thug', cx + 2, cy) // inside ARC_JUMP_RADIUS of the shooter
+    const shooter = spawnNpc(w, 'mutant', cx, cy)
+    const victim = spawnNpc(w, 'mutant', cx + 2, cy) // inside ARC_JUMP_RADIUS of the shooter
     // What projectiles.ts does when an NPC's stun-gun bolt lands.
     applyStatus(w, victim, 'electrified', 45, shooter.id)
     expect(isImmobilized(victim)).toBe(true)
@@ -278,9 +278,9 @@ describe('electrified JUMPS', () => {
 
   it('with the shooter excluded, the leap still takes the next-nearest NPC', () => {
     const { w, cx, cy } = arena()
-    const shooter = spawnNpc(w, 'thug', cx + 1, cy) // nearest to the victim
-    const victim = spawnNpc(w, 'thug', cx, cy)
-    const other = spawnNpc(w, 'thug', cx - 2, cy)
+    const shooter = spawnNpc(w, 'mutant', cx + 1, cy) // nearest to the victim
+    const victim = spawnNpc(w, 'mutant', cx, cy)
+    const other = spawnNpc(w, 'mutant', cx - 2, cy)
     applyStatus(w, victim, 'electrified', 45, shooter.id)
     expect([victim, shooter, other].map(isImmobilized)).toEqual([true, false, true])
   })
@@ -302,9 +302,9 @@ describe('electrified JUMPS', () => {
 
   it('a leap into a wet body floods the wet cluster behind it', () => {
     const { w, cx, cy } = arena()
-    const a = spawnNpc(w, 'thug', cx, cy)
-    const b = tough(spawnNpc(w, 'thug', cx + 2, cy))
-    const c = tough(spawnNpc(w, 'thug', cx + 3.5, cy)) // out of leap range of a, in chain range of b
+    const a = spawnNpc(w, 'mutant', cx, cy)
+    const b = tough(spawnNpc(w, 'mutant', cx + 2, cy))
+    const c = tough(spawnNpc(w, 'mutant', cx + 3.5, cy)) // out of leap range of a, in chain range of b
     addStatus(w, b, 'wet', 150)
     addStatus(w, c, 'wet', 150)
     shock(w, a, 45)
@@ -314,15 +314,15 @@ describe('electrified JUMPS', () => {
 })
 
 describe('spore BLINDS', () => {
-  it('a choking thug cannot see a player five tiles off, but can at arm\'s reach', () => {
+  it('a choking mutant cannot see a player five tiles off, but can at arm\'s reach', () => {
     const { w, cx, cy } = arena()
-    const thug = spawnNpc(w, 'thug', cx + 0.5, cy + 0.5)
+    const mutant = spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5)
     const far = spawnPlayer(w, 0, cx + 5.5, cy + 0.5)
     const near = spawnPlayer(w, 1, cx + 0.5 + SPORE_BLIND_RANGE - 0.2, cy + 0.5)
-    expect(perceives(w, thug, far)).toBe(true)
-    addStatus(w, thug, 'spore', 150)
-    expect(perceives(w, thug, far)).toBe(false)
-    expect(perceives(w, thug, near)).toBe(true)
+    expect(perceives(w, mutant, far)).toBe(true)
+    addStatus(w, mutant, 'spore', 150)
+    expect(perceives(w, mutant, far)).toBe(false)
+    expect(perceives(w, mutant, near)).toBe(true)
   })
 
   it('spore-dwellers (resist 0) are not blinded by their own air', () => {
@@ -337,18 +337,18 @@ describe('spore BLINDS', () => {
   it('a chaser that breathes spore stops tracking you: its last-known spot freezes as you move', () => {
     const { w, cx, cy } = arena()
     const p = tough(spawnPlayer(w, 0, cx - 3 + 0.5, cy + 0.5))
-    const thug = tough(spawnNpc(w, 'thug', cx + 3 + 0.5, cy + 0.5))
+    const mutant = tough(spawnNpc(w, 'mutant', cx + 3 + 0.5, cy + 0.5))
     runTicks(w, idle, 10)
-    expect(thug.ai!.mode).toBe('aggro')
-    addStatus(w, thug, 'spore', 600)
+    expect(mutant.ai!.mode).toBe('aggro')
+    addStatus(w, mutant, 'spore', 600)
     runTicks(w, idle, 12) // one think to register the loss of sight
-    expect(thug.ai!.lastKnownTargetPos).toBeDefined()
-    const lastSeen = { ...thug.ai!.lastKnownTargetPos! }
+    expect(mutant.ai!.lastKnownTargetPos).toBeDefined()
+    const lastSeen = { ...mutant.ai!.lastKnownTargetPos! }
     const y0 = p.pos.y
     runTicks(w, new Map([[0, { moveX: 0, moveY: 1 }]]), 30) // the player slips away south
     expect(p.pos.y - y0).toBeGreaterThan(2)
-    expect(dist(thug, p)).toBeGreaterThan(SPORE_BLIND_RANGE)
-    expect(thug.ai!.lastKnownTargetPos ?? lastSeen).toEqual(lastSeen)
+    expect(dist(mutant, p)).toBeGreaterThan(SPORE_BLIND_RANGE)
+    expect(mutant.ai!.lastKnownTargetPos ?? lastSeen).toEqual(lastSeen)
   })
 })
 
@@ -376,7 +376,7 @@ const pressure = (a: string, b: string): Pressure => {
     for (const c2 of CADENCES)
       for (const phase of PHASES) {
         const w = frozenWorld(3, 1)
-        const e = tough(spawnNpc(w, 'thug', 10, 10))
+        const e = tough(spawnNpc(w, 'mutant', 10, 10))
         let held = 0
         let out = 0
         let lateOut = 0
@@ -419,7 +419,7 @@ describe('element pair sweep: no stun-lock, no dominant pair', () => {
 
   it('the shared guard: a shock landing as the ice melts waits out the immunity gap', () => {
     const w = frozenWorld(3, 1)
-    const e = spawnNpc(w, 'thug', 10, 10)
+    const e = spawnNpc(w, 'mutant', 10, 10)
     applyStatus(w, e, 'frozen', 30)
     for (let i = 0; i <= 30; i++) {
       statusFxSystem(w)

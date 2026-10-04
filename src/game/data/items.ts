@@ -52,7 +52,7 @@ export interface WeaponDef {
 
 export const WEAPONS: Record<string, WeaponDef> = {
   fists: { id: 'fists', name: 'Fists', kind: 'melee', damage: 8, range: 1.1, cooldownTicks: 12, knockback: 4, natural: true },
-  bat: { id: 'bat', name: 'Bat', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
+  wrench: { id: 'wrench', name: 'Wrench', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16 },
   knife: { id: 'knife', name: 'Knife', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20 },
   sledgehammer: {
     id: 'sledgehammer',
@@ -70,9 +70,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
     rechargeOnWrap: 75,
   },
   // The Mireclaw Alpha's natural armament. A baseball bat on an apex swamp
-  // predator was the placeholder that made the boss read as a fat gangster;
+  // predator was the placeholder that made the boss read as a fat human brawler;
   // claws are innate, so they carry no durability and draw NO held sprite
-  // (render/weaponArt treats them like fists). Roughly bat DPS, but landed in
+  // (render/weaponArt treats them like fists). Roughly wrench DPS, but landed in
   // fewer, heavier, longer-reach blows — a hit you feel and roll away from
   // rather than a chip you tank.
   claws: { id: 'claws', name: 'Claws', kind: 'melee', damage: 22, range: 1.5, cooldownTicks: 20, knockback: 12, natural: true },
@@ -219,10 +219,10 @@ export type ItemClass = 'melee' | 'ranged' | 'throwable' | 'consumable' | 'key' 
 /** What kind of thing an item id is — the switch every use-rule dispatches on. */
 export const itemClass = (itemId: string): ItemClass => {
   if (itemId === 'cash') return 'cash'
-  if (itemId === 'briefcase') return 'key'
+  if (itemId === 'canister') return 'key'
   // Wing keycards ('keycard' or 'keycard.<wing>[.<name>]'): a key-class item, so they
   // ignore slot limits, survive a down (recover keeps only 'key' items), and
-  // ride across floors (nextFloor drops only the briefcase). See interaction.ts.
+  // stay behind at the exit (nextFloor drops every key item). See interaction.ts.
   if (itemId === 'keycard' || itemId.startsWith('keycard.')) return 'key'
   if (WEAPONS[itemId]) return WEAPONS[itemId].kind
   if (THROWABLES[itemId]) return 'throwable'
@@ -271,7 +271,7 @@ export const itemName = (itemId: string): string => {
     case 'cash':
       return 'Cash'
     case 'key':
-      return itemId === 'briefcase' ? 'Specimen Canister' : keycardName(itemId)
+      return itemId === 'canister' ? 'Specimen Canister' : keycardName(itemId)
     case 'unknown':
       return titleCase(itemId)
   }

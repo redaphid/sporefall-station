@@ -1,7 +1,7 @@
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { extractionView, setupFloor } from '../game/systems/missions'
+import { setupFloor } from '../game/systems/missions'
 import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { Entity } from '../game/entity'
@@ -304,7 +304,7 @@ export class NetHostSession implements Session {
    *
    * PASS 2 — spend what is left of the budget on the CLOSEST in-radius entities.
    * Array order is spawn order, so it favoured whatever the level generator made
-   * first: a thug standing on your toes could be dropped in favour of a table
+   * first: a mutant standing on your toes could be dropped in favour of a table
    * thirteen tiles away. Nearest-first with an id tiebreak is deterministic and
    * stable tick to tick, which also stops the selection churning (sprites
    * popping in and out) while the party stands still.
@@ -355,8 +355,8 @@ export class NetHostSession implements Session {
         cash: e.playerCtl.cash,
         weapon: e.combat?.weapon ?? 'fists',
         abilityCd: e.playerCtl.abilityCooldown,
-        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
-        briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'canister').reduce((n, s) => n + s.qty, 0),
+        canister: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister'),
         ...(e.playerCtl.draft ? { draft: e.playerCtl.draft } : {}),
       }
     }
@@ -365,7 +365,6 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
-      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alarm: this.world.alarm,
       alert: stationAlerted(this.world),
@@ -389,7 +388,6 @@ export class NetHostSession implements Session {
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
-      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
       lockdown: lockdownView(this.world),

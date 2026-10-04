@@ -28,7 +28,7 @@ import { PLAYER_START_WEAPON, starterLoadout } from '../player'
 /** An armed NPC placed at (x,y) carrying `weapon` — no populate machinery, so
  * building it draws nothing from `w.rng` and any drop roll would be the first draw. */
 const armedNpc = (w: World, weapon: string, x = 5.5, y = 5.5): Entity => {
-  const e = addEntity(w, makeEntity('npc', 'thug', x, y))
+  const e = addEntity(w, makeEntity('npc', 'mutant', x, y))
   e.health = { hp: 10, max: 10, iframes: 0 }
   e.combat = { weapon, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
@@ -41,7 +41,7 @@ const player = (w: World, x = 5.5, y = 5.5, playerId = 0): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
   e.loadout = starterLoadout(PLAYER_START_WEAPON)
   return e
 }
@@ -58,7 +58,7 @@ const weaponPickup = (w: World, itemId: string, x: number, y: number): Entity =>
 
 /** The weapons a corpse used to be able to leave behind — melee, guns, element
  * guns, and the boss's `natural` claws (which once rendered as a fake medkit). */
-const CARRIED = ['pistol', 'bat', 'knife', 'shotgun', 'machinegun', 'sledgehammer', 'freezeRay', 'claws']
+const CARRIED = ['pistol', 'wrench', 'knife', 'shotgun', 'machinegun', 'sledgehammer', 'freezeRay', 'claws']
 
 describe('one permanent weapon — a corpse drops NOTHING', () => {
   it.each(CARRIED)('killing an NPC carrying %s spawns no pickup and emits no weaponDrop event', (weapon) => {
@@ -125,7 +125,7 @@ describe('one permanent weapon — a weapon on the floor can never be picked up'
     expect(w.events.some((e) => e.type === 'pickup')).toBe(false)
   })
 
-  it.each(['bat', 'knife', 'machinegun', 'freezeRay', 'sledgehammer'])(
+  it.each(['wrench', 'knife', 'machinegun', 'freezeRay', 'sledgehammer'])(
     'a %s on the floor is refused the same way',
     (itemId) => {
       const w = createWorld(1, 1)
@@ -140,7 +140,7 @@ describe('one permanent weapon — a weapon on the floor can never be picked up'
   it('a player still holds exactly ONE weapon slot after walking over a pile of guns', () => {
     const w = createWorld(1, 1)
     const p = player(w, 12.5, 12.5)
-    for (const id of ['pistol', 'shotgun', 'machinegun', 'bat']) weaponPickup(w, id, 12.5, 12.5)
+    for (const id of ['pistol', 'shotgun', 'machinegun', 'wrench']) weaponPickup(w, id, 12.5, 12.5)
     runTicks(w, new Map([[0, {}]]), 3)
     const weaponSlots = p.loadout!.inventory.filter((s) => s.itemId === PLAYER_START_WEAPON)
     expect(weaponSlots).toHaveLength(1)

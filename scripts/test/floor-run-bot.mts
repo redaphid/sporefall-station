@@ -114,7 +114,7 @@ const pickGoal = (w: World, p: Entity, breachOnly: Set<number>): Goal => {
     }
     return { at: target.pos, act: target.pickup ? 'walk' : 'shoot', what: `mission ${target.archetype}`, ent: target }
   }
-  return { at: centre(w.mission.extractPoint ?? w.level.exit), act: 'walk', what: 'exit' }
+  return { at: centre(w.level.exit), act: 'walk', what: 'exit' }
 }
 
 const nearestFoe = (w: World, p: Entity): Entity | undefined => {

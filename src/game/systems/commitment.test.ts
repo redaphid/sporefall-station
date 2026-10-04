@@ -154,8 +154,8 @@ describe('threats still interrupt at once', () => {
 })
 
 describe('co-op targeting: a new enemy breaks a held fight', () => {
-  // A thug fights P1 across an open room. P1 ducks behind the wall into the
-  // east room; P2 steps up three tiles from the thug. The fight on P1 is held
+  // A mutant fights P1 across an open room. P1 ducks behind the wall into the
+  // east room; P2 steps up three tiles from the mutant. The fight on P1 is held
   // (its candidate vanished with P1's sightline), but P2 is a new target on
   // the same tier and must win at once.
   const ROOMS = [
@@ -167,8 +167,8 @@ describe('co-op targeting: a new enemy breaks a held fight', () => {
   ]
 
   it('turns on the second player within one think, not after the hold runs out', () => {
-    const w = worldFromScene(ROOMS, { t: npc('thug') }, { hostile: true })
-    const thug = w.entities.find((e) => e.archetype === 'thug')!
+    const w = worldFromScene(ROOMS, { t: npc('mutant') }, { hostile: true })
+    const mutant = w.entities.find((e) => e.archetype === 'mutant')!
     const tough = (e: Entity): Entity => {
       e.health = { hp: 1e6, max: 1e6, iframes: 0 }
       return e
@@ -179,15 +179,15 @@ describe('co-op targeting: a new enemy breaks a held fight', () => {
       [0, emptyInput()],
       [1, emptyInput()],
     ])
-    for (let i = 0; i < 60 && !(thug.ai!.goal === 'battle' && thug.ai!.targetId === p1.id); i++) tickWorld(w, idle)
-    expect(thug.ai!).toMatchObject({ goal: 'battle', targetId: p1.id })
+    for (let i = 0; i < 60 && !(mutant.ai!.goal === 'battle' && mutant.ai!.targetId === p1.id); i++) tickWorld(w, idle)
+    expect(mutant.ai!).toMatchObject({ goal: 'battle', targetId: p1.id })
     p1.pos = { x: 16.5, y: 1.5 }
     p1.prevPos = { ...p1.pos }
-    p2.pos = { x: thug.pos.x - 3, y: thug.pos.y }
+    p2.pos = { x: mutant.pos.x - 3, y: mutant.pos.y }
     p2.prevPos = { ...p2.pos }
     const t0 = w.tick
-    while (w.tick - t0 < 45 && thug.ai!.targetId !== p2.id) tickWorld(w, idle)
-    expect(thug.ai!.targetId).toBe(p2.id)
+    while (w.tick - t0 < 45 && mutant.ai!.targetId !== p2.id) tickWorld(w, idle)
+    expect(mutant.ai!.targetId).toBe(p2.id)
     expect(w.tick - t0, 'ticks to turn on P2').toBeLessThanOrEqual(10)
   })
 })

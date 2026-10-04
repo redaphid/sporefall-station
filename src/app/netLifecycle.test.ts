@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateLevel } from '../game/levelgen/generate'
+import { walledRoom, worldFromRows } from '../game/testkit'
 import { emptyInput, type InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import { decodeJson, encodeJson } from '../net/framing/codec'
@@ -342,11 +343,12 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
   it('still accepts a rejoin on the LAST tick of the grace window', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(10, 'Alice', stubInput(), hub.hostTransport)
+    // An authored empty room: nothing on it can kill the idle host or the ghost
+    // before the window's last tick, so the test turns on the window alone.
+    host.world = worldFromRows(walledRoom(16, 16), { seed: 10 })
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
-    // The subject is the grace window, not a fight: clear the floor's crew so
-    // nothing finds the parked avatar in 90 seconds.
-    host.world.entities = host.world.entities.filter((e) => !e.ai)
+    expect(host.world.entities.filter((e) => e.ai && !e.playerCtl)).toEqual([])
 
     for (let i = 0; i < REJOIN_GRACE_TICKS - 1; i++) host.tick()
 
@@ -885,7 +887,7 @@ describe('connection lifecycle — a legitimate reclaim keeps the player whole',
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
     const avatar = host.world.byId.get(entityId)!
-    avatar.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    avatar.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     avatar.playerCtl!.cash = 777
     const inventoryBefore = JSON.stringify(avatar.loadout!.inventory)
     const players = playerCount(host)

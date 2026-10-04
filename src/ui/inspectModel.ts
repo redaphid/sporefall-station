@@ -65,18 +65,15 @@ const pretty = (s: string): string =>
     .join(' ')
 
 /**
- * Lore names for the four sim FACTION ids. The ids themselves are load-bearing
- * (`entity.Faction`, the disposition matrix, the BLE snapshot), so they stay —
- * this is the player-facing half only. Without it the inspect card printed a
- * bare `Faction: Gang` on a derelict swamp station, which is exactly the
- * cops-and-robbers vocabulary the theme has otherwise moved past. Wording is
- * taken from the shipped manifest so the card agrees with the name plates:
- * `Rootcult Enforcer`, `Spore Warden`, `Settler`.
+ * Lore names for the four sim FACTION ids (`entity.Faction`, the disposition
+ * matrix, the BLE snapshot). The ids are terse; this is the player-facing half.
+ * Wording is taken from the shipped manifest so the card agrees with the name
+ * plates: `Rootcult Acolyte`, `Spore Warden`, `Settler`.
  */
 const FACTION_LABEL: Record<string, string> = {
   civ: 'Settlers',
-  cop: 'Spore Wardens',
-  gang: 'Rootcult',
+  warden: 'Spore Wardens',
+  rootcult: 'Rootcult',
   neutral: 'Unaligned',
 }
 
@@ -152,7 +149,7 @@ const hostilityPhrase = (archetype: string): string | undefined => {
   if (def.wakeOn?.includes('power-cut')) return 'Inert — hostile after a power cut'
   if (def.behavior === 'predator') return 'Preys on the wounded'
   if (def.hostility === 'always') return 'Attacks on sight'
-  if (def.hostility === 'lawful') return 'Attacks lawbreakers'
+  if (def.hostility === 'watchful') return 'Attacks troublemakers'
   return def.retaliates ? 'Peaceful — hits back' : 'Peaceful'
 }
 
@@ -207,7 +204,7 @@ const areaPhrase = (t: (typeof THROWABLES)[string]): string => {
  * lookup is defensive.
  *
  * `nameFor` maps an archetype to its display name — the overlay passes the
- * theme-aware resolver (a `cop` can read "Bog Warden" in a swamp theme; same
+ * theme-aware resolver (a `warden` can read "Bog Warden" in a swamp theme; same
  * sim entity, themed presentation). Defaults to plain title-casing so the
  * builder stays pure and theme-free for tests.
  */
@@ -299,13 +296,13 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
         card.tagline = 'Use it to patch up'
       } else if (e.pickup.itemId === 'cash') {
         card.tagline = 'Money — grab it'
-      } else if (e.pickup.itemId === 'briefcase') {
+      } else if (e.pickup.itemId === 'canister') {
         card.tagline = 'The specimen canister — this is what you came for'
       }
     }
   }
 
-  // Interactive / destructible world object (crate, barrel, ATM, vending, …).
+  // Interactive / destructible world object (crate, barrel, vending, …).
   const obj = OBJECTS[e.archetype]
   if (obj) {
     if (obj.use) rows.push({ label: 'Dispenses', value: obj.use.gives === 'cash' ? `${obj.use.amount ?? 0} scrip` : itemName(obj.use.gives) })

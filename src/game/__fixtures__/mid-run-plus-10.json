@@ -725,13 +725,13 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 488
+        "misdeedUntilTick": 488
       }
     },
     {
       "id": 2,
       "kind": "npc",
-      "archetype": "cop",
+      "archetype": "warden",
       "pos": {
         "x": 2.0322449421653332,
         "y": 1.5
@@ -758,13 +758,13 @@
         "lastHurtTick": 38
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 11
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 14
           }
         ],
@@ -778,7 +778,7 @@
       },
       "ai": {
         "mode": "aggro",
-        "faction": "cop",
+        "faction": "warden",
         "home": {
           "x": 4.5,
           "y": 1.5
@@ -802,7 +802,7 @@
     {
       "id": 3,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": -1.5,
         "y": 1.5
@@ -828,13 +828,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "bat",
+            "itemId": "wrench",
             "qty": 16
           }
         ],
@@ -848,7 +848,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": -1.5,
           "y": 1.5

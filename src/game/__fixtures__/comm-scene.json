@@ -709,7 +709,7 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 0
+        "misdeedUntilTick": 0
       },
       "loadout": {
         "inventory": [
@@ -724,7 +724,7 @@
     {
       "id": 2,
       "kind": "npc",
-      "archetype": "cop",
+      "archetype": "warden",
       "pos": {
         "x": 22,
         "y": 9
@@ -750,7 +750,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -761,7 +761,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "cop",
+        "faction": "warden",
         "home": {
           "x": 22,
           "y": 9
@@ -773,7 +773,7 @@
     {
       "id": 3,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 18,
         "y": 9
@@ -799,7 +799,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -810,7 +810,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 18,
           "y": 9
@@ -822,7 +822,7 @@
     {
       "id": 4,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 23,
         "y": 12
@@ -859,7 +859,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 23,
           "y": 12
@@ -871,7 +871,7 @@
     {
       "id": 5,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 20,
         "y": 8
@@ -897,7 +897,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -908,7 +908,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 20,
           "y": 8

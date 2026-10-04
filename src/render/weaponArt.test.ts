@@ -5,7 +5,7 @@ import { WEAPONS } from '../game/data/items'
 describe('weaponShape — each weapon maps to its intended silhouette', () => {
   it('names the distinctive melee silhouettes', () => {
     expect(weaponShape('sledgehammer')).toBe('hammer')
-    expect(weaponShape('bat')).toBe('club')
+    expect(weaponShape('wrench')).toBe('club')
     expect(weaponShape('knife')).toBe('blade')
   })
 
@@ -46,7 +46,7 @@ describe('hasHeldWeapon', () => {
 describe('isMeleeWeapon', () => {
   it('classifies registered weapons by kind', () => {
     expect(isMeleeWeapon('sledgehammer')).toBe(true)
-    expect(isMeleeWeapon('bat')).toBe(true)
+    expect(isMeleeWeapon('wrench')).toBe(true)
     expect(isMeleeWeapon('pistol')).toBe(false)
     expect(isMeleeWeapon('shotgun')).toBe(false)
   })

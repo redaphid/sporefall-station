@@ -813,7 +813,7 @@
         ],
         "activeSlot": 0,
         "cash": 0,
-        "crimeUntilTick": 0
+        "misdeedUntilTick": 0
       }
     },
     {

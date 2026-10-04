@@ -112,7 +112,7 @@ describe('world channel over the wire', () => {
     expect(JSON.parse(stateRep.body!).seed).toBe(4242)
 
     // A write is queued, not applied until afterTick.
-    sock.fireMessage({ t: 'req', id: 2, verb: 'spawn npc cop 9 9' })
+    sock.fireMessage({ t: 'req', id: 2, verb: 'spawn npc warden 9 9' })
     expect(world.entities.filter((e) => e.kind === 'npc')).toHaveLength(0)
     ch.afterTick()
     expect(world.entities.filter((e) => e.kind === 'npc')).toHaveLength(1)

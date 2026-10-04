@@ -1,8 +1,8 @@
 import type { Rect } from './rooms'
 
 export const Tile = {
-  Street: 0,
-  Sidewalk: 1,
+  Causeway: 0,
+  Boardwalk: 1,
   Floor: 2,
   Wall: 3,
   Grass: 4,
@@ -50,8 +50,8 @@ export const isWallTile = (t: number): boolean =>
 
 /** Every INTERIOR floor-family tile — a tile inside a room/corridor that a body
  * can stand on and furniture/loot/spawns may occupy. The classic city only ever
- * lays `Tile.Floor`; the indoor complex adds its deck variants. Streets,
- * sidewalks, grass and the exit pad are ground, not interior floor. */
+ * lays `Tile.Floor`; the indoor complex adds its deck variants. Causeways,
+ * boardwalks, grass and the exit pad are ground, not interior floor. */
 export const isFloorTile = (t: number): boolean =>
   t === Tile.Floor || t === Tile.Tiled || t === Tile.Plating || t === Tile.Hall || t === Tile.Grate || t === Tile.Bog
 
@@ -87,7 +87,7 @@ export type BuildingRole =
  * furniture it gets and where that furniture sits (populate.furnishInteriors),
  * and gives missions/AI/debug a legible name for "the room you are in".
  * Assigned per room by `assignRoomTypes` (roomTypes.ts): a PURE geometric
- * derivation from the building's role, room sizes, street doors and objective
+ * derivation from the building's role, room sizes, causeway doors and objective
  * room — it draws no rng, so adding it never perturbs generation streams. */
 export type RoomType =
   | 'shopfloor' // customer-facing shop front: shelves, vending, the till
@@ -133,7 +133,7 @@ export interface Building {
   roomTypes?: RoomType[]
   /** Compound pit (open ground) — populate routes patrol beats around it. */
   courtyard?: Rect
-  /** The room a mission objective (briefcase / boss) belongs in — designated
+  /** The room a mission objective (canister / boss) belongs in — designated
    * EXPLICITLY by the generator that carved the building (bunker core, vault,
    * loop core, …). This is the contract missions.ts places targets by; never
    * infer it from `rooms` array order. Not part of tiles/solid, so it is
@@ -194,7 +194,7 @@ export interface Theme {
   roles: readonly BuildingRole[]
   /** Ground of a courtyard compound's open pit. */
   courtyardGround: TileId
-  /** Heart of an open square (a plaza): the paved ring keeps Sidewalk. */
+  /** Heart of an open square (a plaza): the paved ring keeps Boardwalk. */
   plazaHeart: TileId
   /** What stands in an open square. */
   plazaProps: readonly PlazaProp[]
@@ -222,7 +222,7 @@ export const THEMES: readonly Theme[] = [
     minLots: 3,
     maxLots: 4,
     buildingChance: 0.85,
-    yard: Tile.Sidewalk,
+    yard: Tile.Boardwalk,
     courtyardChance: 0.35,
     setbackChance: 0.15,
     vaultChance: 0.3,

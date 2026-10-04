@@ -833,7 +833,7 @@
     {
       "id": 2,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 35.5,
         "y": 4.5
@@ -859,7 +859,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -870,7 +870,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 35.5,
           "y": 4.5
@@ -882,7 +882,7 @@
     {
       "id": 3,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 26.5,
         "y": 9.5
@@ -919,7 +919,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 26.5,
           "y": 9.5
@@ -1006,7 +1006,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1183,7 +1183,7 @@
     {
       "id": 10,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 16.5,
         "y": 39.5
@@ -1220,7 +1220,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 16.5,
           "y": 39.5
@@ -1232,7 +1232,7 @@
     {
       "id": 11,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 6.5,
         "y": 43.5
@@ -1269,7 +1269,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 6.5,
           "y": 43.5
@@ -1281,7 +1281,7 @@
     {
       "id": 12,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 5.5,
         "y": 37.5
@@ -1318,7 +1318,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 5.5,
           "y": 37.5
@@ -1330,7 +1330,7 @@
     {
       "id": 13,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 27.5,
         "y": 38.5
@@ -1356,7 +1356,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1367,7 +1367,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 27.5,
           "y": 38.5
@@ -1379,7 +1379,7 @@
     {
       "id": 14,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 31.5,
         "y": 39.5
@@ -1416,7 +1416,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 31.5,
           "y": 39.5
@@ -1454,7 +1454,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1503,7 +1503,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1526,7 +1526,7 @@
     {
       "id": 17,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 5.5,
         "y": 52.5
@@ -1563,7 +1563,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 5.5,
           "y": 52.5
@@ -1575,7 +1575,7 @@
     {
       "id": 18,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 12.5,
         "y": 55.5
@@ -1612,7 +1612,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "rootcult",
         "home": {
           "x": 12.5,
           "y": 55.5
@@ -1699,7 +1699,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -1944,7 +1944,7 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "bat",
+        "weapon": "wrench",
         "cooldown": 0
       },
       "status": {
@@ -2065,7 +2065,7 @@
     {
       "id": 28,
       "kind": "npc",
-      "archetype": "cop",
+      "archetype": "warden",
       "pos": {
         "x": 48.5,
         "y": 47.5
@@ -2102,7 +2102,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "cop",
+        "faction": "warden",
         "home": {
           "x": 48.5,
           "y": 47.5
@@ -2114,7 +2114,7 @@
     {
       "id": 29,
       "kind": "npc",
-      "archetype": "cop",
+      "archetype": "warden",
       "pos": {
         "x": 49.3,
         "y": 47.5
@@ -2151,7 +2151,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "cop",
+        "faction": "warden",
         "home": {
           "x": 49.3,
           "y": 47.5
@@ -2247,7 +2247,7 @@
     {
       "id": 33,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.wrench",
       "pos": {
         "x": 8.5,
         "y": 4.5
@@ -2268,14 +2268,14 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "wrench",
         "qty": 1
       }
     },
     {
       "id": 34,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.wrench",
       "pos": {
         "x": 33.5,
         "y": 24.5
@@ -2296,14 +2296,14 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "wrench",
         "qty": 1
       }
     },
     {
       "id": 35,
       "kind": "pickup",
-      "archetype": "pickup.bat",
+      "archetype": "pickup.wrench",
       "pos": {
         "x": 15.5,
         "y": 7.5
@@ -2324,7 +2324,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "bat",
+        "itemId": "wrench",
         "qty": 1
       }
     },
@@ -2751,7 +2751,7 @@
     {
       "id": 51,
       "kind": "pickup",
-      "archetype": "pickup.briefcase",
+      "archetype": "pickup.canister",
       "pos": {
         "x": 57.5,
         "y": 40.5
@@ -2772,7 +2772,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "briefcase",
+        "itemId": "canister",
         "qty": 1
       }
     },
@@ -4237,7 +4237,7 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 0
+        "misdeedUntilTick": 0
       },
       "loadout": {
         "inventory": [

@@ -311,7 +311,6 @@ export const PROP_PLACEMENT: Record<string, 'wall' | 'corner' | 'center' | 'any'
   bunk: 'wall',
   tv: 'wall',
   vending: 'wall',
-  atm: 'wall',
   bench: 'wall',
   desk: 'wall',
   toilet: 'corner',

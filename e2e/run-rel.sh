@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Parity M7 proof: build, serve on an ephemeral port, drive the relationships
-# scenario in a real browser (real keyboard), assert a witnessed crime flips
-# cops hostile while an unrelated faction stays neutral. Own port (never 5173/4173).
+# scenario in a real browser (real keyboard), assert a witnessed misdeed flips
+# wardens hostile while an unrelated faction stays neutral. Own port (never 5173/4173).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

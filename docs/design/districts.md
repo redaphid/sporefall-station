@@ -71,6 +71,6 @@ These are the props and tiles the districts would use. Today they borrow the pro
 | `prop.stilt-shack` | Moorings | A lean-to of airlock fabric and plate on stilts with a ladder, built for the corner of a lot. |
 | `prop.mooring-cleat` | Moorings | A big rusted mooring cleat with a frayed line running off into the water. |
 | `prop.net-rack` | Moorings | A drying rack of catch-nets and net-poles hung with empty glass jars. |
-| `tile.jetty-plank` | Moorings | Lashed plank decking over dark water. It would replace `sidewalk` as the ring round its lots. |
+| `tile.jetty-plank` | Moorings | Lashed plank decking over dark water. It would replace `boardwalk` as the ring round its lots. |
 
 None of these keys is wired into the engine yet. Each new prop needs an archetype in `src/game/data/objects.ts` and an entry in `PROP_NAMES`. A district tile also needs per-district tile selection in the renderer.

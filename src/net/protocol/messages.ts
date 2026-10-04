@@ -16,9 +16,9 @@ import { MsgType } from '../types'
  *
  * ## `// RETIRED` entries are TOMBSTONES. Do not compact this list.
  *
- * Fourteen entries are marked `// RETIRED`: the nine culled items in every form
+ * Fifteen entries are marked `// RETIRED`: the nine culled items in every form
  * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
- * the floor). They name content that no longer exists, and a dead-code tool
+ * the floor), and the removed cash terminal. They name content that no longer exists, and a dead-code tool
  * will call them unused. They are CLAIMED, not unused — the same argument as
  * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
  * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag
@@ -47,23 +47,23 @@ import { MsgType } from '../types'
  */
 export const ARCHETYPES = [
   'player',
-  'thug',
-  'cop',
+  'mutant',
+  'warden',
   'civilian',
   'shopkeeper',
   'boss',
   'projectile',
   'grenade',
   'door',
-  'pickup.bat',
+  'pickup.wrench',
   'pickup.knife',
   'pickup.pistol',
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
   'pickup.cash',
-  'pickup.briefcase',
-  'gangster',
-  'bouncer',
+  'pickup.canister',
+  'acolyte',
+  'lockkeeper',
   // Everything below was spawnable but MISSING from this registry, so
   // `archetypeIndex.get(...) ?? 0` encoded it as index 0 and the remote client
   // decoded it back as 'player' — i.e. a spore pod, a lurker or a burning tile
@@ -86,7 +86,7 @@ export const ARCHETYPES = [
   // from what one seed happened to spawn — see messages.archetypes.test.ts,
   // which now fails if any registry grows without this list growing with it.
   // Appended alphabetically in one block. APPEND ONLY, NEVER REORDER.
-  'atm',
+  'atm', // RETIRED
   'banana', // RETIRED
   'barrel',
   'barricade',
@@ -527,7 +527,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       playerId: -1,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
     // slots from the InventoryMsg, this is just the render-side placeholder.
@@ -594,8 +594,6 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
-  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
-  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional
@@ -614,14 +612,14 @@ export interface StateMsg {
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
-   * with the total quantity of every carried stack except the briefcase, which
+   * with the total quantity of every carried stack except the canister, which
    * is what it always was. Bandages themselves were culled. The field survives
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<
     number,
-    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+    { cash: number; weapon: string; abilityCd: number; bandages: number; canister: boolean; draft?: DraftHand }
   >
 }
 

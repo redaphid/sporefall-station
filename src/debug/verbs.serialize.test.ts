@@ -18,8 +18,8 @@ const buildMidRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   const sp = w.level.spawn
   spawnPlayer(w, 0, sp.x, sp.y)
-  spawnNpc(w, 'cop', sp.x + 3, sp.y)
-  spawnNpc(w, 'thug', sp.x - 3, sp.y)
+  spawnNpc(w, 'warden', sp.x + 3, sp.y)
+  spawnNpc(w, 'mutant', sp.x - 3, sp.y)
   return runTicks(w, new Map([[0, { moveX: -1, attack: true }]]), 50)
 }
 
@@ -143,16 +143,16 @@ describe('schema (reflection)', () => {
 
   it('enumerates kinds, archetypes, and component fields from LIVE entities', () => {
     const w = createWorld(1234, 1)
-    spawnNpc(w, 'cop', 5, 5)
-    spawnNpc(w, 'cop', 6, 6)
-    spawnNpc(w, 'thug', 7, 7)
+    spawnNpc(w, 'warden', 5, 5)
+    spawnNpc(w, 'warden', 6, 6)
+    spawnNpc(w, 'mutant', 7, 7)
     spawnPlayer(w, 0, 8, 8)
     const s = JSON.parse(runVerb(w, 'schema'))
 
     expect(s.entityCount).toBe(4)
     expect(s.kinds).toEqual({ npc: 3, player: 1 })
-    expect(s.archetypes.cop).toEqual({ kind: 'npc', count: 2 })
-    expect(s.archetypes.thug).toEqual({ kind: 'npc', count: 1 })
+    expect(s.archetypes.warden).toEqual({ kind: 'npc', count: 2 })
+    expect(s.archetypes.mutant).toEqual({ kind: 'npc', count: 1 })
     expect(s.archetypes.player).toEqual({ kind: 'player', count: 1 })
     expect(s.fields.playerCtl.keys).toContain('abilityCooldown')
 
@@ -169,7 +169,7 @@ describe('schema (reflection)', () => {
 
   it('enumerates UNKNOWN/future components dynamically (no hardcoded list)', () => {
     const w = createWorld(1234, 1)
-    const e = spawnNpc(w, 'cop', 1, 1)
+    const e = spawnNpc(w, 'warden', 1, 1)
     ;(e as unknown as { futureThing: { z: number; tags: string[] } }).futureThing = { z: 42, tags: ['a'] }
     const s = JSON.parse(runVerb(w, 'schema'))
     expect(s.fields.futureThing.count).toBe(1)

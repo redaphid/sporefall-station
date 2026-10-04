@@ -8,12 +8,12 @@
 import { addNpc, addPlayer, center, decide, makeArena } from './arena'
 
 // ── A. Battle/flee crossover has no deadband ────────────────────────────────
-console.log('== A. battle/flee crossover (gangster, hunter brain, hostile world) ==')
+console.log('== A. battle/flee crossover (acolyte, hunter brain, hostile world) ==')
 {
   const w = makeArena(1)
   const c = center(w)
   addPlayer(w, c.x, c.y)
-  const g = addNpc(w, 'gangster', c.x + 6, c.y, { sight: 12 })
+  const g = addNpc(w, 'acolyte', c.x + 6, c.y, { sight: 12 })
   const max = g.health!.max
   let prev = ''
   let flips = 0
@@ -44,13 +44,13 @@ console.log('== B. sworn enemies never engage without a player ==')
 {
   const w = makeArena(2)
   const c = center(w)
-  const cop = addNpc(w, 'cop', c.x, c.y, { sight: 14, weapon: 'pistol' })
-  const gang = addNpc(w, 'gangster', c.x + 4, c.y, { sight: 14, weapon: 'pistol' })
-  // Sworn enemies (initialFactionHate cop<->gang = 5 = Hostile), in plain sight.
-  const copGoal = decide(w, cop).goal
-  const gangGoal = decide(w, gang).goal
-  console.log(`  cop sees gangster 4 tiles away  -> goal=${copGoal.code} target=${copGoal.target ?? '-'}`)
-  console.log(`  gangster sees cop 4 tiles away  -> goal=${gangGoal.code} target=${gangGoal.target ?? '-'}`)
+  const warden = addNpc(w, 'warden', c.x, c.y, { sight: 14, weapon: 'pistol' })
+  const rootcult = addNpc(w, 'acolyte', c.x + 4, c.y, { sight: 14, weapon: 'pistol' })
+  // Sworn enemies (initialFactionHate warden<->rootcult = 5 = Hostile), in plain sight.
+  const wardenGoal = decide(w, warden).goal
+  const rootcultGoal = decide(w, rootcult).goal
+  console.log(`  warden sees acolyte 4 tiles away  -> goal=${wardenGoal.code} target=${wardenGoal.target ?? '-'}`)
+  console.log(`  acolyte sees warden 4 tiles away  -> goal=${rootcultGoal.code} target=${rootcultGoal.target ?? '-'}`)
   console.log('  => both WANDER. `threat` only scans entities with playerCtl, so the')
   console.log('     faction/sworn-enemy matrix drives no autonomous NPC combat.\n')
 }

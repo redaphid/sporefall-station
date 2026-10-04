@@ -208,8 +208,8 @@ describe('the boss health bar and the death screen', () => {
 // estimate that a late snapshot pulls backwards mid-fight.
 // ---------------------------------------------------------------------------
 
-const thugWithBossId = (): Entity => {
-  const e = makeEntity('npc', 'thug', 9, 9)
+const mutantWithBossId = (): Entity => {
+  const e = makeEntity('npc', 'mutant', 9, 9)
   e.id = BOSS_ID
   e.health = { hp: 30, max: 30, iframes: 0 }
   return e
@@ -224,22 +224,22 @@ describe('the boss latch across run boundaries', () => {
     document.body.appendChild(mount)
   })
 
-  it('REGRESSION (host): "Run it back" does not put the bar on a thug that inherits the boss id', () => {
+  it('REGRESSION (host): "Run it back" does not put the bar on a mutant that inherits the boss id', () => {
     const screens = createScreens(mount, () => {})
     screens.update(view({ tick: 900, entities: [boss()], events: [reveal()] }))
     screens.update(view({ tick: 901, entities: [boss()], self: player({ dead: true }) }))
 
-    screens.update(view({ tick: 0, runEpoch: 2, floor: 1, entities: [thugWithBossId()] }))
+    screens.update(view({ tick: 0, runEpoch: 2, floor: 1, entities: [mutantWithBossId()] }))
 
     expect(visible(mount)).toBe(false)
   })
 
-  it('REGRESSION (client): a new run does not put the bar on a thug that inherits the boss id', () => {
+  it('REGRESSION (client): a new run does not put the bar on a mutant that inherits the boss id', () => {
     const screens = createScreens(mount, () => {})
     screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
     screens.update(view({ tick: 5001, simTick: 901, entities: [boss()], self: player({ dead: true }) }))
 
-    screens.update(view({ tick: 5002, simTick: 3, runEpoch: 2, floor: 1, entities: [thugWithBossId()] }))
+    screens.update(view({ tick: 5002, simTick: 3, runEpoch: 2, floor: 1, entities: [mutantWithBossId()] }))
 
     expect(visible(mount)).toBe(false)
   })
@@ -287,10 +287,10 @@ describe('the boss latch across run boundaries', () => {
     const fresh = boss(160)
     fresh.id = 77
     const freshReveal: SimEvent = { type: 'bossReveal', entityId: 77, x: 5, y: 5, maxHp: 320 }
-    screens.update(view({ tick: 0, runEpoch: 2, entities: [thugWithBossId(), fresh] }))
+    screens.update(view({ tick: 0, runEpoch: 2, entities: [mutantWithBossId(), fresh] }))
     expect(visible(mount)).toBe(false)
 
-    screens.update(view({ tick: 300, runEpoch: 2, entities: [thugWithBossId(), fresh], events: [freshReveal] }))
+    screens.update(view({ tick: 300, runEpoch: 2, entities: [mutantWithBossId(), fresh], events: [freshReveal] }))
     expect([visible(mount), hpFill(mount)]).toEqual([true, '50%'])
   })
 })

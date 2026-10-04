@@ -21,9 +21,9 @@ const room = (): World => worldFromRows(ROOM)
 const none = new Map<number, Partial<InputCmd>>()
 const idle = new Map<number, Partial<InputCmd>>([[0, {}]])
 
-/** A rooted thug near the spawn tile with `hp` and `resist`. */
+/** A rooted mutant near the spawn tile with `hp` and `resist`. */
 const body = (w: World, hp: number, resist: Record<string, number>, dx = 0): Entity => {
-  const e = spawnNpc(w, 'thug', w.level.spawn.x + dx, w.level.spawn.y)
+  const e = spawnNpc(w, 'mutant', w.level.spawn.x + dx, w.level.spawn.y)
   e.ai!.guard = true
   e.health = { hp, max: hp, iframes: 0 }
   e.resist = resist

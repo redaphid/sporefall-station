@@ -35,7 +35,7 @@ const ttkSeconds = (shots: number, cooldownTicks: number): number => ((shots - 1
 const table = (label: string, dmg: number, cd: number): void => {
   console.log(`\n=== ${label} — pistol ${dmg} dmg / ${cd} ticks (${((30 / cd) * dmg).toFixed(1)} dps) ===`)
   console.log('enemy       hp   physResist  shots   TTK(s)')
-  for (const arch of ['thug', 'gangster', 'cinder', 'robot', 'brute', 'boss']) {
+  for (const arch of ['mutant', 'acolyte', 'cinder', 'robot', 'brute', 'boss']) {
     const def = NPCS[arch]
     const s = shotsToKill(arch, dmg)
     console.log(

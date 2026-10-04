@@ -65,12 +65,13 @@ describe('sequenced casting: golden digests', () => {
   // resolveWeapon's newest-element pick) reproduces both old digests.
   // Re-pinned when NPC goals gained commitment and settlers took seats at
   // props (was ee39480f / 5930fe81): the fire path is unchanged, the crowd
-  // around it moves differently. Both run on frozen landing maps; 1234 was
-  // re-captured (was 93a464b3) when the landing floor started keeping its
-  // berth clear of residents and patrols, which moves where that crew stands.
+  // around it moves differently. Re-pinned by the lore rename, and again when
+  // the cash terminal left the shopfloor. Both run on frozen landing maps (the
+  // classic floor-1 grid, as authored state). Seed 7 equals main's; 1234 also
+  // moves with the landing berth, which shifts where that floor's crew stands.
   const GOLDEN: Record<number, string> = {
-    7: 'c5354a88',
-    1234: '0188aa7e',
+    7: 'f0f577c1',
+    1234: 'b5f38eca',
   }
 
   for (const seed of [7, 1234]) {

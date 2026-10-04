@@ -111,9 +111,6 @@ export type SimEvent =
   /** A `contain` mission's Spore Node bloomed (soft-fail): the room floods with
    * spores. Not a loss — just harder. */
   | { type: 'bloom'; x: number; y: number; entityId: EntityId }
-  /** An `extraction` carrier went down or died: the prize (new pickup `entityId`)
-   * lies where they fell. */
-  | { type: 'prizeDropped'; entityId: EntityId; byId: EntityId; x: number; y: number }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */
@@ -152,7 +149,7 @@ export type SimEvent =
    * they had no gun to hold it). `timedOut` = the hand ran out of time and took
    * the card under the cursor. */
   | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
-  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+  /** #86 — the crew/wardens noticed enough gunfire (or an attack on a player) to
    * raise `w.alarm` to `level`. */
   | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
   /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */

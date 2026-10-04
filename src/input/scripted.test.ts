@@ -17,14 +17,14 @@ const play = (scenario: string, script: string) => {
   const w = s.world
   const player = w.entities.find((e) => e.playerCtl)!
   const door = (x: number) => w.entities.find((e) => e.door && Math.abs(e.pos.x - x) < 0.8 && Math.abs(e.pos.y - 11) < 0.8)
-  return { w, player, door, missionComplete, liveThugs: w.entities.filter((e) => e.archetype === 'thug' && !e.dead).length }
+  return { w, player, door, missionComplete, liveMutants: w.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length }
 }
 
 describe('scripted demo runs are deterministic wins', () => {
-  it('demo: opens the door, keeps the pickup, kills both thugs, survives', () => {
+  it('demo: opens the door, keeps the pickup, kills both mutants, survives', () => {
     const r = play('demo', 'demo')
     expect(r.w.gameOver).toBe(false)
-    expect(r.liveThugs).toBe(0)
+    expect(r.liveMutants).toBe(0)
     expect(r.player.health!.hp).toBeGreaterThan(0)
     expect(r.door(12)?.door!.open).toBe(true)
   })
@@ -39,7 +39,7 @@ describe('scripted demo runs are deterministic wins', () => {
 
   it('shooting: all three targets are gunned down', () => {
     const r = play('shooting', 'shooting')
-    expect(r.liveThugs).toBe(0)
+    expect(r.liveMutants).toBe(0)
     expect(r.w.gameOver).toBe(false)
   })
 

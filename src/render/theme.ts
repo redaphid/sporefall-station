@@ -16,7 +16,7 @@ export const DEFAULT_THEME_ID = 'swampspace-hires'
 
 // The original 48px pack stays the fallback BASE of every resolution chain, so
 // any sprite the active pack doesn't map falls through to it (and then to
-// procedural art) rather than going blank. The old city/test packs are no
+// procedural art) rather than going blank. The old settlement/test packs are no
 // longer supported.
 export const BASE_THEME_ID = 'swampspace'
 
@@ -56,26 +56,26 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
 // not a canonical key, so validateManifest would DROP a boss sprite mapping
 // with a warning and the art pass could not land without a code change. Until
 // those files exist the loader finds nothing and art.characterSet falls through
-// to the thug body exactly as before.
+// to the mutant body exactly as before.
 // #78 — the Sporefall threat roster (brute/cinder/sporeling/stalker/lurker/pod)
 // all spawn in normal play. They are canonical char keys for the same reason
 // `boss` is: without them `char.brute.*` is not canonical, so validateManifest
 // DROPS the mapping and the art can never load however many files ship.
-export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
+export const CHAR_NAMES = ['player', 'warden', 'mutant', 'civilian', 'scientist', 'acolyte', 'robot', 'boss',
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
   // The group roster (systems/groups.ts) — canonical for the same reason.
   'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
-export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
+export const ITEM_IDS = ['pistol', 'wrench', 'knife', 'medkit', 'cash', 'shotgun', 'molotov', 'grenade-item'] as const
 // The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
 // `crate` are canonical for the same reason `boss` is above: a prop key that is
 // not listed here is not canonical, so validateManifest DROPS the mapping and
 // the PNG is silently discarded however correct the file is. `crate` needed no
 // new art at all -- cargo-crate.png has shipped since the pack landed and was
 // only ever reachable as prop.default.
-export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
+export const PROP_NAMES = ['barrel', 'cryo-terminal', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
   'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node'] as const
-const UNIT_SINGLES = ['player', 'cop'] as const
-const UNIT_WALKERS = ['thug', 'scientist', 'robot'] as const
+const UNIT_SINGLES = ['player', 'warden'] as const
+const UNIT_WALKERS = ['mutant', 'scientist', 'robot'] as const
 
 /** Keys whose value is an animation-frame ARRAY (everything else is a single path). */
 export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.explosion', 'fx.pickup', 'fx.blood'])
@@ -86,8 +86,8 @@ export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.e
  * corridor `hall`, vent `grate`, ceramic `tiled`, tread `plating`, the outer
  * pressure `hull` (wall family) and the `bog` seep flooding the deck. */
 export const TILE_NAMES = [
-  'street',
-  'sidewalk',
+  'causeway',
+  'boardwalk',
   'floor',
   'wall',
   'grass',
@@ -192,14 +192,14 @@ export interface ThemeManifest {
 }
 
 /** A manifest bound to the folder it loaded from (dir is app-root-relative,
- * with trailing slash, e.g. "themes/city/"). */
+ * with trailing slash, e.g. "themes/settlement/"). */
 export interface LoadedTheme {
   id: string
   dir: string
   manifest: ThemeManifest
 }
 
-/** Resolution order: active theme first, default (city) last. May be empty —
+/** Resolution order: active theme first, default (settlement) last. May be empty —
  * everything then falls back to built-in procedural art + built-in names. */
 export type ThemeChain = readonly LoadedTheme[]
 
@@ -428,7 +428,7 @@ export const resolveSpritePaths = (key: string, chain: ThemeChain): string[] | u
  * art pipeline names frames `<kind>-<dir>-<state>.png` (spritesheet.py
  * --kind), so the file mapped to `char.<name>.s-idle` names the body:
  * `chars/spore-drone-s-idle.png` is a `spore-drone`. A name whose file breaks
- * the convention (city's `cop/front-idle.png`) or is unmapped gets no entry. */
+ * the convention (settlement's `warden/front-idle.png`) or is unmapped gets no entry. */
 export const charArtKinds = (chain: ThemeChain): Record<string, string> => {
   const out: Record<string, string> = {}
   for (const name of CHAR_NAMES) {

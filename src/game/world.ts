@@ -30,10 +30,8 @@ export interface MissionState {
    *  `contain`    — destroy the Spore Node (targetEntityId) before it BLOOMS;
    *                 the bloom is a soft-fail (room floods with spores), never a loss.
    *  `infiltrate` — reach & eliminate a target sealed behind a biolock (open it by
-   *                 keycard, power-cut, or breach). Completes on target death.
-   *  `extraction` — a steal whose pickup raises the station alert; it completes
-   *                 only when a standing prize-holder reaches `extractPoint`. */
-  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate' | 'extraction'
+   *                 keycard, power-cut, or breach). Completes on target death. */
+  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate'
   targetEntityId?: EntityId
   targetBuilding?: number
   complete: boolean
@@ -79,10 +77,6 @@ export interface MissionState {
    * what keeps the boss dormant — and its brood unspent — until someone walks
    * in. Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
   bossRevealed?: boolean
-  /** `extraction` only: the tile (integer corner) the party came in by — the
-   * level spawn. Reaching it with the prize is the way out; the Launch Bay stays
-   * locked. `targetEntityId` follows the prize while it lies on the floor. */
-  extractPoint?: Vec2
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */
@@ -150,7 +144,7 @@ export interface World {
   baseRng: Rng
   /** Per-tick FX/net events; consumed after each tick. */
   events: SimEvent[]
-  /** City heat 0..3 — cop aggro threshold. */
+  /** City heat 0..3 — warden aggro threshold. */
   alarm: number
   /** Per-wing power state: `powerCut[wing] === true` means that wing's grid is
    * down (a hacked generator/Cryo Terminal), which auto-unseals its `'power'`

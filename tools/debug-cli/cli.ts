@@ -4,7 +4,7 @@
 //   npx tsx tools/debug-cli/cli.ts state
 //   npx tsx tools/debug-cli/cli.ts games                 (list connected games)
 //   npx tsx tools/debug-cli/cli.ts --game g2 state       (target a specific game)
-//   npx tsx tools/debug-cli/cli.ts spawn npc cop 20 20
+//   npx tsx tools/debug-cli/cli.ts spawn npc warden 20 20
 //   npx tsx tools/debug-cli/cli.ts set 5 '{"health":{"hp":1}}'
 //   npx tsx tools/debug-cli/cli.ts addMod 5 frost 1      (stack a weapon mod on a gun)
 //   npx tsx tools/debug-cli/cli.ts dump > world.json     (snapshot the whole world)

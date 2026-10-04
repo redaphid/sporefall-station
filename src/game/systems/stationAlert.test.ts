@@ -2,8 +2,8 @@
 // into an escape run: every door unseals and pops open, and the whole floor
 // commits to hunting the intruder across rooms.
 //
-// These tests drive the REAL systems through `tickWorld`/`runTicks` on real
-// generated floors and assert on observable outcomes (door state, chosen goals,
+// These tests drive the REAL systems through `tickWorld`/`runTicks` on
+// authored city floors (testkit `createCityWorld`) and assert on observable outcomes (door state, chosen goals,
 // distance closed) rather than internals. The adversarial cases are the ones
 // that matter here:
 //   • the door sweep must never CLOSE anything (the stuck-in-a-door bug, 795d336),
@@ -38,12 +38,6 @@ const bootTemplate = (template: string, floors: number[], players = 1): World =>
   for (let seed = 1; seed <= 300; seed++) {
     for (const floor of floors) {
       const w = boot(seed, floor, players)
-      // An extraction is a re-ruled steal on an identical world; turn it back
-      // so these tests keep the exact floors they were written against.
-      if (template === 'steal' && w.mission.template === 'extraction') {
-        w.mission.template = 'steal'
-        delete w.mission.extractPoint
-      }
       if (w.mission.template !== template) continue
       if (!w.entities.some((e) => e.ai && !e.dead && !e.playerCtl)) continue
       return w
@@ -68,7 +62,7 @@ const firstPlayer = (w: World): Entity => w.entities.find((e) => e.playerCtl)!
 /** Complete a `steal` objective the way auto-pickup does, and tick once. */
 const takeThePrize = (w: World): Entity => {
   const p = firstPlayer(w)
-  p.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+  p.loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
   runTicks(w, idle(0), 1)
   return p
 }
@@ -347,7 +341,7 @@ describe('the broadcast keeps the run evadable', () => {
     const w = bootTemplate('steal', [1, 2, 3], 2)
     const players = w.entities.filter((e) => e.playerCtl)
     expect(players.length).toBe(2)
-    players[0].loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    players[0].loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0, 1), 1)
     expect(w.mission.alertFocusId).toBe(players[0].id)
 
@@ -361,7 +355,7 @@ describe('the broadcast keeps the run evadable', () => {
   it('ADVERSARIAL: never targets a player — allies of nobody, the party is never hunted by itself', () => {
     const w = bootTemplate('steal', [1, 2, 3], 2)
     const players = w.entities.filter((e) => e.playerCtl)
-    players[0].loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    players[0].loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0, 1), 20)
     for (const p of players) expect(p.ai).toBeUndefined()
   })

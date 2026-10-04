@@ -1,6 +1,6 @@
 // Interactive & destructible world objects — data-driven, grounded in the
-// decompiled ObjectReal hierarchy (ExplodingBarrel, Crate, ATMMachine,
-// vending), authored fresh. Each object has hp and declares what it does when
+// decompiled ObjectReal hierarchy (ExplodingBarrel, Crate, vending), authored
+// fresh. Each object has hp and declares what it does when
 // destroyed (spill loot, blast, ignite) and/or when used (dispense cash/item).
 
 export interface ObjectDef {
@@ -34,11 +34,9 @@ export const OBJECTS: Record<string, ObjectDef> = {
   // The burger was this machine's ONLY payout, and the cull took it. Rather than
   // delete the E-interact — which would quietly turn the one usable furnishing
   // on the floor into scenery, a player-facing loss the cull never asked for —
-  // it now pays out its change: a small `cash` dispense, the ATM's behaviour at
-  // a fraction of the amount. FLAGGED for review: this is the one substitution
+  // it now pays out its change: a small `cash` dispense. FLAGGED for review: this is the one substitution
   // in the cull rather than a straight deletion.
   vending: { id: 'vending', name: 'Nutrient Dispenser', hp: 40, loot: ['cash'], use: { gives: 'cash', amount: 10 } },
-  atm: { id: 'atm', name: 'ATM', hp: 50, hackable: true, use: { gives: 'cash', amount: 50 } },
   generator: { id: 'generator', name: 'Generator', hp: 30, hackable: true, explode: { radius: 1.6, damage: 15 }, ignite: true },
   // Sporefall Station power plant — same hackable behavior as `generator`, dressed
   // as the station's Cryo Terminal so a power-cut objective reads in-fiction.

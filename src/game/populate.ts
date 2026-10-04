@@ -21,12 +21,12 @@ import { floodLinked, stairReservedKeys } from './stairs'
  * turn up during exploration (#53 draft aside) at about 1-in-3 rooms. Tunable. */
 export const MOD_PICKUP_ROOM_CHANCE = 1 / 3
 
-/** No street-life NPC (or street patrol waypoint) may be placed closer than this
+/** No causeway-life NPC (or causeway patrol waypoint) may be placed closer than this
  * to the player spawn. Sized past the LONGEST NPC sight range (8) so that with
  * `world.hostile` (every NPC engages players on sight) nobody can already see —
  * and beeline for — the spawn tile on tick 0. Before this guard, ~8% of seeds
  * beat an idle just-spawned player to death within 10 seconds (seed 7 among
- * them: a bat civilian 2.2 tiles from spawn). Building interiors are exempt —
+ * them: a wrench civilian 2.2 tiles from spawn). Building interiors are exempt —
  * walls block sight, and the door is the player's choice to open. */
 export const SPAWN_SAFE_RADIUS = 9
 
@@ -46,7 +46,7 @@ const safeRadius = (w: World): number => (w.floor === 1 ? LANDING_SAFE_RADIUS : 
  * same seed → same layout, whatever the arsenal does. */
 const NPC_ARSENAL: [string, number][] = [
   ['knife', 5],
-  ['bat', 5],
+  ['wrench', 5],
   ['pistol', 5],
   ['shotgun', 2],
   ['machinegun', 2],
@@ -125,10 +125,10 @@ export const populateWorld = (w: World): void => {
   for (let i = 0; i < w.level.buildings.length; i++) {
     populateBuilding(w, rng, wrng, w.level.buildings[i], i)
   }
-  // Indoor complex floors have no streets: the corridors get crew and
+  // Indoor complex floors have no causeways: the corridors get crew and
   // security beats instead (same `populate` stream position, own logic).
   if (w.level.complex) spawnCorridorLife(w, rng, wrng)
-  else spawnStreetLife(w, rng, wrng)
+  else spawnCausewayLife(w, rng, wrng)
   sprinkleLoot(w, rng)
   scatterModPickups(w)
   // #78 follow-up: seed the resist-differentiated Sporefall roster into normal
@@ -146,7 +146,7 @@ export const populateWorld = (w: World): void => {
   furnishInteriors(w)
   // Tactical-AI post-passes, each on its OWN fork so every stream above stays
   // byte-identical per seed (the existing populate tests are the proof):
-  // a bunker defender turns barricader, then gangster packs become squads
+  // a bunker defender turns barricader, then acolyte packs become squads
   // (in that order, so a squad never conscripts the barricader), and deep
   // floors seed dormant corner-ambushers into back rooms.
   assignBarricaders(w)
@@ -284,7 +284,7 @@ const assignBarricaders = (w: World): void => {
     const pack = w.entities.filter(
       (e) =>
         e.kind === 'npc' &&
-        (e.archetype === 'thug' || e.archetype === 'gangster') &&
+        (e.archetype === 'mutant' || e.archetype === 'acolyte') &&
         e.ai?.zone?.building === bi &&
         e.ai.behavior !== 'patrol',
     )
@@ -296,10 +296,10 @@ const assignBarricaders = (w: World): void => {
 
 /** Squad size cap: lead + flank + rears. */
 export const SQUAD_MAX = 4
-/** Chance an eligible gang pack actually forms up (some stay a loose rabble). */
+/** Chance an eligible rootcult pack actually forms up (some stay a loose rabble). */
 const SQUAD_CHANCE = 0.85
 
-/** Link each warehouse/bunker's role-spawned gang pack (thugs/gangsters bound
+/** Link each warehouse/bunker's role-spawned rootcult pack (mutants/acolytes bound
  * to that building) into a `squad` (behaviors.ts): first member leads, second
  * flanks, the rest stack rear. Post-pass over spawned entities in id order on a
  * DEDICATED `squads` fork — no other stream moves. Patrol beats (the
@@ -313,7 +313,7 @@ const assignSquads = (w: World): void => {
     const pack = w.entities.filter(
       (e) =>
         e.kind === 'npc' &&
-        (e.archetype === 'thug' || e.archetype === 'gangster') &&
+        (e.archetype === 'mutant' || e.archetype === 'acolyte') &&
         e.ai?.zone?.building === bi &&
         e.ai.behavior !== 'patrol' &&
         e.ai.behavior !== 'barricader',
@@ -680,7 +680,7 @@ const balanceLanding = (w: World): void => {
     const { b, i } = homes[rng.int(0, homes.length - 1)]
     const spot = randomFloorInBuilding(w, rng, b, true)
     if (!spot) continue
-    const npc = spawnNpc(w, 'thug', spot.x, spot.y, rng)
+    const npc = spawnNpc(w, 'mutant', spot.x, spot.y, rng)
     if (npc.ai) npc.ai.zone = { building: i, role: b.role }
     n++
   }
@@ -697,14 +697,14 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   apartment: [{ archetype: 'civilian', count: [1, 3] }],
   office: [
     { archetype: 'civilian', count: [1, 2] },
-    { archetype: 'cop', count: [0, 1] },
+    { archetype: 'warden', count: [0, 1] },
   ],
-  warehouse: [{ archetype: 'thug', count: [2, 3] }],
+  warehouse: [{ archetype: 'mutant', count: [2, 3] }],
   clinic: [{ archetype: 'civilian', count: [1, 2] }],
   // Bunkers (themed floors >= 2 only) are garrisons: always guarded.
   bunker: [
-    { archetype: 'thug', count: [1, 2] },
-    { archetype: 'gangster', count: [1, 2] },
+    { archetype: 'mutant', count: [1, 2] },
+    { archetype: 'acolyte', count: [1, 2] },
   ],
   // Indoor complex modules (floors 3+). The essence-echoes of the crew still
   // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
@@ -714,9 +714,9 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   // city floor's, and the director's swarms/ambushes supply the pressure.
   mess: [
     { archetype: 'civilian', count: [0, 2] },
-    { archetype: 'thug', count: [0, 1] },
+    { archetype: 'mutant', count: [0, 1] },
   ],
-  galley: [{ archetype: 'thug', count: [0, 1] }],
+  galley: [{ archetype: 'mutant', count: [0, 1] }],
   quarters: [{ archetype: 'civilian', count: [0, 1] }],
   washroom: [],
   lab: [
@@ -726,12 +726,12 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   medbay: [{ archetype: 'scientist', count: [0, 1] }],
   reactor: [
     { archetype: 'robot', count: [0, 1] },
-    { archetype: 'thug', count: [0, 1] },
+    { archetype: 'mutant', count: [0, 1] },
   ],
-  depot: [{ archetype: 'thug', count: [0, 1] }],
+  depot: [{ archetype: 'mutant', count: [0, 1] }],
   security: [
-    { archetype: 'cop', count: [1, 1] },
-    { archetype: 'gangster', count: [0, 1] },
+    { archetype: 'warden', count: [1, 1] },
+    { archetype: 'acolyte', count: [0, 1] },
   ],
 }
 
@@ -741,10 +741,10 @@ const HEAVIES: ReadonlySet<string> = new Set(['robot', 'brute'])
 
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, buildingIdx: number): void => {
   const specs = ROLE_SPAWNS[building.role].filter((s) => w.floor >= 2 || !HEAVIES.has(s.archetype))
-  // Difficulty ramp: deeper floors gang up
-  if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'gangster', count: [1, 2] })
-  if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'gangster', count: [0, 1] })
-  if (w.floor >= 2 && building.role === 'shop') specs.push({ archetype: 'bouncer', count: [1, 1] })
+  // Difficulty ramp: deeper floors bring the rootcult
+  if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'acolyte', count: [1, 2] })
+  if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'acolyte', count: [0, 1] })
+  if (w.floor >= 2 && building.role === 'shop') specs.push({ archetype: 'lockkeeper', count: [1, 1] })
   for (const spec of specs) {
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
@@ -765,11 +765,11 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
       // can derive territorial goals (hold its room, garrison/defend the wing).
       if (npc.ai) npc.ai.zone = { building: buildingIdx, role: building.role }
       if (beat) assignPatrol(npc, beat)
-      // One thug per warehouse walks rounds through the stock instead of
+      // One mutant per warehouse walks rounds through the stock instead of
       // loitering — an interior patrol the players can time and slip past.
       // (Unless a set-piece beat already claimed this NPC: a warehouse-role
-      // COMPOUND's first thug walks the pit, not the stock.)
-      if (!beat && building.role === 'warehouse' && spec.archetype === 'thug' && i === 0) {
+      // COMPOUND's first mutant walks the pit, not the stock.)
+      if (!beat && building.role === 'warehouse' && spec.archetype === 'mutant' && i === 0) {
         const wbeat = [{ x: spot.x, y: spot.y }]
         for (let j = 0; j < 2; j++) {
           const p = randomFloorInBuilding(w, rng, building)
@@ -784,12 +784,12 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
 
 /** Does a patrol leg from `a` to `b` stay outside the floor's spawn berth?
  * Both the straight line and the route a walker actually takes (the AI paths
- * round buildings along the streets) must clear it. */
+ * round buildings along the causeways) must clear it. */
 const legClearsBerth = (w: World, a: { x: number; y: number }, b: { x: number; y: number }): boolean => {
   const r = safeRadius(w)
   if (distToSegment(w.level.spawn, a, b) < r) return false
   // The whole route, not the pathfinder's capped per-think budget: a walker
-  // short of a full route presses toward the goal along the same streets.
+  // short of a full route presses toward the goal along the same causeways.
   const route = findPath(w.level, a.x, a.y, b.x, b.y, { maxNodes: w.level.w * w.level.h }) ?? []
   return route.every((n) => vlen(n.x - w.level.spawn.x, n.y - w.level.spawn.y) >= r)
 }
@@ -823,7 +823,7 @@ const patrolBeat = (building: Building, isFirst: boolean): { x: number; y: numbe
 }
 
 // WEAPONS ARE NOT LOOT. The player carries ONE permanent weapon and cannot pick
-// another up, so a gun on the floor would be a dead sparkle. The bat/knife that
+// another up, so a gun on the floor would be a dead sparkle. The wrench/knife that
 // used to open the basic table are simply GONE from it; the depth gate is
 // otherwise untouched, so floor 1 stays basic and the element throwables still
 // fold in as you descend, bringing the frost/fire/shock/sleep/poison systems
@@ -888,37 +888,37 @@ const stockShop = (w: World, rng: Rng, building: Building): void => {
   }
 }
 
-const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
+const spawnCausewayLife = (w: World, rng: Rng, wrng: Rng): void => {
   const wanderers = rng.int(4, 7)
   for (let i = 0; i < wanderers; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
+    const spot = randomCausewaySpot(w, rng, Tile.Boardwalk) ?? randomCausewaySpot(w, rng, Tile.Causeway)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
   // Scavengers: a couple of civ-faction gleaners drawn to loose loot, so the
-  // street competes with the players for unclaimed pickups.
+  // causeway competes with the players for unclaimed pickups.
   const scavengers = rng.int(1, 2)
   for (let i = 0; i < scavengers; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
+    const spot = randomCausewaySpot(w, rng, Tile.Boardwalk) ?? randomCausewaySpot(w, rng, Tile.Causeway)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng).ai!.behavior = 'scavenger'
   }
-  const copPairs = 1 + Math.floor(w.floor / 3)
-  for (let i = 0; i < copPairs; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Street)
+  const wardenPairs = 1 + Math.floor(w.floor / 3)
+  for (let i = 0; i < wardenPairs; i++) {
+    const spot = randomCausewaySpot(w, rng, Tile.Causeway)
     if (spot) {
-      const a = spawnNpc(w, 'cop', spot.x, spot.y, wrng)
-      const b = spawnNpc(w, 'cop', spot.x + 0.8, spot.y, wrng)
-      // The pair walks a shared street beat instead of loitering at one corner.
+      const a = spawnNpc(w, 'warden', spot.x, spot.y, wrng)
+      const b = spawnNpc(w, 'warden', spot.x + 0.8, spot.y, wrng)
+      // The pair walks a shared causeway beat instead of loitering at one corner.
       // Waypoints respect the spawn-safe radius too, so a beat never marches
       // the pair straight through the player's landing zone.
       // A leg is kept only if its whole line stays outside the berth: the
       // waypoints alone do not, since a leg can cut right past the spawn.
       const beat = [{ x: spot.x, y: spot.y }]
       for (let j = 0; j < 2; j++) {
-        const p = randomStreetSpot(w, rng, Tile.Street)
+        const p = randomCausewaySpot(w, rng, Tile.Causeway)
         if (p && legClearsBerth(w, beat[beat.length - 1], p)) beat.push(p)
       }
       // The beat loops, so every leg, the way back included, must clear too
-      // (a route there and the route back can take different streets).
+      // (a route there and the route back can take different causeways).
       while (beat.length > 1 && !beatClearsBerth(w, beat)) beat.pop()
       assignPatrol(a, beat)
       assignPatrol(b, beat)
@@ -956,14 +956,14 @@ const distToSegment = (p: { x: number; y: number }, a: { x: number; y: number },
   return vlen(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
 }
 
-/** Indoor-complex replacement for street life: a few crew echoes drifting the
+/** Indoor-complex replacement for causeway life: a few crew echoes drifting the
  * corridors, and station-security pairs walking corridor beats. A beat is only
  * eligible when its WHOLE centreline stays outside the spawn-safe radius, so a
  * patrol never marches through the landing zone. */
 const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
   const wanderers = rng.int(CORRIDOR_WANDERERS[0], CORRIDOR_WANDERERS[1])
   for (let i = 0; i < wanderers; i++) {
-    const spot = randomStreetSpot(w, rng, Tile.Hall)
+    const spot = randomCausewaySpot(w, rng, Tile.Hall)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng)
   }
   const beats = (w.level.complex?.corridors ?? [])
@@ -973,8 +973,8 @@ const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
   for (let i = 0; i < pairs; i++) {
     const beat = beats.splice(rng.int(0, beats.length - 1), 1)[0]
     const along = beat[0].x === beat[1].x ? { x: 0, y: 0.8 } : { x: 0.8, y: 0 }
-    const a = spawnNpc(w, 'cop', beat[0].x, beat[0].y, wrng)
-    const b = spawnNpc(w, 'cop', beat[0].x + along.x, beat[0].y + along.y, wrng)
+    const a = spawnNpc(w, 'warden', beat[0].x, beat[0].y, wrng)
+    const b = spawnNpc(w, 'warden', beat[0].x + along.x, beat[0].y + along.y, wrng)
     assignPatrol(a, beat)
     assignPatrol(b, beat)
   }
@@ -1018,7 +1018,7 @@ const spawnComplexSleepers = (w: World): void => {
     for (let i = 0; i < n; i++) {
       const t = free.splice(rng.int(0, free.length - 1), 1)[0]
       taken.add(t.y * lw + t.x)
-      const npc = spawnNpc(w, 'thug', t.x + 0.5, t.y + 0.5)
+      const npc = spawnNpc(w, 'mutant', t.x + 0.5, t.y + 0.5)
       npc.ai!.zone = { building: bi, role: b.role }
       npc.ai!.dormant = true
       npc.ai!.wakeOn = ['damage', 'noise']
@@ -1166,7 +1166,7 @@ const randomFloorInBuilding = (
   building: Building,
   /** An occupant: on a complex floor the gatehouse rooms sit right by the
    * airlock, and on the landing floor any district's buildings can stand by
-   * the edge the run starts on, so keep the spawn-safe radius clear (as street
+   * the edge the run starts on, so keep the spawn-safe radius clear (as causeway
    * life does). */
   occupant = false,
 ): { x: number; y: number } | null => {
@@ -1186,7 +1186,7 @@ const randomFloorInBuilding = (
 /** A random tile of `tile` type outside the spawn-safe radius, as a tile-centre
  * world coord, or null. Every attempt draws the same two ints whether or not it
  * is rejected — determinism is per-seed, not per-layout. */
-const randomStreetSpot = (w: World, rng: Rng, tile: number): { x: number; y: number } | null => {
+const randomCausewaySpot = (w: World, rng: Rng, tile: number): { x: number; y: number } | null => {
   for (let attempt = 0; attempt < 20; attempt++) {
     const tx = rng.int(1, w.level.w - 2)
     const ty = rng.int(1, w.level.h - 2)

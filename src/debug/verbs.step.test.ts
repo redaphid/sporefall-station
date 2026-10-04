@@ -58,13 +58,13 @@ describe('step verb with a held input', () => {
   it('aimAt lands shots on a target straight below the player; the default aim misses it', () => {
     const shoot = (input: string) => {
       const { w } = arena()
-      const npc = spawnNpc(w, 'thug', 20, 25)
+      const npc = spawnNpc(w, 'mutant', 20, 25)
       const hp0 = npc.health!.hp
       step(w, `step 60 ${input}`)
       return hp0 - npc.health!.hp
     }
     const { w } = arena()
-    const npcId = spawnNpc(w, 'thug', 20, 25).id
+    const npcId = spawnNpc(w, 'mutant', 20, 25).id
     expect(shoot(`{"aimAt":${npcId},"attack":true}`)).toBeGreaterThan(0)
     expect(shoot('{"attack":true}')).toBe(0)
   })
@@ -81,7 +81,7 @@ describe('step verb with a held input', () => {
 
   it('reports event counts and the acting player', () => {
     const { w, pid } = arena()
-    spawnNpc(w, 'thug', 23, 20)
+    spawnNpc(w, 'mutant', 23, 20)
     const r = step(w, 'step 45 {"aimX":1,"aimY":0,"attack":true}')
     expect(r.player).toBe(pid)
     expect(r.advanced).toBe(45)
@@ -123,8 +123,8 @@ describe('playtest over saved worlds', () => {
   it('a run split across serialize/deserialize is byte-identical to one continuous run', () => {
     const once = arena()
     const split = arena()
-    spawnNpc(once.w, 'thug', 20, 25)
-    spawnNpc(split.w, 'thug', 20, 25)
+    spawnNpc(once.w, 'mutant', 20, 25)
+    spawnNpc(split.w, 'mutant', 20, 25)
     const npcId = once.w.entities.find((e) => e.kind === 'npc')!.id
     runVerb(once.w, `step 90 {"aimAt":${npcId},"attack":true,"moveX":0.3}`)
     let w = split.w
@@ -139,7 +139,7 @@ describe('playtest over saved worlds', () => {
 describe('look verb', () => {
   it('reports the player build and nearby entities nearest first, within the radius', () => {
     const { w, pid } = arena()
-    const far = spawnNpc(w, 'thug', 20, 31)
+    const far = spawnNpc(w, 'mutant', 20, 31)
     const near = spawnNpc(w, 'brute', 23, 20)
     runVerb(w, `addMod ${pid} frost`)
     const seen = JSON.parse(runVerb(w, 'look 8'))
@@ -155,7 +155,7 @@ describe('look verb', () => {
 
   it('shows element statuses on a struck target', () => {
     const { w, pid } = arena()
-    const npc = spawnNpc(w, 'thug', 20, 25)
+    const npc = spawnNpc(w, 'mutant', 20, 25)
     runVerb(w, `addMod ${pid} incendiary`)
     runVerb(w, `step 40 {"aimAt":${npc.id},"attack":true}`)
     const seen = JSON.parse(runVerb(w, 'look'))

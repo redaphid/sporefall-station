@@ -1,8 +1,8 @@
-// Craft the `crossfire` save: a market plaza on a neutral floor. A gang crew
-// holds the north arcade and a police line walks its beat up from the south.
-// They are sworn enemies and open fire on sight. Shoppers scatter, the bouncer
+// Craft the `crossfire` save: a market plaza on a neutral floor. A rootcult crew
+// holds the north arcade and a warden line walks its beat up from the south.
+// They are sworn enemies and open fire on sight. Shoppers scatter, the lockkeeper
 // guards his door, and nobody is after the player until the player gives them a
-// reason. Shoot a bystander and the cops turn on you too.
+// reason. Shoot a bystander and the wardens turn on you too.
 //
 // Run: pnpm exec tsx scripts/saves/crossfire.mts
 
@@ -19,10 +19,10 @@ const s = new Sketch(W, H, '#')
 s.fill(1, 1, W - 2, H - 2, '-')
 s.fill(6, 8, W - 7, H - 9, '+') // the plaza
 s.fill(19, 15, 26, 20, ',') // the green at its heart
-// North arcade: a colonnade the gang shoots from.
+// North arcade: a colonnade the rootcult shoots from.
 s.fill(4, 3, W - 5, 3, '#')
 for (let x = 6; x < W - 6; x += 5) s.fill(x, 5, x, 6, '#')
-// South: the police barricade line, with gaps.
+// South: the warden barricade line, with gaps.
 for (let x = 7; x < W - 7; x += 6) s.fill(x, H - 7, x + 2, H - 7, '#')
 // East: the club, its door on the plaza.
 s.room(W - 9, 12, W - 2, 23, '.').put(W - 9, 17, '.').put(W - 9, 18, '.')
@@ -37,24 +37,24 @@ arm(player, 'shotgun', [
 ])
 
 const cast: Array<[archetype: string, x: number, y: number]> = [
-  ['gangster', 10.5, 9.5],
-  ['gangster', 20.5, 8.5],
-  ['gangster', 30.5, 9.5],
-  ['thug', 15.5, 10.5],
-  ['thug', 25.5, 10.5],
-  ['thug', 35.5, 10.5],
+  ['acolyte', 10.5, 9.5],
+  ['acolyte', 20.5, 8.5],
+  ['acolyte', 30.5, 9.5],
+  ['mutant', 15.5, 10.5],
+  ['mutant', 25.5, 10.5],
+  ['mutant', 35.5, 10.5],
   ['civilian', 14.5, 14.5],
   ['civilian', 22.5, 13.5],
   ['civilian', 30.5, 16.5],
   ['civilian', 17.5, 22.5],
   ['scientist', 27.5, 21.5],
   ['shopkeeper', 11.5, 18.5],
-  ['bouncer', W - 10.5, 17.5],
+  ['lockkeeper', W - 10.5, 17.5],
 ]
 for (const [archetype, x, y] of cast) spawnNpc(w, archetype, x, y)
-// The police line walks its beat up into the plaza, straight at the arcade.
+// The warden line walks its beat up into the plaza, straight at the arcade.
 for (const x of [10.5, 16.5, 22.5, 28.5, 34.5]) {
-  assignPatrol(spawnNpc(w, 'cop', x, 30.5), [
+  assignPatrol(spawnNpc(w, 'warden', x, 30.5), [
     { x, y: 30.5 },
     { x, y: 14.5 },
   ])

@@ -31,7 +31,7 @@ if (wanted && builds.length !== wanted.length) throw new Error(`unknown build in
 const seeds = list('seeds')?.map(Number) ?? [...CENSUS_SEEDS]
 if (seeds.length === 0 || !seeds.every((s) => Number.isInteger(s) && s >= 0)) throw new Error(`--seeds needs non-negative integers, got "${flag('seeds')}"`)
 const unmodded = CENSUS_BUILDS.find((b) => b.name === 'none')!
-const REACH_ARCHETYPE = 'gangster'
+const REACH_ARCHETYPE = 'acolyte'
 const reachDistances = args.includes('--no-reach') ? [] : [4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 const fights: FightResult[] = []

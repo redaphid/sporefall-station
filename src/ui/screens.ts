@@ -216,7 +216,7 @@ export const createScreens = (
   }
 
   // ---- The BOSS: entrance card + pinned health bar ------------------------
-  // Neither existed. The Alpha wore the thug's sprite and died in under two
+  // Neither existed. The Alpha wore the mutant's sprite and died in under two
   // seconds, so a player could clear a dozen boss floors and truthfully say
   // they had never met a boss. The card is the "this is a boss" moment; the bar
   // is the "and it is still alive" moment that lasts the whole fight.
@@ -356,9 +356,7 @@ export const createScreens = (
           // completion banner: "you won" is much less useful right now than
           // "every door just opened and the floor is coming for you".
           if (ev.type === 'missionComplete') showBanner('MISSION COMPLETE')
-          else if (ev.type === 'stationAlert')
-            showBanner(view.extraction ? 'STATION ALERT — GET OUT THE WAY YOU CAME' : 'STATION ALERT — GET TO THE LAUNCH BAY')
-          else if (ev.type === 'prizeDropped') showBanner('PRIZE DROPPED — GO GET IT')
+          else if (ev.type === 'stationAlert') showBanner('STATION ALERT — GET TO THE LAUNCH BAY')
           else if (ev.type === 'floorChange') showBanner(`FLOOR ${ev.floor}`)
           else if (ev.type === 'alarmRaised')
             showBanner(`ALARM ${ev.level}/3 — ${ev.cause === 'gunfire' ? 'THE CREW HEARD GUNFIRE' : 'THE CREW SAW THE ATTACK'}`)

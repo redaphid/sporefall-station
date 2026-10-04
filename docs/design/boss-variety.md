@@ -30,7 +30,7 @@ same three.
 
 ```ts
 archetype: 'boss',
-faction: 'gang',
+faction: 'rootcult',
 hp: 320,
 speed: 3.2,
 weapon: 'claws',
@@ -97,7 +97,7 @@ const retreatToSpore: Consideration = (w, e) => {
 }
 ```
 
-`threat`, `hunt` and `wander` are the same functions a common thug uses.
+`threat`, `hunt` and `wander` are the same functions a common mutant uses.
 
 **This is the cheapest lever in the engine.** A new boss "strategy", in the
 movement/targeting sense, costs one pure function and one registry line.
@@ -531,7 +531,7 @@ what happens.
 | Template | Objective | Completion | Fail |
 |---|---|---|---|
 | `reach` | get to the Launch Bay | born complete (fallback when there is no building) | — |
-| `steal` | grab the specimen canister | any player holds `briefcase` (`:462`) | none |
+| `steal` | grab the specimen canister | any player holds `canister` (`:462`) | none |
 | `assassinate` | kill the Mireclaw Alpha | target dead (`:467`) | none |
 | `contain` (floor 5+) | burn the Spore Node before `bloomTick` | node dead by any cause | **soft** — it blooms |
 | `infiltrate` (floor 5+) | breach a biolock, kill the Mireclaw | boss dead | none |
@@ -572,6 +572,9 @@ completion. You start with the prize; the objective is the door you came in by.
 The machinery is identical — only the ordering changes. **The highest ratio of
 new-feeling to lines-changed in this document.** It also finally uses
 `broadcastAlert`, which is already built and barely exercised. **Small.**
+
+*Status (2026-10-04): shipped as #85, then removed. Walking back to the entry
+made every floor end where it began, so every floor's exit is now the Launch Bay.*
 
 **B. `holdout` — defend a point for N ticks.** Reuses `bloomTick` (a serialized
 countdown), `spawnEncounters` (`populate.ts:542`, already weighted by floor and
@@ -666,8 +669,8 @@ PR 8.
 
 ### And the thing that is not in this document at all
 
-Every boss above will look like a common thug. `docs/assets/boss-art-brief.md`
-records that `CHARSET_ALIAS.boss = 'thug'`, and calls it *"the single largest
+Every boss above will look like a common mutant. `docs/assets/boss-art-brief.md`
+records that `CHARSET_ALIAS.boss = 'mutant'`, and calls it *"the single largest
 reason the owner cleared roughly six boss floors and reported never having met a
 boss."* The brief is **NOT STARTED, blocked on a ComfyUI custom-node install
 needing owner approval.**

@@ -65,7 +65,7 @@ export interface GameRenderer {
   /** Hot-swap the active visual theme (presentation only — never touches the
    * sim). Resolves when the new assets are baked and applied. */
   setTheme(id: string): Promise<void>
-  /** Sprite thumbnail for an art key ('cop', 'medkit', 'door', …) as a PNG data
+  /** Sprite thumbnail for an art key ('warden', 'medkit', 'door', …) as a PNG data
    * URL — the inspect card's picture of the thing tapped. Extracted from the
    * live art registry (so it matches the active theme exactly), cached per key,
    * cache dropped on theme swap. Undefined when extraction isn't possible. */
@@ -632,9 +632,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           },
           radiusToUv: (r) => (r * pxPerTile) / sh2,
         }
-        // Exit-portal idle flourish: anchored on the way out — the level's exit
-        // tile, or the entry during an extraction.
-        const out = view.extraction ?? currentLevel?.exit
+        // Exit-portal idle flourish: anchored on the level's exit tile.
+        const out = currentLevel?.exit
         if (out && onStorey(out.x)) {
           const e = proj.toUv(out.x + 0.5, out.y + 0.5)
           pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))

@@ -116,7 +116,7 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
           ).toBe(true)
         }
 
-        // On a real Floor tile — never a wall, street, or courtyard pit.
+        // On a real Floor tile — never a wall, causeway, or courtyard pit.
         expect(isDeck(w, tx, ty), `${ctx}: target tile not Floor (poi=${b.poi ?? 'plain'})`).toBe(true)
 
         // Reachable on foot from the spawn.
@@ -154,19 +154,19 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
       if (w.mission.template === 'reach') continue
       const target = w.byId.get(w.mission.targetEntityId!)!
       if (w.mission.template === 'steal') {
-        // Hand the briefcase to a synthetic player and drop the pickup entity.
+        // Hand the canister to a synthetic player and drop the pickup entity.
         const p = { ...target, id: w.nextId++, kind: 'player' as const }
         // Real path: pickup transfers the item, entity despawns. Emulate the
-        // post-pickup state exactly: player holds briefcase, item entity gone.
+        // post-pickup state exactly: player holds canister, item entity gone.
         w.entities = w.entities.filter((e) => e !== target)
         w.byId.delete(target.id)
         p.pickup = undefined
         p.playerCtl = {
           playerId: 0,
           cash: 0,
-          crimeUntilTick: 0,
+          misdeedUntilTick: 0,
         } as never
-        p.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 } as never
+        p.loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 } as never
         w.entities.push(p as never)
         w.byId.set(p.id, p as never)
       } else {
@@ -244,9 +244,7 @@ describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor ta
       // generator (play draws floors 1-2's districts and builds 3+ indoors).
       const w = row.floor >= 2 ? buildCityFloor(row.seed, row.floor) : buildFrozenFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
-      // An extraction is a steal with different completion rules and the same
-      // placement, so it must land exactly where the pinned steal did.
-      expect(w.mission.template === 'extraction' ? 'steal' : w.mission.template, ctx).toBe(row.tpl)
+      expect(w.mission.template, ctx).toBe(row.tpl)
       expect(w.mission.targetBuilding, ctx).toBe(row.bld)
       const t = w.byId.get(w.mission.targetEntityId!)!
       expect([t.pos.x, t.pos.y], ctx).toEqual(row.pos)

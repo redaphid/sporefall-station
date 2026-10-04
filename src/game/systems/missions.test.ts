@@ -28,12 +28,12 @@ describe('roguelite loop', () => {
     expect(locked.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('steal mission completes when a player holds the briefcase, unlocking the exit', () => {
+  it('steal mission completes when a player holds the canister, unlocking the exit', () => {
     for (let seed = 1; seed < 30; seed++) {
       const { w } = makeRun(seed)
       if (w.mission.template !== 'steal') continue
       const player = w.entities.find((e) => e.playerCtl)!
-      player.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+      player.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
       missionSystem(w)
       expect(w.mission.complete).toBe(true)
       expect(w.mission.exitUnlocked).toBe(true)
@@ -64,9 +64,8 @@ describe('roguelite loop', () => {
       reach: /^Reach the Launch Bay$/,
       contain: /^Burn back the Spore Node in the .* before it blooms$/,
       infiltrate: /^Breach the biolock and purge the Mireclaw Alpha in the /,
-      extraction: /^Grab the specimen canister in the .*, then get out the way you came$/,
     }
-    const OFF_THEME = /briefcase|\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
+    const OFF_THEME = /\bboss\b|\bexit\b|\bapartment\b|\bclinic\b|\bwarehouse\b|\boffice\b|\bshop\b|\bbunker\b/i
     const seen = new Set<string>()
     for (let floor = 1; floor <= 6; floor++) {
       for (let seed = 1; seed < 30; seed++) {
@@ -105,20 +104,20 @@ describe('roguelite loop', () => {
     expect(w.mission.description.length).toBeGreaterThan(0)
   })
 
-  it('attacking a civilian in front of a cop raises the alarm and the cop aggros', () => {
+  it('attacking a civilian in front of a warden raises the alarm and the warden aggros', () => {
     const w = createWorld(13, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.combat!.weapon = 'fists'
     const civ = spawnNpc(w, 'civilian', 11.5, 1.5)
-    const cop = spawnNpc(w, 'cop', 13.5, 1.5) // sees the crime
+    const warden = spawnNpc(w, 'warden', 13.5, 1.5) // sees the misdeed
     player.facing = 0
     tickWorld(w, new Map([[0, { ...emptyInput(), attack: true }]]))
-    expect(player.playerCtl!.crimeUntilTick).toBeGreaterThan(w.tick)
+    expect(player.playerCtl!.misdeedUntilTick).toBeGreaterThan(w.tick)
     expect(w.alarm).toBeGreaterThanOrEqual(1)
     expect(civ.ai!.mode).toBe('flee')
-    // Cop should aggro within a couple of think cycles
-    for (let i = 0; i < 30 && cop.ai!.mode !== 'aggro'; i++) tickWorld(w, idle())
-    expect(cop.ai!.mode).toBe('aggro')
+    // Warden should aggro within a couple of think cycles
+    for (let i = 0; i < 30 && warden.ai!.mode !== 'aggro'; i++) tickWorld(w, idle())
+    expect(warden.ai!.mode).toBe('aggro')
   })
 
   it('fully set-up worlds (mission + doors + boss) survive 300 ticks across seeds', () => {
@@ -137,8 +136,8 @@ describe('roguelite loop', () => {
     const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.health!.hp = 1
     w.revivesLeft = 0 // comeback economy already spent this run
-    const thug = spawnNpc(w, 'thug', 11.2, 1.5)
-    thug.combat!.cooldown = 0
+    const mutant = spawnNpc(w, 'mutant', 11.2, 1.5)
+    mutant.combat!.cooldown = 0
     for (let i = 0; i < 120 && !w.gameOver; i++) tickWorld(w, idle())
     expect(w.gameOver).toBe(true)
     expect(player.dead).toBe(true)
@@ -148,8 +147,8 @@ describe('roguelite loop', () => {
     const w = createWorld(14, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.health!.hp = 1
-    const thug = spawnNpc(w, 'thug', 11.2, 1.5)
-    thug.combat!.cooldown = 0
+    const mutant = spawnNpc(w, 'mutant', 11.2, 1.5)
+    mutant.combat!.cooldown = 0
     for (let i = 0; i < 120 && !player.playerCtl!.downed; i++) tickWorld(w, idle())
     expect(player.playerCtl!.downed).toBeDefined()
     expect(w.gameOver).toBe(false) // lone downed player is recovering, not lost

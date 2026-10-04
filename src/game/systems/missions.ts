@@ -1,7 +1,7 @@
 import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
-import { isFloorTile, levelChecksum, themeNamed, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, isSolidTile, levelChecksum, themeNamed, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { applyFloorModifier } from './modifierSystem'
@@ -224,17 +224,15 @@ const applyAccessGate = (w: World): void => {
     gate.door!.wing = wing
     placeGenerator(w, building, wing, rng)
   } else {
-    // Overgrown hatch fed by a Spore Node. For a `contain` mission the node IS
-    // the objective (already placed); otherwise spawn a fresh, reachable node.
+    // Overgrown hatch fed by a Spore Node outside it. Even on `contain`, whose
+    // objective is a node too: that one grows behind this hatch, so feeding the
+    // hatch from it would hide the key behind its own gate.
     gate.door!.locked = true
     gate.door!.overgrown = true
     gate.door!.growthHp = GATEWAY_GROWTH_HP
     gate.flammable = true // fire can catch on the bog and erode the growth
-    const nodeId =
-      w.mission.template === 'contain' && w.mission.targetEntityId !== undefined
-        ? w.mission.targetEntityId
-        : placeSporeNode(w, building, rng)?.id
-    if (nodeId !== undefined) gate.door!.nodeId = nodeId
+    const node = placeSporeNode(w, building, rng)
+    if (node) gate.door!.nodeId = node.id
   }
 }
 
@@ -272,43 +270,99 @@ const tagObjectiveGate = (w: World): void => {
   w.mission.objectiveDoorId = gate.id
 }
 
-/** A random interior Floor tile of the building (never spawn/exit), or null. */
-const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; ty: number } | null => {
-  const sx = Math.floor(w.level.spawn.x)
-  const sy = Math.floor(w.level.spawn.y)
-  for (let attempt = 0; attempt < 24; attempt++) {
-    const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
-    const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
-    if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
-    if (tx === sx && ty === sy) continue
-    if (tx === w.level.exit.x && ty === w.level.exit.y) continue
-    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
-    return { tx, ty }
+/** A door only its soft key (or a breach) opens: a keycard or power biolock,
+ * or an overgrown hatch. A plain lock is not a seal: every lock is pickable. */
+const isSealedDoor = (d: Entity): boolean =>
+  !!d.door &&
+  !d.dead &&
+  !d.door.open &&
+  (d.door.overgrown === true || (d.door.locked && (d.door.sealKind === 'keycard' || d.door.sealKind === 'power')))
+
+/** Tiles a player can walk to from the spawn with every sealed door shut,
+ * following stairs. A seal's key must land in here, or it can sit behind the
+ * very gate it opens (a single-door station module is all behind its gate). */
+const reachableWithSealsShut = (w: World): Uint8Array => {
+  const { w: W, h: H } = w.level
+  const shut = new Set<number>()
+  for (const e of w.entities) if (isSealedDoor(e)) shut.add(Math.floor(e.pos.y) * W + Math.floor(e.pos.x))
+  const stairTo = new Map<number, number>()
+  for (const l of w.level.stairs ?? []) stairTo.set(l.from.y * W + l.from.x, l.landing.y * W + l.landing.x)
+  const reach = new Uint8Array(W * H)
+  const start = Math.floor(w.level.spawn.y) * W + Math.floor(w.level.spawn.x)
+  reach[start] = 1
+  const stack = [start]
+  const visit = (x: number, y: number): void => {
+    const k = y * W + x
+    if (isSolidTile(w.level, x, y) || reach[k] || shut.has(k)) return
+    reach[k] = 1
+    stack.push(k)
+  }
+  while (stack.length > 0) {
+    const k = stack.pop()!
+    const x = k % W
+    const y = (k - x) / W
+    visit(x + 1, y)
+    visit(x - 1, y)
+    visit(x, y + 1)
+    visit(x, y - 1)
+    const hop = stairTo.get(k)
+    if (hop !== undefined) visit(hop % W, Math.floor(hop / W))
+  }
+  return reach
+}
+
+const inInterior = (r: Building['rect'], x: number, y: number): boolean =>
+  x > r.x && x < r.x + r.w - 1 && y > r.y && y < r.y + r.h - 1
+
+/** A floor tile for a seal's key: reachable from the spawn with every seal
+ * shut, and never the spawn, the exit, a stair approach or a doorway. Prefers
+ * the objective building (on a multi-door city block that is where the key has
+ * always been), then any building's interior, then any reachable floor. Null
+ * only when nothing outside the seals is free. Call after the gate is sealed. */
+const keyTile = (w: World, building: Building, rng: Rng): { tx: number; ty: number } | null => {
+  const W = w.level.w
+  const reach = reachableWithSealsShut(w)
+  const taken = new Set<number>(stairReservedKeys(w.level))
+  taken.add(Math.floor(w.level.spawn.y) * W + Math.floor(w.level.spawn.x))
+  taken.add(w.level.exit.y * W + w.level.exit.x)
+  for (const e of w.entities) if (e.door) taken.add(Math.floor(e.pos.y) * W + Math.floor(e.pos.x))
+  const free: number[] = []
+  for (let k = 0; k < reach.length; k++) if (reach[k] && !taken.has(k) && isFloorTile(w.level.tiles[k])) free.push(k)
+  const preferences: ((x: number, y: number) => boolean)[] = [
+    (x, y) => inInterior(building.rect, x, y),
+    (x, y) => w.level.buildings.some((b) => inInterior(b.rect, x, y)),
+    () => true,
+  ]
+  for (const prefer of preferences) {
+    const pool = free.filter((k) => prefer(k % W, Math.floor(k / W)))
+    if (pool.length === 0) continue
+    const k = pool[rng.int(0, pool.length - 1)]
+    return { tx: k % W, ty: Math.floor(k / W) }
   }
   return null
 }
 
-/** Drop the wing keycard in a cargo pod somewhere in the building (reachable —
- * outside the gate it opens). Guaranteed by breach even if placement fails. */
+/** Drop the wing keycard where a player can reach it without passing the gate
+ * it opens. A breach still opens the gate if no tile was free. */
 const placeKeycard = (w: World, building: Building, keyId: string, rng: Rng): void => {
-  const t = randomFloorTile(w, building, rng)
+  const t = keyTile(w, building, rng)
   if (!t) return
   const e = makeEntity('pickup', `pickup.${keyId}`, t.tx + 0.5, t.ty + 0.5, 0.3)
   e.pickup = { itemId: keyId, qty: 1 }
   addEntity(w, e)
 }
 
-/** Spawn the wing's generator inside the building — hacking it cuts the wing. */
+/** Spawn the wing's generator outside the gate; hacking it cuts the wing. */
 const placeGenerator = (w: World, building: Building, wing: string, rng: Rng): void => {
-  const t = randomFloorTile(w, building, rng)
+  const t = keyTile(w, building, rng)
   if (!t) return
   const gen = spawnObject(w, 'generator', t.tx, t.ty)
   gen.wing = wing
 }
 
-/** Spawn a reachable Spore Node (its death un-overgrows the linked gateway). */
+/** Spawn a Spore Node outside the gate (its death un-overgrows the linked gateway). */
 const placeSporeNode = (w: World, building: Building, rng: Rng): Entity | null => {
-  const t = randomFloorTile(w, building, rng)
+  const t = keyTile(w, building, rng)
   if (!t) return null
   return spawnObject(w, 'sporeNode', t.tx, t.ty)
 }

@@ -158,9 +158,11 @@ export interface GamepadMenuNavOptions {
   confirmButtons?: readonly number[]
   /** A back press: these buttons run `run` on their edge (the pause menu's B). */
   back?: { buttons: readonly number[]; run: () => void }
-  /** Where the cursor lands each time suppression lifts (the menu reopens).
-   * Without it the cursor stays wherever it was left. */
-  home?: NavFocus
+  /** The control the cursor lands on each time suppression lifts (the menu
+   * reopens), asked on every open. A hidden, disabled or missing one falls
+   * back to the first live control. Without it the cursor stays wherever it
+   * was left. */
+  home?: () => MenuNavControl | null
 }
 
 /** A flat list is one row; the pause menu passes rows (the wand strip above the
@@ -193,7 +195,7 @@ export const installGamepadMenuNav = (
     return null
   }
   let handle = 0
-  let focus: NavFocus = options.home ?? { row: 0, col: 0 }
+  let focus: NavFocus = { row: 0, col: 0 }
   let mem = emptyNavMemory()
   let painted: MenuNavControl | null = null
   let paintedWas = '' // the control's own shadow (the strip glows its next chip), restored on unpaint
@@ -245,7 +247,11 @@ export const installGamepadMenuNav = (
       const reading = readMenuPad(gp, options.confirmButtons, options.back?.buttons)
       if (resync) {
         resync = false
-        if (options.home) focus = options.home
+        if (options.home) {
+          const home = options.home()
+          const row = rows.findIndex((r) => home !== null && r.includes(home))
+          focus = row >= 0 ? { row, col: rows[row].indexOf(home!) } : { row: rows.findIndex((r) => r.length > 0), col: 0 }
+        }
         focus = stepMenuNav(emptyNavMemory(), emptyNavMemory(), focus, counts).focus
         mem = reading
         paint(rows, true) // show the cursor at once; presses act from the next frame

@@ -1214,7 +1214,11 @@ const runLoop = (
     // A net menu has no wand strip: its swaps would ride a command the gate drops.
     ...(canPause
       ? { onNewSeed, onRestart, onRefresh, onShare: sharing ? (note?: string) => sharing.share(note) : undefined, modSwaps }
-      : { title: netMenuTitle }),
+      : {
+          title: netMenuTitle,
+          // Once a client's session has ended there is no run to go back to.
+          canResume: () => !(session instanceof NetClientSession && session.phase === 'ended'),
+        }),
     weaponThumb: renderer.weaponThumb,
   })
   window.addEventListener('keydown', (ev) => {

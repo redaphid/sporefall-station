@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { PeerId, Transport } from '../types'
+import type { Transport } from '../types'
 import { SendQueue } from './sendQueue'
 
 /** A transport whose sends finish only when the test says so. */
@@ -11,7 +11,7 @@ const heldTransport = () => {
     maxPacket: 180,
     start: async () => {},
     stop: async () => {},
-    sendPacket: (_peer: PeerId, _bytes: Uint8Array) =>
+    sendPacket: () =>
       new Promise<void>((resolve) =>
         pending.push(() => {
           sent++

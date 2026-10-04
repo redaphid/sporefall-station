@@ -99,6 +99,39 @@ runs the tests, and writes `e2e/output/feature-<name>.mp4` (+ labeled stills).
 (`pnpm exec vitest run` stays green without a browser). Wire it into CI as a separate
 job that has Chromium + ffmpeg available.
 
+### Headed Windows Chrome from WSL
+
+Headless Chromium in WSL has no working WebGL, so a recording that must show the
+world runs in a headed Windows Chrome over CDP (`E2E_CDP`). Get that Chrome from
+`scripts/own-chrome.mjs` and from nowhere else:
+
+```sh
+node scripts/own-chrome.mjs launch        # prints {pid, port, profileDir, cdpUrl, lockfile, ...}
+E2E_CDP=<cdpUrl> node e2e/feature-<name>.mjs
+node scripts/own-chrome.mjs kill <lockfile>
+node scripts/own-chrome.mjs list          # Chromes this tool launched, with status
+```
+
+`launch` picks a free port in 9300-9999 and a fresh profile under Windows
+`%TEMP%`. `kill` ends only the recorded PID tree, and only after Windows confirms
+that PID's command line carries the lock's exact port and profile. A run-*.sh
+recorder gets the same thing by sourcing `e2e/own-chrome.sh` (see
+`e2e/run-boss-bar.sh`). From an e2e script, call `launchOwnChrome()` and
+`killOwnChrome(lockfile)` from the module.
+
+Two rules, enforced in code:
+
+- **Never attach to :9222.** That port is the owner's own Chrome. A renderer
+  crash in a driven tab takes his whole browser down. `e2e/lib.mjs` and the
+  other CDP scripts refuse an `E2E_CDP` on 9222.
+- **Never kill Chrome by name or pattern.** No `taskkill /IM`, no `pkill`, no
+  command-line substring match. A quoting bug once cut such a pattern down to
+  `C:`, and it killed every chrome.exe on the desktop. Kill by lockfile only.
+
+`node scripts/test/own-chrome-smoke.mjs` proves the tool on a real desktop. It
+launches, opens about:blank over CDP, and kills. Then it checks that every
+chrome.exe alive before the run is still alive.
+
 ## The two backfilled features
 
 | Test | Fixture | Drives | Adversarial final-state assertions |

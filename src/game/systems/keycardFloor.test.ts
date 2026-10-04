@@ -57,7 +57,7 @@ describe('keycards stay on their floor', () => {
     expect(itemIds(walker)).toEqual(['pistol', 'grenade'])
     expect(activeStack(walker)).toEqual({ itemId: 'grenade', qty: 2 })
     expect(itemIds(guest)).toEqual(['pistol'])
-    expect(guest.loadout!.activeSlot).toBe(-1)
+    expect(activeStack(guest)?.itemId).toBe('pistol')
   })
 
   it('the briefcase goes too: no key-class item survives the exit', () => {

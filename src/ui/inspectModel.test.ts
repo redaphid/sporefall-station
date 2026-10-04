@@ -46,15 +46,15 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
     expect(label('stalker')).toBe('Unaligned')
   })
 
-  it('no NPC card shows a bare faction id', () => {
+  it('every NPC card names its faction with a lore label, never a bare faction id', () => {
     const w = world()
-    const raw = new Set(['Civ', 'Warden', 'Feral', 'Neutral'])
+    const lore = ['Settlers', 'Spore Wardens', 'Rootcult', 'Unaligned']
     for (const a of Object.keys(NPCS)) {
-      expect(raw.has(rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction), a).toBe(false)
+      expect(lore, a).toContain(rowMap(buildInfoCard(spawnNpc(w, a, 5, 5)).rows).Faction)
     }
   })
 
-  it('feral NPCs open Hostile toward the player; wardens/civilians Neutral', () => {
+  it('rootcult NPCs open Hostile toward the player; wardens/civilians Neutral', () => {
     const w = world()
     expect(rowMap(buildInfoCard(spawnNpc(w, 'mutant', 1, 1)).rows)['Toward you']).toBe('Hostile')
     expect(rowMap(buildInfoCard(spawnNpc(w, 'warden', 2, 2)).rows)['Toward you']).toBe('Neutral')
@@ -291,6 +291,19 @@ describe('buildInfoCard — pickups (weapons, consumables, throwables, mods, loo
     expect(buildInfoCard(pickup('cash', 1)).tagline).toMatch(/[Mm]oney/)
     expect(buildInfoCard(pickup('canister')).tagline).toMatch(/goods|came for/)
     expect(rowMap(buildInfoCard(pickup('medkit', 2)).rows).Item).toBe('Medkit ×2')
+  })
+
+  it.each([
+    ['keycard.wing14.essence_lab', 'Essence lab keycard'],
+    ['keycard.wing14', 'Wing 14 keycard'],
+    ['grenade', 'Grenade'],
+    ['canister', 'Specimen Canister'],
+  ])('a floor pickup of %s is titled "%s", not by its pickup.<id> archetype', (itemId, name) => {
+    const e = makeEntity('pickup', `pickup.${itemId}`, 1, 1)
+    e.pickup = { itemId, qty: 1 }
+    const card = buildInfoCard(e)
+    expect(card.title).toBe(name)
+    expect(rowMap(card.rows).Item).toBe(name)
   })
 })
 

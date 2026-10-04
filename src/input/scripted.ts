@@ -311,6 +311,16 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 70 }, // final beat, resting on the ne facing
   ],
 
+  // The crafted `card-night` save: walk in, watch the tables fill and the
+  // cards go down, then put one shot into the east-chair player and watch the
+  // table break up and run.
+  'card-night': [
+    { ticks: 66, y: -1 }, // up into the mess, between the tables
+    { ticks: 660 }, // watch: settlers sit, deal, play
+    { ticks: 24, y: -1, attack: true }, // shots up the east chair's line
+    { ticks: 150 }, // the table scatters
+  ],
+
   // The crafted `castle-siege` save (an authored world, no seed-derived map):
   // cross the drawbridge firing the split/frost/pierce/homing pistol, then
   // sweep the courtyard garrison.

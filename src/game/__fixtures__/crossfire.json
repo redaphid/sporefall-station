@@ -178,7 +178,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 10.5,
           "y": 9.5
@@ -237,7 +237,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 20.5,
           "y": 8.5
@@ -296,7 +296,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 30.5,
           "y": 9.5
@@ -355,7 +355,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 15.5,
           "y": 10.5
@@ -413,7 +413,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 25.5,
           "y": 10.5
@@ -471,7 +471,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 35.5,
           "y": 10.5

@@ -192,7 +192,15 @@ export const movementSystem = (w: World, inputs: Map<number, InputCmd>): void =>
  * that bump it give way entirely, and blows never knock it anywhere. */
 const isRooted = (e: Entity): boolean => e.hive !== undefined
 
+/** A settler sitting at a prop (systems/activities.ts) overlaps its chair or
+ * bench on purpose; pushing them apart would shove the furniture out from under it. */
+const sitsAt = (m: Entity, p: Entity): boolean => {
+  const claim = m.ai?.activity
+  return claim !== undefined && (claim.seat === p.id || claim.site === p.id)
+}
+
 const resolvePair = (a: Entity, b: Entity, blocked: (tx: number, ty: number) => boolean): void => {
+  if (sitsAt(a, b) || sitsAt(b, a)) return
   const dx = b.pos.x - a.pos.x
   const dy = b.pos.y - a.pos.y
   const rr = a.radius + b.radius

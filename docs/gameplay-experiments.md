@@ -99,7 +99,7 @@ In a headless run only **one** local player provides input. So in a staged
 multi-player scene, the crew's motion *between* scripted beats is teleported —
 it's narration, a puppet. Always say which parts are real. The **systems** —
 cloak halving sight, chloroform `status.sleep`, the hacker beating a lockLevel the
-scavenger's autopick can't, pickup→`missionSystem`, misdeed→alarm→LOS warden chase — are
+scrounger's autopick can't, pickup→`missionSystem`, misdeed→alarm→LOS warden chase — are
 genuine and asserted. Single-mechanic reels (noise lure, wet+shock, freeze) are
 fully real system behavior.
 

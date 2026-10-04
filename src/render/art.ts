@@ -205,7 +205,7 @@ export interface ArtPalette {
  */
 export const ARCHETYPE_SCALE: Record<string, number> = {
   boss: 1.5,
-  // A rooted hive spire towers over the sporelings it buds; the bellwether stands a
+  // A rooted hive spire towers over the sporelings it buds; the overseer stands a
   // head above its raid, which is what makes it findable in a crowd.
   hivespire: 1.3,
   bellwether: 1.15,
@@ -445,7 +445,7 @@ const ENTITY_COLORS: Record<string, number> = {
   shopkeeper: 0xb87fd1,
   lurker: 0x6a4b8a, // bruised violet: the corner ambusher reads as "wrong" on sight
   // The group roster's procedural fallbacks: distinct hues so a raid with no art
-  // shipped still reads as bellwether / medic / sapper / gun / grunt at a glance.
+  // shipped still reads as overseer / medic / sapper / gun / grunt at a glance.
   drowner: 0x59636d, // waterlogged slate
   bellwether: 0xcbb277, // brass
   mender: 0x8f6c38, // rust apron (its green tank is the art's job)

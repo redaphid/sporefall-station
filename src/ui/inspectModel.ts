@@ -6,10 +6,10 @@
 // tables for human-facing names; unknown/modded kinds fall back to enumerating
 // the components actually present (the schema-reflection ethos) — never blank.
 
-import type { AiState, Entity, ItemStack } from '../game/entity'
+import type { ActivityKind, ActivityPhase, AiState, Entity, ItemStack } from '../game/entity'
 import { NPCS } from '../game/data/npcs'
 import { OBJECTS } from '../game/data/objects'
-import { CONSUMABLES, THROWABLES, WEAPONS } from '../game/data/items'
+import { CONSUMABLES, THROWABLES, WEAPONS, itemName } from '../game/data/items'
 import { MODS } from '../game/data/mods'
 import { BEHAVIORS, DEFAULT_BEHAVIOR } from '../game/systems/behaviors'
 import { dispositionToward, initialPlayerHate, determineRel } from '../game/systems/relationships'
@@ -73,15 +73,9 @@ const pretty = (s: string): string =>
 const FACTION_LABEL: Record<string, string> = {
   civ: 'Settlers',
   warden: 'Spore Wardens',
-  feral: 'Rootcult',
+  rootcult: 'Rootcult',
   neutral: 'Unaligned',
 }
-
-/** Human name for whichever weapon/throwable/consumable id we can resolve. */
-const itemName = (id: string): string =>
-  id === 'canister'
-    ? 'Specimen Canister'
-    : (WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id))
 
 /** One row per weapon mod on a stack: "❄️ Cryo Rounds" → "×N". Empty for a
  * vanilla / absent stack, so an unmodded gun shows just the Weapon row. */
@@ -116,11 +110,20 @@ const MODE_PHRASE: Record<string, string> = {
   flee: 'Running away',
   seek: 'Heading somewhere',
   sleep: 'Asleep',
+  perform: 'Busy at something',
+}
+
+/** A settler at an activity, by kind and how far along the claim is. */
+const ACTIVITY_PHRASE: Record<ActivityKind, Record<ActivityPhase, string>> = {
+  cards: { going: 'Heading to a card game', seated: 'Waiting for a card game', playing: 'Playing cards' },
+  tinker: { going: 'Heading to a workbench', seated: 'Tinkering at a bench', playing: 'Tinkering at a bench' },
+  rest: { going: 'Heading to a bunk', seated: 'Resting', playing: 'Resting' },
 }
 
 /** The NPC's current activity in plain words, e.g.
  * "Patrolling · heading to waypoint 3". Exported for exhaustive testing. */
 export const aiPhrase = (ai: AiState): string => {
+  if (ai.activity) return ACTIVITY_PHRASE[ai.activity.kind][ai.activity.phase]
   if (ai.goal === 'patrol') return `Patrolling · heading to waypoint ${(ai.patrolIndex ?? 0) + 1}`
   if (ai.goal) return GOAL_PHRASE[ai.goal] ?? pretty(ai.goal)
   if (ai.mode === 'idle' && ai.guard) return 'Standing guard'
@@ -208,7 +211,7 @@ const areaPhrase = (t: (typeof THROWABLES)[string]): string => {
 export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archetype: string) => string = pretty): InfoCard => {
   const rows: InfoRow[] = []
   const card: InfoCard = {
-    title: nameFor(e.archetype),
+    title: e.pickup && !MODS[e.pickup.itemId] ? itemName(e.pickup.itemId) : nameFor(e.archetype),
     kind: e.kind,
     archetype: e.archetype,
     artKey: e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype,

@@ -7,7 +7,7 @@
 //   2. FORWARD CONE + RANGE: acquisition happens ahead of the round and nearby —
 //      never a yank backwards, never a map-wide magnet.
 //   3. HOSTILITY: only real enemies of the OWNER. Never the owner, co-op allies,
-//      corpses, neutral civilians (no auto-misdeed), or an NPC shooter's own feral.
+//      corpses, neutral civilians (no auto-misdeed), or an NPC shooter's own rootcult.
 //   4. CAPPED TURN: a curve (≤ homing rad/tick), not a teleport-turn.
 //   5. DETERMINISM + snapshot shape: pure world-state reads, no new serialized
 //      fields — a homing bullet's JSON shape is exactly what it was before.
@@ -67,7 +67,7 @@ const mutant = (w: World, x: number, y: number, hp = 24): Entity => {
 }
 
 /** An NPC with a real faction (minimal AiState) — for the disposition tests. */
-const factionNpc = (w: World, faction: 'civ' | 'warden' | 'feral' | 'neutral', x: number, y: number): Entity => {
+const factionNpc = (w: World, faction: 'civ' | 'warden' | 'rootcult' | 'neutral', x: number, y: number): Entity => {
   const e = mutant(w, x, y)
   e.ai = { mode: 'idle', faction, home: { x, y }, thinkAt: 0, sightRange: 6 }
   return e
@@ -260,10 +260,10 @@ describe('homing — only real enemies of the owner are prey', () => {
     expect(b2.vel.y).toBeGreaterThan(0)
   })
 
-  it("an NPC's homing round hunts the PLAYER — never the shooter's own feral", () => {
+  it("an NPC's homing round hunts the PLAYER — never the shooter's own rootcult", () => {
     const w = arena()
-    const shooter = factionNpc(w, 'feral', 8.5, 10.5)
-    const ally = factionNpc(w, 'feral', 14.5, 10.5) // dead ahead — the old code's pick
+    const shooter = factionNpc(w, 'rootcult', 8.5, 10.5)
+    const ally = factionNpc(w, 'rootcult', 14.5, 10.5) // dead ahead — the old code's pick
     const player = spawnPlayer(w, 0, 16.5, 13.5) // off-axis but the true enemy
     player.health!.iframes = 0 // shed spawn grace so the hit can land
     const b = shot(w, shooter.id, 8.5, 10.5, 0.3)
@@ -273,7 +273,7 @@ describe('homing — only real enemies of the owner are prey', () => {
       if (b.vel.y > 0) curved = true // bent toward the player, away from the ally line
     }
     expect(curved).toBe(true)
-    expect(ally.health!.hp).toBe(24) // its own feral untouched
+    expect(ally.health!.hp).toBe(24) // its own rootcult untouched
     expect(player.health!.hp).toBeLessThan(player.health!.max) // the player was the mark
   })
 
@@ -281,7 +281,7 @@ describe('homing — only real enemies of the owner are prey', () => {
     const w = arena()
     const shooter = factionNpc(w, 'warden', 8.5, 10.5)
     const fellowWarden = factionNpc(w, 'warden', 14.5, 10.5) // dead ahead
-    const acolyte = factionNpc(w, 'feral', 15.5, 13.0) // sworn enemy, off-axis
+    const acolyte = factionNpc(w, 'rootcult', 15.5, 13.0) // sworn enemy, off-axis
     const b = shot(w, shooter.id, 8.5, 10.5, 0.3)
     let curved = false
     for (let i = 0; i < 40 && !b.dead; i++) {

@@ -114,7 +114,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 12,
           "y": 11
@@ -164,7 +164,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 15,
           "y": 11
@@ -214,7 +214,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": 18,
           "y": 11

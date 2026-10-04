@@ -41,7 +41,7 @@ export interface NpcDef {
 export const NPCS: Record<string, NpcDef> = {
   mutant: {
     archetype: 'mutant',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 40,
     speed: 3.4,
     weapon: 'wrench',
@@ -50,7 +50,7 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
   },
   boss: {
-    // #69 Mireclaw Alpha: a phased apex predator, not a fat acolyte. Lives in
+    // #69 Mireclaw Alpha: a phased apex predator, not a fat human brawler. Lives in
     // the spore (immune) and uses it as a lifeline in phase 2.
     //
     // BALANCE (was hp 80 / wrench / no physical resist — measured, not guessed;
@@ -77,7 +77,7 @@ export const NPCS: Record<string, NpcDef> = {
     // PLAYER_SPEED (4.5): phase 3 is a chase you can barely win, not an
     // unavoidable one.
     archetype: 'boss',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 320,
     speed: 3.2,
     weapon: 'claws',
@@ -99,7 +99,7 @@ export const NPCS: Record<string, NpcDef> = {
   },
   acolyte: {
     archetype: 'acolyte',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 35,
     speed: 3.6,
     weapon: 'pistol',
@@ -175,7 +175,7 @@ export const NPCS: Record<string, NpcDef> = {
   brute: {
     // Chitin-plated bruiser: soaks impact, slow, but flammable — bring fire.
     archetype: 'brute',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 95,
     speed: 2.5,
     weapon: 'wrench',
@@ -189,7 +189,7 @@ export const NPCS: Record<string, NpcDef> = {
     // Ash-dweller: takes only 20% from fire (resistant, NOT immune), so a
     // flamethrower/molotov build stalls out on it — shoot it instead.
     archetype: 'cinder',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 45,
     speed: 3.4,
     weapon: 'fists',
@@ -203,7 +203,7 @@ export const NPCS: Record<string, NpcDef> = {
     // Fast, fragile swarm-thing: spore-immune and toxin-resistant, but flammable
     // and squishy to bullets — poison whiffs, crowd/AoE or fire shines.
     archetype: 'sporeling',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 22,
     speed: 4.4,
     weapon: 'fists',
@@ -216,7 +216,7 @@ export const NPCS: Record<string, NpcDef> = {
   stalker: {
     // #67 Mireclaw brood scavenger: hunts the weakest, shies from a healthy pack.
     // Its own faction ('neutral') is its pack — it culls the wounded of every
-    // OTHER side (crew, wardens, ferals, players). Fast, fragile, opportunistic.
+    // OTHER side (crew, wardens, rootcults, players). Fast, fragile, opportunistic.
     archetype: 'stalker',
     faction: 'neutral',
     hp: 30,
@@ -235,7 +235,7 @@ export const NPCS: Record<string, NpcDef> = {
     // at the intruder, fast and all-in (behaviors 'lurker' pounce). The
     // jump-scare. Fragile on purpose: it wins the ambush or dies in the open.
     archetype: 'lurker',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 28,
     speed: 4.6,
     weapon: 'knife',
@@ -268,7 +268,7 @@ export const NPCS: Record<string, NpcDef> = {
 
   // ── Tides: the group roster (docs/design/enemy-groups.md) ─────────────────────
   // These are the essence-echoes of the colony's WORK CREWS and its fauna — the
-  // swamp redreaming a security detail, a demolition feral, a medic, a pack. They
+  // swamp redreaming a security detail, a demolition rootcult, a medic, a pack. They
   // are built to be met TOGETHER: each one is ordinary alone and changes what the
   // group does (systems/groups.ts runs the group layer, behaviors.ts the brains).
   // Numbers are floor-1 baselines; populate.spawnNpc ramps hp +15% per floor.
@@ -277,7 +277,7 @@ export const NPCS: Record<string, NpcDef> = {
     // of every tide. Deliberately a pistol-grade threat so a raid's danger is
     // its NUMBERS and its orders, not any one member.
     archetype: 'drowner',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 38,
     speed: 3.4,
     weapon: 'pistol',
@@ -288,11 +288,11 @@ export const NPCS: Record<string, NpcDef> = {
     resist: { poisoned: 0.7, spore: 0.5 },
   },
   bellwether: {
-    // The bellwether. Rings a bell for a head: every raid member within earshot is
+    // The overseer. Rings a bell for a head: every raid member within earshot is
     // RALLIED (faster, harder to hurt). Kill it and the raid's nerve breaks —
     // the whole tide routs. The priority target, and tanky enough to be a choice.
     archetype: 'bellwether',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 90,
     speed: 3.0,
     weapon: 'pistol',
@@ -307,7 +307,7 @@ export const NPCS: Record<string, NpcDef> = {
     // raiders RETREAT to it to be healed, then go back in. Fragile and unarmed,
     // so the answer is to reach it — or to deny the retreat.
     archetype: 'mender',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 44,
     speed: 3.3,
     weapon: 'fists',
@@ -322,7 +322,7 @@ export const NPCS: Record<string, NpcDef> = {
     // the raid THROUGH locked hatches instead of around them — plants a charge,
     // backs off, blows the door. Volatile: fire hurts it more.
     archetype: 'breacher',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 62,
     speed: 3.0,
     weapon: 'wrench',
@@ -337,7 +337,7 @@ export const NPCS: Record<string, NpcDef> = {
     // shells OVER walls at wherever its raid last saw you. Slow, keeps its
     // distance, weak up close — the siege is broken by charging the battery.
     archetype: 'lobber',
-    faction: 'feral',
+    faction: 'rootcult',
     hp: 58,
     speed: 2.4,
     weapon: 'fists',

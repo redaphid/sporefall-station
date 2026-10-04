@@ -36,17 +36,17 @@ export const determineRel = (hate: number): RelStatus => {
   return 'Neutral'
 }
 
-/** Initial hate between two factions: same -> Friendly, warden/feral sworn enemies
+/** Initial hate between two factions: same -> Friendly, warden/rootcult sworn enemies
  * -> Hostile, else Neutral. */
 export const initialFactionHate = (a: Faction, b: Faction): number => {
   if (a === b) return -1
-  if ((a === 'warden' && b === 'feral') || (a === 'feral' && b === 'warden')) return 5
+  if ((a === 'warden' && b === 'rootcult') || (a === 'rootcult' && b === 'warden')) return 5
   return 0
 }
 
-/** A faction's opening stance toward the (factionless) player: ferals are
- * hostile on sight, the watch and civilians are neutral until provoked. */
-export const initialPlayerHate = (f: Faction): number => (f === 'feral' ? 5 : 0)
+/** A faction's opening stance toward the (factionless) player: rootcults are
+ * hostile on sight, the wardens and civilians are neutral until provoked. */
+export const initialPlayerHate = (f: Faction): number => (f === 'rootcult' ? 5 : 0)
 
 /** This NPC's disposition toward `targetId` — its stored opinion, or the
  * faction-derived opening stance if it has none yet. */
@@ -89,7 +89,7 @@ export const raiseFloorAggro = (w: World, target: Entity): void => {
 }
 
 /** A player attack on a civ/warden is a misdeed. Every NPC within sight that is an
- * ally of the victim (same faction) or the watch (a warden) accrues hate toward the
+ * ally of the victim (same faction) or the wardens (a warden) accrues hate toward the
  * attacker and, once hostile, turns to aggro them; witnessing civilians flee. */
 export const commitMisdeed = (w: World, victim: Entity, attacker: Entity | undefined): void => {
   if (!attacker?.playerCtl || !victim.ai) return
@@ -110,11 +110,11 @@ export const commitMisdeed = (w: World, victim: Entity, attacker: Entity | undef
     }
 
     const ally = witness.ai.faction === vf
-    const watch = witness.ai.faction === 'warden'
-    if (!ally && !watch) continue
+    const wardens = witness.ai.faction === 'warden'
+    if (!ally && !wardens) continue
 
     addHate(witness, attacker.id, MISDEED_HATE)
-    if (watch && w.alarm < 3) w.alarm++
+    if (wardens && w.alarm < 3) w.alarm++
     if (dispositionToward(witness, attacker.id) === 'Hostile') {
       witness.ai.mode = 'aggro'
       witness.ai.targetId = attacker.id

@@ -31,7 +31,7 @@ const buildWorld = (): World => {
   spawnPlayer(w, 0, 5, 5)
   const npc = addEntity(w, makeEntity('npc', 'mutant', 8, 5))
   npc.health = { hp: 2, max: 5, iframes: 0 }
-  npc.ai = { mode: 'idle', faction: 'feral', home: { x: 8, y: 5 }, thinkAt: 0, sightRange: 6 }
+  npc.ai = { mode: 'idle', faction: 'rootcult', home: { x: 8, y: 5 }, thinkAt: 0, sightRange: 6 }
   const guard = addEntity(w, makeEntity('npc', 'guard', 9, 6))
   guard.health = { hp: 5, max: 5, iframes: 0 }
   const door = addEntity(w, makeEntity('door', 'door', 10, 5))

@@ -6,6 +6,7 @@ import { decodeJson, encodeJson } from '../net/framing/codec'
 import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import { type InventoryMsg } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
+import { nextFloor } from '../game/systems/missions'
 import { NetClientSession } from './netClient'
 import { NetHostSession } from './netHost'
 
@@ -386,6 +387,26 @@ describe('co-op client inventory (issue #57)', () => {
     const inv = decodeJson<InventoryMsg>(invMsg!)
     expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(inv.inventory.find((s) => s.itemId === 'pistol')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
+  })
+
+  it("a guest's keycard stays on the floor it opens: the next floor's InventoryMsg drops it", async () => {
+    const { host, bob } = await startPair(213)
+    const avatar = avatarOf(host, 1)
+    avatar.loadout!.inventory = [
+      { itemId: 'pistol', qty: 1 },
+      { itemId: 'keycard.wing3.essence_lab', qty: 1 },
+      { itemId: 'grenade', qty: 4 },
+    ]
+    avatar.loadout!.activeSlot = 2
+    await tickN(host, bob, 4)
+    expect(bob.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toContain('keycard.wing3.essence_lab')
+
+    nextFloor(host.world)
+    await tickN(host, bob, 6)
+
+    const ld = bob.session.renderView().self!.loadout!
+    expect(ld.inventory.map((s) => s.itemId)).toEqual(['pistol', 'grenade'])
+    expect(ld.inventory[ld.activeSlot]).toEqual({ itemId: 'grenade', qty: 4 })
   })
 
   it('serializes an InventoryMsg round-trip losslessly (mods + ammo preserved)', () => {

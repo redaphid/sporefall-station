@@ -45,12 +45,12 @@ console.log('== B. sworn enemies never engage without a player ==')
   const w = makeArena(2)
   const c = center(w)
   const warden = addNpc(w, 'warden', c.x, c.y, { sight: 14, weapon: 'pistol' })
-  const feral = addNpc(w, 'acolyte', c.x + 4, c.y, { sight: 14, weapon: 'pistol' })
-  // Sworn enemies (initialFactionHate warden<->feral = 5 = Hostile), in plain sight.
+  const rootcult = addNpc(w, 'acolyte', c.x + 4, c.y, { sight: 14, weapon: 'pistol' })
+  // Sworn enemies (initialFactionHate warden<->rootcult = 5 = Hostile), in plain sight.
   const wardenGoal = decide(w, warden).goal
-  const feralGoal = decide(w, feral).goal
+  const rootcultGoal = decide(w, rootcult).goal
   console.log(`  warden sees acolyte 4 tiles away  -> goal=${wardenGoal.code} target=${wardenGoal.target ?? '-'}`)
-  console.log(`  acolyte sees warden 4 tiles away  -> goal=${feralGoal.code} target=${feralGoal.target ?? '-'}`)
+  console.log(`  acolyte sees warden 4 tiles away  -> goal=${rootcultGoal.code} target=${rootcultGoal.target ?? '-'}`)
   console.log('  => both WANDER. `threat` only scans entities with playerCtl, so the')
   console.log('     faction/sworn-enemy matrix drives no autonomous NPC combat.\n')
 }

@@ -1,7 +1,7 @@
 // #65 — panic contagion / stampede. A fleeing or dying body throws a fear pulse
 // nearby timid crew CATCH and flee from, re-emitting their own so terror rolls
 // down a line as a wave — even with no first-hand sight of the threat. Hardened
-// factions (feral/retaliators) don't stampede. Sets exact state, runs the REAL
+// factions (rootcult/retaliators) don't stampede. Sets exact state, runs the REAL
 // tickWorld, asserts the wave.
 
 import { describe, expect, it } from 'vitest'
@@ -10,7 +10,7 @@ import { spawnNpc } from '../populate'
 import { emptyInput } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
 
-const line = (): { w: World; civs: ReturnType<typeof spawnNpc>[]; feral: ReturnType<typeof spawnNpc> } => {
+const line = (): { w: World; civs: ReturnType<typeof spawnNpc>[]; rootcult: ReturnType<typeof spawnNpc> } => {
   const w = createWorld(1, 1, 'normal', false) // peaceful — the only fear is contagious
   const cx = Math.floor(w.level.w / 2)
   const cy = Math.floor(w.level.h / 2)
@@ -27,27 +27,27 @@ const line = (): { w: World; civs: ReturnType<typeof spawnNpc>[]; feral: ReturnT
     civs.push(e)
   }
   // A hardened acolyte sitting right in the crowd — it must NOT catch the panic.
-  const feral = spawnNpc(w, 'acolyte', cx + 8, cy + 1)
-  feral.health = { hp: 1e6, max: 1e6, iframes: 0 }
-  return { w, civs, feral }
+  const rootcult = spawnNpc(w, 'acolyte', cx + 8, cy + 1)
+  rootcult.health = { hp: 1e6, max: 1e6, iframes: 0 }
+  return { w, civs, rootcult }
 }
 
 describe('#65 stampede — fear propagates cell-by-cell down a line', () => {
   it('the crowd flees in a rolling wave, not all at once', () => {
-    const { w, civs, feral } = line()
+    const { w, civs, rootcult } = line()
     // Scare the end one: a pulse from off-stage (a scream it heard) — `born` in
     // the past so it is catchable immediately.
     w.fear.push({ x: civs[0].pos.x, y: civs[0].pos.y, expires: w.tick + 30, sourceId: -1, born: -1 })
 
     const onset = new Array(6).fill(-1)
-    let feralFled = false
+    let rootcultFled = false
     const input = new Map([[0, emptyInput()]])
     for (let t = 0; t < 60; t++) {
       tickWorld(w, input)
       civs.forEach((e, i) => {
         if (onset[i] < 0 && e.ai!.mode === 'flee') onset[i] = t
       })
-      if (feral.ai!.mode === 'flee') feralFled = true
+      if (rootcult.ai!.mode === 'flee') rootcultFled = true
     }
 
     // Every civilian caught the panic…
@@ -58,7 +58,7 @@ describe('#65 stampede — fear propagates cell-by-cell down a line', () => {
     expect(onset[5]).toBeGreaterThan(onset[0] + 5)
     expect(onset[2]).toBeGreaterThan(onset[1]) // it propagated past the first pulse's own radius
     // The hardened acolyte standing among them never stampedes.
-    expect(feralFled).toBe(false)
+    expect(rootcultFled).toBe(false)
   })
 
   it('with no pulse nearby, a caught NPC calms back down (the window decays)', () => {

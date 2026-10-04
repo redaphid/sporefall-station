@@ -1,4 +1,4 @@
-// Craft the `crossfire` save: a market plaza on a neutral floor. A feral crew
+// Craft the `crossfire` save: a market plaza on a neutral floor. A rootcult crew
 // holds the north arcade and a warden line walks its beat up from the south.
 // They are sworn enemies and open fire on sight. Shoppers scatter, the lockkeeper
 // guards his door, and nobody is after the player until the player gives them a
@@ -19,7 +19,7 @@ const s = new Sketch(W, H, '#')
 s.fill(1, 1, W - 2, H - 2, '-')
 s.fill(6, 8, W - 7, H - 9, '+') // the plaza
 s.fill(19, 15, 26, 20, ',') // the green at its heart
-// North arcade: a colonnade the feral shoots from.
+// North arcade: a colonnade the rootcult shoots from.
 s.fill(4, 3, W - 5, 3, '#')
 for (let x = 6; x < W - 6; x += 5) s.fill(x, 5, x, 6, '#')
 // South: the warden barricade line, with gaps.

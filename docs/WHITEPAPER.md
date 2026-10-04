@@ -127,7 +127,7 @@ is only one boss."
 When he first asked for mods, he gave the reason: "I think the family would have
 fun having really unique guns." The game exists to be played with his nephews,
 on phones over Bluetooth, on a couch, with a controller. The salvage ask shows
-what he wants the kids to do together: "a multi-stage bank salvage or something.
+what he wants the kids to do together: "a multi-stage bank heist or something.
 that requires careful planning amongst my nephews." The combinations are what
 the family talks about. "Look what my gun does" is the sentence the mechanic
 exists to produce. His ask for NPC memory says the same about the world: "I want

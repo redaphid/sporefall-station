@@ -64,14 +64,14 @@ export const SCENES: readonly Scene[] = [
   {
     name: 'crossfire',
     title: 'Crossfire',
-    hook: 'Wardens and feral meet in a crowded plaza. Nobody is after you yet.',
+    hook: 'Wardens and rootcult meet in a crowded plaza. Nobody is after you yet.',
     tryThis: 'Watch them fight, or pick a side. Shoot a bystander and the wardens turn on you too.',
     tags: ['factions', 'neutral', 'shotgun'],
   },
   {
     name: 'barracks-blaze',
     title: 'Barracks Blaze',
-    hook: 'A feral asleep in rows of bunks, fuel barrels at the back.',
+    hook: 'A rootcult asleep in rows of bunks, fuel barrels at the back.',
     tryThis: 'Put one incendiary round into a bunk row, then back off. Fire walks bunk to bunk and the burning run.',
     tags: ['fire', 'sleepers', 'barrels'],
   },
@@ -81,6 +81,13 @@ export const SCENES: readonly Scene[] = [
     hook: 'Three hive spires, a sporeling swarm, and a detonator shotgun.',
     tryThis: 'Every kill bursts into the ones beside it. Burn the spires or they keep budding more.',
     tags: ['horde', 'hive', 'detonator'],
+  },
+  {
+    name: 'card-night',
+    title: 'Card Night',
+    hook: 'The settlers’ mess on a quiet shift: two card tables, benches and bunks.',
+    tryThis: 'Watch a table fill and the cards go down. Hurt one player and the whole table scatters.',
+    tags: ['settlers', 'cards', 'peaceful'],
   },
 ]
 

@@ -4,7 +4,7 @@ import { addEntity, createWorld, emitNoise, type World } from '../world'
 import { arbitrateGoal } from './behaviors'
 import { WANDER, BATTLE, PURSUE, FLEE, INVESTIGATE } from './goalCodes'
 
-const ARCH: Record<Faction, string> = { warden: 'warden', feral: 'acolyte', neutral: 'lockkeeper', civ: 'civilian' }
+const ARCH: Record<Faction, string> = { warden: 'warden', rootcult: 'acolyte', neutral: 'lockkeeper', civ: 'civilian' }
 
 const npc = (w: World, faction: Faction, x: number, y: number, hp = 40, max = 40): Entity => {
   const e = addEntity(w, makeEntity('npc', ARCH[faction], x, y))
@@ -30,7 +30,7 @@ describe('goal arbitration', () => {
 
   it('a healthy hostile NPC chooses to battle a visible target', () => {
     const p = player(w, 20, 20)
-    const mutant = npc(w, 'feral', 22, 20, 40, 40)
+    const mutant = npc(w, 'rootcult', 22, 20, 40, 40)
     const goal = arbitrateGoal(w, mutant)
     expect(goal.code).toBe(BATTLE)
     expect(goal.target).toBe(p.id)
@@ -38,7 +38,7 @@ describe('goal arbitration', () => {
 
   it('a badly wounded hostile NPC flees instead of fighting', () => {
     const p = player(w, 20, 20)
-    const mutant = npc(w, 'feral', 22, 20, 5, 40)
+    const mutant = npc(w, 'rootcult', 22, 20, 5, 40)
     const goal = arbitrateGoal(w, mutant)
     expect(goal.code).toBe(FLEE)
     expect(goal.target).toBe(p.id)
@@ -46,8 +46,8 @@ describe('goal arbitration', () => {
 
   it('crosses from battle to flee around a third of max health', () => {
     player(w, 20, 20)
-    const healthy = npc(w, 'feral', 22, 20, 20, 40) // > max/3 -> fight
-    const hurt = npc(w, 'feral', 22, 20, 8, 40) // < max/3 -> flee
+    const healthy = npc(w, 'rootcult', 22, 20, 20, 40) // > max/3 -> fight
+    const hurt = npc(w, 'rootcult', 22, 20, 8, 40) // < max/3 -> flee
     expect(arbitrateGoal(w, healthy).code).toBe(BATTLE)
     expect(arbitrateGoal(w, hurt).code).toBe(FLEE)
   })
@@ -55,7 +55,7 @@ describe('goal arbitration', () => {
   it('picks the more-hated of two hostile targets', () => {
     const p1 = player(w, 21, 20)
     const p2 = player(w, 19, 20)
-    const mutant = npc(w, 'feral', 20, 20, 40, 40)
+    const mutant = npc(w, 'rootcult', 20, 20, 40, 40)
     mutant.ai!.rel = {
       [p1.id]: { hate: 5, code: 'Hostile' },
       [p2.id]: { hate: 40, code: 'Hostile' },
@@ -79,7 +79,7 @@ describe('goal arbitration', () => {
 
   it('pursues a remembered target that has moved out of sight', () => {
     const p = player(w, 32, 20) // 12 tiles away: beyond sightRange 8, within leash
-    const mutant = npc(w, 'feral', 20, 20, 40, 40)
+    const mutant = npc(w, 'rootcult', 20, 20, 40, 40)
     mutant.ai!.targetId = p.id
     mutant.ai!.lastKnownTargetPos = { x: 24, y: 20 }
     expect(arbitrateGoal(w, mutant).code).toBe(PURSUE)

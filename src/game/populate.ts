@@ -283,10 +283,10 @@ const assignBarricaders = (w: World): void => {
 
 /** Squad size cap: lead + flank + rears. */
 export const SQUAD_MAX = 4
-/** Chance an eligible feral pack actually forms up (some stay a loose rabble). */
+/** Chance an eligible rootcult pack actually forms up (some stay a loose rabble). */
 const SQUAD_CHANCE = 0.85
 
-/** Link each warehouse/bunker's role-spawned feral pack (mutants/acolytes bound
+/** Link each warehouse/bunker's role-spawned rootcult pack (mutants/acolytes bound
  * to that building) into a `squad` (behaviors.ts): first member leads, second
  * flanks, the rest stack rear. Post-pass over spawned entities in id order on a
  * DEDICATED `squads` fork — no other stream moves. Patrol beats (the
@@ -681,7 +681,7 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
 
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, buildingIdx: number): void => {
   const specs = [...ROLE_SPAWNS[building.role]]
-  // Difficulty ramp: deeper floors feral up
+  // Difficulty ramp: deeper floors rootcult up
   if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'acolyte', count: [1, 2] })
   if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'acolyte', count: [0, 1] })
   if (w.floor >= 2 && building.role === 'shop') specs.push({ archetype: 'lockkeeper', count: [1, 1] })

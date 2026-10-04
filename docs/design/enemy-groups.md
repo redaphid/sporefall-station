@@ -21,7 +21,7 @@ and the complex director's vent swarms, bunk ambushes and lights-out.
 What was missing is a layer **above** the individual. Every one of those is a
 body deciding for itself. RimWorld's raids read as an *enemy* rather than a mob
 because something above the pawns decides when to go, where to gather, who the
-bellwether is and when the nerve breaks. That layer is the new work.
+overseer is and when the nerve breaks. That layer is the new work.
 
 ## The layer
 
@@ -40,7 +40,7 @@ detail and exhales it at you together, in the order it remembers.
 | archetype | name | role | what it changes |
 |---|---|---|---|
 | `drowner` | Drowned Diver | raid grunt | the body of every tide: a harpoon (pistol-grade) diver echo. Dangerous in numbers, not alone |
-| `bellwether` | Tide Bellwether | bellwether | its bell rallies raiders within 6 tiles: +15% speed, -25% damage taken. Kill it and the raid routs |
+| `bellwether` | Tide Bellwether | overseer | its bell rallies raiders within 6 tiles: +15% speed, -25% damage taken. Kill it and the raid routs |
 | `mender` | Bog Mender | medic | unarmed, hangs behind the line and heals; wounded raiders fall back to it |
 | `breacher` | Blast Diver | sapper | walks the raid through locked hatches: plants a charge, backs off, blows the door |
 | `lobber` | Spore Mortar | siege gun | a spore-ogre hauling a mortar tube: keeps 7-10 tiles off and lobs shells over walls and heads at the raid's fix on you |
@@ -48,7 +48,7 @@ detail and exhales it at you together, in the order it remembers.
 | `hivespire` | Hive Spire | infestation | rooted; buds sporelings at anyone near and plants new spires over time |
 
 Resist tables keep the #78 rule (no single weapon clears the deck): fire is the
-answer to spires and mortars, the bellwether shrugs off some impact, the medic
+answer to spires and mortars, the overseer shrugs off some impact, the medic
 ignores toxins.
 
 ## The mechanics (6)
@@ -69,8 +69,8 @@ ignores toxins.
 Raids know where you are only through an intel mark refreshed every 3s (like the
 station alert's broadcast), so they are evadable.
 
-**2. Command & morale.** The bellwether's aura is refreshed every tick and lapses
-10 ticks after it dies. A raid **routs** when its bellwether falls, or when half its
+**2. Command & morale.** The overseer's aura is refreshed every tick and lapses
+10 ticks after it dies. A raid **routs** when its overseer falls, or when half its
 muster is dead (raids of 3+). Routed raiders flee the nearest player; any that stay
 out of sight for 6s dissolve back into the swamp with no drop. Verb: **decapitate**.
 
@@ -162,7 +162,7 @@ green cross, and each heal draws a beam from the medic to the raider it heals.
 
 | scenario | what to watch | when (seed 3) |
 |---|---|---|
-| `tide-staging` | the muster walks in from several directions, gathers, then all charge on one tick. Shoot the brass-bell bellwether and the raid routs | attack ~1.5s |
+| `tide-staging` | the muster walks in from several directions, gathers, then all charge on one tick. Shoot the brass-bell overseer and the raid routs | attack ~1.5s |
 | `tide-siege` | the mortar walks to its band and lobs shells; the escorts hold round it. Rush the gun and the siege breaks | first shell ~2.3s |
 | `tide-sappers` | the player is sealed in a building with every doorway locked. The Blast Diver walks to a door, plants, backs off, and blows it | charge ~10s, breach ~11.7s |
 | `hound-ring` | the near pack fans out around the player before it closes. Shoot a hound and both packs go manhunter | ring closes ~2s |

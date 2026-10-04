@@ -137,7 +137,7 @@ const main = async () => {
         if (!b) throw new Error('boss-bar: scenario staged no boss')
         b.ai = {
           mode: 'idle',
-          faction: 'feral',
+          faction: 'rootcult',
           home: { x: b.pos.x, y: b.pos.y },
           thinkAt: 0,
           sightRange: 10,

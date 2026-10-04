@@ -12,7 +12,7 @@ import {
   initialPlayerHate,
 } from './relationships'
 
-const ARCH: Record<Faction, string> = { warden: 'warden', feral: 'acolyte', neutral: 'lockkeeper', civ: 'civilian' }
+const ARCH: Record<Faction, string> = { warden: 'warden', rootcult: 'acolyte', neutral: 'lockkeeper', civ: 'civilian' }
 
 const npc = (w: World, faction: Faction, x: number, y: number): Entity => {
   const e = addEntity(w, makeEntity('npc', ARCH[faction], x, y))
@@ -39,14 +39,14 @@ describe('relationships', () => {
     expect(determineRel(50)).toBe('Hostile')
   })
 
-  it('faction matrix: same friendly, warden vs feral hostile, unrelated neutral', () => {
+  it('faction matrix: same friendly, warden vs rootcult hostile, unrelated neutral', () => {
     expect(initialFactionHate('warden', 'warden')).toBeLessThan(0)
-    expect(determineRel(initialFactionHate('warden', 'feral'))).toBe('Hostile')
+    expect(determineRel(initialFactionHate('warden', 'rootcult'))).toBe('Hostile')
     expect(initialFactionHate('civ', 'warden')).toBe(0)
   })
 
-  it('initial player disposition: feral hostile, warden and civ neutral', () => {
-    expect(determineRel(initialPlayerHate('feral'))).toBe('Hostile')
+  it('initial player disposition: rootcult hostile, warden and civ neutral', () => {
+    expect(determineRel(initialPlayerHate('rootcult'))).toBe('Hostile')
     expect(determineRel(initialPlayerHate('warden'))).toBe('Neutral')
     expect(determineRel(initialPlayerHate('civ'))).toBe('Neutral')
   })
@@ -107,10 +107,10 @@ describe('relationships', () => {
     })
   })
 
-  it('a feral NPC (hostile disposition) aggroes a visible player unprovoked', () => {
+  it('a rootcult NPC (hostile disposition) aggroes a visible player unprovoked', () => {
     const w = createWorld(1, 1)
     const p = player(w, 20, 20)
-    const mutant = npc(w, 'feral', 22, 20)
+    const mutant = npc(w, 'rootcult', 22, 20)
     mutant.ai!.thinkAt = 0
     aiSystem(w)
     expect(mutant.ai!.mode).toBe('aggro')

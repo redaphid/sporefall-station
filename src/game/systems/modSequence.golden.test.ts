@@ -63,18 +63,21 @@ describe('sequenced casting: golden digests', () => {
   // pinned the old fold-everything-into-every-shot path. Restoring that fold
   // (fireWeapon firing the whole list as one cast, the reorder input ignored,
   // resolveWeapon's newest-element pick) reproduces both old digests.
-  // Re-pinned by the lore rename (ee39480f, 5930fe81 before it). The digest
-  // hashes archetype, faction and field names, so only the strings moved: the
-  // pre-rename digest text, passed through the codemod, equals today's text
-  // except that `misdeedUntilTick` now sorts after `downed`. The city-word
-  // pass (5c2b17a6, 1378fed3 before it) renamed weapon and tile ids only.
-  // Seed 1234 re-pinned again when the cash terminal left the shopfloor: putting
-  // it back (the shopfloor `one` group in furnish.ts, its wall placement, and
-  // its OBJECTS entry) reproduces f257474f. The floor is an authored city level
-  // (createCityWorld), which digests the same as the seeded one did.
+  // Re-pinned when NPC goals gained commitment and settlers took seats at
+  // props (was ee39480f / 5930fe81): the fire path is unchanged, the crowd
+  // around it moves differently.
+  // Re-pinned by the lore rename (was c5354a88 / 93a464b3). The digest hashes
+  // archetype, faction, item and field names; the pre-rename digest text,
+  // passed through the codemod, equals today's except that `misdeedUntilTick`
+  // now sorts after `downed`.
+  // Seed 1234 re-pinned when the cash terminal left the shopfloor (was
+  // b80e2df3): putting it back (the shopfloor `one` group in furnish.ts, its
+  // wall placement, and its OBJECTS entry) reproduces it. The floor is an
+  // authored city level (createCityWorld), which digests the same as the
+  // seeded one did.
   const GOLDEN: Record<number, string> = {
-    7: 'ee4057c8',
-    1234: '1b4cbe93',
+    7: 'f0f577c1',
+    1234: '423f77b8',
   }
 
   for (const seed of [7, 1234]) {

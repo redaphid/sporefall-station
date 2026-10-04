@@ -1,6 +1,6 @@
 // Craft the `blackout-run` save: a dim station wing on brownout. The way out is
 // a power-sealed door at the east end. The generator that feeds it sits up a
-// side passage past three barracks of sleeping feral. Cutting the power opens
+// side passage past three barracks of sleeping rootcult. Cutting the power opens
 // the door, and it also wakes every sleeper and turns the Derelict Units in
 // the east hall hostile. Sneak in, pull the plug, then run.
 //

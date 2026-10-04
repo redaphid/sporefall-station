@@ -78,10 +78,10 @@ const main = async () => {
 
   const start = await readWorld(page)
   // The scenario's two acolytes are the ones standing right next to the player;
-  // the two nearest ferals are them (any populated acolytes are far off).
-  const nearFerals = start.npcs.filter((n) => n.faction === 'feral').sort((a, b) => a.distToPlayer - b.distToPlayer).slice(0, 2)
-  const healthy0 = nearFerals.reduce((a, b) => (b.hp > a.hp ? b : a))
-  const wounded0 = nearFerals.reduce((a, b) => (b.hp < a.hp ? b : a))
+  // the two nearest rootcults are them (any populated acolytes are far off).
+  const nearRootcults = start.npcs.filter((n) => n.faction === 'rootcult').sort((a, b) => a.distToPlayer - b.distToPlayer).slice(0, 2)
+  const healthy0 = nearRootcults.reduce((a, b) => (b.hp > a.hp ? b : a))
+  const wounded0 = nearRootcults.reduce((a, b) => (b.hp < a.hp ? b : a))
   log('start', JSON.stringify({ healthy0, wounded0 }))
 
   // Let the acolytes act on their goals for a moment.

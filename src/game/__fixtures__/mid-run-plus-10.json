@@ -199,7 +199,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "feral",
+        "faction": "rootcult",
         "home": {
           "x": -1.5,
           "y": 1.5

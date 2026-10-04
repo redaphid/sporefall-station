@@ -2,7 +2,7 @@
 //
 // Every test loads an exact state through serialize/deserialize, runs the real
 // systems (`runTicks` → `tickWorld`) and asserts on the world. The floor is the
-// seed-1 floor-1 city with `hostile = false`, so crew and watch stay calm and the
+// seed-1 floor-1 city with `hostile = false`, so crew and wardens stay calm and the
 // only thing moving the alarm is what the test does. The player stands on the
 // open causeway at y=1.5 aiming +x; witnesses stand behind it, out of the line of
 // fire, so no bullet ever lands on one (that would be a misdeed, a different path).
@@ -155,7 +155,7 @@ describe('who counts as a witness (adversarial)', () => {
     expect(w.noises).toHaveLength(1)
   })
 
-  it('ferals and vermin do not call it in', () => {
+  it('rootcults and vermin do not call it in', () => {
     expect(heatAfterShot([['mutant', 2.5, 0.5], ['sporeling', 3.5, 0.5]])).toBeUndefined()
   })
 
@@ -194,7 +194,7 @@ describe('an attack on a player, seen', () => {
     expect(w.mission.heat).toBe(ATTACK_SEEN_HEAT)
   })
 
-  it('the watch beating on you is not news', () => {
+  it('the wardens beating on you is not news', () => {
     const w = stage([['civilian', 2.5, 0.5], ['warden', 7.5, 1.5]])
     const warden = w.entities.find((e) => e.archetype === 'warden')!
     applyDamage(w, player(w), 5, warden.pos.x, warden.pos.y, 0, warden.id)
@@ -254,7 +254,7 @@ describe('lockdown: a raised alarm seals the Launch Bay', () => {
     expect(lockdownView(w)).toBeUndefined()
   })
 
-  it('the misdeed path counts too: shooting a warden in front of the watch can seal the bay', () => {
+  it('the misdeed path counts too: shooting a warden in front of the wardens can seal the bay', () => {
     const w = stage([['warden', 2.5, 0.5], ['warden', 3.5, 0.5], ['warden', 2.5, 2.5], ['warden', 7.5, 1.5]])
     const victim = w.entities.filter((e) => e.archetype === 'warden')[3]
     commitMisdeed(w, victim, player(w))

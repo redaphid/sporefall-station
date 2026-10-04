@@ -116,6 +116,7 @@ export const TILE_NAMES = [
   'bulkhead',
   'pillar',
 ] as const
+export type TileName = (typeof TILE_NAMES)[number]
 
 /** Wall-family tile names that take an autotiled cap (render/wallCaps.ts):
  * `tile.<name>.cap` is the lit top strip authored along the tile's NORTH edge

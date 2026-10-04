@@ -11,9 +11,8 @@
  */
 
 import { isWallTile, Tile, type Level } from '../game/levelgen/level'
-import type { PROP_NAMES, TILE_NAMES } from './theme'
+import type { PROP_NAMES, TileName } from './theme'
 
-type TileName = (typeof TILE_NAMES)[number]
 type PropName = (typeof PROP_NAMES)[number]
 
 /** Whether a level draws the indoor look. */
@@ -26,10 +25,10 @@ export const INDOOR_TILE_SKIN = { wall: 'bulkhead', floor: 'deck' } as const sat
 export const INDOOR_PILLAR = 'pillar' satisfies TileName
 
 /** A skin with no art in the pack tries this one next, before the plain tile. */
-export const INDOOR_SKIN_FALLBACK: Readonly<Partial<Record<string, TileName>>> = { pillar: 'bulkhead' }
+export const INDOOR_SKIN_FALLBACK: Readonly<Partial<Record<TileName, TileName>>> = { pillar: 'bulkhead' }
 
 /** The `tile.<family>.cap` pair a skinned wall wears. */
-export const INDOOR_CAP_FAMILY: Readonly<Partial<Record<string, TileName>>> = { bulkhead: 'bulkhead', pillar: 'bulkhead' }
+export const INDOOR_CAP_FAMILY: Readonly<Partial<Record<TileName, TileName>>> = { bulkhead: 'bulkhead', pillar: 'bulkhead' }
 
 const SKIN_BY_TILE: ReadonlyMap<number, TileName> = new Map([
   [Tile.Wall, INDOOR_TILE_SKIN.wall],

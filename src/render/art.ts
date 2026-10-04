@@ -3,7 +3,8 @@ import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
 import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
 import { DEFAULT_TPF, type AnimStateName } from './animState'
-import { DIRS5, type Dir5 } from './theme'
+import { DIRS5, type Dir5, type TileName } from './theme'
+import { INDOOR_CAP_FAMILY, INDOOR_SKIN_FALLBACK, parseIndoorArtKey } from './indoorSkin'
 import { pickTileVariant } from './tileSelect'
 import { CAP_QUARTER_TURNS, cutCapSides } from './wallCaps'
 
@@ -43,8 +44,11 @@ export interface ArtRegistry {
    * It picks among themed variants/accents or the procedural TILE_VARIANTS —
    * same hash, same texture, on every device. Pass the tile coordinates too
    * when you have them: surfaces a theme declares in `macroTiles` then pick
-   * their variant by position (adjacent macro slices land adjacently). */
-  tile(tileId: number, hash?: number, tx?: number, ty?: number): Texture
+   * their variant by position (adjacent macro slices land adjacently).
+   * `skin` (indoorSkin.indoorTileSkin) draws the tile from that skin's pool
+   * instead, with its own accents and macro; a theme that ships no art for
+   * the skin draws the plain tile exactly as without one. */
+  tile(tileId: number, hash?: number, tx?: number, ty?: number, skin?: TileName): Texture
   /** Context-placed RGBA decal pool for a surface (`tile.<name>.overlay`) —
    * empty when the theme ships none. Placement: tileSelect.planTileOverlays. */
   tileOverlayPool(tileId: number): readonly Texture[]
@@ -63,11 +67,15 @@ export interface ArtRegistry {
    * corner, both on a transparent full-tile canvas — the tilemap rotates them
    * to whichever edges/corners face open ground. Undefined for non-wall tiles
    * and for themes whose wall art carries no cap. Bevelled corners bake their
-   * own caps into `tile()`. */
-  wallCap(tileId: number): WallCapTextures | undefined
+   * own caps into `tile()`. A skinned wall (`skin` as passed to `tile()`)
+   * wears its INDOOR_CAP_FAMILY pair when the theme ships one, and none when
+   * the theme ships the skinned body without caps. */
+  wallCap(tileId: number, skin?: TileName): WallCapTextures | undefined
   /** Soft seam strip for a boundary where a LOWER surface (street water) meets
    * a higher one (deck/grass) — drawn on the lower tile's edge. */
   groundSeam(side: OverlaySide): Texture
+  /** `indoor:<key>` (indoorSkin.indoorArtKey) draws the theme's indoor prop
+   * art, or `entity('<key>')` when the theme ships none. */
   entity(archetype: string): Texture
   /** White silhouette of the entity texture, swapped in during hit flash. For
    * a character pass its current drawn facing so the flash keeps the pose. */
@@ -737,6 +745,13 @@ export const createArt = (
     return tex
   }
 
+  /** The pool a skin draws from: its own, else the next one down
+   * INDOOR_SKIN_FALLBACK, whichever the theme ships; undefined when none. */
+  const skinPool = (skin: TileName | undefined): TileName | undefined => {
+    for (let s = skin; s !== undefined; s = INDOOR_SKIN_FALLBACK[s]) if ((sprites.tiles?.[s]?.length ?? 0) > 0) return s
+    return undefined
+  }
+
   // ---- Wall caps (the lit top strip, autotiled by wallCaps.ts) -------------
   // Procedural cap for a procedural wall body: a flat strip in the colour the
   // square wall used to bake along its top.
@@ -766,8 +781,12 @@ export const createArt = (
    * when it ships one; the procedural strip when the BODY is procedural too;
    * none when the theme dresses the wall but authored no cap (its art is then
    * drawn exactly as shipped). Bevelled corners share the plain wall's. */
-  const wallCap = (tileId: number): WallCapTextures | undefined => {
+  const wallCap = (tileId: number, skin?: TileName): WallCapTextures | undefined => {
     if (!isWallTile(tileId)) return undefined
+    const skinFamily = skin && INDOOR_CAP_FAMILY[skin]
+    const skinCaps = skinFamily && sprites.tileCaps?.[skinFamily]
+    if (skinCaps) return skinCaps
+    if (skinPool(skin)) return undefined
     const family = tileId === Tile.Hull ? 'hull' : 'wall'
     const themed = sprites.tileCaps?.[family]
     if (themed) return themed
@@ -834,8 +853,8 @@ export const createArt = (
     Object.entries(TILE_ID_BY_NAME).map(([name, id]) => [id, name]),
   )
 
-  const tile = (tileId: number, hash = 0, tx?: number, ty?: number): Texture => {
-    const name = TILE_NAME_BY_ID[tileId]
+  const tile = (tileId: number, hash = 0, tx?: number, ty?: number, skin?: TileName): Texture => {
+    const name = skinPool(skin) ?? TILE_NAME_BY_ID[tileId]
     const variants = name ? sprites.tiles?.[name] : undefined
     if (variants && variants.length > 0) {
       // Rare accents ride the same hash (different bits pick which one).
@@ -1415,6 +1434,8 @@ export const createArt = (
   const effectFrames = (key: EffectKey): readonly Texture[] => sprites[key] ?? []
 
   const entity = (archetype: string): Texture => {
+    const indoor = parseIndoorArtKey(archetype)
+    if (indoor) return sprites.props?.[indoor.prop] ?? entity(indoor.base)
     const real = spriteForArchetype(archetype)
     if (real) return real
     let tex = entityCache.get(archetype)
@@ -1427,6 +1448,9 @@ export const createArt = (
 
   const flashCache = new Map<string, Texture>()
   const entityFlash = (archetype: string, dir?: Dir5): Texture => {
+    // Flashes are procedural silhouettes of the plain key, themed art or not.
+    const indoor = parseIndoorArtKey(archetype)
+    if (indoor) return entityFlash(indoor.base, dir)
     // Characters flash as a white silhouette of their current facing so the
     // pose (and the 48px feet-anchored canvas) never jumps during the flash.
     const character = archetype in CHARSET_ALIAS

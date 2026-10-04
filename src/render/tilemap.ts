@@ -1,6 +1,7 @@
 import { Container, Sprite } from 'pixi.js'
 import { isWallTile, STOREY_SIZE, STOREY_STRIDE, Tile, WALL_CUT_OUTSIDE, type Level, type StairDir } from '../game/levelgen/level'
 import { TILE_PX, type ArtRegistry, type OverlaySide } from './art'
+import { indoorTileSkin } from './indoorSkin'
 import { coordHash, planTileOverlays, type OverlayPlacement } from './tileSelect'
 import { CAP_QUARTER_TURNS, CORNER_QUARTER_TURNS, planWallCaps } from './wallCaps'
 
@@ -101,12 +102,15 @@ export class TilemapView {
             const cut = WALL_CUT_OUTSIDE[tileId]
             if (cut) {
               const neighbor = tileAt(tx + cut.dx, ty + cut.dy)
-              const ground = isWallTile(neighbor) ? Tile.Sidewalk : neighbor
-              const back = new Sprite(art.tile(ground, hash, tx, ty))
+              const exposed = !isWallTile(neighbor)
+              const ground = exposed ? neighbor : Tile.Sidewalk
+              const groundSkin = exposed ? indoorTileSkin(level, tx + cut.dx, ty + cut.dy) : undefined
+              const back = new Sprite(art.tile(ground, hash, tx, ty, groundSkin))
               back.position.set(px, py)
               container.addChild(back)
             }
-            const sprite = new Sprite(art.tile(tileId, hash, tx, ty))
+            const skin = indoorTileSkin(level, tx, ty)
+            const sprite = new Sprite(art.tile(tileId, hash, tx, ty, skin))
             const turn = stairDir.get(ty * level.w + tx)
             if (turn !== undefined) {
               // Stair art is authored facing north; turn it to the shaft.
@@ -162,7 +166,7 @@ export class TilemapView {
               // ---- Wall caps: the lit top strip on every edge facing open
               // ground (rotated there), nubs in concave corners — one
               // continuous line along runs, corners and T-junctions.
-              const caps = art.wallCap(tileId)
+              const caps = art.wallCap(tileId, skin)
               const plan = caps && planWallCaps(level, tx, ty)
               if (caps && plan) {
                 const lay = (tex: typeof caps.edge, quarterTurns: number): void => {

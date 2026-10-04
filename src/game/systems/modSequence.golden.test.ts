@@ -10,7 +10,8 @@ import { populateWorld } from '../populate'
 import { spawnPlayer } from '../player'
 import { playerSpawnPoint } from '../spawnPlacement'
 import { emptyInput, type InputCmd } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { createCityWorld } from '../testkit'
+import { tickWorld, type World } from '../world'
 import { weaponStack } from './inventory'
 import { setupFloor } from './missions'
 
@@ -28,7 +29,7 @@ const fnv1a = (s: string): string => {
  * pickup order, the way a draft would have left it: three casts,
  * [incendiary] [overload x2, frost] [pierce]. */
 const buildRun = (seed: number): World => {
-  const w = createWorld(seed, 1)
+  const w = createCityWorld(seed, 1)
   populateWorld(w)
   setupFloor(w)
   const at = playerSpawnPoint(w.level, 0)
@@ -66,9 +67,13 @@ describe('sequenced casting: golden digests', () => {
   // hashes archetype, faction and field names, so only the strings moved: the
   // pre-rename digest text, passed through the codemod, equals today's text
   // except that `misdeedUntilTick` now sorts after `downed`.
+  // Seed 1234 re-pinned when the ATM left the shopfloor layout: putting back
+  // `{ g: 'one', prop: 'atm' }` in furnish.ts and `OBJECTS.atm` reproduces
+  // 1378fed3. The floor is an authored city level (createCityWorld), which
+  // digests the same as the seeded one did.
   const GOLDEN: Record<number, string> = {
     7: '5c2b17a6',
-    1234: '1378fed3',
+    1234: 'fa02a317',
   }
 
   for (const seed of [7, 1234]) {

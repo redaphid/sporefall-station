@@ -24,8 +24,6 @@ import {
   type ShareState,
 } from './shareModel'
 
-const NEW_SEED_LABEL = '🎲 New Seed'
-const NEW_SEED_ARMED_LABEL = '🎲 Wipe this run? Press again'
 /** Standard-mapping face buttons: A is the bottom one, B the right one. */
 const PAD_A = 0
 const PAD_B = 1
@@ -109,42 +107,42 @@ export const createPauseOverlay = (
   const resumeBtn = btn('Resume', true)
   resumeBtn.addEventListener('click', actions.onResume)
   row.appendChild(resumeBtn)
-  // New Seed throws the run away, so it takes two presses: the first arms it
-  // and says so, the second rolls the seed. Leaving the button or closing the
-  // menu disarms it, so a stray press never wipes a run.
-  let disarmNewSeed = (): void => {}
-  const onNewSeed = actions.onNewSeed
-  if (onNewSeed) {
-    const nsBtn = btn(NEW_SEED_LABEL, false)
-    nsBtn.dataset.role = 'pause-new-seed'
-    disarmNewSeed = () => {
-      delete nsBtn.dataset.armed
-      nsBtn.textContent = NEW_SEED_LABEL
-      nsBtn.style.background = '#1b1e28'
+  // New Seed and Run it back each throw the run away, so each takes two
+  // presses: the first arms it and says so, the second acts. At most one is
+  // armed at a time, and leaving the button or closing the menu disarms it,
+  // so a stray press never ends a run.
+  const disarms: (() => void)[] = []
+  const disarmAll = (): void => disarms.forEach((d) => d())
+  const twoPress = (role: string, label: string, armedLabel: string, act: () => void): HTMLButtonElement => {
+    const b = btn(label, false)
+    b.dataset.role = role
+    const disarm = (): void => {
+      delete b.dataset.armed
+      b.textContent = label
+      b.style.background = '#1b1e28'
     }
-    nsBtn.addEventListener('click', () => {
-      if (nsBtn.dataset.armed !== undefined) {
-        disarmNewSeed()
-        onNewSeed()
+    disarms.push(disarm)
+    b.addEventListener('click', () => {
+      if (b.dataset.armed !== undefined) {
+        disarm()
+        act()
         return
       }
-      nsBtn.dataset.armed = ''
-      nsBtn.textContent = NEW_SEED_ARMED_LABEL
-      nsBtn.style.background = '#5a1f22'
+      disarmAll()
+      b.dataset.armed = ''
+      b.textContent = armedLabel
+      b.style.background = '#5a1f22'
     })
-    nsBtn.addEventListener('blur', () => disarmNewSeed())
+    b.addEventListener('blur', disarm)
     // A held Enter autorepeats its keydown, and each one clicks: one hold
-    // would arm and then wipe. Only a fresh keypress may count.
-    nsBtn.addEventListener('keydown', (e) => {
+    // would arm and then act. Only a fresh keypress may count.
+    b.addEventListener('keydown', (e) => {
       if (e.repeat) e.preventDefault()
     })
-    row.appendChild(nsBtn)
+    return b
   }
-  if (actions.onRestart) {
-    const rbBtn = btn('Run it back', false)
-    rbBtn.addEventListener('click', actions.onRestart)
-    row.appendChild(rbBtn)
-  }
+  if (actions.onNewSeed) row.appendChild(twoPress('pause-new-seed', '🎲 New Seed', '🎲 Wipe this run? Press again', actions.onNewSeed))
+  if (actions.onRestart) row.appendChild(twoPress('pause-run-it-back', 'Run it back', 'Restart this run? Press again', actions.onRestart))
   el.appendChild(row)
   const onRefresh = actions.onRefresh
   if (onRefresh) {
@@ -272,7 +270,7 @@ export const createPauseOverlay = (
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
       if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
-      if (!show) disarmNewSeed()
+      if (!show) disarmAll()
       if (show) {
         lastView = view
         paintSeq()

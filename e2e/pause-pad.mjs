@@ -103,7 +103,10 @@ await shot('3-up-to-strip')
 await press(B)
 await sleep(400)
 r.resumed = await page.evaluate(look)
-r.errors = errors.slice(bootErrors)
+// Headless WSL Chromium has no WebGL, and pixi throws this whenever it gets to
+// it; on a real GPU (CDP_URL) every page error counts.
+const NO_WEBGL = /reading 'updateRenderable'/
+r.errors = errors.slice(bootErrors).filter((e) => process.env.CDP_URL || !NO_WEBGL.test(e))
 await context.close()
 if (process.env.CDP_URL) await browser.close().catch(() => {})
 else await browser.close()

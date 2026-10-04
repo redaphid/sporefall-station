@@ -81,3 +81,28 @@ export const walledRoom = (w: number, h: number): string[] =>
 export const expectWorldEqual = (a: World, b: World): void => {
   expect(serializeWorld(a)).toEqual(serializeWorld(b))
 }
+
+/** A cast glyph's spawner: called with the tile the glyph sits on. */
+export type CastSpawner = (w: World, tx: number, ty: number) => unknown
+
+/**
+ * An authored world whose rows carry its cast as well as its map: every glyph
+ * named in `cast` is floor to the level, and its spawner is called for that
+ * tile, in row-major order (so entity ids follow reading order). Everything
+ * else is a levelText glyph, `@` the spawn.
+ */
+export const worldFromScene = (
+  rows: readonly string[],
+  cast: Readonly<Record<string, CastSpawner>>,
+  init: Omit<WorldInit, 'level'> = {},
+): World => {
+  const floorRows = rows.map((r) => [...r].map((g) => (g in cast ? '.' : g)).join(''))
+  const w = worldFromRows(floorRows, init)
+  rows.forEach((r, ty) => [...r].forEach((g, tx) => cast[g]?.(w, tx, ty)))
+  return w
+}
+
+/** The AI as it ran before goal commitment and settler activities. A golden
+ * digest captured on main before that change is compared against a world
+ * running this, so it keeps proving what it was written to prove. */
+export const AI_BEFORE_COMMITMENT: NonNullable<World['aiFlags']> = { commitment: false, activities: false }

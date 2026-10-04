@@ -11,6 +11,7 @@ import { spawnPlayer } from '../player'
 import { playerSpawnPoint } from '../spawnPlacement'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
+import { AI_BEFORE_COMMITMENT } from '../testkit'
 import { weaponStack } from './inventory'
 import { setupFloor } from './missions'
 
@@ -29,6 +30,7 @@ const fnv1a = (s: string): string => {
  * [incendiary] [overload x2, frost] [pierce]. */
 const buildRun = (seed: number): World => {
   const w = createWorld(seed, 1)
+  w.aiFlags = AI_BEFORE_COMMITMENT
   populateWorld(w)
   setupFloor(w)
   const at = playerSpawnPoint(w.level, 0)
@@ -70,6 +72,7 @@ describe('sequenced casting: golden digests', () => {
   for (const seed of [7, 1234]) {
     it(`seed ${seed}: 400 ticks of fire and swap requests digest exactly`, () => {
       const w = run(seed, 400)
+      delete w.aiFlags // a run setting, not world state: main had none to digest
       expect(fnv1a(worldDigest(w))).toBe(GOLDEN[seed])
     })
   }

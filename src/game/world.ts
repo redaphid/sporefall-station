@@ -182,6 +182,12 @@ export interface World {
     /** Incumbent-goal hysteresis/deadband in `decide` (#62, fixes #59 thrash).
      * Undefined → ON (shipped). `false` → the old zero-deadband behaviour. */
     hysteresis?: boolean
+    /** Goal commitment in `decide`: a goal holds for its minimum duration and
+     * only a higher tier interrupts it. Undefined → ON. `false` → off. */
+    commitment?: boolean
+    /** Settlers claim seats at props and play cards, tinker and rest
+     * (systems/activities.ts). Undefined → ON. `false` → off. */
+    activities?: boolean
     /** `threat` scores any Hostile-disposition entity, not only players — the
      * autonomous faction/sworn-enemy matrix (#63). Undefined → ON (shipped).
      * `false` → the old players-only scan. */

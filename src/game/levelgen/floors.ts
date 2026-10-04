@@ -1,30 +1,48 @@
 import { mulberry32 } from '../rng'
-import { THEMES, type BiomeName, type Theme } from './level'
+import { themeNamed, type BiomeName, type Theme, type ThemeName } from './level'
 
 /**
  * THE RUN'S FLOOR PLAN: what each floor of a run is built as. This module is
  * the one place that decides it; `generateLevel` reads it and nothing else
  * branches on the floor number to pick a setting.
  *
- * The opening floors are the sunken city. Every floor after them is the indoor
- * station complex, and the city never comes back however deep the run goes.
- * The station's biomes turn over one per floor in an order the run's seed
- * shuffles, so floor 3 is not the same biome every run.
+ * The opening floors are the sunken city. Each draws its district from its own
+ * pool, seeded, never the district of the floor before. Every floor after them
+ * is the indoor station complex, and the city never comes back however deep the
+ * run goes. The station's biomes turn over one per floor in an order the run's
+ * seed shuffles, so floor 3 is not the same biome every run.
  */
 export type FloorSetting = { kind: 'city'; theme: Theme } | { kind: 'complex'; biome: BiomeName }
 
-/** Floors 1 and 2, in order: the sunken city's two opening districts. */
-export const OPENING_FLOORS: readonly FloorSetting[] = [
-  { kind: 'city', theme: THEMES[0] },
-  { kind: 'city', theme: THEMES[1] },
-]
+/** The district pool of floors 1 and 2, in order.
+ *
+ * Floor 1 is the landing: the classic downtown grid, byte-frozen because the
+ * in-game demos, every committed floor-1 world and every shared floor-1
+ * `?state=` link replay on it (levelgen/floor1.frozen.test.ts). Widening its
+ * pool is a one-line change here once those move to authored worlds; the
+ * no-repeat rule below already covers it. */
+export const OPENING_POOLS: readonly (readonly ThemeName[])[] = [['downtown'], ['slums', 'stillworks', 'culturebeds']]
+
+/** Run `seed`'s opening districts, one per opening floor: each a seeded pick
+ * from its pool, never the floor before's district. Its own rng fork, so it
+ * moves no other draw. */
+export const openingDistricts = (seed: number): readonly Theme[] => {
+  const rng = mulberry32(seed).fork('floors:districts')
+  const out: Theme[] = []
+  for (const pool of OPENING_POOLS) {
+    const prev = out[out.length - 1]?.name
+    const choices = pool.filter((name) => name !== prev)
+    out.push(themeNamed(choices.length === 1 ? choices[0] : choices[rng.int(0, choices.length - 1)]))
+  }
+  return out
+}
 
 /** Every station biome. A run plays them in a seeded order, one per floor,
  * and repeats that order lap after lap. */
 export const BIOMES: readonly BiomeName[] = ['habitation', 'flooded', 'reactor', 'overgrown']
 
 /** First floor built as the indoor complex. */
-export const COMPLEX_MIN_FLOOR = OPENING_FLOORS.length + 1
+export const COMPLEX_MIN_FLOOR = OPENING_POOLS.length + 1
 
 /** Run `seed`'s biome order: a Fisher-Yates shuffle of BIOMES on its own
  * stream, so it moves no other draw. Every entry is distinct, so no two
@@ -44,7 +62,7 @@ export const biomeOrder = (seed: number): readonly BiomeName[] => {
  * fractions round down. */
 export const floorSetting = (seed: number, floor: number): FloorSetting => {
   const f = Number.isFinite(floor) ? Math.floor(floor) : 1
-  if (f < COMPLEX_MIN_FLOOR) return OPENING_FLOORS[Math.max(f, 1) - 1]
+  if (f < COMPLEX_MIN_FLOOR) return { kind: 'city', theme: openingDistricts(seed)[Math.max(f, 1) - 1] }
   const order = biomeOrder(seed)
   return { kind: 'complex', biome: order[(f - COMPLEX_MIN_FLOOR) % order.length] }
 }

@@ -7,15 +7,16 @@
 import { describe, expect, it } from 'vitest'
 import { resistMult } from '../entity'
 import { spawnNpc } from '../populate'
+import { walledRoom, worldFromRows } from '../testkit'
 import { emptyInput } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { tickWorld, type World } from '../world'
 import { applyDamage } from './combat'
 import { addStatus } from './statusFx'
 
 const HUGE = 1e7
 const spawn = (arch: string): { w: World; e: ReturnType<typeof spawnNpc> } => {
-  const w = createWorld(1, 1)
-  const e = spawnNpc(w, arch, 5, 5)
+  const w = worldFromRows(walledRoom(10, 10))
+  const e = spawnNpc(w, arch, 5.5, 5.5)
   e.health = { hp: HUGE, max: HUGE, iframes: 0 } // pinned high so nothing dies mid-measure
   return { w, e }
 }

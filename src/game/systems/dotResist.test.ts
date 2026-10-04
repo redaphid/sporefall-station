@@ -14,11 +14,14 @@ import type { Entity } from '../entity'
 import { spawnPlayer } from '../player'
 import { spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { expectWorldEqual, runTicks, walledRoom, worldFromRows } from '../testkit'
 import type { InputCmd } from '../types'
-import { createWorld, type World } from '../world'
+import type { World } from '../world'
 import { igniteCell } from './fire'
 import { applyStatus, hasStatus } from './statusFx'
+
+const ROOM = walledRoom(10, 5)
+const room = (): World => worldFromRows(ROOM)
 
 const idle = new Map<number, Partial<InputCmd>>()
 const DOTS = Object.values(ELEMENTS).filter((d) => d.dot > 0)
@@ -39,7 +42,7 @@ const hitsOn = (w: World, e: Entity): number[] =>
  * alone in a fresh world, until the status wears off. `resist` replaces its
  * roster table. A thug with no override is the unresisted reference. */
 const dotHits = (archetype: string, kind: string, ticks: number, resist?: number): number[] => {
-  const w = createWorld(1, 1)
+  const w = room()
   const e = body(w, archetype)
   if (resist !== undefined) e.resist = { [kind]: resist }
   applyStatus(w, e, kind, ticks)
@@ -67,7 +70,7 @@ describe('a resist scales damage over time instead of rounding it away', () => {
   })
 
   it('standing in fire re-lights the burn every tick without forgetting what it owes', () => {
-    const w = createWorld(1, 1)
+    const w = room()
     const thug = body(w, 'thug')
     const cinder = body(w, 'cinder', 1)
     let thugLost = 0
@@ -127,7 +130,7 @@ describe('a resist scales damage over time instead of rounding it away', () => {
     [0.5, 1, 1.5, 2, 3].filter((r) => Number.isInteger(d.dot * r)).map((r) => [d.id, r] as const),
   )
   it.each(whole)('%s at resist %s hits for exactly dot × resist every time, as before', (kind, resist) => {
-    const w = createWorld(1, 1)
+    const w = room()
     const e = body(w, 'thug')
     e.resist = { [kind]: resist }
     applyStatus(w, e, kind, ELEMENTS[kind].durationTicks)
@@ -147,7 +150,7 @@ describe('a resist scales damage over time instead of rounding it away', () => {
 describe('damage over time is deterministic', () => {
   it('a mid-burn serialize round-trip continues byte-identically', () => {
     const stage = (): World => {
-      const w = createWorld(1, 1)
+      const w = room()
       applyStatus(w, body(w, 'thug'), 'burning', 240)
       applyStatus(w, body(w, 'cinder', 1), 'burning', 240)
       applyStatus(w, body(w, 'sporeling', 2), 'poisoned', 120)

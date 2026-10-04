@@ -9,11 +9,14 @@ import type { Entity } from '../entity'
 import { spawnPlayer } from '../player'
 import { spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { expectWorldEqual, runTicks, walledRoom, worldFromRows } from '../testkit'
 import type { InputCmd } from '../types'
-import { createWorld, type World } from '../world'
+import type { World } from '../world'
 import { REGEN_CALM_TICKS } from './regen'
 import { applyStatus } from './statusFx'
+
+const ROOM = walledRoom(10, 5)
+const room = (): World => worldFromRows(ROOM)
 
 const none = new Map<number, Partial<InputCmd>>()
 const idle = new Map<number, Partial<InputCmd>>([[0, {}]])
@@ -46,7 +49,7 @@ const beats = (w: World, e: Entity, n: number, inputs = none): Beat[] => {
 describe('death during damage over time', () => {
   it('a resisted burn kills on the tick its owed hp comes due, once', () => {
     // burning 0.2 owes 0.4 a damage tick: pay 1 on tick 0, nothing on 9, 1 on 18.
-    const w = createWorld(1, 1)
+    const w = room()
     const e = body(w, 2, { burning: 0.2 })
     applyStatus(w, e, 'burning', ELEMENTS.burning.durationTicks)
     expect(beats(w, e, 60)).toEqual([
@@ -60,7 +63,7 @@ describe('death during damage over time', () => {
 
   it('two elements due on the same tick: the first kills, the second never lands', () => {
     // Tick 0 is a damage tick for every element, so burning and poison both come due.
-    const w = createWorld(1, 1)
+    const w = room()
     const e = body(w, 1, { burning: 0.2, poisoned: 0.2 })
     applyStatus(w, e, 'burning', 600)
     applyStatus(w, e, 'poisoned', 600)
@@ -72,7 +75,7 @@ describe('death during damage over time', () => {
   })
 
   it('a downed player takes no DoT and banks nothing while down', () => {
-    const w = createWorld(1, 1)
+    const w = room()
     const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     p.resist = { burning: 0.2 }
     p.health!.hp = 1
@@ -90,7 +93,7 @@ describe('death during damage over time', () => {
 
 describe('resists outside (0, ∞)', () => {
   it('a negative resist neither heals nor banks a debt', () => {
-    const w = createWorld(1, 1)
+    const w = room()
     const e = body(w, 50, { burning: -1, poisoned: -0.3, spore: -2 })
     e.health!.hp = 40
     for (const kind of ['burning', 'poisoned', 'spore']) applyStatus(w, e, kind, 300)
@@ -100,7 +103,7 @@ describe('resists outside (0, ∞)', () => {
   })
 
   it('an immune player resting in flames is never hurt, so regen keeps healing', () => {
-    const w = createWorld(1, 1)
+    const w = room()
     const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     p.health!.iframes = 0
     p.health!.hp = 60
@@ -115,7 +118,7 @@ describe('resists outside (0, ∞)', () => {
 
 describe('two resisted elements at once', () => {
   it('each status owes its own share, so the total is each share rounded up', () => {
-    const w = createWorld(1, 1)
+    const w = room()
     const control = body(w, 100_000, {})
     const subject = body(w, 100_000, { burning: 0.3, poisoned: 0.3 }, 1)
     for (const e of [control, subject]) {
@@ -133,7 +136,7 @@ describe('two resisted elements at once', () => {
 
 describe('the owed fraction across a save', () => {
   it('a mid-burn save through JSON text carries the fraction and resumes in lockstep', () => {
-    const w = createWorld(1, 1)
+    const w = room()
     const e = body(w, 100_000, { burning: 0.2 })
     applyStatus(w, e, 'burning', 300)
     runTicks(w, none, 10)

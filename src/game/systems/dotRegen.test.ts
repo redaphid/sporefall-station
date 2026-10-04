@@ -8,12 +8,11 @@
 import { describe, expect, it } from 'vitest'
 import { ELEMENTS } from '../data/elements'
 import type { Entity } from '../entity'
-import { Tile } from '../levelgen/level'
 import { spawnPlayer } from '../player'
 import { spawnNpc } from '../populate'
-import { runTicks } from '../testkit'
+import { runTicks, walledRoom, worldFromRows } from '../testkit'
 import type { InputCmd } from '../types'
-import { createWorld, type World } from '../world'
+import type { World } from '../world'
 import { applyDamage, detonate } from './combat'
 import { igniteCell } from './fire'
 import { shock, wet } from './interactions'
@@ -24,7 +23,7 @@ const idle = new Map<number, Partial<InputCmd>>([[0, {}]])
 
 /** One player on the spawn tile of an otherwise empty world, spawn grace shed. */
 const solo = (hp: number): { w: World; p: Entity } => {
-  const w = createWorld(1, 1)
+  const w = worldFromRows(walledRoom(10, 5))
   const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
   p.health!.iframes = 0
   p.health!.hp = hp
@@ -93,18 +92,11 @@ describe('damage over time interrupts regen', () => {
 })
 
 describe('every damage source trips a damage sleeper the same way', () => {
-  /** A dormant pod that wakes on damage only, in a cleared 21x21 room, with no
+  /** A dormant pod that wakes on damage only, in an authored 21x21 room, with no
    * resist table so every source lands at full strength. */
   const sleeper = (): { w: World; pod: Entity } => {
-    const w = createWorld(1, 1, 'normal', false)
-    const cx = Math.floor(w.level.w / 2)
-    const cy = Math.floor(w.level.h / 2)
-    for (let y = cy - 10; y <= cy + 10; y++)
-      for (let x = cx - 10; x <= cx + 10; x++) {
-        w.level.tiles[y * w.level.w + x] = Tile.Floor
-        w.level.solid[y * w.level.w + x] = 0
-      }
-    const pod = spawnNpc(w, 'pod', cx + 0.5, cy + 0.5)
+    const w = worldFromRows(walledRoom(23, 23), { hostile: false })
+    const pod = spawnNpc(w, 'pod', 11.5, 11.5)
     pod.ai!.wakeOn = ['damage']
     pod.resist = undefined
     pod.health = { hp: 1000, max: 1000, iframes: 0 }

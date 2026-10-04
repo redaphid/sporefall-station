@@ -31,8 +31,8 @@ describe('planOpen — membership introductions', () => {
     expect(planOpen([host('H')], 'H')).toEqual([])
   })
 
-  it('client joining before the host waits silently', () => {
-    expect(planOpen([client('A', 'c-a')], 'A')).toEqual([])
+  it('client joining a room with no host is told so at once', () => {
+    expect(planOpen([client('A', 'c-a')], 'A')).toEqual([{ kind: 'send', conn: 'A', data: { t: 'nohost' } }])
   })
 
   it('client joining an occupied room introduces both directions', () => {

@@ -113,10 +113,12 @@ export const planOpen = (state: readonly Conn[], joiningConn: string): Action[] 
     return out
   }
 
-  // A client joined. If the host is here, introduce them; else it waits silently
-  // and gets 'host+' when the host connects (handled by the host's planOpen).
+  // A client joined. If the host is here, introduce them. Otherwise say so at
+  // once: a client coming BACK after a drop must learn the host is gone from a
+  // frame, not from a timeout a slow link can trip. A first-time joiner simply
+  // keeps waiting, and gets 'host+' when the host connects.
   const h = host(state)
-  if (!h) return []
+  if (!h) return [{ kind: 'send', conn: joiningConn, data: { t: 'nohost' } }]
   return [
     { kind: 'send', conn: h.conn, data: { t: 'peer+', id: joining.clientId! } },
     { kind: 'send', conn: joiningConn, data: { t: 'host+' } },

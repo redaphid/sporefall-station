@@ -5,7 +5,7 @@ import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import type { GameStartMsg, GoMsg, PingMsg, WelcomeMsg } from '../net/protocol/messages'
 import { isKnownMsgType, MsgType, type DropReason, type LinkMedium, type Transport, type TransportEvent } from '../net/types'
 import { DEGRADED_AFTER_MS, linkChip, linkHealth, PING_INTERVAL_MS, STALLED_AFTER_MS } from './linkHealth'
-import { HOST_ANNOUNCE_MS, NetClientSession, RECONNECT_GIVE_UP_MS } from './netClient'
+import { NetClientSession, RECONNECT_GIVE_UP_MS } from './netClient'
 
 /**
  * The client's online link watchdog, driven against a scripted host: the test
@@ -23,8 +23,9 @@ interface Rig {
   /** The host's half: frame `msg` and deliver it to the client. */
   hostSays: (msg: Uint8Array) => void
   drop: (reason: DropReason) => void
-  /** What the transport answers for peers() after a reconnect opens. */
-  hostPresent: { value: boolean }
+  /** What the relay says when a reconnect opens: the host is there, it has
+   * left ('nohost', reported as a `left` drop), or nothing arrives in time. */
+  onReopen: { value: 'host' | 'nohost' | 'silent' }
   advance: (ms: number) => Promise<void>
 }
 
@@ -34,7 +35,7 @@ const rig = (medium: LinkMedium): Rig => {
   let handler: ((e: TransportEvent) => void) | null = null
   const sent: Uint8Array[] = []
   const reader = new StreamReader({ isValidStart: isKnownMsgType })
-  const hostPresent = { value: true }
+  const onReopen: Rig['onReopen'] = { value: 'host' }
   const r: Rig = {
     client: undefined as unknown as NetClientSession,
     sent,
@@ -43,7 +44,7 @@ const rig = (medium: LinkMedium): Rig => {
       for (const bytes of frameMessage(msg, MAX_PACKET)) handler?.({ type: 'data', peer: 'host', bytes })
     },
     drop: (reason) => handler?.({ type: 'peerDisconnected', peer: 'host', reason }),
-    hostPresent,
+    onReopen,
     advance: async (ms) => {
       const step = 100
       for (let done = 0; done < ms; done += step) {
@@ -70,8 +71,9 @@ const rig = (medium: LinkMedium): Rig => {
     peers: () => (linked ? ['host'] : []),
     reconnect: async () => {
       r.reconnects++
-      linked = hostPresent.value
-      if (linked) handler?.({ type: 'peerConnected', peer: 'host' })
+      linked = onReopen.value === 'host'
+      if (onReopen.value === 'host') handler?.({ type: 'peerConnected', peer: 'host' })
+      if (onReopen.value === 'nohost') handler?.({ type: 'peerDisconnected', peer: 'host', reason: 'left' })
     },
   }
   r.client = new NetClientSession('Guest', { sample: () => emptyInput() }, transport, () => clock)
@@ -166,14 +168,30 @@ describe('online client: silence on an open socket', () => {
     expect(pings(r)[1].rtt).toBe(120)
   })
 
-  it('a reconnect the relay accepts but where no host is announced means the host left', async () => {
+  it("a reconnect where the relay says there is no host ends as host left", async () => {
     const r = rig('online')
     await admit(r)
-    r.hostPresent.value = false
-    await r.advance(STALLED_AFTER_MS + 2000 + HOST_ANNOUNCE_MS + 200)
+    r.onReopen.value = 'nohost'
+    await r.advance(STALLED_AFTER_MS + 2000 + 200)
     expect(r.reconnects).toBe(1)
     expect(r.client.phase).toBe('ended')
     expect(r.client.hostLeft).toBe(true)
+  })
+
+  it('a reconnect that hears nothing in time keeps trying: a late frame never ends the run', async () => {
+    const r = rig('online')
+    await admit(r)
+    r.onReopen.value = 'silent'
+    await r.advance(STALLED_AFTER_MS + 20_000)
+    expect(r.client.phase).toBe('reconnecting')
+    expect(r.client.hostLeft).toBe(false)
+    expect(r.reconnects).toBeGreaterThan(3)
+    r.onReopen.value = 'host'
+    await r.advance(3500)
+    r.hostSays(encodeJson(MsgType.Welcome, { slot: 1, token: 'tok', players: [] }))
+    r.hostSays(encodeJson(MsgType.GameStart, { seed: 7, players: [], floor: 1 }))
+    r.hostSays(encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: 42 } }))
+    expect(r.client.phase).toBe('playing')
   })
 
   it('a host the relay still lists but that never answers gives up as a lost connection', async () => {
@@ -256,5 +274,46 @@ describe('Bluetooth is left alone', () => {
     expect(r.client.phase).toBe('playing')
     expect(pings(r)).toEqual([])
     expect(r.reconnects).toBe(0)
+  })
+})
+
+describe('an announced leave is never shown as a lost connection first', () => {
+  /** Every phase the client enters, with whether it already knew the host left. */
+  const watch = (r: Rig): { phase: string; hostLeft: boolean }[] => {
+    const seen: { phase: string; hostLeft: boolean }[] = []
+    r.client.onPhaseChange = (phase) => seen.push({ phase, hostLeft: r.client.hostLeft })
+    return seen
+  }
+  const ended = (seen: { phase: string; hostLeft: boolean }[]) => seen.filter((s) => s.phase === 'ended')
+
+  it.each(['online', 'bluetooth', 'local'] as const)('%s: Bye, then the link drops', async (medium) => {
+    const r = rig(medium)
+    await admit(r)
+    const seen = watch(r)
+    r.hostSays(encodeJson(MsgType.Bye, {}))
+    r.drop('remote')
+    await r.advance(3000)
+    expect(ended(seen)).toEqual([{ phase: 'ended', hostLeft: true }])
+    expect(seen.map((s) => s.phase)).not.toContain('reconnecting')
+  })
+
+  it.each(['online', 'bluetooth', 'local'] as const)('%s: the drop overtakes the Bye', async (medium) => {
+    const r = rig(medium)
+    await admit(r)
+    const seen = watch(r)
+    r.drop('error')
+    r.hostSays(encodeJson(MsgType.Bye, {}))
+    await r.advance(3000)
+    expect(ended(seen).every((s) => s.hostLeft)).toBe(true)
+    expect(r.client.hostLeft).toBe(true)
+  })
+
+  it('online: the relay says the host left, and the Bye arrives after', async () => {
+    const r = rig('online')
+    await admit(r)
+    const seen = watch(r)
+    r.drop('left')
+    r.hostSays(encodeJson(MsgType.Bye, {}))
+    expect(ended(seen)).toEqual([{ phase: 'ended', hostLeft: true }])
   })
 })

@@ -40,6 +40,9 @@ export class WsTransport implements Transport {
   private handlers = new Set<(e: TransportEvent) => void>()
   private connected = new Set<PeerId>()
   private stopping = false
+  /** This client has been in a room with its host before. The relay's 'nohost'
+   * then means the host left, not that it has yet to arrive. */
+  private metHost = false
 
   constructor(
     readonly role: 'host' | 'client',
@@ -108,6 +111,7 @@ export class WsTransport implements Transport {
     if (!msg) return
     switch (msg.t) {
       case 'host+':
+        if (this.role === 'client') this.metHost = true
         if (this.role === 'client' && !this.connected.has('host')) {
           this.connected.add('host')
           this.emit({ type: 'peerConnected', peer: 'host' })
@@ -117,6 +121,12 @@ export class WsTransport implements Transport {
         // The relay saw the host's socket close. Host transports never
         // reconnect, so whatever the cause, nobody will answer a rejoin.
         if (this.role === 'client' && this.connected.delete('host')) {
+          this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'left' })
+        }
+        break
+      case 'nohost':
+        // Back in a room the host has left: the session must end, not wait.
+        if (this.role === 'client' && this.metHost) {
           this.emit({ type: 'peerDisconnected', peer: 'host', reason: 'left' })
         }
         break

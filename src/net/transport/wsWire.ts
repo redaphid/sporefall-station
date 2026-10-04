@@ -29,6 +29,7 @@ export type WsControl =
   | { t: 'peer-'; id: string; reason: DropReason } // relay→host: that client left
   | { t: 'host+' } //                     relay→client: the host is present
   | { t: 'host-'; reason: DropReason } //  relay→client: the host went away
+  | { t: 'nohost' } //                    relay→client, on open: this room has no host
 
 /** Host → relay, as a text frame: close this client's socket. The host sends
  * it after a Reject (version mismatch, full lobby) has gone out, so a refused
@@ -48,7 +49,7 @@ export const parseHostCommand = (text: string): WsHostCommand | null => {
 export const parseControl = (text: string): WsControl | null => {
   try {
     const m = JSON.parse(text) as WsControl
-    if (m && (m.t === 'peer+' || m.t === 'peer-' || m.t === 'host+' || m.t === 'host-')) return m
+    if (m && (m.t === 'peer+' || m.t === 'peer-' || m.t === 'host+' || m.t === 'host-' || m.t === 'nohost')) return m
     return null
   } catch {
     return null

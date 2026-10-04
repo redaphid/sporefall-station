@@ -130,8 +130,10 @@ The behaviour below is measured by `e2e/ws-online-reliability.mjs`, which puts
 - **Host left.** The relay's `host-` now reaches the session as a `left` drop
   and goes to the HOST LEFT menu from #145, the same menu its Bye uses. A host
   whose network vanished with no Bye and no close frame showed HOST LEFT on the
-  guest within 0.5 s. If a reconnect opens and the relay names no host within
-  2 s, the host is gone, and that is HOST LEFT too. A host the relay still
+  guest within 0.5 s. A client that reconnects to a room with no host gets
+  an explicit `nohost` frame from the relay and ends on HOST LEFT too. A slow
+  or lost frame never ends the run: without `nohost` the guest keeps
+  retrying. A host the relay still
   lists but that never answers gives up after 60 s as CONNECTION LOST. No
   online text says Bluetooth: `LINK_COPY` words each message per medium.
 - **Room codes.** `hostOnline` (`src/app/onlineSession.ts`) tries up to three

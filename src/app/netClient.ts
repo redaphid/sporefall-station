@@ -136,9 +136,6 @@ export type ClientPhase =
 
 const RECONNECT_ATTEMPTS = 30
 const RECONNECT_SPACING_MS = 2000
-/** Online: after a reconnect opens, the relay announces a present host at once.
- * Silence this long means the room has no host any more. */
-export const HOST_ANNOUNCE_MS = 2000
 /** Online: a reconnect that has heard nothing from the host for this long gives
  * up. Covers a host whose socket the relay still holds but nobody answers. */
 export const RECONNECT_GIVE_UP_MS = 60_000
@@ -337,17 +334,11 @@ export class NetClientSession implements Session {
         await this.transport.reconnect!()
         // Some transports resolve before the link is confirmed — give the
         // peerConnected event a moment, then check.
-        const online = this.transport.medium === 'online'
-        await new Promise((r) => setTimeout(r, online ? HOST_ANNOUNCE_MS : 1000))
+        // (The relay says 'nohost' outright when the host left, and the
+        // transport reports that as a `left` drop, which ends the run.)
+        await new Promise((r) => setTimeout(r, 1000))
         if (this.phase !== 'reconnecting') return
         if (this.transport.peers().length > 0) return // peerConnected handler sent the rejoin Hello
-        // The relay took the new socket but named no host: the host left while
-        // we were off the air, and nothing will ever answer.
-        if (online) {
-          this.departure = 'host-left'
-          this.setPhase('ended')
-          return
-        }
       } catch {
         // radio still gone — try again
       }
@@ -524,6 +515,9 @@ export class NetClientSession implements Session {
         this.setPhase('rejected')
         break
       case MsgType.Bye:
+        // The relay may have reported the host gone first; the end is already
+        // shown, so a late Bye changes nothing.
+        if (this.phase === 'ended' && this.departure === 'host-left') break
         this.departure = 'host-left'
         this.setPhase('ended')
         break

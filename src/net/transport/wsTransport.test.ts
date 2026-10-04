@@ -121,7 +121,7 @@ describe('WsTransport over the relay planner', () => {
 
     await client.start()
     await flush()
-    // Client waits silently until the host arrives.
+    // A first-time joiner waits for the host: 'nohost' is not a departure.
     expect(cEvents).toEqual([])
 
     await host.start()
@@ -315,6 +315,23 @@ describe('WsTransport over the relay planner', () => {
     for (const id of host.peers()) await a.drop(id)
     await flush()
     expect(host.peers()).toHaveLength(2)
+  })
+
+  it("a client that comes back to a room its host has left hears it as 'left' at once", async () => {
+    const hub = new Hub()
+    const host = new WsTransport('host', 'r', 'ws://x/ws', hub.connect)
+    const client = new WsTransport('client', 'r', 'ws://x/ws', hub.connect)
+    const cEvents = collect(client)
+    await host.start()
+    await client.start()
+    await flush()
+    await host.stop()
+    await flush()
+    cEvents.length = 0
+
+    await client.reconnect()
+    await flush()
+    expect(cEvents).toEqual([{ type: 'peerDisconnected', peer: 'host', reason: 'left' }])
   })
 
   it('sendPacket rejects before the socket is open', async () => {

@@ -14,7 +14,7 @@
 // overlay carries none, so a bar left up does not sit politely behind the YOU
 // DIED scrim; it sits on top of it.
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RenderView } from '../app/session'
 import { makeEntity, type Entity } from '../game/entity'
 import type { SimEvent } from '../game/types'
@@ -61,11 +61,35 @@ const reveal = (): SimEvent => ({ type: 'bossReveal', entityId: BOSS_ID, x: 5, y
 
 /** The live boss health bar element, found the way a player finds it: on screen. */
 const hud = (mount: HTMLElement): HTMLElement => {
-  const el = mount.querySelector('#bossName')?.parentElement
+  const el = mount.querySelector<HTMLElement>('[data-role="boss-bar"]')
   if (!el) throw new Error('boss HUD not found — createScreens changed shape')
   return el
 }
 const visible = (mount: HTMLElement): boolean => hud(mount).style.display !== 'none'
+const hpFill = (mount: HTMLElement): string => hud(mount).querySelector<HTMLElement>('#bossHp')!.style.width
+
+const card = (mount: HTMLElement): HTMLElement => {
+  const el = mount.querySelector<HTMLElement>('[data-role="boss-card"]')
+  if (!el) throw new Error('boss entrance card not found — createScreens changed shape')
+  return el
+}
+const cardShowing = (mount: HTMLElement): boolean => card(mount).style.opacity === '1'
+
+const deathScreenUp = (mount: HTMLElement): boolean =>
+  mount.querySelector<HTMLElement>('#headline')!.parentElement!.style.display === 'flex'
+
+const partner = (over: { dead?: boolean; downed?: boolean } = {}): Entity => {
+  const e = player(over)
+  e.id = 2
+  e.playerCtl!.playerId = 1
+  return e
+}
+
+const deadBoss = (): Entity => {
+  const e = boss(0)
+  e.dead = true
+  return e
+}
 
 describe('the boss health bar and the death screen', () => {
   let mount: HTMLElement
@@ -162,39 +186,33 @@ describe('the boss health bar and the death screen', () => {
   })
 
   // -------------------------------------------------------------------------
-  // The entrance card (z-index:70), caught by the before/after screenshot and
-  // not by the first cut of this fix. Gating the REVEAL is not enough: the card
-  // dwells for 2.6s, so dying just after the entrance leaves it hanging over
-  // YOU DIED, where the two headlines overprint into unreadable mush.
+  // The entrance card, caught by the before/after screenshot and not by the
+  // first cut of this fix. Gating the REVEAL is not enough: the card dwells for
+  // 2.6s, so dying just after the entrance leaves it hanging over YOU DIED,
+  // where the two headlines overprint into unreadable mush.
   // -------------------------------------------------------------------------
-
-  /** The entrance card: the mount's own child sitting at z-index 70. */
-  const card = (): HTMLElement => {
-    const el = [...mount.children].find((c) => (c as HTMLElement).style.zIndex === '70')
-    if (!el) throw new Error('boss entrance card not found — createScreens changed shape')
-    return el as HTMLElement
-  }
 
   it('REGRESSION: takes down an entrance card that was ALREADY up when the player died', () => {
     const screens = createScreens(mount, () => {})
     screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
-    expect(card().style.opacity).toBe('1') // the entrance is playing
+    expect(cardShowing(mount)).toBe(true)
 
     screens.update(view({ tick: 11, entities: [boss()], self: player({ dead: true }) }))
 
-    expect(card().style.opacity).toBe('0')
+    expect(cardShowing(mount)).toBe(false)
   })
 
   it('never raises a card at all for a reveal that fires while the player is down', () => {
     const screens = createScreens(mount, () => {})
     screens.update(view({ tick: 10, self: player({ dead: true }), entities: [boss()], events: [reveal()] }))
-    expect(card().style.opacity).toBe('0')
+    expect(cardShowing(mount)).toBe(false)
   })
 
   it('control: the card DOES play for a reveal while the player is up', () => {
     const screens = createScreens(mount, () => {})
     screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
-    expect(card().style.opacity).toBe('1')
+    expect(cardShowing(mount)).toBe(true)
+    expect(card(mount).textContent).not.toBe('')
   })
 
   it('does not drop the bar merely because the tick repeats or stalls', () => {
@@ -202,6 +220,108 @@ describe('the boss health bar and the death screen', () => {
     screens.update(view({ tick: 11, entities: [boss(200)] }))
     screens.update(view({ tick: 11, entities: [boss(200)] }))
     expect(visible(mount)).toBe(true)
+  })
+})
+
+describe('adversarial timing around the boss HUD and a fallen player', () => {
+  let mount: HTMLElement
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    document.body.innerHTML = ''
+    mount = document.createElement('div')
+    document.body.appendChild(mount)
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('dying mid-entrance drops the card at once, and neither the dwell timer nor a revive brings it back', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
+    vi.advanceTimersByTime(1000)
+    expect(cardShowing(mount)).toBe(true)
+
+    screens.update(view({ tick: 11, entities: [boss()], self: player({ dead: true }) }))
+    expect([cardShowing(mount), visible(mount), deathScreenUp(mount)]).toEqual([false, false, true])
+
+    vi.advanceTimersByTime(5000)
+    expect(cardShowing(mount)).toBe(false)
+
+    screens.update(view({ tick: 40, entities: [boss()], self: player() }))
+    expect([cardShowing(mount), visible(mount), deathScreenUp(mount)]).toEqual([false, true, false])
+  })
+
+  it('boss and player die on the same tick: no bar, no card, death screen up', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
+
+    screens.update(view({ tick: 11, entities: [deadBoss()], self: player({ dead: true }) }))
+
+    expect([visible(mount), cardShowing(mount), deathScreenUp(mount)]).toEqual([false, false, true])
+  })
+
+  it('a revive after the boss died alongside you does not resurrect the bar', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 11, entities: [deadBoss()], self: player({ downed: true }) }))
+
+    screens.update(view({ tick: 60, entities: [deadBoss()], self: player() }))
+
+    expect([visible(mount), cardShowing(mount)]).toEqual([false, false])
+  })
+
+  it('co-op: you are down while your partner fights on, so YOUR bar is gone', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss(), partner()], events: [reveal()] }))
+    expect(visible(mount)).toBe(true)
+
+    screens.update(view({ tick: 11, entities: [boss(250), partner()], self: player({ downed: true }) }))
+
+    expect([visible(mount), deathScreenUp(mount)]).toEqual([false, true])
+  })
+
+  it('co-op: your PARTNER going down does not take the bar off your screen', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss(), partner()], events: [reveal()] }))
+
+    screens.update(view({ tick: 11, entities: [boss(250), partner({ dead: true })], self: player() }))
+
+    expect([visible(mount), deathScreenUp(mount)]).toEqual([true, false])
+  })
+
+  it('co-op: your partner triggers the entrance while you are down; revived, you get the bar with the hp the partner left it on, and no stale card', () => {
+    const screens = createScreens(mount, () => {})
+    const down = player({ downed: true })
+    screens.update(view({ tick: 10, entities: [boss(), partner()], self: down, events: [reveal()] }))
+    expect([visible(mount), cardShowing(mount)]).toEqual([false, false])
+
+    screens.update(view({ tick: 30, entities: [boss(120), partner()], self: down }))
+    vi.advanceTimersByTime(3000)
+    screens.update(view({ tick: 31, entities: [boss(120), partner()], self: player() }))
+
+    expect([visible(mount), cardShowing(mount)]).toEqual([true, false])
+    expect(hpFill(mount)).toBe('37.5%')
+  })
+
+  it('revive restores the bar at the boss hp it reached while you were down, not the hp you last saw', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 11, entities: [boss(160)] }))
+    expect(hpFill(mount)).toBe('50%')
+
+    screens.update(view({ tick: 12, entities: [boss(160)], self: player({ downed: true }) }))
+    screens.update(view({ tick: 50, entities: [boss(80)], self: player({ downed: true }) }))
+    screens.update(view({ tick: 51, entities: [boss(80)], self: player() }))
+
+    expect([visible(mount), hpFill(mount)]).toEqual([true, '25%'])
+  })
+
+  it('a revive on the same hp the bar last showed still redraws it', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 10, entities: [boss(160)], events: [reveal()] }))
+    screens.update(view({ tick: 11, entities: [boss(160)], self: player({ dead: true }) }))
+    screens.update(view({ tick: 12, entities: [boss(160)], self: player() }))
+
+    expect([visible(mount), hpFill(mount)]).toEqual([true, '50%'])
   })
 })
 

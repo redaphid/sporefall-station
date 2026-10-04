@@ -203,6 +203,7 @@ export const createScreens = (
   // they had never met a boss. The card is the "this is a boss" moment; the bar
   // is the "and it is still alive" moment that lasts the whole fight.
   const bossCard = document.createElement('div')
+  bossCard.dataset.role = 'boss-card'
   bossCard.style.cssText =
     'position:absolute;top:30%;left:50%;transform:translate(-50%,-50%) scale(.85);color:#c98ae8;' +
     'font:900 34px system-ui;letter-spacing:.04em;text-shadow:0 0 18px #a05ae0,0 3px 8px #000;pointer-events:none;' +
@@ -231,6 +232,7 @@ export const createScreens = (
 
   // Top-centre health bar, clear of the notch and of the top-left player HUD.
   const bossHud = document.createElement('div')
+  bossHud.dataset.role = 'boss-bar'
   bossHud.style.cssText =
     // --sf-safe-top: stage-space safe area (ui/orientation.ts) — follows the
     // rotation when the landscape-always fallback turns the stage.

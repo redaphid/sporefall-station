@@ -8,7 +8,7 @@ import { spawnPlayer } from './player'
 import { deserializeWorld, serializeWorld, type WorldJson } from './serialize'
 import { playerSpawnPoint } from './spawnPlacement'
 import { nextFloor, setupFloor } from './systems/missions'
-import { createCityWorld, expectWorldEqual, loadFixture, loadFixtureJson, runTicks } from './testkit'
+import { AI_BEFORE_COMMITMENT, createCityWorld, expectWorldEqual, loadFixture, loadFixtureJson, runTicks } from './testkit'
 import { emptyInput, type InputCmd } from './types'
 import { createWorld, tickWorld, worldFromSeed, worldFromState, type World } from './world'
 
@@ -145,6 +145,7 @@ describe('seeded worlds: the generator path is unchanged', () => {
 
   /** Populate, set up and play `w` for 120 ticks; its save, serialized. */
   const play120 = (w: World): string => {
+    w.aiFlags = AI_BEFORE_COMMITMENT
     populateWorld(w)
     setupFloor(w)
     const at = playerSpawnPoint(w.level, 0)

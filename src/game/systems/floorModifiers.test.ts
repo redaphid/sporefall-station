@@ -29,7 +29,7 @@ import { spawnPlayer } from '../player'
 import { populateWorld, spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
-import { expectWorldEqual, loadFixture } from '../testkit'
+import { AI_BEFORE_COMMITMENT, expectWorldEqual, loadFixture } from '../testkit'
 import { emptyInput, SIM_RATE, type InputCmd, type SimEvent } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
 import { kill } from './combat'
@@ -204,10 +204,12 @@ describe('floor modifiers: the roll', () => {
     for (const [seed, floor] of [[7, 1], [1, 2]] as const) {
       it(`clean floor seed ${seed} floor ${floor}: 300 ticks of play digest exactly as on main`, () => {
         const w = direct(seed, floor)
+        w.aiFlags = AI_BEFORE_COMMITMENT
         expect(w.modifier).toBeUndefined()
         for (let t = 1; t <= 300; t++) {
           tickWorld(w, new Map([[0, cmd({ seq: t, moveX: Math.sin(t * 0.02), moveY: Math.cos(t * 0.03), attack: t % 40 < 10, aimX: 1, aimY: 0 })]]))
         }
+        delete w.aiFlags // a run setting, not world state: main had none to digest
         expect(digestWithoutModifier(w)).toBe(GOLDEN[`play:${seed}:${floor}`])
       })
     }

@@ -13,7 +13,7 @@ import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, stationAlerted, tickWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, loadFixture, runTicks } from '../testkit'
+import { AI_BEFORE_COMMITMENT, expectWorldEqual, loadFixture, runTicks } from '../testkit'
 import type { Entity } from '../entity'
 import { extractionView, setupFloor } from './missions'
 
@@ -72,6 +72,7 @@ describe('adding extraction leaves the RNG stream alone', () => {
     for (const [key, want] of Object.entries(frozen)) {
       const [seed, floor] = key.split(':').map(Number)
       const w = key.startsWith('frozen-') ? setUp(loadFixture(key)) : boot(seed, floor)
+      w.aiFlags = AI_BEFORE_COMMITMENT
       runTicks(w, idle(0), 30)
       if (w.mission.template === 'extraction') {
         converted++

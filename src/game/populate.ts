@@ -133,7 +133,7 @@ export const populateWorld = (w: World): void => {
   furnishInteriors(w)
   // Tactical-AI post-passes, each on its OWN fork so every stream above stays
   // byte-identical per seed (the existing populate tests are the proof):
-  // a bunker defender turns barricader, then gangster packs become squads
+  // a bunker defender turns barricader, then acolyte packs become squads
   // (in that order, so a squad never conscripts the barricader), and deep
   // floors seed dormant corner-ambushers into back rooms.
   assignBarricaders(w)
@@ -271,7 +271,7 @@ const assignBarricaders = (w: World): void => {
     const pack = w.entities.filter(
       (e) =>
         e.kind === 'npc' &&
-        (e.archetype === 'thug' || e.archetype === 'gangster') &&
+        (e.archetype === 'mutant' || e.archetype === 'acolyte') &&
         e.ai?.zone?.building === bi &&
         e.ai.behavior !== 'patrol',
     )
@@ -283,10 +283,10 @@ const assignBarricaders = (w: World): void => {
 
 /** Squad size cap: lead + flank + rears. */
 export const SQUAD_MAX = 4
-/** Chance an eligible gang pack actually forms up (some stay a loose rabble). */
+/** Chance an eligible feral pack actually forms up (some stay a loose rabble). */
 const SQUAD_CHANCE = 0.85
 
-/** Link each warehouse/bunker's role-spawned gang pack (thugs/gangsters bound
+/** Link each warehouse/bunker's role-spawned feral pack (mutants/acolytes bound
  * to that building) into a `squad` (behaviors.ts): first member leads, second
  * flanks, the rest stack rear. Post-pass over spawned entities in id order on a
  * DEDICATED `squads` fork — no other stream moves. Patrol beats (the
@@ -300,7 +300,7 @@ const assignSquads = (w: World): void => {
     const pack = w.entities.filter(
       (e) =>
         e.kind === 'npc' &&
-        (e.archetype === 'thug' || e.archetype === 'gangster') &&
+        (e.archetype === 'mutant' || e.archetype === 'acolyte') &&
         e.ai?.zone?.building === bi &&
         e.ai.behavior !== 'patrol' &&
         e.ai.behavior !== 'barricader',
@@ -641,14 +641,14 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   apartment: [{ archetype: 'civilian', count: [1, 3] }],
   office: [
     { archetype: 'civilian', count: [1, 2] },
-    { archetype: 'cop', count: [0, 1] },
+    { archetype: 'warden', count: [0, 1] },
   ],
-  warehouse: [{ archetype: 'thug', count: [2, 3] }],
+  warehouse: [{ archetype: 'mutant', count: [2, 3] }],
   clinic: [{ archetype: 'civilian', count: [1, 2] }],
   // Bunkers (themed floors >= 2 only) are garrisons: always guarded.
   bunker: [
-    { archetype: 'thug', count: [1, 2] },
-    { archetype: 'gangster', count: [1, 2] },
+    { archetype: 'mutant', count: [1, 2] },
+    { archetype: 'acolyte', count: [1, 2] },
   ],
   // Indoor complex modules (floors 3+). The essence-echoes of the crew still
   // keep to the rooms they lived and worked in. Bunk-room sleepers and vent
@@ -658,9 +658,9 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   // city floor's, and the director's swarms/ambushes supply the pressure.
   mess: [
     { archetype: 'civilian', count: [0, 2] },
-    { archetype: 'thug', count: [0, 1] },
+    { archetype: 'mutant', count: [0, 1] },
   ],
-  galley: [{ archetype: 'thug', count: [0, 1] }],
+  galley: [{ archetype: 'mutant', count: [0, 1] }],
   quarters: [{ archetype: 'civilian', count: [0, 1] }],
   washroom: [],
   lab: [
@@ -670,21 +670,21 @@ const ROLE_SPAWNS: Record<Building['role'], { archetype: string; count: [number,
   medbay: [{ archetype: 'scientist', count: [0, 1] }],
   reactor: [
     { archetype: 'robot', count: [0, 1] },
-    { archetype: 'thug', count: [0, 1] },
+    { archetype: 'mutant', count: [0, 1] },
   ],
-  depot: [{ archetype: 'thug', count: [0, 1] }],
+  depot: [{ archetype: 'mutant', count: [0, 1] }],
   security: [
-    { archetype: 'cop', count: [1, 1] },
-    { archetype: 'gangster', count: [0, 1] },
+    { archetype: 'warden', count: [1, 1] },
+    { archetype: 'acolyte', count: [0, 1] },
   ],
 }
 
 const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, buildingIdx: number): void => {
   const specs = [...ROLE_SPAWNS[building.role]]
-  // Difficulty ramp: deeper floors gang up
-  if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'gangster', count: [1, 2] })
-  if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'gangster', count: [0, 1] })
-  if (w.floor >= 2 && building.role === 'shop') specs.push({ archetype: 'bouncer', count: [1, 1] })
+  // Difficulty ramp: deeper floors feral up
+  if (w.floor >= 2 && building.role === 'warehouse') specs.push({ archetype: 'acolyte', count: [1, 2] })
+  if (w.floor >= 3 && building.role === 'office') specs.push({ archetype: 'acolyte', count: [0, 1] })
+  if (w.floor >= 2 && building.role === 'shop') specs.push({ archetype: 'lockkeeper', count: [1, 1] })
   for (const spec of specs) {
     const n = rng.int(spec.count[0], spec.count[1])
     for (let i = 0; i < n; i++) {
@@ -702,11 +702,11 @@ const populateBuilding = (w: World, rng: Rng, wrng: Rng, building: Building, bui
       // can derive territorial goals (hold its room, garrison/defend the wing).
       if (npc.ai) npc.ai.zone = { building: buildingIdx, role: building.role }
       if (beat) assignPatrol(npc, beat)
-      // One thug per warehouse walks rounds through the stock instead of
+      // One mutant per warehouse walks rounds through the stock instead of
       // loitering — an interior patrol the players can time and slip past.
       // (Unless a set-piece beat already claimed this NPC: a warehouse-role
-      // COMPOUND's first thug walks the pit, not the stock.)
-      if (!beat && building.role === 'warehouse' && spec.archetype === 'thug' && i === 0) {
+      // COMPOUND's first mutant walks the pit, not the stock.)
+      if (!beat && building.role === 'warehouse' && spec.archetype === 'mutant' && i === 0) {
         const wbeat = [{ x: spot.x, y: spot.y }]
         for (let j = 0; j < 2; j++) {
           const p = randomFloorInBuilding(w, rng, building)
@@ -821,12 +821,12 @@ const spawnStreetLife = (w: World, rng: Rng, wrng: Rng): void => {
     const spot = randomStreetSpot(w, rng, Tile.Sidewalk) ?? randomStreetSpot(w, rng, Tile.Street)
     if (spot) spawnNpc(w, 'civilian', spot.x, spot.y, wrng).ai!.behavior = 'scavenger'
   }
-  const copPairs = 1 + Math.floor(w.floor / 3)
-  for (let i = 0; i < copPairs; i++) {
+  const wardenPairs = 1 + Math.floor(w.floor / 3)
+  for (let i = 0; i < wardenPairs; i++) {
     const spot = randomStreetSpot(w, rng, Tile.Street)
     if (spot) {
-      const a = spawnNpc(w, 'cop', spot.x, spot.y, wrng)
-      const b = spawnNpc(w, 'cop', spot.x + 0.8, spot.y, wrng)
+      const a = spawnNpc(w, 'warden', spot.x, spot.y, wrng)
+      const b = spawnNpc(w, 'warden', spot.x + 0.8, spot.y, wrng)
       // The pair walks a shared street beat instead of loitering at one corner.
       // Waypoints respect the spawn-safe radius too, so a beat never marches
       // the pair straight through the player's landing zone.
@@ -888,8 +888,8 @@ const spawnCorridorLife = (w: World, rng: Rng, wrng: Rng): void => {
   for (let i = 0; i < pairs; i++) {
     const beat = beats.splice(rng.int(0, beats.length - 1), 1)[0]
     const along = beat[0].x === beat[1].x ? { x: 0, y: 0.8 } : { x: 0.8, y: 0 }
-    const a = spawnNpc(w, 'cop', beat[0].x, beat[0].y, wrng)
-    const b = spawnNpc(w, 'cop', beat[0].x + along.x, beat[0].y + along.y, wrng)
+    const a = spawnNpc(w, 'warden', beat[0].x, beat[0].y, wrng)
+    const b = spawnNpc(w, 'warden', beat[0].x + along.x, beat[0].y + along.y, wrng)
     assignPatrol(a, beat)
     assignPatrol(b, beat)
   }
@@ -933,7 +933,7 @@ const spawnComplexSleepers = (w: World): void => {
     for (let i = 0; i < n; i++) {
       const t = free.splice(rng.int(0, free.length - 1), 1)[0]
       taken.add(t.y * lw + t.x)
-      const npc = spawnNpc(w, 'thug', t.x + 0.5, t.y + 0.5)
+      const npc = spawnNpc(w, 'mutant', t.x + 0.5, t.y + 0.5)
       npc.ai!.zone = { building: bi, role: b.role }
       npc.ai!.dormant = true
       npc.ai!.wakeOn = ['damage', 'noise']

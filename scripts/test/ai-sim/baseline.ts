@@ -17,7 +17,7 @@ const run = (label: string, w: World, ticks: number, input?: Parameters<typeof m
 }
 
 // ── 1. The #59 repro: a single mid-health hostile taking chip damage ─────────
-// A gangster whose HP sits near the battle/flee crossover (max/3) while the
+// An acolyte whose HP sits near the battle/flee crossover (max/3) while the
 // armed player fires on it. Its goal should oscillate battle<->flee<->pursue.
 for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   const w = makeArena(1234)
@@ -26,18 +26,18 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   p.combat!.weapon = 'pistol'
   p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 99999 }]
   p.playerCtl!.activeSlot = 0
-  const g = addNpc(w, 'gangster', c.x + 6, c.y, { sight: 12 })
+  const g = addNpc(w, 'acolyte', c.x + 6, c.y, { sight: 12 })
   g.health = { hp: Math.round(g.health!.max * frac), max: g.health!.max, iframes: 0 }
   const input = new Map([[0, { attack: true, aimX: 1, aimY: 0 }]])
   run(`#59 duel hp=${(frac * 100).toFixed(0)}%`, w, 300, input)
 }
 
-// ── 2. Faction clash: cops vs gang, lots of mutual HP crossing thresholds ────
+// ── 2. Faction clash: wardens vs feral, lots of mutual HP crossing thresholds ────
 {
   const w = makeArena(22, 24)
   const c = center(w)
-  for (let i = 0; i < 6; i++) addNpc(w, 'cop', c.x - 8, c.y - 5 + i * 2, { sight: 12, weapon: 'pistol' })
-  for (let i = 0; i < 6; i++) addNpc(w, 'gangster', c.x + 8, c.y - 5 + i * 2, { sight: 12, weapon: 'pistol' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'warden', c.x - 8, c.y - 5 + i * 2, { sight: 12, weapon: 'pistol' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'acolyte', c.x + 8, c.y - 5 + i * 2, { sight: 12, weapon: 'pistol' })
   run('faction clash 6v6', w, 400)
 }
 
@@ -47,7 +47,7 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   const c = center(w)
   addPlayer(w, c.x, c.y)
   let id = 0
-  for (const arch of ['thug', 'gangster', 'cop', 'civilian', 'thug', 'gangster', 'robot', 'thug']) {
+  for (const arch of ['mutant', 'acolyte', 'warden', 'civilian', 'mutant', 'acolyte', 'robot', 'mutant']) {
     const a = (id / 8) * Math.PI * 2
     addNpc(w, arch, c.x + Math.cos(a) * 10, c.y + Math.sin(a) * 10, { sight: 12 })
     id++
@@ -63,7 +63,7 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   wall(w, Math.floor(c.x) - 4, Math.floor(c.y) - 4, Math.floor(c.x), Math.floor(c.y) - 4) // horizontal
   const prey = addNpc(w, 'civilian', c.x - 6, c.y + 3, { behavior: 'skittish', sight: 8 })
   prey.ai!.mode = 'flee'
-  const hunter = addNpc(w, 'gangster', c.x + 6, c.y + 3, { behavior: 'hunter', sight: 10 })
+  const hunter = addNpc(w, 'acolyte', c.x + 6, c.y + 3, { behavior: 'hunter', sight: 10 })
   hunter.ai!.rel = { [prey.id]: { hate: 40, code: 'Hostile' } }
   hunter.ai!.mode = 'aggro'
   hunter.ai!.targetId = prey.id
@@ -82,7 +82,7 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
     wall(w, wx, y, wx, y)
   }
   addPlayer(w, c.x - 6, c.y)
-  for (let i = 0; i < 12; i++) addNpc(w, 'thug', c.x + 4 + (i % 4), c.y - 4 + Math.floor(i / 4) * 3, { sight: 16 })
+  for (let i = 0; i < 12; i++) addNpc(w, 'mutant', c.x + 4 + (i % 4), c.y - 4 + Math.floor(i / 4) * 3, { sight: 16 })
   const m = run('chokepoint swarm 12', w, 500)
   console.log(`    -> finalSpread=${m.finalSpread.toFixed(1)} (clumping at the gap)`)
 }
@@ -97,7 +97,7 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   const victim = addNpc(w, 'civilian', c.x, c.y, { behavior: 'skittish' })
   victim.ai!.mode = 'flee'
   addPlayer(w, c.x + 1.5, c.y)
-  for (let i = 0; i < 3; i++) addNpc(w, 'thug', c.x + 1.5, c.y - 1 + i, { sight: 10 })
+  for (let i = 0; i < 3; i++) addNpc(w, 'mutant', c.x + 1.5, c.y - 1 + i, { sight: 10 })
   run('cornered civ', w, 300)
 }
 

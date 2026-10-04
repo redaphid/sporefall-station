@@ -48,8 +48,8 @@ await snap('test')
 
 // Themed display names resolve without touching the sim.
 const themedTitle = await page.evaluate(() => {
-  const cop = window.__world.entities.find((e) => e.archetype === 'cop')
-  return cop ? JSON.parse(window.__verb(`get ${cop.id}`)).archetype : 'no-cop'
+  const warden = window.__world.entities.find((e) => e.archetype === 'warden')
+  return warden ? JSON.parse(window.__verb(`get ${warden.id}`)).archetype : 'no-warden'
 })
 
 // Swap back via the debug-verb path (fire-and-forget), then settle.
@@ -64,7 +64,7 @@ if (shots.city.equals(shots.test)) failures.push('city and test screenshots are 
 if (shots.test.equals(shots['city-restored'])) failures.push('test and restored-city screenshots are identical — swap-back failed')
 if (!JSON.parse(verbReply || '{}').theme) failures.push(`theme verb reply malformed: ${verbReply}`)
 if (tickAfter < 30) failures.push(`sim stopped ticking after theme swaps (tick=${tickAfter})`)
-if (themedTitle === 'no-cop') console.log('[theme-swap] note: no cop on this floor, name-lookup smoke skipped')
+if (themedTitle === 'no-warden') console.log('[theme-swap] note: no warden on this floor, name-lookup smoke skipped')
 if (pageErrors.length) failures.push(`page errors: ${pageErrors.join(' | ')}`)
 if (consoleErrors.length) failures.push(`console errors: ${consoleErrors.join(' | ')}`)
 

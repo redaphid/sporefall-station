@@ -1,5 +1,5 @@
 // The wet stun-lock probe, ported from integration PR #122 (substrateProbes.ts
-// `stunProbe`, flooded street). One gangster armed with a stun gun starts
+// `stunProbe`, flooded street). One acolyte armed with a stun gun starts
 // STUN_GUNNER_DIST tiles down an open street row from the players. On a flooded
 // street the bog tide is in from the first tick, so everyone there is wet and
 // each stun hit on a wet player is a `shock` that floods the wet cluster.
@@ -136,7 +136,7 @@ export const stunProbe = (seed: number, ground: Ground, policy: Policy, team: Te
   if (ground === 'flooded street') startFloorModifier(w, 'bogTide', TIDE_PERIOD - TIDE_FLOOD)
   if (team === 2) addTeammate(w, first)
   const players = playersOf(w)
-  const gunner = spawnNpc(w, 'gangster', first.pos.x + STUN_GUNNER_DIST, first.pos.y)
+  const gunner = spawnNpc(w, 'acolyte', first.pos.x + STUN_GUNNER_DIST, first.pos.y)
   gunner.combat!.weapon = 'stunGun'
   gunner.loadout = npcLoadout('stunGun')
 

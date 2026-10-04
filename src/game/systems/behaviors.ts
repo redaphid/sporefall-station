@@ -153,8 +153,8 @@ const dist2d = (ax: number, ay: number, bx: number, by: number): number => vlen(
  * the `threat` scan uses. Players keep the exact pre-#63 rule. NPC-vs-NPC (ON by
  * default; `w.aiFlags.npcVsNpc === false` restores the players-only scan) reads
  * a stored opinion first, then the FACTION MATRIX (`initialFactionHate`), so
- * sworn enemies (cop↔gang) are mutually Hostile, same-faction stays Friendly,
- * and unrelated factions ignore each other — the crew, the law, and the gangs
+ * sworn enemies (warden↔feral) are mutually Hostile, same-faction stays Friendly,
+ * and unrelated factions ignore each other — the crew, the watch, and the ferals
  * tear into each OTHER, not just the players. Pure lookups, ascending-id caller. */
 const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
   const ai = e.ai!
@@ -170,12 +170,12 @@ const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
     return (
       w.hostile ||
       dispositionToward(e, target.id) === 'Hostile' ||
-      (ai.faction === 'cop' && w.alarm >= 2) ||
+      (ai.faction === 'warden' && w.alarm >= 2) ||
       (!!ai.wakeOn?.includes('power-cut') && anyPowerCut(w))
     )
   }
   if (w.aiFlags?.npcVsNpc === false || !target.ai || target === e) return false
-  // A stored grudge (a witnessed crime, retaliation) wins; else the opening
+  // A stored grudge (a witnessed misdeed, retaliation) wins; else the opening
   // faction stance decides — this is what wakes the dormant sworn-enemy matrix.
   const stored = ai.rel?.[target.id]
   if (stored) return stored.code === 'Hostile'
@@ -320,7 +320,7 @@ const manhunt: Consideration = (w, e) => {
   return [{ code: PURSUE, score: MANHUNT_SCORE, tier: TIER_MEMORY, target: focusId, at: { x: mark.x, y: mark.y } }]
 }
 
-// A frightened NPC (e.g. a civilian who saw a crime) keeps fleeing its scarer
+// A frightened NPC (e.g. a civilian who saw a misdeed) keeps fleeing its scarer
 // until it's well clear, even with no hostile disposition to score.
 const fleeMemory: Consideration = (w, e) => {
   const ai = e.ai!
@@ -448,7 +448,7 @@ const alertGuards: Consideration = (w, e) => {
   let guard: Entity | undefined
   let bestD = Infinity
   for (const g of w.entities) {
-    if (g === e || g.dead || !g.ai || g.ai.faction !== 'cop') continue
+    if (g === e || g.dead || !g.ai || g.ai.faction !== 'warden') continue
     const d = dist2d(g.pos.x, g.pos.y, e.pos.x, e.pos.y)
     if (d > ALERT_RANGE || d >= bestD) continue
     bestD = d

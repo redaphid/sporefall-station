@@ -10,7 +10,7 @@ const player = (w: World): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', 20, 20))
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: 'fists', cooldown: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
@@ -79,7 +79,7 @@ describe('inventory', () => {
 
   it("an NPC's melee weapon still breaks when its durability runs out", () => {
     // Enemy gear is unchanged — only the PLAYER's weapon is permanent.
-    const npc = addEntity(w, makeEntity('npc', 'thug', 20, 20))
+    const npc = addEntity(w, makeEntity('npc', 'mutant', 20, 20))
     npc.combat = { weapon: 'knife', cooldown: 0 }
     npc.loadout = { inventory: [{ itemId: 'knife', qty: 2 }], activeSlot: 0 }
     wearMelee(npc)

@@ -1,7 +1,7 @@
 // Hero-art review recorder (art-cn1): drives the deterministic `artcompare`
 // script over the seed-7 / floor-1 combat-stage — the vine-ranger idles facing
 // the camera, walks a full compass circle showing every drawn facing, then
-// marches east into the frozen thug line and swings a bat (the combat beat).
+// marches east into the frozen mutant line and swings a bat (the combat beat).
 // One run captures idle + all 8 facings + combat, so the owner can A/B the hero
 // across builds at IDENTICAL on-screen framing:
 //   A) shipped engine (CHAR_PX 48) at zoom 2  -> 48px hero drawn 96px on screen
@@ -23,7 +23,7 @@ const THEME = process.env.ART_THEME ?? 'swampspace'
 
 // combat-stage (seed 7, floor 1, hostile:false): the vine-ranger on the lane at
 // x8 facing the camera, keeping the fixture's 200-round pistol, high HP so the
-// combat beat never downs them; the three guard thugs (x12/15/18, frozen) stay
+// combat beat never downs them; the three guard mutants (x12/15/18, frozen) stay
 // as targets the pistol fires into at the end of the run.
 const stage = () => {
   const w = JSON.parse(JSON.stringify(base))
@@ -53,14 +53,14 @@ const stills = [
 const readState = () => {
   const w = window.__world
   const p = w.entities.find((e) => e.playerCtl)
-  const thugs = w.entities.filter((e) => e.archetype === 'thug')
+  const mutants = w.entities.filter((e) => e.archetype === 'mutant')
   return {
     tick: w.tick,
     gameOver: w.gameOver,
     playerHp: p?.health?.hp ?? null,
     playerFacing: p?.facing ?? null,
-    thugsAlive: thugs.filter((e) => !e.dead).length,
-    thugHpMin: thugs.length ? Math.min(...thugs.map((e) => e.health?.hp ?? 0)) : null,
+    mutantsAlive: mutants.filter((e) => !e.dead).length,
+    mutantHpMin: mutants.length ? Math.min(...mutants.map((e) => e.health?.hp ?? 0)) : null,
   }
 }
 
@@ -74,7 +74,7 @@ const ok = await recordFeature({
   expect: (s) => [
     s.gameOver && 'unexpected game over',
     s.playerHp !== null && s.playerHp <= 0 && 'player died during the showcase',
-    s.thugHpMin !== null && s.thugHpMin >= 24 && 'no thug was hit by the pistol',
+    s.mutantHpMin !== null && s.mutantHpMin >= 24 && 'no mutant was hit by the pistol',
   ],
 })
 if (!ok) process.exitCode = 1

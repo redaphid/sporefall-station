@@ -103,7 +103,7 @@ const installHelpers = (page) =>
     }
     // Keep the demo about geometry, not survival: this is a VIEW-layer proof.
     // `hostile=false` quiets the world-level hate, but disposition-hostile NPCs
-    // (thugs) still attack — and a hop landing near one can DOWN the player,
+    // (mutants) still attack — and a hop landing near one can DOWN the player,
     // and a downed player skips autoPickup (interaction.ts), deadlocking the
     // pickup beat. A mountain of HP makes the geometry demo unkillable.
     window.__world.hostile = false

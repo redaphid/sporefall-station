@@ -12,7 +12,7 @@ import { applyWireEntity, kindOf } from '../../src/net/protocol/messages'
 const fakeSelfFromWire = (archetype: string) =>
   applyWireEntity(undefined, { id: 7, archetype, x: 1, y: 1, facing: 0, hpPct: 1, flags: 0 }, 0)
 
-for (const arch of ['player', 'boss', 'thug', 'table']) {
+for (const arch of ['player', 'boss', 'mutant', 'table']) {
   const self: any = fakeSelfFromWire(arch)
   const hud = { cash: 5, weapon: 'pistol', abilityCd: 0, bandages: 0, briefcase: false }
   let threw: string | null = null

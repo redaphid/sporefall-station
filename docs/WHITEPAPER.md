@@ -126,8 +126,8 @@ is only one boss."
 
 When he first asked for mods, he gave the reason: "I think the family would have
 fun having really unique guns." The game exists to be played with his nephews,
-on phones over Bluetooth, on a couch, with a controller. The heist ask shows
-what he wants the kids to do together: "a multi-stage bank heist or something.
+on phones over Bluetooth, on a couch, with a controller. The salvage ask shows
+what he wants the kids to do together: "a multi-stage bank salvage or something.
 that requires careful planning amongst my nephews." The combinations are what
 the family talks about. "Look what my gun does" is the sentence the mechanic
 exists to produce. His ask for NPC memory says the same about the world: "I want
@@ -736,7 +736,7 @@ they share. The census found what they shared.
 
 The census computed why the playtesters were never in danger. Against a
 pistol that always hits, single floor-1 foes lose the damage race by 3 to 9
-times. A thug dies in 1.2 s and needs 3.5 s to down a player. Only the brute
+times. A mutant dies in 1.2 s and needs 3.5 s to down a player. Only the brute
 and the boss win a one-on-one race. Ranged foes did not answer fire from beyond
 8 tiles, so a player could shoot them for free. The planner persona on design B
 wrote it plainly: "None of the four floor-1 fights ever threatened me." The
@@ -759,7 +759,7 @@ feature from combinatorics. It is what makes a combination an answer.
 On `main` before #92, a frozen foe could not act and the next hit shattered it
 for 5 times damage. No archetype could resist a freeze. The generic hand fought
 identically to `frost+pierce` in every arena, and that build was the best fold
-build against gangsters, the swarm and the cinders. After #92 made burning foes
+build against acolytes, the swarm and the cinders. After #92 made burning foes
 panic, fire replaced it. Panic ignores the fire resist, so even the cinders,
 built to punish fire, stopped punishing it. `incendiary+pierce` won 40 of 40
 non-boss fights.
@@ -828,7 +828,7 @@ eight-year-old has little room for.
 
 Every prototype's best moment was the same kind of event. In C, one Conductor
 hit took the boss from 320 to 109 hp. In A, the Primer fired Magnet then Soak,
-the pack drifted into a clump, and one Striker burst killed all five thugs. In
+the pack drifted into a clump, and one Striker burst killed all five mutants. In
 B, one swap produced freeze, thermal crack, then a zap chain, and took a brute
 to 30 of 95 hp in 45 ticks where the loaded order reached 82.
 

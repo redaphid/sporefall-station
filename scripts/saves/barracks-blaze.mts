@@ -1,4 +1,4 @@
-// Craft the `barracks-blaze` save: a gang barracks asleep in rows of bunks,
+// Craft the `barracks-blaze` save: a feral barracks asleep in rows of bunks,
 // with crates stacked between them and fuel barrels along the back wall. The
 // player stands in the west doorway with an incendiary pistol. Fire spreads
 // bunk to bunk; a burning sleeper wakes, panics, and carries the fire into
@@ -42,18 +42,18 @@ for (let y = 17; y <= 20; y++) spawnObject(w, 'barrel', 34, y)
 
 // Asleep in their bunks, two awake on watch by the crate run.
 const sleepers: Array<[archetype: string, x: number, y: number]> = [
-  ['thug', 13.5, 4.5],
-  ['thug', 18.5, 4.5],
-  ['gangster', 23.5, 4.5],
-  ['thug', 28.5, 4.5],
-  ['thug', 15.5, 20.5],
-  ['gangster', 20.5, 20.5],
-  ['thug', 25.5, 20.5],
+  ['mutant', 13.5, 4.5],
+  ['mutant', 18.5, 4.5],
+  ['acolyte', 23.5, 4.5],
+  ['mutant', 28.5, 4.5],
+  ['mutant', 15.5, 20.5],
+  ['acolyte', 20.5, 20.5],
+  ['mutant', 25.5, 20.5],
   ['brute', 31.5, 20.5],
 ]
 for (const [archetype, x, y] of sleepers) spawnNpc(w, archetype, x, y).status!.sleep = 100000
-spawnNpc(w, 'gangster', 30.5, 10.5)
-spawnNpc(w, 'thug', 22.5, 14.5)
+spawnNpc(w, 'acolyte', 30.5, 10.5)
+spawnNpc(w, 'mutant', 22.5, 14.5)
 
 w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Burn the barracks, reach the armoury' }
 

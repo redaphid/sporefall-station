@@ -117,7 +117,7 @@ describe('contentTypeFor', () => {
     ['assets/style-abc.css', 'text/css; charset=utf-8'],
     ['themes/index.json', 'application/json; charset=utf-8'],
     ['manifest.webmanifest', 'application/manifest+json'],
-    ['sprites/cop.png', 'image/png'],
+    ['sprites/warden.png', 'image/png'],
     ['icons/icon.svg', 'image/svg+xml'],
     ['noextension', 'application/octet-stream'],
     ['dir.with.dot/file', 'application/octet-stream'],
@@ -133,7 +133,7 @@ describe('cacheControlFor', () => {
     // Republished in place on every push to the branch — a cached copy would
     // pin the reviewer to a build he already asked to replace.
     expect(cacheControlFor('index.html')).toBe('no-store')
-    expect(cacheControlFor('sprites/cop.png')).toBe('no-store')
+    expect(cacheControlFor('sprites/warden.png')).toBe('no-store')
     expect(cacheControlFor('themes/index.json')).toBe('no-store')
   })
 })

@@ -194,7 +194,7 @@ describe('stairs: stairSystem in the real tick', () => {
 
   it('an NPC on the stair tile never transits (Phase 1: only players take the stairs)', () => {
     const { w, up } = stairWorld()
-    const npc = spawnNpc(w, 'thug', up.from.x + 0.5, up.from.y + 0.5)
+    const npc = spawnNpc(w, 'mutant', up.from.x + 0.5, up.from.y + 0.5)
     npc.ai = undefined
     run(w, {}, 10)
     expect(storeyOf(npc.pos.x)).toBe(0)

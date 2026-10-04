@@ -68,7 +68,7 @@ const buildingWorld = (doorSpots: { x: number; y: number }[]): { w: World; b: Bu
 }
 
 const barricaderAt = (w: World, x: number, y: number) => {
-  const e = spawnNpc(w, 'thug', x, y)
+  const e = spawnNpc(w, 'mutant', x, y)
   e.combat!.weapon = 'bat'
   e.ai!.behavior = 'barricader'
   e.ai!.zone = { building: 0, role: 'warehouse' }
@@ -160,7 +160,7 @@ describe('the barricader at work', () => {
   it('degenerate inputs: no zone / doorless building → no fortify, no crash', () => {
     const { w } = buildingWorld([])
     const noDoors = barricaderAt(w, 13.5, 13.5)
-    const drifter = spawnNpc(w, 'thug', 24.5, 24.5)
+    const drifter = spawnNpc(w, 'mutant', 24.5, 24.5)
     drifter.ai!.behavior = 'barricader' // no zone at all
     run(w, 400)
     expect(barricades(w)).toHaveLength(0)

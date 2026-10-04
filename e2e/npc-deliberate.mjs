@@ -153,7 +153,7 @@ const main = async () => {
     await annotate(page, cast)
     if (cast.anyNpcInSolid) saw.solidOverlap = true
     const lurker = cast.npcs.find((n) => n.archetype === 'lurker')
-    const hunter = cast.npcs.find((n) => n.behavior === 'hunter' || n.archetype === 'gangster')
+    const hunter = cast.npcs.find((n) => n.behavior === 'hunter' || n.archetype === 'acolyte')
     const lead = cast.npcs.find((n) => n.role === 'lead')
     if (lurker) {
       if (lurker.dormant && tick < 60) saw.lurkerDormant = true

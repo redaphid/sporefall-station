@@ -28,7 +28,7 @@ import { PLAYER_START_WEAPON, starterLoadout } from '../player'
 /** An armed NPC placed at (x,y) carrying `weapon` — no populate machinery, so
  * building it draws nothing from `w.rng` and any drop roll would be the first draw. */
 const armedNpc = (w: World, weapon: string, x = 5.5, y = 5.5): Entity => {
-  const e = addEntity(w, makeEntity('npc', 'thug', x, y))
+  const e = addEntity(w, makeEntity('npc', 'mutant', x, y))
   e.health = { hp: 10, max: 10, iframes: 0 }
   e.combat = { weapon, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
@@ -41,7 +41,7 @@ const player = (w: World, x = 5.5, y = 5.5, playerId = 0): Entity => {
   e.health = { hp: 100, max: 100, iframes: 0 }
   e.combat = { weapon: PLAYER_START_WEAPON, cooldown: 0 }
   e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-  e.playerCtl = { playerId, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
   e.loadout = starterLoadout(PLAYER_START_WEAPON)
   return e
 }

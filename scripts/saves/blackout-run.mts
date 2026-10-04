@@ -1,6 +1,6 @@
 // Craft the `blackout-run` save: a dim station wing on brownout. The way out is
 // a power-sealed door at the east end. The generator that feeds it sits up a
-// side passage past three barracks of sleeping gang. Cutting the power opens
+// side passage past three barracks of sleeping feral. Cutting the power opens
 // the door, and it also wakes every sleeper and turns the Derelict Units in
 // the east hall hostile. Sneak in, pull the plug, then run.
 //
@@ -37,14 +37,14 @@ arm(player, 'pistol', [
 ])
 
 const sleepers: Array<[archetype: string, x: number, y: number]> = [
-  ['thug', 13.5, 5.5],
-  ['thug', 19.5, 5.5],
-  ['gangster', 13.5, 10.5],
-  ['thug', 25.5, 5.5],
-  ['gangster', 31.5, 9.5],
-  ['thug', 30.5, 4.5],
-  ['thug', 13.5, 23.5],
-  ['gangster', 19.5, 18.5],
+  ['mutant', 13.5, 5.5],
+  ['mutant', 19.5, 5.5],
+  ['acolyte', 13.5, 10.5],
+  ['mutant', 25.5, 5.5],
+  ['acolyte', 31.5, 9.5],
+  ['mutant', 30.5, 4.5],
+  ['mutant', 13.5, 23.5],
+  ['acolyte', 19.5, 18.5],
   ['brute', 41.5, 3.5],
 ]
 for (const [archetype, x, y] of sleepers) {

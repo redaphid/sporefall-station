@@ -26,10 +26,10 @@ spawnPlayer(w, 0, A.x, A.y)
 
 // Clustered close so their engine-positioned labels crowd and exercise de-overlap.
 const npcs: Entity[] = [
-  spawnNpc(w, 'cop', A.x + 2, A.y - 2),
-  spawnNpc(w, 'thug', A.x - 2, A.y - 2),
-  spawnNpc(w, 'gangster', A.x + 3, A.y + 1),
-  spawnNpc(w, 'thug', A.x, A.y - 3),
+  spawnNpc(w, 'warden', A.x + 2, A.y - 2),
+  spawnNpc(w, 'mutant', A.x - 2, A.y - 2),
+  spawnNpc(w, 'acolyte', A.x + 3, A.y + 1),
+  spawnNpc(w, 'mutant', A.x, A.y - 3),
 ]
 // Freeze every NPC: a long sleep makes aiSystem skip them (no move, no attack).
 for (const e of npcs) e.status = { stun: 0, sleep: 100000, hitFlashUntil: 0, cloakUntil: 0 }
@@ -38,7 +38,7 @@ for (const e of npcs) e.status = { stun: 0, sleep: 100000, hitFlashUntil: 0, clo
 // removed every consumable; it is now a grenade, and it carries the PROPER
 // `pickup.<id>` archetype (the old bare 'medkit' string was never in the wire
 // ARCHETYPES list at all, so kindOf/art had to guess at it).
-const pick = spawnNpc(w, 'thug', A.x - 3, A.y + 2) // reuse spawn plumbing, then reshape
+const pick = spawnNpc(w, 'mutant', A.x - 3, A.y + 2) // reuse spawn plumbing, then reshape
 pick.kind = 'pickup'
 pick.archetype = 'pickup.grenade'
 delete pick.ai

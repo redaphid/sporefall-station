@@ -287,15 +287,15 @@ The project exists to be played with his nephews on two phones over Bluetooth,
 with no cell service (mindmeld 2847/495857). That is not context, it is the
 binding constraint on every feature below.
 
-### Ocean's Eleven — the multi-stage heist
+### Ocean's Eleven — the multi-stage salvage
 
 - **Taken:** a planned, interdependent, multi-role operation rather than a
   firefight.
-- **Owner ask:** *"think about a multi-stage bank heist or something. that
+- **Owner ask:** *"think about a multi-stage bank salvage or something. that
   requires careful planning amongst my nephews. an 'oceans 11' type thing."*
   (mindmeld 2847/497336).
 - **Status: partly shipped.** It produced the `gameplay-experiments` skill and
-  `docs/gameplay-experiments.md`, which records a working six-stage heist
+  `docs/gameplay-experiments.md`, which records a working six-stage salvage
   (cloak → sleep-takedown → hack the vault → grab loot → alarmed getaway) driven
   entirely from the debug and annotation surface with no core-system changes.
   Real emergent mechanics found there: **noise lure**, **sleep takedown**,
@@ -425,7 +425,7 @@ interiors (cover tiles 0 → 86-174), room-role metadata, chokepoints, typed roo
 > *"sophisticated AI ⇄ meaningful buildings, each giving the other a reason to
 > exist."* (mindmeld 2965/530317)
 
-A gang holds a wing, workers are in labs, guards defend the objective wing,
+A feral holds a wing, workers are in labs, guards defend the objective wing,
 civilians flee home. Rooms being anonymous was diagnosed as the reason NPCs had
 no functional reason to occupy any of them.
 
@@ -496,11 +496,11 @@ Adding a mission template **must not perturb the RNG stream**
   *"Re-expressed from observed Streets of Rogue behavior, not ported."* The repo
   itself began life as `mobile-streets-of-rogue`, then "Backseat", then Sporefall
   Station.
-- **Deliberately not taken:** the street-crime cast and its identity.
+- **Deliberately not taken:** the Earth-city cast and its identity.
   > *"We can't call it `streets-of-rogue` related name anymore. we must use a
   > code name"* (mindmeld 2847/496992, 2966/530870)
 - **Still outstanding, recorded but explicitly not to be implemented yet:**
-  re-fiction the character vocabulary — there are no "cops" or "thugs" anymore.
+  re-fiction the character vocabulary — there are no "wardens" or "mutants" anymore.
   Rename player-facing language (and eventually the `faction` values in
   `src/game/entity.ts` and the `relationships.ts` matrix) to station roles —
   security/wardens, scavengers/raiders, crew/civilians — keeping the mechanical
@@ -545,7 +545,7 @@ notice because **nothing goes red for "too easy."**
 ### Enemy groups — tides, packs and hives
 
 `docs/design/enemy-groups.md` adds a group layer above individual AI: raid
-strategies by depth (assault / staging / sappers / siege), officer-and-morale
+strategies by depth (assault / staging / sappers / siege), bellwether-and-morale
 with a rout on decapitation, retreat-to-medic, encirclement, manhunter rage on a
 hit, and spire infestation. Each names its **player verb** — react, catch them
 gathering, stop the breacher, charge the battery, decapitate, break the ring,
@@ -582,7 +582,7 @@ flag** (NPC side) / **discussed only** (player side).
 The watcher's working definition of boring (mindmeld 4435): *"identical tight
 patrol loops, NPCs bunched inert, no behavioral variety, trivially exploitable
 routines."* And the root causes it found: goal-thrash with zero deadband (19
-flips per 20 thinks), a **dead faction matrix** (a cop and a gangster four tiles
+flips per 20 thinks), a **dead faction matrix** (a warden and an acolyte four tiles
 apart in open sight both returned `wander`; a 6v6 clash ran 500 ticks with 0 hits
 and 0 deaths), and *"the theme is skin-deep in the brain"* — no consideration read
 spore, fire, wet, light or corpses. **Status: shipped** (goal hysteresis, the

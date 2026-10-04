@@ -152,7 +152,7 @@ export type SimEvent =
    * they had no gun to hold it). `timedOut` = the hand ran out of time and took
    * the card under the cursor. */
   | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
-  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+  /** #86 — the crew/watch noticed enough gunfire (or an attack on a player) to
    * raise `w.alarm` to `level`. */
   | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
   /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */

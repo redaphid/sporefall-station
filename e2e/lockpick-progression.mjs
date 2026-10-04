@@ -1,6 +1,6 @@
 // fix/lockpick-progression — the previously-blocked bunker mission, end to end.
 //
-// Fixture `bunker-heist` (seed 7 floor 3): steal-the-briefcase with the target
+// Fixture `bunker-salvage` (seed 7 floor 3): steal-the-briefcase with the target
 // in a bunker core behind THREE locked L2 doors — the exact layout players
 // could never finish. One deterministic run proves the whole unlock path:
 //   1. lock prompt shows at the outer airlock door ("Lock II · Use to pick"),
@@ -12,8 +12,8 @@ import { recordFeature } from './record-feature.mjs'
 
 await recordFeature({
   name: 'lockpick-progression',
-  world: 'bunker-heist',
-  script: 'bunker-heist',
+  world: 'bunker-salvage',
+  script: 'bunker-salvage',
   stills: [
     { tick: 40, label: '01-approach' },
     { tick: 60, label: '02-lock-prompt' },
@@ -48,7 +48,7 @@ await recordFeature({
     !s.briefcase && 'briefcase never grabbed',
     !s.missionComplete && 'mission not complete — the progression blocker is BACK',
     !s.exitUnlocked && 'exit did not unlock on mission completion',
-    s.downed && 'player ended the heist downed',
+    s.downed && 'player ended the salvage downed',
     s.gameOver && 'unexpected game over',
   ].filter(Boolean),
 })

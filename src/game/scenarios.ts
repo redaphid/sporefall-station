@@ -109,8 +109,8 @@ const setupFrost = (w: World): void => {
 }
 
 /** The freeze-shatter BALANCE stage: a real Mireclaw Alpha (320hp, 0.75 physical
- * resist) beside an ordinary thug (40hp), both pre-frozen, both in one frame.
- * Hit each once and the whole fix is visible at a glance — the thug gibs, the
+ * resist) beside an ordinary mutant (40hp), both pre-frozen, both in one frame.
+ * Hit each once and the whole fix is visible at a glance — the mutant gibs, the
  * boss takes a chunk off a full bar and keeps coming. Under the old rule both
  * died to the same single poke, which is the bug this stage exists to show. */
 const setupBossFreeze = (w: World): void => {
@@ -119,10 +119,10 @@ const setupBossFreeze = (w: World): void => {
   boss.ai = undefined // hold still on stage, like every other staged body
   boss.intent = { x: 0, y: 0 }
   freeze(w, boss)
-  const thug = spawnNpc(w, 'thug', x + 4.5, y + 0.5)
-  thug.ai = undefined
-  thug.intent = { x: 0, y: 0 }
-  freeze(w, thug)
+  const mutant = spawnNpc(w, 'mutant', x + 4.5, y + 0.5)
+  mutant.ai = undefined
+  mutant.intent = { x: 0, y: 0 }
+  freeze(w, mutant)
   placePlayer(w, x + 3, y)
 }
 
@@ -163,10 +163,10 @@ const findRoom = (w: World, cols: number, rows: number): { x: number; y: number 
   return best ?? findStage(w, cols)
 }
 
-/** #87 — every element verb in one frame, on hostile thugs in one room. The
- * player stands at the west wall. HELD: a frozen thug. PANICKING: a thug the
- * player lit, which bolts east away from them. JUMPED: a shock on one thug that
- * leaps to its neighbour 2 tiles off. BLIND: a thug choking on spore in the far
+/** #87 — every element verb in one frame, on hostile mutants in one room. The
+ * player stands at the west wall. HELD: a frozen mutant. PANICKING: a mutant the
+ * player lit, which bolts east away from them. JUMPED: a shock on one mutant that
+ * leaps to its neighbour 2 tiles off. BLIND: a mutant choking on spore in the far
  * corner, which can't see the player. The e2e video and stills shoot this. */
 const setupElementVerbs = (w: World): void => {
   const { x, y } = findRoom(w, 9, 4)
@@ -175,17 +175,17 @@ const setupElementVerbs = (w: World): void => {
     player.pos = { x: x + 0.5, y: y + 2.5 }
     player.prevPos = { ...player.pos }
     player.facing = 0
-    // Tough enough to watch the whole show: the held and zapped thugs come for
+    // Tough enough to watch the whole show: the held and zapped mutants come for
     // the player once their verbs wear off.
     if (player.health) player.health.hp = player.health.max = 1000
   }
-  const thug = (dx: number, dy: number): Entity => spawnNpc(w, 'thug', x + dx + 0.5, y + dy + 0.5)
-  freeze(w, thug(2, 0))
-  applyStatus(w, thug(2, 2), 'burning', 600, player?.id)
-  const zapped = thug(5, 0)
-  thug(7, 0) // the leap's landing: 2 tiles off, inside ARC_JUMP_RADIUS
+  const mutant = (dx: number, dy: number): Entity => spawnNpc(w, 'mutant', x + dx + 0.5, y + dy + 0.5)
+  freeze(w, mutant(2, 0))
+  applyStatus(w, mutant(2, 2), 'burning', 600, player?.id)
+  const zapped = mutant(5, 0)
+  mutant(7, 0) // the leap's landing: 2 tiles off, inside ARC_JUMP_RADIUS
   applyStatus(w, zapped, 'electrified', 30, player?.id)
-  applyStatus(w, thug(8, 3), 'spore', 150)
+  applyStatus(w, mutant(8, 3), 'spore', 150)
 }
 
 /** A loaded loadout (bat / pistol / grenades) and destructible targets downrange:
@@ -235,8 +235,8 @@ const setupItems = (w: World): void => {
   crate(w, x + 7, y)
 }
 
-/** A civilian in front of two cops and a bouncer: shoot the civilian and the
- * cops (law) turn hostile and charge, while the unrelated bouncer stays calm. */
+/** A civilian in front of two wardens and a lockkeeper: shoot the civilian and the
+ * wardens (watch) turn hostile and charge, while the unrelated lockkeeper stays calm. */
 const setupRelationships = (w: World): void => {
   const { x, y } = findStage(w, 10)
   const player = w.entities.find((e) => e.playerCtl)
@@ -247,15 +247,15 @@ const setupRelationships = (w: World): void => {
   }
   const victim = spawnNpc(w, 'civilian', x + 2 + 0.5, y + 0.5)
   victim.speed = 0 // stays put so the shot lands cleanly
-  spawnNpc(w, 'cop', x + 4 + 0.5, y + 0.5)
-  spawnNpc(w, 'cop', x + 5 + 0.5, y + 0.5)
-  const bouncer = spawnNpc(w, 'bouncer', x + 7 + 0.5, y + 0.5)
-  bouncer.speed = 0 // an unrelated bystander that should stay calm
+  spawnNpc(w, 'warden', x + 4 + 0.5, y + 0.5)
+  spawnNpc(w, 'warden', x + 5 + 0.5, y + 0.5)
+  const lockkeeper = spawnNpc(w, 'lockkeeper', x + 7 + 0.5, y + 0.5)
+  lockkeeper.speed = 0 // an unrelated bystander that should stay calm
 }
 
 /** The animation showcase: a stage that shows every moving part at once —
  * animated fire spreading through crates, a burning bystander throwing hit
- * sparks, a walking cast (thug / scientist / robot / civilian ambling across),
+ * sparks, a walking cast (mutant / scientist / robot / civilian ambling across),
  * a pickup in the player's path for the sparkle, and staggered grenades that
  * boom on their own fuses so an explosion plays without any input. */
 const setupShowcase = (w: World): void => {
@@ -283,12 +283,12 @@ const setupShowcase = (w: World): void => {
       e.ai.waypoint = { x: x + wx + 0.5, y: y + oy + 0.5 }
     }
   }
-  walker('cop', 6, -2, 1)
-  walker('thug', 7, 2, 1)
+  walker('warden', 6, -2, 1)
+  walker('mutant', 7, 2, 1)
   walker('scientist', 6, 2, 2)
   walker('robot', 7, -1, 2)
   walker('civilian', 8, -2, 3)
-  walker('gangster', 8, 2, 3)
+  walker('acolyte', 8, 2, 3)
 
   // World props (real sprites, not shapes): a barrel by the fire that catches,
   // plus an ATM and a vending machine as set dressing.
@@ -340,7 +340,7 @@ const LANE_Y = 11 // open plaza lane below spawn — the camera frames it withou
  * This is CHOREOGRAPHY, not an arbitrary starting number. Several AI rhythms are
  * phased by entity id — the think stagger is `id % 5` (systems/ai.ts:107),
  * repaths are `id % REPATH_STAGGER`, strafe direction is `id % 2` — so the tick
- * on which each staged thug thinks, routes and sidesteps is a function of the
+ * on which each staged mutant thinks, routes and sidesteps is a function of the
  * ids the stage hands out. The scripted demos were tuned with the player landing
  * on an id ≡ 2 (mod 5), so the stage starts there and every beat keeps the
  * timing it was recorded at. Change this and the demos re-phase:
@@ -350,7 +350,7 @@ const STAGE_ID_BASE = 2
 
 const clearStage = (w: World): void => {
   // Scripted stages are hand-choreographed around faction stances (ambient
-  // civilians amble, only the gang thugs charge), so opt out of the global
+  // civilians amble, only the feral mutants charge), so opt out of the global
   // "everyone's an enemy" default — hostility here comes from disposition alone.
   w.hostile = false
   // The player is spawned AFTER populateWorld, so its id — and every stage id
@@ -375,8 +375,8 @@ const clearStage = (w: World): void => {
   }
 }
 
-const stageThug = (w: World, x: number, y: number): Entity => {
-  const t = spawnNpc(w, 'thug', x, y)
+const stageMutant = (w: World, x: number, y: number): Entity => {
+  const t = spawnNpc(w, 'mutant', x, y)
   t.health = { hp: 24, max: 24, iframes: 0 }
   t.ai!.guard = true
   return t
@@ -409,8 +409,8 @@ const stageDemo = (w: World): void => {
   door.door = { open: false, locked: false, lockLevel: 0 }
   door.interact = { verb: 'open', range: 1.3 }
   addEntity(w, door)
-  stageThug(w, 19, LANE_Y)
-  stageThug(w, 20, LANE_Y)
+  stageMutant(w, 19, LANE_Y)
+  stageMutant(w, 20, LANE_Y)
 }
 
 // an unlocked door to swing open, then a locked one to pick and walk through
@@ -423,16 +423,16 @@ const stageDoors = (w: World): void => {
 // a firing lane: three frozen targets for a clean pistol gallery
 const stageShooting = (w: World): void => {
   clearStage(w)
-  for (const x of [12, 15, 18]) stageThug(w, x, LANE_Y).speed = 0
+  for (const x of [12, 15, 18]) stageMutant(w, x, LANE_Y).speed = 0
 }
 
 /**
  * The HOMING-rework proof stage (playtest: "it mostly just curves the bullets
- * into walls"), driven by the `shooting` script. A wall shields a NEARER thug
+ * into walls"), driven by the `shooting` script. A wall shields a NEARER mutant
  * north of the lane — the old global-nearest homing's bait, which it would
- * chase into the wall — while two visible thugs stand in the open: one dead
+ * chase into the wall — while two visible mutants stand in the open: one dead
  * ahead down the lane, one off-axis south-east. The reworked seeker must kill
- * both visible thugs (the off-axis one via a real curve) and leave the
+ * both visible mutants (the off-axis one via a real curve) and leave the
  * bunkered one untouched, every round flying straight past his cover.
  */
 const stageHomingDemo = (w: World): void => {
@@ -450,11 +450,11 @@ const stageHomingDemo = (w: World): void => {
     w.level.tiles[10 * w.level.w + x] = Tile.Wall
     w.level.solid[10 * w.level.w + x] = 1
   }
-  // …with the bait thug bunkered behind it (nearest to the firing spot).
-  stageThug(w, 14.5, 8.5).speed = 0
+  // …with the bait mutant bunkered behind it (nearest to the firing spot).
+  stageMutant(w, 14.5, 8.5).speed = 0
   // The visible marks: dead ahead down the lane, and off-axis south-east.
-  stageThug(w, 18, LANE_Y).speed = 0
-  stageThug(w, 15.5, 13.5).speed = 0
+  stageMutant(w, 18, LANE_Y).speed = 0
+  stageMutant(w, 15.5, 13.5).speed = 0
   // The player's permanent pistol carries the mod under test.
   const player = w.entities.find((e) => e.playerCtl)
   const stack = player?.loadout?.inventory.find((s) => s.itemId === player.combat?.weapon)
@@ -479,8 +479,8 @@ const stageMission = (w: World): void => {
   }
 }
 
-/** Two hostile gangsters — one at full health that charges, one badly wounded
- * that flees — plus a calm cop downrange that will investigate a noise. */
+/** Two hostile acolytes — one at full health that charges, one badly wounded
+ * that flees — plus a calm warden downrange that will investigate a noise. */
 const setupAiGoals = (w: World): void => {
   const { x, y } = findStage(w, 14)
   const player = w.entities.find((e) => e.playerCtl)
@@ -489,10 +489,10 @@ const setupAiGoals = (w: World): void => {
     player.prevPos = { x: player.pos.x, y: player.pos.y }
     player.facing = 0
   }
-  spawnNpc(w, 'gangster', x + 3 + 0.5, y + 0.5) // full health -> charges
-  const wounded = spawnNpc(w, 'gangster', x + 4 + 0.5, y + 0.5)
+  spawnNpc(w, 'acolyte', x + 3 + 0.5, y + 0.5) // full health -> charges
+  const wounded = spawnNpc(w, 'acolyte', x + 4 + 0.5, y + 0.5)
   wounded.health!.hp = 5 // < a third of max -> should flee, not fight
-  spawnNpc(w, 'cop', x + 10 + 0.5, y + 0.5) // neutral bystander for the noise test
+  spawnNpc(w, 'warden', x + 10 + 0.5, y + 0.5) // neutral bystander for the noise test
 }
 
 /** A vending machine to use, a crate to break for loot, and a row of explosive
@@ -546,14 +546,14 @@ const setupNpcCombat = (w: World): void => {
   }
 
   const ring: [string, string][] = [
-    ['thug', 'bat'],
-    ['thug', 'knife'],
-    ['gangster', 'pistol'],
-    ['gangster', 'shotgun'],
-    ['gangster', 'machinegun'],
-    ['thug', 'sledgehammer'],
-    ['gangster', 'tranquilizer'],
-    ['gangster', 'flamethrower'],
+    ['mutant', 'bat'],
+    ['mutant', 'knife'],
+    ['acolyte', 'pistol'],
+    ['acolyte', 'shotgun'],
+    ['acolyte', 'machinegun'],
+    ['mutant', 'sledgehammer'],
+    ['acolyte', 'tranquilizer'],
+    ['acolyte', 'flamethrower'],
   ]
   const radius = 6
   for (let i = 0; i < ring.length; i++) {
@@ -569,9 +569,9 @@ const setupNpcCombat = (w: World): void => {
 
 /** The pluggable-behavior showcase (feat/npc-ai-ecs): four brains on one stage.
  * A skittish civilian (attacked by the scripted player) flees and runs to the
- * patrolling cop to report the crime; a hunter gangster chases the player, loses
+ * patrolling warden to report the misdeed; a hunter acolyte chases the player, loses
  * them behind an L-wall, walks to last-known and sweeps; a scavenger works a
- * corner of pickups; the cop walks its beat until the alert pulls it off.
+ * corner of pickups; the warden walks its beat until the alert pulls it off.
  * Peaceful world — every hostility on stage comes from behaviors + disposition. */
 const setupNpcAi = (w: World): void => {
   const cx = 32
@@ -611,16 +611,16 @@ const setupNpcAi = (w: World): void => {
   spawnNpc(w, 'civilian', cx - 2.3, cy + 0.5).ai!.guard = true
 
   // Hunter: sees far, holds a grudge, carries a bat (a chase, not a shootout).
-  const hunter = spawnNpc(w, 'gangster', cx + 8.5, cy + 0.5)
+  const hunter = spawnNpc(w, 'acolyte', cx + 8.5, cy + 0.5)
   hunter.combat!.weapon = 'bat'
   hunter.ai!.sightRange = 14
   if (player) hunter.ai!.rel = { [player.id]: { hate: 40, code: 'Hostile' } }
 
-  // Patrol: the only cop on stage — also the guard the civilian will run to.
-  // The beat stays >10 tiles from the victim (never a crime witness) yet inside
+  // Patrol: the only warden on stage — also the guard the civilian will run to.
+  // The beat stays >10 tiles from the victim (never a misdeed witness) yet inside
   // the fleeing civilian's 14-tile alert range, north where the camera ends up.
-  const cop = spawnNpc(w, 'cop', cx - 5.5, cy - 10.5)
-  assignPatrol(cop, [
+  const warden = spawnNpc(w, 'warden', cx - 5.5, cy - 10.5)
+  assignPatrol(warden, [
     { x: cx - 5.5, y: cy - 10.5 },
     { x: cx - 1.5, y: cy - 10.5 },
     { x: cx - 5.5, y: cy - 12.5 },
@@ -665,7 +665,7 @@ const setupNpcDeliberate = (w: World): void => {
   w.entities = players
   w.byId.clear()
   for (const e of players) w.byId.set(e.id, e)
-  w.hostile = true // gang cast — everyone on stage engages the player on sight
+  w.hostile = true // feral cast — everyone on stage engages the player on sight
 
   const solidify = (x: number, y: number): void => {
     w.level.tiles[y * w.level.w + x] = Tile.Wall
@@ -699,7 +699,7 @@ const setupNpcDeliberate = (w: World): void => {
     solidify(cx - 11, y) // west face x=21
     solidify(cx - 5, y) // east face x=27
   }
-  const hunter = spawnNpc(w, 'gangster', cx - 8 + 0.5, cy - 5 + 0.5) // (24.5, 27.5)
+  const hunter = spawnNpc(w, 'acolyte', cx - 8 + 0.5, cy - 5 + 0.5) // (24.5, 27.5)
   hunter.combat!.weapon = 'bat'
   hunter.ai!.sightRange = 14
   if (player) {
@@ -717,7 +717,7 @@ const setupNpcDeliberate = (w: World): void => {
   door.interact = { verb: 'open', range: 1.3 }
   addEntity(w, door)
   const squaddie = (x: number, y: number, role: 'lead' | 'flank' | 'rear'): Entity => {
-    const e = spawnNpc(w, 'thug', x, y)
+    const e = spawnNpc(w, 'mutant', x, y)
     e.combat!.weapon = 'bat'
     e.ai!.behavior = 'squad'
     e.ai!.squad = { id: 1, role }
@@ -753,7 +753,7 @@ const setupNpcDeliberate = (w: World): void => {
 }
 
 // Hero-art showcase (art-cn1 review): a blank plaza with the player on the lane
-// and a small thug pair far east. The `artcompare` script walks a full compass
+// and a small mutant pair far east. The `artcompare` script walks a full compass
 // circle in place (showing every drawn facing), then marches east and swings —
 // so a recording captures idle + all directions + combat in one deterministic
 // run, directly comparable across art/engine-resolution builds.
@@ -768,8 +768,8 @@ const stageArtCompare = (w: World): void => {
     player.loadout!.activeSlot = 0
     if (player.combat) player.combat.weapon = 'bat'
   }
-  stageThug(w, 18, LANE_Y)
-  stageThug(w, 19, LANE_Y)
+  stageMutant(w, 18, LANE_Y)
+  stageMutant(w, 19, LANE_Y)
 }
 
 // ── The group layer's set-pieces (systems/groups.ts, docs/design/enemy-groups.md)
@@ -791,14 +791,14 @@ const clearCast = (w: World): Entity | undefined => {
   for (const e of w.entities) w.byId.set(e.id, e)
   w.groups = undefined
   w.hostile = true
-  // Stand the floor's heist down. A real run's floor has a mission (setupFloor),
+  // Stand the floor's salvage down. A real run's floor has a mission (setupFloor),
   // and every way it completes throws EVERY door on the floor open (the station
   // alert / gate-breach release): the prize picked up, or the target "gone" —
   // and clearing the cast above deletes an assassinate/infiltrate boss outright.
   // On seed 3 the sapper scenario seals the player into the prize room, so the
   // player picked the briefcase up on tick 1 and the locked doors the Blast
   // Diver came to blow were all open before it arrived. The set-piece is the
-  // raid, not the heist: the mission reads as done (like floor 10's `reach`), so
+  // raid, not the salvage: the mission reads as done (like floor 10's `reach`), so
   // nothing in missionSystem can unseal the map under it.
   w.mission = { template: 'reach', complete: true, exitUnlocked: true, description: 'Hold out against the tide' }
   const player = w.entities.find((e) => e.playerCtl)
@@ -887,7 +887,7 @@ const sealBuilding = (w: World): { x: number; y: number } | null => {
 }
 
 export const GROUP_SCENARIOS: Record<string, (w: World) => void> = {
-  /** An officer-led tide musters out of sight, then commits as one. Shoot the
+  /** A bellwether-led tide musters out of sight, then commits as one. Shoot the
    * Bellwether (the tall brass-headed one) and watch the raid rout. */
   'tide-staging': (w) => stageTide(w, 'staging', ['leader', 'medic', 'grunt', 'grunt', 'grunt'], 'tide-staging'),
   /** A mortar battery sets up at range and shells the player over the walls;

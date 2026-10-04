@@ -4,7 +4,7 @@
 // placed bodies, or a real populated floor for the wiring/replay tests), runs the
 // REAL systems through tickWorld, and asserts on what the group did over time:
 // raids that stage then go as one, a siege gun that shells from range, sappers
-// that blow a locked hatch, morale that breaks when the officer falls, wounded
+// that blow a locked hatch, morale that breaks when the bellwether falls, wounded
 // that fall back to a medic and return, packs that surround before closing and
 // go manhunter when hurt, and hives that bud and spread — plus the degenerate
 // cases (no target, lone survivors, nothing to breach) and byte-identical replay.

@@ -1,7 +1,7 @@
 // fix/weapon-aim-and-pistol-art — the held weapon points at the CONTINUOUS aim
 // (full 360°, INCLUDING straight down), and the pistol reads as a pistol.
 //
-// Two cuts against a stripped combat-stage (thugs removed so nothing interrupts
+// Two cuts against a stripped combat-stage (mutants removed so nothing interrupts
 // the pose — a clean render showcase):
 //   1. weapon-aim-pistol: a PISTOL held while facing E, SE, S (straight DOWN),
 //      SW and W — the barrel tracks the aim heading, not the 8-way body sprite,
@@ -18,12 +18,12 @@ import { recordFeature } from './record-feature.mjs'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/combat-stage.json'), 'utf8'))
 
-/** combat-stage with the thugs stripped and the player armed to `weaponId`
+/** combat-stage with the mutants stripped and the player armed to `weaponId`
  * (slotted so the fire-site + the renderer's skin agree). A clean, combat-free
  * stage: the player just stands and aims/swings. */
 const staged = (weaponId, mods) => {
   const w = JSON.parse(JSON.stringify(base))
-  w.entities = w.entities.filter((e) => e.playerCtl) // drop the thug line
+  w.entities = w.entities.filter((e) => e.playerCtl) // drop the mutant line
   const p = w.entities.find((e) => e.playerCtl)
   p.combat.weapon = weaponId
   p.playerCtl.inventory = [{ itemId: weaponId, qty: 99, ...(mods ? { mods } : {}) }]

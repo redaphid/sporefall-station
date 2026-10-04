@@ -2,8 +2,8 @@
 
 A **theme** swaps the game's entire visual and flavor identity (sprites, palette,
 entity display names) with **zero code changes and zero sim impact**. The sim
-(`src/game/`) knows nothing about themes: a cop is always archetype `cop` in the
-world and over the wire; a theme only changes how that cop *looks* and what the
+(`src/game/`) knows nothing about themes: a warden is always archetype `warden` in the
+world and over the wire; a theme only changes how that warden *looks* and what the
 UI *calls* it ("Bog Warden" in a swamp theme).
 
 - Engine side: `src/render/theme.ts` (pure schema/validation/resolution),
@@ -63,13 +63,13 @@ still loadable by id without an index entry).
       "exit":     "#d4af37"
     },
     "entities": {                // procedural entity-blob colors, by archetype
-      "cop": "#4a7a5a", "civilian": "#b0c090"
+      "warden": "#4a7a5a", "civilian": "#b0c090"
     }
   },
 
   "names": {                     // display names by archetype — SAME sim
-    "cop": "Bog Warden",         //   behavior, themed presentation. Shown in
-    "thug": "Mire Lurker",       //   the tap-inspect card title. Any archetype
+    "warden": "Bog Warden",         //   behavior, themed presentation. Shown in
+    "mutant": "Mire Lurker",       //   the tap-inspect card title. Any archetype
     "civilian": "Villager",      //   key is allowed.
     "door": "Root Gate"
   },
@@ -113,10 +113,10 @@ the console and in `validateManifest` unit tests.
 | `tile.<name>.accent` | OPTIONAL rare-detail pool for that surface (root cluster, vent grate, glowing spore patch…). One accent replaces the base variant on ~1/17 tiles, picked on the same coordinate hash. Array or single path. |
 | `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `tile.<name>.cap` / `tile.<name>.cap.inner` | OPTIONAL, wall family only (`wall`, `hull`). The lit top strip of the wall, authored as RGBA along the tile's TOP edge (transparent below), plus the matching cap-sized nub in the top-left corner. The tilemap lays the strip on every edge of a wall tile that faces open ground, rotated to that edge, and the nub in concave corners (`src/render/wallCaps.ts`), so the cap line runs continuously along runs, corners and T-junctions; bevelled corners bake it along the 45° cut too. When a theme ships these, its wall BODY art must carry no cap of its own (`scripts/assets/wall_caps.py` splits a baked cap off existing art). Both keys or neither. |
-| `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player cop thug civilian scientist gangster robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
+| `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player warden mutant civilian scientist acolyte robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
 | `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
-| `unit.player`, `unit.cop` | single-sprite billboard fallback (no directions) |
-| `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `thug scientist robot` |
+| `unit.player`, `unit.warden` | single-sprite billboard fallback (no directions) |
+| `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `mutant scientist robot` |
 | `item.default` | generic ground-item sprite |
 | `item.<id>` | per-item pickup, `<id>` ∈ `pistol bat knife medkit cash shotgun molotov grenade-item` |
 | `prop.default` | generic prop (crates etc.) |
@@ -146,8 +146,8 @@ A pool whose length is not a multiple of N² ignores the trailing partial macro;
 a pool shorter than N² falls back to the hash pick. Accents still replace
 slices at the usual rarity — author them as self-contained feature tiles.
 
-Archetypes that share a body keep sharing it (bouncer→cop, boss→thug,
-shopkeeper→civilian): theming `char.cop.*` also reskins bouncers. Doors, fires,
+Archetypes that share a body keep sharing it (lockkeeper→warden, boss→mutant,
+shopkeeper→civilian): theming `char.warden.*` also reskins lockkeepers. Doors, fires,
 weapon-mod gems and pickup-outline shapes are procedural (themeable via
 `palette.entities` colors, not sprites, in schema v1).
 
@@ -176,7 +176,7 @@ weapon-mod gems and pickup-outline shapes are procedural (themeable via
   their own way: `spore-drone` and `gloom-lurker` hover, `brood-sac` pulses,
   and `sporeling-mite` waddles (rocks side to side over its short legs, with
   the stride's lean). Any other kind or file name walks with the stride bob
-  and lean. A bouncer or shopkeeper borrowing another body moves like it.
+  and lean. A lockkeeper or shopkeeper borrowing another body moves like it.
 - **A drawn loop carries its own motion.** When a state plays a clip of 2+
   drawn frames (`…-walk-0`…), the renderer adds no procedural bob, float,
   pulse or breath on top of it. The legacy idle/step pair still gets them.

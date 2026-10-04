@@ -19,7 +19,7 @@ import { weaponStack } from './inventory'
 /** A gun-carrying NPC whose slotted weapon holds `mods` — the enemy analogue of
  * `armed()` in the player mod tests. */
 const moddedNpc = (w: World, x: number, y: number, weapon: string, mods: WeaponMod[]): Entity => {
-  const e = addEntity(w, makeEntity('npc', 'gangster', x, y))
+  const e = addEntity(w, makeEntity('npc', 'acolyte', x, y))
   e.health = { hp: 40, max: 40, iframes: 0 }
   e.combat = { weapon, cooldown: 0 }
   e.loadout = npcLoadout(weapon, mods)
@@ -46,7 +46,7 @@ describe('NPC loadout: a modded enemy folds its mods into its shots', () => {
     const w = createWorld(1, 1)
     const npc = moddedNpc(w, 20, 20, 'pistol', [{ id: 'explosive', stacks: 1 }])
     // A victim two tiles downrange (east), out of the blast of the muzzle.
-    const victim = addEntity(w, makeEntity('npc', 'thug', 22, 20))
+    const victim = addEntity(w, makeEntity('npc', 'mutant', 22, 20))
     victim.health = { hp: 40, max: 40, iframes: 0 }
     fireWeapon(w, npc)
     for (let t = 0; t < 20 && !w.events.some((e) => e.type === 'explosion'); t++) projectileSystem(w)
@@ -83,7 +83,7 @@ describe('NPC loadout: a modded enemy folds its mods into its shots', () => {
 describe('NPC loadout: degenerate + round-trip', () => {
   it('a loadout-less NPC fires innately vanilla — no stack, no mods (the pre-feature default)', () => {
     const w = createWorld(1, 1)
-    const npc = addEntity(w, makeEntity('npc', 'thug', 20, 20))
+    const npc = addEntity(w, makeEntity('npc', 'mutant', 20, 20))
     npc.combat = { weapon: 'pistol', cooldown: 0 }
     npc.health = { hp: 40, max: 40, iframes: 0 }
     expect(npc.loadout).toBeUndefined()
@@ -99,7 +99,7 @@ describe('NPC loadout: degenerate + round-trip', () => {
     const civ = spawnNpc(w, 'civilian', 20, 20) // civilian wields fists
     expect(civ.combat!.weapon).toBe('fists')
     expect(civ.loadout).toBeUndefined()
-    const bat = spawnNpc(w, 'thug', 21, 21) // thug wields a bat (durable melee → slotted)
+    const bat = spawnNpc(w, 'mutant', 21, 21) // mutant wields a bat (durable melee → slotted)
     expect(bat.loadout).toEqual({ inventory: [{ itemId: 'bat', qty: 16 }], activeSlot: 0 })
   })
 

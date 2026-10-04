@@ -89,7 +89,7 @@ console.log('\n=== enemy-on-enemy: can an NPC freeze ray + any impact execute an
 {
   const w = createWorld(7, 1)
   const victim = spawnNpc(w, 'boss', 5, 5)
-  const shooter = spawnNpc(w, 'thug', 6, 5)
+  const shooter = spawnNpc(w, 'mutant', 6, 5)
   // NPC freeze ray: 0 damage, onHit frozen 120t (WEAPONS.freezeRay)
   const ray = WEAPONS.freezeRay
   const d = applyDamage(w, victim, ray.damage, 6, 5, 0, shooter.id)

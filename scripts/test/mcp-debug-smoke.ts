@@ -35,7 +35,7 @@ const main = async (): Promise<void> => {
   // game side
   const world = createWorld(777, 1)
   spawnPlayer(world, 0, world.level.spawn.x, world.level.spawn.y)
-  spawnNpc(world, 'cop', 6, 6)
+  spawnNpc(world, 'warden', 6, 6)
   const channel = startDebugChannel(world, HUB_WS, () => {})
   const loop = setInterval(() => {
     tickWorld(world, new Map())
@@ -54,11 +54,11 @@ const main = async (): Promise<void> => {
   const state = JSON.parse(textOf(await client.callTool({ name: 'game_state', arguments: {} }))) as { seed: number }
   check('game_state via MCP', state.seed === 777, `seed=${state.seed}`)
 
-  const spawned = JSON.parse(textOf(await client.callTool({ name: 'spawn', arguments: { kind: 'npc', archetype: 'thug', x: 9, y: 9 } }))) as { id: number; archetype: string }
-  check('spawn via MCP', spawned.archetype === 'thug' && spawned.id > 0, `id=${spawned.id}`)
+  const spawned = JSON.parse(textOf(await client.callTool({ name: 'spawn', arguments: { kind: 'npc', archetype: 'mutant', x: 9, y: 9 } }))) as { id: number; archetype: string }
+  check('spawn via MCP', spawned.archetype === 'mutant' && spawned.id > 0, `id=${spawned.id}`)
 
   const inspected = JSON.parse(textOf(await client.callTool({ name: 'inspect', arguments: { entity: spawned.id } }))) as { archetype: string }
-  check('inspect via MCP', inspected.archetype === 'thug')
+  check('inspect via MCP', inspected.archetype === 'mutant')
 
   const setRep = JSON.parse(textOf(await client.callTool({ name: 'set_field', arguments: { entity: spawned.id, field: 'health.hp', value: 2 } }))) as { health: { hp: number } }
   check('set_field via MCP', setRep.health.hp === 2, `hp=${setRep.health.hp}`)

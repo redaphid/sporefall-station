@@ -93,12 +93,12 @@ describe('freeze + shatter is a hard hit, not an execute', () => {
   })
 
   it('an ordinary grunt STILL shatters in two, and still ice-gibs', () => {
-    const thug = spawnNpc(w, 'thug', 5, 5)
-    shoot(w, thug)
-    expect(thug.dead).toBeFalsy()
-    shoot(w, thug)
-    expect(thug.dead).toBe(true)
-    expect(thug.shattered).toBe(true)
+    const mutant = spawnNpc(w, 'mutant', 5, 5)
+    shoot(w, mutant)
+    expect(mutant.dead).toBeFalsy()
+    shoot(w, mutant)
+    expect(mutant.dead).toBe(true)
+    expect(mutant.shattered).toBe(true)
     expect(w.events.filter((e) => e.type === 'shatter')).toHaveLength(1)
   })
 
@@ -121,17 +121,17 @@ describe('freeze + shatter is a hard hit, not an execute', () => {
     // NPCs draw the freeze ray from NPC_ARSENAL and the frost mod from
     // ENEMY_MODS, so the old rule let a crossfire delete a boss by accident.
     const boss = spawnNpc(w, 'boss', 5, 5)
-    const thug = spawnNpc(w, 'thug', 6, 5)
+    const mutant = spawnNpc(w, 'mutant', 6, 5)
     const ray = WEAPONS.freezeRay
     expect(ray.damage).toBe(0) // pure utility: it lands, deals nothing, freezes
-    expect(applyDamage(w, boss, ray.damage, 6, 5, 0, thug.id)).toBe(0)
+    expect(applyDamage(w, boss, ray.damage, 6, 5, 0, mutant.id)).toBe(0)
     applyStatus(w, boss, ray.onHit!.status, ray.onHit!.ticks)
     for (let i = 0; i < 20; i++) {
       statusSystem(w)
       w.tick++
     }
 
-    const dealt = applyDamage(w, boss, WEAPONS.bat.damage, 6, 5, 0, thug.id)
+    const dealt = applyDamage(w, boss, WEAPONS.bat.damage, 6, 5, 0, mutant.id)
 
     expect(boss.dead).toBeFalsy()
     expect(dealt).toBe(60) // round(16 x 5 x 0.75)

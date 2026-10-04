@@ -77,7 +77,7 @@ describe('save / load fixtures', () => {
     const h = new GameHarness()
     h.create({ seed: 4242 })
     h.start()
-    spawnNpc(h.world, 'cop', 12, 12)
+    spawnNpc(h.world, 'warden', 12, 12)
     h.stepTicks(30)
     const fixture = saveWorld(h.world)
     const before = h.world.entities.map(serializeEntity)

@@ -56,12 +56,12 @@ export const DIR_FALLBACK: Record<Dir5, readonly Dir5[]> = {
 // not a canonical key, so validateManifest would DROP a boss sprite mapping
 // with a warning and the art pass could not land without a code change. Until
 // those files exist the loader finds nothing and art.characterSet falls through
-// to the thug body exactly as before.
+// to the mutant body exactly as before.
 // #78 — the Sporefall threat roster (brute/cinder/sporeling/stalker/lurker/pod)
 // all spawn in normal play. They are canonical char keys for the same reason
 // `boss` is: without them `char.brute.*` is not canonical, so validateManifest
 // DROPS the mapping and the art can never load however many files ship.
-export const CHAR_NAMES = ['player', 'cop', 'thug', 'civilian', 'scientist', 'gangster', 'robot', 'boss',
+export const CHAR_NAMES = ['player', 'warden', 'mutant', 'civilian', 'scientist', 'acolyte', 'robot', 'boss',
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
   // The group roster (systems/groups.ts) — canonical for the same reason.
   'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
@@ -74,8 +74,8 @@ export const ITEM_IDS = ['pistol', 'bat', 'knife', 'medkit', 'cash', 'shotgun', 
 // only ever reachable as prop.default.
 export const PROP_NAMES = ['barrel', 'atm', 'vending-machine', 'tv', 'toilet', 'locker', 'cabinet', 'desk',
   'chair', 'crate', 'shelf', 'bunk', 'bench', 'table', 'plant', 'spore-node'] as const
-const UNIT_SINGLES = ['player', 'cop'] as const
-const UNIT_WALKERS = ['thug', 'scientist', 'robot'] as const
+const UNIT_SINGLES = ['player', 'warden'] as const
+const UNIT_WALKERS = ['mutant', 'scientist', 'robot'] as const
 
 /** Keys whose value is an animation-frame ARRAY (everything else is a single path). */
 export const FX_KEYS: ReadonlySet<string> = new Set(['fx.flame', 'fx.hit', 'fx.explosion', 'fx.pickup', 'fx.blood'])
@@ -428,7 +428,7 @@ export const resolveSpritePaths = (key: string, chain: ThemeChain): string[] | u
  * art pipeline names frames `<kind>-<dir>-<state>.png` (spritesheet.py
  * --kind), so the file mapped to `char.<name>.s-idle` names the body:
  * `chars/spore-drone-s-idle.png` is a `spore-drone`. A name whose file breaks
- * the convention (city's `cop/front-idle.png`) or is unmapped gets no entry. */
+ * the convention (city's `warden/front-idle.png`) or is unmapped gets no entry. */
 export const charArtKinds = (chain: ThemeChain): Record<string, string> => {
   const out: Record<string, string> = {}
   for (const name of CHAR_NAMES) {

@@ -64,7 +64,7 @@ export interface GameRenderer {
   /** Hot-swap the active visual theme (presentation only — never touches the
    * sim). Resolves when the new assets are baked and applied. */
   setTheme(id: string): Promise<void>
-  /** Sprite thumbnail for an art key ('cop', 'medkit', 'door', …) as a PNG data
+  /** Sprite thumbnail for an art key ('warden', 'medkit', 'door', …) as a PNG data
    * URL — the inspect card's picture of the thing tapped. Extracted from the
    * live art registry (so it matches the active theme exactly), cached per key,
    * cache dropped on theme swap. Undefined when extraction isn't possible. */

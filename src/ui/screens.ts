@@ -216,7 +216,7 @@ export const createScreens = (
   }
 
   // ---- The BOSS: entrance card + pinned health bar ------------------------
-  // Neither existed. The Alpha wore the thug's sprite and died in under two
+  // Neither existed. The Alpha wore the mutant's sprite and died in under two
   // seconds, so a player could clear a dozen boss floors and truthfully say
   // they had never met a boss. The card is the "this is a boss" moment; the bar
   // is the "and it is still alive" moment that lasts the whole fight.

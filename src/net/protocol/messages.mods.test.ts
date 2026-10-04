@@ -104,10 +104,10 @@ describe('snapshot codec — projectile mod tail', () => {
     const decoded = roundTrip([
       wire({ id: 1, archetype: 'player', x: 1.5, y: 2.5 }),
       wire({ id: 2, mods: [{ id: 'homing', stacks: 2 }] }),
-      wire({ id: 3, archetype: 'thug', x: 6, y: 7 }),
+      wire({ id: 3, archetype: 'mutant', x: 6, y: 7 }),
       wire({ id: 4, archetype: 'grenade', x: 2, y: 2 }),
     ])
-    expect(decoded.entities.map((e) => e.archetype)).toEqual(['player', 'projectile', 'thug', 'grenade'])
+    expect(decoded.entities.map((e) => e.archetype)).toEqual(['player', 'projectile', 'mutant', 'grenade'])
     expect(decoded.entities[1].mods).toEqual([{ id: 'homing', stacks: 2 }])
     expect(decoded.entities[0].mods).toBeUndefined()
     expect(decoded.entities[2].x).toBeCloseTo(6, 1)

@@ -63,7 +63,7 @@ const runScenario = (
   const npc = spawnNpc(w, 'civilian', nx + 0.5, ny + 0.5)
   npc.health = { hp: 1, max: 1e6, iframes: 1e9 } // badly wounded ⇒ flees, and survives the window
   npc.ai!.sightRange = 12
-  const threat = spawnNpc(w, 'thug', tx + 0.5, ty + 0.5)
+  const threat = spawnNpc(w, 'mutant', tx + 0.5, ty + 0.5)
   threat.health = { hp: 1e6, max: 1e6, iframes: 1e9 }
   threat.ai = undefined // static menace: isolate flight from pursuit
 

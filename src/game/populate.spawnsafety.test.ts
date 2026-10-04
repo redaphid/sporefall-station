@@ -63,10 +63,10 @@ describe('street life keeps SPAWN_SAFE_RADIUS clear of the player spawn', () => 
       const w = createWorld(seed, 1, 'normal')
       populateWorld(w)
       for (const e of w.entities) {
-        if (e.archetype !== 'cop' || !e.ai?.params?.waypoints) continue
+        if (e.archetype !== 'warden' || !e.ai?.params?.waypoints) continue
         for (const wp of e.ai.params.waypoints) {
           const d = Math.hypot(wp.x - w.level.spawn.x, wp.y - w.level.spawn.y)
-          expect(d, `seed ${seed}: cop#${e.id} waypoint`).toBeGreaterThanOrEqual(SPAWN_SAFE_RADIUS)
+          expect(d, `seed ${seed}: warden#${e.id} waypoint`).toBeGreaterThanOrEqual(SPAWN_SAFE_RADIUS)
         }
       }
     }
@@ -104,23 +104,23 @@ describe('an idle just-spawned player survives (the seed-7 regression)', () => {
 })
 
 describe('spawn grace iframes', () => {
-  it('a hostile thug in melee range cannot touch the player during grace', () => {
+  it('a hostile mutant in melee range cannot touch the player during grace', () => {
     const w = createWorld(123, 1, 'normal')
     setupFloor(w)
     const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
     expect(p.health!.iframes).toBe(SPAWN_GRACE_TICKS)
     // Adversarial: hostile melee NPC ALREADY in swing range at tick 0.
-    spawnNpc(w, 'thug', w.level.spawn.x + 0.8, w.level.spawn.y)
+    spawnNpc(w, 'mutant', w.level.spawn.x + 0.8, w.level.spawn.y)
     const inputs = new Map([[0, idle]])
     for (let t = 0; t < SPAWN_GRACE_TICKS - 1; t++) tickWorld(w, inputs)
     expect(p.health!.hp).toBe(p.health!.max)
   })
 
-  it('grace expires: the same thug connects once iframes run out', () => {
+  it('grace expires: the same mutant connects once iframes run out', () => {
     const w = createWorld(123, 1, 'normal')
     setupFloor(w)
     const p = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-    spawnNpc(w, 'thug', w.level.spawn.x + 0.8, w.level.spawn.y)
+    spawnNpc(w, 'mutant', w.level.spawn.x + 0.8, w.level.spawn.y)
     const inputs = new Map([[0, idle]])
     for (let t = 0; t < SPAWN_GRACE_TICKS + 120; t++) tickWorld(w, inputs)
     expect(p.health!.hp).toBeLessThan(p.health!.max)

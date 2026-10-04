@@ -1,5 +1,5 @@
 // Each body moves the way its ART is drawn (fix/locomotion-by-kind), on the
-// default swampspace-hires pack. Top row, standing: spore-drone (cop) and
+// default swampspace-hires pack. Top row, standing: spore-drone (warden) and
 // gloom-lurker float, brood-sac (pod) pulses, sporeling-mite and the
 // frog-settler only breathe. Below it a spore-drone paces east-west, floating
 // harder and taking no steps; below the player a frog-settler paces on its
@@ -16,9 +16,9 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 
 const CX = 10
 const CY = 11
-const ROW = ['cop', 'lurker', 'pod', 'sporeling', 'civilian']
+const ROW = ['warden', 'lurker', 'pod', 'sporeling', 'civilian']
 const PACERS = [
-  ['cop', 10],
+  ['warden', 10],
   ['civilian', 12.6],
 ]
 const ROW_Y = 8.8
@@ -110,7 +110,7 @@ const ok = await recordFeature({
   ],
   readState,
   expect: (s) => [
-    s.cast !== 'civilian,civilian,cop,cop,lurker,pod,sporeling' && `cast changed: ${s.cast}`,
+    s.cast !== 'civilian,civilian,warden,warden,lurker,pod,sporeling' && `cast changed: ${s.cast}`,
     s.rowStill !== 5 && `only ${s.rowStill}/5 of the standing row stayed put`,
     s.paceFlips < 4 && `pacers turned around only ${s.paceFlips} times; they did not cross`,
     s.playerHurt !== false && `player hurt or missing (${s.playerHurt})`,

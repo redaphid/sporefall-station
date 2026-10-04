@@ -7,7 +7,7 @@
 //   2. FORWARD CONE + RANGE: acquisition happens ahead of the round and nearby —
 //      never a yank backwards, never a map-wide magnet.
 //   3. HOSTILITY: only real enemies of the OWNER. Never the owner, co-op allies,
-//      corpses, neutral civilians (no auto-crime), or an NPC shooter's own gang.
+//      corpses, neutral civilians (no auto-misdeed), or an NPC shooter's own feral.
 //   4. CAPPED TURN: a curve (≤ homing rad/tick), not a teleport-turn.
 //   5. DETERMINISM + snapshot shape: pure world-state reads, no new serialized
 //      fields — a homing bullet's JSON shape is exactly what it was before.
@@ -60,15 +60,15 @@ const arena = (hostile = true): World => {
 }
 
 /** Bare hostile-world target body: no ai → the `w.hostile` floor makes it prey. */
-const thug = (w: World, x: number, y: number, hp = 24): Entity => {
-  const e = addEntity(w, makeEntity('npc', 'thug', x, y))
+const mutant = (w: World, x: number, y: number, hp = 24): Entity => {
+  const e = addEntity(w, makeEntity('npc', 'mutant', x, y))
   e.health = { hp, max: hp, iframes: 0 }
   return e
 }
 
 /** An NPC with a real faction (minimal AiState) — for the disposition tests. */
-const factionNpc = (w: World, faction: 'civ' | 'cop' | 'gang' | 'neutral', x: number, y: number): Entity => {
-  const e = thug(w, x, y)
+const factionNpc = (w: World, faction: 'civ' | 'warden' | 'feral' | 'neutral', x: number, y: number): Entity => {
+  const e = mutant(w, x, y)
   e.ai = { mode: 'idle', faction, home: { x, y }, thinkAt: 0, sightRange: 6 }
   return e
 }
@@ -95,7 +95,7 @@ describe('homing — line of sight gates all steering', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
     wallRow(w, 8, 20, 9) // cover between the firing lane (y≈10.5) and the prey
-    const bunkered = thug(w, 16.5, 6.5) // in range, well inside the cone — the old code's wall-curve bait
+    const bunkered = mutant(w, 16.5, 6.5) // in range, well inside the cone — the old code's wall-curve bait
     const b = shot(w, owner.id, 10.5, 10.5, 0.3, 30)
     for (let i = 0; i < 30; i++) {
       advance(w, 1)
@@ -110,7 +110,7 @@ describe('homing — line of sight gates all steering', () => {
   it('(b) a VISIBLE enemy in the cone is hunted down: the round curves and hits', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
-    const prey = thug(w, 16.5, 13.0) // ~23° south of the eastward heading
+    const prey = mutant(w, 16.5, 13.0) // ~23° south of the eastward heading
     const b = shot(w, owner.id, 10.5, 10.5, 0.2)
     let curved = false
     for (let i = 0; i < 40 && !b.dead; i++) {
@@ -126,7 +126,7 @@ describe('homing — line of sight gates all steering', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 8.5, 10.5)
     wallCol(w, 16, 2, 30) // a standing pillar column east of the stage
-    const prey = thug(w, 13.5, 13.0) // west of the pillar: visible at first
+    const prey = mutant(w, 13.5, 13.0) // west of the pillar: visible at first
     const b = shot(w, owner.id, 8.5, 10.5, 0.1)
     advance(w, 5)
     expect(b.vel.y).toBeGreaterThan(0) // lock: it was steering toward the prey
@@ -159,8 +159,8 @@ describe('homing — line of sight gates all steering', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
     wallRow(w, 8, 20, 9)
-    const bunkered = thug(w, 14.5, 7.5) // dist 5.0 — the OLD code's pick (global nearest)
-    const open = thug(w, 16.5, 13.0) // dist 6.5 — farther, but visible
+    const bunkered = mutant(w, 14.5, 7.5) // dist 5.0 — the OLD code's pick (global nearest)
+    const open = mutant(w, 16.5, 13.0) // dist 6.5 — farther, but visible
     const b = shot(w, owner.id, 10.5, 10.5, 0.2)
     advance(w, 40)
     expect(open.health!.hp).toBeLessThan(24) // the visible body took the round
@@ -173,7 +173,7 @@ describe('homing — cone and range bound the seek', () => {
   it('prey BEHIND the round is never yanked backwards', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
-    thug(w, 6.5, 13.5) // ~143° off the eastward heading — outside any cone
+    mutant(w, 6.5, 13.5) // ~143° off the eastward heading — outside any cone
     const b = shot(w, owner.id, 10.5, 10.5, 0.3, 25)
     for (let i = 0; i < 25; i++) {
       advance(w, 1)
@@ -184,7 +184,7 @@ describe('homing — cone and range bound the seek', () => {
   it('acquisition has a RANGE: a distant enemy is ignored until the round closes in', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
-    const far = thug(w, 24.5, 14.5) // 14.6 tiles out — beyond the 10-tile seeker head
+    const far = mutant(w, 24.5, 14.5) // 14.6 tiles out — beyond the 10-tile seeker head
     const b = shot(w, owner.id, 10.5, 10.5, 0.1)
     for (let i = 0; i < 9; i++) {
       advance(w, 1)
@@ -198,7 +198,7 @@ describe('homing — cone and range bound the seek', () => {
   it('the turn rate is CAPPED — a curve of at most `homing` radians per tick, never a snap', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
-    thug(w, 14.5, 15.5) // ~51° off-axis: several ticks of turning to align
+    mutant(w, 14.5, 15.5) // ~51° off-axis: several ticks of turning to align
     const b = shot(w, owner.id, 10.5, 10.5, 0.1)
     let prev = angle(b)
     let total = 0
@@ -230,7 +230,7 @@ describe('homing — only real enemies of the owner are prey', () => {
   it('(e) the DEAD are not prey', () => {
     const w = arena()
     const owner = spawnPlayer(w, 0, 10.5, 10.5)
-    const corpse = thug(w, 16.5, 13.0)
+    const corpse = mutant(w, 16.5, 13.0)
     corpse.dead = true
     const b = shot(w, owner.id, 10.5, 10.5, 0.3, 25)
     for (let i = 0; i < 25; i++) {
@@ -239,7 +239,7 @@ describe('homing — only real enemies of the owner are prey', () => {
     }
   })
 
-  it('(e) a NEUTRAL civilian in a peaceful world is not prey — homing never auto-commits a crime', () => {
+  it('(e) a NEUTRAL civilian in a peaceful world is not prey — homing never auto-commits a misdeed', () => {
     const peaceful = arena(false)
     const owner = spawnPlayer(peaceful, 0, 10.5, 10.5)
     const civ = factionNpc(peaceful, 'civ', 16.5, 13.0)
@@ -260,10 +260,10 @@ describe('homing — only real enemies of the owner are prey', () => {
     expect(b2.vel.y).toBeGreaterThan(0)
   })
 
-  it("an NPC's homing round hunts the PLAYER — never the shooter's own gang", () => {
+  it("an NPC's homing round hunts the PLAYER — never the shooter's own feral", () => {
     const w = arena()
-    const shooter = factionNpc(w, 'gang', 8.5, 10.5)
-    const ally = factionNpc(w, 'gang', 14.5, 10.5) // dead ahead — the old code's pick
+    const shooter = factionNpc(w, 'feral', 8.5, 10.5)
+    const ally = factionNpc(w, 'feral', 14.5, 10.5) // dead ahead — the old code's pick
     const player = spawnPlayer(w, 0, 16.5, 13.5) // off-axis but the true enemy
     player.health!.iframes = 0 // shed spawn grace so the hit can land
     const b = shot(w, shooter.id, 8.5, 10.5, 0.3)
@@ -273,15 +273,15 @@ describe('homing — only real enemies of the owner are prey', () => {
       if (b.vel.y > 0) curved = true // bent toward the player, away from the ally line
     }
     expect(curved).toBe(true)
-    expect(ally.health!.hp).toBe(24) // its own gang untouched
+    expect(ally.health!.hp).toBe(24) // its own feral untouched
     expect(player.health!.hp).toBeLessThan(player.health!.max) // the player was the mark
   })
 
-  it('the faction matrix drives NPC-vs-NPC homing: a cop round seeks a gangster, never a fellow cop', () => {
+  it('the faction matrix drives NPC-vs-NPC homing: a warden round seeks an acolyte, never a fellow warden', () => {
     const w = arena()
-    const shooter = factionNpc(w, 'cop', 8.5, 10.5)
-    const fellowCop = factionNpc(w, 'cop', 14.5, 10.5) // dead ahead
-    const gangster = factionNpc(w, 'gang', 15.5, 13.0) // sworn enemy, off-axis
+    const shooter = factionNpc(w, 'warden', 8.5, 10.5)
+    const fellowWarden = factionNpc(w, 'warden', 14.5, 10.5) // dead ahead
+    const acolyte = factionNpc(w, 'feral', 15.5, 13.0) // sworn enemy, off-axis
     const b = shot(w, shooter.id, 8.5, 10.5, 0.3)
     let curved = false
     for (let i = 0; i < 40 && !b.dead; i++) {
@@ -289,13 +289,13 @@ describe('homing — only real enemies of the owner are prey', () => {
       if (b.vel.y > 0) curved = true
     }
     expect(curved).toBe(true)
-    expect(fellowCop.health!.hp).toBe(24)
-    expect(gangster.health!.hp).toBeLessThan(24)
+    expect(fellowWarden.health!.hp).toBe(24)
+    expect(acolyte.health!.hp).toBeLessThan(24)
   })
 
   it('ADVERSARIAL: an orphaned round (owner despawned) steers at nothing and does not crash', () => {
     const w = arena()
-    thug(w, 16.5, 13.0) // bait that must NOT be taken — no owner, no side to fight for
+    mutant(w, 16.5, 13.0) // bait that must NOT be taken — no owner, no side to fight for
     const b = shot(w, 12345, 10.5, 10.5, 0.3, 25)
     expect(() => advance(w, 25)).not.toThrow()
     expect(b.dead).toBe(true)
@@ -305,7 +305,7 @@ describe('homing — only real enemies of the owner are prey', () => {
 
 describe('homing — determinism and snapshot shape', () => {
   /** The full playtest scene, built identically each call: carved arena, a wall,
-   * a bunkered thug, an open thug, and a homing-3 pistol fired via real inputs. */
+   * a bunkered mutant, an open mutant, and a homing-3 pistol fired via real inputs. */
   const build = (): World => {
     const w = arena()
     wallRow(w, 8, 20, 9)
@@ -313,8 +313,8 @@ describe('homing — determinism and snapshot shape', () => {
     p.facing = 0
     const stack = arm(p, 'pistol')
     stack.mods = [{ id: 'homing', stacks: 3 }]
-    thug(w, 14.5, 7.5)
-    thug(w, 16.5, 13.0)
+    mutant(w, 14.5, 7.5)
+    mutant(w, 16.5, 13.0)
     return w
   }
 
@@ -338,7 +338,7 @@ describe('homing — determinism and snapshot shape', () => {
     p.facing = 0
     const stack = arm(p, 'pistol')
     stack.mods = [{ id: 'homing', stacks: 3 }]
-    const mark = addEntity(seed, makeEntity('npc', 'thug', 25.5, 23.0))
+    const mark = addEntity(seed, makeEntity('npc', 'mutant', 25.5, 23.0))
     mark.health = { hp: 200, max: 200, iframes: 0 }
     const json = serializeWorld(seed)
     const unbroken = deserializeWorld(json)

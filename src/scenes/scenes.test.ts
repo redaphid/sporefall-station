@@ -153,7 +153,7 @@ describe('each scene plays the beat its card promises', () => {
   it('blackout-run: the door holds until the generator is cut, then opens onto the exit', () => {
     const blocked = loadFixture('blackout-run')
     const door = blocked.entities.find((e) => e.door)!
-    play(blocked, 400, { route: [{ x: 52, y: 14 }, { x: 57.5, y: 14.5 }], use: [door.id], spare: ['thug', 'gangster', 'brute', 'robot'] })
+    play(blocked, 400, { route: [{ x: 52, y: 14 }, { x: 57.5, y: 14.5 }], use: [door.id], spare: ['mutant', 'acolyte', 'brute', 'robot'] })
     expect(door.door).toMatchObject({ locked: true, open: false })
     expect(blocked.floor).toBe(1)
 
@@ -169,7 +169,7 @@ describe('each scene plays the beat its card promises', () => {
       { x: 52, y: 14 },
       { x: 57.5, y: 14.5 },
     ]
-    const events = play(w, 900, { route, use, spare: ['thug', 'gangster', 'brute', 'robot'] }, (w) => w.floor === 2)
+    const events = play(w, 900, { route, use, spare: ['mutant', 'acolyte', 'brute', 'robot'] }, (w) => w.floor === 2)
     expect(count(events, 'powerCut')).toBe(1)
     expect(count(events, 'sealOpen')).toBe(1)
     expect(w.floor).toBe(2)
@@ -196,16 +196,16 @@ describe('each scene plays the beat its card promises', () => {
     expect(w.gameOver).toBe(false)
   })
 
-  it('crossfire: cops and gang kill each other while the player only watches', () => {
+  it('crossfire: wardens and feral kill each other while the player only watches', () => {
     const w = loadFixture('crossfire')
-    const before = { cop: live(w, 'cop').length, gang: live(w, 'gangster').length + live(w, 'thug').length }
+    const before = { warden: live(w, 'warden').length, feral: live(w, 'acolyte').length + live(w, 'mutant').length }
     for (let i = 0; i < 1200; i++) tickWorld(w, new Map())
-    expect(live(w, 'cop').length).toBeLessThan(before.cop)
-    expect(live(w, 'gangster').length + live(w, 'thug').length).toBeLessThan(before.gang)
+    expect(live(w, 'warden').length).toBeLessThan(before.warden)
+    expect(live(w, 'acolyte').length + live(w, 'mutant').length).toBeLessThan(before.feral)
     expect(thePlayer(w)?.health?.hp).toBe(thePlayer(w)?.health?.max)
   })
 
-  it('barracks-blaze: one row alight burns down most of the sleeping gang', () => {
+  it('barracks-blaze: one row alight burns down most of the sleeping feral', () => {
     const w = loadFixture('barracks-blaze')
     const sleepers = w.entities.filter((e) => e.kind === 'npc' && (e.status?.sleep ?? 0) > 0).map((e) => e.id)
     let peakFires = 0

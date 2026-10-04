@@ -1,4 +1,4 @@
-// The two-stage heist finale.
+// The two-stage salvage finale.
 // Stage 1 — gateway breach: unlocking the door that DIRECTLY gates the mission
 // objective is a point of no return — the alarm maxes and every OTHER door on
 // the floor pops open (locks, biolocks, overgrowth), but the floor does NOT
@@ -180,7 +180,7 @@ describe('boss-door aggro — a NORMAL door never triggers it', () => {
   it('breaching a non-objective door leaves the floor calm', () => {
     const { w } = bootBreachable([2, 3, 5, 6])
     // Any door that is NOT the tagged gate, in a spot away from NPCs so the blast
-    // itself commits no crime that could raise the alarm on its own.
+    // itself commits no misdeed that could raise the alarm on its own.
     const normal = w.entities.find(
       (e) => e.door && !e.door.objectiveGate && !w.entities.some((n) => n.ai && !n.dead && Math.hypot(n.pos.x - e.pos.x, n.pos.y - e.pos.y) < 2.5),
     )

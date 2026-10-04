@@ -73,9 +73,9 @@ describe('combat AI — acquire, chase, attack', () => {
   it('a melee NPC closes to swinging range; a ranged NPC holds its distance', () => {
     const { w } = arena()
     const player = spawnPlayer(w, 0, 15.5, 20.5)
-    const melee = spawnNpc(w, 'thug', 21.5, 19.5) // bat, sightRange 7 → perceives at ~6
+    const melee = spawnNpc(w, 'mutant', 21.5, 19.5) // bat, sightRange 7 → perceives at ~6
     melee.combat!.weapon = 'bat'
-    const shooter = spawnNpc(w, 'thug', 21.5, 21.5) // pistol
+    const shooter = spawnNpc(w, 'mutant', 21.5, 21.5) // pistol
     shooter.combat!.weapon = 'pistol'
 
     run(w, 120)
@@ -90,7 +90,7 @@ describe('combat AI — acquire, chase, attack', () => {
   it('a ranged NPC actually fires bullets down the shared projectile path', () => {
     const { w } = arena()
     spawnPlayer(w, 0, 12.5, 20.5)
-    const shooter = spawnNpc(w, 'gangster', 18.5, 20.5)
+    const shooter = spawnNpc(w, 'acolyte', 18.5, 20.5)
     shooter.combat!.weapon = 'pistol'
 
     let sawBullet = false
@@ -104,7 +104,7 @@ describe('combat AI — acquire, chase, attack', () => {
   it('an element weapon inflicts its status on the player through fireWeapon (onHit works for NPCs)', () => {
     const { w } = arena()
     const player = spawnPlayer(w, 0, 12.5, 20.5)
-    const iceman = spawnNpc(w, 'gangster', 18.5, 20.5)
+    const iceman = spawnNpc(w, 'acolyte', 18.5, 20.5)
     iceman.combat!.weapon = 'freezeRay' // damage 0, freezes on hit — only lands via the shared path
 
     // Must outlast SPAWN_GRACE_TICKS (90). On-hit statuses are now gated on the
@@ -132,7 +132,7 @@ describe('combat AI — exemptions (a downed/asleep NPC does not fight)', () => 
   it('a sleeping NPC neither moves nor attacks even in a hostile world', () => {
     const { w } = arena()
     const player = spawnPlayer(w, 0, 12.5, 20.5)
-    const sleeper = spawnNpc(w, 'thug', 16.5, 20.5)
+    const sleeper = spawnNpc(w, 'mutant', 16.5, 20.5)
     sleeper.combat!.weapon = 'bat'
     sleeper.status!.sleep = 300
     const startDist = dist(sleeper.pos.x, sleeper.pos.y, player.pos.x, player.pos.y)
@@ -147,7 +147,7 @@ describe('combat AI — exemptions (a downed/asleep NPC does not fight)', () => 
     const { w } = arena()
     carve(w, 8, 18, 60, 22)
     spawnPlayer(w, 0, 12.5, 20.5)
-    const far = spawnNpc(w, 'thug', 55.5, 20.5) // ~43 tiles away, well beyond sightRange 7
+    const far = spawnNpc(w, 'mutant', 55.5, 20.5) // ~43 tiles away, well beyond sightRange 7
 
     run(w, 20)
 
@@ -161,8 +161,8 @@ describe('combat AI — determinism', () => {
       const w = createWorld(42, 1, 'normal', true)
       carve(w, 8, 18, 40, 22)
       spawnPlayer(w, 0, 12.5, 20.5)
-      spawnNpc(w, 'thug', 22.5, 19.5).combat!.weapon = 'bat'
-      spawnNpc(w, 'gangster', 24.5, 21.5).combat!.weapon = 'pistol'
+      spawnNpc(w, 'mutant', 22.5, 19.5).combat!.weapon = 'bat'
+      spawnNpc(w, 'acolyte', 24.5, 21.5).combat!.weapon = 'pistol'
       return w
     }
     const a = build()

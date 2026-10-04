@@ -1,7 +1,7 @@
 # Sporefall Station (swampspace) — curation & lineage
 
 Fused swamp/space theme: an alien bog overtaking a derelict space station.
-Mangrove roots through deck plating, spore drones instead of cops, phosphor
+Mangrove roots through deck plating, spore drones instead of wardens, phosphor
 water, overgrown tech. Art direction: dominant-color study of *Flashback*
 (Amiga 1992) Titan jungle — teal mist, olive overgrowth, tan/gray tech, hot
 accents (inspiration only; no Flashback art used as input or reproduced).
@@ -51,8 +51,8 @@ palette (`scripts/assets/palette.py`), no dither, hard alpha.
 | archetype | kind | notes |
 |---|---|---|
 | player | vine-ranger | bareheaded, long copper braid, quilted grey liner vest, orange sleeves, caged rust-orange jar at the hip; **full 5-dir idle/step + 8-frame walk**, 2026-09-29, redesigned toward the key art, Wan 2.2 I2V, see below |
-| cop | spore-drone | hovering jellyfish-drone, green sensor mass (bouncer shares) |
-| thug | bog-mutant | hulking moss-crusted olive brute (boss/gangster share) |
+| warden | spore-drone | hovering jellyfish-drone, green sensor mass (lockkeeper shares) |
+| mutant | bog-mutant | hulking moss-crusted olive brute (boss/acolyte share) |
 | scientist | mycologist | pale hazmat, green shoulder pods, sample tube; **full 5-dir idle/step + 8-frame walk**, 2026-09-29, Wan 2.2 I2V, see below |
 | robot | derelict-bot | dark boxy machine, orange eye lenses |
 | civilian | frog-settler | cloaked swamp frog in a brown hood — **full 5-dir idle/step + 8-frame walk**, 2026-09-25, Wan 2.2 I2V, see below (shopkeeper shares) |

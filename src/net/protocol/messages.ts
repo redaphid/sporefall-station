@@ -46,8 +46,8 @@ import { MsgType } from '../types'
  */
 export const ARCHETYPES = [
   'player',
-  'thug',
-  'cop',
+  'mutant',
+  'warden',
   'civilian',
   'shopkeeper',
   'boss',
@@ -61,8 +61,8 @@ export const ARCHETYPES = [
   'pickup.medkit', // RETIRED
   'pickup.cash',
   'pickup.briefcase',
-  'gangster',
-  'bouncer',
+  'acolyte',
+  'lockkeeper',
   // Everything below was spawnable but MISSING from this registry, so
   // `archetypeIndex.get(...) ?? 0` encoded it as index 0 and the remote client
   // decoded it back as 'player' — i.e. a spore pod, a lurker or a burning tile
@@ -492,7 +492,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       playerId: -1,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
     // slots from the InventoryMsg, this is just the render-side placeholder.

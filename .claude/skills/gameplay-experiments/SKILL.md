@@ -2,7 +2,7 @@
 name: gameplay-experiments
 description: >-
   Explore Sporefall Station's world in the ECS debugger, compose deterministic scenarios
-  (heists, set-pieces, emergent-mechanic tests), narrate them on screen with the
+  (salvages, set-pieces, emergent-mechanic tests), narrate them on screen with the
   annotation system, and produce annotated screenshot/video recordings. Use when
   asked to "try out" gameplay ideas, design multi-stage co-op scenarios, discover
   emergent mechanics, or make annotated gameplay reels.
@@ -26,7 +26,7 @@ composing, narrating, and recording scenarios.
 
 ## 1. Explore — learn the palette
 
-Read the systems in `src/game/systems/` (missions, doors/locks, alarm/cops,
+Read the systems in `src/game/systems/` (missions, doors/locks, alarm/wardens,
 hacking, stealth/AI + `relationships.ts`, inventory, elements fire/frost/shock)
 to learn the verbs of play. Then poke live state with the debug tooling:
 
@@ -59,7 +59,7 @@ render via the overlay. Add them with `addAnnotations(w, raw)`
 (`src/game/annotations.ts`), the `annotate` verb, or `window.__annotate(line)`.
 
 Kinds (all accept an optional `text` rendered beside the shape):
-- `text` — screen-space banner (e.g. the current stage: "HEIST 1/6 — Case the joint").
+- `text` — screen-space banner (e.g. the current stage: "SALVAGE 1/6 — Case the joint").
 - `label` — **entity-anchored, engine-positioned**: `{kind:'label', targetId, text}`
   with no x/y → follows the sprite. Use for roles/targets ("Hacker: cut cameras",
   "VAULT — lockLevel 2", "Guard — posted at vault").
@@ -80,8 +80,8 @@ into the fixture or pushed via `beforeTicks(page)` using `__annotate`/`__loadWor
 
 ```js
 await record({
-  name: 'heist',
-  params: { world: 'heist-stage', script: 'heist', e2e: '1', mode: 'solo', class: 'thief' },
+  name: 'salvage',
+  params: { world: 'salvage-stage', script: 'salvage', e2e: '1', mode: 'solo', class: 'scavenger' },
   beforeTicks: async (page) => { /* page.evaluate(() => window.__annotate(...)) per stage */ },
   stills: [{ tick: 30, label: '1-recon' }, { tick: 220, label: '4-vault' }],
   readState: () => ({ vaultOpen: !window.__world.byId.get(VAULT).door.locked }),
@@ -89,7 +89,7 @@ await record({
 })
 ```
 
-Assert the scenario actually PROGRESSES (objective fires, alarm trips, cops
+Assert the scenario actually PROGRESSES (objective fires, alarm trips, wardens
 arrive) so the recording shows real gameplay, not a pose. Copy final mp4s + PNGs
 somewhere retrievable and report exact filenames + sizes.
 
@@ -108,7 +108,7 @@ systems, ranked fun-per-effort). File a GitHub issue capturing it.
 ## Emergent-mechanic starter catalog (all real, all reproducible)
 
 - **Noise lure** — `__debug.noise(x,y)` makes a guard's goal-arbiter pick
-  INVESTIGATE and leave its post. The most heist-relevant behavior.
+  INVESTIGATE and leave its post. The most salvage-relevant behavior.
 - **Sleep takedown** — chloroform sets `status.sleep`; sleeping NPCs skip AI.
 - **Wet + shock chain** — `__debug.wet(id)` a huddle, `__debug.shock(one)` →
   charge floods every connected wet body.

@@ -36,7 +36,7 @@ describe('the version endpoint is never cached by the service worker', () => {
 
   it('still caches the art it is supposed to', () => {
     expect(matches('/themes/swampspace/tiles.png')).toBe(true)
-    expect(matches('/sprites/city/thug.png')).toBe(true)
+    expect(matches('/sprites/city/mutant.png')).toBe(true)
   })
 
   it('never caches a cross-origin request', () => {
@@ -61,7 +61,7 @@ describe('the navigation fallback never swallows a real download', () => {
     expect(SW_GLOB_PATTERNS).toContain('scenes.html')
     expect(denied('/scenes.html')).toBe(true)
     expect(denied('/scenes')).toBe(true)
-    expect(denied('/scenes-of-a-crime')).toBe(false)
+    expect(denied('/scenes-of-a-misdeed')).toBe(false)
   })
 
   it('still falls back for ordinary deep links', () => {

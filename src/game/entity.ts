@@ -45,7 +45,7 @@ export interface LockoutEntry {
 }
 
 export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
-export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
+export type Faction = 'civ' | 'warden' | 'feral' | 'neutral'
 
 /** A disposition band, derived from numeric hate by `determineRel`. */
 export type RelStatus = 'Friendly' | 'Neutral' | 'Annoyed' | 'Hostile'
@@ -153,7 +153,7 @@ export interface AiState {
    * Any urgent mode (aggro/flee/seek) cancels it instantly. */
   scanUntil?: number
   /** Squad membership (behavior 'squad'): shared squad id + this member's role
-   * in the stack. Assigned by populate for gangster packs. */
+   * in the stack. Assigned by populate for acolyte packs. */
   squad?: { id: number; role: 'lead' | 'flank' | 'rear' }
   /** Group membership (systems/groups.ts): the id of a `World.groups` entry —
    * a raid ("tide") or a hound pack — plus this member's role in it. The group
@@ -238,7 +238,7 @@ export interface Loadout {
 export interface Entity {
   id: EntityId
   kind: EntityKind
-  /** Key into data/ definitions: 'thug', 'cop', 'player', 'grenade', 'door.wood', ... */
+  /** Key into data/ definitions: 'mutant', 'warden', 'player', 'grenade', 'door.wood', ... */
   archetype: string
   pos: Vec2
   /** Position at the previous tick — used for render interpolation. */
@@ -304,7 +304,7 @@ export interface Entity {
     playerId: number
     abilityCooldown: number
     cash: number
-    crimeUntilTick: number
+    misdeedUntilTick: number
     /** Passive-regen bookkeeping (systems/regen.ts): consecutive ticks this player
      * has been BOTH completely still and unharmed. Reset to absent the instant they
      * move or take a hit; once it reaches REGEN_CALM_TICKS the player heals over

@@ -76,13 +76,13 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 488
+        "misdeedUntilTick": 488
       }
     },
     {
       "id": 2,
       "kind": "npc",
-      "archetype": "cop",
+      "archetype": "warden",
       "pos": {
         "x": 2.0322449421653332,
         "y": 1.5
@@ -129,7 +129,7 @@
       },
       "ai": {
         "mode": "aggro",
-        "faction": "cop",
+        "faction": "warden",
         "home": {
           "x": 4.5,
           "y": 1.5
@@ -153,7 +153,7 @@
     {
       "id": 3,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": -1.5,
         "y": 1.5
@@ -199,7 +199,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": -1.5,
           "y": 1.5

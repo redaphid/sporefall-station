@@ -12,7 +12,7 @@ screen: full-floor zoomed-out view; 6 large rooms visible; objective arrow "76m"
 player sprite tiny at top-left edge. Player likely still orienting.
 
 Objective geometry: canister #222 at (55.5,56.5) bottom-right, behind LOCKED objective
-door #259 (lockLevel 1) at (55.5,52.5). Gang patrols + squad at y54-59; vermin nearby.
+door #259 (lockLevel 1) at (55.5,52.5). Feral patrols + squad at y54-59; vermin nearby.
 Player spawned top-left (1.5,3.1) → diagonal-opposite corner run, ~76m.
 
 ### tick ~2390-2810  (floor 1 · steal · alarm 0)
@@ -21,7 +21,7 @@ motion: vel 0 in this frame but pos has advanced steadily — moving fine overal
 hp: 112/120, lastHurtTick 2810, hitFlash active — took 8 dmg from EXPLOSION at
 (5.67,21.50) r=1.8 (event ring). Cause unknown from notes — hazard? mine? Watch for tell.
 events: many doorToggles (NPCs), npc#28 scavenged a cash pickup (aiGoal wander→scavenge→wander).
-threat: none aggroed on player. cops patrol N (y1-5), gang patrols S (y54-59). civ#24 fleeing near player (0.4,56.3).
+threat: none aggroed on player. wardens patrol N (y1-5), feral patrols S (y54-59). civ#24 fleeing near player (0.4,56.3).
 signal: DAMAGE with unclear source — explosion hit player mid-route with no visible
 attacker in notes; check readability of hazard tells.
 signal: route = wall-hug along map edge; corridors between buildings may be the de-facto
@@ -37,34 +37,34 @@ Player abandoned the objective route (was y48, arrow said 54m) and swept NORTH k
 - EMERGENT: shot a barrel at (26.5,10.8) → 40dmg explosion killed 3 interactables (#77,
   #86, #87) AND doorBreach'd door#229 — explosives open doors! Also hit player for 40.
 - cash drops looted: $71 total. NPC#28 also scavenges cash (world feels alive).
-- alarm 0→1 (civ murders?). Cops #29/#30 patrol NE near player. No visible response yet.
+- alarm 0→1 (civ murders?). Wardens #29/#30 patrol NE near player. No visible response yet.
 - Recurring env explosions r=1.8 around (5,18-21) — periodic, not player-caused. Sacs?
 - hp: took 40+14+14+8+7 across the spree, regenned to 120/120 by tick 5225. regenCalm
   makes damage evaporate between fights — pressure resets to zero.
 signal: DELIGHT — barrel-breach of a door; player experimenting with sandbox.
 signal: BALANCE — full passive regen between fights removes attrition entirely.
 signal: CONSEQUENCE-GAP — murdered 6 civs incl. fleeing ones; alarm ticked to 1 but
-nothing pushed back. Cops nearby did not respond. Murder feels free.
+nothing pushed back. Wardens nearby did not respond. Murder feels free.
 signal: AI-READABILITY — skittish civs briefly "battle" then flee; looks indecisive.
 
-### tick ~5225-8485  (floor 1 · steal · alarm 1)  RAMPAGE II + first cop kill
+### tick ~5225-8485  (floor 1 · steal · alarm 1)  RAMPAGE II + first warden kill
 - Player paused at ~7900 to study pistol card: Tesla Rounds + Hot Loads, dmg 14,
   1.7/s, bullet speed 14→18.2, "electrified on hit". Pause menu: Resume/New Seed/
   Run it back/Share state. Player is engaging with the build system.
-- Resumed → cop#29 flipped patrol→battle on player. Civ#11 ran ALERT to guard#30 and
-  fired `alerted` event (#11 told #29 about player). Player killed cop#29 (5x14),
+- Resumed → warden#29 flipped patrol→battle on player. Civ#11 ran ALERT to guard#30 and
+  fired `alerted` event (#11 told #29 about player). Player killed warden#29 (5x14),
   killed snitch#11, killed brave civ#10, took 2+2+8. modPickup: VELOCITY (mod #47).
 - npc 21→18. Cash $71. Player then moved SE to (33.6,37.4) — closing on objective
   (arrow 29m at pause). hp 108.
-- SYSTEM READ (relationships.ts): alarm++ ONLY when a cop witnesses the crime within
-  LOS_RANGE=10. Kill-the-witness genuinely suppresses escalation. commitCrime sets
-  crimeUntilTick (wanted 15s). Cops engage at alarm>=2 (behaviors.ts:124);
+- SYSTEM READ (relationships.ts): alarm++ ONLY when a warden witnesses the misdeed within
+  LOS_RANGE=10. Kill-the-witness genuinely suppresses escalation. commitMisdeed sets
+  misdeedUntilTick (wanted 15s). Wardens engage at alarm>=2 (behaviors.ts:124);
   raiseFloorAggro (boss-door breach / mission) jumps alarm to 3 + floor-wide aggro.
 - SYSTEM READ (regen.ts): rest-heal by design — 2.5s perfectly still, then ~10hp/s.
-signal: EMERGENT-DELIGHT — witness elimination works as a stealth-crime mechanic; the
+signal: EMERGENT-DELIGHT — witness elimination works as a stealth-misdeed mechanic; the
 player did it (accidentally?) with zero UI acknowledgement. No tell that it worked.
-signal: CONSEQUENCE-GAP — 9 kills incl. a cop → alarm 1. Cop density so low that the
-crime system rarely fires. Murder-hobo path is dominant and unpressured.
+signal: CONSEQUENCE-GAP — 9 kills incl. a warden → alarm 1. Warden density so low that the
+misdeed system rarely fires. Murder-hobo path is dominant and unpressured.
 
 ### tick 8485 (long pause)
 Player paused on the pistol card for several minutes. Sim frozen (tick pinned across
@@ -76,18 +76,18 @@ Player paused on the pistol card for several minutes. Sim frozen (tick pinned ac
   re-broadcasts player pos every ALERT_BROADCAST_TICKS, floor-sized pursuit leash,
   ALERT_BATTLE_MULT presses fights. The finale has real teeth; the mid-game is slack
   by design (build-up), but observed slack may be flatter than intended.
-- The `alerted` event (civ reaches a guard) aggroes THAT cop but does NOT raise
-  w.alarm — station alarm only rises via cop LOS witness (relationships.ts:117),
+- The `alerted` event (civ reaches a guard) aggroes THAT warden but does NOT raise
+  w.alarm — station alarm only rises via warden LOS witness (relationships.ts:117),
   sealed-door breach (combat.ts:359), alarm objects (objects.ts:64), gate breach.
 
 ## Reflection #1 (mid-session) — hypotheses forming
-1. WITNESS-SILENCE HAS NO TELL: killing the snitch/cop witness genuinely suppresses
+1. WITNESS-SILENCE HAS NO TELL: killing the snitch/warden witness genuinely suppresses
    escalation, but the game never acknowledges it. The player's best emergent play
    was invisible. Idea: a small on-screen tell (e.g. event + HUD blip "witness down —
    alert died with them") + civs who SAW the murder of a witness get panic behavior.
-2. MURDER IS CHEAP MID-GAME: 10+ kills incl. a cop, alarm 1, zero pressure. Ideas:
-   (a) successful `alerted` handoff also bumps w.alarm (a snitch that REACHES a cop
-   = station knows), (b) cops investigate corpses they walk into (corpse-discovery
+2. MURDER IS CHEAP MID-GAME: 10+ kills incl. a warden, alarm 1, zero pressure. Ideas:
+   (a) successful `alerted` handoff also bumps w.alarm (a snitch that REACHES a warden
+   = station knows), (b) wardens investigate corpses they walk into (corpse-discovery
    → investigate + alarm bump). Both use existing stimulus/goal machinery.
 3. DEAD-TIME ON THE WALK: y3→y48 wall-hug with a single mystery explosion. The
    inter-building corridors are empty dead space; route content or ambient threat?
@@ -168,7 +168,7 @@ prune behavior worth a look if it grows unbounded).
   floor 1, tick 292 → the floor-2 run ended between beats. Death INFERRED, not
   observed (single-shot watcher was disarmed after hp-low). First run loss of
   the session. Floor 2 killed them where floor 1 didn't — difficulty does ramp.
-- Run 3 first 10 SECONDS: crime committed, civs #1+#2 both ran `alert` to
+- Run 3 first 10 SECONDS: misdeed committed, civs #1+#2 both ran `alert` to
   security #3, security pursued+battled, player took 4x8 dmg. The
   alert/snitch behavior is common and legible in data — but is it legible ON
   SCREEN? (Does the player know why security suddenly aggroed?) Candidate tell:
@@ -212,7 +212,7 @@ prune behavior worth a look if it grows unbounded).
   the floor is, (b) objective-directed reward stream so full-clear isn't the
   obvious line. Pairs with the mod-economy finding.
 - Floor 3 reached (~t35.9k): 56 npc, alarm 0, hp 72, $323, same god-pistol.
-  New-to-observer archetypes this run: stalker, sporeling, "gangster" (rename
+  New-to-observer archetypes this run: stalker, sporeling, "acolyte" (rename
   list). A stalker was observed FLEEING the player on floor 3.
 
 ### Runs 5-6 rapid-fire
@@ -254,8 +254,8 @@ prune behavior worth a look if it grows unbounded).
   homing rounds chased their own allies (players were excluded outright).
 - NEW: LOS-gated raycast steering (walls/closed doors block; LOS break freezes
   heading), 10-tile forward cone, smallest-angular-deviation acquisition
-  ("bullets go where you aim"), hostility-aware prey (co-op-safe, no auto-crime
-  vs neutral civs, cop/gang matrix honored for NPC rounds), turn cap unchanged,
+  ("bullets go where you aim"), hostility-aware prey (co-op-safe, no auto-misdeed
+  vs neutral civs, warden/feral matrix honored for NPC rounds), turn cap unchanged,
   STATELESS — zero new serialized fields, vanilla shots byte-identical.
 - 17 adversarial tests (homing.test.ts), full suite 3504 green over the combined
   tree, lint+build clean, deterministic e2e demo video:
@@ -298,12 +298,12 @@ prune behavior worth a look if it grows unbounded).
   Coordinator-me stays on observation + conversation.
 
 ## Player directive (recorded mid-session, do not implement yet)
-- **Re-fiction the character vocabulary: there are no "cops", "thugs", etc. anymore.**
-  The station fiction has moved on from the Streets-of-Rogue-style street-crime cast.
-  Code + docs + my own notes still say cop/gang/civ (`faction` values in
+- **Re-fiction the character vocabulary: there are no "wardens", "mutants", etc. anymore.**
+  The station fiction has moved on from the Streets-of-Rogue-style Earth-city cast.
+  Code + docs + my own notes still say warden/feral/civ (`faction` values in
   `src/game/entity.ts`, `relationships.ts` matrix, NPC archetypes, and any
   player-facing strings). Idea on record: rename the player-facing language (and
   eventually the internal vocabulary) to station-appropriate roles — e.g. security/
   wardens, scavengers/raiders, crew/civilians — keeping the mechanical matrix
-  (law faction, hostile-on-sight faction, neutral bystanders) intact. Observer notes
+  (watch faction, hostile-on-sight faction, neutral bystanders) intact. Observer notes
   from here on should prefer fiction-neutral terms: "security", "raiders", "crew".

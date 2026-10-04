@@ -135,17 +135,17 @@ describe('nextFloor carry-over', () => {
     expect(p.loadout!.inventory.some((s) => s.itemId === 'bat')).toBe(true)
   })
 
-  it('descending CLEARS a downed state and its channel/crime bookkeeping (a downed teammate is carried alive)', () => {
+  it('descending CLEARS a downed state and its channel/misdeed bookkeeping (a downed teammate is carried alive)', () => {
     const w = makeRun(12)
     const p = w.entities.find((e) => e.playerCtl)!
     p.playerCtl!.downed = { bleedTicks: 100, reviveProgress: 0 }
     p.playerCtl!.channel = { kind: 'lockpick', targetId: 999, ticksLeft: 10, total: 60 }
-    p.playerCtl!.crimeUntilTick = w.tick + 500
+    p.playerCtl!.misdeedUntilTick = w.tick + 500
     p.dead = false
     nextFloor(w)
     expect(p.playerCtl!.downed).toBeUndefined()
     expect(p.playerCtl!.channel).toBeUndefined()
-    expect(p.playerCtl!.crimeUntilTick).toBe(0)
+    expect(p.playerCtl!.misdeedUntilTick).toBe(0)
     expect(p.health!.hp).toBeGreaterThan(0) // downed (hp 0) → healed to half
   })
 

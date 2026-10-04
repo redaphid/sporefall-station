@@ -84,7 +84,7 @@ Files in this folder:
     - 2026-09-29 00:48: "Not a 'bat', etc. Also dogs shouldn't have knives"
       (said of weapons; it binds the cast too).
     - 2026-09-29 00:50: "Don't make it too steampunk" (Step 0, "Not steampunk").
-    - 2026-09-29 00:51: "\"thug, cop, shopkeeper\" are not lore-appropriate
+    - 2026-09-29 00:51: "\"mutant, warden, shopkeeper\" are not lore-appropriate
       names"
     - 2026-09-29 02:33, after the crash: "Remember the lore stuff as well"
 

@@ -66,13 +66,13 @@ player.loadout!.inventory[0].mods = [
 ]
 
 const garrison: Array<[archetype: string, x: number, y: number]> = [
-  ['thug', 10.5, 20.5],
-  ['thug', 14.5, 22.5],
-  ['thug', 28.5, 21.5],
-  ['thug', 33.5, 14.5],
+  ['mutant', 10.5, 20.5],
+  ['mutant', 14.5, 22.5],
+  ['mutant', 28.5, 21.5],
+  ['mutant', 33.5, 14.5],
   ['brute', 21.5, 15.5],
-  ['gangster', 18.5, 10.5],
-  ['gangster', 25.5, 10.5],
+  ['acolyte', 18.5, 10.5],
+  ['acolyte', 25.5, 10.5],
 ]
 for (const [archetype, x, y] of garrison) spawnNpc(w, archetype, x, y)
 

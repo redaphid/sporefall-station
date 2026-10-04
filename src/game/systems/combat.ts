@@ -8,7 +8,7 @@ import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
-import { commitCrime } from './relationships'
+import { commitMisdeed } from './relationships'
 import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
 import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
@@ -56,9 +56,9 @@ const THROW_COOLDOWN = 20
  * 5x is tuned off the grunt line, and it is a knob the owner should feel free to
  * turn. Pistol 14 → 70 on the shatter, on top of the 14 the freezing shot
  * already dealt: 84 across two shots, so everything up to ~84 effective hp still
- * pops in two (thug 40, cop 60, mender 44, lobber 58, breacher 62) and the
+ * pops in two (mutant 40, warden 60, mender 44, lobber 58, breacher 62) and the
  * ice-gib death still plays. Above that it is a big bite, not an execute:
- * bouncer 90 and bellwether 90 survive on a sliver, brute 95 keeps 65, hivespire
+ * lockkeeper 90 and bellwether 90 survive on a sliver, brute 95 keeps 65, hivespire
  * 120 keeps 61, and the boss keeps 256 of 320 — frost is worth bringing to a
  * boss (it roughly halves the fight) without being the boss's off switch. */
 export const SHATTER_DAMAGE_MULT = 5
@@ -173,7 +173,7 @@ export const applyDamage = (
     target.playerCtl.channel = undefined
   }
 
-  // Civilians panic when hurt; bouncers take it personally
+  // Civilians panic when hurt; lockkeepers take it personally
   if (target.ai) {
     // A PLAYER's landed blow on a group member is remembered for the group layer
     // (systems/groups.ts): it is what turns a hound pack manhunter.
@@ -194,9 +194,9 @@ export const applyDamage = (
 
   if (target.playerCtl) seeAttackOnPlayer(w, target, attackerId)
 
-  // Disposition: a player attack on a civ/cop is a crime — witnesses re-derive
-  // their stance toward the attacker (cops/allies turn hostile, civilians flee).
-  commitCrime(w, target, w.byId.get(attackerId))
+  // Disposition: a player attack on a civ/warden is a misdeed — witnesses re-derive
+  // their stance toward the attacker (wardens/allies turn hostile, civilians flee).
+  commitMisdeed(w, target, w.byId.get(attackerId))
 
   if (target.health.hp <= 0) {
     // The ice gib fires when the SHATTERING BLOW is the one that kills — not on

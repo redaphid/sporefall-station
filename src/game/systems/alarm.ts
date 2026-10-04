@@ -1,4 +1,4 @@
-// The station's EAR (#86). Gunfire and attacks the crew or the law notice build
+// The station's EAR (#86). Gunfire and attacks the crew or the watch notice build
 // HEAT; enough heat raises the alarm one level; an alarm raised all the way
 // the loud way LOCKS DOWN the Launch Bay.
 //
@@ -8,7 +8,7 @@
 //                  Decays 1 per HEAT_DECAY_EVERY ticks; every HEAT_PER_ALARM
 //                  raises `w.alarm` by one.
 //   lockdownTick — latched when `w.alarm` reaches LOCKDOWN_ALARM before the
-//                  heist finale. The bay's seal cycle runs from this tick, and
+//                  salvage finale. The bay's seal cycle runs from this tick, and
 //                  the cycle restarts when the objective completes, so a loud run
 //                  holds the prize under the manhunt for LOCKDOWN_TICKS before
 //                  the bay opens. A timer, never a key: nothing any one player
@@ -30,21 +30,21 @@ export const HEAT_PER_ALARM = 300
 /** Heat bleeds off 1 per this many ticks (6/s). A pistol at 18-tick cadence
  * nets +24/s while firing; a lone shot is gone in ~3 s. */
 export const HEAT_DECAY_EVERY = 5
-/** Heat a crew/law witness adds by SEEING a player get hit. One second of fire. */
+/** Heat a crew/watch witness adds by SEEING a player get hit. One second of fire. */
 export const ATTACK_SEEN_HEAT = 30
 /** The alarm level that seals the Launch Bay. */
 export const LOCKDOWN_ALARM = 3
 /** How long the bay stays sealed once the seal cycle runs (20 s at 30 tps). */
 export const LOCKDOWN_TICKS = 600
 
-/** Can `e` notice a disturbance for the station? The crew and the law only —
- * vermin and gangs don't call it in — and only while awake. */
+/** Can `e` notice a disturbance for the station? The crew and the watch only —
+ * vermin and ferals don't call it in — and only while awake. */
 const isWitness = (e: Entity): boolean =>
   !!e.ai &&
   !e.dead &&
   !e.ai.dormant &&
   !(e.status && e.status.sleep > 0) &&
-  (e.ai.faction === 'civ' || e.ai.faction === 'cop')
+  (e.ai.faction === 'civ' || e.ai.faction === 'warden')
 
 const addHeat = (w: World, amount: number, cause: 'gunfire' | 'attack'): void => {
   if (w.alarm >= LOCKDOWN_ALARM) return // saturated: nothing left to raise
@@ -60,7 +60,7 @@ const addHeat = (w: World, amount: number, cause: 'gunfire' | 'attack'): void =>
 
 /**
  * A player fired a gun. The shot is a real noise (guards come to investigate
- * it, dormant pods wake to it) and, if any crew/law member is within earshot,
+ * it, dormant pods wake to it) and, if any crew/watch member is within earshot,
  * `loudness` heat. Pass the shot's cadence in ticks, so heat tracks time spent
  * firing and a machinegun is not 3.6x louder than a pistol per second.
  */
@@ -81,11 +81,11 @@ export const hearGunfire = (w: World, shooter: Entity, loudness: number): void =
   }
 }
 
-/** An NPC landed a blow on a player. If a crew/law member other than the
- * attacker SEES it, heat rises. The law beating you up is not news. */
+/** An NPC landed a blow on a player. If a crew/watch member other than the
+ * attacker SEES it, heat rises. The watch beating you up is not news. */
 export const seeAttackOnPlayer = (w: World, victim: Entity, attackerId: EntityId): void => {
   const attacker = w.byId.get(attackerId)
-  if (!attacker || attacker.playerCtl || attacker.ai?.faction === 'cop') return
+  if (!attacker || attacker.playerCtl || attacker.ai?.faction === 'warden') return
   for (const e of w.entities) {
     if (e === attacker || !isWitness(e)) continue
     if (!perceives(w, e, victim)) continue
@@ -117,7 +117,7 @@ export const lockdownView = (w: World): { secondsLeft?: number } | undefined => 
 
 /** Per tick, from missionSystem: bleed heat, latch the lockdown, announce the
  * bay reopening. The finale (gateway breach / station alert) maxes the alarm on
- * purpose; that is the heist working, not the player being loud, so it never
+ * purpose; that is the salvage working, not the player being loud, so it never
  * latches a lockdown. */
 export const alarmSystem = (w: World): void => {
   const m = w.mission

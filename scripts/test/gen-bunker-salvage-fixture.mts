@@ -1,8 +1,8 @@
-// Regenerate src/game/__fixtures__/bunker-heist.json — the previously-blocked
+// Regenerate src/game/__fixtures__/bunker-salvage.json — the previously-blocked
 // bunker mission (seed 7 floor 3, steal-the-briefcase, objective behind three
 // locked doors) with the player staged on the street east of the airlock.
 // Backs the lockpick-progression e2e video. Deterministic: same output always.
-// Usage: pnpm exec tsx scripts/test/gen-bunker-heist-fixture.mts
+// Usage: pnpm exec tsx scripts/test/gen-bunker-salvage-fixture.mts
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,6 +29,6 @@ for (const e of w.entities) {
   e.status.sleep = 100_000
 }
 
-const out = join(dirname(fileURLToPath(import.meta.url)), '../../src/game/__fixtures__/bunker-heist.json')
+const out = join(dirname(fileURLToPath(import.meta.url)), '../../src/game/__fixtures__/bunker-salvage.json')
 writeFileSync(out, JSON.stringify(serializeWorld(w), null, 2) + '\n')
 console.log('wrote', out, `(${w.entities.length} entities, mission: ${w.mission.description})`)

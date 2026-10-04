@@ -30,7 +30,7 @@ export const SCENES: readonly Scene[] = [
     name: 'pillared-hall',
     title: 'The Pillared Hall',
     hook: 'Eight pillars, gunmen behind every one, and a pistol that bounces.',
-    tryThis: 'Bank shots off the pillars. Gangsters hunt your last known spot, so break their sight and come round the other side.',
+    tryThis: 'Bank shots off the pillars. Acolytes hunt your last known spot, so break their sight and come round the other side.',
     tags: ['cover', 'bounce', 'homing'],
   },
   {
@@ -64,14 +64,14 @@ export const SCENES: readonly Scene[] = [
   {
     name: 'crossfire',
     title: 'Crossfire',
-    hook: 'Cops and gang meet in a crowded plaza. Nobody is after you yet.',
-    tryThis: 'Watch them fight, or pick a side. Shoot a bystander and the police turn on you too.',
+    hook: 'Wardens and feral meet in a crowded plaza. Nobody is after you yet.',
+    tryThis: 'Watch them fight, or pick a side. Shoot a bystander and the wardens turn on you too.',
     tags: ['factions', 'neutral', 'shotgun'],
   },
   {
     name: 'barracks-blaze',
     title: 'Barracks Blaze',
-    hook: 'A gang asleep in rows of bunks, fuel barrels at the back.',
+    hook: 'A feral asleep in rows of bunks, fuel barrels at the back.',
     tryThis: 'Put one incendiary round into a bunk row, then back off. Fire walks bunk to bunk and the burning run.',
     tags: ['fire', 'sleepers', 'barrels'],
   },

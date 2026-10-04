@@ -113,7 +113,7 @@ const render = (seed: number, floor: number): { file: string; buf: Buffer; W: nu
     if (e.kind === 'interactable') dot(e.pos.x, e.pos.y, 2, 0x2a2a2a)
     else if (e.kind === 'door') dot(e.pos.x, e.pos.y, 2, 0xc9a227)
     else if (e.kind === 'npc') {
-      const c = e.ai?.dormant ? 0xb06ae0 : e.ai?.behavior === 'patrol' ? 0x4f8fff : e.ai?.faction === 'gang' ? 0xe04848 : 0xf0e080
+      const c = e.ai?.dormant ? 0xb06ae0 : e.ai?.behavior === 'patrol' ? 0x4f8fff : e.ai?.faction === 'feral' ? 0xe04848 : 0xf0e080
       dot(e.pos.x, e.pos.y, 3, 0x000000)
       dot(e.pos.x, e.pos.y, 2, c)
     }

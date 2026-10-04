@@ -524,7 +524,7 @@ const nearestLivePlayer = (w: World): Entity | undefined =>
   w.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)
 
 /**
- * Gateway-breach escalation, stage one of the heist finale. The moment the
+ * Gateway-breach escalation, stage one of the salvage finale. The moment the
  * objective's gateway door is UNLOCKED by any means — picked, keycarded,
  * power-cut, or breached (all of which drop `door.locked` and/or set
  * `door.open`) — the station unseals: the alarm maxes and EVERY other door on
@@ -682,7 +682,7 @@ const maybeBloom = (w: World, node: Entity): void => {
 }
 
 /**
- * Taking the prize is stage two of the heist finale: the mission completes,
+ * Taking the prize is stage two of the salvage finale: the mission completes,
  * the exit unlocks — and the whole STATION goes to alert for the escape run
  * (`raiseStationAlert`: every door thrown open, alarm maxed, every non-allied
  * NPC hostile and hunting). `focus` is who they hunt: the briefcase holder, or
@@ -731,7 +731,7 @@ export const nextFloor = (w: World): void => {
     if (p.playerCtl) {
       p.playerCtl.downed = undefined
       p.playerCtl.channel = undefined
-      p.playerCtl.crimeUntilTick = 0
+      p.playerCtl.misdeedUntilTick = 0
       // Key items don't carry across floors
       if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'briefcase')
     }

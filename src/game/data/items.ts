@@ -70,7 +70,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     rechargeOnWrap: 75,
   },
   // The Mireclaw Alpha's natural armament. A baseball bat on an apex swamp
-  // predator was the placeholder that made the boss read as a fat gangster;
+  // predator was the placeholder that made the boss read as a fat acolyte;
   // claws are innate, so they carry no durability and draw NO held sprite
   // (render/weaponArt treats them like fists). Roughly bat DPS, but landed in
   // fewer, heavier, longer-reach blows — a hit you feel and roll away from

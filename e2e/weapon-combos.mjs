@@ -2,7 +2,7 @@
 // row of stationary dummy targets so the on-hit effect is plainly visible.
 //
 // Same proven recipe as feature-weapon-mods.mjs: inject the committed
-// `combat-stage` snapshot (seed 7, three speed-0 thugs at x=12/15/18 on the lane
+// `combat-stage` snapshot (seed 7, three speed-0 mutants at x=12/15/18 on the lane
 // y=11), re-arm the player to a specific base weapon + mod loadout, PRE-POSITION
 // the player just west of the row, then replay the tight `comboFire` timeline
 // (no walk-in) and mux a real mp4. Each clip carries an on-screen title banner
@@ -20,7 +20,7 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 
 const LANE_Y = 11
 // Stand the player on the lane, just west of the dummy row, facing east (0 rad).
-// Distances to the three thugs (x=12/15/18) are ~2.5/5.5/8.5 tiles — inside
+// Distances to the three mutants (x=12/15/18) are ~2.5/5.5/8.5 tiles — inside
 // pistol range (10) and machinegun range (9); the shotgun (range 6) reaches the
 // first two. facing=0 makes every bullet travel east straight down the row.
 const PLAYER_X = 9.5
@@ -50,16 +50,16 @@ const stills = [
 const readState = () => {
   const w = window.__world
   const pl = w.entities.find((e) => e.playerCtl)
-  // Dead NPCs are CULLED from the entities array, so a fallen thug simply
-  // disappears: kills = 3 (initial) − thugsAlive. Non-lethal effects leave a
-  // live thug at hp < 24 (thugsWoundedAlive).
-  const thugsAlive = w.entities.filter((e) => e.archetype === 'thug' && !e.dead)
+  // Dead NPCs are CULLED from the entities array, so a fallen mutant simply
+  // disappears: kills = 3 (initial) − mutantsAlive. Non-lethal effects leave a
+  // live mutant at hp < 24 (mutantsWoundedAlive).
+  const mutantsAlive = w.entities.filter((e) => e.archetype === 'mutant' && !e.dead)
   return {
     tick: w.tick,
     gameOver: w.gameOver,
-    thugsAlive: thugsAlive.length,
-    thugsKilled: 3 - thugsAlive.length,
-    thugsWoundedAlive: thugsAlive.filter((e) => (e.health?.hp ?? 24) < 24).length,
+    mutantsAlive: mutantsAlive.length,
+    mutantsKilled: 3 - mutantsAlive.length,
+    mutantsWoundedAlive: mutantsAlive.filter((e) => (e.health?.hp ?? 24) < 24).length,
     projectiles: w.entities.filter((e) => e.kind === 'projectile').length,
     playerHp: pl?.health?.hp ?? null,
     playerDowned: !!pl?.playerCtl?.downed,
@@ -120,7 +120,7 @@ for (const c of selected) {
     expect: (s) => [
       s.gameOver && 'unexpected game over',
       s.playerDowned && 'player went down (dummies should not reach us)',
-      s.thugsKilled === 0 && s.thugsWoundedAlive === 0 && 'no dummy was hit — nothing to show',
+      s.mutantsKilled === 0 && s.mutantsWoundedAlive === 0 && 'no dummy was hit — nothing to show',
     ].filter(Boolean),
   })
   ok = ok && pass

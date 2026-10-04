@@ -39,7 +39,7 @@ import {
 import { decide } from './behaviors'
 import { fireWeapon } from './combat'
 import { perceives, type Goal } from './goals'
-import { CRIME_HATE, addHate } from './relationships'
+import { MISDEED_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
 import { vlen } from '../simMath'
 
@@ -301,7 +301,7 @@ const performAlert = (w: World, alerter: Entity, guard: Entity): void => {
   ai.alerted = threatId
   ai.mode = 'flee'
   ai.targetId = threatId
-  addHate(guard, threatId, CRIME_HATE)
+  addHate(guard, threatId, MISDEED_HATE)
   guard.ai.mode = 'aggro'
   guard.ai.targetId = threatId
   guard.ai.lastKnownTargetPos = { x: threatE.pos.x, y: threatE.pos.y }

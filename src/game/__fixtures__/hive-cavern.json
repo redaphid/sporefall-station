@@ -140,7 +140,7 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 0
+        "misdeedUntilTick": 0
       }
     },
     {
@@ -374,7 +374,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 26.5,
           "y": 18.5
@@ -429,7 +429,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 28.806782075316935,
           "y": 20.929748939058324
@@ -484,7 +484,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 24.993959207434933,
           "y": 21.001860743897694
@@ -539,7 +539,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 24.0576465376942,
           "y": 23.959596308218213
@@ -594,7 +594,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 21.609916264174743,
           "y": 21.619769318981835
@@ -649,7 +649,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 18.135571386988865,
           "y": 22.87825630182097
@@ -704,7 +704,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 18.896124528390324,
           "y": 19.888427965176188
@@ -759,7 +759,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 15.5,
           "y": 18.5
@@ -814,7 +814,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 18.896124528390324,
           "y": 17.111572034823816
@@ -869,7 +869,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 18.135571386988865,
           "y": 14.121743698179033
@@ -924,7 +924,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 21.609916264174743,
           "y": 15.380230681018164
@@ -979,7 +979,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 24.0576465376942,
           "y": 13.040403691781787
@@ -1034,7 +1034,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 24.993959207434933,
           "y": 15.998139256102304
@@ -1089,7 +1089,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 28.80678207531693,
           "y": 16.070251060941672

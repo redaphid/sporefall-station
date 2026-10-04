@@ -118,13 +118,13 @@
         "playerId": 0,
         "abilityCooldown": 0,
         "cash": 0,
-        "crimeUntilTick": 0
+        "misdeedUntilTick": 0
       }
     },
     {
       "id": 2,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 16.5,
         "y": 4.5
@@ -170,7 +170,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 16.5,
           "y": 4.5
@@ -183,7 +183,7 @@
     {
       "id": 3,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 23.5,
         "y": 19.5
@@ -229,7 +229,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 23.5,
           "y": 19.5
@@ -242,7 +242,7 @@
     {
       "id": 4,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 30.5,
         "y": 4.5
@@ -288,7 +288,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 30.5,
           "y": 4.5
@@ -301,7 +301,7 @@
     {
       "id": 5,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 37.5,
         "y": 19.5
@@ -347,7 +347,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 37.5,
           "y": 19.5
@@ -486,7 +486,7 @@
     {
       "id": 8,
       "kind": "npc",
-      "archetype": "thug",
+      "archetype": "mutant",
       "pos": {
         "x": 29.5,
         "y": 11.5
@@ -532,7 +532,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 29.5,
           "y": 11.5
@@ -585,7 +585,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 42.5,
           "y": 6.5
@@ -598,7 +598,7 @@
     {
       "id": 10,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 42.5,
         "y": 18.5
@@ -644,7 +644,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 42.5,
           "y": 18.5
@@ -657,7 +657,7 @@
     {
       "id": 11,
       "kind": "npc",
-      "archetype": "gangster",
+      "archetype": "acolyte",
       "pos": {
         "x": 17.5,
         "y": 12.5
@@ -703,7 +703,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 17.5,
           "y": 12.5
@@ -767,7 +767,7 @@
       },
       "ai": {
         "mode": "idle",
-        "faction": "gang",
+        "faction": "feral",
         "home": {
           "x": 41.5,
           "y": 11.5

@@ -16,8 +16,8 @@
     }
   },
   "names": {
-    "cop": "Test Warden",
-    "thug": "Glitch Goblin",
+    "warden": "Test Warden",
+    "mutant": "Glitch Goblin",
     "civilian": "Pixel Person"
   },
   "sprites": {

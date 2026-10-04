@@ -573,12 +573,12 @@ describe('complex floors populate like a station', () => {
     expect(props).toBeGreaterThan(1000) // the modules really are furnished
   })
 
-  it('bunk-room sleepers are dormant thugs zoned to crew quarters, and they do appear', () => {
+  it('bunk-room sleepers are dormant mutants zoned to crew quarters, and they do appear', () => {
     let sleepers = 0
     for (let seed = 1; seed <= 30; seed++) {
       const w = world(seed, 5)
       for (const e of w.entities) {
-        if (e.kind !== 'npc' || !e.ai?.dormant || e.archetype !== 'thug') continue
+        if (e.kind !== 'npc' || !e.ai?.dormant || e.archetype !== 'mutant') continue
         sleepers++
         const zone = e.ai.zone!
         expect(zone.role).toBe('quarters')
@@ -595,7 +595,7 @@ describe('complex floors populate like a station', () => {
     for (let seed = 1; seed <= 30; seed++) {
       const w = world(seed, 3)
       for (const e of w.entities) {
-        if (e.archetype !== 'cop' || e.ai?.behavior !== 'patrol') continue
+        if (e.archetype !== 'warden' || e.ai?.behavior !== 'patrol') continue
         patrols++
         for (const p of e.ai.params!.waypoints!) {
           expect(isWallTile(tile(w.level, Math.floor(p.x), Math.floor(p.y)))).toBe(false)

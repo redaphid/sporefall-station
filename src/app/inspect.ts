@@ -108,7 +108,7 @@ const HELP: readonly { sig: string; doc: string }[] = [
   { sig: 'world', doc: 'live World object (host/solo authoritative; join: predicted view). Look, don’t touch — use .verb() to mutate.' },
   { sig: 'help()', doc: 'this usage doc' },
   { sig: 'tick()', doc: 'current sim tick' },
-  { sig: 'session()', doc: '{mode, paused, floor, tick, gameOver, seed?, difficulty?, alarm?, peers?}' },
+  { sig: 'session()', doc: '{mode, paused, floor, tick, gameOver, seed?, difficulty?, alarm?, peers?, link?, pairs?, predictionCorrections?}. Online: link = {health, rttMs, path: p2p|relay}; pairs = ICE candidate types per direct link' },
   { sig: 'version()', doc: 'running build number' },
   { sig: "entities(filter?)", doc: "JSON clones of matching entities. filter: a kind/archetype/component name ('npc', 'guard', 'door') or a predicate ('e => e.health?.hp < 3')" },
   { sig: 'entity(id)', doc: 'one entity as a JSON clone (undefined if absent), e.g. sporefall.entity(12)' },

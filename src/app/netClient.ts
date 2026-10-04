@@ -15,7 +15,10 @@ import { StreamReader } from '../net/framing/chunkedStream'
 import {
   applyWireEntity,
   decodeSnapshot,
-  encodeInput,
+  edgeBits,
+  encodeInputBundle,
+  INPUT_REDUNDANCY,
+  type InputRecord,
   type EventsMsg,
   type GameStartMsg,
   type GoMsg,
@@ -27,7 +30,7 @@ import {
   type WelcomeMsg,
   type WireSnapshot,
 } from '../net/protocol/messages'
-import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type DropReason, type Transport } from '../net/types'
+import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type DropReason, type LinkPath, type Transport } from '../net/types'
 import { LINK_COPY, linkHealth, PING_INTERVAL_MS, type LinkStatus } from './linkHealth'
 import type { RenderView, Session } from './session'
 
@@ -174,6 +177,14 @@ const HELLO_RETRY_MS = 2000
 /** 1 initial Hello + 8 retries ≈ 15s before we admit defeat out loud. */
 const HELLO_MAX_ATTEMPTS = 9
 
+/** One second of snapshots from another run, while playing, before the client
+ * asks for its admission again. A real "play again" needs only the few that
+ * overtake its GameStart. */
+const EPOCH_MISSES_BEFORE_HELLO = 10
+
+/** Taps kept for a resend after a path change: about 2 s of tapping. */
+const MAX_UNACKED_TAPS = 32
+
 /**
  * Client: predicts its own avatar with the shared movement code,
  * smooths everyone else toward snapshot targets, renders host state.
@@ -236,6 +247,12 @@ export class NetClientSession implements Session {
    * rebuilds its world at tick 0).
    */
   private lastSnapTick = -1
+  /** The host run epoch of our newest GameStart; snapshots must carry it. */
+  private snapEpoch = -1
+  /** Snapshots in a row from a run other than ours. */
+  private epochMisses = 0
+  /** Snapshots that moved our predicted avatar by a visible amount: rubber-banding. */
+  predictionCorrections = 0
   /** The exact Hello bytes for this link, kept so a retry re-asks identically. */
   private helloBytes: Uint8Array | null = null
   private helloAttempts = 0
@@ -249,6 +266,13 @@ export class NetClientSession implements Session {
    */
   private sawSnapshot = false
   private inputSeq = 0
+  /** The newest records sent, oldest first: each Input message repeats them. */
+  private sentRecords: InputRecord[] = []
+  /** Records with a pure tap, kept until the host acks past them, so a tap in
+   * flight on a link that dies can be sent again on the new path. */
+  private sentTaps: InputRecord[] = []
+  /** Records per Input message. Tests set 1 to measure without the repeats. */
+  inputRedundancy = INPUT_REDUNDANCY
   /** Unacked inputs, each with the predicted stair lock AFTER it ran — so a
    * reconcile can resume the lock exactly where the acked input left it. */
   private pendingInputs: { seq: number; cmd: InputCmd; lock: boolean }[] = []
@@ -300,11 +324,21 @@ export class NetClientSession implements Session {
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onConnected()
       else if (ev.type === 'peerDisconnected') this.onDisconnected(ev.reason)
+      else if (ev.type === 'pathChanged') this.onPathChanged(ev.path)
       else if (ev.type === 'data') {
         this.lastHeardAt = this.now()
-        this.reader.push(ev.bytes, (m) => this.onMessage(m))
+        if (ev.datagram) this.onMessage(ev.bytes)
+        else this.reader.push(ev.bytes, (m) => this.onMessage(m))
       }
     })
+  }
+
+  /** Our direct link to the host died, and taps in flight on it are gone. The
+   * host folds each record once, so sending the unacked ones again is safe. */
+  private onPathChanged(path: LinkPath): void {
+    if (path !== 'relay' || !this.queue) return
+    this.sentTaps = this.sentTaps.filter((r) => r.cmd.seq > this.lastAckedSeq)
+    if (this.sentTaps.length > 0) this.queue.queueReliable(encodeInputBundle(this.sentTaps))
   }
 
   private onDisconnected(reason: DropReason = 'error'): void {
@@ -369,7 +403,7 @@ export class NetClientSession implements Session {
     if (this.queue && t - this.lastPingAt >= PING_INTERVAL_MS) {
       this.lastPingAt = t
       const ping: PingMsg = this.rttMs === null ? { t } : { t, rtt: Math.round(this.rttMs) }
-      this.queue.queueReliable(encodeJson(MsgType.Ping, ping))
+      this.queue.queueProbe(encodeJson(MsgType.Ping, ping))
     }
     if (linkHealth(silent) === 'stalled' && this.rejoinToken && this.transport.reconnect) {
       this.setPhase('reconnecting')
@@ -382,6 +416,7 @@ export class NetClientSession implements Session {
     return {
       health: this.phase === 'playing' ? linkHealth(this.now() - this.lastHeardAt) : 'good',
       rttMs: this.rttMs,
+      path: this.transport.pathOf?.('host'),
       session: this.phase === 'reconnecting' ? 'reconnecting' : this.phase === 'ended' ? 'ended' : 'live',
     }
   }
@@ -476,6 +511,10 @@ export class NetClientSession implements Session {
 
   private onConnected(): void {
     this.queue = new SendQueue(this.transport, 'host', () => this.onDisconnected())
+    // The host keeps a fresh input state per link, so records repeated from the
+    // old link would fire their taps a second time.
+    this.sentRecords = []
+    this.sentTaps = []
     const rejoining = this.phase === 'reconnecting' && this.rejoinToken && this.slot >= 0
     // A fresh link is a fresh handshake: new bytes, attempts back to zero, and
     // no stale "we already saw the run running" from the previous connection.
@@ -540,7 +579,8 @@ export class NetClientSession implements Session {
         break
       case MsgType.GameStart: {
         const start = decodeJson<GameStartMsg>(msg)
-        const sameRun = start.seed === this.seed
+        const sameRun = start.seed === this.seed && (start.epoch & 0xff) === this.snapEpoch
+        this.snapEpoch = start.epoch & 0xff
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
         // A GameStart while we are reconnecting normally replays the run we were
@@ -552,6 +592,13 @@ export class NetClientSession implements Session {
         // are not there and never reach an exit, with no error anywhere to
         // explain it. Fall through and rebuild from the new seed.
         if (this.phase === 'reconnecting' && sameRun) break
+        // The host says the admission again after our link changed path (or a
+        // retried Hello). Mid-run, the same run is nothing new: rebuilding would
+        // wipe the floor we are standing on.
+        if (this.phase === 'playing' && sameRun) {
+          this.changeFloor(start.floor ?? 1)
+          break
+        }
         this.runEpoch++
         // A lobby start is always floor 1, but a LATE join drops us into a run
         // already in progress. Build the floor the host is actually on, or we
@@ -596,7 +643,9 @@ export class NetClientSession implements Session {
       }
       case MsgType.Go: {
         const go = decodeJson<GoMsg>(msg)
-        this.selfId = go.entityIds[this.slot] ?? -1
+        const selfId = go.entityIds[this.slot] ?? -1
+        if (this.phase === 'playing' && selfId === this.selfId) break
+        this.selfId = selfId
         // Go is the last message of every admission — fresh start, late join AND
         // ghost rejoin — and each one may hand us a host whose tick counter bears
         // no relation to the previous one's. Deliberately belt-and-braces with the
@@ -684,6 +733,19 @@ export class NetClientSession implements Session {
     // (measured at 5.56 tiles). `lastInputSeq` is stale too, so it would re-arm
     // inputs the host has long since consumed. Drop anything not strictly newer —
     // duplicates included — and let the next real snapshot self-heal as before.
+    // A snapshot from another run than our GameStart's is stale, whatever its
+    // tick says: "play again" restarts the host's ticks at 0, so a late one from
+    // the old run would look newer than the first of the new run.
+    if (snap.epoch !== this.snapEpoch) {
+      // A run of them means our GameStart for the host's current run was lost
+      // (it was in flight on a link that died). Ask for the admission again.
+      if (this.phase === 'playing' && ++this.epochMisses >= EPOCH_MISSES_BEFORE_HELLO && this.helloBytes) {
+        this.epochMisses = 0
+        this.queue.queueReliable(this.helloBytes)
+      }
+      return
+    }
+    this.epochMisses = 0
     if (this.lastSnapTick >= 0 && !isNewerTick(snap.tick, this.lastSnapTick)) return
     this.lastSnapTick = snap.tick
     this.tickAtSnap = this.tickCount
@@ -754,6 +816,8 @@ export class NetClientSession implements Session {
     if (Math.hypot(self.pos.x - px, self.pos.y - py) < 0.5) {
       self.pos.x = px
       self.pos.y = py
+    } else {
+      this.predictionCorrections++
     }
   }
 
@@ -809,30 +873,33 @@ export class NetClientSession implements Session {
     if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
     if (cmd.draftPick !== undefined) this.pendingDraftPick = cmd.draftPick
 
-    // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
-    // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
-    // hotbar are PURE edges with no held-state fallback: if their packet were
-    // dropped by a newer one overwriting the slot during a BLE stall, the tap would
-    // be silently lost (the #57 class of bug). Ship those on the reliable lane so
-    // they can never be overwritten; the host still gates them by seq so a delayed
-    // reliable input can't re-fire. attack/interact/special keep the snapshot lane —
-    // their held bit re-conveys intent on the next packet, and sustained fire would
-    // otherwise flood the reliable FIFO every tick.
+    // Each Input message carries this record and the inputRedundancy-1 before
+    // it, on the newest-wins lane (unreliable
+    // where the link has one): a lost packet's records ride in the next one, and
+    // the host folds each record once by seq. Pure taps (roll, throw, hotbar, mod
+    // swap, draft pick) have no held state to re-convey them if more packets than
+    // that go missing, so their record also goes on the reliable lane.
     if (this.tickCount % 2 === 0 && this.queue) {
       const out: InputCmd = { ...cmd, hotbar: this.pendingHotbar }
       delete out.modSwap
       if (this.pendingModSwap !== undefined) out.modSwap = this.pendingModSwap
       delete out.draftPick
       if (this.pendingDraftPick !== undefined) out.draftPick = this.pendingDraftPick
-      const packet = encodeInput(out, this.pendingEdges)
+      const record: InputRecord = { cmd: out, edges: edgeBits(this.pendingEdges) }
+      this.sentRecords.push(record)
+      if (this.sentRecords.length > this.inputRedundancy) this.sentRecords.shift()
       const hasPureEdge =
         this.pendingEdges.roll ||
         this.pendingEdges.throwItem ||
         this.pendingHotbar >= 0 ||
         this.pendingModSwap !== undefined ||
         this.pendingDraftPick !== undefined
-      if (hasPureEdge) this.queue.queueReliable(packet)
-      else this.queue.queueSnapshot(packet)
+      if (hasPureEdge) {
+        this.queue.queueReliable(encodeInputBundle([record]))
+        this.sentTaps.push(record)
+        if (this.sentTaps.length > MAX_UNACKED_TAPS) this.sentTaps.shift()
+      }
+      this.queue.queueSnapshot(encodeInputBundle(this.sentRecords))
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
       this.pendingModSwap = undefined

@@ -232,7 +232,7 @@ const hostSnapshotFor = (host: NetHostSession, avatarId: number): Uint8Array => 
     entities.push(toWireEntity(e, w.tick))
     if (entities.length >= 48) break
   }
-  return encodeSnapshot({ tick: w.tick, floor: w.floor, alarm: w.alarm, lastInputSeq: 0, entities })
+  return encodeSnapshot({ tick: w.tick, floor: w.floor, alarm: w.alarm, epoch: 0, lastInputSeq: 0, entities })
 }
 
 /** Unlock the exit and stand a player on it, so the NEXT host tick descends via
@@ -596,7 +596,7 @@ describe('divergence hunt — seed mismatch', () => {
     // (GameStart + Go) — but carrying the NEW seed.
     const avatarId = host.self.id
     bob.injectMessage(
-      encodeJson(MsgType.GameStart, { seed: host.seed, players: host.lobbyPlayers(), mode: host.world.mode }),
+      encodeJson(MsgType.GameStart, { epoch: 0, seed: host.seed, players: host.lobbyPlayers(), mode: host.world.mode }),
     )
     bob.injectMessage(encodeJson(MsgType.Go, { startTick: host.world.tick, entityIds: { 1: avatarId } }))
     await flush()

@@ -252,6 +252,9 @@ export interface WireEntity {
 
 export interface WireSnapshot {
   tick: number
+  /** The host's run counter (u8, wraps). A snapshot from an earlier run than the
+   * client's GameStart is stale, whatever its tick says. */
+  epoch: number
   floor: number
   alarm: number
   lastInputSeq: number
@@ -278,7 +281,7 @@ export const kindOf = (archetype: string): Entity['kind'] => {
 export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
   const entities = s.entities.length > MAX_WIRE_ENTITIES ? s.entities.slice(0, MAX_WIRE_ENTITIES) : s.entities
   const w = new ByteWriter(16 + entities.length * 12)
-  w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(entities.length)
+  w.u8(MsgType.Snapshot).u32(s.tick).u8(s.epoch & 0xff).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(entities.length)
   for (const e of entities) {
     w.u16(e.id)
     w.u8(archetypeIndex.get(normalizeArchetype(e.archetype)) ?? 0)
@@ -333,6 +336,7 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
   const r = new ByteReader(bytes)
   r.u8() // msgType
   const tick = r.u32()
+  const epoch = r.u8()
   const lastInputSeq = r.u16()
   const floor = r.u8()
   const alarm = r.u8()
@@ -380,46 +384,56 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
       if (target && kind) target.activity = { kind, playing: (code & ACTIVITY_PLAYING) !== 0 }
     }
   }
-  return { tick, floor, alarm, lastInputSeq, entities }
+  return { tick, epoch, floor, alarm, lastInputSeq, entities }
 }
 
-export const encodeInput = (
-  cmd: InputCmd,
-  edges: { attack: boolean; interact: boolean; special: boolean; roll?: boolean; throwItem?: boolean },
-): Uint8Array => {
-  const w = new ByteWriter(10)
-  // Bit 8 carries whether aim is active: the angle byte can't encode a centred
-  // stick (atan2(0,0)=0 looks like "aim right"), so this bit lets the far side
-  // restore a (0,0) aim and hold the last facing instead of snapping.
+/** Button edges as the wire's edge byte: attack 1, interact 2, special 4, and
+ * the pure taps roll 8 and Use/Throw 16. */
+export interface InputEdges {
+  attack: boolean
+  interact: boolean
+  special: boolean
+  roll?: boolean
+  throwItem?: boolean
+}
+
+export const edgeBits = (e: InputEdges): number =>
+  (e.attack ? 1 : 0) | (e.interact ? 2 : 0) | (e.special ? 4 : 0) | (e.roll ? 8 : 0) | (e.throwItem ? 16 : 0)
+
+/** One sampled command and the edges that rode with it. `cmd.seq` names it. */
+export interface InputRecord {
+  cmd: InputCmd
+  edges: number
+}
+
+/** Records one Input message carries: the newest plus the three before it, so a
+ * lost datagram costs nothing unless four in a row go. */
+export const INPUT_REDUNDANCY = 4
+
+/** ext byte: which optional trailers follow a record. */
+const EXT_MOD_SWAP = 1
+const EXT_DRAFT_PICK = 2
+
+const writeRecord = (w: ByteWriter, { cmd, edges }: InputRecord): void => {
+  // `held & 8` says whether aim is active: the angle byte can't encode a
+  // centred stick (atan2(0,0)=0 looks like "aim right").
   const aimActive = Math.hypot(cmd.aimX, cmd.aimY) > 0.01
   const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0) | (aimActive ? 8 : 0)
-  // Roll (bit 8) and Use/Throw (bit 16) are pure edges (taps), decoded by the host.
-  const edge =
-    (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0) | (edges.roll ? 8 : 0) | (edges.throwItem ? 16 : 0)
-  w.u8(MsgType.Input)
-    .u16(cmd.seq & 0xffff)
+  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap <= 0xffff
+  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick <= 0xff
+  w.u16(cmd.seq & 0xffff)
     .u8(Math.round((cmd.moveX + 1) * 127))
     .u8(Math.round((cmd.moveY + 1) * 127))
     .u8(held)
-    .u8(edge)
+    .u8(edges & 0xff)
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
-    // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
-  // OPTIONAL trailing u16: a mod reorder request, +1 biased (0 is
-  // never written; absent = none). Written ONLY when a swap is pending, so every
-  // ordinary input packet is byte-identical to before. An older host reads the
-  // hotbar byte and never looks further, so the extra bytes are ignored.
-  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff ? cmd.modSwap + 1 : 0
-  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick < 0xff ? cmd.draftPick + 1 : 0
-  if (swap > 0 || pick > 0) w.u16(swap)
-  // OPTIONAL trailing u8 after the swap slot: a floor-draft card, +1 biased.
-  if (pick > 0) w.u8(pick)
-  return w.finish()
+    .u8((swap ? EXT_MOD_SWAP : 0) | (pick ? EXT_DRAFT_PICK : 0))
+  if (swap) w.u16(cmd.modSwap!)
+  if (pick) w.u8(cmd.draftPick!)
 }
 
-export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number } => {
-  const r = new ByteReader(bytes)
-  r.u8()
+const readRecord = (r: ByteReader): InputRecord => {
   const cmd = emptyInput()
   cmd.seq = r.u16()
   cmd.moveX = r.u8() / 127 - 1
@@ -427,22 +441,52 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const held = r.u8()
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
-  const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
-  const swapSlot = r.remaining >= 2
-  const modSwap = swapSlot ? r.u16() : 0 // back-compat: absent → no reorder
-  // The draft byte only ever follows a swap slot, so one stray byte is never a pick.
-  const draftPick = swapSlot && r.remaining >= 1 ? r.u8() : 0
+  const hotbar = r.u8()
+  const ext = r.u8()
+  if (ext & EXT_MOD_SWAP) cmd.modSwap = r.u16()
+  if (ext & EXT_DRAFT_PICK) cmd.draftPick = r.u8()
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
-  if (modSwap > 0) cmd.modSwap = modSwap - 1
-  if (draftPick > 0) cmd.draftPick = draftPick - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
   return { cmd, edges }
+}
+
+/**
+ * Input: [type][count u8] then `count` records, oldest first. A record is
+ * seq u16, moveX, moveY, held, edges, aim, hotbar, ext (all u8), then a u16 mod
+ * swap if ext&1 and a u8 draft pick if ext&2. The host folds each record once by
+ * its seq (`foldInputRecord`, app/inputGate.ts), so a repeated record is free and a lost packet's
+ * records arrive in the next one.
+ */
+export const encodeInputBundle = (records: readonly InputRecord[]): Uint8Array => {
+  if (records.length === 0 || records.length > 0xff) throw new RangeError(`input bundle of ${records.length} records`)
+  const w = new ByteWriter(2 + records.length * 12)
+  w.u8(MsgType.Input).u8(records.length)
+  for (const rec of records) writeRecord(w, rec)
+  return w.finish()
+}
+
+export const decodeInputBundle = (bytes: Uint8Array): InputRecord[] => {
+  const r = new ByteReader(bytes)
+  r.u8()
+  const n = r.u8()
+  const out: InputRecord[] = []
+  for (let i = 0; i < n; i++) out.push(readRecord(r))
+  return out
+}
+
+export const encodeInput = (cmd: InputCmd, edges: InputEdges): Uint8Array => encodeInputBundle([{ cmd, edges: edgeBits(edges) }])
+
+/** The newest record of an Input message. */
+export const decodeInput = (bytes: Uint8Array): InputRecord => {
+  const all = decodeInputBundle(bytes)
+  if (all.length === 0) throw new RangeError('empty input bundle')
+  return all[all.length - 1]
 }
 
 /** Build the wire entity for one sim entity (host side). */
@@ -567,6 +611,8 @@ export interface LobbyStateMsg {
 }
 export interface GameStartMsg {
   seed: number
+  /** The host's run counter, as stamped on every snapshot of this run. */
+  epoch: number
   players: LobbyPlayer[]
   /** Difficulty rules the host is running; clients adopt it so co-op agrees.
    * Optional on the wire for back-compat — absent means the default (`normal`). */

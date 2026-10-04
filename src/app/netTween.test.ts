@@ -149,7 +149,7 @@ const rig = async (seed = 4242): Promise<Rig> => {
           tick,
           floor: 1,
           alarm: 0,
-          lastInputSeq: 0,
+          epoch: 0, lastInputSeq: 0,
           entities: [wire(selfId, selfPos.x, selfPos.y), ...others],
         }),
       )

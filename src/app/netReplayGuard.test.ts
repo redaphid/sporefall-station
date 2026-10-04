@@ -173,7 +173,7 @@ const descend = async (host: NetHostSession, bob: ClientHandle): Promise<number>
 
 /** A snapshot the host never sent: one player entity, at `tick`, on `floor`. */
 const fakeSnapshot = (tick: number, floor: number, self: WireEntity): Uint8Array =>
-  encodeSnapshot({ tick, floor, alarm: 0, lastInputSeq: 0, entities: [self] })
+  encodeSnapshot({ tick, floor, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [self] })
 
 const wireSelf = (id: number, x: number, y: number): WireEntity => ({
   id,

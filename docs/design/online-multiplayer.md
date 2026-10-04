@@ -91,6 +91,10 @@ product work around it, not new infrastructure.
   failures land on the hardest networks to debug. Revisit only if relay latency
   measures badly between real distant players.
 
+  Superseded for the owner's case: everyone plays in one place, mostly on one
+  wifi network, and the relay sits on the mainland. See "Peer to peer over
+  WebRTC" below.
+
 ## What shipped with this doc
 
 - **Play online** on the start menu opens `src/ui/onlineMenu.ts`, where the
@@ -156,6 +160,133 @@ The behaviour below is measured by `e2e/ws-online-reliability.mjs`, which puts
   run-up cannot replay (the host edits its world between ticks, as when a
   dropped guest's body expires), the share goes up as a still and the console
   says why. Guests do not share; they do not own the world.
+
+## Peer to peer over WebRTC
+
+The owner plays with his nephews in Hawaii, everyone in one house or hotel,
+mostly on one wifi network and some on cellular. The relay cannot be near
+them. Honolulu (HNL) cannot host a Durable Object, and a room created from
+there is placed in San Jose ([where.durableobjects.live](https://where.durableobjects.live/colo/HNL)).
+Every relayed packet then crosses the Pacific twice: about 100 to 110 ms
+added round trip for players who sit in the same room (inferred from the
+~50 ms HNL to San Jose ping on [WonderNetwork](https://wondernetwork.com/pings/Honolulu/San%20Jose)).
+A `locationHint` cannot help. No hint covers Hawaii, and `wnam` can place the
+room in Dallas, which is further. Room codes are fresh per game, so a room is
+never pinned to where it was first used.
+
+So online play is now peer to peer where it can be, with the relay as the
+fallback (`src/net/transport/rtcTransport.ts`, #155).
+
+- **Topology.** Host star, up to 8 players. Each guest opens one
+  RTCPeerConnection to the host. The relay still announces who is in the room
+  and carries the offer, answer and ICE candidates, behind a one-byte lane tag
+  on its binary frames.
+- **Two data channels.** `ctl` is reliable and ordered: the framed stream for
+  Hello/Welcome/Reject, LobbyState, GameStart/Go, Bye, Events, Inventory,
+  State and edge inputs. `fast` is unordered with `maxRetransmits: 0`: one
+  whole message per datagram for snapshots, input bundles and Ping/Pong. A
+  message over `MAX_DATAGRAM` (1100 B) goes on `ctl` rather than splitting.
+- **Redundant input.** Every Input message carries the newest four records
+  (`INPUT_REDUNDANCY`). The host folds each record once by its seq
+  (`src/app/inputGate.ts`), so a lost datagram costs nothing unless four in a
+  row go. Taps with no held state (roll, throw, hotbar, mod swap, draft pick)
+  also go on `ctl`.
+- **The LAN first.** ICE ranks host candidates first, so two devices on one
+  wifi network connect directly, with no STUN mapping and no internet
+  hairpin. STUN is `stun.cloudflare.com:3478`, for players on different
+  networks. There is no TURN.
+- **Fallback.** A link that has not opened within 3 s puts that peer on the
+  relay. This covers symmetric NAT, hotel wifi with client isolation (host
+  candidates fail and the router does not hairpin), and a browser without
+  WebRTC. A link that closes, fails ICE, or goes 2 s without a byte moves that
+  peer to the relay mid-run. Heartbeats keep an idle link's clock fed. The
+  session does not drop: the peer keeps its slot and avatar, and both sides
+  stop using the link. `?p2p=0` keeps every peer on the relay.
+- **Back to P2P.** A peer on the relay does not stay there. The host retries a
+  direct link after 5 s, 15 s, then every 60 s, and the peer moves back the
+  moment one opens, so a wifi blip or a locked phone costs seconds of relay
+  play, not the rest of the run. A link that held for a minute starts the
+  next round of retries from 5 s again.
+- **Nothing reordered, little lost.** Moving down to the relay loses what was
+  in flight on the dying link. The host says the admission again (Welcome,
+  GameStart, Go, inventory), so a "play again" lost in the switch still lands;
+  the guest resends taps the host has not acknowledged; the host folds each
+  record once, so the repeats are harmless. As a backstop, a guest that sees
+  a second of snapshots from another run asks for its admission again. Moving
+  back up, the direct link is faster than the relay, so each side sends a
+  `p2p` marker behind its last relay frame, and the other side holds its
+  `ctl` messages until the marker lands.
+- **What the player sees.** The link chip reads "P2P 42 ms" or "Relay 88 ms".
+  `sporefall.session()` reports `link.path`, the ICE candidate types per link
+  (`pairs`), and the guest's `predictionCorrections`.
+- **Bluetooth still needs no internet.** An all-Android group can play over
+  Bluetooth with no network at all, which is the zero-lag option. iPhones
+  cannot do Web Bluetooth, so a mixed group plays online.
+
+### Prerequisites fixed first
+
+- The host's single input gate dropped a reliable roll that arrived after a
+  later unreliable input. Held state and edges are now gated apart: held state
+  takes only a newer seq, and edges fire once per record seq inside a 256-seq
+  window (`netInputGate.test.ts`).
+- "Play again" resets the client's newest-snapshot tick, so a late snapshot
+  from the previous run applied and froze the new one. Snapshots and GameStart
+  now carry the host's run epoch, and the client drops a snapshot from another
+  run (`netSnapshotEpoch.test.ts`).
+
+### Measured
+
+`scripts/netlab/measure.mjs` runs the real host and guest sessions in two
+Chromium contexts inside a network namespace, with `netem` delaying and
+dropping relay traffic and P2P traffic separately (`scripts/netlab/README.md`).
+Each row is 60 s of a scripted guest walking and tapping attack. The relay row
+is the game before this change, apart from the input bundles. Added RTT and
+loss are end to end; loss is one way. The Hawaii row puts the relay across
+the Pacific (+110 ms, 1.5% loss) and P2P on a clean LAN.
+
+| profile | path | RTT p50 / p95 (ms) | jitter (ms) | snapshot gap p95 (ms) | corrections / min | taps lost |
+|---|---|---|---|---|---|---|
+| clean | relay | 4.2 / 6.4 | 2.6 | 102.3 | 20 | 0 of 216 |
+| clean | p2p | 2.8 / 3.9 | 1.5 | 101.3 | 2.9 | 0 of 216 |
+| +80 ms | relay | 85.7 / 87.6 | 2 | 102 | 36.2 | 0 of 217 |
+| +80 ms | p2p | 83.7 / 85.2 | 1.6 | 101.4 | 57.1 | 0 of 216 |
+| +80 ms, 2% loss | relay | 85.5 / 136.8 | 8 | 105.4 | 65.7 | 0 of 217 |
+| +80 ms, 2% loss | p2p | 83.4 / 86.7 | 2.6 | 102.8 | 49.5 | 0 of 217 |
+| +80 ms, 5% loss | relay | 88.3 / 501.7 | 52.6 | 152.4 | 137.1 | 9 of 214 |
+| +80 ms, 5% loss | p2p | 83.7 / 86.7 | 2.1 | 199 | 40 | 0 of 217 |
+| Hawaii (relay +110 ms, 1.5% loss; LAN P2P) | relay | 116 / 187 | 51.9 | 137.9 | 69.5 | 0 of 217 |
+| Hawaii (relay +110 ms, 1.5% loss; LAN P2P) | p2p | 2.6 / 3.7 | 1.4 | 101.7 | 20 | 0 of 216 |
+
+- **Round trip and jitter.** With the same added delay on both paths, P2P
+  matches the relay's median and keeps its p95 and jitter flat under loss. On
+  the relay a lost TCP segment stalls everything behind it until it is resent
+  (p95 502 ms at 5% loss). Jitter is the p95 minus the p50 of each snapshot's
+  lateness against its host tick. A lost P2P snapshot shows up instead as a
+  200 ms gap (snapshot gap p95).
+- **Hawaii.** On one wifi network P2P takes the round trip from about 120 ms
+  to a few milliseconds.
+- **Taps.** No attack tap was lost on P2P at any loss rate. At 5% loss the
+  relay lost 9 of 214: a TCP stall delivers several taps inside one host
+  tick, and they merge into one attack.
+- **Rubber-banding is noisy.** Two runs of the same row differ by up to
+  40 corrections a minute, so read only large differences.
+  Corrections grow with latency on both paths. Walking alone produces none on
+  a clean link. A likely cause (inferred, not proven) is that the host repeats
+  the last input while the next is late, and the guest then replays that
+  input again on top. Rolls are not predicted at all and snap on any link;
+  the bench leaves them out.
+
+### TURN, if wanted later
+
+Without TURN, two peers whose NATs both refuse hole punching play over the
+relay: most often a guest on a cellular carrier's NAT reaching a host on
+another network, or a hotel network that isolates clients and does not
+hairpin. On one house wifi network none of this applies. Cloudflare Realtime
+TURN costs $0.05 per GB after 1,000 GB free each month
+([pricing](https://developers.cloudflare.com/realtime/turn/faq/)). A guest
+receives about 3.6 KB/s, about 13 MB an hour, so the free tier covers tens of
+thousands of guest-hours a month. Adding it needs a TURN key and a Worker
+route that mints short-lived credentials for `iceServers`.
 
 ## What's left
 

@@ -238,7 +238,7 @@ describe('late join: the joiner lands on the host’s floor', () => {
     const legacy = hub as unknown as { centrals: Map<PeerId, (b: Uint8Array) => void> }
     const deliver = legacy.centrals.get('central-1')!
     for (const p of frameMessage(encodeJson(MsgType.Welcome, { slot: 1, token: 't' }), 180)) deliver(p)
-    for (const p of frameMessage(encodeJson(MsgType.GameStart, { seed, players: [] }), 180)) deliver(p)
+    for (const p of frameMessage(encodeJson(MsgType.GameStart, { epoch: 0, seed, players: [] }), 180)) deliver(p)
     await flush()
 
     expect(tilesOf(bob.session.renderView().level)).toBe(tilesOf(generateLevel(seed, 1)))

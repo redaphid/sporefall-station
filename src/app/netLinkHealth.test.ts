@@ -87,7 +87,7 @@ const admit = async (r: Rig): Promise<void> => {
   await vi.advanceTimersByTimeAsync(0)
   const welcome: WelcomeMsg = { slot: 1, token: 'tok', players: [] } as unknown as WelcomeMsg
   r.hostSays(encodeJson(MsgType.Welcome, welcome))
-  const start: GameStartMsg = { seed: 7, players: [], floor: 1 } as unknown as GameStartMsg
+  const start: GameStartMsg = { seed: 7, epoch: 0, players: [], floor: 1 }
   r.hostSays(encodeJson(MsgType.GameStart, start))
   const go: GoMsg = { startTick: 0, entityIds: { 1: 42 } }
   r.hostSays(encodeJson(MsgType.Go, go))
@@ -123,6 +123,13 @@ describe('linkHealth', () => {
     expect(linkChip({ health: 'degraded', rttMs: 40, session: 'live' })).toEqual({ tone: 'bad', text: 'Weak connection' })
     expect(linkChip({ health: 'good', rttMs: 40, session: 'reconnecting' }).text).toBe('Reconnecting…')
     expect(linkChip({ health: 'good', rttMs: 40, session: 'ended' })).toEqual({ tone: 'bad', text: 'Disconnected' })
+  })
+
+  it('the chip names the path when the transport has one', () => {
+    expect(linkChip({ health: 'good', rttMs: 41.7, path: 'p2p', session: 'live' })).toEqual({ tone: 'good', text: 'P2P 42 ms' })
+    expect(linkChip({ health: 'good', rttMs: 88, path: 'relay', session: 'live' })).toEqual({ tone: 'good', text: 'Relay 88 ms' })
+    expect(linkChip({ health: 'good', rttMs: null, path: 'relay', session: 'live' })).toEqual({ tone: 'fair', text: 'Relay' })
+    expect(linkChip({ health: 'degraded', rttMs: 40, path: 'p2p', session: 'live' }).text).toBe('Weak connection')
   })
 })
 
@@ -211,7 +218,7 @@ describe('online client: silence on an open socket', () => {
     await r.advance(STALLED_AFTER_MS + 2500)
     expect(r.client.phase).toBe('reconnecting')
     r.hostSays(encodeJson(MsgType.Welcome, { slot: 1, token: 'tok', players: [] }))
-    r.hostSays(encodeJson(MsgType.GameStart, { seed: 7, players: [], floor: 1 }))
+    r.hostSays(encodeJson(MsgType.GameStart, { epoch: 0, seed: 7, players: [], floor: 1 }))
     r.hostSays(encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: 42 } }))
     expect(r.client.phase).toBe('playing')
     await r.advance(1000)

@@ -9,7 +9,7 @@
  * seconds without a byte is already unusual and five is a dead link.
  */
 
-import type { LinkMedium } from '../net/types'
+import type { LinkMedium, LinkPath } from '../net/types'
 
 export const PING_INTERVAL_MS = 1000
 export const DEGRADED_AFTER_MS = 2000
@@ -24,6 +24,8 @@ export interface LinkStatus {
   health: LinkHealth
   /** Newest measured round trip, or null before the first pong. */
   rttMs: number | null
+  /** Direct WebRTC link or the relay, for online transports that know. */
+  path?: LinkPath
   /** `reconnecting`: re-establishing the link now. `ended`: it is over. */
   session: 'live' | 'reconnecting' | 'ended'
 }
@@ -33,14 +35,17 @@ export const LAGGY_RTT_MS = 250
 
 export type ChipTone = 'good' | 'fair' | 'bad'
 
+const PATH_LABEL: Record<LinkPath, string> = { p2p: 'P2P', relay: 'Relay' }
+
 /** The HUD chip for an online session: a tone and a few words. */
 export const linkChip = (s: LinkStatus): { tone: ChipTone; text: string } => {
   if (s.session === 'ended') return { tone: 'bad', text: 'Disconnected' }
   if (s.session === 'reconnecting' || s.health === 'stalled') return { tone: 'bad', text: 'Reconnecting…' }
   if (s.health === 'degraded') return { tone: 'bad', text: 'Weak connection' }
-  if (s.rttMs === null) return { tone: 'fair', text: 'Online' }
+  const via = s.path ? PATH_LABEL[s.path] : null
+  if (s.rttMs === null) return { tone: 'fair', text: via ?? 'Online' }
   const ms = Math.round(s.rttMs)
-  return { tone: ms > LAGGY_RTT_MS ? 'fair' : 'good', text: `${ms} ms` }
+  return { tone: ms > LAGGY_RTT_MS ? 'fair' : 'good', text: via ? `${via} ${ms} ms` : `${ms} ms` }
 }
 
 /** Status lines a joining player sees, per medium. Online play never says

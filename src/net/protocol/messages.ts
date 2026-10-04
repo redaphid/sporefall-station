@@ -17,7 +17,7 @@ import { MsgType } from '../types'
  *
  * Fifteen entries are marked `// RETIRED`: the nine culled items in every form
  * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
- * the floor), and the removed `atm`. They name content that no longer exists, and a dead-code tool
+ * the floor), and the removed cash terminal. They name content that no longer exists, and a dead-code tool
  * will call them unused. They are CLAIMED, not unused — the same argument as
  * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
  * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag

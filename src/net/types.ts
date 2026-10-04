@@ -12,9 +12,9 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
- * 10 — `StateMsg.extraction` is gone with the extraction mission, and `atm` is
- *     a tombstone in `ARCHETYPES` (indices unchanged). 9 is claimed by a
- *     pending branch.
+ * 10 — `StateMsg.extraction` is gone with the extraction mission, and the cash
+ *     terminal's archetype is a tombstone in `ARCHETYPES` (indices unchanged).
+ *     9 is claimed by a pending branch.
  * 8 — four `ARCHETYPES` strings renamed in place (lore-rename codemod), and
  *     the `Faction` ids with them. Indices are unchanged, but an old peer would
  *     decode index 1 as an archetype this build no longer defines.

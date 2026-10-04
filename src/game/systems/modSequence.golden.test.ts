@@ -68,7 +68,7 @@ describe('sequenced casting: golden digests', () => {
   // pre-rename digest text, passed through the codemod, equals today's text
   // except that `misdeedUntilTick` now sorts after `downed`. The city-word
   // pass (5c2b17a6, 1378fed3 before it) renamed weapon and tile ids only.
-  // Seed 1234 re-pinned again when the ATM left the shopfloor layout: putting
+  // Seed 1234 re-pinned again when the cash terminal left the shopfloor: putting
   // it back (the shopfloor `one` group in furnish.ts, its wall placement, and
   // its OBJECTS entry) reproduces f257474f. The floor is an authored city level
   // (createCityWorld), which digests the same as the seeded one did.

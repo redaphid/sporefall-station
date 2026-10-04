@@ -39,8 +39,8 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  * interpreted. Independent of `WorldJson.v` (which serialize.ts owns): a version
  * mismatch here discards the save and starts a fresh run rather than crashing.
  *
- * 4 — the ATM and the `extraction` mission are gone. A save can hold an `atm`
- *     entity or a mission whose way out is the entry, and neither means
+ * 4 — the cash terminal and the `extraction` mission are gone. A save can hold
+ *     that terminal or a mission whose way out is the entry, and neither means
  *     anything to this build.
  * 3 — storeys (docs/design/stairs-and-storeys.md). Complex floors gained a
  *     loft slot in the level atlas, so a pre-storey complex-floor save would

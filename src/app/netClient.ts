@@ -182,6 +182,7 @@ export class NetClientSession implements Session {
 
   private level!: Level
   private seed = 0
+  private runEpoch = 0
   private floor = 1
   private entities = new Map<number, Entity>()
   /** Per remote entity: the newest snapshot position, the one before it, and the
@@ -452,6 +453,7 @@ export class NetClientSession implements Session {
         // are not there and never reach an exit, with no error anywhere to
         // explain it. Fall through and rebuild from the new seed.
         if (this.phase === 'reconnecting' && sameRun) break
+        this.runEpoch++
         // A lobby start is always floor 1, but a LATE join drops us into a run
         // already in progress. Build the floor the host is actually on, or we
         // render floor 1's map — and the walls we collide against — until the
@@ -828,6 +830,7 @@ export class NetClientSession implements Session {
       entities: [...this.entities.values()],
       events,
       tick: this.tickCount,
+      runEpoch: this.runEpoch,
       level: this.level ?? emptyLevel(),
       floor: this.state.floor,
       missionText,

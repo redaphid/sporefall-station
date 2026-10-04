@@ -2,7 +2,9 @@
 // the way you came. Covers the RNG-stream guarantee against a baseline of the
 // pre-extraction world (regenerate with scripts/test/gen-mission-baseline.mts,
 // extraction selection switched off; re-captured after #92 moved 10 idle worlds and after #114 moved 6:8 and 16:3), the full loop, carrier loss in solo and co-op, a
-// mid-floor late join, and the empty floor.
+// mid-floor late join, and the empty floor. Baseline keys are `seed:floor` for
+// the seeded city floors 1-2, and a fixture name for the deeper floors, which
+// run on levels frozen as authored fixtures.
 
 import { describe, expect, it } from 'vitest'
 import baseline from '../__fixtures__/mission-baseline.json'
@@ -11,12 +13,13 @@ import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, stationAlerted, tickWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, runTicks } from '../testkit'
+import { expectWorldEqual, loadFixture, runTicks } from '../testkit'
 import type { Entity } from '../entity'
 import { extractionView, setupFloor } from './missions'
 
-const boot = (seed: number, floor: number): World => {
-  const w = createWorld(seed, floor)
+const boot = (seed: number, floor: number): World => setUp(createWorld(seed, floor))
+
+const setUp = (w: World): World => {
   populateWorld(w)
   setupFloor(w)
   spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
@@ -68,7 +71,7 @@ describe('adding extraction leaves the RNG stream alone', () => {
     let converted = 0
     for (const [key, want] of Object.entries(frozen)) {
       const [seed, floor] = key.split(':').map(Number)
-      const w = boot(seed, floor)
+      const w = key.startsWith('frozen-') ? setUp(loadFixture(key)) : boot(seed, floor)
       runTicks(w, idle(0), 30)
       if (w.mission.template === 'extraction') {
         converted++

@@ -128,11 +128,11 @@ const render = (seed: number, floor: number): { file: string; buf: Buffer; W: nu
   return { file, buf, W, H }
 }
 
-// Complex floors only (3, 5, 7, 9 = one lap of the four biomes), then one
+// Complex floors 3-6 (one lap of the four biomes) and a few others, then one
 // contact sheet of them all (4 across) for a before/after at a glance.
 const pairs = process.argv[3]
   ? process.argv[3].split(',').map((p) => p.split(':').map(Number))
-  : [[3, 3], [3, 5], [3, 7], [3, 9], [11, 3], [7, 7], [21, 5], [42, 9]]
+  : [[3, 3], [3, 4], [3, 5], [3, 6], [11, 3], [7, 7], [21, 5], [42, 9]]
 const shots = pairs.map(([seed, floor]) => render(seed, floor))
 const COLS = 4
 const GAP = 12

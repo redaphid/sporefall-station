@@ -29,7 +29,7 @@ import { spawnPlayer } from '../player'
 import { populateWorld, spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
-import { expectWorldEqual } from '../testkit'
+import { expectWorldEqual, loadFixture } from '../testkit'
 import { emptyInput, SIM_RATE, type InputCmd, type SimEvent } from '../types'
 import { createWorld, tickWorld, type World } from '../world'
 import { kill } from './combat'
@@ -174,22 +174,31 @@ describe('floor modifiers: the roll', () => {
       'stairs:5:2': 'c903e766',
       'direct:6:2': '582621cd',
       'stairs:6:2': '5878d5b7',
-      'direct:1:3': '39b39de5',
-      'stairs:1:3': '93e9b8c6',
-      'direct:3:3': 'f0b7ed2a',
-      'stairs:3:3': '33a2cc63',
-      'direct:10:3': '29c82ce9',
-      'stairs:10:3': '08567d0b',
-      'direct:2:4': 'fdc23d09',
-      'stairs:2:4': 'a03e941c',
+      // Deeper floors run on levels frozen as authored fixtures (the station
+      // floors 3 and the city floor 4 those seeds built before every floor from 3
+      // went indoors). Captured with the modifier roll switched off.
+      'frozen:frozen-1-3': '07add6b1',
+      'frozen:frozen-3-3': '25a45fb6',
+      'frozen:frozen-10-3': '078b40d4',
+      'frozen:frozen-2-4': 'fdc23d09',
       'play:7:1': '84582f4c',
       'play:1:2': '39a56892',
     }
-    const floors: [number, number][] = [[7, 1], [1, 2], [4, 2], [5, 2], [6, 2], [1, 3], [3, 3], [10, 3], [2, 4]]
+    const floors: [number, number][] = [[7, 1], [1, 2], [4, 2], [5, 2], [6, 2]]
     for (const [seed, floor] of floors) {
       it(`seed ${seed} floor ${floor}: layout, mission, population and both rng streams match main`, () => {
         expect(digestWithoutModifier(direct(seed, floor))).toBe(GOLDEN[`direct:${seed}:${floor}`])
         expect(digestWithoutModifier(viaStairs(seed, floor))).toBe(GOLDEN[`stairs:${seed}:${floor}`])
+      })
+    }
+    for (const fixture of ['frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4']) {
+      it(`${fixture}: mission, population and both rng streams match the modifier-free capture`, () => {
+        const w = loadFixture(fixture)
+        populateWorld(w)
+        setupFloor(w)
+        const at = playerSpawnPoint(w.level, 0)
+        spawnPlayer(w, 0, at.x, at.y)
+        expect(digestWithoutModifier(w)).toBe(GOLDEN[`frozen:${fixture}`])
       })
     }
     for (const [seed, floor] of [[7, 1], [1, 2]] as const) {

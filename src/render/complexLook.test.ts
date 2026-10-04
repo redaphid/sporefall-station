@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateLevel } from '../game/levelgen/generate'
-import { BIOMES } from '../game/levelgen/complex'
+import { BIOMES } from '../game/levelgen/floors'
 import type { SimEvent } from '../game/types'
 import { BIOME_TINT, floorTintFor, mulTint, updateDarkWing, type DarkWing } from './complexLook'
 
@@ -18,7 +18,7 @@ describe('complex look: biome floor grade', () => {
     expect(floorTintFor(generateLevel(1, 2), 0xffffff)).toBe(0xffffff)
     expect(floorTintFor(undefined, 0x445566)).toBe(0x445566)
     const tints = new Set<number>()
-    for (let f = 3; f <= 9; f += 2) {
+    for (let f = 3; f <= 6; f++) {
       const level = generateLevel(1, f)
       const t = floorTintFor(level, 0xffffff)
       expect(t).toBe(BIOME_TINT[level.complex!.biome])

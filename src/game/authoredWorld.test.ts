@@ -8,7 +8,7 @@ import { spawnPlayer } from './player'
 import { deserializeWorld, serializeWorld, type WorldJson } from './serialize'
 import { playerSpawnPoint } from './spawnPlacement'
 import { nextFloor, setupFloor } from './systems/missions'
-import { createCityWorld, expectWorldEqual, loadFixtureJson, runTicks } from './testkit'
+import { createCityWorld, expectWorldEqual, loadFixture, loadFixtureJson, runTicks } from './testkit'
 import { emptyInput, type InputCmd } from './types'
 import { createWorld, tickWorld, worldFromSeed, worldFromState, type World } from './world'
 
@@ -143,18 +143,8 @@ describe('seeded worlds: the generator path is unchanged', () => {
     return h >>> 0
   }
 
-  // FNV-1a and length of the serialized world after a populated 120-tick run,
-  // captured on main at b29a651, before the engine took authored state.
-  const MAIN: Array<[seed: number, floor: number, hash: number, length: number]> = [
-    [1, 1, 0x42622a9f, 82071],
-    [7, 2, 0x94e68ce0, 61403],
-    [1003, 3, 0x68bf4a0d, 107189],
-    [42, 5, 0xc07dc4f2, 163312],
-    [9, 4, 0xa4a8ac08, 125955],
-  ]
-
-  it.each(MAIN)('seed %i floor %i serializes byte-identically to main', (seed, floor, hash, length) => {
-    const w = createWorld(seed, floor)
+  /** Populate, set up and play `w` for 120 ticks; its save, serialized. */
+  const play120 = (w: World): string => {
     populateWorld(w)
     setupFloor(w)
     const at = playerSpawnPoint(w.level, 0)
@@ -163,7 +153,34 @@ describe('seeded worlds: the generator path is unchanged', () => {
       const cmd = { ...emptyInput(), seq: t, moveX: t % 40 < 20 ? 1 : -1, moveY: t % 60 < 30 ? 0.5 : -0.5, attack: t % 7 === 0 }
       tickWorld(w, new Map([[0, cmd]]))
     }
-    const s = JSON.stringify(serializeWorld(w))
+    return JSON.stringify(serializeWorld(w))
+  }
+
+  // FNV-1a and length of the serialized world after a populated 120-tick run,
+  // captured on main at b29a651, before the engine took authored state.
+  const MAIN: Array<[seed: number, floor: number, hash: number, length: number]> = [
+    [1, 1, 0x42622a9f, 82071],
+    [7, 2, 0x94e68ce0, 61403],
+  ]
+
+  it.each(MAIN)('seed %i floor %i serializes byte-identically to main', (seed, floor, hash, length) => {
+    const s = play120(createWorld(seed, floor))
+    expect(s.length).toBe(length)
+    expect(fnv(s)).toBe(hash)
+  })
+
+  // The same run on deeper floors, on levels frozen as authored fixtures (the
+  // station floors 3 and 5 and the city floor 4 those seeds built before the
+  // floor plan sent every floor from 3 indoors), so the pin no longer moves
+  // with the generator.
+  const FROZEN: Array<[fixture: string, hash: number, length: number]> = [
+    ['frozen-1003-3', 0xb8977860, 119919],
+    ['frozen-42-5', 0xc1e3854e, 178788],
+    ['frozen-9-4', 0xf203d64f, 133727],
+  ]
+
+  it.each(FROZEN)('%s plays 120 ticks to the pinned save', (fixture, hash, length) => {
+    const s = play120(loadFixture(fixture))
     expect(s.length).toBe(length)
     expect(fnv(s)).toBe(hash)
   })
@@ -195,9 +212,18 @@ describe('seeded worlds: the generator path is unchanged', () => {
   })
 
   it('every committed seeded fixture still loads and re-saves to itself exactly', () => {
-    for (const name of ['mid-run', 'mid-run-plus-10', 'combat-stage', 'comm-scene', 'fire-stage', 'crew-scene', 'crew-scene-8', 'bunker-heist']) {
+    for (const name of ['mid-run', 'mid-run-plus-10', 'combat-stage', 'comm-scene', 'fire-stage', 'crew-scene', 'crew-scene-8']) {
       const j = loadFixtureJson(name)
       expect(j.level, name).toBeUndefined()
+      expect(serializeWorld(deserializeWorld(j)), name).toEqual(loadFixtureJson(name))
+    }
+  })
+
+  it('every committed frozen-level fixture carries its level whole and re-saves to itself exactly', () => {
+    for (const name of ['bunker-heist', 'frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) {
+      const j = loadFixtureJson(name)
+      expect(j.level, name).toBeDefined()
+      expect(j.levelChecksum, name).toBeUndefined()
       expect(serializeWorld(deserializeWorld(j)), name).toEqual(loadFixtureJson(name))
     }
   })

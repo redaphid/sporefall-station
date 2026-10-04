@@ -938,8 +938,8 @@ export const ARMED_GRENADES = 30
 /** `?scenario=armed[&floor=N]` drops a solo run straight onto floor N (default
  * 3, the first station complex), kitted out to survive it. The floor is built
  * by the real floor transition (`nextFloor` from N-1), so the level is exactly
- * what a run reaching N gets: complex floors 3, 5, 7… come out as the indoor
- * complex with their biome, populated and with the floor's mission set. No
+ * what a run reaching N gets: every floor from 3 comes out as the indoor
+ * complex with its biome, populated and with the floor's mission set. No
  * randomness of its own: the level and population come from the world's rng.
  *
  * The one-weapon rule holds (a player carries one permanent gun and cannot
@@ -982,8 +982,6 @@ const setupArmed = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
 const setupStairsDemo = (w: World, floor = ARMED_DEFAULT_FLOOR): void => {
   setupArmed(w, floor)
   for (let tries = 0; tries < 6 && !w.level.stairs; tries++) {
-    // Skip ahead to the next complex floor (odd floors from 3).
-    w.floor += w.floor % 2 === 1 ? 1 : 0
     nextFloor(w)
     setupArmed(w, w.floor)
   }

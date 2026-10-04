@@ -357,7 +357,8 @@ export class NetClientSession implements Session {
    * Bluetooth keeps its own drop detection and is left alone.
    */
   private watchLink(): void {
-    if (this.transport.medium !== 'online') return
+    // Nothing to watch once the end was announced (Bye, or we quit).
+    if (this.transport.medium !== 'online' || this.departure) return
     const t = this.now()
     const silent = t - this.lastHeardAt
     if (this.phase === 'reconnecting') {
@@ -388,8 +389,18 @@ export class NetClientSession implements Session {
   /** Leave on purpose (Main menu): hang up without the reconnect a drop would
    * start. The host sees the peer go and holds its avatar as for any drop. */
   async close(): Promise<void> {
-    this.departure = 'we-left'
+    // A host that already left keeps that verdict: quitting from the HOST LEFT
+    // menu must not repaint it as a lost connection on the way out.
+    this.departure ??= 'we-left'
     await this.transport.stop()
+  }
+
+  /** The net menu's title for this guest. Leaving on purpose is neutral, never
+   * a lost connection. */
+  menuTitle(): 'MENU' | 'LEAVING…' | 'HOST LEFT' | 'CONNECTION LOST' {
+    if (this.departure === 'host-left' && this.phase === 'ended') return 'HOST LEFT'
+    if (this.departure === 'we-left') return 'LEAVING…'
+    return this.phase === 'ended' ? 'CONNECTION LOST' : 'MENU'
   }
 
   private setPhase(phase: ClientPhase): void {

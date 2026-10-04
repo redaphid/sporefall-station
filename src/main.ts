@@ -1215,12 +1215,7 @@ const runLoop = (
       if (phase === 'ended') setPaused(true)
     }
   }
-  const netMenuTitle = (): string =>
-    session instanceof NetClientSession && session.phase === 'ended'
-      ? session.hostLeft
-        ? 'HOST LEFT'
-        : 'CONNECTION LOST'
-      : 'MENU'
+  const netMenuTitle = (): string => (session instanceof NetClientSession ? session.menuTitle() : 'MENU')
   // `const` (not the parameter) so TypeScript keeps the narrowing inside the
   // closure below.
   const sharing = stateRing
@@ -1255,6 +1250,7 @@ const runLoop = (
           title: netMenuTitle,
           // Once a client's session has ended there is no run to go back to.
           canResume: () => !(session instanceof NetClientSession && session.phase === 'ended'),
+          sessionOver: () => session instanceof NetClientSession && session.phase === 'ended',
         }),
     weaponThumb: renderer.weaponThumb,
   })

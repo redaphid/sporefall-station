@@ -184,13 +184,42 @@ const main = async () => {
     check(/^\d+ ms$/.test((await chip(guest)) ?? ''), `chip is back to a round trip ("${await chip(guest)}")`)
     await shot(guest, '06-guest-recovered')
 
-    // 5. The host's network vanishes: no Bye, no close frame.
+    // 5. The host's network vanishes: no Bye, no close frame. The run is lost
+    // first, on purpose: the guest then sits on the game-over screen, whose only
+    // button waits for the host, so HOST LEFT must show over it.
+    await host.evaluate(() => {
+      const w = globalThis.world
+      w.revivesLeft = 0
+      for (const e of w.entities.filter((x) => x.playerCtl)) globalThis.sporefall.verb(`kill ${e.id}`)
+    })
+    const over = await until(guest, () => !!globalThis.__sporefall?.renderView?.().gameOver, undefined, 8000)
+    check(over !== null, 'the run is over on the guest (game-over screen) before its host vanishes')
+    await shot(guest, '06b-guest-game-over')
     const t1 = Date.now()
     proxy.kill('host')
-    const left = await until(guest, () => document.querySelector('[data-role="pause-title"]')?.textContent === 'HOST LEFT', undefined, 10000)
-    check(left !== null && Date.now() - t1 <= 2500, `guest sees HOST LEFT ${Date.now() - t1} ms after the host vanished`)
+    // Timed on the session, which reacts to the relay's frame at once. The title
+    // is painted by the frame loop, so it is checked separately: a throttled or
+    // hidden window can delay paint without the session being late.
+    const ended = await until(guest, () => globalThis.__sporefall?.phase === 'ended' && globalThis.__sporefall?.hostLeft, undefined, 10000)
+    const endedMs = Date.now() - t1
+    if (ended === null)
+      console.error(
+        '    guest state:',
+        JSON.stringify(
+          await guest.evaluate(() => ({
+            phase: globalThis.__sporefall?.phase,
+            hostLeft: globalThis.__sporefall?.hostLeft,
+            visibility: document.visibilityState,
+            title: document.querySelector('[data-role="pause-title"]')?.textContent,
+          })),
+        ),
+      )
+    check(ended !== null && endedMs <= 2500, `guest's session ends as host-left ${endedMs} ms after the host vanished`)
+    const titled = await until(guest, () => document.querySelector('[data-role="pause-title"]')?.textContent === 'HOST LEFT', undefined, 5000)
+    check(titled !== null, `and its menu reads HOST LEFT ${Date.now() - t1} ms after`)
     check((await phase(guest)) === 'ended', 'and it is ended, not reconnecting')
-    check((await chip(guest)) === 'Disconnected', `its chip reads Disconnected ("${await chip(guest)}")`)
+    const chipDone = await until(guest, () => document.querySelector('[data-role="link-chip"]')?.textContent === 'Disconnected', undefined, 2000)
+    check(chipDone !== null, `its chip reads Disconnected ("${await chip(guest)}")`)
     await sleep(500)
     await shot(guest, '07-guest-host-left')
 

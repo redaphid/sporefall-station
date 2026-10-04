@@ -132,6 +132,20 @@ $S/drive.mjs --name solo-from-menu --video \
   --shot in-run
 ```
 
+**A headed Windows Chrome over CDP** (for a recording or `scripts/scenes-render-check.mjs`
+that needs real WebGL without Lane A): launch your own with `scripts/own-chrome.mjs`,
+then kill it by its lockfile.
+
+```sh
+node scripts/own-chrome.mjs launch          # JSON: cdpUrl, lockfile, pid, port (9300-9999), profileDir
+node scripts/own-chrome.mjs kill <lockfile>
+```
+
+Never attach to `:9222`. That is the owner's own Chrome, and a crashed driven tab
+takes his whole browser down. Never kill Chrome by name or by a command-line
+pattern. `kill` refuses any PID whose command line lacks the lock's exact port
+and profile. The e2e helpers refuse `E2E_CDP` on 9222.
+
 Steps run in argv order. The full list is in the header of `drive.mjs`: `--open`,
 `--reload`, `--click`, `--until-tick`, `--until`, `--eval`, `--assert`, `--shot`, and
 `--wait-ms`. `--until` treats a throw as "not yet", so `--until "sporefall.session().seed === 18"`

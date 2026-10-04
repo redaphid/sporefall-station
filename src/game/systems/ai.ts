@@ -31,10 +31,14 @@ import {
   STAGE,
   TEND,
   WORK,
-  decide,
-} from './behaviors'
+  BATTLE,
+  FLEE,
+  INVESTIGATE,
+  PURSUE,
+} from './goalCodes'
+import { decide } from './behaviors'
 import { fireWeapon } from './combat'
-import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
+import { perceives, type Goal } from './goals'
 import { CRIME_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
 import { vlen } from '../simMath'
@@ -49,7 +53,7 @@ const ALERT_REACH = 1.4
 /** Close enough to a sought pickup to grab it. */
 const SCAVENGE_REACH = 0.55
 /** Goal codes whose adoption (or abandonment) is worth a world event. */
-const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
+export const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
 /** Ticks of no movement progress toward an unseen chase goal before the trail
  * is declared cold — the safety net under the router (bodies can jam a door). */
 const STALL_TICKS = 45
@@ -59,10 +63,10 @@ const STALL_DIST = 0.5
  * They walk at full pace and skip the arrive-and-look-around beat, exactly as
  * squad formation already did — a raider taking its muster slot, a hound its
  * ring slot or a sapper its door does not stop to admire the view. */
-const TACTICAL = new Set([FORMUP, FLANK, STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+export const TACTICAL = new Set([FORMUP, FLANK, STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
 /** The group layer's own moves (not the squad's): these also steer with the
  * strict swept-circle line check — see `sweptClear`. */
-const GROUP_MOVES = new Set([STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+export const GROUP_MOVES = new Set([STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
 const isGroupMove = (goal: string | undefined): boolean => goal !== undefined && GROUP_MOVES.has(goal)
 
 // ── Routing (path.ts) tuning ───────────────────────────────────────────────

@@ -8,6 +8,7 @@ import { pickNewSeed } from './app/newSeed'
 import { markUiChrome } from './ui/chrome'
 import { hostFailureMessage } from './app/hostError'
 import { joinFailureMessage } from './app/joinError'
+import { openJoinTransport } from './app/openJoinTransport'
 import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
@@ -66,7 +67,7 @@ import { runRefresh } from './app/refresh'
 import { startUpdates, type Updates } from './app/updates'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
-import { isWebBluetoothAvailable, WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
+import { WebBluetoothClientTransport } from './net/transport/webBluetoothTransport'
 import { resolveWsBaseUrl, WsTransport } from './net/transport/wsTransport'
 import { betaSlugFromBase, namespaceRoom } from './app/betaSlug'
 import type { Transport } from './net/types'
@@ -85,7 +86,7 @@ import {
   noteFrameError,
   noteFrameOk,
 } from './ui/frameErrorModel'
-import { createLobbyUi, pickHost, pickJoinTransport, pickMode, type GameMode } from './ui/menu'
+import { createLobbyUi, pickHost, pickMode, type GameMode } from './ui/menu'
 import { createScreens, restartAffordance } from './ui/screens'
 import { createOverlay } from './ui/overlay'
 import { installStage, lockLandscape, toStage } from './ui/orientation'
@@ -658,25 +659,6 @@ interface SessionDeps {
 }
 
 /**
- * Browser join transport: Web Bluetooth (laptop joining a phone host) when
- * available, else BroadcastChannel tabs. `?transport=tabs` skips the picker so
- * the dev flow and mp-smoke stay click-free; picking Bluetooth runs Chrome's
- * requestDevice chooser inside the button's click handler (gesture required).
- */
-const pickBrowserJoinTransport = async (deps: SessionDeps): Promise<Transport> => {
-  const pref = new URLSearchParams(location.search).get('transport')
-  // `?transport=ws` joins over the Cloudflare Worker relay (Durable Object) —
-  // the WebSocket multiplayer path (no Bluetooth, works across networks).
-  if (pref === 'ws') return new WsTransport('client', deps.room, resolveWsBaseUrl(location.search))
-  if (pref !== 'tabs' && isWebBluetoothAvailable()) {
-    const webBle = new WebBluetoothClientTransport()
-    const choice = await pickJoinTransport(deps.uiMount, () => webBle.requestDevice())
-    if (choice === 'ble') return webBle
-  }
-  return new BroadcastChannelTransport('client', deps.room)
-}
-
-/**
  * Hand the radio back when the page goes away.
  *
  * `Transport.stop()` existed but had NO call site anywhere in the app, so a
@@ -763,7 +745,20 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
 
   // join
   dbg.log(`join: mode start, native=${native}`)
-  const transport = native ? new BleClientTransport(dbg.log) : await pickBrowserJoinTransport(deps)
+  const transport = await openJoinTransport({
+    native,
+    search: location.search,
+    nav: navigator,
+    room: deps.room,
+    uiMount: deps.uiMount,
+    log: dbg.log,
+    backToMenu: () => {
+      const menu = new URL(location.href)
+      menu.searchParams.delete('mode')
+      location.assign(menu)
+    },
+  })
+  if (!transport) return null
   stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
 

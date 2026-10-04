@@ -292,7 +292,6 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
           const len2 = dist(door!.pos, p.pos)
           cmd.moveX = (door!.pos.x - p.pos.x) / len2
           cmd.moveY = (door!.pos.y - p.pos.y) / len2
-          waitUntil = w.tick + 12
         } else if (dd && !dd.locked && !dd.overgrown) {
           cmd.interact = true
           cur.doors++
@@ -318,7 +317,16 @@ const play = (seed: number): { ok: boolean; floors: FloorReport[] } => {
           cmd.moveX = 0
           cmd.moveY = 0
         }
-        if (dd) stuckTicks = 0
+        if (dd && cmd.interact) stuckTicks = 0
+        // A prop shoved into a narrow hall can wedge against a door and hold
+        // the walker out of the panel's reach: shoot it out of the way, as a
+        // player would.
+        const wedged = stuckTicks > 30 && w.entities.find((e) => e.kind === 'interactable' && !e.dead && e.health && dist(e.pos, p.pos) < 1.3)
+        if (wedged) {
+          cmd.aimX = wedged.pos.x - p.pos.x
+          cmd.aimY = wedged.pos.y - p.pos.y
+          cmd.attack = true
+        }
       }
     }
 

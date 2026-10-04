@@ -22,4 +22,7 @@ node e2e/ws-relay.mjs
 echo "[run-ws] co-op proof (two browsers → real relay)…"
 node e2e/ws-multiplayer.mjs
 
+echo "[run-ws] Play online proof (start menu → room code → relay)…"
+node e2e/ws-online-menu.mjs
+
 echo "[run-ws] done. screenshots in e2e/output"

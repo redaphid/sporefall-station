@@ -113,8 +113,14 @@ node scripts/own-chrome.mjs list          # Chromes this tool launched, with sta
 ```
 
 `launch` picks a free port in 9300-9999 and a fresh profile under Windows
-`%TEMP%`. `kill` ends only the recorded PID tree, and only after Windows confirms
-that PID's command line carries the lock's exact port and profile. A run-*.sh
+`%TEMP%`, and records the browser's PID and Windows start time. `kill` stops the
+browser only if that PID still has the recorded start time and the lock's exact
+port and profile arguments. It also stops the browser's descendants that started
+after it and carry the same profile argument. It never uses `taskkill /T`:
+Windows keeps a dead parent's PID on its children, so a tree walk from a reused
+PID can reach someone else's Chrome. One PowerShell process holds a handle on
+each process from the check to the kill, so a PID cannot be reused in between.
+A run-*.sh
 recorder gets the same thing by sourcing `e2e/own-chrome.sh` (see
 `e2e/run-boss-bar.sh`). From an e2e script, call `launchOwnChrome()` and
 `killOwnChrome(lockfile)` from the module.
@@ -129,8 +135,9 @@ Two rules, enforced in code:
   `C:`, and it killed every chrome.exe on the desktop. Kill by lockfile only.
 
 `node scripts/test/own-chrome-smoke.mjs` proves the tool on a real desktop. It
-launches, opens about:blank over CDP, and kills. Then it checks that every
-chrome.exe alive before the run is still alive.
+launches, opens about:blank over CDP, refuses two forged locks, and kills. Then
+it checks that every chrome.exe alive before the run is still alive, matched by
+PID and creation time.
 
 ## The two backfilled features
 

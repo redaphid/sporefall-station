@@ -1,9 +1,10 @@
 # Sourced by the run-*.sh recorders that need a headed Windows Chrome from WSL.
 # The browser comes from scripts/own-chrome.mjs: a fresh profile on a free port
-# in 9300-9999, killed afterwards by its recorded PID only. The profile is new
-# every run because one still holding the game's PWA service worker makes
-# Playwright's connectOverCDP abort on that target. Never point these at
-# :9222 (the owner's Chrome) and never kill chrome.exe by name.
+# in 9300-9999, killed afterwards only if its PID, start time, port and profile
+# all match the lockfile. The profile is new every run because one still
+# holding the game's PWA service worker makes Playwright's connectOverCDP abort
+# on that target. Never point these at :9222 (the owner's Chrome) and never kill
+# chrome.exe by name.
 #
 #   source e2e/own-chrome.sh
 #   trap 'own_chrome_stop' EXIT   # or call it from your existing cleanup

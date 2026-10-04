@@ -10,13 +10,14 @@
 // It exists because agents took down the owner's personal Chrome twice: once by
 // attaching to it on :9222, once by killing every chrome.exe whose command line
 // matched a profile-name substring that a quoting bug had cut down to `C:`.
-// So: port 9222 is refused everywhere, a kill targets only the recorded PID tree,
-// and only after Windows confirms that PID's own command line carries this lock's
-// exact port flag and exact profile dir. Nothing here matches processes by name
-// or pattern. Every child process gets an argv array and no shell option; the
+// So: port 9222 is refused everywhere, and a kill reaches only the recorded
+// browser (same PID, same start time, this lock's exact port and profile args)
+// and descendants that started after it with the same profile arg. It never uses
+// `taskkill /T`, whose tree follows stale parent PIDs into unrelated processes.
+// Nothing here matches processes by name or pattern. Every child process gets an argv array and no shell option; the
 // PowerShell scripts are fixed text whose only inputs are an integer PID or
 // base64 JSON.
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createConnection } from 'node:net'
@@ -30,7 +31,6 @@ export const PORT_MIN = 9300
 export const PORT_MAX = 9999
 const PROFILE_PREFIX = 'own-chrome-'
 const POWERSHELL = 'powershell.exe'
-const TASKKILL = 'taskkill.exe'
 
 export const defaultLockDir = () => process.env.OWN_CHROME_DIR ?? join(tmpdir(), 'own-chrome')
 
@@ -42,10 +42,27 @@ export const assertPortAllowed = (port) => {
     throw new Error(`port ${port} is outside ${PORT_MIN}-${PORT_MAX}`)
 }
 
-/** Throws when a CDP endpoint is the owner's personal Chrome. For anything that connects over CDP. */
+/**
+ * The port a CDP endpoint names, however it is spelled: a URL, a ws:// URL, a
+ * bare `host:port` (which `new URL` would read as a scheme), or a bare port.
+ */
+export const cdpPort = (cdpUrl) => {
+  const s = String(cdpUrl).trim()
+  if (/^\d+$/.test(s)) return Number(s)
+  const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `http://${s}`)
+  if (url.port) return Number(url.port)
+  return url.protocol === 'https:' || url.protocol === 'wss:' ? 443 : 80
+}
+
+/** Throws when a CDP endpoint is the owner's personal Chrome, or cannot be read. For anything that connects over CDP. */
 export const assertNotPersonalChrome = (cdpUrl) => {
-  const { port } = new URL(cdpUrl)
-  if (Number(port) === PERSONAL_CDP_PORT)
+  let port
+  try {
+    port = cdpPort(cdpUrl)
+  } catch (e) {
+    throw new Error(`refusing to attach to ${JSON.stringify(cdpUrl)}: not a readable CDP endpoint`, { cause: e })
+  }
+  if (port === PERSONAL_CDP_PORT)
     throw new Error(`refusing to attach to ${cdpUrl}: :${PERSONAL_CDP_PORT} is the owner's personal Chrome. Launch your own with scripts/own-chrome.mjs`)
 }
 
@@ -76,8 +93,6 @@ export const chromeArgv = ({ port, profileDir, url = 'about:blank' }) => {
   ]
 }
 
-export const taskkillArgv = (pid) => ['/PID', String(pid), '/T', '/F']
-
 /** Windows profile dir for a new launch: unique, directly under the Windows temp dir. */
 const newProfileDir = (winTempDir, port) => `${winTempDir}\\${PROFILE_PREFIX}${port}-${randomBytes(6).toString('hex')}`
 
@@ -97,8 +112,10 @@ export const parseLock = (raw, winTempDir) => {
   assertPortAllowed(lock.port)
   if (typeof lock.profileDir !== 'string' || !isOwnProfileDir(lock.profileDir, winTempDir))
     throw new Error(`lock profileDir ${JSON.stringify(lock.profileDir)} is not an own-chrome profile under ${winTempDir}`)
+  if (typeof lock.startTicks !== 'string' || !/^\d+$/.test(lock.startTicks)) throw new Error(`lock startTicks ${JSON.stringify(lock.startTicks)} is not a Windows FILETIME`)
   if (typeof lock.startedAt !== 'string') throw new Error('lock startedAt missing')
-  return { pid: lock.pid, port: lock.port, profileDir: lock.profileDir, startedAt: lock.startedAt, cdpUrl: `http://127.0.0.1:${lock.port}` }
+  const { pid, port, profileDir, startTicks, startedAt } = lock
+  return { pid, port, profileDir, startTicks, startedAt, cdpUrl: `http://127.0.0.1:${port}` }
 }
 
 /** Split a Windows command line the way CommandLineToArgvW does. */
@@ -144,13 +161,16 @@ export const splitWindowsCommandLine = (cmd) => {
 }
 
 /**
- * Is the live process `proc` ({pid, commandLine} from Windows) the browser this
- * lock recorded? Whole-argument equality only: `--remote-debugging-port=93` does
- * not match `--remote-debugging-port=9301`, and a renderer child (`--type=...`)
- * is not the browser root.
+ * Is the live process `proc` ({pid, startTicks, commandLine} from Windows) the
+ * browser this lock recorded? Its start time must equal the recorded one, so a
+ * reused PID fails. Whole-argument equality only: `--remote-debugging-port=93`
+ * does not match `--remote-debugging-port=9301`, and a renderer child
+ * (`--type=...`) is not the browser root.
  */
 export const checkOwnership = (lock, proc) => {
   if (proc.pid !== lock.pid) return { ok: false, reason: `asked about pid ${lock.pid}, Windows answered for ${proc.pid}` }
+  if (proc.startTicks !== lock.startTicks)
+    return { ok: false, reason: `pid ${lock.pid} started at ${proc.startTicks}, the lock recorded ${lock.startTicks}: the PID was reused` }
   if (typeof proc.commandLine !== 'string' || !proc.commandLine) return { ok: false, reason: `pid ${lock.pid} command line is unreadable` }
   const argv = splitWindowsCommandLine(proc.commandLine)
   const want = [`--remote-debugging-port=${lock.port}`, `--user-data-dir=${lock.profileDir}`]
@@ -160,14 +180,136 @@ export const checkOwnership = (lock, proc) => {
   return { ok: true }
 }
 
-/** Run a fixed PowerShell script. -EncodedCommand keeps its text out of any argv quoting. */
-export const powershell = (body) => {
-  const script = `$ProgressPreference='SilentlyContinue'; ${body}`
-  return execFileSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim()
+const isTicks = (t) => typeof t === 'string' && /^\d+$/.test(t)
+
+/**
+ * Which PIDs of a kill snapshot are ours. `snapshot` is what Windows reported
+ * while holding a handle to each process: the root PID's process and every
+ * process found below it by ParentProcessId. Windows never clears a dead
+ * parent's PID from its children, so "below it" can include another Chrome
+ * whose parent happened to have our PID. A descendant is ours only if it
+ * started no earlier than our browser and carries our exact profile arg.
+ * Throws, killing nothing, when the root is not this lock's browser.
+ */
+export const planKill = (lock, { root, descendants }) => {
+  if (!root) return { kill: [], skipped: [] }
+  const owned = checkOwnership(lock, root)
+  if (!owned.ok) throw new Error(`refusing to kill pid ${lock.pid}: ${owned.reason}`)
+  const profileArg = `--user-data-dir=${lock.profileDir}`
+  const ours = (p) =>
+    isTicks(p.startTicks) &&
+    BigInt(p.startTicks) >= BigInt(lock.startTicks) &&
+    typeof p.commandLine === 'string' &&
+    splitWindowsCommandLine(p.commandLine).includes(profileArg)
+  return {
+    kill: [...descendants.filter(ours).map((p) => p.pid), root.pid],
+    skipped: descendants.filter((p) => !ours(p)).map((p) => p.pid),
+  }
 }
+
+const psArgs = (body) => [
+  '-NoProfile',
+  '-NonInteractive',
+  '-EncodedCommand',
+  Buffer.from(`$ProgressPreference='SilentlyContinue'; [Console]::OutputEncoding=[Text.Encoding]::UTF8; ${body}`, 'utf16le').toString('base64'),
+]
+
+/** Run a fixed PowerShell script. -EncodedCommand keeps its text out of any argv quoting. */
+export const powershell = (body) =>
+  execFileSync(POWERSHELL, psArgs(body), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+
+/**
+ * Opens a process by PID and keeps the handle in `$held`, so Windows cannot
+ * reuse that PID until this PowerShell exits. Start time and command line are
+ * read after the handle is open, so both describe the process the handle holds.
+ */
+const PS_HOLD = `
+$held = @{}
+function Hold([int]$id) {
+  $p = Get-Process -Id $id -ErrorAction SilentlyContinue
+  if (-not $p) { return $null }
+  try { $null = $p.Handle; $t = $p.StartTime.ToFileTimeUtc() } catch { $t = $null }
+  $c = Get-CimInstance Win32_Process -Filter "ProcessId=$id"
+  if (-not $c) { return $null }
+  $held[$id] = $p
+  return @{ ticks = $t; info = [pscustomobject]@{ pid = $id; startTicks = $(if ($t -ne $null) { [string]$t } else { $null }); commandLine = $c.CommandLine } }
+}
+`
+
+/**
+ * One PowerShell process does the check and the kill. It holds handles to the
+ * root and to every descendant that started no earlier than the root, prints
+ * that snapshot as one JSON line, reads back the PIDs to kill, and stops only
+ * processes it holds. `decide` (planKill) runs in between; a throw sends an
+ * empty list.
+ */
+const PS_KILL_TREE = (pid) => `${PS_HOLD}
+$snap = [pscustomobject]@{ root = $null; descendants = @() }
+$root = Hold ${pid}
+if ($root) {
+  $snap.root = $root.info
+  $desc = @()
+  $queue = New-Object System.Collections.Queue
+  $queue.Enqueue(${pid})
+  while ($queue.Count -gt 0) {
+    $parent = $queue.Dequeue()
+    foreach ($c in @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$parent")) {
+      $id = [int]$c.ProcessId
+      if ($held.ContainsKey($id)) { continue }
+      $h = Hold $id
+      if (-not $h) { continue }
+      if ($h.ticks -eq $null -or $root.ticks -eq $null -or $h.ticks -lt $root.ticks) { $held.Remove($id); continue }
+      $desc += $h.info
+      $queue.Enqueue($id)
+    }
+  }
+  $snap.descendants = @($desc)
+}
+$snap | ConvertTo-Json -Compress -Depth 3
+[Console]::Out.Flush()
+$line = [Console]::In.ReadLine()
+$killed = @(); $survived = @()
+if ($line) {
+  foreach ($s in $line.Split(',')) {
+    $p = $held[[int]$s]
+    if (-not $p) { continue }
+    try { Stop-Process -InputObject $p -Force -ErrorAction Stop } catch {}
+    if ($p.WaitForExit(10000)) { $killed += [int]$s } else { $survived += [int]$s }
+  }
+}
+'killed=' + ($killed -join ',') + ';survived=' + ($survived -join ',')
+`
+
+const runKillTree = (pid, decide) =>
+  new Promise((done, fail) => {
+    const ps = spawn(POWERSHELL, psArgs(PS_KILL_TREE(pid)), { stdio: ['pipe', 'pipe', 'pipe'] })
+    let out = ''
+    let err = ''
+    let asked = false
+    let refusal = null
+    ps.stdout.on('data', (d) => {
+      out += d
+      if (asked || !out.includes('\n')) return
+      asked = true
+      let ids = []
+      try {
+        const snap = JSON.parse(out.slice(0, out.indexOf('\n')))
+        ids = decide({ root: snap.root ?? null, descendants: [].concat(snap.descendants ?? []) })
+      } catch (e) {
+        refusal = e
+      }
+      ps.stdin.end(`${ids.join(',')}\n`)
+    })
+    ps.stderr.on('data', (d) => (err += d))
+    ps.on('error', fail)
+    ps.on('close', (code) => {
+      if (refusal) return fail(refusal)
+      const m = /killed=([\d,]*);survived=([\d,]*)/.exec(out)
+      if (code !== 0 || !m) return fail(new Error(`kill script failed (exit ${code}): ${err.trim().slice(0, 400)}`))
+      const ids = (list) => list.split(',').filter(Boolean).map(Number)
+      done({ killed: ids(m[1]), survived: ids(m[2]) })
+    })
+  })
 
 /** One argument quoted so CommandLineToArgvW (and `splitWindowsCommandLine`) reads it back unchanged. */
 export const quoteWindowsArg = (arg) => {
@@ -216,34 +358,32 @@ export const windows = {
           `netsh interface ipv4 show excludedportrange protocol=tcp`,
       ),
     ),
-  /** {pid, commandLine} for exactly this PID, or null when no such process exists. */
+  /** {pid, startTicks, commandLine} for exactly this PID, or null when no such process exists. */
   queryProcess: (pid) => {
     if (!Number.isInteger(pid) || pid <= 0) throw new Error(`bad pid ${pid}`)
-    const out = powershell(
-      `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; ` +
-        `if ($p) { [pscustomobject]@{pid=[int]$p.ProcessId; commandLine=$p.CommandLine} | ConvertTo-Json -Compress } else { 'null' }`,
-    )
-    return JSON.parse(out)
+    return JSON.parse(powershell(`${PS_HOLD} $h = Hold ${pid}; if ($h) { $h.info | ConvertTo-Json -Compress } else { 'null' }`))
   },
   /**
-   * Start chrome.exe and return its Windows PID. Start-Process hands back the PID
-   * of exactly the process it created, so a launch that never answers on CDP can
-   * still be killed by PID. The arguments travel as base64 JSON, never as script text.
+   * Start chrome.exe and return {pid, startTicks} of exactly the process
+   * Start-Process created, so a launch that never answers on CDP can still be
+   * killed. The arguments travel as base64 JSON, never as script text.
    */
   startChrome: (argv) => {
     if (!existsSync(CHROME_EXE)) throw new Error(`no Windows Chrome at ${CHROME_EXE}`)
     const exe = execFileSync('wslpath', ['-w', CHROME_EXE], { encoding: 'utf8' }).trim()
     const payload = Buffer.from(JSON.stringify({ exe, args: windowsCommandLine(argv) })).toString('base64')
-    const pid = Number(
+    const started = JSON.parse(
       powershell(
         `$a = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}')) | ConvertFrom-Json; ` +
-          `(Start-Process -FilePath $a.exe -ArgumentList $a.args -PassThru).Id`,
+          `$p = Start-Process -FilePath $a.exe -ArgumentList $a.args -PassThru; ` +
+          `[pscustomobject]@{ pid = $p.Id; startTicks = [string]$p.StartTime.ToFileTimeUtc() } | ConvertTo-Json -Compress`,
       ),
     )
-    if (!Number.isInteger(pid) || pid <= 0) throw new Error(`Start-Process returned no pid for ${exe}`)
-    return pid
+    if (!Number.isInteger(started.pid) || started.pid <= 0 || !isTicks(started.startTicks)) throw new Error(`Start-Process returned ${JSON.stringify(started)} for ${exe}`)
+    return started
   },
-  taskkill: (pid) => execFileSync(TASKKILL, taskkillArgv(pid), { stdio: 'ignore' }),
+  /** Snapshot the tree under `pid`, let `decide` pick PIDs, and stop those, in one PowerShell process. */
+  killTree: runKillTree,
   removeDir: (winPath) => {
     const linuxPath = execFileSync('wslpath', ['-u', winPath], { encoding: 'utf8' }).trim()
     rmSync(linuxPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
@@ -315,11 +455,11 @@ export const launchOwnChrome = async ({ dir = defaultLockDir(), url, port, timeo
   const chosen = port ?? (await pickPort(isFree))
   const winTemp = win.tempDir()
   const profileDir = newProfileDir(winTemp, chosen)
-  const pid = win.startChrome(chromeArgv({ port: chosen, profileDir, url }))
-  const lock = parseLock({ pid, port: chosen, profileDir, startedAt: new Date().toISOString() }, winTemp)
+  const { pid, startTicks } = win.startChrome(chromeArgv({ port: chosen, profileDir, url }))
+  const lock = parseLock({ pid, port: chosen, profileDir, startTicks, startedAt: new Date().toISOString() }, winTemp)
   mkdirSync(dir, { recursive: true })
   const lockfile = resolve(join(dir, `own-chrome-${chosen}-${pid}.json`))
-  writeFileSync(lockfile, JSON.stringify({ pid, port: chosen, profileDir, startedAt: lock.startedAt }, null, 2) + '\n')
+  writeFileSync(lockfile, JSON.stringify({ pid, port: chosen, profileDir, startTicks, startedAt: lock.startedAt }, null, 2) + '\n')
   try {
     const version = await waitForCdp(chosen, timeoutMs)
     const { processInfo } = await cdpCall(version.webSocketDebuggerUrl, 'SystemInfo.getProcessInfo')
@@ -337,27 +477,21 @@ export const launchOwnChrome = async ({ dir = defaultLockDir(), url, port, timeo
 
 /**
  * Kill the Chrome a lockfile recorded, then delete its profile and the lock.
- * Refuses (throws, touching nothing) unless Windows says that PID's command line
- * carries this lock's exact port flag and profile dir. When Chrome already
- * exited, or a previous kill died halfway, it converges: nothing is left to
- * kill, and the profile and lock are removed.
+ * Refuses (throws, touching nothing) unless the process at that PID has the
+ * recorded start time and this lock's exact port and profile args; see
+ * `planKill` for which descendants go with it. When Chrome already exited, or
+ * a previous kill died halfway, it converges: nothing is left to kill, and the
+ * profile and lock are removed.
  */
 export const killOwnChrome = async (lockfile, { win = windows } = {}) => {
   const winTemp = win.tempDir()
   const lock = parseLock(readFileSync(lockfile, 'utf8'), winTemp)
-  const proc = win.queryProcess(lock.pid)
-  let killed = false
-  if (proc) {
-    const owned = checkOwnership(lock, proc)
-    if (!owned.ok) throw new Error(`refusing to kill pid ${lock.pid}: ${owned.reason}`)
-    win.taskkill(lock.pid)
-    killed = true
-    for (let i = 0; i < 40 && win.queryProcess(lock.pid); i++) await new Promise((r) => setTimeout(r, 250))
-    if (win.queryProcess(lock.pid)) throw new Error(`pid ${lock.pid} survived taskkill`)
-  }
+  let plan = { kill: [], skipped: [] }
+  const { killed, survived } = await win.killTree(lock.pid, (snapshot) => (plan = planKill(lock, snapshot)).kill)
+  if (survived.length) throw new Error(`pids ${survived.join(',')} survived Stop-Process; lock kept`)
   win.removeDir(lock.profileDir)
   unlinkSync(lockfile)
-  return { pid: lock.pid, port: lock.port, killed, profileDir: lock.profileDir }
+  return { pid: lock.pid, port: lock.port, killed, skipped: plan.skipped, profileDir: lock.profileDir }
 }
 
 /** Every lock in `dir`, with whether its Chrome is still the one recorded. */

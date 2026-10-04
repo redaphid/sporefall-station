@@ -143,8 +143,8 @@ node scripts/own-chrome.mjs kill <lockfile>
 
 Never attach to `:9222`. That is the owner's own Chrome, and a crashed driven tab
 takes his whole browser down. Never kill Chrome by name or by a command-line
-pattern. `kill` refuses any PID whose command line lacks the lock's exact port
-and profile. The e2e helpers refuse `E2E_CDP` on 9222.
+pattern. `kill` refuses any PID whose start time, port, or profile differs from
+the lock, and it never uses `taskkill /T`. The e2e helpers refuse `E2E_CDP` on 9222.
 
 Steps run in argv order. The full list is in the header of `drive.mjs`: `--open`,
 `--reload`, `--click`, `--until-tick`, `--until`, `--eval`, `--assert`, `--shot`, and

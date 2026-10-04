@@ -22,11 +22,16 @@ export default tseslint.config(
         { object: 'Date', property: 'now', message: 'No wall-clock in the sim. Ticks only.' },
       ],
       // Regen and dormancy read `health.lastHurtTick`. A site that takes hp by
-      // hand skips it, as the damage-over-time tick did (#130).
-      'no-restricted-syntax': ['error',
-        { selector: "AssignmentExpression[operator='-='][left.property.name='hp']", message: 'Take hp with combat.hurt(), which records the hurt.' },
-        { selector: "AssignmentExpression[left.property.name='hp'] > BinaryExpression.right[operator='-']", message: 'Take hp with combat.hurt(), which records the hurt.' },
-      ],
+      // hand skips it, as the damage-over-time tick did (#130). Each selector
+      // matches both `x.hp` and `x['hp']`.
+      'no-restricted-syntax': ['error', ...[
+        "AssignmentExpression[operator='-='] > MemberExpression.left:matches([property.name='hp'], [property.value='hp'])",
+        "AssignmentExpression[operator='+='][right.operator='-'] > MemberExpression.left:matches([property.name='hp'], [property.value='hp'])",
+        "AssignmentExpression[operator='=']:matches([left.property.name='hp'], [left.property.value='hp']) > BinaryExpression.right[operator='-']",
+        "AssignmentExpression[operator='=']:matches([left.property.name='hp'], [left.property.value='hp']) > CallExpression.right BinaryExpression[operator='-']",
+        "UpdateExpression[operator='--'] > MemberExpression.argument:matches([property.name='hp'], [property.value='hp'])",
+        "CallExpression[callee.object.name='Object'][callee.property.name='assign'] Property:matches([key.name='hp'], [key.value='hp']) > BinaryExpression.value[operator='-']",
+      ].map((selector) => ({ selector, message: 'Take hp with combat.hurt(), which records the hurt.' }))],
     },
   },
 )

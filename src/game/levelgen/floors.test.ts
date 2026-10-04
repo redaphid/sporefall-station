@@ -6,9 +6,9 @@
 import { describe, expect, it } from 'vitest'
 import { serializeWorld } from '../serialize'
 import { createWorld, type RunMode } from '../world'
-import { BIOMES, biomeForFloor, biomeOrder, COMPLEX_MIN_FLOOR, floorSetting, OPENING_FLOORS } from './floors'
+import { BIOMES, biomeForFloor, biomeOrder, COMPLEX_MIN_FLOOR, floorSetting, OPENING_POOLS, openingDistricts } from './floors'
 import { generateLevel } from './generate'
-import { levelChecksum, THEMES, type Level } from './level'
+import { levelChecksum, themeNamed, THEMES, type Level } from './level'
 
 /** What a generated level actually is, read off the level itself. */
 const settingOf = (level: Level): string => (level.complex ? `complex:${level.complex.biome}` : `city:${level.theme}`)
@@ -18,13 +18,12 @@ const SEEDS = [1, 2, 3, 7, 18, 42, 1000, 12345, 20260715, 0x7fffffff, 0xdeadbeef
 describe('the floor plan', () => {
   it('opens on two city floors, then the complex from floor 3', () => {
     expect(COMPLEX_MIN_FLOOR).toBe(3)
-    expect(OPENING_FLOORS).toEqual([
-      { kind: 'city', theme: THEMES[0] },
-      { kind: 'city', theme: THEMES[1] },
-    ])
+    expect(OPENING_POOLS).toHaveLength(2)
     for (const seed of SEEDS) {
-      expect(floorSetting(seed, 1)).toEqual({ kind: 'city', theme: THEMES[0] })
-      expect(floorSetting(seed, 2)).toEqual({ kind: 'city', theme: THEMES[1] })
+      expect(floorSetting(seed, 1)).toEqual({ kind: 'city', theme: themeNamed('downtown') })
+      const second = floorSetting(seed, 2)
+      expect(second.kind).toBe('city')
+      expect(OPENING_POOLS[1]).toContain(second.kind === 'city' ? second.theme.name : undefined)
       for (let f = 3; f <= 30; f++) expect(floorSetting(seed, f).kind, `seed ${seed} floor ${f}`).toBe('complex')
     }
   })
@@ -36,7 +35,7 @@ describe('the floor plan', () => {
         const tag = `seed ${seed} floor ${f}: ${settingOf(level)}`
         if (f <= 2) {
           expect(level.complex, tag).toBeUndefined()
-          expect(level.theme, tag).toBe(THEMES[f - 1].name)
+          expect(level.theme, tag).toBe(openingDistricts(seed)[f - 1].name)
         } else {
           expect(level.complex, tag).toBeDefined()
           expect(level.complex!.biome, tag).toBe(biomeForFloor(seed, f))
@@ -82,20 +81,52 @@ describe('the floor plan', () => {
   })
 })
 
+describe('the opening districts', () => {
+  it('floor 1 is the landing downtown; floor 2 is a seeded pick of the other three, never a repeat', () => {
+    const seen = new Map<string, number>()
+    for (let seed = 0; seed < 3000; seed++) {
+      const [first, second] = openingDistricts(seed)
+      expect(first.name, `seed ${seed}`).toBe('downtown')
+      expect(second.name, `seed ${seed}`).not.toBe(first.name)
+      seen.set(second.name, (seen.get(second.name) ?? 0) + 1)
+    }
+    for (const name of ['slums', 'stillworks', 'culturebeds']) expect(seen.get(name) ?? 0, name).toBeGreaterThan(850)
+  })
+
+  it('every district a run can open on is reachable, and every district in THEMES is in some pool', () => {
+    const pooled = new Set(OPENING_POOLS.flat())
+    for (const t of THEMES) expect(pooled.has(t.name), t.name).toBe(true)
+  })
+
+  it('the generated floor 2 is built as its district: courtyard ground, plaza heart and roles', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const level = generateLevel(seed, 2)
+      const district = themeNamed(level.theme!)
+      for (const b of level.buildings) {
+        if (b.role !== 'bunker') expect(district.roles, `seed ${seed} ${district.name}`).toContain(b.role)
+      }
+      for (const sq of level.plazas ?? []) {
+        const heart = level.tiles[(sq.y + 3) * level.w + sq.x + 3]
+        expect(heart, `seed ${seed} ${district.name} plaza heart`).toBe(district.plazaHeart)
+      }
+    }
+  })
+})
+
 describe('the floor plan: degenerate floors and seeds', () => {
   it('floor 0, negative floors and non-finite floors build as floor 1', () => {
     for (const seed of SEEDS) {
       for (const f of [0, -1, -2, -3, -100, -(2 ** 31), Number.MIN_SAFE_INTEGER, -Infinity, Infinity, NaN]) {
-        expect(floorSetting(seed, f), `seed ${seed} floor ${f}`).toEqual(OPENING_FLOORS[0])
+        expect(floorSetting(seed, f), `seed ${seed} floor ${f}`).toEqual(floorSetting(seed, 1))
         expect(BIOMES, `seed ${seed} floor ${f}`).toContain(biomeForFloor(seed, f))
       }
     }
   })
 
   it('fractional floors round down', () => {
-    expect(floorSetting(9, 2.99)).toEqual(OPENING_FLOORS[1])
+    expect(floorSetting(9, 2.99)).toEqual(floorSetting(9, 2))
     expect(floorSetting(9, 3.5)).toEqual(floorSetting(9, 3))
-    expect(floorSetting(9, 0.5)).toEqual(OPENING_FLOORS[0])
+    expect(floorSetting(9, 0.5)).toEqual(floorSetting(9, 1))
   })
 
   it('degenerate seeds still give a full order of distinct biomes', () => {

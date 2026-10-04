@@ -2,9 +2,10 @@
 // the way you came. Covers the RNG-stream guarantee against a baseline of the
 // pre-extraction world (regenerate with scripts/test/gen-mission-baseline.mts,
 // extraction selection switched off; re-captured after #92 moved 10 idle worlds, after #114 moved 6:8 and 16:3, and after #130 moved 1:5, 6:8, 10:4, 16:3, and 18:5 and #131 moved 19:7), the full loop, carrier loss in solo and co-op, a
-// mid-floor late join, and the empty floor. Baseline keys are `seed:floor` for
-// the seeded city floors 1-2, and a fixture name for the deeper floors, which
-// run on levels frozen as authored fixtures.
+// mid-floor late join, and the empty floor. Baseline keys are `seed:floor`:
+// floor 1 is the seeded landing, floor 2 replays the city generator's slums
+// (play now draws floor 2's district); a fixture name keys the deeper floors,
+// which run on levels frozen as authored fixtures.
 
 import { describe, expect, it } from 'vitest'
 import baseline from '../__fixtures__/mission-baseline.json'
@@ -13,7 +14,7 @@ import { spawnPlayer } from '../player'
 import { emptyInput, type InputCmd } from '../types'
 import { createWorld, stationAlerted, tickWorld, type World } from '../world'
 import { deserializeWorld, serializeWorld } from '../serialize'
-import { expectWorldEqual, loadFixture, runTicks } from '../testkit'
+import { createCityWorld, expectWorldEqual, loadFixture, runTicks } from '../testkit'
 import type { Entity } from '../entity'
 import { extractionView, setupFloor } from './missions'
 
@@ -71,7 +72,7 @@ describe('adding extraction leaves the RNG stream alone', () => {
     let converted = 0
     for (const [key, want] of Object.entries(frozen)) {
       const [seed, floor] = key.split(':').map(Number)
-      const w = key.startsWith('frozen-') ? setUp(loadFixture(key)) : boot(seed, floor)
+      const w = key.startsWith('frozen-') ? setUp(loadFixture(key)) : floor === 1 ? boot(seed, floor) : setUp(createCityWorld(seed, floor))
       runTicks(w, idle(0), 30)
       if (w.mission.template === 'extraction') {
         converted++

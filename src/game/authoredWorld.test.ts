@@ -160,7 +160,6 @@ describe('seeded worlds: the generator path is unchanged', () => {
   // captured on main at b29a651, before the engine took authored state.
   const MAIN: Array<[seed: number, floor: number, hash: number, length: number]> = [
     [1, 1, 0x42622a9f, 82071],
-    [7, 2, 0x94e68ce0, 61403],
   ]
 
   it.each(MAIN)('seed %i floor %i serializes byte-identically to main', (seed, floor, hash, length) => {
@@ -171,16 +170,21 @@ describe('seeded worlds: the generator path is unchanged', () => {
 
   // The same run on deeper floors, on levels frozen as authored fixtures (the
   // station floors 3 and 5 and the city floor 4 those seeds built before the
-  // floor plan sent every floor from 3 indoors), so the pin no longer moves
-  // with the generator.
+  // floor plan sent every floor from 3 indoors), and on floor 2's slums from
+  // the city generator (play now draws floor 2's district), so the pin no
+  // longer moves with the floor plan. Re-captured when station floors stopped
+  // inheriting a city district's encounters and Still Row took over from
+  // `industrial`.
   const FROZEN: Array<[fixture: string, hash: number, length: number]> = [
-    ['frozen-1003-3', 0xb8977860, 119919],
-    ['frozen-42-5', 0xc1e3854e, 178788],
-    ['frozen-9-4', 0xf203d64f, 133727],
+    ['frozen-1003-3', 0x81ad843f, 109526],
+    ['frozen-42-5', 0x67926d31, 178769],
+    ['frozen-9-4', 0x197a6e68, 133727],
+    ['city:7:2', 0x171aacb1, 67306],
   ]
 
   it.each(FROZEN)('%s plays 120 ticks to the pinned save', (fixture, hash, length) => {
-    const s = play120(loadFixture(fixture))
+    const [kind, seed, floor] = fixture.split(':')
+    const s = play120(kind === 'city' ? createCityWorld(Number(seed), Number(floor)) : loadFixture(fixture))
     expect(s.length).toBe(length)
     expect(fnv(s)).toBe(hash)
   })

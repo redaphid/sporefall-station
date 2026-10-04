@@ -14,7 +14,6 @@
 // replacing "last room in the array") must keep every placement byte-identical
 // — floor 1 especially, whose layout+demos are frozen.
 import { describe, expect, it } from 'vitest'
-import { COMPLEX_MIN_FLOOR } from '../levelgen/floors'
 import { isFloorTile, isWallTile, Tile, tileAt } from '../levelgen/level'
 import { populateWorld } from '../populate'
 import { emptyInput } from '../types'
@@ -232,10 +231,10 @@ const PINNED: { seed: number; floor: number; tpl: string; bld: number; pos: [num
 describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor table)', () => {
   it('reproduces every pinned mission placement byte-identically', () => {
     for (const row of PINNED) {
-      // Floors 3+ build the indoor complex in play; these rows pin the
-      // raw-floor-themed CITY generator's placements, so replay floors 3+ on
-      // that city world.
-      const w = row.floor >= COMPLEX_MIN_FLOOR ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
+      // These rows pin the raw-floor-themed CITY generator's placements. Play
+      // now draws floor 2's district from the seed and builds 3+ indoors, so
+      // every row past the landing replays on that city world.
+      const w = row.floor >= 2 ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
       // An extraction is a steal with different completion rules and the same
       // placement, so it must land exactly where the pinned steal did.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateCityLevel, generateLevel } from './generate'
-import { isWallTile, Tile, TileGrid, WALL_CUT_OUTSIDE, type Building, type Level } from './level'
+import { isWallTile, themeNamed, Tile, TileGrid, WALL_CUT_OUTSIDE, type Building, type Level } from './level'
 import { ALLEY_W, BOULEVARD_W, cutLotsVaried, STREET_W } from './lots'
 import { mulberry32 } from '../rng'
 import type { Rect } from './rooms'
@@ -238,9 +238,10 @@ describe('courtyard compound archetype', () => {
     for (const { seed, floor, level, b } of compounds(40)) {
       const tag = `seed ${seed} floor ${floor}`
       const reach = spawnReach(level)
-      // The courtyard: grass strictly inside the building footprint.
+      // The courtyard: the district's pit ground strictly inside the footprint.
       const inner: Rect = { x: b.rect.x + 2, y: b.rect.y + 2, w: b.rect.w - 4, h: b.rect.h - 4 }
-      expect(rectHasReachable(level, reach, inner, Tile.Grass), `${tag}: pit unreachable/missing`).toBe(true)
+      const ground = themeNamed(level.theme!).courtyardGround
+      expect(rectHasReachable(level, reach, inner, ground), `${tag}: pit unreachable/missing`).toBe(true)
       // Every band room still opens somewhere (courtyard or neighbour).
       for (const room of b.rooms) {
         expect(rectHasReachable(level, reach, room, Tile.Floor), `${tag}: compound room ${room.x},${room.y} trapped`).toBe(true)

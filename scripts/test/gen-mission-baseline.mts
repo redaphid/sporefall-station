@@ -7,7 +7,8 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { populateWorld } from '../../src/game/populate'
 import { spawnPlayer } from '../../src/game/player'
 import { emptyInput } from '../../src/game/types'
-import { createWorld, tickWorld, type World } from '../../src/game/world'
+import { createWorld, tickWorld, worldFromState, type World } from '../../src/game/world'
+import { generateCityLevel } from '../../src/game/levelgen/generate'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../../src/game/serialize'
 import { setupFloor } from '../../src/game/systems/missions'
 
@@ -27,7 +28,11 @@ const record = (key: string, w: World): void => {
   for (let i = 0; i < 30; i++) tickWorld(w, new Map([[0, emptyInput()]]))
   out[key] = { template: w.mission.template, hash: fnv(JSON.stringify(serializeWorld(w))) }
 }
-for (let seed = 1; seed <= 20; seed++) for (let floor = 1; floor <= 2; floor++) record(`${seed}:${floor}`, createWorld(seed, floor))
+// Floor 2 replays the city generator's slums: play now draws floor 2's district.
+for (let seed = 1; seed <= 20; seed++) {
+  record(`${seed}:1`, createWorld(seed, 1))
+  record(`${seed}:2`, worldFromState({ level: generateCityLevel(seed, 2), seed, floor: 2 }))
+}
 for (const name of ['frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4', 'frozen-1003-3', 'frozen-42-5', 'frozen-9-4']) record(name, deserializeWorld(JSON.parse(readFileSync(`src/game/__fixtures__/${name}.json`, 'utf8')) as WorldJson))
 writeFileSync(process.argv[2], JSON.stringify(out, null, 1) + '\n')
 console.log(`${Object.keys(out).length} worlds`)

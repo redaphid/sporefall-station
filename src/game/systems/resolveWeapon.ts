@@ -1,14 +1,19 @@
-// The SINGLE weapon-mod composition point. `resolveWeapon` is a PURE function of
-// (immutable WeaponDef, mod list) — no clock, no RNG — so it is trivially unit-
-// testable and identical on every peer. It folds the MODS registry over the base
-// def in SORTED-KEY order, so the same card set yields the same gun regardless of
-// PICK order (Brotato's additive-pool lesson + RoR2's per-effect curves). Every
+// The SINGLE weapon-mod composition point, resolving ONE CAST. The fire path
+// (combat.fireWeapon) splits the mod list into casts (systems/modSequence), and
+// each cast is its modifiers plus at most one element, which ends the cast.
+// `resolveWeapon` is a PURE function of (immutable WeaponDef, cast mods) — no
+// clock, no RNG — so it is trivially unit-testable and identical on every peer.
+// It folds the MODS registry over the base def in SORTED-KEY order, so a cast's
+// stats do not depend on the order of its modifiers (Brotato's additive-pool
+// lesson + RoR2's per-effect curves). The cast's element, if it has one, is the
+// hit's element, and every shard, fragment and blast the cast's rounds spawn
+// carries it too (`carries`); otherwise the hit takes the base weapon's. Every
 // output field is clamped to stay finite and non-degenerate under huge stacks
-// (cooldown floored ≥1 so fireRate can't divide-by-zero; chance-like fields use a
-// hyperbolic curve that approaches but never reaches 100%).
+// (cooldown floored ≥1 so fireRate can't divide-by-zero; chance-like fields use
+// a hyperbolic curve that approaches but never reaches 100%).
 
 import type { WeaponDef, StatusApply } from '../data/items'
-import { MODS, modMaxStacks, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
+import { MODS, modMaxStacks, normalizeMods, type BulletBehavior, type ResolvedTrigger, type WeaponStats } from '../data/mods'
 import type { WeaponMod } from '../entity'
 
 export interface ResolvedWeapon {
@@ -19,10 +24,27 @@ export interface ResolvedWeapon {
   spread: number
   projectileSpeed: number
   knockback: number
-  /** Element applied on hit (base weapon's, or set by an elemental mod). */
+  /** Element applied on hit (base weapon's, or the cast's element mod's). */
   onHit?: StatusApply
+  /** The cast's mods, in normalizeMods form. Absent when none. A round's
+   * provenance is built from this, so its look shows only what the cast runs. */
+  mods?: WeaponMod[]
   behavior: BulletBehavior
+  /** The element each self-hitting behavior carries. */
+  carries: CarriedElements
   triggers: ResolvedTrigger[]
+}
+
+/** The element mod id carried by each behavior whose hits are its own: split
+ * shards, splinter shrapnel, and the explosive blast. It is the cast's element
+ * mod, the payload that ends the cast. A base weapon's own element is not a
+ * mod, so it rides none of them. A key is absent when the weapon lacks the
+ * behavior or the cast holds no element mod.
+ * A trigger's blast carries the same, on `ResolvedTrigger.explode.element`. */
+export interface CarriedElements {
+  split?: string
+  splinter?: string
+  explode?: string
 }
 
 // Clamp bounds — the anti-blowup guardrails (all finite, no NaN/Infinity).
@@ -46,10 +68,11 @@ const zeroBehavior = (): BulletBehavior => ({
 })
 
 /**
- * Fold a mod list over the immutable base weapon into an effective, resolved
- * weapon + bullet-behavior spec. Pure and total: sum all additive deltas
- * (× stacks), multiply all factors (^ stacks), then clamp. Mods are visited in
- * sorted registry-id order so composition is order-independent and deterministic.
+ * Fold one cast's mods over the immutable base weapon into an effective,
+ * resolved weapon + bullet-behavior spec. Pure and total: sum all additive
+ * deltas (× stacks), multiply all factors (^ stacks), then clamp. Stats fold in
+ * sorted registry-id order, so they are order-independent. The element (onHit)
+ * is the cast's element mod, falling back to the base weapon's.
  */
 export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []): ResolvedWeapon => {
   // Accumulators: additive pool (starts at base) and multiplicative product.
@@ -66,12 +89,14 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
   // A hyperbolic field can't just be summed: track its per-stack rate × total stacks.
   let lifestealStacks = 0
   const lifestealPerStack = MODS.lifesteal.behavior!.lifestealFrac!
-  let onHit: StatusApply | undefined = base.onHit
   const triggers: ResolvedTrigger[] = []
 
-  // Sorted-key fold → order-independence. Skip unknown ids and non-positive stacks.
-  const active = [...mods]
-    .filter((m) => MODS[m.id] && m.stacks > 0)
+  const known = mods.filter((m) => MODS[m.id] && m.stacks > 0)
+  const element = known.find((m) => MODS[m.id].onHit)?.id
+  const onHit: StatusApply | undefined = element ? MODS[element].onHit : base.onHit
+
+  // Sorted-key fold → order-independent stats. Skip unknown ids and non-positive stacks.
+  const active = known
     .map((m) => ({ def: MODS[m.id], stacks: Math.min(Math.floor(m.stacks), modMaxStacks(m.id)) }))
     .sort((a, b) => a.def.id.localeCompare(b.def.id))
 
@@ -89,17 +114,23 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       if (b.explodeDamage) behavior.explodeDamage += b.explodeDamage * stacks
       if (b.lifestealFrac) lifestealStacks += stacks // hyperbolic — folded below
     }
-    if (def.onHit) onHit = def.onHit // last (sorted-key) elemental mod wins the single onHit slot
     if (def.trigger) {
       const t = def.trigger
       triggers.push({
         event: t.event,
-        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks } } : {}),
+        ...(t.explode ? { explode: { radius: t.explode.radius, damage: t.explode.damage * stacks, ...(element ? { element } : {}) } } : {}),
       })
     }
   }
 
   behavior.lifestealFrac = lifestealStacks > 0 ? hyperbolic(lifestealPerStack, lifestealStacks) : 0
+  const carries: CarriedElements = element
+    ? {
+        ...(behavior.split > 0 ? { split: element } : {}),
+        ...(behavior.splinter > 0 ? { splinter: element } : {}),
+        ...(behavior.explodeRadius > 0 && behavior.explodeDamage > 0 ? { explode: element } : {}),
+      }
+    : {}
 
   return {
     base,
@@ -110,6 +141,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
     projectileSpeed: clamp(add.projectileSpeed * mul.projectileSpeed, 0.5, SPEED_CAP),
     knockback: clamp(add.knockback * mul.knockback, 0, KNOCKBACK_CAP),
     onHit,
+    mods: normalizeMods(known),
     behavior: {
       pierce: clamp(Math.round(behavior.pierce), 0, BEHAVIOR_CAP),
       bounce: clamp(Math.round(behavior.bounce), 0, BEHAVIOR_CAP),
@@ -120,6 +152,7 @@ export const resolveWeapon = (base: WeaponDef, mods: readonly WeaponMod[] = []):
       splinter: clamp(Math.round(behavior.splinter), 0, BEHAVIOR_CAP),
       lifestealFrac: clamp(behavior.lifestealFrac, 0, 0.95),
     },
+    carries,
     triggers,
   }
 }

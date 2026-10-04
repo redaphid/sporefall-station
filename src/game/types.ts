@@ -25,11 +25,14 @@ export interface InputCmd {
   throwItem: boolean
   /** Dodge-roll this tick (edge-triggered): a burst + i-frames in the move dir. */
   roll: boolean
-  /** Sequenced mods only: swap two entries of the wielded weapon's mod list this
-   * tick, packed `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered
-   * and OPTIONAL: absent on every input that does not ask, so default-mode
-   * inputs and recordings are unchanged. Ignored unless World.modCasting is set. */
+  /** Swap two entries of the wielded weapon's mod list this tick, packed
+   * `(a << 8) | b` (systems/modSequence packModSwap). Edge-triggered and
+   * OPTIONAL: absent on every input that does not ask. */
   modSwap?: number
+  /** Floor draft: take card N of this player's hand this tick (a tap or click on
+   * the card). Optional and edge-triggered like `modSwap`; pad and keyboard
+   * players steer the hand with move + attack/interact instead. */
+  draftPick?: number
 }
 
 export const emptyInput = (): InputCmd => ({
@@ -108,6 +111,9 @@ export type SimEvent =
   /** A `contain` mission's Spore Node bloomed (soft-fail): the room floods with
    * spores. Not a loss — just harder. */
   | { type: 'bloom'; x: number; y: number; entityId: EntityId }
+  /** An `extraction` carrier went down or died: the prize (new pickup `entityId`)
+   * lies where they fell. */
+  | { type: 'prizeDropped'; entityId: EntityId; byId: EntityId; x: number; y: number }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */
@@ -116,7 +122,9 @@ export type SimEvent =
    * (`entityId`) at `x,y`. `fromId` is the corpse it fell from. Rolled from the
    * world RNG at the kill site — a pure function of seed + inputs. */
   | { type: 'weaponDrop'; entityId: EntityId; fromId: EntityId; itemId: string; x: number; y: number }
-  | { type: 'explosion'; x: number; y: number; radius: number }
+  /** `element`: the element mod id the blast applies to every body it damages.
+   * Absent on a plain blast. The renderer tints the blast from it. */
+  | { type: 'explosion'; x: number; y: number; radius: number; element?: string }
   | { type: 'shatter'; x: number; y: number; entityId: EntityId }
   | { type: 'shock'; x: number; y: number; targetId: EntityId }
   | { type: 'use'; entityId: EntityId; byId: EntityId }
@@ -140,6 +148,17 @@ export type SimEvent =
    * klaxon, the banner and the alarm wash all hang off it. */
   | { type: 'stationAlert'; focusId: EntityId; doorsOpened: number; hunters: number }
   | { type: 'floorChange'; floor: number }
+  /** A player took `modId` from their floor-draft hand onto `weapon` (`none` if
+   * they had no gun to hold it). `timedOut` = the hand ran out of time and took
+   * the card under the cursor. */
+  | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
+  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+   * raise `w.alarm` to `level`. */
+  | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
+  /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
+  | { type: 'lockdown' }
+  /** #86 — the lockdown's seal cycle ran out: the Launch Bay is open. */
+  | { type: 'lockdownLifted' }
   /** A body took the stairs: it now stands on the landing of storey `z`. */
   | { type: 'storeyChange'; entityId: EntityId; z: number; x: number; y: number }
   | { type: 'noise'; x: number; y: number }
@@ -190,6 +209,12 @@ export type SimEvent =
   | { type: 'sapperCharge'; entityId: EntityId; doorId: EntityId; x: number; y: number; fuse: number }
   /** A hound pack spotted `targetId` and began to encircle it. */
   | { type: 'packHunt'; groupId: number; targetId: EntityId; count: number }
+  /** A floor modifier took hold on floor entry (floorModifiers.ts). */
+  | { type: 'floorModifier'; kind: 'bogTide' | 'brownout' | 'hunted' }
+  /** Bog tide turned: `rising` = the low ground is flooding now. */
+  | { type: 'tide'; rising: boolean }
+  /** A tracker pack landed on a `hunted` floor, already on `targetId`'s scent. */
+  | { type: 'huntersArrive'; groupId: number; x: number; y: number; count: number; targetId: EntityId }
   /** A pack's ring closed (or timed out) on `targetId` — now it goes in. */
   | { type: 'packClose'; groupId: number; targetId: EntityId; closed: boolean }
   /** A pack went MANHUNTER on `targetId` (someone hurt one of them, or a howl carried). */

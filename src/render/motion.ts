@@ -17,14 +17,22 @@
  * facing mirror's sign composes outside); `rot` adds to sprite rotation in
  * parent space (visually identical whether or not the sprite is mirrored);
  * `alpha` multiplies the sprite alpha. Only the deliberate hop components
- * (walk bob, attack lunge) ever move `dy` — every other state keeps dy = 0 so
- * the feet never leave the ground.
+ * (walk bob, waddle rise, attack lunge) ever move `dy` — every other state
+ * keeps dy = 0 so the feet never leave the ground.
  *
  * That last sentence holds for `stride`, which is every character with legs and
  * the default for anything not listed in LOCOMOTION. It is deliberately NOT true
  * of `hover`, whose whole job is to keep the body off the floor — see
  * LocomotionStyle below. Read "feet never leave the ground" as a statement about
  * bodies that have feet, not as a global invariant of this module.
+ *
+ * The walk bob, idle breath, hover float and pulse are CYCLES, standing in for
+ * frames the art does not have. When a pack draws a state's loop itself (an
+ * 8-frame walk cycle, a drone's drawn hover), the frames carry that cycle and
+ * the procedural one stays off (`drawnCycle`): two unsynchronised bobs beat
+ * against each other. Lean and the one-shots (lunge, flinch, fall, landing
+ * squash) respond to what the sim did, which no looping clip draws, so they
+ * always apply.
  */
 
 import type { AnimStateName } from './animState'
@@ -56,6 +64,10 @@ export const MOTION = {
   /** PULSE locomotion: volume-ish-preserving radial breath (sx up as sy down).
    * Never touches dy — a sac sitting on the ground stays on the ground. */
   pulse: { amp: 0.06, freq: 0.13, movingScale: 1.6 },
+  /** WADDLE locomotion: short legs, so the gait reads as the whole body rocking
+   * over each foot in turn (rot ±rad around the feet) and rising up to `rise` px
+   * over the planted one. One rock left and right is two steps. */
+  waddle: { rad: 0.13, freq: 0.4, rise: 1 },
 } as const
 
 /** How a character's body carries itself. The 48px canvas is the reason this
@@ -67,21 +79,24 @@ export const MOTION = {
  *   and the only style that assumes legs.
  * - `hover`  — never touches the floor: continuous float in every state. Feet
  *   deliberately DO leave the ground; that is the point.
- * - `pulse`  — grounded but boneless: radial breath, no vertical travel. */
-export type LocomotionStyle = 'stride' | 'hover' | 'pulse'
+ * - `pulse`  — grounded but boneless: radial breath, no vertical travel.
+ * - `waddle` — a stride on legs too short to read: the body rocks side to side
+ *   with each step instead of bobbing. Leans and breathes like `stride`. */
+export type LocomotionStyle = 'stride' | 'hover' | 'pulse' | 'waddle'
 
-/** Per-archetype locomotion. Anything absent is `stride`, so adding a character
- * never silently changes how it moves — you opt in. Keyed by the same archetype
- * string the art registry uses. */
-export const LOCOMOTION: Readonly<Record<string, LocomotionStyle>> = {
-  'spore-drone': 'hover',
-  'gloom-lurker': 'hover',
-  'brood-sac': 'pulse',
-  'sporeling-mite': 'pulse',
-}
+/** Locomotion per drawn body, keyed by ART KIND (ArtRegistry.artKind), not by
+ * sim archetype: the swampspace `cop` is a spore-drone, the city `cop` is a
+ * human. Anything absent is `stride`, so adding a character never silently
+ * changes how it moves — you opt in. */
+export const LOCOMOTION: ReadonlyMap<string, LocomotionStyle> = new Map([
+  ['spore-drone', 'hover'],
+  ['gloom-lurker', 'hover'],
+  ['brood-sac', 'pulse'],
+  ['sporeling-mite', 'waddle'],
+])
 
-export const locomotionFor = (archetype: string): LocomotionStyle =>
-  LOCOMOTION[archetype] ?? 'stride'
+export const locomotionFor = (kind: string | undefined): LocomotionStyle =>
+  (kind === undefined ? undefined : LOCOMOTION.get(kind)) ?? 'stride'
 
 export interface MotionInput {
   state: AnimStateName
@@ -105,6 +120,9 @@ export interface MotionInput {
   /** How this body carries itself. Omitted = `stride`, so every existing caller
    * keeps its current motion exactly. */
   style?: LocomotionStyle
+  /** The frames on screen are the pack's own loop for this state (2+ drawn
+   * frames), so walk/idle add no procedural cycle on top. */
+  drawnCycle?: boolean
 }
 
 /** Transform offsets to compose onto the sprite (identity = no motion). */
@@ -130,7 +148,7 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)
  * have feet. A drone that plants itself on the floor reads as a bug. */
 const applyLocomotion = (
   p: MotionPose,
-  style: Exclude<LocomotionStyle, 'stride'>,
+  style: 'hover' | 'pulse',
   m: MotionInput,
   moving: boolean,
 ): void => {
@@ -153,14 +171,22 @@ const applyLocomotion = (
 export const composeMotion = (m: MotionInput): MotionPose => {
   const p: MotionPose = { ...IDENTITY_POSE }
   const style = m.style ?? 'stride'
+  const legged = style === 'stride' || style === 'waddle'
 
   switch (m.state) {
     case 'walk': {
-      if (style === 'stride') {
-        p.dy += walkBob(m.t)
+      if (legged) {
+        if (!m.drawnCycle && style === 'waddle') {
+          // Phase-shifted per entity so a swarm does not rock in unison.
+          const rock = Math.sin(m.t * MOTION.waddle.freq + (m.id % 32))
+          p.rot += rock * MOTION.waddle.rad
+          p.dy -= Math.abs(rock) * MOTION.waddle.rise
+        } else if (!m.drawnCycle) {
+          p.dy += walkBob(m.t)
+        }
         const lean = Math.max(-1, Math.min(1, m.vx / MOTION.lean.refSpeed))
         p.rot += lean * MOTION.lean.rad
-      } else {
+      } else if (!m.drawnCycle) {
         // A hoverer/pulser in motion does MORE of what it already does; it does
         // not acquire a gait. No lean either — leaning implies planted feet to
         // lean against.
@@ -169,7 +195,8 @@ export const composeMotion = (m: MotionInput): MotionPose => {
       break
     }
     case 'idle': {
-      if (style === 'stride') {
+      if (m.drawnCycle) break
+      if (legged) {
         // Slow breathe, phase-shifted per entity so crowds don't sync.
         p.sy += Math.sin(m.t * MOTION.breathe.freq + (m.id % 32)) * MOTION.breathe.amp
       } else {

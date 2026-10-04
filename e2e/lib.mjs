@@ -95,7 +95,7 @@ export const muxVideo = (name, videoDir) => {
  *
  * @param {{name:string, params:object,
  *          stills:{tick:number,label:string,act?:(page:import('playwright').Page)=>Promise<void>}[],
- *          readState:() => any, expect:(s:any)=>string[],
+ *          readState:() => any, expect:(s:any)=>string[], ignoreConsole?:RegExp,
  *          beforeTicks?:(page:import('playwright').Page)=>Promise<void>}} spec
  */
 export const record = async (spec) => {
@@ -110,7 +110,7 @@ export const record = async (spec) => {
   const page = await context.newPage()
   const errs = []
   page.on('pageerror', (e) => errs.push(String(e)))
-  page.on('console', (m) => m.type() === 'error' && errs.push(`console: ${m.text()}`))
+  page.on('console', (m) => m.type() === 'error' && !spec.ignoreConsole?.test(m.text()) && errs.push(`console: ${m.text()}`))
 
   const tick = () => page.evaluate(() => window.__world?.tick ?? 0)
   await page.goto(url, { waitUntil: 'networkidle' })

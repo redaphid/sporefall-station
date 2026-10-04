@@ -33,7 +33,26 @@ describe('deep links vs the saved run', () => {
     expect(wantsFreshBuild(l)).toBe(false)
   })
 
-  it.each(['', '?mode=solo', '?mode=solo&seed=18', '?scenario=', '?room=abc&name=Aaron'])(
+  // A profile held an autosaved seed-7 run; `/?mode=solo&seed=31337&debug` came
+  // up as that seed-7 run at tick ~10k. Someone who typed a seed wants that seed.
+  it.each(['?mode=solo&seed=31337&debug', '?seed=7', '?mode=host&seed=18'])(
+    '%s names the world by seed: no resume, no autosave, no update wait',
+    (qs) => {
+      const l = link(qs)
+      expect(resumesSave(l)).toBe(false)
+      expect(persistsRun(l)).toBe(false)
+      expect(wantsFreshBuild(l)).toBe(false)
+    },
+  )
+
+  it('parses the seed the run will use', () => {
+    expect(link('?seed=31337').seed).toBe(31337)
+    expect(link('?seed=0').seed).toBeNull()
+    expect(link('?seed=abc').seed).toBeNull()
+    expect(link('?seed=').seed).toBeNull()
+  })
+
+  it.each(['', '?mode=solo', '?seed=', '?seed=0', '?seed=abc', '?scenario=', '?room=abc&name=Aaron'])(
     '%s is an ordinary run: resumes and autosaves',
     (qs) => {
       const l = link(qs)

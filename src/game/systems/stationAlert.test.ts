@@ -21,7 +21,7 @@ import { deserializeWorld, serializeWorld } from '../serialize'
 import { expectWorldEqual, runTicks } from '../testkit'
 import { ALERT_BROADCAST_TICKS, setupFloor } from './missions'
 import { ALERT_BATTLE_MULT, arbitrateGoal, decide } from './behaviors'
-import { BATTLE, FLEE, PURSUE } from './goals'
+import { BATTLE, PURSUE, FLEE } from './goalCodes'
 
 const idle = (...ids: number[]): Map<number, InputCmd> => new Map(ids.map((id) => [id, emptyInput()]))
 
@@ -38,6 +38,12 @@ const bootTemplate = (template: string, floors: number[], players = 1): World =>
   for (let seed = 1; seed <= 300; seed++) {
     for (const floor of floors) {
       const w = boot(seed, floor, players)
+      // An extraction is a re-ruled steal on an identical world; turn it back
+      // so these tests keep the exact floors they were written against.
+      if (template === 'steal' && w.mission.template === 'extraction') {
+        w.mission.template = 'steal'
+        delete w.mission.extractPoint
+      }
       if (w.mission.template !== template) continue
       if (!w.entities.some((e) => e.ai && !e.dead && !e.playerCtl)) continue
       return w

@@ -1,7 +1,7 @@
-// #53 — still captures for the DRAFT SCREEN and the tap-INSPECT card showing a
-// build. Boots the real bundle with a modded shotgun injected (?world=@inline),
-// shows the deterministic pick-1-of-3 draft, applies a pick, then selects the
-// player so the overlay renders the inspect card listing the gun's mods.
+// #53/#84 — still captures for the DRAFT SCREEN and the tap-INSPECT card showing a
+// build. Boots the real bundle with a modded shotgun and an open floor-draft hand
+// injected (?world=@inline), taps a card (the sim applies the pick), then selects
+// the player so the overlay renders the inspect card listing the gun's mods.
 import { chromium } from 'playwright'
 import { cpSync, mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -16,8 +16,9 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 const w = JSON.parse(JSON.stringify(base))
 const p = w.entities.find((e) => e.playerCtl)
 p.combat.weapon = 'shotgun'
-p.playerCtl.inventory = [{ itemId: 'shotgun', qty: 99, mods: [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }, { id: 'lifesteal', stacks: 2 }] }]
-p.playerCtl.activeSlot = 0
+p.loadout = { activeSlot: 0, inventory: [{ itemId: 'shotgun', qty: 99, mods: [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }, { id: 'lifesteal', stacks: 2 }] }] }
+const offer = ['pierce', 'frost', 'overload']
+p.playerCtl.draft = { offer, cursor: 0, until: w.tick + 100000, held: 7 }
 const pid = p.id
 
 mkdirSync(OUT, { recursive: true })
@@ -30,17 +31,15 @@ page.on('pageerror', (e) => errs.push(String(e)))
 await page.goto(`${BASE}/?e2e=1&mode=solo&world=@inline&seed=7&zoom=2`, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => typeof window.__loadWorld === 'function', { timeout: 20000 })
 await page.evaluate((j) => window.__loadWorld(j), w)
-// boot only defines the e2e hooks AFTER the @inline world injection unblocks it.
-await page.waitForFunction(() => typeof window.__draftShow === 'function', { timeout: 20000 })
+await page.waitForSelector('.draft-card', { timeout: 20000 })
 await page.waitForTimeout(400)
 
-// --- 1) the draft screen (deterministic pick-1-of-3) ---
-const offer = JSON.parse(await page.evaluate(() => window.__draftShow(1)))
-await page.waitForTimeout(400)
+// --- 1) the draft screen (pick-1-of-3, drawn from the injected hand) ---
 await page.screenshot({ path: join(OUT, 'sig-draft-screen.png') })
 
-// pick the first offered card (headless), then close the screen
-await page.evaluate((id) => window.__draftPick(id), offer[0])
+// tap the first card; the pick rides the next InputCmd and the sim applies it
+await page.click(`.draft-card[data-mod-id="${offer[0]}"]`)
+await page.waitForSelector('.draft-card', { state: 'detached', timeout: 5000 })
 await page.waitForTimeout(300)
 
 // --- 2) the tap-inspect card showing the build ---
@@ -48,7 +47,7 @@ await page.evaluate((id) => window.__verb(`set ${id} {"selected":true}`), pid)
 await page.waitForTimeout(500)
 await page.screenshot({ path: join(OUT, 'sig-inspect-card.png') })
 
-const modsAfter = JSON.parse(await page.evaluate((id) => window.__verb(`get ${id}`), pid)).playerCtl.inventory[0].mods
+const modsAfter = JSON.parse(await page.evaluate((id) => window.__verb(`get ${id}`), pid)).loadout.inventory[0].mods
 await page.close()
 await ctx.close()
 await browser.close()

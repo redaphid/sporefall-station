@@ -230,7 +230,9 @@ describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor ta
       // placements, so replay floors 3+ on that city world.
       const w = row.floor >= COMPLEX_MIN_FLOOR ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
-      expect(w.mission.template, ctx).toBe(row.tpl)
+      // An extraction is a steal with different completion rules and the same
+      // placement, so it must land exactly where the pinned steal did.
+      expect(w.mission.template === 'extraction' ? 'steal' : w.mission.template, ctx).toBe(row.tpl)
       expect(w.mission.targetBuilding, ctx).toBe(row.bld)
       const t = w.byId.get(w.mission.targetEntityId!)!
       expect([t.pos.x, t.pos.y], ctx).toEqual(row.pos)

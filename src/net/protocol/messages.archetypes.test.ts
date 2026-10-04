@@ -4,7 +4,7 @@ import { MODS } from '../../game/data/mods'
 import { NPCS } from '../../game/data/npcs'
 import { OBJECTS } from '../../game/data/objects'
 import { PROTOCOL_VERSION } from '../types'
-import { ARCHETYPES, kindOf, KEYCARD_ARCHETYPE, normalizeArchetype, WIRE_MODS } from './messages'
+import { ARCHETYPES, kindOf, KEYCARD_ARCHETYPE, normalizeArchetype, WIRE_MODS, WIRE_STATUSES } from './messages'
 
 /**
  * The wire archetype registry must COVER the game registries.
@@ -112,10 +112,12 @@ describe('ARCHETYPES covers everything the game can spawn', () => {
       version: PROTOCOL_VERSION,
       archetypes: ARCHETYPES.length,
       mods: WIRE_MODS.length,
+      statuses: WIRE_STATUSES.length,
     }).toEqual({
-      version: 4,
+      version: 5,
       archetypes: 95,
       mods: 18,
+      statuses: 6,
     })
   })
 })

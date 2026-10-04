@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deep-link e2e: ?scenario= always wins over the saved run and never writes to
+# Deep-link e2e: ?scenario= and ?seed= always win over the saved run and never writes to
 # it; an unknown scenario is a visible error. See deep-link-wins.mjs.
 #
 # OWN-SERVER VERIFICATION: unique port + --strictPort, and the served HTML must

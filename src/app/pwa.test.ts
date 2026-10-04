@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
-import { shouldRegisterSw, SW_UPDATE_INTERVAL_MS, type PwaEnv } from './pwa'
+import { shouldRegisterSw, SW_UPDATE_INTERVAL_MS, updateWaiting, type PwaEnv } from './pwa'
 
 // The offline service worker is WEB-ONLY on purpose. Getting this guard wrong is
 // not a cosmetic bug in either direction:
@@ -53,5 +53,23 @@ describe('SW_UPDATE_INTERVAL_MS', () => {
   it('re-checks often enough that a deploy lands the same day, without polling hot', () => {
     expect(SW_UPDATE_INTERVAL_MS).toBeGreaterThanOrEqual(60 * 1000)
     expect(SW_UPDATE_INTERVAL_MS).toBeLessThanOrEqual(24 * 60 * 60 * 1000)
+  })
+})
+
+describe('updateWaiting', () => {
+  const worker = { id: 'new' }
+  const running = { id: 'old' }
+
+  it('is the waiting worker when it would replace a running one', () => {
+    expect(updateWaiting({ active: running, waiting: worker })).toBe(worker)
+  })
+
+  it('is null for a first install, which activates by itself and replaces nothing', () => {
+    expect(updateWaiting({ active: null, waiting: worker })).toBeNull()
+  })
+
+  it('is null with nothing waiting or no registration yet', () => {
+    expect(updateWaiting({ active: running, waiting: null })).toBeNull()
+    expect(updateWaiting(undefined)).toBeNull()
   })
 })

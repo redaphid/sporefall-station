@@ -1,7 +1,8 @@
 import type { Entity } from '../game/entity'
+import type { ModifierView } from '../game/floorModifiers'
 import type { Level } from '../game/levelgen/level'
 import type { Annotation, SimEvent } from '../game/types'
-import type { ModCasting, RunMode } from '../game/world'
+import type { RunMode } from '../game/world'
 
 /** What the render layer consumes each frame. */
 export interface RenderView {
@@ -16,19 +17,23 @@ export interface RenderView {
    * can hyperlink the objective to it. Absent for `reach` missions and on
    * clients running an older host. */
   missionTargetId?: number
+  /** `extraction` mission still open: the entry tile to get back to, and
+   * whether the prize is in a standing player's hands. Absent otherwise. */
+  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   /** STATION ALERT — this floor's objective is done and the escape run is on.
    * Drives the persistent pulsing alert wash (render/juice.ts `alertWash`), as
    * opposed to the one-shot klaxon/banner that ride the `stationAlert` event.
    * Optional so a session that doesn't surface it simply reads calm. */
   alert?: boolean
+  /** #86 LOCKDOWN — the alarm sealed the Launch Bay. `{}` while it waits on the
+   * objective; `secondsLeft` once the post-objective seal is counting down.
+   * Absent = no lockdown. */
+  lockdown?: { secondsLeft?: number }
   /** Difficulty rules in force (host truth; clients mirror it from the host). */
   mode?: RunMode
   /** Party-shared comebacks left this run (only meaningful in `normal`). */
   revivesLeft?: number
-  /** Mod casting rule in force (host truth; clients mirror it from GameStart).
-   * Absent = the default fold. Drives the HUD's sequence strip. */
-  modCasting?: ModCasting
   /** The HOST's sim tick the view reflects. Equal to `tick` on a host; on a
    * client it is the newest snapshot's tick (the client's own `tick` is a local
    * frame counter). Compared against host-tick deadlines such as a weapon's
@@ -36,6 +41,8 @@ export interface RenderView {
   simTick?: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
+  /** This floor's modifier as the HUD and renderer show it. Absent = clean floor. */
+  modifier?: ModifierView
   /** Inert on-screen annotations to draw over the scene (see game/types.ts).
    * Empty/omitted on sessions that don't surface them (clients mirror host state). */
   annotations?: readonly Annotation[]

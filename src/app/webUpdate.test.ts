@@ -434,6 +434,19 @@ describe('createWebUpdater — the swap, once everything is verified', () => {
 // A deep link with `?mode=` skips the picker — the only safe moment a boot used
 // to offer — so on a stale service-worker bundle the new build downloaded in
 // the background and was never applied: the link ran on the build before it.
+describe('createWebUpdater.latest — the build Refresh names', () => {
+  it('is the newer published build once a check has seen one, and null otherwise', async () => {
+    const newer = createWebUpdater(harness({ installed: false }).deps)
+    expect(newer.latest).toBeNull()
+    await newer.check()
+    expect(newer.latest).toBe('900')
+
+    const current = createWebUpdater(harness({ appVersion: '900' }).deps)
+    await current.check()
+    expect(current.latest, 'named the running build as an update').toBeNull()
+  })
+})
+
 describe('createWebUpdater.freshen — a deep link runs on the current build', () => {
   it('hands the staged update over at boot, before any run exists', async () => {
     const h = harness()

@@ -9,17 +9,24 @@ import type { Entity, ItemStack } from './entity'
 import { generateCityLevel } from './levelgen/generate'
 import { serializeWorld } from './serialize'
 import { emptyInput, type InputCmd } from './types'
-import { createWorld, tickWorld, type RunMode, type World } from './world'
+import { tickWorld, worldFromState, type RunMode, type World } from './world'
 
 // The fixture loaders live in the vitest-free `./fixtures.ts` (the app's
 // `?world=` boot hook imports them too); re-export so tests keep one import site.
 export { loadFixture, loadFixtureJson } from './fixtures'
 
 /** Tick a world `n` times, feeding a fresh, defaulted clone of `inputs` each tick
- * (partial commands are filled from `emptyInput`). Returns the world for chaining. */
+ * (partial commands are filled from `emptyInput`). Returns the world for chaining.
+ * Fails the test if any tick leaves an hp that is not a whole number: the
+ * snapshot codec can only carry whole hp, so a fraction splits host from client. */
 export const runTicks = (w: World, inputs: Map<number, Partial<InputCmd>>, n: number): World => {
   for (let i = 0; i < n; i++) {
     tickWorld(w, new Map([...inputs].map(([slot, cmd]) => [slot, { ...emptyInput(), ...cmd }])))
+    for (const e of w.entities) {
+      if (e.health && !Number.isInteger(e.health.hp)) {
+        expect.fail(`tick ${w.tick}: ${e.archetype}#${e.id} hp ${e.health.hp} is not whole`)
+      }
+    }
   }
   return w
 }
@@ -51,13 +58,10 @@ export const arm = (e: Entity, weaponId: string): ItemStack => {
 /** A world on the sunken-streets CITY generator (raw-floor theme) for any floor.
  * Floors 3, 5, 7… build the indoor complex in play; tests of the city set-pieces
  * (bunkers, courtyard compounds, vaults, industrial squads) use this to keep
- * them covered on any floor. Not deserializable (its level checksum is the city
- * one, not seed+floor's). */
-export const createCityWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
-  const w = createWorld(seed, floor, mode, hostile)
-  w.level = generateCityLevel(seed, floor)
-  return w
-}
+ * them covered on any floor. To the engine this level is authored (it is not
+ * what seed+floor generates), so a snapshot carries it whole. */
+export const createCityWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
+  worldFromState({ level: generateCityLevel(seed, floor), seed, floor, mode, hostile })
 
 /** Assert two worlds are in an identical state by comparing their snapshots. */
 export const expectWorldEqual = (a: World, b: World): void => {

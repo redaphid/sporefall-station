@@ -106,6 +106,16 @@ describe('resolveWeapon — order independence (the key invariant)', () => {
     expect(a).toEqual(b)
     expect(a).toEqual(c)
   })
+  it("one cast: its element mod sets onHit, and its provenance is the whole cast", () => {
+    const cast = resolveWeapon(pistol, [{ id: 'overload', stacks: 1 }, { id: 'pierce', stacks: 1 }, { id: 'shock', stacks: 1 }])
+    expect(cast.onHit).toEqual({ status: 'electrified', ticks: 45 })
+    expect(cast.mods).toEqual([{ id: 'overload', stacks: 1 }, { id: 'pierce', stacks: 1 }, { id: 'shock', stacks: 1 }])
+    expect(resolveWeapon(pistol, [{ id: 'pierce', stacks: 1 }, { id: 'overload', stacks: 1 }, { id: 'shock', stacks: 1 }])).toEqual(cast)
+  })
+  it("a cast with no element keeps the base weapon's; one with an element replaces it", () => {
+    expect(resolveWeapon(WEAPONS.freezeRay, [{ id: 'overload', stacks: 1 }]).onHit).toEqual(WEAPONS.freezeRay.onHit)
+    expect(resolveWeapon(WEAPONS.sledgehammer, [{ id: 'frost', stacks: 1 }]).onHit).toEqual({ status: 'frozen', ticks: 120 })
+  })
 })
 
 describe('resolveWeapon — conflicting / duplicate mods', () => {

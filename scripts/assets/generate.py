@@ -9,8 +9,11 @@ teal mist, olive overgrowth swallowing tan/gray tech, sparse hot accents.
 as a generation input or reproduced.)
 
 Recipe (researched + calibrated):
-  * SDXL AnythingXL + skormino pixel-art LoRA (Illustrious/SDXL — the LoRA is
-    NOT SD1.5; triggers "masterpiece, pixpix, 8-bit, pixel_art", CFG 3.5, euler)
+  * SDXL juggernautXL + skormino pixel-art LoRA (Illustrious/SDXL — the LoRA is
+    NOT SD1.5; triggers "masterpiece, pixpix, 8-bit, pixel_art", CFG 3.5, euler).
+    Said "AnythingXL" here until 2026-09-25; that was stale. The earliest cast
+    (6 raws) really was anime-base; everything since is juggernautXL — read the
+    per-pick `ckpt` in curation.json, or the graph in the raw's PNG metadata.
   * IPAdapterAdvanced "style transfer" anchoring: ENVIRONMENT anchors for
     props/items, each character's curated s-idle for its other 9 poses
   * tiles: half-offset + img2img heal pass -> seamless by construction
@@ -757,9 +760,10 @@ ENV_ANCHORS = [os.path.join(ANCHORS, f) for f in ("env-a.png", "env-b.png")]
 # ---------------------------------------------------------------------------
 # BASE MODEL PER CATEGORY.
 #
-# This table exists because the documented path was silently wrong. `sweep
+# HISTORICAL (measured 2026-08, before the 2026-09-25 pack-default change):
+# this table exists because the documented path was silently wrong. `sweep
 # prop.<name>` never passed a checkpoint, so it fell through to comfy.CKPT --
-# `anything-xl`, an ANIME model -- while the only code that knew better was
+# then `anything-xl`, an ANIME model -- while the only code that knew better was
 # exp_props.py, an experiment script nobody is told to run. The measurement, on
 # a fixed 8-seed set (see exp_props.py and docs/sprite-generation.md 6):
 #
@@ -782,9 +786,17 @@ PROP_CFG = 7.0
 PROP_SIZE = 768
 
 # `None` means "whatever comfy.py resolves -- its default, or $CKPT". For
-# chars/tiles/items that is a RECORDED DECISION, not an omission: they were all
-# authored against the anime base and would drift if it moved under them, and
-# the documented low-VRAM escape hatch
+# chars/tiles/items that is a RECORDED DECISION, not an omission: the pack
+# default is where the low-VRAM escape hatch plugs in, so pinning them here
+# would silently break it.
+#
+# 2026-09-25: the pack default itself MOVED, from `anything-xl` to
+# juggernautXL. The old comment here said chars/tiles/items "were all authored
+# against the anime base"; that was only ever true of the first cast. Counting
+# the graphs embedded in `raws/*.png`: 20 juggernautXL, 6 anything-xl, 6 with
+# no metadata. The r2 cast and everything after it is juggernautXL, and the
+# per-pick `ckpt` in curation.json is the authority for any single asset.
+# The documented low-VRAM escape hatch
 # (`CKPT=dreamshaper_8.safetensors LORA= SIZE=512 ... sweep item.root-club`)
 # only works because these categories leave the choice to the environment.
 # Pinning them here would silently break that flag.
@@ -798,7 +810,7 @@ CAT_MODEL = {
     # `fx` (flames, spore bursts) is easy to forget -- it has no table of its own
     # up top, it is expanded out of FX further down, and it was missed on the
     # first pass of this very table. The guard below caught it. Same reasoning as
-    # chars/tiles/items: authored against the anime base, left there on purpose.
+    # chars/tiles/items: it follows the pack default on purpose.
     "fx": {"ckpt": PACK_DEFAULT},
 }
 
@@ -810,15 +822,15 @@ def model_args(name, spec):
     handing the job to comfy.CKPT, because that exact silent fallback is the bug
     this table exists to fix: the run still succeeds, the images still look
     confident and well-formed, and they are entirely wrong. A new category must
-    make its own choice here -- `PACK_DEFAULT` is how you say "the anime base is
-    correct for this one", and saying it costs one line.
+    make its own choice here -- `PACK_DEFAULT` is how you say "the pack default
+    is correct for this one", and saying it costs one line.
     """
     cat = spec.get("cat")
     if cat not in CAT_MODEL:
         raise SystemExit(
             f"{name}: no base-model decision recorded for category {cat!r}.\n"
             f"  Add {cat!r} to CAT_MODEL in generate.py. Use PACK_DEFAULT if the\n"
-            f"  pack default (anything-xl / $CKPT) is right for it, or pin a\n"
+            f"  pack default (juggernautXL / $CKPT) is right for it, or pin a\n"
             f"  checkpoint the way 'prop' does. Refusing to guess: guessing here\n"
             f"  is what rendered every prop on an anime model for months.")
     profile = CAT_MODEL[cat]

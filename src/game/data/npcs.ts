@@ -25,7 +25,7 @@ export interface NpcDef {
   behavior?: string
   /** #78 — damage AFFINITY table copied to `Entity.resist` at spawn: incoming
    * damage multiplier keyed by `'physical'` (impact/explosion) or an element id
-   * (`burning`/`spore`/`poisoned`). 1 neutral, <1 resist, 0 immune, >1 weak.
+   * (`burning`/`spore`/`poisoned`/`electrified`). 1 neutral, <1 resist, 0 immune, >1 weak.
    * Absent → neutral to everything (the townsfolk baseline). This is what makes
    * a Sporefall enemy DEMAND a particular tool — no single weapon clears them all. */
   resist?: Record<string, number>

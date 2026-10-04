@@ -8,9 +8,11 @@
 // was autosaved over the owner's real one. See src/app/deepLink.ts.
 //
 // Asserts, in a real browser against a real build:
-//   1. a solo run leaves a save (seed 5)
+//   1. a solo run with no seed in the URL leaves a save
 //   2. the owner's scenario URL starts the scenario (floor 3, machine gun), not
-//      the save — and the save is still the seed-5 run afterwards
+//      the save — and the save is still the original run afterwards
+//   2b. a bare `?seed=` link starts that seed, not the save, and leaves the save
+//      alone (a seed-7 save once hijacked `/?mode=solo&seed=31337`)
 //   3. an unknown scenario shows a visible error, starts no run, and leaves the
 //      save alone
 //   4. a plain URL afterwards resumes the ORIGINAL run
@@ -65,11 +67,15 @@ const waitForWorld = (pred, ms = 30_000) =>
   )
 
 console.log('[deep-link-wins] 1. a solo run leaves a save')
-await page.goto(`${BASE}/?mode=solo&seed=5&e2e`)
+await page.goto(`${BASE}/?mode=solo&e2e`)
 await waitForWorld(() => window.__world?.tick > 120)
 await page.waitForTimeout(1500)
 const original = await save()
-check(original?.seed === 5, `save exists for the seed-5 run (${JSON.stringify(original)})`)
+const originalSeed = original?.seed
+check(
+  typeof originalSeed === 'number' && originalSeed !== 31337,
+  `save exists for the unseeded run (${JSON.stringify(original)})`,
+)
 
 console.log('[deep-link-wins] 2. the owner URL starts the scenario, not the save')
 logs.length = 0
@@ -85,6 +91,16 @@ check(!logs.some((l) => /resumed in-progress run/.test(l)), 'did not resume the 
 await page.waitForTimeout(2000) // several autosave intervals
 check(JSON.stringify(await save()) === JSON.stringify(original), 'save untouched by the scenario run')
 await page.screenshot({ path: join(OUT, 'deep-link-armed.png') })
+
+console.log('[deep-link-wins] 2b. a ?seed= link starts that seed, not the save')
+logs.length = 0
+await page.goto(`${BASE}/?mode=solo&seed=31337&e2e`)
+const seeded = await waitForWorld(() => window.__world?.seed === 31337 && window.__world?.tick > 120, 45_000)
+const w2b = await world()
+check(seeded, `seed link applied: seed 31337 (${JSON.stringify(w2b)})`)
+check(!logs.some((l) => /resumed in-progress run/.test(l)), 'did not resume the save')
+await page.waitForTimeout(2000) // several autosave intervals
+check(JSON.stringify(await save()) === JSON.stringify(original), 'save untouched by the seed run')
 
 console.log('[deep-link-wins] 3. an unknown scenario is a visible error, not a run')
 logs.length = 0
@@ -105,7 +121,10 @@ await page.goto(`${BASE}/?mode=solo&e2e`)
 await waitForWorld(() => !!window.__world)
 await page.waitForTimeout(500)
 const w4 = await world()
-check(w4?.seed === 5 && logs.some((l) => /resumed in-progress run/.test(l)), `resumed seed 5 (${JSON.stringify(w4)})`)
+check(
+  w4?.seed === originalSeed && logs.some((l) => /resumed in-progress run/.test(l)),
+  `resumed seed ${originalSeed} (${JSON.stringify(w4)})`,
+)
 
 await browser.close()
 if (failures.length) {

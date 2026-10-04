@@ -1,5 +1,6 @@
-import { makeEntity, type Entity } from '../entity'
-import { SIM_DT } from '../types'
+import { MODS } from '../data/mods'
+import { makeEntity, type Entity, type WeaponMod } from '../entity'
+import { SIM_DT, type EntityId } from '../types'
 import { addEntity, isBlocked, type World } from '../world'
 import { applyDamage, detonate, runHitTriggers } from './combat'
 import { canSeeEntity, hateToward } from './goals'
@@ -123,7 +124,8 @@ const bounceOffWall = (w: World, e: Entity): boolean => {
 
 /** Spawn a projectile's split shards in a fan around its heading — children
  * inherit the owner (so kill credit / PvP scoring stay correct) and deal reduced
- * damage. Children never re-split, so a huge split stack can't cascade. */
+ * damage. Children never re-split, so a huge split stack can't cascade. Each
+ * shard applies the element its split carries. */
 const spawnSplit = (w: World, e: Entity): void => {
   const p = e.projectile!
   const s = p.split!
@@ -136,9 +138,7 @@ const spawnSplit = (w: World, e: Entity): void => {
     child.facing = a
     child.vel.x = Math.cos(a) * s.speed
     child.vel.y = Math.sin(a) * s.speed
-    child.projectile = { ownerId: p.ownerId, damage: s.damage, ttl: s.ttl }
-    // Shards inherit the parent's mod provenance so they read as the same build.
-    if (p.mods) child.projectile.mods = p.mods.map((m) => ({ ...m }))
+    shardOf(child, p.ownerId, s, p.mods)
     addEntity(w, child)
   }
 }
@@ -149,9 +149,10 @@ const spawnSplit = (w: World, e: Entity): void => {
  * wall, ttl expiry, or enemy. Directions are evenly spread around the circle with
  * a deterministic per-fragment jitter drawn from the world RNG (`w.rng`, whose
  * stream position serializes → replay-identical). Fragments carry NO `splinter`
- * field, so they can never re-splinter — the recursion guard. They inherit the
- * parent's element (onHit) and mod provenance (for the shared visual) but not its
- * explode/split/pierce/triggers, so a shatter can't cascade or double-detonate. */
+ * field, so they can never re-splinter — the recursion guard. They apply the
+ * element the splinter carries and inherit the parent's provenance (for the
+ * shared visual) but not its explode/split/pierce/triggers, so a shatter can't
+ * cascade or double-detonate. */
 const spawnSplinter = (w: World, e: Entity): void => {
   const p = e.projectile!
   const s = p.splinter!
@@ -165,11 +166,25 @@ const spawnSplinter = (w: World, e: Entity): void => {
     child.facing = a
     child.vel.x = Math.cos(a) * s.speed
     child.vel.y = Math.sin(a) * s.speed
-    child.projectile = { ownerId: p.ownerId, damage: s.damage, ttl: s.ttl }
-    if (p.onHit) child.projectile.onHit = { ...p.onHit }
-    if (p.mods) child.projectile.mods = p.mods.map((m) => ({ ...m }))
+    shardOf(child, p.ownerId, s, p.mods)
     addEntity(w, child)
   }
+}
+
+/** Arm a split shard or splinter fragment: the owner, its damage and life, the
+ * element its parent behavior carries, and the parent's provenance. That
+ * provenance already shows the element: it is the one element mod the round
+ * lands, and a base weapon's own element rides no child. */
+const shardOf = (
+  child: Entity,
+  ownerId: EntityId,
+  s: { damage: number; ttl: number; element?: string },
+  parentMods: readonly WeaponMod[] | undefined,
+): void => {
+  child.projectile = { ownerId, damage: s.damage, ttl: s.ttl }
+  const onHit = s.element ? MODS[s.element]?.onHit : undefined
+  if (onHit) child.projectile.onHit = { ...onHit }
+  if (parentMods) child.projectile.mods = parentMods.map((m) => ({ ...m }))
 }
 
 export const projectileSystem = (w: World): void => {
@@ -182,7 +197,7 @@ export const projectileSystem = (w: World): void => {
     p.ttl--
 
     if (p.ttl <= 0) {
-      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, p.explode.element)
       if (p.splinter) spawnSplinter(w, e)
       land(w, e)
       e.dead = true
@@ -194,7 +209,7 @@ export const projectileSystem = (w: World): void => {
     if (p.arc) continue
     if (isBlocked(w, Math.floor(e.pos.x), Math.floor(e.pos.y))) {
       if (bounceOffWall(w, e)) continue // ricochet — stays alive
-      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+      if (p.explode) detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, p.explode.element)
       if (p.splinter) spawnSplinter(w, e)
       land(w, e)
       e.dead = true
@@ -217,7 +232,7 @@ export const projectileSystem = (w: World): void => {
       if (dx * dx + dy * dy >= rr * rr) continue
 
       if (p.explode) {
-        detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId)
+        detonate(w, e.pos.x, e.pos.y, p.explode.radius, p.explode.damage, p.ownerId, p.explode.element)
         if (p.splinter) spawnSplinter(w, e)
         land(w, e)
         e.dead = true
@@ -243,14 +258,19 @@ export const projectileSystem = (w: World): void => {
       // `!== null`, NOT truthiness: 0 is a hit that landed and dealt no hp (the
       // freeze ray), and it must still apply its status.
       const landed = dealt !== null
-      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks)
+      if (landed && p.onHit) applyStatus(w, other, p.onHit.status, p.onHit.ticks, p.ownerId)
       const killed = !!other.dead || (other.health?.hp ?? 1) <= 0
       if (landed && p.lifestealFrac) {
         // Pay out on damage ACTUALLY DEALT, never the bullet's intended damage.
         // Reading `p.damage` here ignored resist entirely, so an armoured target
         // absorbed most of the blow while the shooter was still paid in full.
         const owner = w.byId.get(p.ownerId) // may be gone — guard
-        if (owner?.health) owner.health.hp = Math.min(owner.health.max, owner.health.hp + dealt * p.lifestealFrac)
+        if (owner?.health) {
+          const owed = (owner.health.lifestealCarry ?? 0) + dealt * p.lifestealFrac
+          const heal = Math.round(owed)
+          owner.health.lifestealCarry = owed - heal
+          owner.health.hp = Math.min(owner.health.max, owner.health.hp + heal)
+        }
       }
       if (landed) runHitTriggers(w, other, p.triggers, p.ownerId, killed)
       if (landed && p.split) spawnSplit(w, e)

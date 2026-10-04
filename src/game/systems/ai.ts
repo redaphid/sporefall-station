@@ -36,7 +36,7 @@ import {
   INVESTIGATE,
   PURSUE,
 } from './goalCodes'
-import { COMMIT_TICKS, decide } from './behaviors'
+import { commitTicks, decide } from './behaviors'
 import { activitySystem, claimSeat, isActivityCode, releaseSeat, seatPoint, SEAT_ARRIVE, sitDown } from './activities'
 import { fireWeapon } from './combat'
 import { perceives, type Goal } from './goals'
@@ -156,7 +156,7 @@ const think = (w: World, e: Entity): void => {
   if (ai.activity && goal.code !== ai.activity.kind) releaseSeat(w, e)
   if (goal.code !== ai.goal) {
     ai.goalSince = w.tick
-    const hold = w.aiFlags?.commitment === false || timed ? 0 : (COMMIT_TICKS[goal.code] ?? 0)
+    const hold = timed ? 0 : commitTicks(goal.code, tier)
     ai.commit = hold > 0 ? { until: w.tick + hold, tier } : undefined
     // Notable transitions (into OR out of a charged goal) are world events, so
     // an agent watching the stream sees aggro/flee/alert/search as they happen.
@@ -680,6 +680,9 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     const dx = e.pos.x - from.x
     const dy = e.pos.y - from.y
     const dist = vlen(dx, dy) || 1
+    // Well clear of the thing it ran from (fleeMemory's own limit): the flight
+    // is done, so the commitment to it ends and the next think moves on.
+    if (threat && dist > ai.sightRange * 2) ai.commit = undefined
     // Flight has no destination to route to — steer the away-vector, deflected
     // to the openest compass direction when a wall looms, so a panicked body
     // streams along walls and out of doorless corners instead of grinding.

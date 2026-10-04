@@ -204,6 +204,30 @@ describe('a threat ends the game: settlers still run', () => {
   })
 })
 
+describe('gunfire breaks a game', () => {
+  it('settlers look up from their cards at a shot in earshot and go to see', () => {
+    const w = stage(MESS.map((r) => r.replace('s..s..s', 's..s...')))
+    until(w, () => playing(w).length === 2, 900)
+    const [a, b] = playing(w)
+    // A shot fired just outside the mess door, in earshot of the table.
+    w.noises.push({ x: 10.5, y: 1.5, expires: w.tick + 60 })
+    const seen = until(w, () => !a.ai!.activity && !b.ai!.activity, 15)
+    for (const s of [a, b]) expect(s.ai!.goal).toBe('investigate')
+    expect(claimantsOf(w, table(w).id)).toEqual([])
+    expect(seen.find((e) => e.type === 'activity' && e.phase === 'end')).toMatchObject({ why: 'broken' })
+  })
+
+  it('an ambient pull that is not a noise does not break a game', () => {
+    const w = stage(MESS.map((r) => r.replace('s..s..s', 's..s...')))
+    until(w, () => playing(w).length === 2, 900)
+    const players = playing(w)
+    const end = players[0].ai!.activity!.until!
+    // No noise and no threat: nothing ambient outbids a seated game.
+    runTicks(w, new Map(), end - w.tick - 1)
+    for (const p of players) expect(p.ai!.activity?.phase).toBe('playing')
+  })
+})
+
 describe('save and load mid-game', () => {
   it('a snapshot taken mid-game replays to the same world, ending on the same tick', () => {
     const w = stage()

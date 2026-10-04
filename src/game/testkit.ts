@@ -101,8 +101,3 @@ export const worldFromScene = (
   rows.forEach((r, ty) => [...r].forEach((g, tx) => cast[g]?.(w, tx, ty)))
   return w
 }
-
-/** The AI as it ran before goal commitment and settler activities. A golden
- * digest captured on main before that change is compared against a world
- * running this, so it keeps proving what it was written to prove. */
-export const AI_BEFORE_COMMITMENT: NonNullable<World['aiFlags']> = { commitment: false, activities: false }

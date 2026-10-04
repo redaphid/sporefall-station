@@ -190,8 +190,8 @@ const ENGAGE_MARGIN = 3
 
 /** BATTLE inside engage range, PURSUE beyond it, with the edge pushed out for
  * the target `e` is already fighting. */
-const engageCode = (w: World, e: Entity, targetId: number, dist: number): string => {
-  const fighting = w.aiFlags?.commitment !== false && e.ai!.goal === BATTLE && e.ai!.targetId === targetId
+const engageCode = (e: Entity, targetId: number, dist: number): string => {
+  const fighting = e.ai!.goal === BATTLE && e.ai!.targetId === targetId
   return dist <= ENGAGE_RANGE + (fighting ? ENGAGE_MARGIN : 0) ? BATTLE : PURSUE
 }
 
@@ -222,7 +222,7 @@ const threat: Consideration = (w, e) => {
     const hate = hateToward(w, e, p.id)
     const aggress = battleScore(hate, hp, dist) * press
     if (aggress > WANDER_SCORE)
-      out.push({ code: engageCode(w, e, p.id, dist), score: aggress, tier: TIER_THREAT, target: p.id })
+      out.push({ code: engageCode(e, p.id, dist), score: aggress, tier: TIER_THREAT, target: p.id })
     const flee = fleeScore(hate, hp, max, dist)
     if (flee > WANDER_SCORE) out.push({ code: FLEE, score: flee, tier: TIER_THREAT, target: p.id })
   }
@@ -552,7 +552,7 @@ const defendMyWing: Consideration = (w, e) => {
     if (!rectContains(b.rect, Math.floor(p.pos.x), Math.floor(p.pos.y))) continue
     if (!perceives(w, e, p)) continue
     const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
-    out.push({ code: engageCode(w, e, p.id, dist), score: DEFEND_SCORE, tier: TIER_THREAT, target: p.id })
+    out.push({ code: engageCode(e, p.id, dist), score: DEFEND_SCORE, tier: TIER_THREAT, target: p.id })
   }
   return out
 }
@@ -851,8 +851,7 @@ const healthyPack = (w: World, e: Entity, radius: number): { count: number; near
 // Prefer the lowest-HP perceived body — the wounded get finished. Never while a
 // healthy pack is near enough that closing in would trip packAvoid again.
 const stalkWeakest: Consideration = (w, e) => {
-  const margin = w.aiFlags?.commitment === false ? 0 : PACK_MARGIN
-  if (margin > 0 && healthyPack(w, e, PACK_RADIUS + margin).count >= PACK_K) return []
+  if (healthyPack(w, e, PACK_RADIUS + PACK_MARGIN).count >= PACK_K) return []
   let best: Entity | undefined
   let bestHp = Infinity
   for (const p of w.entities) {
@@ -864,7 +863,7 @@ const stalkWeakest: Consideration = (w, e) => {
   }
   if (!best) return []
   const dist = Math.max(1, dist2d(best.pos.x, best.pos.y, e.pos.x, e.pos.y))
-  return [{ code: engageCode(w, e, best.id, dist), score: STALK_SCORE, tier: TIER_THREAT, target: best.id }]
+  return [{ code: engageCode(e, best.id, dist), score: STALK_SCORE, tier: TIER_THREAT, target: best.id }]
 }
 
 // Outnumbered by HEALTHY enemies → break off and reposition (PANIC tier, so it
@@ -920,7 +919,7 @@ const enrage: Consideration = (w, e) => {
   const p = nearestPlayer(w, e)
   if (!p) return []
   const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
-  return [{ code: engageCode(w, e, p.id, dist), score: 20, tier: TIER_PANIC, target: p.id }]
+  return [{ code: engageCode(e, p.id, dist), score: 20, tier: TIER_PANIC, target: p.id }]
 }
 
 // Phase 2: wounded (but not yet enraged) → retreat to the nearest spore cloud and
@@ -1211,13 +1210,14 @@ const rooted: Consideration = (w, e) => {
 
 // ── Activities: a settler with nothing pressing takes a seat at a prop ─────
 // (systems/activities.ts). Above garrison/work so an idle settler goes and
-// does something; below investigate so a fresh disturbance can still draw one
-// that has not sat down yet. Once seated, the claim holds the goal against
-// every other ambient candidate (see `decide`); only a higher tier ends it.
+// does something. Held, with the incumbent margin, it outscores every other
+// ambient goal, so a game is only broken by a threat (a higher tier) or by
+// gunfire and blasts in earshot: a settler that hears one looks up from its
+// cards, drops the claim and goes to see.
 const ACTIVITY_SCORE = 2.8
 
 const unwind: Consideration = (w, e) => {
-  if (w.aiFlags?.activities === false) return []
+  if (nearestNoise(w, e)) return []
   const claim = e.ai!.activity
   if (claim) {
     const at = seatPoint(w, claim)
@@ -1403,9 +1403,9 @@ export const HYSTERESIS_MARGIN = 0.25
  *
  * Codes absent here never hold: wander is the floor, the squad and group layer
  * re-issue their orders every think and members must track them, and an
- * activity holds through its seat claim instead (`holdTier`).
+ * activity holds on score: its candidate stays on offer while the seat is held.
  */
-export const COMMIT_TICKS: Readonly<Record<string, number>> = {
+const COMMIT_TICKS: Readonly<Record<string, number>> = {
   [FLEE]: 90,
   [BATTLE]: 45,
   [PURSUE]: 45,
@@ -1418,16 +1418,23 @@ export const COMMIT_TICKS: Readonly<Record<string, number>> = {
   [SCAVENGE]: 60,
 }
 
+/** How long a goal adopted at `tier` holds. Flight only holds when panic
+ * started it (a scream, a pack too strong to face): those are the vanishing
+ * edges above. Flight from an enemy seen at the threat tier ends the way it
+ * always did, by the behavior's own memory (fleeMemory), so a wounded fighter
+ * that has lost the player goes back to looking around instead of running on
+ * blind. Holding that flight made Castle Siege's garrison measurably harder. */
+export const commitTicks = (code: string, tier: number): number =>
+  code === FLEE && tier < TIER_PANIC ? 0 : (COMMIT_TICKS[code] ?? 0)
+
 /** The tier a standing goal is protected up to this think, or undefined when
  * nothing holds it: its commitment ran out (or steering released it on
- * finishing the goal), or the entity it was about is gone. A claimed activity
- * seat holds its goal at the ambient tier for as long as the claim lasts. */
+ * finishing the goal), or the entity it was about is gone. */
 const holdTier = (w: World, e: Entity): number | undefined => {
   const ai = e.ai!
   const t = ai.targetId !== undefined ? w.byId.get(ai.targetId) : undefined
   if (ai.targetId !== undefined && (!t || t.dead)) return undefined
-  const committed = w.aiFlags?.commitment !== false && ai.commit && w.tick < ai.commit.until ? ai.commit.tier : undefined
-  if (ai.activity) return Math.max(committed ?? TIER_AMBIENT, TIER_AMBIENT)
+  const committed = ai.commit && w.tick < ai.commit.until ? ai.commit.tier : undefined
   return committed
 }
 
@@ -1470,10 +1477,13 @@ export const decide = (w: World, e: Entity): Decision => {
     }
   }
   // A standing goal still on offer competes on score, margin and all. One whose
-  // candidate vanished (and any seated activity) is held instead.
-  if (ai && incumbentCode !== undefined && !isIncumbent(best) && (!offered || ai.activity)) {
+  // candidate vanished is held against lower tiers,
+  // and against its own tier only while the challenger names no new target: a
+  // fighter that lost sight of one player turns at once on another.
+  if (ai && incumbentCode !== undefined && !isIncumbent(best) && !offered) {
     const guard = holdTier(w, e)
-    if (guard !== undefined && best.tier <= guard) return { goal: { code: incumbentCode }, scores, tier: guard, held: true }
+    const newTarget = best.target !== undefined && best.target !== incumbentTarget
+    if (guard !== undefined && (best.tier < guard || (best.tier === guard && !newTarget))) return { goal: { code: incumbentCode }, scores, tier: guard, held: true }
   }
   const goal: Goal = { code: best.code }
   if (best.target !== undefined) goal.target = best.target

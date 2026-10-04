@@ -11,13 +11,11 @@ tinkering at a lab bench, rest in a bunk.
 floors and five station floors for 90 s each, with idle players, and records
 every NPC's goal each tick (`src/debug/goalCensus.ts`). It reports goal
 switches per NPC-minute, the median time spent in a goal, and A→B→A
-flip-flops (a goal left and re-adopted within 2 s). `--flags` runs any
-combination of the `aiFlags` toggles, so every variant below comes from the same
-binary and the same worlds.
+flip-flops (a goal left and re-adopted within 2 s). Run it in this branch and
+in an export of main (with `goalCensus.ts` and the script copied in) to compare.
 
 ```
-npx tsx scripts/goal-census.mts --flags commitment=false,activities=false   # main's AI
-npx tsx scripts/goal-census.mts                                              # shipped
+npx tsx scripts/goal-census.mts [--seconds 90] [--json out.json]
 ```
 
 ## The mechanism
@@ -41,10 +39,15 @@ RNG noise and score ties played no part: the loops are deterministic limit cycle
 
 ## The design
 
-**Commitment.** A goal adopted with an entry in `COMMIT_TICKS` holds for that
-many ticks. While it holds, if its candidate is no longer offered, only a
-candidate on a higher tier replaces it. A goal that is still offered competes
-as before, through the margin, so a wounded fighter still turns to flee.
+**Commitment.** A goal holds for `commitTicks(code, tier)` ticks. While it
+holds and its candidate is no longer offered, a candidate on a lower tier never
+replaces it, and one on the same tier only does if it names a new target: a
+thug that loses sight of one player turns on another at once. A goal that is
+still offered competes as before, through the margin, so a wounded fighter
+still turns to flee. Flight only commits when panic started it (a scream, a
+pack too strong to face). Flight from an enemy seen at the threat tier ends by
+the behavior's own memory, as on main: holding it kept badly wounded Castle
+Siege defenders running blind, and the scripted bot lost the scene.
 Steering releases the commitment when it finishes or abandons the goal: on
 arrival, when cornered, or when a trail goes cold. Two spatial deadbands remove
 shared edges: a predator does not stalk back toward a healthy pack until the
@@ -59,8 +62,10 @@ starts only when every claimant has sat down and at least two have; the start
 rolls one end tick that every seat shares, so the table gets up together. The
 claim (`ai.activity`) lives only on the NPC, and a site's occupancy is derived
 from the live claimants, so a death or an interrupt frees the seat with no
-second record to update. A claim holds its goal against every other ambient
-candidate. A threat (a higher tier) ends it at once.
+second record to update. A held claim outscores every other ambient goal through
+the incumbent margin. A threat (a higher tier) ends it at once, and so does
+gunfire or a blast in earshot: the settler looks up from its cards and goes to
+see.
 
 **Rejected: a routine layer.** A stateless per-settler schedule (work, then
 leisure, then rest) cut settler time at activities from 36% to 23% and the card
@@ -69,38 +74,35 @@ cooldown between sessions already gives the rhythm.
 
 ## Results (census, 19 worlds × 90 s)
 
-On main as of ed65863 (every floor from 3 is the indoor station):
+Main at 85394077 against this branch, the same worlds:
 
-| variant | switches/min | median dwell | A→B→A <2 s /min | settler A→B→A | settler median dwell | settler time in activity |
+| | switches/min | median dwell | A→B→A <2 s /min | settler A→B→A | settler median dwell | settler time in activity |
 |---|---:|---:|---:|---:|---:|---:|
-| main | 1.23 | 3.00 s | 0.32 | 0.06 | 3.0 s | 0% |
-| commitment only | 1.03 | 3.20 s | 0.11 | 0.03 | 3.2 s | 0% |
-| activities only | 2.11 | 2.80 s | 0.80 | 0.62 | 8.0 s | 38% |
-| **both (shipped)** | **1.44** | **4.20 s** | **0.13** | **0.09** | **20.0 s** | **39%** |
+| main | 1.85 | 1.50 s | 0.78 | 0.15 | 2.4 s | 0% |
+| **this branch** | **1.59** | **4.20 s** | **0.15** | **0.04** | **20.0 s** | **37%** |
 
-Activities alone bring back a settler loop (work→flee→work, 60 times) that
-commitment then removes, which is why the two ship together. Total switches
-rise with activities because settlers now go and do things: each of those
-switches starts a goal that lasts about 20 s.
+Settler switches rise (0.41 → 1.83 per minute) because settlers now go and do
+things, and each of those switches starts a goal that lasts about 20 s.
 
-On the station floors main built before #149 the same census measured a far
-worse baseline, dominated by the loops described above: 2.13 switches/min,
-0.33 s median dwell and 1.30 flip-flops/min, falling to 1.38, 4.00 s and 0.18
-with both shipped (settler flip-flops 1.59 → 0.06 per minute).
+While designing, the same census compared (a) commitment alone, (b) activities
+alone and (a)+(b) through temporary toggles, since removed. (a) alone held the
+flip-flops down without giving settlers anything to do. (b) alone reopened a
+settler work→flee→work loop (60 times) that (a) removes. A routine layer on top
+cut activity time from 36% to 23% with no measurable change in flip-flops.
 
 The authored regression in `systems/commitment.test.ts` (the scream and pack
-loops, 60 s each) falls from 74.7 to 4.6 switches/min and from 72.8 to 0.9
-flip-flops/min.
+loops, 60 s each) is held against what main did on the same scenes: 237
+switches and 231 flip-flops there, against 10 and 2 now.
 
 ## Co-op
 
 The AI runs on the host. A seated settler's activity, and whether play has
 started, rides a sparse trailer after the status trailer in every snapshot
-(`WIRE_ACTIVITIES`, protocol 6), so a client draws the same card game.
+(`WIRE_ACTIVITIES`, protocol 9), so a client draws the same card game.
 
 ## Where to look
 
-- `systems/behaviors.ts`: `COMMIT_TICKS`, `holdTier`, `decide`, `unwind`.
+- `systems/behaviors.ts`: `commitTicks`, `holdTier`, `decide`, `unwind`.
 - `systems/activities.ts`: the activity table, seat claims, `activitySystem`.
 - `render/activityFxModel.ts`: the card fan, the card laid each beat, the pile,
   and the card over each player's head.

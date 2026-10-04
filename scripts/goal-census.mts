@@ -23,16 +23,6 @@ const flag = (name: string): string | undefined => {
 }
 const seconds = Number(flag('seconds') ?? 90)
 const ticks = seconds * SIM_RATE
-/** A/B toggles applied to every world, e.g. --flags commitment=false,activities=false */
-const aiFlags = Object.fromEntries(
-  (flag('flags') ?? '')
-    .split(',')
-    .filter(Boolean)
-    .map((kv) => {
-      const [k, v] = kv.split('=')
-      return [k, v !== 'false']
-    }),
-) as World['aiFlags']
 
 const fixture = (name: string): World =>
   deserializeWorld(
@@ -60,9 +50,7 @@ const floors: GoalTrace[] = []
 const perRun: CensusRow[] = []
 const sessions: Record<string, number> = {}
 for (const [label, make] of runs) {
-  const w = make()
-  w.aiFlags = aiFlags
-  const traces = traceGoals(w, ticks, { sessions })
+  const traces = traceGoals(make(), ticks, { sessions })
   all.push(...traces)
   ;(label.startsWith('scene:') ? scenes : floors).push(...traces)
   perRun.push(censusRows(label, traces)[0])
@@ -70,10 +58,10 @@ for (const [label, make] of runs) {
 }
 
 const totals = [...censusRows('ALL', all), ...censusRows('scenes', scenes), ...censusRows('floors', floors)]
-console.log(`Goal census, ${seconds} s per world, idle players, aiFlags ${JSON.stringify(aiFlags)}. Sessions started: ${JSON.stringify(sessions)}.\n`)
+console.log(`Goal census, ${seconds} s per world, idle players. Sessions started: ${JSON.stringify(sessions)}.\n`)
 console.log(renderRows(totals))
 console.log('\nPer world:\n')
 console.log(renderRows(perRun))
 console.log('\nTop switches (ALL):', JSON.stringify(totals[0].topSwitches))
 const out = flag('json')
-if (out) writeFileSync(out, JSON.stringify({ seconds, aiFlags, sessions, totals, perRun }, null, 2))
+if (out) writeFileSync(out, JSON.stringify({ seconds, sessions, totals, perRun }, null, 2))

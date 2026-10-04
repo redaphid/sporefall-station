@@ -21,14 +21,34 @@ class MockHub {
   private hostHandler: ((e: TransportEvent) => void) | null = null
   private centrals = new Map<PeerId, (bytes: Uint8Array) => void>()
   private n = 0
+  /** What each client hears when the host's radio goes down. */
+  private hostDown: (() => void)[] = []
 
-  constructor() {
-    const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
+  /**
+   * `radio: true` behaves like a real link: a sent packet lands a few ms
+   * later, and stopping the host transport cuts every client off, dropping
+   * any packet still in the air. The default delivers on the next microtask.
+   */
+  constructor(opts: { radio?: boolean } = {}) {
+    let up = true
+    const deliver = (fn: (() => void) | undefined): Promise<void> =>
+      opts.radio
+        ? new Promise((resolve) =>
+            setTimeout(() => {
+              if (up) fn?.()
+              resolve()
+            }, 5),
+          )
+        : Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
       maxPacket: 180,
       start: async () => {},
-      stop: async () => {},
+      stop: async () => {
+        if (!opts.radio) return
+        up = false
+        for (const cut of this.hostDown) cut()
+      },
       sendPacket: (peer: PeerId, bytes: Uint8Array) => deliver(() => this.centrals.get(peer)?.(bytes)),
       on: (h) => {
         this.hostHandler = h
@@ -69,6 +89,7 @@ class MockHub {
       ...(opts.reconnectable === false ? {} : { reconnect: async () => {} }),
     }
     const session = new NetClientSession(name, input, clientTransport)
+    this.hostDown.push(() => clientHandler?.({ type: 'peerDisconnected', peer: 'host', reason: 'remote' }))
     const connect = (): void => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => clientHandler?.({ type: 'peerConnected', peer: 'host' }))
@@ -1055,5 +1076,63 @@ describe('connection lifecycle — the host restarts or vanishes', () => {
     await flush()
     expect(bob.session.phase).toBe('ended')
     expect(bob.session.renderView().missionText).toMatch(/lost/i)
+  })
+})
+
+describe('connection lifecycle — the host quits to the main menu', () => {
+  it('tells a playing client the host left, and the client does not try to reconnect', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(74, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput()) // reconnect-capable: a drop would retry
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+    for (let i = 0; i < 4; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+    expect(bob.session.phase).toBe('playing')
+    const phases: string[] = []
+    bob.session.onPhaseChange = (p) => phases.push(p)
+
+    await host.close()
+    await flush()
+    expect(bob.session.phase).toBe('ended')
+    expect(phases).not.toContain('reconnecting')
+    expect(bob.session.renderView().missionText).toBe('The host left the game')
+  })
+
+  it('on a real-feeling radio, the goodbye lands before the host hangs up', async () => {
+    // Packets take a few ms and a hang-up drops what is still in the air, so a
+    // host that stopped the radio without waiting for its Bye to go out would
+    // leave the client to see a plain drop, and to try to reconnect.
+    const hub = new MockHub({ radio: true })
+    const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 60))
+    const host = new NetHostSession(75, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await settle()
+    host.beginGame()
+    await settle()
+    for (let i = 0; i < 4; i++) {
+      host.tick()
+      bob.session.tick()
+      await settle()
+    }
+    expect(bob.session.phase).toBe('playing')
+    const phases: string[] = []
+    bob.session.onPhaseChange = (p) => phases.push(p)
+
+    await host.close()
+    await settle()
+    expect(phases).not.toContain('reconnecting')
+    expect(bob.session.phase).toBe('ended')
+    expect(bob.session.renderView().missionText).toBe('The host left the game')
   })
 })

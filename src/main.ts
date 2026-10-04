@@ -36,6 +36,7 @@ import { createPersister, readSave, type KeyValueStore, type Persister } from '.
 import { loadSettings } from './app/settings'
 import { createModSwapQueue, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
 import { createPauseOverlay } from './ui/pauseOverlay'
+import { createQuitToMenu } from './app/quitToMenu'
 import {
   canRequestFullscreen,
   enterFullscreen,
@@ -43,7 +44,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT, SIM_RATE, type InputCmd } from './game/types'
+import { emptyInput, SIM_DT, SIM_RATE, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -297,6 +298,16 @@ const boot = async (): Promise<void> => {
   input = withModSwaps(input, modSwaps, () => !paused())
   const draftPicks = withDraftPicks(input)
   input = draftPicks
+  // A net session's menu opens over a sim it cannot stop. While it is up, the
+  // local player stands still rather than acting on presses meant for the menu.
+  const menuGate = { open: false }
+  const ungated = input
+  input = {
+    sample: () => {
+      const cmd = ungated.sample() // still drained, so edges pressed in the menu do not fire after it
+      return menuGate.open ? emptyInput() : cmd
+    },
+  }
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
@@ -603,8 +614,8 @@ const boot = async (): Promise<void> => {
   // crash rather than a phone. Acquired here because this is the point of no
   // return into gameplay: `runLoop` never returns, game-over swaps the world in
   // place rather than going back to the menu, so the only way out of a game is a
-  // reload — and the browser releases the lock for us on unload. The handle's
-  // `release()` exists for whenever a real quit-to-menu path arrives.
+  // page navigation (Main menu and Refresh both leave that way) — and the
+  // browser releases the lock for us on unload.
   keepScreenAwake()
   runLoop(
     session,
@@ -622,6 +633,7 @@ const boot = async (): Promise<void> => {
     padZoom,
     modSwaps,
     draftPicks,
+    menuGate,
   )
 }
 
@@ -987,6 +999,8 @@ const runLoop = (
   modSwaps?: ModSwapQueue,
   /** Tapped floor-draft cards, queued onto the local player's next command. */
   draftPicks?: DraftPickSource,
+  /** Open while a net session's menu is up; the local input reads it (boot). */
+  menuGate: { open: boolean } = { open: false },
 ): void => {
   const hud = createHud(uiMount, modSwaps ? (a, b) => modSwaps.push(a, b) : undefined)
   // A net client hears its hand closed only on the next 2 Hz state message, so
@@ -1011,10 +1025,12 @@ const runLoop = (
   // The authoritative world lives on the HostSession and is REPLACED wholesale
   // by restart(); read it fresh each call so we always persist the current run.
   const hostWorld = (): World | undefined => (session instanceof HostSession ? session.world : undefined)
+  // Set by Main menu: the run was thrown away, so nothing may write it back.
+  let abandoned = false
   if (persister) {
     const flush = (): void => {
       const w = hostWorld()
-      if (w) persister.flush(w)
+      if (w && !abandoned) persister.flush(w)
     }
     // pagehide + visibilitychange:hidden are the reliable "app is going away"
     // signals in BOTH desktop Chrome and the Capacitor Android WebView (Android
@@ -1070,7 +1086,19 @@ const runLoop = (
         rebindDebug()
       }
     : undefined
-  const screens = createScreens(uiMount, onRestart, cameraSource, onNewSeed, renderer.weaponThumb)
+  // Main menu (pause menu and run-over screen): throw the run away, close the
+  // net session on purpose, and land on the start menu. See app/quitToMenu.ts.
+  const quitToMenu = createQuitToMenu({
+    abandonRun: () => {
+      abandoned = true
+      persister?.clear()
+    },
+    closeNet: () => session.close?.() ?? Promise.resolve(),
+    goToMenu: () => location.replace(import.meta.env.BASE_URL),
+    wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  })
+  const onMainMenu = (): void => void quitToMenu()
+  const screens = createScreens(uiMount, onRestart, cameraSource, onNewSeed, renderer.weaponThumb, onMainMenu)
   // Mission panel + objective hyperlinks: tapping a linked objective row starts a
   // VIEW-ONLY camera focus (focusModel.ts) — an animated glide to the target and
   // back. Nothing here writes sim state; determinism is untouched.
@@ -1100,14 +1128,33 @@ const runLoop = (
   touch?.setInspectHandler((mode, x, y) => commOverlay.inspectAt(mode === 'tap' ? 'chip' : 'card', x, y))
   const overlay = createControllersOverlay(uiMount)
   // Pause overlay carries the shared gun+mods panel and the Resume / New Seed /
-  // Run-it-back / Share-state actions. Solo/host can toggle pause with Escape
-  // (app-layer flip of session.isPaused — never touches the sim); the pad's
-  // Start also pauses (hostSession.ts), and the ⏸ button below is the touch
-  // equivalent.
+  // Run-it-back / Main menu / Share-state actions. Solo can toggle pause with
+  // Escape (app-layer flip of session.isPaused — never touches the sim); the
+  // pad's Start also pauses (hostSession.ts), and the ⏸ button below is the
+  // touch equivalent.
+  //
+  // A net session cannot stop a sim other players share, so its menu opens over
+  // the live game (menuGate holds the local player still) and offers only
+  // Resume and Main menu. A client whose host leaves gets that menu by itself.
   const canPause = session instanceof HostSession
+  const menuOpen = (): boolean => (session instanceof HostSession ? (session.isPaused ?? false) : menuGate.open)
   const setPaused = (p: boolean): void => {
     if (session instanceof HostSession) session.isPaused = p
+    else menuGate.open = p
   }
+  if (session instanceof NetClientSession) {
+    const announce = session.onPhaseChange
+    session.onPhaseChange = (phase) => {
+      announce?.(phase)
+      if (phase === 'ended') setPaused(true)
+    }
+  }
+  const netMenuTitle = (): string =>
+    session instanceof NetClientSession && session.phase === 'ended'
+      ? session.hostLeft
+        ? 'HOST LEFT'
+        : 'CONNECTION LOST'
+      : 'MENU'
   // `const` (not the parameter) so TypeScript keeps the narrowing inside the
   // closure below.
   const sharing = stateRing
@@ -1134,20 +1181,19 @@ const runLoop = (
   }
   const pauseOverlay = createPauseOverlay(uiMount, {
     onResume: () => setPaused(false),
-    onNewSeed,
-    onRestart,
-    onRefresh,
-    onShare: sharing ? (note) => sharing.share(note) : undefined,
+    onMainMenu,
+    // A net menu has no wand strip: its swaps would ride a command the gate drops.
+    ...(canPause
+      ? { onNewSeed, onRestart, onRefresh, onShare: sharing ? (note?: string) => sharing.share(note) : undefined, modSwaps }
+      : { title: netMenuTitle }),
     weaponThumb: renderer.weaponThumb,
-    modSwaps,
   })
-  if (canPause)
-    window.addEventListener('keydown', (ev) => {
-      if (ev.key !== 'Escape') return
-      const view = session.renderView()
-      if (view.gameOver || view.self?.dead) return // death screen owns the moment
-      setPaused(!(session.isPaused ?? false))
-    })
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return
+    const view = session.renderView()
+    if (view.gameOver || view.self?.dead) return // death screen owns the moment
+    setPaused(!menuOpen())
+  })
   // ⏸ — THE ONLY WAY INTO THE PAUSE MENU FROM A PHONE.
   //
   // Pause had exactly two triggers, Escape and the pad's Start, and a phone has
@@ -1162,20 +1208,19 @@ const runLoop = (
   // them in the hit test) and it is marked data-ui-chrome so the tap never
   // enters the stick/inspect press classification. It sits left of the gear.
   // Hidden while paused — the overlay's own Resume owns that moment — and on
-  // the death/game-over screens, matching the overlay's visibility rule.
+  // the death/game-over screens, matching the overlay's visibility rule. A net
+  // session's copy shows ☰, since its menu does not pause anything.
   const pauseBtn = document.createElement('button')
-  if (canPause) {
-    pauseBtn.textContent = '⏸'
-    pauseBtn.setAttribute('aria-label', 'Pause')
-    pauseBtn.dataset.role = 'pause-button'
-    markUiChrome(pauseBtn)
-    pauseBtn.style.cssText =
-      'position:absolute;right:52px;top:10px;z-index:70;width:34px;height:34px;border-radius:8px;' +
-      'border:1px solid #0008;background:#222c;color:#eee;font-size:16px;cursor:pointer;pointer-events:auto;' +
-      'touch-action:manipulation'
-    pauseBtn.addEventListener('click', () => setPaused(true))
-    uiMount.appendChild(pauseBtn)
-  }
+  pauseBtn.textContent = canPause ? '⏸' : '☰'
+  pauseBtn.setAttribute('aria-label', canPause ? 'Pause' : 'Menu')
+  pauseBtn.dataset.role = 'pause-button'
+  markUiChrome(pauseBtn)
+  pauseBtn.style.cssText =
+    'position:absolute;right:52px;top:10px;z-index:70;width:34px;height:34px;border-radius:8px;' +
+    'border:1px solid #0008;background:#222c;color:#eee;font-size:16px;cursor:pointer;pointer-events:auto;' +
+    'touch-action:manipulation'
+  pauseBtn.addEventListener('click', () => setPaused(true))
+  uiMount.appendChild(pauseBtn)
   const showPadHint = createPadHint(uiMount)
   let currentLevel = session.renderView().level
 
@@ -1239,7 +1284,7 @@ const runLoop = (
         }
         // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
         // ~1.5 s of advanced sim time (solo/host only; persister is undefined else).
-        if (persister) {
+        if (persister && !abandoned) {
           const w = hostWorld()
           if (w) persister.maybeSave(w)
         }
@@ -1307,11 +1352,11 @@ const runLoop = (
         missionPanel.update(view)
         commOverlay.update(view)
         overlay.update(pads)
-        const paused = session.isPaused ?? false
+        const paused = menuOpen()
         pauseOverlay.update(paused, view)
         // Same visibility rule as the overlay itself: gone while the pause menu
         // is up (Resume owns that), gone on death/game-over (that screen does).
-        if (canPause) pauseBtn.style.display = paused || view.gameOver || view.self?.dead ? 'none' : 'block'
+        pauseBtn.style.display = paused || view.gameOver || view.self?.dead ? 'none' : 'block'
         // Tell the updater where the player is, so a downloaded build can swap
         // itself in at a moment that costs nothing (src/app/updatePolicy.ts). The
         // floor-change window is held open for the length of the "FLOOR n" banner

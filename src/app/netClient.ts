@@ -174,6 +174,13 @@ const HELLO_MAX_ATTEMPTS = 9
  */
 export class NetClientSession implements Session {
   phase: ClientPhase = 'connecting'
+  /** Why the link ended on purpose, if it did: the host said Bye, or we quit.
+   * Either way a drop that follows is expected and must not reconnect. */
+  private departure: 'host-left' | 'we-left' | null = null
+  /** The host said Bye: it left on purpose, the link did not just drop. */
+  get hostLeft(): boolean {
+    return this.departure === 'host-left'
+  }
   rejectReason = ''
   slot = -1
   onPhaseChange?: (phase: ClientPhase) => void
@@ -285,6 +292,7 @@ export class NetClientSession implements Session {
 
   private onDisconnected(): void {
     this.reader.reset() // a fresh link starts a fresh byte stream
+    if (this.departure) return // the end was announced; this drop is its echo
     // Mid-game drop with a rejoin token and a reconnect-capable transport:
     // keep trying quietly; the host holds our avatar for 90s.
     if (this.phase === 'playing' && this.rejoinToken && this.transport.reconnect) {
@@ -314,6 +322,13 @@ export class NetClientSession implements Session {
 
   async start(): Promise<void> {
     await this.transport.start()
+  }
+
+  /** Leave on purpose (Main menu): hang up without the reconnect a drop would
+   * start. The host sees the peer go and holds its avatar as for any drop. */
+  async close(): Promise<void> {
+    this.departure = 'we-left'
+    await this.transport.stop()
   }
 
   private setPhase(phase: ClientPhase): void {
@@ -434,6 +449,10 @@ export class NetClientSession implements Session {
       case MsgType.Reject:
         this.rejectReason = decodeJson<{ reason: string }>(msg).reason
         this.setPhase('rejected')
+        break
+      case MsgType.Bye:
+        this.departure = 'host-left'
+        this.setPhase('ended')
         break
       case MsgType.LobbyState:
         this.onLobbyChange?.(decodeJson<LobbyStateMsg>(msg))
@@ -821,9 +840,11 @@ export class NetClientSession implements Session {
     const missionText =
       this.phase === 'reconnecting'
         ? 'Bluetooth dropped — reconnecting…'
-        : this.phase === 'ended' && this.selfId >= 0
-          ? 'Connection lost'
-          : this.state.missionText
+        : this.phase === 'ended' && this.departure === 'host-left'
+          ? 'The host left the game'
+          : this.phase === 'ended' && this.selfId >= 0
+            ? 'Connection lost'
+            : this.state.missionText
     return {
       entities: [...this.entities.values()],
       events,

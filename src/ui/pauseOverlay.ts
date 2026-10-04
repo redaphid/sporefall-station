@@ -10,6 +10,7 @@ import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout } from './loadoutModel'
 import { buildSequence } from './sequenceModel'
 import { installGamepadMenuNav } from './gamepadMenu'
+import { createTwoPressGroup, MAIN_MENU_ARMED_LABEL, MAIN_MENU_LABEL } from './twoPress'
 import { createSequenceStrip, stripChips } from './sequenceStrip'
 import {
   initialShare,
@@ -59,6 +60,11 @@ export const createPauseOverlay = (
     onResume: () => void
     onNewSeed?: () => void
     onRestart?: () => void
+    /** Abandon the run and go to the start menu. */
+    onMainMenu?: () => void
+    /** The heading, read each frame. A net session's menu does not stop the
+     * shared sim, so it is not "PAUSED", and a client's says why it opened. */
+    title?: () => string
     /** Save, fetch the newest build, go to the picker. `show` paints its status. */
     onRefresh?: (show: (text: string) => void) => void
     onShare?: (note?: string) => Promise<ShareResult>
@@ -71,7 +77,12 @@ export const createPauseOverlay = (
   el.style.cssText =
     'position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;' +
     'gap:16px;z-index:60;background:#0009;pointer-events:auto;text-align:center;padding:20px;box-sizing:border-box'
-  el.innerHTML = `<div style="font:800 40px system-ui;color:#fff;letter-spacing:6px;text-shadow:0 2px 8px #000">PAUSED</div>`
+  const heading = document.createElement('div')
+  heading.dataset.role = 'pause-title'
+  heading.style.cssText = 'font:800 40px system-ui;color:#fff;letter-spacing:6px;text-shadow:0 2px 8px #000'
+  const title = actions.title ?? (() => 'PAUSED')
+  heading.textContent = title()
+  el.appendChild(heading)
   const panel = createLoadoutPanel(actions.weaponThumb)
   el.appendChild(panel.el)
   // Sequenced mods: the wand order, reorderable while paused. The sim is
@@ -107,42 +118,18 @@ export const createPauseOverlay = (
   const resumeBtn = btn('Resume', true)
   resumeBtn.addEventListener('click', actions.onResume)
   row.appendChild(resumeBtn)
-  // New Seed and Run it back each throw the run away, so each takes two
-  // presses: the first arms it and says so, the second acts. At most one is
-  // armed at a time, and leaving the button or closing the menu disarms it,
-  // so a stray press never ends a run.
-  const disarms: (() => void)[] = []
-  const disarmAll = (): void => disarms.forEach((d) => d())
+  // New Seed, Run it back and Main menu each end the run, so each takes two
+  // presses (twoPress.ts). Closing the menu disarms them all.
+  const runEnders = createTwoPressGroup()
   const twoPress = (role: string, label: string, armedLabel: string, act: () => void): HTMLButtonElement => {
     const b = btn(label, false)
     b.dataset.role = role
-    const disarm = (): void => {
-      delete b.dataset.armed
-      b.textContent = label
-      b.style.background = '#1b1e28'
-    }
-    disarms.push(disarm)
-    b.addEventListener('click', () => {
-      if (b.dataset.armed !== undefined) {
-        disarm()
-        act()
-        return
-      }
-      disarmAll()
-      b.dataset.armed = ''
-      b.textContent = armedLabel
-      b.style.background = '#5a1f22'
-    })
-    b.addEventListener('blur', disarm)
-    // A held Enter autorepeats its keydown, and each one clicks: one hold
-    // would arm and then act. Only a fresh keypress may count.
-    b.addEventListener('keydown', (e) => {
-      if (e.repeat) e.preventDefault()
-    })
+    runEnders.wire(b, armedLabel, act)
     return b
   }
   if (actions.onNewSeed) row.appendChild(twoPress('pause-new-seed', '🎲 New Seed', '🎲 Wipe this run? Press again', actions.onNewSeed))
   if (actions.onRestart) row.appendChild(twoPress('pause-run-it-back', 'Run it back', 'Restart this run? Press again', actions.onRestart))
+  if (actions.onMainMenu) row.appendChild(twoPress('pause-main-menu', MAIN_MENU_LABEL, MAIN_MENU_ARMED_LABEL, actions.onMainMenu))
   el.appendChild(row)
   const onRefresh = actions.onRefresh
   if (onRefresh) {
@@ -270,10 +257,12 @@ export const createPauseOverlay = (
       // Never over the death/game-over overlay — that screen owns its own panel.
       const show = paused && !view.gameOver && !view.self?.dead
       if (show && !wasPaused) panel.update(buildLoadout(view.self)) // refresh on open
-      if (!show) disarmAll()
+      if (!show) runEnders.disarmAll()
       if (show) {
         lastView = view
         paintSeq()
+        const text = title()
+        if (heading.textContent !== text) heading.textContent = text
       }
       wasPaused = show
       el.style.display = show ? 'flex' : 'none'

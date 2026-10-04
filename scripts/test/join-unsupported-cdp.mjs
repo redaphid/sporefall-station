@@ -35,7 +35,7 @@ try {
   assert(await phone.evaluate(() => !('bluetooth' in navigator)), 'iPhone page has no navigator.bluetooth')
   await phone.click('text=Join co-op')
   const text = await unsupportedText(phone)
-  assert(/iPhones and iPads can't join over Bluetooth/.test(text), `iPhone sees the reason: ${JSON.stringify(text)}`)
+  assert(/Safari and Chrome on iPhone and iPad can't use Bluetooth/.test(text), `iPhone sees the reason: ${JSON.stringify(text)}`)
   assert((await phone.locator('text=Looking for a host').count()) === 0, 'no empty lobby behind it')
   await phone.screenshot({ path: `${OUT}/join-unsupported-iphone.png` })
   await phone.click('text=Back to menu')

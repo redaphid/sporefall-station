@@ -3,7 +3,7 @@
  *
  * Joining used to fall back to BroadcastChannel whenever Web Bluetooth was
  * missing. That transport only reaches tabs in the same browser, so an iPhone
- * (no iOS browser ships Web Bluetooth) landed in an empty lobby that looked
+ * (neither Safari nor Chrome on iOS ships Web Bluetooth) landed in an empty lobby that looked
  * exactly like a host that would not advertise (#15). BroadcastChannel is now
  * reached only on purpose, with `?transport=tabs`; a device that cannot join
  * gets a plan that says why.
@@ -46,7 +46,7 @@ export const JOIN_UNSUPPORTED: Record<UnsupportedReason, { title: string; detail
   'apple-mobile': {
     title: "Can't join from this device",
     detail:
-      "iPhones and iPads can't join over Bluetooth. Apple doesn't let any iOS browser use it, Chrome included. " +
+      "Safari and Chrome on iPhone and iPad can't use Bluetooth for this. " +
       'Join from an Android phone or a laptop running Chrome.',
   },
   'no-web-bluetooth': {

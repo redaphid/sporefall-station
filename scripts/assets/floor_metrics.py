@@ -169,7 +169,7 @@ def main():
         m, probs = gate([Path(p) for p in sys.argv[i + 2:]])
         print(sys.argv[i + 1], json.dumps(m), probs or "PASS")
         return
-    for name in ("floor", "street", "grass", "sidewalk", "hall", "plating", "tiled", "bog", "deck"):
+    for name in ("floor", "causeway", "grass", "boardwalk", "hall", "plating", "tiled", "bog", "deck"):
         ps = pool(name)
         if ps:
             print(f"{name:9s} {json.dumps(measure(ps))}")

@@ -2,7 +2,7 @@
 """Swampspace theme pack generator — "Sporefall Station".
 
 An alien bog overtaking a derelict space station: mangrove roots through deck
-plating, bioluminescent spore drones for cops, phosphorescent water, star-glass
+plating, bioluminescent spore drones for wardens, phosphorescent water, star-glass
 bulkheads. Art direction: Flashback (Amiga 1992) Titan-jungle palette/mood —
 teal mist, olive overgrowth swallowing tan/gray tech, sparse hot accents.
 (Inspiration only: prompts + a derived color palette; no Flashback art is used
@@ -202,12 +202,12 @@ CHARS = {
                "chest straps and a large glowing orange-amber visor, green vines wrapped around "
                "one arm, sturdy tan boots, vivid saturated colors, high contrast, "
                "chunky proportions, big head, short legs", ""),
-    "cop": ("spore-drone",
+    "warden": ("spore-drone",
             "a hovering robotic security drone machine, a rounded gray metal pod body with NO "
             "legs, moss patches on the shell, one large glowing green sensor eye, small thruster "
             "jets underneath, two thin dangling manipulator arms, floating above the ground",
             "human, person, legs, feet, boots, spacesuit, helmet, orange visor, orange cap"),
-    "thug": ("bog-mutant",
+    "mutant": ("bog-mutant",
              "a huge hulking swamp mutant brute, broad shoulders twice as wide as its waist, "
              "moss-crusted olive-green warty skin, bare chest, glowing yellow eyes, massive "
              "heavy fists, hunched forward, chunky proportions, big head, short legs",
@@ -468,7 +468,7 @@ NEG_THIN = ("elongated, slender, lanky, skinny, thin limbs, spindly, long legs, 
             "fashion model, willowy, narrow shoulders, stretched, anorexic")
 BG_STATIC = ("single isolated game object centered on plain flat white background, "
              "the whole object in frame, resting on the floor")
-CHAR_ALIASES = {"gangster": "thug", "bouncer": "cop", "boss": "thug", "shopkeeper": "civilian"}
+CHAR_ALIASES = {"acolyte": "mutant", "lockkeeper": "warden", "boss": "mutant", "shopkeeper": "civilian"}
 
 # ---- the rest of the pack ---------------------------------------------------
 TILES = {

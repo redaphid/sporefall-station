@@ -384,7 +384,7 @@ export class EntityViews {
       view.footX = footX
       view.footY = footY
       // Per-archetype BULK multiplies the animation pulse: the Mireclaw Alpha
-      // draws at 1.5x so it can never be mistaken for the thug whose sprite it
+      // draws at 1.5x so it can never be mistaken for the mutant whose sprite it
       // still borrows (art.ARCHETYPE_SCALE).
       const scale =
         (e.kind === 'fire' ? 1 + Math.sin(t * 0.9) * 0.08 : burning ? 1 + burnPulse(t) * 0.08 : 1) *

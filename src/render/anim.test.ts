@@ -250,7 +250,7 @@ describe('tap-pick covers the whole visible character sprite', () => {
     const e = {
       id: 1,
       kind: 'npc',
-      archetype: 'thug',
+      archetype: 'mutant',
       pos: { x: 10, y: 10 },
     } as unknown as Entity
     // Head centre sits ~1 tile above the entity centre on the 48px canvas.

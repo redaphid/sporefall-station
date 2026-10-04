@@ -5,10 +5,11 @@
 //
 // The press reaches every peer as a `sealDenied` event. The walk-in is read off
 // the door entity, which carries its seal only on the host: the wire sends a
-// door's open/locked bits, not its seal kind, so a joiner gets the press hint
-// and not the walk-in one.
+// door's open/locked bits, not its seal kind or key, so a joiner gets the press
+// hint and not the walk-in one, and is told "the keycard" without its wing.
 
 import type { RenderView } from '../app/session'
+import { itemName } from '../game/data/items'
 import type { Entity } from '../game/entity'
 import { SPECIAL_NAME } from '../game/player'
 import { hasKeycard } from '../game/systems/interaction'
@@ -19,17 +20,20 @@ export type SealKind = Extract<SimEvent, { type: 'sealDenied' }>['sealKind']
 /** Fewest sim ticks between two seal hints (3 s at 30 tps). */
 export const SEAL_HINT_COOLDOWN_TICKS = 90
 
-/** What opens each seal, besides a breach. */
-const KEY_STEP: Record<SealKind, (nameOf: (archetype: string) => string) => string> = {
-  keycard: () => 'Sealed. Find the keycard',
+const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)
+
+/** What opens each seal, besides a breach. The keycard step names the card the
+ * way the hotbar will once it is picked up. */
+const KEY_STEP: Record<SealKind, (nameOf: (archetype: string) => string, keyId?: string) => string> = {
+  keycard: (_nameOf, keyId) => `Sealed. Find the ${keyId ? lowerFirst(itemName(keyId)) : 'keycard'}`,
   power: (nameOf) => `Sealed. Hack the ${nameOf('generator')}`,
   overgrown: (nameOf) => `Overgrown. Kill its ${nameOf('sporeNode')}`,
 }
 
 /** Names the special, not "a grenade": only the special's blast breaches a
  * door (combat.detonate); a thrown Grenade item's blast does not. */
-export const sealHintText =(kind: SealKind, nameOf: (archetype: string) => string): string =>
-  `${KEY_STEP[kind](nameOf)}, or blast it with your ${SPECIAL_NAME} special`
+export const sealHintText = (kind: SealKind, nameOf: (archetype: string) => string, keyId?: string): string =>
+  `${KEY_STEP[kind](nameOf, keyId)}, or blast it with your ${SPECIAL_NAME} special`
 
 /** The seal on a shut door, if it has one. A plain lock is not a seal. */
 const sealOf = (d: Entity): SealKind | undefined => {
@@ -68,17 +72,25 @@ export const createSealHint = (nameOf: (archetype: string) => string): SealHint 
       const self = view.self
       if (!self) return undefined
       let kind: SealKind | undefined
+      let sealedDoor: Entity | undefined
       if (view.tick !== lastEventTick) {
         lastEventTick = view.tick
-        for (const ev of view.events) if (ev.type === 'sealDenied' && ev.byId === self.id) kind = ev.sealKind
+        for (const ev of view.events) {
+          if (ev.type !== 'sealDenied' || ev.byId !== self.id) continue
+          kind = ev.sealKind
+          sealedDoor = view.entities.find((e) => e.id === ev.entityId)
+        }
       }
       // Walking into the door hints once on contact, not every frame of leaning.
       const door = sealedDoorTouched(view.entities, self)
-      if (door && door.id !== leaningOn) kind ??= sealOf(door)
+      if (door && door.id !== leaningOn && !kind) {
+        kind = sealOf(door)
+        sealedDoor = door
+      }
       leaningOn = door?.id
       if (!kind || view.tick - shownAt < SEAL_HINT_COOLDOWN_TICKS) return undefined
       shownAt = view.tick
-      return sealHintText(kind, nameOf)
+      return sealHintText(kind, nameOf, sealedDoor?.door?.keyId)
     },
   }
 }

@@ -6,6 +6,7 @@ import { decodeJson, encodeJson } from '../net/framing/codec'
 import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import { type InventoryMsg } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
+import { nextFloor } from '../game/systems/missions'
 import { NetClientSession } from './netClient'
 import { NetHostSession } from './netHost'
 
@@ -134,12 +135,12 @@ const richLoadout = (): { inventory: ItemStack[]; activeSlot: number } => ({
   // 1..n are held items (throwables/consumables), the only selectable ones.
   // Post-cull this is what a rich inventory actually looks like: the permanent
   // modded weapon, the one surviving throwable in a deep stack, and the mission
-  // briefcase. It used to run pistol/molotov/grenade/bandage; three of those four
+  // canister. It used to run pistol/molotov/grenade/bandage; three of those four
   // ids no longer exist, and a wire test that round-trips dead content proves
   // less than one that round-trips what a player can really be carrying.
   inventory: [
     { itemId: 'pistol', qty: 1, mods: [{ id: 'frost', stacks: 2 }] },
-    { itemId: 'briefcase', qty: 1 },
+    { itemId: 'canister', qty: 1 },
     { itemId: 'grenade', qty: 37 },
   ],
   activeSlot: 2, // the grenade is HELD; a weapon slot can never be the active one
@@ -167,7 +168,7 @@ describe('co-op client inventory (issue #57)', () => {
     const self = bob.session.renderView().self!
     const inv = self.loadout!.inventory
     // Full slot list arrives — the modded permanent weapon plus every held item.
-    expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(inv.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(self.loadout!.activeSlot).toBe(2)
     // Per-slot qty rides along.
     expect(inv.find((s) => s.itemId === 'pistol')!.qty).toBe(1)
@@ -257,7 +258,7 @@ describe('co-op client inventory (issue #57)', () => {
     await tickN(host, late, 6)
 
     const self = late.session.renderView().self!
-    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(self.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(self.loadout!.activeSlot).toBe(2)
   })
 
@@ -384,8 +385,28 @@ describe('co-op client inventory (issue #57)', () => {
     const invMsg = b.received().find((m) => m[0] === MsgType.Inventory)
     expect(invMsg).toBeDefined()
     const inv = decodeJson<InventoryMsg>(invMsg!)
-    expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'briefcase', 'grenade'])
+    expect(inv.inventory.map((s) => s.itemId)).toEqual(['pistol', 'canister', 'grenade'])
     expect(inv.inventory.find((s) => s.itemId === 'pistol')!.mods).toEqual([{ id: 'frost', stacks: 2 }])
+  })
+
+  it("a guest's keycard stays on the floor it opens: the next floor's InventoryMsg drops it", async () => {
+    const { host, bob } = await startPair(213)
+    const avatar = avatarOf(host, 1)
+    avatar.loadout!.inventory = [
+      { itemId: 'pistol', qty: 1 },
+      { itemId: 'keycard.wing3.essence_lab', qty: 1 },
+      { itemId: 'grenade', qty: 4 },
+    ]
+    avatar.loadout!.activeSlot = 2
+    await tickN(host, bob, 4)
+    expect(bob.session.renderView().self!.loadout!.inventory.map((s) => s.itemId)).toContain('keycard.wing3.essence_lab')
+
+    nextFloor(host.world)
+    await tickN(host, bob, 6)
+
+    const ld = bob.session.renderView().self!.loadout!
+    expect(ld.inventory.map((s) => s.itemId)).toEqual(['pistol', 'grenade'])
+    expect(ld.inventory[ld.activeSlot]).toEqual({ itemId: 'grenade', qty: 4 })
   })
 
   it('serializes an InventoryMsg round-trip losslessly (mods + ammo preserved)', () => {

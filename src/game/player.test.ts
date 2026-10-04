@@ -55,8 +55,8 @@ describe('the player special — a lobbed grenade', () => {
     const w = createWorld(20, 1)
     const p = spawnPlayer(w, 0, 10.5, 1.5)
     p.facing = 0
-    const a = spawnNpc(w, 'thug', 14.5, 1.5)
-    const b = spawnNpc(w, 'thug', 15.2, 1.5)
+    const a = spawnNpc(w, 'mutant', 14.5, 1.5)
+    const b = spawnNpc(w, 'mutant', 15.2, 1.5)
     tickWorld(w, new Map([[0, { ...emptyInput(), special: true }]]))
     expect(p.playerCtl!.abilityCooldown).toBeGreaterThan(0) // fired → on cooldown
     tickN(w, new Map([[0, emptyInput()]]), 40) // fuse burns, boom
@@ -69,14 +69,14 @@ describe('the player melee multiplier', () => {
   it('a player swings a melee weapon harder than an NPC with the same weapon', () => {
     const w = createWorld(3, 1)
     const p = spawnPlayer(w, 0, 20, 20)
-    p.loadout!.inventory = [{ itemId: 'bat', qty: 100 }]
+    p.loadout!.inventory = [{ itemId: 'wrench', qty: 100 }]
     p.loadout!.activeSlot = 0
-    p.combat = { weapon: 'bat', cooldown: 0 }
+    p.combat = { weapon: 'wrench', cooldown: 0 }
     p.facing = 0
-    const victim = spawnNpc(w, 'thug', 20.9, 20)
+    const victim = spawnNpc(w, 'mutant', 20.9, 20)
     const before = victim.health!.hp
     expect(fireWeapon(w, p)).toBe(true)
-    expect(before - victim.health!.hp).toBe(Math.round(WEAPONS.bat.damage * PLAYER_MELEE_MULT))
+    expect(before - victim.health!.hp).toBe(Math.round(WEAPONS.wrench.damage * PLAYER_MELEE_MULT))
   })
 })
 

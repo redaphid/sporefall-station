@@ -1,9 +1,9 @@
 import { Tile, TileGrid, isWallTile } from './level'
 
 /**
- * Autotile pass: bevel convex building corners that face the street. A wall
+ * Autotile pass: bevel convex building corners that face the causeway. A wall
  * tile whose two exposed orthogonal neighbours AND the diagonal between them
- * are outdoor ground (street/sidewalk/grass), while the opposite two stay
+ * are outdoor ground (causeway/boardwalk/grass), while the opposite two stay
  * wall, becomes a 45° cut variant named for the exposed corner.
  *
  * Collision is untouched — cut tiles stay fully solid (see level.ts Tile
@@ -13,7 +13,7 @@ import { Tile, TileGrid, isWallTile } from './level'
  * AFTER connectivity repair, so reachability BFS never sees cut tiles.
  */
 export const applyCornerCuts = (grid: TileGrid): void => {
-  const outdoor = (t: number): boolean => t === Tile.Street || t === Tile.Sidewalk || t === Tile.Grass
+  const outdoor = (t: number): boolean => t === Tile.Causeway || t === Tile.Boardwalk || t === Tile.Grass
   const cuts: { x: number; y: number; t: number }[] = []
   for (let y = 0; y < grid.h; y++) {
     for (let x = 0; x < grid.w; x++) {

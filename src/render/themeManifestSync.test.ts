@@ -75,7 +75,7 @@ describe('theme manifests stay in sync with the assets on disk', () => {
 
   it.each(themes)('%s: tile pools list EXACTLY the numbered tiles on disk, in numeric order', (theme) => {
     const tilesDir = join(THEMES_DIR, theme, 'tiles')
-    if (!existsSync(tilesDir)) return // single-file themes (city/test) have no pools
+    if (!existsSync(tilesDir)) return // single-file themes (settlement/test) have no pools
     const m = load(theme)
     const disk = readdirSync(tilesDir)
     for (const surface of SURFACES) {

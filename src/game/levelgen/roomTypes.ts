@@ -7,7 +7,7 @@ import type { Rect } from './rooms'
  * missions and AI can reason about rooms instead of anonymous rects.
  *
  * The assignment is a PURE function of geometry the generator already fixed:
- * role, room areas, which room the street door opens into, and the designated
+ * role, room areas, which room the causeway door opens into, and the designated
  * objective room. It draws NO rng, so calling it can never perturb a
  * generation stream — the frozen floor-1 checksums and every populate stream
  * stay byte-identical.
@@ -33,7 +33,7 @@ export const roomOwningTile = (rooms: readonly Rect[], tx: number, ty: number): 
   return best
 }
 
-/** Indices of rooms a street door opens into: for each door on the building's
+/** Indices of rooms a causeway door opens into: for each door on the building's
  * exterior wall, the room owning the tile just inside it. Doors that open onto
  * a corridor/passage (hallway spines, compound gates, bunker airlocks) own no
  * room and contribute nothing. */
@@ -95,7 +95,7 @@ export const assignRoomTypes = (b: Building): RoomType[] => {
   }
 
   const entries = entryRooms(b)
-  /** The single front-of-house room: the largest room with a street door, or
+  /** The single front-of-house room: the largest room with a causeway door, or
    * the largest room outright when no door opens directly into a room. */
   const front = (): number => {
     for (let k = n - 1; k >= 0; k--) if (entries.has(order[k])) return order[k]
@@ -105,7 +105,7 @@ export const assignRoomTypes = (b: Building): RoomType[] => {
   const types: RoomType[] = new Array<RoomType>(n)
   switch (b.role) {
     case 'shop': {
-      // EVERY street-door room is shop floor (a corner shop with two doors is
+      // EVERY causeway-door room is shop floor (a corner shop with two doors is
       // one big shop floor); back rooms hold the stock.
       types.fill('stockroom')
       for (const i of entries) types[i] = 'shopfloor'

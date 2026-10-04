@@ -2,7 +2,7 @@
 // on themed floors — bunker airlock, hallway spine, courtyard pit, bevelled
 // corners — by pushing exact-world snapshots (gen-levelgen-tour.mts) into the
 // live build via window.__loadWorld, with annotation labels narrating each stop
-// and __zoom flipping between overview and street level. Asserts the loaded
+// and __zoom flipping between overview and causeway level. Asserts the loaded
 // worlds really carry the archetypes and that nothing errored.
 import { chromium } from 'playwright'
 import { execFileSync } from 'node:child_process'
@@ -50,7 +50,7 @@ const scene = async (name, expectFn) => {
     await page.evaluate((j) => window.__loadWorld(j), json)
   }
   await page.waitForTimeout(300)
-  // Street-level look, then pull out to the district overview, back in.
+  // Causeway-level look, then pull out to the district overview, back in.
   await page.evaluate(() => window.__zoom(1.6, true))
   await dwell(45)
   await page.screenshot({ path: join(OUT, `levelgen-tour-${name}-close.png`) })

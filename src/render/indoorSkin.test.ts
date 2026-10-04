@@ -86,7 +86,7 @@ describe('indoorArtKey', () => {
   })
 
   it('passes through keys with no indoor art, prototype names included', () => {
-    for (const key of ['thug', 'tv', 'atm', 'door.wood', 'Door', '', 'toString', 'constructor', '__proto__'])
+    for (const key of ['mutant', 'tv', 'atm', 'door.wood', 'Door', '', 'toString', 'constructor', '__proto__'])
       expect(indoorArtKey(key, true)).toBe(key)
   })
 
@@ -97,7 +97,7 @@ describe('indoorArtKey', () => {
   })
 
   it('parses nothing that indoorArtKey would not produce', () => {
-    for (const key of ['door', 'indoor:', 'indoor:thug', 'indoor:toString', 'indoor:indoor:door', 'Indoor:door'])
+    for (const key of ['door', 'indoor:', 'indoor:mutant', 'indoor:toString', 'indoor:indoor:door', 'Indoor:door'])
       expect(parseIndoorArtKey(key), key).toBeUndefined()
   })
 

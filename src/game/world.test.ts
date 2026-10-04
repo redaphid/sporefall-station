@@ -11,35 +11,35 @@ const tickN = (w: ReturnType<typeof createWorld>, inputs: Map<number, InputCmd>,
 }
 
 describe('sim integration', () => {
-  it('player melee attack damages and kills an adjacent thug', () => {
+  it('player melee attack damages and kills an adjacent mutant', () => {
     const w = createWorld(5, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
     player.combat!.weapon = 'fists' // pin melee — the player starts with a pistol
-    const thug = spawnNpc(w, 'thug', 11.5, 1.5)
-    player.facing = 0 // facing +x, toward the thug
+    const mutant = spawnNpc(w, 'mutant', 11.5, 1.5)
+    player.facing = 0 // facing +x, toward the mutant
 
     tickWorld(w, new Map([[0, { ...emptyInput(), attack: true }]]))
-    expect(thug.health!.hp).toBeLessThan(thug.health!.max)
+    expect(mutant.health!.hp).toBeLessThan(mutant.health!.max)
 
-    // A wounded thug now flees (goal arbitration) — chase it down while swinging.
-    for (let i = 0; i < 300 && w.byId.get(thug.id); i++) {
-      const cur = w.byId.get(thug.id)!
+    // A wounded mutant now flees (goal arbitration) — chase it down while swinging.
+    for (let i = 0; i < 300 && w.byId.get(mutant.id); i++) {
+      const cur = w.byId.get(mutant.id)!
       const dx = cur.pos.x - player.pos.x
       const dy = cur.pos.y - player.pos.y
       const chase = { ...emptyInput(), attack: true, moveX: Math.sign(dx), moveY: Math.sign(dy) }
       tickWorld(w, new Map([[0, chase]]))
     }
-    expect(w.byId.get(thug.id)).toBeUndefined() // dead and swept
+    expect(w.byId.get(mutant.id)).toBeUndefined() // dead and swept
   })
 
-  it('thug aggros a visible player and closes distance', () => {
+  it('mutant aggros a visible player and closes distance', () => {
     const w = createWorld(6, 1)
     const player = spawnPlayer(w, 0, 10.5, 1.5)
-    const thug = spawnNpc(w, 'thug', 15.5, 1.5) // 5 tiles away on open road, within sight 7
+    const mutant = spawnNpc(w, 'mutant', 15.5, 1.5) // 5 tiles away on open road, within sight 7
     const idle = new Map([[0, emptyInput()]])
-    const d0 = Math.hypot(thug.pos.x - player.pos.x, thug.pos.y - player.pos.y)
+    const d0 = Math.hypot(mutant.pos.x - player.pos.x, mutant.pos.y - player.pos.y)
     tickN(w, idle, 60)
-    const d1 = Math.hypot(thug.pos.x - player.pos.x, thug.pos.y - player.pos.y)
+    const d1 = Math.hypot(mutant.pos.x - player.pos.x, mutant.pos.y - player.pos.y)
     expect(d1).toBeLessThan(d0 - 1)
     // And eventually lands hits
     tickN(w, idle, 120)

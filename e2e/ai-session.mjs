@@ -1,8 +1,8 @@
 // @ts-check
 // Parity M8 proof: drives the ai-goals scenario in a real browser and asserts
-// the desirability arbitration — a full-health gangster chooses BATTLE and
-// closes on the player, a badly wounded gangster chooses FLEE and runs away,
-// and a calm cop INVESTIGATEs a noise (moves toward it). Video + screenshots.
+// the desirability arbitration — a full-health acolyte chooses BATTLE and
+// closes on the player, a badly wounded acolyte chooses FLEE and runs away,
+// and a calm warden INVESTIGATEs a noise (moves toward it). Video + screenshots.
 import { chromium } from 'playwright-core'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -77,14 +77,14 @@ const main = async () => {
   await sleep(300)
 
   const start = await readWorld(page)
-  // The scenario's two gangsters are the ones standing right next to the player;
-  // the two nearest gangs are them (any populated gangsters are far off).
-  const nearGangs = start.npcs.filter((n) => n.faction === 'gang').sort((a, b) => a.distToPlayer - b.distToPlayer).slice(0, 2)
-  const healthy0 = nearGangs.reduce((a, b) => (b.hp > a.hp ? b : a))
-  const wounded0 = nearGangs.reduce((a, b) => (b.hp < a.hp ? b : a))
+  // The scenario's two acolytes are the ones standing right next to the player;
+  // the two nearest rootcults are them (any populated acolytes are far off).
+  const nearRootcults = start.npcs.filter((n) => n.faction === 'rootcult').sort((a, b) => a.distToPlayer - b.distToPlayer).slice(0, 2)
+  const healthy0 = nearRootcults.reduce((a, b) => (b.hp > a.hp ? b : a))
+  const wounded0 = nearRootcults.reduce((a, b) => (b.hp < a.hp ? b : a))
   log('start', JSON.stringify({ healthy0, wounded0 }))
 
-  // Let the gangsters act on their goals for a moment.
+  // Let the acolytes act on their goals for a moment.
   await sleep(1200)
   const mid = await readWorld(page)
   const healthy1 = mid.npcs.find((n) => n.id === healthy0.id)
@@ -92,23 +92,23 @@ const main = async () => {
   await screenshot(page, 'battle-vs-flee')
   log('after', JSON.stringify({ healthy1, wounded1 }))
 
-  check(!!healthy1 && healthy1.goal === 'battle', 'the healthy gangster chose BATTLE')
-  check(mid.self.hp < start.self.hp, `the battling gangster engaged and hurt the player (hp ${start.self.hp} -> ${mid.self.hp})`)
-  check(!!wounded1 && wounded1.goal === 'flee', 'the wounded gangster chose FLEE')
-  check(!!wounded1 && wounded1.distToPlayer > wounded0.distToPlayer, 'the wounded gangster ran away from the player')
+  check(!!healthy1 && healthy1.goal === 'battle', 'the healthy acolyte chose BATTLE')
+  check(mid.self.hp < start.self.hp, `the battling acolyte engaged and hurt the player (hp ${start.self.hp} -> ${mid.self.hp})`)
+  check(!!wounded1 && wounded1.goal === 'flee', 'the wounded acolyte chose FLEE')
+  check(!!wounded1 && wounded1.distToPlayer > wounded0.distToPlayer, 'the wounded acolyte ran away from the player')
 
-  // Noise: make a racket a few tiles from the calm cop; it should investigate.
-  const copBefore = (await readWorld(page)).npcs.find((n) => n.faction === 'cop')
-  const noiseAt = { x: copBefore.x + 3, y: copBefore.y }
-  const distBefore = Math.hypot(copBefore.x - noiseAt.x, copBefore.y - noiseAt.y)
+  // Noise: make a racket a few tiles from the calm warden; it should investigate.
+  const wardenBefore = (await readWorld(page)).npcs.find((n) => n.faction === 'warden')
+  const noiseAt = { x: wardenBefore.x + 3, y: wardenBefore.y }
+  const distBefore = Math.hypot(wardenBefore.x - noiseAt.x, wardenBefore.y - noiseAt.y)
   await page.evaluate((n) => window.__debug.noise(n.x, n.y), noiseAt)
   await sleep(1500)
-  const copAfter = (await readWorld(page)).npcs.find((n) => n.faction === 'cop')
-  const distAfter = copAfter ? Math.hypot(copAfter.x - noiseAt.x, copAfter.y - noiseAt.y) : Infinity
+  const wardenAfter = (await readWorld(page)).npcs.find((n) => n.faction === 'warden')
+  const distAfter = wardenAfter ? Math.hypot(wardenAfter.x - noiseAt.x, wardenAfter.y - noiseAt.y) : Infinity
   await screenshot(page, 'investigate-noise')
-  log('cop', JSON.stringify({ copBefore, copAfter, distBefore, distAfter }))
+  log('warden', JSON.stringify({ wardenBefore, wardenAfter, distBefore, distAfter }))
 
-  check(!!copAfter && distAfter < distBefore - 0.5, `the cop moved toward the noise (${distBefore.toFixed(1)} -> ${distAfter.toFixed(1)})`)
+  check(!!wardenAfter && distAfter < distBefore - 0.5, `the warden moved toward the noise (${distBefore.toFixed(1)} -> ${distAfter.toFixed(1)})`)
 
   await page.close()
   await context.close()

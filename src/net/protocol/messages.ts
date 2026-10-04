@@ -1,9 +1,10 @@
-import type { DraftHand, Entity, ItemStack } from '../../game/entity'
+import type { ActivityKind, DraftHand, Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
+import { shownActivity } from '../../game/systems/activities'
 import type { FloorModifier } from '../../game/floorModifiers'
 import type { InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
@@ -46,23 +47,23 @@ import { MsgType } from '../types'
  */
 export const ARCHETYPES = [
   'player',
-  'thug',
-  'cop',
+  'mutant',
+  'warden',
   'civilian',
   'shopkeeper',
   'boss',
   'projectile',
   'grenade',
   'door',
-  'pickup.bat',
+  'pickup.wrench',
   'pickup.knife',
   'pickup.pistol',
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
   'pickup.cash',
-  'pickup.briefcase',
-  'gangster',
-  'bouncer',
+  'pickup.canister',
+  'acolyte',
+  'lockkeeper',
   // Everything below was spawnable but MISSING from this registry, so
   // `archetypeIndex.get(...) ?? 0` encoded it as index 0 and the remote client
   // decoded it back as 'player' — i.e. a spore pod, a lurker or a burning tile
@@ -203,6 +204,12 @@ export const WIRE_STATUSES = ['burning', 'frozen', 'wet', 'electrified', 'poison
 
 const wireStatusBit = new Map<string, number>(WIRE_STATUSES.map((k, i) => [k, 1 << i]))
 
+/** Activities a seated NPC shows, by wire code (index + 1) in the snapshot's
+ * activity trailer. Frozen history: append only, at most 127. */
+export const WIRE_ACTIVITIES: readonly ActivityKind[] = ['cards', 'tinker', 'rest']
+/** Set on an activity code when the session is under way (not just seated). */
+const ACTIVITY_PLAYING = 0x80
+
 /** Most mods a single bullet advertises on the wire (bounds the record size). */
 const WIRE_MOD_CAP = 12
 
@@ -239,6 +246,8 @@ export interface WireEntity {
   /** Active element statuses (`Entity.fx` keys) that the renderer tints and
    * shades. Absent = none. */
   statuses?: string[]
+  /** A seated NPC's activity at a prop, and whether play has started. */
+  activity?: { kind: ActivityKind; playing: boolean }
 }
 
 export interface WireSnapshot {
@@ -300,9 +309,22 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
     for (const k of e.statuses ?? []) mask |= wireStatusBit.get(k) ?? 0
     if (mask) statused.push([i, mask])
   })
-  if (statused.length > 0) {
+  // Sparse activity trailer, after the status one: u8 count, then (u8 record
+  // index, u8 code) where code is WIRE_ACTIVITIES index + 1, | ACTIVITY_PLAYING
+  // once play is on. When it is present the status count is always written,
+  // even as 0, so the decoder can tell the two trailers apart.
+  const seated: [number, number][] = []
+  entities.forEach((e, i) => {
+    const k = e.activity ? WIRE_ACTIVITIES.indexOf(e.activity.kind) : -1
+    if (k >= 0) seated.push([i, (k + 1) | (e.activity!.playing ? ACTIVITY_PLAYING : 0)])
+  })
+  if (statused.length > 0 || seated.length > 0) {
     w.u8(statused.length)
     for (const [i, mask] of statused) w.u8(i).u8(mask)
+  }
+  if (seated.length > 0) {
+    w.u8(seated.length)
+    for (const [i, code] of seated) w.u8(i).u8(code)
   }
   return w.finish()
 }
@@ -347,6 +369,15 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
       const mask = r.u8()
       const statuses = WIRE_STATUSES.filter((_, bit) => (mask & (1 << bit)) !== 0)
       if (target && statuses.length > 0) target.statuses = statuses
+    }
+  }
+  if (r.remaining > 0) {
+    const n = r.u8()
+    for (let j = 0; j < n && r.remaining >= 2; j++) {
+      const target = entities[r.u8()]
+      const code = r.u8()
+      const kind = WIRE_ACTIVITIES[(code & ~ACTIVITY_PLAYING) - 1]
+      if (target && kind) target.activity = { kind, playing: (code & ACTIVITY_PLAYING) !== 0 }
     }
   }
   return { tick, floor, alarm, lastInputSeq, entities }
@@ -442,6 +473,8 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   if (e.projectile?.mods && e.projectile.mods.length > 0) we.mods = e.projectile.mods.map((m) => ({ ...m }))
   const statuses = e.fx ? Object.keys(e.fx).filter((k) => wireStatusBit.has(k)) : []
   if (statuses.length > 0) we.statuses = statuses
+  const shown = shownActivity(e)
+  if (shown) we.activity = shown
   return we
 }
 
@@ -469,6 +502,8 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   // the renderer then draws each status at its base intensity and canonical hue.
   if (we.statuses && we.statuses.length > 0) e.fx = Object.fromEntries(we.statuses.map((k) => [k, { until: tick + 2 }]))
   else delete e.fx
+  if (we.activity) e.activityShown = { ...we.activity }
+  else delete e.activityShown
   if ((we.flags & SnapFlags.HitFlash) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.hitFlashUntil = tick + 2
@@ -492,7 +527,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       playerId: -1,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
     // slots from the InventoryMsg, this is just the render-side placeholder.
@@ -579,14 +614,14 @@ export interface StateMsg {
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
-   * with the total quantity of every carried stack except the briefcase, which
+   * with the total quantity of every carried stack except the canister, which
    * is what it always was. Bandages themselves were culled. The field survives
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<
     number,
-    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+    { cash: number; weapon: string; abilityCd: number; bandages: number; canister: boolean; draft?: DraftHand }
   >
 }
 

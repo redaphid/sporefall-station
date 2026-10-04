@@ -267,7 +267,7 @@ JOBS: dict[str, Job] = {
 }
 
 # Style anchor PAIRS. One qwen3-vl style read is noisy: against the Genesis floor/wall
-# pair it failed the shipped street tile, and against the flat indoor hall/plating pair
+# pair it failed the shipped causeway tile, and against the flat indoor hall/plating pair
 # it fails anything with glow. A candidate passes when it matches the pack's style
 # against either pair (calibrated on shipped art outside both pairs).
 PROP_DENY = ("person", "man", "woman", "character", "creature", "robot", "face", "skull", "grave",
@@ -279,8 +279,8 @@ STYLE_REFS = {"prop": (("chars/vine-ranger-s-idle.png", "props/spore-barrel.png"
                        ("tiles/hall-0.png", "tiles/plating-0.png")),
               # A receding floor read against loud anchors fails on "contrast" every time
               # (8/8 quiet decks did), so floors are judged against the pack's calm grounds.
-              "floor": (("tiles/street-0.png", "tiles/hall-0.png"),
-                        ("tiles/street-1.png", "tiles/bog-0.png"))}
+              "floor": (("tiles/causeway-0.png", "tiles/hall-0.png"),
+                        ("tiles/causeway-1.png", "tiles/bog-0.png"))}
 
 
 # ---------------------------------------------------------------------------

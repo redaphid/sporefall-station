@@ -1,7 +1,7 @@
 // feat/sprite-animation — ANIMATION STATES showcase video (exact world + real systems).
 //
 // One deterministic run cycles a character through every animation state:
-//   idle (breathe) → walk (lean+bob) → attack (pistol lunge; the thug flinches
+//   idle (breathe) → walk (lean+bob) → attack (pistol lunge; the mutant flinches
 //   HURT then topples as a DEATH ghost) → the player takes a bullet (HURT
 //   flinch) → dodge ROLL (tumble + landing squash) → idle again.
 //
@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/combat-stage.json'), 'utf8'))
 
 /** combat-stage reduced to the anim stage: player parked on the lane at x6
- * facing east, ONE guard thug at x12 (2 pistol shots = death), and a slow
+ * facing east, ONE guard mutant at x12 (2 pistol shots = death), and a slow
  * bullet crawling in from the WEST that stings the player at ~tick 138. */
 const stage = () => {
   const w = JSON.parse(JSON.stringify(base))
@@ -30,7 +30,7 @@ const stage = () => {
   p.prevPos = { x: 6, y: 11 }
   p.facing = 0
   p.health.hp = p.health.max
-  const thug = w.entities.find((e) => e.archetype === 'thug') // the x=12 guard
+  const mutant = w.entities.find((e) => e.archetype === 'mutant') // the x=12 guard
   const sting = {
     id: w.nextId,
     kind: 'projectile',
@@ -45,7 +45,7 @@ const stage = () => {
     projectile: { ownerId: 999, damage: 14, ttl: 400 },
   }
   w.nextId += 1
-  w.entities = [p, thug, sting]
+  w.entities = [p, mutant, sting]
   return w
 }
 
@@ -58,7 +58,7 @@ const readState = () => {
     playerMax: pl?.health?.max ?? null,
     playerX: pl?.pos.x ?? null,
     playerDowned: !!pl?.playerCtl?.downed,
-    thugs: w.entities.filter((e) => e.archetype === 'thug' && !e.dead).length,
+    mutants: w.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length,
     projectiles: w.entities.filter((e) => e.kind === 'projectile' && !e.dead).length,
   }
 }
@@ -70,13 +70,13 @@ const ok = await recordFeature({
   script: 'animStates',
   stills: [
     { tick: 15, label: 'video-01-idle' },
-    { tick: 100, label: 'video-02-thug-down' },
+    { tick: 100, label: 'video-02-mutant-down' },
     { tick: 150, label: 'video-03-player-hurt' },
     { tick: 240, label: 'video-04-rolled' },
   ],
   readState,
   expect: (s) => [
-    s.thugs !== 0 && `thug survived the attack phase (${s.thugs} left) — no death state shown`,
+    s.mutants !== 0 && `mutant survived the attack phase (${s.mutants} left) — no death state shown`,
     s.playerHp >= s.playerMax && `west bullet never landed (hp ${s.playerHp}/${s.playerMax}) — no hurt state shown`,
     s.playerHp <= 0 && 'player died — the sting was supposed to be survivable',
     s.playerDowned && 'player went down',

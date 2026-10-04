@@ -5,7 +5,7 @@ import { addEntity, isBlocked, type World } from '../world'
 import { applyDamage, detonate, runHitTriggers } from './combat'
 import { canSeeEntity, hateToward } from './goals'
 import { applyAreaEffect } from './itemEffects'
-import { CRIME_HATE, initialFactionHate } from './relationships'
+import { MISDEED_HATE, initialFactionHate } from './relationships'
 import { applyStatus } from './statusFx'
 import { vlen } from '../simMath'
 
@@ -35,23 +35,23 @@ const wrapAngle = (a: number): number => {
  *    Hostile (stored grudge, faction opener, the `w.hostile` floor, infection —
  *    all via `hateToward`). Never players: co-op allies are not prey. In a
  *    peaceful world a Neutral civilian is not prey either — homing must never
- *    auto-commit a crime the player didn't aim.
+ *    auto-commit a misdeed the player didn't aim.
  *  - NPC-owned rounds seek players the NPC hates (the enemy-fire symmetry the
  *    old global-nearest scan got backwards: it excluded players outright, so an
  *    enemy's homing gun chased its own allies), and NPCs it holds a Hostile
- *    stance toward (stored rel, else the faction matrix — cop vs gang).
+ *    stance toward (stored rel, else the faction matrix — warden vs rootcult).
  * Downed players are out of the fight (their hits void anyway) — skipped. */
 const isHomingPrey = (w: World, owner: Entity, t: Entity): boolean => {
   if (t.id === owner.id || t.dead || !t.health) return false
   if (t.kind === 'player') {
     if (!owner.ai || t.playerCtl?.downed) return false
-    return hateToward(w, owner, t.id) >= CRIME_HATE
+    return hateToward(w, owner, t.id) >= MISDEED_HATE
   }
   if (t.kind !== 'npc') return false
-  if (owner.playerCtl) return hateToward(w, t, owner.id) >= CRIME_HATE
+  if (owner.playerCtl) return hateToward(w, t, owner.id) >= MISDEED_HATE
   const stored = owner.ai?.rel?.[t.id]?.hate
   const hate = stored ?? initialFactionHate(owner.ai?.faction ?? 'neutral', t.ai?.faction ?? 'neutral')
-  return hate >= CRIME_HATE
+  return hate >= MISDEED_HATE
 }
 
 /** Steer a homing projectile. Candidates are live enemy bodies (`isHomingPrey`)

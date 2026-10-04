@@ -1,7 +1,7 @@
-// Heist-finale tour: ONE continuous video of the three beats on a real steal
+// Salvage-finale tour: ONE continuous video of the three beats on a real steal
 // floor — sealed quest gate, gateway breach (every other door pops open), and
 // prize grab (the whole town aggros the holder, visibly converging while the
-// sim runs). Exact-world snapshots from gen-heist-tour.mts via __loadWorld.
+// sim runs). Exact-world snapshots from gen-salvage-tour.mts via __loadWorld.
 // Asserts the real mechanics in-page: doors released after breach, alarm maxed
 // and every unit locked on after the grab.
 import { chromium } from 'playwright'
@@ -13,13 +13,13 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BASE = process.env.BASE_URL ?? 'http://localhost:4173'
 const OUT = process.env.E2E_OUT ?? join(__dirname, 'output')
-const FIXTURES = join(OUT, 'heist-fixtures')
+const FIXTURES = join(OUT, 'salvage-fixtures')
 const SIZE = { width: 1280, height: 720 }
 mkdirSync(OUT, { recursive: true })
 
 const fixture = (name) => JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), 'utf8'))
 
-const videoDir = join(OUT, 'video-heist-tour')
+const videoDir = join(OUT, 'video-salvage-tour')
 rmSync(videoDir, { recursive: true, force: true })
 mkdirSync(videoDir, { recursive: true })
 
@@ -45,22 +45,22 @@ const scene = async (name, dwellTicks, readInfo) => {
   await page.waitForTimeout(300)
   await page.evaluate(() => window.__zoom(1.15, true))
   await dwell(dwellTicks)
-  await page.screenshot({ path: join(OUT, `heist-tour-${name}.png`) })
+  await page.screenshot({ path: join(OUT, `salvage-tour-${name}.png`) })
   const info = await page.evaluate(readInfo)
   state.scenes.push({ name, ...info })
 }
 
-await scene('heist-1-sealed', 45, () => {
+await scene('salvage-1-sealed', 45, () => {
   const w = window.__sporefall.world
   const gate = w.byId.get(w.mission.objectiveDoorId)
   return { failures: [!gate?.door?.locked && 'gate not sealed'].filter(Boolean) }
 })
-await scene('heist-2-breach', 60, () => {
+await scene('salvage-2-breach', 60, () => {
   const w = window.__sporefall.world
   const closed = w.entities.filter((e) => e.door && (!e.door.open || e.door.locked) && e.id !== w.mission.objectiveDoorId)
   return { failures: [closed.length > 0 && `${closed.length} doors still closed`, !w.mission.bossAggroTriggered && 'breach not latched'].filter(Boolean) }
 })
-await scene('heist-3-manhunt', 90, () => {
+await scene('salvage-3-manhunt', 90, () => {
   const w = window.__sporefall.world
   const player = w.entities.find((e) => e.playerCtl)
   // Live-sim targets drift (trails go cold, civilians flee) — the permanent
@@ -77,8 +77,8 @@ await browser.close()
 
 const webm = readdirSync(videoDir).find((f) => f.endsWith('.webm'))
 if (!webm) throw new Error('no webm recorded')
-const webmPath = join(OUT, 'heist-tour.webm')
-const mp4 = join(OUT, 'heist-tour.mp4')
+const webmPath = join(OUT, 'salvage-tour.webm')
+const mp4 = join(OUT, 'salvage-tour.mp4')
 renameSync(join(videoDir, webm), webmPath)
 execFileSync('ffmpeg', ['-y', '-i', webmPath, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-vf',
   'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
@@ -94,12 +94,12 @@ if (bytes < 150_000) failures.push(`mp4 only ${bytes} bytes`)
 const share = process.env.TOUR_SHARE
 if (share) {
   mkdirSync(share, { recursive: true })
-  cpSync(mp4, join(share, 'heist-tour.mp4'))
+  cpSync(mp4, join(share, 'salvage-tour.mp4'))
 }
 
-console.log(`heist-tour.mp4 (${(bytes / 1024).toFixed(0)} KB)`)
+console.log(`salvage-tour.mp4 (${(bytes / 1024).toFixed(0)} KB)`)
 if (failures.length) {
   for (const f of failures) console.error(`FAIL: ${f}`)
   process.exit(1)
 }
-console.log('OK — heist tour recorded, all asserts passed')
+console.log('OK — salvage tour recorded, all asserts passed')

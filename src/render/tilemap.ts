@@ -22,14 +22,14 @@ interface Chunk {
  * stair shaft's open side `dir`. */
 export const STAIR_QUARTER_TURNS: Record<StairDir, number> = { s: 0, w: 1, n: 2, e: 3 }
 
-/** Ground "height" rank for seam shading: water-street lowest, then moss/
- * grass, then raised sidewalk decking, then interior floors. A LOWER tile
+/** Ground "height" rank for seam shading: water-causeway lowest, then moss/
+ * grass, then raised boardwalk decking, then interior floors. A LOWER tile
  * bordering a higher one takes a soft seam shadow on that edge, so surfaces
  * meet deliberately (shoreline, curb) instead of butting flat colors. */
 const GROUND_RANK: Record<number, number> = {
-  [Tile.Street]: 0,
+  [Tile.Causeway]: 0,
   [Tile.Grass]: 1,
-  [Tile.Sidewalk]: 2,
+  [Tile.Boardwalk]: 2,
   [Tile.Floor]: 3,
   [Tile.Exit]: 3,
   // Indoor complex: bog seep sits lowest, corridors below the room decks.
@@ -59,14 +59,14 @@ export class TilemapView {
     this.root.removeChildren().forEach((c) => c.destroy({ children: true }))
     this.chunks = []
     const tileAt = (tx: number, ty: number): number =>
-      tx >= 0 && ty >= 0 && tx < level.w && ty < level.h ? level.tiles[ty * level.w + tx] : Tile.Sidewalk
+      tx >= 0 && ty >= 0 && tx < level.w && ty < level.h ? level.tiles[ty * level.w + tx] : Tile.Boardwalk
     // Context-keyed overlay decals ("moss as placement, not texture"): for
     // every surface the theme ships a `tile.<name>.overlay` pool for, plan
     // decal placements from the tile grid (wall bases, door thresholds, plate
     // seams…) — deterministic, so the same moss grows on every device. The
     // plan is grouped per tile for O(1) lookup while baking chunks.
     const overlayAt = new Map<number, OverlayPlacement[]>()
-    for (const t of [Tile.Floor, Tile.Sidewalk, Tile.Street, Tile.Grass, Tile.Exit]) {
+    for (const t of [Tile.Floor, Tile.Boardwalk, Tile.Causeway, Tile.Grass, Tile.Exit]) {
       const pool = art.tileOverlayPool(t)
       if (pool.length === 0) continue
       for (const p of planTileOverlays(level, t, pool.length, art.tileMacro(t))) {
@@ -98,12 +98,12 @@ export class TilemapView {
             const py = (ty - cy * CHUNK) * TILE_PX
             // Bevelled wall corner: its texture has a transparent cut triangle,
             // so first lay down the ground tile the bevel exposes (the diagonal
-            // outside neighbour's art — falls back to sidewalk).
+            // outside neighbour's art — falls back to boardwalk).
             const cut = WALL_CUT_OUTSIDE[tileId]
             if (cut) {
               const neighbor = tileAt(tx + cut.dx, ty + cut.dy)
               const exposed = !isWallTile(neighbor)
-              const ground = exposed ? neighbor : Tile.Sidewalk
+              const ground = exposed ? neighbor : Tile.Boardwalk
               const groundSkin = exposed ? indoorTileSkin(level, tx + cut.dx, ty + cut.dy) : undefined
               const back = new Sprite(art.tile(ground, hash, tx, ty, groundSkin))
               back.position.set(px, py)

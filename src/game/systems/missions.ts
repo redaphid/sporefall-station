@@ -1,4 +1,5 @@
-import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
+import { itemClass, itemName, keycardId } from '../data/items'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type Loadout } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
 import { isFloorTile, isSolidTile, levelChecksum, type Building, type BuildingRole } from '../levelgen/level'
@@ -52,6 +53,20 @@ const WING_NAMES: Record<BuildingRole, string> = {
 
 /** Themed module name for a building role (falls back to the raw role, defensively). */
 const wingName = (role: BuildingRole): string => WING_NAMES[role] ?? role
+
+/** The keycard for `building`'s gate, named as the objective banner names the
+ * building. A name another keycard seal on this floor already uses gets a
+ * number ("essence lab 2"); a building with no role falls back to its wing. */
+export const keycardFor = (w: World, building: Building, wing: string): string => {
+  const base = building.role ? wingName(building.role) : ''
+  if (!base) return keycardId(wing)
+  const taken = new Set(
+    w.entities.filter((e) => e.door?.sealKind === 'keycard' && e.door.keyId).map((e) => itemName(e.door!.keyId!)),
+  )
+  let name = base
+  for (let n = 2; taken.has(itemName(keycardId(wing, name))); n++) name = `${base} ${n}`
+  return keycardId(wing, name)
+}
 
 /** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
  * enough to fight to it and burn it back; short enough that dawdling floods the
@@ -108,8 +123,8 @@ const generateMission = (w: World): void => {
 
   if (rng.chance(0.5)) {
     const spot = roomCenter(building)
-    const item = makeEntity('pickup', 'pickup.briefcase', spot.x, spot.y, 0.3)
-    item.pickup = { itemId: 'briefcase', qty: 1 }
+    const item = makeEntity('pickup', 'pickup.canister', spot.x, spot.y, 0.3)
+    item.pickup = { itemId: 'canister', qty: 1 }
     addEntity(w, item)
     // Past the tutorial floor, half the steals become EXTRACTIONS. Rolled on a
     // dedicated fork so the mission stream (and every placement after it) stays
@@ -210,11 +225,12 @@ const applyAccessGate = (w: World): void => {
 
   if (scheme === 0) {
     // Keycard biolock: card carried in a cargo pod elsewhere in the building.
+    const keyId = keycardFor(w, building, wing)
     gate.door!.locked = true
     gate.door!.sealKind = 'keycard'
-    gate.door!.keyId = `keycard.${wing}`
+    gate.door!.keyId = keyId
     gate.door!.wing = wing
-    placeKeycard(w, building, `keycard.${wing}`, rng)
+    placeKeycard(w, building, keyId, rng)
   } else if (scheme === 1) {
     // Power biolock: cut the wing at its generator (the loud, systemic key).
     gate.door!.locked = true
@@ -524,7 +540,7 @@ const nearestLivePlayer = (w: World): Entity | undefined =>
   w.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)
 
 /**
- * Gateway-breach escalation, stage one of the heist finale. The moment the
+ * Gateway-breach escalation, stage one of the salvage finale. The moment the
  * objective's gateway door is UNLOCKED by any means — picked, keycarded,
  * power-cut, or breached (all of which drop `door.locked` and/or set
  * `door.open`) — the station unseals: the alarm maxes and EVERY other door on
@@ -564,7 +580,7 @@ export const missionSystem = (w: World): void => {
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
       const holder = w.entities.find(
-        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister'),
       )
       if (holder) completeMission(w, holder)
     } else if (w.mission.template === 'extraction') {
@@ -617,7 +633,7 @@ export const missionSystem = (w: World): void => {
   w.events.push({ type: 'runOver', floor: w.floor })
 }
 
-const holdsPrize = (e: Entity): boolean => (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase')
+const holdsPrize = (e: Entity): boolean => (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister')
 
 /** The standing player carrying the extraction prize, if any. */
 export const extractionCarrier = (w: World): Entity | undefined =>
@@ -659,12 +675,12 @@ const runExtraction = (w: World): void => {
 
 const dropPrize = (w: World, carrier: Entity): void => {
   const ld = carrier.loadout!
-  const i = ld.inventory.findIndex((s) => s.itemId === 'briefcase')
+  const i = ld.inventory.findIndex((s) => s.itemId === 'canister')
   ld.inventory.splice(i, 1)
   // Keep the active slot on the same stack when the prize sat in front of it.
   if (i < ld.activeSlot) ld.activeSlot--
-  const item = makeEntity('pickup', 'pickup.briefcase', carrier.pos.x, carrier.pos.y, 0.3)
-  item.pickup = { itemId: 'briefcase', qty: 1 }
+  const item = makeEntity('pickup', 'pickup.canister', carrier.pos.x, carrier.pos.y, 0.3)
+  item.pickup = { itemId: 'canister', qty: 1 }
   addEntity(w, item)
   w.mission.targetEntityId = item.id
   w.events.push({ type: 'prizeDropped', entityId: item.id, byId: carrier.id, x: item.pos.x, y: item.pos.y })
@@ -682,10 +698,10 @@ const maybeBloom = (w: World, node: Entity): void => {
 }
 
 /**
- * Taking the prize is stage two of the heist finale: the mission completes,
+ * Taking the prize is stage two of the salvage finale: the mission completes,
  * the exit unlocks — and the whole STATION goes to alert for the escape run
  * (`raiseStationAlert`: every door thrown open, alarm maxed, every non-allied
- * NPC hostile and hunting). `focus` is who they hunt: the briefcase holder, or
+ * NPC hostile and hunting). `focus` is who they hunt: the canister holder, or
  * whoever stood closest to the kill. A floor with no live players (posthumous
  * completion) skips the alert — there is nobody to hunt, and an alert with no
  * focus would leave the manhunt broadcasting at a corpse. Latched by
@@ -702,6 +718,14 @@ const completeMission = (w: World, focus?: Entity): void => {
   // An extraction restarted it at the grab instead (runExtraction).
   if (w.mission.lockdownTick !== undefined && w.mission.template !== 'extraction') w.mission.lockdownTick = w.tick
   if (focus) raiseStationAlert(w, focus)
+}
+
+/** Every key item (the canister, each wing keycard) belongs to the floor it
+ * was found on, so the exit takes them all. The held stack stays held. */
+const leaveFloorKeys = (ld: Loadout): void => {
+  const held = ld.inventory[ld.activeSlot]
+  ld.inventory = ld.inventory.filter((s) => itemClass(s.itemId) !== 'key')
+  ld.activeSlot = held ? ld.inventory.indexOf(held) : -1
 }
 
 /** Regenerate the world in place for the next floor, carrying players over. */
@@ -731,9 +755,8 @@ export const nextFloor = (w: World): void => {
     if (p.playerCtl) {
       p.playerCtl.downed = undefined
       p.playerCtl.channel = undefined
-      p.playerCtl.crimeUntilTick = 0
-      // Key items don't carry across floors
-      if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'briefcase')
+      p.playerCtl.misdeedUntilTick = 0
+      if (p.loadout) leaveFloorKeys(p.loadout)
     }
     p.dead = false
     w.entities.push(p)

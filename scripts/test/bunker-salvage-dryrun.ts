@@ -1,7 +1,7 @@
-// Headless rehearsal of the `bunker-heist` script against the bunker-heist
+// Headless rehearsal of the `bunker-salvage` script against the bunker-salvage
 // fixture: same world, same per-tick inputs the browser run will use — prints
 // every notable event so the choreography can be tuned WITHOUT recording video.
-// Usage: pnpm exec tsx scripts/test/bunker-heist-dryrun.ts
+// Usage: pnpm exec tsx scripts/test/bunker-salvage-dryrun.ts
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -11,10 +11,10 @@ import type { WorldJson } from '../../src/game/serialize'
 import { createScriptedInput, SCRIPTS, scriptTicks } from '../../src/input/scripted'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const json = JSON.parse(readFileSync(join(here, '../../src/game/__fixtures__/bunker-heist.json'), 'utf8')) as WorldJson
+const json = JSON.parse(readFileSync(join(here, '../../src/game/__fixtures__/bunker-salvage.json'), 'utf8')) as WorldJson
 const w = deserializeWorld(json)
-const src = createScriptedInput(SCRIPTS['bunker-heist'])
-const total = scriptTicks(SCRIPTS['bunker-heist'])
+const src = createScriptedInput(SCRIPTS['bunker-salvage'])
+const total = scriptTicks(SCRIPTS['bunker-salvage'])
 const p = w.entities.find((e) => e.playerCtl)!
 
 for (let t = 0; t < total + 30; t++) {
@@ -31,5 +31,5 @@ console.log('END:', {
   exitUnlocked: w.mission.exitUnlocked,
   hp: p.health!.hp,
   downed: !!p.playerCtl!.downed,
-  briefcase: p.playerCtl!.inventory.some((s) => s.itemId === 'briefcase'),
+  canister: p.playerCtl!.inventory.some((s) => s.itemId === 'canister'),
 })

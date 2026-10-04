@@ -304,7 +304,7 @@ export class NetHostSession implements Session {
    *
    * PASS 2 — spend what is left of the budget on the CLOSEST in-radius entities.
    * Array order is spawn order, so it favoured whatever the level generator made
-   * first: a thug standing on your toes could be dropped in favour of a table
+   * first: a mutant standing on your toes could be dropped in favour of a table
    * thirteen tiles away. Nearest-first with an id tiebreak is deterministic and
    * stable tick to tick, which also stops the selection churning (sprites
    * popping in and out) while the party stands still.
@@ -355,8 +355,8 @@ export class NetHostSession implements Session {
         cash: e.playerCtl.cash,
         weapon: e.combat?.weapon ?? 'fists',
         abilityCd: e.playerCtl.abilityCooldown,
-        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'briefcase').reduce((n, s) => n + s.qty, 0),
-        briefcase: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        bandages: (e.loadout?.inventory ?? []).filter((s) => s.itemId !== 'canister').reduce((n, s) => n + s.qty, 0),
+        canister: (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister'),
         ...(e.playerCtl.draft ? { draft: e.playerCtl.draft } : {}),
       }
     }

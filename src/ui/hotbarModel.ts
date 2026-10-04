@@ -1,10 +1,6 @@
-import { CONSUMABLES, THROWABLES, WEAPONS, itemClass } from '../game/data/items'
+import { itemClass, itemName } from '../game/data/items'
 import { MODS } from '../game/data/mods'
 import type { ItemStack } from '../game/entity'
-
-/** Human-readable name for any carried item id. */
-export const itemLabel = (itemId: string): string =>
-  WEAPONS[itemId]?.name ?? THROWABLES[itemId]?.name ?? CONSUMABLES[itemId]?.name ?? itemId
 
 /** The mod-badge string for a slot: each mod's icon, repeated is shown as
  * `icon×N` for a stack. Empty when the slot carries no mods, so a vanilla gun
@@ -26,12 +22,12 @@ export interface HotbarSlot {
   mods: string
 }
 
-/** Slots the hotbar must never show: the briefcase (a mission item, not
+/** Slots the hotbar must never show: the canister (a mission item, not
  * equippable) and WEAPONS. The player's weapon is permanent and cannot be
  * swapped, so its slot exists only to hold weapon-mods — showing it would offer
  * a switch that does nothing, and gamepad cycling walks exactly this list. */
 const hidden = (itemId: string): boolean => {
-  if (itemId === 'briefcase') return true
+  if (itemId === 'canister') return true
   const c = itemClass(itemId)
   return c === 'melee' || c === 'ranged'
 }
@@ -44,7 +40,7 @@ const hidden = (itemId: string): boolean => {
  */
 export const hotbarSlots = (inv: ItemStack[], activeSlot: number): HotbarSlot[] =>
   inv
-    .map((s, index) => ({ index, itemId: s.itemId, label: itemLabel(s.itemId), qty: s.qty, active: index === activeSlot, mods: modBadge(s) }))
+    .map((s, index) => ({ index, itemId: s.itemId, label: itemName(s.itemId), qty: s.qty, active: index === activeSlot, mods: modBadge(s) }))
     .filter((s) => !hidden(s.itemId))
 
 /** Whether the player is carrying anything throwable (grenade/molotov/etc). */

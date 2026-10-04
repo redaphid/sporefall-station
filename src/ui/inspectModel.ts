@@ -6,10 +6,10 @@
 // tables for human-facing names; unknown/modded kinds fall back to enumerating
 // the components actually present (the schema-reflection ethos) — never blank.
 
-import type { AiState, Entity, ItemStack } from '../game/entity'
+import type { ActivityKind, ActivityPhase, AiState, Entity, ItemStack } from '../game/entity'
 import { NPCS } from '../game/data/npcs'
 import { OBJECTS } from '../game/data/objects'
-import { CONSUMABLES, THROWABLES, WEAPONS } from '../game/data/items'
+import { CONSUMABLES, THROWABLES, WEAPONS, itemName } from '../game/data/items'
 import { MODS } from '../game/data/mods'
 import { BEHAVIORS, DEFAULT_BEHAVIOR } from '../game/systems/behaviors'
 import { dispositionToward, initialPlayerHate, determineRel } from '../game/systems/relationships'
@@ -65,26 +65,17 @@ const pretty = (s: string): string =>
     .join(' ')
 
 /**
- * Lore names for the four sim FACTION ids. The ids themselves are load-bearing
- * (`entity.Faction`, the disposition matrix, the BLE snapshot), so they stay —
- * this is the player-facing half only. Without it the inspect card printed a
- * bare `Faction: Gang` on a derelict swamp station, which is exactly the
- * cops-and-robbers vocabulary the theme has otherwise moved past. Wording is
- * taken from the shipped manifest so the card agrees with the name plates:
- * `Rootcult Enforcer`, `Spore Warden`, `Settler`.
+ * Lore names for the four sim FACTION ids (`entity.Faction`, the disposition
+ * matrix, the BLE snapshot). The ids are terse; this is the player-facing half.
+ * Wording is taken from the shipped manifest so the card agrees with the name
+ * plates: `Rootcult Acolyte`, `Spore Warden`, `Settler`.
  */
 const FACTION_LABEL: Record<string, string> = {
   civ: 'Settlers',
-  cop: 'Spore Wardens',
-  gang: 'Rootcult',
+  warden: 'Spore Wardens',
+  rootcult: 'Rootcult',
   neutral: 'Unaligned',
 }
-
-/** Human name for whichever weapon/throwable/consumable id we can resolve. */
-const itemName = (id: string): string =>
-  id === 'briefcase'
-    ? 'Specimen Canister'
-    : (WEAPONS[id]?.name ?? THROWABLES[id]?.name ?? CONSUMABLES[id]?.name ?? pretty(id))
 
 /** One row per weapon mod on a stack: "❄️ Cryo Rounds" → "×N". Empty for a
  * vanilla / absent stack, so an unmodded gun shows just the Weapon row. */
@@ -119,11 +110,20 @@ const MODE_PHRASE: Record<string, string> = {
   flee: 'Running away',
   seek: 'Heading somewhere',
   sleep: 'Asleep',
+  perform: 'Busy at something',
+}
+
+/** A settler at an activity, by kind and how far along the claim is. */
+const ACTIVITY_PHRASE: Record<ActivityKind, Record<ActivityPhase, string>> = {
+  cards: { going: 'Heading to a card game', seated: 'Waiting for a card game', playing: 'Playing cards' },
+  tinker: { going: 'Heading to a workbench', seated: 'Tinkering at a bench', playing: 'Tinkering at a bench' },
+  rest: { going: 'Heading to a bunk', seated: 'Resting', playing: 'Resting' },
 }
 
 /** The NPC's current activity in plain words, e.g.
  * "Patrolling · heading to waypoint 3". Exported for exhaustive testing. */
 export const aiPhrase = (ai: AiState): string => {
+  if (ai.activity) return ACTIVITY_PHRASE[ai.activity.kind][ai.activity.phase]
   if (ai.goal === 'patrol') return `Patrolling · heading to waypoint ${(ai.patrolIndex ?? 0) + 1}`
   if (ai.goal) return GOAL_PHRASE[ai.goal] ?? pretty(ai.goal)
   if (ai.mode === 'idle' && ai.guard) return 'Standing guard'
@@ -149,7 +149,7 @@ const hostilityPhrase = (archetype: string): string | undefined => {
   if (def.wakeOn?.includes('power-cut')) return 'Inert — hostile after a power cut'
   if (def.behavior === 'predator') return 'Preys on the wounded'
   if (def.hostility === 'always') return 'Attacks on sight'
-  if (def.hostility === 'lawful') return 'Attacks lawbreakers'
+  if (def.hostility === 'watchful') return 'Attacks troublemakers'
   return def.retaliates ? 'Peaceful — hits back' : 'Peaceful'
 }
 
@@ -204,14 +204,14 @@ const areaPhrase = (t: (typeof THROWABLES)[string]): string => {
  * lookup is defensive.
  *
  * `nameFor` maps an archetype to its display name — the overlay passes the
- * theme-aware resolver (a `cop` can read "Bog Warden" in a swamp theme; same
+ * theme-aware resolver (a `warden` can read "Bog Warden" in a swamp theme; same
  * sim entity, themed presentation). Defaults to plain title-casing so the
  * builder stays pure and theme-free for tests.
  */
 export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archetype: string) => string = pretty): InfoCard => {
   const rows: InfoRow[] = []
   const card: InfoCard = {
-    title: nameFor(e.archetype),
+    title: e.pickup && !MODS[e.pickup.itemId] ? itemName(e.pickup.itemId) : nameFor(e.archetype),
     kind: e.kind,
     archetype: e.archetype,
     artKey: e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype,
@@ -296,7 +296,7 @@ export const buildInfoCard = (e: Entity, ctx: InfoCardCtx = {}, nameFor: (archet
         card.tagline = 'Use it to patch up'
       } else if (e.pickup.itemId === 'cash') {
         card.tagline = 'Money — grab it'
-      } else if (e.pickup.itemId === 'briefcase') {
+      } else if (e.pickup.itemId === 'canister') {
         card.tagline = 'The specimen canister — this is what you came for'
       }
     }

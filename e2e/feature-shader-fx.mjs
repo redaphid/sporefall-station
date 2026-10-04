@@ -124,7 +124,7 @@ const combat = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__
         tick: 290,
         label: '02-stream-trails',
         // Pin the in-flight modded stream while the trail is on screen (the
-        // thugs are usually dead+swept by the end, so assert mid-run).
+        // mutants are usually dead+swept by the end, so assert mid-run).
         act: async (page) => {
           await page.evaluate(() => {
             window.__moddedShotsMid = window.__world.entities.filter(
@@ -139,12 +139,12 @@ const combat = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__
       tick: window.__world.tick,
       fx: { ...window.__fx },
       moddedShotsMid: window.__moddedShotsMid ?? 0,
-      thugsAlive: window.__world.entities.filter((e) => e.archetype === 'thug' && !e.dead).length,
+      mutantsAlive: window.__world.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length,
     }),
     expect: (s) => [
       ...fxAsserts(s),
       !(s.moddedShotsMid > 0) && 'no max-stack rounds in flight at tick 290 — nothing was trailing',
-      s.thugsAlive >= 3 && 'the stream hit nothing — all three thugs still standing',
+      s.mutantsAlive >= 3 && 'the stream hit nothing — all three mutants still standing',
     ],
   })
 }

@@ -1,4 +1,4 @@
-// The two-stage heist finale.
+// The two-stage salvage finale.
 // Stage 1 — gateway breach: unlocking the door that DIRECTLY gates the mission
 // objective is a point of no return — the alarm maxes and every OTHER door on
 // the floor pops open (locks, biolocks, overgrowth), but the floor does NOT
@@ -180,7 +180,7 @@ describe('boss-door aggro — a NORMAL door never triggers it', () => {
   it('breaching a non-objective door leaves the floor calm', () => {
     const { w } = bootBreachable([2, 3, 5, 6])
     // Any door that is NOT the tagged gate, in a spot away from NPCs so the blast
-    // itself commits no crime that could raise the alarm on its own.
+    // itself commits no misdeed that could raise the alarm on its own.
     const normal = w.entities.find(
       (e) => e.door && !e.door.objectiveGate && !w.entities.some((n) => n.ai && !n.dead && Math.hypot(n.pos.x - e.pos.x, n.pos.y - e.pos.y) < 2.5),
     )
@@ -243,7 +243,7 @@ describe('taking the prize (stage 2) — every unit in town aggros the taker', (
     expect(before.some((n) => dispositionToward(n, player.id) !== 'Hostile')).toBe(true)
 
     // The canister lands in the holder's loadout — exactly what auto-pickup does.
-    player.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    player.loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0), 1)
 
     expect(w.mission.complete).toBe(true)
@@ -272,7 +272,7 @@ describe('taking the prize (stage 2) — every unit in town aggros the taker', (
     const w = bootTemplate('steal', [1, 2, 3], 2)
     const players = w.entities.filter((e) => e.playerCtl)
     expect(players.length).toBe(2)
-    players[0].loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    players[0].loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0, 1), 1)
 
     // Allies gain no brain and are never targeted by their own party's NPCs.
@@ -285,7 +285,7 @@ describe('taking the prize (stage 2) — every unit in town aggros the taker', (
 
   it('fires exactly once — the completion latch holds', () => {
     const w = bootTemplate('steal', [1, 2, 3])
-    firstPlayer(w).loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 }
+    firstPlayer(w).loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 }
     runTicks(w, idle(0), 1)
     expect(w.mission.complete).toBe(true)
     // Wind the alarm back down; completion must not re-raise it. (Individual

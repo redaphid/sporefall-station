@@ -9,6 +9,7 @@ import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
 import { buildLoadout, selfModVerdict } from './loadoutModel'
 import { installGamepadMenuNav } from './gamepadMenu'
 import { ANNOUNCE_MS, modifierKey, modifierStripText, modifierToast } from './modifierModel'
+import { createSealHint } from './sealHintModel'
 
 export interface Screens {
   update(view: RenderView): void
@@ -166,12 +167,13 @@ export const createScreens = (
     'text-shadow:0 2px 6px #000;pointer-events:none;opacity:0;transition:opacity .3s;text-align:center;white-space:nowrap'
   mount.appendChild(toast)
   let toastTimer: ReturnType<typeof setTimeout> | undefined
-  const showToast = (text: string): void => {
+  const showToast = (text: string, ms = 1800): void => {
     toast.textContent = text
     toast.style.opacity = '1'
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => (toast.style.opacity = '0'), 1800)
+    toastTimer = setTimeout(() => (toast.style.opacity = '0'), ms)
   }
+  const sealHint = createSealHint(themeDisplayName)
 
   // Floor modifier strip: a small line just under the mission chip. It reads out
   // the modifier in full when it takes hold, then shrinks to a live readout
@@ -356,6 +358,8 @@ export const createScreens = (
           if (modToast) showToast(modToast)
         }
       }
+      const sealToast = sealHint.update(view)
+      if (sealToast) showToast(sealToast, 3000)
       updateBoss(view)
       updateLocator(view)
       updateModifier(view)

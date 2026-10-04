@@ -119,6 +119,10 @@ export const createPickTracker = (): PickTracker => {
     if (!self) return undefined
     const target: Entity | null = nearestInteractable(view.entities, self)
     if (!target?.door || target.door.open || !target.door.locked) return undefined
+    // A biolock or an overgrown hatch can't be picked: a press is refused, and
+    // the seal hint toast (ui/sealHintModel) says what opens it instead.
+    const { overgrown, sealKind } = target.door
+    if (overgrown || sealKind === 'keycard' || sealKind === 'power') return undefined
     return { doorId: target.id, x: target.pos.x, y: target.pos.y, text: promptText(target.door.lockLevel) }
   }
 

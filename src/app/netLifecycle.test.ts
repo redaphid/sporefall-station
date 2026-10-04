@@ -7,7 +7,8 @@ import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import { encodeInput, type GoMsg, type WelcomeMsg } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
 import { NetClientSession } from './netClient'
-import { MAX_PLAYERS, NetHostSession } from './netHost'
+import { NetHostSession } from './netHost'
+import { MAX_PLAYERS } from '../net/types'
 
 /**
  * Connection-lifecycle harness: one host "peripheral" and N centrals over an
@@ -26,6 +27,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -56,6 +58,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.toHost(peer, bytes),

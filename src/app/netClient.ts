@@ -21,11 +21,14 @@ import {
   type GoMsg,
   type InventoryMsg,
   type LobbyStateMsg,
+  type PingMsg,
+  type PongMsg,
   type StateMsg,
   type WelcomeMsg,
   type WireSnapshot,
 } from '../net/protocol/messages'
-import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type Transport } from '../net/types'
+import { isKnownMsgType, MsgType, PROTOCOL_VERSION, type DropReason, type Transport } from '../net/types'
+import { LINK_COPY, linkHealth, PING_INTERVAL_MS, type LinkStatus } from './linkHealth'
 import type { RenderView, Session } from './session'
 
 /**
@@ -133,6 +136,12 @@ export type ClientPhase =
 
 const RECONNECT_ATTEMPTS = 30
 const RECONNECT_SPACING_MS = 2000
+/** Online: after a reconnect opens, the relay announces a present host at once.
+ * Silence this long means the room has no host any more. */
+export const HOST_ANNOUNCE_MS = 2000
+/** Online: a reconnect that has heard nothing from the host for this long gives
+ * up. Covers a host whose socket the relay still holds but nobody answers. */
+export const RECONNECT_GIVE_UP_MS = 60_000
 
 /**
  * JOIN HANDSHAKE RETRANSMISSION.
@@ -279,21 +288,37 @@ export class NetClientSession implements Session {
 
   private rejoinToken = ''
 
+  /** Clock reading of the newest byte from the host (online link health). */
+  private lastHeardAt: number
+  private lastPingAt = Number.NEGATIVE_INFINITY
+  private rttMs: number | null = null
+
   constructor(
     private name: string,
     private localInput: InputSource,
     private transport: Transport,
+    private now: () => number = () => performance.now(),
   ) {
+    this.lastHeardAt = now()
     transport.on((ev) => {
       if (ev.type === 'peerConnected') this.onConnected()
-      else if (ev.type === 'peerDisconnected') this.onDisconnected()
-      else if (ev.type === 'data') this.reader.push(ev.bytes, (m) => this.onMessage(m))
+      else if (ev.type === 'peerDisconnected') this.onDisconnected(ev.reason)
+      else if (ev.type === 'data') {
+        this.lastHeardAt = this.now()
+        this.reader.push(ev.bytes, (m) => this.onMessage(m))
+      }
     })
   }
 
-  private onDisconnected(): void {
+  private onDisconnected(reason: DropReason = 'error'): void {
     this.reader.reset() // a fresh link starts a fresh byte stream
     if (this.departure) return // the end was announced; this drop is its echo
+    // The host is gone for good (the relay saw its socket close without a Bye).
+    if (reason === 'left') {
+      this.departure = 'host-left'
+      this.setPhase('ended')
+      return
+    }
     // Mid-game drop with a rejoin token and a reconnect-capable transport:
     // keep trying quietly; the host holds our avatar for 90s.
     if (this.phase === 'playing' && this.rejoinToken && this.transport.reconnect) {
@@ -312,8 +337,17 @@ export class NetClientSession implements Session {
         await this.transport.reconnect!()
         // Some transports resolve before the link is confirmed — give the
         // peerConnected event a moment, then check.
-        await new Promise((r) => setTimeout(r, 1000))
+        const online = this.transport.medium === 'online'
+        await new Promise((r) => setTimeout(r, online ? HOST_ANNOUNCE_MS : 1000))
+        if (this.phase !== 'reconnecting') return
         if (this.transport.peers().length > 0) return // peerConnected handler sent the rejoin Hello
+        // The relay took the new socket but named no host: the host left while
+        // we were off the air, and nothing will ever answer.
+        if (online) {
+          this.departure = 'host-left'
+          this.setPhase('ended')
+          return
+        }
       } catch {
         // radio still gone — try again
       }
@@ -325,6 +359,41 @@ export class NetClientSession implements Session {
     await this.transport.start()
   }
 
+  /**
+   * Online only: ping the host, and treat silence as a dead link. A socket can
+   * stay open with nothing flowing (a phone switching networks), and the host
+   * streams snapshots and Pongs, so STALLED_AFTER_MS of quiet means reconnect.
+   * Bluetooth keeps its own drop detection and is left alone.
+   */
+  private watchLink(): void {
+    if (this.transport.medium !== 'online') return
+    const t = this.now()
+    const silent = t - this.lastHeardAt
+    if (this.phase === 'reconnecting') {
+      if (silent >= RECONNECT_GIVE_UP_MS) this.setPhase('ended')
+      return
+    }
+    if (this.phase !== 'playing') return
+    if (this.queue && t - this.lastPingAt >= PING_INTERVAL_MS) {
+      this.lastPingAt = t
+      const ping: PingMsg = this.rttMs === null ? { t } : { t, rtt: Math.round(this.rttMs) }
+      this.queue.queueReliable(encodeJson(MsgType.Ping, ping))
+    }
+    if (linkHealth(silent) === 'stalled' && this.rejoinToken && this.transport.reconnect) {
+      this.setPhase('reconnecting')
+      void this.reconnectLoop()
+    }
+  }
+
+  /** What the HUD's link chip shows. Health only means something mid-run. */
+  linkStatus(): LinkStatus {
+    return {
+      health: this.phase === 'playing' ? linkHealth(this.now() - this.lastHeardAt) : 'good',
+      rttMs: this.rttMs,
+      session: this.phase === 'reconnecting' ? 'reconnecting' : this.phase === 'ended' ? 'ended' : 'live',
+    }
+  }
+
   /** Leave on purpose (Main menu): hang up without the reconnect a drop would
    * start. The host sees the peer go and holds its avatar as for any drop. */
   async close(): Promise<void> {
@@ -333,6 +402,9 @@ export class NetClientSession implements Session {
   }
 
   private setPhase(phase: ClientPhase): void {
+    // Entering play starts the silence clock afresh; the handshake that got us
+    // here is traffic.
+    if (phase === 'playing') this.lastHeardAt = this.now()
     this.phase = phase
     // Every phase change is a chance to arm the handshake retry (we just moved
     // into a state that is waiting on the host) or to shut it off for good.
@@ -454,6 +526,9 @@ export class NetClientSession implements Session {
       case MsgType.Bye:
         this.departure = 'host-left'
         this.setPhase('ended')
+        break
+      case MsgType.Pong:
+        this.rttMs = this.now() - decodeJson<PongMsg>(msg).t
         break
       case MsgType.LobbyState:
         this.onLobbyChange?.(decodeJson<LobbyStateMsg>(msg))
@@ -713,6 +788,7 @@ export class NetClientSession implements Session {
 
   tick(): void {
     this.tickCount++
+    this.watchLink()
     if (this.phase !== 'playing') return
 
     const cmd = this.localInput.sample()
@@ -841,11 +917,11 @@ export class NetClientSession implements Session {
     }
     const missionText =
       this.phase === 'reconnecting'
-        ? 'Connection dropped — reconnecting…'
+        ? LINK_COPY[this.transport.medium].reconnecting
         : this.phase === 'ended' && this.departure === 'host-left'
           ? 'The host left the game'
           : this.phase === 'ended' && this.selfId >= 0
-            ? 'Connection lost'
+            ? LINK_COPY[this.transport.medium].lost
             : this.state.missionText
     return {
       entities: [...this.entities.values()],

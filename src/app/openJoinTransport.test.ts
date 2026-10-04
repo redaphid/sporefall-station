@@ -71,7 +71,7 @@ const deps = (over: Partial<JoinTransportDeps> & { bluetooth?: object; ua?: keyo
   mounts.push(uiMount)
   const ua = over.ua ?? 'desktopChrome'
   const nav = Object.assign(over.bluetooth ?? {}, { userAgent: UA[ua], maxTouchPoints: TOUCH[ua] })
-  return { native: false, search: '', nav, room: 'r', uiMount, log: () => {}, backToMenu: () => {}, ...over }
+  return { online: false, native: false, search: '', nav, room: 'r', uiMount, log: () => {}, backToMenu: () => {}, ...over }
 }
 
 type Outcome = { kind: 'returned'; transport: Transport | null } | { kind: 'waiting-on-picker' }
@@ -146,5 +146,12 @@ describe('openJoinTransport', () => {
     expect(ws.kind === 'returned' && ws.transport instanceof WsTransport).toBe(true)
     const native = await run(deps({ native: true, ua: 'iPhoneSafari', bluetooth: {} }))
     expect(native.kind === 'returned' && native.transport instanceof BleClientTransport).toBe(true)
+  })
+
+  it('Play online opens the relay transport even in the native app and on an iPhone', async () => {
+    for (const d of [deps({ online: true, native: true }), deps({ online: true, ua: 'iPhoneSafari' })]) {
+      const out = await run(d)
+      expect(out.kind === 'returned' && out.transport instanceof WsTransport).toBe(true)
+    }
   })
 })

@@ -61,7 +61,9 @@ const main = async () => {
     const host = await open('Host')
     await shot(host, '01-online-screen')
     await host.getByRole('button', { name: 'Host online game' }).click()
-    const code = (await host.locator('#room-code').textContent({ timeout: 15000 }))?.trim() ?? ''
+    // The code appears once the room is really open on the relay.
+    await until(host, () => (document.querySelector('#room-code')?.textContent ?? '').length > 0)
+    const code = (await host.locator('#room-code').textContent())?.trim() ?? ''
     console.log(`[online] host's room code: ${code}`)
     check(/^[A-HJ-NP-Z2-9]{4}$/.test(code), `host lobby shows a readable 4-character code ("${code}")`)
     await shot(host, '02-host-lobby-code')
@@ -89,6 +91,14 @@ const main = async () => {
       "a different code never lands in this host's lobby",
     )
     await shot(stranger, '04-stranger-waiting')
+    const t0 = Date.now()
+    const noGame = await until(stranger, () => document.body.innerText.includes('No game with that code'), undefined, 15000)
+    check(noGame && Date.now() - t0 < 12000, `after about 10 s it says "No game with that code"`)
+    check(
+      await stranger.evaluate(() => [...document.querySelectorAll('button')].some((b) => b.textContent === 'Back to menu')),
+      'and offers Back to menu',
+    )
+    await shot(stranger, '04b-no-game-with-that-code')
 
     await host.getByRole('button', { name: 'Start game' }).click()
     const ticking = (p) => until(p, () => (globalThis.world?.tick ?? 0) > 60, undefined, 30000)

@@ -10,7 +10,7 @@
 // `?role=host|client` query on connect (see wsTransport.ts / index.ts).
 
 import { DurableObject } from 'cloudflare:workers'
-import { type Action, type Conn, planClose, planData, planOpen } from './roomRelay'
+import { type Action, admit, type Conn, planClose, planFrame, planOpen } from './roomRelay'
 import type { DropReason, WsControl } from '../net/transport/wsWire'
 
 /** What we stash on each socket via serializeAttachment. */
@@ -31,13 +31,13 @@ export class RoomDO extends DurableObject {
       return new Response('missing/invalid ?role (host|client)', { status: 400 })
     }
 
-    // One host per room. Reject a second host at the HTTP layer, BEFORE upgrading:
-    // closing a hibernation socket synchronously mid-upgrade drops the close code
-    // (the client just sees an abnormal 1006), so a clean 409 is the reliable
-    // signal. The room's membership is exactly its currently-accepted sockets.
-    if (role === 'host' && this.snapshot().some((c) => c.role === 'host')) {
-      return new Response('room already has a host', { status: 409 })
-    }
+    // One host and at most MAX_ROOM_CLIENTS clients per room. Refuse at the HTTP
+    // layer, BEFORE upgrading: closing a hibernation socket synchronously
+    // mid-upgrade drops the close code (the client just sees an abnormal 1006),
+    // so a clean 409 is the reliable signal. Membership is exactly the
+    // currently-accepted sockets.
+    const admission = admit(this.snapshot(), role)
+    if (!admission.ok) return new Response(admission.reason, { status: admission.status })
 
     const connId = crypto.randomUUID()
     const attachment: Attachment = {
@@ -60,12 +60,11 @@ export class RoomDO extends DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    // Transports only ever send binary DATA frames; a text frame is not part of
-    // the protocol and is ignored (control flows relay→transport only).
-    if (typeof message === 'string') return
+    // Binary DATA frames are routed; the only text a transport sends is a host's
+    // `drop` command. planFrame also closes any sender of an oversized frame.
     const att = ws.deserializeAttachment() as Attachment | null
     if (!att) return
-    this.dispatch(planData(this.snapshot(), att.connId, new Uint8Array(message)))
+    this.dispatch(planFrame(this.snapshot(), att.connId, typeof message === 'string' ? message : new Uint8Array(message)))
   }
 
   async webSocketClose(ws: WebSocket, _code: number, _reason: string, wasClean: boolean): Promise<void> {

@@ -20,3 +20,11 @@ export const hostFailureMessage = (err: unknown): string => {
   const detail = raw.trim().replace(/\s+/g, ' ')
   return detail ? `Can't host: ${detail}` : FALLBACK
 }
+
+/** An online host that could not open a room after its retries: say so, and
+ * what to try, since the browser cannot tell a taken code from no network. */
+export const onlineHostFailureMessage = (err: unknown): string => {
+  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
+  const detail = raw.trim().replace(/\s+/g, ' ')
+  return `Couldn't open an online room${detail ? ` (${detail})` : ''}. Check your connection and retry.`
+}

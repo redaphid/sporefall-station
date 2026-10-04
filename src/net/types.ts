@@ -12,6 +12,8 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
+ * 7 — Ping/Pong (21/22) for online link health, and Bye (20). A peer that
+ *     does not know a message type reads it as a framing desync.
  * 6 — no wire change, but every floor from 3 now builds as the indoor complex
  *     (4, 6, 8… were city) with a seeded biome order. Layout never crosses the
  *     wire (a client regenerates it from seed+floor), so an old client would
@@ -28,7 +30,7 @@ export type PeerId = string
  *     registered rather than only the enemies.
  * 1 — initial.
  */
-export const PROTOCOL_VERSION = 6
+export const PROTOCOL_VERSION = 7
 
 /** GATT service/characteristic UUIDs (BLE transport). */
 export const BLE_SERVICE_UUID = '5f47a3c0-9b1e-4a52-8f6d-2c3e4b5a6d70'
@@ -47,6 +49,17 @@ export const BLE_DATA_C2H_UUID = '5f47a3c2-9b1e-4a52-8f6d-2c3e4b5a6d70'
  * @protocolReservation
  */
 export const BLE_LOBBY_INFO_UUID = '5f47a3c3-9b1e-4a52-8f6d-2c3e4b5a6d70'
+
+/**
+ * Max simultaneous players in one run (host + clients). Slots run 0..MAX_PLAYERS-1;
+ * the host always owns slot 0, so up to MAX_PLAYERS-1 remote clients may join.
+ * Raised from 4→8 for large local groups (stress/8-players). NOTE: over BLE the
+ * host peripheral's radio caps concurrent centrals well below this (commonly ~7,
+ * device-specific) — this constant is the protocol/sim ceiling, not a promise the
+ * transport can carry it. The BroadcastChannel/web path has no such radio limit.
+ * The online relay (src/worker/roomRelay.ts) caps a room's clients from it too.
+ */
+export const MAX_PLAYERS = 8
 
 export const SNAPSHOT_INTERVAL_TICKS = 3 // 10Hz at 30Hz sim
 
@@ -72,6 +85,11 @@ export const MsgType = {
    * ends the run and does not try to reconnect. An older client that does not
    * know it simply sees the link drop. */
   Bye: 20,
+  /** Client → host, once a second in online play: `{ t }`, the client's clock,
+   * plus `rtt`, its newest measured round trip, so the host can show it too. */
+  Ping: 21,
+  /** Host → that client, at once: the Ping's `t` echoed back. */
+  Pong: 22,
 } as const
 
 const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))
@@ -80,13 +98,22 @@ const KNOWN_MSG_TYPES: ReadonlySet<number> = new Set(Object.values(MsgType))
  * a genuine message start from payload bytes that merely parse as a header. */
 export const isKnownMsgType = (t: number): boolean => KNOWN_MSG_TYPES.has(t)
 
+/** What carries a session. It decides what the player is told about the link,
+ * and whether silence on it is treated as a dead connection (online only). */
+export type LinkMedium = 'bluetooth' | 'online' | 'local'
+
+/** `left`: the peer is gone for good, as the relay reports when the host's
+ * socket closes. Nothing will answer a reconnect. */
+export type DropReason = 'remote' | 'local' | 'error' | 'left'
+
 export type TransportEvent =
   | { type: 'peerConnected'; peer: PeerId }
-  | { type: 'peerDisconnected'; peer: PeerId; reason: 'remote' | 'local' | 'error' }
+  | { type: 'peerDisconnected'; peer: PeerId; reason: DropReason }
   | { type: 'data'; peer: PeerId; bytes: Uint8Array }
 
 export interface Transport {
   readonly role: 'host' | 'client'
+  readonly medium: LinkMedium
   /** Max bytes per sendPacket call (BLE: MTU-3 clamped to 244; dev: 4096). */
   readonly maxPacket: number
   start(): Promise<void>
@@ -100,4 +127,7 @@ export interface Transport {
   peers(): PeerId[]
   /** Client transports: re-establish the link to the same host after a drop. */
   reconnect?(): Promise<void>
+  /** Host transports that can: hang up on one peer the host refused, so it
+   * stops holding a seat. Called after the Reject has gone out. */
+  drop?(peer: PeerId): Promise<void>
 }

@@ -307,43 +307,53 @@ export const pickHost = (
 export interface LobbyUi {
   setPlayers(players: { slot: number; name: string }[]): void
   setStatus(text: string): void
-  /** Resolves when the host presses Start (host mode only). */
+  /** An online room's code, under the title and big enough to read out. */
+  setRoomCode(code: string): void
+  /** Host mode: reveal Start and resolve when it is pressed. Start stays hidden
+   * until the host is really on the air, so a failed host never offers it. */
   waitForStart(): Promise<void>
+  /** Show `message` with Retry and Back to menu buttons; resolves with the pick. */
+  offerRetry(message: string): Promise<'retry' | 'back'>
+  /** Show `message` with a Back to menu button; resolves when it is pressed. */
+  offerBack(message: string): Promise<void>
   close(): void
 }
 
-/** `roomCode` puts an online room's code under the title, big enough to read
- * out across a room. */
-export const createLobbyUi = (mount: HTMLElement, isHost: boolean, roomCode?: string): LobbyUi => {
+const LOBBY_BUTTON_CSS =
+  'font:700 17px system-ui;padding:12px 30px;border-radius:10px;border:0;cursor:pointer;margin-top:8px'
+
+export const createLobbyUi = (mount: HTMLElement, isHost: boolean): LobbyUi => {
   const overlay = document.createElement('div')
   markUiChrome(overlay) // press-exempt UI chrome (chrome.ts)
+  overlay.dataset.role = 'lobby'
   overlay.style.cssText =
     'position:absolute;inset:0;background:#0b0b12;display:flex;flex-direction:column;align-items:center;' +
-    'justify-content:center;gap:12px;pointer-events:auto;color:#eee;font:16px system-ui'
+    'justify-content:center;gap:12px;pointer-events:auto;color:#eee;font:16px system-ui;text-align:center'
   overlay.innerHTML = `
     <div style="font:800 22px system-ui">${isHost ? 'HOSTING' : 'LOBBY'}</div>
-    <div id="room-code" style="font:800 44px ui-monospace,monospace;letter-spacing:8px;color:#7fd17f"></div>
-    <div id="status" style="opacity:.7"></div>
+    <div id="room-code" style="font:800 44px ui-monospace,monospace;letter-spacing:8px;color:#7fd17f;display:none"></div>
+    <div id="status" style="opacity:.7;max-width:min(360px,85vw)"></div>
     <div id="players" style="display:flex;flex-direction:column;gap:6px;min-width:min(300px,75vw)"></div>
+    <div id="actions" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
   `
   const codeEl = overlay.querySelector<HTMLElement>('#room-code')!
-  if (roomCode) codeEl.textContent = roomCode
-  else codeEl.remove()
   const playersEl = overlay.querySelector<HTMLElement>('#players')!
   const statusEl = overlay.querySelector<HTMLElement>('#status')!
+  const actionsEl = overlay.querySelector<HTMLElement>('#actions')!
 
-  let startResolve: (() => void) | null = null
   let stopNav: () => void = () => {}
-  if (isHost) {
-    const startBtn = document.createElement('button')
-    startBtn.textContent = 'Start game'
-    startBtn.style.cssText =
-      'font:700 17px system-ui;padding:12px 30px;border-radius:10px;border:0;background:#7fd17f;' +
-      'color:#0b0b12;cursor:pointer;margin-top:8px'
-    startBtn.addEventListener('click', () => startResolve?.())
-    overlay.appendChild(startBtn)
-    // Host can start the co-op run from a controller.
-    stopNav = installGamepadMenuNav(() => [startBtn])
+  /** Replace the action row and hand the pad to it. */
+  const showActions = (buttons: HTMLButtonElement[]): void => {
+    stopNav()
+    actionsEl.replaceChildren(...buttons)
+    stopNav = buttons.length > 0 ? installGamepadMenuNav(() => buttons) : () => {}
+  }
+  const button = (label: string, colors: string, onClick: () => void): HTMLButtonElement => {
+    const b = document.createElement('button')
+    b.textContent = label
+    b.style.cssText = `${LOBBY_BUTTON_CSS};${colors}`
+    b.addEventListener('click', onClick)
+    return b
   }
 
   // Build/OTA version readout, so you can tell at a glance which build a phone is
@@ -362,18 +372,50 @@ export const createLobbyUi = (mount: HTMLElement, isHost: boolean, roomCode?: st
 
   return {
     setPlayers(players): void {
-      playersEl.innerHTML = players
-        .map(
-          (p) =>
-            `<div style="background:#ffffff12;border-radius:8px;padding:8px 12px">` +
-            `P${p.slot + 1} · ${p.name}</div>`,
-        )
-        .join('')
+      // Names come off the wire from other players: text, never markup.
+      playersEl.replaceChildren(
+        ...players.map((p) => {
+          const row = document.createElement('div')
+          row.style.cssText = 'background:#ffffff12;border-radius:8px;padding:8px 12px'
+          row.textContent = `P${p.slot + 1} · ${p.name}`
+          return row
+        }),
+      )
     },
     setStatus(text): void {
       statusEl.textContent = text
     },
-    waitForStart: () => new Promise((r) => (startResolve = r)),
+    setRoomCode(code): void {
+      codeEl.textContent = code
+      codeEl.style.display = 'block'
+    },
+    waitForStart: () =>
+      new Promise((resolve) => {
+        if (!isHost) return
+        showActions([button('Start game', 'background:#7fd17f;color:#0b0b12', () => resolve())])
+      }),
+    offerRetry: (message) =>
+      new Promise((resolve) => {
+        statusEl.textContent = message
+        const pick = (choice: 'retry' | 'back') => (): void => {
+          showActions([])
+          resolve(choice)
+        }
+        showActions([
+          button('Retry', 'background:#7fd17f;color:#0b0b12', pick('retry')),
+          button('Back to menu', 'background:#ffffff10;color:#eee;border:2px solid #ffffff2e', pick('back')),
+        ])
+      }),
+    offerBack: (message) =>
+      new Promise((resolve) => {
+        statusEl.textContent = message
+        showActions([
+          button('Back to menu', 'background:#ffffff10;color:#eee;border:2px solid #ffffff2e', () => {
+            showActions([])
+            resolve()
+          }),
+        ])
+      }),
     close: () => {
       stopNav()
       overlay.remove()

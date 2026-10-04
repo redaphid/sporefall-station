@@ -30,6 +30,20 @@ export type WsControl =
   | { t: 'host+' } //                     relay→client: the host is present
   | { t: 'host-'; reason: DropReason } //  relay→client: the host went away
 
+/** Host → relay, as a text frame: close this client's socket. The host sends
+ * it after a Reject (version mismatch, full lobby) has gone out, so a refused
+ * player does not hold a relay seat. */
+export type WsHostCommand = { t: 'drop'; id: string }
+
+export const parseHostCommand = (text: string): WsHostCommand | null => {
+  try {
+    const m = JSON.parse(text) as WsHostCommand
+    return m && m.t === 'drop' && typeof m.id === 'string' ? m : null
+  } catch {
+    return null
+  }
+}
+
 /** A control frame is any text frame; parse it back to a WsControl (or null). */
 export const parseControl = (text: string): WsControl | null => {
   try {

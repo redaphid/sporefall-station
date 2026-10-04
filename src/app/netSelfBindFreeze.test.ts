@@ -52,6 +52,7 @@ const makeClient = () => {
   const transport: Transport = {
     role: 'client',
     maxPacket: 180,
+    medium: 'local',
     start: async () => {},
     stop: async () => {},
     sendPacket: (_p: PeerId, bytes: Uint8Array) => {

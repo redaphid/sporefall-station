@@ -10,6 +10,9 @@ import { hostFailureMessage } from './app/hostError'
 import { joinFailureMessage } from './app/joinError'
 import { openJoinTransport } from './app/openJoinTransport'
 import { onlineRoom, type RoomCode } from './app/roomCode'
+import { hostOnline, watchForHost } from './app/onlineSession'
+import { LINK_COPY } from './app/linkHealth'
+import { installLinkChip } from './ui/linkChip'
 import { pickOnline } from './ui/onlineMenu'
 import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
@@ -326,7 +329,7 @@ const boot = async (): Promise<void> => {
 
   const session = await createSession(mode, {
     seed,
-    room: online ? namespaceRoom(onlineRoom(online), betaSlugFromBase(import.meta.env.BASE_URL)) : room,
+    room: online ? onlineRelayRoom(online) : room,
     online,
     name,
     input,
@@ -335,6 +338,8 @@ const boot = async (): Promise<void> => {
     renderer,
   })
   if (!session) return
+  // Online play gets a link chip: round trip, or a weak/reconnecting warning.
+  if (online && session.linkStatus) installLinkChip(uiMount, () => session.linkStatus!())
   paused = () => session.isPaused ?? false
 
   // ── Save-game persistence (feat/localstorage-resume) ──────────────────────
@@ -670,6 +675,17 @@ const browserStore = (): KeyValueStore | undefined => {
   }
 }
 
+/** The relay room for an online code, inside this build's beta namespace. */
+const onlineRelayRoom = (code: RoomCode): string =>
+  namespaceRoom(onlineRoom(code), betaSlugFromBase(import.meta.env.BASE_URL))
+
+/** Leave for the start menu: the same page without `?mode`, so the picker shows. */
+const backToStartMenu = (): void => {
+  const menu = new URL(location.href)
+  menu.searchParams.delete('mode')
+  location.assign(menu)
+}
+
 interface SessionDeps {
   seed: number
   room: string
@@ -727,38 +743,58 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
     // put it on and killed discovery). Joining phones tag the row 'Sporefall'
     // themselves — see toHostLabel — which needs no advertisement bytes and works
     // against hosts running older builds too.
-    const wsHost = deps.online !== undefined || new URLSearchParams(location.search).get('transport') === 'ws'
-    const transport = wsHost
-      ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
-      : native
-        ? new BleHostTransport(deps.name, dbg.log)
-        : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
-    stopTransportOnPagehide(transport)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
-    const lobby = createLobbyUi(deps.uiMount, true, deps.online)
-    lobby.setStatus(deps.online ? 'Friends join with this code from Play online' : 'Waiting for players…')
+    const lobby = createLobbyUi(deps.uiMount, true)
+    // Bring a host session up on `transport`. Start is only offered once this
+    // succeeds, so a host that is not on the air never looks like one.
+    const goLive = async (transport: Transport): Promise<NetHostSession> => {
+      const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
+      try {
+        await session.start()
+      } catch (err) {
+        console.error('host: start failed', err)
+        dbg.log(`host: START FAILED — ${err instanceof Error ? err.message : String(err)}`)
+        await transport.stop().catch(() => {})
+        throw err
+      }
+      stopTransportOnPagehide(transport)
+      return session
+    }
+    let session: NetHostSession
+    if (deps.online) {
+      const relay = resolveWsBaseUrl(location.search)
+      const hosted = await hostOnline({
+        firstCode: deps.online,
+        goLive: (code) => goLive(new WsTransport('host', onlineRelayRoom(code), relay)),
+        lobby,
+        backToMenu: backToStartMenu,
+      })
+      if (!hosted) return null
+      session = hosted.session
+    } else {
+      // `?transport=ws&room=` is the dev path onto the relay under a named room.
+      const transport =
+        new URLSearchParams(location.search).get('transport') === 'ws'
+          ? new WsTransport('host', deps.room, resolveWsBaseUrl(location.search))
+          : native
+            ? new BleHostTransport(deps.name, dbg.log)
+            : new BroadcastChannelTransport('host', deps.room)
+      // Hosting could not report its own failure: a rejected start() left the
+      // player on "Waiting for players…" while nothing was on the air. Show the
+      // plugin's own words; "Bluetooth permission denied" is fixable, "it just
+      // doesn't work" is not.
+      try {
+        session = await goLive(transport)
+      } catch (err) {
+        lobby.setStatus(hostFailureMessage(err))
+        return null
+      }
+      lobby.setStatus('Waiting for players…')
+    }
     lobby.setPlayers(session.lobbyPlayers())
     session.onLobbyChange = (players) => {
       dbg.log(`host: lobby now ${players.length} player(s)`)
       lobby.setPlayers(players)
-    }
-    // Hosting could not report its own failure. createSession is awaited at the
-    // call site WITHOUT a catch (the join path has one, this did not), so a
-    // rejected session.start() became an unhandled rejection and the player was
-    // left staring at "Waiting for players…" while nothing was on the air —
-    // indistinguishable from a healthy host that nobody has joined yet.
-    //
-    // That is the difference between a friend saying "it says Bluetooth
-    // permission denied" and "it just doesn't work", which is the difference
-    // between a fixable evening and a ruined one. Show the plugin's own words.
-    try {
-      await session.start()
-    } catch (err) {
-      console.error('host: start failed', err)
-      dbg.log(`host: START FAILED — ${err instanceof Error ? err.message : String(err)}`)
-      lobby.setStatus(hostFailureMessage(err))
-      return null
     }
     await lobby.waitForStart()
     session.beginGame()
@@ -769,22 +805,16 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
 
   // join
   dbg.log(`join: mode start, native=${native}`)
-  // An online pick is a deliberate choice of link, not a device probe.
-  const transport = deps.online
-    ? new WsTransport('client', deps.room, resolveWsBaseUrl(location.search))
-    : await openJoinTransport({
-        native,
-        search: location.search,
-        nav: navigator,
-        room: deps.room,
-        uiMount: deps.uiMount,
-        log: dbg.log,
-        backToMenu: () => {
-          const menu = new URL(location.href)
-          menu.searchParams.delete('mode')
-          location.assign(menu)
-        },
-      })
+  const transport = await openJoinTransport({
+    online: deps.online !== undefined,
+    native,
+    search: location.search,
+    nav: navigator,
+    room: deps.room,
+    uiMount: deps.uiMount,
+    log: dbg.log,
+    backToMenu: backToStartMenu,
+  })
   if (!transport) return null
   stopTransportOnPagehide(transport)
   const session = new NetClientSession(deps.name, deps.input, transport)
@@ -856,6 +886,7 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
     }
   }
   lobby.setStatus(deps.online ? `Waiting for the host of ${deps.online}…` : 'Looking for a host…')
+  if (deps.online) watchForHost({ transport, lobby, backToMenu: backToStartMenu })
   session.onLobbyChange = (msg) => lobby.setPlayers(msg.players)
   session.onLevelChange = (level) => deps.renderer.setLevel(level)
   const ready = new Promise<boolean>((resolve) => {
@@ -868,14 +899,14 @@ const createSession = async (mode: Exclude<GameMode, 'online'>, deps: SessionDep
         lobby.setStatus(`Rejected: ${session.rejectReason}`)
         resolve(false)
       } else if (phase === 'ended') {
-        lobby.setStatus('Host disconnected')
+        lobby.setStatus(session.hostLeft ? 'Host left' : 'Host disconnected')
         resolve(false)
       } else if (phase === 'unreachable') {
         // The join handshake is retried now (netClient.ts), but a retry that
         // never lands must still END somewhere the player can see. This is the
         // Bluetooth link being up while the host never answers — the case that
         // used to sit on "Looking for a host…" until the phone was force-quit.
-        lobby.setStatus('Host never answered — move closer and reload to retry')
+        lobby.setStatus(LINK_COPY[transport.medium].unreachable)
         resolve(false)
       }
     }

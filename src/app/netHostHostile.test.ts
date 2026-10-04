@@ -35,6 +35,7 @@ const makeHostTransport = (): {
   const transport: Transport = {
     role: 'host',
     maxPacket: 180,
+    medium: 'local',
     start: async () => {},
     stop: async () => {},
     sendPacket: async (peer, bytes) => {

@@ -110,23 +110,48 @@ product work around it, not new infrastructure.
   dropped".
 - Joiners without Bluetooth (iPhones, Firefox) are pointed at Play online.
 
-## What's left, in order
+## Reliability (the follow-up PR)
 
-1. **Host-left state.** The relay already sends `host-`. The client should end
-   at once with "The host left" and offer Back to menu, instead of reconnecting
-   for 100 s to a room no host can return to. This needs no relay change.
-2. **Liveness.** Add an app-level ping on the existing data lane: the client
-   echoes, and the host measures RTT. If 3 s pass with no snapshot, enter
-   `reconnecting`. That closes the silent-stall gap and feeds item 3. The relay
-   could answer pings with `setWebSocketAutoResponse` at no duration cost.
-3. **Quality indicator.** Put a small RTT/quality chip in the HUD for online
-   sessions, using the ping from item 2.
-4. **Room taken.** The browser can't see the 409 status. When an online host
-   fails to open, retry once with a fresh code, then show "Couldn't start an
-   online room". Hide Start while hosting is failing.
-5. **Lobby Back button and share link.** Let the player leave a lobby without
-   reloading. Add `?join=CODE` so a host can send a link instead of reading the
-   code out.
-6. **Host migration** stays out of scope. The host owns the only authoritative
+The behaviour below is measured by `e2e/ws-online-reliability.mjs`, which puts
+`e2e/ws-fault-proxy.mjs` between the pages and the relay.
+
+- **Link watchdog (online only).** The guest pings the host once a second on
+  the data lane (`Ping`/`Pong`, protocol 7) and counts silence from the host's
+  last byte (`src/app/linkHealth.ts`). After 2 s of silence the HUD chip reads
+  "Weak connection". After 5 s the guest reconnects even though its socket is
+  still open. With the socket frozen for 15 s, the chip warned at 2.4 s, the
+  guest reconnected at 5.2 s, and play resumed on the same avatar 0.4 s after
+  the network came back. Bluetooth keeps its own drop detection and sends no
+  pings.
+- **Link chip.** A dot and the round trip ("84 ms"). It turns amber over 250 ms
+  and reads "Weak connection", "Reconnecting…" or "Disconnected" when those
+  apply. The host's chip shows its worst player's round trip, which each guest
+  reports in its Ping.
+- **Host left.** The relay's `host-` now reaches the session as a `left` drop
+  and goes to the HOST LEFT menu from #145, the same menu its Bye uses. A host
+  whose network vanished with no Bye and no close frame showed HOST LEFT on the
+  guest within 0.5 s. If a reconnect opens and the relay names no host within
+  2 s, the host is gone, and that is HOST LEFT too. A host the relay still
+  lists but that never answers gives up after 60 s as CONNECTION LOST. No
+  online text says Bluetooth: `LINK_COPY` words each message per medium.
+- **Room codes.** `hostOnline` (`src/app/onlineSession.ts`) tries up to three
+  codes, because a held code and a dropped network fail the same way in the
+  browser. Only after every attempt fails does it show the reason with Retry and
+  Back to menu. The code and Start appear only once a room is open. A guest
+  whose code nobody hosts sees "No game with that code" and Back to menu after
+  10 s (`watchForHost`).
+- **Relay boundary.** `/ws/:room` refuses names outside
+  `^([a-z0-9-]+~)?[A-Za-z0-9-]{1,64}$` with 400. A room admits
+  `MAX_PLAYERS` (8) clients and refuses the next with 409. A frame over 64 KiB
+  plus the peer-id header closes its sender with 1009. A host that rejects a
+  player (version, full lobby, expired rejoin) sends `drop`, and the relay
+  closes that socket with 4003. `e2e/ws-relay.mjs` checks each of these against
+  the real Durable Object.
+
+## What's left
+
+1. **Share link.** Add `?join=CODE` so a host can send a link instead of reading
+   the code out.
+2. **Host migration** stays out of scope. The host owns the only authoritative
    world. Migration would mean shipping that world to a new host mid-run, which
    is the `?state=` machinery and a separate design.

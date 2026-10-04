@@ -108,6 +108,9 @@ class MockHub {
   }
 }
 
+/** Rolls the host has folded and not yet run. */
+const queuedRolls = (p: { taps: { edges: number }[] }): number => p.taps.filter((t) => (t.edges & 8) !== 0).length
+
 const stubInput = (cmd: Partial<InputCmd> = {}): InputSource => ({
   sample: () => ({ ...emptyInput(), ...cmd }),
 })
@@ -881,15 +884,15 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     // First delivery: the roll edge latches, then the tick consumes it exactly once.
     raw.send(rollPkt)
     await flush()
-    expect(p.pendingEdges & 8).toBe(8)
+    expect(queuedRolls(p)).toBe(1)
     host.tick()
-    expect(p.pendingEdges).toBe(0)
+    expect(p.taps).toHaveLength(0)
 
     // A duplicate/reordered copy of the SAME packet (seq 5 is now stale) must NOT
     // re-arm the roll — otherwise the player dodge-rolls a second time they never asked for.
     raw.send(rollPkt)
     await flush()
-    expect(p.pendingEdges & 8).toBe(0)
+    expect(queuedRolls(p)).toBe(0)
   })
 
   it('does not drop a pure-edge tap (roll) when the input lane stalls under congestion', async () => {
@@ -973,7 +976,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     await flush()
 
     // The host must have received the roll edge — a dropped dodge is a real defect.
-    expect(p.pendingEdges & 8).toBe(8)
+    expect(queuedRolls(p)).toBe(1)
   })
 
   it("keeps a client's OWN avatar in its snapshot even when 60 NPCs crowd the interest radius", async () => {
@@ -1028,6 +1031,6 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     // A newer packet (seq 2) carrying the roll edge must arm it.
     raw.send(encodeInput({ ...emptyInput(), seq: 2 }, rollEdges))
     await flush()
-    expect(p.pendingEdges & 8).toBe(8)
+    expect(queuedRolls(p)).toBe(1)
   })
 })

@@ -222,4 +222,38 @@ describe('RtcTransport', () => {
     for (let v = sentOnRelayFrom; v < n; v++) expect(seen.has(v), `message ${v}`).toBe(true)
     await t.stop()
   })
+
+  it('a retry that dies half open, then one that works, still delivers the stream in order', async () => {
+    const t = await setup({ relayMs: 15, host: { retryDelaysMs: [150, 150] } })
+    await wait(60)
+    const guest = t.guest()
+    let n = 0
+    const pump = setInterval(() => {
+      const v = n++
+      void t.host.sendPacket(guest, new Uint8Array([v & 0xff, v >> 8])).catch(() => {})
+    }, 2)
+    t.net.silent = true
+    await wait(180)
+    expect(t.host.pathOf(guest)).toBe('relay')
+    const sentOnRelayFrom = n
+    t.net.silent = false
+    // The first retry opens on the host, but the guest's fast channel never
+    // does in time: the guest holds the host's ctl messages, then gives up.
+    t.net.slowChannel = { label: 'fast', ms: 10_000 }
+    await wait(240)
+    expect(t.client.pathOf('host')).toBe('relay')
+    t.net.slowChannel = null
+    await wait(300)
+    expect(t.host.pathOf(guest)).toBe('p2p')
+    expect(t.client.pathOf('host')).toBe('p2p')
+    await wait(40)
+    clearInterval(pump)
+    await wait(60)
+    const got = dataOf(t.clientEvents).map((d) => d.bytes[0] | (d.bytes[1] << 8))
+    for (let i = 1; i < got.length; i++) expect(got[i], `message ${i}`).toBeGreaterThan(got[i - 1])
+    const seen = new Set(got)
+    for (let v = sentOnRelayFrom; v < n; v++) expect(seen.has(v), `message ${v}`).toBe(true)
+    await t.stop()
+  })
 })
+

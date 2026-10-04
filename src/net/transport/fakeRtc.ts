@@ -130,6 +130,9 @@ export class FakeRtcNet {
    * timers, and a test must lose the same messages on a busy machine. */
   lossRate = 0
   sent = { reliable: 0, unreliable: 0 }
+  /** The answerer's channel with this label opens this much later than the
+   * rest, so the offerer is up while the answerer is not. */
+  slowChannel: { label: string; ms: number } | null = null
 
   readonly makePeerConnection = (config: RTCConfiguration): RTCPeerConnection =>
     new FakePeerConnection(this, config) as unknown as RTCPeerConnection
@@ -156,9 +159,16 @@ export class FakeRtcNet {
       }
       offerer.setState('connected')
       answerer.setState('connected')
-      for (const ch of [...offerer.channels, ...answerer.channels]) {
+      const open = (ch: FakeChannel): void => {
+        if (ch.readyState !== 'connecting') return
         ch.readyState = 'open'
         ch.onopen?.({})
+      }
+      const slow = this.slowChannel
+      for (const ch of offerer.channels) open(ch)
+      for (const ch of answerer.channels) {
+        if (slow && ch.label === slow.label) setTimeout(() => open(ch), slow.ms)
+        else open(ch)
       }
     })
   }

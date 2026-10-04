@@ -337,6 +337,14 @@ export class RtcTransport implements Transport {
     this.log(`${peer} retry failed: ${why}`)
     clearTimeout(link.deadline)
     this.closePc(link)
+    // The peer's ctl messages held since its marker landed are in order now:
+    // its next frames come over the relay, behind them. Kept, they would surface
+    // at the next upgrade, after newer relay frames.
+    if (link.peerMarked) {
+      const held = link.held ?? []
+      link.held = []
+      for (const bytes of held) this.emit({ type: 'data', peer, bytes })
+    }
     this.scheduleRetry(peer, link)
   }
 

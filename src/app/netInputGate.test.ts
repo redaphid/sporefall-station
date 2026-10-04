@@ -85,7 +85,7 @@ describe('input gate: continuous state and edges are gated apart', () => {
     expect(ran.filter((c) => c.roll)).toHaveLength(1)
   })
 
-  it('folds the edges of every record in a bundle, not only the newest', () => {
+  it('runs every tapped record of a bundle, one per tick, oldest first', () => {
     const { host, datagram, ran } = rig()
     datagram(
       encodeInputBundle([
@@ -95,11 +95,36 @@ describe('input gate: continuous state and edges are gated apart', () => {
         rec(8, { draftPick: 2 }),
       ]),
     )
+    for (let i = 0; i < 5; i++) host.tick()
+    expect(ran.map((c) => [c.hotbar, c.throwItem, c.modSwap, c.draftPick])).toEqual([
+      [1, false, undefined, undefined],
+      [-1, true, undefined, undefined],
+      [-1, false, 0x0102, undefined],
+      [-1, false, undefined, 2],
+      [-1, false, undefined, undefined],
+    ])
+  })
+
+  it('a tap that lands late still runs in seq order', () => {
+    const { host, reliable, datagram, ran } = rig()
+    const THROW = { attack: false, interact: false, special: false, throwItem: true }
+    datagram(encodeInputBundle([rec(12, { hotbar: 2 })]))
+    reliable(encodeInputBundle([rec(10, {}, THROW)]))
     host.tick()
-    expect(ran[0]).toMatchObject({ hotbar: 1, throwItem: true, modSwap: 0x0102, draftPick: 2 })
     host.tick()
-    expect(ran[1]).toMatchObject({ hotbar: -1, throwItem: false })
-    expect(ran[1].modSwap).toBeUndefined()
+    expect(ran.map((c) => [c.throwItem, c.hotbar])).toEqual([
+      [true, -1],
+      [false, 2],
+    ])
+  })
+
+  it('merges attack taps into one tick, as a held trigger would', () => {
+    const { host, datagram, ran } = rig()
+    const ATTACK = { attack: true, interact: false, special: false }
+    datagram(encodeInputBundle([rec(2, {}, ATTACK), rec(4, {}, ATTACK)]))
+    host.tick()
+    host.tick()
+    expect(ran.map((c) => c.attack)).toEqual([true, false])
   })
 
   it('drops the edges of a record older than the window', () => {

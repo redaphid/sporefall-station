@@ -95,6 +95,13 @@ describe('bossBar', () => {
     expect(bossBar(view([bossEntity(1, 32)]), 1, NAME)?.phaseLabel).toBe('ENRAGED')
   })
 
+  it('draws nothing when the latched id now names a living non-boss', () => {
+    const thug = makeEntity('npc', 'thug', 9, 9)
+    thug.id = 1
+    thug.health = { hp: 30, max: 30, iframes: 0 }
+    expect(bossBar(view([thug]), 1, NAME)).toBeNull()
+  })
+
   it('drops the bar the instant the boss dies', () => {
     const dead = bossEntity(1, 0)
     dead.dead = true

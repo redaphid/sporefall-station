@@ -6,6 +6,7 @@ import { encodeSnapshot, type WireEntity } from '../net/protocol/messages'
 import { MsgType, type Transport, type TransportEvent } from '../net/types'
 import { HostSession } from './hostSession'
 import { NetClientSession } from './netClient'
+import { NetHostSession } from './netHost'
 
 /**
  * `RenderView.runEpoch` marks run boundaries for per-run UI state (the boss
@@ -125,6 +126,30 @@ describe('a net client changes runEpoch only on a fresh run', () => {
 describe('a host changes runEpoch only on a fresh run', () => {
   it('changes it on "Run it back" and on "New Seed", and not while the run plays', () => {
     const host = new HostSession(1, { sample: () => emptyInput() })
+    const first = host.renderView().runEpoch
+    for (let i = 0; i < 30; i++) host.tick()
+    expect(host.renderView().runEpoch).toBe(first)
+
+    host.restart()
+    const replay = host.renderView().runEpoch
+    expect(replay).not.toBe(first)
+
+    host.restart(48)
+    expect(host.renderView().runEpoch).not.toBe(replay)
+  })
+
+  it('a NET host changes it on "Run it back" and on "New Seed", and not while the run plays', () => {
+    const transport: Transport = {
+      role: 'host',
+      maxPacket: 180,
+      start: async () => {},
+      stop: async () => {},
+      sendPacket: () => Promise.resolve(),
+      on: () => () => {},
+      peers: () => [],
+    }
+    const host = new NetHostSession(1, 'Host', { sample: () => emptyInput() }, transport)
+    host.beginGame()
     const first = host.renderView().runEpoch
     for (let i = 0; i < 30; i++) host.tick()
     expect(host.renderView().runEpoch).toBe(first)

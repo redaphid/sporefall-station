@@ -1,5 +1,5 @@
-import { itemName, keycardId } from '../data/items'
-import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
+import { itemClass, itemName, keycardId } from '../data/items'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type Loadout } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
 import { isFloorTile, isSolidTile, levelChecksum, type Building, type BuildingRole } from '../levelgen/level'
@@ -720,6 +720,14 @@ const completeMission = (w: World, focus?: Entity): void => {
   if (focus) raiseStationAlert(w, focus)
 }
 
+/** Every key item (the briefcase, each wing keycard) belongs to the floor it
+ * was found on, so the exit takes them all. The held stack stays held. */
+const leaveFloorKeys = (ld: Loadout): void => {
+  const held = ld.inventory[ld.activeSlot]
+  ld.inventory = ld.inventory.filter((s) => itemClass(s.itemId) !== 'key')
+  ld.activeSlot = held ? ld.inventory.indexOf(held) : -1
+}
+
 /** Regenerate the world in place for the next floor, carrying players over. */
 export const nextFloor = (w: World): void => {
   const players = w.entities.filter((e) => e.playerCtl)
@@ -748,8 +756,7 @@ export const nextFloor = (w: World): void => {
       p.playerCtl.downed = undefined
       p.playerCtl.channel = undefined
       p.playerCtl.crimeUntilTick = 0
-      // Key items don't carry across floors
-      if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'briefcase')
+      if (p.loadout) leaveFloorKeys(p.loadout)
     }
     p.dead = false
     w.entities.push(p)

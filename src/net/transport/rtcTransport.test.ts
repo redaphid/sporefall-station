@@ -90,6 +90,16 @@ describe('RtcTransport', () => {
     await t.stop()
   })
 
+  it('a guest with p2p off stays on the relay, and the host stops offering it a link', async () => {
+    const t = await setup({ host: { retryDelaysMs: [40] }, client: { p2p: false } })
+    await wait(400)
+    expect(t.host.pathOf(t.guest())).toBe('relay')
+    expect(t.client.pathOf('host')).toBe('relay')
+    // The host's first offer goes out before it hears the guest's answer; no retry follows.
+    expect(t.net.pcs).toHaveLength(1)
+    await t.stop()
+  })
+
   it('switches a live peer to the relay when the channels die, without dropping it', async () => {
     const t = await setup()
     await wait(10)

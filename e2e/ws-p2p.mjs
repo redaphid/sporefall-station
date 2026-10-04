@@ -61,12 +61,12 @@ const main = async () => {
   }
   const shot = (page, label) => page.screenshot({ path: join(OUT, `ws-p2p-${label}.png`) })
 
-  const playPair = async (tag, hostQuery) => {
+  const playPair = async (tag, hostQuery, guestQuery = '') => {
     const host = await open(`${tag}Host`, hostQuery)
     await host.getByRole('button', { name: 'Host online game' }).click()
     await until(host, () => (document.querySelector('#room-code')?.textContent ?? '').length > 0)
     const code = (await host.locator('#room-code').textContent())?.trim() ?? ''
-    const guest = await open(`${tag}Guest`)
+    const guest = await open(`${tag}Guest`, guestQuery)
     await guest.locator('[data-role="online-code"]').fill(code)
     await guest.getByRole('button', { name: 'Join', exact: true }).click()
     await until(host, () => document.querySelectorAll('#players > div').length === 2)
@@ -122,6 +122,19 @@ const main = async () => {
       `with ?p2p=0 on the host, the guest plays over the relay and its chip reads "${await chip(relay.guest)}"`,
     )
     await shot(relay.guest, '03-guest-relay')
+
+    // ?p2p=0 on the guest alone: the host still offers at join and would retry
+    // at 5 s; the guest must decline both and stay on the relay.
+    const guestOff = await playPair('guestoff', '', '&p2p=0')
+    await sleep(8000)
+    check(
+      /^Relay \d+ ms$/.test(await chip(guestOff.guest)),
+      `with ?p2p=0 on the guest, it is still on the relay 8 s in ("${await chip(guestOff.guest)}")`,
+    )
+    check(
+      (await session(guestOff.host)).link?.path === 'relay',
+      'and the host agrees it is on the relay',
+    )
   } finally {
     for (const { ctx, tag, videoDir } of contexts) {
       await ctx.close().catch(() => {})

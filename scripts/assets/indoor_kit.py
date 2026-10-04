@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from PIL import Image, ImageDraw
 
 HERE = Path(__file__).resolve().parent
@@ -89,7 +90,7 @@ NEG_PROP = f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, {NEG_WRONG_READ}"
 # Value plan (mean luminance), slotted between the existing indoor bands in
 # tiles_indoor.BAND (hull 22, grate 40, bog 58, hall 62, plating 72, tiled 112)
 # and the first biome's wall 30 / floor 82.
-BAND = {"deck": 76.0, "bulkhead": 30.0, "pillar": 46.0, "stair_up": 92.0, "stair_down": 44.0,
+BAND = {"deck": 34.0, "bulkhead": 22.0, "pillar": 46.0, "stair_up": 92.0, "stair_down": 44.0,
         "door": 78.0}
 
 
@@ -116,10 +117,14 @@ JOBS: dict[str, Job] = {
     # The hero: every other tile and the doors take its pick as their style anchor.
     "deck": Job(
         "floor",
-        "seamless top-down texture of a derelict space station corridor floor, large square riveted "
-        "steel deck plates with dark recessed seams, scuffed worn gunmetal and teal paint, grime, "
-        "small patches of glowing green spore fungus creeping out of the seams, seen from directly above",
-        seamless=True, ref="env", ref_weight=0.35,
+        # Owner, on the first pick: "that floor is too busy to read". The floor is the
+        # backdrop the cast is read on, so it asks for big quiet plates and nothing that glows.
+        "seamless top-down texture of a plain dark matte steel floor made of a few very large flat "
+        "square plates, faint thin seams between them, smooth worn dull surface, very subtle grime, "
+        "uniform, minimal detail, no lights, seen from directly above",
+        neg="lights, glowing, glow, neon, bright spots, rivets, bolts, grates, vents, pipes, cables, "
+            "fungus, spores, moss, text, symbols, hazard stripes, high contrast, busy pattern",
+        seamless=True, ref="env", ref_weight=0.2,
         accept=("floor", "deck", "plate", "plating", "metal", "panel", "tile", "texture", "grate", "steel")),
     "deck-accent": Job(
         "floor",
@@ -153,7 +158,7 @@ JOBS: dict[str, Job] = {
         # tile itself reads 'server'. What a pillar must never read as is something a player
         # walks through, or a face. So it is judged standing in the deck, against a deny list.
         deny=("door", "hatch", "window", "gate", "portal", "entrance", "opening", "hole", "stair",
-              "ladder", "eye", "face", "skull", "head", "mask"),
+              "ladder", "eye", "face", "skull", "head", "mask", "manhole", "drain", "vent", "grate"),
         accept=("pillar", "column", "plate", "metal", "panel", "hatch", "square", "box", "tile",
                 "lid", "block", "steel", "vent", "cover")),
     "stair_up": Job(
@@ -271,7 +276,11 @@ PROP_DENY = ("person", "man", "woman", "character", "creature", "robot", "face",
 STYLE_REFS = {"prop": (("chars/vine-ranger-s-idle.png", "props/spore-barrel.png"),
                        ("props/cargo-crate.png", "props/storage-rack.png")),
               "tile": (("tiles/floor-0.png", "tiles/wall-0.png"),
-                       ("tiles/hall-0.png", "tiles/plating-0.png"))}
+                       ("tiles/hall-0.png", "tiles/plating-0.png")),
+              # A receding floor read against loud anchors fails on "contrast" every time
+              # (8/8 quiet decks did), so floors are judged against the pack's calm grounds.
+              "floor": (("tiles/street-0.png", "tiles/hall-0.png"),
+                        ("tiles/street-1.png", "tiles/bog-0.png"))}
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +402,29 @@ def _limit(a, k=MAX_COLOURS, lights=False):
     return out
 
 
+# A floor recedes: its value swing and fine detail are capped below the cast's, and
+# its hue is pulled toward neutral so saturated sprites carry the colour.
+FLOOR_RMS = 7.0
+# Warm dark greys: the teal deck shared its hue with the teal stalker, the beetle
+# and most of the new props (review of #157). Each step is an even mix of a brown
+# and a steel entry of the locked palette, the INDOOR_EXTRA precedent for loosening.
+FLOOR_RAMP = [TI._hex(h) for h in ("#141210", "#1e1b18", "#28231f", "#2e2925", "#35312f", "#3d3832",
+                                    "#433c33", "#4d463c")]
+
+
+def quiet_floor(raw, surface, res):
+    """Shape from the raw, value and hue from the floor plan: only the luminance
+    survives, its swing is capped at FLOOR_RMS around the surface band, and each
+    pixel takes the warm-grey ramp step nearest its value."""
+    im = Image.open(raw).convert("RGB")
+    lum = TI.seamless_kcentroid(im, res).astype(np.float32) @ np.array([0.299, 0.587, 0.114], np.float32)
+    lum = gaussian_filter(lum, sigma=0.6, mode="wrap")
+    lum = BAND[surface] + (lum - lum.mean()) * min(1.0, FLOOR_RMS / (lum.std() + 1e-3))
+    ramp = np.array(FLOOR_RAMP, np.float32)
+    ramp_l = ramp @ np.array([0.299, 0.587, 0.114], np.float32)
+    return ramp[np.abs(lum[..., None] - ramp_l).argmin(-1)].astype(np.uint8)
+
+
 def _tile(raw, surface, res=PX, seamless=False, lights=False):
     im = Image.open(raw).convert("RGB")
     small = TI.seamless_kcentroid(im, res) if seamless else np.asarray(P.kcentroid(im, res, res).convert("RGB"))
@@ -418,21 +450,31 @@ def bulkhead_caps(body):
 
 
 def locked_door(closed):
-    """The closed hatch with a red-and-black hazard locking bar clamped across its
-    middle. Diffused red lock lights never survived the 1024 -> 64 px reduction
-    (12 takes, at most 0.6% red pixels), and locked must read at a glance."""
+    """The closed hatch, a red-and-black hazard bar across its seam, and over both
+    main's padlock glyph at three times its old size. Diffused red lock lights never
+    survived the 1024 -> 64 px reduction (12 takes, at most 0.6% red pixels), and the
+    bar alone read weaker than main's padlock at game zoom (review of #157)."""
+    from PIL import ImageDraw
     a = np.asarray(closed.convert("RGBA")).copy()
-    y0, y1 = PX // 2 - 5, PX // 2 + 5
+    y0, y1 = PX // 2 - 3, PX // 2 + 3
     for x in range(3, PX - 3):
         for y in range(y0, y1):
             a[y, x, :3] = TI.C["red"] if ((x + y) // 4) % 2 == 0 else TI.C["black"]
-    a[y0 - 1, 2:PX - 2, :3] = TI.C["black"]
-    a[y1, 2:PX - 2, :3] = TI.C["black"]
+    im = Image.fromarray(a, "RGBA")
+    d = ImageDraw.Draw(im)
+    ink, gold, shade = tuple(int(v) for v in TI.C["black"]), (255, 216, 62), (176, 141, 80)
     c = PX // 2
-    a[c - 7:c + 7, c - 6:c + 6, :3] = TI.C["black"]
-    a[c - 6:c + 6, c - 5:c + 5, :3] = TI.C["amber"]
-    a[c - 2:c + 3, c - 1:c + 1, :3] = TI.C["black"]
-    return Image.fromarray(a, "RGBA")
+    # shackle: a thick arch, ink outside and in
+    d.rounded_rectangle([c - 12, c - 22, c + 12, c + 4], radius=12, outline=ink, width=9)
+    d.rounded_rectangle([c - 10, c - 20, c + 10, c + 2], radius=10, outline=gold, width=5)
+    # body
+    d.rounded_rectangle([c - 17, c - 6, c + 17, c + 22], radius=4, fill=ink)
+    d.rounded_rectangle([c - 15, c - 4, c + 15, c + 20], radius=3, fill=gold)
+    d.rectangle([c - 15, c + 14, c + 15, c + 20], fill=shade)
+    # keyhole
+    d.ellipse([c - 4, c + 1, c + 4, c + 9], fill=ink)
+    d.rectangle([c - 2, c + 6, c + 2, c + 15], fill=ink)
+    return im
 
 
 def prop_sprite(raw, j, content=60):
@@ -455,7 +497,7 @@ def post_candidate(name, raw, index=0):
     """One raw -> {relative path: image}. `index` numbers variant files for pools."""
     j = JOBS[name]
     if name == "deck":  # macro-2 master: one 128 px wrap, sliced into four 64 px tiles
-        m = _tile(raw, "deck", res=2 * PX, seamless=True)
+        m = quiet_floor(raw, "deck", res=2 * PX)
         return {f"tiles/deck-{4 * index + q}.png": Image.fromarray(
             m[(q // 2) * PX:(q // 2 + 1) * PX, (q % 2) * PX:(q % 2 + 1) * PX], "RGB") for q in range(4)}
     if name == "deck-accent":
@@ -515,12 +557,23 @@ def harness(name, files):
             n = len(np.unique(a[..., :3].reshape(-1, 3), axis=0))
             if n > MAX_COLOURS + 2 and not rel.endswith("door-locked.png"):  # + the drawn lock bar
                 probs.append(f"{rel}: {n} colours > {MAX_COLOURS + 2}")
-            if TI.detail_energy(a[..., :3]) < 4:
+            if TI.detail_energy(a[..., :3]) < (1.5 if j.kind == "floor" else 4):
                 probs.append(f"{rel}: flat (detail {TI.detail_energy(a[..., :3]):.1f})")
         if j.seamless and name != "deck" and not rel.endswith(("-cap.png", "-cap-inner.png")):
             e = P.seam_energy(im)
             if e > 30:
                 probs.append(f"{rel}: wrap seam energy {e:.1f} > 30")
+    if name == "deck":  # a floor must recede: no busier than the quietest city ground
+        import floor_metrics as FM
+        tmp = STAGE / name / "_fm"
+        tmp.mkdir(parents=True, exist_ok=True)
+        paths = []
+        for k in sorted(files):
+            files[k].save(tmp / Path(k).name)
+            paths.append(tmp / Path(k).name)
+        fm, fp = FM.gate(paths)
+        probs += fp
+        print(f"  floor metrics {json.dumps(fm)}")
     if name == "deck":  # the master wraps; its slices meet each other by construction
         tiles = [np.asarray(files[k]) for k in sorted(files)]
         master = np.vstack([np.hstack(tiles[:2]), np.hstack(tiles[2:])])
@@ -606,7 +659,7 @@ def vlm(name, files):
     elif not any(w in subject for w in accept):
         probs.append(f"VLM reads it as {subject!r}")
     reasons = []
-    for pair in STYLE_REFS[cat]:
+    for pair in STYLE_REFS["floor" if j.kind == "floor" else cat]:
         refs = []
         for r in pair:  # anchors shown exactly the way the candidate is
             a = Image.open(THEME / r)
@@ -619,7 +672,12 @@ def vlm(name, files):
             break
         reasons.append(sv.get("reason", ""))
     else:
-        probs.append(f"style (both anchor pairs): {reasons[0]}")
+        if j.kind == "floor":
+            # A floor is gated by floor_metrics, not by a style read: every quiet deck
+            # (8/8) failed it for "low contrast, no clear outlines", which is the brief.
+            print(f"  style read (not gated for floors): {reasons[0][:120]}")
+        else:
+            probs.append(f"style (both anchor pairs): {reasons[0]}")
     return subject, probs
 
 
@@ -654,10 +712,45 @@ def pick(name, seeds):
     for s in seeds:
         if not gate_.get(str(s), {}).get("pass"):
             raise SystemExit(f"{name} s{s} did not pass the gate: {gate_.get(str(s))}")
-        shutil.copy2(raws_of(name)[s], RAWS / f"{name}-s{s}.png")
+        store_raw(raws_of(name)[s], RAWS / f"{name}-s{s}.png")
+    for old in RAWS.glob(f"{name}-s*.png"):  # a dropped pick's raw leaves with it
+        if int(old.stem.rpartition("-s")[2]) not in seeds:
+            old.unlink()
     cur[name] = {"seeds": seeds, "raws": [f"raws/indoor/{name}-s{s}.png" for s in seeds]}
     CURATION.write_text(json.dumps(cur, indent=1) + "\n")
     print(f"picked {name}: {seeds}")
+
+
+# Curated raws are committed, so they are stored at RAW_PX (the 1024 px tile renders
+# made the first 18 picks 23.6 MB, 2.6x every raw already on main). The posts
+# k-centroid to 64-128 px, so 768 loses nothing they use; `verify` re-gates the
+# shipped files from the stored raws. The graph rides along unchanged.
+RAW_PX = 768
+
+
+def store_raw(src, dst):
+    text = png_text(src)
+    im = Image.open(src)
+    if max(im.size) > RAW_PX:
+        im = im.resize((RAW_PX, RAW_PX), Image.LANCZOS)
+    im.save(dst, optimize=True)
+    embed(dst, text["prompt"], text["workflow"])
+
+
+def verify():
+    """Re-gate every shipped pick from its stored raw (harness + VLM)."""
+    global CAST_BAND
+    CAST_BAND = cast_band({n: measure(REPO / "public/themes/swampspace/chars" / f"{n}.png") for n in CAST})
+    bad = 0
+    for name, c in load_curation().items():
+        if name not in JOBS:
+            continue
+        for index, seed in enumerate(c["seeds"]):
+            files = post_candidate(name, RAWS / f"{name}-s{seed}.png", index)
+            probs = harness(name, files) + vlm(name, files)[1]
+            bad += bool(probs)
+            print(f"{name} s{seed}: {'ok' if not probs else 'FAIL ' + str(probs)[:200]}", flush=True)
+    return bad
 
 
 def png_text(path):
@@ -715,6 +808,9 @@ def ship():
                 embed(dst, prompt, workflow)
                 shipped[rel] = flow
     (FLOWS / "shipped.json").write_text(json.dumps(dict(sorted(shipped.items())), indent=1) + "\n")
+    for f in FLOWS.glob("*.json"):  # a dropped pick's flow leaves with it
+        if f.name != "shipped.json" and f.name.removesuffix("_api.json").removesuffix(".json") not in shipped.values():
+            f.unlink()
     # Keys the pool sync does not own: caps, props, and the deck's macro side.
     mpath = THEME / "manifest.json"
     m = json.loads(mpath.read_text())
@@ -813,6 +909,15 @@ def main():
                 ImageDraw.Draw(im).text((i * 260 + 4, 262), f"s{seed}", fill=(230, 230, 230))
             im.save(STAGE / f"{name}-raws.png")
             print(STAGE / f"{name}-raws.png")
+    elif verb == "verify":
+        sys.exit(verify())
+    elif verb == "restore-raws":  # recompress committed raws to RAW_PX in place
+        for p in sorted(RAWS.glob("*.png")):
+            tmp = p.with_suffix(".tmp.png")
+            shutil.copy2(p, tmp)
+            store_raw(tmp, p)
+            tmp.unlink()
+            print(p.name, p.stat().st_size)
     elif verb == "tally":  # swept / passed / rejected / picked, per job
         cur = load_curation()
         for name in JOBS:

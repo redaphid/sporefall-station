@@ -85,6 +85,7 @@ const rig = () => {
       calls.push('restart')
       session.restart()
     },
+    onMainMenu: () => calls.push('mainMenu'),
     onRefresh: () => calls.push('refresh'),
     onShare: () => {
       calls.push('share')
@@ -112,7 +113,8 @@ const rig = () => {
   frame([])
   press(A) // the first press joins the pad to the local player's slot
   const runItBackBtn = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-role="pause-run-it-back"]')!
-  return { session, swaps, calls, frame, press, focused, rings, newSeedBtn, runItBackBtn, open: () => press(START) }
+  const mainMenuBtn = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-role="pause-main-menu"]')!
+  return { session, swaps, calls, frame, press, focused, rings, newSeedBtn, runItBackBtn, mainMenuBtn, open: () => press(START) }
 }
 
 describe('pause menu with only a controller', () => {
@@ -128,11 +130,11 @@ describe('pause menu with only a controller', () => {
     const r = rig()
     r.open()
     const seen = [r.focused()]
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       r.press(RIGHT)
       seen.push(r.focused())
     }
-    expect(seen).toEqual(['Resume', '🎲 New Seed', 'Run it back', '⟳ Refresh', '🔗 Share state', 'Resume'])
+    expect(seen).toEqual(['Resume', '🎲 New Seed', 'Run it back', 'Main menu', '⟳ Refresh', '🔗 Share state', 'Resume'])
     r.press(LEFT)
     expect(r.focused()).toBe('🔗 Share state')
     expect(r.calls).toEqual([])
@@ -358,6 +360,56 @@ describe('Run it back takes a second press too', () => {
   })
 })
 
+describe('Main menu takes two presses', () => {
+  const ARMED = 'Quit to the menu? Press again'
+
+  it('the first A arms it and leaves nothing; the second A quits to the menu', () => {
+    const r = rig()
+    r.open()
+    for (let i = 0; i < 3; i++) r.press(RIGHT)
+    expect(r.focused()).toBe('Main menu')
+    r.press(A)
+    expect(r.calls).toEqual([])
+    expect(r.session.isPaused).toBe(true)
+    expect(r.mainMenuBtn().textContent).toBe(ARMED)
+    r.press(A)
+    expect(r.calls).toEqual(['mainMenu'])
+  })
+
+  it('a held Enter cannot count as the second press', () => {
+    const r = rig()
+    r.open()
+    const mm = r.mainMenuBtn()
+    const keydown = (repeat: boolean): boolean =>
+      mm.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat, bubbles: true, cancelable: true }))
+    expect(keydown(false)).toBe(true)
+    expect(keydown(true)).toBe(false)
+  })
+
+  it('a tap that never focuses it is disarmed by closing the menu', () => {
+    const r = rig()
+    r.open()
+    r.mainMenuBtn().click()
+    r.press(START)
+    r.open()
+    expect(r.mainMenuBtn().textContent).toBe('Main menu')
+    r.mainMenuBtn().click()
+    expect(r.calls).toEqual([])
+  })
+
+  it('shares one armed slot with New Seed and Run it back', () => {
+    const r = rig()
+    r.open()
+    r.runItBackBtn().click()
+    r.mainMenuBtn().click()
+    expect(r.runItBackBtn().dataset.armed).toBeUndefined()
+    expect(r.mainMenuBtn().dataset.armed).toBe('')
+    r.newSeedBtn().click()
+    expect(r.mainMenuBtn().dataset.armed).toBeUndefined()
+    expect(r.calls).toEqual([])
+  })
+})
+
 describe('adversarial', () => {
   it('A or B held while Start opens the menu does nothing until released and pressed again', () => {
     const r = rig()
@@ -414,7 +466,7 @@ describe('adversarial', () => {
   it('B does nothing once Refresh has taken the run away', () => {
     const r = rig()
     r.open()
-    for (let i = 0; i < 3; i++) r.press(RIGHT)
+    for (let i = 0; i < 4; i++) r.press(RIGHT)
     r.press(A) // Refresh disables every action
     r.press(B)
     expect(r.calls).toEqual(['refresh'])

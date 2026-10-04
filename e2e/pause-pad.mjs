@@ -1,11 +1,15 @@
 // The pause menu with a controller alone (#125), in a real page. A scripted
 // standard gamepad joins, pauses with Start, and walks the menu: the cursor
 // opens on Resume, Right walks the actions, one A only arms New Seed, Up climbs
-// to the wand strip, and B resumes. Screenshots land in e2e/output/pause-pad/.
+// to the wand strip, and B resumes. A held Enter only arms New Seed or Run it
+// back. Main menu takes two A presses and lands on a fresh start menu, and a new
+// run from there ticks at 30 Hz. Screenshots land in e2e/output/pause-pad/.
 //
 //   BASE_URL=http://127.0.0.1:4990 node e2e/pause-pad.mjs
-//   CDP_URL=http://localhost:9222 BASE_URL=http://localhost:4990 node e2e/pause-pad.mjs
-// CDP_URL drives an existing Chrome (real GPU) in a fresh context of its own.
+//   CDP_URL=http://localhost:<port> BASE_URL=http://localhost:4990 node e2e/pause-pad.mjs
+// CDP_URL drives a Chrome you launched yourself (real GPU), with its own
+// --remote-debugging-port and a throwaway --user-data-dir, never someone's
+// everyday browser. The run uses a fresh context of its own inside it.
 
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -135,6 +139,29 @@ r.heldEnterRbLabels = await page.evaluate(() => ({
   newSeed: document.querySelector('[data-role="pause-new-seed"]')?.textContent,
 }))
 await shot('4-run-it-back-armed')
+// Main menu: one A arms it, the second quits. The page must land on a fresh
+// start menu with the deep-link params gone and no world left running, and a
+// new run from there must tick at the normal 30 Hz.
+await press(RIGHT)
+r.onMainMenu = await page.evaluate(look)
+await press(A)
+await sleep(200)
+r.mainMenuArmed = await page.evaluate(() => ({
+  label: document.querySelector('[data-role="pause-main-menu"]')?.textContent,
+  paused: document.querySelectorAll('[data-role="mod-sequence"]').length > 1,
+}))
+await shot('5-main-menu-armed')
+await page.evaluate(() => (window.__oldPage = true))
+await press(A)
+await until(page, 'the start menu', () => !window.__oldPage && document.querySelector('[data-role="start-menu"]') !== null)
+await sleep(1000)
+r.menu = await page.evaluate(() => ({ search: location.search, world: window.world === undefined, startMenu: !!document.querySelector('[data-role="start-menu"]') }))
+await shot('6-back-at-start-menu')
+await page.click('[data-role="start-menu"] button.sf-start__btn')
+await until(page, 'a new run', () => window.world?.tick > 10)
+const t0 = await page.evaluate(() => window.world.tick)
+await sleep(2000)
+r.newRunTicksIn2s = (await page.evaluate(() => window.world.tick)) - t0
 // Headless WSL Chromium has no WebGL, and pixi throws this whenever it gets to
 // it; on a real GPU (CDP_URL) every page error counts.
 const NO_WEBGL = /reading 'updateRenderable'/
@@ -143,6 +170,8 @@ await context.close()
 if (process.env.CDP_URL) await browser.close().catch(() => {})
 else await browser.close()
 
+const quitArmed =
+  JSON.stringify(r.onMainMenu.rings) === '["Main menu"]' && r.mainMenuArmed.label === 'Quit to the menu? Press again' && r.mainMenuArmed.paused
 const checks = [
   ['Start opens the menu with one cursor, on Resume', r.opened.paused && JSON.stringify(r.opened.rings) === '["Resume"]'],
   ['Right moves the cursor to New Seed', JSON.stringify(r.onNewSeed.rings) === '["🎲 New Seed"]'],
@@ -157,6 +186,10 @@ const checks = [
       r.heldEnterRbLabels.runItBack === 'Restart this run? Press again' &&
       r.heldEnterRbLabels.newSeed === '🎲 New Seed',
   ],
+  ['Right reaches Main menu, and one A only arms it', quitArmed],
+  // Refresh also lands on the picker, so these count only when Main menu did it.
+  ['the second A lands on a fresh start menu with no deep-link params and no world', quitArmed && r.menu.search === '' && r.menu.world && r.menu.startMenu],
+  ['a new run from the menu ticks at 30 Hz (no leaked loop)', quitArmed && r.newRunTicksIn2s >= 45 && r.newRunTicksIn2s <= 75],
   ['no page errors after boot', r.errors.length === 0],
 ]
 writeFileSync(join(OUT, 'result.json'), JSON.stringify({ r, checks }, null, 2))

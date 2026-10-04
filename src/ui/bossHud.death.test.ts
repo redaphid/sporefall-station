@@ -215,6 +215,32 @@ describe('the boss health bar and the death screen', () => {
     expect(card(mount).textContent).not.toBe('')
   })
 
+  // A net client's `tick` is a local frame counter that never resets; only
+  // `simTick` (the host's tick) goes back to 0 when the host restarts the run.
+  it('REGRESSION: a restart seen from a NET CLIENT does not resurrect the bar on an id-recycled enemy', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
+    expect(visible(mount)).toBe(true)
+
+    screens.update(view({ tick: 5001, simTick: 901, entities: [boss()], self: player({ dead: true }) }))
+    const thug = makeEntity('npc', 'thug', 9, 9)
+    thug.id = BOSS_ID
+    thug.health = { hp: 30, max: 30, iframes: 0 }
+
+    screens.update(view({ tick: 5002, simTick: 0, floor: 1, entities: [thug] }))
+
+    expect(visible(mount)).toBe(false)
+  })
+
+  it('a net client whose local tick races ahead of the host tick keeps the bar', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 5001, simTick: 900, entities: [boss(250)] }))
+    screens.update(view({ tick: 5002, simTick: 905, entities: [boss(240)] }))
+
+    expect([visible(mount), hpFill(mount)]).toEqual([true, '75%'])
+  })
+
   it('does not drop the bar merely because the tick repeats or stalls', () => {
     const screens = engageBoss()
     screens.update(view({ tick: 11, entities: [boss(200)] }))

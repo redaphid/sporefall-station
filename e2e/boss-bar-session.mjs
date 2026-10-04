@@ -38,8 +38,8 @@ const EXPECTED_SHATTER_BITE = Math.round(PISTOL * SHATTER_MULT * BOSS_RESIST)
 /** Read the bar straight off the shipping DOM that screens.ts builds. */
 const readBar = (page) =>
   page.evaluate(() => {
-    const hp = document.querySelector('#bossHp')
-    const hud = hp?.parentElement?.parentElement
+    const hud = document.querySelector('[data-role="boss-bar"]')
+    const hp = hud?.querySelector('#bossHp')
     return {
       shown: !!hud && getComputedStyle(hud).display !== 'none',
       width: hp ? hp.style.width : null,

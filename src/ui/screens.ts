@@ -255,9 +255,11 @@ export const createScreens = (
 
   const updateBoss = (view: RenderView): void => {
     // A restart rebuilds the world in place and recycles entity ids from 1, so
-    // the latch must not survive it (bossModel.isRunReset).
-    if (isRunReset(lastBossTick, view.tick)) bossId = undefined
-    lastBossTick = view.tick
+    // the latch must not survive it (bossModel.isRunReset). Keyed on the HOST's
+    // tick: a net client's own `tick` is a frame counter that never resets.
+    const simTick = view.simTick ?? view.tick
+    if (isRunReset(lastBossTick, simTick)) bossId = undefined
+    lastBossTick = simTick
     // Take down an entrance card that was already up when the player went down.
     if (playerOutOfFight(view) && bossCard.style.opacity !== '0') hideBossCard()
     bossId = latchBossId(bossId, view.events)

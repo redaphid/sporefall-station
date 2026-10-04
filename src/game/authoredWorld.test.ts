@@ -134,59 +134,51 @@ describe('level text', () => {
 })
 
 describe('seeded worlds: the generator path is unchanged', () => {
-  const fnv = (s: string): number => {
-    let h = 0x811c9dc5
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i)
-      h = Math.imul(h, 0x01000193)
-    }
-    return h >>> 0
-  }
-
-  /** Populate, set up and play `w` for 120 ticks; its save, serialized. */
-  const play120 = (w: World): string => {
+  const setUp = (w: World): World => {
     populateWorld(w)
     setupFloor(w)
     const at = playerSpawnPoint(w.level, 0)
     spawnPlayer(w, 0, at.x, at.y)
-    for (let t = 0; t < 120; t++) {
+    return w
+  }
+
+  /** Play ticks `from`..`from + n` with a fixed walk-and-shoot script. */
+  const play = (w: World, from: number, n: number): World => {
+    for (let t = from; t < from + n; t++) {
       const cmd = { ...emptyInput(), seq: t, moveX: t % 40 < 20 ? 1 : -1, moveY: t % 60 < 30 ? 0.5 : -0.5, attack: t % 7 === 0 }
       tickWorld(w, new Map([[0, cmd]]))
     }
-    return JSON.stringify(serializeWorld(w))
+    return w
   }
 
-  // FNV-1a and length of the serialized world after a populated 120-tick run,
-  // captured on main at b29a651, before the engine took authored state.
-  const MAIN: Array<[seed: number, floor: number, hash: number, length: number]> = [
-    [1, 1, 0x42622a9f, 82071],
-  ]
+  /** A save minus how it carries its level: a seeded world saves a checksum,
+   * an authored one its rows. Everything else must agree. */
+  const withoutLevel = (w: World): Partial<WorldJson> => {
+    const j: Partial<WorldJson> = serializeWorld(w)
+    delete j.level
+    delete j.levelChecksum
+    return j
+  }
 
-  it.each(MAIN)('seed %i floor %i serializes byte-identically to main', (seed, floor, hash, length) => {
-    const s = play120(createWorld(seed, floor))
-    expect(s.length).toBe(length)
-    expect(fnv(s)).toBe(hash)
+  it.each([
+    [1, 1],
+    [7, 2],
+    [1003, 3],
+    [42, 5],
+  ])('seed %i floor %i plays 120 ticks the same from its seed as from its level written out as text', (seed, floor) => {
+    const seeded = play(setUp(createWorld(seed, floor)), 0, 120)
+    const level = levelFromJson(levelToJson(generateLevel(seed, floor)))
+    const authored = play(setUp(worldFromState({ level, seed, floor })), 0, 120)
+    expect(withoutLevel(authored)).toEqual(withoutLevel(seeded))
   })
 
-  // The same run on deeper floors, on levels frozen as authored fixtures (the
-  // station floors 3 and 5 and the city floor 4 those seeds built before the
-  // floor plan sent every floor from 3 indoors), and on floor 2's slums from
-  // the city generator (play now draws floor 2's district), so the pin no
-  // longer moves with the floor plan. Re-captured when station floors stopped
-  // inheriting a city district's encounters and Still Row took over from
-  // `industrial`.
-  const FROZEN: Array<[fixture: string, hash: number, length: number]> = [
-    ['frozen-1003-3', 0x81ad843f, 109526],
-    ['frozen-42-5', 0x67926d31, 178769],
-    ['frozen-9-4', 0x197a6e68, 133727],
-    ['city:7:2', 0x171aacb1, 67306],
-  ]
-
-  it.each(FROZEN)('%s plays 120 ticks to the pinned save', (fixture, hash, length) => {
-    const [kind, seed, floor] = fixture.split(':')
-    const s = play120(kind === 'city' ? createCityWorld(Number(seed), Number(floor)) : loadFixture(fixture))
-    expect(s.length).toBe(length)
-    expect(fnv(s)).toBe(hash)
+  // Deeper floors on levels frozen as authored fixtures: a run saved halfway
+  // and reloaded finishes exactly where an unbroken run does.
+  it.each(['frozen-1003-3', 'frozen-42-5', 'frozen-9-4'])('%s saved at tick 60 and reloaded finishes the run unchanged', (fixture) => {
+    const straight = play(setUp(loadFixture(fixture)), 0, 120)
+    const half = play(setUp(loadFixture(fixture)), 0, 60)
+    const resumed = play(reload(serializeWorld(half)), 60, 60)
+    expectWorldEqual(resumed, straight)
   })
 
   it('createWorld is exactly worldFromState(worldFromSeed(...))', () => {

@@ -67,6 +67,18 @@ describe('pick prompt (before committing)', () => {
     expect(t.update(view({ entities: [self, closed], self })).prompt).toBeUndefined()
   })
 
+  it('a biolock or an overgrown hatch offers no pick, because a press cannot pick it', () => {
+    const self = player(1, 10, 10)
+    for (const seal of [{ sealKind: 'keycard' as const }, { sealKind: 'power' as const }, { overgrown: true }]) {
+      const door = lockedDoor(2, 10.8, 10)
+      Object.assign(door.door!, seal)
+      expect(createPickTracker().update(view({ entities: [self, door], self })).prompt, JSON.stringify(seal)).toBeUndefined()
+    }
+    const pickable = lockedDoor(2, 10.8, 10)
+    pickable.door!.sealKind = 'pick'
+    expect(createPickTracker().update(view({ entities: [self, pickable], self })).prompt?.text).toBe('Lock II · Use to pick (3.5s)')
+  })
+
   it('prompt text covers every lock level and clamps degenerate ones', () => {
     expect(promptText(1)).toBe('Lock I · Use to pick (2.0s)')
     expect(promptText(3)).toBe('Lock III · Use to pick (5.0s)')

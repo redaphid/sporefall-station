@@ -24,8 +24,8 @@ const stage = (name: string): World => {
 }
 
 describe('every scenario survives a save and reload', () => {
-  it('knows all 28 scenarios', () => {
-    expect(SCENARIO_NAMES).toHaveLength(28)
+  it('knows all 37 scenarios', () => {
+    expect(SCENARIO_NAMES).toHaveLength(37)
   })
 
   it.each(SCENARIO_NAMES)('%s: reloaded world stays equal to the original for 120 ticks', (name) => {

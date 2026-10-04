@@ -84,8 +84,8 @@ describe('botInput', () => {
 describe('runFight (a tiny census subset)', () => {
   const subset: [string, string][] = [
     ['arena-brute', 'none'],
-    ['arena-brute', 'seq hand fire-lead'],
-    ['arena-cinder', 'hand'],
+    ['arena-brute', 'hand fire-lead'],
+    ['arena-cinder', 'frost'],
   ]
 
   it('replays byte-identically: same arena, build and seed give the same fight', () => {
@@ -165,15 +165,15 @@ describe('summarize and renderCensus', () => {
       arenas: ['arena-brute'],
       seeds: [1],
       rooms: ['seed 1: test room'],
-      fights: [fight('none', 'downed', 90, 120, 40), fight('frost', 'won', 150, 30), { ...fight('hand', 'won', 150, 30), hpTraceHash: '0' }],
+      fights: [fight('none', 'downed', 90, 120, 40), fight('frost', 'won', 150, 30), fight('pierce>frost', 'won', 150, 30)],
       reach: [],
       reachArchetype: 'gangster',
     })
     expect(md).toContain('| build | arena-brute |')
     expect(md).toContain('| frost | **1/1 · 30** |')
     expect(md).toContain('| none | 0/1 · 120 |')
-    expect(md).toContain('| hand | **1/1 · 30** |')
-    expect(md).toContain('| arena-brute | frost = hand: 1/1 won, 5.0 s, 30 dmg | none: 0/1 won, n/a s, 120 dmg | 1/1 won, 5.0 s, 30 dmg | 1/3 |')
-    expect(md).toContain('- arena-brute: none = frost = hand.')
+    expect(md).toContain('| pierce>frost | **1/1 · 30** |')
+    expect(md).toContain('| arena-brute | frost = pierce>frost: 1/1 won, 5.0 s, 30 dmg | none: 0/1 won, n/a s, 120 dmg | 1/3 |')
+    expect(md).toContain('- arena-brute: none = frost = pierce>frost.')
   })
 })

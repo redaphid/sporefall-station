@@ -14,36 +14,24 @@ import { runVerb } from './verbs'
 export interface CensusBuild {
   readonly name: string
   readonly mods: readonly string[]
-  readonly sequenced: boolean
 }
 
-const fold = (name: string, mods: string[]): CensusBuild => ({ name, mods, sequenced: false })
-const seq = (name: string, mods: string[]): CensusBuild => ({ name: `seq ${name}`, mods, sequenced: true })
-
-const HAND = ['shock', 'incendiary', 'frost', 'pierce']
+const build = (name: string, mods: string[]): CensusBuild => ({ name, mods })
 
 export const CENSUS_BUILDS: readonly CensusBuild[] = [
-  fold('none', []),
-  fold('shock', ['shock']),
-  fold('incendiary', ['incendiary']),
-  fold('frost', ['frost']),
-  fold('hand', HAND),
-  fold('shock+pierce', ['shock', 'pierce']),
-  fold('incendiary+pierce', ['incendiary', 'pierce']),
-  fold('frost+pierce', ['frost', 'pierce']),
-  seq('none', []),
-  seq('shock', ['shock']),
-  seq('incendiary', ['incendiary']),
-  seq('frost', ['frost']),
-  seq('pierce>shock', ['pierce', 'shock']),
-  seq('pierce>incendiary', ['pierce', 'incendiary']),
-  seq('pierce>frost', ['pierce', 'frost']),
-  seq('pierce>incendiary>frost', ['pierce', 'incendiary', 'frost']),
-  seq('pierce>shock>incendiary', ['pierce', 'shock', 'incendiary']),
-  seq('pierce>frost>shock', ['pierce', 'frost', 'shock']),
-  seq('hand shock-lead', ['pierce', 'shock', 'incendiary', 'frost']),
-  seq('hand fire-lead', ['pierce', 'incendiary', 'frost', 'shock']),
-  seq('hand frost-lead', ['pierce', 'frost', 'shock', 'incendiary']),
+  build('none', []),
+  build('shock', ['shock']),
+  build('incendiary', ['incendiary']),
+  build('frost', ['frost']),
+  build('pierce>shock', ['pierce', 'shock']),
+  build('pierce>incendiary', ['pierce', 'incendiary']),
+  build('pierce>frost', ['pierce', 'frost']),
+  build('pierce>incendiary>frost', ['pierce', 'incendiary', 'frost']),
+  build('pierce>shock>incendiary', ['pierce', 'shock', 'incendiary']),
+  build('pierce>frost>shock', ['pierce', 'frost', 'shock']),
+  build('hand shock-lead', ['pierce', 'shock', 'incendiary', 'frost']),
+  build('hand fire-lead', ['pierce', 'incendiary', 'frost', 'shock']),
+  build('hand frost-lead', ['pierce', 'frost', 'shock', 'incendiary']),
 ]
 
 /** One seed per arena-room shape, from 7x7 to 11x8, so no two seeds stage the same geometry. */
@@ -105,8 +93,7 @@ export const botInput = (w: World, me: Entity): BotStep | undefined => {
   return input
 }
 
-const newRun = (seed: number, sequenced: boolean): World =>
-  new HostSession(seed, { sample: emptyInput }, undefined, 'normal', sequenced ? 'sequence' : undefined).world
+const newRun = (seed: number): World => new HostSession(seed, { sample: emptyInput }).world
 
 const fnv = (h: number, n: number): number => {
   let x = h
@@ -120,7 +107,7 @@ const fnv = (h: number, n: number): number => {
 export const runFight = (arena: string, build: CensusBuild, seed: number, policy: Policy = 'bot'): FightResult => {
   const spec = ARENAS[arena]
   if (!spec) throw new Error(`census: unknown arena "${arena}"`)
-  const w = newRun(seed, build.sequenced)
+  const w = newRun(seed)
   applyScenario(w, arena)
   const me = firstPlayer(w)
   for (const mod of build.mods) runVerb(w, `addMod ${me.id} ${mod}`)
@@ -187,7 +174,7 @@ const openStreetRow = (w: World, n: number): Rect => {
 }
 
 export const reachProbe = (archetype: string, seed: number, distance: number, playerFires: boolean): ReachResult => {
-  const w = newRun(seed, false)
+  const w = newRun(seed)
   stageArena(w, { question: 'reach probe', foes: [] }, openStreetRow(w, distance + 2))
   const me = firstPlayer(w)
   const foe = spawnNpc(w, archetype, me.pos.x + distance, me.pos.y)
@@ -213,7 +200,7 @@ export const reachProbe = (archetype: string, seed: number, distance: number, pl
 }
 
 export const describeArenaRoom = (seed: number): string => {
-  const w = newRun(seed, false)
+  const w = newRun(seed)
   const room = arenaRoom(w)
   const b = w.level.buildings.find((x) => room && x.rooms.includes(room))
   if (!room || !b) return `seed ${seed}: no room`
@@ -314,14 +301,13 @@ export const renderCensus = (r: CensusReport): string => {
 
   out.push('### Best and worst build per arena', '')
   out.push('Builds joined by `=` tie on every ranking key.', '')
-  out.push('| arena | best | worst | generic hand (fold) | builds that failed to win at least once |', '|---|---|---|---|---|')
+  out.push('| arena | best | worst | builds that failed to win at least once |', '|---|---|---|---|')
   for (const arena of r.arenas) {
     const rows = ranked.get(arena)!
-    const hand = rows.find((s) => s.build === 'hand')
     const failed = rows.filter((s) => s.wins < s.fights).length
     const best = rows[0]
     const worst = rows[rows.length - 1]
-    out.push(`| ${arena} | ${tiedWith(rows, best)}: ${brief(best)} | ${tiedWith(rows, worst)}: ${brief(worst)} | ${hand ? brief(hand) : 'n/a'} | ${failed}/${rows.length} |`)
+    out.push(`| ${arena} | ${tiedWith(rows, best)}: ${brief(best)} | ${tiedWith(rows, worst)}: ${brief(worst)} | ${failed}/${rows.length} |`)
   }
   out.push('')
 

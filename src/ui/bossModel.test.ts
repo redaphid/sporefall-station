@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../game/entity'
 import { MIRECLAW_ENRAGE_FRAC, MIRECLAW_RETREAT_FRAC } from '../game/systems/behaviors'
 import type { SimEvent } from '../game/types'
-import { bossBar, bossPhase, bossRevealName, isRunReset, latchBossId, playerOutOfFight } from './bossModel'
+import { bossBar, bossPhase, bossRevealName, latchBossId, playerOutOfFight } from './bossModel'
 
 const NAME = 'Mireclaw Alpha'
 
@@ -196,22 +196,5 @@ describe('bossBar hides while the player is out of the fight', () => {
     dead.dead = true
     const v = { entities: [dead], events: [], self: player({ dead: true }) }
     expect(bossBar(v, 1, NAME)).toBeNull()
-  })
-})
-
-describe('isRunReset — "Run it back" must not carry the latch into a new world', () => {
-  it('is false on the first frame we have ever seen', () => {
-    expect(isRunReset(undefined, 0)).toBe(false)
-    expect(isRunReset(undefined, 5000)).toBe(false)
-  })
-
-  it('is false while the tick advances normally', () => {
-    expect(isRunReset(10, 11)).toBe(false)
-    expect(isRunReset(10, 10)).toBe(false) // a repeated frame is not a new run
-  })
-
-  it('is TRUE when the tick goes backwards — the world was rebuilt in place', () => {
-    expect(isRunReset(5000, 0)).toBe(true)
-    expect(isRunReset(1, 0)).toBe(true)
   })
 })

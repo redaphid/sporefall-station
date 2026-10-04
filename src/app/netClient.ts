@@ -182,6 +182,7 @@ export class NetClientSession implements Session {
 
   private level!: Level
   private seed = 0
+  private runEpoch = 0
   private floor = 1
   private entities = new Map<number, Entity>()
   /** Per remote entity: the newest snapshot position, the one before it, and the
@@ -256,10 +257,6 @@ export class NetClientSession implements Session {
   /** Local tick count when the newest snapshot landed, so the host's tick can
    * be carried forward between snapshots (they arrive every few ticks). */
   private tickAtSnap = 0
-  /** The host tick reported while `lastSnapTick` is re-baselined and no snapshot
-   * has landed yet. Held rather than reset to 0: a rejoin to the SAME run passes
-   * through that window, and the HUD reads a drop in `simTick` as a new run. */
-  private heldHostTick = 0
   private lastAckedSeq = 0
   /** Our OWN player's authoritative inventory, streamed by the host on change. */
   private localInv?: InventoryMsg
@@ -456,6 +453,7 @@ export class NetClientSession implements Session {
         // are not there and never reach an exit, with no error anywhere to
         // explain it. Fall through and rebuild from the new seed.
         if (this.phase === 'reconnecting' && sameRun) break
+        this.runEpoch++
         // A lobby start is always floor 1, but a LATE join drops us into a run
         // already in progress. Build the floor the host is actually on, or we
         // render floor 1's map — and the walls we collide against — until the
@@ -492,7 +490,7 @@ export class NetClientSession implements Session {
         // createWorld), so its tick counter goes back to 0. Re-baseline, or every
         // snapshot of the new run would look older than the last one of the old
         // run and be rejected as a replay — a permanently frozen screen.
-        this.rebaselineSnapClock()
+        this.lastSnapTick = -1
         this.onLevelChange?.(this.level)
         this.setPhase('starting')
         break
@@ -507,7 +505,7 @@ export class NetClientSession implements Session {
         // "play again" today): a rejoin takes the `reconnecting` early-break out
         // of GameStart and never reaches that line, and the failure mode this
         // averts is a client frozen on a dead screen for the rest of the run.
-        this.rebaselineSnapClock()
+        this.lastSnapTick = -1
         this.setPhase('playing')
         break
       }
@@ -554,17 +552,11 @@ export class NetClientSession implements Session {
    * a client onto the right map.
    */
   /** The host tick right now: the newest snapshot's tick carried forward by
-   * the local ticks since it landed (snapshots come every few ticks). Counts
-   * down host-tick deadlines on the HUD, such as a weapon recharge, and its drop
-   * marks a new run for the boss HUD (screens.ts). */
+   * the local ticks since it landed (snapshots come every few ticks). Used only
+   * to count down host-tick deadlines on the HUD, such as a weapon recharge. */
   private hostTickEstimate(): number {
-    if (this.lastSnapTick < 0) return this.heldHostTick
+    if (this.lastSnapTick < 0) return 0
     return this.lastSnapTick + Math.max(0, this.tickCount - this.tickAtSnap)
-  }
-
-  private rebaselineSnapClock(): void {
-    this.heldHostTick = this.hostTickEstimate()
-    this.lastSnapTick = -1
   }
 
   private changeFloor(floor: number): void {
@@ -838,6 +830,7 @@ export class NetClientSession implements Session {
       entities: [...this.entities.values()],
       events,
       tick: this.tickCount,
+      runEpoch: this.runEpoch,
       level: this.level ?? emptyLevel(),
       floor: this.state.floor,
       missionText,

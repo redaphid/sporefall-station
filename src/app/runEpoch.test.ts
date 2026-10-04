@@ -4,16 +4,15 @@ import { encodeJson } from '../net/framing/codec'
 import { frameMessage } from '../net/framing/chunkedStream'
 import { encodeSnapshot, type WireEntity } from '../net/protocol/messages'
 import { MsgType, type Transport, type TransportEvent } from '../net/types'
+import { HostSession } from './hostSession'
 import { NetClientSession } from './netClient'
 
 /**
- * `RenderView.simTick` is the host tick a client's view reflects. The HUD reads
- * a DROP in it as "the host started a new run" (screens.ts drops the boss latch,
- * whose entity id the new world recycles). So the client must not report a
- * drop that did not happen: `GameStart` and `Go` re-baseline the snapshot
- * clock, and a ghost REJOIN to the same run passes through that window with
- * the boss still alive. Reporting 0 there would cost the player the boss bar
- * for the rest of the fight, since the reveal fires once per floor.
+ * `RenderView.runEpoch` marks run boundaries for per-run UI state (the boss
+ * latch in screens.ts). It must change on a fresh run and on nothing else: a
+ * rejoin to the same run and a late snapshot both happen mid-fight, and the
+ * boss reveal fires once per floor, so a false boundary loses the boss bar for
+ * the rest of the fight.
  */
 
 const flush = async (): Promise<void> => {
@@ -52,7 +51,7 @@ const gameStart = (seed: number): Uint8Array =>
   encodeJson(MsgType.GameStart, { seed, players: [{ slot: 1, name: 'Friend' }], floor: 1 })
 const go = (): Uint8Array => encodeJson(MsgType.Go, { startTick: 0, entityIds: { 1: SELF } })
 
-const admitAt = async (tick: number) => {
+const admitted = async () => {
   const c = makeClient()
   await c.session.start()
   c.emit({ type: 'peerConnected', peer: 'host' })
@@ -60,42 +59,81 @@ const admitAt = async (tick: number) => {
   c.deliver(encodeJson(MsgType.Welcome, { slot: 1, token: 'tok' }))
   c.deliver(gameStart(1))
   c.deliver(go())
-  c.deliver(snapshot(tick))
+  c.deliver(snapshot(900))
   await flush()
   expect(c.session.phase).toBe('playing')
-  expect(c.session.renderView().simTick).toBe(tick)
   return c
 }
 
-describe('a net client reports the host tick without inventing a drop', () => {
-  it('a ghost rejoin to the SAME run keeps simTick at the last known host tick until the next snapshot', async () => {
-    const c = await admitAt(900)
+describe('a net client changes runEpoch only on a fresh run', () => {
+  it('keeps it through late, duplicate and out-of-order snapshots', async () => {
+    const c = await admitted()
+    const epoch = c.session.renderView().runEpoch
+
+    for (const tick of [910, 904, 904, 911, 3]) c.deliver(snapshot(tick))
+    await flush()
+
+    expect(c.session.renderView().runEpoch).toBe(epoch)
+  })
+
+  it('keeps it through a ghost rejoin to the same run', async () => {
+    const c = await admitted()
+    const epoch = c.session.renderView().runEpoch
 
     c.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
     expect(c.session.phase).toBe('reconnecting')
     c.emit({ type: 'peerConnected', peer: 'host' })
     c.deliver(gameStart(1))
     c.deliver(go())
+    c.deliver(snapshot(930))
     await flush()
 
     expect(c.session.phase).toBe('playing')
-    expect(c.session.renderView().simTick).toBe(900)
-
-    c.deliver(snapshot(905))
-    await flush()
-    expect(c.session.renderView().simTick).toBe(905)
+    expect(c.session.renderView().runEpoch).toBe(epoch)
   })
 
-  it('a NEW run shows the drop as soon as its first snapshot lands', async () => {
-    const c = await admitAt(900)
+  it('changes it when the host starts a new run, same seed or new', async () => {
+    const c = await admitted()
+    const first = c.session.renderView().runEpoch
+
+    c.deliver(gameStart(1))
+    c.deliver(go())
+    await flush()
+    const second = c.session.renderView().runEpoch
+    expect(second).not.toBe(first)
 
     c.deliver(gameStart(48))
     c.deliver(go())
     await flush()
-    expect(c.session.renderView().simTick).toBe(900)
+    expect(c.session.renderView().runEpoch).not.toBe(second)
+  })
 
-    c.deliver(snapshot(3, 'thug'))
+  it('changes it when a rejoin finds the host on a DIFFERENT run', async () => {
+    const c = await admitted()
+    const epoch = c.session.renderView().runEpoch
+
+    c.emit({ type: 'peerDisconnected', peer: 'host', reason: 'remote' })
+    c.emit({ type: 'peerConnected', peer: 'host' })
+    c.deliver(gameStart(48))
+    c.deliver(go())
     await flush()
-    expect(c.session.renderView().simTick).toBe(3)
+
+    expect(c.session.renderView().runEpoch).not.toBe(epoch)
+  })
+})
+
+describe('a host changes runEpoch only on a fresh run', () => {
+  it('changes it on "Run it back" and on "New Seed", and not while the run plays', () => {
+    const host = new HostSession(1, { sample: () => emptyInput() })
+    const first = host.renderView().runEpoch
+    for (let i = 0; i < 30; i++) host.tick()
+    expect(host.renderView().runEpoch).toBe(first)
+
+    host.restart()
+    const replay = host.renderView().runEpoch
+    expect(replay).not.toBe(first)
+
+    host.restart(48)
+    expect(host.renderView().runEpoch).not.toBe(replay)
   })
 })

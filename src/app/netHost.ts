@@ -95,6 +95,7 @@ export class NetHostSession implements Session {
   private ghosts = new Map<number, Ghost>()
   private inputs = new Map<number, InputCmd>()
   started = false
+  private runEpoch = 0
   onLobbyChange?: (players: LobbyPlayer[]) => void
   /** Test/telemetry counter: how many per-client Inventory messages we've sent. */
   debugInventorySends = 0
@@ -196,6 +197,7 @@ export class NetHostSession implements Session {
    */
   restart(seed?: number): void {
     if (seed !== undefined) this.seed = seed >>> 0
+    this.runEpoch++
     this.world = this.freshWorld()
     this.ghosts.clear()
     // Force a fresh inventory push after respawn: the new loadout must reach every
@@ -369,6 +371,7 @@ export class NetHostSession implements Session {
       entities: this.world.entities,
       events: this.world.events,
       tick: this.world.tick,
+      runEpoch: this.runEpoch,
       level: this.world.level,
       floor: this.world.floor,
       missionText: this.world.mission.description,

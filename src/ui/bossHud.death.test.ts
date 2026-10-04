@@ -48,6 +48,7 @@ const view = (over: Partial<RenderView> = {}): RenderView =>
     entities: [],
     events: [] as SimEvent[],
     tick: 1,
+    runEpoch: 1,
     level: { w: 40, h: 40 },
     floor: 3,
     missionText: '',
@@ -162,30 +163,6 @@ describe('the boss health bar and the death screen', () => {
   })
 
   // -------------------------------------------------------------------------
-  // "Run it back" — the adjacent case. screens is built ONCE (main.ts) and
-  // never rebuilt, but restart rebuilds the world in place and recycles entity
-  // ids from 1. A latch carried across that boundary re-binds the Alpha's name
-  // plate to whatever floor-1 enemy inherits its id.
-  // -------------------------------------------------------------------------
-
-  it('REGRESSION: a restart does not resurrect the bar on an id-recycled enemy', () => {
-    const screens = createScreens(mount, () => {})
-    screens.update(view({ tick: 900, entities: [boss()], events: [reveal()] }))
-    expect(visible(mount)).toBe(true)
-
-    // Death, then "Run it back": a brand-new world, tick back to 0, and an
-    // ordinary thug that happens to be handed the dead boss's id.
-    screens.update(view({ tick: 901, entities: [boss()], self: player({ dead: true }) }))
-    const thug = makeEntity('npc', 'thug', 9, 9)
-    thug.id = BOSS_ID
-    thug.health = { hp: 30, max: 30, iframes: 0 }
-
-    screens.update(view({ tick: 0, floor: 1, entities: [thug] }))
-
-    expect(visible(mount)).toBe(false)
-  })
-
-  // -------------------------------------------------------------------------
   // The entrance card, caught by the before/after screenshot and not by the
   // first cut of this fix. Gating the REVEAL is not enough: the card dwells for
   // 2.6s, so dying just after the entrance leaves it hanging over YOU DIED,
@@ -215,37 +192,106 @@ describe('the boss health bar and the death screen', () => {
     expect(card(mount).textContent).not.toBe('')
   })
 
-  // A net client's `tick` is a local frame counter that never resets; only
-  // `simTick` (the host's tick) goes back to 0 when the host restarts the run.
-  it('REGRESSION: a restart seen from a NET CLIENT does not resurrect the bar on an id-recycled enemy', () => {
-    const screens = createScreens(mount, () => {})
-    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
-    expect(visible(mount)).toBe(true)
-
-    screens.update(view({ tick: 5001, simTick: 901, entities: [boss()], self: player({ dead: true }) }))
-    const thug = makeEntity('npc', 'thug', 9, 9)
-    thug.id = BOSS_ID
-    thug.health = { hp: 30, max: 30, iframes: 0 }
-
-    screens.update(view({ tick: 5002, simTick: 0, floor: 1, entities: [thug] }))
-
-    expect(visible(mount)).toBe(false)
-  })
-
-  it('a net client whose local tick races ahead of the host tick keeps the bar', () => {
-    const screens = createScreens(mount, () => {})
-    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
-    screens.update(view({ tick: 5001, simTick: 900, entities: [boss(250)] }))
-    screens.update(view({ tick: 5002, simTick: 905, entities: [boss(240)] }))
-
-    expect([visible(mount), hpFill(mount)]).toEqual([true, '75%'])
-  })
-
   it('does not drop the bar merely because the tick repeats or stalls', () => {
     const screens = engageBoss()
     screens.update(view({ tick: 11, entities: [boss(200)] }))
     screens.update(view({ tick: 11, entities: [boss(200)] }))
     expect(visible(mount)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Run boundaries. screens is built ONCE (main.ts) and never rebuilt, but a
+// restart rebuilds the world in place and recycles entity ids from 1. The
+// latch keys on `runEpoch`, which only a fresh run changes. Never on a tick
+// drop: a net client's `tick` is a local frame counter and its `simTick` is an
+// estimate that a late snapshot pulls backwards mid-fight.
+// ---------------------------------------------------------------------------
+
+const thugWithBossId = (): Entity => {
+  const e = makeEntity('npc', 'thug', 9, 9)
+  e.id = BOSS_ID
+  e.health = { hp: 30, max: 30, iframes: 0 }
+  return e
+}
+
+describe('the boss latch across run boundaries', () => {
+  let mount: HTMLElement
+
+  beforeEach(() => {
+    document.body.innerHTML = ''
+    mount = document.createElement('div')
+    document.body.appendChild(mount)
+  })
+
+  it('REGRESSION (host): "Run it back" does not put the bar on a thug that inherits the boss id', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 900, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 901, entities: [boss()], self: player({ dead: true }) }))
+
+    screens.update(view({ tick: 0, runEpoch: 2, floor: 1, entities: [thugWithBossId()] }))
+
+    expect(visible(mount)).toBe(false)
+  })
+
+  it('REGRESSION (client): a new run does not put the bar on a thug that inherits the boss id', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 5001, simTick: 901, entities: [boss()], self: player({ dead: true }) }))
+
+    screens.update(view({ tick: 5002, simTick: 3, runEpoch: 2, floor: 1, entities: [thugWithBossId()] }))
+
+    expect(visible(mount)).toBe(false)
+  })
+
+  it('a late snapshot that pulls the client host-tick estimate backwards mid-fight keeps the bar', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
+    for (let i = 1; i <= 10; i++) screens.update(view({ tick: 5000 + i, simTick: 900 + i, entities: [boss(250)] }))
+
+    screens.update(view({ tick: 5011, simTick: 904, entities: [boss(240)] }))
+    screens.update(view({ tick: 5012, simTick: 905, entities: [boss(240)] }))
+
+    expect([visible(mount), hpFill(mount)]).toEqual([true, '75%'])
+  })
+
+  it('a rejoin mid-fight keeps the bar, through the re-baseline frames where the host tick reads 0', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 5000, simTick: 900, entities: [boss()], events: [reveal()] }))
+
+    screens.update(view({ tick: 5001, simTick: 0, entities: [boss(260)] }))
+    screens.update(view({ tick: 5002, simTick: 0, entities: [boss(260)] }))
+    screens.update(view({ tick: 5003, simTick: 930, entities: [boss(240)] }))
+
+    expect([visible(mount), hpFill(mount)]).toEqual([true, '75%'])
+  })
+
+  it('"Run it back" replays the seed, so the new boss can get the OLD id: no bar until ITS entrance', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 900, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 901, entities: [boss(100)], self: player({ dead: true }) }))
+
+    screens.update(view({ tick: 0, runEpoch: 2, entities: [boss()] }))
+    screens.update(view({ tick: 1, runEpoch: 2, entities: [boss()] }))
+    expect([visible(mount), cardShowing(mount)]).toEqual([false, false])
+
+    screens.update(view({ tick: 400, runEpoch: 2, entities: [boss()], events: [reveal()] }))
+    expect([visible(mount), cardShowing(mount), hpFill(mount)]).toEqual([true, true, '100%'])
+  })
+
+  it('a new run with a new boss under a new id shows the new bar on its entrance', () => {
+    const screens = createScreens(mount, () => {})
+    screens.update(view({ tick: 900, entities: [boss()], events: [reveal()] }))
+    screens.update(view({ tick: 901, entities: [boss()], gameOver: true }))
+
+    const fresh = boss(160)
+    fresh.id = 77
+    const freshReveal: SimEvent = { type: 'bossReveal', entityId: 77, x: 5, y: 5, maxHp: 320 }
+    screens.update(view({ tick: 0, runEpoch: 2, entities: [thugWithBossId(), fresh] }))
+    expect(visible(mount)).toBe(false)
+
+    screens.update(view({ tick: 300, runEpoch: 2, entities: [thugWithBossId(), fresh], events: [freshReveal] }))
+    expect([visible(mount), hpFill(mount)]).toEqual([true, '50%'])
   })
 })
 

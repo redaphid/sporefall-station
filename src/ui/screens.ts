@@ -2,7 +2,7 @@ import type { RenderView } from '../app/session'
 import { cameraRect, onViewerStorey } from '../game/stairs'
 import { MODS } from '../game/data/mods'
 import { themeDisplayName } from '../render/themeState'
-import { bossBar, bossRevealName, isRunReset, latchBossId, playerOutOfFight } from './bossModel'
+import { bossBar, bossRevealName, latchBossId, playerOutOfFight } from './bossModel'
 import { locatorMarkers, type CameraState, type LocatorMarker, type Teammate } from './locatorModel'
 import { markUiChrome } from './chrome'
 import { createLoadoutPanel, type WeaponThumb } from './loadoutPanel'
@@ -251,15 +251,12 @@ export const createScreens = (
   const bossPhaseEl = bossHud.querySelector<HTMLElement>('#bossPhase')!
   let bossId: number | undefined
   let lastBossKey = ''
-  let lastBossTick: number | undefined
+  let bossRunEpoch: number | undefined
 
   const updateBoss = (view: RenderView): void => {
-    // A restart rebuilds the world in place and recycles entity ids from 1, so
-    // the latch must not survive it (bossModel.isRunReset). Keyed on the HOST's
-    // tick: a net client's own `tick` is a frame counter that never resets.
-    const simTick = view.simTick ?? view.tick
-    if (isRunReset(lastBossTick, simTick)) bossId = undefined
-    lastBossTick = simTick
+    // A new run recycles entity ids, so the latch must not outlive its run.
+    if (view.runEpoch !== bossRunEpoch) bossId = undefined
+    bossRunEpoch = view.runEpoch
     // Take down an entrance card that was already up when the player went down.
     if (playerOutOfFight(view) && bossCard.style.opacity !== '0') hideBossCard()
     bossId = latchBossId(bossId, view.events)

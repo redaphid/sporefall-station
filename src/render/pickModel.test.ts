@@ -6,11 +6,17 @@
 import { describe, expect, it } from 'vitest'
 import type { RenderView } from '../app/session'
 import { makeEntity, type Entity } from '../game/entity'
-import { generateLevel } from '../game/levelgen/generate'
+import { levelFromJson } from '../game/levelgen/levelText'
 import type { SimEvent } from '../game/types'
 import { createPickTracker, promptText } from './pickModel'
 
-const level = generateLevel(1, 1)
+const level = levelFromJson({
+  rows: [
+    '################',
+    ...Array.from({ length: 12 }, (_, y) => (y === 2 ? '#.....@........#' : '#..............#')),
+    '################',
+  ],
+})
 
 const player = (id: number, x: number, y: number): Entity => {
   const e = makeEntity('player', 'player', x, y)
@@ -32,6 +38,7 @@ const view = (over: Partial<RenderView>): RenderView => ({
   entities: [],
   events: [],
   tick: 0,
+  runEpoch: 1,
   level,
   floor: 1,
   missionText: '',

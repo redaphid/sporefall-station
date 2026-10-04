@@ -85,21 +85,6 @@ export const latchBossId = (prev: number | undefined, events: readonly SimEvent[
   return id
 }
 
-/**
- * True when this frame belongs to a NEW run rather than the one we were just
- * watching.
- *
- * `screens.ts` is built once (main.ts) and never rebuilt, but "Run it back" /
- * "New Seed" rebuild the world in place (`app/hostSession.buildRun`) — which
- * resets the tick to 0 **and restarts entity ids at 1**
- * (`game/world.createWorld`). A latch carried across that boundary therefore
- * does not merely go stale: the dead boss's id is handed straight back out to
- * an unrelated floor-1 enemy, and the Alpha's name plate reappears over a thug
- * that never announced itself. A tick that fails to advance is a new world.
- */
-export const isRunReset = (prevTick: number | undefined, tick: number): boolean =>
-  prevTick !== undefined && tick < prevTick
-
 /** The entrance card text for a reveal event, or undefined if this frame has none. */
 export const bossRevealName = (events: readonly SimEvent[], name: string): string | undefined => {
   for (const ev of events) if (ev.type === 'bossReveal') return name
@@ -123,7 +108,9 @@ export const bossBar = (view: BossViewLike, bossId: number | undefined, name: st
   if (playerOutOfFight(view)) return null
   if (bossId === undefined) return null
   const boss = view.entities.find((e) => e.id === bossId)
-  if (!boss || boss.dead || !boss.health || boss.health.max <= 0) return null
+  // The id must still name a boss: a new world recycles ids, so the Alpha's
+  // old id can belong to a thug after a restart.
+  if (!boss || boss.archetype !== 'boss' || boss.dead || !boss.health || boss.health.max <= 0) return null
   const hp = Math.max(0, boss.health.hp)
   if (hp <= 0) return null
   const hpFrac = Math.min(1, hp / boss.health.max)

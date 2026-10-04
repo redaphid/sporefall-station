@@ -1,18 +1,20 @@
-import { PLAYER_MELEE_MULT, SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
-import { WEAPONS, type StatusApply, type WeaponDef } from '../data/items'
-import { normalizeMods, type ResolvedTrigger } from '../data/mods'
+import { SPECIAL_COOLDOWN_TICKS, throwGrenade } from '../player'
+import { WEAPONS, type StatusApply } from '../data/items'
+import { MODS, normalizeMods, type ResolvedTrigger } from '../data/mods'
 import { NPCS } from '../data/npcs'
-import { makeEntity, resistMult, type Entity, type ItemStack, type WeaponMod } from '../entity'
+import { makeEntity, resistMult, type Entity, type WeaponMod } from '../entity'
 import type { EntityId, InputCmd } from '../types'
 import { addEntity, emitFear, emitNoise, type World } from '../world'
 import { applyStatus, isFrozen, isImmobilized, removeStatus } from './statusFx'
 import { groupDamageMult } from './groupFx'
 import { equipSlot, useHeld, wearMelee, weaponStack } from './inventory'
 import { commitCrime } from './relationships'
+import { hearGunfire, seeAttackOnPlayer } from './alarm'
 import { destroyObject, isObject, resistsDamage } from './objects'
-import { resolveWeapon, type ResolvedWeapon } from './resolveWeapon'
+import { resolveWeapon, type CarriedElements, type ResolvedWeapon } from './resolveWeapon'
 import { isRolling, tryStartRoll } from './roll'
-import { applyModSwap, pelletShares, planCasts, recharging, sequenceShape, sequencing } from './modSequence'
+import { applyModSwap, pelletShares, planPull, recharging } from './modSequence'
+import { meleeDamage } from './modEffect'
 import { spawnSporeBurst } from './spore'
 import { vlen } from '../simMath'
 
@@ -184,6 +186,8 @@ export const applyDamage = (
     }
   }
 
+  if (target.playerCtl) seeAttackOnPlayer(w, target, attackerId)
+
   // Disposition: a player attack on a civ/cop is a crime — witnesses re-derive
   // their stance toward the attacker (cops/allies turn hostile, civilians flee).
   commitCrime(w, target, w.byId.get(attackerId))
@@ -294,8 +298,13 @@ export interface ProjectileSpec {
   split?: number
   splinter?: number
   lifestealFrac?: number
+  carries?: CarriedElements
   triggers?: ResolvedTrigger[]
 }
+
+/** `spec` with the element it carries, keeping the key absent when there is none. */
+const carrying = <T extends object>(spec: T, element: string | undefined): T & { element?: string } =>
+  element ? { ...spec, element } : spec
 
 export const spawnProjectile = (
   w: World,
@@ -325,11 +334,12 @@ export const spawnProjectile = (
     if (spec.pierce) p.pierceLeft = spec.pierce
     if (spec.bounce) p.bounceLeft = spec.bounce
     if (spec.homing) p.homing = spec.homing
-    if (spec.explodeRadius && spec.explodeDamage) p.explode = { radius: spec.explodeRadius, damage: spec.explodeDamage }
-    if (spec.split && spec.split > 0) p.split = { count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }
+    const carries = spec.carries ?? {}
+    if (spec.explodeRadius && spec.explodeDamage) p.explode = carrying({ radius: spec.explodeRadius, damage: spec.explodeDamage }, carries.explode)
+    if (spec.split && spec.split > 0) p.split = carrying({ count: spec.split, damage: Math.max(1, Math.round(damage * 0.5)), speed, ttl: Math.ceil(ttl / 2) }, carries.split)
     // Splinter: a radial shrapnel burst on death — many short-lived, weak fragments
     // (fast but ttl ~6 ticks → a tight scatter, not a second volley).
-    if (spec.splinter && spec.splinter > 0) p.splinter = { count: spec.splinter, damage: Math.max(1, Math.round(damage * 0.35)), speed: speed * 0.7, ttl: 6 }
+    if (spec.splinter && spec.splinter > 0) p.splinter = carrying({ count: spec.splinter, damage: Math.max(1, Math.round(damage * 0.35)), speed: speed * 0.7, ttl: 6 }, carries.splinter)
     if (spec.lifestealFrac) p.lifestealFrac = spec.lifestealFrac
     if (spec.triggers && spec.triggers.length) p.triggers = spec.triggers
   }
@@ -339,16 +349,29 @@ export const spawnProjectile = (
 /** A blast at (x,y): every live body in radius takes `damage` from the owner.
  * The one AoE primitive — reused by grenades/explosive bullets (projectiles.ts)
  * and by on-kill detonator triggers. Kept here (not projectiles.ts) so the
- * projectile system can import it without a cycle back through applyDamage. */
-export const detonate = (w: World, x: number, y: number, radius: number, damage: number, ownerId: EntityId): void => {
-  w.events.push({ type: 'explosion', x, y, radius })
+ * projectile system can import it without a cycle back through applyDamage.
+ * A blast carrying `element` (a mod id) applies that element to every body it
+ * damages, through the same gate and status path as a bullet hit. */
+export const detonate = (
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  damage: number,
+  ownerId: EntityId,
+  element?: string,
+): void => {
+  w.events.push(element ? { type: 'explosion', x, y, radius, element } : { type: 'explosion', x, y, radius })
+  const onHit = element ? MODS[element]?.onHit : undefined
   // Explosions are LOUD: every NPC in earshot comes to investigate the boom —
   // the price of the fast door-breach path below (vs the slow, quiet pick).
   emitNoise(w, x, y)
   for (const other of w.entities) {
     if (other.dead || !other.health) continue
     const dist = vlen(other.pos.x - x, other.pos.y - y)
-    if (dist <= radius + other.radius) applyDamage(w, other, damage, x, y, 10, ownerId)
+    if (dist > radius + other.radius) continue
+    const landed = applyDamage(w, other, damage, x, y, 10, ownerId) !== null
+    if (landed && onHit) applyStatus(w, other, onHit.status, onHit.ticks, ownerId)
   }
   // Breach: a blast centred close enough blows a door open, locked or not —
   // the always-available alternative to picking (the player special IS a
@@ -393,7 +416,7 @@ export const runHitTriggers = (
   for (const t of triggers) {
     if (!t.explode) continue
     if (t.event === 'hit' || (t.event === 'kill' && killed)) {
-      detonate(w, victim.pos.x, victim.pos.y, t.explode.radius, t.explode.damage, ownerId)
+      detonate(w, victim.pos.x, victim.pos.y, t.explode.radius, t.explode.damage, ownerId, t.explode.element)
     }
   }
 }
@@ -414,6 +437,7 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
     split: b.split || undefined,
     splinter: b.splinter || undefined,
     lifestealFrac: b.lifestealFrac || undefined,
+    carries: rw.carries,
     triggers: rw.triggers.length ? rw.triggers : undefined,
   }
 }
@@ -422,76 +446,50 @@ const projectileSpec = (rw: ResolvedWeapon): ProjectileSpec | undefined => {
  * site: players (combatSystem) and NPCs (ai.ts) both route through here, so mods,
  * elements (onHit), pellets, projectile behavior and melee arcs work identically
  * for either. Sets `combat.cooldown` and returns whether a shot/swing happened
- * (false = an empty gun clicked). Ammo/durability are spent only for INVENTORY
+ * (false = the weapon is recharging). Durability is spent only for INVENTORY
  * weapons (a `weaponStack`); NPCs carry no inventory, so their loadout is innate
- * and never runs dry. Callers gate on `combat.cooldown <= 0` before calling. */
+ * and never wears out. Callers gate on `combat.cooldown <= 0` before calling.
+ *
+ * The mod list is an ordered wand (systems/modSequence). One trigger pull plans
+ * up to `castsPerTrigger` casts from the stack's `castIndex`; each cast resolves
+ * the base weapon with ONLY its own mods (its modifiers plus at most one
+ * element), so every projectile carries at most one element. A multi-cast gun
+ * splits its pellets between casts, laid out left to right across the fan in
+ * cast order. Running off the end of a cycle of two or more casts wraps the
+ * index and locks the weapon for `rechargeOnWrap` ticks.
+ */
 export const fireWeapon = (w: World, e: Entity): boolean => {
   if (!e.combat) return false
   const weapon = WEAPONS[e.combat.weapon] ?? WEAPONS.fists
   const stack = weaponStack(e)
-  // Sequenced casting (opt-in run rule). A weapon with no mods has nothing to
-  // sequence and takes the default path below, unchanged.
-  if (sequencing(w) && stack?.mods && stack.mods.length > 0) return fireSequenced(w, e, weapon, stack)
-  const rw = resolveWeapon(weapon, stack?.mods)
-  if (weapon.kind === 'melee') {
-    e.combat.cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
-    const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
-    if (weapon.durability !== undefined && stack) wearMelee(e)
-    if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
-      runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
-    }
-    return true
-  }
-  // No ammo: a gun always fires. There is no magazine, no depletion and no
-  // dry-fire click — firing costs nothing, so the only thing gating a shot is
-  // the cooldown the caller already checked.
-  e.combat.cooldown = rw.cooldownTicks
-  const spec = projectileSpec(rw)
-  for (let i = 0; i < rw.pellets; i++) {
-    const offset = rw.pellets > 1 ? (i / (rw.pellets - 1) - 0.5) * rw.spread : 0
-    spawnProjectile(w, e, rw.damage, rw.projectileSpeed, weapon.range, offset, rw.onHit, spec, rw.mods)
-  }
-  return true
-}
-
-/**
- * The sequenced-casting fire path (systems/modSequence). One trigger pull plans
- * up to `castsPerTrigger` casts from the weapon's stored `castIndex`; each cast
- * resolves the base weapon with ONLY its own mods (its modifiers plus at most
- * one payload), so every projectile carries at most one element. A multi-cast
- * gun splits its pellets between casts, laid out left to right across the fan
- * in cast order. Running off the end of the list wraps the index and locks the
- * weapon for `rechargeOnWrap` ticks. Returns false (no shot) while recharging.
- */
-const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack): boolean => {
-  if (recharging(stack, w.tick)) return false
-  const shape = sequenceShape(weapon)
-  const plan = planCasts(stack.mods, shape, stack.castIndex ?? 0)
-  // Every entry unknown/empty: nothing live, fire the bare weapon.
-  const casts = plan.casts.length > 0 ? plan.casts : [{ mods: [] as WeaponMod[], positions: [] as number[] }]
-  stack.castIndex = plan.nextIndex
+  if (stack && recharging(stack, w.tick)) return false
+  const { shape, plan, cycle } = planPull(weapon, stack?.mods, stack?.castIndex ?? 0)
+  // Nothing live (no mods, or every entry unknown/empty): fire the bare weapon.
+  const casts = plan.casts.length > 0 ? plan.casts : [{ mods: [] as WeaponMod[] }]
+  // Only a cycle of two or more casts has a position to keep. A one-cast wand
+  // (or a stack with no mods) carries none, exactly like a plain gun.
+  if (stack && cycle > 1) stack.castIndex = plan.nextIndex
+  else if (stack) delete stack.castIndex
   let cooldown = 1
   if (weapon.kind === 'melee') {
     const rw = resolveWeapon(weapon, casts[0].mods)
     cooldown = rw.cooldownTicks
-    const damage = Math.round(rw.damage * (e.playerCtl ? PLAYER_MELEE_MULT : 1))
+    const damage = meleeDamage(rw.damage, e.playerCtl !== undefined)
     const hit = meleeAttack(w, e, damage, weapon.range, rw.knockback)
-    if (weapon.durability !== undefined) wearMelee(e)
+    if (weapon.durability !== undefined && stack) wearMelee(e)
     if (hit) {
-      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks)
+      if (rw.onHit) applyStatus(w, hit, rw.onHit.status, rw.onHit.ticks, e.id)
       runHitTriggers(w, hit, rw.triggers, e.id, hit.dead === true || (hit.health?.hp ?? 1) <= 0)
     }
   } else {
-    // Shares are fixed per cast slot (castsPerTrigger), so a pull cut short by
-    // a wrap fires only the groups it cast: the thin last blast marks the wrap.
+    // No ammo: a gun always fires. Shares are fixed per cast slot
+    // (castsPerTrigger), so a pull cut short by a wrap fires only the groups it
+    // cast: the thin last blast marks the wrap.
     const shares = pelletShares(weapon.pellets ?? 1, shape.castsPerTrigger)
     const resolved = casts.map((c, g) => resolveWeapon({ ...weapon, pellets: shares[g] }, c.mods))
     const total = resolved.reduce((n, rw) => n + rw.pellets, 0)
     let k = 0
-    for (let g = 0; g < casts.length; g++) {
-      const rw = resolved[g]
+    for (const rw of resolved) {
       cooldown = Math.max(cooldown, rw.cooldownTicks)
       const spec = projectileSpec(rw)
       for (let j = 0; j < rw.pellets; j++, k++) {
@@ -500,11 +498,11 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
       }
     }
   }
-  if (plan.wrapped && shape.rechargeOnWrap > 0) {
+  if (stack && plan.wrapped && shape.rechargeOnWrap > 0) {
     cooldown = Math.max(cooldown, shape.rechargeOnWrap)
     stack.rechargeUntil = w.tick + cooldown
   }
-  e.combat!.cooldown = cooldown
+  e.combat.cooldown = cooldown
   return true
 }
 
@@ -512,12 +510,10 @@ const fireSequenced = (w: World, e: Entity, weapon: WeaponDef, stack: ItemStack)
 export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
   for (const e of w.entities) {
     if (!e.playerCtl || !e.combat || e.dead || e.playerCtl.downed) continue
-    // Sequenced mods: a reorder request is applied before the action gates, so a
-    // swap asked for mid-roll or while stunned is not silently dropped.
-    if (sequencing(w)) {
-      const swap = inputs.get(e.playerCtl.playerId)?.modSwap
-      if (swap !== undefined) applyModSwap(e, swap)
-    }
+    // A mod reorder request is applied before the action gates, so a swap asked
+    // for mid-roll or while stunned is not silently dropped.
+    const swap = inputs.get(e.playerCtl.playerId)?.modSwap
+    if (swap !== undefined) applyModSwap(e, swap)
     if (isRolling(e, w.tick)) continue // mid-roll: hands full — no attack/ability/throw
     if (e.status && (e.status.stun > 0 || e.status.sleep > 0)) continue
     if (isImmobilized(e)) continue // frozen/electrified can't act
@@ -550,6 +546,7 @@ export const combatSystem = (w: World, inputs: Map<number, InputCmd>): void => {
     // the held-item cursor and there is nothing to cycle back TO — that rule would
     // leave a player holding a grenade permanently unable to shoot. Items go on
     // the USE/Throw button above, which is where they now exclusively live.
-    fireWeapon(w, e) // THE single fire-site: mods/elements/pellets fold in here
+    // THE single fire-site: mods/elements/pellets fold in here
+    if (fireWeapon(w, e) && WEAPONS[e.combat.weapon]?.kind === 'ranged') hearGunfire(w, e, e.combat.cooldown)
   }
 }

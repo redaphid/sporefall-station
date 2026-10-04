@@ -118,14 +118,18 @@ describe('element statuses reach a co-op client', () => {
   it('every element kind survives the trip, and an unstatused bystander draws none', async () => {
     const { host, bob, step, near } = await coop()
     const p = near()
+    // One body per kind: #87 makes elements interact on one body (wet douses
+    // burning, a panic blocks a freeze), and this test is about the wire.
     const kinds = ['burning', 'electrified', 'frozen', 'poisoned', 'spore', 'wet']
-    const hit = spawnNpc(host.world, 'thug', p.x, p.y)
+    const hits = kinds.map((_, i) => spawnNpc(host.world, 'thug', p.x + (i % 3) - 1, p.y - 1 - Math.floor(i / 3)))
     const bystander = spawnNpc(host.world, 'thug', p.x, p.y + 1)
     await step(1)
-    for (const k of kinds) addStatus(host.world, hit, k, 300)
+    kinds.forEach((k, i) => addStatus(host.world, hits[i], k, 300))
     await step(6)
-    expect(drawnStatuses(bob, hit.id)).toEqual(Object.keys(host.world.byId.get(hit.id)!.fx!).sort())
-    expect(drawnStatuses(bob, hit.id).length).toBeGreaterThanOrEqual(5)
+    for (const [i, k] of kinds.entries()) {
+      expect(Object.keys(host.world.byId.get(hits[i].id)!.fx!), k).toEqual([k])
+      expect(drawnStatuses(bob, hits[i].id), k).toEqual([k])
+    }
     expect(drawnStatuses(bob, bystander.id)).toEqual([])
   })
 

@@ -17,9 +17,13 @@
  *   - `dark` (indoor-complex lights-out) ABOVE every actor/combat layer, so the
  *     blacked-out wing really hides what is in it, but BELOW `reticle`/`pick`,
  *     so the player's own aim and affordances stay readable in the dark.
+ *     A brownout's darkness shares this slot.
+ *   - `tide` (bog-tide water) directly over the floor and UNDER `entities`, so
+ *     bodies stand in the water rather than behind a sheet of it.
  */
 export const WORLD_LAYER_ORDER = [
   'tilemap',
+  'tide',
   'entities',
   'playerMarkers',
   'statusFx',

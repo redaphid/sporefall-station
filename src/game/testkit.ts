@@ -9,7 +9,7 @@ import type { Entity, ItemStack } from './entity'
 import { generateCityLevel } from './levelgen/generate'
 import { serializeWorld } from './serialize'
 import { emptyInput, type InputCmd } from './types'
-import { createWorld, tickWorld, type RunMode, type World } from './world'
+import { tickWorld, worldFromState, type RunMode, type World } from './world'
 
 // The fixture loaders live in the vitest-free `./fixtures.ts` (the app's
 // `?world=` boot hook imports them too); re-export so tests keep one import site.
@@ -58,13 +58,10 @@ export const arm = (e: Entity, weaponId: string): ItemStack => {
 /** A world on the sunken-streets CITY generator (raw-floor theme) for any floor.
  * Floors 3, 5, 7… build the indoor complex in play; tests of the city set-pieces
  * (bunkers, courtyard compounds, vaults, industrial squads) use this to keep
- * them covered on any floor. Not deserializable (its level checksum is the city
- * one, not seed+floor's). */
-export const createCityWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
-  const w = createWorld(seed, floor, mode, hostile)
-  w.level = generateCityLevel(seed, floor)
-  return w
-}
+ * them covered on any floor. To the engine this level is authored (it is not
+ * what seed+floor generates), so a snapshot carries it whole. */
+export const createCityWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
+  worldFromState({ level: generateCityLevel(seed, floor), seed, floor, mode, hostile })
 
 /** Assert two worlds are in an identical state by comparing their snapshots. */
 export const expectWorldEqual = (a: World, b: World): void => {

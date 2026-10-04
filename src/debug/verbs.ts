@@ -8,7 +8,7 @@
 import { makeEntity, type Entity } from '../game/entity'
 import { BEHAVIORS, DEFAULT_BEHAVIOR, behaviorFor } from '../game/systems/behaviors'
 import { NPCS } from '../game/data/npcs'
-import { MODS, isModId, modMaxStacks } from '../game/data/mods'
+import { MODS, isModId, stackMod } from '../game/data/mods'
 import { weaponStack } from '../game/systems/inventory'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
@@ -16,8 +16,10 @@ import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serial
 import { kill as killEntity } from '../game/systems/combat'
 import { addAnnotations, clearAnnotations } from '../game/annotations'
 import { selectedEntities } from '../game/select'
+import { FLOOR_MODIFIER_KINDS, type FloorModifierKind } from '../game/floorModifiers'
+import { startFloorModifier } from '../game/systems/modifierSystem'
 import { emptyInput, type InputCmd, type SimEvent } from '../game/types'
-import { addEntity, tickWorld, type World } from '../game/world'
+import { addEntity, replaceWorldInPlace, tickWorld, type World } from '../game/world'
 import { decodeArg } from './protocol'
 
 /** Verbs that mutate the world — the channel defers these onto the sim step so
@@ -35,6 +37,7 @@ export const WRITE_VERBS = new Set([
   'clearAnnotations',
   'addMod',
   'setBehavior',
+  'modifier',
 ])
 
 export interface VerbCtx {
@@ -45,6 +48,16 @@ export interface VerbCtx {
    * owns a renderer (main.ts / the debug channel); themes are render-side only,
    * so the verb never touches the world and is a no-op in headless contexts. */
   setTheme?: (id: string) => void
+  /** Whoever keeps a replayable history of the world (the share link's
+   * `StateRing`). It assumes the world changes only by ticks it observed, so
+   * verbs must report theirs: `step` hands it every tick with its inputs, and
+   * any other write restarts it, since no input sequence reproduces an edit. */
+  history?: WorldHistory
+}
+
+export interface WorldHistory {
+  observe(w: World, inputs: ReadonlyMap<number, InputCmd>): void
+  reset(w: World): void
 }
 
 /** The effective verb name, unwrapping the `command` escape hatch. */
@@ -215,11 +228,9 @@ export const heldCmd = (w: World, h: HeldInput, i: number): InputCmd => {
 }
 
 /** Replace a live world's contents in place so every closed-over reference (the
- * channel holds one) keeps pointing at the same object. World is a flat record,
- * so copying its own fields from a freshly-deserialized world is a full swap. */
-const loadWorldInto = (target: World, fresh: World): void => {
-  Object.assign(target, fresh)
-}
+ * channel holds one) keeps pointing at the same object. Fields the snapshot
+ * lacks are cleared, not left over (see `replaceWorldInPlace`). */
+const loadWorldInto = (target: World, fresh: World): void => replaceWorldInPlace(target, fresh)
 
 const jsonType = (v: unknown): string => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v)
 
@@ -272,6 +283,15 @@ export const buildSchema = (w: { entities: readonly Entity[] }): {
 /** Run one verb line against the world and return a text reply. Throws on a bad
  * verb/argument; the transport turns that into an `ok:false` reply. */
 export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
+  const { history } = ctx
+  const name = verbName(line)
+  // In `finally`: a write that throws may already have half-applied.
+  if (history && WRITE_VERBS.has(name) && name !== 'step' && name !== 'tick')
+    try {
+      return runVerb(w, line, { ...ctx, history: undefined })
+    } finally {
+      history.reset(w)
+    }
   const trimmed = line.trim()
   const sp = trimmed.indexOf(' ')
   const verb = sp < 0 ? trimmed : trimmed.slice(0, sp)
@@ -360,7 +380,6 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
         gameOver: w.gameOver,
         mission: w.mission.description,
         missionComplete: w.mission.complete,
-        modCasting: w.modCasting ?? 'fold',
         player: {
           id: me.id,
           at: { x: Math.round(me.pos.x * 10) / 10, y: Math.round(me.pos.y * 10) / 10 },
@@ -368,6 +387,8 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
           downed: me.playerCtl!.downed !== undefined,
           weapon: stack?.itemId,
           mods: stack?.mods?.map((m) => `${m.id}${m.stacks > 1 ? `x${m.stacks}` : ''}`) ?? [],
+          castIndex: stack?.castIndex,
+          rechargeUntil: stack?.rechargeUntil,
           fx: me.fx && Object.keys(me.fx).length ? Object.keys(me.fx) : undefined,
         },
         near,
@@ -420,7 +441,9 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       const held = json.length ? parseHeldInput(w, decodeArg(json.join(' '))) : undefined
       const events: Record<string, number> = {}
       for (let i = 0; i < n; i++) {
-        tickWorld(w, held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map())
+        const inputs = held ? new Map([[held.playerId, heldCmd(w, held, i)]]) : new Map<number, InputCmd>()
+        tickWorld(w, inputs)
+        ctx.history?.observe(w, inputs)
         for (const ev of w.events) events[ev.type] = (events[ev.type] ?? 0) + 1
       }
       const aimAtGone = held?.aimAt !== undefined && !w.byId.has(held.aimAt) ? true : undefined
@@ -461,11 +484,7 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (!Number.isInteger(stacks) || stacks < 1) throw new Error(`stacks must be a positive integer, got "${stacksStr}"`)
       const stack = weaponStack(e)
       if (!stack) throw new Error(`entity ${e.id} has no slotted weapon to mod (equip a ranged/melee weapon from inventory first)`)
-      const cap = modMaxStacks(modId)
-      const mods = (stack.mods ??= [])
-      const existing = mods.find((m) => m.id === modId)
-      if (existing) existing.stacks = Math.min(cap, existing.stacks + stacks)
-      else mods.push({ id: modId, stacks: Math.min(cap, stacks) })
+      stackMod((stack.mods ??= []), modId, stacks)
       return JSON.stringify({ id: e.id, weapon: e.combat?.weapon, mods: stack.mods })
     }
 
@@ -534,6 +553,24 @@ export const runVerb = (w: World, line: string, ctx: VerbCtx = {}): string => {
       if (!ctx.setTheme) throw new Error('theme switching unavailable here (no renderer attached)')
       ctx.setTheme(rest)
       return JSON.stringify({ theme: rest, status: 'switching' })
+    }
+
+    case 'modifier': {
+      // `modifier` reads this floor's modifier; `modifier <kind> [age]` forces
+      // one as if the floor began `age` ticks ago (bogTide 450 = tide in now,
+      // hunted 900 = pack lands next tick); `modifier none` clears it.
+      const [kind, ageArg] = rest.split(/\s+/)
+      if (!kind) return JSON.stringify(w.modifier ?? null)
+      if (kind === 'none') {
+        w.modifier = undefined
+        return 'null'
+      }
+      const age = ageArg === undefined ? 0 : Number(ageArg)
+      if (!FLOOR_MODIFIER_KINDS.includes(kind as FloorModifierKind) || !Number.isInteger(age) || age < 0) {
+        throw new Error(`usage: modifier [${FLOOR_MODIFIER_KINDS.join('|')}|none] [ageTicks>=0]`)
+      }
+      startFloorModifier(w, kind as FloorModifierKind, age)
+      return JSON.stringify(w.modifier)
     }
 
     case 'command':

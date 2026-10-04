@@ -1,3 +1,4 @@
+import { LOCKDOWN_TICKS } from '../game/systems/alarm'
 import { describe, expect, it } from 'vitest'
 import { makeEntity } from '../game/entity'
 import { generateLevel } from '../game/levelgen/generate'
@@ -236,9 +237,14 @@ const hostSnapshotFor = (host: NetHostSession, avatarId: number): Uint8Array => 
  * the real `missionSystem` → `nextFloor` path (event broadcast included). */
 const armDescent = (host: NetHostSession): void => {
   host.world.mission.exitUnlocked = true
+  // The soak fires constantly, so the alarm can seal the bay (#86); staging a
+  // descent means any lockdown has already run its course.
+  host.world.mission.lockdownTick = -LOCKDOWN_TICKS
   const player = host.world.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)!
-  player.pos.x = host.world.level.exit.x + 0.5
-  player.pos.y = host.world.level.exit.y + 0.5
+  // An extraction floor's way out is the entry, not the Launch Bay.
+  const exit = host.world.mission.extractPoint ?? host.world.level.exit
+  player.pos.x = exit.x + 0.5
+  player.pos.y = exit.y + 0.5
   player.prevPos.x = player.pos.x
   player.prevPos.y = player.pos.y
 }
@@ -950,6 +956,11 @@ const pairOnComplex = async (input: InputSource): Promise<Awaited<ReturnType<typ
     await step(pair.host, [pair.bob], 18)
   }
   expect(pair.host.world.floor).toBe(3)
+  // Each descent dealt a floor draft, which holds its player still. Run the hands
+  // out through the real timeout path, then let a 2 Hz state message close Bob's.
+  for (const e of pair.host.world.entities) if (e.playerCtl?.draft) e.playerCtl.draft.until = pair.host.world.tick
+  await step(pair.host, [pair.bob], 16)
+  expect(pair.bob.session.renderView().self?.playerCtl?.draft).toBeUndefined()
   return pair
 }
 

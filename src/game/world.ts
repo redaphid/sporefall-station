@@ -1,6 +1,7 @@
 import type { Entity } from './entity'
+import type { FloorModifier } from './floorModifiers'
 import { generateLevel } from './levelgen/generate'
-import { isSolidTile, type Level } from './levelgen/level'
+import { isSolidTile, levelChecksum, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
@@ -13,6 +14,7 @@ import { sporeSystem } from './systems/spore'
 import { infectionActive, infectionSystem } from './systems/infection'
 import { interactionSystem } from './systems/interaction'
 import { missionSystem } from './systems/missions'
+import { modifierSystem } from './systems/modifierSystem'
 import { movementSystem } from './systems/movement'
 import { rollSystem } from './systems/roll'
 import { projectileSystem } from './systems/projectiles'
@@ -20,6 +22,7 @@ import { regenSystem } from './systems/regen'
 import { statusSystem } from './systems/status'
 import { statusFxSystem } from './systems/statusFx'
 import { stairSystem } from './systems/stairs'
+import { draftSystem } from './systems/draft'
 import type { Annotation, EntityId, InputCmd, SimEvent, Vec2 } from './types'
 
 export interface MissionState {
@@ -27,8 +30,10 @@ export interface MissionState {
    *  `contain`    — destroy the Spore Node (targetEntityId) before it BLOOMS;
    *                 the bloom is a soft-fail (room floods with spores), never a loss.
    *  `infiltrate` — reach & eliminate a target sealed behind a biolock (open it by
-   *                 keycard, power-cut, or breach). Completes on target death. */
-  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate'
+   *                 keycard, power-cut, or breach). Completes on target death.
+   *  `extraction` — a steal whose pickup raises the station alert; it completes
+   *                 only when a standing prize-holder reaches `extractPoint`. */
+  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate' | 'extraction'
   targetEntityId?: EntityId
   targetBuilding?: number
   complete: boolean
@@ -63,11 +68,21 @@ export interface MissionState {
    * seen — and it is what lets NPCs across the floor keep coming. Refreshing it
    * only every N ticks is what keeps the escape EVADABLE. */
   alertMark?: Vec2
+  /** #86 — noticed gunfire/attacks, in ticks of sustained fire (systems/alarm.ts).
+   * Omitted when 0 so a quiet floor round-trips byte-for-byte. */
+  heat?: number
+  /** #86 — the tick the Launch Bay's lockdown seal cycle started (the alarm hit
+   * LOCKDOWN_ALARM the loud way; restarted when the objective completes). */
+  lockdownTick?: number
   /** Latch: a live player has SEEN the Mireclaw Alpha, so its entrance has been
    * announced and its phases are running (systems/mireclaw.maybeReveal). Also
    * what keeps the boss dormant — and its brood unspent — until someone walks
    * in. Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
   bossRevealed?: boolean
+  /** `extraction` only: the tile (integer corner) the party came in by — the
+   * level spawn. Reaching it with the prize is the way out; the Launch Bay stays
+   * locked. `targetEntityId` follows the prize while it lies on the floor. */
+  extractPoint?: Vec2
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */
@@ -114,20 +129,17 @@ export type RunMode = 'casual' | 'normal'
  * Shared across the party — a co-op run has one pool, not one per player. */
 export const REVIVES_PER_RUN = 2
 
-/**
- * How a weapon's mods fire. Absent = the default fold (every mod on every
- * shot, systems/resolveWeapon). `'sequence'` = the opt-in prototype where the
- * mod list is an ordered wand and each cast consumes the next entry
- * (systems/modSequence). A pure sim input like `mode`: the host picks it when
- * the run is created and it rides the save and the GameStart message.
- */
-export type ModCasting = 'sequence'
-
 export interface World {
   tick: number
   seed: number
   floor: number
   level: Level
+  /** Checksum of the level `generateLevel(seed, floor)` produced, present when
+   * the level came from the generator (worldFromSeed, missions.nextFloor). While
+   * the live level still hashes to it, a snapshot omits the level and
+   * regenerates it on load. An authored level, or a generated one a scenario
+   * has carved, travels inside the snapshot instead (serialize.ts). */
+  levelChecksumFromSeed?: number
   entities: Entity[]
   byId: Map<EntityId, Entity>
   nextId: EntityId
@@ -154,9 +166,6 @@ export interface World {
   mode: RunMode
   /** Party-shared comebacks left this run; only consumed/gated in `normal`. */
   revivesLeft: number
-  /** Mod casting rule for this run (see ModCasting). Absent = default fold,
-   * so every existing world and snapshot is unchanged. */
-  modCasting?: ModCasting
   /** Combat tunable: when true every NPC treats players as an enemy on sight and
    * engages regardless of faction disposition (the "make them all enemies" knob).
    * Default true; turn off for a peaceful/faction-only world. Sleeping, downed and
@@ -195,15 +204,45 @@ export interface World {
    * floors that field groups; absent otherwise and serialized only when
    * present, so every group-free snapshot is byte-identical. */
   groups?: GroupsState
+  /** This floor's modifier (floorModifiers.ts), rolled by setupFloor from
+   * seed+floor. Absent on a clean floor and serialized only when present, so
+   * every clean-floor snapshot is byte-identical. */
+  modifier?: FloorModifier
 }
 
-export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
+/**
+ * A world's starting state: everything the engine needs to run, and nothing it
+ * derives. The level is DATA here, so a test, a crafted save or a level editor
+ * hands the engine a map directly and no seed is involved. `worldFromSeed` is
+ * the generator that produces one of these from seed+floor.
+ */
+export interface WorldInit {
+  level: Level
+  /** Root of the sim's dice (AI rolls, loot, group and hunt streams), not the
+   * source of the level. The generator uses one number for both, and the next
+   * floor of any run is generated from it (missions.nextFloor). Default 1. */
+  seed?: number
+  /** Default 1. Floor-gated rules (complex director, boss floors, drafts) read it. */
+  floor?: number
+  mode?: RunMode
+  hostile?: boolean
+  /** Set by `worldFromSeed` only: the level is `generateLevel(seed, floor)`
+   * untouched, so a snapshot may leave it out and regenerate it. */
+  levelChecksumFromSeed?: number
+}
+
+/** The engine's entry: a live world from a starting state. Deterministic in
+ * `init`; no seed or generator is consulted. */
+export const worldFromState = (init: WorldInit): World => {
+  const seed = init.seed ?? 1
+  const floor = init.floor ?? 1
   const baseRng = mulberry32(seed)
   return {
     tick: 0,
     seed,
     floor,
-    level: generateLevel(seed, floor),
+    level: init.level,
+    ...(init.levelChecksumFromSeed !== undefined ? { levelChecksumFromSeed: init.levelChecksumFromSeed } : {}),
     entities: [],
     byId: new Map(),
     nextId: 1,
@@ -221,11 +260,33 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     noises: [],
     fear: [],
     gameOver: false,
-    mode,
+    mode: init.mode ?? 'normal',
     revivesLeft: REVIVES_PER_RUN,
-    hostile,
+    hostile: init.hostile ?? true,
     annotations: [],
   }
+}
+
+/** The generator: seed+floor to a starting state, via the level generator. */
+export const worldFromSeed = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): WorldInit => {
+  const level = generateLevel(seed, floor)
+  return { level, seed, floor, mode, hostile, levelChecksumFromSeed: levelChecksum(level) }
+}
+
+/** Convenience for the app and tests: generate floor `floor` of run `seed` and
+ * start it. Exactly `worldFromState(worldFromSeed(...))`. */
+export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
+  worldFromState(worldFromSeed(seed, floor, mode, hostile))
+
+/** Replace `target`'s whole state with `fresh`'s, in place, so every holder of
+ * the `target` reference sees the new world. Every field `fresh` lacks (a
+ * director, groups, modifier, a seeded level's checksum) is cleared rather than
+ * left over. `aiFlags` is not part of a snapshot, so the running world's A/B
+ * toggles survive. The debug `load` verb and `applyFixture` both use this. */
+export const replaceWorldInPlace = (target: World, fresh: World): void => {
+  const { aiFlags } = target
+  for (const k of Object.keys(target)) delete (target as unknown as Record<string, unknown>)[k]
+  Object.assign(target, fresh, aiFlags ? { aiFlags } : {})
 }
 
 /** Is any wing's power currently cut? Robots (Derelict Units) turn hostile while
@@ -278,8 +339,9 @@ export const doorClosedAt = (w: World, tx: number, ty: number): boolean => {
 export const isBlocked = (w: World, tx: number, ty: number): boolean =>
   isSolidTile(w.level, tx, ty) || doorClosedAt(w, tx, ty)
 
-export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
+export const tickWorld = (w: World, rawInputs: Map<number, InputCmd>): void => {
   w.events.length = 0
+  const inputs = draftSystem(w, rawInputs)
   if (w.noises.length > 0) w.noises = w.noises.filter((n) => n.expires > w.tick)
   if (w.fear.length > 0) w.fear = w.fear.filter((f) => f.expires > w.tick)
   for (const e of w.entities) {
@@ -288,6 +350,7 @@ export const tickWorld = (w: World, inputs: Map<number, InputCmd>): void => {
   }
   complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
   groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
+  modifierSystem(w) // floor modifier: tracker-pack arrivals, the tide wetting whoever wades
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick
   aiSystem(w)
   rollSystem(w, inputs)

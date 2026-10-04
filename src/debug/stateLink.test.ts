@@ -16,6 +16,7 @@ import {
   verifyStateLink,
   type StateLinkPayload,
 } from './stateLink'
+import { runVerb } from './verbs'
 import { worldDigest } from './worldDigest'
 
 /** A mid-run world whose sim RNG has genuinely advanced past its seed — the only
@@ -165,6 +166,104 @@ describe('StateRing (the moments before the bug)', () => {
     const check = verifyStateLink(payload)
     expect(check.ok).toBe(false)
     expect(check.reason).toMatch(/did not reproduce/)
+  })
+})
+
+describe('StateRing x debug verbs (stage a link with sporefall.verb, then share)', () => {
+  /** A plain `?seed=7` run, where CLAUDE.md's link-capture procedure starts. */
+  const plainRun = (): World => {
+    const w = createWorld(7, 1)
+    spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
+    return w
+  }
+  /** The frame loop: tick, then feed the ring (main.ts `afterTick` order). */
+  const frames = (w: World, ring: StateRing, n: number): void => {
+    for (let i = 0; i < n; i++) {
+      tickWorld(w, new Map(DRIVE))
+      ring.observe(w, DRIVE)
+    }
+  }
+  const share = (w: World, ring: StateRing) => verifyStateLink(captureState(w, {}, ring.rewind()))
+  const playerId = (w: World): number => w.entities.find((e) => e.playerCtl)!.id
+
+  it('a share right after `step` replays onto the captured world', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    frames(w, ring, 10)
+    runVerb(w, 'step 20', { history: ring })
+    expect(share(w, ring)).toEqual({ ok: true, rewindTicks: 30 })
+  })
+
+  it('records held-input steps with the exact command each tick used', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    runVerb(w, 'step 45 {"moveX":1,"moveY":-1,"attack":true}', { history: ring })
+    expect(share(w, ring).ok).toBe(true)
+    expect(ring.rewind().frames.every((f) => f.inputs.length === 1 && f.inputs[0]![1].attack)).toBe(true)
+  })
+
+  it('a hidden tab that only ever steps (frame loop frozen) shares green with full run-up', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    for (let i = 0; i < 7; i++) runVerb(w, 'step 13', { history: ring })
+    const check = share(w, ring)
+    expect(check.ok).toBe(true)
+    expect(check.rewindTicks).toBeGreaterThanOrEqual(30)
+  })
+
+  it('`command step` (the escape hatch) is recorded like a bare step', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    runVerb(w, 'command step 9', { history: ring })
+    expect(share(w, ring)).toEqual({ ok: true, rewindTicks: 9 })
+  })
+
+  it('a non-tick edit (teleport, set, spawn, load) restarts the history at the edited world', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    const sp = w.level.spawn
+    const dump = runVerb(w, 'dump')
+    for (const edit of [
+      `teleport ${playerId(w)} ${sp.x + 2} ${sp.y}`,
+      `set ${playerId(w)} {"health":{"hp":3,"max":10}}`,
+      `spawn npc thug ${sp.x + 4} ${sp.y}`,
+      `load ${dump}`,
+    ]) {
+      frames(w, ring, 40)
+      runVerb(w, edit, { history: ring })
+      expect(share(w, ring), edit).toEqual({ ok: true, rewindTicks: 0 })
+    }
+    frames(w, ring, 5)
+    runVerb(w, 'step 5', { history: ring })
+    expect(share(w, ring)).toEqual({ ok: true, rewindTicks: 10 })
+  })
+
+  it('a failed step keeps the history; a failed edit restarts it (it may have half-applied)', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    frames(w, ring, 12)
+    expect(() => runVerb(w, 'step -1', { history: ring })).toThrow()
+    expect(() => runVerb(w, 'step 3 {"bogus":1}', { history: ring })).toThrow()
+    expect(share(w, ring)).toEqual({ ok: true, rewindTicks: 12 })
+    expect(() => runVerb(w, `teleport ${playerId(w)} 1 nope`, { history: ring })).toThrow()
+    expect(share(w, ring)).toEqual({ ok: true, rewindTicks: 0 })
+  })
+
+  it('read verbs leave the history alone', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    frames(w, ring, 8)
+    runVerb(w, 'entities', { history: ring })
+    runVerb(w, 'dump', { history: ring })
+    expect(share(w, ring)).toEqual({ ok: true, rewindTicks: 8 })
+  })
+
+  it('without the history hook a step breaks the link (the hook is load-bearing)', () => {
+    const w = plainRun()
+    const ring = new StateRing(w)
+    frames(w, ring, 10)
+    runVerb(w, 'step 20')
+    expect(share(w, ring).ok).toBe(false)
   })
 })
 

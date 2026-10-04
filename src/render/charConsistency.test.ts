@@ -201,9 +201,18 @@ const accentDx = (path: string): [number, number] => {
 // is judged on its BUILD (height / head-block / mass) against the reference
 // pose rather than frame-by-frame. A walk cycle that is a slimmer character
 // than the idle is the "not the same character" defect this file exists to
-// catch — reported once per family, not once per frame.
-const familyOf = (frame: string): 'walk' | 'pose' => (frame.includes('-walk-') || /(^|-)walk-\d+$/.test(frame) ? 'walk' : 'pose')
+// catch — reported once per family, not once per frame. A character with a walk
+// cycle has its `step` cut from that cycle (the widest stride), so it is a walk frame.
+const isWalk = (frame: string): boolean => frame.includes('-walk-') || /(^|-)walk-\d+$/.test(frame)
+const familyOf = (frame: string, hasWalk: boolean): 'walk' | 'pose' =>
+  isWalk(frame) || (hasWalk && frame.split('-').slice(1).join('-') === 'step') ? 'walk' : 'pose'
+// Width and head block change with the viewing angle, so they are compared only
+// between frames drawn from the reference's own direction (consistency.py VIEW_DEPENDENT).
 const FAMILY_TOL = { height: 3, head_h: 4, mass_frac: 0.25 } // consistency.py FAMILY_TOL
+// In the side view the width is the figure's depth, so a walk character's side
+// poses take mass and centroid from their own view's walk frames (consistency.py
+// SIDE_VIEWS / SIDE_FROM_WALK); front and back views answer to the reference.
+const SIDE_VIEWS = new Set(['e', 'w'])
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b)
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2
@@ -244,13 +253,20 @@ describe('swampspace character-sprite consistency (committed spec)', () => {
 
   for (const [kind, frames] of byKind) {
     describe(kind, () => {
+      const hasWalk = frames.some((f) => isWalk(f.frame))
+      const sideRef = new Map<string, { mass: number; cx: number }>()
+      for (const d of SIDE_VIEWS) {
+        const ms = frames.filter((f) => f.frame.split('-')[0] === d && isWalk(f.frame)).map((f) => silhouette(f.file))
+        if (ms.length && d !== spec[kind]?.ref_frame.split('-')[0])
+          sideRef.set(d, { mass: median(ms.map((m) => m.mass)), cx: median(ms.map((m) => m.cx)) })
+      }
       // Each non-pose animation family must read as the SAME CHARACTER as the
       // reference pose — one assertion per family, on the family's median build.
-      for (const fam of [...new Set(frames.map((f) => familyOf(f.frame)))].filter((f) => f !== 'pose')) {
+      for (const fam of [...new Set(frames.map((f) => familyOf(f.frame, hasWalk)))].filter((f) => f !== 'pose')) {
         it(`the '${fam}' frames are the same build as the reference pose`, () => {
           const s = spec[kind]
           expect(s).toBeDefined()
-          const ms = frames.filter((f) => familyOf(f.frame) === fam).map((f) => silhouette(f.file))
+          const ms = frames.filter((f) => familyOf(f.frame, hasWalk) === fam).map((f) => silhouette(f.file))
           const why = `the '${fam}' frames are a different build from '${s.ref_frame}' — the player would change shape when they move; regenerate that set against this character's spec`
           expect(Math.abs(median(ms.map((m) => m.height)) - s.ref.height), why).toBeLessThanOrEqual(FAMILY_TOL.height)
           expect(Math.abs(median(ms.map((m) => m.head_h)) - s.ref.head_h), why).toBeLessThanOrEqual(FAMILY_TOL.head_h)
@@ -258,17 +274,20 @@ describe('swampspace character-sprite consistency (committed spec)', () => {
         })
       }
 
-      for (const { frame, file } of frames.filter((f) => familyOf(f.frame) === 'pose')) {
+      for (const { frame, file } of frames.filter((f) => familyOf(f.frame, hasWalk) === 'pose')) {
         it(`${frame} stays within the character's silhouette envelope`, () => {
           const s = spec[kind]
           expect(s).toBeDefined()
           const m = silhouette(file)
           const { ref, tol } = s
           expect(Math.abs(m.height - ref.height), `height ${m.height} vs ref ${ref.height}`).toBeLessThanOrEqual(tol.height)
-          expect(Math.abs(m.width - ref.width), `width ${m.width} vs ref ${ref.width}`).toBeLessThanOrEqual(tol.width)
-          expect(Math.abs(m.head_h - ref.head_h), `head_h ${m.head_h} vs ref ${ref.head_h}`).toBeLessThanOrEqual(tol.head_h)
-          expect(Math.abs(m.mass - ref.mass) / ref.mass, `mass ${m.mass} vs ref ${ref.mass}`).toBeLessThanOrEqual(tol.mass_frac)
-          expect(Math.abs(m.cx - ref.cx), `cx ${m.cx.toFixed(2)} vs ref ${ref.cx}`).toBeLessThanOrEqual(tol.cx)
+          if (frame.split('-')[0] === s.ref_frame.split('-')[0]) {
+            expect(Math.abs(m.width - ref.width), `width ${m.width} vs ref ${ref.width}`).toBeLessThanOrEqual(tol.width)
+            expect(Math.abs(m.head_h - ref.head_h), `head_h ${m.head_h} vs ref ${ref.head_h}`).toBeLessThanOrEqual(tol.head_h)
+          }
+          const v = { ...ref, ...sideRef.get(frame.split('-')[0]) }
+          expect(Math.abs(m.mass - v.mass) / v.mass, `mass ${m.mass} vs ref ${v.mass}`).toBeLessThanOrEqual(tol.mass_frac)
+          expect(Math.abs(m.cx - v.cx), `cx ${m.cx.toFixed(2)} vs ref ${v.cx}`).toBeLessThanOrEqual(tol.cx)
           expect(Math.abs(m.foot_y - ref.foot_y), `foot_y ${m.foot_y} vs ref ${ref.foot_y}`).toBeLessThanOrEqual(tol.foot_y)
           if (s.accent) {
             const dir = frame.split('-')[0]

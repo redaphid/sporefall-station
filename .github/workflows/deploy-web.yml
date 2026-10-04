@@ -104,6 +104,16 @@ jobs:
             || gh release download latest --repo "$GITHUB_REPOSITORY" --pattern 'sporefall.apk' \
                  --dir dist/download --clobber \
             || echo "no published APK yet — skipping (site still deploys)"
+          # Workers reject any asset over 25 MiB, which fails the whole deploy.
+          # The `latest` APK is usually the previous push's (android-apk.yml
+          # finishes after this job), so an APK size fix lands a deploy late.
+          # Drop an oversize APK (the download 404s)
+          # rather than block the site; it moves to external hosting later.
+          APK=dist/download/sporefall.apk
+          if [ -f "$APK" ] && [ "$(stat -c %s "$APK")" -gt $((24 * 1024 * 1024)) ]; then
+            echo "::warning::sporefall.apk is $(stat -c %s "$APK") B, over the 24 MiB budget (Workers cap 25 MiB); not serving it"
+            rm "$APK"
+          fi
           ls -la dist/download || true
         env:
           GH_TOKEN: ${{ github.token }}

@@ -19,12 +19,15 @@ export interface Updates {
   /** Tell the updater where the player is. Cheap; safe to call every frame. */
   reportMoment(moment: UpdateMoment, peers: number): void
   /**
-   * Deep links only: make sure this is the current build before honouring the
-   * link (see `WebUpdater.freshen`). `'staged'` means a reload onto the new
-   * build is on its way. The native app has no deep-link entry point (no
-   * intent filter for the site), so there it resolves `'unavailable'` at once.
+   * Check now and wait (at most `timeoutMs`) for a newer build to download
+   * (see `WebUpdater.freshen` / `NativeUpdater.freshen`). `'staged'` means it
+   * is ready and applies at the next moment the policy allows. Used by deep
+   * links at boot and by pause → Refresh. `'unavailable'` where neither
+   * updater runs (dev server, beta build).
    */
   freshen(timeoutMs: number): Promise<CheckOutcome | 'timeout'>
+  /** The newer build the last check found published, or null if none was seen. */
+  readonly latest: string | null
 }
 
 /**
@@ -42,6 +45,9 @@ export const startUpdates = (): Updates => {
       web?.reportMoment(moment, peers)
       native?.reportMoment(moment, peers)
     },
-    freshen: (timeoutMs) => web?.freshen(timeoutMs) ?? Promise.resolve('unavailable'),
+    freshen: (timeoutMs) => web?.freshen(timeoutMs) ?? native?.freshen(timeoutMs) ?? Promise.resolve('unavailable'),
+    get latest(): string | null {
+      return web?.latest ?? native?.latest ?? null
+    },
   }
 }

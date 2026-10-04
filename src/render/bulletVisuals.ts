@@ -283,3 +283,9 @@ export const composeBulletTraits = (mods: readonly WeaponMod[] | undefined): Bul
   t.power = power
   return t
 }
+
+/** A blast's tint: the pickup hue of the element it applies (the explosion
+ * event's `element`), or none for a plain blast. Pure, like the bullet look, so
+ * host and client tint the same blast the same way. */
+export const blastTint = (element: string | undefined): number | undefined =>
+  element && MODS[element]?.onHit ? modPickupColor(element) : undefined

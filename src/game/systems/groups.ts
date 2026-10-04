@@ -82,6 +82,10 @@ export interface GroupState {
   ringBase?: number
   /** Pack: manhunter until this tick. */
   rageUntil?: number
+  /** Pack: a `hunted`-floor tracker pack (systems/modifierSystem.ts). It keeps a
+   * scent fix on its prey that refreshes every TRACK_TICKS without needing
+   * sight, follows it, and never gives up and goes back to its den. */
+  tracker?: true
 }
 
 /** The floor's raid schedule. */
@@ -130,6 +134,13 @@ export const healAmount = (floor: number): number => 7 + floor
 /** Siege gun. */
 export const LOB_MIN = 4
 export const LOB_MAX = 14
+/** The band a siege gun holds inside (it walks to LOB_IDEAL from outside it).
+ * The far edge sits INSIDE the gun's own sight (lobber sightRange 11): a
+ * battery that parks just past what it can see has no spotter and never fires,
+ * which is exactly what the first cut did, holding at 11.8 tiles in silence. */
+export const LOB_HOLD_MIN = LOB_MIN + 3
+export const LOB_HOLD_MAX = Math.min(LOB_MAX - 2, 10)
+export const LOB_IDEAL = (LOB_HOLD_MIN + LOB_HOLD_MAX) / 2
 export const LOB_INTERVAL = Math.round(3.5 * S)
 export const LOB_SCATTER = 1.2
 export const LOB_RADIUS = 1.7
@@ -146,6 +157,8 @@ export const RING_TOL = 1.3
 export const RING_MAX_TICKS = 4 * S
 /** A pack that has not seen its prey this long goes back to prowling. */
 export const PACK_LOSE_TICKS = 8 * S
+/** A tracker pack's scent fix on its prey is at most this stale. */
+export const TRACK_TICKS = 2 * S
 /** Manhunter rage. */
 export const RAGE_TICKS = 20 * S
 export const HOWL_RADIUS = 14
@@ -811,8 +824,12 @@ const updatePack = (w: World, g: GroupState, members: Entity[]): void => {
 
   let target = g.targetId !== undefined ? w.byId.get(g.targetId) : undefined
   if (target && (target.dead || target.playerCtl?.downed)) target = undefined
-  if (!target && raging) target = nearestOf(players, centroid(members))
+  if (!target && (raging || g.tracker)) target = nearestOf(players, centroid(members))
   g.targetId = target?.id
+  if (target && g.tracker && (g.markAt === undefined || w.tick - g.markAt >= TRACK_TICKS)) {
+    g.mark = { x: target.pos.x, y: target.pos.y }
+    g.markAt = w.tick
+  }
   if (target && members.some((m) => perceives(w, m, target))) {
     g.mark = { x: target.pos.x, y: target.pos.y }
     g.markAt = w.tick

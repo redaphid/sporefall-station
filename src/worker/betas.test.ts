@@ -234,6 +234,35 @@ describe('handleBeta', () => {
     expect(await (await get('/betas/')).text()).toContain('No betas published yet')
   })
 
+  it('labels a PR beta by its PR number, and a branch beta by its branch', () => {
+    // The two slug rules live side by side in this listing: `pr-<n>` (unique per
+    // pull request, minted by CI) and the branch's last segment (which CAN
+    // collide). A reader has to be able to tell which rule a row is under, or
+    // "why are there two rows for the same work" has no answer on the page.
+    const fromPr: BetaIndexEntry = {
+      slug: 'pr-81',
+      branch: 'feat/beta-pr-comment',
+      sha: 'abcdef1234567890',
+      builtAt: '2026-09-25T00:00:00.000Z',
+      files: 2,
+      pr: 81,
+    }
+    const fromBranch: BetaIndexEntry = {
+      slug: 'older',
+      branch: 'preview/older',
+      sha: '0000000011111111',
+      builtAt: '2026-01-01T00:00:00.000Z',
+      files: 1,
+    }
+    const html = renderBetaIndex([fromPr, fromBranch])
+    expect(html).toContain('href="/betas/pr-81/"')
+    expect(html).toContain('PR #81')
+    expect(html).toContain('feat/beta-pr-comment')
+    // A branch beta must NOT grow a PR label it never had.
+    expect(html).not.toContain('PR #0')
+    expect(html).toContain('preview/older')
+  })
+
   it('escapes listing text so a branch name can never inject markup', () => {
     const nasty: BetaIndexEntry = {
       slug: 'x',

@@ -34,8 +34,8 @@ const UNSAFE_MOMENTS: readonly UpdateMoment[] = UPDATE_MOMENTS.filter((m) => !is
 describe('the safe-moment list itself', () => {
   // Pinned literally: widening the list is a deliberate act that must fail this
   // test and be re-reviewed, not something that slips in with a refactor.
-  it('is exactly the four moments where a reload costs the player nothing', () => {
-    expect([...SAFE_MOMENTS]).toEqual(['modePicker', 'lobby', 'floorTransition', 'runOver'])
+  it('is exactly the five moments where a reload costs the player nothing', () => {
+    expect([...SAFE_MOMENTS]).toEqual(['modePicker', 'lobby', 'floorTransition', 'runOver', 'leaving'])
   })
 
   it('shrinks to the mode picker alone once other players are on the link', () => {
@@ -135,6 +135,7 @@ describe('decideApply — the positive cases, kept deliberately small', () => {
 
 describe('momentOf — naming the moment from what the frame knows', () => {
   const inputs = (o: Partial<MomentInputs> = {}): MomentInputs => ({
+    leaving: false,
     runOver: false,
     floorChanging: false,
     paused: false,
@@ -164,12 +165,27 @@ describe('momentOf — naming the moment from what the frame knows', () => {
     expect(momentOf(inputs({ paused: true, floorChanging: true }))).toBe('floorTransition')
   })
 
+  it('names a Refresh press as leaving, over a pause or any other break', () => {
+    // Refresh is pressed FROM the pause menu, so `paused` is always true with it.
+    expect(momentOf(inputs({ leaving: true, paused: true }))).toBe('leaving')
+    expect(momentOf(inputs({ leaving: true, paused: true, runOver: true, floorChanging: true }))).toBe('leaving')
+  })
+
+  it('never lets leaving widen the co-op list: other players never agreed to go', () => {
+    expect(decideApply({ staged: true, applied: false, moment: 'leaving', peers: 0 })).toEqual({ apply: true })
+    expect(decideApply({ staged: true, applied: false, moment: 'leaving', peers: 1 })).toEqual({
+      apply: false,
+      why: 'coop-session-live',
+    })
+  })
+
   it('only ever produces moments that are in the enumerated list', () => {
     const bools = [false, true]
-    for (const runOver of bools)
-      for (const floorChanging of bools)
-        for (const paused of bools)
-          expect(UPDATE_MOMENTS).toContain(momentOf({ runOver, floorChanging, paused }))
+    for (const leaving of bools)
+      for (const runOver of bools)
+        for (const floorChanging of bools)
+          for (const paused of bools)
+            expect(UPDATE_MOMENTS).toContain(momentOf({ leaving, runOver, floorChanging, paused }))
   })
 })
 

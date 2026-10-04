@@ -123,6 +123,9 @@ export interface AiState {
   /** #65 — a POINT to flee away from when there is no threat ENTITY to run from
    * (a caught fear pulse / stampede). Steering uses it when `targetId` is unset. */
   fleeFrom?: Vec2
+  /** Where a burning body is running from while it panics (statusFx `panic`);
+   * the window itself is `lockout.panic`. */
+  panicFrom?: Vec2
   /** Skittish: threat id already reported to a guard (don't re-alert). */
   alerted?: EntityId
   /** Where/when this NPC last made real progress toward an UNSEEN chase goal —
@@ -186,12 +189,12 @@ export interface ItemStack {
    * fixture/snapshot serializes byte-for-byte unchanged (same optional-field
    * discipline as `annotations`). Resolved by `resolveWeapon` at the fire site. */
   mods?: WeaponMod[]
-  /** Sequenced casting only (World.modCasting): the position in the weapon's
-   * live mod window that the next cast starts from. Absent until the first
-   * sequenced shot, so default-mode stacks never carry it. */
+  /** The position in the weapon's live mod window that the next cast starts
+   * from (systems/modSequence). Only a wand whose cycle has two or more casts
+   * carries it; a one-cast wand or a stack with no mods never does. */
   castIndex?: number
-  /** Sequenced casting only: absolute tick until which the weapon recharges
-   * after its sequence wrapped. Absent until the first wrap. */
+  /** Absolute tick until which the weapon recharges after a cycle of two or
+   * more casts wrapped. Absent until the first such wrap. */
   rechargeUntil?: number
 }
 
@@ -204,6 +207,20 @@ export interface ItemStack {
  * innate fists, a class-starter with no slot) resolves VANILLA — undefined stack,
  * infinite/no-wear — exactly as an inventory-less NPC did before this component
  * existed, so every pre-loadout snapshot round-trips byte-for-byte. */
+/** A floor-draft hand a player is still choosing from (systems/draft.ts). */
+export interface DraftHand {
+  /** The mod ids on offer, in card order. */
+  offer: string[]
+  /** Index of the card under this player's cursor. */
+  cursor: number
+  /** Absolute tick at which the hand takes the card under the cursor. */
+  until: number
+  /** Intent bits held on the previous tick. Cards move or are taken only on a
+   * fresh press, and a hand opens with every bit set, so a stick or trigger still
+   * held from walking onto the exit does nothing until released. */
+  held: number
+}
+
 export interface Loadout {
   /** Slot-based inventory; each stack's qty doubles as ammo/durability/count. */
   inventory: ItemStack[]
@@ -298,13 +315,16 @@ export interface Entity {
      * + speed-burst window; `cooldownUntilTick` gates the next roll (no chaining);
      * `dirX/dirY` is the frozen roll heading (move dir, or facing when stationary). */
     roll?: { untilTick: number; cooldownUntilTick: number; dirX: number; dirY: number }
+    /** Present while this player is choosing a mod from the floor draft. */
+    draft?: DraftHand
   }
   projectile?: {
     ownerId: EntityId
     damage: number
     ttl: number
-    /** Grenades: AoE on fuse-end or impact instead of point damage. */
-    explode?: { radius: number; damage: number }
+    /** Grenades: AoE on fuse-end or impact instead of point damage. `element`:
+     * the element mod id the blast applies (ResolvedWeapon.carries). */
+    explode?: { radius: number; damage: number; element?: string }
     /** Thrown items: the area effect applied where it lands (grenade → explode). */
     onLand?: import('./data/items').AreaEffect
     /** Status inflicted on the entity a bullet strikes (freeze ray, tranq). */
@@ -319,21 +339,23 @@ export interface Entity {
      * round chases only VISIBLE enemies of its owner ahead of it, and flies
      * straight otherwise — it never curves at something behind a wall. */
     homing?: number
-    /** Spawn N damaging children on the first body it strikes (split/multishot). */
-    split?: { count: number; damage: number; speed: number; ttl: number }
+    /** Spawn N damaging children on the first body it strikes (split/multishot).
+     * `element`: the element mod id the shards apply (ResolvedWeapon.carries). */
+    split?: { count: number; damage: number; speed: number; ttl: number; element?: string }
     /** Shatter into a RADIAL burst of short-range fragments on ANY termination —
      * wall/ttl/body impact (splinterShot). Distinct from `split` (a forward fork
      * on first body hit): this is an omnidirectional shrapnel spray at the point
-     * the round dies. Fragments never carry this field, so they can't re-splinter. */
-    splinter?: { count: number; damage: number; speed: number; ttl: number }
+     * the round dies. Fragments never carry this field, so they can't re-splinter.
+     * `element`: the element mod id the fragments apply. */
+    splinter?: { count: number; damage: number; speed: number; ttl: number; element?: string }
     /** Heal the owner by frac·damage dealt on each hit (lifesteal). */
     lifestealFrac?: number
     /** Bodies already struck (pierce), so one victim isn't re-hit every tick. */
     hitIds?: EntityId[]
     /** Resolved trigger effects fired on hit/kill (on-reload handled elsewhere). */
     triggers?: import('./data/mods').ResolvedTrigger[]
-    /** Build provenance: the (normalized) mods this shot executes, which is the
-     * gun's list minus any element a newer element overrides (ResolvedWeapon.mods).
+    /** Build provenance: the (normalized) mods of the cast that fired this shot
+     * (ResolvedWeapon.mods), so it never shows another cast's element.
      * Pure inert data — no system reads it — carried so the renderer (and
      * net peers, via the snapshot codec) can COMPOSE the bullet's procedural
      * look from its mods, Nova-Drift style. Absent = vanilla shot, so every

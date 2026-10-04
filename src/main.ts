@@ -14,11 +14,12 @@ import { keepScreenAwake } from './app/wakeLock'
 import { APP_VERSION } from './app/version'
 import { createDebugApi } from './game/debug'
 import type { DebugLink } from './debug/channel'
+import type { WorldHistory } from './debug/verbs'
 // Type-only: the implementations are dynamically imported, so neither the
 // replay nor the upload code reaches the initial boot chunk.
 import type { StateReplay } from './app/stateReplay'
 import type { ShareResult } from './app/stateShare'
-import { loadFixtureJson } from './game/fixtures'
+import { hasFixture, loadFixtureJson } from './game/fixtures'
 import { applyScenario, isKnownScenario, SCENARIO_NAMES } from './game/scenarios'
 import {
   DEEP_LINK_FRESHEN_MS,
@@ -27,17 +28,17 @@ import {
   readDeepLink,
   resumesSave,
   unknownScenarioMessage,
+  unknownWorldMessage,
   wantsFreshBuild,
 } from './app/deepLink'
+import { SCENES } from './scenes/registry'
 import { deserializeWorld, type WorldJson } from './game/serialize'
 import type { World } from './game/world'
 import { createPersister, readSave, type KeyValueStore, type Persister } from './app/persistence'
 import { loadSettings } from './app/settings'
-import { flagOn } from './app/featureFlags'
-import type { ModCasting } from './game/world'
 import { createModSwapQueue, previewSwaps, withModSwaps, type ModSwapQueue } from './input/modSwapQueue'
 import { buildSequence } from './ui/sequenceModel'
-import { createSequenceStrip } from './ui/sequenceStrip'
+import { createSequenceStrip, installStripPadNav } from './ui/sequenceStrip'
 import {
   canRequestFullscreen,
   enterFullscreen,
@@ -45,7 +46,7 @@ import {
   isFullscreen,
   shouldHideCursor,
 } from './ui/fullscreenModel'
-import { SIM_DT, type InputCmd } from './game/types'
+import { SIM_DT, SIM_RATE, type InputCmd } from './game/types'
 import { padAimReticles, pointerAim, type Aim, type ReticleAnchor } from './input/aim'
 import { anyPadActive, createGamepadCoop } from './input/gamepadCoop'
 import {
@@ -63,6 +64,7 @@ import type { InputSource } from './input/input'
 import { Capacitor } from '@capacitor/core'
 import { notifyOtaReady } from './app/ota'
 import { FLOOR_TRANSITION_FRAMES, momentOf } from './app/updatePolicy'
+import { runRefresh } from './app/refresh'
 import { startUpdates, type Updates } from './app/updates'
 import { BleClientTransport, BleHostTransport } from './net/transport/bleTransport'
 import { BroadcastChannelTransport } from './net/transport/broadcastChannelTransport'
@@ -105,9 +107,11 @@ import { createMissionPanel } from './ui/missionPanel'
 import { resolveLink } from './ui/missionModel'
 import { focusCameraTarget, focusPanRate, startFocus, tickFocus, type FocusState } from './ui/focusModel'
 import { projectToScreen } from './ui/locatorModel'
-import { createDraftScreen } from './ui/draftScreen'
-import { applyDraftPick, floorDraftOffer } from './game/systems/draft'
+import { createDraftScreen, localDraft } from './ui/draftScreen'
+import type { DraftLoadout } from './game/systems/draft'
+import { withDraftPicks, type DraftPickSource } from './input/draftPick'
 import { weaponStack } from './game/systems/inventory'
+import { WEAPONS } from './game/data/items'
 
 /** The rewind ring, plus the single action the pause menu needs from it. Both
  * live on one object because they are one feature: the ring is only worth
@@ -155,7 +159,8 @@ const boot = async (): Promise<void> => {
   stage.onChange = (): void => renderer.app.resize()
 
   const params = new URLSearchParams(location.search)
-  const seed = Number(params.get('seed')) || ((Math.random() * 0xffffffff) >>> 0)
+  const link = readDeepLink(params)
+  const seed = link.seed ?? (Math.random() * 0xffffffff) >>> 0
   // A beta build (served from /betas/<slug>/) plays in its OWN rooms. The sim is
   // deterministic and the host is authoritative, so a beta peer and a production
   // peer sharing room 'car' do not see a version warning — they DESYNC, and it
@@ -202,7 +207,6 @@ const boot = async (): Promise<void> => {
   // skips the picker, which is otherwise the only moment an update applies. The
   // moment is still `modePicker` here (no run exists), so a staged update is
   // handed over as soon as it verifies and the page reloads with the same URL.
-  const link = readDeepLink(params)
   if (wantsFreshBuild(link)) {
     const note = showBootNote(uiMount, 'Loading the latest build…', 600)
     const fresh = await updates.freshen(DEEP_LINK_FRESHEN_MS)
@@ -222,17 +226,25 @@ const boot = async (): Promise<void> => {
     showBootError(uiMount, msg)
     return
   }
-  // A `?state=` link IS the intent: someone was sent an exact world to look at,
-  // so boot straight into it rather than making them pick Solo from the menu
-  // first (which would also build a throwaway world before replacing it).
-  // Shared states restore into SINGLE-PLAYER — see the `?state=` block below.
+  // `@inline` waits for a WorldJson handed over by `window.__loadWorld`.
+  if (link.world !== null && link.world !== '@inline' && !hasFixture(link.world)) {
+    const msg = unknownWorldMessage(link.world, SCENES.map((s) => s.name), APP_VERSION)
+    console.error(`sporefall: ${msg}`)
+    showBootError(uiMount, msg)
+    return
+  }
+  // A `?state=` link or a `?world=` save IS the intent: someone was sent an
+  // exact world to play, so boot straight into it rather than making them pick
+  // Solo from the menu first (which would also build a throwaway world before
+  // replacing it). Both restore into SINGLE-PLAYER — see the blocks below.
   const sharedState = params.get('state')
+  const exactWorld = sharedState ?? params.get('world')
   const mode =
     (params.get('mode') as GameMode | null) ??
     // The third argument adds the Settings entry (opens the panel over the menu
     // with controller navigation armed) — the pad-only player's route to button
     // remapping, e.g. binding the zoom buttons.
-    (sharedState ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
+    (exactWorld ? 'solo' : await pickMode(uiMount, requestFullscreenOnGesture, renderer.settingsUi))
   // Past the picker, nothing between here and the frame loop can honestly
   // promise a safe moment (lobby handshakes, BLE connects), so fall back to the
   // conservative one until the loop starts reporting real ones.
@@ -292,21 +304,26 @@ const boot = async (): Promise<void> => {
     touch = createTouch(uiMount, zoomSink)
     input = mergeInputs(input, touch)
   }
-  // Sequenced-mods reorder requests from the HUD strip / pause menu ride out on
-  // the local player's next command (see input/modSwapQueue.ts).
+  // Mod reorder requests from the HUD strip / pause menu ride out on the local
+  // player's next command (see input/modSwapQueue.ts). `paused` is bound to the
+  // session once it exists: a paused session samples and drops commands.
   const modSwaps = createModSwapQueue()
-  input = withModSwaps(input, modSwaps)
+  let paused = (): boolean => false
+  input = withModSwaps(input, modSwaps, () => !paused())
+  const draftPicks = withDraftPicks(input)
+  input = draftPicks
   const coop = createGamepadCoop()
 
   const session = await createSession(mode, { seed, room, name, input, coop, uiMount, renderer })
   if (!session) return
+  paused = () => session.isPaused ?? false
 
   // ── Save-game persistence (feat/localstorage-resume) ──────────────────────
   // Persist the AUTHORITATIVE world to localStorage so a full-page reload
   // seamlessly rejoins the in-progress run. SOLO/host only (HostSession owns the
   // authoritative world); a NetClient rejoins via the host, and we never persist
   // a client-predicted world as authoritative. A link that names the world
-  // (`?scenario=`, `?state=`, `?world=`, `?script=`) takes precedence over the
+  // (`?scenario=`, `?state=`, `?world=`, `?seed=`, `?script=`) takes precedence over the
   // save AND never writes to it: no persister at all, so neither the autosave
   // nor a restart/death `clear()` can touch the player's real run.
   const store = browserStore()
@@ -408,6 +425,14 @@ const boot = async (): Promise<void> => {
   // stays dev-gated: only `?debug`/`?e2e` enable it; otherwise it refuses with
   // an explanation. All getters, so world replacement (?world=, load, restart)
   // is tracked automatically.
+  //
+  // `verbHistory` forwards to the share ring armed further down, so a link
+  // staged with `step`/`teleport`/... replays: see `VerbCtx.history`.
+  let shareHistory: WorldHistory | undefined
+  const verbHistory: WorldHistory = {
+    observe: (w, inputs) => shareHistory?.observe(w, inputs),
+    reset: (w) => shareHistory?.reset(w),
+  }
   const inspect = createInspect({
     getWorld: () => ('world' in session ? (session as HostSession).world : undefined),
     getView: () => session.renderView(),
@@ -419,6 +444,7 @@ const boot = async (): Promise<void> => {
     devWrites: params.has('debug') || params.has('e2e'),
     version: APP_VERSION,
     setTheme: (id) => void renderer.setTheme(id),
+    history: verbHistory,
   })
   installInspect(inspect, window)
   console.log(`sporefall build ${APP_VERSION}: window.world + window.sporefall.help() for inspection`)
@@ -444,28 +470,6 @@ const boot = async (): Promise<void> => {
       // fire-and-forget; this resolves when the new assets are actually baked).
       ;(window as unknown as { __setTheme: (id: string) => Promise<void> }).__setTheme = (id) =>
         renderer.setTheme(id)
-      // #53 mod draft: the between-floor "pick 1 of N" screen. The offer is the
-      // deterministic `floorDraftOffer(seed, floor)`; picking appends the mod to
-      // the local player's equipped gun. Exposed here so a screenshot e2e can show
-      // the card screen and drive a pick headlessly (no pixel math). The automatic
-      // floor-clear trigger lands with floor progression (deferred, see P4 note).
-      const draftScreen = createDraftScreen(uiMount)
-      const applyPick = (id: string): void => {
-        const self = hostWorld.entities.find((e) => e.playerCtl)
-        const stack = self && weaponStack(self)
-        if (stack) applyDraftPick(stack, id)
-      }
-      ;(window as unknown as { __draftOffer: (f?: number) => string }).__draftOffer = (f) =>
-        JSON.stringify(floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor))
-      ;(window as unknown as { __draftShow: (f?: number) => string }).__draftShow = (f) => {
-        const offer = floorDraftOffer(hostWorld.seed, f ?? hostWorld.floor)
-        draftScreen.show(offer, applyPick)
-        return JSON.stringify(offer)
-      }
-      ;(window as unknown as { __draftPick: (id: string) => void }).__draftPick = (id) => {
-        applyPick(id)
-        draftScreen.hide()
-      }
       // Drive the view zoom headlessly: smooth (real interpolation path) or
       // snapped (deterministic stills at exact zoom levels).
       ;(window as unknown as { __zoom: (z: number, snap?: boolean) => number }).__zoom = (z, snap) => {
@@ -515,6 +519,7 @@ const boot = async (): Promise<void> => {
     debug = startDebugLink((session as HostSession).world, hubUrl(location.hostname || '127.0.0.1', port), console.log, {
       name,
       setTheme: (id) => void renderer.setTheme(id),
+      history: verbHistory,
     })
   }
   // Shareable states (`?state=`). Arm a rolling ring of the last second or two
@@ -570,6 +575,16 @@ const boot = async (): Promise<void> => {
         ring = new StateRing(host.world)
       }
     }
+    shareHistory = {
+      observe: (w, inputs) => {
+        rebindRing()
+        ring.observe(w, inputs)
+      },
+      reset: (w) => {
+        rebindRing()
+        ring.reset(w)
+      },
+    }
     // The one capture path. The button and the console verb both land here, so
     // there is nothing to keep in sync and no second implementation to drift.
     const share = async (note?: string): Promise<ShareResult> => {
@@ -621,6 +636,7 @@ const boot = async (): Promise<void> => {
     stateRing,
     padZoom,
     modSwaps,
+    draftPicks,
   )
 }
 
@@ -682,13 +698,17 @@ const stopTransportOnPagehide = (transport: Transport): void => {
   window.addEventListener('pagehide', () => void transport.stop().catch(() => {}), { once: true })
 }
 
-/** The `sequencedMods` flag, resolved to the run rule a host latches into each
- * run it builds. Read per run, so toggling applies from the next run. */
-const runModCasting = (): ModCasting | undefined => (flagOn(loadSettings().flags, 'sequencedMods') ? 'sequence' : undefined)
+/** The local player's gun as the draft cards judge it, so a pick that would do
+ * nothing on it reads as dead before it is taken. */
+const draftLoadout = (view: RenderView): DraftLoadout | undefined => {
+  const weapon = view.self?.combat && WEAPONS[view.self.combat.weapon]
+  if (!weapon || !view.self) return undefined
+  return { weapon, mods: weaponStack(view.self)?.mods ?? [] }
+}
 
 const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session | null> => {
   if (mode === 'solo') {
-    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal', runModCasting)
+    const session = new HostSession(deps.seed, deps.input, deps.coop, 'normal')
     deps.renderer.setLevel(session.world.level)
     return session
   }
@@ -712,7 +732,7 @@ const createSession = async (mode: GameMode, deps: SessionDeps): Promise<Session
         : new BroadcastChannelTransport('host', deps.room)
     dbg.log(`host: mode start, native=${native}, name="${deps.name}"`)
     stopTransportOnPagehide(transport)
-    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal', runModCasting)
+    const session = new NetHostSession(deps.seed, deps.name, deps.input, transport, 'normal')
     const lobby = createLobbyUi(deps.uiMount, true)
     lobby.setStatus('Waiting for players…')
     lobby.setPlayers(session.lobbyPlayers())
@@ -913,8 +933,8 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
 }
 
 /** The pause overlay: the big PAUSED title plus the shared gun+mods loadout
- * panel and the Resume / New Seed / Run-it-back / Share-state actions.
- * `onResume` unpauses, `onNewSeed`/`onRestart`/`onShare` are wired only on
+ * panel and the Resume / New Seed / Run-it-back / Refresh / Share-state actions.
+ * `onResume` unpauses, `onNewSeed`/`onRestart`/`onRefresh`/`onShare` are wired only on
  * host/solo (undefined hides the button). Reachable via Escape, the pad's
  * Start button, or the ⏸ chrome button (main.ts — the only one of the three a
  * phone has). */
@@ -927,6 +947,8 @@ const createPauseOverlay = (
     onResume: () => void
     onNewSeed?: () => void
     onRestart?: () => void
+    /** Save, fetch the newest build, go to the picker. `show` paints its status. */
+    onRefresh?: (show: (text: string) => void) => void
     onShare?: (note?: string) => Promise<ShareResult>
     weaponThumb?: WeaponThumb
     modSwaps?: ModSwapQueue
@@ -942,14 +964,16 @@ const createPauseOverlay = (
   el.appendChild(panel.el)
   // Sequenced mods: the wand order, reorderable while paused. The sim is
   // stopped, so swaps queue and apply on the first tick after Resume; the strip
-  // previews the queued order meanwhile.
+  // previews the queued order meanwhile. Touch and mouse tap two chips; a pad
+  // walks the chips with the d-pad or stick and taps with a face button (Start
+  // stays Resume, so it never taps a chip on the way out).
   const swaps = actions.modSwaps
   let lastView: RenderView | undefined
   const paintSeq = (): void => {
     const v = lastView
     seq.update(
       v && swaps
-        ? buildSequence(v.self, v.modCasting, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
+        ? buildSequence(v.self, v.simTick ?? v.tick, (mods) => previewSwaps(mods, swaps.pending()))
         : null,
     )
   }
@@ -959,6 +983,7 @@ const createPauseOverlay = (
   })
   seq.el.style.cssText += ';width:min(340px,86vw);box-sizing:border-box;padding:8px 10px;border-radius:10px;background:#141822f2;text-align:left;color:#e7e7ee;font:12px system-ui'
   el.appendChild(seq.el)
+  installStripPadNav(seq, () => el.style.display === 'none')
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;justify-content:center'
   const btn = (label: string, primary: boolean): HTMLButtonElement => {
@@ -983,6 +1008,27 @@ const createPauseOverlay = (
     row.appendChild(rbBtn)
   }
   el.appendChild(row)
+  const onRefresh = actions.onRefresh
+  if (onRefresh) {
+    const refreshBtn = btn('⟳ Refresh', false)
+    refreshBtn.dataset.role = 'pause-refresh'
+    const status = document.createElement('div')
+    status.dataset.role = 'refresh-status'
+    status.style.cssText = 'font:600 14px system-ui;color:#cfd3e0;display:none'
+    refreshBtn.addEventListener('click', () => {
+      // One way out: nothing else on this panel may act on a run that is leaving.
+      for (const b of row.querySelectorAll('button')) {
+        b.disabled = true
+        b.style.opacity = '0.6'
+      }
+      onRefresh((text) => {
+        status.textContent = text
+        status.style.display = 'block'
+      })
+    })
+    row.appendChild(refreshBtn)
+    el.appendChild(status)
+  }
   // ── Share state ───────────────────────────────────────────────────────────
   // One tap: snapshot the live world (with the ring's run-up), verify it replays
   // to itself, upload it, put the URL on the clipboard. The state machine and
@@ -1169,8 +1215,19 @@ const runLoop = (
   padZoom?: PadZoom,
   /** Sequenced-mods reorder queue shared by the HUD strip and the pause menu. */
   modSwaps?: ModSwapQueue,
+  /** Tapped floor-draft cards, queued onto the local player's next command. */
+  draftPicks?: DraftPickSource,
 ): void => {
   const hud = createHud(uiMount, modSwaps ? (a, b) => modSwaps.push(a, b) : undefined)
+  // A net client hears its hand closed only on the next 2 Hz state message, so
+  // after a tap the local seat is hidden until a hand with a new deadline arrives.
+  let answeredUntil = -1
+  const draftScreen = createDraftScreen(uiMount, (index) => {
+    const hand = session.renderView().self?.playerCtl?.draft
+    if (!hand || !draftPicks) return
+    answeredUntil = hand.until
+    draftPicks.pick(index)
+  })
   // Hide the OS cursor during ACTIVE play so it never obscures the view. CSS
   // only (`cursor: none` on the canvas) — mouse AIM reads the cursor's ABSOLUTE
   // position (the window `pointermove` tracker → aim.pointerAim), so we must NOT
@@ -1284,10 +1341,32 @@ const runLoop = (
   // `const` (not the parameter) so TypeScript keeps the narrowing inside the
   // closure below.
   const sharing = stateRing
+  // Set by Refresh and never cleared: the page is on its way to the picker.
+  let leaving = false
+  const onRefresh = (show: (text: string) => void): void => {
+    void runRefresh({
+      save: () => {
+        const w = hostWorld()
+        if (w) persister?.flush(w)
+      },
+      leave: () => {
+        // An updater's own reload keeps the current URL, so point it at the picker first.
+        history.replaceState(null, '', import.meta.env.BASE_URL)
+        leaving = true
+      },
+      freshen: (ms) => updates.freshen(ms),
+      latest: () => updates.latest,
+      running: APP_VERSION,
+      show,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      goToMenu: () => location.replace(import.meta.env.BASE_URL),
+    })
+  }
   const pauseOverlay = createPauseOverlay(uiMount, {
     onResume: () => setPaused(false),
     onNewSeed,
     onRestart,
+    onRefresh,
     onShare: sharing ? (note) => sharing.share(note) : undefined,
     weaponThumb: renderer.weaponThumb,
     modSwaps,
@@ -1424,6 +1503,19 @@ const runLoop = (
         renderer.draw(view, alpha, dt)
         hud.update(view)
         const pads = coop.debug()
+        // Floor draft: one card row shared by every LOCAL player still holding a
+        // hand (the keyboard/touch player plus joined pads); remote peers pick on
+        // their own screens.
+        const localIds = new Set(pads.flatMap((p) => (p.slot === null ? [] : [p.slot])))
+        if (view.self?.playerCtl) localIds.add(view.self.playerCtl.playerId)
+        const draft = localDraft(view.entities, localIds, view.self, answeredUntil)
+        draftScreen.update(
+          draft.offer,
+          draft.seats,
+          Math.ceil((draft.until - view.tick) / SIM_RATE),
+          draft.inPlay ? 'strip' : 'full',
+          draftLoadout(view),
+        )
         // Twin-stick aim reticles: one per joined pad with a deflected right stick,
         // anchored to that pad's player entity. Presentation only.
         const anchors: ReticleAnchor[] = []
@@ -1464,6 +1556,7 @@ const runLoop = (
         } else if (floorFrames > 0) floorFrames--
         updates.reportMoment(
           momentOf({
+            leaving,
             runOver: restartAffordance(view).visible,
             floorChanging: floorFrames > 0,
             paused,

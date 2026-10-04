@@ -17,17 +17,19 @@
 
   "entry": [
     // --- The actual app -----------------------------------------------------
-    // index.html has <script type="module" src="/src/main.ts">, and that is
-    // Vite's only input (no build.rollupOptions.input override). main.ts is the
-    // single root of everything the player actually runs.
+    // index.html has <script type="module" src="/src/main.ts">, the root of
+    // everything the player runs. scenes.html (the scene gallery) is Vite's
+    // second input (build.rollupOptions.input); Knip does not follow its
+    // script tag, so its root, src/scenes/page.ts, is listed by hand.
     //
-    // Only index.html is listed. src/main.ts, vite.config.ts,
+    // Nothing else is listed. src/main.ts, vite.config.ts,
     // capacitor.config.ts and eslint.config.js are all reached automatically —
     // src/main.ts via Knip's default entry pattern, and the configs via Knip's
     // vite/capacitor/eslint plugins (it reports them as redundant if listed).
     // Left implicit on purpose: a hand-listed entry that Knip already covers is
     // exactly the kind of config that rots without anyone noticing.
     "index.html",
+    "src/scenes/page.ts",
 
     // --- Unit tests ---------------------------------------------------------
     // vite.config.ts sets test.include: ['src/**/*.test.ts']. These are entries

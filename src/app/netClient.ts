@@ -1,4 +1,5 @@
 import type { Entity } from '../game/entity'
+import { isLowTile, modifierView, tideFlooded, WADE_SPEED } from '../game/floorModifiers'
 import { generateLevel } from '../game/levelgen/generate'
 import type { Level } from '../game/levelgen/level'
 import { isSolidTile } from '../game/levelgen/level'
@@ -249,8 +250,9 @@ export class NetClientSession implements Session {
   /** Mod reorder tapped since the last input packet (undefined = none). Latched
    * like `pendingHotbar` and shipped on the reliable lane. */
   private pendingModSwap?: number
+  /** Floor-draft card tapped since the last input packet, shipped reliably. */
+  private pendingDraftPick?: number
   /** Mod casting rule the host announced in GameStart (absent = default fold). */
-  private modCasting?: 'sequence'
   /** Local tick count when the newest snapshot landed, so the host's tick can
    * be carried forward between snapshots (they arrive every few ticks). */
   private tickAtSnap = 0
@@ -441,7 +443,6 @@ export class NetClientSession implements Session {
         const sameRun = start.seed === this.seed
         this.seed = start.seed
         if (start.mode) this.state.mode = start.mode
-        this.modCasting = start.modCasting === 'sequence' ? 'sequence' : undefined
         // A GameStart while we are reconnecting normally replays the run we were
         // ALREADY in (the host repeats it after a ghost reclaim), so the level is
         // already live and snapshots resync the floor. But if the SEED changed,
@@ -665,12 +666,18 @@ export class NetClientSession implements Session {
 
   private stepSelf(cmd: InputCmd): void {
     const self = this.self
-    if (!self || self.playerCtl?.downed) return
+    // A drafting player stands still on the host; predicting a walk would rubber-band.
+    if (!self || self.playerCtl?.downed || self.playerCtl?.draft) return
     if (isMovementLocked(self) && !isRolling(self, this.tickCount)) return
     const len = Math.hypot(cmd.moveX, cmd.moveY)
     if (len < 0.01) return
     const norm = len > 1 ? 1 / len : 1
-    const speed = 4.5 // class speeds vary ±1; mispredictions get reconciled
+    // Class speeds vary ±1; mispredictions get reconciled. Wading in a bog-tide
+    // flood is predicted, though: it is a steady 35% cut, not a blip.
+    const wading =
+      tideFlooded(this.state.modifier, this.hostTickEstimate()) &&
+      isLowTile(this.level.tiles[Math.floor(self.pos.y) * this.level.w + Math.floor(self.pos.x)])
+    const speed = 4.5 * (wading ? WADE_SPEED : 1)
     self.facing = Math.atan2(cmd.moveY * norm, cmd.moveX * norm)
     moveAndCollide(self, cmd.moveX * norm * speed * SIM_DT, cmd.moveY * norm * speed * SIM_DT, this.blocked)
     const r = stairStep(this.level, self.pos.x, self.pos.y, this.stairLock)
@@ -698,6 +705,7 @@ export class NetClientSession implements Session {
     // next packet still carries the equip/throw instead of dropping it.
     if (cmd.hotbar >= 0) this.pendingHotbar = cmd.hotbar
     if (cmd.modSwap !== undefined) this.pendingModSwap = cmd.modSwap
+    if (cmd.draftPick !== undefined) this.pendingDraftPick = cmd.draftPick
 
     // Send at ~15Hz (every 2nd tick). Movement/aim ride the capacity-1 snapshot
     // lane (latest-wins — a stale queued input is fine to drop). But roll / throw /
@@ -712,14 +720,21 @@ export class NetClientSession implements Session {
       const out: InputCmd = { ...cmd, hotbar: this.pendingHotbar }
       delete out.modSwap
       if (this.pendingModSwap !== undefined) out.modSwap = this.pendingModSwap
+      delete out.draftPick
+      if (this.pendingDraftPick !== undefined) out.draftPick = this.pendingDraftPick
       const packet = encodeInput(out, this.pendingEdges)
       const hasPureEdge =
-        this.pendingEdges.roll || this.pendingEdges.throwItem || this.pendingHotbar >= 0 || this.pendingModSwap !== undefined
+        this.pendingEdges.roll ||
+        this.pendingEdges.throwItem ||
+        this.pendingHotbar >= 0 ||
+        this.pendingModSwap !== undefined ||
+        this.pendingDraftPick !== undefined
       if (hasPureEdge) this.queue.queueReliable(packet)
       else this.queue.queueSnapshot(packet)
       this.pendingEdges = { attack: false, interact: false, special: false, roll: false, throwItem: false }
       this.pendingHotbar = -1
       this.pendingModSwap = undefined
+      this.pendingDraftPick = undefined
     }
 
     // Predict own movement immediately
@@ -776,6 +791,8 @@ export class NetClientSession implements Session {
       // Surface host-tracked HUD numbers on our local entity for the HUD widget
       this.self.playerCtl.cash = hud.cash
       this.self.playerCtl.abilityCooldown = hud.abilityCd
+      if (hud.draft) this.self.playerCtl.draft = hud.draft
+      else delete this.self.playerCtl.draft
       if (this.self.combat) this.self.combat.weapon = hud.weapon
       else this.self.combat = { weapon: hud.weapon, cooldown: 0 }
     }
@@ -816,11 +833,14 @@ export class NetClientSession implements Session {
       missionText,
       missionComplete: this.state.missionComplete,
       missionTargetId: this.state.missionTargetId,
+      extraction: this.state.extraction,
       gameOver: this.state.gameOver,
       alert: this.state.alert,
+      lockdown: this.state.lockdown,
       mode: this.state.mode,
       revivesLeft: this.state.revivesLeft,
-      ...(this.modCasting ? { modCasting: this.modCasting, simTick: this.hostTickEstimate() } : {}),
+      simTick: this.hostTickEstimate(),
+      ...(this.state.modifier ? { modifier: modifierView(this.state.modifier, this.hostTickEstimate()) } : {}),
       self: this.self,
     }
   }

@@ -1,0 +1,1193 @@
+{
+  "v": 1,
+  "seed": 1,
+  "floor": 1,
+  "tick": 0,
+  "nextId": 22,
+  "alarm": 0,
+  "gameOver": false,
+  "mission": {
+    "template": "reach",
+    "complete": true,
+    "exitUnlocked": true,
+    "description": "Clear the cavern, climb out the north shaft"
+  },
+  "noises": [],
+  "events": [],
+  "rng": 1092533862,
+  "baseRng": 1,
+  "level": {
+    "rows": [
+      "############################################",
+      "############################################",
+      "############################################",
+      "############################################",
+      "############################################",
+      "#########~~~~~~###,,,,,,,,###~~~~~~#########",
+      "########~~~~~~~~,,,,,,E,,,,,~~~~~~~~########",
+      "#######~~~~~~~~~~,,,,,,,,,,~~~~~~~~~~#######",
+      "######~~~~~~~~~~~~,,,,,,,,~~~~~~~~~~~~######",
+      "#####~~~~~~~~~~~~~~,,,,,,~~~~~~~~~~~~~~#####",
+      "#####~~~~~~~~~~~~~~,,,,,,~~~~~~~~~~~~~~#####",
+      "#####~~~~~~~~~~~~~~,,,,,,~~~~~~~~~~~~~~#####",
+      "#####~~~~~~~~~~~~~~,,,,,,~~~~~~~~~~~~~~#####",
+      "#####~~~~~~~~~~~~~~,,,#,,~~~~~~~~~~~~~~#####",
+      "#####~~~~~~~~~~~~~~,,,#,,~~~~~~~~~~~~~~#####",
+      "######~~~~~~~~~~~~,,,,,,,,~~~~~~~~~~~~######",
+      "#######~~~~~~~~~~,,,,,,,,,,~~~~~~~~~~#######",
+      "########~~~~~~~~,,,,,,,,,,,,~~~~~~~~########",
+      "########,~~~~~~,#,,,,,,,,,,,#~~~~~~,########",
+      "########,,,,,,,,#,,,,,,,,,,,#,,,,,,,########",
+      "########,,,,,,,,,,,,,,,,,,,,,,,,,,,,########",
+      "########,,,,,,,,,,,,,,,,,,,,,,,,,,,,########",
+      "########,,,,,,,,,,~~,,,,~~,,,,,,,,,,########",
+      "#########,,,,,,,,~~~~~~~~~~,,,,,,,,#########",
+      "#########,,,,,,,~~~~~~#~~~~~,,,,,,,#########",
+      "##########,,,,,~~~~~~~#~~~~~~,,,,,##########",
+      "##########,,,,,~~~~~~~~~~~~~~,,,,,##########",
+      "###########,,,,~~~~~~~~~~~~~~,,,,###########",
+      "############,,,~~~~~~~~~~~~~~,,,############",
+      "#############,,~~~~~~~~~~~~~~,,#############",
+      "##############,~~~~~~~.~~~~~~,##############",
+      "################~~~~~~~~~~~~################",
+      "#################~~~~~~~~~~#################",
+      "##################~~~...~~##################",
+      "###################~~...~###################",
+      "#####################...####################",
+      "#####################...####################",
+      "############################################"
+    ],
+    "spawn": {
+      "x": 22.5,
+      "y": 30.5
+    },
+    "exit": {
+      "x": 22,
+      "y": 6
+    }
+  },
+  "entities": [
+    {
+      "id": 1,
+      "kind": "player",
+      "archetype": "player",
+      "pos": {
+        "x": 22.5,
+        "y": 30.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 30.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.5,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 90
+      },
+      "combat": {
+        "weapon": "shotgun",
+        "cooldown": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "loadout": {
+        "inventory": [
+          {
+            "itemId": "shotgun",
+            "qty": 1,
+            "mods": [
+              {
+                "id": "detonator",
+                "stacks": 1
+              },
+              {
+                "id": "pierce",
+                "stacks": 1
+              },
+              {
+                "id": "split",
+                "stacks": 1
+              },
+              {
+                "id": "heavy",
+                "stacks": 1
+              },
+              {
+                "id": "incendiary",
+                "stacks": 1
+              }
+            ]
+          }
+        ],
+        "activeSlot": 0
+      },
+      "playerCtl": {
+        "playerId": 0,
+        "abilityCooldown": 0,
+        "cash": 0,
+        "crimeUntilTick": 0
+      }
+    },
+    {
+      "id": 2,
+      "kind": "npc",
+      "archetype": "hivespire",
+      "pos": {
+        "x": 12.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 12.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.7,
+        "burning": 1.6,
+        "spore": 0,
+        "poisoned": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 12.5,
+          "y": 11.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "hive",
+        "guard": true
+      },
+      "hive": {
+        "nextSpawnAt": 60,
+        "nextSpreadAt": 900,
+        "children": []
+      }
+    },
+    {
+      "id": 3,
+      "kind": "npc",
+      "archetype": "hivespire",
+      "pos": {
+        "x": 32.5,
+        "y": 11.5
+      },
+      "prevPos": {
+        "x": 32.5,
+        "y": 11.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.7,
+        "burning": 1.6,
+        "spore": 0,
+        "poisoned": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 32.5,
+          "y": 11.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "hive",
+        "guard": true
+      },
+      "hive": {
+        "nextSpawnAt": 60,
+        "nextSpreadAt": 900,
+        "children": []
+      }
+    },
+    {
+      "id": 4,
+      "kind": "npc",
+      "archetype": "hivespire",
+      "pos": {
+        "x": 22.5,
+        "y": 9.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 9.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 120,
+        "max": 120,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "physical": 0.7,
+        "burning": 1.6,
+        "spore": 0,
+        "poisoned": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "neutral",
+        "home": {
+          "x": 22.5,
+          "y": 9.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "hive",
+        "guard": true
+      },
+      "hive": {
+        "nextSpawnAt": 60,
+        "nextSpreadAt": 900,
+        "children": []
+      }
+    },
+    {
+      "id": 5,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 26.5,
+        "y": 18.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 18.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 26.5,
+          "y": 18.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 6,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 28.806782075316935,
+        "y": 20.929748939058324
+      },
+      "prevPos": {
+        "x": 28.806782075316935,
+        "y": 20.929748939058324
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 28.806782075316935,
+          "y": 20.929748939058324
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 7,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 24.993959207434933,
+        "y": 21.001860743897694
+      },
+      "prevPos": {
+        "x": 24.993959207434933,
+        "y": 21.001860743897694
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 24.993959207434933,
+          "y": 21.001860743897694
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 8,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 24.0576465376942,
+        "y": 23.959596308218213
+      },
+      "prevPos": {
+        "x": 24.0576465376942,
+        "y": 23.959596308218213
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 24.0576465376942,
+          "y": 23.959596308218213
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 9,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 21.609916264174743,
+        "y": 21.619769318981835
+      },
+      "prevPos": {
+        "x": 21.609916264174743,
+        "y": 21.619769318981835
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 21.609916264174743,
+          "y": 21.619769318981835
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 10,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 18.135571386988865,
+        "y": 22.87825630182097
+      },
+      "prevPos": {
+        "x": 18.135571386988865,
+        "y": 22.87825630182097
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 18.135571386988865,
+          "y": 22.87825630182097
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 11,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 18.896124528390324,
+        "y": 19.888427965176188
+      },
+      "prevPos": {
+        "x": 18.896124528390324,
+        "y": 19.888427965176188
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 18.896124528390324,
+          "y": 19.888427965176188
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 12,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 15.5,
+        "y": 18.5
+      },
+      "prevPos": {
+        "x": 15.5,
+        "y": 18.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 15.5,
+          "y": 18.5
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 13,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 18.896124528390324,
+        "y": 17.111572034823816
+      },
+      "prevPos": {
+        "x": 18.896124528390324,
+        "y": 17.111572034823816
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 18.896124528390324,
+          "y": 17.111572034823816
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 14,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 18.135571386988865,
+        "y": 14.121743698179033
+      },
+      "prevPos": {
+        "x": 18.135571386988865,
+        "y": 14.121743698179033
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 18.135571386988865,
+          "y": 14.121743698179033
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 15,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 21.609916264174743,
+        "y": 15.380230681018164
+      },
+      "prevPos": {
+        "x": 21.609916264174743,
+        "y": 15.380230681018164
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 21.609916264174743,
+          "y": 15.380230681018164
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 16,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 24.0576465376942,
+        "y": 13.040403691781787
+      },
+      "prevPos": {
+        "x": 24.0576465376942,
+        "y": 13.040403691781787
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 24.0576465376942,
+          "y": 13.040403691781787
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 17,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 24.993959207434933,
+        "y": 15.998139256102304
+      },
+      "prevPos": {
+        "x": 24.993959207434933,
+        "y": 15.998139256102304
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 24.993959207434933,
+          "y": 15.998139256102304
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 18,
+      "kind": "npc",
+      "archetype": "sporeling",
+      "pos": {
+        "x": 28.80678207531693,
+        "y": 16.070251060941672
+      },
+      "prevPos": {
+        "x": 28.80678207531693,
+        "y": 16.070251060941672
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 4.4,
+      "radius": 0.35,
+      "facing": 0,
+      "health": {
+        "hp": 22,
+        "max": 22,
+        "iframes": 0
+      },
+      "combat": {
+        "weapon": "fists",
+        "cooldown": 0
+      },
+      "resist": {
+        "burning": 1.5,
+        "poisoned": 0.15,
+        "spore": 0
+      },
+      "status": {
+        "stun": 0,
+        "sleep": 0,
+        "hitFlashUntil": 0,
+        "cloakUntil": 0
+      },
+      "ai": {
+        "mode": "idle",
+        "faction": "gang",
+        "home": {
+          "x": 28.80678207531693,
+          "y": 16.070251060941672
+        },
+        "thinkAt": 0,
+        "sightRange": 9,
+        "behavior": "vermin"
+      }
+    },
+    {
+      "id": 19,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 18.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 18.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 20,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 26.5,
+        "y": 22.5
+      },
+      "prevPos": {
+        "x": 26.5,
+        "y": 22.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    },
+    {
+      "id": 21,
+      "kind": "interactable",
+      "archetype": "barrel",
+      "pos": {
+        "x": 22.5,
+        "y": 16.5
+      },
+      "prevPos": {
+        "x": 22.5,
+        "y": 16.5
+      },
+      "vel": {
+        "x": 0,
+        "y": 0
+      },
+      "intent": {
+        "x": 0,
+        "y": 0
+      },
+      "speed": 0,
+      "radius": 0.4,
+      "facing": 0,
+      "health": {
+        "hp": 15,
+        "max": 15,
+        "iframes": 0
+      },
+      "flammable": true
+    }
+  ]
+}

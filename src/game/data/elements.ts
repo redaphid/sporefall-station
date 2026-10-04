@@ -1,6 +1,16 @@
-// Data-driven element table. Each element is a status effect with optional
-// per-tick behavior; later milestones fill in the stubbed ones. `dot` is hp
-// lost per tick while the effect is active, applied generically by elementSystem.
+// Data-driven element table. `dot` is hp lost per tick while the effect is
+// active, applied generically by elementSystem. The damage is the least of it:
+// each element has a VERB (#87), and the verb lives where its trigger is.
+//   frozen      holds — immobilized, shatters on impact     (statusFx, combat)
+//   burning     panics — runs from its lighter, lights what it brushes
+//                                                           (statusFx, behaviors.decide, fire)
+//   electrified jumps — stuns, leaps to the nearest NPC, floods the wet
+//                                                           (interactions.shock)
+//   spore       blinds — sees only arm's reach, loses you   (goals.perceives)
+//   wet         douses fire and conducts shock              (statusFx, interactions)
+//   poisoned    no verb and no source in play: a cut candidate.
+// Control verbs (holds, jumps' stun, panics) share one lockout guard in statusFx,
+// so no pair of elements keeps a body out of the fight longer than one can alone.
 
 export interface ElementDef {
   id: string

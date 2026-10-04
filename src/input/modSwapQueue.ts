@@ -4,8 +4,10 @@
 // A reorder is a player INPUT, not a UI-side edit: it must reach the sim through
 // the same per-tick command stream as everything else so recordings, replays
 // and the host all see it. The UI only queues it here; `withModSwaps` hands out
-// one request per sampled command. While a solo run is paused no command is
-// sampled, so queued swaps apply on the first tick after resume.
+// one request per sampled command. A paused solo run still samples its input
+// every tick and drops the command, so while paused the queue hands out
+// nothing: queued swaps wait (the pause menu previews them from here) and apply
+// on the first tick after resume.
 
 import { packModSwap } from '../game/systems/modSequence'
 import type { InputSource } from './input'
@@ -42,10 +44,13 @@ export const createModSwapQueue = (): ModSwapQueue => {
 }
 
 /** Wrap an input source so each sampled command carries at most one queued
- * swap. Commands with nothing queued are returned untouched. */
-export const withModSwaps = (src: InputSource, queue: ModSwapQueue): InputSource => ({
+ * swap. Commands with nothing queued are returned untouched. `live` says
+ * whether the sim will apply the command being sampled; while it is false the
+ * queue keeps its swaps. */
+export const withModSwaps = (src: InputSource, queue: ModSwapQueue, live: () => boolean = () => true): InputSource => ({
   sample() {
     const cmd = src.sample()
+    if (!live()) return cmd
     const swap = queue.take()
     if (swap !== undefined) cmd.modSwap = swap
     return cmd

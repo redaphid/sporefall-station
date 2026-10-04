@@ -1,9 +1,10 @@
-import type { Entity, ItemStack } from '../../game/entity'
+import type { DraftHand, Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
+import type { FloorModifier } from '../../game/floorModifiers'
 import type { InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
 import { ByteReader, ByteWriter } from '../framing/codec'
@@ -373,11 +374,15 @@ export const encodeInput = (
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
     // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
-  // OPTIONAL trailing u16: a sequenced-mods reorder request, +1 biased (0 is
+  // OPTIONAL trailing u16: a mod reorder request, +1 biased (0 is
   // never written; absent = none). Written ONLY when a swap is pending, so every
   // ordinary input packet is byte-identical to before. An older host reads the
   // hotbar byte and never looks further, so the extra bytes are ignored.
-  if (cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff) w.u16(cmd.modSwap + 1)
+  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff ? cmd.modSwap + 1 : 0
+  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick < 0xff ? cmd.draftPick + 1 : 0
+  if (swap > 0 || pick > 0) w.u16(swap)
+  // OPTIONAL trailing u8 after the swap slot: a floor-draft card, +1 biased.
+  if (pick > 0) w.u8(pick)
   return w.finish()
 }
 
@@ -392,13 +397,17 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
   const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
-  const modSwap = r.remaining >= 2 ? r.u16() : 0 // back-compat: absent → no reorder
+  const swapSlot = r.remaining >= 2
+  const modSwap = swapSlot ? r.u16() : 0 // back-compat: absent → no reorder
+  // The draft byte only ever follows a swap slot, so one stray byte is never a pick.
+  const draftPick = swapSlot && r.remaining >= 1 ? r.u8() : 0
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
   if (modSwap > 0) cmd.modSwap = modSwap - 1
+  if (draftPick > 0) cmd.draftPick = draftPick - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
@@ -533,10 +542,6 @@ export interface GameStartMsg {
    * a run already in progress and must not build floor 1's level for a party
    * standing on floor 3. Optional for back-compat: absent means 1. */
   floor?: number
-  /** Mod casting rule the host runs (World.modCasting). Optional and additive:
-   * an older client ignores it, and absent means the default fold. Clients do
-   * not simulate combat; they need it only to draw the sequence HUD. */
-  modCasting?: 'sequence'
 }
 export interface GoMsg {
   startTick: number
@@ -554,15 +559,23 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
+  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
+  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional
    * on the wire for back-compat with an older host. */
   alert?: boolean
+  /** #86 lockdown (see RenderView.lockdown). Optional for back-compat. */
+  lockdown?: { secondsLeft?: number }
   /** Difficulty rules in force (host authoritative). */
   mode?: 'casual' | 'normal'
   /** Party-shared comebacks left this run (HUD; `normal` only). */
   revivesLeft?: number
+  /** This floor's modifier (host truth). Absent on a clean floor and from an
+   * older host. The client derives the tide/hunt display from it and its own
+   * host-tick estimate, so it needs no per-tick traffic. */
+  modifier?: FloorModifier
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
@@ -571,7 +584,10 @@ export interface StateMsg {
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
-  huds: Record<number, { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean }>
+  huds: Record<
+    number,
+    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+  >
 }
 
 /**

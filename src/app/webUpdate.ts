@@ -271,6 +271,8 @@ export interface WebUpdater {
   check(): Promise<CheckOutcome>
   /** A complete, verified update is downloaded and waiting to be applied. */
   readonly staged: boolean
+  /** The newer build the last check found published, or null if none was seen. */
+  readonly latest: string | null
   /** Tell the updater where the player is. It applies if (and only if) it may. */
   reportMoment(moment: UpdateMoment, peers: number): void
   /** Wire to the SW `statechange`→`installed` event; safe to call repeatedly. */
@@ -303,6 +305,7 @@ export interface WebUpdater {
 export const createWebUpdater = (deps: WebUpdaterDeps): WebUpdater => {
   let staged = false
   let applied = false
+  let latest: string | null = null
   // The last place the player was seen. Defaults to the most conservative
   // moment there is, so an update can never apply before the app has said
   // where the player actually is.
@@ -360,6 +363,7 @@ export const createWebUpdater = (deps: WebUpdaterDeps): WebUpdater => {
     const version = parseVersionPayload(probe)
     if (version.kind === 'unavailable') return 'unavailable'
     if (!isNewerBuild(version.version, deps.appVersion)) return 'up-to-date'
+    latest = version.version
 
     // There IS a newer build. Let the service worker do the downloading — it
     // is the thing that can do it atomically.
@@ -375,6 +379,9 @@ export const createWebUpdater = (deps: WebUpdaterDeps): WebUpdater => {
     check,
     get staged(): boolean {
       return staged
+    },
+    get latest(): string | null {
+      return latest
     },
     reportMoment(next: UpdateMoment, nextPeers: number): void {
       moment = next

@@ -18,7 +18,7 @@ import type { World } from '../game/world'
 import type { GameHarness } from './harness'
 import { runHarnessVerb } from './harness'
 import type { DebugMsg, HelloMsg } from './protocol'
-import { runVerb, verbName, WRITE_VERBS } from './verbs'
+import { runVerb, verbName, WRITE_VERBS, type WorldHistory } from './verbs'
 
 /** localStorage slot for the STABLE debug game id (post-rebrand convention). */
 export const DEBUG_GAME_ID_KEY = 'sporefall.debugGameId'
@@ -94,6 +94,8 @@ export interface ChannelOpts {
   /** Renderer hook for the `theme` verb (presentation-only hot-swap); absent in
    * headless contexts, where the verb reports itself unavailable. */
   setTheme?: (id: string) => void
+  /** Told about every tick and edit a verb makes; see `VerbCtx.history`. */
+  history?: WorldHistory
   /** Liveness heartbeat interval in ms (default 1000; 0 disables). */
   heartbeatMs?: number
   /** Injectable page-lifecycle source for tests; defaults to the real DOM
@@ -163,7 +165,15 @@ const connectWithBackoff = (
   }
 
   const open = (): void => {
-    ws = new WS(url)
+    try {
+      ws = new WS(url)
+    } catch (e) {
+      // The constructor throws only for a URL the browser will never dial, such as
+      // ws:// from an HTTPS page. Retrying cannot help, and letting it escape froze boot.
+      stopped = true
+      log(`[debug] hub unavailable (${url}): ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`)
+      return
+    }
     ws.onopen = () => {
       ready = true
       attempt = 0
@@ -248,7 +258,7 @@ export const startDebugChannel = (
     const reply = (ok: boolean, body: string): void => send({ t: 'rep', id, ok, body })
     const run = (): void => {
       try {
-        reply(true, runVerb(world, verb, { events: recentEvents, setTheme: opts.setTheme }))
+        reply(true, runVerb(world, verb, { events: recentEvents, setTheme: opts.setTheme, history: opts.history }))
       } catch (e) {
         reply(false, e instanceof Error ? e.message : String(e))
       }

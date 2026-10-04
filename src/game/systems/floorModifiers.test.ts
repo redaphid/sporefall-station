@@ -29,7 +29,7 @@ import { spawnPlayer } from '../player'
 import { populateWorld, spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
-import { expectWorldEqual, loadFixture } from '../testkit'
+import { createCityWorld, expectWorldEqual, loadFixture } from '../testkit'
 import { emptyInput, SIM_RATE, type InputCmd, type SimEvent } from '../types'
 import { createWorld, tickWorld, worldFromState, type World } from '../world'
 import { kill } from './combat'
@@ -87,6 +87,17 @@ const direct = (seed: number, floor: number): World => {
   return w
 }
 
+/** `direct`, on the city generator's raw-floor district: the floor-2 slums
+ * these goldens were captured on, now that play draws floor 2's district. */
+const directCity = (seed: number, floor: number): World => {
+  const w = createCityWorld(seed, floor)
+  populateWorld(w)
+  setupFloor(w)
+  const at = playerSpawnPoint(w.level, 0)
+  spawnPlayer(w, 0, at.x, at.y)
+  return w
+}
+
 const viaStairs = (seed: number, floor: number): World => {
   const w = direct(seed, 1)
   while (w.floor < floor) nextFloor(w)
@@ -124,7 +135,9 @@ const paint = (w: World, x0: number, y0: number, x1: number, y1: number, tile: n
 const mod = (kind: FloorModifierKind, since = 0): World['modifier'] =>
   kind === 'hunted' ? { kind, since, huntAt: since + HUNT_FIRST, hunts: 0 } : { kind, since }
 
-/** Seeds whose floor rolls each modifier (found by scan, pinned by assertion). */
+/** Seeds whose floor rolls each modifier (found by scan, pinned by assertion).
+ * Their worlds are the city generator's floor-2 slums (`directCity`), the floor
+ * they were found on, so the suites below never move with the floor plan. */
 const SEEDS = { hunted: [4, 2], brownout: [5, 2], bogTide: [6, 2] } as const
 
 // ── the roll ───────────────────────────────────────────────────────────────
@@ -136,8 +149,8 @@ describe('floor modifiers: the roll', () => {
 
   it('the pinned seeds roll the modifier each suite relies on', () => {
     for (const [kind, [seed, floor]] of Object.entries(SEEDS)) {
-      expect(rollFloorModifier(seed, floor, generateLevel(seed, floor))).toBe(kind)
-      expect(direct(seed, floor).modifier?.kind).toBe(kind)
+      expect(rollFloorModifier(seed, floor, createCityWorld(seed, floor).level)).toBe(kind)
+      expect(directCity(seed, floor).modifier?.kind).toBe(kind)
     }
     expect(direct(1, 2).modifier).toBeUndefined()
   })
@@ -266,7 +279,7 @@ describe('floor modifiers: the roll', () => {
 
   it('round-trips through a snapshot and replays byte-identically', () => {
     for (const [seed, floor] of Object.values(SEEDS)) {
-      const w = direct(seed, floor)
+      const w = directCity(seed, floor)
       tickN(w, HUNT_FIRST + 40) // past the first hunt and into the first flood
       const j = serializeWorld(w)
       expect(j.modifier?.kind).toBe(w.modifier?.kind)
@@ -296,7 +309,7 @@ describe('floor modifiers: the roll', () => {
   })
 
   it('is inert once the run is over', () => {
-    const w = direct(...SEEDS.hunted)
+    const w = directCity(...SEEDS.hunted)
     w.gameOver = true
     w.tick = w.modifier!.huntAt!
     modifierSystem(w)
@@ -505,7 +518,7 @@ describe('brownout', () => {
 describe('hunted', () => {
   const trackers = (w: World) => (w.groups?.list ?? []).filter((g) => g.tracker)
 
-  const huntFloor = (): World => direct(...SEEDS.hunted)
+  const huntFloor = (): World => directCity(...SEEDS.hunted)
 
   it('nothing comes early; at HUNT_FIRST a tracker pack lands out of reach, already on the scent', () => {
     const w = huntFloor()

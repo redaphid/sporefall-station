@@ -73,7 +73,7 @@ const scene = async (name, expectFn) => {
 }
 
 await scene('tour-1-bunker', (i) =>
-  [i.floor !== 3 && 'floor', i.theme !== 'industrial' && 'theme', !i.pois.includes('bunker') && 'no bunker', i.annotations < 4 && 'labels'].filter(Boolean),
+  [i.floor !== 3 && 'floor', i.theme !== 'stillworks' && 'theme', !i.pois.includes('bunker') && 'no bunker', i.annotations < 4 && 'labels'].filter(Boolean),
 )
 await scene('tour-2-hallway', (i) => [!i.pois.includes('hallway') && 'no hallway'].filter(Boolean))
 await scene('tour-3-courtyard', (i) => [!i.pois.includes('courtyard') && 'no courtyard'].filter(Boolean))

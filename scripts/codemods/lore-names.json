@@ -1,0 +1,57 @@
+{
+  "terms": {
+    "cop": { "to": "warden", "why": "The law faction and its archetype already read 'Spore Warden' in both swamp packs." },
+    "cops": { "to": "wardens", "why": "Plural of cop." },
+    "police": { "to": "wardens", "why": "Mass noun for the same faction; the colony has wardens, not police." },
+    "thug": { "to": "mutant", "why": "The melee archetype is drawn and named 'Bog Mutant' (bog-mutant cast walk)." },
+    "thugs": { "to": "mutants", "why": "Plural of thug." },
+    "gangster": { "to": "acolyte", "why": "The pistol hunter is the Rootcult's; acolyte names a cult member without modern crime." },
+    "gangsters": { "to": "acolytes", "why": "Plural of gangster." },
+    "enforcer": { "to": "acolyte", "why": "'Rootcult Enforcer' is mob-muscle wording for the same archetype." },
+    "enforcers": { "to": "acolytes", "why": "Plural of enforcer." },
+    "gang": { "to": "feral", "why": "The hostile-on-sight faction is mostly swamp life (Mireclaw, Cinder Husks, sporelings), not a street gang." },
+    "gangs": { "to": "ferals", "why": "Plural of gang." },
+    "bouncer": { "to": "lockkeeper", "why": "The peaceful-until-hit door guard is drawn as the 'Airlock Warden'; a lockkeeper keeps the airlock." },
+    "bouncers": { "to": "lockkeepers", "why": "Plural of bouncer." },
+    "officer": { "to": "bellwether", "why": "The raid's command role is the Tide Bellwether, the bell that leads the flock." },
+    "officers": { "to": "bellwethers", "why": "Plural of officer." },
+    "heist": { "to": "salvage", "why": "The bunker objective run is a colony salvage dive, not a robbery." },
+    "heists": { "to": "salvages", "why": "Plural of heist." },
+    "crime": { "to": "misdeed", "why": "Attacking settlers in view of the wardens; a misdeed carries no police-procedural frame." },
+    "crimes": { "to": "misdeeds", "why": "Plural of crime." },
+    "criminal": { "to": "troublemaker", "why": "Who the wardens chase; no legal-system frame." },
+    "criminals": { "to": "troublemakers", "why": "Plural of criminal." },
+    "lawbreaker": { "to": "troublemaker", "why": "Same as criminal." },
+    "lawbreakers": { "to": "troublemakers", "why": "Plural of lawbreaker." },
+    "law": { "to": "watch", "why": "'The law' means the warden faction; the colony keeps a watch (the art lore's Sodium Watch)." },
+    "lawful": { "to": "watchful", "why": "Hostility value for wardens: only aggro on troublemakers." },
+    "robber": { "to": "raider", "why": "Cops-and-robbers framing; raiders are the tide's word." },
+    "robbers": { "to": "raiders", "why": "Plural of robber." },
+    "thief": { "to": "scavenger", "why": "Settlers in the lore scavenge; a thief is street-crime." },
+    "thieves": { "to": "scavengers", "why": "Plural of thief." },
+    "dcop": { "to": "dwarden", "why": "Test-local delta variable fused with cop." },
+    "dthug": { "to": "dmutant", "why": "Test-local delta variable fused with thug." },
+    "dgang": { "to": "dferal", "why": "Test-local delta variable fused with gang." }
+  },
+  "phrases": [
+    { "from": " * Lore names for the four sim FACTION ids. The ids themselves are load-bearing\n * (`entity.Faction`, the disposition matrix, the BLE snapshot), so they stay —\n * this is the player-facing half only. Without it the inspect card printed a\n * bare `Faction: Gang` on a derelict swamp station, which is exactly the\n * cops-and-robbers vocabulary the theme has otherwise moved past. Wording is\n * taken from the shipped manifest so the card agrees with the name plates:\n * `Rootcult Enforcer`, `Spore Warden`, `Settler`.", "to": " * Lore names for the four sim FACTION ids (`entity.Faction`, the disposition\n * matrix, the BLE snapshot). The ids are terse; this is the player-facing half.\n * Wording is taken from the shipped manifest so the card agrees with the name\n * plates: `Rootcult Acolyte`, `Spore Warden`, `Settler`.", "why": "inspectModel.ts: the old comment explained the label by quoting the old id, which the rename makes untrue." },
+    { "from": "  // The card used to print a bare `Faction: Gang` — cops-and-robbers wording on\n  // a derelict swamp station, and the same vocabulary the theme names moved\n  // past. The sim ids are unchanged; only the label is lore.\n", "to": "  // The card prints the faction's lore name, never the terse sim id.\n", "why": "inspectModel.test.ts: same comment as above." },
+    { "from": "cops-and-robbers", "to": "Earth-city", "why": "Names the rejected fiction without repeating its words." },
+    { "from": "street-crime", "to": "Earth-city", "why": "Same as cops-and-robbers." },
+    { "from": "police line", "to": "warden line", "why": "Adjectival police reads as singular warden." },
+    { "from": "police barricade", "to": "warden barricade", "why": "Adjectival police reads as singular warden." },
+    { "from": "\"wanted\" for", "to": "\"marked\" for", "why": "Wanted-poster wording for the misdeed timer; 'wanted' elsewhere is the plain verb." }
+  ],
+  "keep": [
+    { "pattern": "https?://[^\\s)\\]>\"'`]+", "why": "External URLs are immutable addresses (GitHub blobs, review images, references)." },
+    { "pattern": "\\b[A-Z]:[\\\\/][^\\s)\"'`|]*", "why": "Windows paths point at files outside this repo." },
+    { "pattern": "/mnt/[a-z]/[^\\s)\"'`|]*", "why": "WSL paths point at files outside this repo." },
+    { "pattern": "hooded officer|officer'?s? (?:great)?coat", "why": "Garment wording in an image-model prompt and a record of what the model drew, not a faction." },
+    { "pattern": "applicable law|as a law\\b", "why": "Legal boilerplate and the scientific sense of law, unrelated to the warden faction." }
+  ],
+  "skipPaths": [
+    { "prefix": "scripts/codemods/", "why": "The mapping and the codemod must name the old terms." },
+    { "prefix": "android/", "why": "Generated Capacitor and Gradle files." },
+    { "prefix": "pnpm-lock.yaml", "why": "Package lockfile." }
+  ]
+}

@@ -791,4 +791,44 @@ describe('readPad', () => {
       expect(s.attack).toBe(false)
     })
   })
+
+  describe('a raw pad learns its right stick from use (8BitDo-style, mapping "")', () => {
+    const raw = padProfile({ id: '8BitDo Lite 2', mapping: '', axes: new Array(8).fill(0) })
+    const read = (hat: HatCalibration, axes: number[]) => readPad(fakePad({ axes, axisCount: 8, mapping: '' }), raw, hat)
+
+    it('aims nothing until the stick has rested and then swept through the middle', () => {
+      const hat = initialHatCalibration()
+      expect(read(hat, [0, 0, 0, 0.5, 0.5, 0]).aimX).toBe(0)
+      expect(read(hat, [0, 0, 0, 0.5, 0.5, 0]).aimX).toBe(0)
+    })
+
+    it('aims along the learned pair once it has swept', () => {
+      const hat = initialHatCalibration()
+      read(hat, [0, 0, 0, 0, 0, 0])
+      const s = read(hat, [0, 0, 0, 0.6, -0.6, 0])
+      expect(s.aimX).toBeGreaterThan(0)
+      expect(s.aimY).toBeLessThan(0)
+      expect(s.attack).toBe(false)
+    })
+
+    it('triggers that report 0 then jump to -1 never become aim', () => {
+      const hat = initialHatCalibration()
+      read(hat, [0, 0, 0, 0, 0, 0])
+      for (let i = 0; i < 5; i++) {
+        const s = read(hat, [0, 0, -1, 0, 0, -1])
+        expect(s.aimX).toBe(0)
+        expect(s.aimY).toBe(0)
+      }
+      // Even if one is later pressed part-way, it stays disqualified.
+      expect(read(hat, [0, 0, -0.4, 0, 0, -0.4]).aimX).toBe(0)
+    })
+
+    it('a hat reading only -1/0/1 never becomes aim', () => {
+      const hat = initialHatCalibration()
+      read(hat, [0, 0, 0, 0, 0, 0])
+      const s = read(hat, [0, 0, 0, 0, 1, 1])
+      expect(s.aimX).toBe(0)
+      expect(s.aimY).toBe(0)
+    })
+  })
 })

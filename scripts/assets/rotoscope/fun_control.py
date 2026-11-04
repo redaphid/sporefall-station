@@ -100,12 +100,13 @@ def save_flow(g, out, d):
     json.dump(comfy_ui.to_workflow(g, pos, specs=comfy_ui.fetch_specs(S.HOST)), open(os.path.join(out, f"flow-{d}.json"), "w"), indent=1)
 
 
-def adopt(base, out, d, raw):
-    """Make <out> a run `cast_walk.py assemble --take` reads: the base run's idle/keyframe for <d>, and a
-    sheet.json whose loop for <d> is spritesheet's own pick on this clip."""
+def adopt(base, out, d, raw, ref):
+    """Make <out> a run `cast_walk.py assemble --take` reads: the base run's idle for <d>, the keyframe this
+    take really used, and a sheet.json whose loop for <d> is spritesheet's own pick on this clip."""
     import shutil
-    for f in glob.glob(os.path.join(base, "raw", f"{d}-idle.png")) + glob.glob(os.path.join(base, "raw", f"{d}-keyframe*")):
+    for f in glob.glob(os.path.join(base, "raw", f"{d}-idle.png")):
         shutil.copyfile(f, os.path.join(out, "raw", os.path.basename(f)))
+    Image.open(ref).convert("RGB").save(os.path.join(out, "raw", f"{d}-keyframe.png"))
     meta = json.load(open(os.path.join(base, "sheet.json")))
     clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(os.path.join(raw, "*.png")))]
     meta["loops"] = {d: S.find_loop(clip)}
@@ -128,6 +129,7 @@ def main():
     ap.add_argument("--steps", type=int, default=4)
     ap.add_argument("--split", type=int, default=2)
     ap.add_argument("--no-lora", action="store_true")
+    ap.add_argument("--moves", default=MOVES, help="the motion sentence; the default is written for many legs")
     ap.add_argument("--base-run", help="a video-route run (video-sN) whose <dir>-idle/keyframe this take reuses, so "
                                        "`cast_walk.py assemble <base> --take <dir>=<out>` can take it")
     a = ap.parse_args()
@@ -140,7 +142,7 @@ def main():
         vname = upload_file(os.path.join(a.out, "control.mp4"), f"rnd-multileg-{tag}.mp4")
         rname = S.upload(Image.open(a.ref).convert("RGB"), f"rnd-multileg-{tag}-ref.png")
     who = open(a.describe_file).read().strip()
-    text = f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {S.DIRS[a.dir]}, {MOVES}. {S.WAN_RULES}"
+    text = f"Pixel art video game sprite animation. {who[0].upper() + who[1:]}, {S.DIRS[a.dir]}, {a.moves}. {S.WAN_RULES}"
     g = graph(rname, vname, text, a.seed, f"sprite-sheet/rnd-multileg/{tag}", S.WAN["width"], S.WAN["height"],
               a.length, a.shift, a.steps, a.split, not a.no_lora)
     json.dump(g, open(os.path.join(a.out, "flow_api.json"), "w"), indent=1)
@@ -161,7 +163,7 @@ def main():
     for i, im in enumerate(sorted(ims, key=lambda im: im["filename"])):
         S.fetch(im).save(os.path.join(raw, f"{i:04d}.png"))
     if a.base_run:
-        adopt(a.base_run, a.out, a.dir, raw)
+        adopt(a.base_run, a.out, a.dir, raw, a.ref)
     json.dump({"period": period, "seed": a.seed, "shift": a.shift, "steps": a.steps, "lora": not a.no_lora,
                "text": text}, open(os.path.join(a.out, "run.json"), "w"), indent=1)
     print(f"-> {raw} ({len(ims)} frames)")

@@ -285,7 +285,7 @@
       "why": "Cited works and a project path, not the colony's ground."
     },
     {
-      "pattern": "baseball bat|Not a 'bat'",
+      "pattern": "baseball bat|Not a 'bat'|'not a bat'",
       "why": "A description of the old art, and the owner's verbatim quote about it."
     },
     {

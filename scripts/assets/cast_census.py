@@ -96,6 +96,8 @@ def best_run(runs, kind):
     root = os.path.join(runs, kind)
     if not os.path.isdir(root):
         return "no run dir"
+    if not os.listdir(root):
+        return "empty run dir"
     takes = sorted(os.path.basename(p) for p in glob.glob(os.path.join(root, "take*")) if os.path.isdir(p))
     sheet = os.path.join(root, "best-pal", "sheet.json")
     if not os.path.exists(sheet):

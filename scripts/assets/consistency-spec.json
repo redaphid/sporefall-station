@@ -269,10 +269,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 19,
-   "head_h": 18,
-   "mass": 473,
-   "cx": 0.47,
+   "width": 25,
+   "head_h": 30,
+   "mass": 662,
+   "cx": -0.28,
    "foot_y": 45
   },
   "tol": {

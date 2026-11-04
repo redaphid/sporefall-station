@@ -192,11 +192,11 @@
  "gloom-lurker": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 41,
-   "width": 43,
-   "head_h": 26,
-   "mass": 862,
-   "cx": -0.62,
+   "height": 43,
+   "width": 37,
+   "head_h": 35,
+   "mass": 846,
+   "cx": -0.65,
    "foot_y": 45
   },
   "tol": {

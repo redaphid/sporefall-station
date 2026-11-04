@@ -76,3 +76,23 @@ sporeling 4.4, stalker 4.2, gloamhound 4.2, warden/spore-drone 4.0, pod/brood-sa
 hivespire 0 (only stationary one). Gloom-lurker: prowl, not pulse. Brood-sac: needs a real way to move
 (hatch legs / crawl / roll) or a design that can. Spore-drone: real flight (wing beats/thrust), not a bob.
 
+
+## Resume 2026-11-04 (Aaron: "go down the list for the remaining characters")
+
+The run stopped 09-29 ~20:20. Merged main at 0b3f6c3f. Census: `/mnt/d/tmp/cast-walks/census-2026-11-04.tsv`, per-ref detail `census-2026-11-04-refs.tsv`.
+This section supersedes every status above. Rules unchanged. Gate head is still G7 `938319cdcc807028`.
+
+On main (5): vine-ranger, mycologist, drowned-diver, blast-diver, frog-settler.
+
+In flight, finish first:
+1. sporeling-mite: Wan ne/n from the kf2 picks (ne s3, n s3), then gate. Its ne-idle fails charConsistency (height 43 vs 46), which keeps this branch red, so nothing merges to main until it lands.
+2. cinder-husk: gate wip/cinder-finish-art (cut off 09-29), ship for testing (Aaron 09-29: "fine for now"), redesign later.
+3. bellwether: take1 s/se/e pass; retake ne (1.563) and se per queue-retakes.sh, assemble, gate.
+4. mireclaw-stalker: frames on wip/stalker-ship need seam exception G8. Waiting on Aaron's sign-off (rule 14).
+
+Not animated, in order, using concept-picks-v3 and rule 13:
+5. gloom-lurker, 6. mireclaw-alpha (needs a brief), 7. carapace-brute (needs a brief), 8. spore-mortar, 9. derelict-bot, 10. gloam-hound, 11. bog-mender, 12. spore-drone, 13. brood-sac, 14. hive-spire, 15. bog-mutant (redesign, Aaron veto).
+
+Junk, never merge: wip/mireclaw-alpha-crash-0929 (files zeroed by a crash).
+
+Concurrency: each worker has its own worktree and branch `art/<char>-1104`, cut from origin/art/cast-walk-cycles. Workers append to PROGRESS.md through the /mnt/d/tmp/cast-walks symlink and do not commit it; the coordinator commits it. Workers stop at "ready" for the coordinator's contact-sheet check (rule 5); merges are serial.

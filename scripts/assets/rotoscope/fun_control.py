@@ -100,7 +100,8 @@ def adopt(base, out, d, raw, ref, g):
         shutil.copyfile(f, os.path.join(out, "raw", os.path.basename(f)))
     Image.open(ref).convert("RGB").save(os.path.join(out, "raw", f"{d}-keyframe.png"))
     json.dump(g, open(os.path.join(out, f"flow-{d}_api.json"), "w"), indent=1)
-    json.dump(S.comfy_ui.to_workflow(g), open(os.path.join(out, f"flow-{d}.json"), "w"), indent=1)
+    specs = S.comfy_ui.fetch_specs(S.HOST)  # Fun-Control's nodes are not in comfy_ui.BUILTIN
+    json.dump(S.comfy_ui.to_workflow(g, specs=specs), open(os.path.join(out, f"flow-{d}.json"), "w"), indent=1)
     meta = json.load(open(os.path.join(base, "sheet.json")))
     clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(os.path.join(raw, "*.png")))]
     meta["loops"] = {d: S.find_loop(clip)}

@@ -42,6 +42,7 @@ def main():
     ap.add_argument("--kind", required=True)
     ap.add_argument("--dir", default="se")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--ms", type=int, default=133, help="GIF ms per frame. anim.walk = 4 ticks a frame, 30 ticks = 1 s")
     ap.add_argument("takes", nargs="+", help="name=dir of 96 px frames")
     a = ap.parse_args()
     takes = [t.split("=", 1) for t in a.takes]
@@ -66,8 +67,7 @@ def main():
                 w = frames[n][2 + i].resize((96 * scale, 96 * scale), Image.NEAREST)
                 fr.paste(w, (c * 96 * scale, 0), w)
             seq.append(fr)
-        # anim.walk = 4: a walk frame every 4 ticks at 60 Hz
-        seq[0].save(f"{a.out}-walk-96{tag}.gif", save_all=True, append_images=seq[1:], duration=67, loop=0)
+        seq[0].save(f"{a.out}-walk-96{tag}.gif", save_all=True, append_images=seq[1:], duration=a.ms, loop=0)
 
     crest = {n: {"idle": bone_top(fr[0]), "walk": [bone_top(f) for f in fr[2:]]} for n, fr in frames.items()}
     for v in crest.values():

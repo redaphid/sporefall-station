@@ -610,23 +610,29 @@ def detect_wan(overrides: dict) -> tuple[dict, list[str]]:
 
 
 def video_graph(input_name, d, seed, q, w, describe="", style=STYLE, prefix="sprite-sheet/video",
-                motion="walk") -> Graph:
-    """ONE direction: Qwen keyframe (1280x720 on white) -> Wan 2.2 I2V, 81 frames of MOTIONS[motion] in place."""
+                motion="walk", keyframe=None) -> Graph:
+    """ONE direction: Qwen keyframe (1280x720 on white) -> Wan 2.2 I2V, 81 frames of MOTIONS[motion] in place.
+    `keyframe` names an uploaded image picked from a probe: Wan starts from exactly it, and no Qwen runs."""
     pose, moves, closed = MOTIONS[motion]
     g = Graph()
-    g.band("models + input", "#335")
-    m, clip, vae, src, neg = _qwen_loaders(g, q, input_name)
-    lat = g.add("EmptySD3LatentImage", {"width": KEY_W, "height": KEY_H, "batch_size": 1}, col=1)
-    steps, cfg = (4, 1.0) if q.get("lightning") else (20, 2.5)
-    g.band(f"keyframe {d} (Qwen-Image-Edit)")
-    pos = g.add("TextEncodeQwenImageEditPlus", {"clip": [clip, 0], "vae": [vae, 0], "image1": [src, 0],
-                                                "prompt": _idle_prompt(d, describe, style, pose)}, f"{d} keyframe prompt", col=0)
-    pos = g.add("FluxKontextMultiReferenceLatentMethod",
-                {"conditioning": [pos, 0], "reference_latents_method": "index_timestep_zero"}, col=0)
-    ks = g.add("KSampler", {"model": [m, 0], "positive": [pos, 0], "negative": [neg, 0], "latent_image": [lat, 0],
-                            "seed": seed, "steps": steps, "cfg": cfg, "sampler_name": "euler", "scheduler": "simple",
-                            "denoise": 1.0}, f"{d} keyframe sampler", col=1)
-    key = g.add("VAEDecode", {"samples": [ks, 0], "vae": [vae, 0]}, col=1)
+    if keyframe:
+        g.band(f"keyframe {d} (picked)")
+        key = g.add("LoadImage", {"image": keyframe}, f"picked keyframe {d}", col=1)
+    else:
+        g.band("models + input", "#335")
+        m, clip, vae, src, neg = _qwen_loaders(g, q, input_name)
+        lat = g.add("EmptySD3LatentImage", {"width": KEY_W, "height": KEY_H, "batch_size": 1}, col=1)
+        steps, cfg = (4, 1.0) if q.get("lightning") else (20, 2.5)
+        g.band(f"keyframe {d} (Qwen-Image-Edit)")
+        pos = g.add("TextEncodeQwenImageEditPlus", {"clip": [clip, 0], "vae": [vae, 0], "image1": [src, 0],
+                                                    "prompt": _idle_prompt(d, describe, style, pose)},
+                    f"{d} keyframe prompt", col=0)
+        pos = g.add("FluxKontextMultiReferenceLatentMethod",
+                    {"conditioning": [pos, 0], "reference_latents_method": "index_timestep_zero"}, col=0)
+        ks = g.add("KSampler", {"model": [m, 0], "positive": [pos, 0], "negative": [neg, 0], "latent_image": [lat, 0],
+                                "seed": seed, "steps": steps, "cfg": cfg, "sampler_name": "euler",
+                                "scheduler": "simple", "denoise": 1.0}, f"{d} keyframe sampler", col=1)
+        key = g.add("VAEDecode", {"samples": [ks, 0], "vae": [vae, 0]}, col=1)
     g.add("SaveImage", {"images": [key, 0], "filename_prefix": f"{prefix}/{d}-keyframe"}, f"keyframe {d}", col=2)
     start = g.add("ImageScale", {"image": [key, 0], "upscale_method": "lanczos", "width": w["width"],
                                  "height": w["height"], "crop": "center"}, "keyframe -> 848x480", col=3)
@@ -1286,13 +1292,20 @@ def cmd_video(a, dirs, kind, root, src, pal):
         print(" ·", n)
     ranges = period_ranges(a.period, dirs)
     input_name = upload(src, f"spritesheet-{kind}.png") if online else f"spritesheet-{kind}.png"
+    keyframes = {}
+    for spec in a.keyframe:
+        d, _, path = spec.partition("=")
+        if d not in dirs or not path:
+            raise SystemExit(f"--keyframe {spec!r}: want <dir>=<image>, with <dir> in --dirs ({','.join(dirs)})")
+        name = f"spritesheet-{kind}-{d}-keyframe.png"
+        keyframes[d] = upload(Image.open(path).convert("RGB"), name) if online else name
     runs = []
     for seed in a.seeds or [3]:  # the frog's seed
         out = os.path.join(root, f"video-s{seed}")
         os.makedirs(f"{out}/raw", exist_ok=True)
         graphs = {d: video_graph(input_name, d, seed, q, w,
                                  (a.describe_back or a.describe) if d in BACK_DIRS else a.describe, a.style or STYLE,
-                                 f"sprite-sheet/{kind}/video-s{seed}", a.motion) for d in dirs}
+                                 f"sprite-sheet/{kind}/video-s{seed}", a.motion, keyframes.get(d)) for d in dirs}
         for d, g in graphs.items():
             json.dump(g.nodes, open(f"{out}/flow-{d}_api.json", "w"), indent=1)
             json.dump(g.workflow(), open(f"{out}/flow-{d}.json", "w"), indent=1)
@@ -1557,6 +1570,9 @@ def main(argv=None):
     ap.add_argument("--describe-back", default="",
                     help=f"video: the describe for the back views ({', '.join(BACK_DIRS)}), whose face is hidden "
                          "(default --describe); keep face parts out of it or they are drawn on the back")
+    ap.add_argument("--keyframe", nargs="+", action="extend", default=[], metavar="DIR=IMAGE",
+                    help="video: start this direction's Wan from a keyframe already picked (e.g. from a Qwen probe), "
+                         "e.g. ne=kf/ne-s3.png; a re-render is not guaranteed to redraw the pick")
     ap.add_argument("--motion", choices=list(MOTIONS), default="walk",
                     help="video: how it moves in place; hover = fliers (bob, never step), pulse = rooted things")
     ap.add_argument("--style", help=f"style sentence (default: {STYLE!r})")

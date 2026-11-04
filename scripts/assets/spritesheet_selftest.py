@@ -445,6 +445,16 @@ def main():
             ks = [n for n in wf["nodes"] if n["type"] == "KSampler"]
             check(f"{label}: KSampler widgets = seed, control, steps, cfg, sampler, scheduler, denoise",
                   all(len(n["widgets_values"]) == 7 and n["widgets_values"][1] == "fixed" for n in ks))
+        picked = S.video_graph("c.png", "e", 3, q, S.WAN, "a courier", keyframe="kf.png").nodes
+        check("video --keyframe: validates", not validate(picked), validate(picked)[:3])
+        check("video --keyframe: no Qwen runs",
+              not any(n["class_type"] == "TextEncodeQwenImageEditPlus" for n in picked.values()))
+        pwi = next(n["inputs"] for n in picked.values() if n["class_type"] == "WanImageToVideo")
+        pscale = picked[pwi["start_image"][0]]["inputs"]["image"][0]
+        check("video --keyframe: Wan starts from the picked image",
+              picked[pscale]["class_type"] == "LoadImage" and picked[pscale]["inputs"]["image"] == "kf.png")
+        check("video --keyframe: the keyframe is still saved under its title (harvest finds it)",
+              any(n["_meta"]["title"] == "keyframe e" for n in picked.values() if n["class_type"] == "SaveImage"))
         g = S.video_graph("c.png", "e", 3, q, S.WAN)
         adv = [n for n in g.nodes.values() if n["class_type"] == "KSamplerAdvanced"]
 

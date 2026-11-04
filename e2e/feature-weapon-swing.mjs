@@ -1,9 +1,9 @@
 // feat/weapon-sprites — HELD WEAPONS that SWING, and MODS that mutate the look.
 // Injects the committed `combat-stage` snapshot with the player re-armed to a
-// MELEE weapon, replays the `meleeSwing` timeline (march into the thug line and
+// MELEE weapon, replays the `meleeSwing` timeline (march into the mutant line and
 // hold the attack), and captures a still per beat + an asserted mp4. Three cuts:
 //   1. a plain SLEDGEHAMMER (big hammer silhouette, wide overhead arc),
-//   2. a plain BAT (tapered club, faster cadence),
+//   2. a plain WRENCH (tapered club, faster cadence),
 //   3. a sledgehammer with the INCENDIARY mod — the weapon wears the fire-orange
 //      pickup hue + a glow, proving mods mutate the held sprite.
 // The swing is deterministic (a pure function of the attack window), so the same
@@ -28,7 +28,7 @@ const armed = (weaponId, mods) => {
 }
 
 // Stills straddle the swing window so at least one lands mid-arc (attack cadence
-// is deterministic: sledgehammer 28 ticks, bat 15 — several swings across 150).
+// is deterministic: sledgehammer 28 ticks, wrench 15 — several swings across 150).
 const stills = [
   { tick: 20, label: '01-armed' },
   { tick: 150, label: '02-marching' },
@@ -45,7 +45,7 @@ const readState = () => {
     tick: w.tick,
     gameOver: w.gameOver,
     weapon: pl?.combat?.weapon ?? null,
-    thugsAlive: w.entities.filter((e) => e.archetype === 'thug' && !e.dead).length,
+    mutantsAlive: w.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length,
     playerHp: pl?.health?.hp ?? null,
   }
 }
@@ -54,13 +54,13 @@ const cuts = [
   {
     name: 'weapon-swing-sledgehammer',
     world: armed('sledgehammer', undefined),
-    // A heavy weapon that reaches the line and staggers/kills at least one thug.
-    expect: (s) => [s.weapon !== 'sledgehammer' && 'not wielding the sledgehammer', s.thugsAlive === 3 && 'sledge never connected', s.gameOver && 'unexpected game over'],
+    // A heavy weapon that reaches the line and staggers/kills at least one mutant.
+    expect: (s) => [s.weapon !== 'sledgehammer' && 'not wielding the sledgehammer', s.mutantsAlive === 3 && 'sledge never connected', s.gameOver && 'unexpected game over'],
   },
   {
-    name: 'weapon-swing-bat',
-    world: armed('bat', undefined),
-    expect: (s) => [s.weapon !== 'bat' && 'not wielding the bat', s.gameOver && 'unexpected game over'],
+    name: 'weapon-swing-wrench',
+    world: armed('wrench', undefined),
+    expect: (s) => [s.weapon !== 'wrench' && 'not wielding the wrench', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'weapon-swing-sledgehammer-incendiary',

@@ -37,11 +37,11 @@ const stills = [
 
 const readState = () => {
   const w = window.__world
-  const thugs = w.entities.filter((e) => e.archetype === 'thug')
+  const mutants = w.entities.filter((e) => e.archetype === 'mutant')
   return {
     tick: w.tick,
     gameOver: w.gameOver,
-    thugsAlive: thugs.filter((e) => !e.dead).length,
+    mutantsAlive: mutants.filter((e) => !e.dead).length,
     seenMods: [...(window.__seenModIds ?? [])].sort(),
     moddedBulletsSeen: window.__moddedBullets ?? 0,
     vanillaBulletsSeen: window.__vanillaBullets ?? 0,
@@ -98,7 +98,7 @@ const runs = [
       s.moddedBulletsSeen < 5 && `only ${s.moddedBulletsSeen} modded bullets seen`,
       JSON.stringify(s.seenMods) !== JSON.stringify(['frost', 'pierce', 'velocity']) &&
         `wrong provenance in flight: ${s.seenMods}`,
-      s.thugsAlive === 3 && 'cryo lance hit nothing',
+      s.mutantsAlive === 3 && 'cryo lance hit nothing',
       s.gameOver && 'unexpected game over',
     ],
   },
@@ -110,7 +110,7 @@ const runs = [
     expect: (s) => [
       s.moddedBulletsSeen < 3 && `only ${s.moddedBulletsSeen} modded bullets seen`,
       s.seenMods.length !== ALL_MODS.length && `provenance lost mods: ${s.seenMods.length}/${ALL_MODS.length}`,
-      s.thugsAlive === 3 && 'monster build hit nothing',
+      s.mutantsAlive === 3 && 'monster build hit nothing',
     ],
   },
 ]

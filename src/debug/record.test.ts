@@ -15,7 +15,7 @@ const recordSession = (): Recording => {
   h.startRecording()
   // Scripted programmatic inputs: everyone pushes into the populated city and
   // fires — deterministically triggering AI/combat (hits + deaths). Spawn is
-  // the map's NW corner and street life now keeps a spawn-safe radius, so the
+  // the map's NW corner and causeway life now keeps a spawn-safe radius, so the
   // party must march INTO the city (east/south) to reach anyone to shoot.
   h.setInput(0, { moveX: 1, attack: true })
   h.setInput(1, { moveX: 1, attack: true })
@@ -77,7 +77,7 @@ describe('save / load fixtures', () => {
     const h = new GameHarness()
     h.create({ seed: 4242 })
     h.start()
-    spawnNpc(h.world, 'cop', 12, 12)
+    spawnNpc(h.world, 'warden', 12, 12)
     h.stepTicks(30)
     const fixture = saveWorld(h.world)
     const before = h.world.entities.map(serializeEntity)

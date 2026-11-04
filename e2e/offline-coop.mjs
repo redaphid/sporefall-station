@@ -125,7 +125,7 @@ const advanceHostFloor = async (page, ms = 20000) => {
       // overshoot (floor 2 → 4 instead of 3).
       if (w.floor !== from) return w.floor
       w.mission.exitUnlocked = true
-      const exit = w.mission.extractPoint ?? w.level.exit
+      const exit = w.level.exit
       for (const e of w.entities) {
         if (!e.playerCtl || e.dead || e.playerCtl.downed) continue
         e.pos.x = exit.x + 0.5

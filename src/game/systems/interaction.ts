@@ -218,7 +218,7 @@ const handleInteract = (w: World, p: Entity): void => {
 
 /** Does this player hold the keycard a biolock demands? A seal with an explicit
  * `keyId` wants that exact card; a keyless seal accepts any wing keycard. */
-const hasKeycard = (p: Entity, keyId: string | undefined): boolean =>
+export const hasKeycard = (p: Entity, keyId: string | undefined): boolean =>
   (p.loadout?.inventory ?? []).some((s) =>
     keyId !== undefined ? s.itemId === keyId : s.itemId === 'keycard' || s.itemId.startsWith('keycard.'),
   )

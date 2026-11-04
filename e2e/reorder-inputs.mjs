@@ -4,8 +4,9 @@
 //   touch — a phone-sized touch context: tap two HUD chips during play, then
 //           ⏸, tap two chips in the pause strip, Resume.
 //   pad   — no touch, no mouse, no keyboard: a scripted standard gamepad
-//           (navigator.getGamepads) joins, pauses with Start, walks the pause
-//           strip with the d-pad, taps two chips with A, resumes with Start.
+//           (navigator.getGamepads) joins, pauses with Start, climbs from
+//           Resume to the pause strip with Up, walks it with the d-pad, taps
+//           two chips with A, resumes with Start.
 //
 // Each run asserts on the REAL sim list (window.world), before and after, and
 // on the pause strip's preview while the sim is stopped.
@@ -118,12 +119,14 @@ const padRun = async (browser) => {
   const A = 0
   const START = 9
   const RIGHT = 15
+  const UP = 12
   const r = { input: 'gamepad', bootErrors, start }
   await press(A) // any input joins the pad (it lands on the local player's slot)
   await press(START)
   await until(page, 'the pause menu', paused)
   r.pausedBy = 'Start'
   await sleep(200)
+  await press(UP) // the menu opens on Resume; the wand strip is the row above
   await press(RIGHT)
   await press(A) // pick chip 1
   await press(RIGHT)

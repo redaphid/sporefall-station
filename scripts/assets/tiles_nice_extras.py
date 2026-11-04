@@ -65,9 +65,9 @@ def grass_accent(T, v):
     return snap(img)
 
 
-def street_accent(T, v):
+def causeway_accent(T, v):
     rng = rng_(9000 + v)
-    img = N.street_tile(T, v).astype(np.float32)
+    img = N.causeway_tile(T, v).astype(np.float32)
     # a drain grate with teal seep
     s = T // 4
     x0, y0 = T // 2 - s // 2, T // 2 - s // 2
@@ -107,7 +107,7 @@ def main():
         Image.fromarray(floor_accent(T, v), "RGB").save(f"{out}/floor-accent-{v}.png")
     for v in range(3):
         Image.fromarray(grass_accent(T, v), "RGB").save(f"{out}/grass-accent-{v}.png")
-        Image.fromarray(street_accent(T, v), "RGB").save(f"{out}/street-accent-{v}.png")
+        Image.fromarray(causeway_accent(T, v), "RGB").save(f"{out}/causeway-accent-{v}.png")
     for v in range(4):
         floor_overlay(T, v).save(f"{out}/floor-overlay-{v}.png")
     print(f"tile extras -> {out} (T={T})")

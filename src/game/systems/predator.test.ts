@@ -30,8 +30,8 @@ describe('#67 predator — culls the weakest', () => {
     const { w, cx, cy } = arena()
     const stalker = spawnNpc(w, 'stalker', cx, cy)
     stalker.ai!.sightRange = 14
-    spawnNpc(w, 'gangster', cx + 3, cy) // full HP, and CLOSER
-    const weak = spawnNpc(w, 'gangster', cx + 5, cy) // wounded, farther
+    spawnNpc(w, 'acolyte', cx + 3, cy) // full HP, and CLOSER
+    const weak = spawnNpc(w, 'acolyte', cx + 5, cy) // wounded, farther
     wound(weak, 0.1)
     const goal = decide(w, stalker).goal
     expect(['battle', 'pursue']).toContain(goal.code)
@@ -54,9 +54,9 @@ describe('#67 predator — refuses a losing fight', () => {
     const { w, cx, cy } = arena()
     const stalker = spawnNpc(w, 'stalker', cx, cy)
     stalker.ai!.sightRange = 14
-    const weak = spawnNpc(w, 'gangster', cx + 5, cy)
+    const weak = spawnNpc(w, 'acolyte', cx + 5, cy)
     wound(weak, 0.05) // a tempting straggler…
-    for (let i = 0; i < 3; i++) spawnNpc(w, 'cop', cx + 2 + i * 0.5, cy + 1) // …but 3 healthy cops on top of it
+    for (let i = 0; i < 3; i++) spawnNpc(w, 'warden', cx + 2 + i * 0.5, cy + 1) // …but 3 healthy wardens on top of it
     const goal = decide(w, stalker).goal
     expect(goal.code).toBe('flee') // pack-avoid (PANIC) overrides the stalk
   })
@@ -65,12 +65,12 @@ describe('#67 predator — refuses a losing fight', () => {
     const { w, cx, cy } = arena()
     const stalker = spawnNpc(w, 'stalker', cx, cy)
     stalker.ai!.sightRange = 14
-    const weak = spawnNpc(w, 'gangster', cx + 5, cy)
+    const weak = spawnNpc(w, 'acolyte', cx + 5, cy)
     wound(weak, 0.05)
-    const cops = [0, 1, 2].map((i) => spawnNpc(w, 'cop', cx + 2 + i * 0.5, cy + 1))
+    const wardens = [0, 1, 2].map((i) => spawnNpc(w, 'warden', cx + 2 + i * 0.5, cy + 1))
     expect(decide(w, stalker).goal.code).toBe('flee') // outnumbered → break off
-    cops[0].dead = true
-    cops[1].dead = true // pack thinned below K=3
+    wardens[0].dead = true
+    wardens[1].dead = true // pack thinned below K=3
     const goal = decide(w, stalker).goal
     expect(['battle', 'pursue']).toContain(goal.code) // back on the hunt
   })
@@ -79,7 +79,7 @@ describe('#67 predator — refuses a losing fight', () => {
     const { w, cx, cy } = arena()
     const stalker = spawnNpc(w, 'stalker', cx, cy)
     stalker.ai!.sightRange = 14
-    const weak = spawnNpc(w, 'gangster', cx + 4, cy)
+    const weak = spawnNpc(w, 'acolyte', cx + 4, cy)
     wound(weak, 0.15)
     const input = new Map([[0, emptyInput()]])
     for (let t = 0; t < 30; t++) tickWorld(w, input)

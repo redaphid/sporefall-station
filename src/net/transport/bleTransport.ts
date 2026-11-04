@@ -92,6 +92,7 @@ export class BleHostTransport implements Transport {
    * means patching the plugin or carrying the client's negotiated maxPacket in
    * the Hello message — deliberately out of scope here.
    */
+  readonly medium = 'bluetooth'
   readonly maxPacket = MAX_PACKET
   private handlers = new Set<(e: TransportEvent) => void>()
   private connected = new Set<PeerId>()
@@ -225,6 +226,7 @@ export interface FoundHost {
  */
 export class BleClientTransport implements Transport {
   readonly role = 'client' as const
+  readonly medium = 'bluetooth'
   maxPacket = MAX_PACKET
   private handlers = new Set<(e: TransportEvent) => void>()
   private hostDeviceId: string | null = null

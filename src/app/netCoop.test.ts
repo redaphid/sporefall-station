@@ -26,6 +26,7 @@ class MockHub {
     const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -56,6 +57,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.deliverToHost(peer, bytes),
@@ -105,6 +107,9 @@ class MockHub {
     }
   }
 }
+
+/** Rolls the host has folded and not yet run. */
+const queuedRolls = (p: { taps: { edges: number }[] }): number => p.taps.filter((t) => (t.edges & 8) !== 0).length
 
 const stubInput = (cmd: Partial<InputCmd> = {}): InputSource => ({
   sample: () => ({ ...emptyInput(), ...cmd }),
@@ -799,6 +804,7 @@ const makeCapturingClientTransport = (): {
   const transport: Transport = {
     role: 'client',
     maxPacket: 180,
+    medium: 'local',
     start: async () => {},
     stop: async () => {},
     sendPacket: async () => {},
@@ -878,15 +884,15 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     // First delivery: the roll edge latches, then the tick consumes it exactly once.
     raw.send(rollPkt)
     await flush()
-    expect(p.pendingEdges & 8).toBe(8)
+    expect(queuedRolls(p)).toBe(1)
     host.tick()
-    expect(p.pendingEdges).toBe(0)
+    expect(p.taps).toHaveLength(0)
 
     // A duplicate/reordered copy of the SAME packet (seq 5 is now stale) must NOT
     // re-arm the roll — otherwise the player dodge-rolls a second time they never asked for.
     raw.send(rollPkt)
     await flush()
-    expect(p.pendingEdges & 8).toBe(0)
+    expect(queuedRolls(p)).toBe(0)
   })
 
   it('does not drop a pure-edge tap (roll) when the input lane stalls under congestion', async () => {
@@ -907,6 +913,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     const hostTransport: Transport = {
       role: 'host',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_peer, bytes) => deliver(() => h.client?.({ type: 'data', peer: 'host', bytes })),
@@ -919,6 +926,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: async (_peer, bytes) => {
@@ -968,7 +976,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     await flush()
 
     // The host must have received the roll edge — a dropped dodge is a real defect.
-    expect(p.pendingEdges & 8).toBe(8)
+    expect(queuedRolls(p)).toBe(1)
   })
 
   it("keeps a client's OWN avatar in its snapshot even when 60 NPCs crowd the interest radius", async () => {
@@ -991,7 +999,7 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
 
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
     for (let i = 0; i < 60; i++) {
-      addEntity(host.world, makeEntity('npc', 'thug', avatar.pos.x, avatar.pos.y))
+      addEntity(host.world, makeEntity('npc', 'mutant', avatar.pos.x, avatar.pos.y))
     }
 
     for (let i = 0; i < 6; i++) {
@@ -1023,6 +1031,6 @@ describe('offline co-op — input edge integrity (stale/duplicate packets)', () 
     // A newer packet (seq 2) carrying the roll edge must arm it.
     raw.send(encodeInput({ ...emptyInput(), seq: 2 }, rollEdges))
     await flush()
-    expect(p.pendingEdges & 8).toBe(8)
+    expect(queuedRolls(p)).toBe(1)
   })
 })

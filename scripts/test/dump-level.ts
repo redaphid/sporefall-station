@@ -8,8 +8,8 @@ const floor = Number(process.argv[3]) || 1
 const level = generateLevel(seed, floor)
 
 const GLYPH: Record<number, string> = {
-  [Tile.Street]: ' ',
-  [Tile.Sidewalk]: '·',
+  [Tile.Causeway]: ' ',
+  [Tile.Boardwalk]: '·',
   [Tile.Floor]: '.',
   [Tile.Wall]: '█',
   [Tile.Grass]: ',',

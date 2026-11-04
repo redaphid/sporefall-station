@@ -1,6 +1,6 @@
 // @ts-check
 // Combat-AI proof: boots the `npc-combat` scenario — a ring of ARMED, HOSTILE
-// NPCs (bat/knife/pistol/shotgun/machinegun/sledgehammer/freeze-ray/flamethrower)
+// NPCs (wrench/knife/pistol/shotgun/machinegun/sledgehammer/freeze-ray/flamethrower)
 // around a tanky player — in a real pixi build and asserts that they ACQUIRE the
 // player, CONVERGE on them, FIRE bullets, and DEAL damage. Captures a video +
 // labelled screenshots and copies them to the scratchpad share dir.

@@ -7,6 +7,7 @@ This directory holds the maintained recipes for proving player-facing behavior o
 - Serve this checkout with `$S/serve.sh start <port>` and require every `$S/doctor.sh <port>` line to be `ok`.
 - Never drive a server this run did not start. Doctor fails on someone else's preview.
 - Lane A (visual and playtesting) is claude-in-chrome, one tab per agent, at `http://localhost:<port>`. Lane B (sim/DOM, no canvas) is `$S/drive.mjs --port <port>`.
+- The headless playtest lane is `$S/pt.sh <name> …`. It needs no server and no doctor, only `pnpm install` in this checkout.
 - Pass `seed` explicitly so a run is reproducible.
 
 ## Driving conventions
@@ -24,7 +25,8 @@ This directory holds the maintained recipes for proving player-facing behavior o
 ## Features
 
 - [Start menu and solo run](./start-menu-solo.md) covers the mode picker, a solo run from it, the `?mode=solo` shortcut, and the autosave. Verified end to end on 2026-09-25.
-- [Scenario deep links](./scenario-deep-links.md) covers `?scenario=` staging, deep links beating the saved run, and the unknown-scenario error.
+- [Combat and weapon mods](./combat-mods.md) covers firing at an enemy, a mod changing the hit, and the enemy's reaction, through the headless playtest lane. Verified 2026-10-02.
+- [Scenario deep links](./scenario-deep-links.md) covers `?scenario=` staging, deep links beating the saved run, and the unknown-scenario error. Verified end to end on 2026-10-02.
 - [Console inspection](./console-inspection.md) covers `window.sporefall` reads everywhere and `verb` writes under `?debug`.
 - [Same-machine co-op](./local-coop.md) covers host lobby, join, start, and late join over `?transport=tabs`.
 - [State links](./state-links.md) covers `sporefallShare` capture and `?state=<id>` replay.

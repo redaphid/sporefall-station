@@ -17,7 +17,7 @@
  * The app shell precache: HTML, hashed JS/CSS, icons and the DEFAULT theme
  * chain (swampspace-hires falls back to swampspace, so offline play needs
  * both). Deliberately EXCLUDES public/sprites/** — 7.1 MB used only by the
- * legacy `city` theme and the dev asset-showcase page, picked up on demand by
+ * legacy `settlement` theme and the dev asset-showcase page, picked up on demand by
  * the runtime rule below instead of bloating the install.
  *
  * Note there is no `ota/**` pattern, and there must never be one: precaching
@@ -25,6 +25,10 @@
  */
 export const SW_GLOB_PATTERNS: readonly string[] = [
   'index.html',
+  // The scene gallery is a second page. Precached so it opens offline, and so
+  // the precache route answers /scenes.html before the navigation fallback
+  // could hand back the game's index.html instead.
+  'scenes.html',
   'manifest.webmanifest',
   'assets/**/*.{js,css}',
   'icons/**/*.{png,svg,ico}',
@@ -49,6 +53,24 @@ export const SW_NAVIGATE_FALLBACK = 'index.html'
  * leaving the device: the reviewer reviews the live game, the URL says
  * otherwise, and there is no status code or console error to notice. The Worker
  * route cannot defend against this — the request never reaches it.
+ *
+ * `/review/` is that same bug with a different victim, and it bit for real.
+ * `pnpm run review:image` uploads a before/after shot to KV and hands back
+ * `https://<origin>/review/<key>.png` — a URL whose entire job is to be opened
+ * by a human. The Worker serves it correctly (`image/png`, `nosniff`), and a
+ * `fetch()` for it gets the image, so GitHub's camo proxy and the PR body are
+ * fine. But a person TAPPING that link performs a navigation, and without this
+ * line the worker answers it out of the precache with index.html: the game
+ * boots at a `.png` URL, at status 200, with nothing in the console to say so.
+ * The publish-time verification in scripts/review-image.mjs cannot catch it
+ * either — that check runs in Node, where there is no service worker.
+ *
+ * `/state` is here for completeness rather than for a live bug. The game only
+ * ever reaches it with `fetch()` (src/app/stateShare.ts), and `fetch()` is not
+ * a navigation, so the fallback never touched it. But it is a Worker route
+ * (src/worker/router.ts) whose ids get pasted into address bars by hand while
+ * debugging, and that IS a navigation. Listing it costs nothing and closes the
+ * last member of this family: every KV-backed route in the router is now here.
  */
 export const SW_NAVIGATE_FALLBACK_DENYLIST: readonly RegExp[] = [
   /^\/ws\//,
@@ -56,7 +78,10 @@ export const SW_NAVIGATE_FALLBACK_DENYLIST: readonly RegExp[] = [
   /^\/download/,
   /^\/get$/,
   /^\/asset-showcase/,
+  /^\/scenes(\.html)?$/,
   /^\/betas(\/|$)/,
+  /^\/review\//,
+  /^\/state(\/|$)/,
 ]
 
 /** The shape of a runtime-caching rule's matcher, as workbox calls it. */

@@ -37,15 +37,9 @@ import type { Entity } from '../entity'
 import { bunkerLaneKeys, isSolidTile, type Building, rectCenter, rectContains } from '../levelgen/level'
 import { anyPowerCut, stationAlerted, type FearPulse, type World } from '../world'
 import {
-  BATTLE,
   ENGAGE_RANGE,
-  FLEE,
-  INVESTIGATE,
   INVESTIGATE_SCORE,
   LEASH,
-  PURSUE,
-  WANDER,
-  WANDER_SCORE,
   battleScore,
   canSeeEntity,
   fleeScore,
@@ -56,8 +50,9 @@ import {
 } from './goals'
 import {
   HEAL_RANGE,
-  LOB_MAX,
-  LOB_MIN,
+  LOB_HOLD_MAX,
+  LOB_HOLD_MIN,
+  LOB_IDEAL,
   centroid,
   groupOf,
   livePlayers,
@@ -66,21 +61,63 @@ import {
   roleOf,
 } from './groups'
 import { infectionActive } from './infection'
+import { activityKinds, findSite, seatPoint } from './activities'
 import { spawnObject } from './objects'
 import { determineRel, dispositionToward, initialFactionHate } from './relationships'
 import { strongestStimulus } from './stimulus'
 import { isPanicking } from './statusFx'
 import { vlen } from '../simMath'
+import {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+  BATTLE,
+  FLEE,
+  INVESTIGATE,
+  PURSUE,
+  WANDER,
+  WANDER_SCORE,
+} from './goalCodes'
+export {
+  ALERT,
+  BREACH,
+  DRAWN,
+  EMPLACE,
+  FALLBACK,
+  FLANK,
+  FORMUP,
+  FORTIFY,
+  GARRISON,
+  GUARD,
+  PATROL,
+  RETREAT,
+  RING,
+  SCAVENGE,
+  SEARCH,
+  STACK,
+  STAGE,
+  TEND,
+  WORK,
+} from './goalCodes'
 
 // ── Goal codes owned by the registry behaviors ─────────────────────────────
-export const PATROL = 'patrol'
-export const SEARCH = 'search'
-export const ALERT = 'alert'
-export const SCAVENGE = 'scavenge'
 // Squad choreography (see the `squad` behavior below).
-export const FORMUP = 'formup'
-export const STACK = 'stack'
-export const FLANK = 'flank'
 
 // ── Decision tiers (see header) ────────────────────────────────────────────
 export const TIER_AMBIENT = 0
@@ -117,8 +154,8 @@ const dist2d = (ax: number, ay: number, bx: number, by: number): number => vlen(
  * the `threat` scan uses. Players keep the exact pre-#63 rule. NPC-vs-NPC (ON by
  * default; `w.aiFlags.npcVsNpc === false` restores the players-only scan) reads
  * a stored opinion first, then the FACTION MATRIX (`initialFactionHate`), so
- * sworn enemies (cop↔gang) are mutually Hostile, same-faction stays Friendly,
- * and unrelated factions ignore each other — the crew, the law, and the gangs
+ * sworn enemies (warden↔rootcult) are mutually Hostile, same-faction stays Friendly,
+ * and unrelated factions ignore each other — the crew, the wardens, and the rootcults
  * tear into each OTHER, not just the players. Pure lookups, ascending-id caller. */
 const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
   const ai = e.ai!
@@ -134,16 +171,28 @@ const isHostileTarget = (w: World, e: Entity, target: Entity): boolean => {
     return (
       w.hostile ||
       dispositionToward(e, target.id) === 'Hostile' ||
-      (ai.faction === 'cop' && w.alarm >= 2) ||
+      (ai.faction === 'warden' && w.alarm >= 2) ||
       (!!ai.wakeOn?.includes('power-cut') && anyPowerCut(w))
     )
   }
   if (w.aiFlags?.npcVsNpc === false || !target.ai || target === e) return false
-  // A stored grudge (a witnessed crime, retaliation) wins; else the opening
+  // A stored grudge (a witnessed misdeed, retaliation) wins; else the opening
   // faction stance decides — this is what wakes the dormant sworn-enemy matrix.
   const stored = ai.rel?.[target.id]
   if (stored) return stored.code === 'Hostile'
   return determineRel(initialFactionHate(ai.faction, target.ai.faction)) === 'Hostile'
+}
+
+/** Once fighting a target, it stays a fight (not a chase) until it is this much
+ * past ENGAGE_RANGE. Both codes steer the same, but a target pacing along the
+ * range line flipped the goal back and forth every think. */
+const ENGAGE_MARGIN = 3
+
+/** BATTLE inside engage range, PURSUE beyond it, with the edge pushed out for
+ * the target `e` is already fighting. */
+const engageCode = (e: Entity, targetId: number, dist: number): string => {
+  const fighting = e.ai!.goal === BATTLE && e.ai!.targetId === targetId
+  return dist <= ENGAGE_RANGE + (fighting ? ENGAGE_MARGIN : 0) ? BATTLE : PURSUE
 }
 
 // ── Threat: fight-or-flight against every perceived enemy ──────────────────
@@ -173,7 +222,7 @@ const threat: Consideration = (w, e) => {
     const hate = hateToward(w, e, p.id)
     const aggress = battleScore(hate, hp, dist) * press
     if (aggress > WANDER_SCORE)
-      out.push({ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: aggress, tier: TIER_THREAT, target: p.id })
+      out.push({ code: engageCode(e, p.id, dist), score: aggress, tier: TIER_THREAT, target: p.id })
     const flee = fleeScore(hate, hp, max, dist)
     if (flee > WANDER_SCORE) out.push({ code: FLEE, score: flee, tier: TIER_THREAT, target: p.id })
   }
@@ -284,7 +333,7 @@ const manhunt: Consideration = (w, e) => {
   return [{ code: PURSUE, score: MANHUNT_SCORE, tier: TIER_MEMORY, target: focusId, at: { x: mark.x, y: mark.y } }]
 }
 
-// A frightened NPC (e.g. a civilian who saw a crime) keeps fleeing its scarer
+// A frightened NPC (e.g. a civilian who saw a misdeed) keeps fleeing its scarer
 // until it's well clear, even with no hostile disposition to score.
 const fleeMemory: Consideration = (w, e) => {
   const ai = e.ai!
@@ -299,7 +348,6 @@ const fleeMemory: Consideration = (w, e) => {
 // swarm pools on a shared focus and can be baited off the players. A flocking
 // bias at MEMORY tier: it beats wander/investigate but any perceived target
 // (threat/infest, THREAT tier) still overrides it. ────────────────────────────
-export const DRAWN = 'drawn'
 const DRAW_RANGE = 16
 const DRAW_SCORE = WANDER_SCORE + 0.6
 
@@ -413,7 +461,7 @@ const alertGuards: Consideration = (w, e) => {
   let guard: Entity | undefined
   let bestD = Infinity
   for (const g of w.entities) {
-    if (g === e || g.dead || !g.ai || g.ai.faction !== 'cop') continue
+    if (g === e || g.dead || !g.ai || g.ai.faction !== 'warden') continue
     const d = dist2d(g.pos.x, g.pos.y, e.pos.x, e.pos.y)
     if (d > ALERT_RANGE || d >= bestD) continue
     bestD = d
@@ -433,7 +481,7 @@ const scavenge: Consideration = (w, e) => {
   for (const p of w.entities) {
     if (p.dead || !p.pickup) continue
     // Never loot the mission objective or a weapon-mod gem — those belong to the
-    // players' run, and a scavenged briefcase would soft-lock the floor.
+    // players' run, and a scavenged canister would soft-lock the floor.
     if (p.id === w.mission.targetEntityId || p.archetype.startsWith('mod.')) continue
     const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
     if (d > ai.sightRange || d >= bestD) continue
@@ -449,11 +497,9 @@ const scavenge: Consideration = (w, e) => {
 // A zoned NPC (populate stamps `ai.zone`) doesn't wander the whole map: it holds
 // its own building (`workMyRoom`), and — if it belongs to the objective wing —
 // masses on the objective room as a garrison (`garrison`) and turns on any
-// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (street life,
+// intruder that breaches its turf (`defendMyWing`). Unzoned NPCs (causeway life,
 // test/scenario spawns) fall through untouched. All pure lookups over the level
 // geometry + ascending-id scans; no `Date`/`Math.random`.
-export const WORK = 'work'
-export const GARRISON = 'garrison'
 
 /** A resident holds its room over aimless wander (beats WANDER, loses to
  * investigate/patrol so a real disturbance or beat still wins). */
@@ -506,7 +552,7 @@ const defendMyWing: Consideration = (w, e) => {
     if (!rectContains(b.rect, Math.floor(p.pos.x), Math.floor(p.pos.y))) continue
     if (!perceives(w, e, p)) continue
     const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
-    out.push({ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: DEFEND_SCORE, tier: TIER_THREAT, target: p.id })
+    out.push({ code: engageCode(e, p.id, dist), score: DEFEND_SCORE, tier: TIER_THREAT, target: p.id })
   }
   return out
 }
@@ -653,7 +699,6 @@ const squadFlank: Consideration = (w, e) => {
 // lane (bunkerLaneKeys — the same contract furniture honors), capped per
 // building, and — because a barricade is an ENTITY, never a solid tile — BFS
 // reachability over `level.solid` is untouched by construction.
-export const FORTIFY = 'fortify'
 /** Above garrison (2.5): plug the doors first, THEN mass on the core. */
 const FORTIFY_SCORE = 2.6
 /** Hard ceiling on live barricades per building. */
@@ -779,8 +824,34 @@ const HEALTHY_FRAC = 0.6 // "healthy" = hp at/above this fraction of max
 const isPrey = (e: Entity, p: Entity): boolean =>
   p !== e && !p.dead && !!p.health && (!!p.playerCtl || !!p.ai) && p.ai?.faction !== e.ai!.faction
 
-// Prefer the lowest-HP perceived body — the wounded get finished.
+/** A predator that broke off from a pack does not come back in until the pack
+ * is this much farther than the range that made it break off. Without the gap
+ * the two rules share one edge, and flight (out) and the stalk (back in) carried
+ * it across that edge every think: flee, battle, flee. */
+const PACK_MARGIN = 4
+
+/** Healthy enemies of `e` within `radius`, and the nearest of them. */
+const healthyPack = (w: World, e: Entity, radius: number): { count: number; nearest?: Entity } => {
+  let count = 0
+  let nearest: Entity | undefined
+  let nd = Infinity
+  for (const p of w.entities) {
+    if (!isPrey(e, p)) continue
+    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
+    if (d > radius || p.health!.hp < p.health!.max * HEALTHY_FRAC) continue
+    count++
+    if (d < nd) {
+      nd = d
+      nearest = p
+    }
+  }
+  return { count, nearest }
+}
+
+// Prefer the lowest-HP perceived body — the wounded get finished. Never while a
+// healthy pack is near enough that closing in would trip packAvoid again.
 const stalkWeakest: Consideration = (w, e) => {
+  if (healthyPack(w, e, PACK_RADIUS + PACK_MARGIN).count >= PACK_K) return []
   let best: Entity | undefined
   let bestHp = Infinity
   for (const p of w.entities) {
@@ -792,29 +863,14 @@ const stalkWeakest: Consideration = (w, e) => {
   }
   if (!best) return []
   const dist = Math.max(1, dist2d(best.pos.x, best.pos.y, e.pos.x, e.pos.y))
-  return [{ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: STALK_SCORE, tier: TIER_THREAT, target: best.id }]
+  return [{ code: engageCode(e, best.id, dist), score: STALK_SCORE, tier: TIER_THREAT, target: best.id }]
 }
 
 // Outnumbered by HEALTHY enemies → break off and reposition (PANIC tier, so it
 // overrides the stalk: a predator won't wade into a losing fight).
 const packAvoid: Consideration = (w, e) => {
-  let healthy = 0
-  let nearest: Entity | undefined
-  let nd = Infinity
-  for (const p of w.entities) {
-    if (!isPrey(e, p)) continue
-    const d = dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y)
-    if (d > PACK_RADIUS) continue
-    if (p.health!.hp >= p.health!.max * HEALTHY_FRAC) {
-      healthy++
-      if (d < nd) {
-        nd = d
-        nearest = p
-      }
-    }
-  }
-  if (healthy >= PACK_K && nearest) return [{ code: FLEE, score: 1, tier: TIER_PANIC, target: nearest.id }]
-  return []
+  const { count, nearest } = healthyPack(w, e, PACK_RADIUS)
+  return count >= PACK_K && nearest ? [{ code: FLEE, score: 1, tier: TIER_PANIC, target: nearest.id }] : []
 }
 
 // ── #69 Mireclaw Alpha: a PHASED apex predator (composes spore/hive/dormancy).
@@ -825,7 +881,6 @@ const packAvoid: Consideration = (w, e) => {
 export const MIRECLAW_RETREAT_FRAC = 0.5
 /** Below this HP fraction it ENRAGES — drops all self-preservation, goes faster. */
 export const MIRECLAW_ENRAGE_FRAC = 0.2
-export const RETREAT = 'retreat'
 
 const nearestPlayer = (w: World, e: Entity): Entity | undefined => {
   let best: Entity | undefined
@@ -864,7 +919,7 @@ const enrage: Consideration = (w, e) => {
   const p = nearestPlayer(w, e)
   if (!p) return []
   const dist = Math.max(1, dist2d(p.pos.x, p.pos.y, e.pos.x, e.pos.y))
-  return [{ code: dist <= ENGAGE_RANGE ? BATTLE : PURSUE, score: 20, tier: TIER_PANIC, target: p.id }]
+  return [{ code: engageCode(e, p.id, dist), score: 20, tier: TIER_PANIC, target: p.id }]
 }
 
 // Phase 2: wounded (but not yet enraged) → retreat to the nearest spore cloud and
@@ -884,13 +939,6 @@ const retreatToSpore: Consideration = (w, e) => {
 // raid's intel mark — and proposes a goal for this one member. None of them
 // mutates the group: phase changes, heals, shells and charges all happen in
 // the group system, so arbitration stays a pure scoring pass like the rest.
-export const STAGE = 'stage'
-export const GUARD = 'guard'
-export const EMPLACE = 'emplace'
-export const BREACH = 'breach'
-export const FALLBACK = 'fallback'
-export const TEND = 'tend'
-export const RING = 'ring'
 
 /** Gathering at the staging point: above every hunt/formation memory, so a
  * staging raider walks to the muster instead of freelancing — but at MEMORY
@@ -915,16 +963,6 @@ const RING_SCORE = 12
 const RAGE_SCORE = 20
 /** How far behind the line a medic with nobody to patch hangs back. */
 const MEDIC_HANG_BACK = 3
-/** The siege gun's firing band (holds inside it, walks to the ideal range outside
- * it). The far edge sits INSIDE the gun's own sight (lobber sightRange 11): a
- * battery that parks just past what it can see has no spotter and never fires —
- * which is exactly what the first cut of this did, holding at 11.8 tiles in silence.
- * Read at call time, not module load: groups.ts and this file import each other
- * (via populate), so a top-level `LOB_MIN + 3` hits the TDZ whenever populate is
- * the first module loaded (tsx scripts, a worker entry). */
-const lobHoldMin = (): number => LOB_MIN + 3
-const lobHoldMax = (): number => Math.min(LOB_MAX - 2, 10)
-const lobIdeal = (): number => (lobHoldMin() + lobHoldMax()) / 2
 /** How far a sapper backs off its planted charge. */
 const SAPPER_CLEAR = 3.5
 
@@ -1065,10 +1103,9 @@ const siegeGun: Consideration = (w, e) => {
   const t = g.targetId !== undefined ? w.byId.get(g.targetId) : undefined
   if (t && !t.dead && dist2d(t.pos.x, t.pos.y, e.pos.x, e.pos.y) < 1.6) return [] // cornered: bite
   const d = dist2d(g.mark.x, g.mark.y, e.pos.x, e.pos.y)
-  if (d >= lobHoldMin() && d <= lobHoldMax()) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
+  if (d >= LOB_HOLD_MIN && d <= LOB_HOLD_MAX) return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: here(e) }]
   const u = away(e.pos, g.mark)
-  const ideal = lobIdeal()
-  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * ideal, y: g.mark.y + u.y * ideal } }]
+  return [{ code: EMPLACE, score: JOB_SCORE, tier: TIER_PANIC, at: { x: g.mark.x + u.x * LOB_IDEAL, y: g.mark.y + u.y * LOB_IDEAL } }]
 }
 
 // The MEDIC walks to whoever is hurt worst (the retreating first), and with
@@ -1171,6 +1208,27 @@ const rooted: Consideration = (w, e) => {
   return best ? [{ code: BATTLE, score: 5, tier: TIER_THREAT, target: best.id }] : []
 }
 
+// ── Activities: a settler with nothing pressing takes a seat at a prop ─────
+// (systems/activities.ts). Above garrison/work so an idle settler goes and
+// does something. Held, with the incumbent margin, it outscores every other
+// ambient goal, so a game is only broken by a threat (a higher tier) or by
+// gunfire and blasts in earshot: a settler that hears one looks up from its
+// cards, drops the claim and goes to see.
+const ACTIVITY_SCORE = 2.8
+
+const unwind: Consideration = (w, e) => {
+  if (nearestNoise(w, e)) return []
+  const claim = e.ai!.activity
+  if (claim) {
+    const at = seatPoint(w, claim)
+    return at ? [{ code: claim.kind, score: ACTIVITY_SCORE, tier: TIER_AMBIENT, target: claim.site, subject: claim.seat, at }] : []
+  }
+  const kinds = activityKinds(w, e)
+  if (kinds.length === 0) return []
+  const pick = findSite(w, e, kinds)
+  return pick ? [{ code: pick.kind, score: ACTIVITY_SCORE, tier: TIER_AMBIENT, target: pick.site, subject: pick.seat, at: pick.at }] : []
+}
+
 // ── The registries ─────────────────────────────────────────────────────────
 
 export const CONSIDERATIONS: Record<string, Consideration> = {
@@ -1210,6 +1268,7 @@ export const CONSIDERATIONS: Record<string, Consideration> = {
   scavenge,
   garrison,
   workMyRoom,
+  unwind,
   wander,
 }
 
@@ -1225,7 +1284,7 @@ export const DEFAULT_BEHAVIOR = 'basic'
 export const BEHAVIORS: Record<string, BehaviorDef> = {
   basic: {
     about: 'fight, flee, catch panic, investigate, hold its turf, wander — the default townsfolk brain',
-    considerations: ['panic', 'contagiousFear', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'manhunt', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    considerations: ['panic', 'contagiousFear', 'threat', 'defendMyWing', 'pursueMemory', 'fleeMemory', 'manhunt', 'investigate', 'unwind', 'garrison', 'workMyRoom', 'wander'],
   },
   patrol: {
     about: 'walks a fixed beat; garrisons the objective wing; still fights and investigates',
@@ -1236,8 +1295,8 @@ export const BEHAVIORS: Record<string, BehaviorDef> = {
     considerations: ['threat', 'defendMyWing', 'hunt', 'fleeMemory', 'manhunt', 'investigate', 'garrison', 'workMyRoom', 'wander'],
   },
   skittish: {
-    about: 'flees trouble, catches the crowd’s panic, and runs to the nearest guard to raise the alarm',
-    considerations: ['alertGuards', 'fear', 'contagiousFear', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'garrison', 'workMyRoom', 'wander'],
+    about: 'flees trouble, catches the crowd’s panic, runs to the nearest guard to raise the alarm, and plays cards, tinkers and rests when all is quiet',
+    considerations: ['alertGuards', 'fear', 'contagiousFear', 'threat', 'pursueMemory', 'fleeMemory', 'investigate', 'unwind', 'garrison', 'workMyRoom', 'wander'],
   },
   scavenger: {
     about: 'drawn to loose items it can see; grabs them into its stash',
@@ -1306,6 +1365,14 @@ export interface Decision {
   goal: Goal
   /** Per-consideration top score of this think — the "why" trail. */
   scores: Record<string, number>
+  /** Tier of the winning candidate (what a commitment to it is guarded by). */
+  tier: number
+  /** The standing goal held: nothing outranked it while committed, so the
+   * think changes nothing. `goal` is then only the incumbent's code. */
+  held: boolean
+  /** The goal runs on its own clock (a burning panic ends with its lockout),
+   * so adopting it takes no commitment. */
+  timed?: true
 }
 
 const round3 = (n: number): number => Math.round(n * 1000) / 1000
@@ -1321,15 +1388,66 @@ const round3 = (n: number): number => Math.round(n * 1000) / 1000
  * honest — only arbitration sees the bonus. */
 export const HYSTERESIS_MARGIN = 0.25
 
+/**
+ * Minimum ticks a goal holds once adopted. While it holds and its candidate is
+ * no longer on offer, only a candidate on a HIGHER tier replaces it, so a
+ * settler fleeing a scream keeps running and a fighter that blinks out of sight
+ * does not drop the fight for a step. A goal still on offer competes as before,
+ * through the margin above (a wounded fighter still turns to flee).
+ *
+ * The margin only guards a goal that is still on offer. These goals were
+ * measured flipping because their candidate VANISHES: a fear pulse or a pack
+ * radius is a hard edge, acting on the goal carries the body across it, and the
+ * next think falls back to the ambient goal that walks it straight back in
+ * (garrison→flee→garrison every 6 ticks). Holding the goal breaks that loop.
+ *
+ * Codes absent here never hold: wander is the floor, the squad and group layer
+ * re-issue their orders every think and members must track them, and an
+ * activity holds on score: its candidate stays on offer while the seat is held.
+ */
+const COMMIT_TICKS: Readonly<Record<string, number>> = {
+  [FLEE]: 90,
+  [BATTLE]: 45,
+  [PURSUE]: 45,
+  [SEARCH]: 45,
+  [INVESTIGATE]: 60,
+  [PATROL]: 60,
+  [WORK]: 60,
+  [GARRISON]: 60,
+  [DRAWN]: 60,
+  [SCAVENGE]: 60,
+}
+
+/** How long a goal adopted at `tier` holds. Flight only holds when panic
+ * started it (a scream, a pack too strong to face): those are the vanishing
+ * edges above. Flight from an enemy seen at the threat tier ends the way it
+ * always did, by the behavior's own memory (fleeMemory), so a wounded fighter
+ * that has lost the player goes back to looking around instead of running on
+ * blind. Holding that flight made Castle Siege's garrison measurably harder. */
+export const commitTicks = (code: string, tier: number): number =>
+  code === FLEE && tier < TIER_PANIC ? 0 : (COMMIT_TICKS[code] ?? 0)
+
+/** The tier a standing goal is protected up to this think, or undefined when
+ * nothing holds it: its commitment ran out (or steering released it on
+ * finishing the goal), or the entity it was about is gone. */
+const holdTier = (w: World, e: Entity): number | undefined => {
+  const ai = e.ai!
+  const t = ai.targetId !== undefined ? w.byId.get(ai.targetId) : undefined
+  if (ai.targetId !== undefined && (!t || t.dead)) return undefined
+  const committed = ai.commit && w.tick < ai.commit.until ? ai.commit.tier : undefined
+  return committed
+}
+
 /** Run one think: evaluate the entity's behavior and pick the winning goal.
  * Highest tier wins; within a tier, strictly-greater EFFECTIVE score (the
  * incumbent gets the hysteresis bonus) in consideration / candidate order —
- * byte-for-byte deterministic. */
+ * byte-for-byte deterministic. A held incumbent then stands against any winner
+ * that is not on a higher tier. */
 export const decide = (w: World, e: Entity): Decision => {
   // A panicking (burning) body outranks every behavior: it just runs.
   const ai = e.ai
   if (ai?.panicFrom) {
-    if (isPanicking(w, e)) return { goal: { code: FLEE, at: { ...ai.panicFrom } }, scores: { panic: 1 } }
+    if (isPanicking(w, e)) return { goal: { code: FLEE, at: { ...ai.panicFrom } }, scores: { panic: 1 }, tier: TIER_PANIC, held: false, timed: true }
     ai.panicFrom = undefined
   }
   const def = behaviorFor(e)
@@ -1342,6 +1460,7 @@ export const decide = (w: World, e: Entity): Decision => {
   const eff = (c: Candidate): number => (hyst && isIncumbent(c) ? c.score * (1 + HYSTERESIS_MARGIN) : c.score)
   let best: Candidate = { code: WANDER, score: WANDER_SCORE, tier: TIER_AMBIENT }
   let bestEff = eff(best)
+  let offered = false
   const scores: Record<string, number> = {}
   for (const id of def.considerations) {
     const consider = CONSIDERATIONS[id]
@@ -1349,6 +1468,7 @@ export const decide = (w: World, e: Entity): Decision => {
     for (const c of consider(w, e)) {
       const top = scores[id]
       if (top === undefined || c.score > top) scores[id] = round3(c.score)
+      if (isIncumbent(c)) offered = true
       const ce = eff(c)
       if (c.tier > best.tier || (c.tier === best.tier && ce > bestEff)) {
         best = c
@@ -1356,11 +1476,20 @@ export const decide = (w: World, e: Entity): Decision => {
       }
     }
   }
+  // A standing goal still on offer competes on score, margin and all. One whose
+  // candidate vanished is held against lower tiers,
+  // and against its own tier only while the challenger names no new target: a
+  // fighter that lost sight of one player turns at once on another.
+  if (ai && incumbentCode !== undefined && !isIncumbent(best) && !offered) {
+    const guard = holdTier(w, e)
+    const newTarget = best.target !== undefined && best.target !== incumbentTarget
+    if (guard !== undefined && (best.tier < guard || (best.tier === guard && !newTarget))) return { goal: { code: incumbentCode }, scores, tier: guard, held: true }
+  }
   const goal: Goal = { code: best.code }
   if (best.target !== undefined) goal.target = best.target
   if (best.at) goal.at = best.at
   if (best.subject !== undefined) goal.subject = best.subject
-  return { goal, scores }
+  return { goal, scores, tier: best.tier, held: false }
 }
 
 /** Single-shot arbitration for the entity's behavior (`basic` when unset) —

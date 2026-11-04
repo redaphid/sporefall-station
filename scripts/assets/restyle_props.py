@@ -88,7 +88,7 @@ RAMPS: dict[str, dict] = {
         "ramp": ["#08080c", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38",
                  "#b08d50", "#cbb277", "#a8c46a", "#ffd83e"],
     },
-    # locker + atm. Painted-steel lockup with a tan panel — warm enough not to
+    # locker + cryo terminal. Painted-steel lockup with a tan panel — warm enough not to
     # be the console's cold grey (these two share a guardpost and must not
     # merge), but NOT the olive-green the first attempt used.
     #

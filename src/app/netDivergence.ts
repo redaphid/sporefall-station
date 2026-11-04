@@ -1,6 +1,7 @@
 import { generateLevel } from '../game/levelgen/generate'
 import { levelChecksum, type Level } from '../game/levelgen/level'
 import type { World } from '../game/world'
+import { normalizeArchetype } from '../net/protocol/messages'
 import type { RenderView } from './session'
 
 /**
@@ -299,7 +300,9 @@ export const diffHostClient = (
       })
       continue
     }
-    if (he.archetype !== ce.archetype) {
+    // The wire folds dynamic families (a wing keycard's `.wing<n>`) onto one
+    // archetype, so the client legitimately sees the folded name.
+    if (normalizeArchetype(he.archetype) !== ce.archetype) {
       add('entity.archetype', `entity ${ce.id}: client sees '${ce.archetype}', host has '${he.archetype}'`, {
         entityId: ce.id,
       })

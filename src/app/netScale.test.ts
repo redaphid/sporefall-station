@@ -8,7 +8,8 @@ import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import { decodeSnapshot, encodeSnapshot, type WireSnapshot } from '../net/protocol/messages'
 import { isKnownMsgType, MsgType, PROTOCOL_VERSION, SNAPSHOT_INTERVAL_TICKS, type PeerId, type Transport, type TransportEvent } from '../net/types'
 import { NetClientSession } from './netClient'
-import { MAX_PLAYERS, NetHostSession, SNAPSHOT_ENTITY_CAP } from './netHost'
+import { NetHostSession, SNAPSHOT_ENTITY_CAP } from './netHost'
+import { MAX_PLAYERS } from '../net/types'
 
 /**
  * SCALE, BACKPRESSURE AND INTEREST MANAGEMENT at a full 8-player load.
@@ -59,6 +60,7 @@ class ScaleHub {
   constructor(readonly maxPacket = 180) {
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket,
       start: async () => {},
       stop: async () => {},
@@ -151,6 +153,7 @@ class ScaleHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: this.maxPacket,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) =>
@@ -271,10 +274,11 @@ const crowdBeforePlayers = (host: NetHostSession, n: number, cx: number, cy: num
 
 describe('interest cap — players are unconditionally included', () => {
   it('ships all 8 players even when 80+ props crowd the interest window', async () => {
-    // Seed 1 floor 1 has rooms holding 80+ props inside one 14-tile window; the
-    // avatars spawn LAST in `world.entities`, so an array-order cap never
-    // reaches them. This is a live-play state, not a synthetic one.
+    // 80 props inside one 14-tile window, ordered before the avatars exactly as
+    // a furnished floor lays them out, so an array-order cap never reaches the
+    // players.
     const { host, centrals } = await start8(1)
+    crowdBeforePlayers(host, 80, 18, 18)
     const players = huddleAt(host, 18, 18)
     const playerIds = new Set(players.map((p) => p.id))
     const inWindow = host.world.entities.filter(
@@ -369,10 +373,10 @@ describe('interest cap — selection quality and stability', () => {
       addEntity(host.world, e)
       far.push(e)
     }
-    // The thing that matters: a thug standing on top of the party.
-    const thug = makeEntity('npc', 'thug', 30.3, 30.3, 0.35)
-    thug.health = { hp: 40, max: 40, iframes: 0 }
-    addEntity(host.world, thug)
+    // The thing that matters: a mutant standing on top of the party.
+    const mutant = makeEntity('npc', 'mutant', 30.3, 30.3, 0.35)
+    mutant.health = { hp: 40, max: 40, iframes: 0 }
+    addEntity(host.world, mutant)
     // Real floor order: everything the level made comes before the avatars.
     const ids = new Set(avatars.map((a) => a.id))
     const props = host.world.entities.filter((e) => !ids.has(e.id))
@@ -384,7 +388,7 @@ describe('interest cap — selection quality and stability', () => {
 
     for (const c of centrals) {
       const snap = c.snapshots.at(-1)!
-      expect(snap.entities.some((e) => e.id === thug.id), `${c.peer} lost the point-blank thug`).toBe(true)
+      expect(snap.entities.some((e) => e.id === mutant.id), `${c.peer} lost the point-blank mutant`).toBe(true)
     }
   })
 
@@ -447,7 +451,7 @@ describe('interest boundary — the client must not keep ghosts', () => {
   it('removes an entity from the client when it leaves the 14-tile window', async () => {
     const { host, client } = await bootClient(7)
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    const mover = makeEntity('npc', 'thug', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
+    const mover = makeEntity('npc', 'mutant', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
     mover.health = { hp: 40, max: 40, iframes: 0 }
     mover.ai = undefined
     addEntity(host.world, mover)
@@ -475,7 +479,7 @@ describe('interest boundary — the client must not keep ghosts', () => {
   it('re-adds an entity that leaves the window and comes back', async () => {
     const { host, client } = await bootClient(7)
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    const mover = makeEntity('npc', 'thug', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
+    const mover = makeEntity('npc', 'mutant', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
     mover.health = { hp: 40, max: 40, iframes: 0 }
     mover.ai = undefined
     addEntity(host.world, mover)
@@ -500,7 +504,7 @@ describe('interest boundary — the client must not keep ghosts', () => {
   it('leaves no ghost for an entity that DIES while outside the window', async () => {
     const { host, client } = await bootClient(7)
     const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
-    const doomed = makeEntity('npc', 'thug', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
+    const doomed = makeEntity('npc', 'mutant', avatar.pos.x + 1, avatar.pos.y + 1, 0.35)
     doomed.health = { hp: 40, max: 40, iframes: 0 }
     doomed.ai = undefined
     addEntity(host.world, doomed)
@@ -796,7 +800,7 @@ describe('stale snapshot arrival', () => {
       tick,
       floor: 1,
       alarm: 0,
-      lastInputSeq: tick,
+      epoch: 0, lastInputSeq: tick,
       entities: [{ id: selfId, archetype: 'player', x, y: 20, facing: 0, hpPct: 1, flags: 0 }],
     })
 
@@ -832,7 +836,7 @@ describe('stale snapshot arrival', () => {
       tick,
       floor,
       alarm: 0,
-      lastInputSeq: 1,
+      epoch: 0, lastInputSeq: 1,
       entities: [{ id: selfId, archetype: 'player', x: 20, y: 20, facing: 0, hpPct: 1, flags: 0 }],
     })
     await push(mk(2000, 2)) // party took the lift to floor 2
@@ -886,7 +890,7 @@ describe('inventory change-gating at 8 players', () => {
     await tickHost(host, 4)
     const before = host.debugInventorySends
     const avatar = host.world.byId.get(host.peersBySlot.get(3)!.entityId!)!
-    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'briefcase', qty: 1 }]
+    avatar.loadout!.inventory = [...avatar.loadout!.inventory, { itemId: 'canister', qty: 1 }]
     await tickHost(host, 2)
     expect(host.debugInventorySends).toBe(before + 1)
   })
@@ -930,14 +934,14 @@ describe('8-player wire budget', () => {
   it('a full 48-entity snapshot fits the BLE packet budget it claims', async () => {
     const entities = Array.from({ length: SNAPSHOT_ENTITY_CAP }, (_, i) => ({
       id: i + 1,
-      archetype: 'thug',
+      archetype: 'mutant',
       x: i,
       y: i,
       facing: 0,
       hpPct: 1,
       flags: 0,
     }))
-    const bytes = encodeSnapshot({ tick: 1, floor: 1, alarm: 0, lastInputSeq: 1, entities })
+    const bytes = encodeSnapshot({ tick: 1, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 1, entities })
     // 10B header + 10B/entity = 490B. At the 20-byte BLE floor that is 25
     // packets for ONE peer's ONE snapshot; at 244B MTU it is 3.
     expect(bytes.length).toBeLessThanOrEqual(512)

@@ -1,9 +1,10 @@
-import type { DraftHand, Entity, ItemStack } from '../../game/entity'
+import type { ActivityKind, DraftHand, Entity, ItemStack } from '../../game/entity'
 import { makeEntity } from '../../game/entity'
 import { THROWABLES } from '../../game/data/items'
 import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
+import { shownActivity } from '../../game/systems/activities'
 import type { FloorModifier } from '../../game/floorModifiers'
 import type { InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
@@ -15,9 +16,9 @@ import { MsgType } from '../types'
  *
  * ## `// RETIRED` entries are TOMBSTONES. Do not compact this list.
  *
- * Fourteen entries are marked `// RETIRED`: the nine culled items in every form
+ * Fifteen entries are marked `// RETIRED`: the nine culled items in every form
  * they take on the wire (`banana`/`molotov`/… in flight, `pickup.banana`/… on
- * the floor). They name content that no longer exists, and a dead-code tool
+ * the floor), and the removed cash terminal. They name content that no longer exists, and a dead-code tool
  * will call them unused. They are CLAIMED, not unused — the same argument as
  * the protocol-reservation note on `BLE_LOBBY_INFO_UUID` in net/types.ts.
  * (Spelling that tag out in prose here made Knip read it as a real JSDoc tag
@@ -46,23 +47,23 @@ import { MsgType } from '../types'
  */
 export const ARCHETYPES = [
   'player',
-  'thug',
-  'cop',
+  'mutant',
+  'warden',
   'civilian',
   'shopkeeper',
   'boss',
   'projectile',
   'grenade',
   'door',
-  'pickup.bat',
+  'pickup.wrench',
   'pickup.knife',
   'pickup.pistol',
   'pickup.bandage', // RETIRED
   'pickup.medkit', // RETIRED
   'pickup.cash',
-  'pickup.briefcase',
-  'gangster',
-  'bouncer',
+  'pickup.canister',
+  'acolyte',
+  'lockkeeper',
   // Everything below was spawnable but MISSING from this registry, so
   // `archetypeIndex.get(...) ?? 0` encoded it as index 0 and the remote client
   // decoded it back as 'player' — i.e. a spore pod, a lurker or a burning tile
@@ -85,7 +86,7 @@ export const ARCHETYPES = [
   // from what one seed happened to spawn — see messages.archetypes.test.ts,
   // which now fails if any registry grows without this list growing with it.
   // Appended alphabetically in one block. APPEND ONLY, NEVER REORDER.
-  'atm',
+  'atm', // RETIRED
   'banana', // RETIRED
   'barrel',
   'barricade',
@@ -203,6 +204,12 @@ export const WIRE_STATUSES = ['burning', 'frozen', 'wet', 'electrified', 'poison
 
 const wireStatusBit = new Map<string, number>(WIRE_STATUSES.map((k, i) => [k, 1 << i]))
 
+/** Activities a seated NPC shows, by wire code (index + 1) in the snapshot's
+ * activity trailer. Frozen history: append only, at most 127. */
+export const WIRE_ACTIVITIES: readonly ActivityKind[] = ['cards', 'tinker', 'rest']
+/** Set on an activity code when the session is under way (not just seated). */
+const ACTIVITY_PLAYING = 0x80
+
 /** Most mods a single bullet advertises on the wire (bounds the record size). */
 const WIRE_MOD_CAP = 12
 
@@ -239,10 +246,15 @@ export interface WireEntity {
   /** Active element statuses (`Entity.fx` keys) that the renderer tints and
    * shades. Absent = none. */
   statuses?: string[]
+  /** A seated NPC's activity at a prop, and whether play has started. */
+  activity?: { kind: ActivityKind; playing: boolean }
 }
 
 export interface WireSnapshot {
   tick: number
+  /** The host's run counter (u8, wraps). A snapshot from an earlier run than the
+   * client's GameStart is stale, whatever its tick says. */
+  epoch: number
   floor: number
   alarm: number
   lastInputSeq: number
@@ -269,7 +281,7 @@ export const kindOf = (archetype: string): Entity['kind'] => {
 export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
   const entities = s.entities.length > MAX_WIRE_ENTITIES ? s.entities.slice(0, MAX_WIRE_ENTITIES) : s.entities
   const w = new ByteWriter(16 + entities.length * 12)
-  w.u8(MsgType.Snapshot).u32(s.tick).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(entities.length)
+  w.u8(MsgType.Snapshot).u32(s.tick).u8(s.epoch & 0xff).u16(s.lastInputSeq).u8(s.floor).u8(s.alarm).u8(entities.length)
   for (const e of entities) {
     w.u16(e.id)
     w.u8(archetypeIndex.get(normalizeArchetype(e.archetype)) ?? 0)
@@ -300,9 +312,22 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
     for (const k of e.statuses ?? []) mask |= wireStatusBit.get(k) ?? 0
     if (mask) statused.push([i, mask])
   })
-  if (statused.length > 0) {
+  // Sparse activity trailer, after the status one: u8 count, then (u8 record
+  // index, u8 code) where code is WIRE_ACTIVITIES index + 1, | ACTIVITY_PLAYING
+  // once play is on. When it is present the status count is always written,
+  // even as 0, so the decoder can tell the two trailers apart.
+  const seated: [number, number][] = []
+  entities.forEach((e, i) => {
+    const k = e.activity ? WIRE_ACTIVITIES.indexOf(e.activity.kind) : -1
+    if (k >= 0) seated.push([i, (k + 1) | (e.activity!.playing ? ACTIVITY_PLAYING : 0)])
+  })
+  if (statused.length > 0 || seated.length > 0) {
     w.u8(statused.length)
     for (const [i, mask] of statused) w.u8(i).u8(mask)
+  }
+  if (seated.length > 0) {
+    w.u8(seated.length)
+    for (const [i, code] of seated) w.u8(i).u8(code)
   }
   return w.finish()
 }
@@ -311,6 +336,7 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
   const r = new ByteReader(bytes)
   r.u8() // msgType
   const tick = r.u32()
+  const epoch = r.u8()
   const lastInputSeq = r.u16()
   const floor = r.u8()
   const alarm = r.u8()
@@ -349,46 +375,65 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
       if (target && statuses.length > 0) target.statuses = statuses
     }
   }
-  return { tick, floor, alarm, lastInputSeq, entities }
+  if (r.remaining > 0) {
+    const n = r.u8()
+    for (let j = 0; j < n && r.remaining >= 2; j++) {
+      const target = entities[r.u8()]
+      const code = r.u8()
+      const kind = WIRE_ACTIVITIES[(code & ~ACTIVITY_PLAYING) - 1]
+      if (target && kind) target.activity = { kind, playing: (code & ACTIVITY_PLAYING) !== 0 }
+    }
+  }
+  return { tick, epoch, floor, alarm, lastInputSeq, entities }
 }
 
-export const encodeInput = (
-  cmd: InputCmd,
-  edges: { attack: boolean; interact: boolean; special: boolean; roll?: boolean; throwItem?: boolean },
-): Uint8Array => {
-  const w = new ByteWriter(10)
-  // Bit 8 carries whether aim is active: the angle byte can't encode a centred
-  // stick (atan2(0,0)=0 looks like "aim right"), so this bit lets the far side
-  // restore a (0,0) aim and hold the last facing instead of snapping.
+/** Button edges as the wire's edge byte: attack 1, interact 2, special 4, and
+ * the pure taps roll 8 and Use/Throw 16. */
+export interface InputEdges {
+  attack: boolean
+  interact: boolean
+  special: boolean
+  roll?: boolean
+  throwItem?: boolean
+}
+
+export const edgeBits = (e: InputEdges): number =>
+  (e.attack ? 1 : 0) | (e.interact ? 2 : 0) | (e.special ? 4 : 0) | (e.roll ? 8 : 0) | (e.throwItem ? 16 : 0)
+
+/** One sampled command and the edges that rode with it. `cmd.seq` names it. */
+export interface InputRecord {
+  cmd: InputCmd
+  edges: number
+}
+
+/** Records one Input message carries: the newest plus the three before it, so a
+ * lost datagram costs nothing unless four in a row go. */
+export const INPUT_REDUNDANCY = 4
+
+/** ext byte: which optional trailers follow a record. */
+const EXT_MOD_SWAP = 1
+const EXT_DRAFT_PICK = 2
+
+const writeRecord = (w: ByteWriter, { cmd, edges }: InputRecord): void => {
+  // `held & 8` says whether aim is active: the angle byte can't encode a
+  // centred stick (atan2(0,0)=0 looks like "aim right").
   const aimActive = Math.hypot(cmd.aimX, cmd.aimY) > 0.01
   const held = (cmd.attack ? 1 : 0) | (cmd.interact ? 2 : 0) | (cmd.special ? 4 : 0) | (aimActive ? 8 : 0)
-  // Roll (bit 8) and Use/Throw (bit 16) are pure edges (taps), decoded by the host.
-  const edge =
-    (edges.attack ? 1 : 0) | (edges.interact ? 2 : 0) | (edges.special ? 4 : 0) | (edges.roll ? 8 : 0) | (edges.throwItem ? 16 : 0)
-  w.u8(MsgType.Input)
-    .u16(cmd.seq & 0xffff)
+  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap <= 0xffff
+  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick <= 0xff
+  w.u16(cmd.seq & 0xffff)
     .u8(Math.round((cmd.moveX + 1) * 127))
     .u8(Math.round((cmd.moveY + 1) * 127))
     .u8(held)
-    .u8(edge)
+    .u8(edges & 0xff)
     .u8(Math.round(((Math.atan2(cmd.aimY, cmd.aimX) % (Math.PI * 2)) + Math.PI * 2) * FACING_SCALE) & 0xff)
-    // Hotbar slot to equip this tick as a +1 biased byte: 0 = none (-1), 1..N = slot 0..N-1.
     .u8((cmd.hotbar >= 0 ? cmd.hotbar + 1 : 0) & 0xff)
-  // OPTIONAL trailing u16: a mod reorder request, +1 biased (0 is
-  // never written; absent = none). Written ONLY when a swap is pending, so every
-  // ordinary input packet is byte-identical to before. An older host reads the
-  // hotbar byte and never looks further, so the extra bytes are ignored.
-  const swap = cmd.modSwap !== undefined && cmd.modSwap >= 0 && cmd.modSwap < 0xffff ? cmd.modSwap + 1 : 0
-  const pick = cmd.draftPick !== undefined && cmd.draftPick >= 0 && cmd.draftPick < 0xff ? cmd.draftPick + 1 : 0
-  if (swap > 0 || pick > 0) w.u16(swap)
-  // OPTIONAL trailing u8 after the swap slot: a floor-draft card, +1 biased.
-  if (pick > 0) w.u8(pick)
-  return w.finish()
+    .u8((swap ? EXT_MOD_SWAP : 0) | (pick ? EXT_DRAFT_PICK : 0))
+  if (swap) w.u16(cmd.modSwap!)
+  if (pick) w.u8(cmd.draftPick!)
 }
 
-export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number } => {
-  const r = new ByteReader(bytes)
-  r.u8()
+const readRecord = (r: ByteReader): InputRecord => {
   const cmd = emptyInput()
   cmd.seq = r.u16()
   cmd.moveX = r.u8() / 127 - 1
@@ -396,22 +441,52 @@ export const decodeInput = (bytes: Uint8Array): { cmd: InputCmd; edges: number }
   const held = r.u8()
   const edges = r.u8()
   const aim = r.u8() / FACING_SCALE
-  const hotbar = r.remaining > 0 ? r.u8() : 0 // back-compat: absent → no equip
-  const swapSlot = r.remaining >= 2
-  const modSwap = swapSlot ? r.u16() : 0 // back-compat: absent → no reorder
-  // The draft byte only ever follows a swap slot, so one stray byte is never a pick.
-  const draftPick = swapSlot && r.remaining >= 1 ? r.u8() : 0
+  const hotbar = r.u8()
+  const ext = r.u8()
+  if (ext & EXT_MOD_SWAP) cmd.modSwap = r.u16()
+  if (ext & EXT_DRAFT_PICK) cmd.draftPick = r.u8()
   cmd.attack = (held & 1) !== 0
   cmd.interact = (held & 2) !== 0
   cmd.special = (held & 4) !== 0
   cmd.throwItem = (edges & 16) !== 0
   cmd.hotbar = hotbar > 0 ? hotbar - 1 : -1
-  if (modSwap > 0) cmd.modSwap = modSwap - 1
-  if (draftPick > 0) cmd.draftPick = draftPick - 1
   const aimActive = (held & 8) !== 0
   cmd.aimX = aimActive ? Math.cos(aim) : 0
   cmd.aimY = aimActive ? Math.sin(aim) : 0
   return { cmd, edges }
+}
+
+/**
+ * Input: [type][count u8] then `count` records, oldest first. A record is
+ * seq u16, moveX, moveY, held, edges, aim, hotbar, ext (all u8), then a u16 mod
+ * swap if ext&1 and a u8 draft pick if ext&2. The host folds each record once by
+ * its seq (`foldInputRecord`, app/inputGate.ts), so a repeated record is free and a lost packet's
+ * records arrive in the next one.
+ */
+export const encodeInputBundle = (records: readonly InputRecord[]): Uint8Array => {
+  if (records.length === 0 || records.length > 0xff) throw new RangeError(`input bundle of ${records.length} records`)
+  const w = new ByteWriter(2 + records.length * 12)
+  w.u8(MsgType.Input).u8(records.length)
+  for (const rec of records) writeRecord(w, rec)
+  return w.finish()
+}
+
+export const decodeInputBundle = (bytes: Uint8Array): InputRecord[] => {
+  const r = new ByteReader(bytes)
+  r.u8()
+  const n = r.u8()
+  const out: InputRecord[] = []
+  for (let i = 0; i < n; i++) out.push(readRecord(r))
+  return out
+}
+
+export const encodeInput = (cmd: InputCmd, edges: InputEdges): Uint8Array => encodeInputBundle([{ cmd, edges: edgeBits(edges) }])
+
+/** The newest record of an Input message. */
+export const decodeInput = (bytes: Uint8Array): InputRecord => {
+  const all = decodeInputBundle(bytes)
+  if (all.length === 0) throw new RangeError('empty input bundle')
+  return all[all.length - 1]
 }
 
 /** Build the wire entity for one sim entity (host side). */
@@ -442,6 +517,8 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   if (e.projectile?.mods && e.projectile.mods.length > 0) we.mods = e.projectile.mods.map((m) => ({ ...m }))
   const statuses = e.fx ? Object.keys(e.fx).filter((k) => wireStatusBit.has(k)) : []
   if (statuses.length > 0) we.statuses = statuses
+  const shown = shownActivity(e)
+  if (shown) we.activity = shown
   return we
 }
 
@@ -469,6 +546,8 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   // the renderer then draws each status at its base intensity and canonical hue.
   if (we.statuses && we.statuses.length > 0) e.fx = Object.fromEntries(we.statuses.map((k) => [k, { until: tick + 2 }]))
   else delete e.fx
+  if (we.activity) e.activityShown = { ...we.activity }
+  else delete e.activityShown
   if ((we.flags & SnapFlags.HitFlash) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.hitFlashUntil = tick + 2
@@ -492,7 +571,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
       playerId: -1,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
     }
     // Loadout is the shared equipment component; the local client fills its real
     // slots from the InventoryMsg, this is just the render-side placeholder.
@@ -532,6 +611,8 @@ export interface LobbyStateMsg {
 }
 export interface GameStartMsg {
   seed: number
+  /** The host's run counter, as stamped on every snapshot of this run. */
+  epoch: number
   players: LobbyPlayer[]
   /** Difficulty rules the host is running; clients adopt it so co-op agrees.
    * Optional on the wire for back-compat — absent means the default (`normal`). */
@@ -543,6 +624,16 @@ export interface GameStartMsg {
    * standing on floor 3. Optional for back-compat: absent means 1. */
   floor?: number
 }
+export interface PingMsg {
+  t: number
+  /** The sender's newest round trip in ms, absent before its first Pong. */
+  rtt?: number
+}
+
+export interface PongMsg {
+  t: number
+}
+
 export interface GoMsg {
   startTick: number
   /** slot → entity id of that player's avatar */
@@ -559,8 +650,6 @@ export interface StateMsg {
   /** Mission target entity id (steal item / assassinate boss) so client UIs can
    * hyperlink the objective. Optional on the wire for back-compat. */
   missionTargetId?: number
-  /** Open `extraction` mission (RenderView.extraction). Optional on the wire. */
-  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   alarm: number
   /** STATION ALERT latched on this floor (objective met, escape run on). Optional
@@ -579,14 +668,14 @@ export interface StateMsg {
   /** Per-slot HUD extras for each player's own display.
    *
    * `bandages` is a MISNOMER kept for wire compatibility: netHost.ts fills it
-   * with the total quantity of every carried stack except the briefcase, which
+   * with the total quantity of every carried stack except the canister, which
    * is what it always was. Bandages themselves were culled. The field survives
    * the cull because renaming or dropping it would change the shape of a JSON
    * message that peers on an older bundle still send and read, for no gain —
    * the client simply stopped deriving a phantom `bandage` stack from it. */
   huds: Record<
     number,
-    { cash: number; weapon: string; abilityCd: number; bandages: number; briefcase: boolean; draft?: DraftHand }
+    { cash: number; weapon: string; abilityCd: number; bandages: number; canister: boolean; draft?: DraftHand }
   >
 }
 

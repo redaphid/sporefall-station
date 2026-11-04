@@ -276,7 +276,7 @@ describe('createGamepadCoop', () => {
       'button %i joins the pad and stays fully inert while held',
       (i) => {
         coop.update(
-          viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'bat', qty: 1 }], activeSlot: 0 }]),
+          viewWith([{ playerId: 0, inventory: [{ itemId: 'pistol', qty: 5 }, { itemId: 'wrench', qty: 1 }], activeSlot: 0 }]),
         )
         pads = [pad(0, { buttons: press(i) })]
         const first = coop.sample()
@@ -481,11 +481,11 @@ describe('createGamepadCoop', () => {
       expect(cycleHotbar([{ itemId: 'pistol', qty: 1 }], 0, 1)).toBe(-1)
       expect(cycleHotbar([{ itemId: 'pistol', qty: 1 }], 0, -1)).toBe(-1)
     })
-    it('skips the non-equippable briefcase in display order', () => {
-      const withCase = [{ itemId: 'briefcase', qty: 1 }, { itemId: 'grenade', qty: 1 }, { itemId: 'bandage', qty: 1 }]
+    it('skips the non-equippable canister in display order', () => {
+      const withCase = [{ itemId: 'canister', qty: 1 }, { itemId: 'grenade', qty: 1 }, { itemId: 'bandage', qty: 1 }]
       // display order is [grenade@1, bandage@2]; next from grenade(1) -> bandage(2)
       expect(cycleHotbar(withCase, 1, 1)).toBe(2)
-      // and next from the last wraps back to the first real slot, never the briefcase
+      // and next from the last wraps back to the first real slot, never the canister
       expect(cycleHotbar(withCase, 2, 1)).toBe(1)
     })
     it('starts from the first item slot when nothing is held', () => {

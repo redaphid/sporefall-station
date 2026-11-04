@@ -97,8 +97,8 @@ describe('clearAnnotations', () => {
 describe('selection via the general entities/state verbs', () => {
   it('`entities selected` returns only the selected entities', () => {
     const w = world()
-    const a = spawnNpc(w, 'cop', 1, 1)
-    spawnNpc(w, 'thug', 2, 2)
+    const a = spawnNpc(w, 'warden', 1, 1)
+    spawnNpc(w, 'mutant', 2, 2)
     setSelected(a, true)
     const got = JSON.parse(runVerb(w, 'entities selected'))
     expect(got).toHaveLength(1)
@@ -111,7 +111,7 @@ describe('selection via the general entities/state verbs', () => {
 
   it('`state` reports selectedIds and the annotation count', () => {
     const w = world()
-    const a = spawnNpc(w, 'cop', 1, 1)
+    const a = spawnNpc(w, 'warden', 1, 1)
     setSelected(a, true)
     runVerb(w, `annotate ${encodeArg('{ "kind": "text", "text": "hi" }')}`)
     const st = JSON.parse(runVerb(w, 'state'))

@@ -63,7 +63,7 @@ check("a legitimate write does NOT raise",
 
 # --- a pack outside the chain is entirely dead art --------------------------
 check("art written to a pack outside the chain is all shadowed",
-      packs.shadows("city", {KEY}).get(KEY) == packs.default_pack())
+      packs.shadows("settlement", {KEY}).get(KEY) == packs.default_pack())
 
 # --- the default must be READ from theme.ts, never copied -------------------
 check("default pack is read from theme.ts and matches the app",

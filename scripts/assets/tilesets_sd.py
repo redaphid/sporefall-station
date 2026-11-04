@@ -36,14 +36,14 @@ SURFACES = {
         "seamless game tile, flat top-down view",
         0.5,
     ),
-    "street": (
+    "causeway": (
         "masterpiece, pixpix, 8-bit, pixel_art, top-down dark bog water tile, "
         "still swamp water channel, teal ripples and surface sheen, floating "
         "moss flecks, deep murky water, SNES rpg water texture, seamless game "
         "tile, flat top-down view",
         0.45,
     ),
-    "sidewalk": (
+    "boardwalk": (
         "masterpiece, pixpix, 8-bit, pixel_art, top-down metal deck plating "
         "tile, riveted steel walkway plates, worn scratched metal, moss "
         "creeping in panel seams, derelict space station floor, SNES sci-fi "
@@ -102,7 +102,7 @@ def main() -> None:
     out_dir = Path(sys.argv[2])
     names = sys.argv[3:] or list(SURFACES)
     out_dir.mkdir(parents=True, exist_ok=True)
-    counts = {"grass": 4, "street": 4, "sidewalk": 4, "floor": 4, "wall": 3}
+    counts = {"grass": 4, "causeway": 4, "boardwalk": 4, "floor": 4, "wall": 3}
     for i, name in enumerate(names):
         refine(proc_dir, out_dir, name, counts[name], seed=31337 + i * 101)
 

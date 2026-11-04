@@ -119,6 +119,9 @@ export const startStateReplay = (
       difference: check.difference,
       tick: played.tick,
       world: played,
+      // A still has no run-up: the verdict is that the captured frame loaded
+      // as captured, not that a replay reconverged.
+      still: total === 0,
     }
 
     if (check.ok) {
@@ -180,11 +183,13 @@ export const startStateReplay = (
   }
 
   if (total === 0) {
-    // No run-up was recorded (the sender had no ring armed). The captured frame
-    // is already loaded, so there is nothing to play — just say so.
-    show(el, `▶ LIVE — captured frame${payload.meta.note ? `\n"${payload.meta.note}"` : ''}`, 'rgba(20,120,60,.92)')
-    setTimeout(() => (el.style.opacity = '0'), 2200)
-    setTimeout(() => el.remove(), 3000)
+    // No run-up was recorded (no ring armed, or an online host whose run-up
+    // could not replay). The captured frame is already loaded, so there is
+    // nothing to play — but the verdict is still published, so a check that
+    // waits on `__stateReplay` passes or fails rather than hanging.
+    finish()
+    if (el.textContent?.startsWith('▶ LIVE'))
+      show(el, `▶ LIVE — captured frame${payload.meta.note ? `\n"${payload.meta.note}"` : ''}`, 'rgba(20,120,60,.92)')
   } else {
     show(el, `⏵ REPLAY  0/${total} ticks  ·  ${(total / SIM_RATE).toFixed(1)}s to live`, 'rgba(30,30,40,.88)', '#ffd479')
   }

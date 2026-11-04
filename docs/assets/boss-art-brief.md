@@ -17,7 +17,7 @@ prevent. The roster is already mixed-base, so that consistency risk is overstate
 
 ## Why it is needed
 
-`boss` had no art of its own: `art.CHARSET_ALIAS` mapped it to `thug`, so the Mireclaw Alpha was
+`boss` had no art of its own: `art.CHARSET_ALIAS` mapped it to `mutant`, so the Mireclaw Alpha was
 **pixel-identical to the commonest enemy in the game** — same body, same palette, same size. That
 is the single largest reason the owner cleared roughly six boss floors and reported never having
 met a boss.
@@ -38,9 +38,9 @@ Two changes in this branch mean the art pass is pure asset work:
    Before this, `validateManifest` would have dropped a boss sprite mapping with a warning.
 2. `art.characterSet` now prefers an archetype's **own** set over the one it borrows
    (`sprites.chars[archetype] ?? sprites.chars[alias] ?? procedural`). Drop the files in, map them
-   in the manifest, and the Alpha promotes off the thug body automatically.
+   in the manifest, and the Alpha promotes off the mutant body automatically.
 
-Leave `CHARSET_ALIAS.boss = 'thug'` in place as the fallback.
+Leave `CHARSET_ALIAS.boss = 'mutant'` in place as the fallback.
 
 ## Spec
 
@@ -63,7 +63,7 @@ up and armoured — not as a separate monster.
 
 - Low-slung arthropod, chitin-plated, **clawed** (the claws are its weapon and must be visible in
   the silhouette — that is what replaced the baseball bat).
-- Palette: the theme already assigns it violet `#a05ae0`, against the thug's dusty red `#d17f7f`.
+- Palette: the theme already assigns it violet `#a05ae0`, against the mutant's dusty red `#d17f7f`.
   Lean on that — violet chitin, spore-bloom highlights.
 - It lives in the spore and regenerates in it (phase 2), so wisps/growth on the carapace are on-lore.
 - **Must not** read as an upright humanoid. That was the recurring failure mode in the `stalker`

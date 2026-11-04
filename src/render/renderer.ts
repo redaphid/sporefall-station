@@ -19,6 +19,7 @@ import { DARK_ALPHA, floorTintFor, updateDarkWing, type DarkWing } from './compl
 import { EffectsLayer } from './effects'
 import { darknessRuns, easeTide, lowTileRuns, TIDE_COLOR } from './modifierLook'
 import { GroupFxLayer } from './groupFx'
+import { ActivityFxLayer } from './activityFx'
 import { VerbMarkerLayer } from './verbMarkerLayer'
 import { createHaptics } from './haptics'
 import { nativeHapticDriver } from './hapticsDriver'
@@ -64,7 +65,7 @@ export interface GameRenderer {
   /** Hot-swap the active visual theme (presentation only — never touches the
    * sim). Resolves when the new assets are baked and applied. */
   setTheme(id: string): Promise<void>
-  /** Sprite thumbnail for an art key ('cop', 'medkit', 'door', …) as a PNG data
+  /** Sprite thumbnail for an art key ('warden', 'medkit', 'door', …) as a PNG data
    * URL — the inspect card's picture of the thing tapped. Extracted from the
    * live art registry (so it matches the active theme exactly), cached per key,
    * cache dropped on theme swap. Undefined when extraction isn't possible. */
@@ -148,6 +149,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     entityFlash: (a, d) => inner.entityFlash(a, d),
     isCharacterSprite: (a) => inner.isCharacterSprite(a),
     characterSet: (a) => inner.characterSet(a),
+    artKind: (a) => inner.artKind(a),
     walkStep: (a) => inner.walkStep(a),
     flameFrames: () => inner.flameFrames(),
     effectFrames: (k) => inner.effectFrames(k),
@@ -174,6 +176,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   // retreat cross): drawn over the effects sprites, inside the same layer.
   const groupFx = new GroupFxLayer()
   effects.root.addChild(groupFx.root)
+  const activityFx = new ActivityFxLayer()
+  effects.root.addChild(activityFx.root)
   // #87 element verbs with no body look of their own: panic "!!" and a slashed
   // eye for spore blindness, over the head, above every sprite.
   const verbMarkers = new VerbMarkerLayer()
@@ -591,6 +595,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       }
       // Outside the hitstop freeze: the tracker must see every tick's events.
       groupFx.update(view, elapsed)
+      activityFx.update(shown, view.tick)
       drawReticles()
       drawPickUi(view)
       if (bounds) camera.apply(world, app.screen.width, app.screen.height, bounds.w, bounds.h, bounds.x0, bounds.y0)
@@ -627,9 +632,8 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
           },
           radiusToUv: (r) => (r * pxPerTile) / sh2,
         }
-        // Exit-portal idle flourish: anchored on the way out — the level's exit
-        // tile, or the entry during an extraction.
-        const out = view.extraction ?? currentLevel?.exit
+        // Exit-portal idle flourish: anchored on the level's exit tile.
+        const out = currentLevel?.exit
         if (out && onStorey(out.x)) {
           const e = proj.toUv(out.x + 0.5, out.y + 0.5)
           pipeline.setPortal(e.x, e.y, proj.radiusToUv(1.4))

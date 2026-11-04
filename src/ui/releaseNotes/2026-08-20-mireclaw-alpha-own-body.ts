@@ -1,1 +1,1 @@
-export default 'The Mireclaw Alpha is no longer a big thug'
+export default 'The Mireclaw Alpha is no longer a big mutant'

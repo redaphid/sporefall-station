@@ -12,7 +12,7 @@
 // (`fetchState`) is likewise only called when `?state=` is actually present.
 
 import {
-  captureState,
+  captureReproducible,
   isStateLinkPayload,
   StateRing,
   verifyStateLink,
@@ -21,37 +21,7 @@ import {
 } from '../debug/stateLink'
 import type { World } from '../game/world'
 import { APP_VERSION, SITE_ORIGIN } from './version'
-
-/** Hostnames that only ever mean "this machine". */
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
-
-/**
- * Is this page being served by a NATIVE SHELL out of its own bundled assets,
- * rather than by the site?
- *
- * The Android APK is the case that matters. `capacitor.config.ts` sets no
- * `androidScheme`, so Capacitor's default applies and the webview serves the
- * bundled `dist/` from `https://localhost` -- a real origin, with a real
- * successful `fetch`, that resolves to files inside the APK. A request built
- * from `location.origin` there never reaches the Worker; it hits the app's own
- * SPA fallback and comes back as 200 + index.html.
- *
- * PORTLESS ON PURPOSE. `vite dev` (localhost:5173) and `wrangler dev`
- * (localhost:8787) are localhost too, and they must keep resolving to
- * THEMSELVES: wrangler genuinely serves `/state`, and vite has the
- * `?stateOrigin=` override below. Only a portless localhost -- plus
- * `capacitor://localhost` and a `file://` document, whose origin is the literal
- * string `"null"` -- is a native shell.
- */
-const isNativeShellOrigin = (origin: string): boolean => {
-  if (!origin || origin === 'null') return true
-  try {
-    const url = new URL(origin)
-    return LOCAL_HOSTS.has(url.hostname) && url.port === ''
-  } catch {
-    return true
-  }
-}
+import { workerOrigin } from './workerOrigin'
 
 /**
  * Where the Worker serves `/state`.
@@ -64,7 +34,7 @@ const isNativeShellOrigin = (origin: string): boolean => {
  * keeps `vite dev` (5173) able to point at `wrangler dev` (8787).
  */
 export const stateOrigin = (search: string, origin: string, siteOrigin: string = SITE_ORIGIN): string =>
-  new URLSearchParams(search).get('stateOrigin') ?? (siteOrigin && isNativeShellOrigin(origin) ? siteOrigin : origin)
+  new URLSearchParams(search).get('stateOrigin') ?? workerOrigin(origin, siteOrigin)
 
 const gzip = async (text: string): Promise<Blob> =>
   new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).blob()
@@ -78,6 +48,9 @@ export interface ShareResult {
   rawBytes: number
   /** Ticks of run-up bundled with the capture (0 when no ring was armed). */
   rewindTicks: number
+  /** Set when an online host's run-up could not replay and a still went up
+   * instead: the reason, for the player and the console. */
+  runUpDropped?: string
 }
 
 /**
@@ -93,11 +66,18 @@ export const shareState = async (
   meta: StateLinkMeta = {},
   ring?: StateRing,
   origin: string = stateOrigin(location.search, location.origin),
+  /** Online host: share a still rather than nothing when the run-up does not
+   * replay (see captureReproducible). Solo keeps refusing, since there a
+   * failed replay is a determinism bug worth hearing about. */
+  stillIfRunUpFails = false,
 ): Promise<ShareResult> => {
-  const payload = captureState(world, { capturedAt: Date.now(), build: APP_VERSION, ...meta }, ring?.rewind())
-
-  const check = verifyStateLink(payload)
-  if (!check.ok) throw new Error(`refusing to share a state that does not reproduce itself: ${check.reason}`)
+  const { payload, check, runUpDropped } = captureReproducible(
+    world,
+    { capturedAt: Date.now(), build: APP_VERSION, ...meta },
+    ring?.rewind(),
+  )
+  const failure = !check.ok ? check.reason : runUpDropped && !stillIfRunUpFails ? runUpDropped : undefined
+  if (failure) throw new Error(`refusing to share a state that does not reproduce itself: ${failure}`)
 
   const json = JSON.stringify(payload)
   const body = await gzip(json)
@@ -123,7 +103,14 @@ export const shareState = async (
     )
 
   const { id, url } = (await res.json()) as { id: string; url: string }
-  return { id, url, bytes: body.size, rawBytes: json.length, rewindTicks: check.rewindTicks }
+  return {
+    id,
+    url,
+    bytes: body.size,
+    rawBytes: json.length,
+    rewindTicks: check.rewindTicks,
+    ...(runUpDropped ? { runUpDropped } : {}),
+  }
 }
 
 /**

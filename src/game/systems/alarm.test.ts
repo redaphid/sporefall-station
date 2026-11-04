@@ -2,10 +2,10 @@
 //
 // Every test loads an exact state through serialize/deserialize, runs the real
 // systems (`runTicks` → `tickWorld`) and asserts on the world. The floor is the
-// seed-1 floor-1 city with `hostile = false`, so crew and law stay calm and the
+// seed-1 floor-1 city with `hostile = false`, so crew and wardens stay calm and the
 // only thing moving the alarm is what the test does. The player stands on the
-// open street at y=1.5 aiming +x; witnesses stand behind it, out of the line of
-// fire, so no bullet ever lands on one (that would be a crime, a different path).
+// open causeway at y=1.5 aiming +x; witnesses stand behind it, out of the line of
+// fire, so no bullet ever lands on one (that would be a misdeed, a different path).
 
 import { describe, expect, it } from 'vitest'
 import type { Entity } from '../entity'
@@ -30,7 +30,7 @@ import { WEAPONS } from '../data/items'
 import { HEAR_RANGE } from './goals'
 import { nextFloor, setupFloor } from './missions'
 import { populateWorld } from '../populate'
-import { commitCrime } from './relationships'
+import { commitMisdeed } from './relationships'
 
 const PISTOL = WEAPONS.pistol.cooldownTicks
 /** Tick 0 is a decay tick, so the first shot's heat reads one less. */
@@ -126,12 +126,12 @@ describe('gunfire is a heard noise', () => {
     expect(w.mission.heat).toBeUndefined()
   })
 
-  it('the shot still lures: a calm cop in earshot goes to investigate it', () => {
-    const w = stage([['cop', 2.5, 0.5]])
-    const cop = w.entities.find((e) => e.archetype === 'cop')!
+  it('the shot still lures: a calm warden in earshot goes to investigate it', () => {
+    const w = stage([['warden', 2.5, 0.5]])
+    const warden = w.entities.find((e) => e.archetype === 'warden')!
     fire(w, 1)
     idle(w, 12)
-    expect(cop.ai!.goal).toBe('investigate')
+    expect(warden.ai!.goal).toBe('investigate')
   })
 
   it('hearing draws nothing from the world RNG', () => {
@@ -155,8 +155,8 @@ describe('who counts as a witness (adversarial)', () => {
     expect(w.noises).toHaveLength(1)
   })
 
-  it('gangs and vermin do not call it in', () => {
-    expect(heatAfterShot([['thug', 2.5, 0.5], ['sporeling', 3.5, 0.5]])).toBeUndefined()
+  it('rootcults and vermin do not call it in', () => {
+    expect(heatAfterShot([['mutant', 2.5, 0.5], ['sporeling', 3.5, 0.5]])).toBeUndefined()
   })
 
   it('HEAR_RANGE is the edge: just inside counts, just outside does not', () => {
@@ -186,26 +186,26 @@ describe('who counts as a witness (adversarial)', () => {
 })
 
 describe('an attack on a player, seen', () => {
-  it('a thug landing a hit in view of a civilian adds ATTACK_SEEN_HEAT', () => {
-    const w = stage([['civilian', 2.5, 0.5], ['thug', 7.5, 1.5]])
-    const thug = w.entities.find((e) => e.archetype === 'thug')!
+  it('a mutant landing a hit in view of a civilian adds ATTACK_SEEN_HEAT', () => {
+    const w = stage([['civilian', 2.5, 0.5], ['mutant', 7.5, 1.5]])
+    const mutant = w.entities.find((e) => e.archetype === 'mutant')!
     player(w).health!.iframes = 0 // past the spawn grace
-    expect(applyDamage(w, player(w), 5, thug.pos.x, thug.pos.y, 0, thug.id)).not.toBeNull()
+    expect(applyDamage(w, player(w), 5, mutant.pos.x, mutant.pos.y, 0, mutant.id)).not.toBeNull()
     expect(w.mission.heat).toBe(ATTACK_SEEN_HEAT)
   })
 
-  it('the law beating on you is not news', () => {
-    const w = stage([['civilian', 2.5, 0.5], ['cop', 7.5, 1.5]])
-    const cop = w.entities.find((e) => e.archetype === 'cop')!
-    applyDamage(w, player(w), 5, cop.pos.x, cop.pos.y, 0, cop.id)
+  it('the wardens beating on you is not news', () => {
+    const w = stage([['civilian', 2.5, 0.5], ['warden', 7.5, 1.5]])
+    const warden = w.entities.find((e) => e.archetype === 'warden')!
+    applyDamage(w, player(w), 5, warden.pos.x, warden.pos.y, 0, warden.id)
     expect(w.mission.heat).toBeUndefined()
   })
 
   it('nobody in sight → nothing (the only witness is behind a wall)', () => {
-    // (4.5, 5.5) is inside the building south of the street, walled off.
-    const w = stage([['civilian', 4.5, 5.5], ['thug', 7.5, 1.5]])
-    const thug = w.entities.find((e) => e.archetype === 'thug')!
-    applyDamage(w, player(w), 5, thug.pos.x, thug.pos.y, 0, thug.id)
+    // (4.5, 5.5) is inside the building south of the causeway, walled off.
+    const w = stage([['civilian', 4.5, 5.5], ['mutant', 7.5, 1.5]])
+    const mutant = w.entities.find((e) => e.archetype === 'mutant')!
+    applyDamage(w, player(w), 5, mutant.pos.x, mutant.pos.y, 0, mutant.id)
     expect(w.mission.heat).toBeUndefined()
   })
 })
@@ -254,10 +254,10 @@ describe('lockdown: a raised alarm seals the Launch Bay', () => {
     expect(lockdownView(w)).toBeUndefined()
   })
 
-  it('the crime path counts too: shooting a cop in front of the law can seal the bay', () => {
-    const w = stage([['cop', 2.5, 0.5], ['cop', 3.5, 0.5], ['cop', 2.5, 2.5], ['cop', 7.5, 1.5]])
-    const victim = w.entities.filter((e) => e.archetype === 'cop')[3]
-    commitCrime(w, victim, player(w))
+  it('the misdeed path counts too: shooting a warden in front of the wardens can seal the bay', () => {
+    const w = stage([['warden', 2.5, 0.5], ['warden', 3.5, 0.5], ['warden', 2.5, 2.5], ['warden', 7.5, 1.5]])
+    const victim = w.entities.filter((e) => e.archetype === 'warden')[3]
+    commitMisdeed(w, victim, player(w))
     expect(w.alarm).toBe(3)
     idle(w, 1)
     expect(w.mission.lockdownTick).toBeDefined()
@@ -345,8 +345,8 @@ describe('balance guard on real floors (the full table: scripts/test/alarm-sweep
   })
 })
 
-describe('the heist finale maxes the alarm without a lockdown', () => {
-  const heist = (): World => {
+describe('the salvage finale maxes the alarm without a lockdown', () => {
+  const salvage = (): World => {
     for (let seed = 1; seed <= 200; seed++) {
       const w = createWorld(seed, 1)
       populateWorld(w)
@@ -358,8 +358,8 @@ describe('the heist finale maxes the alarm without a lockdown', () => {
     throw new Error('no steal floor')
   }
 
-  it('picking the objective gate (alarm → 3) is the heist working, not noise: no lockdown', () => {
-    const w = heist()
+  it('picking the objective gate (alarm → 3) is the salvage working, not noise: no lockdown', () => {
+    const w = salvage()
     const gate = w.byId.get(w.mission.objectiveDoorId!)!
     gate.door!.locked = false
     gate.door!.open = true
@@ -369,8 +369,8 @@ describe('the heist finale maxes the alarm without a lockdown', () => {
   })
 
   it('taking the prize (station alert) raises no lockdown on a quiet run', () => {
-    const w = heist()
-    player(w).loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    const w = salvage()
+    player(w).loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     idle(w, 2)
     expect(w.mission.complete).toBe(true)
     expect(w.mission.lockdownTick).toBeUndefined()
@@ -378,14 +378,14 @@ describe('the heist finale maxes the alarm without a lockdown', () => {
   })
 
   it('a LOUD run: the seal cycle restarts when the prize is taken', () => {
-    const w = heist()
+    const w = salvage()
     w.alarm = LOCKDOWN_ALARM
     idle(w, 1)
     const latched = w.mission.lockdownTick!
     idle(w, LOCKDOWN_TICKS + 50) // long past the first cycle
     expect(exitSealed(w)).toBe(false)
     expect(lockdownView(w)).toEqual({}) // still shown: it waits on the objective
-    player(w).loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    player(w).loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     idle(w, 1)
     expect(w.mission.complete).toBe(true)
     expect(w.mission.lockdownTick).toBeGreaterThan(latched)

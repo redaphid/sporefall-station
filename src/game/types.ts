@@ -111,9 +111,6 @@ export type SimEvent =
   /** A `contain` mission's Spore Node bloomed (soft-fail): the room floods with
    * spores. Not a loss — just harder. */
   | { type: 'bloom'; x: number; y: number; entityId: EntityId }
-  /** An `extraction` carrier went down or died: the prize (new pickup `entityId`)
-   * lies where they fell. */
-  | { type: 'prizeDropped'; entityId: EntityId; byId: EntityId; x: number; y: number }
   | { type: 'pickup'; entityId: EntityId; byId: EntityId; itemId: string }
   /** A world weapon-mod pickup was grabbed: `modId` applied to `byId`'s equipped
    * `weapon`. `maxed` = the mod was already at its stack cap (grab was a no-op). */
@@ -152,7 +149,7 @@ export type SimEvent =
    * they had no gun to hold it). `timedOut` = the hand ran out of time and took
    * the card under the cursor. */
   | { type: 'draftPick'; byId: EntityId; modId: string; weapon: string; maxed: boolean; timedOut: boolean }
-  /** #86 — the crew/law noticed enough gunfire (or an attack on a player) to
+  /** #86 — the crew/wardens noticed enough gunfire (or an attack on a player) to
    * raise `w.alarm` to `level`. */
   | { type: 'alarmRaised'; level: number; cause: 'gunfire' | 'attack' }
   /** #86 — the alarm hit the lockdown level: the Launch Bay is sealed. */
@@ -170,6 +167,16 @@ export type SimEvent =
   /** An NPC's AI adopted a new goal worth noting (aggro/flee/alert/search/…) —
    * `prev` is the goal it left, `targetId` who/what the new goal concerns. */
   | { type: 'aiGoal'; entityId: EntityId; goal: string; prev: string; targetId?: EntityId }
+  /** An activity at site `entityId` (a card table, bench, bunk) began or ended
+   * for the NPCs in `seats`. `why` says how an end came about. */
+  | {
+      type: 'activity'
+      entityId: EntityId
+      kind: 'cards' | 'tinker' | 'rest'
+      phase: 'start' | 'end'
+      seats: EntityId[]
+      why?: 'done' | 'broken' | 'timeout'
+    }
   /** A frightened NPC reached a guard and reported its scarer: the guard
    * (`entityId`) now hunts `targetId`, tipped off by `byId`. */
   | { type: 'alerted'; entityId: EntityId; byId: EntityId; targetId: EntityId }
@@ -179,7 +186,7 @@ export type SimEvent =
   /** A barricader plugged a chokepoint: destructible `barricade` object
    * `entityId` now stands beside a doorway at x,y, built by `byId`. */
   | { type: 'barricade'; entityId: EntityId; byId: EntityId; x: number; y: number }
-  /** Complex director (floors 3, 5, 7…): a vent grate at x,y burst and `count`
+  /** Complex director (floors 3+): a vent grate at x,y burst and `count`
    * sporelings crawled out hunting `targetId`. */
   | { type: 'ventSwarm'; x: number; y: number; count: number; targetId: EntityId }
   /** Complex director: a player stepped into crew quarters `building` and its

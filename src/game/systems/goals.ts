@@ -27,16 +27,8 @@ import { initialPlayerHate } from './relationships'
 import { hasStatus } from './statusFx'
 import { vlen } from '../simMath'
 
-export const WANDER = 'wander'
-export const BATTLE = 'battle'
-export const PURSUE = 'pursue'
-export const FLEE = 'flee'
-export const INVESTIGATE = 'investigate'
-
 /** Within this distance a Hostile target is fought rather than chased. */
 export const ENGAGE_RANGE = 13
-/** Baseline desirability of wandering — the floor every drive competes against. */
-export const WANDER_SCORE = 1
 /** Desirability of investigating a heard noise — beats wander, loses to a fight. */
 export const INVESTIGATE_SCORE = 3
 /** Shared distance divisor for battle & flee scores (the game's dist·100/40). */
@@ -44,7 +36,7 @@ export const DIST_K = 2.5
 /** How far an NPC can hear a noise to investigate it. */
 export const HEAR_RANGE = 12
 /** Baseline hate a `w.hostile` world imputes toward players for an NPC with no
- * stored opinion — the `CRIME_HATE` threshold, so battleScore clears WANDER. */
+ * stored opinion — the `MISDEED_HATE` threshold, so battleScore clears WANDER. */
 export const WORLD_HOSTILE_HATE = 5
 /** Multiple of sightRange an NPC keeps chasing a remembered target before giving up. */
 export const LEASH = 1.5

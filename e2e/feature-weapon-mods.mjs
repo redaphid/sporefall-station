@@ -3,7 +3,7 @@
 // specific MODDED gun, replays the proven `shooting` timeline, and captures a
 // still per beat + an asserted mp4 — one distinct signature gun per recording
 // ("all varieties, always"): ricochet-freeze-shotgun, homing pistol, nuke cannon,
-// vampire SMG. Effects are asserted on the post-run world (thugs frozen/cleared).
+// vampire SMG. Effects are asserted on the post-run world (mutants frozen/cleared).
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -35,11 +35,11 @@ const stills = [
 const readState = () => {
   const w = window.__world
   const pl = w.entities.find((e) => e.playerCtl)
-  const thugs = w.entities.filter((e) => e.archetype === 'thug')
+  const mutants = w.entities.filter((e) => e.archetype === 'mutant')
   return {
     tick: w.tick,
     gameOver: w.gameOver,
-    thugsAlive: thugs.filter((e) => !e.dead).length,
+    mutantsAlive: mutants.filter((e) => !e.dead).length,
     frozen: w.entities.filter((e) => e.fx && e.fx.frozen).length,
     projectiles: w.entities.filter((e) => e.kind === 'projectile').length,
     playerHp: pl?.health?.hp ?? null,
@@ -52,23 +52,23 @@ const guns = [
     name: 'sig-ricochet-freeze-shotgun',
     world: armed('shotgun', [{ id: 'bulk', stacks: 2 }, { id: 'bounce', stacks: 1 }, { id: 'frost', stacks: 1 }]),
     // A wall-hugging spray that freezes then shatters a room.
-    expect: (s) => [s.thugsAlive === 3 && 'freeze-shotgun cleared nothing', s.gameOver && 'unexpected game over'],
+    expect: (s) => [s.mutantsAlive === 3 && 'freeze-shotgun cleared nothing', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'sig-homing-pistol',
     world: armed('pistol', [{ id: 'homing', stacks: 3 }, { id: 'rapid', stacks: 2 }]),
-    expect: (s) => [s.thugsAlive === 3 && 'homing pistol hit nothing', s.playerDowned && 'player downed'],
+    expect: (s) => [s.mutantsAlive === 3 && 'homing pistol hit nothing', s.playerDowned && 'player downed'],
   },
   {
     name: 'sig-nuke-cannon',
     world: armed('machinegun', [{ id: 'explosive', stacks: 2 }, { id: 'overload', stacks: 3 }]),
-    expect: (s) => [s.thugsAlive === 3 && 'nuke cannon cleared nothing', s.gameOver && 'unexpected game over'],
+    expect: (s) => [s.mutantsAlive === 3 && 'nuke cannon cleared nothing', s.gameOver && 'unexpected game over'],
   },
   {
     name: 'sig-vampire-smg',
     world: armed('machinegun', [{ id: 'lifesteal', stacks: 3 }, { id: 'pierce', stacks: 2 }, { id: 'rapid', stacks: 1 }], 40),
     // Mows the crowd and heals off it — survives despite starting at 40 hp.
-    expect: (s) => [s.thugsAlive === 3 && 'vampire SMG hit nothing', s.playerDowned && 'player bled out'],
+    expect: (s) => [s.mutantsAlive === 3 && 'vampire SMG hit nothing', s.playerDowned && 'player bled out'],
   },
 ]
 

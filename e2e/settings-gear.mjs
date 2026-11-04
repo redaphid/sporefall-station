@@ -155,8 +155,8 @@ const run = async () => {
   !s.panelOpen ? ok('second tap closed the panel') : fail('panel did not close')
 
   // --- 4. gameplay is unharmed by the exemption ---------------------------
-  const cop = await at(page, 2)
-  await tap(cop.x, cop.y)
+  const warden = await at(page, 2)
+  await tap(warden.x, warden.y)
   await settle(page)
   s = await state(page)
   s.inspectVisible ? ok('tapping an NPC still opens the inspect chip') : fail('inspect broke: tap on NPC opened nothing')

@@ -126,7 +126,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
     e.health = { hp: 100, max: 100, iframes: 0 }
     e.combat = { weapon: 'fists', cooldown: 0 }
     e.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
-    e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+    e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
     e.loadout = { inventory: [], activeSlot: -1 }
     return e
   }
@@ -150,12 +150,12 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
 
   it('a phantom MELEE weapon materializes with full durability', () => {
     const p = bareEntity()
-    p.combat!.weapon = 'bat'
+    p.combat!.weapon = 'wrench'
     const res = applyModPickup(p, 'overload')
-    expect(res).toMatchObject({ modId: 'overload', weapon: 'bat' })
+    expect(res).toMatchObject({ modId: 'overload', weapon: 'wrench' })
     const stack = weaponStack(p)!
-    expect(stack.itemId).toBe('bat')
-    expect(stack.qty).toBe(16) // bat durability
+    expect(stack.itemId).toBe('wrench')
+    expect(stack.qty).toBe(16) // wrench durability
     expect(stack.mods).toEqual([{ id: 'overload', stacks: 1 }])
   })
 

@@ -6,7 +6,7 @@ import { setupFloor } from './missions'
 
 /**
  * Mission placement is bunker-aware: when the mission's target building is a
- * bunker, the objective (briefcase or boss) must sit in the bunker's INNERMOST
+ * bunker, the objective (canister or boss) must sit in the bunker's INNERMOST
  * chamber — the last room, behind the airlock and the chamber ring — and all
  * of the bunker's doors (airlock outer+inner, chamber) spawn locked.
  */

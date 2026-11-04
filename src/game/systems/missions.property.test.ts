@@ -14,19 +14,33 @@
 // replacing "last room in the array") must keep every placement byte-identical
 // — floor 1 especially, whose layout+demos are frozen.
 import { describe, expect, it } from 'vitest'
-import { COMPLEX_MIN_FLOOR } from '../levelgen/complex'
 import { isFloorTile, isWallTile, Tile, tileAt } from '../levelgen/level'
 import { populateWorld } from '../populate'
 import { emptyInput } from '../types'
-import { createCityWorld } from '../testkit'
+import { createCityWorld, frozenWorld } from '../testkit'
 import { createWorld, tickWorld, type World } from '../world'
 import { setupFloor } from './missions'
 
 const SEEDS = 100
-const FLOORS = [1, 2, 3]
+const FLOORS = [1, 2, 3, 4]
+
+/** A walkable floor tile. On a station floor that includes moss: the
+ * overgrown biome grows it over the deck, rooms included. */
+const isDeck = (w: World, x: number, y: number): boolean => {
+  const t = tileAt(w.level, x, y)
+  return isFloorTile(t) || (w.level.complex !== undefined && t === Tile.Grass)
+}
 
 const buildFloor = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)
+  populateWorld(w)
+  setupFloor(w)
+  return w
+}
+
+/** The floor-1 map these placements were pinned on, frozen as authored state. */
+const buildFrozenFloor = (seed: number, floor: number): World => {
+  const w = frozenWorld(seed, floor)
   populateWorld(w)
   setupFloor(w)
   return w
@@ -102,8 +116,8 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
           ).toBe(true)
         }
 
-        // On a real Floor tile — never a wall, street, or courtyard pit.
-        expect(isFloorTile(tileAt(w.level, tx, ty)), `${ctx}: target tile not Floor (poi=${b.poi ?? 'plain'})`).toBe(true)
+        // On a real Floor tile — never a wall, causeway, or courtyard pit.
+        expect(isDeck(w, tx, ty), `${ctx}: target tile not Floor (poi=${b.poi ?? 'plain'})`).toBe(true)
 
         // Reachable on foot from the spawn.
         const seen = reachableFrom(w)
@@ -128,7 +142,7 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
           // The room's centre tile — where missions drop the target — is Floor.
           const cx = Math.floor(r.x + r.w / 2)
           const cy = Math.floor(r.y + r.h / 2)
-          expect(isFloorTile(tileAt(w.level, cx, cy)), `${ctx}: objectiveRoom centre (${cx},${cy}) is not Floor`).toBe(true)
+          expect(isDeck(w, cx, cy), `${ctx}: objectiveRoom centre (${cx},${cy}) is not Floor`).toBe(true)
         }
       }
     }
@@ -140,19 +154,19 @@ describe(`mission target invariants — ${SEEDS} seeds × floors ${FLOORS.join('
       if (w.mission.template === 'reach') continue
       const target = w.byId.get(w.mission.targetEntityId!)!
       if (w.mission.template === 'steal') {
-        // Hand the briefcase to a synthetic player and drop the pickup entity.
+        // Hand the canister to a synthetic player and drop the pickup entity.
         const p = { ...target, id: w.nextId++, kind: 'player' as const }
         // Real path: pickup transfers the item, entity despawns. Emulate the
-        // post-pickup state exactly: player holds briefcase, item entity gone.
+        // post-pickup state exactly: player holds canister, item entity gone.
         w.entities = w.entities.filter((e) => e !== target)
         w.byId.delete(target.id)
         p.pickup = undefined
         p.playerCtl = {
           playerId: 0,
           cash: 0,
-          crimeUntilTick: 0,
+          misdeedUntilTick: 0,
         } as never
-        p.loadout = { inventory: [{ itemId: 'briefcase', qty: 1 }], activeSlot: 0 } as never
+        p.loadout = { inventory: [{ itemId: 'canister', qty: 1 }], activeSlot: 0 } as never
         w.entities.push(p as never)
         w.byId.set(p.id, p as never)
       } else {
@@ -225,14 +239,12 @@ const PINNED: { seed: number; floor: number; tpl: string; bld: number; pos: [num
 describe('objectiveRoom refactor is placement-preserving (pinned pre-refactor table)', () => {
   it('reproduces every pinned mission placement byte-identically', () => {
     for (const row of PINNED) {
-      // Floors 3+ now alternate complex and city (city themes cycling over city
-      // floors only); these rows pin the raw-floor-themed CITY generator's
-      // placements, so replay floors 3+ on that city world.
-      const w = row.floor >= COMPLEX_MIN_FLOOR ? buildCityFloor(row.seed, row.floor) : buildFloor(row.seed, row.floor)
+      // These rows pin placements on the maps of their day: floor 1 rows on
+      // the frozen landing maps, later rows on the raw-floor-themed CITY
+      // generator (play draws floors 1-2's districts and builds 3+ indoors).
+      const w = row.floor >= 2 ? buildCityFloor(row.seed, row.floor) : buildFrozenFloor(row.seed, row.floor)
       const ctx = `seed=${row.seed} floor=${row.floor}`
-      // An extraction is a steal with different completion rules and the same
-      // placement, so it must land exactly where the pinned steal did.
-      expect(w.mission.template === 'extraction' ? 'steal' : w.mission.template, ctx).toBe(row.tpl)
+      expect(w.mission.template, ctx).toBe(row.tpl)
       expect(w.mission.targetBuilding, ctx).toBe(row.bld)
       const t = w.byId.get(w.mission.targetEntityId!)!
       expect([t.pos.x, t.pos.y], ctx).toEqual(row.pos)

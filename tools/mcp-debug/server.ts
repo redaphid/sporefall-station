@@ -58,7 +58,7 @@ export function buildMcpServer(raw: Raw): McpServer {
   )
   server.registerTool(
     'spawn',
-    { description: 'Spawn an entity: kind (npc/player/pickup/...) + archetype (npc archetype like "cop"/"thug"; ignored for kind "player") at (x,y).', inputSchema: { kind: z.string(), archetype: z.string(), x: z.number(), y: z.number() } },
+    { description: 'Spawn an entity: kind (npc/player/pickup/...) + archetype (npc archetype like "warden"/"mutant"; ignored for kind "player") at (x,y).', inputSchema: { kind: z.string(), archetype: z.string(), x: z.number(), y: z.number() } },
     ({ kind, archetype, x, y }) => run(() => raw(`spawn ${kind} ${archetype} ${x} ${y}`)),
   )
   server.registerTool('kill', { description: 'Kill an entity (players are downed, not removed).', inputSchema: { entity: id } }, ({ entity }) => run(() => raw(`kill ${entity}`)))

@@ -35,8 +35,6 @@ declare global {
   }
 }
 
-export const isWebBluetoothAvailable = (): boolean => 'bluetooth' in navigator
-
 // Web Bluetooth never exposes the negotiated MTU, so stay at the same
 // conservative floor the Capacitor client falls back to.
 const MAX_PACKET = 180
@@ -53,6 +51,7 @@ const MAX_PACKET = 180
  */
 export class WebBluetoothClientTransport implements Transport {
   readonly role = 'client' as const
+  readonly medium = 'bluetooth'
   readonly maxPacket = MAX_PACKET
   private handlers = new Set<(e: TransportEvent) => void>()
   private device: BluetoothDevice | null = null

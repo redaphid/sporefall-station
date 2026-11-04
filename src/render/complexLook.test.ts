@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { generateLevel } from '../game/levelgen/generate'
-import { BIOMES } from '../game/levelgen/complex'
+import { BIOMES } from '../game/levelgen/floors'
 import type { SimEvent } from '../game/types'
-import { BIOME_TINT, floorTintFor, mulTint, updateDarkWing, type DarkWing } from './complexLook'
+import { BIOME_TINT, DISTRICT_TINT, floorTintFor, mulTint, updateDarkWing, type DarkWing } from './complexLook'
+import { levelFromJson } from '../game/levelgen/levelText'
+import type { Level, ThemeName } from '../game/levelgen/level'
 
 describe('complex look: biome floor grade', () => {
   it('mulTint is a channel-wise multiply with white as identity and black as zero', () => {
@@ -13,12 +15,25 @@ describe('complex look: biome floor grade', () => {
     expect(mulTint(0xff0000, 0x00ff00)).toBe(0)
   })
 
-  it('city floors keep the theme tint untouched; every biome grades it distinctly', () => {
-    expect(floorTintFor(generateLevel(1, 1), 0xabcdef)).toBe(0xabcdef)
-    expect(floorTintFor(generateLevel(1, 2), 0xffffff)).toBe(0xffffff)
+  it('a level with no district keeps the theme tint; every district grades it its own way', () => {
+    const city = (theme: ThemeName): Level => levelFromJson({ rows: ['@..'], theme })
+    expect(floorTintFor(levelFromJson({ rows: ['@..'] }), 0xabcdef)).toBe(0xabcdef)
     expect(floorTintFor(undefined, 0x445566)).toBe(0x445566)
+    const names: ThemeName[] = ['concourse', 'moorings', 'stillworks', 'culturebeds']
+    const tints = names.map((n) => floorTintFor(city(n), 0xffffff))
+    names.forEach((n, i) => expect(tints[i], n).toBe(DISTRICT_TINT[n]))
+    expect(new Set([0xffffff, ...tints]).size).toBe(5)
+    const [, moorings, still, beds] = tints
+    // The Moorings run teal (blue over red).
+    expect(moorings & 0xff).toBeGreaterThan((moorings >> 16) & 0xff)
+    // Still Row runs warm (more red than blue); the Culture Beds run green.
+    expect((still >> 16) & 0xff).toBeGreaterThan(still & 0xff)
+    expect((beds >> 8) & 0xff).toBeGreaterThan((beds >> 16) & 0xff)
+  })
+
+  it('every station biome grades the floor distinctly', () => {
     const tints = new Set<number>()
-    for (let f = 3; f <= 9; f += 2) {
+    for (let f = 3; f <= 6; f++) {
       const level = generateLevel(1, f)
       const t = floorTintFor(level, 0xffffff)
       expect(t).toBe(BIOME_TINT[level.complex!.biome])

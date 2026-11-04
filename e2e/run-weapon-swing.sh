@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # feat/weapon-sprites — held-weapon SWING + mod-mutation videos. Builds, serves
 # the real pixi bundle on its own port, injects melee loadouts (?world=@inline),
-# and records an asserted mp4 + stills per cut (plain sledgehammer, plain bat,
+# and records an asserted mp4 + stills per cut (plain sledgehammer, plain wrench,
 # incendiary-modded sledgehammer). Artifacts are copied to E2E_SHARE when set.
 set -euo pipefail
 cd "$(dirname "$0")/.."

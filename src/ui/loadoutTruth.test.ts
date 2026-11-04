@@ -34,14 +34,14 @@ const round = (n: number, dp = 0): number => Math.round(n * 10 ** dp) / 10 ** dp
 const text = (values: number[], fmt: (n: number) => string): string =>
   [...new Set(values.map((n) => round(n, 3)))].map(fmt).join('/')
 
-/** A player facing east at a 1000-hp thug one tile away, holding `weaponId`. */
+/** A player facing east at a 1000-hp mutant one tile away, holding `weaponId`. */
 const rig = (weaponId: string, mods: WeaponMod[]): World => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20.5, 20.5)
   p.loadout!.inventory = []
   arm(p, weaponId).mods = mods.map((x) => ({ ...x }))
   p.facing = 0
-  const t = addEntity(w, makeEntity('npc', 'thug', 21.5, 20.5))
+  const t = addEntity(w, makeEntity('npc', 'mutant', 21.5, 20.5))
   t.health = { hp: 1000, max: 1000, iframes: 0 }
   t.status = { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 } // as populate.ts gives a real NPC
   return deserializeWorld(serializeWorld(w))

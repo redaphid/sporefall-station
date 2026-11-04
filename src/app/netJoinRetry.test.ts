@@ -60,6 +60,7 @@ class LossyHub {
   constructor(readonly maxPacket = 180) {
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket,
       start: async () => {},
       stop: async () => {},
@@ -107,6 +108,7 @@ class LossyHub {
     const transport: Transport = {
       role: 'client',
       maxPacket: this.maxPacket,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p, bytes) => this.send('c2h', bytes, (b) => this.hostHandler?.({ type: 'data', peer, bytes: b })),
@@ -186,7 +188,7 @@ describe('join handshake — retried until answered, then given up on OUT LOUD',
     expect(host.world.entities.filter((e) => e.playerCtl)).toHaveLength(0)
   })
 
-  it('recovers a start whose Go never reached the client (stuck on “Generating city…”)', async () => {
+  it('recovers a start whose Go never reached the client (stuck on “Surfacing the colony…”)', async () => {
     const hub = new LossyHub()
     const host = new NetHostSession(13, 'Alice', stubInput(), hub.hostTransport)
     await host.start()

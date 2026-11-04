@@ -35,8 +35,8 @@ Rules that bite: G1 heirloom gear, re-tailored, quilted liners, stitches, old pa
 **Lore check** (Aaron 09-29: "draw more from the lore"; his dated words are in `PROTOCOL.md` rule 10). A design passes all five before any candidate goes to Aaron. Log answers 1 and 2 in PROGRESS.md and put them in the caption he sees.
 1. **Family and hook.** Name the family (§5 A-E) and one line on what only this character does in the colony. Canon uses four of the queue as family anchors (§6): mycologist and bog-mutant for C, derelict-bot for D, spore-drone for E. §5C is written against the green hulk: the warp is asymmetric and partial, it respects the gear it eats, and the person stays legible inside it. The other fourteen have no canon entry: take the role from the archetype's comment in `src/game/data/npcs.ts` and choose the family yourself.
 2. **"Could this exist in any other swamp?"** The answer is no, and the reason reads in the outline at 96 px (L3), not only in the name.
-3. **Not the archetype id.** `thug`, `cop`, `gangster` and `shopkeeper` are Streets of Rogue leftovers, not briefs (Aaron: "not lore-appropriate names"). `generate.py` briefs `thug` as "a huge hulking swamp mutant brute": that is the Hulk.
-4. **No stock weapon in the sprite.** No bat, knife or pistol; the renderer draws the held weapon (`src/render/weaponArt.ts`). A beast holds nothing and bites or claws (Aaron: "dogs shouldn't have knives").
+3. **Not the archetype id.** `mutant`, `warden`, `acolyte` and `shopkeeper` are Streets of Rogue leftovers, not briefs (Aaron: "not lore-appropriate names"). `generate.py` briefs `mutant` as "a huge hulking swamp mutant brute": that is the Hulk.
+4. **No stock weapon in the sprite.** No wrench, knife or pistol; the renderer draws the held weapon (`src/render/weaponArt.ts`). A beast holds nothing and bites or claws (Aaron: "dogs shouldn't have knives").
 5. **Prompt laws.** Describe shapes, materials and colours; never name a familiar creature or object you do not want drawn literally (L2). Never write "silhouette" in a prompt (LORE_GROUNDING: it renders a black figure). It stays a drawing, never a photo (§8.3). Echoes follow G6, G7 and L1.
 
 Procedure:
@@ -125,21 +125,23 @@ The gate is everything `python3 scripts/assets/gate_hash.py` hashes: `cast-gate-
 
 ## In-game video (Step 3 proof)
 
-Headless Chromium on this box has no GL context (ANGLE `xcb_connect failed`; `--use-angle=swiftshader` closes the page), so record through the headed Windows Chrome already listening on `127.0.0.1:9222`, against a local preview of the build, never the live site:
+Headless Chromium on this box has no GL context (ANGLE `xcb_connect failed`; `--use-angle=swiftshader` closes the page), so record through a headed Windows Chrome you launch yourself with `scripts/own-chrome.mjs`, against a local preview of the build, never the live site. Never use the Chrome on `:9222`: it is Aaron's own browser, and `e2e/lib.mjs` refuses it.
 
 ```sh
 export PATH=~/.local/bin:~/.local/node22/bin:$PATH
 corepack pnpm exec vite build && (corepack pnpm exec vite preview --port 4917 --strictPort --host 127.0.0.1 &)
-BASE_URL=http://127.0.0.1:4917 E2E_CDP=http://127.0.0.1:9222 E2E_OUT=/mnt/d/tmp/cast-walks/<char>/ingame node e2e/feature-<arch>-walk.mjs
+node scripts/own-chrome.mjs launch     # note cdpUrl and lockfile from the JSON
+BASE_URL=http://127.0.0.1:4917 E2E_CDP=<cdpUrl> E2E_OUT=/mnt/d/tmp/cast-walks/<char>/ingame node e2e/feature-<arch>-walk.mjs
+node scripts/own-chrome.mjs kill <lockfile>
 ```
 
-Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a39): 8 of the archetype on a ring, each pacing one compass sector, NPC brains off, speed halved so each leg reads. Look at a still yourself before sending; `2cb` the MP4, a 4 s GIF and a still; save them under `/mnt/d/tmp/cast-walks/<char>/ingame/`. It opens a visible context in Aaron's Chrome while it records.
+Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a39): 8 of the archetype on a ring, each pacing one compass sector, NPC brains off, speed halved so each leg reads. Look at a still yourself before sending; `2cb` the MP4, a 4 s GIF and a still; save them under `/mnt/d/tmp/cast-walks/<char>/ingame/`. It opens a visible window on the desktop while it records.
 
 ## Every image carries its flow
 
 - The CLI sends the editor graph as `extra_data.extra_pnginfo.workflow`, so ComfyUI's keyframe PNG and walk MP4 embed `workflow` + `prompt`; they are kept untouched as `raw/<dir>-keyframe-comfy.png` and `raw/<dir>-walk-comfy.mp4`.
 - Every post-processed frame in a run, `sheet.png` and the contact sheet get tEXt `prompt` + `workflow` from the run's `flow-<dir>.json`; `repack --to` and `assemble` carry the flows along. The run dirs keep these embedded copies.
-- Shipped frames carry their flow too. Each sprite is its own ~26 KB Worker asset, far under the 25 MiB per-file cap; deploy-web's `scripts/check-dist-sizes.mjs` fails on any file in `dist/` over 24 MiB (the OTA zip is the one to watch). `export` also copies each direction's flow to `scripts/assets/flows/cast/<kind>/<dir>.json` (editor graph, drag it into ComfyUI) and `<dir>_api.json` (API prompt), the same pair as the run's `flow-<dir>*.json`, as a backup; `sheet` embeds the flow from there. Frames that lost their text chunks: `python3 scripts/assets/cast_walk.py embed --kind <kind>` writes the pair back as tEXt `prompt` + `workflow` right after IHDR, byte for byte what export shipped.
+- Shipped frames carry their flow too. Each sprite is its own ~26 KB Worker asset, far under the 25 MiB per-file cap. `export` also copies each direction's flow to `scripts/assets/flows/cast/<kind>/<dir>.json` (editor graph, drag it into ComfyUI) and `<dir>_api.json` (API prompt), the same pair as the run's `flow-<dir>*.json`, as a backup; `sheet` embeds the flow from there. Frames that lost their text chunks: `python3 scripts/assets/cast_walk.py embed --kind <kind>` writes the pair back as tEXt `prompt` + `workflow` right after IHDR, byte for byte what export shipped.
 - Check one of each: a frame `python3 -c "import json;from PIL import Image;print(len(json.loads(Image.open('F.png').info['workflow'])['nodes']))"`; shipped flow `python3 -c "import json;print(len(json.load(open('scripts/assets/flows/cast/K/D.json'))['nodes']))"`; MP4 `~/.local/bin/ffprobe -v error -show_entries format_tags=workflow -of json F.mp4`.
 
 ## Gotchas already fixed (commit on `art/cast-walk-cycles`)
@@ -157,7 +159,7 @@ Template: `e2e/feature-scientist-walk.mjs` on branch `e2e/scientist-walk` (3920a
 | `verify.py` printed ok with Ollama down | fails closed: `no VLM answer` (9c518ef) |
 | a gate run hung 20+ min | qwen3-vl rambled 7000 tokens; `num_predict 256` (1f0fa8c) |
 | a drag-in didn't rebuild the graph | flows embedded everywhere (7fa5255) |
-| deploy failed: APK 27 MiB > 25 MiB asset cap | deploy-web drops an APK over 24 MiB (it moves to external hosting); `check-dist-sizes.mjs` fails on any other file over 24 MiB. Frames keep their flows: a brief strip (5f528c4) was undone by `embed` |
+| deploy failed: APK 27 MiB > 25 MiB asset cap | deploy-web drops an APK over 24 MiB (it moves to external hosting). Frames keep their flows: a brief strip (5f528c4) was undone by `embed` |
 
 Other traps: a clip can turn around late (mycologist n from ~frame 56); the loop search usually avoids it but check the n row. Each direction's keyframe is an independent edit of the input, so colour can drift per direction (gate 2 + palette lock). `anim.walk: 4` plays 8 frames in 32 ticks: one stride per loop is right.
 

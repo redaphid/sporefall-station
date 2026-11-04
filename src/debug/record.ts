@@ -11,7 +11,7 @@ import { populateWorld } from '../game/populate'
 import { deserializeWorld, serializeWorld, type WorldJson } from '../game/serialize'
 import { setupFloor } from '../game/systems/missions'
 import type { InputCmd, SimEvent } from '../game/types'
-import { createWorld, tickWorld, type World } from '../game/world'
+import { createWorld, replaceWorldInPlace, tickWorld, type World } from '../game/world'
 import { serializeEntity } from './verbs'
 
 /** A player's genesis state — enough to respawn it identically on replay. */
@@ -123,22 +123,6 @@ export type WorldFixture = WorldJson
 
 export const saveWorld = (w: World): WorldFixture => serializeWorld(w)
 
-/** Restore a fixture into an existing world in place (its `level`/`rng` are
- * regenerated/resumed from the snapshot, so the reference stays valid). */
-export const applyFixture = (w: World, fx: WorldFixture): void => {
-  const restored = deserializeWorld(fx)
-  w.seed = restored.seed
-  w.floor = restored.floor
-  w.level = restored.level
-  w.tick = restored.tick
-  w.nextId = restored.nextId
-  w.alarm = restored.alarm
-  w.gameOver = restored.gameOver
-  w.mission = restored.mission
-  w.noises = restored.noises
-  w.events = restored.events
-  w.rng = restored.rng
-  w.baseRng = restored.baseRng
-  w.entities = restored.entities
-  w.byId = restored.byId
-}
+/** Restore a fixture into an existing world in place, so readonly holders of
+ * `w` keep their reference (see `replaceWorldInPlace`). */
+export const applyFixture = (w: World, fx: WorldFixture): void => replaceWorldInPlace(w, deserializeWorld(fx))

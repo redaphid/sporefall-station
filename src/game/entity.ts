@@ -9,6 +9,13 @@ export type EntityKind = 'player' | 'npc' | 'projectile' | 'pickup' | 'door' | '
 export interface StatusEntry {
   until: number
   source?: EntityId
+  /** Damage over time dealt ahead of what this status has owed so far, in
+   * whole millionths of an hp, [0, 1_000_000). hp stays whole, so each damage
+   * tick deals what it owes rounded UP and keeps the overpayment here (fire.ts
+   * elementSystem). Over any window a body takes the exact resisted damage
+   * rounded up, so a resist above 0 always hurts (#131). A refresh keeps it.
+   * Absent when nothing is prepaid, so a whole-number burn snapshots as before. */
+  prepaidMicroHp?: number
 }
 
 export type Fx = Record<string, StatusEntry>
@@ -37,8 +44,32 @@ export interface LockoutEntry {
   activeUntil?: number
 }
 
-export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep'
-export type Faction = 'civ' | 'cop' | 'gang' | 'neutral'
+export type AiMode = 'idle' | 'wander' | 'patrol' | 'aggro' | 'flee' | 'seek' | 'sleep' | 'perform'
+export type Faction = 'civ' | 'warden' | 'rootcult' | 'neutral'
+
+/** An ambient activity a prop offers (systems/activities.ts): cards at a
+ * table, tinkering at a lab bench, resting in a bunk. */
+export type ActivityKind = 'cards' | 'tinker' | 'rest'
+
+/** Where a claim stands: walking to the seat, sitting and waiting for the
+ * others, or performing (every seat at the site shares one `until`). */
+export type ActivityPhase = 'going' | 'seated' | 'playing'
+
+/** One NPC's claim on one seat of an activity site. The claim lives only on the
+ * NPC; a site's occupancy is the set of live NPCs claiming it, so a death or an
+ * interrupt frees the seat with no second record to keep in step. */
+export interface ActivityClaim {
+  kind: ActivityKind
+  /** The prop that offers the activity (table, bench, bunk). */
+  site: EntityId
+  /** The prop sat at: a chair round the table, or the site itself. */
+  seat: EntityId
+  phase: ActivityPhase
+  /** Tick the current phase began. */
+  since: number
+  /** Playing: the tick the game ends, identical across the site's seats. */
+  until?: number
+}
 
 /** A disposition band, derived from numeric hate by `determineRel`. */
 export type RelStatus = 'Friendly' | 'Neutral' | 'Annoyed' | 'Hostile'
@@ -99,7 +130,7 @@ export interface AiState {
   /** #77 — the station module this NPC BELONGS to: index into `level.buildings`
    * plus that building's role, stamped at spawn by populate. Drives the
    * territorial goals (work its room, garrison/defend the objective wing).
-   * Absent for street life / roamers and any directly-spawned (test/scenario)
+   * Absent for causeway life / roamers and any directly-spawned (test/scenario)
    * NPC → snapshot-stable, and the brain falls back to plain wander. */
   zone?: { building: number; role: BuildingRole }
   /** The goal chosen by the last arbitration (battle/flee/pursue/investigate/
@@ -146,7 +177,7 @@ export interface AiState {
    * Any urgent mode (aggro/flee/seek) cancels it instantly. */
   scanUntil?: number
   /** Squad membership (behavior 'squad'): shared squad id + this member's role
-   * in the stack. Assigned by populate for gangster packs. */
+   * in the stack. Assigned by populate for acolyte packs. */
   squad?: { id: number; role: 'lead' | 'flank' | 'rear' }
   /** Group membership (systems/groups.ts): the id of a `World.groups` entry —
    * a raid ("tide") or a hound pack — plus this member's role in it. The group
@@ -168,6 +199,13 @@ export interface AiState {
   provokedBy?: EntityId
   /** Lobber (siege gun): next absolute tick it may fire a shell. */
   lobAt?: number
+  /** Goal commitment (behaviors.decide): until `until`, only a candidate on a
+   * tier above `tier` may replace the current goal. Absent when uncommitted. */
+  commit?: { until: number; tier: number }
+  /** The activity seat this NPC has claimed (systems/activities.ts). */
+  activity?: ActivityClaim
+  /** Earliest tick this NPC looks for another activity. Absent: any time. */
+  leisureAt?: number
 }
 
 /** A member's job inside its group (systems/groups.ts). */
@@ -231,7 +269,7 @@ export interface Loadout {
 export interface Entity {
   id: EntityId
   kind: EntityKind
-  /** Key into data/ definitions: 'thug', 'cop', 'player', 'grenade', 'door.wood', ... */
+  /** Key into data/ definitions: 'mutant', 'warden', 'player', 'grenade', 'door.wood', ... */
   archetype: string
   pos: Vec2
   /** Position at the previous tick — used for render interpolation. */
@@ -260,13 +298,18 @@ export interface Entity {
    * round-trips byte-for-byte. */
   stairLock?: true
 
+  /** CLIENT render mirror of a seated NPC's activity (net/protocol). The host
+   * never sets it: there the truth is `ai.activity`, read through
+   * activities.shownActivity. */
+  activityShown?: { kind: ActivityKind; playing: boolean }
+
   health?: {
     hp: number
     max: number
     iframes: number
-    /** Absolute tick of the last LANDED blow (set by combat.applyDamage and the
-     * shock arc). Drives passive regen: the "unharmed" clock (systems/regen.ts)
-     * counts from here. Optional/absent until first hurt, so pre-feature snapshots
+    /** Absolute tick of the last LANDED blow, damage over time included (set by
+     * combat.hurt, which every damage source calls). Drives passive regen: the
+     * "unharmed" clock (systems/regen.ts) counts from here. Optional/absent until first hurt, so pre-feature snapshots
      * round-trip byte-for-byte (same discipline as `mods`/`annotations`). */
     lastHurtTick?: number
     /** Lifesteal earned but not yet paid, in [-0.5, 0.5). hp stays whole, so each
@@ -297,7 +340,7 @@ export interface Entity {
     playerId: number
     abilityCooldown: number
     cash: number
-    crimeUntilTick: number
+    misdeedUntilTick: number
     /** Passive-regen bookkeeping (systems/regen.ts): consecutive ticks this player
      * has been BOTH completely still and unharmed. Reset to absent the instant they
      * move or take a hit; once it reaches REGEN_CALM_TICKS the player heals over
@@ -429,7 +472,7 @@ export interface Entity {
   fire?: { fuel: number }
   /** Destroyed by shattering a frozen body — an ice gib, not a corpse. */
   shattered?: boolean
-  /** A usable object (ATM/vending) that has already dispensed once. */
+  /** A usable object (vending) that has already dispensed once. */
   used?: boolean
   dead?: boolean
   // ── #64 spore contamination (gated by systems/infection.ts INFECTION_ENABLED) ──

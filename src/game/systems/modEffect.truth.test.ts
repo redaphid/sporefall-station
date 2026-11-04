@@ -24,7 +24,7 @@ const WEAPON_IDS = Object.keys(WEAPONS)
 const EMPTY_SLOT = '__none__'
 
 const npc = (w: World, x: number, hp: number): Entity => {
-  const e = addEntity(w, makeEntity('npc', 'thug', x, 20.5))
+  const e = addEntity(w, makeEntity('npc', 'mutant', x, 20.5))
   e.health = { hp, max: hp, iframes: 0 }
   return e
 }

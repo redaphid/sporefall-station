@@ -110,10 +110,10 @@ describe('runHarnessVerb', () => {
     drive(h, 'create 5')
     drive(h, 'start_run')
     const before = (drive(h, 'state') as { counts: Record<string, number> }).counts.npc ?? 0
-    const spawned = drive(h, 'spawn npc cop 10 10') as { id: number; archetype: string }
-    expect(spawned.archetype).toBe('cop')
+    const spawned = drive(h, 'spawn npc warden 10 10') as { id: number; archetype: string }
+    expect(spawned.archetype).toBe('warden')
     const after = drive(h, 'state') as { counts: Record<string, number> }
     expect(after.counts.npc).toBe(before + 1)
-    expect((drive(h, `get ${spawned.id}`) as { archetype: string }).archetype).toBe('cop')
+    expect((drive(h, `get ${spawned.id}`) as { archetype: string }).archetype).toBe('warden')
   })
 })

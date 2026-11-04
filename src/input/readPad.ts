@@ -157,8 +157,58 @@ const HAT_NULL_MIN = 1.1
  * a bare pure read. */
 export interface HatCalibration {
   proven: boolean
+  /** Raw-pad aim learning (see learnAimAxes). Axis index -> what we have seen it do. */
+  axes: Map<number, AxisHistory>
 }
-export const initialHatCalibration = (): HatCalibration => ({ proven: false })
+export const initialHatCalibration = (): HatCalibration => ({ proven: false, axes: new Map() })
+
+/** What one raw axis has proven about itself. */
+interface AxisHistory {
+  /** Hit the -1 extreme before ever sweeping through the middle: a trigger
+   * resting at -1. Never a stick; disqualified for good. */
+  trigger: boolean
+  /** Has been seen near centre. A stick is observed at rest before it moves. */
+  rested: boolean
+  /** Has read a value strictly between centre and full tilt. A stick sweeps
+   * through those; a hat only ever reads -1/0/1 and a trigger starts disqualified. */
+  analog: boolean
+}
+
+/** Raw axes that may be a right stick: from index 2 up (0/1 are the move stick),
+ * never the speculative hat axis. */
+const AIM_CANDIDATE_MIN = 2
+const REST_EXTREME = 0.9
+const ANALOG_MIN = 0.2
+const ANALOG_MAX = 0.9
+
+/**
+ * A raw pad's aim stick, learned from use instead of guessed (mutates `calib`).
+ * Returns the proven pair of axis indices, or null until two candidate axes have
+ * each shown they are sticks: swept through an intermediate value before ever
+ * hitting the -1 extreme. Triggers (rest at -1) and hats
+ * (discrete -1/0/1) can never qualify, so this keeps PadProfile.aimAxes' promise
+ * that a resting trigger pair can never pin the aim, while still giving
+ * non-standard pads (8BitDo, Switch-style, evdev-unmapped) a working right stick.
+ */
+const learnAimAxes = (pad: Gamepad, profile: PadProfile, calib: HatCalibration): [number, number] | null => {
+  const proven: number[] = []
+  for (let i = AIM_CANDIDATE_MIN; i < pad.axes.length; i++) {
+    if (i === profile.hatAxis || profile.moveAxes.includes(i)) continue
+    const v = axisValue(pad, i)
+    if (v === undefined) continue
+    let h = calib.axes.get(i)
+    if (!h) calib.axes.set(i, (h = { trigger: false, rested: false, analog: false }))
+    if (h.trigger) continue
+    const a = Math.abs(v)
+    if (a <= ANALOG_MIN) h.rested = true
+    else if (a < ANALOG_MAX && h.rested) h.analog = true
+    // A trigger reads 0 until first touched, then rests at -1: it jumps to the
+    // extreme without sweeping through the middle. A stick sweeps first.
+    else if (v <= -REST_EXTREME && !h.analog) h.trigger = true
+    if (h.analog) proven.push(i)
+  }
+  return proven.length >= 2 ? [proven[0], proven[1]] : null
+}
 
 /** Decode a one-axis hat, GATED on calibration (mutates `calib`). A reading in
  * the null region both PROVES the axis is a hat and reports "no direction". An
@@ -213,7 +263,10 @@ export const readPad = (
   // reads centred. This is not "no aim": selectAim falls back to the movement
   // vector, and the fire buttons are untouched. See PadProfile.aimAxes for why
   // guessing here is unacceptable in a way that guessing a d-pad index is not.
-  const aim = profile.aimAxes === null ? { x: 0, y: 0 } : stickPair(pad, profile.aimAxes[0], profile.aimAxes[1])
+  // ...unless the pad proves one in use: learnAimAxes qualifies only axes that
+  // behave like a stick, so the guess it replaces stays impossible.
+  const aimAxes = profile.aimAxes ?? learnAimAxes(pad, profile, hat)
+  const aim = aimAxes === null ? { x: 0, y: 0 } : stickPair(pad, aimAxes[0], aimAxes[1])
   const aimX = aim.x
   const aimY = aim.y
 

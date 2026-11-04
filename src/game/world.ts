@@ -1,7 +1,7 @@
 import type { Entity } from './entity'
 import type { FloorModifier } from './floorModifiers'
 import { generateLevel } from './levelgen/generate'
-import { isSolidTile, type Level } from './levelgen/level'
+import { isSolidTile, levelChecksum, type Level } from './levelgen/level'
 import { mulberry32, type Rng } from './rng'
 import { aiSystem } from './systems/ai'
 import { awakeningSystem } from './systems/dormancy'
@@ -30,10 +30,8 @@ export interface MissionState {
    *  `contain`    — destroy the Spore Node (targetEntityId) before it BLOOMS;
    *                 the bloom is a soft-fail (room floods with spores), never a loss.
    *  `infiltrate` — reach & eliminate a target sealed behind a biolock (open it by
-   *                 keycard, power-cut, or breach). Completes on target death.
-   *  `extraction` — a steal whose pickup raises the station alert; it completes
-   *                 only when a standing prize-holder reaches `extractPoint`. */
-  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate' | 'extraction'
+   *                 keycard, power-cut, or breach). Completes on target death. */
+  template: 'steal' | 'assassinate' | 'reach' | 'contain' | 'infiltrate'
   targetEntityId?: EntityId
   targetBuilding?: number
   complete: boolean
@@ -79,10 +77,6 @@ export interface MissionState {
    * what keeps the boss dormant — and its brood unspent — until someone walks
    * in. Optional/omitted-when-false so old snapshots round-trip byte-for-byte. */
   bossRevealed?: boolean
-  /** `extraction` only: the tile (integer corner) the party came in by — the
-   * level spawn. Reaching it with the prize is the way out; the Launch Bay stays
-   * locked. `targetEntityId` follows the prize while it lies on the floor. */
-  extractPoint?: Vec2
 }
 
 /** A heard disturbance NPCs can investigate — a point that decays after a while. */
@@ -134,6 +128,12 @@ export interface World {
   seed: number
   floor: number
   level: Level
+  /** Checksum of the level `generateLevel(seed, floor)` produced, present when
+   * the level came from the generator (worldFromSeed, missions.nextFloor). While
+   * the live level still hashes to it, a snapshot omits the level and
+   * regenerates it on load. An authored level, or a generated one a scenario
+   * has carved, travels inside the snapshot instead (serialize.ts). */
+  levelChecksumFromSeed?: number
   entities: Entity[]
   byId: Map<EntityId, Entity>
   nextId: EntityId
@@ -144,7 +144,7 @@ export interface World {
   baseRng: Rng
   /** Per-tick FX/net events; consumed after each tick. */
   events: SimEvent[]
-  /** City heat 0..3 — cop aggro threshold. */
+  /** City heat 0..3 — warden aggro threshold. */
   alarm: number
   /** Per-wing power state: `powerCut[wing] === true` means that wing's grid is
    * down (a hacked generator/Cryo Terminal), which auto-unseals its `'power'`
@@ -204,13 +204,39 @@ export interface World {
   modifier?: FloorModifier
 }
 
-export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World => {
+/**
+ * A world's starting state: everything the engine needs to run, and nothing it
+ * derives. The level is DATA here, so a test, a crafted save or a level editor
+ * hands the engine a map directly and no seed is involved. `worldFromSeed` is
+ * the generator that produces one of these from seed+floor.
+ */
+export interface WorldInit {
+  level: Level
+  /** Root of the sim's dice (AI rolls, loot, group and hunt streams), not the
+   * source of the level. The generator uses one number for both, and the next
+   * floor of any run is generated from it (missions.nextFloor). Default 1. */
+  seed?: number
+  /** Default 1. Floor-gated rules (complex director, boss floors, drafts) read it. */
+  floor?: number
+  mode?: RunMode
+  hostile?: boolean
+  /** Set by `worldFromSeed` only: the level is `generateLevel(seed, floor)`
+   * untouched, so a snapshot may leave it out and regenerate it. */
+  levelChecksumFromSeed?: number
+}
+
+/** The engine's entry: a live world from a starting state. Deterministic in
+ * `init`; no seed or generator is consulted. */
+export const worldFromState = (init: WorldInit): World => {
+  const seed = init.seed ?? 1
+  const floor = init.floor ?? 1
   const baseRng = mulberry32(seed)
   return {
     tick: 0,
     seed,
     floor,
-    level: generateLevel(seed, floor),
+    level: init.level,
+    ...(init.levelChecksumFromSeed !== undefined ? { levelChecksumFromSeed: init.levelChecksumFromSeed } : {}),
     entities: [],
     byId: new Map(),
     nextId: 1,
@@ -228,11 +254,33 @@ export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal
     noises: [],
     fear: [],
     gameOver: false,
-    mode,
+    mode: init.mode ?? 'normal',
     revivesLeft: REVIVES_PER_RUN,
-    hostile,
+    hostile: init.hostile ?? true,
     annotations: [],
   }
+}
+
+/** The generator: seed+floor to a starting state, via the level generator. */
+export const worldFromSeed = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): WorldInit => {
+  const level = generateLevel(seed, floor)
+  return { level, seed, floor, mode, hostile, levelChecksumFromSeed: levelChecksum(level) }
+}
+
+/** Convenience for the app and tests: generate floor `floor` of run `seed` and
+ * start it. Exactly `worldFromState(worldFromSeed(...))`. */
+export const createWorld = (seed: number, floor: number, mode: RunMode = 'normal', hostile = true): World =>
+  worldFromState(worldFromSeed(seed, floor, mode, hostile))
+
+/** Replace `target`'s whole state with `fresh`'s, in place, so every holder of
+ * the `target` reference sees the new world. Every field `fresh` lacks (a
+ * director, groups, modifier, a seeded level's checksum) is cleared rather than
+ * left over. `aiFlags` is not part of a snapshot, so the running world's A/B
+ * toggles survive. The debug `load` verb and `applyFixture` both use this. */
+export const replaceWorldInPlace = (target: World, fresh: World): void => {
+  const { aiFlags } = target
+  for (const k of Object.keys(target)) delete (target as unknown as Record<string, unknown>)[k]
+  Object.assign(target, fresh, aiFlags ? { aiFlags } : {})
 }
 
 /** Is any wing's power currently cut? Robots (Derelict Units) turn hostile while
@@ -294,7 +342,7 @@ export const tickWorld = (w: World, rawInputs: Map<number, InputCmd>): void => {
     e.prevPos.x = e.pos.x
     e.prevPos.y = e.pos.y
   }
-  complexDirectorSystem(w) // floors 3, 5, 7…: vent swarms, bunk ambushes, lights-out
+  complexDirectorSystem(w) // floors 3+: vent swarms, bunk ambushes, lights-out
   groupSystem(w) // raids, hound packs, hive spires: phases, morale, rally, heals, shells, spread
   modifierSystem(w) // floor modifier: tracker-pack arrivals, the tide wetting whoever wades
   awakeningSystem(w) // #68: wake dormant pods/units BEFORE they think this tick

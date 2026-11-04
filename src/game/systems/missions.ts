@@ -1,7 +1,8 @@
-import { makeEntity, SPAWN_GRACE_TICKS, type Entity } from '../entity'
+import { itemClass, itemName, keycardId } from '../data/items'
+import { makeEntity, SPAWN_GRACE_TICKS, type Entity, type Loadout } from '../entity'
 import { groundAnchor, stairReservedKeys } from '../stairs'
 import { generateLevel } from '../levelgen/generate'
-import { isFloorTile, type Building, type BuildingRole } from '../levelgen/level'
+import { isFloorTile, isSolidTile, levelChecksum, themeNamed, type Building, type BuildingRole } from '../levelgen/level'
 import { populateWorld, spawnNpc } from '../populate'
 import type { Rng } from '../rng'
 import { applyFloorModifier } from './modifierSystem'
@@ -50,8 +51,24 @@ const WING_NAMES: Record<BuildingRole, string> = {
   security: 'security post',
 }
 
-/** Themed module name for a building role (falls back to the raw role, defensively). */
-const wingName = (role: BuildingRole): string => WING_NAMES[role] ?? role
+/** What a building of `role` is called on this floor: the city district's own
+ * name for it, else the station-wide one (else the raw role, defensively). */
+const wingNameOn = (w: World, role: BuildingRole): string =>
+  (w.level.theme ? themeNamed(w.level.theme).wingNames[role] : undefined) ?? WING_NAMES[role] ?? role
+
+/** The keycard for `building`'s gate, named as the objective banner names the
+ * building. A name another keycard seal on this floor already uses gets a
+ * number ("essence lab 2"); a building with no role falls back to its wing. */
+export const keycardFor = (w: World, building: Building, wing: string): string => {
+  const base = building.role ? wingNameOn(w, building.role) : ''
+  if (!base) return keycardId(wing)
+  const taken = new Set(
+    w.entities.filter((e) => e.door?.sealKind === 'keycard' && e.door.keyId).map((e) => itemName(e.door!.keyId!)),
+  )
+  let name = base
+  for (let n = 2; taken.has(itemName(keycardId(wing, name))); n++) name = `${base} ${n}`
+  return keycardId(wing, name)
+}
 
 /** Absolute-tick countdown a `contain` Spore Node gets before it blooms. Long
  * enough to fight to it and burn it back; short enough that dawdling floods the
@@ -60,21 +77,31 @@ const BLOOM_TICKS = 40 * 30
 /** Bog integrity of an overgrown gateway hatch — fire erodes it (interaction). */
 const GATEWAY_GROWTH_HP = 12
 
-/** Door entities on every building door tile. Mission building's exterior doors are locked. */
+/** One door entity on every building door tile. Mission building's exterior doors are locked. */
 const spawnDoors = (w: World): void => {
+  const byTile = new Map<number, Entity>()
   for (let i = 0; i < w.level.buildings.length; i++) {
     const b = w.level.buildings[i]
     for (const d of b.doors) {
-      const e = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
       const isMissionBuilding = i === w.mission.targetBuilding
       // Locks harden with depth: the lock level sets the pick-channel LENGTH
       // (see interaction.pickTicks) — L1 on floors 1-2, L2 from floor 3. Every
       // level is pickable by the default player; grenades breach as the loud
       // alternative (combat.detonate), so mission doors never dead-end a run.
       const lockLevel = isMissionBuilding ? Math.min(2, 1 + Math.floor((w.floor - 1) / 2)) : 0
+      // Neighbouring complex modules share a doorway and both list it. Two
+      // doors stacked on one tile are a softlock: a press only ever toggles
+      // the first, and the second stays shut. The mission building's lock wins.
+      const shared = byTile.get(d.y * w.level.w + d.x)
+      if (shared) {
+        if (isMissionBuilding) shared.door = { open: false, locked: true, lockLevel }
+        continue
+      }
+      const e = makeEntity('door', 'door', d.x + 0.5, d.y + 0.5, 0.5)
       e.door = { open: false, locked: isMissionBuilding, lockLevel }
       e.interact = { verb: 'open', range: 1.3 }
       addEntity(w, e)
+      byTile.set(d.y * w.level.w + d.x, e)
     }
   }
 }
@@ -98,31 +125,17 @@ const generateMission = (w: World): void => {
 
   if (rng.chance(0.5)) {
     const spot = roomCenter(building)
-    const item = makeEntity('pickup', 'pickup.briefcase', spot.x, spot.y, 0.3)
-    item.pickup = { itemId: 'briefcase', qty: 1 }
+    const item = makeEntity('pickup', 'pickup.canister', spot.x, spot.y, 0.3)
+    item.pickup = { itemId: 'canister', qty: 1 }
     addEntity(w, item)
-    // Past the tutorial floor, half the steals become EXTRACTIONS. Rolled on a
-    // dedicated fork so the mission stream (and every placement after it) stays
-    // byte-identical to the frozen steal table; only the objective's rules change.
-    const extraction = w.floor >= 2 && w.rng.fork('extraction').chance(0.5)
-    w.mission = extraction
-      ? {
-          template: 'extraction',
-          targetEntityId: item.id,
-          targetBuilding: buildingIdx,
-          complete: false,
-          exitUnlocked: false,
-          description: `Grab the specimen canister in the ${wingName(building.role)}, then get out the way you came`,
-          extractPoint: { x: Math.floor(w.level.spawn.x), y: Math.floor(w.level.spawn.y) },
-        }
-      : {
-          template: 'steal',
-          targetEntityId: item.id,
-          targetBuilding: buildingIdx,
-          complete: false,
-          exitUnlocked: false,
-          description: `Extract the specimen canister from the ${wingName(building.role)}`,
-        }
+    w.mission = {
+      template: 'steal',
+      targetEntityId: item.id,
+      targetBuilding: buildingIdx,
+      complete: false,
+      exitUnlocked: false,
+      description: `Extract the specimen canister from the ${wingNameOn(w, building.role)}`,
+    }
   } else {
     const spot = roomCenter(building)
     const boss = spawnNpc(w, 'boss', spot.x, spot.y)
@@ -132,7 +145,7 @@ const generateMission = (w: World): void => {
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Purge the Mireclaw Alpha in the ${wingName(building.role)}`,
+      description: `Purge the Mireclaw Alpha in the ${wingNameOn(w, building.role)}`,
     }
   }
 }
@@ -152,7 +165,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Burn back the Spore Node in the ${wingName(building.role)} before it blooms`,
+      description: `Burn back the Spore Node in the ${wingNameOn(w, building.role)} before it blooms`,
       bloomTick: w.tick + BLOOM_TICKS,
     }
   } else {
@@ -163,7 +176,7 @@ const generateSporefallMission = (w: World, rng: Rng, building: Building, buildi
       targetBuilding: buildingIdx,
       complete: false,
       exitUnlocked: false,
-      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingName(building.role)}`,
+      description: `Breach the biolock and purge the Mireclaw Alpha in the ${wingNameOn(w, building.role)}`,
     }
   }
   return true
@@ -200,11 +213,12 @@ const applyAccessGate = (w: World): void => {
 
   if (scheme === 0) {
     // Keycard biolock: card carried in a cargo pod elsewhere in the building.
+    const keyId = keycardFor(w, building, wing)
     gate.door!.locked = true
     gate.door!.sealKind = 'keycard'
-    gate.door!.keyId = `keycard.${wing}`
+    gate.door!.keyId = keyId
     gate.door!.wing = wing
-    placeKeycard(w, building, `keycard.${wing}`, rng)
+    placeKeycard(w, building, keyId, rng)
   } else if (scheme === 1) {
     // Power biolock: cut the wing at its generator (the loud, systemic key).
     gate.door!.locked = true
@@ -212,17 +226,15 @@ const applyAccessGate = (w: World): void => {
     gate.door!.wing = wing
     placeGenerator(w, building, wing, rng)
   } else {
-    // Overgrown hatch fed by a Spore Node. For a `contain` mission the node IS
-    // the objective (already placed); otherwise spawn a fresh, reachable node.
+    // Overgrown hatch fed by a Spore Node outside it. Even on `contain`, whose
+    // objective is a node too: that one grows behind this hatch, so feeding the
+    // hatch from it would hide the key behind its own gate.
     gate.door!.locked = true
     gate.door!.overgrown = true
     gate.door!.growthHp = GATEWAY_GROWTH_HP
     gate.flammable = true // fire can catch on the bog and erode the growth
-    const nodeId =
-      w.mission.template === 'contain' && w.mission.targetEntityId !== undefined
-        ? w.mission.targetEntityId
-        : placeSporeNode(w, building, rng)?.id
-    if (nodeId !== undefined) gate.door!.nodeId = nodeId
+    const node = placeSporeNode(w, building, rng)
+    if (node) gate.door!.nodeId = node.id
   }
 }
 
@@ -260,43 +272,99 @@ const tagObjectiveGate = (w: World): void => {
   w.mission.objectiveDoorId = gate.id
 }
 
-/** A random interior Floor tile of the building (never spawn/exit), or null. */
-const randomFloorTile = (w: World, building: Building, rng: Rng): { tx: number; ty: number } | null => {
-  const sx = Math.floor(w.level.spawn.x)
-  const sy = Math.floor(w.level.spawn.y)
-  for (let attempt = 0; attempt < 24; attempt++) {
-    const tx = rng.int(building.rect.x + 1, building.rect.x + building.rect.w - 2)
-    const ty = rng.int(building.rect.y + 1, building.rect.y + building.rect.h - 2)
-    if (!isFloorTile(w.level.tiles[ty * w.level.w + tx])) continue
-    if (tx === sx && ty === sy) continue
-    if (tx === w.level.exit.x && ty === w.level.exit.y) continue
-    if (stairReservedKeys(w.level).has(ty * w.level.w + tx)) continue
-    return { tx, ty }
+/** A door only its soft key (or a breach) opens: a keycard or power biolock,
+ * or an overgrown hatch. A plain lock is not a seal: every lock is pickable. */
+const isSealedDoor = (d: Entity): boolean =>
+  !!d.door &&
+  !d.dead &&
+  !d.door.open &&
+  (d.door.overgrown === true || (d.door.locked && (d.door.sealKind === 'keycard' || d.door.sealKind === 'power')))
+
+/** Tiles a player can walk to from the spawn with every sealed door shut,
+ * following stairs. A seal's key must land in here, or it can sit behind the
+ * very gate it opens (a single-door station module is all behind its gate). */
+const reachableWithSealsShut = (w: World): Uint8Array => {
+  const { w: W, h: H } = w.level
+  const shut = new Set<number>()
+  for (const e of w.entities) if (isSealedDoor(e)) shut.add(Math.floor(e.pos.y) * W + Math.floor(e.pos.x))
+  const stairTo = new Map<number, number>()
+  for (const l of w.level.stairs ?? []) stairTo.set(l.from.y * W + l.from.x, l.landing.y * W + l.landing.x)
+  const reach = new Uint8Array(W * H)
+  const start = Math.floor(w.level.spawn.y) * W + Math.floor(w.level.spawn.x)
+  reach[start] = 1
+  const stack = [start]
+  const visit = (x: number, y: number): void => {
+    const k = y * W + x
+    if (isSolidTile(w.level, x, y) || reach[k] || shut.has(k)) return
+    reach[k] = 1
+    stack.push(k)
+  }
+  while (stack.length > 0) {
+    const k = stack.pop()!
+    const x = k % W
+    const y = (k - x) / W
+    visit(x + 1, y)
+    visit(x - 1, y)
+    visit(x, y + 1)
+    visit(x, y - 1)
+    const hop = stairTo.get(k)
+    if (hop !== undefined) visit(hop % W, Math.floor(hop / W))
+  }
+  return reach
+}
+
+const inInterior = (r: Building['rect'], x: number, y: number): boolean =>
+  x > r.x && x < r.x + r.w - 1 && y > r.y && y < r.y + r.h - 1
+
+/** A floor tile for a seal's key: reachable from the spawn with every seal
+ * shut, and never the spawn, the exit, a stair approach or a doorway. Prefers
+ * the objective building (on a multi-door city block that is where the key has
+ * always been), then any building's interior, then any reachable floor. Null
+ * only when nothing outside the seals is free. Call after the gate is sealed. */
+const keyTile = (w: World, building: Building, rng: Rng): { tx: number; ty: number } | null => {
+  const W = w.level.w
+  const reach = reachableWithSealsShut(w)
+  const taken = new Set<number>(stairReservedKeys(w.level))
+  taken.add(Math.floor(w.level.spawn.y) * W + Math.floor(w.level.spawn.x))
+  taken.add(w.level.exit.y * W + w.level.exit.x)
+  for (const e of w.entities) if (e.door) taken.add(Math.floor(e.pos.y) * W + Math.floor(e.pos.x))
+  const free: number[] = []
+  for (let k = 0; k < reach.length; k++) if (reach[k] && !taken.has(k) && isFloorTile(w.level.tiles[k])) free.push(k)
+  const preferences: ((x: number, y: number) => boolean)[] = [
+    (x, y) => inInterior(building.rect, x, y),
+    (x, y) => w.level.buildings.some((b) => inInterior(b.rect, x, y)),
+    () => true,
+  ]
+  for (const prefer of preferences) {
+    const pool = free.filter((k) => prefer(k % W, Math.floor(k / W)))
+    if (pool.length === 0) continue
+    const k = pool[rng.int(0, pool.length - 1)]
+    return { tx: k % W, ty: Math.floor(k / W) }
   }
   return null
 }
 
-/** Drop the wing keycard in a cargo pod somewhere in the building (reachable —
- * outside the gate it opens). Guaranteed by breach even if placement fails. */
+/** Drop the wing keycard where a player can reach it without passing the gate
+ * it opens. A breach still opens the gate if no tile was free. */
 const placeKeycard = (w: World, building: Building, keyId: string, rng: Rng): void => {
-  const t = randomFloorTile(w, building, rng)
+  const t = keyTile(w, building, rng)
   if (!t) return
   const e = makeEntity('pickup', `pickup.${keyId}`, t.tx + 0.5, t.ty + 0.5, 0.3)
   e.pickup = { itemId: keyId, qty: 1 }
   addEntity(w, e)
 }
 
-/** Spawn the wing's generator inside the building — hacking it cuts the wing. */
+/** Spawn the wing's generator outside the gate; hacking it cuts the wing. */
 const placeGenerator = (w: World, building: Building, wing: string, rng: Rng): void => {
-  const t = randomFloorTile(w, building, rng)
+  const t = keyTile(w, building, rng)
   if (!t) return
   const gen = spawnObject(w, 'generator', t.tx, t.ty)
   gen.wing = wing
 }
 
-/** Spawn a reachable Spore Node (its death un-overgrows the linked gateway). */
+/** Spawn a Spore Node outside the gate (its death un-overgrows the linked gateway). */
 const placeSporeNode = (w: World, building: Building, rng: Rng): Entity | null => {
-  const t = randomFloorTile(w, building, rng)
+  const t = keyTile(w, building, rng)
   if (!t) return null
   return spawnObject(w, 'sporeNode', t.tx, t.ty)
 }
@@ -460,7 +528,7 @@ const nearestLivePlayer = (w: World): Entity | undefined =>
   w.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)
 
 /**
- * Gateway-breach escalation, stage one of the heist finale. The moment the
+ * Gateway-breach escalation, stage one of the salvage finale. The moment the
  * objective's gateway door is UNLOCKED by any means — picked, keycarded,
  * power-cut, or breached (all of which drop `door.locked` and/or set
  * `door.open`) — the station unseals: the alarm maxes and EVERY other door on
@@ -500,11 +568,9 @@ export const missionSystem = (w: World): void => {
   if (!w.mission.complete) {
     if (w.mission.template === 'steal') {
       const holder = w.entities.find(
-        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase'),
+        (e) => e.playerCtl && (e.loadout?.inventory ?? []).some((s) => s.itemId === 'canister'),
       )
       if (holder) completeMission(w, holder)
-    } else if (w.mission.template === 'extraction') {
-      runExtraction(w)
     } else if (
       w.mission.template === 'assassinate' ||
       w.mission.template === 'infiltrate' ||
@@ -521,10 +587,10 @@ export const missionSystem = (w: World): void => {
     }
   }
 
-  // Floor transition: any live player standing on the unlocked exit tile — for
-  // an extraction, the entry they came in by. A lockdown seals it (#86).
+  // Floor transition: any live player standing on the unlocked exit tile. A
+  // lockdown seals it (#86).
   if (w.mission.exitUnlocked && !exitSealed(w)) {
-    const exit = w.mission.extractPoint ?? w.level.exit
+    const exit = w.level.exit
     for (const e of w.entities) {
       if (!e.playerCtl || e.playerCtl.downed || e.dead) continue
       if (Math.floor(e.pos.x) === exit.x && Math.floor(e.pos.y) === exit.y) {
@@ -553,59 +619,6 @@ export const missionSystem = (w: World): void => {
   w.events.push({ type: 'runOver', floor: w.floor })
 }
 
-const holdsPrize = (e: Entity): boolean => (e.loadout?.inventory ?? []).some((s) => s.itemId === 'briefcase')
-
-/** The standing player carrying the extraction prize, if any. */
-export const extractionCarrier = (w: World): Entity | undefined =>
-  w.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed && holdsPrize(e))
-
-/** What the HUD needs to point at the way out: the extraction point, and whether
- * the prize is in a standing player's hands (the objective is now "get out"). */
-export const extractionView = (w: World): { x: number; y: number; held: boolean } | undefined => {
-  const at = w.mission.extractPoint
-  if (w.mission.template !== 'extraction' || !at || w.mission.complete) return undefined
-  return { x: at.x, y: at.y, held: extractionCarrier(w) !== undefined }
-}
-
-/**
- * `extraction`: taking the prize raises the station alert (the escape begins
- * with the prize in hand), and the mission completes only when a standing
- * carrier reaches the entry. A carrier who goes down or dies drops the prize
- * where they fell; the mission target follows it, so the HUD re-points at the
- * canister and NPCs leave it alone (behaviors.ts skips the mission target).
- */
-const runExtraction = (w: World): void => {
-  const at = w.mission.extractPoint
-  for (const p of w.entities) {
-    if (!p.playerCtl || !holdsPrize(p)) continue
-    if (p.dead || p.playerCtl.downed) {
-      dropPrize(w, p)
-      continue
-    }
-    // The grab is an extraction's "objective": a loud run's lockdown cycle starts
-    // over with the prize in hand, as it does for a steal (#86).
-    if (w.mission.alertTick === undefined && w.mission.lockdownTick !== undefined) w.mission.lockdownTick = w.tick
-    raiseStationAlert(w, p)
-    if (at && Math.floor(p.pos.x) === at.x && Math.floor(p.pos.y) === at.y && !exitSealed(w)) {
-      completeMission(w, p)
-      return
-    }
-  }
-}
-
-const dropPrize = (w: World, carrier: Entity): void => {
-  const ld = carrier.loadout!
-  const i = ld.inventory.findIndex((s) => s.itemId === 'briefcase')
-  ld.inventory.splice(i, 1)
-  // Keep the active slot on the same stack when the prize sat in front of it.
-  if (i < ld.activeSlot) ld.activeSlot--
-  const item = makeEntity('pickup', 'pickup.briefcase', carrier.pos.x, carrier.pos.y, 0.3)
-  item.pickup = { itemId: 'briefcase', qty: 1 }
-  addEntity(w, item)
-  w.mission.targetEntityId = item.id
-  w.events.push({ type: 'prizeDropped', entityId: item.id, byId: carrier.id, x: item.pos.x, y: item.pos.y })
-}
-
 /** `contain` soft-fail: if the Spore Node lives past its bloom tick, it BLOOMS —
  * a spore gout floods the core (harder to fight through), latched once. This is
  * never a loss: the objective is still to destroy the node, just now amid spores. */
@@ -618,10 +631,10 @@ const maybeBloom = (w: World, node: Entity): void => {
 }
 
 /**
- * Taking the prize is stage two of the heist finale: the mission completes,
+ * Taking the prize is stage two of the salvage finale: the mission completes,
  * the exit unlocks — and the whole STATION goes to alert for the escape run
  * (`raiseStationAlert`: every door thrown open, alarm maxed, every non-allied
- * NPC hostile and hunting). `focus` is who they hunt: the briefcase holder, or
+ * NPC hostile and hunting). `focus` is who they hunt: the canister holder, or
  * whoever stood closest to the kill. A floor with no live players (posthumous
  * completion) skips the alert — there is nobody to hunt, and an alert with no
  * focus would leave the manhunt broadcasting at a corpse. Latched by
@@ -635,16 +648,26 @@ const completeMission = (w: World, focus?: Entity): void => {
   // player actually needs to act on (see ui/screens.ts).
   w.events.push({ type: 'missionComplete', description: w.mission.description })
   // A loud run's lockdown seal cycle starts over with the prize in hand.
-  // An extraction restarted it at the grab instead (runExtraction).
-  if (w.mission.lockdownTick !== undefined && w.mission.template !== 'extraction') w.mission.lockdownTick = w.tick
+  if (w.mission.lockdownTick !== undefined) w.mission.lockdownTick = w.tick
   if (focus) raiseStationAlert(w, focus)
+}
+
+/** Every key item (the canister, each wing keycard) belongs to the floor it
+ * was found on, so the exit takes them all. The held stack stays held. */
+const leaveFloorKeys = (ld: Loadout): void => {
+  const held = ld.inventory[ld.activeSlot]
+  ld.inventory = ld.inventory.filter((s) => itemClass(s.itemId) !== 'key')
+  ld.activeSlot = held ? ld.inventory.indexOf(held) : -1
 }
 
 /** Regenerate the world in place for the next floor, carrying players over. */
 export const nextFloor = (w: World): void => {
   const players = w.entities.filter((e) => e.playerCtl)
   w.floor++
+  // A floor transition is worldgen: the next floor of any run, authored or
+  // not, is generated from the run's seed.
   w.level = generateLevel(w.seed, w.floor)
+  w.levelChecksumFromSeed = levelChecksum(w.level)
   w.entities = []
   w.byId.clear()
   w.rng = w.baseRng.fork(`sim:${w.floor}`)
@@ -664,9 +687,8 @@ export const nextFloor = (w: World): void => {
     if (p.playerCtl) {
       p.playerCtl.downed = undefined
       p.playerCtl.channel = undefined
-      p.playerCtl.crimeUntilTick = 0
-      // Key items don't carry across floors
-      if (p.loadout) p.loadout.inventory = p.loadout.inventory.filter((s) => s.itemId !== 'briefcase')
+      p.playerCtl.misdeedUntilTick = 0
+      if (p.loadout) leaveFloorKeys(p.loadout)
     }
     p.dead = false
     w.entities.push(p)

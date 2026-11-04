@@ -23,6 +23,7 @@ export class LoopbackHub {
     const microtask = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: MAX_PACKET,
       start: async () => {},
       stop: async () => {},
@@ -50,6 +51,7 @@ export class LoopbackHub {
     const transport: Transport = {
       role: 'client',
       maxPacket: MAX_PACKET,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p, bytes) => this.deliverToHost(peer, bytes),

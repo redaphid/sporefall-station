@@ -1,7 +1,7 @@
 // @ts-check
 // feat/npc-ai-ecs proof: drives the `npc-ai` scenario with the `npc-ai` script
 // in a real browser and asserts the four pluggable behaviors are distinguishable
-// in play — patrol walks its beat, the skittish civilian alerts the cop, the
+// in play — patrol walks its beat, the skittish civilian alerts the warden, the
 // hunter presses to last-known position and sweeps, the scavenger stashes loot.
 // The annotation overlay labels every cast member with its LIVE behavior · goal
 // (via the real `annotate` verb), so the video narrates the AI's own state.
@@ -103,7 +103,7 @@ const main = async () => {
     patrolGoal: false,
     alertGoal: false,
     alerted: false,
-    copAggro: false,
+    wardenAggro: false,
     hunterBattle: false,
     hunterSearch: false,
     scavStash: 0,
@@ -133,7 +133,7 @@ const main = async () => {
       if (n.behavior === 'patrol') {
         if (n.patrolIndex !== undefined) saw.patrolLegs.add(n.patrolIndex)
         if (n.goal === 'patrol') saw.patrolGoal = true
-        if (n.mode === 'aggro' && n.targetId === cast.player?.id) saw.copAggro = true
+        if (n.mode === 'aggro' && n.targetId === cast.player?.id) saw.wardenAggro = true
       }
       if (n.behavior === 'skittish') {
         if (n.goal === 'alert') saw.alertGoal = true
@@ -156,10 +156,10 @@ const main = async () => {
   const final = await readCast(page)
   log('final cast:', JSON.stringify(final.npcs, null, 1))
 
-  check(saw.patrolGoal && saw.patrolLegs.size >= 2, `the cop walked its beat (legs seen: ${[...saw.patrolLegs].join(',')})`)
-  check(saw.alertGoal, 'the skittish civilian chose ALERT (ran for the cop)')
+  check(saw.patrolGoal && saw.patrolLegs.size >= 2, `the warden walked its beat (legs seen: ${[...saw.patrolLegs].join(',')})`)
+  check(saw.alertGoal, 'the skittish civilian chose ALERT (ran for the warden)')
   check(saw.alerted, 'the civilian reported the attacker (alerted flag set)')
-  check(saw.copAggro, 'the alerted cop turned on the player')
+  check(saw.wardenAggro, 'the alerted warden turned on the player')
   check(saw.hunterBattle, 'the hunter engaged the player')
   check(saw.hunterSearch, 'the hunter swept last-known position after losing the trail')
   check(saw.scavStash >= 2, `the scavenger stashed loot (${saw.scavStash} items)`)

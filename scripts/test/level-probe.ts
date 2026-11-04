@@ -4,7 +4,7 @@ import { createWorld } from '../../src/game/world'
 import { Tile } from '../../src/game/levelgen/level'
 const w = createWorld(7, 1)
 const L = w.level
-const glyph: Record<number, string> = { [Tile.Wall]: '#', [Tile.Street]: '.', [Tile.Sidewalk]: ',', [Tile.Floor]: '_', [Tile.Grass]: '"', [Tile.Exit]: 'E' }
+const glyph: Record<number, string> = { [Tile.Wall]: '#', [Tile.Causeway]: '.', [Tile.Boardwalk]: ',', [Tile.Floor]: '_', [Tile.Grass]: '"', [Tile.Exit]: 'E' }
 for (let y = 4; y <= 18; y++) {
   let row = ''
   for (let x = 2; x <= 24; x++) row += glyph[L.tiles[y * L.w + x]] ?? '?'

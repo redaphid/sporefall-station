@@ -46,8 +46,8 @@ describe('exit tile art — every shipped theme', () => {
         const tiles = m.palette?.tiles ?? {}
         if (tiles.exit !== undefined) expect(tiles.exit, `${t.id}: malformed exit colour`).toMatch(/^#[0-9a-fA-F]{6}$/)
         const effExit = (tiles.exit ?? '#d4af37').toLowerCase() // built-in gold fallback
-        expect(effExit, `${t.id}: exit colour equals street colour — invisible exit`).not.toBe(tiles.street?.toLowerCase())
-        expect(effExit, `${t.id}: exit colour equals sidewalk colour — invisible exit`).not.toBe(tiles.sidewalk?.toLowerCase())
+        expect(effExit, `${t.id}: exit colour equals causeway colour — invisible exit`).not.toBe(tiles.causeway?.toLowerCase())
+        expect(effExit, `${t.id}: exit colour equals boardwalk colour — invisible exit`).not.toBe(tiles.boardwalk?.toLowerCase())
       }
     })
   }

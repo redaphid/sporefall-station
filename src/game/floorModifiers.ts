@@ -63,9 +63,9 @@ export const HUNT_GAP = 45 * S
 /** A hunt that could not land (no one to hunt, nowhere to arrive) retries. */
 export const HUNT_RETRY = 5 * S
 
-/** Low ground: streets outside, corridors, vent grates and bog seep inside.
- * Rooms and sidewalks stay dry, so the tide reroutes you through them. */
-export const isLowTile = (t: number): boolean => t === Tile.Street || t === Tile.Hall || t === Tile.Grate || t === Tile.Bog
+/** Low ground: causeways outside, corridors, vent grates and bog seep inside.
+ * Rooms and boardwalks stay dry, so the tide reroutes you through them. */
+export const isLowTile = (t: number): boolean => t === Tile.Causeway || t === Tile.Hall || t === Tile.Grate || t === Tile.Bog
 
 /** Ground-storey low tiles on a level. Lofts never flood. */
 export const lowTileCount = (level: Level): number => {

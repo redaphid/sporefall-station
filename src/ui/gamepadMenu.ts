@@ -1,5 +1,5 @@
 // Gamepad navigation for the DOM menus (start picker, join/lobby, game-over
-// overlay). Menus are plain <button>s driven by clicks; gamepads fire no DOM
+// overlay, pause). Menus are plain <button>s driven by clicks; gamepads fire no DOM
 // events, so without this a controller-only player is stuck the moment they hit
 // a menu — no way to pick a mode, restart a run, or roll a new seed.
 //
@@ -12,25 +12,25 @@
 // Robustness notes: nav is read off the LEFT STICK (axes 0/1) and the standard
 // d-pad buttons (12-15), never off the high "hat" axis that some pads (8BitDo
 // Lite 2) park at -1 while idle — so a resting pad can't walk the cursor. Confirm
-// accepts ANY face button (0-3) or Start (9): a player mashing to proceed should
-// always get through, and these menus have no destructive option to fat-finger.
+// defaults to ANY face button (0-3) or Start (9): a player mashing to proceed
+// should always get through. The pause menu narrows that to A, gives B to back,
+// and puts its one destructive button (New Seed) behind a second press.
 
-/** One frame's worth of intent decoded from a pad: move to prev/next item, or
- * confirm the focused one. Left/Up map to `prev`, Right/Down to `next`. */
+/** One frame's worth of intent decoded from a pad: the four directions,
+ * confirm, and back. */
 export interface PadReading {
-  prev: boolean
-  next: boolean
+  up: boolean
+  down: boolean
+  left: boolean
+  right: boolean
   confirm: boolean
+  back: boolean
 }
 
 /** Edge-detection memory: what was held last frame, so a held control acts once. */
-export interface NavMemory {
-  prevDown: boolean
-  nextDown: boolean
-  confirmDown: boolean
-}
+export type NavMemory = PadReading
 
-export const emptyNavMemory = (): NavMemory => ({ prevDown: false, nextDown: false, confirmDown: false })
+export const emptyNavMemory = (): NavMemory => ({ up: false, down: false, left: false, right: false, confirm: false, back: false })
 
 /** Stick magnitude past which an axis counts as a directional press. Well above
  * any spec-conformant resting drift, below a deliberate flick. */
@@ -46,47 +46,88 @@ export interface PadLike {
 /** The buttons that confirm by default: any face button, or Start. */
 export const MENU_CONFIRM_BUTTONS: readonly number[] = [0, 1, 2, 3, 9]
 
-/** Decode a pad snapshot into directional + confirm intent. Tolerant of short
- * button/axis arrays (non-standard pads) — every lookup is bounds-guarded. */
-export const readMenuPad = (gp: PadLike | null | undefined, confirmButtons: readonly number[] = MENU_CONFIRM_BUTTONS): PadReading => {
-  if (!gp) return { prev: false, next: false, confirm: false }
+/** Decode a pad snapshot into directional, confirm and back intent. Tolerant of
+ * short button/axis arrays (non-standard pads): every lookup is bounds-guarded. */
+export const readMenuPad = (
+  gp: PadLike | null | undefined,
+  confirmButtons: readonly number[] = MENU_CONFIRM_BUTTONS,
+  backButtons: readonly number[] = [],
+): PadReading => {
+  if (!gp) return emptyNavMemory()
   const pressed = (i: number): boolean => gp.buttons[i]?.pressed === true
   const axis = (i: number): number => gp.axes[i] ?? 0
   const dz = MENU_STICK_DEADZONE
-  // Up OR Left → previous; Down OR Right → next. Covers vertical stacks and the
-  // horizontal game-over button row with one control scheme.
-  const prev = pressed(12) || pressed(14) || axis(1) <= -dz || axis(0) <= -dz
-  const next = pressed(13) || pressed(15) || axis(1) >= dz || axis(0) >= dz
-  const confirm = confirmButtons.some(pressed)
-  return { prev, next, confirm }
+  return {
+    up: pressed(12) || axis(1) <= -dz,
+    down: pressed(13) || axis(1) >= dz,
+    left: pressed(14) || axis(0) <= -dz,
+    right: pressed(15) || axis(0) >= dz,
+    confirm: confirmButtons.some(pressed),
+    back: backButtons.some(pressed),
+  }
+}
+
+/** Where the cursor sits: a row of the menu, and a control within it. */
+export interface NavFocus {
+  row: number
+  col: number
 }
 
 export interface NavStep {
-  index: number
+  focus: NavFocus
   activate: boolean
+  back: boolean
   mem: NavMemory
 }
 
-/** Pure reducer: given this frame's reading, the edge memory, the current focus
- * index and the item count, return the new index, whether to activate, and the
- * next memory. A press only fires on the false→true edge. Wrapping is cyclic. */
-export const stepMenuNav = (reading: PadReading, mem: NavMemory, index: number, count: number): NavStep => {
-  let idx = count > 0 ? Math.max(0, Math.min(count - 1, index)) : 0
-  if (count > 0) {
-    if (reading.prev && !mem.prevDown) idx = (idx - 1 + count) % count
-    if (reading.next && !mem.nextDown) idx = (idx + 1) % count
+/** Snap a focus onto a live control: the same row if it has any, else the first
+ * row that does. Column clamps to the row's end. */
+const settle = (focus: NavFocus, rows: readonly number[]): NavFocus => {
+  const row = (rows[focus.row] ?? 0) > 0 ? focus.row : rows.findIndex((n) => n > 0)
+  if (row < 0) return { row: 0, col: 0 }
+  return { row, col: Math.max(0, Math.min(rows[row] - 1, focus.col)) }
+}
+
+/** The next non-empty row after `row` going `dir`, cyclic. */
+const nextRow = (rows: readonly number[], row: number, dir: 1 | -1): number => {
+  for (let k = 1; k <= rows.length; k++) {
+    const r = (row + dir * k + rows.length * k) % rows.length
+    if (rows[r] > 0) return r
   }
-  const activate = count > 0 && reading.confirm && !mem.confirmDown
-  return {
-    index: idx,
-    activate,
-    mem: { prevDown: reading.prev, nextDown: reading.next, confirmDown: reading.confirm },
+  return row
+}
+
+/**
+ * Pure reducer over a menu laid out as rows of controls (`rows[i]` is row i's
+ * control count). A press acts only on its false→true edge, and every move wraps.
+ *
+ * One live row (every menu except pause): Up/Left step back and Down/Right step
+ * forward, so a vertical stack and a horizontal row share one scheme. Several
+ * rows: Up/Down change row, keeping the column where the new row allows, and
+ * Left/Right walk within the row.
+ */
+export const stepMenuNav = (reading: PadReading, mem: NavMemory, focus: NavFocus, rows: readonly number[]): NavStep => {
+  const rose = (k: keyof PadReading): boolean => reading[k] && !mem[k]
+  let { row, col } = settle(focus, rows)
+  const live = rows.filter((n) => n > 0).length
+  if (live > 0) {
+    const n = rows[row]
+    const vertical = live > 1
+    const back = rose('left') || (!vertical && rose('up'))
+    const fwd = rose('right') || (!vertical && rose('down'))
+    if (back) col = (col - 1 + n) % n
+    if (fwd) col = (col + 1) % n
+    if (vertical && (rose('up') || rose('down'))) {
+      row = nextRow(rows, row, rose('up') ? -1 : 1)
+      col = Math.min(col, rows[row] - 1)
+    }
   }
+  return { focus: { row, col }, activate: live > 0 && rose('confirm'), back: rose('back'), mem: reading }
 }
 
 /** Focus-cursor styling applied to the active button (a glow ring). Stashed on a
  * data attribute so we can cleanly strip it when focus moves or nav tears down. */
-const FOCUS_SHADOW = '0 0 0 3px #ffd76a, 0 0 14px #ffd76aaa'
+export const FOCUS_SHADOW = '0 0 0 3px #ffd76a, 0 0 14px #ffd76aaa'
 
 /** What the nav cursor can land on. Buttons everywhere; the settings panel also
  * walks its selects and checkboxes (all three carry `.disabled`, `.focus()`,
@@ -115,7 +156,21 @@ export interface GamepadMenuNavOptions {
   /** Pad buttons that confirm; defaults to MENU_CONFIRM_BUTTONS. The pause menu
    * leaves out Start, which already resumes the run. */
   confirmButtons?: readonly number[]
+  /** A back press: these buttons run `run` on their edge (the pause menu's B). */
+  back?: { buttons: readonly number[]; run: () => void }
+  /** The control the cursor lands on each time suppression lifts (the menu
+   * reopens), asked on every open. A hidden, disabled or missing one falls
+   * back to the first live control. Without it the cursor stays wherever it
+   * was left. */
+  home?: () => MenuNavControl | null
 }
+
+/** A flat list is one row; the pause menu passes rows (the wand strip above the
+ * action buttons). */
+export type MenuNavLayout = MenuNavControl[] | MenuNavControl[][]
+
+const asRows = (layout: MenuNavLayout): MenuNavControl[][] =>
+  layout.length > 0 && Array.isArray(layout[0]) ? (layout as MenuNavControl[][]) : [layout as MenuNavControl[]]
 
 /**
  * Install controller navigation over a set of buttons and return a teardown fn.
@@ -123,41 +178,58 @@ export interface GamepadMenuNavOptions {
  * list) and show/hide (the game-over overlay) are handled: hidden/disabled
  * buttons are skipped, and when none are live the loop idles cheaply. Safe to
  * leave running for the lifetime of a persistent overlay.
+ *
+ * The cursor follows real focus: when a tap or click focuses one of these
+ * controls, the cursor moves there instead of pulling focus back.
  */
 export const installGamepadMenuNav = (
-  getButtons: () => MenuNavControl[],
+  getButtons: () => MenuNavLayout,
   options: GamepadMenuNavOptions = {},
 ): (() => void) => {
   const schedule = options.schedule ?? ((cb) => requestAnimationFrame(cb))
   const cancel = options.cancel ?? ((h) => cancelAnimationFrame(h))
   const activate = options.activate ?? ((el: MenuNavControl) => el.click())
-  const read = (): PadReading => readMenuPad(readPads(), options.confirmButtons)
-  let handle = 0
-  let index = 0
-  let mem = emptyNavMemory()
-  let painted: MenuNavControl | null = null
-
-  const liveButtons = (): MenuNavControl[] =>
-    getButtons().filter((b) => !b.disabled && b.offsetParent !== null)
-
-  const paint = (btns: MenuNavControl[]): void => {
-    const cur = btns[index] ?? null
-    if (cur === painted) {
-      if (cur && document.activeElement !== cur) cur.focus?.()
-      return
-    }
-    if (painted) painted.style.boxShadow = ''
-    if (cur) {
-      cur.style.boxShadow = FOCUS_SHADOW
-      if (document.activeElement !== cur) cur.focus?.()
-    }
-    painted = cur
-  }
-
   const readPads = (): PadLike | null => {
     if (typeof navigator === 'undefined' || !navigator.getGamepads) return null
     for (const p of navigator.getGamepads()) if (p) return p
     return null
+  }
+  let handle = 0
+  let focus: NavFocus = { row: 0, col: 0 }
+  let mem = emptyNavMemory()
+  let painted: MenuNavControl | null = null
+  let paintedWas = '' // the control's own shadow (the strip glows its next chip), restored on unpaint
+
+  const liveRows = (): MenuNavControl[][] =>
+    asRows(getButtons()).map((row) => row.filter((b) => !b.disabled && b.offsetParent !== null))
+
+  const unpaint = (): void => {
+    if (painted) painted.style.boxShadow = paintedWas
+    painted = null
+  }
+
+  /** Ring the focused control. Pull real focus onto it when the pad moved the
+   * cursor, or when nothing else holds focus (a just-shown overlay). */
+  const paint = (rows: MenuNavControl[][], moved: boolean): void => {
+    const cur = rows[focus.row]?.[focus.col] ?? null
+    if (cur !== painted) {
+      unpaint()
+      if (cur) {
+        paintedWas = cur.style.boxShadow
+        cur.style.boxShadow = FOCUS_SHADOW
+      }
+      painted = cur
+    }
+    const active = document.activeElement
+    if (cur && active !== cur && (moved || !active || active === document.body)) cur.focus?.()
+  }
+
+  const adoptRealFocus = (rows: MenuNavControl[][]): void => {
+    const active = document.activeElement
+    rows.forEach((row, r) => {
+      const c = row.indexOf(active as MenuNavControl)
+      if (c >= 0) focus = { row: r, col: c }
+    })
   }
 
   // Set while suppressed; the first live frame afterwards re-baselines the edge
@@ -165,33 +237,44 @@ export const installGamepadMenuNav = (
   let resync = false
 
   const frame = (): void => {
-    const btns = liveButtons()
+    const rows = liveRows()
+    const counts = rows.map((r) => r.length)
     if (options.suppress?.()) {
       resync = true
-      if (painted) {
-        painted.style.boxShadow = ''
-        painted = null
-      }
-    } else if (btns.length > 0) {
-      if (index >= btns.length) index = btns.length - 1
+      unpaint()
+    } else if (counts.some((n) => n > 0)) {
+      const gp = readPads()
+      const reading = readMenuPad(gp, options.confirmButtons, options.back?.buttons)
       if (resync) {
         resync = false
-        const r = read()
-        mem = { prevDown: r.prev, nextDown: r.next, confirmDown: r.confirm }
-        paint(btns) // show the cursor at once; presses act from the next frame
+        if (options.home) {
+          const home = options.home()
+          const row = rows.findIndex((r) => home !== null && r.includes(home))
+          focus = row >= 0 ? { row, col: rows[row].indexOf(home!) } : { row: rows.findIndex((r) => r.length > 0), col: 0 }
+        }
+        focus = stepMenuNav(emptyNavMemory(), emptyNavMemory(), focus, counts).focus
+        mem = reading
+        paint(rows, true) // show the cursor at once; presses act from the next frame
+      } else if (!gp) {
+        // No pad is not a release: keep the memory, so a button held through a
+        // disconnect cannot edge-fire when the pad comes back.
+        adoptRealFocus(rows)
+        paint(rows, false)
       } else {
-        const step = stepMenuNav(read(), mem, index, btns.length)
+        adoptRealFocus(rows)
+        const before = focus
+        const step = stepMenuNav(reading, mem, focus, counts)
         mem = step.mem
-        index = step.index
-        paint(btns)
+        focus = step.focus
+        paint(rows, focus.row !== before.row || focus.col !== before.col)
         if (step.activate) {
-          const focused = btns[index]
+          const focused = rows[focus.row]?.[focus.col]
           if (focused) activate(focused)
         }
+        if (step.back) options.back?.run()
       }
-    } else if (painted) {
-      painted.style.boxShadow = ''
-      painted = null
+    } else {
+      unpaint()
     }
     handle = schedule(frame)
   }
@@ -199,7 +282,6 @@ export const installGamepadMenuNav = (
   handle = schedule(frame)
   return () => {
     cancel(handle)
-    if (painted) painted.style.boxShadow = ''
-    painted = null
+    unpaint()
   }
 }

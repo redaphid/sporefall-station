@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { makeEntity, type Entity } from '../entity'
-import { addEntity, createWorld, type World } from '../world'
+import { addEntity, type World } from '../world'
+import { walledRoom, worldFromRows } from '../testkit'
 import { applyDamage } from './combat'
 import { fireAt } from './fire'
 import { destroyObject, spawnObject, useObject } from './objects'
@@ -9,7 +10,7 @@ import { OBJECTS } from '../data/objects'
 const player = (w: World, x = 10, y = 10): Entity => {
   const e = addEntity(w, makeEntity('player', 'player', x, y))
   e.health = { hp: 100, max: 100, iframes: 0 }
-  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, crimeUntilTick: 0 }
+  e.playerCtl = { playerId: 0, abilityCooldown: 0, cash: 0, misdeedUntilTick: 0 }
   e.loadout = { inventory: [], activeSlot: -1 }
   return e
 }
@@ -23,7 +24,7 @@ const npc = (w: World, x: number, y: number, hp = 40): Entity => {
 describe('interactive objects', () => {
   let w: World
   beforeEach(() => {
-    w = createWorld(1, 1)
+    w = worldFromRows(walledRoom(40, 40))
   })
 
   it('spawns an object with the hp from its data', () => {
@@ -65,16 +66,6 @@ describe('interactive objects', () => {
     expect(w.events.some((e) => e.type === 'explosion')).toBe(false)
   })
 
-  it('an ATM dispenses cash once when used', () => {
-    const p = player(w)
-    const atm = spawnObject(w, 'atm', 11, 10)
-    const before = p.playerCtl!.cash
-    expect(useObject(w, p, atm)).toBe(true)
-    expect(p.playerCtl!.cash).toBeGreaterThan(before)
-    // Second use is empty.
-    expect(useObject(w, p, atm)).toBe(false)
-  })
-
   // Was 'dispenses an item pickup': the machine's only payout was a burger, and
   // the item cull removed it. It now returns change instead of being demoted to
   // scenery, so the assertion follows the payout from a spawned pickup to cash.
@@ -84,7 +75,7 @@ describe('interactive objects', () => {
     const vending = spawnObject(w, 'vending', 11, 10)
     expect(useObject(w, p, vending)).toBe(true)
     expect(p.playerCtl!.cash).toBe(before + 10)
-    // Second use is empty — the once-only rule the ATM has.
+    // Second use is empty.
     expect(useObject(w, p, vending)).toBe(false)
     expect(p.playerCtl!.cash).toBe(before + 10)
   })

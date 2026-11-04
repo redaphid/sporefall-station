@@ -70,7 +70,7 @@ const idle: PadState = {
  * Resolve a prev/next weapon-cycle intent into an ABSOLUTE inventory slot index
  * (the value InputCmd.hotbar carries and the host equips), or -1 when there's
  * nothing to switch to. Pure so it's unit-testable. Cycles over the same
- * briefcase-filtered display slots the touch hotbar shows, wrapping at the ends;
+ * canister-filtered display slots the touch hotbar shows, wrapping at the ends;
  * from bare fists (activeSlot not in the list) it starts at the first/last slot.
  */
 export const cycleHotbar = (inv: ItemStack[], activeSlot: number, dir: 1 | -1): number => {

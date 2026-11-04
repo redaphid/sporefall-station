@@ -4,7 +4,7 @@ import type { Rect } from './rooms'
 
 /**
  * Courtyard compound: a ring of rooms around an open courtyard "pit". A gated
- * passage runs from the street straight into the courtyard (double doors,
+ * passage runs from the causeway straight into the courtyard (double doors,
  * flanked by walls), every edge room doors onto the courtyard, and corner
  * rooms join their neighbouring edge rooms — so fights funnel into the pit
  * and patrols can circle it. Replaces the old plain ring-of-floor courtyard
@@ -100,7 +100,7 @@ export const carveCompound = (
   return { rooms, doors, courtyard, objectiveRoom: cornerDoors[3].room }
 }
 
-/** The gated edge: a straight walled passage from street to courtyard, double
+/** The gated edge: a straight walled passage from causeway to courtyard, double
  * doors at both ends, splitting that edge's room band in two. */
 const carveGate = (
   rng: Rng,

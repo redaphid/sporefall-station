@@ -31,11 +31,16 @@ import {
   STAGE,
   TEND,
   WORK,
-  decide,
-} from './behaviors'
+  BATTLE,
+  FLEE,
+  INVESTIGATE,
+  PURSUE,
+} from './goalCodes'
+import { commitTicks, decide } from './behaviors'
+import { activitySystem, claimSeat, isActivityCode, releaseSeat, seatPoint, SEAT_ARRIVE, sitDown } from './activities'
 import { fireWeapon } from './combat'
-import { BATTLE, FLEE, INVESTIGATE, PURSUE, perceives, type Goal } from './goals'
-import { CRIME_HATE, addHate } from './relationships'
+import { perceives, type Goal } from './goals'
+import { MISDEED_HATE, addHate } from './relationships'
 import { isImmobilized } from './statusFx'
 import { vlen } from '../simMath'
 
@@ -49,7 +54,7 @@ const ALERT_REACH = 1.4
 /** Close enough to a sought pickup to grab it. */
 const SCAVENGE_REACH = 0.55
 /** Goal codes whose adoption (or abandonment) is worth a world event. */
-const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
+export const NOTABLE_GOALS = new Set([BATTLE, PURSUE, FLEE, ALERT, SEARCH, SCAVENGE])
 /** Ticks of no movement progress toward an unseen chase goal before the trail
  * is declared cold — the safety net under the router (bodies can jam a door). */
 const STALL_TICKS = 45
@@ -59,10 +64,10 @@ const STALL_DIST = 0.5
  * They walk at full pace and skip the arrive-and-look-around beat, exactly as
  * squad formation already did — a raider taking its muster slot, a hound its
  * ring slot or a sapper its door does not stop to admire the view. */
-const TACTICAL = new Set([FORMUP, FLANK, STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+export const TACTICAL = new Set([FORMUP, FLANK, STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
 /** The group layer's own moves (not the squad's): these also steer with the
  * strict swept-circle line check — see `sweptClear`. */
-const GROUP_MOVES = new Set([STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
+export const GROUP_MOVES = new Set([STAGE, GUARD, EMPLACE, BREACH, FALLBACK, TEND, RING])
 const isGroupMove = (goal: string | undefined): boolean => goal !== undefined && GROUP_MOVES.has(goal)
 
 // ── Routing (path.ts) tuning ───────────────────────────────────────────────
@@ -118,6 +123,7 @@ const buildDoorCtx = (w: World): DoorCtx => {
 }
 
 export const aiSystem = (w: World): void => {
+  activitySystem(w)
   const ctx = buildDoorCtx(w)
   for (const e of w.entities) {
     if (!e.ai || e.dead) continue
@@ -143,10 +149,15 @@ export const aiSystem = (w: World): void => {
 
 const think = (w: World, e: Entity): void => {
   const ai = e.ai!
-  const { goal, scores } = decide(w, e)
+  const { goal, scores, tier, held, timed } = decide(w, e)
   ai.lastScores = scores
+  if (held) return
+  // Leaving an activity frees its seat (a threat interrupting a card game).
+  if (ai.activity && goal.code !== ai.activity.kind) releaseSeat(w, e)
   if (goal.code !== ai.goal) {
     ai.goalSince = w.tick
+    const hold = timed ? 0 : commitTicks(goal.code, tier)
+    ai.commit = hold > 0 ? { until: w.tick + hold, tier } : undefined
     // Notable transitions (into OR out of a charged goal) are world events, so
     // an agent watching the stream sees aggro/flee/alert/search as they happen.
     if (NOTABLE_GOALS.has(goal.code) || (ai.goal !== undefined && NOTABLE_GOALS.has(ai.goal))) {
@@ -192,6 +203,16 @@ const applyGoal = (w: World, e: Entity, goal: Goal): void => {
     // A body that JUST broke into flight screams — throwing a fear pulse nearby
     // crew catch and stampede from (world.ts emitFear / behaviors.contagiousFear).
     if (!wasFleeing) emitFear(w, e)
+    return
+  }
+  if (isActivityCode(goal.code)) {
+    if (ai.activity && ai.activity.site !== goal.target) releaseSeat(w, e)
+    if (!ai.activity && goal.target !== undefined && goal.subject !== undefined)
+      claimSeat(w, e, { kind: goal.code, site: goal.target, seat: goal.subject })
+    ai.mode = 'perform'
+    ai.targetId = undefined
+    ai.waypoint = undefined
+    ai.lastKnownTargetPos = undefined
     return
   }
   if (goal.code === INVESTIGATE) {
@@ -288,6 +309,7 @@ const performAlert = (w: World, alerter: Entity, guard: Entity): void => {
   const threatId = ai.fearId
   const threatE = threatId !== undefined ? w.byId.get(threatId) : undefined
   ai.thinkAt = w.tick // re-decide next tick
+  ai.commit = undefined
   if (threatId === undefined || !threatE || threatE.dead || !guard.ai) {
     // Nothing (left) to report — calm down.
     ai.mode = 'idle'
@@ -297,7 +319,7 @@ const performAlert = (w: World, alerter: Entity, guard: Entity): void => {
   ai.alerted = threatId
   ai.mode = 'flee'
   ai.targetId = threatId
-  addHate(guard, threatId, CRIME_HATE)
+  addHate(guard, threatId, MISDEED_HATE)
   guard.ai.mode = 'aggro'
   guard.ai.targetId = threatId
   guard.ai.lastKnownTargetPos = { x: threatE.pos.x, y: threatE.pos.y }
@@ -318,6 +340,7 @@ const collectPickup = (w: World, e: Entity, item: Entity): void => {
   ai.mode = 'idle'
   ai.targetId = undefined
   ai.thinkAt = w.tick
+  ai.commit = undefined
 }
 
 /**
@@ -566,7 +589,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
   // "arrive, look around, move on" beat. Any urgent mode cancels it instantly,
   // so responsiveness to a real threat is unchanged.
   if (ai.scanUntil !== undefined) {
-    if (w.tick < ai.scanUntil && ai.mode !== 'aggro' && ai.mode !== 'flee' && ai.mode !== 'seek') {
+    if (w.tick < ai.scanUntil && ai.mode !== 'aggro' && ai.mode !== 'flee' && ai.mode !== 'seek' && ai.mode !== 'perform') {
       if ((ai.scanUntil - w.tick) % SCAN_STEP === 0) e.facing += SCAN_TURN
       return
     }
@@ -621,6 +644,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // behavior can move on (a hunter opens its sweep, basic gives up).
       ai.lastKnownTargetPos = undefined
       ai.progress = undefined
+      ai.commit = undefined
       return
     }
     if (dist > 0.2) {
@@ -635,12 +659,14 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
           // instead of grinding at a wall until the stall timer fires.
           ai.lastKnownTargetPos = undefined
           ai.progress = undefined
+          ai.commit = undefined
         }
       }
     } else {
       // Reached last known position with no target in sight
       ai.lastKnownTargetPos = undefined
       ai.progress = undefined
+      ai.commit = undefined
     }
     return
   }
@@ -654,6 +680,9 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     const dx = e.pos.x - from.x
     const dy = e.pos.y - from.y
     const dist = vlen(dx, dy) || 1
+    // Well clear of the thing it ran from (fleeMemory's own limit): the flight
+    // is done, so the commitment to it ends and the next think moves on.
+    if (threat && dist > ai.sightRange * 2) ai.commit = undefined
     // Flight has no destination to route to — steer the away-vector, deflected
     // to the openest compass direction when a wall looms, so a panicked body
     // streams along walls and out of doorless corners instead of grinding.
@@ -673,6 +702,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       ai.fleeFrom = undefined
       ai.mode = 'idle'
       ai.thinkAt = w.tick
+      ai.commit = undefined
       e.intent.x = 0
       e.intent.y = 0
       return
@@ -697,6 +727,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
         ai.mode = 'idle'
       }
       ai.thinkAt = w.tick
+      ai.commit = undefined
       return
     }
     const dx = target.pos.x - e.pos.x
@@ -720,8 +751,27 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
           ai.mode = 'idle'
         }
         ai.thinkAt = w.tick
+        ai.commit = undefined
       }
     }
+    return
+  }
+
+  if (ai.mode === 'perform') {
+    // Walk to the claimed seat, then sit facing what it is for. A seat that is
+    // gone or cannot be reached is given up.
+    const claim = ai.activity
+    const at = claim ? seatPoint(w, claim) : undefined
+    if (!claim || !at) {
+      if (claim) releaseSeat(w, e)
+      else ai.mode = 'idle'
+      return
+    }
+    if (vlen(at.x - e.pos.x, at.y - e.pos.y) > SEAT_ARRIVE) {
+      if (moveToward(w, e, ctx, at.x, at.y, 0.6, true) === 'blocked') releaseSeat(w, e)
+      return
+    }
+    sitDown(w, e)
     return
   }
 
@@ -732,6 +782,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
     if (dist < 0.4) {
       ai.waypoint = undefined
       ai.mode = 'idle'
+      ai.commit = undefined
       ai.path = undefined
       // Arrived on purpose → pause and look around before the next errand.
       // Squad positioning (formation slots, flank runs) skips the beat: those
@@ -750,6 +801,7 @@ const steer = (w: World, e: Entity, ctx: DoorCtx): void => {
       // re-decide instead of wall-grinding or oscillating.
       ai.waypoint = undefined
       ai.mode = 'idle'
+      ai.commit = undefined
     }
   }
 }

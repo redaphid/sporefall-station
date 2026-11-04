@@ -1,1 +1,1 @@
-export default 'The Mycologist turns and walks in every direction'
+export default 'The Mycologist walks in every direction'

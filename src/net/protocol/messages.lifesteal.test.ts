@@ -25,7 +25,7 @@ describe('player hp over the snapshot codec after a lifesteal heal', () => {
     const pairs: [number, number][] = []
     for (let t = 0; t < 60; t++) {
       tickWorld(w, new Map([[0, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 }]]))
-      const snap = { tick: w.tick, floor: w.floor, alarm: 0, lastInputSeq: 0, entities: [toWireEntity(host, w.tick)] }
+      const snap = { tick: w.tick, floor: w.floor, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [toWireEntity(host, w.tick)] }
       applyWireEntity(mirror, decodeSnapshot(encodeSnapshot(snap)).entities[0], w.tick)
       pairs.push([host.health.hp, mirror.health.hp])
     }
@@ -41,7 +41,7 @@ describe('player hp over the snapshot codec after a lifesteal heal', () => {
       mirror.health = { hp: 0, max, iframes: 0 }
       for (let hp = 0; hp <= max; hp++) {
         host.health = { hp, max, iframes: 0 }
-        const snap = { tick: 0, floor: 1, alarm: 0, lastInputSeq: 0, entities: [toWireEntity(host, 0)] }
+        const snap = { tick: 0, floor: 1, alarm: 0, epoch: 0, lastInputSeq: 0, entities: [toWireEntity(host, 0)] }
         applyWireEntity(mirror, decodeSnapshot(encodeSnapshot(snap)).entities[0], 0)
         if (mirror.health.hp !== hp) misses.push(`${hp}/${max} -> ${mirror.health.hp}`)
       }

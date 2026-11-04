@@ -99,11 +99,51 @@ runs the tests, and writes `e2e/output/feature-<name>.mp4` (+ labeled stills).
 (`pnpm exec vitest run` stays green without a browser). Wire it into CI as a separate
 job that has Chromium + ffmpeg available.
 
+### Headed Windows Chrome from WSL
+
+Headless Chromium in WSL has no working WebGL, so a recording that must show the
+world runs in a headed Windows Chrome over CDP (`E2E_CDP`). Get that Chrome from
+`scripts/own-chrome.mjs` and from nowhere else:
+
+```sh
+node scripts/own-chrome.mjs launch        # prints {pid, port, profileDir, cdpUrl, lockfile, ...}
+E2E_CDP=<cdpUrl> node e2e/feature-<name>.mjs
+node scripts/own-chrome.mjs kill <lockfile>
+node scripts/own-chrome.mjs list          # Chromes this tool launched, with status
+```
+
+`launch` picks a free port in 9300-9999 and a fresh profile under Windows
+`%TEMP%`, and records the browser's PID and Windows start time. `kill` stops the
+browser only if that PID still has the recorded start time and the lock's exact
+port and profile arguments. It also stops the browser's descendants that started
+after it and carry the same profile argument. It never uses `taskkill /T`:
+Windows keeps a dead parent's PID on its children, so a tree walk from a reused
+PID can reach someone else's Chrome. One PowerShell process holds a handle on
+each process from the check to the kill, so a PID cannot be reused in between.
+A run-*.sh
+recorder gets the same thing by sourcing `e2e/own-chrome.sh` (see
+`e2e/run-boss-bar.sh`). From an e2e script, call `launchOwnChrome()` and
+`killOwnChrome(lockfile)` from the module.
+
+Two rules, enforced in code:
+
+- **Never attach to :9222.** That port is the owner's own Chrome. A renderer
+  crash in a driven tab takes his whole browser down. `e2e/lib.mjs` and the
+  other CDP scripts refuse an `E2E_CDP` on 9222.
+- **Never kill Chrome by name or pattern.** No `taskkill /IM`, no `pkill`, no
+  command-line substring match. A quoting bug once cut such a pattern down to
+  `C:`, and it killed every chrome.exe on the desktop. Kill by lockfile only.
+
+`node scripts/test/own-chrome-smoke.mjs` proves the tool on a real desktop. It
+launches, opens about:blank over CDP, refuses two forged locks, and kills. Then
+it checks that every chrome.exe alive before the run is still alive, matched by
+PID and creation time.
+
 ## The two backfilled features
 
 | Test | Fixture | Drives | Adversarial final-state assertions |
 |------|---------|--------|-------------------------------------|
-| `feature-combat` | `combat-stage` (3 thugs, hp 24, on the pistol lane) | `shooting` script | every pinned thug id is gone (killed + swept); player alive, not downed; no game over |
+| `feature-combat` | `combat-stage` (3 mutants, hp 24, on the pistol lane) | `shooting` script | every pinned mutant id is gone (killed + swept); player alive, not downed; no game over |
 | `feature-fire` | `fire-stage` (lit crate row → flammable bystander, hp 12) | `burn` (no input) | the pinned bystander id is gone (burned to death ~tick 100); NO flammable civilian survives; player at full hp and hasn't moved; no game over |
 
 ## `?state=<id>` — shareable debug links
@@ -152,3 +192,58 @@ different problem and is deliberately not attempted.
 ```
 pnpm run e2e:state    # full browser round-trip against `wrangler dev`
 ```
+
+## Authored worlds and crafted saves
+
+The engine starts from state, not from a seed. `worldFromState({ level, ... })`
+(`src/game/world.ts`) takes the level as data. `worldFromSeed(seed, floor)` is
+the generator that builds that state from seed+floor, and `createWorld(seed,
+floor)` chains the two for the app and most tests. The next floor of any run,
+authored or not, is still generated from `World.seed`.
+
+A level is written as text, one glyph per tile (`src/game/levelgen/levelText.ts`):
+
+```ts
+const w = worldFromState({
+  level: levelFromJson({
+    rows: [
+      '##########',
+      '#..@..#..#',
+      '#.....#..#',
+      '#........#',
+      '####E#####',
+    ],
+  }),
+})
+```
+
+Legend: `#` wall, `.` floor, `+` tiled floor, `=` hall, `%` plating, `x` grate,
+`~` bog, `,` grass, `-` boardwalk, `:` causeway, `H` hull, `E` exit, `^`/`v` stairs,
+`1`-`4` bevelled wall corners (NW, NE, SE, SW), `@` the player spawn (a floor tile).
+`spawn`, `exit`, `buildings`, `theme` and the complex/storey fields are optional
+JSON fields beside `rows`. Without an `E` the level has no exit.
+
+**One save format.** `serializeWorld` writes the level into `WorldJson.level`
+whenever it is not what seed+floor generates (an authored level, or a generated
+one a scenario carved). An untouched generated level still travels as
+`levelChecksum` only, so seeded snapshots, fixtures and `?state=` links are
+byte-identical to before. Tests, crafted saves and share links all use this one
+format. A hand-edited `level.rows` needs no checksum fix-up.
+
+**Crafting a save to play on a phone.** Copy `scripts/saves/castle-siege.mts`,
+draw the rows, place the player (weapon, mods) and the enemies, and run it with
+`pnpm exec tsx`. It writes `src/game/__fixtures__/<name>.json`. Fixtures ship in
+the bundle, so after deploy the save plays at
+`https://sporefall.hypnodroid.com/?world=<name>`. That URL boots straight into
+solo and does not touch the player's own autosave. The JSON is the save, so you
+can also edit it by hand. Pin it with a test like `src/game/saves.test.ts`.
+
+To share a crafted save as a `?state=` link: open `/?world=<name>`, play a
+second or two, then press Share state in the pause menu (or run
+`await sporefallShare('<label>')`). Links live 30 days in KV and are capped at
+512 KiB gzipped; the castle with its run-up measured 3.5 KiB. Do not stage with
+the `step` debug verb before sharing: the rewind ring does not record ticks that
+`step` advances, so the capture fails its own replay check.
+
+Authored worlds are single-player. Net clients still regenerate the level from
+seed+floor, so a host must not load an authored world into a co-op session.

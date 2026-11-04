@@ -1,5 +1,5 @@
 // Prints the wet stun-lock probe table (src/debug/wetStunProbe.ts): one NPC
-// stun gunner against players on a dry or flooded street, over #122's 8 seeds.
+// stun gunner against players on a dry or flooded causeway, over #122's 8 seeds.
 //
 //   npx tsx scripts/wet-stun-probe.mts
 import { PROBE_SEEDS, probeTable, STUN_GUNNER_DIST, STUN_PROBE_TICKS } from '../src/debug/wetStunProbe'

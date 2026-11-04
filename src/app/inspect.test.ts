@@ -9,16 +9,29 @@ import { makeEntity, type Entity } from '../game/entity'
 import { spawnPlayer } from '../game/player'
 import { deserializeWorld } from '../game/serialize'
 import type { SimEvent } from '../game/types'
-import { addEntity, createWorld, type World } from '../game/world'
+import { levelFromJson } from '../game/levelgen/levelText'
+import { addEntity, worldFromState, type World } from '../game/world'
 import { createInspect, EVENT_CAP, EVENT_TICK_WINDOW, installInspect, type InspectDeps } from './inspect'
 import type { RenderView } from './session'
 
+const ROOM = [
+  '##############',
+  '#............#',
+  '#............#',
+  '#............#',
+  '#............#',
+  '#....@.......#',
+  '#............#',
+  '#............#',
+  '##############',
+]
+
 const buildWorld = (): World => {
-  const w = createWorld(123, 1)
+  const w = worldFromState({ level: levelFromJson({ rows: ROOM }), seed: 123 })
   spawnPlayer(w, 0, 5, 5)
-  const npc = addEntity(w, makeEntity('npc', 'thug', 8, 5))
+  const npc = addEntity(w, makeEntity('npc', 'mutant', 8, 5))
   npc.health = { hp: 2, max: 5, iframes: 0 }
-  npc.ai = { mode: 'idle', faction: 'gang', home: { x: 8, y: 5 }, thinkAt: 0, sightRange: 6 }
+  npc.ai = { mode: 'idle', faction: 'rootcult', home: { x: 8, y: 5 }, thinkAt: 0, sightRange: 6 }
   const guard = addEntity(w, makeEntity('npc', 'guard', 9, 6))
   guard.health = { hp: 5, max: 5, iframes: 0 }
   const door = addEntity(w, makeEntity('door', 'door', 10, 5))
@@ -30,6 +43,7 @@ const viewOf = (w: World, events: readonly SimEvent[] = []): RenderView => ({
   entities: w.entities,
   events,
   tick: w.tick,
+  runEpoch: 1,
   level: w.level,
   floor: w.floor,
   missionText: w.mission.description,
@@ -82,7 +96,7 @@ describe('sporefall entity/player/mission reads', () => {
   const { ns } = createInspect(hostDeps(w))
 
   it('entity(id) returns a clone; a missing id returns undefined', () => {
-    const npc = w.entities.find((e) => e.archetype === 'thug')!
+    const npc = w.entities.find((e) => e.archetype === 'mutant')!
     const got = ns.entity(npc.id)!
     expect(got.id).toBe(npc.id)
     ;(got as { health: { hp: number } }).health.hp = 0

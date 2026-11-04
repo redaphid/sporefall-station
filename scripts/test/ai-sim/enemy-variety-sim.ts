@@ -31,7 +31,7 @@ const elem = (arch: string, kind: string): number => {
   return before - e.health.hp
 }
 
-const enemies = ['thug', 'brute', 'cinder', 'sporeling', 'robot']
+const enemies = ['mutant', 'brute', 'cinder', 'sporeling', 'robot']
 const tools: [string, (a: string) => number][] = [
   ['bullets/melee', (a) => phys(a)],
   ['fire', (a) => elem(a, 'burning')],
@@ -40,11 +40,11 @@ const tools: [string, (a: string) => number][] = [
 
 console.log('═══ #78 enemy variety — tool × enemy damage (higher = better matchup) ═══')
 console.log(`${'enemy'.padEnd(11)}${tools.map(([n]) => n.padStart(14)).join('')}`)
-const base = Object.fromEntries(tools.map(([n, f]) => [n, f('thug')]))
+const base = Object.fromEntries(tools.map(([n, f]) => [n, f('mutant')]))
 for (const e of enemies) {
   const cells = tools.map(([n, f]) => {
     const v = f(e)
-    const tag = e === 'thug' ? ' ' : v >= 0.9 * base[n] ? '↑' : v <= 0.4 * base[n] ? '↓' : ' '
+    const tag = e === 'mutant' ? ' ' : v >= 0.9 * base[n] ? '↑' : v <= 0.4 * base[n] ? '↓' : ' '
     return `${String(v)}${tag}`.padStart(14)
   })
   console.log(`${e.padEnd(11)}${cells.join('')}`)

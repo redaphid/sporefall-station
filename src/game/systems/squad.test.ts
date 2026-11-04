@@ -46,11 +46,11 @@ const run = (w: World, n: number): void => {
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y)
 
 const squaddie = (w: World, x: number, y: number, role: 'lead' | 'flank' | 'rear', id = 1): Entity => {
-  const e = spawnNpc(w, 'thug', x, y)
-  e.combat!.weapon = 'bat'
+  const e = spawnNpc(w, 'mutant', x, y)
+  e.combat!.weapon = 'wrench'
   e.ai!.behavior = 'squad'
   e.ai!.squad = { id, role }
-  e.ai!.sightRange = 12 // a trained pack watches further than street rabble
+  e.ai!.sightRange = 12 // a trained pack watches further than causeway rabble
   return e
 }
 
@@ -213,7 +213,7 @@ describe('populate wiring', () => {
     return w
   }
 
-  it('a gang pack in a warehouse/bunker links into a squad with legal roles and size 2-4', () => {
+  it('a rootcult pack in a warehouse/bunker links into a squad with legal roles and size 2-4', () => {
     // Scan a few seeds: squads form (SQUAD_CHANCE < 1, so not necessarily the
     // first candidate), always well-formed when they do.
     let sawSquad = false

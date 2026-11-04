@@ -23,9 +23,9 @@ describe('malformed verb lines', () => {
   })
   it('tolerates leading/trailing/interior whitespace in a valid verb', () => {
     const w = world()
-    spawnNpc(w, 'cop', 0, 0)
+    spawnNpc(w, 'warden', 0, 0)
     expect(JSON.parse(runVerb(w, '   state   ')).total).toBe(1)
-    expect(JSON.parse(runVerb(w, 'spawn   npc    cop   3   4')).archetype).toBe('cop')
+    expect(JSON.parse(runVerb(w, 'spawn   npc    warden   3   4')).archetype).toBe('warden')
   })
   it('survives a very long line without crashing', () => {
     const w = world()
@@ -58,10 +58,10 @@ describe('spawn', () => {
     expect(() => runVerb(world(), 'spawn npc')).toThrow(/usage/)
   })
   it('rejects missing / non-numeric / non-finite coords', () => {
-    expect(() => runVerb(world(), 'spawn npc cop')).toThrow(/expected a number/)
-    expect(() => runVerb(world(), 'spawn npc cop 1')).toThrow(/expected a number/)
-    expect(() => runVerb(world(), 'spawn npc cop a b')).toThrow(/expected a number/)
-    expect(() => runVerb(world(), 'spawn npc cop 1e999 0')).toThrow(/expected a number/)
+    expect(() => runVerb(world(), 'spawn npc warden')).toThrow(/expected a number/)
+    expect(() => runVerb(world(), 'spawn npc warden 1')).toThrow(/expected a number/)
+    expect(() => runVerb(world(), 'spawn npc warden a b')).toThrow(/expected a number/)
+    expect(() => runVerb(world(), 'spawn npc warden 1e999 0')).toThrow(/expected a number/)
   })
   it('falls back to a bare entity for an unknown npc archetype (no crash)', () => {
     const w = world()
@@ -79,7 +79,7 @@ describe('spawn', () => {
   })
   it('allows huge but finite out-of-bounds coords (repro convenience)', () => {
     const w = world()
-    const out = JSON.parse(runVerb(w, 'spawn npc cop 1e6 -1e6'))
+    const out = JSON.parse(runVerb(w, 'spawn npc warden 1e6 -1e6'))
     expect(out.pos).toEqual({ x: 1e6, y: -1e6 })
   })
   it('spawns a standard player regardless of the archetype token', () => {
@@ -93,18 +93,18 @@ describe('spawn', () => {
 describe('set — patch validation', () => {
   it('rejects invalid JSON cleanly', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     expect(() => runVerb(w, `set ${e.id} {not json}`)).toThrow()
     expect(() => runVerb(w, `set ${e.id} {"a":}`)).toThrow()
   })
   it('requires an id and a patch (usage)', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     expect(() => runVerb(w, `set ${e.id}`)).toThrow(/usage/)
   })
   it('rejects non-object JSON (number / string / array / null)', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     for (const bad of ['5', '"hi"', '[1,2,3]', 'null', 'true']) {
       expect(() => runVerb(w, `set ${e.id} ${encodeArg(bad)}`)).toThrow(/must be a JSON object/)
     }
@@ -122,7 +122,7 @@ describe('set — prototype pollution (fixed bug)', () => {
 
   it('does NOT pollute Object.prototype via __proto__', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     // Wrapped in b64 because the JSON has spaces; also proves the b64 path is
     // not an escape around the guard.
     runVerb(w, `set ${e.id} ${encodeArg('{ "__proto__": { "polluted": true } }')}`)
@@ -134,7 +134,7 @@ describe('set — prototype pollution (fixed bug)', () => {
 
   it('does NOT pollute via a nested constructor.prototype patch', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     runVerb(w, `set ${e.id} ${encodeArg('{ "constructor": { "prototype": { "polluted": true } } }')}`)
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
     // The real constructor is intact.
@@ -145,7 +145,7 @@ describe('set — prototype pollution (fixed bug)', () => {
 describe('set — merge semantics', () => {
   it('deep-merges without clobbering sibling fields', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     const maxBefore = e.health!.max
     runVerb(w, `set ${e.id} {"health":{"hp":7}}`)
     expect(e.health!.hp).toBe(7)
@@ -153,7 +153,7 @@ describe('set — merge semantics', () => {
   })
   it('coerces string scalars to the field s existing type', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     runVerb(w, `set ${e.id} {"speed":"3.5"}`)
     expect(e.speed).toBe(3.5)
     // Booleans coerce from strings too.
@@ -163,20 +163,20 @@ describe('set — merge semantics', () => {
   })
   it('adds unknown/future fields verbatim and they survive a round-trip', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     runVerb(w, `set ${e.id} ${encodeArg('{ "futureThing": { "z": 42, "tags": ["a","b"] } }')}`)
     const back = JSON.parse(runVerb(w, `get ${e.id}`))
     expect(back.futureThing).toEqual({ z: 42, tags: ['a', 'b'] })
   })
   it('accepts a deeply nested patch', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     runVerb(w, `set ${e.id} ${encodeArg('{ "a": { "b": { "c": { "d": 1 } } } }')}`)
     expect(JSON.parse(runVerb(w, `get ${e.id}`)).a.b.c.d).toBe(1)
   })
   it('accepts a large valid payload', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     const big = { blob: Array.from({ length: 5000 }, (_, i) => i) }
     runVerb(w, `set ${e.id} ${encodeArg(JSON.stringify(big))}`)
     expect((JSON.parse(runVerb(w, `get ${e.id}`)).blob as number[]).length).toBe(5000)
@@ -186,18 +186,18 @@ describe('set — merge semantics', () => {
 describe('set — base64 payloads', () => {
   it('accepts a b64-wrapped whitespace payload', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     runVerb(w, `set ${e.id} ${encodeArg('{ "health": { "hp": 3 } }')}`)
     expect(e.health!.hp).toBe(3)
   })
   it('rejects malformed base64 cleanly', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     expect(() => runVerb(w, `set ${e.id} b64:!!!!not_base64`)).toThrow()
   })
   it('rejects base64 that decodes to non-JSON', () => {
     const w = world()
-    const e = spawnNpc(w, 'thug', 0, 0)
+    const e = spawnNpc(w, 'mutant', 0, 0)
     expect(() => runVerb(w, `set ${e.id} b64:${toB64('hello not json')}`)).toThrow()
   })
 })
@@ -205,7 +205,7 @@ describe('set — base64 payloads', () => {
 describe('verbatim mirror edge cases', () => {
   it('throws (does not hang) on a circular entity graph', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     ;(e as unknown as { self?: unknown }).self = e // JSON.stringify cannot encode this
     expect(() => runVerb(w, `get ${e.id}`)).toThrow(/circular/i)
   })
@@ -214,7 +214,7 @@ describe('verbatim mirror edge cases', () => {
   })
   it('serializeEntity is a deep copy, not a live reference', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     const snap = serializeEntity(e)
     e.pos.x = 999
     expect((snap.pos as { x: number }).x).toBe(0) // snapshot frozen at capture
@@ -227,7 +227,7 @@ describe('kill / teleport adversarial', () => {
   })
   it('teleport rejects missing/garbage coords before mutating', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 7, 8)
+    const e = spawnNpc(w, 'warden', 7, 8)
     expect(() => runVerb(w, `teleport ${e.id}`)).toThrow(/expected a number for x/)
     expect(() => runVerb(w, `teleport ${e.id} 1 z`)).toThrow(/expected a number for y/)
     // Failed teleport left the position untouched (no partial mutation).
@@ -235,7 +235,7 @@ describe('kill / teleport adversarial', () => {
   })
   it('teleport clears interpolation so the sprite does not streak', () => {
     const w = world()
-    const e = spawnNpc(w, 'cop', 0, 0)
+    const e = spawnNpc(w, 'warden', 0, 0)
     e.prevPos = { x: 0, y: 0 }
     runVerb(w, `teleport ${e.id} 20 30`)
     expect(e.pos).toEqual({ x: 20, y: 30 })
@@ -249,7 +249,7 @@ describe('command escape hatch', () => {
   })
   it('forwards to the inner verb verbatim, including nested command', () => {
     const w = world()
-    spawnNpc(w, 'cop', 0, 0)
+    spawnNpc(w, 'warden', 0, 0)
     expect(JSON.parse(runVerb(w, 'command state')).total).toBe(1)
     expect(JSON.parse(runVerb(w, 'command command state')).total).toBe(1)
   })

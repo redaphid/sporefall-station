@@ -7,7 +7,7 @@
 //   • use-rolls      : hands hold nothing usable (an empty gun), so pressing USE
 //                      dodge-rolls through an inbound bullet — hp UNCHANGED.
 // Both effects are asserted on the post-run world. Built on the committed
-// `combat-stage` snapshot (thugs cleared) + the `?world=@inline` boot path.
+// `combat-stage` snapshot (mutants cleared) + the `?world=@inline` boot path.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'

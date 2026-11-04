@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { mulberry32 } from '../rng'
 import { carveComplex, type ComplexMeta } from './complex'
+import { biomeForFloor } from './floors'
 import { generateLevel } from './generate'
 import { isWallTile, Tile, TileGrid, type Building, type Level } from './level'
 import type { Rect } from './rooms'
@@ -20,17 +21,17 @@ interface Floor {
 const floorOf = (seed: number, floor: number): Floor => {
   const level = generateLevel(seed, floor)
   const grid = new TileGrid(level.w, level.h, new Uint8Array(level.w * level.h))
-  const { meta } = carveComplex(mulberry32(seed).fork(`levelgen:${floor}`).fork('complex'), grid, floor)
+  const { meta } = carveComplex(mulberry32(seed).fork(`levelgen:${floor}`).fork('complex'), grid, biomeForFloor(seed, floor))
   return { tag: `seed ${seed} floor ${floor} (${meta.archetype})`, level, meta }
 }
 
 const cache = new Map<number, Floor[]>()
-/** seeds x complex floors 3, 5, 7, 9. */
+/** seeds x complex floors 3-6, one lap of the four biomes. */
 const sweep = (seeds: number): Floor[] => {
   const hit = cache.get(seeds)
   if (hit) return hit
   const out: Floor[] = []
-  for (let seed = 1; seed <= seeds; seed++) for (let floor = 3; floor <= 9; floor += 2) out.push(floorOf(seed, floor))
+  for (let seed = 1; seed <= seeds; seed++) for (let floor = 3; floor <= 6; floor++) out.push(floorOf(seed, floor))
   cache.set(seeds, out)
   return out
 }

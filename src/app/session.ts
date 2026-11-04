@@ -1,3 +1,4 @@
+import type { LinkStatus } from './linkHealth'
 import type { Entity } from '../game/entity'
 import type { ModifierView } from '../game/floorModifiers'
 import type { Level } from '../game/levelgen/level'
@@ -17,9 +18,6 @@ export interface RenderView {
    * can hyperlink the objective to it. Absent for `reach` missions and on
    * clients running an older host. */
   missionTargetId?: number
-  /** `extraction` mission still open: the entry tile to get back to, and
-   * whether the prize is in a standing player's hands. Absent otherwise. */
-  extraction?: { x: number; y: number; held: boolean }
   gameOver: boolean
   /** STATION ALERT — this floor's objective is done and the escape run is on.
    * Drives the persistent pulsing alert wash (render/juice.ts `alertWash`), as
@@ -39,6 +37,12 @@ export interface RenderView {
    * frame counter). Compared against host-tick deadlines such as a weapon's
    * `rechargeUntil`. Optional: absent means `tick`. */
   simTick?: number
+  /** Which run this view belongs to. Changes each time the session starts a
+   * fresh run (restart / New Seed on a host, a non-rejoin GameStart on a
+   * client) and at no other time: not on a floor change, a rejoin, or a late
+   * snapshot. A new run recycles entity ids, so per-run UI state such as the
+   * boss latch keys on this, never on a drop in the tick. */
+  runEpoch: number
   /** The entity this device's player controls (camera target, HUD). */
   self?: Entity
   /** This floor's modifier as the HUD and renderer show it. Absent = clean floor. */
@@ -70,4 +74,9 @@ export interface Session {
    * Omitted → the run rebuilds from the current seed (plain "play again").
    */
   restart?(seed?: number): void
+  /** Leave the net session on purpose (Main menu). A host tells its peers it
+   * left; a client hangs up. Solo has nothing to close and leaves it undefined. */
+  close?(): Promise<void>
+  /** Net sessions: the health of the link, for the online HUD chip. */
+  linkStatus?(): LinkStatus
 }

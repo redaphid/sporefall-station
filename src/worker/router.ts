@@ -24,6 +24,7 @@ import { STATE_PREFIX, handleWorldStore } from './worldStore'
 import { handleOta } from './ota'
 import { REVIEW_PREFIX, handleReviewImage } from './reviewImages'
 import { handleBeta } from './betas'
+import { ROOM_NAME_RE } from './roomRelay'
 import { BETAS_PREFIX } from '../app/betaSlug'
 import type { Env } from './env'
 
@@ -35,7 +36,13 @@ export const route = async (request: Request, env: Env): Promise<Response> => {
   // A BETA build namespaces its room names by slug before they get here, so
   // beta players cannot land in a live player's simulation — see betaSlug.ts.
   if (url.pathname.startsWith('/ws/')) {
-    const room = decodeURIComponent(url.pathname.slice('/ws/'.length)) || 'default'
+    let room = ''
+    try {
+      room = decodeURIComponent(url.pathname.slice('/ws/'.length))
+    } catch {
+      /* malformed escape: refused below */
+    }
+    if (!ROOM_NAME_RE.test(room)) return new Response('bad room name', { status: 400 })
     const stub = env.ROOM.get(env.ROOM.idFromName(room))
     return stub.fetch(request)
   }

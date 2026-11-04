@@ -54,7 +54,7 @@ const run = async () => {
   const ids = await page.evaluate(() => {
     const byArch = {}
     for (const e of window.__world.entities) (byArch[e.archetype] ??= []).push(e.id)
-    return { cop: byArch.cop[0], thugA: byArch.thug[0], thugB: byArch.thug[1], gangster: byArch.gangster[0], pickup: byArch['pickup.grenade'][0] }
+    return { warden: byArch.warden[0], mutantA: byArch.mutant[0], mutantB: byArch.mutant[1], acolyte: byArch.acolyte[0], pickup: byArch['pickup.grenade'][0] }
   })
 
   const annotate = (arr) => page.evaluate((json) => window.__annotate(json), JSON.stringify(arr))
@@ -69,7 +69,7 @@ const run = async () => {
   // ---- 1. per-kind screenshots (each variety proven unambiguously) ----------
   const perKind = {
     text: [{ kind: 'text', text: 'Claude: sweep this room left to right', color: '#ffd76a' }],
-    label: [{ kind: 'label', targetId: ids.cop, text: 'Cop — lawful, hits back' }],
+    label: [{ kind: 'label', targetId: ids.warden, text: 'Warden — watchful, hits back' }],
     pin: [{ kind: 'pin', targetId: ids.pickup, text: 'Grenade — grab it' }],
     arrow: [{ kind: 'arrow', x: 26, y: 6, x2: 20, y2: 11, text: 'go here', color: '#7fd17f' }],
     circle: [{ kind: 'circle', x: 20, y: 9, radius: 2.6, text: 'danger zone', color: '#ff6b6b' }],
@@ -85,10 +85,10 @@ const run = async () => {
   await clearAll()
   const scene = [
     { kind: 'text', text: 'Claude: sweep this room left to right', color: '#ffd76a' },
-    { kind: 'label', targetId: ids.cop, text: 'Cop — lawful' },
-    { kind: 'label', targetId: ids.thugA, text: 'Thug — hostile' },
-    { kind: 'label', targetId: ids.thugB, text: 'Thug — flank' },
-    { kind: 'label', targetId: ids.gangster, text: 'Gangster — pistol' },
+    { kind: 'label', targetId: ids.warden, text: 'Warden — watchful' },
+    { kind: 'label', targetId: ids.mutantA, text: 'Mutant — hostile' },
+    { kind: 'label', targetId: ids.mutantB, text: 'Mutant — flank' },
+    { kind: 'label', targetId: ids.acolyte, text: 'Acolyte — pistol' },
     { kind: 'pin', targetId: ids.pickup, text: 'Grenade — grab it' },
     { kind: 'circle', x: 20, y: 9, radius: 2.6, text: 'danger zone', color: '#ff6b6b' },
     { kind: 'arrow', x: 26, y: 6, x2: 20, y2: 11, text: 'go here', color: '#7fd17f' },
@@ -172,11 +172,11 @@ const run = async () => {
   else ok('all annotation text is legible (on-screen, unclipped, bounded, backed, ≥12px, non-overlapping, off-target)')
 
   // ---- 4. selection: tap an entity → highlight + inspect card + Entity.selected
-  const cop = await page.evaluate((id) => {
+  const warden = await page.evaluate((id) => {
     const e = window.__world.entities.find((x) => x.id === id)
     return window.__project(e.pos.x, e.pos.y)
-  }, ids.cop)
-  await page.mouse.move(cop.x, cop.y)
+  }, ids.warden)
+  await page.mouse.move(warden.x, warden.y)
   await page.mouse.down()
   await page.mouse.up()
   await settle()
@@ -192,10 +192,10 @@ const run = async () => {
       cardText: card ? card.textContent : '',
       ringPresent: !!ring,
     }
-  }, ids.cop)
+  }, ids.warden)
   shots.push(await shot('selection'))
 
-  sel.targetSelected ? ok(`tapped entity ${ids.cop} is now selected`) : fail(`tap did not select entity ${ids.cop} (selected: ${sel.selectedIds})`)
+  sel.targetSelected ? ok(`tapped entity ${ids.warden} is now selected`) : fail(`tap did not select entity ${ids.warden} (selected: ${sel.selectedIds})`)
   sel.cardVisible ? ok(`inspect card visible: ${JSON.stringify(sel.cardText)}`) : fail('inspect card not visible after tap')
   sel.ringPresent ? ok('selection highlight ring present') : fail('no selection ring after tap')
 

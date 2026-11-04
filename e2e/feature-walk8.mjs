@@ -1,5 +1,5 @@
 // feat/sprite-scale-8dir — 48px feet-anchored characters with 8-way facing.
-// Injects the committed `combat-stage` snapshot with the thugs cleared and the
+// Injects the committed `combat-stage` snapshot with the mutants cleared and the
 // player parked in the open park at (10,11), then drives the `walk8` script: a
 // full compass circle (E, SE, S, SW, W, NW, N, NE) with a pause after each leg.
 // A still lands in every pause, so the artifact set shows all eight facings —

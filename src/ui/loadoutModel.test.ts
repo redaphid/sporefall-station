@@ -24,7 +24,7 @@ const player = (weaponId: string, mods?: { id: string; stacks: number }[]): Enti
       playerId: 0,
       abilityCooldown: 0,
       cash: 0,
-      crimeUntilTick: 0,
+      misdeedUntilTick: 0,
     },
     loadout: {
       inventory: weaponId === 'fists' ? [] : [{ itemId: weaponId, qty: 8, ...(mods ? { mods } : {}) }],

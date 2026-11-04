@@ -7,7 +7,7 @@ export interface NpcDef {
   speed: number // tiles/sec
   weapon: string
   sightRange: number
-  /** Innate temperament: aggro anyone on sight (thugs) vs only criminals (cops)
+  /** Innate temperament: aggro anyone on sight (mutants) vs only troublemakers (wardens)
    * vs never (civs).
    *
    * NB this is FLAVOUR, not the targeting rule — the only reader is the inspect
@@ -15,13 +15,13 @@ export interface NpcDef {
    * `behaviors.isHostileTarget`, which goes by the faction matrix, stored
    * disposition and `world.hostile`. Keep the two in step by hand; a value here
    * that contradicts an archetype's behaviour just mislabels it to the player. */
-  hostility: 'always' | 'lawful' | 'never'
+  hostility: 'always' | 'watchful' | 'never'
   fleesOnDamage: boolean
-  /** Peaceful until hit, then fights back (bouncers). */
+  /** Peaceful until hit, then fights back (lockkeepers). */
   retaliates?: boolean
   /** Behavior registry id (systems/behaviors.ts) newly spawned NPCs of this
    * archetype think with. Absent → 'basic'. Populate may override per-spawn
-   * (street cops get a patrol beat, some civilians scavenge). */
+   * (causeway wardens get a patrol beat, some civilians scavenge). */
   behavior?: string
   /** #78 — damage AFFINITY table copied to `Entity.resist` at spawn: incoming
    * damage multiplier keyed by `'physical'` (impact/explosion) or an element id
@@ -39,21 +39,21 @@ export interface NpcDef {
 }
 
 export const NPCS: Record<string, NpcDef> = {
-  thug: {
-    archetype: 'thug',
-    faction: 'gang',
+  mutant: {
+    archetype: 'mutant',
+    faction: 'rootcult',
     hp: 40,
     speed: 3.4,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 7,
     hostility: 'always',
     fleesOnDamage: false,
   },
   boss: {
-    // #69 Mireclaw Alpha: a phased apex predator, not a fat gangster. Lives in
+    // #69 Mireclaw Alpha: a phased apex predator, not a fat human brawler. Lives in
     // the spore (immune) and uses it as a lifeline in phase 2.
     //
-    // BALANCE (was hp 80 / bat / no physical resist — measured, not guessed;
+    // BALANCE (was hp 80 / wrench / no physical resist — measured, not guessed;
     // see scripts/test/boss-ttk-probe.ts). At 80hp the "apex predator" died in
     // 1.9s of pistol fire while an ORDINARY brute took 4.2s, so the boss was a
     // QUARTER of the fight of a rank-and-file enemy. Worse, its own three-phase
@@ -77,7 +77,7 @@ export const NPCS: Record<string, NpcDef> = {
     // PLAYER_SPEED (4.5): phase 3 is a chase you can barely win, not an
     // unavoidable one.
     archetype: 'boss',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 320,
     speed: 3.2,
     weapon: 'claws',
@@ -87,19 +87,19 @@ export const NPCS: Record<string, NpcDef> = {
     behavior: 'mireclaw',
     resist: { physical: 0.75, burning: 1.25, poisoned: 0.5, spore: 0 },
   },
-  cop: {
-    archetype: 'cop',
-    faction: 'cop',
+  warden: {
+    archetype: 'warden',
+    faction: 'warden',
     hp: 60,
     speed: 4.0,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 8,
-    hostility: 'lawful',
+    hostility: 'watchful',
     fleesOnDamage: false,
   },
-  gangster: {
-    archetype: 'gangster',
-    faction: 'gang',
+  acolyte: {
+    archetype: 'acolyte',
+    faction: 'rootcult',
     hp: 35,
     speed: 3.6,
     weapon: 'pistol',
@@ -108,8 +108,8 @@ export const NPCS: Record<string, NpcDef> = {
     fleesOnDamage: false,
     behavior: 'hunter',
   },
-  bouncer: {
-    archetype: 'bouncer',
+  lockkeeper: {
+    archetype: 'lockkeeper',
     faction: 'neutral',
     hp: 90,
     speed: 3.0,
@@ -135,7 +135,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'civ',
     hp: 45,
     speed: 3.2,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 6,
     hostility: 'never',
     fleesOnDamage: false,
@@ -175,10 +175,10 @@ export const NPCS: Record<string, NpcDef> = {
   brute: {
     // Chitin-plated bruiser: soaks impact, slow, but flammable — bring fire.
     archetype: 'brute',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 95,
     speed: 2.5,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -189,7 +189,7 @@ export const NPCS: Record<string, NpcDef> = {
     // Ash-dweller: takes only 20% from fire (resistant, NOT immune), so a
     // flamethrower/molotov build stalls out on it — shoot it instead.
     archetype: 'cinder',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 45,
     speed: 3.4,
     weapon: 'fists',
@@ -203,7 +203,7 @@ export const NPCS: Record<string, NpcDef> = {
     // Fast, fragile swarm-thing: spore-immune and toxin-resistant, but flammable
     // and squishy to bullets — poison whiffs, crowd/AoE or fire shines.
     archetype: 'sporeling',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 22,
     speed: 4.4,
     weapon: 'fists',
@@ -216,7 +216,7 @@ export const NPCS: Record<string, NpcDef> = {
   stalker: {
     // #67 Mireclaw brood scavenger: hunts the weakest, shies from a healthy pack.
     // Its own faction ('neutral') is its pack — it culls the wounded of every
-    // OTHER side (crew, cops, gangs, players). Fast, fragile, opportunistic.
+    // OTHER side (crew, wardens, rootcults, players). Fast, fragile, opportunistic.
     archetype: 'stalker',
     faction: 'neutral',
     hp: 30,
@@ -235,7 +235,7 @@ export const NPCS: Record<string, NpcDef> = {
     // at the intruder, fast and all-in (behaviors 'lurker' pounce). The
     // jump-scare. Fragile on purpose: it wins the ambush or dies in the open.
     archetype: 'lurker',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 28,
     speed: 4.6,
     weapon: 'knife',
@@ -268,7 +268,7 @@ export const NPCS: Record<string, NpcDef> = {
 
   // ── Tides: the group roster (docs/design/enemy-groups.md) ─────────────────────
   // These are the essence-echoes of the colony's WORK CREWS and its fauna — the
-  // swamp redreaming a security detail, a demolition gang, a medic, a pack. They
+  // swamp redreaming a security detail, a demolition rootcult, a medic, a pack. They
   // are built to be met TOGETHER: each one is ordinary alone and changes what the
   // group does (systems/groups.ts runs the group layer, behaviors.ts the brains).
   // Numbers are floor-1 baselines; populate.spawnNpc ramps hp +15% per floor.
@@ -277,7 +277,7 @@ export const NPCS: Record<string, NpcDef> = {
     // of every tide. Deliberately a pistol-grade threat so a raid's danger is
     // its NUMBERS and its orders, not any one member.
     archetype: 'drowner',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 38,
     speed: 3.4,
     weapon: 'pistol',
@@ -288,11 +288,11 @@ export const NPCS: Record<string, NpcDef> = {
     resist: { poisoned: 0.7, spore: 0.5 },
   },
   bellwether: {
-    // The officer. Rings a bell for a head: every raid member within earshot is
+    // The overseer. Rings a bell for a head: every raid member within earshot is
     // RALLIED (faster, harder to hurt). Kill it and the raid's nerve breaks —
     // the whole tide routs. The priority target, and tanky enough to be a choice.
     archetype: 'bellwether',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 90,
     speed: 3.0,
     weapon: 'pistol',
@@ -307,7 +307,7 @@ export const NPCS: Record<string, NpcDef> = {
     // raiders RETREAT to it to be healed, then go back in. Fragile and unarmed,
     // so the answer is to reach it — or to deny the retreat.
     archetype: 'mender',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 44,
     speed: 3.3,
     weapon: 'fists',
@@ -322,10 +322,10 @@ export const NPCS: Record<string, NpcDef> = {
     // the raid THROUGH locked hatches instead of around them — plants a charge,
     // backs off, blows the door. Volatile: fire hurts it more.
     archetype: 'breacher',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 62,
     speed: 3.0,
-    weapon: 'bat',
+    weapon: 'wrench',
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,
@@ -337,7 +337,7 @@ export const NPCS: Record<string, NpcDef> = {
     // shells OVER walls at wherever its raid last saw you. Slow, keeps its
     // distance, weak up close — the siege is broken by charging the battery.
     archetype: 'lobber',
-    faction: 'gang',
+    faction: 'rootcult',
     hp: 58,
     speed: 2.4,
     weapon: 'fists',

@@ -13,6 +13,9 @@ const fixtures = import.meta.glob('./__fixtures__/*.json', { eager: true, import
   WorldJson
 >
 
+/** Is there a committed fixture by this name? */
+export const hasFixture = (name: string): boolean => `./__fixtures__/${name}.json` in fixtures
+
 /** Read a committed fixture as its raw JSON snapshot (a fresh, mutation-safe copy). */
 export const loadFixtureJson = (name: string): WorldJson => {
   const j = fixtures[`./__fixtures__/${name}.json`]

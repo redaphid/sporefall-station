@@ -83,7 +83,7 @@ const scenarios: Scenario[] = [
 ]
 
 const run = (s: Scenario): void => {
-  // HOSTILE world: the civilian genuinely hates and fears the thug, so flight
+  // HOSTILE world: the civilian genuinely hates and fears the mutant, so flight
   // is chosen by the real arbitration rather than forced by the harness.
   const w = createWorld(1, 1, 'normal', true)
   const cx = Math.floor(w.level.w / 2)
@@ -100,7 +100,7 @@ const run = (s: Scenario): void => {
   // and keeps wanting to. Huge max keeps it alive for the whole window.
   npc.health = { hp: 1, max: 1e6, iframes: 1e9 }
   npc.ai!.sightRange = 12
-  const threat = spawnNpc(w, 'thug', tx + 0.5, ty + 0.5)
+  const threat = spawnNpc(w, 'mutant', tx + 0.5, ty + 0.5)
   threat.health = { hp: 1e6, max: 1e6, iframes: 0 }
   threat.ai = undefined // a STATIC menace: isolate flee steering from pursuit
 

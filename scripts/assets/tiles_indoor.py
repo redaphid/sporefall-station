@@ -78,7 +78,7 @@ C = {name: np.array(_hex(h), np.float32) for name, h in {
 BAYER4 = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], np.float32) / 16.0
 
 # Value plan (mean luminance). Existing swampspace-hires bands:
-#   wall 30 < street 40 < grass 54 < floor 82 < sidewalk 118 < exit 150.
+#   wall 30 < causeway 40 < grass 54 < floor 82 < boardwalk 118 < exit 150.
 # Indoor surfaces slot in so every TOUCHING pair sits >= one band apart:
 # hull (outer mass) darkest; corridors a clear step above the module walls;
 # engineering plate between corridor and the tan crew deck; ceramic the light

@@ -100,9 +100,9 @@ const main = async () => {
   check(start.barrels === 3 && start.crate, 'scene has 3 barrels and a crate')
 
   // USE: the vending machine (adjacent west) returns change. It dispensed a
-  // BURGER until the item cull removed every consumable; it now pays cash like
-  // the ATM, so the observable effect moved from a new pickup on the floor to
-  // the player's cash going up.
+  // BURGER until the item cull removed every consumable; it now pays cash, so
+  // the observable effect moved from a new pickup on the floor to the player's
+  // cash going up.
   const cashBefore = start.cash
   await page.keyboard.press('KeyE')
   await sleep(300)

@@ -59,7 +59,6 @@ describe('interior prop / furniture art resolution', () => {
 
   it('the classic props still map to their bespoke swampspace sprites', () => {
     expect(PROP_SPRITE.barrel).toBe('barrel')
-    expect(PROP_SPRITE.atm).toBe('atm')
     expect(PROP_SPRITE.vending).toBe('vending-machine')
     expect(PROP_SPRITE.tv).toBe('tv')
     expect(PROP_SPRITE.toilet).toBe('toilet')
@@ -70,7 +69,7 @@ describe('interior prop / furniture art resolution', () => {
     expect(PROP_SPRITE.locker).toBe('locker')
     expect(PROP_SPRITE.cabinet).toBe('cabinet')
     expect(PROP_SPRITE.desk).toBe('desk')
-    expect(PROP_SPRITE.cryoTerminal).toBe('atm')
+    expect(PROP_SPRITE.cryoTerminal).toBe('cryo-terminal')
     expect(PROP_SPRITE.generator).toBe('tv')
   })
 

@@ -85,7 +85,7 @@ describe('handshake', () => {
 describe('read verbs answer immediately', () => {
   it('replies to a read without waiting for afterTick', () => {
     const { w, ws } = setup()
-    spawnNpc(w, 'cop', 0, 0)
+    spawnNpc(w, 'warden', 0, 0)
     ws.recv({ t: 'req', id: 7, verb: 'state' })
     const reps = ws.ofType('rep')
     expect(reps).toHaveLength(1)
@@ -105,7 +105,7 @@ describe('read verbs answer immediately', () => {
 describe('write verbs defer to the tick boundary', () => {
   it('does not mutate the world at receive time', () => {
     const { w, ws } = setup()
-    const npc = spawnNpc(w, 'thug', 0, 0)
+    const npc = spawnNpc(w, 'mutant', 0, 0)
     ws.recv({ t: 'req', id: 9, verb: `kill ${npc.id}` })
     // Deferred: no reply and no mutation until afterTick drains the queue.
     expect(ws.ofType('rep')).toHaveLength(0)
@@ -113,7 +113,7 @@ describe('write verbs defer to the tick boundary', () => {
   })
   it('applies the write and replies when afterTick drains', () => {
     const { w, ws, ch } = setup()
-    const npc = spawnNpc(w, 'thug', 0, 0)
+    const npc = spawnNpc(w, 'mutant', 0, 0)
     ws.recv({ t: 'req', id: 9, verb: `kill ${npc.id}` })
     ch.afterTick()
     const rep = ws.ofType('rep').find((r) => r.id === 9) as RepMsg
@@ -126,7 +126,7 @@ describe('write verbs defer to the tick boundary', () => {
 describe('event streaming + ordering', () => {
   it("streams a kill's death event instead of the next tick clearing it", () => {
     const { w, ws, ch } = setup()
-    const npc = spawnNpc(w, 'thug', 0, 0)
+    const npc = spawnNpc(w, 'mutant', 0, 0)
     ws.recv({ t: 'req', id: 1, verb: `kill ${npc.id}` })
     // Drain-then-stream in a single afterTick: the death event pushed by the
     // deferred kill must reach the wire, not get swept by the following tick.
@@ -171,7 +171,7 @@ describe('a game-over / non-ticking world stays fully inspectable + mutable', ()
   // world can be inspected — or the player revived — through game-over.
   it('answers reads (state / entities / dump) on a gameOver world', () => {
     const { w, ws } = setup()
-    spawnNpc(w, 'cop', 0, 0)
+    spawnNpc(w, 'warden', 0, 0)
     w.gameOver = true
     ws.recv({ t: 'req', id: 1, verb: 'state' })
     ws.recv({ t: 'req', id: 2, verb: 'entities' })
@@ -183,7 +183,7 @@ describe('a game-over / non-ticking world stays fully inspectable + mutable', ()
   })
   it('still applies a write (revive via set) on a gameOver world', () => {
     const { w, ws, ch } = setup()
-    const npc = spawnNpc(w, 'thug', 0, 0)
+    const npc = spawnNpc(w, 'mutant', 0, 0)
     w.gameOver = true
     ws.recv({ t: 'req', id: 5, verb: `set ${npc.id} {"health":{"hp":99}}` })
     ch.afterTick() // the mutation queue still drains when the channel is pumped

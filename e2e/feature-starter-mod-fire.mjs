@@ -1,7 +1,7 @@
 // Playtest fix #1 HEADLINE video: the class STARTER weapon is now a real slotted
 // ItemStack (a 40-round pistol that can hold mods), so a default player walks over
 // a weapon-mod gem and the gun actually gains the mod — then fires the modded
-// (frost) rounds into the thug line, freezing then shattering them. Proves the
+// (frost) rounds into the mutant line, freezing then shattering them. Proves the
 // "walk over a diamond, nothing happens" bug is fixed end-to-end.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -13,7 +13,7 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 
 // combat-stage, but the player carries EXACTLY what spawnPlayer now produces: a
 // slotted, equipped pistol loaded with 40 rounds (STARTER_AMMO). A frost gem sits
-// on the lane at x≈5.5 where `modFrostFire` walks; the thug line stays as targets.
+// on the lane at x≈5.5 where `modFrostFire` walks; the mutant line stays as targets.
 const world = () => {
   const w = JSON.parse(JSON.stringify(base))
   const p = w.entities.find((e) => e.playerCtl)
@@ -44,7 +44,7 @@ const readState = () => {
   const slot = p?.playerCtl?.inventory?.[p.playerCtl.activeSlot]
   const gems = w.entities.filter((e) => !e.dead && String(e.archetype).startsWith('mod.')).length
   const frozen = w.entities.filter((e) => e.fx && e.fx.frozen).length
-  const thugsAlive = w.entities.filter((e) => e.archetype === 'thug' && !e.dead).length
+  const mutantsAlive = w.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length
   return {
     tick: w.tick,
     gameOver: w.gameOver,
@@ -53,7 +53,7 @@ const readState = () => {
     mods: (slot?.mods ?? []).map((m) => `${m.id}×${m.stacks}`).sort(),
     gemsLeft: gems,
     frozenNow: frozen,
-    thugsAlive,
+    mutantsAlive,
     playerHp: p?.health?.hp ?? null,
   }
 }
@@ -70,7 +70,7 @@ const ok = await recordFeature({
     s.gemsLeft !== 0 && `frost gem not grabbed: ${s.gemsLeft} left`,
     !s.mods.includes('frost×1') && `frost not applied to the starter (mods: ${s.mods.join(',')})`,
     s.ammo === 40 && 'pistol never fired (still 40 rounds) — finite ammo not spent',
-    s.thugsAlive === 3 && 'no thug was killed by the frozen rounds',
+    s.mutantsAlive === 3 && 'no mutant was killed by the frozen rounds',
   ],
 })
 if (!ok) process.exitCode = 1

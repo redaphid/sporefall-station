@@ -10,6 +10,7 @@ import {
   resolveClip,
   sceneContinuous,
   STATE_TICKS,
+  type AnimStateName,
   type ResolvedAnim,
 } from './animState'
 import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
@@ -98,6 +99,13 @@ const poseFor = (set: CharSet, dir: Dir5): DirPose | undefined => {
   }
   return undefined
 }
+
+/** Does the pack draw this state's loop itself for the facing's pose (2+
+ * frames of `char.<name>.<dir>-<state>-<n>`)? Then the frames carry the cycle
+ * and motion.ts adds none (MotionInput.drawnCycle). The legacy idle/step pair
+ * is not a drawn loop: the procedural cycle exists for exactly that art. */
+const drawsCycle = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): boolean =>
+  (set ? (poseFor(set, dir)?.clips?.[state]?.length ?? 0) : 0) > 1
 
 /** Pick the texture a CHARACTER shows for a resolved animation state: state
  * clip (with per-state fallback chains) → legacy idle/step synthesis →
@@ -326,7 +334,8 @@ export class EntityViews {
               vx: e.vel.x,
               moving,
               rollUntil: roll?.untilTick,
-              style: locomotionFor(e.archetype),
+              style: locomotionFor(this.art.artKind(artKey)),
+              drawnCycle: drawsCycle(this.art.characterSet(artKey), facingDir(e.facing).dir, anim.state),
             })
           : IDENTITY_POSE
 
@@ -365,7 +374,7 @@ export class EntityViews {
       view.footX = footX
       view.footY = footY
       // Per-archetype BULK multiplies the animation pulse: the Mireclaw Alpha
-      // draws at 1.5x so it can never be mistaken for the thug whose sprite it
+      // draws at 1.5x so it can never be mistaken for the mutant whose sprite it
       // still borrows (art.ARCHETYPE_SCALE).
       const scale =
         (e.kind === 'fire' ? 1 + Math.sin(t * 0.9) * 0.08 : burning ? 1 + burnPulse(t) * 0.08 : 1) *

@@ -1,8 +1,8 @@
 import type { Rect } from './rooms'
 
 export const Tile = {
-  Street: 0,
-  Sidewalk: 1,
+  Causeway: 0,
+  Boardwalk: 1,
   Floor: 2,
   Wall: 3,
   Grass: 4,
@@ -17,7 +17,7 @@ export const Tile = {
   WallCutNE: 7,
   WallCutSE: 8,
   WallCutSW: 9,
-  // ── Indoor complex (floors 3, 5, 7…, levelgen/complex.ts) ─────────────────────────
+  // ── Indoor complex (floors 3+, levelgen/complex.ts) ─────────────────────────
   // Appended after the cut corners for the same reason: ids never renumber.
   /** Corridor deck plating — the station's hallways. Walkable. */
   Hall: 10,
@@ -50,8 +50,8 @@ export const isWallTile = (t: number): boolean =>
 
 /** Every INTERIOR floor-family tile — a tile inside a room/corridor that a body
  * can stand on and furniture/loot/spawns may occupy. The classic city only ever
- * lays `Tile.Floor`; the indoor complex adds its deck variants. Streets,
- * sidewalks, grass and the exit pad are ground, not interior floor. */
+ * lays `Tile.Floor`; the indoor complex adds its deck variants. Causeways,
+ * boardwalks, grass and the exit pad are ground, not interior floor. */
 export const isFloorTile = (t: number): boolean =>
   t === Tile.Floor || t === Tile.Tiled || t === Tile.Plating || t === Tile.Hall || t === Tile.Grate || t === Tile.Bog
 
@@ -71,7 +71,7 @@ export type BuildingRole =
   | 'warehouse'
   | 'clinic'
   | 'bunker'
-  // Indoor complex modules (floors 3, 5, 7…): one room per module, named for what the
+  // Indoor complex modules (floors 3+): one room per module, named for what the
   // colony used it for — see levelgen/complex.ts and COMPLEX_ROOM_TYPE.
   | 'mess'
   | 'galley'
@@ -87,7 +87,7 @@ export type BuildingRole =
  * furniture it gets and where that furniture sits (populate.furnishInteriors),
  * and gives missions/AI/debug a legible name for "the room you are in".
  * Assigned per room by `assignRoomTypes` (roomTypes.ts): a PURE geometric
- * derivation from the building's role, room sizes, street doors and objective
+ * derivation from the building's role, room sizes, causeway doors and objective
  * room — it draws no rng, so adding it never perturbs generation streams. */
 export type RoomType =
   | 'shopfloor' // customer-facing shop front: shelves, vending, the till
@@ -105,7 +105,7 @@ export type RoomType =
   | 'armory' // bunker core: weapon lockers
   | 'barracks' // bunker sleeping quarters
   | 'vault' // sealed reward chamber
-  // Indoor complex rooms (floors 3, 5, 7…)
+  // Indoor complex rooms (floors 3+)
   | 'messhall' // the crew dining hall: long tables and benches
   | 'galley' // the kitchen behind the mess: counters, dispensers
   | 'bunkroom' // crew sleeping quarters: rows of bunks and lockers
@@ -133,16 +133,41 @@ export interface Building {
   roomTypes?: RoomType[]
   /** Compound pit (open ground) — populate routes patrol beats around it. */
   courtyard?: Rect
-  /** The room a mission objective (briefcase / boss) belongs in — designated
+  /** The room a mission objective (canister / boss) belongs in — designated
    * EXPLICITLY by the generator that carved the building (bunker core, vault,
    * loop core, …). This is the contract missions.ts places targets by; never
    * infer it from `rooms` array order. Not part of tiles/solid, so it is
-   * levelChecksum- and wire-invisible (levels regenerate from seed+floor). */
+   * levelChecksum- and wire-invisible. */
   objectiveRoom?: Rect
 }
 
 /** A floor's district flavour — drives density, footprints and role palette. */
-export type ThemeName = 'downtown' | 'slums' | 'industrial' | 'park'
+export type ThemeName = 'concourse' | 'moorings' | 'stillworks' | 'culturebeds'
+
+/** One prop a district stands in its open squares (populate.dressPlazas). */
+export interface PlazaProp {
+  prop: string
+  /** How many per square, inclusive range. */
+  count: [number, number]
+}
+
+/** A district's own encounters on top of the shared roster (populate.ts),
+ * from floor 2 (the landing floor stays gentle). A field left out draws no
+ * dice, so the other districts' streams never move. */
+export interface DistrictEncounters {
+  /** Chance a building hosts 1-2 Cinder Husks (else the shared 12%). */
+  cinders?: number
+  /** Derelict Units still on shift here from floor 2 (elsewhere from floor 4). */
+  robotsOnShift?: boolean
+  /** Chance a building hosts an extra Brood Sac clutch of 2-3. */
+  broodSacs?: number
+  /** Chance a building hosts an extra 1-2 Spore Mites. */
+  sporeMites?: number
+  /** Chance a building hosts an extra Mireclaw Stalker, scavenging. */
+  stalkers?: number
+  /** Chance a building hosts 1-2 Drowned Divers. */
+  drowners?: number
+}
 
 export interface Theme {
   name: ThemeName
@@ -167,54 +192,120 @@ export interface Theme {
   bunkerChance: number
   /** Role palette (repeats bias the weighting). */
   roles: readonly BuildingRole[]
+  /** Ground of a courtyard compound's open pit. */
+  courtyardGround: TileId
+  /** Heart of an open square (a plaza): the paved ring keeps Boardwalk. */
+  plazaHeart: TileId
+  /** What stands in an open square. */
+  plazaProps: readonly PlazaProp[]
+  encounters: DistrictEncounters
+  /** What this district calls a building of each role in mission text, over
+   * the station-wide names (missions.WING_NAMES). */
+  wingNames: Partial<Record<BuildingRole, string>>
 }
 
 /**
- * District themes cycle by floor so consecutive floors read differently.
- * Index 0 (floor 1) is intentionally dense so early floors feel like a city.
+ * The sunken city's districts (docs/design/districts.md): the Concourse, the
+ * colony's company core where catches were weighed and paid out; the
+ * Moorings, the survivors' shacks lashed to the old catch-jetties; Still Row,
+ * the dead essence trade's distilleries; and the Culture Beds, the
+ * mycologists' grow terraces gone feral.
  */
 export const THEMES: readonly Theme[] = [
+  // THE CONCOURSE: the company core, where every catch was weighed, tallied
+  // and paid out under corporate signage now striped with waterline
+  // calendars. Dense paved blocks of tally offices and weigh-houses with
+  // arcades (corridor spines) and payroll strongrooms (vaults); its forecourt
+  // fountains have drowned into bog basins. Stalkers scavenge the counters.
   {
-    name: 'downtown',
+    name: 'concourse',
     minLots: 3,
     maxLots: 4,
     buildingChance: 0.85,
-    yard: Tile.Sidewalk,
+    yard: Tile.Boardwalk,
     courtyardChance: 0.35,
     setbackChance: 0.15,
-    vaultChance: 0.2,
-    hallwayChance: 0.6,
+    vaultChance: 0.3,
+    hallwayChance: 0.65,
     bunkerChance: 0.06,
-    roles: ['office', 'office', 'shop', 'apartment'],
+    roles: ['office', 'office', 'shop', 'apartment', 'clinic'],
+    courtyardGround: Tile.Bog,
+    plazaHeart: Tile.Bog,
+    plazaProps: [
+      { prop: 'bench', count: [2, 4] },
+      { prop: 'table', count: [1, 2] },
+      { prop: 'vending', count: [0, 1] },
+    ],
+    encounters: { stalkers: 0.3 },
+    wingNames: {
+      office: 'tally hall',
+      shop: 'weigh-house',
+      apartment: 'company lodging',
+      clinic: 'company infirmary',
+      warehouse: 'bond store',
+    },
   },
+  // THE MOORINGS: where the generational survivors live, shacks lashed to
+  // the old catch-jetties and rebuilt a stripe higher every generation. Many
+  // small lots with bog water between them, moss-mat kitchen gardens on the
+  // squares; the families' drowned divers still walk the jetties.
   {
-    name: 'slums',
+    name: 'moorings',
     minLots: 4,
     maxLots: 5,
     buildingChance: 0.8,
-    yard: Tile.Grass,
+    yard: Tile.Bog,
     courtyardChance: 0.05,
     setbackChance: 0.4,
     vaultChance: 0.05,
     hallwayChance: 0.35,
     bunkerChance: 0.12,
     roles: ['apartment', 'apartment', 'shop', 'warehouse'],
+    courtyardGround: Tile.Bog,
+    plazaHeart: Tile.Grass,
+    plazaProps: [
+      { prop: 'plant', count: [2, 4] },
+      { prop: 'crate', count: [1, 2] },
+      { prop: 'table', count: [0, 1] },
+    ],
+    encounters: { drowners: 0.35 },
+    wingNames: {
+      apartment: 'stilt shack',
+      shop: 'barter stall',
+      warehouse: 'net loft',
+      office: 'stripe-painters\' hall',
+    },
   },
+  // STILL ROW: the essence trade's distilleries. Big still houses (the
+  // reactor-hall room kit: barrel banks, lockers), cage-works and export
+  // sheds round flooded settling yards. Cinder Husks haunt the cold stills and
+  // Derelict Units are still on shift.
   {
-    name: 'industrial',
+    name: 'stillworks',
     minLots: 3,
     maxLots: 3,
     buildingChance: 0.82,
-    yard: Tile.Sidewalk,
+    yard: Tile.Bog,
     courtyardChance: 0.45,
     setbackChance: 0.25,
     vaultChance: 0.15,
     hallwayChance: 0.55,
     bunkerChance: 0.35,
-    roles: ['warehouse', 'warehouse', 'office', 'shop'],
+    roles: ['reactor', 'warehouse', 'depot', 'warehouse', 'reactor'],
+    courtyardGround: Tile.Bog,
+    plazaHeart: Tile.Bog,
+    plazaProps: [
+      { prop: 'barrel', count: [2, 4] },
+      { prop: 'crate', count: [1, 3] },
+    ],
+    encounters: { cinders: 0.5, robotsOnShift: true },
+    wingNames: { reactor: 'still house', warehouse: 'cage-works', depot: 'export shed' },
   },
+  // THE CULTURE BEDS: the mycologists' grow terraces, gone feral. Low,
+  // scattered labs and infirmaries among open beds where planters stand in
+  // rows on the moss and brood sacs have taken the furrows.
   {
-    name: 'park',
+    name: 'culturebeds',
     minLots: 4,
     maxLots: 5,
     buildingChance: 0.55,
@@ -224,9 +315,22 @@ export const THEMES: readonly Theme[] = [
     vaultChance: 0.05,
     hallwayChance: 0.3,
     bunkerChance: 0.05,
-    roles: ['clinic', 'apartment', 'shop', 'clinic'],
+    roles: ['lab', 'medbay', 'apartment', 'lab', 'shop'],
+    courtyardGround: Tile.Grass,
+    plazaHeart: Tile.Grass,
+    plazaProps: [
+      { prop: 'plant', count: [3, 6] },
+      { prop: 'vending', count: [0, 1] },
+    ],
+    encounters: { broodSacs: 0.35, sporeMites: 0.4 },
+    wingNames: { lab: 'culture house', medbay: 'spore ward', shop: 'seed store' },
   },
 ]
+
+const THEME_BY_NAME = new Map(THEMES.map((t) => [t.name, t]))
+
+/** The district called `name`. */
+export const themeNamed = (name: ThemeName): Theme => THEME_BY_NAME.get(name)!
 
 /** Deterministic theme for a floor (1-based); consecutive floors always differ. */
 export const themeForFloor = (floor: number): Theme => THEMES[(floor - 1) % THEMES.length]
@@ -284,17 +388,16 @@ export interface Level {
   exit: { x: number; y: number }
   /** District theme this floor was generated with. */
   theme?: ThemeName
-  /** Open plaza lots (themed floors): paved squares with a green heart. Not
-   * serialized — the level regenerates from seed+floor like everything else. */
+  /** Open plaza lots (themed floors): paved squares with a green heart. */
   plazas?: Rect[]
   /** Present ONLY on indoor-complex floors (3+): the corridor network, vents,
    * wings and biome the complex generator laid down. Its presence is THE
    * switch the complex-aware systems (populate, complexDirector, render) key
-   * off. Regenerated from seed+floor, never serialized. */
+   * off. */
   complex?: ComplexInfo
   /** The storeys of this floor (levelgen/storeys.ts). Absent means a single
    * storey — every city floor, and a complex floor the structural rule gave no
-   * loft. Regenerated from seed+floor, never serialized. */
+   * loft. */
   storeys?: Storey[]
   /** Stair links, one per direction (see StairLink). Present with `storeys`. */
   stairs?: StairLink[]

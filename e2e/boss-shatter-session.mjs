@@ -3,12 +3,12 @@
 //
 // The owner's report: "the freeze mod still allows players to 2-shot everything,
 // including bosses." This drives the `boss-freeze` scenario — a real 320hp
-// Mireclaw Alpha and an ordinary 40hp thug, both pre-frozen, in one frame — and
+// Mireclaw Alpha and an ordinary 40hp mutant, both pre-frozen, in one frame — and
 // lands one pistol round (14 damage) on each.
 //
 //   E2E_MODE=before  the OLD rule: BOTH die. The shatter is an instant kill, so
 //                    the boss's 320hp pool is irrelevant. This is the bug.
-//   E2E_MODE=after   the fix: the thug gibs, the boss survives, down exactly
+//   E2E_MODE=after   the fix: the mutant gibs, the boss survives, down exactly
 //                    round(14 x SHATTER_DAMAGE_MULT x 0.75 resist) = 53.
 //
 // Recorded HEADFUL (E2E_HEADFUL=1, or E2E_CDP at a real browser's DevTools
@@ -24,7 +24,7 @@ const EXPECTED_BOSS_LOSS = Math.round(DMG * MULT * BOSS_RESIST) // 53
 
 /** Find a STAGED body by archetype. The scenario pre-freezes exactly the two
  * bodies it stages, and the map's ambient population does not, so `fx.frozen`
- * is what separates the Mireclaw on stage from a thug wandering the floor. */
+ * is what separates the Mireclaw on stage from a mutant wandering the floor. */
 const idOf = (page, archetype) =>
   page.evaluate(
     (a) => window.__world.entities.find((e) => e.archetype === a && !e.dead && e.fx?.frozen)?.id ?? -1,
@@ -57,7 +57,7 @@ const main = async () => {
     params: { mode: 'solo', scenario: 'boss-freeze', e2e: '1', seed: '424242' },
     stills: [
       { tick: 20, label: '1-both-frozen' },
-      { tick: 45, label: '2-thug-hit', act: (page) => hit(page, 'thug') },
+      { tick: 45, label: '2-mutant-hit', act: (page) => hit(page, 'mutant') },
       { tick: 75, label: '3-boss-hit', act: (page) => hit(page, 'boss') },
       { tick: 110, label: '4-aftermath' },
     ],
@@ -70,15 +70,15 @@ const main = async () => {
         bossDead: !!p.boss?.dead,
         bossShattered: !!p.boss?.shattered,
         bossStillStanding: !!live('boss'),
-        thugDead: !!p.thug?.dead,
-        thugShattered: !!p.thug?.shattered,
+        mutantDead: !!p.mutant?.dead,
+        mutantShattered: !!p.mutant?.shattered,
       }
     },
     expect: (s) => {
       const f = []
       if (s.bossMax !== BOSS_HP) f.push(`staged boss has ${s.bossMax} max hp, expected ${BOSS_HP}`)
-      if (!s.thugDead) f.push('the 40hp thug survived a shatter — the mechanic lost its feel')
-      if (!s.thugShattered) f.push('the thug died without ice-gibbing')
+      if (!s.mutantDead) f.push('the 40hp mutant survived a shatter — the mechanic lost its feel')
+      if (!s.mutantShattered) f.push('the mutant died without ice-gibbing')
       if (MODE === 'before') {
         // Asserting the BUG, so a 'before' recording cannot quietly be of a
         // fixed build and get passed off as the broken one.

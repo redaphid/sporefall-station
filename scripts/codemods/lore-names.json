@@ -1,0 +1,363 @@
+{
+  "baseline": "22a8075a",
+  "terms": {
+    "cop": {
+      "to": "warden",
+      "why": "The law faction and its archetype already read 'Spore Warden' in both swamp packs."
+    },
+    "cops": {
+      "to": "wardens",
+      "why": "Plural of cop."
+    },
+    "police": {
+      "to": "wardens",
+      "why": "Mass noun for the same faction; the colony has wardens, not police."
+    },
+    "thug": {
+      "to": "mutant",
+      "why": "The melee archetype is drawn and named 'Bog Mutant' (bog-mutant cast walk)."
+    },
+    "thugs": {
+      "to": "mutants",
+      "why": "Plural of thug."
+    },
+    "gangster": {
+      "to": "acolyte",
+      "why": "The pistol hunter is the Rootcult's; acolyte names a cult member without modern crime."
+    },
+    "gangsters": {
+      "to": "acolytes",
+      "why": "Plural of gangster."
+    },
+    "enforcer": {
+      "to": "acolyte",
+      "why": "'Rootcult Enforcer' is mob-muscle wording for the same archetype."
+    },
+    "enforcers": {
+      "to": "acolytes",
+      "why": "Plural of enforcer."
+    },
+    "gang": {
+      "to": "rootcult",
+      "why": "The faction that holds the Rootcult Acolyte and is hostile on sight; its label already reads 'Rootcult'."
+    },
+    "gangs": {
+      "to": "rootcults",
+      "why": "Plural of gang."
+    },
+    "bouncer": {
+      "to": "lockkeeper",
+      "why": "The peaceful-until-hit door guard is drawn as the 'Airlock Warden'; a lockkeeper keeps the airlock."
+    },
+    "bouncers": {
+      "to": "lockkeepers",
+      "why": "Plural of bouncer."
+    },
+    "officer": {
+      "to": "overseer",
+      "why": "The raid's command role (bellwether, medic, sapper); 'bellwether' is already an archetype, so the role gets its own word."
+    },
+    "officers": {
+      "to": "overseers",
+      "why": "Plural of officer."
+    },
+    "heist": {
+      "to": "salvage",
+      "why": "The bunker objective run is a colony salvage dive, not a robbery."
+    },
+    "heists": {
+      "to": "salvages",
+      "why": "Plural of heist."
+    },
+    "crime": {
+      "to": "misdeed",
+      "why": "Attacking settlers in view of the wardens; a misdeed carries no police-procedural frame."
+    },
+    "crimes": {
+      "to": "misdeeds",
+      "why": "Plural of crime."
+    },
+    "criminal": {
+      "to": "troublemaker",
+      "why": "Who the wardens chase; no legal-system frame."
+    },
+    "criminals": {
+      "to": "troublemakers",
+      "why": "Plural of criminal."
+    },
+    "lawbreaker": {
+      "to": "troublemaker",
+      "why": "Same as criminal."
+    },
+    "lawbreakers": {
+      "to": "troublemakers",
+      "why": "Plural of lawbreaker."
+    },
+    "law": {
+      "to": "wardens",
+      "why": "'The law' means the warden faction; 'watch' is already an identifier (debug-cli)."
+    },
+    "lawful": {
+      "to": "watchful",
+      "why": "Hostility value for wardens: only aggro on troublemakers."
+    },
+    "robber": {
+      "to": "marauder",
+      "why": "Cops-and-robbers framing; 'raider' is already an AI behavior id."
+    },
+    "robbers": {
+      "to": "marauders",
+      "why": "Plural of robber."
+    },
+    "thief": {
+      "to": "scrounger",
+      "why": "A test player's name; 'scavenger' is already an AI behavior id."
+    },
+    "thieves": {
+      "to": "scroungers",
+      "why": "Plural of thief."
+    },
+    "dcop": {
+      "to": "dwarden",
+      "why": "Test-local delta variable fused with cop."
+    },
+    "dthug": {
+      "to": "dmutant",
+      "why": "Test-local delta variable fused with thug."
+    },
+    "dgang": {
+      "to": "drootcult",
+      "why": "Test-local delta variable fused with gang."
+    },
+    "street": {
+      "to": "causeway",
+      "why": "The outdoor floors are a sunken colony; its open ground is raised causeways over bog, not Earth streets."
+    },
+    "streets": {
+      "to": "causeways",
+      "why": "Plural of street."
+    },
+    "sidewalk": {
+      "to": "boardwalk",
+      "why": "The walkway beside a causeway is a boardwalk over the swamp."
+    },
+    "sidewalks": {
+      "to": "boardwalks",
+      "why": "Plural of sidewalk."
+    },
+    "briefcase": {
+      "to": "canister",
+      "why": "The objective already reads 'Specimen Canister' to players; 'keycard' is taken by the wing keycard archetype."
+    },
+    "briefcases": {
+      "to": "canisters",
+      "why": "Plural of briefcase."
+    },
+    "bat": {
+      "to": "wrench",
+      "why": "Colony melee is its maintenance kit; the lore-weapons work makes the bat a pipe wrench (wrench essence = weight/knockback)."
+    },
+    "bats": {
+      "to": "wrenches",
+      "why": "Plural of bat."
+    }
+  },
+  "phrases": [
+    {
+      "from": " * Lore names for the four sim FACTION ids. The ids themselves are load-bearing\n * (`entity.Faction`, the disposition matrix, the BLE snapshot), so they stay —\n * this is the player-facing half only. Without it the inspect card printed a\n * bare `Faction: Gang` on a derelict swamp station, which is exactly the\n * cops-and-robbers vocabulary the theme has otherwise moved past. Wording is\n * taken from the shipped manifest so the card agrees with the name plates:\n * `Rootcult Enforcer`, `Spore Warden`, `Settler`.",
+      "to": " * Lore names for the four sim FACTION ids (`entity.Faction`, the disposition\n * matrix, the BLE snapshot). The ids are terse; this is the player-facing half.\n * Wording is taken from the shipped manifest so the card agrees with the name\n * plates: `Rootcult Acolyte`, `Spore Warden`, `Settler`.",
+      "why": "inspectModel.ts: the old comment explained the label by quoting the old id, which the rename makes untrue."
+    },
+    {
+      "from": "  // The card used to print a bare `Faction: Gang` — cops-and-robbers wording on\n  // a derelict swamp station, and the same vocabulary the theme names moved\n  // past. The sim ids are unchanged; only the label is lore.\n",
+      "to": "  // The card prints the faction's lore name, never the terse sim id.\n",
+      "why": "inspectModel.test.ts: same comment as above."
+    },
+    {
+      "from": "/briefcase|\\bboss\\b",
+      "to": "/\\bboss\\b",
+      "why": "missions.test.ts bans the old word from mission text; renaming it would ban the new word instead, so drop it from the ban list (the lint check now bans it repo-wide)."
+    },
+    {
+      "from": "cops-and-robbers",
+      "to": "Earth-city",
+      "why": "Names the rejected fiction without repeating its words."
+    },
+    {
+      "from": "street-crime",
+      "to": "Earth-city",
+      "why": "Same as cops-and-robbers."
+    },
+    {
+      "from": "police line",
+      "to": "warden line",
+      "why": "Adjectival police reads as singular warden."
+    },
+    {
+      "from": "police barricade",
+      "to": "warden barricade",
+      "why": "Adjectival police reads as singular warden."
+    },
+    {
+      "from": "\"wanted\" for",
+      "to": "\"marked\" for",
+      "why": "Wanted-poster wording for the misdeed timer; 'wanted' elsewhere is the plain verb."
+    },
+    {
+      "from": "3 not \"cop\"",
+      "to": "3 not an Earth-city name",
+      "why": "PROGRESS.md: the check said the design avoids the old name; renaming it made the check name the new one."
+    },
+    {
+      "from": "npcs.ts cop weapon 'bat' -> renderer draws a club in its claw",
+      "to": "npcs.ts gave it a stock Earth-city club -> renderer draws a club in its claw",
+      "why": "PROGRESS.md: describes the rejected weapon, so it must keep saying it was a club."
+    },
+    {
+      "from": "-> feat/lore-weapons with the cop's bat",
+      "to": "-> feat/lore-weapons with the drone's stock club",
+      "why": "PROGRESS.md: same rejected weapon."
+    },
+    {
+      "from": "npcs.ts breacher weapon: 'bat' -> feat/lore-weapons",
+      "to": "npcs.ts gave the breacher a stock club -> feat/lore-weapons",
+      "why": "PROGRESS.md: same rejected weapon."
+    },
+    {
+      "from": "npcs.ts gives cop a `bat` (Aaron: not a bat)",
+      "to": "npcs.ts gives the drone a stock club (Aaron rejected it)",
+      "why": "QUEUE.md: same rejected weapon; the owner quote itself stays in PROTOCOL.md."
+    },
+    {
+      "from": "there are no \"cops\" or \"thugs\" anymore",
+      "to": "the old Earth-city enemy names are gone",
+      "why": "inspo-A.md: records the rejection of the old names, so it describes them instead of naming the replacements."
+    },
+    {
+      "from": "there are no \"cops\", \"thugs\", etc. anymore.",
+      "to": "the old Earth-city enemy names are gone.",
+      "why": "Observer log: same directive."
+    },
+    {
+      "from": "spore drones instead of cops",
+      "to": "spore drones walking the patrol beat",
+      "why": "CURATION.md: the contrast with the old enemy reads as nonsense once renamed."
+    },
+    {
+      "from": "stalker, sporeling, \"gangster\" (rename\n  list)",
+      "to": "stalker, sporeling, and the Rootcult pistol\n  hunter (its name was then on the rename list)",
+      "why": "Observer log: a note that the old name was due for renaming."
+    },
+    {
+      "from": "read as a fat gangster",
+      "to": "read as a fat human brawler",
+      "why": "items.ts: the old art's failure, which a renamed word would misstate."
+    },
+    {
+      "from": "not a fat gangster",
+      "to": "not a fat human brawler",
+      "why": "npcs.ts: same."
+    }
+  ],
+  "keep": [
+    {
+      "pattern": "https?://[^\\s)\\]>\"'`]+",
+      "why": "External URLs are immutable addresses (GitHub blobs, review images, references)."
+    },
+    {
+      "pattern": "\\b[A-Z]:[\\\\/][^\\s)\"'`|]*",
+      "why": "Windows paths point at files outside this repo."
+    },
+    {
+      "pattern": "/mnt/[a-z]/[^\\s)\"'`|]*",
+      "why": "WSL paths point at files outside this repo."
+    },
+    {
+      "pattern": "hooded officer|officer'?s? (?:great)?coat",
+      "why": "Garment wording in an image-model prompt and a record of what the model drew, not a faction."
+    },
+    {
+      "pattern": "applicable law|as a law\\b",
+      "why": "Legal boilerplate and the scientific sense of law, unrelated to the warden faction."
+    },
+    {
+      "pattern": "[Ss]treets[- ]of[- ][Rr]ogue|Sesame Street",
+      "why": "Cited works and a project path, not the colony's ground."
+    },
+    {
+      "pattern": "baseball bat|Not a 'bat'",
+      "why": "A description of the old art, and the owner's verbatim quote about it."
+    },
+    {
+      "pattern": "thug, cop, shopkeeper",
+      "why": "The owner's verbatim ruling that those names are not lore-appropriate."
+    },
+    {
+      "pattern": "bank heist",
+      "why": "The owner's verbatim request, quoted in the whitepaper and inspo-A."
+    }
+  ],
+  "keepCompounds": {
+    "words": [
+      "gangway",
+      "gangways",
+      "gangplank",
+      "gangplanks",
+      "copilot",
+      "copilots"
+    ],
+    "why": "Real words whose camelCase spelling (gangWay) splits into a term segment."
+  },
+  "skipPaths": [
+    {
+      "prefix": "scripts/codemods/",
+      "why": "The mapping and the codemod must name the old terms."
+    },
+    {
+      "prefix": "android/",
+      "why": "Generated Capacitor and Gradle files."
+    },
+    {
+      "prefix": "pnpm-lock.yaml",
+      "why": "Package lockfile."
+    }
+  ],
+  "scoped": [
+    {
+      "from": "city",
+      "to": "settlement",
+      "why": "The old base theme pack: the drowned settlement as built, before the swamp (LORE: a colony 'physically sinking into the swamp'). Scoped because 'city' elsewhere names the sunken-city floors, which stay.",
+      "files": [
+        "docs/themes.md",
+        "e2e/run-theme.sh",
+        "e2e/theme-swampspace.mjs",
+        "e2e/theme-swap.mjs",
+        "public/themes/city/manifest.json",
+        "public/themes/settlement/manifest.json",
+        "public/themes/swampspace-hires/CURATION.md",
+        "public/themes/swampspace/CURATION.md",
+        "scripts/assets/manifest.py",
+        "scripts/assets/pack_guard_selftest.py",
+        "src/app/swConfig.ts",
+        "src/debug/verbs.theme.test.ts",
+        "src/render/art.ts",
+        "src/render/haptics.test.ts",
+        "src/render/locomotionByArt.test.ts",
+        "src/render/motion.ts",
+        "src/render/settingsPanel.test.ts",
+        "src/render/theme.test.ts",
+        "src/render/theme.ts",
+        "src/render/themeManifestSync.test.ts",
+        "src/render/tileSelect.test.ts",
+        "src/render/tileSelect.ts"
+      ]
+    }
+  ],
+  "sameMeaning": [
+    {
+      "word": "warden",
+      "file": "src/debug/goalCensus.ts",
+      "why": "The goal census (#159) already names the cop faction class warden, the same thing."
+    }
+  ]
+}

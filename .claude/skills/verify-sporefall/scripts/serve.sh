@@ -21,6 +21,11 @@ start() {
     echo "already serving on :$PORT (pid $(cat "$PIDFILE")). Run: $0 stop $PORT" >&2
     exit 1
   fi
+  # A fresh git worktree has no node_modules; vite would be "not found".
+  if [ ! -d node_modules ]; then
+    echo "[serve] pnpm install (fresh checkout)…"
+    pnpm install --frozen-lockfile >"$STATE/$PORT.install.log" 2>&1 || { tail -20 "$STATE/$PORT.install.log" >&2; exit 1; }
+  fi
   if [ "${SKIP_BUILD:-}" != 1 ]; then
     echo "[serve] vite build…"
     pnpm exec vite build >"$STATE/$PORT.build.log" 2>&1 || { tail -20 "$STATE/$PORT.build.log" >&2; exit 1; }

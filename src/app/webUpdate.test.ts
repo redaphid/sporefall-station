@@ -160,7 +160,7 @@ describe('isCriticalAsset', () => {
   it('leaves art out, so one odd content-type cannot stall updates forever', () => {
     // A bad theme file is a missing sprite. A bad entry script is a dead app.
     // Blocking every future update on the former would be the worse bug.
-    for (const url of ['/themes/swampspace/tiles.png', '/sprites/city/thug.png', '/icons/icon-192.png']) {
+    for (const url of ['/themes/swampspace/tiles.png', '/sprites/city/mutant.png', '/icons/icon-192.png']) {
       expect(isCriticalAsset(url), url).toBe(false)
     }
   })

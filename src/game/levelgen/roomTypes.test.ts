@@ -2,7 +2,7 @@
 // ward/armory/…) derived purely from geometry the generator already fixed, so
 // furnishing/missions/AI can reason about rooms instead of anonymous rects.
 // Strict + adversarial: sweeps many seeds across all four themes, checks the
-// semantic invariants of each role's anatomy (street doors open into the
+// semantic invariants of each role's anatomy (causeway doors open into the
 // front-of-house, the bathroom is the smallest room, the bunker core is the
 // armory, a sealed vault is a vault), and proves the assignment drew NO rng —
 // the frozen floor-1 checksums and themed-floor tiles are byte-identical with
@@ -73,14 +73,14 @@ describe('room types — every room gets a legible identity', () => {
 })
 
 describe('room types — role anatomy invariants (adversarial seed sweep)', () => {
-  it('shops: every street door opens into shop floor; back rooms hold stock', () => {
+  it('shops: every causeway door opens into shop floor; back rooms hold stock', () => {
     for (const s of seeds) {
       for (const f of floors) {
         for (const b of generateLevel(s, f).buildings) {
           if (b.role !== 'shop') continue
           const entries = entryRoomIndices(b)
           for (const ri of entries) {
-            // The sealed vault chamber never has a street door, so an entry
+            // The sealed vault chamber never has a causeway door, so an entry
             // room is always plain shop floor.
             expect(b.roomTypes![ri], `seed ${s} floor ${f}`).toBe('shopfloor')
           }

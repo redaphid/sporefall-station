@@ -79,8 +79,7 @@ export const useObject = (w: World, agent: Entity, e: Entity): boolean => {
   const def = OBJECTS[e.archetype]
   if (!def) return false
   // A hackable generator/Cryo Terminal wired to a wing cuts that wing's power
-  // (once). Objects that are hackable but wingless (the ATM) fall through to
-  // their normal `use` payout below.
+  // (once).
   if (def.hackable && e.wing !== undefined && !e.used) {
     e.used = true
     cutPower(w, e.wing, agent.id)

@@ -218,7 +218,7 @@ describe('roll douses burning — edges and adversaries', () => {
   })
 
   it('a burning NPC is untouched — nothing without playerCtl rolls', () => {
-    const npc = addEntity(w, makeEntity('npc', 'thug', p.pos.x + 3, p.pos.y))
+    const npc = addEntity(w, makeEntity('npc', 'mutant', p.pos.x + 3, p.pos.y))
     npc.health = { hp: 30, max: 30, iframes: 0 }
     addStatus(w, npc, 'burning', 600)
     const until0 = npc.fx!.burning.until

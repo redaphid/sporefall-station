@@ -1,11 +1,11 @@
 // Floor modifiers (floorModifiers.ts + systems/modifierSystem.ts), adversarial.
 //
 // Mechanics run in hand-carved arenas (exact tiles, exact bodies) through the
-// real tickWorld. Wiring, replay and the "nothing else moved" proof run on real
-// populated floors. The golden digests were first captured on `main` @ 16cf73f,
-// before any modifier code existed, and re-captured on `main` @ 7853983.
+// real tickWorld. Wiring and replay run on real populated floors. The "nothing
+// else moved" proof builds each floor twice on an authored level, once with the
+// modifier switched off, and compares the two.
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { worldDigest } from '../../debug/worldDigest'
 import type { Entity } from '../entity'
 import {
@@ -29,9 +29,9 @@ import { spawnPlayer } from '../player'
 import { populateWorld, spawnNpc } from '../populate'
 import { deserializeWorld, serializeWorld } from '../serialize'
 import { playerSpawnPoint } from '../spawnPlacement'
-import { expectWorldEqual } from '../testkit'
+import { createCityWorld, expectWorldEqual, loadFixture } from '../testkit'
 import { emptyInput, SIM_RATE, type InputCmd, type SimEvent } from '../types'
-import { createWorld, tickWorld, type World } from '../world'
+import { createWorld, tickWorld, worldFromState, type World } from '../world'
 import { kill } from './combat'
 import { perceives } from './goals'
 import { groupById, membersOf, packSize } from './groups'
@@ -40,6 +40,19 @@ import { nextFloor, setupFloor } from './missions'
 import { spawnObject } from './objects'
 import { applyFloorModifier, HUNT_BAND, modifierSystem } from './modifierSystem'
 import { isWet } from './statusFx'
+
+// Switches for the "nothing else moved" proof: `roll` makes setupFloor roll no
+// modifier, `system` stops the per-tick modifier system. Both default off, so
+// every other test runs the real module.
+const off = vi.hoisted(() => ({ roll: false, system: false }))
+vi.mock('./modifierSystem', async (importOriginal) => {
+  const real = await importOriginal<typeof import('./modifierSystem')>()
+  return {
+    ...real,
+    applyFloorModifier: (w: World): void => (off.roll ? void (w.modifier = undefined) : real.applyFloorModifier(w)),
+    modifierSystem: (w: World): void => (off.system ? undefined : real.modifierSystem(w)),
+  }
+})
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -67,6 +80,17 @@ const digestWithoutModifier = (w: World): string => {
 
 const direct = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)
+  populateWorld(w)
+  setupFloor(w)
+  const at = playerSpawnPoint(w.level, 0)
+  spawnPlayer(w, 0, at.x, at.y)
+  return w
+}
+
+/** `direct`, on the city generator's raw-floor district: the floor-2 slums
+ * these goldens were captured on, now that play draws floor 2's district. */
+const directCity = (seed: number, floor: number): World => {
+  const w = createCityWorld(seed, floor)
   populateWorld(w)
   setupFloor(w)
   const at = playerSpawnPoint(w.level, 0)
@@ -111,7 +135,9 @@ const paint = (w: World, x0: number, y0: number, x1: number, y1: number, tile: n
 const mod = (kind: FloorModifierKind, since = 0): World['modifier'] =>
   kind === 'hunted' ? { kind, since, huntAt: since + HUNT_FIRST, hunts: 0 } : { kind, since }
 
-/** Seeds whose floor rolls each modifier (found by scan, pinned by assertion). */
+/** Seeds whose floor rolls each modifier (found by scan, pinned by assertion).
+ * Their worlds are the city generator's floor-2 slums (`directCity`), the floor
+ * they were found on, so the suites below never move with the floor plan. */
 const SEEDS = { hunted: [4, 2], brownout: [5, 2], bogTide: [6, 2] } as const
 
 // ── the roll ───────────────────────────────────────────────────────────────
@@ -123,8 +149,8 @@ describe('floor modifiers: the roll', () => {
 
   it('the pinned seeds roll the modifier each suite relies on', () => {
     for (const [kind, [seed, floor]] of Object.entries(SEEDS)) {
-      expect(rollFloorModifier(seed, floor, generateLevel(seed, floor))).toBe(kind)
-      expect(direct(seed, floor).modifier?.kind).toBe(kind)
+      expect(rollFloorModifier(seed, floor, createCityWorld(seed, floor).level)).toBe(kind)
+      expect(directCity(seed, floor).modifier?.kind).toBe(kind)
     }
     expect(direct(1, 2).modifier).toBeUndefined()
   })
@@ -155,53 +181,96 @@ describe('floor modifiers: the roll', () => {
   it('never rolls a bog tide on a floor with too little low ground to flood', () => {
     for (let seed = 1; seed <= 300; seed++) {
       const lv = generateLevel(seed, 2)
-      lv.tiles.fill(Tile.Floor) // no street, hall, grate or bog anywhere
+      lv.tiles.fill(Tile.Floor) // no causeway, hall, grate or bog anywhere
       expect(rollFloorModifier(seed, 2, lv)).not.toBe('bogTide')
     }
     expect(TIDE_MIN_TILES).toBeGreaterThan(0)
   })
 
-  describe('byte-identical to main apart from the modifier itself', () => {
-    // Captured on main @ 7853983 with the same build helpers and `worldDigest`.
-    const GOLDEN: Record<string, string> = {
-      'direct:7:1': '2dec1543',
-      'stairs:7:1': '2dec1543',
-      'direct:1:2': '6062b4e2',
-      'stairs:1:2': '7e646164',
-      'direct:4:2': '92795920',
-      'stairs:4:2': 'b73d0410',
-      'direct:5:2': 'eaa0178e',
-      'stairs:5:2': 'c903e766',
-      'direct:6:2': '582621cd',
-      'stairs:6:2': '5878d5b7',
-      'direct:1:3': '39b39de5',
-      'stairs:1:3': '93e9b8c6',
-      'direct:3:3': 'f0b7ed2a',
-      'stairs:3:3': '33a2cc63',
-      'direct:10:3': '29c82ce9',
-      'stairs:10:3': '08567d0b',
-      'direct:2:4': 'fdc23d09',
-      'stairs:2:4': 'a03e941c',
-      'play:7:1': '84582f4c',
-      'play:1:2': '39a56892',
+  describe('nothing else moves: each floor equals itself with the modifier switched off', () => {
+    const switchedOff = <T>(which: 'roll' | 'system', run: () => T): T => {
+      off[which] = true
+      try {
+        return run()
+      } finally {
+        off[which] = false
+      }
     }
-    const floors: [number, number][] = [[7, 1], [1, 2], [4, 2], [5, 2], [6, 2], [1, 3], [3, 3], [10, 3], [2, 4]]
-    for (const [seed, floor] of floors) {
-      it(`seed ${seed} floor ${floor}: layout, mission, population and both rng streams match main`, () => {
-        expect(digestWithoutModifier(direct(seed, floor))).toBe(GOLDEN[`direct:${seed}:${floor}`])
-        expect(digestWithoutModifier(viaStairs(seed, floor))).toBe(GOLDEN[`stairs:${seed}:${floor}`])
-      })
+
+    const FIXTURES = ['frozen-1-3', 'frozen-3-3', 'frozen-10-3', 'frozen-2-4']
+
+    /** Populate, set up and spawn on one of the frozen fixtures' authored maps. */
+    const onLevel = (fixture: string, seed: number, floor: number): World => {
+      const w = worldFromState({ level: loadFixture(fixture).level, seed, floor })
+      populateWorld(w)
+      setupFloor(w)
+      const at = playerSpawnPoint(w.level, 0)
+      spawnPlayer(w, 0, at.x, at.y)
+      return w
     }
-    for (const [seed, floor] of [[7, 1], [1, 2]] as const) {
-      it(`clean floor seed ${seed} floor ${floor}: 300 ticks of play digest exactly as on main`, () => {
-        const w = direct(seed, floor)
-        expect(w.modifier).toBeUndefined()
+
+    it('layout, mission, population and both rng streams match on authored levels', () => {
+      const kinds = new Set<string>()
+      for (const fixture of FIXTURES) {
+        for (let seed = 1; seed <= 6; seed++) {
+          for (const floor of [2, 3]) {
+            const w = onLevel(fixture, seed, floor)
+            if (w.modifier) kinds.add(w.modifier.kind)
+            const clean = switchedOff('roll', () => onLevel(fixture, seed, floor))
+            expect(clean.modifier).toBeUndefined()
+            expect(digestWithoutModifier(w), `${fixture} seed ${seed} floor ${floor}`).toBe(fnv1a(worldDigest(clean)))
+          }
+        }
+      }
+      expect(kinds.size, 'the sample rolls more than one kind of modifier').toBeGreaterThan(1)
+    })
+
+    // The generator is the subject here, so these worlds come from the seed.
+    it('the same holds on generated floors 2-5, seeds 1-12', () => {
+      const kinds = new Set<string>()
+      for (let seed = 1; seed <= 12; seed++) {
+        for (let floor = 2; floor <= 5; floor++) {
+          const w = direct(seed, floor)
+          if (w.modifier) kinds.add(w.modifier.kind)
+          const clean = switchedOff('roll', () => direct(seed, floor))
+          expect(clean.modifier).toBeUndefined()
+          expect(digestWithoutModifier(w), `seed ${seed} floor ${floor}`).toBe(fnv1a(worldDigest(clean)))
+        }
+      }
+      expect([...kinds].sort()).toEqual([...FLOOR_MODIFIER_KINDS].sort())
+    })
+
+    it('a modifier rolled on the way down the stairs moves nothing else either', () => {
+      let rolled = 0
+      for (let seed = 1; seed <= 8; seed++) {
+        const down = (): World => {
+          const w = onLevel('frozen-1-3', seed, 1)
+          nextFloor(w)
+          return w
+        }
+        const w = down()
+        if (w.modifier) rolled++
+        expect(digestWithoutModifier(w), `seed ${seed}`).toBe(fnv1a(worldDigest(switchedOff('roll', down))))
+      }
+      expect(rolled).toBeGreaterThan(0)
+    })
+
+    it('a clean floor plays 300 ticks exactly as with no modifier system at all', () => {
+      const play = (w: World): World => {
         for (let t = 1; t <= 300; t++) {
           tickWorld(w, new Map([[0, cmd({ seq: t, moveX: Math.sin(t * 0.02), moveY: Math.cos(t * 0.03), attack: t % 40 < 10, aimX: 1, aimY: 0 })]]))
         }
-        expect(digestWithoutModifier(w)).toBe(GOLDEN[`play:${seed}:${floor}`])
-      })
-    }
+        return w
+      }
+      for (const [fixture, seed] of [
+        ['frozen-1-3', 1],
+        ['frozen-2-4', 3],
+      ] as const) {
+        const ran = switchedOff('roll', () => play(onLevel(fixture, seed, 2)))
+        const never = switchedOff('roll', () => switchedOff('system', () => play(onLevel(fixture, seed, 2))))
+        expect(fnv1a(worldDigest(ran)), fixture).toBe(fnv1a(worldDigest(never)))
+      }
+    })
   })
 
   it('a clean floor serializes with no modifier key at all', () => {
@@ -210,7 +279,7 @@ describe('floor modifiers: the roll', () => {
 
   it('round-trips through a snapshot and replays byte-identically', () => {
     for (const [seed, floor] of Object.values(SEEDS)) {
-      const w = direct(seed, floor)
+      const w = directCity(seed, floor)
       tickN(w, HUNT_FIRST + 40) // past the first hunt and into the first flood
       const j = serializeWorld(w)
       expect(j.modifier?.kind).toBe(w.modifier?.kind)
@@ -240,7 +309,7 @@ describe('floor modifiers: the roll', () => {
   })
 
   it('is inert once the run is over', () => {
-    const w = direct(...SEEDS.hunted)
+    const w = directCity(...SEEDS.hunted)
     w.gameOver = true
     w.tick = w.modifier!.huntAt!
     modifierSystem(w)
@@ -282,10 +351,10 @@ describe('bog tide', () => {
     ])
   })
 
-  /** Street (low) on the left half, sidewalk (high) on the right. */
+  /** Causeway (low) on the left half, boardwalk (high) on the right. */
   const shore = (): World => {
-    const w = arena(2, 2, 50, 30, Tile.Sidewalk)
-    paint(w, 2, 2, 25, 30, Tile.Street)
+    const w = arena(2, 2, 50, 30, Tile.Boardwalk)
+    paint(w, 2, 2, 25, 30, Tile.Causeway)
     w.modifier = mod('bogTide', 0)
     return w
   }
@@ -296,7 +365,7 @@ describe('bog tide', () => {
     return p.pos.x - x0
   }
 
-  it('wading through a flooded street is slower and leaves you wet; the same walk at low tide is not', () => {
+  it('wading through a flooded causeway is slower and leaves you wet; the same walk at low tide is not', () => {
     const dry = shore()
     const pd = spawnPlayer(dry, 0, 5.5, 10.5)
     const dryDist = walked(dry, pd, 30)
@@ -340,9 +409,9 @@ describe('bog tide', () => {
   it('NPCs wade too, and a shock arcs through everyone standing in the flood', () => {
     const w = shore()
     w.tick = FLOOD_AT
-    const a = spawnNpc(w, 'thug', 10.5, 10.5)
-    const b = spawnNpc(w, 'thug', 11.5, 10.5)
-    const c = spawnNpc(w, 'thug', 12.5, 10.5)
+    const a = spawnNpc(w, 'mutant', 10.5, 10.5)
+    const b = spawnNpc(w, 'mutant', 11.5, 10.5)
+    const c = spawnNpc(w, 'mutant', 12.5, 10.5)
     tickN(w, 1)
     expect([a, b, c].every(isWet)).toBe(true)
     const hp = c.health!.hp
@@ -352,8 +421,8 @@ describe('bog tide', () => {
 
   it('the same trio on dry ground at low tide stops the arc at the first body', () => {
     const w = shore()
-    const a = spawnNpc(w, 'thug', 10.5, 10.5)
-    const b = spawnNpc(w, 'thug', 11.5, 10.5)
+    const a = spawnNpc(w, 'mutant', 10.5, 10.5)
+    const b = spawnNpc(w, 'mutant', 11.5, 10.5)
     tickN(w, 1)
     expect(isWet(a) || isWet(b)).toBe(false)
     const hp = b.health!.hp
@@ -366,7 +435,7 @@ describe('bog tide', () => {
     w.tick = FLOOD_AT
     const p = spawnPlayer(w, 0, 5.5, 10.5)
     p.dead = true
-    const n = spawnNpc(w, 'thug', 6.5, 12.5)
+    const n = spawnNpc(w, 'mutant', 6.5, 12.5)
     kill(w, n)
     tickN(w, 1)
     expect(isWet(p)).toBe(false)
@@ -376,13 +445,13 @@ describe('bog tide', () => {
   it('props in the flood stay dry, so an arc through the water never erases a barrel or crate', () => {
     const w = shore()
     w.tick = FLOOD_AT
-    const thug = spawnNpc(w, 'thug', 10.5, 10.5)
+    const mutant = spawnNpc(w, 'mutant', 10.5, 10.5)
     const barrel = spawnObject(w, 'barrel', 11, 10)
     const crate = spawnObject(w, 'crate', 10, 11)
     tickN(w, 1)
-    expect(isWet(thug)).toBe(true)
+    expect(isWet(mutant)).toBe(true)
     expect([isWet(barrel), isWet(crate)]).toEqual([false, false])
-    shock(w, thug)
+    shock(w, mutant)
     expect([barrel.dead ?? false, crate.dead ?? false]).toEqual([false, false])
     expect([barrel.health!.hp, crate.health!.hp]).toEqual([barrel.health!.max, crate.health!.max])
   })
@@ -400,7 +469,7 @@ describe('brownout', () => {
   const stage = (kind?: FloorModifierKind): { w: World; guard: Entity; p: Entity } => {
     const w = arena()
     if (kind) w.modifier = mod(kind)
-    const guard = spawnNpc(w, 'thug', 10.5, 10.5)
+    const guard = spawnNpc(w, 'mutant', 10.5, 10.5)
     const p = spawnPlayer(w, 0, 10.5, 10.5)
     return { w, guard, p }
   }
@@ -449,7 +518,7 @@ describe('brownout', () => {
 describe('hunted', () => {
   const trackers = (w: World) => (w.groups?.list ?? []).filter((g) => g.tracker)
 
-  const huntFloor = (): World => direct(...SEEDS.hunted)
+  const huntFloor = (): World => directCity(...SEEDS.hunted)
 
   it('nothing comes early; at HUNT_FIRST a tracker pack lands out of reach, already on the scent', () => {
     const w = huntFloor()

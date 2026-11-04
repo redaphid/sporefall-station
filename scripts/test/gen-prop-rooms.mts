@@ -122,7 +122,7 @@ const park = (w: World, x: number, y: number): void => {
   write('crew-quarters', w, r, notes)
 }
 
-// 2. THE THREE BROKEN PROPS beside four that work. vending/toilet/atm are still
+// 2. THE THREE BROKEN PROPS beside four that work. vending/toilet/cryo-terminal are still
 //    the old anything-xl output; this is them in a room next to cargo-crate,
 //    supply-cabinet, work-desk and wall-screen rather than isolated at 6x.
 {

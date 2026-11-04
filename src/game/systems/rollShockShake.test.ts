@@ -116,7 +116,7 @@ describe('dodge shakes off electric shock — gates and adversaries', () => {
   })
 
   it('an electrified NPC cannot shake — nothing without playerCtl responds', () => {
-    const npc = addEntity(w, makeEntity('npc', 'thug', p.pos.x + 3, p.pos.y))
+    const npc = addEntity(w, makeEntity('npc', 'mutant', p.pos.x + 3, p.pos.y))
     npc.health = { hp: 30, max: 30, iframes: 0 }
     addStatus(w, npc, 'electrified', 30)
     const until0 = npc.fx!.electrified.until

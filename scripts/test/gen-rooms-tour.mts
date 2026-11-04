@@ -62,7 +62,7 @@ const ROOM_COLORS: Record<string, string> = {
   waiting: '#ffd24a', ward: '#8aff8a', supply: '#c8a06a', guardpost: '#ff8a4a',
   armory: '#ff5a5a', barracks: '#7fd1ff', vault: '#ff7fd1',
 }
-const SIGNATURE = new Set(['toilet', 'bunk', 'shelf', 'locker', 'atm', 'desk', 'bench', 'tv', 'vending'])
+const SIGNATURE = new Set(['toilet', 'bunk', 'shelf', 'locker', 'desk', 'bench', 'tv', 'vending'])
 
 /** Label every room with its type; pin one of each signature prop found. */
 const annotate = (w: World, b: Building): Annotation[] => {

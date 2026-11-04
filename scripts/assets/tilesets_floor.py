@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Macro-tile redesign of the swampspace FLOOR + STREET surfaces.
+"""Macro-tile redesign of the swampspace FLOOR + CAUSEWAY surfaces.
 
 The old interior floors were dark plates under uniform bright-green speckle —
 "confetti moss": high-frequency noise with no plate structure that fought the
@@ -27,7 +27,7 @@ Deterministic: fixed-seed PRNG per asset; re-running reproduces byte-for-byte.
 Usage:
   python3 tilesets_floor.py proc [outdir]      # macros + slices + overlays + accents
   python3 tilesets_floor.py sd <procdir> <outdir>   # ComfyUI img2img refine of the macros
-  python3 tilesets_floor.py final <procdir> <sddir|-> <outdir> [--sd floor,street]
+  python3 tilesets_floor.py final <procdir> <sddir|-> <outdir> [--sd floor,causeway]
         # slice the chosen macros into the shipped pool + copy decals/accents
 """
 
@@ -42,7 +42,7 @@ from PIL import Image
 
 M = 64  # macro side (2x2 game tiles)
 T = 32  # game tile side
-MACROS = {"floor": 2, "street": 3}  # macro count per surface (pool = 4 * count)
+MACROS = {"floor": 2, "causeway": 3}  # macro count per surface (pool = 4 * count)
 
 # ---- Close-valued deck ramp (anchored between palette #141a16/#23282e/#22380f)
 SEAM = (16, 20, 18)
@@ -75,7 +75,7 @@ BOG_GLINT = (96, 168, 168)
 
 FLOOR_FAMILY = [CAVITY, SEAM, SCUFF, DECK_A, DECK_B, DECK_C, RIVET,
                 MOSS_STAIN, MOSS_DEEP, MOSS_DARK, ROOT_BASE, ROOT_MID]
-STREET_FAMILY = [CAVITY, BOG_DEEP, BOG_DIM, BOG_BASE, BOG_LIFT, BOG_MID,
+CAUSEWAY_FAMILY = [CAVITY, BOG_DEEP, BOG_DIM, BOG_BASE, BOG_LIFT, BOG_MID,
                  BOG_SHEEN, MOSS_DEEP, MOSS_DARK, ROOT_BASE, ROOT_MID]
 
 
@@ -192,9 +192,9 @@ def floor_macro(idx: int) -> Image.Image:
 
 
 # ---------------------------------------------------------------------------
-# STREET: bog-water channel (64px macro — fewer, LARGER ripple features).
+# CAUSEWAY: bog-water channel (64px macro — fewer, LARGER ripple features).
 
-def street_macro(idx: int) -> Image.Image:
+def causeway_macro(idx: int) -> Image.Image:
     p = Painter(8000 + idx, M, BOG_BASE)
     rng = p.rng
     # broad depth mottle (soft, wraps)
@@ -248,7 +248,7 @@ def street_macro(idx: int) -> Image.Image:
     return p.im
 
 
-def street_lily_accent() -> Image.Image:
+def causeway_lily_accent() -> Image.Image:
     """Rare scum/lily patch feature tile (32px, full-tile accent)."""
     p = Painter(8500, T, BOG_BASE)
     rng = p.rng
@@ -446,12 +446,12 @@ def cmd_proc(outdir: Path) -> None:
     for i in range(2):
         floor_macro(i).save(outdir / f"floor-macro-{i}.png")
     for i in range(3):
-        street_macro(i).save(outdir / f"street-macro-{i}.png")
+        causeway_macro(i).save(outdir / f"causeway-macro-{i}.png")
     for n in range(4):
         floor_overlay(n).save(outdir / f"floor-overlay-{n}.png")
     for n in range(2):
         floor_accent(n).save(outdir / f"floor-accent-{n}.png")
-    street_lily_accent().save(outdir / "street-accent-2.png")
+    causeway_lily_accent().save(outdir / "causeway-accent-2.png")
     print(f"proc macros/overlays/accents -> {outdir}")
 
 
@@ -465,7 +465,7 @@ SD_RECIPES = {
         "texture, seamless game tile, flat top-down view",
         0.3,  # 0.4 washed the plates; 0.3 keeps structure, adds wear
     ),
-    "street": (
+    "causeway": (
         "masterpiece, pixpix, 8-bit, pixel_art, top-down dark bog water, still "
         "swamp channel at night, one large soft ripple ring, calm deep murky "
         "teal water, sparse surface sheen, muted low contrast, SNES rpg water "
@@ -483,7 +483,7 @@ def cmd_sd(procdir: Path, outdir: Path) -> None:
     from comfy import build_graph, run  # noqa: E402
     from post import kcentroid  # noqa: E402
     outdir.mkdir(parents=True, exist_ok=True)
-    fams = {"floor": FLOOR_FAMILY, "street": STREET_FAMILY}
+    fams = {"floor": FLOOR_FAMILY, "causeway": CAUSEWAY_FAMILY}
     for si, name in enumerate(SD_RECIPES):
         pos, denoise = SD_RECIPES[name]
         for i in range(MACROS[name]):
@@ -504,7 +504,7 @@ def cmd_sd(procdir: Path, outdir: Path) -> None:
 
 def cmd_final(procdir: Path, sddir: Path | None, outdir: Path, sd_for: set[str]) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
-    for name in ("floor", "street"):
+    for name in ("floor", "causeway"):
         src = sddir if (name in sd_for and sddir is not None) else procdir
         for i in range(MACROS[name]):
             im = Image.open(src / f"{name}-macro-{i}.png").convert("RGB")
@@ -514,7 +514,7 @@ def cmd_final(procdir: Path, sddir: Path | None, outdir: Path, sd_for: set[str])
         Image.open(procdir / f"floor-overlay-{n}.png").save(outdir / f"floor-overlay-{n}.png")
     for n in range(2):
         Image.open(procdir / f"floor-accent-{n}.png").convert("RGB").save(outdir / f"floor-accent-{n}.png")
-    Image.open(procdir / "street-accent-2.png").convert("RGB").save(outdir / "street-accent-2.png")
+    Image.open(procdir / "causeway-accent-2.png").convert("RGB").save(outdir / "causeway-accent-2.png")
     print(f"final pools -> {outdir} (sd for: {sorted(sd_for) or 'none'})")
 
 

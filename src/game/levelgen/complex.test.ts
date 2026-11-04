@@ -1,4 +1,4 @@
-// Indoor complex generator (floors 3, 5, 7…) — strict, adversarial property tests.
+// Indoor complex generator (every floor from 3) — strict, adversarial property tests.
 // Every invariant runs over MANY seeds x every biome, because a generator bug
 // is a needle: one seed in fifty strands a bunk room behind a solid wall.
 
@@ -10,9 +10,10 @@ import { LEVEL_H, LEVEL_W } from '../types'
 import { createCityWorld } from '../testkit'
 import { floodLinked } from '../stairs'
 import { createWorld } from '../world'
-import { BIOME_DEFS, BIOMES, biomeForFloor, carveComplex, cityFloorOrdinal, COMPLEX_MIN_FLOOR, isComplexFloor } from './complex'
+import { BIOME_DEFS, carveComplex } from './complex'
+import { biomeOrder, COMPLEX_MIN_FLOOR } from './floors'
 import { generateComplexLevel, generateLevel } from './generate'
-import { isFloorTile, isStairTile, isWallTile, levelChecksum, Tile, TileGrid, type Level } from './level'
+import { isFloorTile, isStairTile, isWallTile, levelChecksum, Tile, TileGrid, type BiomeName, type Level } from './level'
 import { COMPLEX_ROOM_TYPE } from './roomTypes'
 import type { Rect } from './rooms'
 
@@ -22,7 +23,7 @@ const spawnReach = (level: Level): Uint8Array => floodLinked(level, Math.floor(l
 const tile = (level: Level, x: number, y: number): number => level.tiles[y * level.w + x]
 
 /** Every tile a CITY floor may lay and a complex floor may not. */
-const CITY_TILES: ReadonlySet<number> = new Set([Tile.Street, Tile.Sidewalk, Tile.WallCutNW, Tile.WallCutNE, Tile.WallCutSE, Tile.WallCutSW])
+const CITY_TILES: ReadonlySet<number> = new Set([Tile.Causeway, Tile.Boardwalk, Tile.WallCutNW, Tile.WallCutNE, Tile.WallCutSE, Tile.WallCutSW])
 
 /**
  * Index of the first tile failing `bad`, or -1 — the whole-grid sweeps below
@@ -87,56 +88,14 @@ const archways = (level: Level, bi: number): { x: number; y: number }[] => {
 
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-/** seeds x complex floors 3, 5, 7, 9 — one full lap of the four biomes. */
+/** seeds x complex floors 3-6 — one full lap of the four biomes. */
 const sweep = function* (seeds: number): Generator<{ seed: number; floor: number; level: Level; tag: string }> {
   for (let seed = 1; seed <= seeds; seed++) {
-    for (let floor = 3; floor <= 9; floor += 2) {
+    for (let floor = 3; floor <= 6; floor++) {
       yield { seed, floor, level: generateLevel(seed, floor), tag: `seed ${seed} floor ${floor}` }
     }
   }
 }
-
-describe('complex floor switch + biomes', () => {
-  it('floors 1-2 stay city; from floor 3 complex and city alternate (3, 5, 7… complex; 4, 6, 8… city)', () => {
-    expect(COMPLEX_MIN_FLOOR).toBe(3)
-    for (const f of [-3, 0, 1, 2]) expect(isComplexFloor(f), `floor ${f}`).toBe(false)
-    for (const f of [3, 5, 7, 9, 51, 999]) expect(isComplexFloor(f), `floor ${f}`).toBe(true)
-    for (const f of [4, 6, 8, 50, 1000]) expect(isComplexFloor(f), `floor ${f}`).toBe(false)
-    // Strict alternation: no two adjacent floors from 3 up share a generator.
-    for (let f = 3; f < 60; f++) expect(isComplexFloor(f + 1)).toBe(!isComplexFloor(f))
-    for (let seed = 1; seed <= 10; seed++) {
-      for (let f = 1; f <= 8; f++) {
-        const level = generateLevel(seed, f)
-        if (isComplexFloor(f)) expect(level.complex, `seed ${seed} floor ${f}`).toBeDefined()
-        else expect(level.complex, `seed ${seed} floor ${f}`).toBeUndefined()
-      }
-    }
-  })
-
-  it('city floors between complexes cycle every district theme, never repeating back to back', () => {
-    const cityFloors = [1, 2, 4, 6, 8, 10, 12]
-    expect(cityFloors.map(cityFloorOrdinal)).toEqual([1, 2, 3, 4, 5, 6, 7])
-    const themes = cityFloors.map((f) => generateLevel(7, f).theme)
-    for (let i = 1; i < themes.length; i++) expect(themes[i], `city floor ${cityFloors[i]}`).not.toBe(themes[i - 1])
-    expect(new Set(themes).size).toBe(4)
-  })
-
-  it('biomes cycle across complex floors so consecutive complex floors never share one, and every biome shows up', () => {
-    const seen = new Set<string>()
-    const complexFloors = Array.from({ length: 20 }, (_, i) => 3 + 2 * i)
-    expect(complexFloors.slice(0, 4).map(biomeForFloor)).toEqual([...BIOMES])
-    for (const f of complexFloors) {
-      expect(biomeForFloor(f)).not.toBe(biomeForFloor(f + 2))
-      seen.add(biomeForFloor(f))
-      expect(generateLevel(7, f).complex!.biome).toBe(biomeForFloor(f))
-    }
-    expect([...seen].sort()).toEqual([...BIOMES].sort())
-  })
-
-  it('biomeForFloor never returns undefined, even for degenerate floors', () => {
-    for (const f of [-7, 0, 1, 2, 1e6]) expect(BIOMES).toContain(biomeForFloor(f))
-  })
-})
 
 describe('complex generator: determinism', () => {
   it('is bit-exact for the same seed+floor (tiles, buildings, corridors, vents, wings)', () => {
@@ -181,7 +140,7 @@ describe('complex generator: structural invariants (60 seeds x 4 biomes)', () =>
     }
   })
 
-  it('never lays a city tile: no street, sidewalk or bevelled corner indoors', () => {
+  it('never lays a city tile: no causeway, boardwalk or bevelled corner indoors', () => {
     for (const { level, tag } of sweep(60)) {
       // ASSERT PER FLOOR, NOT PER TILE — see the note above `firstTile`.
       const bad = firstTile(level, (t) => CITY_TILES.has(t))
@@ -370,18 +329,21 @@ describe('complex generator: the station reads like a station', () => {
     let flooded = 0
     let overgrown = 0
     let habitationMoss = 0
+    const levelOf = (seed: number, biome: BiomeName): Level => {
+      const level = generateLevel(seed, COMPLEX_MIN_FLOOR + biomeOrder(seed).indexOf(biome))
+      expect(level.complex!.biome).toBe(biome)
+      return level
+    }
     for (let seed = 1; seed <= 30; seed++) {
-      flooded += count(generateLevel(seed, 5), Tile.Bog)
-      overgrown += count(generateLevel(seed, 9), Tile.Grass)
-      habitationMoss += count(generateLevel(seed, 3), Tile.Grass)
-      expect(generateLevel(seed, 5).complex!.biome).toBe('flooded')
-      expect(generateLevel(seed, 9).complex!.biome).toBe('overgrown')
+      flooded += count(levelOf(seed, 'flooded'), Tile.Bog)
+      overgrown += count(levelOf(seed, 'overgrown'), Tile.Grass)
+      habitationMoss += count(levelOf(seed, 'habitation'), Tile.Grass)
     }
     expect(flooded / 30).toBeGreaterThan(40)
     expect(overgrown / 30).toBeGreaterThan(40)
     expect(habitationMoss).toBe(0)
     // Reactor floors plate their engineering decks.
-    expect(generateLevel(1, 7).tiles.filter((x) => x === Tile.Plating).length).toBeGreaterThan(100)
+    expect(levelOf(1, 'reactor').tiles.filter((x) => x === Tile.Plating).length).toBeGreaterThan(100)
   })
 
   it('the objective module (deepest from the spawn) takes a biome objective role', () => {
@@ -578,11 +540,11 @@ describe('complex generator: adversarial inputs', () => {
   })
 
   it('overwrites whatever was in the grid (a dirty buffer cannot leak through)', () => {
-    const tilesA = new Uint8Array(LEVEL_W * LEVEL_H).fill(Tile.Street)
+    const tilesA = new Uint8Array(LEVEL_W * LEVEL_H).fill(Tile.Causeway)
     const tilesB = new Uint8Array(LEVEL_W * LEVEL_H)
     for (let i = 0; i < tilesB.length; i++) tilesB[i] = i % 10
-    carveComplex(mulberry32(9).fork('x'), new TileGrid(LEVEL_W, LEVEL_H, tilesA), 3)
-    carveComplex(mulberry32(9).fork('x'), new TileGrid(LEVEL_W, LEVEL_H, tilesB), 3)
+    carveComplex(mulberry32(9).fork('x'), new TileGrid(LEVEL_W, LEVEL_H, tilesA), 'habitation')
+    carveComplex(mulberry32(9).fork('x'), new TileGrid(LEVEL_W, LEVEL_H, tilesB), 'habitation')
     expect(Array.from(tilesB)).toEqual(Array.from(tilesA))
   })
 })
@@ -611,12 +573,12 @@ describe('complex floors populate like a station', () => {
     expect(props).toBeGreaterThan(1000) // the modules really are furnished
   })
 
-  it('bunk-room sleepers are dormant thugs zoned to crew quarters, and they do appear', () => {
+  it('bunk-room sleepers are dormant mutants zoned to crew quarters, and they do appear', () => {
     let sleepers = 0
     for (let seed = 1; seed <= 30; seed++) {
       const w = world(seed, 5)
       for (const e of w.entities) {
-        if (e.kind !== 'npc' || !e.ai?.dormant || e.archetype !== 'thug') continue
+        if (e.kind !== 'npc' || !e.ai?.dormant || e.archetype !== 'mutant') continue
         sleepers++
         const zone = e.ai.zone!
         expect(zone.role).toBe('quarters')
@@ -633,7 +595,7 @@ describe('complex floors populate like a station', () => {
     for (let seed = 1; seed <= 30; seed++) {
       const w = world(seed, 3)
       for (const e of w.entities) {
-        if (e.archetype !== 'cop' || e.ai?.behavior !== 'patrol') continue
+        if (e.archetype !== 'warden' || e.ai?.behavior !== 'patrol') continue
         patrols++
         for (const p of e.ai.params!.waypoints!) {
           expect(isWallTile(tile(w.level, Math.floor(p.x), Math.floor(p.y)))).toBe(false)

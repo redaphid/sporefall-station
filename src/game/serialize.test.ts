@@ -12,8 +12,8 @@ const buildMidRun = (seed: number): World => {
   const w = createWorld(seed, 1)
   const sp = w.level.spawn
   spawnPlayer(w, 0, sp.x, sp.y)
-  spawnNpc(w, 'cop', sp.x + 3, sp.y)
-  spawnNpc(w, 'thug', sp.x - 3, sp.y)
+  spawnNpc(w, 'warden', sp.x + 3, sp.y)
+  spawnNpc(w, 'mutant', sp.x - 3, sp.y)
   return runTicks(w, new Map([[0, { moveX: -1, attack: true }]]), 50)
 }
 
@@ -46,6 +46,7 @@ describe('serializeWorld / deserializeWorld', () => {
 
   it('rejects a fixture whose level checksum drifts from seed+floor', () => {
     const j = serializeWorld(buildMidRun(7))
+    if (j.levelChecksum === undefined) throw new Error('a seeded world serializes its level by checksum')
     expect(() => deserializeWorld({ ...j, levelChecksum: j.levelChecksum ^ 1 })).toThrow(/checksum drift/)
   })
 

@@ -151,33 +151,33 @@ describe('the wet teammate', () => {
 })
 
 describe('NPCs keep the full flood (the player\'s Tesla against wet enemies)', () => {
-  it('a wet thug shocked again inside its lock still takes the electrocution', () => {
+  it('a wet mutant shocked again inside its lock still takes the electrocution', () => {
     const { w, cx, cy } = arena()
-    const thug = soak(w, spawnNpc(w, 'thug', cx + 0.5, cy + 0.5))
-    thug.health = { hp: 1000, max: 1000, iframes: 0 }
-    shock(w, thug)
+    const mutant = soak(w, spawnNpc(w, 'mutant', cx + 0.5, cy + 0.5))
+    mutant.health = { hp: 1000, max: 1000, iframes: 0 }
+    shock(w, mutant)
     w.tick += CADENCE
-    expect(isImmobilized(thug)).toBe(true)
-    shock(w, thug)
-    expect(thug.health.hp).toBe(1000 - 2 * ELEC)
+    expect(isImmobilized(mutant)).toBe(true)
+    shock(w, mutant)
+    expect(mutant.health.hp).toBe(1000 - 2 * ELEC)
   })
 
-  it('a wet player\'s shock on a wet thug beside it floods the thug every time, and the player once', () => {
+  it('a wet player\'s shock on a wet mutant beside it floods the mutant every time, and the player once', () => {
     const { w, cx, cy } = arena()
     const p = wetPlayer(w, 0, cx + 0.5, cy + 0.5)
-    const thug = soak(w, spawnNpc(w, 'thug', cx + 1.5, cy + 0.5))
-    thug.health = { hp: 1000, max: 1000, iframes: 0 }
-    shock(w, thug, STUN, p.id)
+    const mutant = soak(w, spawnNpc(w, 'mutant', cx + 1.5, cy + 0.5))
+    mutant.health = { hp: 1000, max: 1000, iframes: 0 }
+    shock(w, mutant, STUN, p.id)
     w.tick += CADENCE
-    shock(w, thug, STUN, p.id)
-    expect(thug.health.hp).toBe(1000 - 2 * ELEC)
+    shock(w, mutant, STUN, p.id)
+    expect(mutant.health.hp).toBe(1000 - 2 * ELEC)
     expect(p.health!.hp).toBe(1000 - ELEC)
   })
 })
 
 describe('the real stun gun on a wet player', () => {
   const stunGunner = (w: World, x: number, y: number): Entity => {
-    const gunner = spawnNpc(w, 'gangster', x, y)
+    const gunner = spawnNpc(w, 'acolyte', x, y)
     gunner.health = { hp: 100000, max: 100000, iframes: 0 }
     gunner.combat!.weapon = 'stunGun'
     gunner.loadout = npcLoadout('stunGun')

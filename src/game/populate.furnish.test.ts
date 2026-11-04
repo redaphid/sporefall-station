@@ -23,7 +23,12 @@ const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
  * uniquely identifies them. */
 // Room furniture lives on the ground storey; a loft's cache crate is loot
 // (populate stockLofts), not a room's furnishing.
-const furniture = (w: World): Entity[] => w.entities.filter((e) => e.kind === 'interactable' && storeyOf(e.pos.x) === 0)
+/** Props furnishing rooms: ground storey, and not the district dressing that
+ * stands in open squares (populate.dressPlazas, covered in populate.plazas.test). */
+const inPlaza = (w: World, e: Entity): boolean =>
+  (w.level.plazas ?? []).some((r) => e.pos.x >= r.x && e.pos.y >= r.y && e.pos.x < r.x + r.w && e.pos.y < r.y + r.h)
+const furniture = (w: World): Entity[] =>
+  w.entities.filter((e) => e.kind === 'interactable' && storeyOf(e.pos.x) === 0 && !inPlaza(w, e))
 
 const populated = (seed: number, floor: number): World => {
   const w = createWorld(seed, floor)

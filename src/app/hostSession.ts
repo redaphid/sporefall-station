@@ -3,7 +3,7 @@ import { modifierView } from '../game/floorModifiers'
 import { spawnPlayer } from '../game/player'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
-import { extractionView, setupFloor } from '../game/systems/missions'
+import { setupFloor } from '../game/systems/missions'
 import { lockdownView } from '../game/systems/alarm'
 import { createWorld, stationAlerted, tickWorld, type RunMode, type World } from '../game/world'
 import type { InputCmd } from '../game/types'
@@ -86,6 +86,7 @@ const mergeCmd = (a: InputCmd, b: InputCmd): InputCmd => {
 export class HostSession implements Session {
   world!: World
   self!: Entity
+  private runEpoch = 0
   private inputs = new Map<number, InputCmd>()
   /** M5: net layer deposits latest per-player commands here. */
   readonly remoteInputs = new Map<number, InputCmd>()
@@ -109,6 +110,7 @@ export class HostSession implements Session {
   /** Generate floor 1 from the seed and spawn the local player. Used at start
    * and by restart() — a fresh run from default state. */
   private buildRun(): void {
+    this.runEpoch++
     this.world = createWorld(this.seed, 1, this.mode)
     populateWorld(this.world)
     setupFloor(this.world)
@@ -163,12 +165,12 @@ export class HostSession implements Session {
       entities: this.world.entities,
       events: this.world.events,
       tick: this.world.tick,
+      runEpoch: this.runEpoch,
       level: this.world.level,
       floor: this.world.floor,
       missionText: this.world.mission.description,
       missionComplete: this.world.mission.complete,
       missionTargetId: this.world.mission.targetEntityId,
-      extraction: extractionView(this.world),
       gameOver: this.world.gameOver,
       alert: stationAlerted(this.world),
       lockdown: lockdownView(this.world),

@@ -33,7 +33,7 @@ describe('ai verb', () => {
   it('dumps the resolved behavior, considerations, and live decision state', () => {
     const w = world()
     spawnPlayer(w, 0, 5.5, 5.5)
-    const g = spawnNpc(w, 'gangster', 8.5, 5.5) // archetype default: hunter
+    const g = spawnNpc(w, 'acolyte', 8.5, 5.5) // archetype default: hunter
     run(w, 10)
     const out = JSON.parse(runVerb(w, `ai ${g.id}`)) as Record<string, unknown>
     expect(out.behavior).toBe('hunter')
@@ -46,7 +46,7 @@ describe('ai verb', () => {
 
   it('flags an unknown behavior id instead of lying about what runs', () => {
     const w = world()
-    const npc = spawnNpc(w, 'thug', 3.5, 3.5)
+    const npc = spawnNpc(w, 'mutant', 3.5, 3.5)
     npc.ai!.behavior = 'totally-bogus'
     const out = JSON.parse(runVerb(w, `ai ${npc.id}`)) as Record<string, unknown>
     expect(out.behavior).toBe('totally-bogus')
@@ -94,14 +94,14 @@ describe('setBehavior verb', () => {
 
   it('rejects an unknown behavior id and names the known ones', () => {
     const w = world()
-    const npc = spawnNpc(w, 'thug', 3.5, 3.5)
+    const npc = spawnNpc(w, 'mutant', 3.5, 3.5)
     expect(() => runVerb(w, `setBehavior ${npc.id} zigzag`)).toThrow(/unknown behavior "zigzag".*basic.*hunter/s)
     expect(npc.ai!.behavior).toBeUndefined() // untouched on failure
   })
 
   it('rejects malformed waypoints so a bad patch can never NaN-poison the sim', () => {
     const w = world()
-    const npc = spawnNpc(w, 'cop', 3.5, 3.5)
+    const npc = spawnNpc(w, 'warden', 3.5, 3.5)
     expect(() => runVerb(w, `setBehavior ${npc.id} patrol {"waypoints":[{"x":"NaN","y":2}]}`)).toThrow(/waypoints/)
     expect(() => runVerb(w, `setBehavior ${npc.id} patrol {"waypoints":"nope"}`)).toThrow(/waypoints/)
     expect(npc.ai!.params).toBeUndefined()
@@ -109,7 +109,7 @@ describe('setBehavior verb', () => {
 
   it('rejects prototype-polluting params outright', () => {
     const w = world()
-    const npc = spawnNpc(w, 'cop', 3.5, 3.5)
+    const npc = spawnNpc(w, 'warden', 3.5, 3.5)
     expect(() => runVerb(w, `setBehavior ${npc.id} patrol {"__proto__":{"pwned":1}}`)).toThrow(/forbidden key/)
     expect(({} as Record<string, unknown>).pwned).toBeUndefined()
   })
@@ -117,7 +117,7 @@ describe('setBehavior verb', () => {
   it('sheds stale decision state so the new brain starts clean', () => {
     const w = world()
     spawnPlayer(w, 0, 5.5, 5.5)
-    const g = spawnNpc(w, 'gangster', 8.5, 5.5)
+    const g = spawnNpc(w, 'acolyte', 8.5, 5.5)
     run(w, 10) // mid-battle: targetId set
     expect(g.ai!.targetId).toBeDefined()
     runVerb(w, `setBehavior ${g.id} scavenger`)

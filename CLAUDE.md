@@ -24,6 +24,14 @@ What "AI-native" means here, concretely:
   position* to/from `WorldJson`. `src/game/testkit.ts` (`loadFixture`, `runTicks`,
   `expectWorldEqual`) builds tests on top: load an exact state → run the real
   systems → assert. Fixtures live in `src/game/__fixtures__/`.
+- **Start from authored state.** The engine's entry is
+  `worldFromState(init: WorldInit)` (`src/game/world.ts`): the level is data, so
+  no seed is needed. `worldFromSeed(seed, floor)` is the generator, and
+  `createWorld(seed, floor)` is the helper that chains the two. Levels are written
+  as hand-editable text rows (`src/game/levelgen/levelText.ts`), and a `WorldJson`
+  carries them whole whenever the level is not seed+floor's. Crafted saves (e.g.
+  `castle-siege`) ship as fixtures and play at `/?world=<name>`. See
+  `docs/testing-video.md` § "Authored worlds and crafted saves".
 - **Inspect from the browser console.** EVERY build (including the deployed
   site) exposes `window.world` (live World) and `window.sporefall` (curated
   read-only namespace: entities/events/schema/serialize/…; `sporefall.help()`
@@ -37,7 +45,7 @@ What "AI-native" means here, concretely:
   and `docs/` (a real JS debugger can attach to a headless run via `node --inspect`).
 - **Communicate back to the player.** Drawing/labelling on screen and tap-to-inspect
   annotations run on the same substrate, so the agent can show what it reasons about.
-- **Experiment with gameplay.** Compose deterministic scenarios (heists, set-pieces,
+- **Experiment with gameplay.** Compose deterministic scenarios (salvages, set-pieces,
   emergent-mechanic tests), narrate them with annotations, and record annotated
   video/stills — see the **`.claude/skills/gameplay-experiments`** skill and
   `docs/gameplay-experiments.md`.

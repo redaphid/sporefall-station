@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Mission-marker parity proof: build, serve on an ephemeral port, then record
-# the seed-7 "follow the 🎯 to the SE-corner briefcase" clip with rendered-truth
+# the seed-7 "follow the 🎯 to the SE-corner canister" clip with rendered-truth
 # asserts (see e2e/mission-marker.mjs). Own port (never 5173/4173).
 set -euo pipefail
 cd "$(dirname "$0")/.."

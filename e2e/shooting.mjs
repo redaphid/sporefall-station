@@ -15,7 +15,7 @@ await record({
   ],
   readState: () => {
     const w = window.__world
-    const alive = w.entities.filter((e) => e.archetype === 'thug' && !e.dead).length
+    const alive = w.entities.filter((e) => e.archetype === 'mutant' && !e.dead).length
     const pl = w.entities.find((e) => e.playerCtl)
     return { targets: 3, alive, hp: pl.health.hp, gameOver: w.gameOver }
   },

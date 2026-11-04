@@ -138,7 +138,7 @@ Each sample, read (all `--game $TARGET`):
   - `health {hp,max,iframes}`, `status {stun,sleep,hitFlash,cloak}` — pressure.
   - inventory/mods if present (use `schema` to discover fields you don't know).
 - **The pressure around them** — nearby `npc`s: `ai {mode,goal,faction,behavior,
-  waypoint,sightRange}` (are cops aggroed? civilians fleeing?), and threats in
+  waypoint,sightRange}` (are wardens aggroed? civilians fleeing?), and threats in
   line-of-sight. `schema` enumerates any component you haven't seen.
 - **A screenshot** every few samples (Chrome `screenshot` on the game tab) for the
   spatial read notes can't capture: where the player is stuck, what's off-screen,
@@ -157,8 +157,8 @@ Timestamp with the sim **`tick`** (never `Date.now()`). One terse block per samp
 ### tick 1985  (floor 1 · mission steal · alarm 0)
 intent: player#7 moving SW (-0.26,0.54), NOT firing, hp 25/25
 motion: vel≈0 despite intent → looks WALL-STUCK against room edge (pos 8.35,14.65)
-events since 1860: pickup(ammo) x1; hit(cop#41→player#7, 4dmg)
-threat: cop#41 ai.mode=chase goal=attack, 3 tiles NE, in sight
+events since 1860: pickup(ammo) x1; hit(warden#41→player#7, 4dmg)
+threat: warden#41 ai.mode=chase goal=attack, 3 tiles NE, in sight
 signal: DAMAGE-SPIKE + STUCK — took a hit while pinned on geometry
 ```
 
@@ -171,7 +171,7 @@ From the deltas between samples, flag (each becomes idea fuel):
 - **Pacing / dead time** — long spans with no events, no objective progress, low
   intent magnitude → boredom / wandering / unclear goal.
 - **Difficulty & balance** — damage taken vs dealt, deaths, near-misses (hp dips
-  then recovers), alarm→cop-swarm spikes, unfair off-screen hits.
+  then recovers), alarm→warden-swarm spikes, unfair off-screen hits.
 - **Feedback & readability** — did the player react to a threat *after* it hurt
   them (didn't see it coming)? Did a mechanic fire with no on-screen tell?
 - **Control / feel** — `intent` nonzero but `vel≈0` (stuck on geometry / bad
@@ -189,7 +189,7 @@ Each idea, structured:
 
 - **Observation** — what recurred, with ≥2 tick-cited examples from the log.
 - **Interpretation** — the likely design cause (name the system in
-  `src/game/systems/` if you can: missions, doors/locks, alarm/cops, stealth/AI,
+  `src/game/systems/` if you can: missions, doors/locks, alarm/wardens, stealth/AI,
   elements, inventory).
 - **Proposal** — the smallest change that would help (a knob, a tell, a layout
   rule, a new affordance).
@@ -216,7 +216,7 @@ gh issue create \
   --label observer,gameplay \
   --body "$(cat <<'EOF'
 **Observation** (seed 2689870660, floor 1)
-- tick 1985: intent SW but vel≈0, pinned on room edge while cop#41 landed a hit.
+- tick 1985: intent SW but vel≈0, pinned on room edge while warden#41 landed a hit.
 - tick 2140: same pattern, NE corner — 1.5s of zero motion under fire.
 
 **Interpretation** — collision/steering lets movement intent zero out against

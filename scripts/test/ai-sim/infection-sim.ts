@@ -62,7 +62,7 @@ console.log('\n═══ R0 probe: 1 host in a crew line ═══')
   const w = makeArena(3, 16, false)
   w.aiFlags = { infection: true }
   const c = center(w)
-  const host = addNpc(w, 'thug', c.x, c.y, { sight: 10, speed: 2.5 })
+  const host = addNpc(w, 'mutant', c.x, c.y, { sight: 10, speed: 2.5 })
   host.infected = true
   host.ai!.behavior = 'infected'
   host.ai!.mode = 'aggro'

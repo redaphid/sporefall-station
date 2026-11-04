@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generateLevel } from '../game/levelgen/generate'
+import { walledRoom, worldFromRows } from '../game/testkit'
 import { emptyInput, type InputCmd } from '../game/types'
 import type { InputSource } from '../input/input'
 import { decodeJson, encodeJson } from '../net/framing/codec'
@@ -7,7 +8,8 @@ import { frameMessage, StreamReader } from '../net/framing/chunkedStream'
 import { encodeInput, type GoMsg, type WelcomeMsg } from '../net/protocol/messages'
 import { MsgType, PROTOCOL_VERSION, type PeerId, type Transport, type TransportEvent } from '../net/types'
 import { NetClientSession } from './netClient'
-import { MAX_PLAYERS, NetHostSession } from './netHost'
+import { NetHostSession } from './netHost'
+import { MAX_PLAYERS } from '../net/types'
 
 /**
  * Connection-lifecycle harness: one host "peripheral" and N centrals over an
@@ -21,14 +23,35 @@ class MockHub {
   private hostHandler: ((e: TransportEvent) => void) | null = null
   private centrals = new Map<PeerId, (bytes: Uint8Array) => void>()
   private n = 0
+  /** What each client hears when the host's radio goes down. */
+  private hostDown: (() => void)[] = []
 
-  constructor() {
-    const deliver = (fn: (() => void) | undefined): Promise<void> => Promise.resolve().then(() => fn?.())
+  /**
+   * `radio: true` behaves like a real link: a sent packet lands a few ms
+   * later, and stopping the host transport cuts every client off, dropping
+   * any packet still in the air. The default delivers on the next microtask.
+   */
+  constructor(opts: { radio?: boolean } = {}) {
+    let up = true
+    const deliver = (fn: (() => void) | undefined): Promise<void> =>
+      opts.radio
+        ? new Promise((resolve) =>
+            setTimeout(() => {
+              if (up) fn?.()
+              resolve()
+            }, 5),
+          )
+        : Promise.resolve().then(() => fn?.())
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
-      stop: async () => {},
+      stop: async () => {
+        if (!opts.radio) return
+        up = false
+        for (const cut of this.hostDown) cut()
+      },
       sendPacket: (peer: PeerId, bytes: Uint8Array) => deliver(() => this.centrals.get(peer)?.(bytes)),
       on: (h) => {
         this.hostHandler = h
@@ -56,6 +79,7 @@ class MockHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) => this.toHost(peer, bytes),
@@ -69,6 +93,7 @@ class MockHub {
       ...(opts.reconnectable === false ? {} : { reconnect: async () => {} }),
     }
     const session = new NetClientSession(name, input, clientTransport)
+    this.hostDown.push(() => clientHandler?.({ type: 'peerDisconnected', peer: 'host', reason: 'remote' }))
     const connect = (): void => {
       void Promise.resolve().then(() => this.hostHandler?.({ type: 'peerConnected', peer }))
       void Promise.resolve().then(() => clientHandler?.({ type: 'peerConnected', peer: 'host' }))
@@ -321,8 +346,12 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
   it('still accepts a rejoin on the LAST tick of the grace window', async () => {
     const hub = new MockHub()
     const host = new NetHostSession(10, 'Alice', stubInput(), hub.hostTransport)
+    // An authored empty room: nothing on it can kill the idle host or the ghost
+    // before the window's last tick, so the test turns on the window alone.
+    host.world = worldFromRows(walledRoom(16, 16), { seed: 10 })
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
+    expect(host.world.entities.filter((e) => e.ai && !e.playerCtl)).toEqual([])
 
     for (let i = 0; i < REJOIN_GRACE_TICKS - 1; i++) host.tick()
 
@@ -361,6 +390,7 @@ describe('connection lifecycle — ghost expiry at the 90s boundary', () => {
     const host = new NetHostSession(12, 'Alice', stubInput(), hub.hostTransport)
     await host.start()
     const { entityId } = await seedGhost(hub, host)
+    host.world.entities = host.world.entities.filter((e) => !e.ai) // only the grace window may end it
     for (let i = 0; i < REJOIN_GRACE_TICKS; i++) host.tick()
     expect(host.world.byId.get(entityId)).toBeDefined() // flagged dead, not yet swept
     host.tick()
@@ -860,7 +890,7 @@ describe('connection lifecycle — a legitimate reclaim keeps the player whole',
     await host.start()
     const { slot, token, entityId } = await seedGhost(hub, host)
     const avatar = host.world.byId.get(entityId)!
-    avatar.loadout!.inventory.push({ itemId: 'briefcase', qty: 1 })
+    avatar.loadout!.inventory.push({ itemId: 'canister', qty: 1 })
     avatar.playerCtl!.cash = 777
     const inventoryBefore = JSON.stringify(avatar.loadout!.inventory)
     const players = playerCount(host)
@@ -1055,5 +1085,63 @@ describe('connection lifecycle — the host restarts or vanishes', () => {
     await flush()
     expect(bob.session.phase).toBe('ended')
     expect(bob.session.renderView().missionText).toMatch(/lost/i)
+  })
+})
+
+describe('connection lifecycle — the host quits to the main menu', () => {
+  it('tells a playing client the host left, and the client does not try to reconnect', async () => {
+    const hub = new MockHub()
+    const host = new NetHostSession(74, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput()) // reconnect-capable: a drop would retry
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+    for (let i = 0; i < 4; i++) {
+      host.tick()
+      bob.session.tick()
+      await flush()
+    }
+    expect(bob.session.phase).toBe('playing')
+    const phases: string[] = []
+    bob.session.onPhaseChange = (p) => phases.push(p)
+
+    await host.close()
+    await flush()
+    expect(bob.session.phase).toBe('ended')
+    expect(phases).not.toContain('reconnecting')
+    expect(bob.session.renderView().missionText).toBe('The host left the game')
+  })
+
+  it('on a real-feeling radio, the goodbye lands before the host hangs up', async () => {
+    // Packets take a few ms and a hang-up drops what is still in the air, so a
+    // host that stopped the radio without waiting for its Bye to go out would
+    // leave the client to see a plain drop, and to try to reconnect.
+    const hub = new MockHub({ radio: true })
+    const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 60))
+    const host = new NetHostSession(75, 'Alice', stubInput(), hub.hostTransport)
+    const bob = hub.addClient('Bob', stubInput())
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await settle()
+    host.beginGame()
+    await settle()
+    for (let i = 0; i < 4; i++) {
+      host.tick()
+      bob.session.tick()
+      await settle()
+    }
+    expect(bob.session.phase).toBe('playing')
+    const phases: string[] = []
+    bob.session.onPhaseChange = (p) => phases.push(p)
+
+    await host.close()
+    await settle()
+    expect(phases).not.toContain('reconnecting')
+    expect(bob.session.phase).toBe('ended')
+    expect(bob.session.renderView().missionText).toBe('The host left the game')
   })
 })

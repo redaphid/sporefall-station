@@ -125,14 +125,14 @@ const run = async () => {
   await tap(400, 650)
   await settle(page)
 
-  // --- 1. quick tap on the cop → compact CHIP -----------------------------
-  const cop = await at(page, 2)
-  await tap(cop.x, cop.y)
+  // --- 1. quick tap on the warden → compact CHIP -----------------------------
+  const warden = await at(page, 2)
+  await tap(warden.x, warden.y)
   await settle(page)
   let p = await popup(page)
   p.visible && p.mode === 'chip' ? ok(`tap → chip (“${p.title}”)`) : fail(`tap should open a chip, got ${JSON.stringify(p)}`)
-  p.title.includes('Cop') ? ok('chip is themed-titled Cop') : fail(`chip title: “${p.title}”`)
-  p.selected.includes(2) ? ok('tapped cop is Entity.selected') : fail(`selected: ${p.selected}`)
+  p.title.includes('Warden') ? ok('chip is themed-titled Warden') : fail(`chip title: “${p.title}”`)
+  p.selected.includes(2) ? ok('tapped warden is Entity.selected') : fail(`selected: ${p.selected}`)
   p.ringPresent ? ok('highlight ring present') : fail('no selection ring')
   onScreen(p) ? ok('chip fully on-screen') : fail(`chip rect off-screen: ${JSON.stringify(p.rect)}`)
   await shot(page, 'chip-npc')
@@ -148,14 +148,14 @@ const run = async () => {
   await shot(page, 'card-npc-expanded')
 
   // --- 3. tap empty space → dismissed -------------------------------------
-  await tap(640, 650) // street south of the scene
+  await tap(640, 650) // causeway south of the scene
   await settle(page)
   p = await popup(page)
   !p.visible && p.selected.length === 0 ? ok('tap on empty space dismissed popup + selection') : fail(`not dismissed: ${JSON.stringify(p)}`)
 
-  // --- 4. LONG-PRESS a thug → full card straight away, live AI state ------
-  const thug = await at(page, 3)
-  await touchStart([{ x: thug.x, y: thug.y }])
+  // --- 4. LONG-PRESS a mutant → full card straight away, live AI state ------
+  const mutant = await at(page, 3)
+  await touchStart([{ x: mutant.x, y: mutant.y }])
   // Poll (still held): the long-press timer fires at 400ms after the pointer-
   // down actually lands, and the card paints on the NEXT animation frame — a
   // fixed sleep races both under headless dispatch lag.
@@ -175,12 +175,12 @@ const run = async () => {
   await settle(page)
   p = await popup(page)
   p.visible && p.mode === 'card' ? ok('card persists after release') : fail('card vanished on release')
-  p.title.includes('Thug') ? ok('card titled Thug') : fail(`title: “${p.title}”`)
+  p.title.includes('Mutant') ? ok('card titled Mutant') : fail(`title: “${p.title}”`)
   p.text.includes('Faction') && p.text.includes('Nature') ? ok('NPC rows (Faction/Nature) present') : fail(`rows: ${p.text}`)
   p.hasThumb ? ok('sprite thumbnail rendered') : fail('no sprite thumbnail on card')
   await shot(page, 'card-npc-longpress')
 
-  // --- 5. kill the inspected thug → destroyed state, then auto-close ------
+  // --- 5. kill the inspected mutant → destroyed state, then auto-close ------
   await page.evaluate(() => window.__verb('kill 3'))
   await page.waitForTimeout(400) // < DESTROYED_TICKS (1.2s) — still lingering
   p = await popup(page)
@@ -195,7 +195,7 @@ const run = async () => {
     const e = window.__world.entities.find((x) => x.id === 1)
     return { x: e.pos.x, y: e.pos.y }
   })
-  // Start over thug 5 but nudged into the LEFT (move-stick) half, then drag:
+  // Start over mutant 5 but nudged into the LEFT (move-stick) half, then drag:
   // the press starts on an entity yet must never inspect — it becomes the stick.
   const t5 = await at(page, 5)
   const sx = Math.min(t5.x - 25, 620)
@@ -230,13 +230,13 @@ const run = async () => {
   await page.evaluate(() => window.__verb('teleport 1 20 11'))
   await page.evaluate(() => window.__zoom(0.5, true))
   await settle(page, 400)
-  const gangOut = await at(page, 4)
-  await touchStart([{ x: gangOut.x, y: gangOut.y }])
+  const rootcultOut = await at(page, 4)
+  await touchStart([{ x: rootcultOut.x, y: rootcultOut.y }])
   await page.waitForTimeout(550)
   await touchEnd()
   await settle(page)
   p = await popup(page)
-  p.visible && p.mode === 'card' && p.title.includes('Gangster')
+  p.visible && p.mode === 'card' && p.title.includes('Acolyte')
     ? ok('long-press inspects at 0.5× zoom (grown pick radius)')
     : fail(`zoom-out inspect: ${JSON.stringify({ mode: p.mode, title: p.title })}`)
   onScreen(p) ? ok('zoomed-out card clamped on-screen') : fail(`card off-screen: ${JSON.stringify(p.rect)}`)
@@ -272,8 +272,8 @@ const run = async () => {
   desk.on('console', (m) => m.type() === 'error' && errs.push(`console: ${m.text()}`))
   await boot(desk)
 
-  const dcop = await at(desk, 2)
-  await desk.mouse.click(dcop.x, dcop.y)
+  const dwarden = await at(desk, 2)
+  await desk.mouse.click(dwarden.x, dwarden.y)
   await settle(desk)
   p = await popup(desk)
   p.visible && p.mode === 'card' ? ok('desktop click opens the FULL card directly') : fail(`desktop click: ${JSON.stringify(p)}`)
@@ -291,16 +291,16 @@ const run = async () => {
   !p.visible ? ok('✕ closed the card') : fail('✕ did not close the card')
 
   // A mouse drag (camera-feeling gesture) never inspects.
-  const dthug = await at(desk, 5)
-  await desk.mouse.move(dthug.x, dthug.y)
+  const dmutant = await at(desk, 5)
+  await desk.mouse.move(dmutant.x, dmutant.y)
   await desk.mouse.down()
-  await desk.mouse.move(dthug.x + 80, dthug.y + 40, { steps: 5 })
+  await desk.mouse.move(dmutant.x + 80, dmutant.y + 40, { steps: 5 })
   await desk.mouse.up()
   await settle(desk)
   p = await popup(desk)
   !p.visible ? ok('mouse drag never inspects') : fail('mouse drag opened a popup')
 
-  // Mission target: make the gangster the objective, inspect it, use LOCATE.
+  // Mission target: make the acolyte the objective, inspect it, use LOCATE.
   await desk.evaluate(() => {
     window.__world.mission.template = 'assassinate'
     window.__world.mission.description = 'Purge the Mireclaw Alpha'
@@ -308,8 +308,8 @@ const run = async () => {
     window.__world.mission.targetEntityId = 4
   })
   await settle(desk)
-  const dgang = await at(desk, 4)
-  await desk.mouse.click(dgang.x, dgang.y)
+  const drootcult = await at(desk, 4)
+  await desk.mouse.click(drootcult.x, drootcult.y)
   await settle(desk)
   p = await popup(desk)
   p.visible && p.hasMission ? ok('mission-target card offers the locate action') : fail(`mission card: ${JSON.stringify(p)}`)

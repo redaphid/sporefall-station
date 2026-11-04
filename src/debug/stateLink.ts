@@ -254,6 +254,30 @@ export const captureState = (w: World, meta: StateLinkMeta = {}, rewind?: StateR
   meta,
 })
 
+export interface ReproducibleCapture {
+  payload: StateLinkPayload
+  check: StateLinkCheck
+  /** Why the run-up was left out, when it was. The link then opens on the
+   * captured frame instead of playing up to it. */
+  runUpDropped?: string
+}
+
+/**
+ * Capture for an ONLINE host. Its ring records every player's commands, so a
+ * remote guest replays as one more scripted slot, just like a local pad. But a
+ * net host also changes its world between ticks (a dropped player's body is
+ * parked, then expires), and a run-up spanning one of those cannot reproduce
+ * itself. Rather than refuse the share, keep the moment and drop the run-up:
+ * a still always reproduces, and `runUpDropped` says why it is a still.
+ */
+export const captureReproducible = (w: World, meta: StateLinkMeta, rewind?: StateRewind): ReproducibleCapture => {
+  const payload = captureState(w, meta, rewind)
+  const check = verifyStateLink(payload)
+  if (check.ok || !rewind) return { payload, check }
+  const still = captureState(w, meta)
+  return { payload: still, check: verifyStateLink(still), runUpDropped: check.reason }
+}
+
 /** Structural guard for something parsed off the network. Cheap shape check
  * only — `deserializeWorld` does the real validation (including the level
  * checksum, which catches seed/floor drift). */

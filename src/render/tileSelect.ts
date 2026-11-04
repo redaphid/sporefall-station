@@ -24,7 +24,7 @@ const mod = (v: number, m: number): number => ((v % m) + m) % m
  * Index into a tile-variant pool for the tile at (tx,ty).
  *
  * Plain pools (no macro): the historical pure-hash pick — `(hash >>> 2) % n`
- * — kept bit-identical so existing themes (city) render exactly as before.
+ * — kept bit-identical so existing themes (settlement) render exactly as before.
  *
  * Macro pools (`macro` = N ≥ 2): the pool is sliced from N×N-tile macro
  * images, row-major — variants [m*N² .. m*N²+N²-1] are macro m's slices. The

@@ -64,7 +64,7 @@ export const spawnPlayer = (w: World, playerId: number, x: number, y: number): E
     playerId,
     abilityCooldown: 0,
     cash: 0,
-    crimeUntilTick: 0,
+    misdeedUntilTick: 0,
   }
   return addEntity(w, e)
 }

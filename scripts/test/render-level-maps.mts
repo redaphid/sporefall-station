@@ -16,8 +16,8 @@ mkdirSync(OUT, { recursive: true })
 
 const SCALE = 8
 const COLORS: Record<number, [number, number, number]> = {
-  [Tile.Street]: [0x33, 0x33, 0x3c],
-  [Tile.Sidewalk]: [0x4c, 0x4c, 0x56],
+  [Tile.Causeway]: [0x33, 0x33, 0x3c],
+  [Tile.Boardwalk]: [0x4c, 0x4c, 0x56],
   [Tile.Floor]: [0x63, 0x52, 0x3f],
   [Tile.Wall]: [0x14, 0x14, 0x1c],
   [Tile.Grass]: [0x2e, 0x5d, 0x3a],
@@ -38,7 +38,7 @@ const render = (seed: number, floor: number): void => {
         for (let px = 0; px < SCALE; px++) {
           let c = base
           if (cut) {
-            // Show the bevel: the cut triangle renders as sidewalk.
+            // Show the bevel: the cut triangle renders as boardwalk.
             const u = (px + 0.5) / SCALE
             const v = (py + 0.5) / SCALE
             const inCut =
@@ -46,7 +46,7 @@ const render = (seed: number, floor: number): void => {
               (cut.dx > 0 && cut.dy < 0 && 1 - u + v < 0.5) ||
               (cut.dx > 0 && cut.dy > 0 && 2 - u - v < 0.5) ||
               (cut.dx < 0 && cut.dy > 0 && u + 1 - v < 0.5)
-            if (inCut) c = COLORS[Tile.Sidewalk]
+            if (inCut) c = COLORS[Tile.Boardwalk]
           }
           const i = ((ty * SCALE + py) * W + tx * SCALE + px) * 3
           buf[i] = c[0]

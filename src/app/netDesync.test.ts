@@ -51,6 +51,7 @@ class DesyncHub {
   constructor() {
     this.hostTransport = {
       role: 'host',
+      medium: 'local',
       maxPacket: 180,
       start: async () => {},
       stop: async () => {},
@@ -89,6 +90,7 @@ class DesyncHub {
     const clientTransport: Transport = {
       role: 'client',
       maxPacket: 180,
+      medium: 'local',
       start: async () => {},
       stop: async () => {},
       sendPacket: (_p: PeerId, bytes: Uint8Array) =>
@@ -230,7 +232,7 @@ const hostSnapshotFor = (host: NetHostSession, avatarId: number): Uint8Array => 
     entities.push(toWireEntity(e, w.tick))
     if (entities.length >= 48) break
   }
-  return encodeSnapshot({ tick: w.tick, floor: w.floor, alarm: w.alarm, lastInputSeq: 0, entities })
+  return encodeSnapshot({ tick: w.tick, floor: w.floor, alarm: w.alarm, epoch: 0, lastInputSeq: 0, entities })
 }
 
 /** Unlock the exit and stand a player on it, so the NEXT host tick descends via
@@ -241,8 +243,7 @@ const armDescent = (host: NetHostSession): void => {
   // descent means any lockdown has already run its course.
   host.world.mission.lockdownTick = -LOCKDOWN_TICKS
   const player = host.world.entities.find((e) => e.playerCtl && !e.dead && !e.playerCtl.downed)!
-  // An extraction floor's way out is the entry, not the Launch Bay.
-  const exit = host.world.mission.extractPoint ?? host.world.level.exit
+  const exit = host.world.level.exit
   player.pos.x = exit.x + 0.5
   player.pos.y = exit.y + 0.5
   player.prevPos.x = player.pos.x
@@ -333,7 +334,7 @@ describe('divergence detector — proving it can fail (red before green)', () =>
     const { host, bob, selfId } = await startPair(4008)
     await step(host, [bob], 18)
     const view = bob.session.renderView()
-    const ghost = makeEntity('npc', 'thug', 5, 5)
+    const ghost = makeEntity('npc', 'mutant', 5, 5)
     ghost.id = 60000
     expectFires(
       diffHostClient(host.world, patch(view, { entities: [...view.entities, ghost] }), { selfEntityId: selfId() }),
@@ -373,6 +374,28 @@ describe('divergence detector — proving it can fail (red before green)', () =>
     const target = view.entities.find((e) => e.id !== selfId())!
     const entities = view.entities.map((e) => (e.id === target.id ? { ...e, archetype: 'wrong-thing' } : e))
     expectFires(diffHostClient(host.world, patch(view, { entities }), { selfEntityId: selfId() }), 'entity.archetype')
+  })
+
+  it("folds only the wire's keycard family: a wing keycard drawn as a keycard is fine, any other mismatch still fires", async () => {
+    const { host, bob, selfId } = await startPair(4014)
+    await step(host, [bob], 18)
+    const view = bob.session.renderView()
+    const target = view.entities.find((e) => e.id !== selfId())!
+    const drawnAs = (archetype: string): DivergenceReport =>
+      diffHostClient(
+        host.world,
+        patch(view, { entities: view.entities.map((e) => (e.id === target.id ? { ...e, archetype } : e)) }),
+        { selfEntityId: selfId() },
+      )
+    const archetypeIssues = (r: DivergenceReport) => r.issues.filter((i) => i.kind === 'entity.archetype')
+
+    host.world.byId.get(target.id)!.archetype = 'pickup.keycard.wing3'
+    expect(archetypeIssues(drawnAs('pickup.keycard'))).toEqual([])
+    expectFires(drawnAs('pickup.canister'), 'entity.archetype')
+    expectFires(drawnAs('pickup.keycard.wing3'), 'entity.archetype')
+
+    host.world.byId.get(target.id)!.archetype = 'pickup.canister'
+    expectFires(drawnAs('pickup.keycard'), 'entity.archetype')
   })
 
   it('fires entity.position when a remote entity is adrift beyond smoothing', async () => {
@@ -573,7 +596,7 @@ describe('divergence hunt — seed mismatch', () => {
     // (GameStart + Go) — but carrying the NEW seed.
     const avatarId = host.self.id
     bob.injectMessage(
-      encodeJson(MsgType.GameStart, { seed: host.seed, players: host.lobbyPlayers(), mode: host.world.mode }),
+      encodeJson(MsgType.GameStart, { epoch: 0, seed: host.seed, players: host.lobbyPlayers(), mode: host.world.mode }),
     )
     bob.injectMessage(encodeJson(MsgType.Go, { startTick: host.world.tick, entityIds: { 1: avatarId } }))
     await flush()
@@ -668,7 +691,7 @@ describe('divergence hunt — seed mismatch', () => {
     // whatever tick the loop ends on. Whether one is in the air then is pure
     // happenstance of the floor's fights (it flipped when the group layer grew
     // floor 3's cast, which re-rolled the shared AI dice and so who shoots whom
-    // when — here a cop and a gangster trading shots at tick 31). That is
+    // when — here a warden and an acolyte trading shots at tick 31). That is
     // snapshot cadence, not a late-join defect, so in-flight projectiles are
     // excused here and ONLY here; every other kind still has to be clean.
     settled.issues = settled.issues.filter(

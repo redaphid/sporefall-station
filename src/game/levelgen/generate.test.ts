@@ -20,14 +20,14 @@ describe('generateLevel', () => {
     expect(levelChecksum(a)).not.toBe(levelChecksum(c))
   })
 
-  it('cycles themes so consecutive city floors look different', () => {
-    // Floors 3, 5, 7… are indoor complexes; the city floors are 1, 2, 4, 6, 8.
-    const themes = [1, 2, 4, 6, 8].map((f) => generateLevel(7, f).theme)
-    // Every adjacent city-floor pair uses a different district theme.
-    for (let i = 1; i < themes.length; i++) {
-      expect(themes[i]).not.toBe(themes[i - 1])
-    }
-    expect(new Set(themes).size).toBeGreaterThanOrEqual(4)
+  it('the two city floors use different district themes', () => {
+    expect(generateLevel(7, 1).theme).not.toBe(generateLevel(7, 2).theme)
+  })
+
+  it('the city generator still cycles every district theme on the raw floor', () => {
+    const themes = [1, 2, 3, 4, 5].map((f) => generateCityLevel(7, f).theme)
+    for (let i = 1; i < themes.length; i++) expect(themes[i]).not.toBe(themes[i - 1])
+    expect(new Set(themes).size).toBe(4)
   })
 
   it('varies spawn and exit placement across floors (not always TL->BR)', () => {

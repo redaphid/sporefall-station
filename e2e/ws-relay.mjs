@@ -169,6 +169,46 @@ const main = async () => {
 
     host.ws.close()
     client2.ws.close()
+
+    // Boundary hardening, against the real Durable Object.
+    console.log('[ws-relay] hardening')
+    const badRoom = await fetch(`http://localhost:${PORT}/ws/${encodeURIComponent('my room')}`)
+    check(badRoom.status === 400, `a malformed room name is refused with 400 (${badRoom.status})`)
+
+    const capRoom = `cap-${process.pid}`
+    const capHost = openPeer('host', capRoom)
+    await capHost.open
+    const seated = []
+    for (let i = 0; i < 8; i++) {
+      const c = openPeer('client', capRoom)
+      await c.open
+      seated.push(c)
+    }
+    const ninth = openPeer('client', capRoom)
+    await ninth.open.catch(() => {})
+    const ninthRefused = await ninth.until(() => ninth.errored.msg !== null || ninth.closed.code !== null)
+    check(ninthRefused && /409/.test(ninth.errored.msg ?? ''), `a ninth client is refused with 409 (${ninth.errored.msg})`)
+
+    await capHost.until(() => capHost.controls.filter((c) => c.t === 'peer+').length === 8)
+    const dropId = capHost.controls.find((c) => c.t === 'peer+').id
+    capHost.ws.send(JSON.stringify({ t: 'drop', id: dropId }))
+    const dropped = seated[0]
+    // workerd under `wrangler dev` takes a few seconds to finish this close.
+    await dropped.until(() => dropped.closed.code !== null, 15000)
+    check(dropped.closed.code === 4003, `a client the host refused is closed by the relay (code ${dropped.closed.code})`)
+    check(seated.slice(1).every((c) => c.closed.code === null), 'every other client stays connected')
+
+    const bigSender = seated[1]
+    bigSender.ws.send(new Uint8Array(65536 + 257))
+    await bigSender.until(() => bigSender.closed.code !== null)
+    check(bigSender.closed.code === 1009, `a frame over the limit closes its sender with 1009 (${bigSender.closed.code})`)
+    const fine = seated[2]
+    fine.ws.send(new Uint8Array(65536))
+    await capHost.until(() => capHost.data.length > 0)
+    check(capHost.data.some((d) => d.length >= 65536), 'a 64 KiB frame still reaches the host')
+
+    capHost.ws.close()
+    for (const c of seated) c.ws.close()
   } finally {
     await wrangler.stop()
   }

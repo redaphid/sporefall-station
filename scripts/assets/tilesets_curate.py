@@ -4,10 +4,10 @@
 - grass: 4 procedural + 4 SD (healed: SD sometimes drops steel-blue speck
   artifacts into foliage; remap any out-of-family color to the nearest
   in-family palette color) = 8 variants
-- street: 4 procedural + SD 0,1,3 (SD 2 carries an arrow-shaped artifact) = 7
+- causeway: 4 procedural + SD 0,1,3 (SD 2 carries an arrow-shaped artifact) = 7
 - floor: SD 0-3 replace the procedural (better moss-on-deck contrast)
 - wall: SD 0-2 replace the procedural (more organic root weave, cap intact)
-- sidewalk/exit/accents: procedural only
+- boardwalk/exit/accents: procedural only
 
 Usage: python3 scripts/assets/tilesets_curate.py <proc_dir> <sd_dir> <out_dir>
 (<out_dir> is normally public/themes/swampspace/tiles — proc tiles already
@@ -79,9 +79,9 @@ def main() -> None:
     for i, im in enumerate(tone_normalize(pool, GRASS_FAMILY)):
         im.save(out_dir / f"grass-{i}.png")
 
-    # street: proc 0-3 stay; SD 0,1,3 become street-4..6
+    # causeway: proc 0-3 stay; SD 0,1,3 become causeway-4..6
     for j, i in enumerate([0, 1, 3]):
-        Image.open(sd_dir / f"street-{i}.png").convert("RGB").save(out_dir / f"street-{4 + j}.png")
+        Image.open(sd_dir / f"causeway-{i}.png").convert("RGB").save(out_dir / f"causeway-{4 + j}.png")
 
     # floor: SD replaces proc
     for i in range(4):

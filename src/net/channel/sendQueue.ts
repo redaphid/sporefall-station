@@ -49,17 +49,28 @@ export class SendQueue {
     void this.pump()
   }
 
+  /** Newest-wins state (snapshots, input bundles): a datagram where the
+   * transport has an unreliable lane, else the capacity-1 slot. */
   queueSnapshot(msg: Uint8Array): void {
+    if (!this.stopped && this.transport.sendDatagram?.(this.peer, msg)) return
     if (this.snapshotSlot !== null) this.overwrites++
     else this.overwrites = 0
     this.snapshotSlot = msg
     void this.pump()
   }
 
+  /** A round-trip probe (Ping/Pong): a lost one is only a missing sample, so it
+   * rides the unreliable lane where there is one and never waits on a resend. */
+  queueProbe(msg: Uint8Array): void {
+    if (!this.stopped && this.transport.sendDatagram?.(this.peer, msg)) return
+    this.queueReliable(msg)
+  }
+
   stop(): void {
     this.stopped = true
     this.reliable.length = 0
     this.snapshotSlot = null
+    this.settleFlushed()
   }
 
   /** Reliable messages sent since the snapshot lane last had a turn. */
@@ -116,8 +127,30 @@ export class SendQueue {
       }
     } finally {
       this.inflight = false
+      this.settleFlushed()
     }
     // A message may have arrived while we were finishing the last packet.
     if (!this.stopped && (this.reliable.length > 0 || this.snapshotSlot !== null)) void this.pump()
+  }
+
+  private flushWaiters: (() => void)[] = []
+
+  private idle(): boolean {
+    return this.stopped || (!this.inflight && this.reliable.length === 0 && this.snapshotSlot === null)
+  }
+
+  private settleFlushed(): void {
+    if (!this.idle()) return
+    const waiters = this.flushWaiters
+    this.flushWaiters = []
+    for (const w of waiters) w()
+  }
+
+  /** Resolves once everything queued so far has gone to the transport, or the
+   * queue stopped. A host leaving on purpose waits on this so its goodbye is
+   * on the radio before the transport goes down. */
+  flushed(): Promise<void> {
+    if (this.idle()) return Promise.resolve()
+    return new Promise((resolve) => this.flushWaiters.push(resolve))
   }
 }

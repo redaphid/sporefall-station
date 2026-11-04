@@ -94,6 +94,7 @@ describe('persistence — validation & invalidation (never throw on a bad save)'
     const store = memStore()
     const env = makeEnvelope(liveWorld(), 0)
     // Corrupt the level checksum → deserializeWorld throws → restore falls back.
+    if (env.world.levelChecksum === undefined) throw new Error('a seeded world serializes its level by checksum')
     env.world.levelChecksum = env.world.levelChecksum ^ 0xdeadbeef
     store.setItem(SAVE_KEY, JSON.stringify(env))
     expect(() => readSave(store)).not.toThrow()

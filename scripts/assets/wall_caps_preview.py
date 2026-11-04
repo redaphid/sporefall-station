@@ -118,7 +118,7 @@ def compose(level, theme, px, mode):
             if t in CUT_OUTSIDE:
                 dx, dy = CUT_OUTSIDE[t]
                 g = at(tx + dx, ty + dy)
-                cell = art(name_by_id.get(g, "sidewalk") if g is not None and g not in WALLS else "sidewalk", tx, ty)
+                cell = art(name_by_id.get(g, "boardwalk") if g is not None and g not in WALLS else "boardwalk", tx, ty)
                 body = pools["wall"][0]
                 m = cut_mask(t, px)
                 cell = cell * (1 - m[..., None]) + body * m[..., None]

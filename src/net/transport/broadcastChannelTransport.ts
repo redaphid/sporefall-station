@@ -17,6 +17,7 @@ interface WireMsg {
  * backpressure paths get exercised honestly on desktop.
  */
 export class BroadcastChannelTransport implements Transport {
+  readonly medium = 'local'
   readonly maxPacket = 244 // pretend to be BLE so framing is exercised
   private channel: BroadcastChannel
   private handlers = new Set<(e: TransportEvent) => void>()

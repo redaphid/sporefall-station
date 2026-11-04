@@ -72,7 +72,7 @@ how thin some of those would be"). The critic re-picks under the pixel-art / thi
 
 
 **16:1x (Aaron, rule 13):** real locomotion for every mover. Speeds (npcs.ts): lurker 4.6 (fastest),
-sporeling 4.4, stalker 4.2, gloamhound 4.2, cop/spore-drone 4.0, pod/brood-sac 3.0 once woken,
+sporeling 4.4, stalker 4.2, gloamhound 4.2, warden/spore-drone 4.0, pod/brood-sac 3.0 once woken,
 hivespire 0 (only stationary one). Gloom-lurker: prowl, not pulse. Brood-sac: needs a real way to move
 (hatch legs / crawl / roll) or a design that can. Spore-drone: real flight (wing beats/thrust), not a bob.
 

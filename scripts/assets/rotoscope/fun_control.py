@@ -21,6 +21,7 @@ import sys
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import comfy_ui  # noqa: E402
 import spritesheet as S  # noqa: E402
 
 FUN = {"high": "wanfun\\HighNoise\\Wan2.2-Fun-A14B-Control_HighNoise-Q4_K_M.gguf",
@@ -91,6 +92,14 @@ def graph(ref_name, video_name, text, seed, prefix, w, h, length, shift, steps, 
     return g
 
 
+def save_flow(g, out, d):
+    """flow-<d>.json + flow-<d>_api.json: what assemble carries along and every shipped frame embeds, so a sprite
+    dragged into ComfyUI opens the Fun-Control graph that drew it. Widget specs come from the live server."""
+    pos = {nid: ((i % 6) * 480, (i // 6) * 420) for i, nid in enumerate(g)}
+    json.dump(g, open(os.path.join(out, f"flow-{d}_api.json"), "w"), indent=1)
+    json.dump(comfy_ui.to_workflow(g, pos, specs=comfy_ui.fetch_specs(S.HOST)), open(os.path.join(out, f"flow-{d}.json"), "w"), indent=1)
+
+
 def adopt(base, out, d, raw):
     """Make <out> a run `cast_walk.py assemble --take` reads: the base run's idle/keyframe for <d>, and a
     sheet.json whose loop for <d> is spritesheet's own pick on this clip."""
@@ -135,6 +144,7 @@ def main():
     g = graph(rname, vname, text, a.seed, f"sprite-sheet/rnd-multileg/{tag}", S.WAN["width"], S.WAN["height"],
               a.length, a.shift, a.steps, a.split, not a.no_lora)
     json.dump(g, open(os.path.join(a.out, "flow_api.json"), "w"), indent=1)
+    save_flow(g, a.out, a.dir)
     if a.dry_run:
         print(f"dry run: period {period}, {len(g)} nodes -> {a.out}")
         return

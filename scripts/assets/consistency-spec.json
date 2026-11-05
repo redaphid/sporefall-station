@@ -116,11 +116,11 @@
  "mireclaw-stalker": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 32,
-   "width": 43,
-   "head_h": 6,
-   "mass": 374,
-   "cx": 1.78,
+   "height": 43,
+   "width": 44,
+   "head_h": 23,
+   "mass": 684,
+   "cx": 1.59,
    "foot_y": 44
   },
   "tol": {

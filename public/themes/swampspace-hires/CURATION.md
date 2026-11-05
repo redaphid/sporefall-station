@@ -331,3 +331,37 @@ Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
 Gate 4b same was fixed on the way (7046bba): it counted the front's visor
 against every back view. Nothing parked. Frame heights: 84-90 px on the
 hi-res pack, 42-45 on the 48 px pack.
+
+## bellwether, 2026-11-05: redesigned (yellow marshal), walking, ne by skeleton control
+
+The raid's marshal (`npcs.ts` `bellwether`: kill it and the raid routs) had
+one frame, the August hires s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign. The shipped s-idle held a blade (lore check 4), and the first concept (glare-marshal) vanished on the game floor at 96 px. Lore family A (salvage caste): the raid's marshal in faded hazard-yellow plate (§8.1 trade paint), a black gas mask with one orange lens band (the single hot accent), a small brass hand bell under the belt, and a flat charcoal air pack on the back. It holds nothing; the renderer draws its weapon (`weaponArt.ts`) |
+| input | concept yellow-marshal redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 11 of 4), sha256 `4eec320445b51be6…`; old anchors archived at `/mnt/d/tmp/cast-walks/archive/bellwether/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction. e and se retaken with a describe that names the charcoal pack and says it is never yellow; ne/n use a face-free `--describe-back` |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, `--motion walk`, for s, se, e, n. ne: Wan Fun-Control driven by a stick-skeleton biped walk rig (`scripts/assets/rotoscope/fun_control.py`), seed 23, on the take3 ne keyframe mirrored to face right like every shipped ne |
+| takes | s and n take1 (seed 1004). se take3 (seed 3, the pack describe; take1 .431 and take2 .265 came before the pack fix). e take2 (seed 3). ne: three Wan takes failed (1.563 / .749 / 1.066), then the skeleton route (skel1) |
+| loops | the shortest full stride: s period 17 (seam .483), se 25 (.386), e 17 (.241), ne 20 (.136), n 21 (.755) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.bellwether.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-05, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .483 / .386 / .241 / .136 / .755 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .108-.199, head .048-.072 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. Known look gap: the n view (take1) draws a narrower, flatter
+dark back panel than the deep charcoal pack that e and ne show. Frame
+heights: 85-92 px on the hi-res pack, 42-46 on the 48 px pack.

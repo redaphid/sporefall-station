@@ -193,10 +193,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 43,
-   "width": 37,
-   "head_h": 35,
-   "mass": 846,
-   "cx": -0.65,
+   "width": 33,
+   "head_h": 31,
+   "mass": 722,
+   "cx": -0.6,
    "foot_y": 45
   },
   "tol": {

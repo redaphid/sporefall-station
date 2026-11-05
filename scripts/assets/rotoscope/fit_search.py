@@ -26,7 +26,7 @@ BLENDER = "/mnt/d/tools/blender/blender.exe"
 RIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rig_multileg.py")
 # name: (step, low, high)
 SPACE = {"--ortho": (.3, 5.0, 7.5), "--aim-z": (.12, .7, 1.8), "--foot-r": (.15, .4, 1.6), "--hip-x": (.06, .2, .5),
-         "--body-z": (.12, 1.4, 2.1), "--femur": (.1, .6, 1.1), "--tibia": (.12, 1.3, 2.1)}
+         "--body-z": (.12, 1.4, 2.1), "--femur": (.1, .6, 1.1), "--tibia": (.12, 1.3, 2.1), "--yaw": (8., -60, 150)}
 
 
 def win(path):
@@ -96,6 +96,8 @@ def main():
     with cf.ThreadPoolExecutor(a.jobs) as pool:
         for rnd in range(a.rounds):
             for k, (step, lo, hi) in SPACE.items():
+                if k not in best:  # --yaw: only searched when the start args name it
+                    continue
                 v = float(best[best.index(k) + 1])
                 tries = [with_value(best, k, x) for x in (v - 2 * step, v - step, v + step, v + 2 * step) if lo <= x <= hi]
                 costs = list(pool.map(lambda t: score(a.ref, a.dir, os.path.join(a.out, f"t{t[0]}"), t[1]), enumerate(tries)))

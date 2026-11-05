@@ -36,6 +36,8 @@ def arg(name, default):
 OUT = arg("--out", "D:/tmp/cast-walks/rnd-multileg/proxy").rstrip("/")
 DIRS_ALL = {"s": 0.0, "se": 45.0, "e": 90.0, "ne": 135.0, "n": 180.0}
 DIRS = [d for d in arg("--dirs", "se").split(",") if d]
+if "--yaw" in argv:  # the keyframe's own turn, when a direction's keyframe is not drawn square on (mireclaw-stalker s)
+    DIRS_ALL.update({d: float(arg("--yaw", "0")) for d in DIRS})
 FRAMES = int(arg("--frames", "16"))
 W, H = int(arg("--w", "848")), int(arg("--h", "480"))
 ELEV = math.radians(float(arg("--elev", "30")))

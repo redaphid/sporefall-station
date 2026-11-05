@@ -22,11 +22,16 @@ RAMP = {(8, 8, 12): (35, 40, 46), (20, 26, 22): (60, 68, 77), (28, 20, 32): (60,
 LEGS_FROM = 0.55
 
 
-def recolour(a):
-    out, m = a.copy(), a[..., 3] > 0
-    ys = np.nonzero(m.any(1))[0]
-    legs = m.copy()
-    legs[: int(ys.min() + LEGS_FROM * (ys.max() - ys.min()))] = False
+def leg_cut(frames):
+    """First leg row for one direction, from all its frames' union: a per-frame cut would ride up and down with
+    the lifted foot, and the charcoal/grey edge would crawl along the leg."""
+    ys = np.nonzero(np.any([a[..., 3] > 0 for a in frames], axis=0).any(1))[0]
+    return int(ys.min() + LEGS_FROM * (ys.max() - ys.min()))
+
+
+def recolour(a, cut):
+    out, legs = a.copy(), a[..., 3] > 0
+    legs[:cut] = False
     for src, dst in RAMP.items():  # match on the source image so a pixel moves once
         out[legs & np.all(a[..., :3] == src, axis=2), :3] = dst
     return out
@@ -38,11 +43,13 @@ def main():
     for px, pack in PACKS.items():
         n = 0
         for d in DIRS:
-            for p in POSES:
+            ims = {p: Image.open(f"{run}-{px}/frames/mireclaw-stalker-{d}-{p}.png") for p in POSES}
+            arrs = {p: np.asarray(im.convert("RGBA")) for p, im in ims.items()}
+            cut = leg_cut(list(arrs.values()))
+            for p, im in ims.items():
                 name = f"mireclaw-stalker-{d}-{p}.png"
-                im = Image.open(f"{run}-{px}/frames/{name}")
-                a = np.asarray(im.convert("RGBA"))
-                b = recolour(a)
+                a = arrs[p]
+                b = recolour(a, cut)
                 n += int((a != b).any(2).sum())
                 info = PngImagePlugin.PngInfo()
                 for k, v in im.text.items():

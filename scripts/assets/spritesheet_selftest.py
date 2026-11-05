@@ -610,6 +610,39 @@ def main():
         big = Image.new("RGBA", (5, 5), (250, 250, 250, 255))
         check("despeckle: a white AREA (a real white shirt) is left alone", S.despeckle(big).getpixel((2, 2))[0] == 250)
 
+        def spider(*pieces):  # a 96 px frame: a 20x20 body at (30..49, 30..49) plus small pieces (x, y, w, h)
+            a = np.zeros((96, 96, 4), np.uint8)
+            a[30:50, 30:50] = (36, 86, 92, 255)
+            for x, y, w, h in pieces:
+                a[y:y + h, x:x + w] = (150, 200, 205, 255)
+            return Image.fromarray(a, "RGBA")
+        tip, far, blob = (51, 30, 1, 3), (60, 70, 2, 2), (70, 70, 5, 5)  # 1 px off / 11 px off / 25 px
+        walks = [f"walk-{i}" for i in range(8)]
+        fr = {("s", p): spider(tip, far, blob) for p in walks}
+        fr[("s", "walk-3")] = spider(far, blob)          # the tip is missing either side of walk-4 ...
+        fr[("s", "walk-5")] = spider(far, blob)
+        fr[("s", "walk-4")] = spider(tip, far, (70, 10, 5, 5))  # walk-4 unique, so step has one twin
+        fr[("s", "step")] = fr[("s", "walk-4")].copy()   # ... and step is a copy of walk-4
+        fr[("s", "idle")] = spider(tip, far)             # a still frame of its own
+        dr = S.drop_specks(fr, ["s"], ["idle", "step"] + walks, 96)
+        at = lambda k, xy: dr[("s", k)].getpixel(xy)[3]  # noqa: E731
+        check("specks: a small piece floating off the body is dropped", at("walk-0", (60, 70)) == 0)
+        check("specks: a piece 1 px off the body that holds still (spine tip) is kept", at("walk-0", (51, 31)) == 255)
+        check("specks: a 1 px-off piece absent from both neighbouring walk frames is dropped",
+              at("walk-4", (51, 31)) == 0)
+        check("specks: a detached piece bigger than SPECK_PX is kept", at("walk-0", (72, 72)) == 255)
+        check("specks: the body is untouched", at("walk-4", (40, 40)) == 255)
+        check("specks: step gets its walk twin's result",
+              np.array_equal(np.asarray(dr[("s", "step")]), np.asarray(dr[("s", "walk-4")])))
+        check("specks: a still frame of its own drops only the floating piece",
+              at("idle", (60, 70)) == 0 and at("idle", (51, 31)) == 255)
+        check("specks: a sprite in one piece comes back unchanged",
+              np.array_equal(np.asarray(S.drop_specks({("s", "idle"): spider()}, ["s"], ["idle"], 96)[("s", "idle")]),
+                             np.asarray(spider())))
+        gait = [wren(stride=s, size=240) for s in (-40, -20, 0, 20, 40)]
+        check("stance: idle is the loop frame nearest the clip's start pose",
+              S.stance(gait, wren(stride=18, size=240)) == 3)
+
         n0 = len(Fake.prompts)
         vout = os.path.join(tmp, "video")
         S.main([src, "--out", vout, "--method", "video", "--dirs", "s,e"])

@@ -1091,12 +1091,58 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
                 px = despeckle(snap(P.kcentroid(keyed[(d, p)].crop(u), tw, th), pal))
                 frame.paste(px, ((canvas - tw) // 2, canvas - 1 - th), px)
             out[(d, p)] = frame
+    return drop_specks(out, dirs, poses, canvas)
+
+
+SPECK_PX = 12  # at 96 px; a detached piece this small or smaller may be a speck
+
+
+def drop_specks(frames: dict, dirs, poses, canvas: int) -> dict:
+    """Drop the crumbs a motion-blurred leg leaves after keying (mireclaw-stalker se walk-4: pale
+    teal bits floating off the claw, the 'flash near his feet'). A small piece detached from the
+    body is art when it sits one pixel off it and holds still (a spine tip over the crest); it is a
+    speck when it floats further out, or when it is transparent in the walk frames either side of it.
+    `idle` and `step` are copies of walk frames and get their frame's result."""
+    from scipy import ndimage
+    lim = max(1, round(SPECK_PX * (canvas / 96) ** 2))
+    alpha = {k: np.asarray(v)[..., 3] > 0 for k, v in frames.items()}
+    out = dict(frames)
+    for d in dirs:
+        walks = [p for p in poses if p.startswith("walk-") and (d, p) in frames]
+        for p in [p for p in poses if (d, p) in frames]:
+            a = alpha[(d, p)]
+            lab, n = ndimage.label(a, structure=np.ones((3, 3)))
+            if n < 2:
+                continue
+            size = np.bincount(lab.ravel())
+            size[0] = 0
+            body = size.argmax()
+            gap = ndimage.distance_transform_edt(lab != body)
+            beside = None
+            if p in walks:
+                i = walks.index(p)
+                beside = alpha[(d, walks[i - 1])] | alpha[(d, walks[(i + 1) % len(walks)])]
+            drop = np.zeros_like(a)
+            for c in range(1, n + 1):
+                piece = lab == c
+                if c == body or size[c] > lim:
+                    continue
+                if gap[piece].min() > 2.5 or (beside is not None and not (piece & beside).any()):
+                    drop |= piece
+            if drop.any():
+                im = np.asarray(frames[(d, p)]).copy()
+                im[drop] = 0
+                out[(d, p)] = Image.fromarray(im, "RGBA")
+        for still in [(d, p) for p in poses if p not in walks and (d, p) in frames]:
+            twin = next((p for p in walks if np.array_equal(np.asarray(frames[still]), np.asarray(frames[(d, p)]))), None)
+            if twin:
+                out[still] = out[(d, twin)].copy()
     return out
 
 
 def clip_beside(run: str, raws: dict, loops: dict) -> dict:
-    """{(dir, pose): (clip frame before, clip frame after)} for each cut walk frame and the step (a copy
-    of one), read from the run's raw/walk-<dir>/ clip at cut_loop's indices."""
+    """{(dir, pose): (clip frame before, clip frame after)} for each cut walk frame and the idle and step
+    (copies of walk frames), read from the run's raw/walk-<dir>/ clip at cut_loop's indices."""
     out = {}
     for d in {d for d, _ in raws}:
         clip, loop = sorted(glob.glob(f"{run}/raw/walk-{d}/*.png")), loops.get(d)
@@ -1104,15 +1150,24 @@ def clip_beside(run: str, raws: dict, loops: dict) -> dict:
         if not clip or not loop or not walks:
             continue
         at = {f"walk-{i}": loop["start"] + round(i * loop["period"] / len(walks)) for i in range(len(walks))}
-        step = raws.get((d, "step"))
-        if step is not None:
-            same = [p for p in walks if np.array_equal(np.asarray(step), np.asarray(raws[(d, p)]))]
+        for still in ("idle", "step"):
+            im = raws.get((d, still))
+            same = [p for p in walks if im is not None and np.array_equal(np.asarray(im), np.asarray(raws[(d, p)]))]
             if same:
-                at["step"] = at[same[0]]
+                at[still] = at[same[0]]
         for p, t in at.items():
             if 0 < t < len(clip) - 1:
                 out[(d, p)] = (Image.open(clip[t - 1]), Image.open(clip[t + 1]))
     return out
+
+
+def stance(cyc: list, start) -> int:
+    """Index of the loop frame nearest the clip's start frame (the keyframe's standing pose, as Wan
+    drew it): the pack's `idle`. Taken from the loop, not the start frame itself, because Wan often
+    turns the body in the first frames (mireclaw-stalker s: a 3/4 start, a front-on walk), and an
+    idle in another view or size pops the moment the walk starts."""
+    small = _small(cyc + [start])
+    return int(np.argmin([np.abs(f - small[-1]).mean() for f in small[:-1]]))
 
 
 def widest(frames: list) -> int:
@@ -1342,7 +1397,7 @@ def cmd_video(a, dirs, kind, root, src, pal):
             loop = closed_loop(clip) if MOTIONS[a.motion].closed else find_loop(clip, pmin, pmax)
             cyc = cut_loop(clip, loop)
             loops[d] = loop
-            raws[(d, "idle")] = clip[0]  # the start frame: the keyframe, re-rendered by Wan in its own look
+            raws[(d, "idle")] = cyc[stance(cyc, clip[0])]
             raws[(d, "step")] = cyc[widest(cyc)]
             for i, f in enumerate(cyc):
                 raws[(d, f"walk-{i}")] = f
@@ -1413,6 +1468,7 @@ def cmd_repack(a):
             loop = closed_loop(clip) if closed else find_loop(clip, *ranges[d])
             cyc = cut_loop(clip, loop)
             meta.setdefault("loops", {})[d] = loop
+            cyc[stance(cyc, clip[0])].save(f"{raw}/{d}-idle.png")
             cyc[widest(cyc)].save(f"{raw}/{d}-step.png")
             for i, f in enumerate(cyc):
                 f.save(f"{raw}/{d}-walk-{i}.png")

@@ -88,7 +88,7 @@ In flight, finish first:
 1. sporeling-mite: Wan ne/n from the kf2 picks (ne s3, n s3), then gate. Its ne-idle fails charConsistency (height 43 vs 46), which keeps this branch red, so nothing merges to main until it lands.
 2. cinder-husk: gate wip/cinder-finish-art (cut off 09-29), ship for testing (Aaron 09-29: "fine for now"), redesign later.
 3. bellwether: take1 s/se/e pass; retake ne (1.563) and se per queue-retakes.sh, assemble, gate.
-4. mireclaw-stalker: frames on wip/stalker-ship need seam exception G8. Waiting on Aaron's sign-off (rule 14).
+4. mireclaw-stalker: not asking for exception G8 yet. Case: /mnt/d/tmp/cast-walks/gate-case-stalker-2026-11-04.md. The exception alone would not ship it (gates 4a and 5 stay red, wrong-facing idles are fixed only in uncommitted ship5 edits), and rule 14 wants a better route tried first. Running the skeleton-control se A/B Aaron queued on 09-29.
 
 Not animated, in order, using concept-picks-v3 and rule 13:
 5. gloom-lurker, 6. mireclaw-alpha (needs a brief), 7. carapace-brute (needs a brief), 8. spore-mortar, 9. derelict-bot, 10. gloam-hound, 11. bog-mender, 12. spore-drone, 13. brood-sac, 14. hive-spire, 15. bog-mutant (redesign, Aaron veto).

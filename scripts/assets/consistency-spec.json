@@ -269,11 +269,11 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 25,
+   "width": 27,
    "head_h": 30,
-   "mass": 662,
-   "cx": -0.28,
-   "foot_y": 45
+   "mass": 652,
+   "cx": 0.43,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

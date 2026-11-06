@@ -4,7 +4,8 @@ import {
   ANIM_STATE_DEFS,
   ANIM_STATES,
   animFrame,
-  CLIP_WINDOW_STATES,
+  CLIP_SIZED_STATES,
+  DRAWN_ONLY_STATES,
   DEFAULT_TPF,
   effectiveClips,
   entityPhase,
@@ -14,6 +15,7 @@ import {
   isLoop,
   MAX_ANIM_FRAMES,
   MAX_TICK_SKIP,
+  onceEnd,
   resolveAnimState,
   sceneContinuous,
   resolveClip,
@@ -205,7 +207,7 @@ describe('resolveClip — per-state fallback chains', () => {
     for (const s of ANIM_STATES) {
       const chain = fallbackChain(s)
       expect(chain[0]).toBe(s)
-      if (CLIP_WINDOW_STATES.includes(s)) expect(chain).toEqual([s])
+      if (DRAWN_ONLY_STATES.includes(s)) expect(chain).toEqual([s])
       else expect(chain[chain.length - 1]).toBe('idle')
     }
   })
@@ -318,7 +320,7 @@ describe('constants sanity', () => {
   })
 
   it('the art contract: draw and fidget are drawn-only one-shots; only draw stows the weapon', () => {
-    expect([...CLIP_WINDOW_STATES].sort()).toEqual(['draw', 'fidget'])
+    expect([...DRAWN_ONLY_STATES].sort()).toEqual(['draw', 'fidget'])
     expect(ANIM_STATES.filter(stowsWeapon)).toEqual(['draw'])
     expect(ANIM_STATE_DEFS.draw.play).toBe('once')
     expect(ANIM_STATE_DEFS.fidget.play).toBe('once')
@@ -382,5 +384,44 @@ describe('roll window coupling', () => {
       if (r.state === 'roll') rollTicks++
     }
     expect(rollTicks).toBe(ROLL_TICKS)
+  })
+})
+
+describe('clip-sized windows: attack, hurt and death play a drawn clip whole', () => {
+  const fixed = ['attack', 'hurt', 'death'] as const
+  const end = (s: (typeof fixed)[number], clipTicks?: number): number | undefined =>
+    onceEnd(s, 100, { tick: 100, moving: false, clipTicks: clipTicks === undefined ? {} : { [s]: clipTicks } })
+
+  it('the table: every one-shot but roll reads its clip; attack/hurt/death are never shorter than STATE_TICKS', () => {
+    expect([...CLIP_SIZED_STATES].sort()).toEqual(['attack', 'death', 'draw', 'fidget', 'hurt'])
+    for (const s of fixed) expect(ANIM_STATE_DEFS[s].window).toEqual({ clipAtLeast: STATE_TICKS[s] })
+  })
+
+  it.each(fixed)('%s without a clip (absent or 0 ticks) keeps exactly its fixed window', (s) => {
+    expect(end(s)).toBe(100 + STATE_TICKS[s])
+    expect(end(s, 0)).toBe(100 + STATE_TICKS[s])
+  })
+
+  it.each(fixed)('%s with a clip longer than the fixed window lasts the clip, to the tick', (s) => {
+    const len = STATE_TICKS[s] + 7
+    expect(end(s, len)).toBe(100 + len)
+    const a = { tick: 0, moving: true, starts: { [s]: 100 }, clipTicks: { [s]: len } }
+    expect(resolveAnimState({ ...a, tick: 100 + len - 1 }).state).toBe(s)
+    expect(resolveAnimState({ ...a, tick: 100 + len }).state).toBe('walk')
+  })
+
+  it.each(fixed)('%s with a clip SHORTER than the fixed window still lasts the fixed window', (s) => {
+    expect(end(s, 1)).toBe(100 + STATE_TICKS[s])
+    expect(end(s, STATE_TICKS[s] - 1)).toBe(100 + STATE_TICKS[s])
+  })
+
+  it('the frame index runs through a long clip and holds its last frame only past it', () => {
+    // 8 attack frames at tpf 2 = 16 ticks: frame k at ticks 2k, 2k+1.
+    for (let dt = 0; dt < 16; dt++) expect(animFrame('attack', 8, 100 + dt, 100, 2, 7)).toBe(Math.floor(dt / 2))
+  })
+
+  it('a drawn-only state still never plays without its clip', () => {
+    expect(onceEnd('draw', 100, { tick: 100, moving: false })).toBeUndefined()
+    expect(onceEnd('fidget', 100, { tick: 100, moving: false, clipTicks: { fidget: 0 } })).toBeUndefined()
   })
 })

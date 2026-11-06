@@ -5,8 +5,9 @@ import { SIM_DT } from '../game/types'
 import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
-  CLIP_WINDOW_STATES,
+  CLIP_SIZED_STATES,
   effectiveClips,
+  onceEnd,
   resolveClip,
   sceneContinuous,
   stowsWeapon,
@@ -111,11 +112,13 @@ const ownFrames = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): n
 const drawsState = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): boolean =>
   ownFrames(set, dir, state) > 1
 
-/** Length in ticks (frames × tpf) of each drawn-only state's own clip for the
- * facing; a state the pack does not draw is left out and never plays. */
+/** Length in ticks (frames × tpf) of the facing's own clip for each state
+ * whose window reads it (animState.CLIP_SIZED_STATES); a state the pack does
+ * not draw is left out: a drawn-only state then never plays, and attack/hurt/
+ * death keep their fixed window. */
 const clipTicksFor = (art: ArtRegistry, set: CharSet | undefined, dir: Dir5): Partial<Record<AnimStateName, number>> => {
   const out: Partial<Record<AnimStateName, number>> = {}
-  for (const s of CLIP_WINDOW_STATES) {
+  for (const s of CLIP_SIZED_STATES) {
     const n = ownFrames(set, dir, s)
     if (n > 0) out[s] = n * Math.max(1, Math.floor(art.animTpf(s)))
   }
@@ -483,7 +486,9 @@ export class EntityViews {
     // `weaponStack` is undefined → the untinted base look).
     const skin = composeWeaponSkin(weaponStack(e)?.mods)
 
-    // Pose: melee swings over the attack window; ranged holds and recoils.
+    // Pose: melee swings over the fixed attack window; ranged holds and
+    // recoils. A drawn attack clip may run longer: past STATE_TICKS.attack the
+    // progress passes 1 and the weapon is back at rest while the clip plays.
     // Hand PLACEMENT borrows the quantized 8-way facing; the weapon's ROTATION
     // follows the continuous aim (e.facing) — the same signal bullets fire along.
     const { dir, flip } = facingDir(e.facing)
@@ -551,16 +556,18 @@ export class EntityViews {
   }
 
   /** Advance death ghosts: play the death clip (theme frames or the held last
-   * pose) under the procedural topple/fade, then free the sprite. */
+   * pose) under the procedural topple/fade, then free the sprite. A ghost lasts
+   * the death window: its drawn clip, or STATE_TICKS.death without one. */
   private updateGhosts(tick: number, t: number): void {
     for (let i = this.ghosts.length - 1; i >= 0; i--) {
       const g = this.ghosts[i]
-      if (tick >= g.start + STATE_TICKS.death) {
+      const { dir } = facingDir(g.facing)
+      const set = this.art.characterSet(g.artKey)
+      const end = onceEnd('death', g.start, { tick, moving: false, clipTicks: clipTicksFor(this.art, set, dir) })!
+      if (tick >= end) {
         this.expireGhost(i)
         continue
       }
-      const { dir } = facingDir(g.facing)
-      const set = this.art.characterSet(g.artKey)
       const drawn = drawsState(set, dir, 'death')
       const pose = set ? poseFor(set, dir) : undefined
       if (pose) {
@@ -578,6 +585,7 @@ export class EntityViews {
       const motion = composeMotion({
         state: 'death',
         start: g.start,
+        end,
         tick,
         t,
         id: g.id,

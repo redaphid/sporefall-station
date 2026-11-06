@@ -195,10 +195,10 @@ render-side start signals live in `src/render/animTracker.ts`.
 |---|---|---|---|
 | `idle` | loop | nothing else active | — |
 | `walk` | loop | entity is moving | while moving |
-| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting) | 6 ticks |
-| `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | 8 ticks |
+| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting) | its drawn clip, at least 6 ticks |
+| `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | its drawn clip, at least 8 ticks |
 | `roll` | one-shot | dodge-roll active | the sim's roll window (12 ticks) |
-| `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | 18 ticks |
+| `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | its drawn clip, at least 18 ticks |
 | `draw` | one-shot, **drawn-only** | the NPC's AI entered `aggro` (it engaged a target), after at least 30 ticks not engaged | its own clip: frames × tpf |
 | `fidget` | one-shot, **drawn-only** | the body has been still and calm (not aggro/flee/seek, dormant, downed, stunned, asleep or frozen) for 90 ticks; then on a per-entity grid every 180–329 ticks, hashed from the entity id | its own clip: frames × tpf |
 
@@ -231,6 +231,29 @@ all five drawn directions (west is mirrored):
 
 At the defaults, an 8-frame `draw` lasts 16 ticks (0.53 s) and an 8-frame
 `fidget` 24 ticks (0.8 s). `anim` is per theme, not per kind.
+
+**Action clips (`attack`, `hurt`, `death`).** These play with or without art.
+Without frames of its own, each lasts its fixed window (6, 8 and 18 ticks) on a
+borrowed pose, exactly as before. With frames, it lasts `frames × tpf` ticks,
+or the fixed window if that is longer (the last frame holds), so a drawn clip
+always plays whole. At the defaults an 8-frame `attack` lasts 16 ticks, an
+8-frame `hurt` 24 and an 8-frame `death` 40. The effects tied to the fixed
+window keep it whatever the art:
+
+- `attack`: the held-weapon swing (melee) or recoil (ranged) takes 6 ticks,
+  then the weapon is back at rest while the clip plays on. The lunge also
+  takes the first 6 ticks, at 30% when the clip is drawn. The held weapon
+  stays visible over an attack clip, so draw the body, not the weapon.
+- `hurt`: the white hit flash covers the clip's first 3 ticks (the hit lands
+  one tick after the state starts, so at tpf 3 frame 0 is never seen). Put
+  the impact on frame 1.
+- `death`: a drawn death gets no topple. The body stays opaque, fades out over
+  the clip's last 18 ticks, and is gone when the clip ends.
+
+A new trigger restarts the clip from frame 0. Keep an attack clip no longer
+than the kind's attack interval, or its tail is never seen: a wrench swings
+every 15 ticks, so 7 frames at tpf 2 (14 ticks) play whole and 8 frames
+(16 ticks) lose their last tick. Start and end the clip on the idle pose.
 
 **Key grammar.** Each state takes up to 8 frames per drawn direction:
 `char.<name>.<dir>-<state>-<n>` with `<n>` ∈ `0..7`. Frames must be
@@ -278,8 +301,8 @@ attack lunge, hurt flinch, roll tumble + landing squash, death topple+fade) as
 subtle transform offsets around the feet anchor — themes get it for free; it
 composes with any frames you ship. Where a pack draws a state itself (2+
 frames), the procedural twin steps aside: a drawn walk or idle loop drops the
-bob, breath, hover or pulse cycle; a drawn `death` keeps the fade but not the
-topple; a drawn `attack` keeps 30% of the lunge. Tuning lives in
+bob, breath, hover or pulse cycle; a drawn `death` keeps the fade (over its last
+18 ticks) but not the topple; a drawn `attack` keeps 30% of the lunge. Tuning lives in
 `src/render/motion.ts` (`MOTION` table).
 
 ## Fallback semantics (exact)

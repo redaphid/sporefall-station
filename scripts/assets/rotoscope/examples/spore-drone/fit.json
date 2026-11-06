@@ -53,7 +53,7 @@
    "step": 4
   },
   "ne": {
-   "keyframe": "kf/ne-kf-s3-mirror.png",
+   "keyframe": "kf/ne-kf-s3-mirror-rear.png",
    "az": 135,
    "hinge": [
     55,
@@ -64,7 +64,7 @@
    "step": 3
   },
   "n": {
-   "keyframe": "kf/n-kf-s11.png",
+   "keyframe": "kf/n-kf-s11-rear.png",
    "az": 180,
    "hinge": [
     55,

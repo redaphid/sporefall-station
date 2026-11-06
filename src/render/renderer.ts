@@ -40,7 +40,7 @@ import { PlayerMarkerLayer } from './playerMarkerLayer'
 import { createSettingsPanel } from './settingsPanel'
 import { Sound } from './sound'
 import { EntityViews } from './sprites'
-import { DEATH_TUMBLE } from './displayBody'
+import { DEATH_TUMBLE, WALL_SLAM } from './displayBody'
 import { StatusFxLayer } from './statusShaders'
 import { TilemapView } from './tilemap'
 
@@ -162,7 +162,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   }
   const world = new Container()
   const tilemap = new TilemapView()
-  const entities = new EntityViews(art, { tumble: DEATH_TUMBLE })
+  const entities = new EntityViews(art, { tumble: DEATH_TUMBLE, slam: WALL_SLAM })
   const bullets = new BulletLayer(art)
   // Per-character status-effect shaders (lightning/fire/frost/poison/wet),
   // modulated by uniforms derived from the applying weapon + its mods. A batched

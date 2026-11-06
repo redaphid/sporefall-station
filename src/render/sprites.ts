@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite, type Texture } from 'pixi.js'
+import { Container, Graphics, Matrix, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { SIM_DT } from '../game/types'
@@ -20,7 +20,20 @@ import {
 import { eventStarts, trackAnim, type AnimMemory } from './animTracker'
 import type { TickEvents } from '../app/eventLog'
 import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
-import { deriveThrow, poseAt, restLift, simulateBody, TUMBLE, type BodyTrack, type DeathFacts, type IsSolid } from './displayBody'
+import {
+  deriveThrow,
+  poseAt,
+  restLift,
+  simulateBody,
+  slamAt,
+  SLAM,
+  stopAtWall,
+  TUMBLE,
+  type BodyTrack,
+  type DeathFacts,
+  type IsSolid,
+} from './displayBody'
+import { burstBlocks, dustBlocks, reachToWall, squashMatrix, type Block } from './slamFx'
 import {
   ARCHETYPE_SCALE,
   CHAR_PX,
@@ -102,6 +115,8 @@ interface Ghost {
   body?: BodyTrack
   /** Its blob on the floor while it flies (thrown bodies only). */
   shadow?: Graphics
+  /** The slam's impact burst and dust puff (bodies that slammed only). */
+  fx?: Graphics
 }
 
 /** The thrown body's floor shadow: a dark blob that stays on the floor while
@@ -229,17 +244,20 @@ export class EntityViews {
   private views = new Map<number, View>()
   private ghosts: Ghost[] = []
   private readonly tumble: boolean
+  private readonly slam: boolean
   private solid: IsSolid = () => false
   private rounds = new Map<number, SeenRound>()
 
   /** `tumble`: a kill throws the body (displayBody.ts); off, the ghost
-   * topples where it stood, as it always did. */
+   * topples where it stood, as it always did. `slam`: a thrown body that hits
+   * a wall hard slams, crumples and slumps (#173); off, it stops at the wall. */
   constructor(
     private art: ArtRegistry,
-    opts: { tumble?: boolean } = {},
+    opts: { tumble?: boolean; slam?: boolean } = {},
   ) {
     this.root.sortableChildren = true
     this.tumble = opts.tumble ?? false
+    this.slam = opts.slam ?? false
   }
 
   /** The level a thrown body must stay out of the walls of. */
@@ -264,6 +282,7 @@ export class EntityViews {
       this.root.removeChild(g.sprite)
       g.sprite.destroy()
       g.shadow?.destroy()
+      g.fx?.destroy()
     }
     this.ghosts.length = 0
   }
@@ -273,6 +292,7 @@ export class EntityViews {
     this.root.removeChild(g.sprite)
     g.sprite.destroy()
     g.shadow?.destroy()
+    g.fx?.destroy()
     this.ghosts.splice(i, 1)
   }
 
@@ -297,6 +317,11 @@ export class EntityViews {
       shadow = new Graphics().ellipse(0, 0, SHADOW.rx, SHADOW.ry).fill({ color: 0x000000 })
       this.root.addChild(shadow)
     }
+    let fx: Graphics | undefined
+    if (thrown?.body.slam) {
+      fx = new Graphics()
+      this.root.addChild(fx)
+    }
     this.ghosts.push({
       sprite: view.sprite,
       artKey: view.archetype,
@@ -307,6 +332,7 @@ export class EntityViews {
       texKey: view.texKey,
       body: thrown?.body,
       shadow,
+      fx,
     })
     if (this.ghosts.length > MAX_GHOSTS) this.expireGhost(0)
   }
@@ -358,7 +384,7 @@ export class EntityViews {
       projectiles,
       hostiles,
     })
-    return th && { start: at.tick, body: simulateBody(th, this.solid) }
+    return th && { start: at.tick, body: simulateBody(th, this.solid, stopAtWall, { slam: this.slam }) }
   }
 
   private prevTick = -1
@@ -693,6 +719,37 @@ export class EntityViews {
     view.weaponShapeKey = undefined
   }
 
+  /** The slam over a thrown ghost already posed by its track: the squash
+   * (pressed to the face: the wall-side edge stays put while the far side
+   * comes in), then the impact burst and the dust puff on `g.fx`. */
+  private slamGhost(g: Ghost, body: BodyTrack, ticks: number, rot: number): void {
+    const sl = body.slam!
+    const { width: w, height: h } = g.sprite.texture
+    g.sprite.skew.set(0, 0)
+    const sq = slamAt(body, ticks)
+    if (sq && sq.q !== 0) {
+      const m = squashMatrix(rot, g.flip, sq.q, sq.nx, sq.ny)
+      const press = sq.q * reachToWall(rot, w, h, sq.nx, sq.ny)
+      const x = g.sprite.position.x - sq.nx * press
+      const y = g.sprite.position.y - sq.ny * press
+      g.sprite.setFromMatrix(new Matrix(m.a, m.b, m.c, m.d, x, y))
+    }
+    const blocks: Block[] = []
+    const since = ticks - sl.tick
+    if (since >= 0 && since < SLAM.burstTicks) {
+      // On the face where the body met it: its centre at the hit, out to its edge.
+      const cx = sl.x * TILE_PX - sl.nx * reachToWall(sl.rot, w, h, sl.nx, sl.ny)
+      const cy = charFootPx(sl.y, TILE_PX) - restLift(sl.rot, h) - sl.z * TILE_PX - sl.ny * reachToWall(sl.rot, w, h, sl.nx, sl.ny)
+      blocks.push(...burstBlocks(since, body.throw.seed, cx, cy, sl.nx, sl.ny))
+    }
+    if (sl.z > 0) blocks.push(...dustBlocks(ticks - sl.down, body.throw.seed, sl.x * TILE_PX, charFootPx(sl.y, TILE_PX)))
+    const fx = g.fx!
+    fx.clear()
+    for (const b of blocks) fx.rect(b.x, b.y, b.w, b.h).fill({ color: b.color, alpha: b.alpha })
+    fx.visible = blocks.length > 0
+    fx.zIndex = g.sprite.zIndex + 0.01
+  }
+
   /** Advance death ghosts: play the death clip (theme frames or the held last
    * pose) under the procedural topple/fade, then free the sprite. A ghost lasts
    * the death window: its drawn clip, or STATE_TICKS.death without one. */
@@ -747,6 +804,7 @@ export class EntityViews {
         g.sprite.alpha = motion.alpha
         g.sprite.scale.set(g.flip ? -1 : 1, 1)
         g.sprite.zIndex = depthKey('npc', p.y)
+        if (g.fx) this.slamGhost(g, g.body, t - g.start, rot)
         if (g.shadow) {
           // On the floor under the body, fading out once it has landed.
           const since = t - g.start - g.body.landed

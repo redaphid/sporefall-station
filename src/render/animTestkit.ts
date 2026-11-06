@@ -100,6 +100,8 @@ export interface TraceOpts {
   events?: 'log' | 'lastTick' | 'none'
   /** A kill throws the body (displayBody.ts). Default off: the topple. */
   tumble?: boolean
+  /** A thrown body that hits a wall hard slams (#173). Default off: it stops. */
+  slam?: boolean
   /** Called after every update, with the views (tests reading ghosts). */
   inspect?: (views: EntityViews, tick: number) => void
 }
@@ -107,7 +109,7 @@ export interface TraceOpts {
 /** Run the scene and record each focus entity's sprite on every rendered tick.
  * The event log is fed after every tick, the way main.ts feeds it. */
 export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Record<number, Frame[]> => {
-  const views = new EntityViews(art, { tumble: opts.tumble ?? false })
+  const views = new EntityViews(art, { tumble: opts.tumble ?? false, slam: opts.slam ?? false })
   views.setLevel(scene.w.level)
   const log = createEventLog()
   const stride = opts.stride ?? 1

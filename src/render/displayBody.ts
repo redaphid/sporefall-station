@@ -24,8 +24,14 @@
  * death tick, because a client's tick counter is its own and not the host's.
  *
  * Walls: the body never enters a solid tile. Each wall touch is a `WallContact`
- * on the track, and `onWall` decides the rebound; the default is a dull bounce.
- * The wall slam (comic C) plugs in there.
+ * on the track, and `onWall` decides the rebound; the default stops it dead.
+ *
+ * The wall slam (#173, comic C): with `slam` on, a touch faster than
+ * SLAM.minSpeed is a `Slam` on the track instead. From its tick the body is
+ * scripted, not integrated: SLAM, pressed flat to the wall face where it hit;
+ * CRUMPLE, it springs back from flat and tips onto its side; SLUMP, it slides
+ * down the face to the wall's foot and lies there. The squash is `slamAt`, a
+ * closed form of the track and the tick, so it is cadence-free like the rest.
  */
 
 import { SIM_RATE } from '../game/types'
@@ -278,6 +284,57 @@ export const stopAtWall: OnWall = (c, v) => {
   return { x: (v.x - into * c.nx) * TUMBLE.wallSlide, y: (v.y - into * c.ny) * TUMBLE.wallSlide }
 }
 
+/** THE slam switch. Off = a body thrown into a wall stops at it exactly as
+ * the plain tumble does. */
+export const WALL_SLAM = true
+
+/** Slam tunables. Speeds in tiles/tick, time in ticks since the contact. */
+export const SLAM = {
+  /** A touch slower than this into the wall is a touch: it just stops. The
+   * first hop of a force-0.25 throw is about this; a body sliding on the
+   * floor after its last landing never reaches it. */
+  minSpeed: 0.035,
+  /** Impact speed of the hardest throw: the squash is full here. */
+  maxSpeed: 0.08,
+  /** Share of its depth along the normal the body loses, at minSpeed .. maxSpeed. */
+  squash: { min: 0.3, max: 0.5 },
+  /** Share of the squash it spreads by across the normal. */
+  spread: 0.6,
+  /** SLAM: ticks it stays pressed flat where it hit. */
+  hold: 3,
+  /** CRUMPLE: ticks the squash springs back (past round, then settling). */
+  spring: 6,
+  /** CRUMPLE: ticks to tip the rest of the way onto its side. */
+  crumple: 4,
+  /** SLUMP: ticks to slide down the face to the floor. */
+  slump: 8,
+  /** A second wall this many ticks away across the first one's normal is
+   * the same slam: a corner. */
+  cornerTicks: 2,
+  /** Ticks the impact burst lasts, and the dust puff at the foot. */
+  burstTicks: 5,
+  dustTicks: 8,
+} as const
+
+/** A hard wall hit. `nx, ny` is the unit normal (both set in a corner);
+ * `x, y, z` is where the body hit, pressed to the face; `rot` its spin then. */
+export interface Slam {
+  /** Tick since the death of the impact. */
+  tick: number
+  x: number
+  y: number
+  z: number
+  nx: number
+  ny: number
+  /** Speed into the wall, tiles/tick (the faster axis in a corner). */
+  speed: number
+  /** Squash at impact, SLAM.squash.min .. max. */
+  amp: number
+  rot: number
+  /** Tick since the death it reaches the floor (the dust puff). */
+  down: number
+}
+
 /** The body at one moment. `z` is height off the floor in tiles; `rot` is the
  * body's spin (0 upright, ±π/2 lying on its side). */
 export interface BodyPose {
@@ -296,6 +353,8 @@ export interface BodyTrack {
   /** Tick (since the death) of the last landing: in flight before it. */
   readonly landed: number
   readonly contacts: readonly WallContact[]
+  /** The hard hit, when it slammed (slam on only). */
+  readonly slam?: Slam
 }
 
 /** Is a footprint of half-size (rx, ry) at (x, y) touching a solid tile? */
@@ -318,8 +377,9 @@ const fitFootprint = (solid: IsSolid, x: number, y: number): { rx: number; ry: n
   return { rx, ry }
 }
 
-/** Integrate the throw at whole ticks until the body lies still. */
-export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtWall): BodyTrack => {
+/** Integrate the throw at whole ticks until the body lies still. `slam`: a
+ * hard wall hit slams (SLAM) instead of going to `onWall`. */
+export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtWall, opts: { slam?: boolean } = {}): BodyTrack => {
   const jitter = (salt: number): number => 0.9 + 0.2 * unit(th.seed, salt)
   const speed = lerp(TUMBLE.speed.min, TUMBLE.speed.max, th.force) * jitter(1)
   let vx = th.dirX * speed
@@ -346,6 +406,23 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtW
   let landed = 0
   let rollEnd = Infinity
   const rest = TUMBLE.bounce * jitter(4)
+  /** The hard hit this tick, while it is being found: its normal and speed. */
+  let hit: { nx: number; ny: number; speed: number } | undefined
+
+  /** Slide the footprint along one axis as far toward `dir` as it goes clear,
+   * up to `max` tiles: the body pressed to the face. */
+  const press = (axis: 'x' | 'y', dir: number, max: number): void => {
+    let lo = 0
+    let hi = max
+    for (let n = 0; n < 16; n++) {
+      const mid = (lo + hi) / 2
+      const clear = axis === 'x' ? !blocked(solid, x + dir * mid, y, rx, ry) : !blocked(solid, x, y + dir * mid, rx, ry)
+      if (clear) lo = mid
+      else hi = mid
+    }
+    if (axis === 'x') x += dir * lo
+    else y += dir * lo
+  }
 
   const step = (k: number, axis: 'x' | 'y'): void => {
     const v = axis === 'x' ? vx : vy
@@ -367,6 +444,13 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtW
       speed: Math.abs(v),
     }
     contacts.push(c)
+    if (opts.slam && c.speed >= (hit ? SLAM.minSpeed / 2 : SLAM.minSpeed)) {
+      // Into the face, and no slide: the slam takes it from here. A second
+      // face the same tick is the other side of a corner.
+      press(axis, Math.sign(v), Math.abs(v))
+      hit = { nx: hit ? hit.nx + c.nx : c.nx, ny: hit ? hit.ny + c.ny : c.ny, speed: Math.max(hit?.speed ?? 0, c.speed) }
+      return
+    }
     const out = onWall(c, { x: vx, y: vy })
     vx = out.x
     vy = out.y
@@ -377,6 +461,25 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtW
     k++
     step(k, 'x')
     step(k, 'y')
+    if (hit) {
+      // A corner: the other wall close enough across the first one's normal
+      // that the body would be in it a moment later.
+      const across = hit.nx === 0 ? 'x' : hit.ny === 0 ? 'y' : undefined
+      const v = across === 'x' ? vx : vy
+      const reach = Math.abs(v) * SLAM.cornerTicks
+      if (across && Math.abs(v) >= SLAM.minSpeed / 2) {
+        const far = across === 'x' ? blocked(solid, x + Math.sign(v) * reach, y, rx, ry) : blocked(solid, x, y + Math.sign(v) * reach, rx, ry)
+        if (far) {
+          contacts.push({ tick: k, x, y, z, nx: across === 'x' ? -Math.sign(v) : 0, ny: across === 'y' ? -Math.sign(v) : 0, speed: Math.abs(v) })
+          press(across, Math.sign(v), reach)
+          if (across === 'x') hit.nx = -Math.sign(v)
+          else hit.ny = -Math.sign(v)
+        }
+      }
+      if (!grounded) z = Math.max(0, z + vz)
+      poses.push({ x, y, z, rot: 0 })
+      break
+    }
     if (!grounded) {
       z += vz
       vz -= TUMBLE.gravity
@@ -403,18 +506,67 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtW
     poses.push({ x, y, z, rot: 0 })
     if (grounded && k >= rollEnd && vx === 0 && vy === 0) break
   }
+
+  // The slam's script: pressed where it hit for SLAM.hold, then down the face
+  // to the floor (falling, so slow first), lying at the foot after.
+  let slam: Slam | undefined
+  if (hit) {
+    const k0 = k
+    const z0 = z
+    const len = Math.hypot(hit.nx, hit.ny)
+    const down = z0 > 0 ? k0 + SLAM.hold + SLAM.slump : k0
+    for (let s = 1; s <= SLAM.hold + SLAM.slump + TUMBLE.rollTicks; s++) {
+      const u = Math.min(1, Math.max(0, (s - SLAM.hold) / SLAM.slump))
+      poses.push({ x, y, z: z0 * (1 - u * u), rot: 0 })
+    }
+    const amp = lerp(SLAM.squash.min, SLAM.squash.max, clamp01((hit.speed - SLAM.minSpeed) / (SLAM.maxSpeed - SLAM.minSpeed)))
+    slam = { tick: k0, x, y, z: z0, nx: hit.nx / len, ny: hit.ny / len, speed: hit.speed, amp, rot: 0, down }
+    if (!grounded) landed = down
+  }
+
   // The tip is steady through the hop and the bounces and lays the body on its
   // side at the last landing; then it rocks past its side and back (the roll)
-  // and slides lying still. It never comes back toward upright.
+  // and slides lying still. It never comes back toward upright. A slam holds
+  // the tip while the body is pressed flat, then finishes it as it crumples.
   const land = landed > 0 ? landed : poses.length - 1
+  const tipAt = (i: number): number => {
+    if (i <= land) return (finalRot * i) / land
+    const q = Math.min(1, (i - land) / TUMBLE.rollTicks)
+    return finalRot + side * TUMBLE.rock * Math.sin(q * Math.PI) * (1 - q)
+  }
   for (let i = 1; i < poses.length; i++) {
-    if (i <= land) poses[i].rot = (finalRot * i) / land
+    if (!slam || i <= slam.tick) poses[i].rot = tipAt(i)
     else {
-      const q = Math.min(1, (i - land) / TUMBLE.rollTicks)
-      poses[i].rot = finalRot + side * TUMBLE.rock * Math.sin(q * Math.PI) * (1 - q)
+      const s = i - slam.tick
+      const rot0 = poses[slam.tick].rot
+      if (i > land) poses[i].rot = tipAt(i)
+      else if (s <= SLAM.hold) poses[i].rot = rot0
+      else {
+        const u = Math.min(1, (s - SLAM.hold) / SLAM.crumple)
+        poses[i].rot = rot0 + (finalRot - rot0) * (1 - (1 - u) * (1 - u))
+      }
     }
   }
-  return { throw: th, poses, settle: poses.length - 1, landed: land, contacts }
+  if (slam) slam.rot = poses[slam.tick].rot
+  return { throw: th, poses, settle: poses.length - 1, landed: land, contacts, ...(slam ? { slam } : {}) }
+}
+
+/** The slam's squash `ticks` after the death: `q` is the share of its depth
+ * along the normal the body has lost (negative: stretched past round as it
+ * springs back). Undefined outside the slam. Flat from the impact through
+ * SLAM.hold, then a damped spring back over SLAM.spring. */
+export const slamAt = (track: BodyTrack, ticks: number): { q: number; nx: number; ny: number } | undefined => {
+  const sl = track.slam
+  if (!sl) return undefined
+  const s = ticks - sl.tick
+  if (!(s >= 0) || s >= SLAM.hold + SLAM.spring) return undefined
+  let q: number
+  if (s < SLAM.hold) q = sl.amp * (1 - (0.2 * s) / SLAM.hold)
+  else {
+    const u = (s - SLAM.hold) / SLAM.spring
+    q = 0.8 * sl.amp * Math.cos(1.5 * Math.PI * u) * (1 - u)
+  }
+  return { q, nx: sl.nx, ny: sl.ny }
 }
 
 /** The body `ticks` after its death (fractional: tick + interpolation). */

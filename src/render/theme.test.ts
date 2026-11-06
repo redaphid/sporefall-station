@@ -437,6 +437,20 @@ describe('animation-state sprite keys', () => {
     expect(warnings.length).toBe(4)
   })
 
+  it('the action contract: draw and fidget frames for every drawn direction are canonical, n 0..7', () => {
+    const sprites: Record<string, string> = {}
+    for (const [kind, state] of [
+      ['drowner', 'draw'],
+      ['gloamhound', 'fidget'],
+    ] as const)
+      for (const d of ['s', 'se', 'e', 'ne', 'n'])
+        for (let n = 0; n < 8; n++) sprites[`char.${kind}.${d}-${state}-${n}`] = `${kind}/${d}-${state}-${n}.png`
+    const { manifest, warnings } = validateManifest({ sprites, anim: { draw: 3, fidget: 4 } })
+    expect(warnings).toEqual([])
+    expect(Object.keys(manifest.sprites).length).toBe(80)
+    expect(manifest.anim).toEqual({ draw: 3, fidget: 4 })
+  })
+
   it('legacy idle/step keys coexist with new-grammar keys for the same direction', () => {
     const { manifest, warnings } = validateManifest({
       sprites: { 'char.warden.e-idle': 'i.png', 'char.warden.e-step': 's.png', 'char.warden.e-hurt-0': 'h.png' },

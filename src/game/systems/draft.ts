@@ -137,6 +137,34 @@ export const dealFloorDraft = (w: World, clearedFloor: number): void => {
   }
 }
 
+/** The `draft:<floor>` stream the opening hand draws from. Floor exits deal the
+ * floor just cleared (1 and up), so stream 0 belongs to the opening alone. */
+export const OPENING_DRAFT_STREAM = 0
+
+/** Deal the opening hand to one player: the same cards as everyone else's
+ * opening, closing at the shared deadline `DRAFT_TICKS`. Only on floor 1 and
+ * only before that deadline, so a player who joins once the opening is over
+ * lands with no hand. A player already holding a hand keeps it untouched.
+ * Returns whether a hand was dealt. Reads no `w.rng`. */
+export const dealOpeningHand = (w: World, e: Entity): boolean => {
+  if (w.floor !== 1 || w.tick >= DRAFT_TICKS) return false
+  if (!e.playerCtl || e.dead || e.playerCtl.draft) return false
+  const offer = floorDraftOffer(w.seed, OPENING_DRAFT_STREAM)
+  if (offer.length === 0) return false
+  e.playerCtl.draft = { offer, cursor: 0, until: DRAFT_TICKS, held: PREV | NEXT | CONFIRM, opening: true }
+  return true
+}
+
+/** Open a run with a choice: deal the opening hand to every live player at the
+ * landing of floor 1. Only at tick 0, so a repeat call once the run is under
+ * way cannot hand a player who already chose a second card. The run's session
+ * calls this once its players are spawned; a scenario or a loaded world does
+ * not, so neither opens on a hand. */
+export const dealOpeningDraft = (w: World): void => {
+  if (w.tick !== 0) return
+  for (const e of w.entities) dealOpeningHand(w, e)
+}
+
 /**
  * Run every open hand for one tick and return the inputs the rest of the sim
  * should see. A drafting player's command steers the hand (move = cursor,

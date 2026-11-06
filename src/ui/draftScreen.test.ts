@@ -58,4 +58,15 @@ describe('draft screen', () => {
     screen.update(['frost', 'no-such-mod'], [{ playerId: 0, cursor: 0 }], 12)
     expect(cards().map((c) => c.dataset.modId)).toEqual(['frost'])
   })
+
+  it('titles an opening hand as a landfall pick and flips back on a floor hand', () => {
+    const { screen, el } = mount()
+    const title = () => el.querySelector('.draft-screen > div > div')?.textContent ?? el.textContent
+    screen.update(OFFER, [{ playerId: 0, cursor: 0 }], 12, 'full', undefined, true)
+    expect(el.textContent).toContain('LANDFALL')
+    screen.update(OFFER, [{ playerId: 0, cursor: 0 }], 11, 'full', undefined, false)
+    expect(el.textContent).toContain('FLOOR CLEARED')
+    expect(el.textContent).not.toContain('LANDFALL')
+    void title
+  })
 })

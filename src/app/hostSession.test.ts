@@ -157,3 +157,42 @@ describe('sessions spawn a ready-to-play avatar with no selection step', () => {
     for (const p of all) expect(p.combat!.weapon).toBe('pistol')
   })
 })
+
+describe('HostSession opening draft', () => {
+  const draftOf = (s: HostSession, slot = 0) => players(s).find((e) => e.playerCtl!.playerId === slot)!.playerCtl!.draft
+  const idle = { inputs: new Map<number, InputCmd>(), joins: [] as number[], leaves: [] as number[], pauses: [] as number[] }
+
+  it('is off by default: a plain session opens in the fight', () => {
+    expect(draftOf(new HostSession(1, stubInput))).toBeUndefined()
+  })
+
+  it('a run with the opening on starts on a hand for the local player', () => {
+    const s = new HostSession(1, stubInput, undefined, 'normal', true)
+    expect(draftOf(s)).toMatchObject({ opening: true, until: 600 })
+  })
+
+  it('restart deals a fresh opening hand', () => {
+    const s = new HostSession(1, stubInput, undefined, 'normal', true)
+    for (let i = 0; i < 700; i++) s.tick()
+    expect(draftOf(s)).toBeUndefined()
+    s.restart()
+    expect(draftOf(s)?.opening).toBe(true)
+  })
+
+  it('a pad joining during the opening gets the hand; after it, none', () => {
+    const s = new HostSession(1, stubInput, scripted([{ ...idle, joins: [1] }]), 'normal', true)
+    s.tick()
+    expect(draftOf(s, 1)?.opening).toBe(true)
+    const late = scripted([...Array(701).fill(idle), { ...idle, joins: [2] }])
+    const s2 = new HostSession(1, stubInput, late, 'normal', true)
+    for (let i = 0; i < 702; i++) s2.tick()
+    expect(draftOf(s2, 2)).toBeUndefined()
+  })
+
+  it('the drafting player stands still until the pick', () => {
+    const s = new HostSession(1, { sample: moving }, undefined, 'normal', true)
+    const x = s.self.pos.x
+    for (let i = 0; i < 20; i++) s.tick()
+    expect(s.self.pos.x).toBe(x)
+  })
+})

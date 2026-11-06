@@ -4,7 +4,16 @@ Facts learned on Aaron's Windows box (RTX 4090, WSL2) during the cast-walk art r
 Read before an unattended ComfyUI/Wan run. Art-run procedure lives in
 `docs/cast-walks/RUNBOOK.md`; this file is the machine.
 
-## The box hard-crashes under GPU load
+## The box hard-crashes during art runs
+
+- **11-06 telemetry finding:** 5 of the 7 abrupt resets since 09-26 came with the CPU
+  at 97-100% and 88-101 GB of RAM in use; GPU power in the last minute was a moderate
+  230-322 W (the GPU hit 400 W+ often without crashing). Suspect CPU/memory saturation
+  or CPU-side power (EPS cables, VRM), not GPU peaks or the wall outlet. Art runs
+  saturate the CPU: parallel agents each running the full vitest suite, ComfyUI, WSL.
+  Avoid stacking full-suite runs; run one file when that proves the change. Logger and
+  reader: `D:\mechs\windows-crash\telemetry\` (task `SOUL-CrashLogger1Hz`; after a
+  crash run `crash-reader.ps1 -Last 1`), notes in `D:\mechs\windows-crash\CLAUDE.md`.
 
 - Windows logged 24 Kernel-Power 41 events (sudden power loss, no bugcheck) between
   2026-09-14 and 2026-11-06, clustered on heavy ComfyUI/Wan days: 7 on 09-29, then

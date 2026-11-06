@@ -19,9 +19,9 @@ Read `PROTOCOL.md` first for the rules. This file says where things stand and ho
 | sporeling-mite | sporeling | d58abc99, build 1067 |
 | gloom-lurker (teal hazmat) | lurker | 5f801b3f, build 1075. Aaron rejected the design; bubble-back replaces it |
 
-## Ready to ship (waiting for Aaron's go)
+## Shipped 11-06 (Aaron: "Ship whatever you think I'll like")
 
-`ship/batch-1105` at c4b5352c holds both of these. It fast-forwards from main. Build, lint and vitest (5395/5395) pass.
+`ship/batch-1105` at c4b5352c, pushed to main on 11-06, holds both of these. It fast-forwards from main. Build, lint and vitest (5395/5395) pass.
 
 - **gloom-lurker as bubble-back**, Aaron's pick: a six-legged beetle with green essence bubbles heaped on its back. Gate 9/9 on G7. It also changes `src/render/motion.ts` so the lurker strides instead of hovering (7abbb33c).
 - **carapace-brute**, existing design: a quadruped trot. Gate 9/9 on G7. It also includes a tool fix that keys out white leg-gap pockets in the leg band (`spritesheet.py`, bc7211cc, 378ed3c6).

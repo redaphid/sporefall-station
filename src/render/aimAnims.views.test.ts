@@ -12,7 +12,7 @@ const AIM = { aim: 2, aimwalk: 8 }
 const run = (clips: Record<string, number>, weapons = true): { player: Frame[]; drowner: Frame[] } => {
   const scene = aimScene()
   const [p, d] = scene.focus
-  const t = trace(scene, fakeArt({ player: clips, drowner: clips }, {}, weapons ? fakeWeapons() : undefined))
+  const t = trace(scene, fakeArt({ player: clips, drowner: clips }, {}, {}, weapons ? fakeWeapons() : undefined))
   return { player: t[p.id], drowner: t[d.id] }
 }
 /** Index into a trace by the scene's 0-based input tick. */

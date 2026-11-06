@@ -32,8 +32,8 @@ const SWING_EVERY = 15
 describe('a drawn attack plays its whole clip', () => {
   const scene = swingScene()
   const mutant = scene.focus[1]
-  const drawn = trace(scene, fakeArt({ mutant: { attack: 7 } }, {}, fakeWeapons()))[mutant.id]
-  const plain = trace(swingScene(), fakeArt({}, {}, fakeWeapons()))[mutant.id]
+  const drawn = trace(scene, fakeArt({ mutant: { attack: 7 } }, {}, {}, fakeWeapons()))[mutant.id]
+  const plain = trace(swingScene(), fakeArt({}, {}, {}, fakeWeapons()))[mutant.id]
 
   it('7 frames at tpf 2: attack.0 .. attack.6 over 14 ticks from every swing, then out of the state', () => {
     const at = onsets(drawn, 'attack')

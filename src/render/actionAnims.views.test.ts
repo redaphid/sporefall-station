@@ -48,15 +48,17 @@ import {
   trace as traceWith,
   type Frame,
   type Scene,
+  type TraceOpts,
 } from './animTestkit'
 
 const trace = (
   scene: Scene,
   extra: readonly ('draw' | 'fidget')[],
+  opts: TraceOpts = {},
   weapons?: ReturnType<typeof fakeWeapons>,
 ): Record<number, Frame[]> => {
   const clips = Object.fromEntries(extra.map((s) => [s, 8]))
-  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }, {}, weapons))
+  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }, {}, {}, weapons), opts)
 }
 
 /** The draw scene of actionAnims.test.ts, rendered every tick. */
@@ -90,7 +92,7 @@ describe('draw at the entity layer', () => {
   it('the drowner shows draw.0 .. draw.7 at tpf 2 from the engage tick, with its held weapon hidden', () => {
     const scene = drawScene()
     const d = scene.focus[0]
-    const frames = trace(scene, ['draw'], fakeWeapons())[d.id]
+    const frames = trace(scene, ['draw'], {}, fakeWeapons())[d.id]
     const at = frames.findIndex((f) => shown(f).startsWith('draw.'))
     expect(at).toBeGreaterThan(0)
     const clip = frames.slice(at, at + 16)
@@ -147,17 +149,20 @@ const digest = (t: Frame[][]): string[][] =>
 
 describe('a pack without action frames renders exactly as origin/main did', () => {
   const plain = fakeArt()
+  // The skid (skid.test.ts) is a later feature with its own switch; off, the
+  // renderer must draw exactly what it drew before it existed.
+  const off: TraceOpts = { skid: false }
   const now = {
-    draw: digest(Object.values(trace(drawScene(), []))),
-    kennel: digest(Object.values(trace(kennelScene(), []))),
+    draw: digest(Object.values(trace(drawScene(), [], off))),
+    kennel: digest(Object.values(trace(kennelScene(), [], off))),
     // Attack (wrench swing, pistol recoil), hurt and a death ghost; the
     // lobber's shells; a hive spire budding and spreading.
-    brawl: digest(Object.values(traceWith(brawlScene(), plain))),
-    siege: digest(Object.values(traceWith(siegeScene(), plain))),
-    hive: digest(Object.values(traceWith(hiveScene(), plain))),
+    brawl: digest(Object.values(traceWith(brawlScene(), plain, off))),
+    siege: digest(Object.values(traceWith(siegeScene(), plain, off))),
+    hive: digest(Object.values(traceWith(hiveScene(), plain, off))),
     // A pistol player standing, strafing, backpedalling and firing with its
     // aim held east, then a wrench; a drowner engaging and firing back.
-    aim: digest(Object.values(traceWith(aimScene(), plain))),
+    aim: digest(Object.values(traceWith(aimScene(), plain, off))),
   }
   const out = process.env.ACTION_ANIMS_GOLDEN
   if (out) writeFileSync(out, JSON.stringify(now, null, 1) + '\n')

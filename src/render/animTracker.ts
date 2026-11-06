@@ -17,6 +17,10 @@
  * (game/aiming.ts isAiming), the same on host, replay and, through the
  * snapshot's aim trailer, on a co-op client.
  *
+ * Not a state but an overlay on idle: a SKID (observeSkid) — the body ran at
+ * speed and stopped dead, so the display leans back against the run while the
+ * sim position has already stopped.
+ *
  * Some actions leave no such trace on the actor: the lobber's shell and a hive
  * spire's budding raise no `combat.cooldown`. Those start from sim EVENTS
  * (EVENT_STARTS). An event lives for one tick, so the renderer reads it from
@@ -38,6 +42,7 @@ import { ROLL_TICKS } from '../game/systems/roll'
 import { SIM_DT, type EntityId, type SimEvent } from '../game/types'
 import { entityMoving } from './anim'
 import { fidgetStart, hurtStart, resolveAnimState, type AnimStateName, type ResolvedAnim } from './animState'
+import type { SkidMotion } from './motion'
 
 /** Ticks a body must spend NOT engaged before engaging again re-plays `draw`.
  * The sim's own: the same window decides when an engage waits its
@@ -61,6 +66,104 @@ export interface AnimMemory {
   stillSince?: number
   /** Latest start per state from a sim event (EVENT_STARTS). */
   eventStarts?: Partial<Record<AnimStateName, number>>
+  /** Where the body was at the last observation (observeSkid). */
+  seen?: { tick: number; x: number; y: number }
+  /** The run in progress at speed: since when, and the last step observed
+   * (`vx/vy` tiles per tick, ending at `x/y` on `tick`). */
+  run?: { since: number; peak: number; tick: number; x: number; y: number; vx: number; vy: number }
+  /** The skid playing, or the last one while its dust is still in the air:
+   * where the feet stopped and how fast the run was (tiles/s). */
+  skid?: Skid
+}
+
+export interface Skid extends SkidMotion {
+  x: number
+  y: number
+  speed: number
+}
+
+/** When a stop is a SKID. `minSpeed` tiles/s is a run (every walker's top speed
+ * is 2.4+, the player's 4; a half-pushed stick or a wade is not); `runUp` ticks
+ * at that speed before the stop, so a 1-tick jitter never skids; and the last
+ * step must keep `keep` of the run's peak speed, so a body that eases down, a
+ * knockback slide decaying by friction, and the short final step that snaps a
+ * body flush against a wall all stop without one. `life` is how long a skid's
+ * memory lasts: the lean, and the dust after it. */
+export const SKID_GATE = { minSpeed: 2.2, runUp: 6, keep: 0.85, life: 16 } as const
+
+const still = (e: Entity): boolean =>
+  e.playerCtl?.downed !== undefined ||
+  (e.status !== undefined && (e.status.stun > 0 || e.status.sleep > 0)) ||
+  e.fx?.frozen !== undefined
+
+/**
+ * Observe a body's run and stop for the skid, given the state it resolved to.
+ *
+ * A frame may run several ticks at once, a hitstop may skip up to six, and a
+ * network client sees the same body at another cadence. So a stop's tick is not
+ * the tick it was SEEN: it is reconstructed from the distance covered since the
+ * last step seen at speed (a run is constant speed, so `distance / step` ticks
+ * of it went unseen). The lean is then a function of that tick alone, the same
+ * at every frame rate. A run's start, and the tick a skid is cut, come back the
+ * same way.
+ *
+ * No skid when the body stops into anything but idle (an attack, a draw, a
+ * flinch: those carry the momentum themselves), rolls (the tumble and its
+ * landing squash are the stop), is still pushing on (`intent` toward the run:
+ * a wall stopped it, not the legs), or is stunned, asleep, frozen or downed.
+ */
+export const observeSkid = (mem: AnimMemory, e: Entity, tick: number, state: AnimStateName, rolling: boolean): void => {
+  const seen = mem.seen
+  if (seen !== undefined && tick === seen.tick) return // a second frame of the same tick
+  if (seen !== undefined && tick < seen.tick) {
+    mem.run = undefined // rewound: what was observed is in the future now
+    mem.skid = undefined
+  }
+  mem.seen = { tick, x: e.pos.x, y: e.pos.y }
+  if (mem.skid !== undefined && tick >= mem.skid.at + SKID_GATE.life) mem.skid = undefined
+
+  const vx = e.pos.x - e.prevPos.x
+  const vy = e.pos.y - e.prevPos.y
+  const step = Math.hypot(vx, vy)
+  // Ticks of a constant-speed step it took to get from (x, y) to here.
+  const unseen = (x: number, y: number): number => (step > 0 ? Math.round(Math.hypot(e.pos.x - x, e.pos.y - y) / step) : 0)
+
+  if (rolling) {
+    mem.run = undefined
+    mem.skid = undefined
+    return
+  }
+  if (entityMoving(e, SIM_DT)) {
+    const sp = step / SIM_DT
+    const run = mem.run
+    // When this movement began: just after the last observation, give or take
+    // the unseen steps in between.
+    const began = seen === undefined ? tick : Math.max(seen.tick + 1, tick + 1 - unseen(seen.x, seen.y))
+    if (mem.skid !== undefined && mem.skid.cutAt === undefined) mem.skid.cutAt = Math.max(mem.skid.at, began)
+    if (sp < SKID_GATE.minSpeed || (run !== undefined && sp < SKID_GATE.keep * run.peak)) {
+      mem.run = undefined // a walk, or a body slowing down: no skid out of this
+      return
+    }
+    mem.run = { since: run?.since ?? began, peak: Math.max(run?.peak ?? 0, sp), tick, x: e.pos.x, y: e.pos.y, vx, vy }
+    return
+  }
+
+  if (mem.skid !== undefined && mem.skid.cutAt === undefined && state !== 'idle' && state !== 'fidget' && tick > mem.skid.at) {
+    mem.skid.cutAt = tick
+  }
+  const run = mem.run
+  mem.run = undefined
+  if (run === undefined) return
+  const len = Math.hypot(run.vx, run.vy)
+  // The run kept its last step for `unseen` more ticks, then stopped.
+  const at = Math.min(tick, run.tick + 1 + Math.round(Math.hypot(e.pos.x - run.x, e.pos.y - run.y) / len))
+  if (at - run.since < SKID_GATE.runUp) return
+  if (state !== 'idle' && state !== 'fidget') return
+  if (still(e)) return
+  const dirX = run.vx / len
+  const dirY = run.vy / len
+  if (e.intent.x * dirX + e.intent.y * dirY > 0.5) return // pushing into a wall
+  mem.skid = { at, dirX, dirY, x: e.pos.x, y: e.pos.y, speed: len / SIM_DT }
 }
 
 type EventOf<K extends SimEvent['type']> = Extract<SimEvent, { type: K }>
@@ -179,5 +282,6 @@ export const trackAnim = (
   const still = calm && (anim.state === 'idle' || anim.state === 'fidget')
   if (!still) mem.stillSince = undefined
   else mem.stillSince ??= tick
+  observeSkid(mem, e, tick, anim.state, rolling)
   return anim
 }

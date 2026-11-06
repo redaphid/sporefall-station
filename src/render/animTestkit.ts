@@ -49,11 +49,14 @@ export const KINDS = ['player', 'mutant', 'drowner', 'gloamhound', 'lobber', 'hi
 export const fakeArt = (
   clips: Partial<Record<(typeof KINDS)[number], FakeClips>> = {},
   tpf: Partial<Record<AnimStateName, number>> = {},
+  /** Art kind per set (ArtRegistry.artKind), e.g. `{ mutant: 'spore-drone' }`
+   * to draw a kind with the hover locomotion. */
+  kinds: Record<string, string> = {},
   weapons?: Record<string, HeldWeaponArt>,
 ): ArtRegistry => {
   const chars: Record<string, CharSet> = {}
   for (const k of KINDS) chars[k] = fakeSet(k, clips[k])
-  return createArt(fakeRenderer, { chars, weapons }, {}, tpf, true)
+  return createArt(fakeRenderer, { chars, charKinds: kinds, weapons }, {}, tpf, true)
 }
 
 /** Placeholder held-weapon art for every weapon in the game: each view one
@@ -126,12 +129,17 @@ export interface TraceOpts {
   tumble?: boolean
   /** Called after every update, with the views (tests reading ghosts). */
   inspect?: (views: EntityViews, tick: number) => void
+  /** The skid feature (EntityViews `skid`); omitted = the renderer's default. */
+  skid?: boolean
+  /** Render alphas, one frame each, per rendered tick (a display faster than
+   * the sim draws one tick several times); the last is recorded. Default [0.5]. */
+  alphas?: readonly number[]
 }
 
 /** Run the scene and record each focus entity's sprite on every rendered tick.
  * The event log is fed after every tick, the way main.ts feeds it. */
 export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Record<number, Frame[]> => {
-  const views = new EntityViews(art, { tumble: opts.tumble ?? false })
+  const views = new EntityViews(art, { tumble: opts.tumble ?? false, ...(opts.skid === undefined ? {} : { skid: opts.skid }) })
   views.setLevel(scene.w.level)
   const log = createEventLog()
   const stride = opts.stride ?? 1
@@ -144,7 +152,7 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
     if ((i + 1) % stride !== 0 || opts.frozen?.(scene.w.tick)) continue
     const events =
       opts.events === 'none' ? [] : opts.events === 'lastTick' ? [{ tick: scene.w.tick, events: scene.w.events }] : log.entries
-    views.update(scene.w.entities, 0.5, scene.w.tick, scene.w.floor, events)
+    for (const a of opts.alphas ?? [0.5]) views.update(scene.w.entities, a, scene.w.tick, scene.w.floor, events)
     opts.inspect?.(views, scene.w.tick)
     for (const e of scene.focus) {
       const v = internals(views).views.get(e.id)

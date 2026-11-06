@@ -21,6 +21,7 @@ import { eventStarts, trackAnim, type AnimMemory } from './animTracker'
 import type { TickEvents } from '../app/eventLog'
 import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
 import { deriveThrow, poseAt, restLift, simulateBody, TUMBLE, type BodyTrack, type DeathFacts, type IsSolid } from './displayBody'
+import { drawSkidDust, skidDust } from './skidDust'
 import {
   ARCHETYPE_SCALE,
   CHAR_PX,
@@ -112,6 +113,8 @@ interface View {
   lastFist?: { dir: Dir; fist: FistBox }
   /** What a death tumble needs from the last sighting (tumble on only). */
   last?: { x: number; y: number; vx: number; vy: number; maxHp: number; tumbles: boolean }
+  /** The dust a skid kicked up, while it is in the air (skidDust.ts). */
+  dust?: Graphics
 }
 
 /** A projectile at its latest sighting, kept a while after it vanished: the
@@ -274,14 +277,26 @@ export class EntityViews {
   private solid: IsSolid = () => false
   private rounds = new Map<number, SeenRound>()
 
+  /** Skid to a stop (animTracker.observeSkid): the lean and the dust (the held
+   * weapon follows the body's transform, lean included). Off = the motion this
+   * renderer drew before skids existed, exactly (the action-anims golden trace
+   * pins it). */
+  private skid: boolean
+
   /** `tumble`: a kill throws the body (displayBody.ts); off, the ghost
    * topples where it stood, as it always did. */
   constructor(
     private art: ArtRegistry,
-    opts: { tumble?: boolean } = {},
+    opts: { tumble?: boolean; skid?: boolean } = {},
   ) {
     this.root.sortableChildren = true
     this.tumble = opts.tumble ?? false
+    this.skid = opts.skid ?? true
+  }
+
+  /** Switch the skid on or off live (the `skidStop` feature flag). */
+  setSkid(on: boolean): void {
+    this.skid = on
   }
 
   /** The level a thrown body must stay out of the walls of. */
@@ -294,6 +309,7 @@ export class EntityViews {
   refresh(): void {
     for (const view of this.views.values()) {
       this.hideWeapon(view)
+      this.dropDust(view)
       this.root.removeChild(view.sprite)
       view.sprite.destroy()
     }
@@ -431,6 +447,7 @@ export class EntityViews {
       if (!view || view.archetype !== artKey) {
         if (view) {
           this.hideWeapon(view)
+          this.dropDust(view)
           this.root.removeChild(view.sprite)
           view.sprite.destroy()
         }
@@ -483,6 +500,8 @@ export class EntityViews {
       // --- Layer 2: procedural motion offsets (lean/bob/lunge/flinch/squash),
       // composed around the feet anchor. The roll tumble is whole-body and
       // keeps its dedicated branch below.
+      const style = locomotionFor(this.art.artKind(artKey))
+      const skid = this.skid && character ? view.anim.skid : undefined
       const motion: MotionPose =
         character && !rolling
           ? composeMotion({
@@ -495,8 +514,9 @@ export class EntityViews {
               vx: e.vel.x,
               moving,
               rollUntil: roll?.untilTick,
-              style: locomotionFor(this.art.artKind(artKey)),
+              style,
               drawn: drawsState(charSet, facing, anim.state),
+              skid,
             })
           : IDENTITY_POSE
 
@@ -589,6 +609,15 @@ export class EntityViews {
       // whatever they're consuming.
       view.sprite.zIndex = depthKey(e.kind, y)
 
+      // The skid's dust, kicked forward from where the feet stopped: in front of
+      // the body, or behind it when the run went up-screen (away from us).
+      const puffs = skid ? skidDust(skid, e.id, t, style) : []
+      if (puffs.length > 0 && skid) {
+        view.dust ??= this.root.addChild(new Graphics())
+        drawSkidDust(view.dust, puffs)
+        view.dust.zIndex = depthKey(e.kind, skid.y) + (skid.dirY < 0 ? -0.01 : 0.01)
+      } else this.dropDust(view)
+
       // --- Layer 3: the held weapon — a hand-anchored sprite that swings on
       // attack (melee) or recoils (ranged) and re-tints from its mods. Rolling
       // is a whole-body tumble, so the weapon is stowed for its duration, and
@@ -609,6 +638,7 @@ export class EntityViews {
       if (!view.seen) {
         this.views.delete(id)
         this.hideWeapon(view) // a corpse drops its weapon; the ghost is body-only
+        this.dropDust(view)
         if (continuous && this.art.isCharacterSprite(view.archetype)) {
           this.toGhost(view, id, tick, entities, eventLog) // died this tick — the sprite lives on briefly
         } else {
@@ -766,6 +796,14 @@ export class EntityViews {
       this.rounds.set(e.id, { x: e.pos.x, y: e.pos.y, vx: e.vel.x, vy: e.vel.y, tick, ownerId: p.ownerId, damage: p.damage })
     }
     for (const [id, r] of this.rounds) if (tick - r.tick > ROUND_MEMORY_TICKS || r.tick > tick) this.rounds.delete(id)
+  }
+
+  /** Drop a view's skid dust. Idempotent. */
+  private dropDust(view: View): void {
+    if (!view.dust) return
+    this.root.removeChild(view.dust)
+    view.dust.destroy()
+    view.dust = undefined
   }
 
   /** Drop a view's weapon/cap/glow sprites (bare fists, non-characters, rolling,

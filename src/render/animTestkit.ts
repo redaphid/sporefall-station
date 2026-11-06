@@ -47,10 +47,13 @@ export const KINDS = ['player', 'mutant', 'drowner', 'gloamhound', 'lobber', 'hi
 export const fakeArt = (
   clips: Partial<Record<(typeof KINDS)[number], FakeClips>> = {},
   tpf: Partial<Record<AnimStateName, number>> = {},
+  /** Art kind per set (ArtRegistry.artKind), e.g. `{ mutant: 'spore-drone' }`
+   * to draw a kind with the hover locomotion. */
+  kinds: Record<string, string> = {},
 ): ArtRegistry => {
   const chars: Record<string, CharSet> = {}
   for (const k of KINDS) chars[k] = fakeSet(k, clips[k])
-  return createArt(fakeRenderer, { chars }, {}, tpf, true)
+  return createArt(fakeRenderer, { chars, charKinds: kinds }, {}, tpf, true)
 }
 
 interface ViewInternals {
@@ -100,8 +103,9 @@ export interface TraceOpts {
   events?: 'log' | 'lastTick' | 'none'
   /** The skid feature (EntityViews `skid`); omitted = the renderer's default. */
   skid?: boolean
-  /** Render alpha per frame. Default 0.5. */
-  alpha?: number
+  /** Render alphas, one frame each, per rendered tick (a display faster than
+   * the sim draws one tick several times); the last is recorded. Default [0.5]. */
+  alphas?: readonly number[]
 }
 
 /** Run the scene and record each focus entity's sprite on every rendered tick.
@@ -119,7 +123,7 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
     if ((i + 1) % stride !== 0 || opts.frozen?.(scene.w.tick)) continue
     const events =
       opts.events === 'none' ? [] : opts.events === 'lastTick' ? [{ tick: scene.w.tick, events: scene.w.events }] : log.entries
-    views.update(scene.w.entities, opts.alpha ?? 0.5, scene.w.tick, scene.w.floor, events)
+    for (const a of opts.alphas ?? [0.5]) views.update(scene.w.entities, a, scene.w.tick, scene.w.floor, events)
     for (const e of scene.focus) {
       const v = internals(views).views.get(e.id)
       const g = v ? undefined : internals(views).ghosts.find((x) => x.id === e.id)

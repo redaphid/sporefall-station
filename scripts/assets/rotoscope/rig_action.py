@@ -156,15 +156,28 @@ def aim_arms(B, J, shift=(0.0, 0.0), reach=0.86, drop=0.10, yaw=0.0):
     a = np.linalg.norm(F["shoulder_near"] - F["elbow_near"])
     b = np.linalg.norm(F["elbow_near"] - F["hand_near"])
     L = a + b
-    sx = abs(B.side[0])
-    W = abs(F["shoulder_far"][0] - F["shoulder_near"][0]) / sx if sx > 0.5 else 0.85 * L
-    W = min(W, 1.1 * L)
+    # the far shoulder in the body frame, solved from the fit's screen offset (forward + side, no height):
+    # the support hand then reaches the gun hand in every view, whatever the fit's torso turn
+    Dx = F["shoulder_near"] - F["shoulder_far"]
+    M = np.array([[B.fwd[0], B.side[0]], [B.fwd[1], B.side[1]]])
+    fD, sD = np.linalg.lstsq(M, Dx, rcond=None)[0]
+    # near is his right, so the far shoulder sits to his left: sD > 0. Side-on the screen barely shows the
+    # width (and a turned torso in the fit reads as the wrong sign): give it the body's own
+    sD = 0.85 * L if abs(B.side[0]) < 0.5 else max(sD, 0.3 * L)
+    D = np.array([fD, sD, 0.0])
+    # where a forced width leaves the fit's far shoulder off its projection, take up the rest in forward + up,
+    # so on screen the support hand still lands on the gun hand
+    c = Dx - B.proj(*D)
+    fC, uC = np.linalg.lstsq(np.array([[B.fwd[0], 0.0], [B.fwd[1], -1.0]]), c, rcond=None)[0]
+    D = D + np.array([fC, 0.0, uC])
     turn = math.radians(yaw)
     f = reach * L
-    G = np.array([f * math.cos(turn), -W / 2 + f * math.sin(turn), -drop * L])  # from the near shoulder
+    G = np.array([f * math.cos(turn), f * math.sin(turn), -drop * L]) - np.array([0.0, sD / 2, 0.0])
+    if np.linalg.norm(G) > 0.97 * L:  # out of reach: pull the gun in along the facing
+        G[0] = math.sqrt(max(0.0, (0.97 * L) ** 2 - G[1] ** 2 - G[2] ** 2))
     shift = np.asarray(shift, float)
     for w, T, pole in (("near", G, (0.0, 1.0, -1.0)),
-                       ("far", G + np.array([-0.06 * L, W - 0.02 * L, -0.07 * L]), (0.0, -1.0, -1.0))):
+                       ("far", G + D + np.array([-0.06 * L, 0.0, -0.07 * L]), (0.0, -1.0, -1.0))):
         sh = F[f"shoulder_{w}"] + shift
         J[f"shoulder_{w}"] = sh
         J[f"elbow_{w}"] = sh + B.proj(*ik3(T, a, b, pole))

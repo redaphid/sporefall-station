@@ -100,6 +100,8 @@ export interface TraceOpts {
   events?: 'log' | 'lastTick' | 'none'
   /** A kill throws the body (displayBody.ts). Default off: the topple. */
   tumble?: boolean
+  /** Called after every update, with the views (tests reading ghosts). */
+  inspect?: (views: EntityViews, tick: number) => void
 }
 
 /** Run the scene and record each focus entity's sprite on every rendered tick.
@@ -119,6 +121,7 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
     const events =
       opts.events === 'none' ? [] : opts.events === 'lastTick' ? [{ tick: scene.w.tick, events: scene.w.events }] : log.entries
     views.update(scene.w.entities, 0.5, scene.w.tick, scene.w.floor, events)
+    opts.inspect?.(views, scene.w.tick)
     for (const e of scene.focus) {
       const v = internals(views).views.get(e.id)
       const g = v ? undefined : internals(views).ghosts.find((x) => x.id === e.id)

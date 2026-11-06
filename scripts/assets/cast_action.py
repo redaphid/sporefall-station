@@ -39,6 +39,9 @@ import post as P  # noqa: E402
 import spritesheet as S  # noqa: E402
 from palette import RGB as LOCKED  # noqa: E402
 
+sys.path.insert(0, os.path.join(HERE, "rotoscope"))
+import action_checks as AC  # noqa: E402
+
 DIRS = CW.DIRS
 PACKS = CW.PACKS
 
@@ -189,12 +192,28 @@ def cmd_post(a):
             dx, dy = shifts.get(d, (0, 0))
             dx, dy = round(dx * px / 96), round(dy * px / 96)
             prompt, workflow = _flow(run, d)
+            belt = {}  # per frame, the sprite row just under the belt (the rig's pelvis + 2 sprite px at 96)
+            for n in rig:
+                belt[n] = int(round(to_sprite(union[d], scale[d], px, *rig[n]["body"][3][:2])[1] + dy + 2 * px / 96))
+            cmap = None
+            if a.snap_idle:  # the clip's colours onto the shipped idle's, per band, learned from the rest frame
+                rest = _locked(Image.fromarray(np.roll(np.roll(np.asarray(frames[(d, f"{a.state}-0")]), dy, 0), dx, 1)))
+                cmap = AC.learn_map(np.asarray(idle), np.asarray(rest), belt.get(0, int(0.55 * px)))
+            faces = {}
             for n in range(len(idx)):
                 im = _locked(Image.fromarray(np.roll(np.roll(np.asarray(frames[(d, f"{a.state}-{n}")]), dy, 0), dx, 1)))
+                if cmap is not None:
+                    im = Image.fromarray(AC.apply_map(np.asarray(im), belt.get(n, int(0.55 * px)), cmap), "RGBA")
                 if a.breathe and n % 2 == 1 and n in rig:
                     im = breathe(im, to_sprite(union[d], scale[d], px, *rig[n]["body"][3][:2])[1] + dy)
                 if a.idle_ends and n in (0, len(idx) - 1):  # the cut into and out of the clip is the idle itself
                     im = idle.copy()
+                elif a.idle_start and n == 0:
+                    im = idle.copy()
+                ok, why, _ = AC.face_verdict(idle, im)
+                faces[n] = why
+                if not ok:
+                    report.setdefault("face_fail", []).append(f"{px}/{d}-{n}: {why}")
                 f = f"{a.out}/{px}/{a.kind}-{d}-{a.state}-{n}.png"
                 im.save(f)
                 if prompt and workflow:
@@ -204,6 +223,10 @@ def cmd_post(a):
             print(f"{pack} {d}: {len(idx)} frames; frame 0 vs idle {report['frames'][f'{px}/{d}-0']}, "
                   f"last vs idle {report['frames'][f'{px}/{d}-{len(idx) - 1}']}")
     json.dump(report, open(f"{a.out}/post.json", "w"), indent=1)
+    for f in report.get("face_fail", []):
+        print(f"FACE FAIL {f}")
+    if a.face_strict and report.get("face_fail"):
+        raise SystemExit(f"{len(report['face_fail'])} frame(s) lost the idle's face (action_checks.py face); see post.json")
 
 
 def _clips_shift(spec):
@@ -307,6 +330,13 @@ def main():
     p.add_argument("--no-paint", action="store_true", help="keep the rig's props out of the frame: the model drew "
                    "the weapon (docs/art-direction.md: no hand-drawn guns in shipped frames)")
     p.add_argument("--breathe", action="store_true", help="odd frames raise the upper body 1 px above the belt (a held pose's breath)")
+    p.add_argument("--idle-start", action="store_true", help="frame 0 is the shipped idle itself (a clip that ends elsewhere, "
+                                                             "e.g. the player's draw, which ends IN the aim pose)")
+    p.add_argument("--snap-idle", action="store_true", help="map the clip's colours onto the shipped idle's, above and below "
+                                                            "the belt, learned from frame 0 (action_checks.py snap): the "
+                                                            "trousers keep the idle's brown")
+    p.add_argument("--face-strict", action="store_true", help="exit non-zero when a frame lost the idle's face "
+                                                              "(action_checks.py face; always reported in post.json)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("export")
     p.add_argument("dir")

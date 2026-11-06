@@ -50,3 +50,20 @@ describe('scripted demo runs are deterministic wins', () => {
     expect(r.w.gameOver).toBe(false)
   })
 })
+
+describe('scripted aim (ax/ay): the body strafes with its aim held', () => {
+  it('playerDraw: every strafing and backpedalling tick aims east while the move goes north, south or west', () => {
+    const src = createScriptedInput(SCRIPTS.playerDraw)
+    const cmds = Array.from({ length: scriptTicks(SCRIPTS.playerDraw) }, () => src.sample())
+    const moving = cmds.filter((c) => c.moveX !== 0 || c.moveY !== 0)
+    expect(moving.length).toBe(36 + 36 + 30)
+    for (const c of moving) expect([c.aimX, c.aimY]).toEqual([1, 0])
+    expect(cmds.slice(0, 60).every((c) => c.moveX === 0 && c.moveY === 0)).toBe(true) // stands through the draw
+  })
+
+  it('a step without ax/ay still aims along the move, as before', () => {
+    const src = createScriptedInput([{ ticks: 2, x: 0, y: 1 }])
+    const c = src.sample()
+    expect([c.aimX, c.aimY]).toEqual([0, 1])
+  })
+})

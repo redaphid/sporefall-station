@@ -24,6 +24,11 @@ export interface ScriptStep {
   special?: boolean
   /** Dodge-roll edge: fire once, on the first tick of the segment. */
   roll?: boolean
+  /** Aim axis held for the segment (a twin-stick's right stick): the body faces
+   * and fires along it while it moves along x/y, so it can strafe and
+   * backpedal. Absent = aim along the move, as before. */
+  ax?: number
+  ay?: number
 }
 
 export const scriptTicks = (steps: ScriptStep[]): number => steps.reduce((n, s) => n + s.ticks, 0)
@@ -38,7 +43,7 @@ const stepCmd = (s: ScriptStep, i: number, seq: number): InputCmd => {
   cmd.interact = !!s.interact && i === 0
   cmd.special = !!s.special && i === 0
   cmd.roll = !!s.roll && i === 0
-  const aim = selectAim(cmd.moveX, cmd.moveY)
+  const aim = selectAim(cmd.moveX, cmd.moveY, s.ax ?? 0, s.ay ?? 0)
   cmd.aimX = aim.x
   cmd.aimY = aim.y
   return cmd
@@ -226,6 +231,19 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
     { ticks: 100 }, // stand: the west bullet arrives ~138 → player hurt flinch
     { ticks: 1, roll: true, x: 1 }, // dodge-roll east (tumble, tick 220)
     { ticks: 59 }, // landing squash, settle back to idle breathe
+  ],
+
+  // The player's draw (feat/player-draw-1106): the gun comes up as the floor
+  // starts, so the player stands through the quickdraw, then strafes north and
+  // south with the aim held east (aimwalk, gun on the line), stops (aim), and
+  // backpedals west. Paired with e2e/feature-player-draw.mjs.
+  playerDraw: [
+    { ticks: 60 }, // stand: draw, then the braced aim
+    { ticks: 36, y: -1, ax: 1 }, // strafe north, aim east
+    { ticks: 36, y: 1, ax: 1 }, // strafe south, aim east
+    { ticks: 24, ax: 1 }, // stand in aim
+    { ticks: 30, x: -1, ax: 1 }, // backpedal west, aim east
+    { ticks: 24, ax: 1 },
   ],
 
   // Weapon-mod PICKUP headline (feat/mod-pickups): drop onto the lane, then stroll

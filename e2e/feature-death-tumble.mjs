@@ -1,13 +1,13 @@
 // #172 death tumble: a kill THROWS the body (display only).
 //
 // Stage: the open lot west of the walled block in combat-stage. The player
-// stands at (34, 9); four sleeping mutants stand around it. Rounds are fired
-// at them one at a time from the player's side, so each body is thrown a
-// different way:
-//   east  (44.8, 9)  full-force round flying east  -> slams the block's wall (x 46)
-//   north (34, 5)    full-force round flying north -> open ground
-//   sw    (30, 12.5) full-force round flying south-west
-//   west  (30, 9)    a weak finishing round (6 hp left of 24) flying west
+// stands at (34, 9); sleeping victims stand around it and are killed one beat
+// at a time (SHOTS), each a different case of the throw:
+//   east-wall    full-damage round east into a mutant flush on the wall (x 46)
+//   pistol-plink 14 dmg on a 40-max-hp mutant: under the threshold, the old topple
+//   shotgun      five 7-dmg pellets point blank on a 7-hp mutant, fanned south-west
+//   sporeling    a pistol round finishing a sporeling (14 / 22 = 0.64)
+//   grenade-a..c a grenade onto a cluster of three: radial throws, one tick
 //
 // Two passes over the same deterministic run:
 //   1. `record()`: the live video with stills (the clip).
@@ -28,20 +28,33 @@ const STEP_OUT = process.env.TUMBLE_STEP_OUT ?? join(OUT, 'death-tumble-steps')
 const ZOOM = Number(process.env.TUMBLE_ZOOM ?? 1)
 
 const PLAYER = { x: 34, y: 9 }
+/** Every victim, asleep where it is put. `arch` overrides the art (a cloned
+ * mutant drawn as that archetype); `max` overrides max hp. */
 export const VICTIMS = [
-  { tag: 'east-wall', x: 44.8, y: 9, hp: 24 },
-  { tag: 'north', x: 34, y: 5, hp: 24 },
-  { tag: 'southwest', x: 30, y: 12.5, hp: 24 },
-  { tag: 'west-weak', x: 30, y: 9, hp: 6 },
+  { tag: 'east-wall', x: 45.55, y: 9, hp: 24 },
+  { tag: 'pistol-plink', x: 34, y: 5, hp: 14, max: 40 },
+  { tag: 'shotgun', x: 30, y: 12.5, hp: 7 },
+  { tag: 'sporeling', x: 30, y: 9, hp: 14, max: 22, arch: 'sporeling' },
+  { tag: 'grenade-a', x: 38, y: 13, hp: 24 },
+  { tag: 'grenade-b', x: 38.9, y: 13.3, hp: 24 },
+  { tag: 'grenade-c', x: 38.3, y: 13.9, hp: 24 },
 ]
-/** [tick, victim index, round start, round velocity tiles/s, damage]. */
+const ray = (from, deg, speed) => ({ x: Math.cos((deg * Math.PI) / 180) * speed, y: Math.sin((deg * Math.PI) / 180) * speed })
+/** [tick, label, rounds: [start, velocity tiles/s, damage, onLand?]]. */
 const SHOTS = [
-  [20, 0, { x: 41.5, y: 9 }, { x: 14, y: 0 }, 24],
-  [70, 1, { x: 34, y: 7.6 }, { x: 0, y: -14 }, 24],
-  [120, 2, { x: 32.2, y: 10.3 }, { x: -9.9, y: 9.9 }, 24],
-  [170, 3, { x: 32.6, y: 9 }, { x: -14, y: 0 }, 24],
+  // A full-damage round into a mutant flush against the block's west wall.
+  [20, 'east-wall', [[{ x: 42.5, y: 9 }, { x: 14, y: 0 }, 24]]],
+  // A pistol plink (14 of 40 max hp) on a mutant: under the threshold.
+  [65, 'pistol-plink', [[{ x: 34, y: 7.6 }, { x: 0, y: -14 }, 14]]],
+  // Point-blank shotgun (5 x 7 dmg, 16 tiles/s) finishing a mutant on 7 hp:
+  // i-frames void all but the first pellet's hit, so the renderer counts the volley.
+  [110, 'shotgun', [-12, -6, 0, 6, 12].map((d) => [{ x: 31.4, y: 11.1 }, ray(0, 135 + d, 16), 7])],
+  // A pistol round (14 dmg) finishing a sporeling: 14/22 = 0.64.
+  [155, 'sporeling', [[{ x: 32.6, y: 9 }, { x: -14, y: 0 }, 14]]],
+  // A grenade lobbed onto the cluster: lands at (38.4, 13.4) after 15 ticks.
+  [200, 'grenade', [[{ x: 36, y: 11 }, { x: (2.4 / 15) * 30, y: (2.4 / 15) * 30 }, 0, { kind: 'explode', radius: 1.8, damage: 40 }]]],
 ]
-const TOTAL = 240
+const TOTAL = 300
 
 const stage = () => {
   const w = JSON.parse(JSON.stringify(base))
@@ -56,6 +69,8 @@ const stage = () => {
     m.pos = { x: v.x, y: v.y }
     m.prevPos = { x: v.x, y: v.y }
     m.health.hp = v.hp
+    if (v.max) m.health.max = v.max
+    if (v.arch) m.archetype = v.arch
     // Asleep: they stand where they are put (sleeping NPCs skip AI).
     m.status.sleep = 100000
     m.ai.home = { x: v.x, y: v.y }
@@ -68,25 +83,28 @@ const stage = () => {
   return w
 }
 
-/** In-page: put a round in flight (the host world, `?e2e`). */
-const shoot = ([, , at, vel, dmg]) => {
+/** In-page: put a volley in flight (the host world, `?e2e`). */
+const shoot = ([, , rounds]) => {
   const w = window.__world
-  const id = w.nextId++
-  const e = {
-    id,
-    kind: 'projectile',
-    archetype: 'projectile',
-    pos: { ...at },
-    prevPos: { ...at },
-    vel: { ...vel },
-    intent: { x: 0, y: 0 },
-    speed: 0,
-    radius: 0.15,
-    facing: Math.atan2(vel.y, vel.x),
-    projectile: { ownerId: w.entities.find((x) => x.playerCtl).id, damage: dmg, ttl: 60 },
+  const owner = w.entities.find((x) => x.playerCtl).id
+  for (const [at, vel, dmg, onLand] of rounds) {
+    const id = w.nextId++
+    const e = {
+      id,
+      kind: 'projectile',
+      archetype: onLand ? 'grenade' : 'projectile',
+      pos: { ...at },
+      prevPos: { ...at },
+      vel: { ...vel },
+      intent: { x: 0, y: 0 },
+      speed: 0,
+      radius: 0.15,
+      facing: Math.atan2(vel.y, vel.x),
+      projectile: onLand ? { ownerId: owner, damage: 0, ttl: 15, onLand, arc: true } : { ownerId: owner, damage: dmg, ttl: 60 },
+    }
+    w.entities.push(e)
+    w.byId.set(id, e)
   }
-  w.entities.push(e)
-  w.byId.set(id, e)
 }
 
 const params = { mode: 'solo', e2e: '1', world: '@inline', zoom: String(ZOOM) }
@@ -109,11 +127,11 @@ const ok = await record({
   params,
   beforeTicks: load,
   stills: [
-    ...SHOTS.map((s, i) => ({ tick: s[0] - 1, label: `shot-${i}-${VICTIMS[s[1]].tag}`, act: (page) => page.evaluate(shoot, s) })),
+    ...SHOTS.map((s, i) => ({ tick: s[0] - 1, label: `shot-${i}-${s[1]}`, act: (page) => page.evaluate(shoot, s) })),
     { tick: TOTAL, label: 'end' },
   ],
   readState,
-  expect: (s) => [s.mutants !== 0 && `${s.mutants} mutants survived: a round missed`],
+  expect: (s) => [s.mutants !== 0 && `${s.mutants} mutants survived: a round missed`].filter(Boolean),
 })
 
 // --- 2) the stepped pass ---------------------------------------------------

@@ -632,11 +632,11 @@
       "kind": "npc",
       "archetype": "drowner",
       "pos": {
-        "x": 7,
+        "x": 7.8,
         "y": 11
       },
       "prevPos": {
-        "x": 7,
+        "x": 7.8,
         "y": 11
       },
       "vel": {
@@ -682,10 +682,10 @@
         "mode": "idle",
         "faction": "rootcult",
         "home": {
-          "x": 7,
+          "x": 7.8,
           "y": 11
         },
-        "thinkAt": 0,
+        "thinkAt": 45,
         "sightRange": 9,
         "behavior": "raider"
       }
@@ -695,12 +695,12 @@
       "kind": "npc",
       "archetype": "drowner",
       "pos": {
-        "x": 7.9,
-        "y": 8.9
+        "x": 8.4,
+        "y": 9.4
       },
       "prevPos": {
-        "x": 7.9,
-        "y": 8.9
+        "x": 8.4,
+        "y": 9.4
       },
       "vel": {
         "x": 0,
@@ -745,10 +745,10 @@
         "mode": "idle",
         "faction": "rootcult",
         "home": {
-          "x": 7.9,
-          "y": 8.9
+          "x": 8.4,
+          "y": 9.4
         },
-        "thinkAt": 0,
+        "thinkAt": 45,
         "sightRange": 9,
         "behavior": "raider"
       }
@@ -759,11 +759,11 @@
       "archetype": "drowner",
       "pos": {
         "x": 10,
-        "y": 8
+        "y": 8.8
       },
       "prevPos": {
         "x": 10,
-        "y": 8
+        "y": 8.8
       },
       "vel": {
         "x": 0,
@@ -809,9 +809,9 @@
         "faction": "rootcult",
         "home": {
           "x": 10,
-          "y": 8
+          "y": 8.8
         },
-        "thinkAt": 0,
+        "thinkAt": 45,
         "sightRange": 9,
         "behavior": "raider"
       }

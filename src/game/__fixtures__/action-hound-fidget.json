@@ -632,12 +632,12 @@
       "kind": "npc",
       "archetype": "gloamhound",
       "pos": {
-        "x": 7.5,
-        "y": 12.5
+        "x": 8,
+        "y": 12
       },
       "prevPos": {
-        "x": 7.5,
-        "y": 12.5
+        "x": 8,
+        "y": 12
       },
       "vel": {
         "x": 0,
@@ -682,8 +682,8 @@
         "mode": "idle",
         "faction": "neutral",
         "home": {
-          "x": 7.5,
-          "y": 12.5
+          "x": 8,
+          "y": 12
         },
         "thinkAt": 1000000000,
         "sightRange": 10,
@@ -696,11 +696,11 @@
       "archetype": "gloamhound",
       "pos": {
         "x": 10,
-        "y": 8.5
+        "y": 9.2
       },
       "prevPos": {
         "x": 10,
-        "y": 8.5
+        "y": 9.2
       },
       "vel": {
         "x": 0,
@@ -746,7 +746,7 @@
         "faction": "neutral",
         "home": {
           "x": 10,
-          "y": 8.5
+          "y": 9.2
         },
         "thinkAt": 1000000000,
         "sightRange": 10,
@@ -758,12 +758,12 @@
       "kind": "npc",
       "archetype": "gloamhound",
       "pos": {
-        "x": 12.5,
-        "y": 12.5
+        "x": 12,
+        "y": 12
       },
       "prevPos": {
-        "x": 12.5,
-        "y": 12.5
+        "x": 12,
+        "y": 12
       },
       "vel": {
         "x": 0,
@@ -808,8 +808,8 @@
         "mode": "idle",
         "faction": "neutral",
         "home": {
-          "x": 12.5,
-          "y": 12.5
+          "x": 12,
+          "y": 12
         },
         "thinkAt": 1000000000,
         "sightRange": 10,

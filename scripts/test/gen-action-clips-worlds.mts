@@ -1,5 +1,5 @@
 // Worlds for the in-game proof of the first drawn action clips (e2e/feature-action-clips.mjs):
-//   drowner-draw   three drowners on patrol at 3 tiles from the player, west, north-west and north,
+//   drowner-draw   three drowners on patrol at 2.2 tiles from the player, west, north-west and north,
 //                  so their first sight of the player is an engage seen in e, se and s: the 8-frame
 //                  `draw` plays, then the first shot lands NpcDef.drawTicks (16) after the engage.
 //   hound-fidget   three gloam-hounds standing calm, facing e, ne and w (w is e mirrored), brains
@@ -32,14 +32,15 @@ const stage = (place: (w: ReturnType<typeof deserializeWorld>) => void, name: st
 }
 
 stage((w) => {
-  for (const [dx, dy] of [[-3, 0], [-2.1, -2.1], [0, -3]] as const) {
+  for (const [dx, dy] of [[-2.2, 0], [-1.6, -1.6], [0, -2.2]] as const) {
     const d = spawnNpc(w, 'drowner', CX + dx, CY + dy)
     d.facing = Math.atan2(-dy, -dx)
+    d.ai!.thinkAt = 45 // first look at tick 45, once the camera has settled on the player: the engage is on screen
   }
 }, 'drowner-draw')
 
 stage((w) => {
-  for (const [dx, dy, face] of [[-2.5, 1.5, 0], [0, -2.5, -Math.PI / 4], [2.5, 1.5, Math.PI]] as const) {
+  for (const [dx, dy, face] of [[-2, 1, 0], [0, -1.8, -Math.PI / 4], [2, 1, Math.PI]] as const) {
     const h = spawnNpc(w, 'gloamhound', CX + dx, CY + dy)
     h.facing = face
     h.ai!.thinkAt = 1e9 // calm for the whole clip: no hunt, no wander

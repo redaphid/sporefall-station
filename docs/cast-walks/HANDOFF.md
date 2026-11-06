@@ -1,4 +1,34 @@
-# Cast walk run: handoff, 2026-11-05 23:40 PT
+# Cast walk run: handoff, 2026-11-06 11:00 MST (overnight run 06:35-11:35)
+
+**Read first if resuming.** Decision trail: `/mnt/d/tmp/cast-walks/.audit/overnight-1106.tsv`. Board: https://draw.hypnodroid.com/b/sporefall-overnight-1106 (status cards, montage history, PROGRESS tail; `/mnt/d/tmp/cast-walks/dashboard/push_dash.py` refreshes it).
+
+## Ready to ship (Aaron pushes; the classifier blocks main pushes from sessions)
+
+Both fast-forward from origin/main 8ecfd465, merge-trap checked on the combination, gate hash G7 938319cdcc807028 unchanged:
+1. `git push origin f91170d8:main`: ship/batch-1106b = derelict-bot walk, bog-mutant (pod-carrier) walk, hive-spire idle, 8 regenerated props, hand-sized held weapons + beasts' natural weapons, levelgen timing-test flake fix. 5521 tests pass.
+2. then `git push origin ee613512:main`: ship/actions-1106 = the above + action engine (one state table; drawn draw/fidget; full attack/hurt/death clips; lob/hive event starts; pistol carriers wait 16 ticks before the first shot) + drowner pistol draw (5 dirs) + hive-spire attack clip. 5710 tests pass.
+After each push: watch deploy-web, check /ota/version.json and one frame's sha on the live site (rule 5).
+
+## Questions for Aaron (one at a time)
+
+1. spore-mortar: gate 9/9 on branch art/spore-mortar-1105; ship or redesign?
+2. mireclaw-stalker and mireclaw-alpha (art/mireclaw-alpha-1106 b3ffb103): symmetric backs fail 4a on n. Exempt n? Cases: /mnt/d/tmp/cast-walks/gate-case-stalker-n-2026-11-05.md, gate-case-alpha-n-2026-11-06.md
+3. gloam-hound head_h gate change (the hound scratch fidget, art/action-clips-1106-hound 7e2217c8, ships with it)
+4. consistency check judges action frames against the idle silhouette: judge actions as a family?
+5. spore-drone (art/spore-drone-1106 d7733d36, canvas fan wings): gate-5 head window is the wing tips on a flyer. /mnt/d/tmp/cast-walks/gate-case-spore-drone-head-drift-2026-11-06.md
+6. bog-mender (art/bog-mender-1106 f0f6c677, medbay automaton): 1/50 front frame read side/away. docs/cast-walks/gate-cases/bog-mender-4a-s-facing.md on its branch
+7. brood-sac (art/brood-sac-1106 4d59c686, root-walker egg): 4a "not a figure" 39/50
+8. gate hole: verify.py exits 0 when a kind has no jobs (only the boss was affected; data fixed cafa1769). /mnt/d/tmp/cast-walks/gate-case-verify-fail-open-2026-11-06.md
+Also: hound "fangs" keep the knife's durability (wear out after 20 bites) to keep fights byte-identical; removing it is a balance call.
+
+## Infra
+
+Hard crashes 11-06 00:30 and 10:12 (5 since 11-04). The 10:12 one happened with mindmeld stood down. A GPU power cap was tried earlier and did not help. Watchdog now auto-releases a lock only after 3 min idle; batches hold the lock between directions.
+
+---
+
+## Previous handoff (2026-11-05 23:40 PT)
+
 
 The run animates the whole Sporefall cast with 5-direction walk cycles. Aaron paused it on 11-05 to free his GPU.
 Read `PROTOCOL.md` first for the rules. This file says where things stand and how to resume.

@@ -48,9 +48,12 @@ for (const [fixture, themes, zooms] of JOBS.filter(([f]) => !process.env.ONLY ||
     // fixed timeout instead let one pack photograph a half-loaded tile pool and
     // the next a complete one -- the floor changed between shots, which destroys
     // the whole point of holding everything else still.
+    // main.ts parks on `__loadWorld` BEFORE it defines `__setTheme`, so waiting
+    // for the theme hook first deadlocks: hand over the world, then set the theme.
+    await page.waitForFunction(() => typeof window.__loadWorld === 'function')
+    await page.evaluate((j) => window.__loadWorld(j), world)
     await page.waitForFunction(() => typeof window.__setTheme === 'function')
     await page.evaluate((t) => window.__setTheme(t), theme)
-    await page.evaluate((j) => window.__loadWorld(j), world)
     await page.waitForTimeout(700)
     for (const z of zooms) {
       await page.evaluate((zz) => window.__zoom(zz, true), z)

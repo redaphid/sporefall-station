@@ -1,7 +1,7 @@
 // draw and fidget at the entity layer the game draws with: EntityViews over a
 // real createArt registry, fed a tiny fake pack whose every frame is its own
-// labelled texture, and the real sim underneath. The tests read back which
-// frame each sprite shows, tick by tick.
+// labelled texture, and the real sim underneath (animTestkit.ts). The tests
+// read back which frame each sprite shows, tick by tick.
 //
 // The GOLDEN half pins "a pack without the new frames renders exactly as
 // today": the per-tick sprite trace (texture, position, rotation, scale, alpha,
@@ -13,60 +13,35 @@
 // this branch's src/game over that checkout first: old renderer, current sim.
 // (Done once: the engage wind-up, NpcDef.drawTicks, delays the drowner's first
 // shot 16 ticks; draw windows from tick 51 moved, window 0 and the kennel not.)
+// The brawl, siege and hive scenes were added the same way, from 8ecfd465's
+// renderer over this branch's sim; 828dffad's renderer gives the same digests.
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { Texture, type Renderer, type Sprite } from 'pixi.js'
 import { describe, expect, it } from 'vitest'
-import type { Entity } from '../game/entity'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
-import { runTicks, walledRoom, worldFromRows } from '../game/testkit'
-import type { World } from '../game/world'
-import { createArt, type CharSet, type DirPose } from './art'
-import { EntityViews } from './sprites'
+import { walledRoom, worldFromRows } from '../game/testkit'
+import {
+  brawlScene,
+  fakeArt,
+  hiveScene,
+  shown,
+  siegeScene,
+  teleport,
+  trace as traceWith,
+  type Frame,
+  type Scene,
+} from './animTestkit'
 
-const DIRS = ['s', 'se', 'e', 'ne', 'n'] as const
-const tex = (label: string): Texture => new Texture({ label })
-
-/** A pose per direction: legacy idle + step, an 8-frame walk clip, and
- * optionally 8-frame `draw` / `fidget` clips — every frame its own texture,
- * labelled `<name>.<dir>.<state>.<n>`. */
-const fakeSet = (name: string, extra: readonly ('draw' | 'fidget')[]): CharSet => {
-  const set: CharSet = {}
-  for (const d of DIRS) {
-    const clip = (state: string): Texture[] => Array.from({ length: 8 }, (_, n) => tex(`${name}.${d}.${state}.${n}`))
-    const pose: DirPose = { idle: tex(`${name}.${d}.idle`), step: tex(`${name}.${d}.step`), clips: { walk: clip('walk') } }
-    for (const s of extra) pose.clips![s] = clip(s)
-    set[d] = pose
-  }
-  return set
-}
-
-const fakeRenderer = { generateTexture: () => Texture.EMPTY } as unknown as Renderer
-
-const artFor = (extra: readonly ('draw' | 'fidget')[]) =>
-  createArt(
-    fakeRenderer,
-    { chars: { drowner: fakeSet('drowner', extra), gloamhound: fakeSet('gloamhound', extra), player: fakeSet('player', []) } },
-    {},
-    {},
-    true,
-  )
-
-interface ViewInternals {
-  views: Map<number, { sprite: Sprite; weapon?: Sprite }>
-}
-const viewOf = (v: EntityViews, id: number) => (v as unknown as ViewInternals).views.get(id)
-
-const teleport = (e: Entity, x: number, y: number): void => {
-  e.pos = { x, y }
-  e.prevPos = { x, y }
+const trace = (scene: Scene, extra: readonly ('draw' | 'fidget')[]): Record<number, Frame[]> => {
+  const clips = Object.fromEntries(extra.map((s) => [s, 8]))
+  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }))
 }
 
 /** The draw scene of actionAnims.test.ts, rendered every tick. */
-const drawScene = () => {
+const drawScene = (): Scene => {
   const w = worldFromRows(walledRoom(40, 12), { seed: 7 })
   const p = spawnPlayer(w, 0, 3.5, 5.5)
   const d = spawnNpc(w, 'drowner', 33.5, 5.5)
@@ -83,7 +58,7 @@ const drawScene = () => {
 }
 
 /** Two tethered hounds (speed 0), rendered every tick. */
-const kennelScene = () => {
+const kennelScene = (): Scene => {
   const w = worldFromRows(walledRoom(20, 10), { seed: 11 })
   const a = spawnNpc(w, 'gloamhound', 9.5, 3.5)
   const b = spawnNpc(w, 'gloamhound', 9.5, 6.5)
@@ -91,53 +66,6 @@ const kennelScene = () => {
   b.speed = 0
   return { w, focus: [a, b], before: (): void => {}, n: 700 }
 }
-
-interface Frame {
-  tick: number
-  tex: string
-  x: number
-  y: number
-  rot: number
-  sx: number
-  sy: number
-  alpha: number
-  weapon: string | null
-}
-
-/** Run the scene and record each focus entity's sprite every tick. */
-const trace = (
-  scene: { w: World; focus: Entity[]; before: (i: number) => void; n: number },
-  extra: readonly ('draw' | 'fidget')[],
-): Record<number, Frame[]> => {
-  const views = new EntityViews(artFor(extra))
-  const out: Record<number, Frame[]> = {}
-  for (const e of scene.focus) out[e.id] = []
-  for (let i = 0; i < scene.n; i++) {
-    scene.before(i)
-    runTicks(scene.w, new Map(), 1)
-    views.update(scene.w.entities, 0.5, scene.w.tick, scene.w.floor)
-    for (const e of scene.focus) {
-      const v = viewOf(views, e.id)
-      if (!v) continue
-      const s = v.sprite
-      out[e.id].push({
-        tick: scene.w.tick,
-        tex: s.texture.label ?? '?',
-        x: s.position.x,
-        y: s.position.y,
-        rot: s.rotation,
-        sx: s.scale.x,
-        sy: s.scale.y,
-        alpha: s.alpha,
-        weapon: v.weapon ? `${v.weapon.rotation.toFixed(6)}@${v.weapon.position.x.toFixed(3)},${v.weapon.position.y.toFixed(3)}` : null,
-      })
-    }
-  }
-  return out
-}
-
-/** "<state>.<n>" of a label like "drowner.e.draw.3", or the bare state. */
-const shown = (f: Frame): string => f.tex.split('.').slice(2).join('.')
 
 describe('draw at the entity layer', () => {
   it('the drowner shows draw.0 .. draw.7 at tpf 2 from the engage tick, with its held weapon hidden', () => {
@@ -197,19 +125,28 @@ const digest = (t: Frame[][]): string[][] =>
     return out
   })
 
-describe('a pack without draw/fidget frames renders exactly as origin/main did', () => {
+describe('a pack without action frames renders exactly as origin/main did', () => {
+  const plain = fakeArt()
   const now = {
     draw: digest(Object.values(trace(drawScene(), []))),
     kennel: digest(Object.values(trace(kennelScene(), []))),
+    // Attack (wrench swing, pistol recoil), hurt and a death ghost; the
+    // lobber's shells; a hive spire budding and spreading.
+    brawl: digest(Object.values(traceWith(brawlScene(), plain))),
+    siege: digest(Object.values(traceWith(siegeScene(), plain))),
+    hive: digest(Object.values(traceWith(hiveScene(), plain))),
   }
   const out = process.env.ACTION_ANIMS_GOLDEN
   if (out) writeFileSync(out, JSON.stringify(now, null, 1) + '\n')
 
-  it('the golden digest exists and covers the engage and the long idle', () => {
+  it('the golden digest exists and covers the engage, the long idle, a fight to the death, shelling and budding', () => {
     expect(existsSync(GOLDEN)).toBe(true)
     const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')) as typeof now
     expect(golden.draw.map((c) => c.length)).toEqual([7])
     expect(golden.kennel.map((c) => c.length)).toEqual([14, 14])
+    expect(golden.brawl.map((c) => c.length)).toEqual([5, 3])
+    expect(golden.siege.map((c) => c.length)).toEqual([6])
+    expect(golden.hive.map((c) => c.length)).toEqual([6])
   })
 
   it('sprite texture, transform, alpha and held weapon match the old renderer on every tick', () => {

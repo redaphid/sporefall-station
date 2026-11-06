@@ -377,12 +377,12 @@
   "prop.plant": "props/bio-planter.png",
   "prop.spore-node": "props/spore-node.png",
   "item.default": "items/biogel-kit.png",
-  "item.rivetDriver": "items/spore-pistol.png",
-  "item.pressureLance": "items/root-club.png",
-  "item.siphonSpike": "items/shard-knife.png",
+  "item.rivetDriver": "items/rivetDriver.png",
+  "item.pressureLance": "items/pressureLance.png",
+  "item.siphonSpike": "items/siphonSpike.png",
   "item.medkit": "items/biogel-kit.png",
   "item.cash": "items/credit-chits.png",
-  "item.scatterFunnel": "items/scatter-blaster.png",
+  "item.scatterFunnel": "items/scatterFunnel.png",
   "item.molotov": "items/phosphor-flask.png",
   "item.grenade-item": "items/spore-grenade.png",
   "projectile": "fx/spore-bolt.png",
@@ -987,7 +987,13 @@
   "weapon.rivetDriver.se-mod-explosive-0": "weapons/rivetDriver-se-mod-explosive-0.png",
   "weapon.rivetDriver.se-mod-frost-0": "weapons/rivetDriver-se-mod-frost-0.png",
   "weapon.rivetDriver.se-mod-incendiary-0": "weapons/rivetDriver-se-mod-incendiary-0.png",
-  "weapon.rivetDriver.se-mod-shock-0": "weapons/rivetDriver-se-mod-shock-0.png"
+  "weapon.rivetDriver.se-mod-shock-0": "weapons/rivetDriver-se-mod-shock-0.png",
+  "item.cageRam": "items/cageRam.png",
+  "item.coilRepeater": "items/coilRepeater.png",
+  "item.phosphorHose": "items/phosphorHose.png",
+  "item.frostCondenser": "items/frostCondenser.png",
+  "item.lullDarter": "items/lullDarter.png",
+  "item.sparkCoil": "items/sparkCoil.png"
  },
  "anim": {
   "walk": 4

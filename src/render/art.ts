@@ -404,14 +404,8 @@ export const ITEM_ALIAS: Record<string, string> = {
   //
   // Thrown explosives — the spore-grenade art was already on disk.
   grenade: 'grenade-item',
-  // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
-  coilRepeater: 'scatterFunnel',
-  phosphorHose: 'scatterFunnel',
-  frostCondenser: 'scatterFunnel',
-  lullDarter: 'rivetDriver',
-  sparkCoil: 'rivetDriver',
-  // Blunt melee wears the root-club.
-  cageRam: 'pressureLance',
+  // The lore weapons each have their own item art (theme ITEM_IDS), so no
+  // weapon borrows another's icon any more.
 }
 
 // Archetypes with a dedicated character sprite; the rest reuse the warden body.

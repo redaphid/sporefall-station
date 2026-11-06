@@ -533,3 +533,44 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## mireclaw-alpha (boss), 2026-11-06: design kept, a heavy crab walk by skeleton control in all 5 directions
+
+The Mireclaw Alpha (`npcs.ts` `boss`) had one frame, the August hires s-idle,
+drawn in every direction. Aaron rejected a redesign (11-05: "much worse"), so
+the shipped design is kept: a glossy violet dome on spiky black chitin, a fanged
+maw, spiny raised limbs (one a curved hook), thick violet-plated legs with hooked
+claws. Procedure: [`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md),
+the many-legs route in `docs/cast-walks/PIPELINE-NONBIPED.md`.
+
+| stage | what |
+|---|---|
+| design | kept as shipped; a beast that holds nothing |
+| input | the shipped `mireclaw-alpha-s-idle.png`, sha256 `b840d40bab00428a…` |
+| keyframes | s: the shipped s-idle itself, 7x NEAREST on 1280x720. se/e/ne/n: Qwen-Image-Edit band (`keyframe_probe.py`), a describe of the shipped look (round 1 drew a smooth cartoon crab, rejected): se s11, e s3, ne s1004, n s1004. Rear mark on ne/n: a seam stripe down the shell, inside the silhouette |
+| motion | Wan 2.2 Fun-Control A14B from a stick skeleton of `scripts/assets/rotoscope/rig_crab.py` (new): diagonal leg sets, duty .6, shell bob and roll, raised limbs sway; s/se 2 walking pairs + 2 raised limbs a side as drawn, e/ne/n 3 pairs; period 16, seed 3 |
+| takes | s take1 (t1-s); se/e/ne/n take1 of the round-2 keyframes (t2); round-1 se/e takes archived |
+| loops | period 16 in every direction: s .116, se .132, e .143, ne .131, n .122 |
+| colour lock | `assemble` re-snaps until the shipped s-idle's colours hold (5ef1a3b4): 8 colours, all in the locked 34; the seam stripe lands on (123,135,145) |
+| size | `--lock-height` now sizes the sheet so every height-matched direction fits, and seats each direction's lowest row on canvas-2 (b1fb8c61). Idles s and ne are walk-1 (`assemble --idle`) |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`; 50 keys for `char.boss.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7): 8/9, NOT shipped.
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .116 / .132 / .143 / .131 / .122 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame | FAIL 3 of 50: n-walk-1/2/7 read toward-viewer (s/se/e/ne 40/40) |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, boil max .3, head drift max .14 | identity .022-.046, boil .095-.128, head .045-.055 |
+| 6 | VLM style vs the frog | 0 of 10 |
+| 6b | pixels off the locked palette | 0.0 |
+
+Parked: n on gate 4a, rule-14 case `/mnt/d/tmp/cast-walks/gate-case-alpha-n-2026-11-06.md` (the
+stalker's symmetric-back pattern). An earlier run printed 9/9 with the VLM gates checking 0
+frames: the boss had no `generate.CHARS` jobs (fixed cafa1769; case
+`gate-case-verify-fail-open-2026-11-06.md`). Gait at 96 px (`gait_measure.py`): lift s 3.5,
+se 3.9, e 7.5, ne 4.6, n 2.8 px, phase_R .16-.47. Frames 76-86 px tall and 80-90 wide on the
+hi-res pack (the shipped s-idle was 90x90).

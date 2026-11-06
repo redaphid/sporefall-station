@@ -26,3 +26,27 @@ Contact: `/mnt/d/tmp/cast-walks/mireclaw-alpha/step0-1105/r1/contact.png`. None 
 the oversized claw (the hook), all eight stand on four planted limbs (not a biped), the anchor pulled B
 to grey, and every one has 2-3 px toes (leg p5 1-4 px, limb p10 2-6). A00001 has the best mass (domed
 spined head-body, two orange eye dots, thin .030, w/h 1.02): it is the paint-over base for round 2.
+
+## Round 2 (changed prompt + img2img from a paint-over)
+
+A (seed 110601 x4, anchor off): the claw led the prompt, weighted 1.4, with "standing on two legs" weighted 1.3.
+The claw now dominates, but the body turned into a worm or quadruped on a dirt slab. A00002 is orange all over,
+which breaks the single hot accent. All four are rejected.
+B/C: img2img from `r2/paint-A1.png`, which is r1 A00001 recoloured to a teal ramp. Its four planted limbs were
+replaced by two short stout legs, one raised two-jaw claw with orange tips and a small tucked arm, and its spines
+were recoloured bone-tan. Denoise .55 (B, seed 110611 x2) and .65 (C, seed 110612 x2). All four pass the brief's
+numbers. Each is 92 px wide by 74-76 px tall, leg p5 7-8 px, limb p10 11-13 px, thin .012-.017. Orange (plus
+its red shade) is the only hot hue.
+
+Pick: **C00001**. It has the most chitin detail: a segmented claw, short pale fangs that echo the stalker's, and
+plated legs. Its floor_like is .177, where the stalker measures .342 and carapace-brute .182.
+Runners-up: C00002 (the claw half sinks into the floor) and B00002 (blockier legs, still close to the paint).
+Watch: the pick is a straight front view, not 3/4. The claw reads as a raised two-pronged pincer, not a
+crab claw.
+
+Design sheet (rule 6, for Aaron's veto): https://2cb.pw/design-sheet-1105-29a6ba
+(`/mnt/d/tmp/cast-walks/mireclaw-alpha/design-sheet-1105.png`).
+Staged: `/mnt/d/tmp/cast-walks/runs/mireclaw-alpha/input-anchor.png` (sha256 210ce77a, 96 px, 17 locked
+colours, 0 off-palette), `describe.txt`, `describe-back.txt` (face-free) and `step1-launch.txt`. Wan has not
+started. The old anchor and the 09-29 concept are archived in
+`/mnt/d/tmp/cast-walks/archive/mireclaw-alpha/anchor-2026-11-05/`.

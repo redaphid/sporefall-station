@@ -43,6 +43,12 @@ flowchart LR
   2026-11-06: "doglike creatures have 'knives' or similar, which is bizarre." Hounds,
   stalkers, lurkers, brutes and the boss use natural weapons (`natural: true` in
   `src/game/data/items.ts`; the beast relabel lands with branch `fix/weapon-overlay-1106`): nothing is drawn in a paw or jaw, nothing drops as loot.
+- **The look promises what the shot delivers.** Design a weapon to its existing
+  behaviour: projectile speed, tracer, hit sparks, knockback. 2026-11-06, on a glowing
+  "bubble gun" sidearm: "That 'bubble gun' or whatever would be very unsatisfying to use,
+  with characteristics different than the existing projectiles." The fast hard-hitting
+  sidearm reads as a punchy kinetic gun (recoil, muzzle flash, a solid barrel); lore
+  shows in salvaged-tool details and at most one small essence-glow accent.
 - **Animated.** A weapon has an idle loop (the essence jar bubbles) and a use clip
   (recoil and flash, a swing arc).
 - **Held like a weapon.** Guns are aimed, not dangled at the hip: characters walk

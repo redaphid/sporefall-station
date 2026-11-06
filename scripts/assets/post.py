@@ -19,14 +19,24 @@ def kcentroid(im: Image.Image, tw: int, th: int, centroids: int = 2) -> Image.Im
     the source patch and take the dominant cluster's mean color. Preserves
     outlines and flat fills far better than box/lanczos at sprite scales."""
     im = im.convert("RGBA")
-    src = np.asarray(im, dtype=np.float32)
+    h, w = im.height, im.width
+    return kcentroid_grid(im, np.linspace(0, w, tw + 1).astype(int), np.linspace(0, h, th + 1).astype(int))
+
+
+def kcentroid_grid(im: Image.Image, xs, ys) -> Image.Image:
+    """`kcentroid` on explicit cell edges (len(xs) - 1 columns, len(ys) - 1 rows) in source pixels.
+    Edges may lie outside the image: that part of a cell is empty, so a cell wholly outside is
+    transparent. A non-walk state is posted on its walk's own grid, extended past the walk's window."""
+    src = np.asarray(im.convert("RGBA"), dtype=np.float32)
     h, w = src.shape[:2]
-    out = np.zeros((th, tw, 4), dtype=np.float32)
-    ys = np.linspace(0, h, th + 1).astype(int)
-    xs = np.linspace(0, w, tw + 1).astype(int)
-    for j in range(th):
-        for i in range(tw):
-            patch = src[ys[j]:max(ys[j] + 1, ys[j + 1]), xs[i]:max(xs[i] + 1, xs[i + 1])]
+    out = np.zeros((len(ys) - 1, len(xs) - 1, 4), dtype=np.float32)
+    for j in range(len(ys) - 1):
+        for i in range(len(xs) - 1):
+            y0, x0 = ys[j], xs[i]
+            y1, x1 = max(y0 + 1, ys[j + 1]), max(x0 + 1, xs[i + 1])
+            if y1 <= 0 or x1 <= 0 or y0 >= h or x0 >= w:
+                continue
+            patch = src[max(0, y0):y1, max(0, x0):x1]
             px = patch.reshape(-1, 4)
             opaque = px[px[:, 3] > 128]
             if len(opaque) * 2 <= len(px):  # mostly transparent -> transparent

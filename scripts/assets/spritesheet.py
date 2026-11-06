@@ -1093,8 +1093,23 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
     keyframe is its own Qwen edit and draws the figure at its own size, so each direction is
     scaled to make its idle as tall as the s idle. A quadruped's side is legitimately lower
     than its front, so it never takes this."""
-    keyed = {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ()), band=band), shrink)
-             for k, v in raws.items()}
+    keyed = key_frames(raws, pockets, ghost, beside, band, shrink)
+    union, scale = fixed_windows(keyed, dirs, poses, canvas, content, lock_height)
+    out = {}
+    for d in dirs:
+        for p in poses:
+            out[(d, p)] = post_fixed(keyed[(d, p)], union.get(d), scale.get(d), canvas, pal) if (d, p) in keyed \
+                else Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    return drop_specks(out, dirs, poses, canvas)
+
+
+def key_frames(raws: dict, pockets: int = 0, ghost=None, beside=None, band: float = 1.0, shrink: int = 1) -> dict:
+    return {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ()), band=band), shrink)
+            for k, v in raws.items()}
+
+
+def fixed_windows(keyed: dict, dirs, poses, canvas: int, content: int | None, lock_height: bool = False):
+    """({dir: crop window in raw pixels}, {dir: scale}): `pixelize_fixed`'s one window and scale per direction."""
     boxes = {k: bbox(v) for k, v in keyed.items()}
     union = {}
     for d in dirs:
@@ -1113,17 +1128,29 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
             if b:
                 fits = content / max(u[3] - u[1], u[2] - u[0])
                 scale[d] = min(s * (ref[3] - ref[1]) / (b[3] - b[1]), fits)
-    out = {}
-    for d in dirs:
-        u = union.get(d)
-        for p in poses:
-            frame = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-            if u and (d, p) in keyed:
-                tw, th = max(1, round((u[2] - u[0]) * scale[d])), max(1, round((u[3] - u[1]) * scale[d]))
-                px = despeckle(snap(P.kcentroid(keyed[(d, p)].crop(u), tw, th), pal))
-                frame.paste(px, ((canvas - tw) // 2, canvas - 1 - th), px)
-            out[(d, p)] = frame
-    return drop_specks(out, dirs, poses, canvas)
+    return union, scale
+
+
+def post_fixed(keyed: Image.Image, u, scale, canvas: int, pal, whole: bool = False) -> Image.Image:
+    """One keyed raw frame through its direction's window `u` at `scale`, feet on canvas - 2. `whole`
+    extends the window's own pixel grid over the full canvas, so a pose that reaches past every walk
+    frame (an aimed arm) keeps its reach and the pixels inside the window match the walk's grid."""
+    frame = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    if not u:
+        return frame
+    tw, th = max(1, round((u[2] - u[0]) * scale)), max(1, round((u[3] - u[1]) * scale))
+    x0, y0 = (canvas - tw) // 2, canvas - 1 - th
+    if whole:
+        cw, ch = (u[2] - u[0]) / tw, (u[3] - u[1]) / th
+        # kcentroid's own edges inside the window (np.linspace: k * step, the last edge exact), extended
+        xs = np.array([u[0] + (u[2] - u[0] if k == tw else np.floor(k * cw)) for k in range(-x0, canvas - x0 + 1)], int)
+        ys = np.array([u[1] + (u[3] - u[1] if k == th else np.floor(k * ch)) for k in range(-y0, canvas - y0 + 1)], int)
+        px = despeckle(snap(P.kcentroid_grid(keyed, xs, ys), pal))
+        frame.paste(px, (0, 0), px)
+        return frame
+    px = despeckle(snap(P.kcentroid(keyed.crop(u), tw, th), pal))
+    frame.paste(px, (x0, y0), px)
+    return frame
 
 
 SPECK_PX = 12  # at 96 px; a detached piece this small or smaller may be a speck

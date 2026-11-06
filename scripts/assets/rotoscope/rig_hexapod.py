@@ -4,9 +4,15 @@
   python3 rig_hexapod.py --dir se --ref keyframe.png --out <dir> [--period 16] [--stride .5] [--lift .22]
   python3 skeleton.py <dir> --stick 5 --ref keyframe.png
 
-Gait: alternating tripod. Front and rear legs of one side step with the middle leg of the other (L0 R1 L2,
-then R0 L1 R2), duty 0.5, so three feet are always down and the body dips once per tripod swap. Every
-foot's path is a function of phase, so frame `period` equals frame 0 exactly.
+Gait: alternating tripod (default). Front and rear legs of one side step with the middle leg of the other
+(L0 R1 L2, then R0 L1 R2), duty 0.5, so three feet are always down and the body dips once per tripod swap.
+`--gait ripple` is a crawl wave: each side swings rear, middle, front in turn, the two sides half a cycle
+apart, so with `--duty .67` two feet are up at a time (never two neighbours on one side). Every foot's path
+is a function of phase, so frame `period` equals frame 0 exactly.
+
+`--axis upright` is for a body that stands on its legs rather than lying along them (brood-sac's egg): the
+drawn axis is a short vertical stub from the hips up into the body, and the fit outline is the whole
+ellipsoid sitting on the hips, not the upper half of a heap.
 
 The body is rigid (gloom-lurker's bubble heap): it only bobs. The creature is posed in its own frame
 (forward -Y, up +Z, ground z 0), turned by the direction's yaw (s 0, se 45, e 90, ne 135, n 180), and
@@ -64,8 +70,12 @@ class Plan:
         self.pole_up = a.pole_up
         self.heap = (a.heap_w, a.heap_l, a.heap_h)   # ellipsoid semi-axes x, y, z, centred over the body
         # the drawn body axis, head to tail: head tip, head, shell middle, heap top, rear plate
-        self.axis = [(0, -1.25, self.body_z * 0.9), (0, -0.95, self.body_z * 1.1), (0, -0.1, self.body_z + 0.35),
-                     (0, 0.35, self.body_z + self.heap[2] * 0.75), (0, 1.0, self.body_z + 0.15)]
+        self.gait, self.upright = a.gait, a.axis == "upright"
+        if self.upright:
+            self.axis = [(0, 0, self.body_z), (0, 0, self.body_z + self.heap[2] * 0.6)]
+        else:
+            self.axis = [(0, -1.25, self.body_z * 0.9), (0, -0.95, self.body_z * 1.1), (0, -0.1, self.body_z + 0.35),
+                         (0, 0.35, self.body_z + self.heap[2] * 0.75), (0, 1.0, self.body_z + 0.15)]
 
     def foot(self, rest, phase):
         """Stance: the foot slides back at constant speed (in place). Swing: it arcs forward."""
@@ -79,14 +89,18 @@ class Plan:
 
     def pose(self, t):
         """{leg name: [hip, knee, mid, tip]} and the body axis, in the creature frame, at phase t."""
-        dip = self.bob * (0.5 - 0.5 * math.cos(4 * math.pi * t))
+        dip = self.bob * (0.5 - 0.5 * math.cos((4 if self.gait == "tripod" else 6) * math.pi * t))
         legs = {}
         for sx, side in ((-1, "L"), (1, "R")):
             for i, (hy, ang) in enumerate(self.legs):
                 hip = [sx * self.hip_x, hy, self.body_z - dip]
                 a = math.radians(ang)
                 rest = [hip[0] + sx * self.foot_r * math.cos(a), hy - self.foot_r * math.sin(a), 0.0]
-                phase = 0.0 if (i % 2 == 0) == (side == "L") else 0.5
+                if self.gait == "tripod":
+                    phase = 0.0 if (i % 2 == 0) == (side == "L") else 0.5
+                else:  # ripple: swing starts rear (i 2) to front (i 0) a third apart, R half a cycle after L
+                    start = (2 - i) / 3 + (0.5 if side == "R" else 0.0)
+                    phase = (self.duty - start) % 1.0
                 tip = self.foot(rest, (t + phase) % 1.0)
                 d = v_sub(tip, hip)
                 dist = min(max(v_len(d), abs(self.femur - self.tibia) + 1e-3), self.femur + self.tibia - 1e-3)
@@ -107,11 +121,12 @@ class Plan:
         legs, body = self.pose(0.0)
         pts = [p for chain in legs.values() for p in chain] + body
         hw, hl, hh = self.heap
+        cz, js = (self.body_z + hh, range(1, 24)) if self.upright else (self.body_z, range(1, 12))
         for i in range(24):
-            for j in range(1, 12):
-                th, ph = 2 * math.pi * i / 24, math.pi * j / 24  # upper half only
+            for j in js:  # a heap shows its upper half; an upright body all of it, sitting on the hips
+                th, ph = 2 * math.pi * i / 24, math.pi * j / 24
                 pts.append([hw * math.sin(ph) * math.cos(th), hl * math.sin(ph) * math.sin(th),
-                            self.body_z + hh * math.cos(ph)])
+                            cz + hh * math.cos(ph)])
         return pts
 
 
@@ -171,6 +186,8 @@ def main():
     ap.add_argument("--stride", type=float, default=0.5, help="a foot's travel along the body, units")
     ap.add_argument("--lift", type=float, default=0.22)
     ap.add_argument("--duty", type=float, default=0.5)
+    ap.add_argument("--gait", choices=("tripod", "ripple"), default="tripod")
+    ap.add_argument("--axis", choices=("beetle", "upright"), default="beetle")
     ap.add_argument("--bob", type=float, default=0.03)
     ap.add_argument("--body-z", type=float, default=0.38)
     ap.add_argument("--femur", type=float, default=0.62)
@@ -196,7 +213,7 @@ def main():
               "legs": {n: [cam.px(p) for p in chain] for n, chain in legs.items()}}
         json.dump(js, open(os.path.join(a.out, f"joints-{i:02d}.json"), "w"))
     json.dump(info, open(os.path.join(a.out, "fit.json"), "w"), indent=1)
-    print(f"{a.period} frames (tripod) {a.dir} -> {a.out}")
+    print(f"{a.period} frames ({a.gait}) {a.dir} -> {a.out}")
 
 
 if __name__ == "__main__":

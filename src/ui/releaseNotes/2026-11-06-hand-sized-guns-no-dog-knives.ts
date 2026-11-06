@@ -1,1 +1,1 @@
-export default 'Hand-sized guns; hounds bite, no knives'
+export default 'No more floating knives; hounds bite'

@@ -30,7 +30,7 @@ The renderer already has the states. No theme ships frames for any of them excep
 | A missing state borrows frame 0 of the next state in its chain: attack to walk to idle, hurt to idle, death to hurt to idle. | `animState.ts` `STATE_FALLBACK` |
 | Shipped keys in `swampspace-hires`: idle 105, step 105, walk 360. Attack, hurt, roll and death: 0. | `public/themes/swampspace-hires/manifest.json` |
 | Theme cadence override: `"anim": {"walk": 4}`. It is per theme and per state, not per kind. | same manifest; `theme.ts` `resolveAnimTpf` |
-| Attack starts when `combat.cooldown` rises between frames, which is the tick the swing or shot lands. | `src/render/sprites.ts` (render-derived attack signal) |
+| Attack starts when `combat.cooldown` rises between frames, which is the tick the swing lands or the shot fires. | `src/render/sprites.ts` (render-derived attack signal) |
 | Hurt starts at `status.hitFlashUntil - 3`. Death plays on a ghost after the entity leaves the snapshot. | `animState.ts` `resolveAnimState`, `sprites.ts` death ghosts |
 | Procedural motion always adds a lunge (attack), a decaying shudder (hurt) and a 90-degree topple with fade (death). A drawn loop switches off only the idle and walk cycles. | `src/render/motion.ts` `composeMotion`, `drawnCycle` |
 | Locomotion styles by art kind: `spore-drone` and `gloom-lurker` hover, `brood-sac` pulses, `sporeling-mite` waddles. Everything else strides. | `motion.ts` `LOCOMOTION` |
@@ -53,7 +53,7 @@ These are renderer changes unless marked. None is made here.
    `src/game/systems/groups.ts`, which pushes `{type: 'lob', entityId}`. Map the sim events to a state start
    in the renderer's event pass: `lob` to attack (lobber), `hiveSpawn` and `hiveSpread` to attack or a new
    `spawn` state (hive-spire, keyed on `byId`), `aiGoal` with `goal: 'summon'` (mireclaw-alpha), `packRage`
-   (gloam-hound howl).
+   (gloam-hound howl; it carries `groupId`, so every member starts).
 4. **A `wake` one-shot state.** `dormancy.ts` pushes `{type: 'woke', entityId, by}` for brood-sac and
    gloom-lurker. Add `wake` to `ANIM_STATES` (fallback `wake` to `idle`), and draw a dormant idle under the
    existing `idle` key for a dormant entity, or add a `dormant` loop state.

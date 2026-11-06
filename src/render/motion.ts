@@ -104,6 +104,11 @@ export interface MotionInput {
   state: AnimStateName
   /** State start tick (one-shots; loops ignore it). */
   start: number
+  /** End tick (exclusive) of a one-shot's window, when the pack's drawn clip
+   * runs it past the fixed STATE_TICKS window. Only death reads it: the fade
+   * covers the window's last STATE_TICKS.death ticks, so a long drawn death
+   * stays visible while it plays. Omitted = start + the fixed window. */
+  end?: number
   /** Integer sim tick. */
   tick: number
   /** Continuous view-time (tick + render alpha) — smoothness only. */
@@ -223,12 +228,14 @@ export const composeMotion = (m: MotionInput): MotionPose => {
       break
     }
     case 'death': {
-      // Topple around the feet (side chosen deterministically per entity) and
-      // fade out; alpha hits exactly 0 as the window closes.
+      // Topple around the feet (side chosen deterministically per entity) over
+      // the fixed window, and fade out over the window's last STATE_TICKS.death
+      // ticks; alpha hits exactly 0 as the window closes.
       const prog = clamp01((m.t - m.start) / STATE_TICKS.death)
+      const fadeFrom = (m.end ?? m.start + STATE_TICKS.death) - STATE_TICKS.death
       const side = m.id % 2 === 0 ? 1 : -1
       if (!m.drawn) p.rot += side * MOTION.deathFall.rot * Math.pow(prog, 0.7)
-      p.alpha *= 1 - prog
+      p.alpha *= 1 - clamp01((m.t - fadeFrom) / STATE_TICKS.death)
       break
     }
     case 'roll':

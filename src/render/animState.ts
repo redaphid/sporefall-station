@@ -11,9 +11,10 @@
  * One table, ANIM_STATE_DEFS, says everything the engine knows about a state:
  * whether it loops, its cadence, how long a one-shot stays up, what it borrows
  * when a pack draws no frames for it, and whether it hides the held weapon. A
- * new action is a row here, a start source in animTracker.ts, and a slot in
- * ANIM_PRIORITY; the theme loader, manifest validation and key grammar all
- * iterate ANIM_STATES, so the frames load with no further change.
+ * new action is a row here, a start source in animTracker.ts (a field it
+ * observes on the entity, or a row in EVENT_STARTS for a sim event), and a
+ * slot in ANIM_PRIORITY; the theme loader, manifest validation and key grammar
+ * all iterate ANIM_STATES, so the frames load with no further change.
  */
 
 // ---------------------------------------------------------------------------
@@ -23,12 +24,16 @@
 export type AnimStateName = 'idle' | 'walk' | 'attack' | 'hurt' | 'roll' | 'death' | 'draw' | 'fidget'
 
 /** How long a one-shot stays active once started:
- * - a number: that many ticks, whatever the art (fixed gameplay-feel windows);
+ * - `{ clipAtLeast: n }`: the pose's own drawn clip, `frames × tpf`, but never
+ *   less than n ticks. A pack that draws no frames for the state gets exactly
+ *   n (the fixed gameplay-feel window), so it looks as it always did; a pack
+ *   that draws a longer clip plays all of it. The effects timed against n (the
+ *   weapon swing, lunge, flinch, death topple) keep n: see STATE_TICKS.
  * - `'sim'`: the sim's own window, passed in as `AnimInputs.simEnds` (roll);
  * - `'clip'`: exactly the pose's own drawn clip, `frames × tpf`. Such a state is
  *   DRAWN-ONLY: with no frames of its own it never activates, and the character
  *   shows whatever it would have shown without it. */
-export type OnceWindow = number | 'sim' | 'clip'
+export type OnceWindow = { clipAtLeast: number } | 'sim' | 'clip'
 
 export type AnimStateDef =
   | {
@@ -53,16 +58,17 @@ export type AnimStateDef =
     }
 
 /** THE state table. `satisfies` keeps each row's literal types, so
- * `ANIM_STATE_DEFS.attack.window` is the number 6, not `OnceWindow`. */
+ * `ANIM_STATE_DEFS.attack.window.clipAtLeast` is the number 6. */
 export const ANIM_STATE_DEFS = {
   idle: { play: 'loop', tpf: 12, while: 'always', borrows: [] },
   // walk tpf matches the legacy 2-frame walk cadence (WALK_TPF).
   walk: { play: 'loop', tpf: 6, while: 'moving', borrows: ['idle'] },
-  attack: { play: 'once', tpf: 2, window: 6, borrows: ['walk', 'idle'] },
-  hurt: { play: 'once', tpf: 3, window: 8, borrows: ['idle'] },
+  // attack, hurt, death: a drawn clip plays whole; without one, the fixed window.
+  attack: { play: 'once', tpf: 2, window: { clipAtLeast: 6 }, borrows: ['walk', 'idle'] },
+  hurt: { play: 'once', tpf: 3, window: { clipAtLeast: 8 }, borrows: ['idle'] },
   // Roll's window is the sim's (`playerCtl.roll.untilTick`), never a render guess.
   roll: { play: 'once', tpf: 3, window: 'sim', borrows: ['walk', 'idle'] },
-  death: { play: 'once', tpf: 5, window: 18, borrows: ['hurt', 'idle'] },
+  death: { play: 'once', tpf: 5, window: { clipAtLeast: 18 }, borrows: ['hurt', 'idle'] },
   // An armed NPC pulls its weapon the moment it engages (animTracker.ts).
   draw: { play: 'once', tpf: 2, window: 'clip', borrows: [], stowsWeapon: true },
   // An occasional idle variant (scratch, shift weight) on a still, calm body.
@@ -73,10 +79,15 @@ export const ANIM_STATES = Object.keys(ANIM_STATE_DEFS) as readonly AnimStateNam
 
 /** Resolution order, highest first. Death is terminal; a roll is a committed
  * whole-body tumble (and its i-frames make a mid-roll hurt impossible); a hurt
- * flinch reads as more urgent than anything the body chose to do. `draw` beats
- * `attack` because the sim fires on the very tick it engages a target in range:
- * with attack on top a drawn draw would never be seen, and the first shot's
- * pose is what gives way. Walk beats fidget so a step cancels a scratch. */
+ * flinch reads as more urgent than anything the body chose to do. `draw` over
+ * `attack` no longer decides anything for a pistol carrier: the sim holds its
+ * first shot for `NpcDef.drawTicks`, which ends as an 8-frame default-cadence
+ * clip does. It still decides two overlaps: a body with no wind-up that swings
+ * on its engage tick, and a theme whose `anim.draw` tpf outlasts the wind-up.
+ * There attack on top would cut into the clip, show the held weapon, then jump
+ * back into the draw; draw on top plays the clip whole and only hides the
+ * attack pose (the shot still flies). Walk beats fidget so a step cancels a
+ * scratch. */
 export const ANIM_PRIORITY: readonly AnimStateName[] = [
   'death',
   'roll',
@@ -100,12 +111,15 @@ export const DEFAULT_TPF = Object.fromEntries(ANIM_STATES.map((s) => [s, ANIM_ST
   number
 >
 
-/** The fixed one-shot windows, by name — motion.ts and the weapon swing time
- * their envelopes against these. */
+/** The fixed gameplay-feel windows, by name: the whole state when the pack
+ * draws no clip, and the span motion.ts and the weapon swing time their
+ * envelopes against whatever the art. A longer drawn clip keeps playing after
+ * them (the swing is back at rest, the lunge and flinch have settled, the
+ * death fade runs over the clip's last STATE_TICKS.death ticks). */
 export const STATE_TICKS = {
-  attack: ANIM_STATE_DEFS.attack.window,
-  hurt: ANIM_STATE_DEFS.hurt.window,
-  death: ANIM_STATE_DEFS.death.window,
+  attack: ANIM_STATE_DEFS.attack.window.clipAtLeast,
+  hurt: ANIM_STATE_DEFS.hurt.window.clipAtLeast,
+  death: ANIM_STATE_DEFS.death.window.clipAtLeast,
 } as const
 
 /** Mirrors combat.ts FLASH_TICKS (not exported there; sim is frozen for this
@@ -133,8 +147,9 @@ export interface AnimInputs {
   starts?: Partial<Record<AnimStateName, number>>
   /** End tick of each `'sim'`-window state (roll: `playerCtl.roll.untilTick`). */
   simEnds?: Partial<Record<AnimStateName, number>>
-  /** Length in ticks of the pose's OWN clip for each `'clip'`-window state
-   * (frames × tpf). Absent or 0 = the pack does not draw it. */
+  /** Length in ticks of the pose's OWN clip for each state whose window reads
+   * it (CLIP_SIZED_STATES): frames × tpf. Absent or 0 = the pack does not draw
+   * it. */
   clipTicks?: Partial<Record<AnimStateName, number>>
 }
 
@@ -149,14 +164,12 @@ export interface ResolvedAnim {
  * when it cannot be active at all (a drawn-only state the pack does not draw,
  * a sim window with no end). */
 export const onceEnd = (s: AnimStateName, start: number, a: AnimInputs): number | undefined => {
-  const def = ANIM_STATE_DEFS[s]
+  const def: AnimStateDef = ANIM_STATE_DEFS[s]
   if (def.play === 'loop') return undefined
   if (def.window === 'sim') return a.simEnds?.[s]
-  if (def.window === 'clip') {
-    const len = a.clipTicks?.[s] ?? 0
-    return len > 0 ? start + len : undefined
-  }
-  return start + def.window
+  const len = a.clipTicks?.[s] ?? 0
+  if (def.window === 'clip') return len > 0 ? start + len : undefined
+  return start + Math.max(def.window.clipAtLeast, len)
 }
 
 export const resolveAnimState = (a: AnimInputs): ResolvedAnim => {
@@ -335,7 +348,14 @@ export const stowsWeapon = (s: AnimStateName): boolean => {
 }
 
 /** The drawn-only states: their window is their own clip (`window: 'clip'`). */
-export const CLIP_WINDOW_STATES: readonly AnimStateName[] = ANIM_STATES.filter((s) => {
+export const DRAWN_ONLY_STATES: readonly AnimStateName[] = ANIM_STATES.filter((s) => {
   const def: AnimStateDef = ANIM_STATE_DEFS[s]
   return def.play === 'once' && def.window === 'clip'
+})
+
+/** The states whose window reads the pose's own clip length (`'clip'` or
+ * `{ clipAtLeast }`): the renderer measures frames × tpf for exactly these. */
+export const CLIP_SIZED_STATES: readonly AnimStateName[] = ANIM_STATES.filter((s) => {
+  const def: AnimStateDef = ANIM_STATE_DEFS[s]
+  return def.play === 'once' && def.window !== 'sim'
 })

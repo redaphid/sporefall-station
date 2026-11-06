@@ -144,6 +144,23 @@ describe('death fall', () => {
     expect(Math.sign(odd.rot)).toBe(-1)
   })
 
+  it('a window given as `end` exactly start + STATE_TICKS.death is the default, bit for bit', () => {
+    for (let dt = -1; dt <= STATE_TICKS.death + 2; dt += 0.25) {
+      const m = base({ state: 'death', start: 100, t: 100 + dt, id: 2 })
+      expect(composeMotion({ ...m, end: 100 + STATE_TICKS.death })).toEqual(composeMotion(m))
+    }
+  })
+
+  it('a longer drawn death: opaque until the last STATE_TICKS.death ticks, 0 exactly at `end`', () => {
+    const start = 100
+    const end = start + 40
+    const at = (t: number) => composeMotion(base({ state: 'death', start, end, t, id: 2, drawn: true }))
+    for (let t = start; t <= end - STATE_TICKS.death; t += 0.5) expect(at(t).alpha).toBe(1)
+    expect(at(end - STATE_TICKS.death / 2).alpha).toBeCloseTo(0.5, 9)
+    expect(at(end).alpha).toBe(0)
+    for (let t = start; t <= end; t += 0.5) expect(at(t).rot).toBe(0) // drawn: no topple
+  })
+
   it('rotation progresses monotonically (no jitter on the way down)', () => {
     let prev = 0
     for (let dt = 0; dt <= STATE_TICKS.death; dt += 0.5) {

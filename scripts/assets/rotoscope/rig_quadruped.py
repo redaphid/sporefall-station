@@ -11,7 +11,7 @@ fit.json holds head_top, neck, withers, rump, and for each leg L in fore_near, f
 hind_far: L_top, L_mid, L_low, L_toe (shoulder or hip, elbow or knee, wrist or ankle, toe), each [x, y],
 plus az and elev: the facing in degrees from screen right toward away from the camera, and the camera's
 elevation. Each leg works in the plane of the walk direction and screen up, and keeps the bend direction
-its fitted mid joint shows. Writes joints-NN.json, the layout skeleton.py reads.
+its fitted mid joint shows. Front and back views (s, n) keep each joint's fitted x and walk in y only. Writes joints-NN.json, the layout skeleton.py reads.
 """
 import argparse
 import json
@@ -43,7 +43,11 @@ def two_bone(u, v, a_len, b_len, bend):
 def build(fit, period, stride, lift, stance, bob):
     az, elev = math.radians(fit["az"]), math.radians(fit["elev"])
     fwd = (math.cos(az), -math.sin(az) * math.sin(elev))  # one unit of walking on screen, x right y down
-    assert abs(fwd[0]) > 0.2, "this rig needs a view with some sideways travel (se, e, ne)"
+    # s and n walk toward or away from the camera: screen x carries no travel, so each joint keeps its
+    # fitted x (its side of the body) and the walk shows only in y. The rest leg is then ambiguous in
+    # depth; it is taken as foot under hip, the elbow back and the knee forward by 0.3 of the leg's drop
+    # (fit "<leg>_bend": +1 forward, -1 back, to override).
+    front = abs(fwd[0]) < 0.2
 
     def to_uv(p, o):  # screen offset p - o -> (along the walk, up)
         u = (p[0] - o[0]) / fwd[0]
@@ -55,10 +59,16 @@ def build(fit, period, stride, lift, stance, bob):
     legs = {}
     for L in PAIRS:
         top, mid, low = fit[f"{L}_top"], fit[f"{L}_mid"], fit[f"{L}_low"]
-        mu, mv = to_uv(mid, top)
-        lu, lv = to_uv(low, top)
+        if front:
+            drop_low = low[1] - top[1]
+            lu, lv = 0.0, -drop_low
+            mu = fit.get(f"{L}_bend", -1.0 if L.startswith("fore") else 1.0) * 0.3 * abs(drop_low)
+            mv = mu * fwd[1] - (mid[1] - top[1])
+        else:
+            mu, mv = to_uv(mid, top)
+            lu, lv = to_uv(low, top)
         bend = 1.0 if (lu * mv - lv * mu) > 0 else -1.0
-        legs[L] = dict(a=math.hypot(mu, mv), b=math.hypot(lu - mu, lv - mv), bend=bend)
+        legs[L] = dict(a=math.hypot(mu, mv), b=math.hypot(lu - mu, lv - mv), bend=bend, lv=lv)
 
     frames = []
     for i in range(period):
@@ -70,10 +80,16 @@ def build(fit, period, stride, lift, stance, bob):
             l = legs[L]
             d, h, toe = foot(phi + off, stride, lift, stance)
             top = moved(fit[f"{L}_top"])
-            low = to_xy(fit[f"{L}_low"], d, h)  # the ground stays put: measured from the rest foot
-            u, v = to_uv(low, top)
-            mu, mv = two_bone(u, v, l["a"], l["b"], l["bend"])
-            mid = to_xy(top, mu, mv)
+            if front:
+                u, v = d, l["lv"] + h + drop
+                mu, mv = two_bone(u, v, l["a"], l["b"], l["bend"])
+                low = [fit[f"{L}_low"][0], top[1] + u * fwd[1] - v]
+                mid = [fit[f"{L}_mid"][0], top[1] + mu * fwd[1] - mv]
+            else:
+                low = to_xy(fit[f"{L}_low"], d, h)  # the ground stays put: measured from the rest foot
+                u, v = to_uv(low, top)
+                mu, mv = two_bone(u, v, l["a"], l["b"], l["bend"])
+                mid = to_xy(top, mu, mv)
             rest_toe = [fit[f"{L}_toe"][0] - fit[f"{L}_low"][0], fit[f"{L}_toe"][1] - fit[f"{L}_low"][1]]
             toe_pt = [low[0] + rest_toe[0] * (1 - 0.3 * toe), low[1] + rest_toe[1] + 10 * toe]
             root = moved(fit["withers"] if L.startswith("fore") else fit["rump"])

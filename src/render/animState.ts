@@ -73,10 +73,15 @@ export const ANIM_STATES = Object.keys(ANIM_STATE_DEFS) as readonly AnimStateNam
 
 /** Resolution order, highest first. Death is terminal; a roll is a committed
  * whole-body tumble (and its i-frames make a mid-roll hurt impossible); a hurt
- * flinch reads as more urgent than anything the body chose to do. `draw` beats
- * `attack` because the sim fires on the very tick it engages a target in range:
- * with attack on top a drawn draw would never be seen, and the first shot's
- * pose is what gives way. Walk beats fidget so a step cancels a scratch. */
+ * flinch reads as more urgent than anything the body chose to do. `draw` over
+ * `attack` no longer decides anything for a pistol carrier: the sim holds its
+ * first shot for `NpcDef.drawTicks`, which ends as an 8-frame default-cadence
+ * clip does. It still decides two overlaps: a body with no wind-up that swings
+ * on its engage tick, and a theme whose `anim.draw` tpf outlasts the wind-up.
+ * There attack on top would cut into the clip, show the held weapon, then jump
+ * back into the draw; draw on top plays the clip whole and only hides the
+ * attack pose (the shot still flies). Walk beats fidget so a step cancels a
+ * scratch. */
 export const ANIM_PRIORITY: readonly AnimStateName[] = [
   'death',
   'roll',

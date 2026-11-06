@@ -203,9 +203,13 @@ render-side start signals live in `src/render/animTracker.ts`.
 | `fidget` | one-shot, **drawn-only** | the body has been still and calm (not aggro/flee/seek, dormant, downed, stunned, asleep or frozen) for 90 ticks; then on a per-entity grid every 180–329 ticks, hashed from the entity id | its own clip: frames × tpf |
 
 **Priority when several conditions hold at once (highest wins):**
-`death > roll > hurt > draw > attack > walk > fidget > idle`. `draw` beats
-`attack` because the sim fires on the same tick it engages a target already in
-range; with attack on top, the draw would never be seen.
+`death > roll > hurt > draw > attack > walk > fidget > idle`. A pistol
+carrier never has `draw` and `attack` at once: the sim holds its first shot
+for the archetype's `drawTicks` (16), so an 8-frame draw at the default tpf
+ends the tick the first shot fires. The order matters only when they do
+overlap: a kind with no wind-up (it attacks on its engage tick), or a theme
+whose `anim.draw` tpf makes the clip longer than the wind-up. Then the draw
+plays whole and the attack pose is skipped; the shot itself still shows.
 
 **Drawn-only states (`draw`, `fidget`).** These exist only as art. A pack that
 ships no frames for one never enters it: no borrowed stand-in, no procedural

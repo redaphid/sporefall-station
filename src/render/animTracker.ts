@@ -18,6 +18,7 @@
  * clock only as the sim tick, so EntityViews and the tests run the same code.
  */
 
+import { DRAW_REARM_TICKS } from '../game/data/npcs'
 import type { Entity } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { SIM_DT } from '../game/types'
@@ -25,9 +26,9 @@ import { entityMoving } from './anim'
 import { fidgetStart, hurtStart, resolveAnimState, type AnimStateName, type ResolvedAnim } from './animState'
 
 /** Ticks a body must spend NOT engaged before engaging again re-plays `draw`.
- * The AI drops in and out of aggro at perception edges (a target stepping
- * behind a pillar); a weapon already out is not drawn twice in a second. */
-export const DRAW_REARM_TICKS = 30
+ * The sim's own: the same window decides when an engage waits its
+ * `NpcDef.drawTicks` again (systems/ai.ts), so the clip and the held fire agree. */
+export { DRAW_REARM_TICKS }
 
 export interface AnimMemory {
   /** combat.cooldown at the last observation. */

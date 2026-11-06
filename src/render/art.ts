@@ -128,6 +128,12 @@ export interface HeldWeaponView {
   attack: readonly Texture[]
   grip: readonly [number, number]
   muzzle: readonly [number, number]
+  /** The essence accent alone, in pale ink: coloured and pulsed from the
+   * weapon's mods in place of a whole-sprite tint. Absent: tint the sprite. */
+  glow?: readonly Texture[]
+  /** Generated attachments per mod id, drawn over the weapon when it carries
+   * that mod (MOD_LAYER_ORDER). */
+  mods?: Readonly<Record<string, readonly Texture[]>>
 }
 export type HeldWeaponArt = Partial<Record<WeaponView, HeldWeaponView>>
 

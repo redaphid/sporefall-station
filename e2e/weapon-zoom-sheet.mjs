@@ -124,7 +124,7 @@ const weaponPatch = () => {
   const sprites = {}
   for (const f of readdirSync(WEAPONS_DIR)) {
     const m = f.match(/^weapon-([A-Za-z]+)-(e|se|s|ne|n)-(idle|attack)-(\d)\.png$/)
-    if (m) sprites[`weapon.${m[1]}.${m[2]}-${m[3]}-${m[4]}`] = `/__weapons/${f}`
+    if (m) sprites[`weapon.${m[1]}.${m[2]}-${m[3]}-${m[4]}`] = `__weapons/${f}`
   }
   const pts = join(WEAPONS_DIR, 'weapons.json')
   return { sprites, weapons: existsSync(pts) ? JSON.parse(readFileSync(pts, 'utf8')) : {} }
@@ -146,6 +146,8 @@ if (patch) {
     m.weapons = { ...(m.weapons ?? {}), ...patch.weapons }
     await route.fulfill({ response: res, json: m })
   })
+  // Relative to the theme dir, so the loader reads them on the pack's pixel
+  // grid (themeLoader gridOf matches the path's theme prefix).
   await page.route('**/__weapons/*', (route) =>
     route.fulfill({ path: join(WEAPONS_DIR, decodeURIComponent(route.request().url().split('/__weapons/')[1])) }),
   )

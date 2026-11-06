@@ -391,3 +391,87 @@ describe('held weapon VISIBILITY — beasts bite, people hold', () => {
     expect(sprites(r)).toHaveLength(1)
   })
 })
+
+// 5. MODS LIGHT THE ACCENT, NOT THE SPRITE. A view that ships a `glow` layer
+//    (the essence accent alone) keeps the weapon's own colours and colours only
+//    that layer from the mods; mod attachments draw over it in MOD_LAYER_ORDER.
+describe('mod-lit accent and attachment layers', () => {
+  const layered = (): HeldWeaponArt => {
+    const art = placeholderWeapon('rivetDriver')
+    for (const v of VIEWS) {
+      const view = art[v]!
+      art[v] = {
+        ...view,
+        glow: [tex(17, 11, `rivetDriver.${v}-glow-0`)],
+        mods: {
+          frost: [tex(17, 11, `rivetDriver.${v}-mod-frost-0`)],
+          incendiary: [tex(17, 11, `rivetDriver.${v}-mod-incendiary-0`)],
+          explosive: [tex(17, 11, `rivetDriver.${v}-mod-explosive-0`)],
+        },
+      }
+    }
+    return art
+  }
+  const label = (sp: Sprite): string => sp.texture.label ?? ''
+  const modded = (mods: { id: string; stacks: number }[]): Entity => {
+    const e = holding('rivetDriver', 'player')
+    e.loadout = { inventory: [{ itemId: 'rivetDriver', qty: 1, mods }], activeSlot: 0 }
+    return e
+  }
+
+  it('unmodded: the weapon untinted, no accent, no attachments', () => {
+    const r = drawn(modded([]), rig({ rivetDriver: layered() }))
+    expect(held(r)).toHaveLength(1)
+    expect(held(r)[0].tint).toBe(0xffffff)
+    expect(sprites(r).filter((sp) => label(sp).includes('-glow-') || label(sp).includes('-mod-'))).toHaveLength(0)
+  })
+
+  it('modded: the accent takes the mod colour, the weapon keeps its own', () => {
+    const r = drawn(modded([{ id: 'frost', stacks: 1 }]), rig({ rivetDriver: layered() }))
+    const accent = sprites(r).find((sp) => label(sp).includes('-glow-'))!
+    expect(held(r)[0].tint).toBe(0xffffff)
+    expect(accent.tint).not.toBe(0xffffff)
+    // registered on the weapon's own grip and grid
+    expect(accent.position.x).toBe(held(r)[0].position.x)
+    expect(accent.position.y).toBe(held(r)[0].position.y)
+    expect(accent.anchor.x).toBe(held(r)[0].anchor.x)
+    expect(accent.zIndex).toBeGreaterThan(held(r)[0].zIndex)
+  })
+
+  it('attachments stack bottom-to-top in MOD_LAYER_ORDER whatever the pickup order', () => {
+    const r = drawn(
+      modded([
+        { id: 'incendiary', stacks: 1 },
+        { id: 'frost', stacks: 2 },
+        { id: 'explosive', stacks: 1 },
+        { id: 'pierce', stacks: 1 }, // no drawn layer: skipped
+      ]),
+      rig({ rivetDriver: layered() }),
+    )
+    const order = sprites(r)
+      .filter((sp) => label(sp).includes('-mod-'))
+      .sort((a, b) => a.zIndex - b.zIndex)
+      .map((sp) => label(sp).split('-mod-')[1].split('-')[0])
+    expect(order).toEqual(['explosive', 'frost', 'incendiary'])
+  })
+
+  it('a pack without a glow layer still tints the whole sprite (unchanged path)', () => {
+    const e = modded([{ id: 'frost', stacks: 1 }])
+    const r = drawn(e)
+    expect(held(r)[0].tint).not.toBe(0xffffff)
+  })
+
+  it('dropping the weapon drops every layer', () => {
+    const r = rig({ rivetDriver: layered() })
+    const e = modded([{ id: 'frost', stacks: 1 }, { id: 'explosive', stacks: 1 }])
+    r.views.update([e], 0, 100, 0)
+    e.combat = { weapon: 'fists', cooldown: 0 }
+    r.views.update([e], 0, 101, 0)
+    expect(sprites(r).filter((sp) => label(sp).includes('-glow-') || label(sp).includes('-mod-'))).toHaveLength(0)
+  })
+
+  it('beasts draw no weapon and no layers', () => {
+    const r = drawn(holding('fangs', 'gloamhound'), rig({ rivetDriver: layered() }))
+    expect(sprites(r)).toHaveLength(1)
+  })
+})

@@ -29,6 +29,7 @@ import {
   type ThemeChain,
 } from './theme'
 import { CHAR_PX, TILE_PX, type CharSet, type DirPose, type FistBox, type HeldWeaponArt, type SpriteTextures, type WallCapTextures } from './art'
+import { MODS } from '../game/data/mods'
 import { HAND_ANCHORS } from './handAnchors'
 import { ANIM_STATES, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
@@ -270,9 +271,19 @@ export const loadSpriteTextures = async (renderer: Renderer, chain: ThemeChain):
             if (!pts) console.warn(`[theme] weapon.${id}.${v} has frames but no grip in the manifest; using its centre`)
             const w = idle[0].source.pixelWidth
             const h = idle[0].source.pixelHeight
+            const glow = await weaponClip(`weapon.${id}.${v}-glow`)
+            const mods: Record<string, Texture[]> = {}
+            await Promise.all(
+              Object.keys(MODS).map(async (m) => {
+                const layer = await weaponClip(`weapon.${id}.${v}-mod-${m}`)
+                if (layer.length > 0) mods[m] = layer
+              }),
+            )
             art[v] = {
               idle,
               attack,
+              ...(glow.length > 0 ? { glow } : {}),
+              ...(Object.keys(mods).length > 0 ? { mods } : {}),
               grip: pts?.grip ?? [Math.floor(w / 2), Math.floor(h / 2)],
               muzzle: pts?.muzzle ?? pts?.grip ?? [w - 1, Math.floor(h / 2)],
             }

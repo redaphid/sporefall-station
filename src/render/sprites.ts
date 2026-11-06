@@ -36,6 +36,25 @@ import { composeWeaponSkin } from './weaponSkin'
 /** Held-weapon idle loop cadence (sim ticks per frame). */
 export const WEAPON_IDLE_TPF = 6
 
+/** Draw order of mod attachment layers, bottom to top: what hangs under the
+ * barrel first, what wraps it next, what sits on top, the muzzle piece last.
+ * A mod not listed draws after these, in id order. */
+export const MOD_LAYER_ORDER: readonly string[] = [
+  'explosive', 'detonator', 'bulk', 'rapid', 'heavy', 'frost', 'velocity', 'shock', 'homing', 'incendiary', 'choke',
+]
+
+/** The attachment layers a view draws for these mods, bottom to top. */
+export const modLayers = (layers: Readonly<Record<string, readonly unknown[]>> | undefined, mods: readonly { id: string; stacks: number }[] | undefined): string[] => {
+  if (!layers || !mods) return []
+  const rank = (id: string): number => {
+    const i = MOD_LAYER_ORDER.indexOf(id)
+    return i < 0 ? MOD_LAYER_ORDER.length : i
+  }
+  return [...new Set(mods.filter((m) => m.stacks > 0 && (layers[m.id]?.length ?? 0) > 0).map((m) => m.id))].sort(
+    (a, b) => rank(a) - rank(b) || a.localeCompare(b),
+  )
+}
+
 /** Z offsets around the body: the depth key is world y in TILES, so these must
  * stay far below any gap between two bodies. */
 const Z_BEHIND = -0.001
@@ -103,6 +122,10 @@ interface View {
   weaponGlow?: Sprite
   /** The wielder's own fist redrawn over the weapon's grip (art.fistCap). */
   weaponCap?: Sprite
+  /** The pack's essence-accent layer, coloured by the weapon's mods. */
+  weaponAccent?: Sprite
+  /** Generated mod attachments over the weapon, in MOD_LAYER_ORDER. */
+  weaponMods?: Sprite[]
   /** Last measured fist per drawn facing, held through a hit-flash frame (whose
    * white silhouette carries no measurement). */
   lastFist?: { dir: Dir; fist: FistBox }
@@ -572,8 +595,12 @@ export class EntityViews {
     weapon.position.set(body.position.x + ox, body.position.y + oy)
     weapon.rotation = 0
     weapon.scale.set(pose.mirror ? -1 : 1, 1)
-    const skin = composeWeaponSkin(weaponStack(e)?.mods)
-    weapon.tint = skin.tint
+    const mods = weaponStack(e)?.mods
+    const skin = composeWeaponSkin(mods)
+    // A pack that draws the essence accent as its own layer gets that layer
+    // coloured instead of the whole sprite tinted (a tint muddies pixel art).
+    const accented = (clip.glow?.length ?? 0) > 0
+    weapon.tint = accented ? 0xffffff : skin.tint
     weapon.alpha = body.alpha
     weapon.zIndex = body.zIndex + (pose.behind ? Z_BEHIND : Z_FRONT)
 
@@ -594,6 +621,8 @@ export class EntityViews {
       cap.alpha = body.alpha
       cap.zIndex = body.zIndex + Z_CAP
     } else this.dropCap(view)
+
+    this.updateWeaponLayers(view, clip, weapon, mods, skin.power > 0 ? skin.glowColor : undefined, tick, attacking)
 
     if (skin.glow > 0) {
       if (!view.weaponGlow) {
@@ -618,6 +647,61 @@ export class EntityViews {
     }
   }
 
+  /** The view's mod attachments, then its essence accent, over the weapon on
+   * the same grip anchor (every frame of a view shares one canvas). */
+  private updateWeaponLayers(
+    view: View,
+    clip: HeldWeaponView,
+    weapon: Sprite,
+    mods: readonly { id: string; stacks: number }[] | undefined,
+    accent: number | undefined,
+    tick: number,
+    attacking: boolean,
+  ): void {
+    const place = (sp: Sprite, tex: Texture, z: number): void => {
+      sp.texture = tex
+      sp.anchor.copyFrom(weapon.anchor)
+      sp.position.copyFrom(weapon.position)
+      sp.scale.copyFrom(weapon.scale)
+      sp.alpha = weapon.alpha
+      sp.zIndex = weapon.zIndex + z
+    }
+    const ids = modLayers(clip.mods, mods)
+    const pool = (view.weaponMods ??= [])
+    while (pool.length > ids.length) {
+      const sp = pool.pop()!
+      this.root.removeChild(sp)
+      sp.destroy()
+    }
+    ids.forEach((id, i) => {
+      if (!pool[i]) {
+        pool[i] = new Sprite()
+        this.root.addChild(pool[i])
+      }
+      const frames = clip.mods![id]
+      place(pool[i], frames[cycleFrame(tick, frames.length, WEAPON_IDLE_TPF)], 0.0001 * (i + 1))
+    })
+    if (accent !== undefined && clip.glow && clip.glow.length > 0) {
+      if (!view.weaponAccent) {
+        view.weaponAccent = new Sprite()
+        this.root.addChild(view.weaponAccent)
+      }
+      const sp = view.weaponAccent
+      place(sp, clip.glow[cycleFrame(tick, clip.glow.length, WEAPON_IDLE_TPF)], 0.0001 * (ids.length + 1))
+      sp.tint = accent
+      // Charged look: a slow breath at rest, full on the shot.
+      sp.alpha = weapon.alpha * (attacking ? 1 : 0.7 + 0.3 * Math.sin(tick * 0.2))
+    } else this.dropAccent(view)
+  }
+
+  private dropAccent(view: View): void {
+    if (view.weaponAccent) {
+      this.root.removeChild(view.weaponAccent)
+      view.weaponAccent.destroy()
+      view.weaponAccent = undefined
+    }
+  }
+
   private dropCap(view: View): void {
     if (view.weaponCap) {
       this.root.removeChild(view.weaponCap)
@@ -635,6 +719,12 @@ export class EntityViews {
       view.weapon = undefined
     }
     this.dropCap(view)
+    this.dropAccent(view)
+    for (const sp of view.weaponMods ?? []) {
+      this.root.removeChild(sp)
+      sp.destroy()
+    }
+    view.weaponMods = undefined
     if (view.weaponGlow) {
       this.root.removeChild(view.weaponGlow)
       view.weaponGlow.destroy()

@@ -545,3 +545,39 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## derelict-bot (robot), 2026-11-06: redesigned (compressor-hulk concept), walking by skeleton control in all 5 directions
+
+The derelict unit (`npcs.ts` `robot`, speed 2.6) had one frame, the August hires
+s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign from the critic's v3 pick (`assets/identity/lore/compressor-hulk.png`, sha256 `65c47d704a0dc4af…`). Lore family D (drowned machinery, the canon anchor): a colony maintenance unit still walking its last work order, a rusting grey riveted box chassis on oxide-orange piston legs cannibalised from another machine, one amber status lamp as the single hot accent, a pale pressure gauge below it, a battery pack low on the back. It holds nothing; the renderer draws its weapon (`weaponArt.ts`) |
+| input | the concept redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 3 of 4), sha256 `0cd805b02cefb081…`; legs 6-8 px wide at 96 px; old anchors archived at `/mnt/d/tmp/cast-walks/archive/derelict-bot/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction (take1, seed 3); ne/n use a face-free `--describe-back`. The n keyframe was repainted on CPU: the battery pack moved from the centre of the back to a narrow panel low on the right third, because a centred square read as a face panel (gate 4a) |
+| motion | Wan 2.2 Fun-Control A14B driven by a stick-skeleton biped walk rig (`rig_biped.py`, period 24, half stride 55, lift 26, arm swing 20), the keyframe as reference, a stiff deliberate mechanical stride |
+| takes | Wan I2V take1 (seed 3) and take2 (seed 11) did not loop s, e or ne (s 1.151/1.092, e .762/1.832, ne 1.097/1.729), and its n passed the seam with a near-static shuffle. Skeleton: s, e, ne skel1 (seed 3); se skel2 (seed 11); n skel2 (seed 11, repainted keyframe) |
+| loops | period 24 in every direction: s seam .216, se .111, e .119, ne .132, n .169 |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.robot.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .216 / .111 / .119 / .132 / .169 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .105-.201, head .034-.086 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+The first gate run (n skel1, centred pack) failed 4a on 3 of 50 frames (n-walk-2, 4, 6 read as
+facing the viewer); the n keyframe repaint above fixed it. Nothing parked. Known look gap: on se
+the gauge face is keyed out as a backdrop pocket (it is under `POCKET_PALE` of the anchor), so it
+shows as a dark socket where s shows a pale dial. Frame heights: 86-92 px on the hi-res pack,
+42-46 on the 48 px pack.

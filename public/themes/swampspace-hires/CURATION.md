@@ -545,3 +545,42 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## bog-mender (mender), 2026-11-06: redesigned (medbay automaton), walking, ne by skeleton control. NOT SHIPPED: gate 8/9
+
+The root cult's medic (`npcs.ts` `mender`: it hangs behind the line, and wounded
+raiders retreat to it to heal) had one frame in every direction: the August hires
+s-idle, a hooded plague-doctor coat. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign. The critic graded the shipped design C. Three concepts ran through `concept_to_input.py` with seeds 3, 11 and 23 (design sheet https://2cb.pw/design-sheet-d942b2). The critic's v3 pick, desiccant-nurse, measured thin .057: its white apron keys out on the floor. Lore family D (drowned machinery): an old colony medbay unit that the root cult keeps fed with essence. It still waddles to whoever is hurt (purpose without a purpose). Its heart is a glass port of bubbling amber essence (G2), the single hot accent. It has a pear body of faded teal-blue enamel, repair patches, rubber hose and gloves, and no gears. It holds nothing; the renderer draws its fists |
+| input | concept `watched/galley-surgeon-character.png`, redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 11 of 3), sha256 `8622c518052b7e76…`; old anchors archived at `/mnt/d/tmp/cast-walks/archive/bog-mender/anchor-2026-11-06/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction. s/se/e use the front describe (visor band, chest port). n/ne use a face-free `--describe-back`; take2 swaps take1's square back hatch, which ne drew centred like a face panel, for a pale centre seam stripe |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, `--motion walk`, for s, se, e, n. ne: Wan Fun-Control driven by a stick-skeleton biped rig (`rig_biped.py`, P20, half-stride 40, lift 24), seed 3, on the take2 ne keyframe |
+| takes | s, se, e take1 (seed 3). n take2 (seed 11; take1 .998 sat on the 1.0 limit). ne: take1 .463 (centred hatch), take2 .707, then the skeleton route (skel1) |
+| loops | the shortest full stride: s period 17 (seam .253), se 23 (.330), e 22 (.286), ne 20 (.159), n 16 (.855) |
+| colour lock | `assemble --lock-height` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.mender.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), **FAIL (8/9)**:
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .253 / .330 / .286 / .159 / .855 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | **3 of 50 fail**: s-walk-0/1/2 "reads as facing away" |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .098-.126, head .041-.105 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+4a: the three failures come from the one-image `facing` question. The two-reference
+view check reads every s frame as front. The case is in
+[`docs/cast-walks/gate-cases/bog-mender-4a-s-facing.md`](../../../docs/cast-walks/gate-cases/bog-mender-4a-s-facing.md),
+and the s direction is stopped until it is decided. Known look gaps: ne draws an
+almost square-on back, close to n, where other characters turn a three-quarter
+back. The 96 px read is a teal-blue body on the teal-grey floor. Frame heights:
+87-91 px on the hi-res pack, 43-46 on the 48 px pack.

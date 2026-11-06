@@ -586,7 +586,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       if (frozen) hitstop = tickHitstop(hitstop)
       camera.update(frozen ? 0 : dt)
       if (!frozen) {
-        entities.update(shown, alpha, view.tick, view.floor)
+        entities.update(shown, alpha, view.tick, view.floor, view.eventLog ?? [{ tick: view.tick, events: view.events }])
         playerMarkers.update(shown, view.self?.id, alpha, view.tick)
         verbMarkers.update(shown, alpha, view.tick)
         statusFx.update(shown, alpha, view.tick)

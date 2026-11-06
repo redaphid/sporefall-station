@@ -27,12 +27,14 @@
  * bodies that have feet, not as a global invariant of this module.
  *
  * The walk bob, idle breath, hover float and pulse are CYCLES, standing in for
- * frames the art does not have. When a pack draws a state's loop itself (an
- * 8-frame walk cycle, a drone's drawn hover), the frames carry that cycle and
- * the procedural one stays off (`drawnCycle`): two unsynchronised bobs beat
- * against each other. Lean and the one-shots (lunge, flinch, fall, landing
- * squash) respond to what the sim did, which no looping clip draws, so they
- * always apply.
+ * frames the art does not have. When a pack draws a state itself (an 8-frame
+ * walk cycle, a drone's drawn hover, a drawn death), the frames carry that
+ * motion and its procedural twin stays off (`drawn`): two unsynchronised bobs
+ * beat against each other, and two falls on one body read as a glitch. So a
+ * drawn loop drops its cycle, a drawn death keeps the fade but drops the
+ * topple, and a drawn attack keeps only a fraction of the lunge. Lean, the hurt
+ * flinch and the landing squash respond to what the sim did and always apply.
+ * The drawn-only one-shots (draw, fidget) exist only as frames and add nothing.
  */
 
 import type { AnimStateName } from './animState'
@@ -48,8 +50,9 @@ export const MOTION = {
   lean: { rad: 0.09, refSpeed: 3 },
   /** Idle breathing: sy pulses ±amp around 1, freq in rad/tick. */
   breathe: { amp: 0.012, freq: 0.16 },
-  /** Attack: brief forward lunge along facing, peak px at mid-window. */
-  attackLunge: { px: 3.5 },
+  /** Attack: brief forward lunge along facing, peak px at mid-window. A drawn
+   * attack clip carries its own strike, so only `drawnScale` of it remains. */
+  attackLunge: { px: 3.5, drawnScale: 0.3 },
   /** Hurt: decaying sideways shudder, freq in rad/tick. */
   hurtFlinch: { px: 2.5, freq: 2.4 },
   /** Post-roll landing squash: sy dips −amount, sx bulges +amount, then eases
@@ -101,6 +104,11 @@ export interface MotionInput {
   state: AnimStateName
   /** State start tick (one-shots; loops ignore it). */
   start: number
+  /** End tick (exclusive) of a one-shot's window, when the pack's drawn clip
+   * runs it past the fixed STATE_TICKS window. Only death reads it: the fade
+   * covers the window's last STATE_TICKS.death ticks, so a long drawn death
+   * stays visible while it plays. Omitted = start + the fixed window. */
+  end?: number
   /** Integer sim tick. */
   tick: number
   /** Continuous view-time (tick + render alpha) — smoothness only. */
@@ -119,9 +127,9 @@ export interface MotionInput {
   /** How this body carries itself. Omitted = `stride`, so every existing caller
    * keeps its current motion exactly. */
   style?: LocomotionStyle
-  /** The frames on screen are the pack's own loop for this state (2+ drawn
-   * frames), so walk/idle add no procedural cycle on top. */
-  drawnCycle?: boolean
+  /** The frames on screen are the pack's own clip for this state (2+ drawn
+   * frames), so its procedural twin stays off (see the module comment). */
+  drawn?: boolean
 }
 
 /** Transform offsets to compose onto the sprite (identity = no motion). */
@@ -175,17 +183,17 @@ export const composeMotion = (m: MotionInput): MotionPose => {
   switch (m.state) {
     case 'walk': {
       if (legged) {
-        if (!m.drawnCycle && style === 'waddle') {
+        if (!m.drawn && style === 'waddle') {
           // Phase-shifted per entity so a swarm does not rock in unison.
           const rock = Math.sin(m.t * MOTION.waddle.freq + (m.id % 32))
           p.rot += rock * MOTION.waddle.rad
           p.dy -= Math.abs(rock) * MOTION.waddle.rise
-        } else if (!m.drawnCycle) {
+        } else if (!m.drawn) {
           p.dy += walkBob(m.t)
         }
         const lean = Math.max(-1, Math.min(1, m.vx / MOTION.lean.refSpeed))
         p.rot += lean * MOTION.lean.rad
-      } else if (!m.drawnCycle) {
+      } else if (!m.drawn) {
         // A hoverer/pulser in motion does MORE of what it already does; it does
         // not acquire a gait. No lean either — leaning implies planted feet to
         // lean against.
@@ -194,7 +202,7 @@ export const composeMotion = (m: MotionInput): MotionPose => {
       break
     }
     case 'idle': {
-      if (m.drawnCycle) break
+      if (m.drawn) break
       if (legged) {
         // Slow breathe, phase-shifted per entity so crowds don't sync.
         p.sy += Math.sin(m.t * MOTION.breathe.freq + (m.id % 32)) * MOTION.breathe.amp
@@ -207,7 +215,8 @@ export const composeMotion = (m: MotionInput): MotionPose => {
       // Out-and-back lunge along facing: sin(π·progress) peaks mid-window and
       // returns exactly to 0 at the end.
       const prog = clamp01((m.t - m.start) / STATE_TICKS.attack)
-      const env = Math.sin(prog * Math.PI) * MOTION.attackLunge.px
+      const env =
+        Math.sin(prog * Math.PI) * MOTION.attackLunge.px * (m.drawn ? MOTION.attackLunge.drawnScale : 1)
       p.dx += Math.cos(m.facing) * env
       p.dy += Math.sin(m.facing) * env
       break
@@ -219,16 +228,21 @@ export const composeMotion = (m: MotionInput): MotionPose => {
       break
     }
     case 'death': {
-      // Topple around the feet (side chosen deterministically per entity) and
-      // fade out; alpha hits exactly 0 as the window closes.
+      // Topple around the feet (side chosen deterministically per entity) over
+      // the fixed window, and fade out over the window's last STATE_TICKS.death
+      // ticks; alpha hits exactly 0 as the window closes.
       const prog = clamp01((m.t - m.start) / STATE_TICKS.death)
+      const fadeFrom = (m.end ?? m.start + STATE_TICKS.death) - STATE_TICKS.death
       const side = m.id % 2 === 0 ? 1 : -1
-      p.rot += side * MOTION.deathFall.rot * Math.pow(prog, 0.7)
-      p.alpha *= 1 - prog
+      if (!m.drawn) p.rot += side * MOTION.deathFall.rot * Math.pow(prog, 0.7)
+      p.alpha *= 1 - clamp01((m.t - fadeFrom) / STATE_TICKS.death)
       break
     }
     case 'roll':
       break // tumble handled whole-body in sprites.ts
+    case 'draw':
+    case 'fidget':
+      break // drawn-only: the frames are the whole motion
   }
 
   // Post-roll landing squash: fires once the roll window has just closed,

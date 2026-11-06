@@ -1502,7 +1502,9 @@ def cmd_repack(a):
             cyc = cut_loop(clip, loop)
             meta.setdefault("loops", {})[d] = loop
             cyc[stance(cyc, clip[0])].save(f"{raw}/{d}-idle.png")
-            cyc[widest(cyc)].save(f"{raw}/{d}-step.png")
+            ref = f"{raw}/{d}-step-ref.png"  # a rig that knows its own stroke names the step pose (rig_flyer.py)
+            step = stance(cyc, Image.open(ref).convert("RGB")) if os.path.exists(ref) else widest(cyc)
+            cyc[step].save(f"{raw}/{d}-step.png")
             for i, f in enumerate(cyc):
                 f.save(f"{raw}/{d}-walk-{i}.png")
             print(f"  {d}: loop of {loop['period']} from {loop['start']}, seam {loop['seam']}  "

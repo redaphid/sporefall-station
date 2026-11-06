@@ -104,6 +104,13 @@ def body_layer(path, body_h):
     k = S.key_background(im)
     b = S.bbox(k)
     k = k.crop(b)
+    # needle tips at the bottom (a leg drawn to a point) vanish in the 96/48 px reduction but still set the crop
+    # window's floor, which lifts that direction's feet off the canvas floor; trim rows thinner than ~1 px at 48
+    occ = (np.asarray(k)[..., 3] > 128).sum(axis=1)
+    bottom = len(occ)
+    while bottom > 1 and occ[bottom - 1] < k.width * 0.045:
+        bottom -= 1
+    k = k.crop((0, 0, k.width, bottom))
     s = body_h / k.height
     return k.resize((max(1, round(k.width * s)), round(body_h)), Image.LANCZOS)
 
@@ -175,10 +182,25 @@ def main():
         cyc = frames(fit, d, a.period)
         raw = os.path.join(a.out, "raw", f"walk-{d}")
         os.makedirs(raw, exist_ok=True)
-        clip = [cyc[i % a.period] for i in range(a.length)]
+        # the pack's idle is the loop frame nearest the clip's first frame (spritesheet.stance) and its step the
+        # widest one unless raw/<d>-step-ref.png names it. Gate 3 holds both, in every direction, to the s idle's
+        # size, and the walk's median to the s idle's build: a wing beat's extremes (wings up, wings level) differ
+        # by more than its limits, so fit.json may name both poses as cycle frames (dirs.<d>.idle, .step).
+        cfg = fit["dirs"][d]
+        if "idle" in cfg:
+            first = cfg["idle"]
+        else:
+            hs = []
+            for f in cyc:
+                b = S.bbox(S.key_background(f.resize((W // 4, H // 4))))
+                hs.append(b[3] - b[1])
+            first = int(np.argmin([abs(h - float(np.median(hs))) for h in hs]))
+        if "step" in cfg:
+            cyc[cfg["step"]].save(os.path.join(a.out, "raw", f"{d}-step-ref.png"))
+        clip = [cyc[(first + i) % a.period] for i in range(a.length)]
         for i, im in enumerate(clip):
             im.save(os.path.join(raw, f"{i:04d}.png"))
-        cyc[0].save(os.path.join(a.out, "raw", f"{d}-keyframe.png"))
+        cyc[first].save(os.path.join(a.out, "raw", f"{d}-keyframe.png"))
         meta["loops"][d] = S.find_loop(clip)
         print(d, "loop", {k: v for k, v in meta["loops"][d].items() if k in ("period", "start", "seam")}, flush=True)
     json.dump(meta, open(os.path.join(a.out, "sheet.json"), "w"), indent=1)

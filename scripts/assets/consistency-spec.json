@@ -40,12 +40,12 @@
  "spore-drone": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 28,
-   "head_h": 12,
-   "mass": 414,
-   "cx": 0.6,
-   "foot_y": 45
+   "height": 37,
+   "width": 38,
+   "head_h": 14,
+   "mass": 511,
+   "cx": 0.04,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

@@ -18,7 +18,7 @@ const OLD: Record<string, { now: string; def: Omit<WeaponDef, 'id' | 'name'> }> 
     now: 'cageRam',
     def: { kind: 'melee', damage: 26, range: 1.4, cooldownTicks: 28, knockback: 16, durability: 12, onHit: { status: 'stun', ticks: 20 }, slots: 8, castsPerTrigger: 1, rechargeOnWrap: 75 },
   },
-  pistol: { now: 'decanter', def: { kind: 'ranged', damage: 14, range: 10, cooldownTicks: 18, knockback: 3, projectileSpeed: 14, slots: 4, castsPerTrigger: 1, rechargeOnWrap: 20 } },
+  pistol: { now: 'rivetDriver', def: { kind: 'ranged', damage: 14, range: 10, cooldownTicks: 18, knockback: 3, projectileSpeed: 14, slots: 4, castsPerTrigger: 1, rechargeOnWrap: 20 } },
   shotgun: {
     now: 'scatterFunnel',
     def: { kind: 'ranged', damage: 7, range: 6, cooldownTicks: 26, knockback: 4, projectileSpeed: 16, pellets: 5, spread: 0.5, slots: 4, castsPerTrigger: 2, rechargeOnWrap: 30 },
@@ -48,7 +48,7 @@ describe('lore weapons: the mundane arsenal is gone, its numbers are not', () =>
       expect(LOOT_ITEM_IDS, id).not.toContain(id)
     }
     expect(REMOVED).not.toContain(PLAYER_START_WEAPON)
-    expect(PLAYER_START_WEAPON).toBe('decanter')
+    expect(PLAYER_START_WEAPON).toBe('rivetDriver')
   })
 
   it('every slot keeps the old weapon numbers exactly, under a new id and name', () => {

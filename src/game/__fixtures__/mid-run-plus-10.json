@@ -703,7 +703,7 @@
         "iframes": 50
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 14
       },
       "status": {
@@ -715,7 +715,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 200
           }
         ],

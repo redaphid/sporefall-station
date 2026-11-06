@@ -20,7 +20,7 @@ import { spawnObject } from '../../src/game/systems/objects'
 import { createWorld, type World } from '../../src/game/world'
 import type { Entity } from '../../src/game/entity'
 
-const PISTOL = WEAPONS.decanter
+const PISTOL = WEAPONS.rivetDriver
 const FROST = MODS.frost.onHit!
 
 /** One shot through the projectile path's ordering. Advances the world tick by

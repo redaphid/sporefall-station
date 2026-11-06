@@ -198,7 +198,7 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
   })
 
   it('an out-of-ammo gun → fire clicks: no roll (the fallback is not on FIRE)', () => {
-    p.loadout!.inventory = [{ itemId: 'decanter', qty: 0 }] // a zero count is meaningless now
+    p.loadout!.inventory = [{ itemId: 'rivetDriver', qty: 0 }] // a zero count is meaningless now
     p.loadout!.activeSlot = 0
     combatSystem(w, fire({ moveX: 1 }))
     // The load-bearing guarantee: FIRE never backflips.
@@ -208,7 +208,7 @@ describe('fire button — nothing to fire is a DRY no-op, never a roll', () => {
   })
 
   it('holding fire NEVER rolls across a full roll cycle', () => {
-    p.loadout!.inventory = [{ itemId: 'decanter', qty: 0 }]
+    p.loadout!.inventory = [{ itemId: 'rivetDriver', qty: 0 }]
     p.loadout!.activeSlot = 0
     let rollStarts = 0
     const span = ROLL_TICKS + ROLL_COOLDOWN + 5
@@ -243,7 +243,7 @@ describe('use button — nothing usable → dodge-roll (the backflip)', () => {
   })
 
   it('an out-of-ammo gun active (not a usable item) → USE rolls', () => {
-    p.loadout!.inventory = [{ itemId: 'decanter', qty: 0 }]
+    p.loadout!.inventory = [{ itemId: 'rivetDriver', qty: 0 }]
     p.loadout!.activeSlot = 0
     combatSystem(w, use({ moveX: 1 }))
     expect(p.playerCtl!.roll).toBeDefined()

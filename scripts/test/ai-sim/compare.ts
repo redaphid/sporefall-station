@@ -36,7 +36,7 @@ const boundaryDuel = (seed: number): World => {
   const w = makeArena(seed, 20)
   const c = center(w)
   addPlayer(w, c.x, c.y)
-  const g = addNpc(w, 'acolyte', c.x + 13, c.y, { sight: 16, weapon: 'decanter' })
+  const g = addNpc(w, 'acolyte', c.x + 13, c.y, { sight: 16, weapon: 'rivetDriver' })
   g.health = { hp: Math.round(g.health!.max / 3) + 1, max: g.health!.max, iframes: 0 } // near the flee edge too
   return w
 }
@@ -44,8 +44,8 @@ const boundaryDuel = (seed: number): World => {
 const factionClash = (seed: number): World => {
   const w = makeArena(seed, 24)
   const c = center(w)
-  for (let i = 0; i < 6; i++) addNpc(w, 'warden', c.x - 8, c.y - 5 + i * 2, { sight: 13, weapon: 'decanter' })
-  for (let i = 0; i < 6; i++) addNpc(w, 'acolyte', c.x + 8, c.y - 5 + i * 2, { sight: 13, weapon: 'decanter' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'warden', c.x - 8, c.y - 5 + i * 2, { sight: 13, weapon: 'rivetDriver' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'acolyte', c.x + 8, c.y - 5 + i * 2, { sight: 13, weapon: 'rivetDriver' })
   return w
 }
 

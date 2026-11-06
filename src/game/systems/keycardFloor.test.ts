@@ -45,8 +45,8 @@ describe('keycards stay on their floor', () => {
 
     const walk = (extra: Partial<InputCmd> = {}): World => runTicks(w, new Map([[0, { moveX: 1, ...extra }]]), 1)
     for (let t = 0; t < 120 && !itemIds(walker).includes('grenade'); t++) walk()
-    expect(itemIds(walker)).toEqual(['decanter', 'keycard.wing3.essence_lab', 'grenade'])
-    expect(itemIds(guest)).toEqual(['decanter', 'keycard.wing3.essence_lab', 'keycard.wing7.reactor'])
+    expect(itemIds(walker)).toEqual(['rivetDriver', 'keycard.wing3.essence_lab', 'grenade'])
+    expect(itemIds(guest)).toEqual(['rivetDriver', 'keycard.wing3.essence_lab', 'keycard.wing7.reactor'])
 
     walk({ hotbar: 2 })
     expect(activeStack(walker)?.itemId).toBe('grenade')
@@ -54,10 +54,10 @@ describe('keycards stay on their floor', () => {
     for (let t = 0; t < 120 && w.floor === 1; t++) walk()
     expect(w.floor).toBe(2)
 
-    expect(itemIds(walker)).toEqual(['decanter', 'grenade'])
+    expect(itemIds(walker)).toEqual(['rivetDriver', 'grenade'])
     expect(activeStack(walker)).toEqual({ itemId: 'grenade', qty: 2 })
-    expect(itemIds(guest)).toEqual(['decanter'])
-    expect(activeStack(guest)?.itemId).toBe('decanter')
+    expect(itemIds(guest)).toEqual(['rivetDriver'])
+    expect(activeStack(guest)?.itemId).toBe('rivetDriver')
   })
 
   it('the canister goes too: no key-class item survives the exit', () => {

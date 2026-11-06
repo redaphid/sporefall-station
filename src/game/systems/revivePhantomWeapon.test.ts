@@ -61,7 +61,7 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
     expect(p.combat!.weapon).toBe(stack!.itemId) // combat.weapon is consistent
     expect(p.loadout!.activeSlot).toBeGreaterThanOrEqual(0)
     // Starter pistol comes back fully loaded (moddable slot, carries mods).
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'decanter', qty: 1 }])
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'rivetDriver', qty: 1 }])
   })
 
   it('normal revive KEEPS key items and re-slots the starter ahead of them', () => {
@@ -73,11 +73,11 @@ describe('revive leaves the player with a real, slotted, moddable weapon', () =>
     downAndRevive(w, p)
 
     expect(p.loadout!.inventory).toEqual([
-      { itemId: 'decanter', qty: 1 },
+      { itemId: 'rivetDriver', qty: 1 },
       { itemId: 'keycard.red', qty: 1 },
     ])
-    expect(weaponStack(p)!.itemId).toBe('decanter') // activeSlot 0 still resolves the gun
-    expect(p.combat!.weapon).toBe('decanter')
+    expect(weaponStack(p)!.itemId).toBe('rivetDriver') // activeSlot 0 still resolves the gun
+    expect(p.combat!.weapon).toBe('rivetDriver')
   })
 
   it('a REVIVED player who walks over a mod pickup actually receives the mod', () => {
@@ -178,7 +178,7 @@ describe('applyModPickup — phantom-weapon materialization (defense in depth)',
 
   it('a full inventory cannot be over-stuffed by materialization (leaves the mod on the ground)', () => {
     const p = bareEntity()
-    p.combat!.weapon = 'decanter'
+    p.combat!.weapon = 'rivetDriver'
     p.loadout!.inventory = Array.from({ length: 6 }, () => ({ itemId: 'grenade', qty: 1 }))
     const res = applyModPickup(p, 'frost')
     expect(res).toBeNull()

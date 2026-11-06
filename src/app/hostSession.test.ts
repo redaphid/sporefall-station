@@ -140,12 +140,12 @@ describe('sessions spawn a ready-to-play avatar with no selection step', () => {
   it('a fresh session spawns the local player with the standard loadout immediately', () => {
     const session = new HostSession(7, stubInput)
     // The avatar exists BEFORE any tick — nothing waits on a selection screen.
-    expect(session.self.combat!.weapon).toBe('decanter')
+    expect(session.self.combat!.weapon).toBe('rivetDriver')
     expect(session.self.loadout!.activeSlot).toBe(0)
     expect(session.self.playerCtl!.abilityCooldown).toBe(0) // grenade special ready
     for (let i = 0; i < 10; i++) session.tick() // and the real systems run on it
     expect(session.world.tick).toBe(10)
-    expect(players(session)[0].combat!.weapon).toBe('decanter')
+    expect(players(session)[0].combat!.weapon).toBe('rivetDriver')
   })
 
   it('pad joiners get the same standard loadout as the host', () => {
@@ -154,6 +154,6 @@ describe('sessions spawn a ready-to-play avatar with no selection step', () => {
     session.tick()
     const all = players(session)
     expect(all).toHaveLength(2)
-    for (const p of all) expect(p.combat!.weapon).toBe('decanter')
+    for (const p of all) expect(p.combat!.weapon).toBe('rivetDriver')
   })
 })

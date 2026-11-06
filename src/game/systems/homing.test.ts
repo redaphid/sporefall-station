@@ -311,7 +311,7 @@ describe('homing — determinism and snapshot shape', () => {
     wallRow(w, 8, 20, 9)
     const p = spawnPlayer(w, 0, 10.5, 10.5)
     p.facing = 0
-    const stack = arm(p, 'decanter')
+    const stack = arm(p, 'rivetDriver')
     stack.mods = [{ id: 'homing', stacks: 3 }]
     mutant(w, 14.5, 7.5)
     mutant(w, 16.5, 13.0)
@@ -336,7 +336,7 @@ describe('homing — determinism and snapshot shape', () => {
     const seed = createWorld(1, 1)
     const p = spawnPlayer(seed, 0, 20.5, 20.5)
     p.facing = 0
-    const stack = arm(p, 'decanter')
+    const stack = arm(p, 'rivetDriver')
     stack.mods = [{ id: 'homing', stacks: 3 }]
     const mark = addEntity(seed, makeEntity('npc', 'mutant', 25.5, 23.0))
     mark.health = { hp: 200, max: 200, iframes: 0 }
@@ -354,7 +354,7 @@ describe('homing — determinism and snapshot shape', () => {
   it('a homing round serializes with NO new fields — the pre-rework projectile shape, exactly', () => {
     const w = arena()
     const p = spawnPlayer(w, 0, 10.5, 10.5)
-    const stack = arm(p, 'decanter')
+    const stack = arm(p, 'rivetDriver')
     stack.mods = [{ id: 'homing', stacks: 2 }]
     p.facing = 0
     p.combat!.cooldown = 0

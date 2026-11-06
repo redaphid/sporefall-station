@@ -77,7 +77,7 @@ const swatch = (x: number, y: number, w: number, t: BulletTraits, label: string)
 // ---- (b) real-sim splinter scatter ---------------------------------------
 const armed = (w: World, x: number, y: number, mods: WeaponMod[]): Entity => {
   const p = spawnPlayer(w, 0, x, y)
-  p.playerCtl!.inventory = [{ itemId: 'decanter', qty: 99, mods }]
+  p.playerCtl!.inventory = [{ itemId: 'rivetDriver', qty: 99, mods }]
   equipSlot(p, 0)
   p.facing = 0
   return p

@@ -20,7 +20,8 @@ import sys
 from pathlib import Path
 
 RENAMES = {
-    "pistol": "decanter",
+    "pistol": "rivetDriver",
+    "decanter": "rivetDriver",  # the first sidearm design, replaced the same day (owner: read as a gun)
     "wrench": "pressureLance",
     "knife": "siphonSpike",
     "sledgehammer": "cageRam",

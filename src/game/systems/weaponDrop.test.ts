@@ -58,7 +58,7 @@ const weaponPickup = (w: World, itemId: string, x: number, y: number): Entity =>
 
 /** The weapons a corpse used to be able to leave behind — melee, guns, element
  * guns, and the boss's `natural` claws (which once rendered as a fake medkit). */
-const CARRIED = ['decanter', 'pressureLance', 'siphonSpike', 'scatterFunnel', 'coilRepeater', 'cageRam', 'frostCondenser', 'claws']
+const CARRIED = ['rivetDriver', 'pressureLance', 'siphonSpike', 'scatterFunnel', 'coilRepeater', 'cageRam', 'frostCondenser', 'claws']
 
 describe('one permanent weapon — a corpse drops NOTHING', () => {
   it.each(CARRIED)('killing an NPC carrying %s spawns no pickup and emits no weaponDrop event', (weapon) => {
@@ -73,7 +73,7 @@ describe('one permanent weapon — a corpse drops NOTHING', () => {
 
   it('an ENVIRONMENT kill (applyDamage, no player swing) drops nothing either', () => {
     const w = createWorld(1, 1)
-    const npc = armedNpc(w, 'decanter')
+    const npc = armedNpc(w, 'rivetDriver')
     applyDamage(w, npc, 999, npc.pos.x + 1, npc.pos.y, 0, 999) // attackerId that isn't a player
     expect(npc.dead).toBe(true)
     expect(drops(w)).toHaveLength(0)
@@ -84,7 +84,7 @@ describe('one permanent weapon — a corpse drops NOTHING', () => {
     // be overwhelmingly likely to show itself here.
     for (let seed = 1; seed <= 400; seed++) {
       const w = createWorld(seed, 1)
-      kill(w, armedNpc(w, 'decanter'))
+      kill(w, armedNpc(w, 'rivetDriver'))
       expect(drops(w), `seed ${seed} spawned a drop`).toHaveLength(0)
     }
   })
@@ -103,7 +103,7 @@ describe('one permanent weapon — killing never touches the shared RNG stream',
   it('a long batch of deaths still leaves the stream untouched', () => {
     const w = createWorld(1234, 1)
     const before = w.rng.state()
-    for (let i = 0; i < 200; i++) kill(w, armedNpc(w, 'decanter', 3.5 + (i % 10), 4.5))
+    for (let i = 0; i < 200; i++) kill(w, armedNpc(w, 'rivetDriver', 3.5 + (i % 10), 4.5))
     expect(drops(w)).toHaveLength(0)
     expect(w.rng.state()).toBe(before)
   })
@@ -140,7 +140,7 @@ describe('one permanent weapon — a weapon on the floor can never be picked up'
   it('a player still holds exactly ONE weapon slot after walking over a pile of guns', () => {
     const w = createWorld(1, 1)
     const p = player(w, 12.5, 12.5)
-    for (const id of ['decanter', 'scatterFunnel', 'coilRepeater', 'pressureLance']) weaponPickup(w, id, 12.5, 12.5)
+    for (const id of ['rivetDriver', 'scatterFunnel', 'coilRepeater', 'pressureLance']) weaponPickup(w, id, 12.5, 12.5)
     runTicks(w, new Map([[0, {}]]), 3)
     const weaponSlots = p.loadout!.inventory.filter((s) => s.itemId === PLAYER_START_WEAPON)
     expect(weaponSlots).toHaveLength(1)
@@ -176,7 +176,7 @@ describe('one permanent weapon — determinism', () => {
 
   it('the post-kill world round-trips through serialize byte-for-byte', () => {
     const w = createWorld(4242, 2)
-    kill(w, armedNpc(w, 'decanter'))
+    kill(w, armedNpc(w, 'rivetDriver'))
     const json = serializeWorld(w)
     expect(serializeWorld(deserializeWorld(json))).toEqual(json)
   })

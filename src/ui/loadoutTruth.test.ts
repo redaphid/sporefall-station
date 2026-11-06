@@ -234,10 +234,10 @@ describe('the review probes, pinned', () => {
   const stat = (l: LoadoutModel, k: string) => l.stats.find((s) => s.key === k)!.resolvedText
 
   it('a pistol with only Rapid is one cast, so it fires at the Rapid rate, not the recharge (#115)', () => {
-    expect(stat(panel('decanter', [m('rapid')]), 'fireRate')).toBe('2/s')
+    expect(stat(panel('rivetDriver', [m('rapid')]), 'fireRate')).toBe('2/s')
   })
   it('a pistol [frost, rapid] wraps on the Rapid cast, so its next pull after frost waits out the recharge', () => {
-    const w = rig('decanter', [m('frost'), m('rapid')])
+    const w = rig('rivetDriver', [m('frost'), m('rapid')])
     const p = w.entities.find((e: Entity) => e.playerCtl)!
     weaponStack(p)!.castIndex = 1
     expect(stat(buildLoadout(p)!, 'fireRate')).toBe('1.5/s')

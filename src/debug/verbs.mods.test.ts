@@ -28,7 +28,7 @@ describe('addMod verb', () => {
   it('adds a mod (default 1 stack) to the slotted weapon', () => {
     const id = armedPlayer(w)
     const reply = JSON.parse(runVerb(w, `addMod ${id} frost`))
-    expect(reply.weapon).toBe('decanter')
+    expect(reply.weapon).toBe('rivetDriver')
     expect(reply.mods).toEqual([{ id: 'frost', stacks: 1 }])
   })
 

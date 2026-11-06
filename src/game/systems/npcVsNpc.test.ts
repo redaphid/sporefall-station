@@ -75,10 +75,10 @@ describe('#63 NPC-vs-NPC — a real firefight erupts from disposition alone', ()
     const { w, cx, cy } = arena(4)
     const warden = spawnNpc(w, 'warden', cx, cy)
     warden.ai!.sightRange = 14
-    warden.combat!.weapon = 'decanter'
+    warden.combat!.weapon = 'rivetDriver'
     const rootcult = spawnNpc(w, 'acolyte', cx + 4, cy)
     rootcult.ai!.sightRange = 14
-    rootcult.combat!.weapon = 'decanter'
+    rootcult.combat!.weapon = 'rivetDriver'
     const input = new Map([[0, emptyInput()]])
     let hits = 0
     let wardenAggroedRootcult = false
@@ -103,10 +103,10 @@ describe('#63 NPC-vs-NPC — a real firefight erupts from disposition alone', ()
     w.aiFlags = { npcVsNpc: false }
     const warden = spawnNpc(w, 'warden', cx, cy)
     warden.ai!.sightRange = 14
-    warden.combat!.weapon = 'decanter'
+    warden.combat!.weapon = 'rivetDriver'
     const rootcult = spawnNpc(w, 'acolyte', cx + 4, cy)
     rootcult.ai!.sightRange = 14
-    rootcult.combat!.weapon = 'decanter'
+    rootcult.combat!.weapon = 'rivetDriver'
     const input = new Map([[0, emptyInput()]])
     let hits = 0
     for (let t = 0; t < 60; t++) {

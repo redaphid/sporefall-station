@@ -38,24 +38,24 @@ describe('draftCards — display data', () => {
 
 describe('applyDraftPick — append / stack / cap', () => {
   it('appends a new mod to a vanilla weapon', () => {
-    const stack: ItemStack = { itemId: 'decanter', qty: 8 }
+    const stack: ItemStack = { itemId: 'rivetDriver', qty: 8 }
     applyDraftPick(stack, 'frost')
     expect(stack.mods).toEqual([{ id: 'frost', stacks: 1 }])
   })
 
   it('stacks an already-picked mod', () => {
-    const stack: ItemStack = { itemId: 'decanter', qty: 8, mods: [{ id: 'overload', stacks: 1 }] }
+    const stack: ItemStack = { itemId: 'rivetDriver', qty: 8, mods: [{ id: 'overload', stacks: 1 }] }
     applyDraftPick(stack, 'overload')
     expect(stack.mods).toEqual([{ id: 'overload', stacks: 2 }])
   })
 
   it('never exceeds a mod maxStacks', () => {
-    const stack: ItemStack = { itemId: 'decanter', qty: 8 }
+    const stack: ItemStack = { itemId: 'rivetDriver', qty: 8 }
     for (let i = 0; i < 20; i++) applyDraftPick(stack, 'frost') // frost maxStacks = 1
     expect(stack.mods).toEqual([{ id: 'frost', stacks: 1 }])
   })
 
   it('rejects an unknown mod id', () => {
-    expect(() => applyDraftPick({ itemId: 'decanter', qty: 8 }, 'nope')).toThrow(/unknown mod/)
+    expect(() => applyDraftPick({ itemId: 'rivetDriver', qty: 8 }, 'nope')).toThrow(/unknown mod/)
   })
 })

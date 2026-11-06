@@ -5,7 +5,7 @@ import { computeTouchLabels } from './touchLabels'
 
 const player = (opts: { weapon?: string; cd?: number } = {}): Entity => {
   const p = makeEntity('player', 'player', 0, 0)
-  p.combat = { weapon: opts.weapon ?? 'decanter', cooldown: 0 }
+  p.combat = { weapon: opts.weapon ?? 'rivetDriver', cooldown: 0 }
   p.playerCtl = {
     playerId: 0,
     abilityCooldown: opts.cd ?? 0,
@@ -96,9 +96,9 @@ describe('computeTouchLabels — USE verb selection', () => {
 describe('computeTouchLabels — degenerate self', () => {
   it('a self with no playerCtl still produces safe labels (weapon + ready special)', () => {
     const p = makeEntity('player', 'player', 0, 0)
-    p.combat = { weapon: 'decanter', cooldown: 0 }
+    p.combat = { weapon: 'rivetDriver', cooldown: 0 }
     const labels = computeTouchLabels(view(p))
-    expect(labels.atk).toBe('Decanter')
+    expect(labels.atk).toBe('Rivet Driver')
     expect(labels.spc).toBe('Grenade')
     expect(labels.spcEnabled).toBe(true) // cd defaults to 0
   })

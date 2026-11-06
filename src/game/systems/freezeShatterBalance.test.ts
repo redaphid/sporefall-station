@@ -25,7 +25,7 @@ import { SHATTER_DAMAGE_MULT, applyDamage } from './combat'
 import { applyStatus, isFrozen } from './statusFx'
 import { statusSystem } from './status'
 
-const PISTOL = WEAPONS.decanter
+const PISTOL = WEAPONS.rivetDriver
 const FROST = MODS.frost.onHit!
 
 /** One shot in the projectile system's order — damage first, THEN the onHit

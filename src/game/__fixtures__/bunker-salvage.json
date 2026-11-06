@@ -2046,13 +2046,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -2625,13 +2625,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -3122,13 +3122,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],
@@ -3379,13 +3379,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 1,
             "mods": [
               {
@@ -15319,7 +15319,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -15331,7 +15331,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 1
           }
         ],

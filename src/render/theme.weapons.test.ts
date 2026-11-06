@@ -17,9 +17,9 @@ describe('weapon sprite keys', () => {
     }
     for (const v of WEAPON_VIEWS)
       for (const s of ['idle', 'attack'])
-        for (let n = 0; n < MAX_ANIM_FRAMES; n++) expect(SPRITE_KEYS.has(`weapon.decanter.${v}-${s}-${n}`)).toBe(true)
-    expect(SPRITE_KEYS.has(`weapon.decanter.e-idle-${MAX_ANIM_FRAMES}`)).toBe(false)
-    expect(SPRITE_KEYS.has('weapon.decanter.sw-idle-0')).toBe(false) // the west half is mirrored, never drawn
+        for (let n = 0; n < MAX_ANIM_FRAMES; n++) expect(SPRITE_KEYS.has(`weapon.rivetDriver.${v}-${s}-${n}`)).toBe(true)
+    expect(SPRITE_KEYS.has(`weapon.rivetDriver.e-idle-${MAX_ANIM_FRAMES}`)).toBe(false)
+    expect(SPRITE_KEYS.has('weapon.rivetDriver.sw-idle-0')).toBe(false) // the west half is mirrored, never drawn
     expect(SPRITE_KEYS.has('weapon.fangs.e-idle-0')).toBe(false)
   })
 
@@ -33,36 +33,36 @@ describe('weapon sprite keys', () => {
 describe('the weapons grip/muzzle section', () => {
   it('keeps whole-pixel grip and muzzle per id and view; muzzle defaults to the grip', () => {
     const { manifest, warnings } = validateManifest({
-      weapons: { decanter: { e: { grip: [3, 6], muzzle: [14, 2] }, s: { grip: [4, 7] } } },
+      weapons: { rivetDriver: { e: { grip: [3, 6], muzzle: [14, 2] }, s: { grip: [4, 7] } } },
     })
     expect(warnings).toEqual([])
-    expect(manifest.weapons.decanter.e).toEqual({ grip: [3, 6], muzzle: [14, 2] })
-    expect(manifest.weapons.decanter.s).toEqual({ grip: [4, 7], muzzle: [4, 7] })
+    expect(manifest.weapons.rivetDriver.e).toEqual({ grip: [3, 6], muzzle: [14, 2] })
+    expect(manifest.weapons.rivetDriver.s).toEqual({ grip: [4, 7], muzzle: [4, 7] })
   })
 
   it.each([
     ['unknown weapon', { 'spork-of-doom': { e: { grip: [1, 1] } } }],
     ['natural weapon', { fangs: { e: { grip: [1, 1] } } }],
     ['prototype key', JSON.parse('{"__proto__": {"e": {"grip": [1, 1]}}}')],
-    ['unknown view', { decanter: { sw: { grip: [1, 1] } } }],
-    ['fractional grip', { decanter: { e: { grip: [1.5, 1] } } }],
-    ['negative grip', { decanter: { e: { grip: [-1, 1] } } }],
-    ['missing grip', { decanter: { e: { muzzle: [1, 1] } } }],
-    ['bad muzzle', { decanter: { e: { grip: [1, 1], muzzle: 'tip' } } }],
+    ['unknown view', { rivetDriver: { sw: { grip: [1, 1] } } }],
+    ['fractional grip', { rivetDriver: { e: { grip: [1.5, 1] } } }],
+    ['negative grip', { rivetDriver: { e: { grip: [-1, 1] } } }],
+    ['missing grip', { rivetDriver: { e: { muzzle: [1, 1] } } }],
+    ['bad muzzle', { rivetDriver: { e: { grip: [1, 1], muzzle: 'tip' } } }],
     ['not an object', [1, 2]],
   ])('drops a %s with a warning, never throws', (_name, weapons) => {
     const { manifest, warnings } = validateManifest({ weapons })
     expect(warnings.length).toBeGreaterThan(0)
-    expect(manifest.weapons.decanter?.e).toBeUndefined()
-    expect(Object.keys(manifest.weapons.decanter ?? {})).toEqual([])
+    expect(manifest.weapons.rivetDriver?.e).toBeUndefined()
+    expect(Object.keys(manifest.weapons.rivetDriver ?? {})).toEqual([])
   })
 
   it('the first theme in the chain that pins a view wins', () => {
     const theme = (id: string, weapons: unknown): LoadedTheme => ({ id, dir: `themes/${id}/`, manifest: validateManifest({ weapons }).manifest })
-    const chain = [theme('a', { decanter: { e: { grip: [1, 2] } } }), theme('b', { decanter: { e: { grip: [9, 9] }, s: { grip: [5, 5] } } })]
-    expect(resolveWeaponPoints('decanter', 'e', chain)?.grip).toEqual([1, 2])
-    expect(resolveWeaponPoints('decanter', 's', chain)?.grip).toEqual([5, 5])
-    expect(resolveWeaponPoints('decanter', 'n', chain)).toBeUndefined()
+    const chain = [theme('a', { rivetDriver: { e: { grip: [1, 2] } } }), theme('b', { rivetDriver: { e: { grip: [9, 9] }, s: { grip: [5, 5] } } })]
+    expect(resolveWeaponPoints('rivetDriver', 'e', chain)?.grip).toEqual([1, 2])
+    expect(resolveWeaponPoints('rivetDriver', 's', chain)?.grip).toEqual([5, 5])
+    expect(resolveWeaponPoints('rivetDriver', 'n', chain)).toBeUndefined()
   })
 
   it('every carried weapon id is a held-art id', () => {

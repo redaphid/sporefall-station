@@ -12,7 +12,7 @@ export type PeerId = string
  * through the gate, and then the older peer quietly renders every new object
  * as another copy of the player. Nothing errors; the game just lies.
  *
- * 15 — the lore weapons: every weapon id was renamed (pistol -> decanter,
+ * 15 — the lore weapons: every weapon id was renamed (pistol -> rivetDriver,
  *     wrench -> pressureLance, ...; scripts/rename-weapon-ids.py) and the
  *     `pickup.<id>` archetypes appended. An old peer would send and expect ids
  *     this build classes as 'unknown' items.

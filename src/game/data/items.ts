@@ -57,7 +57,7 @@ export interface WeaponDef {
 // still". Every carried weapon is a colony still-section, and each kept the
 // combat numbers of the mundane weapon it replaced byte for byte
 // (loreWeapons.test.ts pins them), so balance did not move:
-//   pistol -> decanter        wrench -> pressureLance   knife -> siphonSpike
+//   pistol -> rivetDriver        wrench -> pressureLance   knife -> siphonSpike
 //   sledgehammer -> cageRam   shotgun -> scatterFunnel  machinegun -> coilRepeater
 //   flamethrower -> phosphorHose   freezeRay -> frostCondenser
 //   tranquilizer -> lullDarter     stunGun -> sparkCoil
@@ -107,9 +107,9 @@ export const WEAPONS: Record<string, WeaponDef> = {
   // durability exactly (the same relabel as the beasts above).
   grappleArms: { id: 'grappleArms', name: 'Grapple Arms', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16, natural: true },
   horns: { id: 'horns', name: 'Horns', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16, natural: true },
-  decanter: {
-    id: 'decanter',
-    name: 'Decanter',
+  rivetDriver: {
+    id: 'rivetDriver',
+    name: 'Rivet Driver',
     kind: 'ranged',
     damage: 14,
     range: 10,

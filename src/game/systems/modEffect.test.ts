@@ -48,17 +48,17 @@ describe('melee (PR #78 inventory: 9 work, 9 silently inert, bulk worse than not
 
 describe('the pistol every player holds', () => {
   it('every mod works except Choke, which has no fan to tighten', () => {
-    const v = verdicts('decanter')
+    const v = verdicts('rivetDriver')
     expect(v.choke).toBe('inert: no effect on this weapon')
     expect(Object.entries(v).filter(([, x]) => x !== 'live').map(([k]) => k)).toEqual(['choke'])
   })
 
   it('Choke comes alive once Barrage turns the shot into a fan', () => {
-    expect(modVerdict(WEAPONS.decanter, [m('bulk'), m('choke')], 'choke').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [m('bulk'), m('choke')], 'choke').kind).toBe('live')
   })
 
   it('a bullet ignores knockback, so the gun never reports it', () => {
-    expect(executedShot(WEAPONS.decanter, [m('heavy', 5)]).knockback).toBeUndefined()
+    expect(executedShot(WEAPONS.rivetDriver, [m('heavy', 5)]).knockback).toBeUndefined()
     expect(executedShot(WEAPONS.cageRam, [m('heavy')]).knockback).toBeGreaterThan(WEAPONS.cageRam.knockback)
   })
 })
@@ -67,13 +67,13 @@ describe('elements: each cast carries its own', () => {
   it('no element overrides another: each fires on its own cast, so every one is live', () => {
     for (const order of [['frost', 'shock'], ['shock', 'incendiary', 'frost']]) {
       const mods = order.map((id) => m(id))
-      for (const id of order) expect(modVerdict(WEAPONS.decanter, mods, id), id + ' in ' + order.join(',')).toEqual({ kind: 'live' })
+      for (const id of order) expect(modVerdict(WEAPONS.rivetDriver, mods, id), id + ' in ' + order.join(',')).toEqual({ kind: 'live' })
     }
   })
 
   it("the owner's wand [bounce x2, incendiary, splinter, frost]: every mod is live", () => {
     const wand = [m('bounce', 2), m('incendiary'), m('splinterShot'), m('frost')]
-    for (const { id } of wand) expect(modVerdict(WEAPONS.decanter, wand, id), id).toEqual({ kind: 'live' })
+    for (const { id } of wand) expect(modVerdict(WEAPONS.rivetDriver, wand, id), id).toEqual({ kind: 'live' })
   })
 
   it('an element the gun already fires adds nothing', () => {
@@ -90,56 +90,56 @@ describe('elements: each cast carries its own', () => {
 describe('downside-only mods', () => {
   it('Overload on a zero-damage gun only slows it down', () => {
     expect(modVerdict(WEAPONS.frostCondenser, [m('overload')], 'overload')).toEqual({ kind: 'penalty', reason: 'only lowers fire rate' })
-    expect(modVerdict(WEAPONS.decanter, [m('overload')], 'overload').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [m('overload')], 'overload').kind).toBe('live')
   })
 })
 
 describe('the wand: slots, casts and the recharge', () => {
   it('a mod past the live window is stowed and never fires', () => {
     const mods = ['pierce', 'bounce', 'homing', 'split', 'explosive'].map((id) => m(id))
-    expect(modVerdict(WEAPONS.decanter, mods, 'explosive')).toEqual({ kind: 'inert', reason: 'stowed: swap it in' })
-    expect(modVerdict(WEAPONS.decanter, mods, 'split').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, mods, 'explosive')).toEqual({ kind: 'inert', reason: 'stowed: swap it in' })
+    expect(modVerdict(WEAPONS.rivetDriver, mods, 'split').kind).toBe('live')
   })
 
   it('a faster cast that wraps a two-cast cycle is outlasted by the recharge', () => {
-    expect(modVerdict(WEAPONS.decanter, [m('frost'), m('rapid')], 'rapid')).toEqual({ kind: 'inert', reason: 'recharge hides it' })
+    expect(modVerdict(WEAPONS.rivetDriver, [m('frost'), m('rapid')], 'rapid')).toEqual({ kind: 'inert', reason: 'recharge hides it' })
   })
 
   it('a one-cast wand never recharges, so its fire-rate mod counts (#115)', () => {
-    expect(modVerdict(WEAPONS.decanter, [m('rapid')], 'rapid').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [m('rapid')], 'rapid').kind).toBe('live')
   })
 
   it('a fire-rate mod on a cast that does not wrap still counts', () => {
-    expect(modVerdict(WEAPONS.decanter, [m('rapid'), m('frost'), m('shock')], 'rapid').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [m('rapid'), m('frost'), m('shock')], 'rapid').kind).toBe('live')
   })
 })
 
 describe('degenerate input', () => {
   it('an unknown mod id is inert, never a crash', () => {
-    expect(modVerdict(WEAPONS.decanter, [m('bogus')], 'bogus')).toEqual({ kind: 'inert', reason: 'unknown mod' })
+    expect(modVerdict(WEAPONS.rivetDriver, [m('bogus')], 'bogus')).toEqual({ kind: 'inert', reason: 'unknown mod' })
   })
 
   it('a mod not yet on the weapon is judged as if picked up', () => {
-    expect(modVerdict(WEAPONS.decanter, [], 'pierce').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [], 'pierce').kind).toBe('live')
     expect(modVerdict(WEAPONS.cageRam, [], 'pierce').kind).toBe('inert')
-    expect(modVerdict(WEAPONS.decanter, [m('pierce', 0)], 'pierce').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [m('pierce', 0)], 'pierce').kind).toBe('live')
   })
 
   it('unknown and empty neighbours do not change a verdict', () => {
     const junk = [m('bogus', 3), m('rapid', 0), m('pierce', -2)]
-    for (const id of Object.keys(MODS)) expect(modVerdict(WEAPONS.decanter, [...junk, m(id)], id), id).toEqual(modVerdict(WEAPONS.decanter, [m(id)], id))
+    for (const id of Object.keys(MODS)) expect(modVerdict(WEAPONS.rivetDriver, [...junk, m(id)], id), id).toEqual(modVerdict(WEAPONS.rivetDriver, [m(id)], id))
   })
 
   it('huge stacks are clamped the way the fire path clamps them', () => {
-    expect(modVerdict(WEAPONS.decanter, [m('pierce', 1e9)], 'pierce').kind).toBe('live')
+    expect(modVerdict(WEAPONS.rivetDriver, [m('pierce', 1e9)], 'pierce').kind).toBe('live')
     expect(modVerdict(WEAPONS.cageRam, [m('pierce', 1e9)], 'pierce').kind).toBe('inert')
   })
 
   it('is pure: the same input always gives the same verdict and never mutates the list', () => {
     const mods = [m('frost'), m('shock')]
     const before = JSON.stringify(mods)
-    const a = modVerdict(WEAPONS.decanter, mods, 'frost')
-    expect(modVerdict(WEAPONS.decanter, mods, 'frost')).toEqual(a)
+    const a = modVerdict(WEAPONS.rivetDriver, mods, 'frost')
+    expect(modVerdict(WEAPONS.rivetDriver, mods, 'frost')).toEqual(a)
     expect(JSON.stringify(mods)).toBe(before)
   })
 })

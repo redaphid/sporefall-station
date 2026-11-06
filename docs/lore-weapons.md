@@ -21,10 +21,12 @@ not move. Comics that settled the roster: https://draw.hypnodroid.com/b/sporefal
 | stunGun | sparkCoil | Spark Coil | yellow | loot |
 
 - **Decanter** (sidearm): a caged glass bulb IS the barrel; the petcock decants one bubble per pull.
-- **Pressure Lance**: a stolen still pipe, canvas grip, jar mid-shaft; the thrust vents the jar out a flared nozzle (the knockback).
+- **Pressure Lance**: a stolen still pipe with a heavy pneumatic piston head; the thrust slams the piston (the knockback).
 - **Siphon Spike**: a sampling probe: glass barrel, needle tip. Quick jab.
 - **Cage Ram**: two-handed pole, a wire cage holding a charged bulb; it bursts on impact (the stun).
 - **Scatter Funnel / Coil Repeater / Phosphor Hose / Frost Condenser / Lull Darter / Spark Coil**: funnel mouth, coil-wrapped tube, hose-fed wand, finned condenser, slim dart tube, forked coil prongs.
+
+**Look promises behaviour** (owner, 2026-11-06): each weapon must read as what its existing projectile, hit and numbers deliver; essence glow is one small accent, never the barrel.
 
 Not steampunk: worn grey steel, rubber, canvas tape; no gears, brass filigree or goggles.
 

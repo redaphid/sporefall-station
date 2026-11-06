@@ -17,7 +17,7 @@ const scene = (stacks: number, hp: number, physicalResist?: number): { w: World;
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.health = { hp, max: MAX, iframes: 0 }
-  arm(p, 'decanter').mods = [{ id: 'lifesteal', stacks }]
+  arm(p, 'rivetDriver').mods = [{ id: 'lifesteal', stacks }]
   const foe = addEntity(w, makeEntity('npc', 'civilian', 22, 20))
   foe.health = { hp: 10000, max: 10000, iframes: 0 }
   if (physicalResist !== undefined) foe.resist = { physical: physicalResist }

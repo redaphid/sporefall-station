@@ -65,7 +65,7 @@ afterEach(() => {
 /** A solo run wired the way main.ts wires it, with a pistol carrying three mods. */
 const rig = (opts: { canResume?: () => boolean } = {}) => {
   const session = new HostSession(18, { sample: () => emptyInput() }, createGamepadCoop(() => pads))
-  arm(session.self, 'decanter').mods = [
+  arm(session.self, 'rivetDriver').mods = [
     { id: 'frost', stacks: 1 },
     { id: 'heavy', stacks: 1 },
     { id: 'shock', stacks: 1 },

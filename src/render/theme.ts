@@ -66,7 +66,7 @@ export const CHAR_NAMES = ['player', 'warden', 'mutant', 'civilian', 'scientist'
   'brute', 'cinder', 'sporeling', 'stalker', 'lurker', 'pod',
   // The group roster (systems/groups.ts) — canonical for the same reason.
   'drowner', 'bellwether', 'mender', 'breacher', 'lobber', 'gloamhound', 'hivespire'] as const
-export const ITEM_IDS = ['decanter', 'pressureLance', 'siphonSpike', 'medkit', 'cash', 'scatterFunnel', 'molotov', 'grenade-item'] as const
+export const ITEM_IDS = ['rivetDriver', 'pressureLance', 'siphonSpike', 'medkit', 'cash', 'scatterFunnel', 'molotov', 'grenade-item'] as const
 // The six sporeforge furnishings (shelf/bunk/bench/table/plant/spore-node) and
 // `crate` are canonical for the same reason `boss` is above: a prop key that is
 // not listed here is not canonical, so validateManifest DROPS the mapping and

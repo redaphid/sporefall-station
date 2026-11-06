@@ -17,8 +17,8 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 const world = () => {
   const w = JSON.parse(JSON.stringify(base))
   const p = w.entities.find((e) => e.playerCtl)
-  p.combat.weapon = 'decanter'
-  p.playerCtl.inventory = [{ itemId: 'decanter', qty: 99 }]
+  p.combat.weapon = 'rivetDriver'
+  p.playerCtl.inventory = [{ itemId: 'rivetDriver', qty: 99 }]
   p.playerCtl.activeSlot = 0
   w.entities = w.entities.filter((e) => e.archetype !== 'mutant')
   let id = w.nextId
@@ -67,7 +67,7 @@ const ok = await recordFeature({
   // Adversarial post-run asserts: both gems consumed, both mods now ride the pistol.
   expect: (s) => [
     s.gameOver && 'unexpected game over',
-    s.weapon !== 'decanter' && `weapon changed: ${s.weapon}`,
+    s.weapon !== 'rivetDriver' && `weapon changed: ${s.weapon}`,
     s.gemsLeft !== 0 && `gems not all grabbed: ${s.gemsLeft} left`,
     !s.mods.includes('frost×1') && `frost not applied (mods: ${s.mods.join(',')})`,
     !s.mods.includes('overload×1') && `overload not applied (mods: ${s.mods.join(',')})`,

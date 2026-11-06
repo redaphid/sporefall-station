@@ -72,12 +72,12 @@ describe('sequenced casting: golden digests', () => {
   // Re-pinned by the lore weapons (was f0f577c1 / b5f38eca). Two parts, proven
   // separately: (1) the id rename alone is pure: with drones still taking the
   // arsenal roll, mapping the new ids in worldDigest back to the old ones
-  // (decanter->pistol, ...) reproduces f0f577c1 and b5f38eca exactly; (2) the
+  // (rivetDriver->pistol, ...) reproduces f0f577c1 and b5f38eca exactly; (2) the
   // drone wardens now keep their grapple arms instead of a rolled weapon
   // (NpcDef.bodyArmed), so the crowd around the fire path fights differently.
   const GOLDEN: Record<number, string> = {
-    7: 'e631c5e9',
-    1234: '306e8244',
+    7: '1d12c12d',
+    1234: 'c65ecfe4',
   }
 
   for (const seed of [7, 1234]) {

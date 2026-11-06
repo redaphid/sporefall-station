@@ -99,13 +99,13 @@ describe('inventory — adversarial', () => {
 
     it('REFUSES a weapon slot outright — the weapon is permanent and unselectable', () => {
       const e = player(w)
-      arm(e, 'decanter')
+      arm(e, 'rivetDriver')
       e.loadout!.inventory.push({ itemId: 'scatterFunnel', qty: 1 }, { itemId: 'pressureLance', qty: 16 })
       expect(equipSlot(e, 0)).toBe(false) // its own weapon
       expect(equipSlot(e, 1)).toBe(false) // a gun that somehow got into a slot
       expect(equipSlot(e, 2)).toBe(false) // ...or a melee weapon
       expect(e.loadout!.activeSlot).toBe(-1)
-      expect(e.combat!.weapon).toBe('decanter') // never swapped
+      expect(e.combat!.weapon).toBe('rivetDriver') // never swapped
     })
   })
 
@@ -177,14 +177,14 @@ describe('inventory — adversarial', () => {
         const e = player(w)
         // The permanent weapon in slot 0, a throwable in slot 1, a HELD
         // consumable above it in slot 2.
-        arm(e, 'decanter')
+        arm(e, 'rivetDriver')
         e.loadout!.inventory.push({ itemId: 'grenade', qty: 1 }, { itemId: id, qty: 2 })
         expect(equipSlot(e, 2)).toBe(true) // hold the consumable
         throwActive(w, e) // throws the grenade at slot 1, removeSlot(1)
-        expect(e.loadout!.inventory.map((s) => s.itemId)).toEqual(['decanter', id])
+        expect(e.loadout!.inventory.map((s) => s.itemId)).toEqual(['rivetDriver', id])
         expect(e.loadout!.activeSlot).toBe(1) // shifted down, still the consumable
         expect(activeStack(e)!.itemId).toBe(id)
-        expect(e.combat!.weapon).toBe('decanter')
+        expect(e.combat!.weapon).toBe('rivetDriver')
       })
     })
   })
@@ -239,12 +239,12 @@ describe('inventory — adversarial', () => {
 
     it('firing spends nothing from the weapon or the held throwable', () => {
       const e = player(w)
-      arm(e, 'decanter')
+      arm(e, 'rivetDriver')
       e.loadout!.inventory.push({ itemId: 'grenade', qty: 3 })
       equipSlot(e, 1) // hold the grenade; weapon still pistol
       // Firing spends nothing now, so holding a throwable cannot drain the gun
       // (nor the throwable) — the counts simply stand still.
-      expect(e.loadout!.inventory.find((s) => s.itemId === 'decanter')!.qty).toBe(1)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'rivetDriver')!.qty).toBe(1)
       expect(e.loadout!.inventory.find((s) => s.itemId === 'grenade')!.qty).toBe(3)
     })
 

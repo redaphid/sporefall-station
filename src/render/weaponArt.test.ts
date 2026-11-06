@@ -12,7 +12,7 @@ describe('hasHeldWeapon', () => {
 
   it('every carried weapon (and an unknown id) may hold art; the pack decides whether any is drawn', () => {
     expect(hasHeldWeapon('cageRam')).toBe(true)
-    expect(hasHeldWeapon('decanter')).toBe(true)
+    expect(hasHeldWeapon('rivetDriver')).toBe(true)
     expect(hasHeldWeapon('spork-of-doom')).toBe(true)
   })
 })
@@ -21,7 +21,7 @@ describe('isMeleeWeapon', () => {
   it('classifies registered weapons by kind', () => {
     expect(isMeleeWeapon('cageRam')).toBe(true)
     expect(isMeleeWeapon('pressureLance')).toBe(true)
-    expect(isMeleeWeapon('decanter')).toBe(false)
+    expect(isMeleeWeapon('rivetDriver')).toBe(false)
     expect(isMeleeWeapon('scatterFunnel')).toBe(false)
   })
 

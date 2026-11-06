@@ -47,7 +47,7 @@ const safeRadius = (w: World): number => (w.floor === 1 ? LANDING_SAFE_RADIUS : 
 const NPC_ARSENAL: [string, number][] = [
   ['siphonSpike', 5],
   ['pressureLance', 5],
-  ['decanter', 5],
+  ['rivetDriver', 5],
   ['scatterFunnel', 2],
   ['coilRepeater', 2],
   ['cageRam', 1],

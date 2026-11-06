@@ -17,8 +17,8 @@ const base = JSON.parse(readFileSync(join(__dirname, '../src/game/__fixtures__/c
 const world = () => {
   const w = JSON.parse(JSON.stringify(base))
   const p = w.entities.find((e) => e.playerCtl)
-  p.combat.weapon = 'decanter'
-  p.playerCtl.inventory = [{ itemId: 'decanter', qty: 40 }] // the new slotted starter
+  p.combat.weapon = 'rivetDriver'
+  p.playerCtl.inventory = [{ itemId: 'rivetDriver', qty: 40 }] // the new slotted starter
   p.playerCtl.activeSlot = 0
   let id = w.nextId
   w.entities.push({
@@ -66,7 +66,7 @@ const ok = await recordFeature({
   readState,
   expect: (s) => [
     s.gameOver && 'unexpected game over',
-    s.weapon !== 'decanter' && `weapon changed: ${s.weapon}`,
+    s.weapon !== 'rivetDriver' && `weapon changed: ${s.weapon}`,
     s.gemsLeft !== 0 && `frost gem not grabbed: ${s.gemsLeft} left`,
     !s.mods.includes('frost×1') && `frost not applied to the starter (mods: ${s.mods.join(',')})`,
     s.ammo === 40 && 'pistol never fired (still 40 rounds) — finite ammo not spent',

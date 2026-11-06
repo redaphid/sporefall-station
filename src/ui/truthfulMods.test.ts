@@ -187,7 +187,7 @@ describe('draft screen re-renders when a verdict changes', () => {
     const mount = document.createElement('div')
     const screen = createDraftScreen(mount, () => {})
     const seats = [{ playerId: 0, cursor: 0 }]
-    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.decanter, mods: [] })
+    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.rivetDriver, mods: [] })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')).toBeNull()
     screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.cageRam, mods: [] })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')

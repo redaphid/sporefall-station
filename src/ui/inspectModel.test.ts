@@ -86,9 +86,9 @@ describe('buildInfoCard — every NPC archetype in the game gets a full card', (
 describe('buildInfoCard — the weapon an NPC is carrying', () => {
   const weaponRow = (e: Entity): string | undefined => rowMap(buildInfoCard(e).rows).Weapon
 
-  it('an armed NPC names its weapon — a mutant swings a Pressure Lance, an acolyte a Decanter', () => {
+  it('an armed NPC names its weapon — a mutant swings a Pressure Lance, an acolyte a Rivet Driver', () => {
     expect(weaponRow(spawnNpc(world(), 'mutant', 5, 5))).toBe('Pressure Lance')
-    expect(weaponRow(spawnNpc(world(), 'acolyte', 5, 5))).toBe('Decanter')
+    expect(weaponRow(spawnNpc(world(), 'acolyte', 5, 5))).toBe('Rivet Driver')
   })
 
   it('a fists-only NPC reads as "Unarmed", not the "Fists" item name', () => {
@@ -190,8 +190,8 @@ describe('buildInfoCard — players', () => {
   it('a vanilla gun shows no mod rows', () => {
     const w = world()
     const p = spawnPlayer(w, 0, 2, 2)
-    p.combat!.weapon = 'decanter'
-    p.loadout!.inventory.push({ itemId: 'decanter', qty: 6 })
+    p.combat!.weapon = 'rivetDriver'
+    p.loadout!.inventory.push({ itemId: 'rivetDriver', qty: 6 })
     p.loadout!.activeSlot = p.loadout!.inventory.length - 1
     expect(buildInfoCard(p).rows.some((r) => r.value.startsWith('×'))).toBe(false)
   })

@@ -51,7 +51,7 @@ let ok = true
 ok =
   (await recordFeature({
     name: 'weapon-aim-pistol',
-    world: staged('decanter', undefined),
+    world: staged('rivetDriver', undefined),
     script: 'aimShowcase',
     params: { zoom: 2 },
     stills: [
@@ -62,7 +62,7 @@ ok =
       { tick: 480, label: '05-west' },
     ],
     readState,
-    expect: (s) => [s.weapon !== 'decanter' && 'lost the pistol', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
+    expect: (s) => [s.weapon !== 'rivetDriver' && 'lost the pistol', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
   })) && ok
 
 // Cut 2 — melee swing around a downward aim.

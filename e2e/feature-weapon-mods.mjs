@@ -56,7 +56,7 @@ const guns = [
   },
   {
     name: 'sig-homing-pistol',
-    world: armed('decanter', [{ id: 'homing', stacks: 3 }, { id: 'rapid', stacks: 2 }]),
+    world: armed('rivetDriver', [{ id: 'homing', stacks: 3 }, { id: 'rapid', stacks: 2 }]),
     expect: (s) => [s.mutantsAlive === 3 && 'homing pistol hit nothing', s.playerDowned && 'player downed'],
   },
   {

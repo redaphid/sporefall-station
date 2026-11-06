@@ -101,7 +101,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "decanter",
+        "weapon": "rivetDriver",
         "cooldown": 0
       },
       "status": {
@@ -113,7 +113,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "decanter",
+            "itemId": "rivetDriver",
             "qty": 1,
             "mods": [
               {

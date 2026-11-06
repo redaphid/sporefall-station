@@ -22,7 +22,7 @@ export interface NpcDef {
    * arsenal roll (populate.rollWeapon) is still drawn, so the weapon stream
    * stays put for everyone else, but discarded: the archetype keeps its
    * natural `weapon`. Without this a populated drone got handed a rolled
-   * Decanter or Siphon Spike and the renderer hung it off a claw. */
+   * Rivet Driver or Siphon Spike and the renderer hung it off a claw. */
   bodyArmed?: true
   /** Peaceful until hit, then fights back (lockkeepers). */
   retaliates?: boolean
@@ -110,7 +110,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 35,
     speed: 3.6,
-    weapon: 'decanter',
+    weapon: 'rivetDriver',
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -289,7 +289,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 38,
     speed: 3.4,
-    weapon: 'decanter',
+    weapon: 'rivetDriver',
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,
@@ -304,7 +304,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 90,
     speed: 3.0,
-    weapon: 'decanter',
+    weapon: 'rivetDriver',
     sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,

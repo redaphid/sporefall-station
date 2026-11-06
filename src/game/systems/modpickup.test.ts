@@ -52,13 +52,13 @@ describe('mod pickup — applies to the equipped weapon', () => {
   })
 
   it('grabs a mod and stacks it onto the currently-equipped gun', () => {
-    const p = arm(player(w), 'decanter')
+    const p = arm(player(w), 'rivetDriver')
     const pick = dropMod(w, 'frost', p)
     step(w)
     expect(mods(p)).toEqual([{ id: 'frost', stacks: 1 }])
     expect(w.byId.get(pick.id)).toBeUndefined() // consumed + swept
     const ev = w.events.find((e) => e.type === 'modPickup')
-    expect(ev).toMatchObject({ type: 'modPickup', byId: p.id, modId: 'frost', weapon: 'decanter', maxed: false })
+    expect(ev).toMatchObject({ type: 'modPickup', byId: p.id, modId: 'frost', weapon: 'rivetDriver', maxed: false })
   })
 
   it('a mod applies to a MELEE weapon too (any slotted weapon is moddable)', () => {
@@ -69,7 +69,7 @@ describe('mod pickup — applies to the equipped weapon', () => {
   })
 
   it('stacks a repeat of the same mod up toward its cap', () => {
-    const p = arm(player(w), 'decanter', [{ id: 'homing', stacks: 1 }])
+    const p = arm(player(w), 'rivetDriver', [{ id: 'homing', stacks: 1 }])
     dropMod(w, 'homing', p)
     step(w)
     expect(mods(p)).toEqual([{ id: 'homing', stacks: 2 }])
@@ -78,7 +78,7 @@ describe('mod pickup — applies to the equipped weapon', () => {
 
   it('at the stack cap: grab is consumed with maxed feedback, never over-stacks', () => {
     const cap = modMaxStacks('homing')
-    const p = arm(player(w), 'decanter', [{ id: 'homing', stacks: cap }])
+    const p = arm(player(w), 'rivetDriver', [{ id: 'homing', stacks: cap }])
     const pick = dropMod(w, 'homing', p)
     step(w)
     expect(mods(p)).toEqual([{ id: 'homing', stacks: cap }]) // unchanged, no over-stack
@@ -105,23 +105,23 @@ describe('mod pickup — degenerate inputs are safe', () => {
 
   it('a PHANTOM moddable weapon (combat.weapon set, no slot) MATERIALIZES on grab, then takes the mod', () => {
     const p = player(w)
-    p.combat!.weapon = 'decanter' // held but not slotted → phantom (legacy save / bug)
+    p.combat!.weapon = 'rivetDriver' // held but not slotted → phantom (legacy save / bug)
     const pick = dropMod(w, 'incendiary', p)
     step(w)
     // The phantom is healed: pistol slotted, and the mod landed on it. The slot
     // is NOT equipped — a weapon slot is never selectable now that the weapon is
     // permanent, so `activeSlot` stays the held-item cursor (-1, nothing held).
     // `weaponStack` finds the slot by the weapon id, which is what mods need.
-    expect(weaponStack(p)?.itemId).toBe('decanter')
+    expect(weaponStack(p)?.itemId).toBe('rivetDriver')
     expect(p.loadout!.activeSlot).toBe(-1)
-    expect(p.combat!.weapon).toBe('decanter')
+    expect(p.combat!.weapon).toBe('rivetDriver')
     expect(mods(p)).toEqual([{ id: 'incendiary', stacks: 1 }])
     expect(w.byId.get(pick.id)).toBeUndefined() // consumed + swept
     expect(w.events.some((e) => e.type === 'modPickup')).toBe(true)
   })
 
   it('a downed player does not vacuum up mods', () => {
-    const p = arm(player(w), 'decanter')
+    const p = arm(player(w), 'rivetDriver')
     p.playerCtl!.downed = { bleedTicks: 300, reviveProgress: 0 }
     const pick = dropMod(w, 'frost', p)
     step(w)
@@ -133,7 +133,7 @@ describe('mod pickup — degenerate inputs are safe', () => {
 describe('mod pickup — co-op applies to the grabber only', () => {
   it('each player mods their OWN weapon; the other is untouched', () => {
     const w = createWorld(1, 1)
-    const a = arm(player(w, 10, 10, 0), 'decanter')
+    const a = arm(player(w, 10, 10, 0), 'rivetDriver')
     const b = arm(player(w, 40, 40, 1), 'scatterFunnel')
     dropMod(w, 'frost', a) // sits on A
     dropMod(w, 'explosive', b) // sits on B
@@ -146,7 +146,7 @@ describe('mod pickup — co-op applies to the grabber only', () => {
 
   it('a mod dropped on A is not stolen by a distant B', () => {
     const w = createWorld(1, 1)
-    const a = arm(player(w, 10, 10, 0), 'decanter')
+    const a = arm(player(w, 10, 10, 0), 'rivetDriver')
     const b = arm(player(w, 40, 40, 1), 'scatterFunnel')
     dropMod(w, 'frost', a)
     step(w)
@@ -171,7 +171,7 @@ describe('mod pickup — serialize & determinism', () => {
   it('end-to-end: two identical worlds pick up the same mod to identical state', () => {
     const build = (): World => {
       const w = createWorld(9, 3)
-      const p = arm(player(w), 'decanter')
+      const p = arm(player(w), 'rivetDriver')
       dropMod(w, 'shock', p)
       return w
     }
@@ -184,7 +184,7 @@ describe('mod pickup — serialize & determinism', () => {
 
   it('replaying a serialized post-pickup world stays byte-identical for more ticks', () => {
     const w = createWorld(2, 1)
-    const p = arm(player(w), 'decanter')
+    const p = arm(player(w), 'rivetDriver')
     dropMod(w, 'bounce', p)
     step(w)
     const snap = serializeWorld(w)

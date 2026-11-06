@@ -31,7 +31,7 @@ describe('inventory', () => {
     const slots: { itemId: string; qty: number }[] = []
     addItem(slots, 'grenade', 1)
     addItem(slots, 'grenade', 2)
-    addItem(slots, 'decanter', 8)
+    addItem(slots, 'rivetDriver', 8)
     expect(slots).toHaveLength(2)
     expect(slots.find((s) => s.itemId === 'grenade')!.qty).toBe(3)
   })
@@ -46,7 +46,7 @@ describe('inventory', () => {
     const e = player(w)
     e.loadout!.inventory = [
       { itemId: 'pressureLance', qty: 12 },
-      { itemId: 'decanter', qty: 1 },
+      { itemId: 'rivetDriver', qty: 1 },
     ]
     expect(equipSlot(e, 0)).toBe(false)
     expect(equipSlot(e, 1)).toBe(false)

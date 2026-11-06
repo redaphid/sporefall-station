@@ -143,7 +143,7 @@ describe('a real modded shot, host sim → wire → client mirror', () => {
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 20, 20)
     p.loadout!.inventory = []
-    arm(p, 'decanter').mods = mods
+    arm(p, 'rivetDriver').mods = mods
     p.facing = 0
     combatSystem(w, new Map([[0, { ...emptyInput(), attack: true }]]))
     const round = w.entities.find((e) => e.kind === 'projectile')!
@@ -169,7 +169,7 @@ describe("a shard or blast carrying its cast's element, host sim → wire → cl
     const w = createWorld(1, 1)
     const p = spawnPlayer(w, 0, 20, 20)
     p.loadout!.inventory = []
-    const stack = arm(p, 'decanter')
+    const stack = arm(p, 'rivetDriver')
     stack.mods = mods.map((id) => ({ id, stacks: 1 }))
     stack.castIndex = at
     p.facing = 0

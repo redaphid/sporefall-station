@@ -4,7 +4,7 @@ import { MODS } from '../data/mods'
 import type { WeaponMod } from '../entity'
 import { resolveWeapon } from './resolveWeapon'
 
-const pistol = WEAPONS.decanter
+const pistol = WEAPONS.rivetDriver
 const shotgun = WEAPONS.scatterFunnel
 const mg = WEAPONS.coilRepeater
 

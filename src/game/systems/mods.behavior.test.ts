@@ -54,7 +54,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('vanilla shot: one projectile, one hit, dies on impact', () => {
-    const p = armed(w, 20, 20, 'decanter')
+    const p = armed(w, 20, 20, 'rivetDriver')
     const t = npc(w, 22, 20)
     fire(w, p)
     expect(w.entities.filter((e) => e.kind === 'projectile')).toHaveLength(1)
@@ -64,7 +64,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('pierce: a single bullet punches through two lined-up NPCs', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'pierce', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'pierce', stacks: 1 }])
     const a = npc(w, 21.5, 20)
     const b = npc(w, 23, 20)
     fire(w, p)
@@ -74,7 +74,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('explosive: a bullet detonates, damaging a cluster + emitting an explosion event', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'explosive', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'explosive', stacks: 1 }])
     const direct = npc(w, 22, 20)
     const splash = npc(w, 22, 21) // within blast radius of the impact
     fire(w, p)
@@ -85,7 +85,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('frost then shatter: a frost bullet freezes; a follow-up shot shatters the ice (instant kill)', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'frost', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'frost', stacks: 1 }])
     const t = npc(w, 22, 20)
     fire(w, p)
     advance(w, 20)
@@ -99,7 +99,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('incendiary: a bullet sets the target burning (element applied)', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'incendiary', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'incendiary', stacks: 1 }])
     const t = npc(w, 22, 20)
     fire(w, p)
     advance(w, 20)
@@ -107,7 +107,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('lifesteal: the shooter heals off a hit', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'lifesteal', stacks: 3 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'lifesteal', stacks: 3 }])
     p.health!.hp = 50
     npc(w, 22, 20)
     fire(w, p)
@@ -116,7 +116,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('split: a bullet bursts into shards inheriting the owner', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'split', stacks: 2 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'split', stacks: 2 }])
     npc(w, 22, 20)
     fire(w, p)
     const before = w.entities.filter((e) => e.kind === 'projectile').length
@@ -133,7 +133,7 @@ describe('behavior mods — real fire path', () => {
   const projTotal = (w: World): number => w.entities.filter((e) => e.kind === 'projectile').length
 
   it('splinterShot: a round shatters into a radial fragment burst on impact', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'splinterShot', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'splinterShot', stacks: 1 }])
     npc(w, 22, 20)
     fire(w, p)
     expect(projTotal(w)).toBe(1) // just the parent so far
@@ -145,7 +145,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('more stacks → more fragments (splinter:4 per stack)', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'splinterShot', stacks: 3 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'splinterShot', stacks: 3 }])
     npc(w, 22, 20)
     fire(w, p)
     advance(w, 12)
@@ -153,7 +153,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('a vanilla round never splinters', () => {
-    const p = armed(w, 20, 20, 'decanter')
+    const p = armed(w, 20, 20, 'rivetDriver')
     npc(w, 22, 20)
     fire(w, p)
     advance(w, 12)
@@ -161,7 +161,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('fragments never re-splinter — the burst is bounded and dies out', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'splinterShot', stacks: 3 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'splinterShot', stacks: 3 }])
     npc(w, 22, 20)
     fire(w, p)
     advance(w, 4)
@@ -179,14 +179,14 @@ describe('behavior mods — real fire path', () => {
 
   it('splinter fires on a WALL/ttl impact too, not only on a body', () => {
     // No NPC in front: the round flies until ttl and shatters in place.
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'splinterShot', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'splinterShot', stacks: 1 }])
     fire(w, p)
     advance(w, 80) // outlast the pistol's range/ttl
     expect(projTotal(w)).toBe(1 + 4)
   })
 
   it('splinter + split COMPOSE: a forward fork AND a radial shatter both fire', () => {
-    const p = armed(w, 20, 20, 'decanter', [
+    const p = armed(w, 20, 20, 'rivetDriver', [
       { id: 'split', stacks: 1 }, // 2 forward-fork children on the first body
       { id: 'splinterShot', stacks: 1 }, // 4 radial fragments on death
     ])
@@ -199,7 +199,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('splinter fragments inherit the parent element (splinter + frost → icy shards)', () => {
-    const p = armed(w, 20, 20, 'decanter', [
+    const p = armed(w, 20, 20, 'rivetDriver', [
       { id: 'frost', stacks: 1 },
       { id: 'splinterShot', stacks: 1 },
     ])
@@ -214,7 +214,7 @@ describe('behavior mods — real fire path', () => {
 
   it('a seeded splinter build replays identically from two deserialized copies', () => {
     const seed = createWorld(7, 1)
-    const shooter = armed(seed, 20, 20, 'decanter', [{ id: 'splinterShot', stacks: 3 }])
+    const shooter = armed(seed, 20, 20, 'rivetDriver', [{ id: 'splinterShot', stacks: 3 }])
     npc(seed, 23, 20)
     shooter.combat!.cooldown = 0
     const json = serializeWorld(seed)
@@ -228,7 +228,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('detonator: killing an NPC chain-explodes onto a neighbor (on-kill trigger)', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'detonator', stacks: 1 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'detonator', stacks: 1 }])
     const weak = npc(w, 22, 20, 10) // dies to one 14-dmg pistol shot
     const neighbor = npc(w, 22, 21.5, 40) // inside the on-kill blast radius (2)
     fire(w, p)
@@ -238,7 +238,7 @@ describe('behavior mods — real fire path', () => {
   })
 
   it('homing: an off-axis bullet steers its velocity toward the target', () => {
-    const p = armed(w, 20, 20, 'decanter', [{ id: 'homing', stacks: 3 }])
+    const p = armed(w, 20, 20, 'rivetDriver', [{ id: 'homing', stacks: 3 }])
     npc(w, 25, 23) // below-and-right of the due-east shot
     fire(w, p)
     const proj = w.entities.find((e) => e.kind === 'projectile')!

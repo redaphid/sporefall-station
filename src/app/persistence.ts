@@ -39,7 +39,7 @@ export const LEGACY_SAVE_KEY = 'sor.savegame'
  * interpreted. Independent of `WorldJson.v` (which serialize.ts owns): a version
  * mismatch here discards the save and starts a fresh run rather than crashing.
  *
- * 5 — lore weapons. Every weapon id was renamed (pistol -> decanter, wrench
+ * 5 — lore weapons. Every weapon id was renamed (pistol -> rivetDriver, wrench
  *     -> pressureLance, ...; scripts/rename-weapon-ids.py) and the Spore
  *     Warden fights with its grapple arms. A pre-rename save holds the old ids
  *     in loadouts, NPC combat and `pickup.<id>` entities, which would class as

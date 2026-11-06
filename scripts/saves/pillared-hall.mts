@@ -28,7 +28,7 @@ s.put(3, 11, '@')
 
 const w = worldFromState({ level: levelFromJson({ rows: s.rows }) })
 const player = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-arm(player, 'decanter', [
+arm(player, 'rivetDriver', [
   { id: 'bounce', stacks: 2 },
   { id: 'homing', stacks: 1 },
   { id: 'velocity', stacks: 1 },

@@ -78,12 +78,12 @@ const main = async () => {
   const avatar = () => host.world.byId.get(host.peersBySlot.get(slot)?.entityId)
   // Give the client's host-side avatar a known multi-weapon loadout to switch/use.
   avatar().playerCtl.inventory = [
-    { itemId: 'decanter', qty: 20 },
+    { itemId: 'rivetDriver', qty: 20 },
     { itemId: 'frostCondenser', qty: 6, mods: [{ id: 'frost', stacks: 2 }] },
     { itemId: 'bandage', qty: 3 },
   ]
   avatar().playerCtl.activeSlot = 0
-  avatar().combat.weapon = 'decanter'
+  avatar().combat.weapon = 'rivetDriver'
   await sleep(800)
 
   // (2) Movement reconciles: client walks right, host avatar's x should advance.

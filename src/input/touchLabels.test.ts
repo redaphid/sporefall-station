@@ -6,7 +6,7 @@ import { computeTouchLabels } from './touchLabels'
 
 const player = (abilityCooldown = 0): Entity => {
   const p = makeEntity('player', 'player', 0, 0)
-  p.combat = { weapon: 'decanter', cooldown: 0 }
+  p.combat = { weapon: 'rivetDriver', cooldown: 0 }
   p.playerCtl = {
     playerId: 0,
     abilityCooldown,
@@ -40,7 +40,7 @@ describe('computeTouchLabels', () => {
   })
 
   it('ATK shows the equipped weapon name', () => {
-    expect(computeTouchLabels(view(player())).atk).toBe('Decanter')
+    expect(computeTouchLabels(view(player())).atk).toBe('Rivet Driver')
     const bare = player()
     bare.combat = undefined
     expect(computeTouchLabels(view(bare)).atk).toBe('Fists')

@@ -161,7 +161,7 @@ export const ARCHETYPES = [
   // PROTOCOL_VERSION 15 — the lore weapons (scripts/rename-weapon-ids.py): the
   // mundane pistol/wrench/knife/... became colony still-sections. The old
   // pickup names above are RETIRED in place. APPEND ONLY, at the end.
-  'pickup.decanter',
+  'pickup.rivetDriver',
   'pickup.pressureLance',
   'pickup.siphonSpike',
   'pickup.cageRam',

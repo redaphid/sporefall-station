@@ -78,7 +78,7 @@ interface Rig {
 }
 
 const rig = (
-  weapons: Record<string, HeldWeaponArt> = { decanter: placeholderWeapon('decanter'), pressureLance: placeholderWeapon('pressureLance', 0) },
+  weapons: Record<string, HeldWeaponArt> = { rivetDriver: placeholderWeapon('rivetDriver'), pressureLance: placeholderWeapon('pressureLance', 0) },
 ): Rig => {
   const sprites: SpriteTextures = {
     artScale: GRID,
@@ -115,7 +115,7 @@ const holding = (weaponId: string, archetype = 'drowner'): Entity => {
 }
 
 const aimedAt = (facing: number): Entity => {
-  const e = holding('decanter')
+  const e = holding('rivetDriver')
   e.facing = facing
   e.ai!.mode = 'aggro' // engaged: weapon up
   return e
@@ -144,7 +144,7 @@ describe('pack art only: no drawn art, nothing held', () => {
   })
 
   it('the pistol with pack frames draws exactly one weapon sprite', () => {
-    expect(held(drawn(holding('decanter')))).toHaveLength(1)
+    expect(held(drawn(holding('rivetDriver')))).toHaveLength(1)
   })
 })
 
@@ -165,21 +165,21 @@ describe('per-facing drawings: each facing shows its own view', () => {
   })
 
   it('a missing view borrows its neighbour rather than vanishing', () => {
-    const only = placeholderWeapon('decanter')
+    const only = placeholderWeapon('rivetDriver')
     delete only.s
     delete only.se
-    const [w] = held(drawn(aimedAt(Math.PI / 2), rig({ decanter: only })))
+    const [w] = held(drawn(aimedAt(Math.PI / 2), rig({ rivetDriver: only })))
     expect(viewOf(w)).toBe('e')
   })
 
   it('low-ready (calm NPC, never fired) lowers the profile gun to the se drawing', () => {
-    const e = holding('decanter')
+    const e = holding('rivetDriver')
     e.ai!.mode = 'idle'
     expect(viewOf(held(drawn(e))[0])).toBe('se')
   })
 
   it('a shot raises it: the frame after the cooldown jumps shows the level e drawing', () => {
-    const e = holding('decanter')
+    const e = holding('rivetDriver')
     e.ai!.mode = 'idle'
     const r = rig()
     r.views.update([e], 0, 100, 0)
@@ -210,11 +210,11 @@ describe('the pixel grid: unscaled, unrotated, on whole art pixels', () => {
   })
 
   it('a maxed mod skin tints the weapon but never scales it', () => {
-    const e = holding('decanter')
+    const e = holding('rivetDriver')
     e.loadout = {
       inventory: [
         {
-          itemId: 'decanter',
+          itemId: 'rivetDriver',
           qty: 1,
           mods: [
             { id: 'heavy', stacks: 9 },
@@ -270,7 +270,7 @@ describe('in the hand: the grip sits on the fist the frame draws', () => {
     const e = aimedAt(0)
     const r = rig()
     // A body frame the fist table does not know: the procedural set of a player.
-    const p = holding('decanter', 'player')
+    const p = holding('rivetDriver', 'player')
     p.facing = 0
     r.views.update([p], 0, 100, 0)
     const [w] = held(r)
@@ -317,7 +317,7 @@ describe('animated: idle loop and attack one-shot', () => {
       r.views.update([e], 0, t, 0)
       seen.add(held(r)[0].texture.label!)
     }
-    expect([...seen].sort()).toEqual(['decanter.e-idle-0', 'decanter.e-idle-1'])
+    expect([...seen].sort()).toEqual(['rivetDriver.e-idle-0', 'rivetDriver.e-idle-1'])
   })
 
   it('a shot plays the attack frames in order over the attack window, then back to idle', () => {
@@ -331,8 +331,8 @@ describe('animated: idle loop and attack one-shot', () => {
       labels.push(held(r)[0].texture.label!)
     }
     const attack = labels.filter((l) => l.includes('attack'))
-    expect(attack[0]).toBe('decanter.e-attack-0')
-    expect(new Set(attack)).toEqual(new Set(['decanter.e-attack-0', 'decanter.e-attack-1', 'decanter.e-attack-2']))
+    expect(attack[0]).toBe('rivetDriver.e-attack-0')
+    expect(new Set(attack)).toEqual(new Set(['rivetDriver.e-attack-0', 'rivetDriver.e-attack-1', 'rivetDriver.e-attack-2']))
     expect(labels.at(-1)).toMatch(/idle/)
   })
 

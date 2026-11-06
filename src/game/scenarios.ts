@@ -205,7 +205,7 @@ const setupInventory = (w: World): void => {
     player.facing = 0 // aim east, down the row into view
     player.loadout!.inventory = [
       { itemId: 'pressureLance', qty: WEAPONS.pressureLance.durability! },
-      { itemId: 'decanter', qty: 3 },
+      { itemId: 'rivetDriver', qty: 3 },
       { itemId: 'grenade', qty: 2 },
     ]
     player.loadout!.activeSlot = 0
@@ -316,8 +316,8 @@ const setupShowcase = (w: World): void => {
     // Showcase only: tanky so the demo can wander through fire/booms and survive.
     if (player.health) player.health = { hp: 500, max: 500, iframes: 0 }
   }
-  const gun = makeEntity('pickup', 'pickup.decanter', x + 4 + 0.5, y + 0.5, 0.3)
-  gun.pickup = { itemId: 'decanter', qty: 1 }
+  const gun = makeEntity('pickup', 'pickup.rivetDriver', x + 4 + 0.5, y + 0.5, 0.3)
+  gun.pickup = { itemId: 'rivetDriver', qty: 1 }
   addEntity(w, gun)
 
   // Grenades on OPEN ground at the east end (not on a crate — a grenade spawned
@@ -551,7 +551,7 @@ const setupNpcCombat = (w: World): void => {
   const ring: [string, string][] = [
     ['mutant', 'pressureLance'],
     ['mutant', 'siphonSpike'],
-    ['acolyte', 'decanter'],
+    ['acolyte', 'rivetDriver'],
     ['acolyte', 'scatterFunnel'],
     ['acolyte', 'coilRepeater'],
     ['mutant', 'cageRam'],

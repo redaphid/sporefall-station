@@ -5,7 +5,7 @@
 // nearest-neighbour. One PNG per pose: rows are archetypes, columns facings.
 //
 //   BASE_URL=http://localhost:4891 node e2e/weapon-zoom-sheet.mjs OUT_DIR \
-//     [--theme swampspace-hires] [--weapons PACK_DIR] [--label after]
+//     [--theme swampspace-hires] [--weapons PACK_DIR] [--label after] [--cast armed|loot|beasts]
 //
 // --weapons PACK_DIR test-drives weapon art that is not in the pack yet: the
 // page's theme manifest is patched in flight to map every
@@ -39,17 +39,38 @@ const WEAPONS_DIR = flag('weapons', undefined)
 const LABEL = flag('label', 'sheet')
 mkdirSync(OUT, { recursive: true })
 
-// The armed cast: archetype and the weapon its table (or the player) carries.
-const CAST = [
-  ['player', 'decanter'],
-  ['drowner', 'decanter'],
-  ['bellwether', 'decanter'],
-  ['acolyte', 'decanter'],
-  ['mutant', 'pressureLance'],
-  ['warden', 'pressureLance'],
-  ['shopkeeper', 'pressureLance'],
-  ['breacher', 'pressureLance'],
-]
+// The cast per sheet (--cast): the armed tool users with the weapon their
+// table carries; every lore weapon in the player's hands; and every body that
+// fights with itself (beasts, drones), which must draw NO held weapon.
+const CASTS = {
+  armed: [
+    ['player', 'rivetDriver'],
+    ['drowner', 'rivetDriver'],
+    ['bellwether', 'rivetDriver'],
+    ['acolyte', 'rivetDriver'],
+    ['mutant', 'pressureLance'],
+    ['shopkeeper', 'pressureLance'],
+    ['breacher', 'pressureLance'],
+    ['civilian', 'siphonSpike'],
+  ],
+  loot: [
+    'rivetDriver', 'scatterFunnel', 'coilRepeater', 'phosphorHose', 'frostCondenser',
+    'lullDarter', 'sparkCoil', 'pressureLance', 'siphonSpike', 'cageRam',
+  ].map((w) => ['player', w]),
+  beasts: [
+    ['gloamhound', 'fangs'],
+    ['stalker', 'fangs'],
+    ['lurker', 'mandibles'],
+    ['brute', 'horns'],
+    ['boss', 'claws'],
+    ['sporeling', 'fists'],
+    ['pod', 'fists'],
+    ['warden', 'grappleArms'],
+    ['lockkeeper', 'fists'],
+    ['hivespire', 'fists'],
+  ],
+}
+const CAST = CASTS[flag('cast', 'armed')]
 const FACINGS = [
   ['s', Math.PI / 2],
   ['se', Math.PI / 4],

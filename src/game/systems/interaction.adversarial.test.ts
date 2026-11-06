@@ -115,9 +115,9 @@ describe('bleed-out → self-revive (solo) or death (no rescuer)', () => {
     // loadout so the player is NOT stuck with a phantom weapon (issue: revived
     // players couldn't pick up mods). The pistol starter is real + slotted.
     expect(p.loadout!.inventory.some((s) => s.itemId === 'pressureLance')).toBe(false)
-    expect(p.loadout!.inventory).toEqual([{ itemId: 'decanter', qty: 1 }])
+    expect(p.loadout!.inventory).toEqual([{ itemId: 'rivetDriver', qty: 1 }])
     expect(p.loadout!.activeSlot).toBe(0)
-    expect(p.combat!.weapon).toBe('decanter')
+    expect(p.combat!.weapon).toBe('rivetDriver')
     expect(w.revivesLeft).toBe(1) // penalty: one comeback spent
   })
 

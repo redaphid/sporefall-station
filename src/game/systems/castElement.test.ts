@@ -27,7 +27,7 @@ const isElement = (id: string): boolean => MODS[id]?.onHit !== undefined
 /** A gun facing east, its next cast starting at window position `at`.
  * Seed 1 floor 1 has an open corridor over y 18..22, x 14..36: every stage
  * below stays inside it, so no wall stops a round, shard or blast. */
-const rig = (mods: string[], at = 0, weapon = 'decanter'): { w: World; p: Entity } => {
+const rig = (mods: string[], at = 0, weapon = 'rivetDriver'): { w: World; p: Entity } => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
@@ -68,7 +68,7 @@ const fire = (w: World, ticks = 20): SimEvent[] => {
 }
 
 /** Pull once and stop the moment the round dies, so its children are fresh. */
-const children = (mods: string[], at = 0, weapon = 'decanter'): { round: Entity; shards: Entity[]; frags: Entity[] } => {
+const children = (mods: string[], at = 0, weapon = 'rivetDriver'): { round: Entity; shards: Entity[]; frags: Entity[] } => {
   const { w } = rig(mods, at, weapon)
   body(w, 24, 20, 1)
   combatSystem(w, new Map([[0, { ...emptyInput(), attack: true }]]))

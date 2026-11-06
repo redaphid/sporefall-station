@@ -402,8 +402,8 @@ export const ITEM_ALIAS: Record<string, string> = {
   coilRepeater: 'scatterFunnel',
   phosphorHose: 'scatterFunnel',
   frostCondenser: 'scatterFunnel',
-  lullDarter: 'decanter',
-  sparkCoil: 'decanter',
+  lullDarter: 'rivetDriver',
+  sparkCoil: 'rivetDriver',
   // Blunt melee wears the root-club.
   cageRam: 'pressureLance',
 }

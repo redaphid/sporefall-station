@@ -23,7 +23,7 @@ s.put(15, H - 2, '@') // the player comes in at the south wall
 s.put(15, H - 1, 'E')
 
 const w = worldFromState({ level: levelFromJson({ rows: s.rows }), hostile: false })
-arm(spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y), 'decanter', [])
+arm(spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y), 'rivetDriver', [])
 
 // Two tables, four chairs round each, every chair turned to its table.
 for (const [tx, ty] of [

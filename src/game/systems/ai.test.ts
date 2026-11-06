@@ -76,7 +76,7 @@ describe('combat AI — acquire, chase, attack', () => {
     const melee = spawnNpc(w, 'mutant', 21.5, 19.5) // wrench, sightRange 7 → perceives at ~6
     melee.combat!.weapon = 'pressureLance'
     const shooter = spawnNpc(w, 'mutant', 21.5, 21.5) // pistol
-    shooter.combat!.weapon = 'decanter'
+    shooter.combat!.weapon = 'rivetDriver'
 
     run(w, 120)
 
@@ -91,7 +91,7 @@ describe('combat AI — acquire, chase, attack', () => {
     const { w } = arena()
     spawnPlayer(w, 0, 12.5, 20.5)
     const shooter = spawnNpc(w, 'acolyte', 18.5, 20.5)
-    shooter.combat!.weapon = 'decanter'
+    shooter.combat!.weapon = 'rivetDriver'
 
     let sawBullet = false
     for (let i = 0; i < 60; i++) {
@@ -162,7 +162,7 @@ describe('combat AI — determinism', () => {
       carve(w, 8, 18, 40, 22)
       spawnPlayer(w, 0, 12.5, 20.5)
       spawnNpc(w, 'mutant', 22.5, 19.5).combat!.weapon = 'pressureLance'
-      spawnNpc(w, 'acolyte', 24.5, 21.5).combat!.weapon = 'decanter'
+      spawnNpc(w, 'acolyte', 24.5, 21.5).combat!.weapon = 'rivetDriver'
       return w
     }
     const a = build()

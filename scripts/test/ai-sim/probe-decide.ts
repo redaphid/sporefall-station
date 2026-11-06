@@ -44,8 +44,8 @@ console.log('== B. sworn enemies never engage without a player ==')
 {
   const w = makeArena(2)
   const c = center(w)
-  const warden = addNpc(w, 'warden', c.x, c.y, { sight: 14, weapon: 'decanter' })
-  const rootcult = addNpc(w, 'acolyte', c.x + 4, c.y, { sight: 14, weapon: 'decanter' })
+  const warden = addNpc(w, 'warden', c.x, c.y, { sight: 14, weapon: 'rivetDriver' })
+  const rootcult = addNpc(w, 'acolyte', c.x + 4, c.y, { sight: 14, weapon: 'rivetDriver' })
   // Sworn enemies (initialFactionHate warden<->rootcult = 5 = Hostile), in plain sight.
   const wardenGoal = decide(w, warden).goal
   const rootcultGoal = decide(w, rootcult).goal

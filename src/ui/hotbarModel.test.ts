@@ -7,7 +7,7 @@ describe('hotbarSlots', () => {
     // the surviving items must still carry their TRUE indices, or a tapped strip
     // position equips the wrong slot.
     const inv = [
-      { itemId: 'decanter', qty: 1 },
+      { itemId: 'rivetDriver', qty: 1 },
       { itemId: 'canister', qty: 1 },
       { itemId: 'grenade', qty: 2 },
       { itemId: 'bandage', qty: 3 },
@@ -24,7 +24,7 @@ describe('hotbarSlots', () => {
     // would offer a swap that cannot happen, and gamepad cycling walks exactly
     // this list, so a shown weapon would also be a cyclable dead end.
     const inv = [
-      { itemId: 'decanter', qty: 1 },
+      { itemId: 'rivetDriver', qty: 1 },
       { itemId: 'pressureLance', qty: 16 },
       { itemId: 'scatterFunnel', qty: 1 },
       { itemId: 'molotov', qty: 1 },
@@ -33,7 +33,7 @@ describe('hotbarSlots', () => {
   })
 
   it('is empty when the player carries nothing but their weapon', () => {
-    expect(hotbarSlots([{ itemId: 'decanter', qty: 1 }], 0)).toEqual([])
+    expect(hotbarSlots([{ itemId: 'rivetDriver', qty: 1 }], 0)).toEqual([])
   })
 
   it('marks no slot active when activeSlot is -1', () => {
@@ -44,7 +44,7 @@ describe('hotbarSlots', () => {
 
 describe('modBadge / hotbar mod display', () => {
   it('is empty for a vanilla weapon', () => {
-    expect(modBadge({ itemId: 'decanter', qty: 6 })).toBe('')
+    expect(modBadge({ itemId: 'rivetDriver', qty: 6 })).toBe('')
     expect(modBadge({ itemId: 'grenade', qty: 2 })).toBe('')
   })
   it('shows an icon per mod, with ×N for a stack', () => {
@@ -56,20 +56,20 @@ describe('modBadge / hotbar mod display', () => {
     // Mods are the whole progression, so hiding the weapon slot must not hide the
     // player's mods. `modBadge` is now called directly by the HUD against the
     // weapon's stack (ui/hud.ts) — this pins that it still renders.
-    const weapon = { itemId: 'decanter', qty: 1, mods: [{ id: 'overload', stacks: 3 }] }
+    const weapon = { itemId: 'rivetDriver', qty: 1, mods: [{ id: 'overload', stacks: 3 }] }
     expect(hotbarSlots([weapon], 0)).toEqual([]) // not in the strip...
     expect(modBadge(weapon)).toContain('💥×3') // ...but the badge still resolves
   })
   it('ignores unknown / zero-stack mods', () => {
-    expect(modBadge({ itemId: 'decanter', qty: 6, mods: [{ id: 'nope', stacks: 2 }, { id: 'frost', stacks: 0 }] })).toBe('')
+    expect(modBadge({ itemId: 'rivetDriver', qty: 6, mods: [{ id: 'nope', stacks: 2 }, { id: 'frost', stacks: 0 }] })).toBe('')
   })
 })
 
 describe('hasThrowable', () => {
   it('is true when a throwable is carried', () => {
-    expect(hasThrowable([{ itemId: 'decanter', qty: 6 }, { itemId: 'grenade', qty: 2 }])).toBe(true)
+    expect(hasThrowable([{ itemId: 'rivetDriver', qty: 6 }, { itemId: 'grenade', qty: 2 }])).toBe(true)
   })
   it('is false with no throwables', () => {
-    expect(hasThrowable([{ itemId: 'decanter', qty: 6 }])).toBe(false)
+    expect(hasThrowable([{ itemId: 'rivetDriver', qty: 6 }])).toBe(false)
   })
 })

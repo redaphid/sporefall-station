@@ -565,7 +565,10 @@ Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), all PASS (9
 | 6b | pixels off the locked palette, max 0 | 0.0 |
 
 The first gate run (n skel1, centred pack) failed 4a on 3 of 50 frames (n-walk-2, 4, 6 read as
-facing the viewer); the n keyframe repaint above fixed it. Nothing parked. Known look gap: on se
-the gauge face is keyed out as a backdrop pocket (it is under `POCKET_PALE` of the anchor), so it
-shows as a dark socket where s shows a pale dial. Frame heights: 86-92 px on the hi-res pack,
+facing the viewer); the n keyframe repaint above fixed it. Nothing parked. The se gauge face first
+shipped keyed out as a backdrop pocket (a dark socket where s shows a pale dial): the anchor's pale
+share is under `POCKET_PALE`, so pockets were keyed everywhere. `pocket_key` now keeps a one-piece pale
+part of `POCKET_PART` or more (101417dd), and se alone was re-posted from the same raws; s, e, ne and n
+are the frames of the first pass. The gate was run again on it, same gate, 9/9 with the numbers above.
+Frame heights: 86-92 px on the hi-res pack,
 42-46 on the 48 px pack.

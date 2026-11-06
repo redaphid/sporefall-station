@@ -5,6 +5,7 @@ import { SIM_DT } from '../game/types'
 import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
+  clipLength,
   effectiveClips,
   MEASURED_STATES,
   onceEnd,
@@ -118,11 +119,17 @@ const drawsState = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): 
  * state (animState.MEASURED_STATES); a state the pack does not draw is left
  * out: a drawn-only state then never plays, and attack/hurt/death keep their
  * fixed window. */
-const clipTicksFor = (art: ArtRegistry, set: CharSet | undefined, dir: Dir5): Partial<Record<AnimStateName, number>> => {
+const clipTicksFor = (
+  art: ArtRegistry,
+  artKey: string,
+  set: CharSet | undefined,
+  dir: Dir5,
+  weaponId?: string,
+): Partial<Record<AnimStateName, number>> => {
   const out: Partial<Record<AnimStateName, number>> = {}
   for (const s of MEASURED_STATES) {
     const n = ownFrames(set, dir, s)
-    if (n > 0) out[s] = n * Math.max(1, Math.floor(art.animTpf(s)))
+    if (n > 0) out[s] = clipLength(n, art.animTpf(s), art.animTiming(artKey, s, weaponId))
   }
   return out
 }
@@ -137,6 +144,7 @@ const pickCharTexture = (
   id: number,
   anim: ResolvedAnim,
   tick: number,
+  weaponId?: string,
 ): { texture: Texture; key: string } => {
   const set = art.characterSet(artKey)
   const pose = set ? poseFor(set, dir) : undefined
@@ -144,7 +152,8 @@ const pickCharTexture = (
     const clips = effectiveClips<Texture>({ idle: pose.idle, step: pose.step }, pose.clips)
     const rc = resolveClip(clips, anim.state)
     if (rc) {
-      const frame = animFrame(anim.state, rc.frames.length, tick, anim.start, art.animTpf(anim.state), id)
+      const timing = rc.source === anim.state ? art.animTiming(artKey, anim.state, weaponId) : undefined
+      const frame = animFrame(anim.state, rc.frames.length, tick, anim.start, art.animTpf(anim.state), id, timing)
       return { texture: rc.frames[frame], key: `${anim.state}:${rc.source}:${dir}:${frame}` }
     }
   }
@@ -183,7 +192,7 @@ const pickTexture = (
   // (s/se/e/ne/n; west half mirrored) + the resolved animation state.
   if (art.isCharacterSprite(artKey)) {
     const { dir, flip } = facingDir(e.facing)
-    const picked = pickCharTexture(art, artKey, dir, e.id, anim, tick)
+    const picked = pickCharTexture(art, artKey, dir, e.id, anim, tick, e.combat?.weapon)
     return { ...picked, flip }
   }
 
@@ -325,7 +334,7 @@ export class EntityViews {
       // Death never appears here — corpses are swept the same tick and
       // continue as ghosts (toGhost).
       const anim: ResolvedAnim = character
-        ? trackAnim(view.anim, e, tick, clipTicksFor(this.art, charSet, facing), fromEvents.get(e.id))
+        ? trackAnim(view.anim, e, tick, clipTicksFor(this.art, artKey, charSet, facing, e.combat?.weapon), fromEvents.get(e.id))
         : { state: moving ? 'walk' : 'idle', start: 0 }
 
       const flashing = e.status !== undefined && e.status.hitFlashUntil > tick
@@ -579,7 +588,7 @@ export class EntityViews {
       const g = this.ghosts[i]
       const { dir } = facingDir(g.facing)
       const set = this.art.characterSet(g.artKey)
-      const end = onceEnd('death', g.start, { tick, moving: false, clipTicks: clipTicksFor(this.art, set, dir) })!
+      const end = onceEnd('death', g.start, { tick, moving: false, clipTicks: clipTicksFor(this.art, g.artKey, set, dir) })!
       if (tick >= end) {
         this.expireGhost(i)
         continue
@@ -590,7 +599,8 @@ export class EntityViews {
         const clips = effectiveClips<Texture>({ idle: pose.idle, step: pose.step }, pose.clips)
         const rc = resolveClip(clips, 'death')
         if (rc) {
-          const frame = animFrame('death', rc.frames.length, tick, g.start, this.art.animTpf('death'), g.id)
+          const timing = rc.source === 'death' ? this.art.animTiming(g.artKey, 'death') : undefined
+          const frame = animFrame('death', rc.frames.length, tick, g.start, this.art.animTpf('death'), g.id, timing)
           const key = `ghost:${rc.source}:${dir}:${frame}`
           if (key !== g.texKey) {
             g.sprite.texture = rc.frames[frame]

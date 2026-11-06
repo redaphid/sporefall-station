@@ -326,6 +326,39 @@ and **hold their last frame** until the window closes.
 manifest `anim` section (integers 1..30). Frame selection is a pure function
 of sim tick + entity id: deterministic on every device and replay.
 
+**Per-frame timing (`animTiming`).** A one-shot can give each frame its own
+duration, so a quickdraw holds its anticipation, snaps through in one tick a
+frame, overshoots for a frame and holds the braced end:
+
+```jsonc
+"animTiming": { "player.draw": [3, 2, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6] }
+```
+
+Keys are `<kind>.<state>` for the clip-sized one-shots (`draw fidget attack
+hurt death`; never a loop, never `roll`, whose window is the sim's). Values are
+1..16 integer ticks in 1..30. The clip then lasts their sum (the state window
+reads it, so a drawn-only state lasts exactly that), and a frame past the end of
+the list lasts the state's `anim` cadence. First theme in the chain that sets a
+key wins. Without `animTiming` every frame lasts the cadence, exactly as before.
+
+### Weapon variants (reserved seam)
+
+Draws, aims and recoil braces will differ by what the body holds. Every such
+lookup walks one chain, most specific first (`src/render/weaponVariant.ts`):
+
+`@<weapon id>` (`@pistol`) → `@<weapon class>` (`@sidearm`) → the generic state
+
+Classes: `sidearm`, `longgun`, `heavy`, `melee1h`, `melee2h`, `natural`.
+
+- **Timing: live.** `animTiming` keys take a variant: `"player.draw@sidearm"`,
+  `"player.draw@shotgun"`. The held weapon (`combat.weapon`) picks the entry.
+- **Frames: reserved.** `char.<kind>.<dir>-<state>@<variant>-<n>` is the
+  grammar; the validator drops such keys today with a warning that says they are
+  reserved. The loader will try them in the same order (`frameKeyChain`) and end
+  on the generic key packs ship now, so a pack without weapon art never changes.
+- **Planned state: `brace`,** a per-class one-shot that `attack` plays over aim
+  (a heavy gun's recoil absorbed by the stance). Not in the state table yet.
+
 **Backward compatibility (exact).** The legacy keys keep working unchanged:
 
 - `char.<name>.<dir>-idle` ≡ the single `idle` frame.

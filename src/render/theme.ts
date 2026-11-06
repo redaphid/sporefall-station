@@ -8,7 +8,8 @@
  * asset-generation pipeline targets — keep them in sync).
  */
 
-import { ANIM_STATES, cadenceOf, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
+import { isWeaponVariant } from './weaponVariant'
+import { ANIM_STATES, cadenceOf, CLIP_SIZED_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
 // The hi-res Sporefall Station pack (artScale 2 — themeLoader bakes it at
 // double texture density over the same logical sizes) is the default theme.
@@ -177,6 +178,12 @@ export interface ThemeManifest {
   /** Per-animation-state cadence override, in sim ticks per frame (1..30).
    * States a theme omits use the engine default (animState.DEFAULT_TPF). */
   anim: Partial<Record<AnimStateName, number>>
+  /** Per-frame durations of a kind's one-shot clip, in sim ticks:
+   * `"<kind>.<state>": [ticks of frame 0, of frame 1, …]` (each 1..30, at most
+   * MAX_ANIM_FRAMES entries). The clip then lasts their sum; a frame past the
+   * list lasts the state's `anim` cadence. Only clip-sized one-shots
+   * (animState.CLIP_SIZED_STATES): draw, fidget, attack, hurt, death. */
+  animTiming: Record<string, readonly number[]>
   /** Tile surfaces whose variant pool is sliced from N×N-tile macro images
    * (tile name → N, 2..4). The tilemap then picks variants by position within
    * the macro cell so adjacent slices land adjacently (plate seams and large
@@ -210,6 +217,7 @@ export const emptyManifest = (): ThemeManifest => ({
   names: {},
   sprites: {},
   anim: {},
+  animTiming: {},
   macroTiles: {},
   artScale: 1,
 })
@@ -310,7 +318,11 @@ const validateSprites = (raw: unknown, warn: (w: string) => void): ThemeManifest
   }
   for (const [k, v] of Object.entries(raw)) {
     if (!SPRITE_KEYS.has(k)) {
-      warn(`sprites: unknown key "${k}" dropped (see docs/themes.md for the canonical list)`)
+      warn(
+        /^char\.[^.]+\.[a-z]+-[a-z]+@/.test(k)
+          ? `sprites: "${k}" dropped: weapon-variant frames (char.<kind>.<dir>-<state>@<weapon>-<n>) are reserved, not loaded yet (docs/themes.md "Weapon variants")`
+          : `sprites: unknown key "${k}" dropped (see docs/themes.md for the canonical list)`,
+      )
       continue
     }
     if (v === null) {
@@ -374,6 +386,40 @@ const validateAnim = (raw: unknown, warn: (w: string) => void): ThemeManifest['a
   return out
 }
 
+const validateAnimTiming = (raw: unknown, warn: (w: string) => void): ThemeManifest['animTiming'] => {
+  const out: ThemeManifest['animTiming'] = {}
+  if (raw === undefined) return out
+  if (!isRecord(raw)) {
+    warn('animTiming: expected an object of "<kind>.<state>" → per-frame ticks')
+    return out
+  }
+  for (const [k, v] of Object.entries(raw)) {
+    const [kind, stateAt, ...rest] = k.split('.')
+    const [state, variant, ...more] = (stateAt ?? '').split('@')
+    if (
+      rest.length > 0 ||
+      more.length > 0 ||
+      !(CHAR_NAMES as readonly string[]).includes(kind) ||
+      !(CLIP_SIZED_STATES as readonly string[]).includes(state) ||
+      (variant !== undefined && !isWeaponVariant(variant))
+    ) {
+      warn(`animTiming: "${k}" dropped (expected <kind>.<state>[@<weapon or class>], state one of ${CLIP_SIZED_STATES.join(' ')})`)
+      continue
+    }
+    const ok =
+      Array.isArray(v) &&
+      v.length >= 1 &&
+      v.length <= MAX_ANIM_FRAMES &&
+      v.every((t) => typeof t === 'number' && Number.isInteger(t) && t >= 1 && t <= 30)
+    if (!ok) {
+      warn(`animTiming.${k}: expected 1..${MAX_ANIM_FRAMES} integer ticks in 1..30, got ${JSON.stringify(v)}`)
+      continue
+    }
+    out[k] = [...(v as number[])]
+  }
+  return out
+}
+
 /** Coerce arbitrary JSON into a safe, normalized manifest. Collects a warning
  * per dropped/defaulted field; never throws. */
 export const validateManifest = (raw: unknown): ValidatedManifest => {
@@ -396,13 +442,14 @@ export const validateManifest = (raw: unknown): ValidatedManifest => {
   manifest.names = validateNames(raw.names, warn)
   manifest.sprites = validateSprites(raw.sprites, warn)
   manifest.anim = validateAnim(raw.anim, warn)
+  manifest.animTiming = validateAnimTiming(raw.animTiming, warn)
   manifest.macroTiles = validateMacroTiles(raw.macroTiles, warn)
   if (raw.artScale !== undefined) {
     if (typeof raw.artScale === 'number' && Number.isInteger(raw.artScale) && raw.artScale >= 1 && raw.artScale <= 4)
       manifest.artScale = raw.artScale
     else warn(`artScale: expected an integer 1..4, got ${JSON.stringify(raw.artScale)}; using 1`)
   }
-  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'macroTiles', 'artScale'])
+  const known = new Set(['id', 'name', 'version', 'palette', 'names', 'sprites', 'anim', 'animTiming', 'macroTiles', 'artScale'])
   for (const k of Object.keys(raw)) if (!known.has(k)) warn(`manifest: unknown key "${k}" dropped`)
   return { manifest, warnings }
 }
@@ -473,6 +520,14 @@ export const resolveAnimTpf = (state: AnimStateName, chain: ThemeChain): number 
 export const resolveAnimTpfs = (chain: ThemeChain): Record<AnimStateName, number> => {
   const out = { ...DEFAULT_TPF }
   for (const s of ANIM_STATES) out[s] = resolveAnimTpf(s, chain)
+  return out
+}
+
+/** Per-frame clip timings for a chain: per `<kind>.<state>`, the first theme
+ * that sets it wins (fed to the ArtRegistry). */
+export const resolveAnimTimings = (chain: ThemeChain): Record<string, readonly number[]> => {
+  const out: Record<string, readonly number[]> = {}
+  for (const theme of [...chain].reverse()) Object.assign(out, theme.manifest.animTiming)
   return out
 }
 

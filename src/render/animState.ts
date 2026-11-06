@@ -383,11 +383,30 @@ export const entityPhase = (id: number, period: number): number => {
   return p < 0 ? p + period : p
 }
 
+/** Per-frame durations of a one-shot clip, in sim ticks (manifest
+ * `animTiming`, docs/themes.md): frame k lasts `durations[k]`, a frame past
+ * the list's end lasts `tpf`. Undefined = every frame lasts `tpf`. */
+export type FrameDurations = readonly number[]
+
+/** Ticks a frame lasts: its own duration, else the state's cadence. Never < 1. */
+const frameTicks = (k: number, tpf: number, durations: FrameDurations | undefined): number =>
+  Math.max(1, Math.floor(durations?.[k] ?? tpf))
+
+/** Length in ticks of a `frames`-frame clip: frames × tpf, or the sum of its
+ * per-frame durations. */
+export const clipLength = (frames: number, tpf: number, durations?: FrameDurations): number => {
+  let n = 0
+  for (let k = 0; k < frames; k++) n += frameTicks(k, tpf, durations)
+  return n
+}
+
 /**
  * Which frame of a clip shows at `tick`.
  * - Loop states cycle `frames` at `tpf` ticks/frame, phase-shifted per entity.
  * - One-shots index from `start`, clamp to the last frame, and hold it there
- *   until the state window closes (never wrap, never go negative).
+ *   until the state window closes (never wrap, never go negative). With
+ *   `durations`, frame k lasts durations[k] ticks (a held anticipation, a
+ *   one-tick snap, a long settle); loops ignore them.
  */
 export const animFrame = (
   state: AnimStateName,
@@ -396,6 +415,7 @@ export const animFrame = (
   start: number,
   tpf: number,
   id: number,
+  durations?: FrameDurations,
 ): number => {
   if (frames <= 1) return 0
   const t = Math.max(1, Math.floor(tpf))
@@ -404,7 +424,14 @@ export const animFrame = (
     const at = (((tick + entityPhase(id, period)) % period) + period) % period
     return Math.floor(at / t)
   }
-  return Math.min(frames - 1, Math.floor(Math.max(0, tick - start) / t))
+  const elapsed = Math.max(0, tick - start)
+  if (durations === undefined) return Math.min(frames - 1, Math.floor(elapsed / t))
+  let end = 0
+  for (let k = 0; k < frames; k++) {
+    end += frameTicks(k, t, durations)
+    if (elapsed < end) return k
+  }
+  return frames - 1
 }
 
 /** Does this state hide the held-weapon sprite while it plays? */

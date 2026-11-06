@@ -2,7 +2,8 @@ import { Container, Graphics, Rectangle, Sprite, Texture, type Renderer } from '
 import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
 import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
-import { cadenceOf, DEFAULT_TPF, type AnimStateName } from './animState'
+import { cadenceOf, DEFAULT_TPF, type AnimStateName, type FrameDurations } from './animState'
+import { pickVariant } from './weaponVariant'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
 import { CAP_QUARTER_TURNS, cutCapSides } from './wallCaps'
@@ -102,6 +103,10 @@ export interface ArtRegistry {
   /** Cadence (sim ticks per frame) for an animation state — theme override or
    * the engine default. */
   animTpf(state: AnimStateName): number
+  /** Per-frame durations of a character archetype's one-shot clip (manifest
+   * `animTiming`, keyed by the set the archetype draws with), or undefined:
+   * every frame lasts `animTpf(state)`. */
+  animTiming(archetype: string, state: AnimStateName, weaponId?: string): FrameDurations | undefined
   /** Grip-anchored held-weapon silhouette for a weapon id (procedural, cached).
    * Drawn pointing +x with the grip near the left edge (WEAPON_ANCHOR), so the
    * renderer pins it to the hand and rotates it around the grip for the swing.
@@ -567,6 +572,8 @@ export const createArt = (
    * procedural blobs. Defaults FALSE so the untouched path is the historical
    * one. Purely local presentation — never reaches the sim or the wire. */
   newEnemyArt = false,
+  /** Per-frame clip timings, `"<kind>.<state>"` → ticks (theme.resolveAnimTimings). */
+  animTimings: Readonly<Record<string, readonly number[]>> = {},
 ): ArtRegistry => {
   // Flag ON adds the six; flag OFF leaves the base map exactly as it was.
   const CHARSET_ALIAS: Record<string, string> = newEnemyArt
@@ -1497,6 +1504,11 @@ export const createArt = (
     bulletGlow,
     themedBullet: () => sprites.projectile,
     animTpf,
+    // Weapon-aware: `<kind>.<state>@<weapon>`, then `@<class>`, then generic.
+    animTiming: (archetype: string, state: AnimStateName, weaponId?: string): FrameDurations | undefined => {
+      const name = themedSetName(archetype)
+      return name !== undefined ? pickVariant(`${name}.${state}`, weaponId, (k) => animTimings[k]) : undefined
+    },
     weaponTexture,
   }
 }

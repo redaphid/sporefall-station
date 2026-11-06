@@ -11,7 +11,7 @@ import { BackbufferPipeline } from './backbuffer'
 import { BulletLayer } from './bullets'
 import { blastTint } from './bulletVisuals'
 import { DistortionPool, packPrims, specsForEvents, sustainedSpecs, type UvProjector } from './distortion'
-import { resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from './theme'
+import { resolveAnimTimings, resolveAnimTpfs, resolvePalette, resolveThemeId, type ThemeChain } from './theme'
 import { loadSpriteTextures, loadThemeChain, listThemes } from './themeLoader'
 import { setActiveThemeChain } from './themeState'
 import { Camera } from './camera'
@@ -132,6 +132,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       { tiles: p.tiles, entities: p.entities },
       resolveAnimTpfs(c),
       flagOn(loadSettings().flags, 'newEnemyArt'),
+      resolveAnimTimings(c),
     )
   }
   // Facade over the swappable registry so the tilemap/entity/effect layers keep
@@ -157,6 +158,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
     bulletGlow: () => inner.bulletGlow(),
     themedBullet: () => inner.themedBullet(),
     animTpf: (s) => inner.animTpf(s),
+    animTiming: (a, s, w) => inner.animTiming(a, s, w),
     weaponTexture: (id) => inner.weaponTexture(id),
   }
   const world = new Container()

@@ -48,10 +48,12 @@ export const KINDS = ['player', 'mutant', 'drowner', 'gloamhound', 'lobber', 'hi
 export const fakeArt = (
   clips: Partial<Record<(typeof KINDS)[number], FakeClips>> = {},
   tpf: Partial<Record<AnimStateName, number>> = {},
+  /** Per-frame clip timings, `"<kind>.<state>[@<variant>]"` → ticks (manifest `animTiming`). */
+  timings: Record<string, readonly number[]> = {},
 ): ArtRegistry => {
   const chars: Record<string, CharSet> = {}
   for (const k of KINDS) chars[k] = fakeSet(k, clips[k])
-  return createArt(fakeRenderer, { chars }, {}, tpf, true)
+  return createArt(fakeRenderer, { chars }, {}, tpf, true, timings)
 }
 
 interface ViewInternals {

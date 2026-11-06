@@ -568,6 +568,13 @@ MOTIONS = {
                     "bent the whole time, the legs step forward and back one after another in a clear repeating "
                     "gait, the arms swing opposite the legs, the body stays low and bobs slightly, and it never "
                     "moves across the frame", closed=False),
+    # A four-legged runner (gloam-hound): `prowl` swings arms, which a quadruped's forelegs are not.
+    "trot": Motion("low on all four feet mid-stride in a fast trot: one front foot and the opposite back foot "
+                   "reaching forward, the other two pushing back, the body level and leaning forward, the head low",
+                   "trots in place like a video game four-legged run cycle, low and fast: it stays on all four feet "
+                   "the whole time, the legs move in diagonal pairs, one front leg together with the opposite back "
+                   "leg and then the other pair, stepping forward and back in a clear repeating gait, the body "
+                   "stays level and bobs slightly, and it never moves across the frame", closed=False),
     "pulse": Motion("resting in place in a relaxed idle pose",
                     "stays rooted in place like a video game idle: it slowly swells and settles back once, its base "
                     "never moves, and it never moves across the frame", closed=True),

@@ -2,6 +2,8 @@ import { Container, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { SIM_DT } from '../game/types'
+import { isSolidTile, type Level } from '../game/levelgen/level'
+import { isObject } from '../game/systems/objects'
 import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
@@ -18,6 +20,7 @@ import {
 import { eventStarts, trackAnim, type AnimMemory } from './animTracker'
 import type { TickEvents } from '../app/eventLog'
 import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
+import { deriveThrow, poseAt, restLift, simulateBody, TUMBLE, type BodyTrack, type DeathFacts, type IsSolid } from './displayBody'
 import {
   ARCHETYPE_SCALE,
   CHAR_PX,
@@ -65,7 +68,23 @@ interface View {
   weaponGlow?: Sprite
   /** Shape key of the weapon texture currently shown (skip redundant swaps). */
   weaponShapeKey?: string
+  /** What a death tumble needs from the last sighting (tumble on only). */
+  last?: { x: number; y: number; vx: number; vy: number; maxHp: number; tumbles: boolean }
 }
+
+/** A projectile at its latest sighting, kept a while after it vanished: the
+ * round that killed a body is gone by the time the body is. */
+interface SeenRound {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  tick: number
+  ownerId: number
+}
+
+/** Ticks a vanished round stays in memory. */
+const ROUND_MEMORY_TICKS = 30
 
 /** A character that just died: the entity is swept from the snapshot the same
  * tick, so the renderer keeps its last sprite as a short-lived ghost playing
@@ -78,6 +97,8 @@ interface Ghost {
   flip: boolean
   id: number
   texKey: string
+  /** The thrown body's track, when the kill tumbles it (displayBody.ts). */
+  body?: BodyTrack
 }
 
 /** Ghost cap — a massacre never accumulates unbounded sprites (mobile-cheap). */
@@ -200,9 +221,23 @@ export class EntityViews {
   readonly root = new Container()
   private views = new Map<number, View>()
   private ghosts: Ghost[] = []
+  private readonly tumble: boolean
+  private solid: IsSolid = () => false
+  private rounds = new Map<number, SeenRound>()
 
-  constructor(private art: ArtRegistry) {
+  /** `tumble`: a kill throws the body (displayBody.ts); off, the ghost
+   * topples where it stood, as it always did. */
+  constructor(
+    private art: ArtRegistry,
+    opts: { tumble?: boolean } = {},
+  ) {
     this.root.sortableChildren = true
+    this.tumble = opts.tumble ?? false
+  }
+
+  /** The level a thrown body must stay out of the walls of. */
+  setLevel(level: Level): void {
+    this.solid = (tx, ty) => isSolidTile(level, tx, ty)
   }
 
   /** Drop every pooled sprite so the next update() rebuilds them against the
@@ -241,22 +276,74 @@ export class EntityViews {
    * advanced continuously, died. Floor changes / restarts (floor switch, tick
    * jump or regression) destroy views normally — no ghost burst on a new level.
    */
-  private toGhost(view: View, id: number, tick: number): void {
+  private toGhost(view: View, id: number, tick: number, entities: readonly Entity[], eventLog: readonly TickEvents[]): void {
     // Reset any mid-roll anchor/rotation so the fall pivots on the feet.
     view.sprite.anchor.set(0.5, 1)
     view.sprite.position.set(view.footX, view.footY)
     view.sprite.rotation = 0
     view.sprite.scale.set(view.flip ? -1 : 1, 1)
+    const thrown = this.tumble && view.last?.tumbles ? this.throwBody(view, id, tick, entities, eventLog) : undefined
     this.ghosts.push({
       sprite: view.sprite,
       artKey: view.archetype,
-      start: tick,
+      start: thrown?.start ?? tick,
       facing: view.facing,
       flip: view.flip,
       id,
       texKey: view.texKey,
+      body: thrown?.body,
     })
     if (this.ghosts.length > MAX_GHOSTS) this.expireGhost(0)
+  }
+
+  /** Throw a body that just died: read its death off the event log (the tick
+   * and place it died, the damage that tick, any blast) and the rest off what
+   * was on screen, and integrate the tumble once. */
+  private throwBody(
+    view: View,
+    id: number,
+    tick: number,
+    entities: readonly Entity[],
+    eventLog: readonly TickEvents[],
+  ): { start: number; body: BodyTrack } {
+    const last = view.last!
+    let death: { tick: number; x: number; y: number } | undefined
+    for (const { tick: t, events } of eventLog) {
+      if (t > tick) continue
+      for (const ev of events) if (ev.type === 'death' && ev.entityId === id) death = { tick: t, x: ev.x, y: ev.y }
+    }
+    // No death event (a client whose events lag its snapshots): the last
+    // sighting, now.
+    const at = death ?? { tick, x: last.x, y: last.y }
+    let killDamage = 0
+    const explosions: DeathFacts['explosions'][number][] = []
+    for (const { tick: t, events } of eventLog) {
+      if (t !== at.tick) continue
+      for (const ev of events) {
+        if (ev.type === 'hit' && ev.targetId === id) killDamage += ev.amount
+        if (ev.type === 'explosion') explosions.push(ev)
+      }
+    }
+    const projectiles: DeathFacts['projectiles'][number][] = []
+    for (const r of this.rounds.values()) {
+      if (r.tick <= at.tick) projectiles.push({ ...r, ticksBefore: at.tick - r.tick })
+    }
+    const hostiles = entities
+      .filter((e) => !e.dead && e.id !== id && (e.playerCtl !== undefined || e.ai?.targetId === id))
+      .map((e) => e.pos)
+    const th = deriveThrow({
+      id,
+      x: at.x,
+      y: at.y,
+      facing: view.facing,
+      vel: { x: last.vx, y: last.vy },
+      maxHp: last.maxHp,
+      killDamage,
+      explosions,
+      projectiles,
+      hostiles,
+    })
+    return { start: at.tick, body: simulateBody(th, this.solid) }
   }
 
   private prevTick = -1
@@ -273,6 +360,7 @@ export class EntityViews {
     const since = this.prevFloor === floor && this.prevTick >= 0 && tick >= this.prevTick ? this.prevTick : tick - 1
     const fromEvents = eventStarts(eventLog, since, tick)
 
+    if (this.tumble) this.seeRounds(entities, tick)
     for (const e of entities) {
       if (e.dead) continue
       // Bullets ('projectile' archetype) draw in the procedural BulletLayer,
@@ -389,6 +477,17 @@ export class EntityViews {
       view.facing = e.facing
       view.footX = footX
       view.footY = footY
+      if (this.tumble) {
+        view.last = {
+          x: e.pos.x,
+          y: e.pos.y,
+          vx: e.vel.x,
+          vy: e.vel.y,
+          maxHp: e.health?.max ?? 0,
+          // Rooted spires and props do not fly; players go down, not flying.
+          tumbles: character && e.hive === undefined && !isObject(e) && e.playerCtl === undefined,
+        }
+      }
       // Per-archetype BULK multiplies the animation pulse: the Mireclaw Alpha
       // draws at 1.5x so it can never be mistaken for the mutant whose sprite it
       // still borrows (art.ARCHETYPE_SCALE).
@@ -454,7 +553,7 @@ export class EntityViews {
         this.views.delete(id)
         this.hideWeapon(view) // a corpse drops its weapon; the ghost is body-only
         if (continuous && this.art.isCharacterSprite(view.archetype)) {
-          this.toGhost(view, id, tick) // died this tick — the sprite lives on briefly
+          this.toGhost(view, id, tick, entities, eventLog) // died this tick — the sprite lives on briefly
         } else {
           this.root.removeChild(view.sprite)
           view.sprite.destroy()
@@ -552,6 +651,16 @@ export class EntityViews {
     }
   }
 
+  /** Remember every round on screen at its latest sighting; forget the ones
+   * gone a while. */
+  private seeRounds(entities: readonly Entity[], tick: number): void {
+    for (const e of entities) {
+      if (e.kind !== 'projectile' || e.dead || !e.projectile) continue
+      this.rounds.set(e.id, { x: e.pos.x, y: e.pos.y, vx: e.vel.x, vy: e.vel.y, tick, ownerId: e.projectile.ownerId })
+    }
+    for (const [id, r] of this.rounds) if (tick - r.tick > ROUND_MEMORY_TICKS || r.tick > tick) this.rounds.delete(id)
+  }
+
   /** Drop a view's weapon/glow sprites (bare fists, non-characters, rolling, or
    * on view teardown). Idempotent. */
   private hideWeapon(view: View): void {
@@ -576,7 +685,9 @@ export class EntityViews {
       const g = this.ghosts[i]
       const { dir } = facingDir(g.facing)
       const set = this.art.characterSet(g.artKey)
-      const end = onceEnd('death', g.start, { tick, moving: false, clipTicks: clipTicksFor(this.art, set, dir) })!
+      const end = g.body
+        ? g.start + g.body.settle + TUMBLE.hold + STATE_TICKS.death
+        : onceEnd('death', g.start, { tick, moving: false, clipTicks: clipTicksFor(this.art, set, dir) })!
       if (tick >= end) {
         this.expireGhost(i)
         continue
@@ -607,6 +718,21 @@ export class EntityViews {
         moving: false,
         drawn,
       })
+      if (g.body) {
+        // Thrown: spin about the body's middle, which sits half the body's
+        // height (standing) to half its thickness (lying) above the floor
+        // point, plus the hop. A drawn death clip carries its own fall, so it
+        // keeps the flight but not the spin.
+        const p = poseAt(g.body, t - g.start)
+        const rot = drawn ? 0 : p.rot
+        g.sprite.anchor.set(0.5, 0.5)
+        g.sprite.position.set(p.x * TILE_PX, charFootPx(p.y, TILE_PX) - restLift(rot, g.sprite.texture.height) - p.z * TILE_PX)
+        g.sprite.rotation = rot
+        g.sprite.alpha = motion.alpha
+        g.sprite.scale.set(g.flip ? -1 : 1, 1)
+        g.sprite.zIndex = depthKey('npc', p.y)
+        continue
+      }
       g.sprite.rotation = motion.rot
       g.sprite.alpha = motion.alpha
       g.sprite.scale.set((g.flip ? -1 : 1) * motion.sx, motion.sy)

@@ -98,12 +98,15 @@ export interface TraceOpts {
    * (default), only the rendered tick's own events (`view.events` on a host),
    * or none at all. */
   events?: 'log' | 'lastTick' | 'none'
+  /** A kill throws the body (displayBody.ts). Default off: the topple. */
+  tumble?: boolean
 }
 
 /** Run the scene and record each focus entity's sprite on every rendered tick.
  * The event log is fed after every tick, the way main.ts feeds it. */
 export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Record<number, Frame[]> => {
-  const views = new EntityViews(art)
+  const views = new EntityViews(art, { tumble: opts.tumble ?? false })
+  views.setLevel(scene.w.level)
   const log = createEventLog()
   const stride = opts.stride ?? 1
   const out: Record<number, Frame[]> = {}

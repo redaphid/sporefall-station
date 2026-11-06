@@ -61,12 +61,52 @@ Read before an unattended ComfyUI/Wan run. Art-run procedure lives in
 
 ## Sharing the GPU between workers
 
-- `/mnt/d/tmp/cast-walks/GPU-WAN.lock`: take it per batch, hold it across a batch's
-  between-direction CPU steps, release it and `POST /free` to ComfyUI when the batch
-  ends. Two Wan jobs on one 4090 thrash VRAM (11-06: 23.6 GB, 100% util at 96 W) and
-  a 3-minute gate crawled past 30 minutes.
-- `/mnt/d/tmp/cast-walks/gpu-watchdog.sh` alerts after 60 s idle and auto-releases a
-  lock only after 3 minutes idle with ComfyUI empty and no gate process.
+One rule: **every GPU batch runs under `scripts/gpu/gpu-run`.** ComfyUI jobs (Wan,
+Fun-Control, SDXL, Qwen), the VLM gate (`cast_walk.py gate`, `verify.py`) and probes
+that call either all take the same lock; mindmeld's Ollama is stood down for them.
+
+```
+~/Projects/sporefall-station/scripts/gpu/gpu-run --label "<char> <what>" -- python3 scripts/assets/cast_walk.py take ...
+~/Projects/sporefall-station/scripts/gpu/gpu-run --status   # holder, age, command, queue; or "free"
+```
+
+Call it by that main-checkout path: it works from any worktree, including branches cut
+before it existed (keep `~/Projects/sporefall-station` on current `main`).
+
+- **Wrap the whole GPU batch, never a CPU step.** One command that submits every
+  direction and waits (a `cast_walk.py` call, or a batch script) holds the lock across
+  its own between-direction CPU work. Assemble, export, loopscan and lint run outside
+  `gpu-run`, so the next worker gets the GPU the moment your batch ends.
+- **No one creates, deletes or waits on a lock file by hand.** The lock is an `flock`
+  on `/tmp/sporefall-gpu.flock` (local Linux; drvfs locks are unreliable). The kernel
+  releases it when the batch ends by any route: exit, error, SIGTERM, SIGKILL, crash.
+  Nothing can go stale, so nothing needs a watchdog to release it.
+- Waiters queue in arrival order and print the holder every 30 s. `--wait SECONDS` gives
+  up with exit 75 without running the command. Without it, `gpu-run` waits as long as
+  it takes: run it with a long `timeout` or in the background.
+- While it holds the lock, `gpu-run` writes the holder to `/tmp/sporefall-gpu.status`
+  and mirrors it to `/mnt/d/tmp/cast-walks/GPU-WAN.lock` **as information only** (first
+  line `gpu-run | <label> | pid N | since T | worktree`) for the dashboard, the watchdog
+  and people. Both disappear when the batch ends. `gpu-run --who` prints the status
+  JSON, or exits 1 when the GPU is free.
+- Before the command it extends mindmeld's stand-down to at least 60 minutes (it warns
+  and continues if mindmeld is down). After it, it POSTs ComfyUI `/free` to unload
+  models; pass `--keep-models` only when the same worker's next batch follows at once.
+- A `gpu-run` inside a `gpu-run` (a batch script that calls it per step) just runs.
+- A coordinator hold is a queued batch like any other:
+  `gpu-run --label "hold: <reason>" -- sleep 600` runs before everyone who queues after it.
+- To stop a batch, `kill <pid>` (SIGTERM) the `gpu-run` pid that `--status` shows. It
+  passes the signal to the whole job. After a SIGKILL of `gpu-run` alone, the next
+  holder waits for the orphaned job's process group to end before it starts.
+- A worker that still writes `GPU-WAN.lock` by hand (a brief from before 11-06) blocks
+  `gpu-run` until that file goes; `--status` names it.
+- Why (11-06): hand-made lock files were held through 15 minutes of CPU work, left
+  stale by crashes, and raced by hand-written take/release code. The idle watchdog
+  that deleted them released one in a between-direction CPU gap: two Wan jobs shared
+  the 4090 (23.6 GB VRAM) and a 3-minute gate crawled past 30 minutes.
+- `/mnt/d/tmp/cast-walks/gpu-watchdog.sh` only alerts on an idle GPU. It never deletes
+  the lock file. An alert means "stage the next batch", not "release someone".
+- Tests (dummy commands, no GPU): `bash scripts/gpu/gpu-run.test.sh`.
 
 ## Showing progress while Aaron is away
 

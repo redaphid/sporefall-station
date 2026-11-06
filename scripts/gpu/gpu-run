@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+# gpu-run: run one GPU batch while holding the machine's single GPU lock.
+#
+#   gpu-run [--label TEXT] [--wait SECONDS] [--keep-models] [--ignore-legacy] -- COMMAND...
+#   gpu-run --status     holder (label, pids, age, command, worktree) and waiters, or "free"
+#   gpu-run --who        the holder's status JSON (exit 0), or nothing (exit 1 when free)
+#
+# The lock is an flock(2) on a local Linux file. The kernel drops it when the holder's
+# file descriptor closes: normal exit, error, SIGTERM, SIGKILL, crash, reboot. A lock is
+# never left behind, and nobody creates or deletes a lock file. (WSL keeps /tmp across
+# reboots, so the status file can outlive a crash; --status calls it stale and the next
+# holder replaces it.)
+#
+# Waiters queue in arrival order and print the holder every 30 s. While holding, gpu-run
+#   1. extends mindmeld's Ollama stand-down to max(remaining, 60) minutes,
+#   2. writes the holder to /tmp/sporefall-gpu.status and mirrors it, as information
+#      only, to /mnt/d/tmp/cast-walks/GPU-WAN.lock for the dashboard, watchdog and humans,
+#   3. runs COMMAND in its own process group (the lock descriptor is not inherited, so a
+#      daemon the command starts cannot pin the lock),
+#   4. forwards SIGINT/SIGTERM/SIGHUP to that group, and on exit sends SIGTERM to anything
+#      left in it,
+#   5. POSTs ComfyUI /free (unload models, free memory) unless --keep-models,
+#   6. removes both status files.
+# If gpu-run itself is SIGKILLed, the kernel frees the lock at once, the command's direct
+# child gets SIGKILL (PR_SET_PDEATHSIG) and the next holder replaces the stale status files.
+#
+# A gpu-run inside a gpu-run (same process tree; GPU_RUN_HOLDER is set by the outer one)
+# runs its command directly: no wait, no stand-down, no /free.
+#
+# Exit status: the command's status; 128+N if it died from signal N; 75 if --wait ran out
+# (the command did not run); 2 on a usage error.
+#
+# Overridable for tests: GPU_RUN_LOCK, GPU_RUN_STATUS, GPU_RUN_QUEUE, GPU_RUN_MIRROR,
+# GPU_RUN_COMFY_URL, GPU_RUN_MINDMELD_URL, GPU_RUN_POLL (seconds between waiter reports).
+set -uo pipefail
+
+LOCK=${GPU_RUN_LOCK:-/tmp/sporefall-gpu.flock}
+STATUS=${GPU_RUN_STATUS:-/tmp/sporefall-gpu.status}
+QUEUE=${GPU_RUN_QUEUE:-/tmp/sporefall-gpu.queue}
+MIRROR=${GPU_RUN_MIRROR:-/mnt/d/tmp/cast-walks/GPU-WAN.lock}
+COMFY=${GPU_RUN_COMFY_URL:-http://127.0.0.1:8188}
+MINDMELD=${GPU_RUN_MINDMELD_URL:-http://localhost:3847}
+POLL=${GPU_RUN_POLL:-30}
+MARK="gpu-run |"   # first token of a mirror gpu-run wrote; anything else is a hand-made lock
+
+now_ms() { local t=${EPOCHREALTIME/./}; echo $((t / 1000)); }
+say() { printf 'gpu-run: %s\n' "$*" >&2; }
+usage() { sed -n '2,7s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+
+# "<pid>:<start time in clock ticks>" identifies a process even across pid reuse.
+alive() { # alive PID:START
+  local pid=${1%%:*} want=${1#*:} stat
+  stat=$(cat "/proc/$pid/stat" 2>/dev/null) || return 1
+  stat=${stat##*) }
+  # shellcheck disable=SC2086
+  set -- $stat
+  [ "${20}" = "$want" ]
+}
+self_id() {
+  local stat; stat=$(cat /proc/$$/stat); stat=${stat##*) }
+  # shellcheck disable=SC2086
+  set -- $stat
+  printf '%s:%s' "$$" "${20}"
+}
+
+# Status JSON and mirror -------------------------------------------------------------
+
+lock_free() { # probe without disturbing a holder: free iff a non-blocking flock succeeds
+  ( exec {fd}>>"$LOCK" && flock -n "$fd" ) 2>/dev/null
+}
+
+status_json() { cat "$STATUS" 2>/dev/null; }
+
+describe_holder() { # one human line from the status file
+  python3 - "$STATUS" <<'PY' 2>/dev/null
+import json, sys, time
+s = json.load(open(sys.argv[1]))
+age = int(time.time() - s["start_epoch"])
+print(f'{s["label"]} | gpu-run pid {s["pid"]}, job pgid {s.get("pgid","?")} | '
+      f'since {s["start"]} ({age // 60}m{age % 60:02d}s) | {s["worktree"]} | {s["command"]}')
+PY
+}
+
+clear_status_files() { # remove the status file and our own mirror; never a hand-made lock
+  rm -f "$STATUS"
+  if [ -f "$MIRROR" ] && head -1 "$MIRROR" 2>/dev/null | grep -q "^$MARK"; then rm -f "$MIRROR"; fi
+}
+
+# Waiter queue: one line per waiter "<pid:start> <label>", kept in arrival order. Dead
+# waiters (crashed, killed) are pruned by liveness, so the queue cannot go stale either.
+queue_edit() { # queue_edit add|del|head [label]
+  local op=$1 label=${2:-} me; me=$(self_id)
+  (
+    exec {qfd}>>"$QUEUE.mutex"; flock "$qfd"
+    touch "$QUEUE"
+    local kept=() line head=""
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      alive "${line%% *}" || continue
+      [ "$op" = del ] && [ "${line%% *}" = "$me" ] && continue
+      kept+=("$line")
+    done <"$QUEUE"
+    local mine=0; for line in "${kept[@]+"${kept[@]}"}"; do [ "${line%% *}" = "$me" ] && mine=1; done
+    # add joins; head re-joins a waiter whose entry vanished, so it cannot wait forever
+    { [ "$op" = add ] || [ "$op" = head ]; } && [ "$mine" = 0 ] && kept+=("$me $label")
+    printf '%s\n' "${kept[@]+"${kept[@]}"}" | sed '/^$/d' >"$QUEUE.tmp" && mv "$QUEUE.tmp" "$QUEUE"
+    if [ "$op" = head ]; then head=$(head -1 "$QUEUE"); printf '%s\n' "${head%% *}"; fi
+  )
+}
+
+queue_list() { # labels of live waiters, in order
+  [ -f "$QUEUE" ] || return 0
+  local line n=0
+  while IFS= read -r line; do
+    [ -n "$line" ] && alive "${line%% *}" || continue
+    n=$((n + 1)); printf '  %d. %s (pid %s)\n' "$n" "${line#* }" "${line%%:*}"
+  done <"$QUEUE"
+}
+
+# --status / --who ----------------------------------------------------------------
+
+show_status() {
+  if lock_free; then
+    echo "free"
+    [ -f "$STATUS" ] && echo "(stale status from a gpu-run killed by SIGKILL; the next holder replaces it)"
+  else
+    if [ -f "$STATUS" ]; then echo "held: $(describe_holder)"; else echo "held (holder has not written its status yet)"; fi
+  fi
+  if [ -f "$MIRROR" ] && ! head -1 "$MIRROR" | grep -q "^$MARK"; then
+    echo "hand-made legacy lock present, gpu-run waits for it: $(head -1 "$MIRROR" | cut -c1-120)"
+  fi
+  local q; q=$(queue_list)
+  [ -n "$q" ] && printf 'waiting:\n%s\n' "$q"
+  return 0
+}
+
+case "${1:-}" in
+  --status) show_status; exit 0 ;;
+  --who) if lock_free; then exit 1; fi; status_json || echo '{}'; exit 0 ;;
+  -h|--help) usage ;;
+esac
+
+# Arguments --------------------------------------------------------------------------
+
+LABEL="" WAIT="" KEEP=0 IGNORE_LEGACY=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --label) LABEL=${2-}; shift 2 || usage ;;
+    --label=*) LABEL=${1#*=}; shift ;;
+    --wait) WAIT=${2-}; shift 2 || usage ;;
+    --wait=*) WAIT=${1#*=}; shift ;;
+    --keep-models) KEEP=1; shift ;;
+    --ignore-legacy) IGNORE_LEGACY=1; shift ;;
+    --) shift; break ;;
+    *) say "unknown option $1 (the command goes after --)"; usage ;;
+  esac
+done
+[ $# -gt 0 ] || { say "no command given"; usage; }
+[ -z "$WAIT" ] || [[ "$WAIT" =~ ^[0-9]+$ ]] || { say "--wait takes whole seconds"; exit 2; }
+WORKTREE=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+[ -n "$LABEL" ] || LABEL="$(basename "$WORKTREE"): $1"
+
+# Nested: the outer gpu-run already holds the lock for this process tree.
+if [ -n "${GPU_RUN_HOLDER:-}" ] && alive "$GPU_RUN_HOLDER"; then
+  say "nested inside ${GPU_RUN_HOLDER%%:*}'s lock; running '$LABEL' directly"
+  exec "$@"
+fi
+
+# Acquire ----------------------------------------------------------------------------
+
+ME=$(self_id)
+START_EPOCH=$(date +%s)
+exec {LOCKFD}>>"$LOCK"
+CHILD="" HELD=0
+on_exit() {
+  local rc=$?
+  trap - EXIT INT TERM HUP
+  queue_edit del >/dev/null 2>&1
+  if [ -n "$CHILD" ] && kill -0 -- "-$CHILD" 2>/dev/null; then
+    say "sending SIGTERM to processes left in the job's group $CHILD"
+    kill -TERM -- "-$CHILD" 2>/dev/null
+  fi
+  if [ "$HELD" = 1 ]; then
+    if [ "$KEEP" = 0 ]; then
+      curl -s -m 10 -o /dev/null -X POST "$COMFY/free" -H 'content-type: application/json' \
+        -d '{"unload_models":true,"free_memory":true}' || say "ComfyUI /free failed at $COMFY (is it running?)"
+    fi
+    clear_status_files
+  fi
+  exit "$rc"
+}
+trap on_exit EXIT
+trap 'exit 130' INT; trap 'exit 143' TERM; trap 'exit 129' HUP
+
+START_MS=$(now_ms)
+deadline=""; [ -n "$WAIT" ] && deadline=$((START_MS + WAIT * 1000))
+queue_edit add "$LABEL" >/dev/null
+last_report=0
+while :; do
+  if [ "$(queue_edit head "$LABEL")" = "$ME" ]; then
+    step=5000; [ -n "$deadline" ] && [ $((deadline - $(now_ms))) -lt $step ] && step=$((deadline - $(now_ms)))
+    [ "$step" -lt 0 ] && step=0
+    if flock -w "$(printf '%d.%03d' $((step / 1000)) $((step % 1000)))" "$LOCKFD"; then
+      # Honour a hand-made GPU-WAN.lock from a worker that predates gpu-run.
+      if [ "$IGNORE_LEGACY" = 1 ] || [ ! -f "$MIRROR" ] || head -1 "$MIRROR" 2>/dev/null | grep -q "^$MARK"; then
+        HELD=1; break
+      fi
+      flock -u "$LOCKFD"
+      holder="hand-made $MIRROR: $(head -1 "$MIRROR" 2>/dev/null | cut -c1-100) (delete it if its owner is gone, or pass --ignore-legacy)"
+      sleep 2
+    else
+      holder=$(describe_holder || echo "unknown holder")
+    fi
+  else
+    holder="$(describe_holder || echo "unknown holder"); queued behind earlier waiters"
+    sleep 1
+  fi
+  now=$(date +%s)
+  if [ $((now - last_report)) -ge "$POLL" ]; then
+    say "waiting $((now - START_EPOCH))s for the GPU: $holder"; last_report=$now
+  fi
+  if [ -n "$deadline" ] && [ "$(now_ms)" -ge "$deadline" ]; then
+    say "gave up after ${WAIT}s; '$LABEL' did not run"; exit 75
+  fi
+done
+queue_edit del >/dev/null
+waited=$(( $(date +%s) - START_EPOCH ))
+
+# Hold -------------------------------------------------------------------------------
+
+# A holder killed by SIGKILL frees the lock and its job's direct child dies with it, but
+# grandchildren (a python run under a batch shell) can keep the GPU busy. Its stale status
+# names the job's process group: wait for that group to end before starting.
+orphan=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("pgid") or "")' "$STATUS" 2>/dev/null)
+if [ -n "$orphan" ] && kill -0 -- "-$orphan" 2>/dev/null; then
+  say "a killed holder's job is still running (process group $orphan): $(ps -o pid=,args= -g "$orphan" | head -3 | tr -s ' \n' ' ')"
+  while kill -0 -- "-$orphan" 2>/dev/null; do
+    if [ -n "$deadline" ] && [ "$(now_ms)" -ge "$deadline" ]; then say "gave up after ${WAIT}s; '$LABEL' did not run"; exit 75; fi
+    sleep 1
+  done
+  say "process group $orphan has ended"
+fi
+# The previous holder may have been killed before it could clear these; we own the lock now.
+clear_status_files
+START=$(date -Iseconds)
+write_status() { # write_status PGID -- COMMAND...
+  local pgid=$1; shift
+  python3 - "$STATUS" "$MIRROR" "$MARK" "$LABEL" "$$" "$pgid" "$START" "$START_EPOCH" "$WORKTREE" "$@" <<'PY' || say "could not write status files"
+import json, os, shlex, sys
+status, mirror, mark, label, pid, pgid, start, epoch, worktree = sys.argv[1:10]
+cmd = shlex.join(sys.argv[11:])
+s = {"holder": label, "label": label, "pid": int(pid), "pgid": int(pgid) if pgid else None,
+     "command": cmd, "start": start, "start_epoch": int(epoch), "worktree": worktree,
+     "lock": "flock", "note": "information only: gpu-run holds the real lock; never create or delete this file"}
+body = json.dumps(s, indent=1)
+tmp = status + ".tmp"
+open(tmp, "w").write(body + "\n"); os.replace(tmp, status)
+try:
+    first = open(mirror).readline() if os.path.exists(mirror) else mark
+    if not first.startswith(mark):  # a hand-made lock (--ignore-legacy): leave it alone
+        sys.exit(0)
+    os.makedirs(os.path.dirname(mirror), exist_ok=True)
+    open(mirror, "w").write(f"{mark} {label} | pid {pid} | since {start} | {worktree}\n{body}\n")
+except OSError as e:
+    print(f"gpu-run: mirror {mirror} not written: {e}", file=sys.stderr)
+PY
+}
+
+# Keep mindmeld's Ollama off the GPU for at least the next hour.
+rem=$(curl -s -m 3 "$MINDMELD/api/stand-down" 2>/dev/null | python3 -c \
+  'import json,sys; d=json.load(sys.stdin); print(int(d.get("secondsRemaining") or 0) if d.get("standingDown") else 0)' 2>/dev/null)
+if [ -z "$rem" ]; then
+  say "warning: mindmeld at $MINDMELD unreachable; its Ollama may share the GPU"
+else
+  mins=$(( (rem + 59) / 60 )); [ "$mins" -lt 60 ] && mins=60; [ "$mins" -gt 240 ] && mins=240
+  body=$(python3 -c 'import json,sys; print(json.dumps({"minutes": int(sys.argv[1]), "reason": "gpu-run: " + sys.argv[2]}))' "$mins" "$LABEL")
+  curl -s -m 3 -o /dev/null -f -X POST "$MINDMELD/api/stand-down" -H 'content-type: application/json' -d "$body" \
+    || say "warning: mindmeld stand-down POST failed"
+fi
+
+write_status "" -- "$@"   # before the command starts, so it can read its own status
+say "holding the GPU for '$LABEL' (waited ${waited}s)"
+export GPU_RUN_HOLDER="$ME" GPU_RUN_LABEL="$LABEL"
+exec {INFD}<&0  # a background job would otherwise get /dev/null as stdin
+setsid setpriv --pdeathsig KILL -- "$@" <&"$INFD" {LOCKFD}>&- &
+CHILD=$!
+exec {INFD}<&-
+write_status "$CHILD" -- "$@"
+
+forward() { kill "-$1" -- "-$CHILD" 2>/dev/null || kill "-$1" "$CHILD" 2>/dev/null; }
+trap 'forward INT' INT; trap 'forward TERM' TERM; trap 'forward HUP' HUP
+while :; do
+  wait "$CHILD"; rc=$?
+  kill -0 "$CHILD" 2>/dev/null || break   # wait returned because a signal arrived; keep waiting
+done
+say "'$LABEL' finished rc=$rc after $(( $(date +%s) - START_EPOCH - waited ))s; releasing the GPU"
+exit "$rc"

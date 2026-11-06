@@ -65,7 +65,7 @@ class Plan:
         self.femur, self.tibia = a.femur, a.tibia
         self.stride, self.lift, self.duty, self.bob = a.stride, a.lift, a.duty, a.bob
         # (hip y, rest-foot angle from lateral, degrees, + = forward), front to back, one side
-        self.legs = [(-0.55, 40.0), (0.0, 2.0), (0.55, -38.0)]
+        self.legs = [(-0.55 * a.hip_y, 40.0), (0.0, 2.0), (0.55 * a.hip_y, -38.0)]
         self.hip_x, self.foot_r = a.hip_x, a.foot_r
         self.pole_up = a.pole_up
         self.heap = (a.heap_w, a.heap_l, a.heap_h)   # ellipsoid semi-axes x, y, z, centred over the body
@@ -194,6 +194,7 @@ def main():
     ap.add_argument("--tibia", type=float, default=0.66)
     ap.add_argument("--pole-up", type=float, default=0.7, help="how far the knees bow up rather than out")
     ap.add_argument("--hip-x", type=float, default=0.5)
+    ap.add_argument("--hip-y", type=float, default=1.0, help="scale the hips' spread along the body (an egg's roots bunch at its base)")
     ap.add_argument("--foot-r", type=float, default=0.75)
     ap.add_argument("--heap-w", type=float, default=0.85)
     ap.add_argument("--heap-l", type=float, default=1.05)

@@ -11,7 +11,10 @@ Read before an unattended ComfyUI/Wan run. Art-run procedure lives in
   230-322 W (the GPU hit 400 W+ often without crashing). Suspect CPU/memory saturation
   or CPU-side power (EPS cables, VRM), not GPU peaks or the wall outlet. Art runs
   saturate the CPU: parallel agents each running the full vitest suite, ComfyUI, WSL.
-  Avoid stacking full-suite runs; run one file when that proves the change. Logger and
+  Avoid stacking full-suite runs; run one file when that proves the change. Before one
+  full `vitest run`, wait for others with `while pgrep -f '[v]itest run' >/dev/null; do
+  sleep 15; done` (the bracket matters: plain `pgrep -f "vitest run"` matches the
+  waiting shell itself and never returns empty). Logger and
   reader: `D:\mechs\windows-crash\telemetry\` (task `SOUL-CrashLogger1Hz`; after a
   crash run `crash-reader.ps1 -Last 1`), notes in `D:\mechs\windows-crash\CLAUDE.md`.
 

@@ -230,12 +230,12 @@
  "mireclaw-alpha": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 44,
-   "head_h": 30,
-   "mass": 916,
-   "cx": -0.22,
-   "foot_y": 45
+   "height": 39,
+   "width": 40,
+   "head_h": 27,
+   "mass": 733,
+   "cx": 0.42,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

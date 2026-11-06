@@ -211,12 +211,12 @@
  "brood-sac": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 37,
-   "width": 42,
-   "head_h": 35,
-   "mass": 1041,
-   "cx": -0.05,
-   "foot_y": 44
+   "height": 41,
+   "width": 40,
+   "head_h": 40,
+   "mass": 827,
+   "cx": 0.15,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

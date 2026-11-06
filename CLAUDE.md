@@ -139,6 +139,21 @@ prefix is the sort key, so a stale-dated note lands below newer ones and may
 never reach the menu at all. Skip it only for pure internals with nothing a
 player would notice.
 
+## Decide by drawing scenario comics first
+
+Owner's rule. Before deciding what to build, or how, walk through several concrete
+scenarios from the game and draw each as a short comic strip (3-6 panels) on the draw
+whiteboard (`https://draw.hypnodroid.com`, the draw MCP; one board per effort). A panel
+shows a real moment: who is on screen, what the player does, what the sim does, what
+the player should see and feel. Use the game's own sprites, tiles and palette in the
+panels where you can, so the comic doubles as a proposed screenshot. Make them mildly
+entertaining and good-looking (a caption with a little wit, clean layout) while
+conveying the scenario plainly. Let the strips pick the build: what the
+scenarios need, in what order, and what the player would notice. Then build it, and
+link the board from the issue, the PR body and your report. Ideas you are not
+building now become GitHub issues carrying their comic panel as the proposed
+screenshot.
+
 ## Map of the codebase
 
 | Path | What |

@@ -118,6 +118,77 @@ def paint_gun(im, prop, pal, scale):
     return out
 
 
+class Pistol:
+    """A hand-pixelled pistol per facing (`weapon_sprites.py OUT --only pistol`: pistol-<view>@2x.png for
+    the 96 px pack, @1x for 48, weapons.json their grip and muzzle points). Pasted at the fist on the
+    sprite's own grid: integer offsets, no scaling, no rotation; each facing uses its own drawn view."""
+
+    def __init__(self, d):
+        self.dir = d
+        self.points = json.load(open(os.path.join(d, "weapons.json")))
+        self.cache = {}
+
+    def get(self, view, px):
+        name = f"pistol-{view}@{2 if px == 96 else 1}x.png"
+        if name not in self.cache:
+            self.cache[name] = (np.asarray(Image.open(os.path.join(self.dir, name)).convert("RGBA")),
+                                np.array(self.points[name]["grip"]))
+        return self.cache[name]
+
+
+# the body stands between the camera and a gun held out in front of the chest: the gun only shows past it
+PISTOL_BEHIND = {"ne", "n"}
+
+
+def to_sprite(u, scale, canvas, x, y):
+    """A raw-clip point in sprite pixels (floats), through post_fixed(whole=True)'s grid for window u."""
+    tw, th = max(1, round((u[2] - u[0]) * scale)), max(1, round((u[3] - u[1]) * scale))
+    x0, y0 = (canvas - tw) // 2, canvas - 1 - th
+    return x0 + (x - u[0]) / ((u[2] - u[0]) / tw), y0 + (y - u[1]) / ((u[3] - u[1]) / th)
+
+
+def paint_pistol(im, d, hand, aim, pistol, px):
+    """Paste the facing's pistol with its grip in the fist. `hand`: the rig's gun hand in sprite px;
+    `aim`: the barrel's screen direction. In a view where the barrel runs across the screen (se, e, ne)
+    the grip sits one pixel inside the fist's front edge along the barrel; looking along it (s, n) the
+    grip sits at the hand. The fist's own pixels stay over the grip; in ne/n the body hides the gun."""
+    sprite, grip = pistol.get(d, px)
+    a = np.asarray(im).copy()
+    op = a[..., 3] > 0
+    k = px / 96
+    ys, xs = np.nonzero(op)
+    near = np.hypot(xs - hand[0], ys - hand[1]) <= max(2.0, 4.5 * k)
+    u = np.asarray(aim, float)
+    n = np.linalg.norm(u)
+    if d in ("se", "e", "ne") and near.any() and n > 1e-6:
+        u = u / n
+        proj = (xs[near] - hand[0]) * u[0] + (ys[near] - hand[1]) * u[1]
+        i = proj.argmax()
+        anchor = np.array([xs[near][i], ys[near][i]], float) - u * max(1.0, 2 * k)
+    elif near.any():
+        anchor = np.array([xs[near].mean(), ys[near].mean()])
+    else:
+        anchor = np.asarray(hand, float)
+    ox, oy = int(round(anchor[0])) - grip[0], int(round(anchor[1])) - grip[1]
+    fist = max(1.0, 2 * k)
+    for (sy, sx) in zip(*np.nonzero(sprite[..., 3] > 0)):
+        y, x = oy + sy, ox + sx
+        if not (0 <= x < a.shape[1] and 0 <= y < a.shape[0]):
+            continue
+        if op[y, x] and (d in PISTOL_BEHIND or np.hypot(sx - grip[0], sy - grip[1]) <= fist):
+            continue
+        a[y, x] = sprite[sy, sx]
+    return Image.fromarray(a, "RGBA")
+
+
+def breathe(im, cut):
+    """The upper body one pixel up above row `cut` (the belt), the cut row stretched into the gap: a breath."""
+    a = np.asarray(im).copy()
+    cut = int(np.clip(cut, 1, a.shape[0] - 1))
+    a[: cut - 1] = a[1:cut]
+    return Image.fromarray(a, "RGBA")
+
+
 def register(frame, idle, reach=3):
     """(dx, dy, share): the integer shift of `frame` that best matches `idle`'s alpha, and the share of
     the union's pixels that still differ in colour after it."""
@@ -149,6 +220,7 @@ def cmd_post(a):
     clips = _clips(a.clip)
     props = dict(p.split("=", 1) for p in a.props or [])
     shifts = dict(_clips_shift(s) for s in a.shift or [])
+    pistol = Pistol(a.pistol) if a.pistol else None
     report = {"base": base, "state": a.state, "clips": {d: [r, i] for d, (r, i) in clips.items()}, "frames": {}}
     for pack, (px, content) in PACKS.items():
         union, scale = S.fixed_windows(keyed, dirs, poses, px, content, bool(meta.get("lock_height")))
@@ -157,10 +229,13 @@ def cmd_post(a):
             clip = sorted(glob.glob(f"{run}/raw/walk-{d}/*.png"))
             frames = {}
             ctl = sorted(glob.glob(f"{props[d]}/joints-*.json")) if d in props else []
+            rig = {}
             for n, t in enumerate(idx):
                 beside = tuple(Image.open(clip[k]).convert("RGB") for k in (t - 1, t + 1) if 0 <= k < len(clip))
                 raw = Image.open(clip[t]).convert("RGB")
-                if ctl:  # the control repeats from its frame 0, so clip frame t was posed by rig frame t % P
+                if ctl:
+                    rig[n] = json.load(open(ctl[t % len(ctl)]))
+                if ctl and not pistol:  # the control repeats from its frame 0, so clip frame t was posed by rig frame t % P
                     for prop in json.load(open(ctl[t % len(ctl)])).get("props", {}).values():
                         raw = paint_gun(raw, prop, pal, 1 / (scale[d] * 96 / px))
                     beside = ()  # the painted prop is in this frame only: a ghost key would take it
@@ -173,6 +248,16 @@ def cmd_post(a):
             prompt, workflow = _flow(run, d)
             for n in range(len(idx)):
                 im = _locked(Image.fromarray(np.roll(np.roll(np.asarray(frames[(d, f"{a.state}-{n}")]), dy, 0), dx, 1)))
+                if pistol and n in rig:  # the pistol on the sprite's own grid, at the rig's hand moved with the frame
+                    for prop in rig[n].get("props", {}).values():
+                        if prop["on"] < 0.5:
+                            continue
+                        rear, muz = np.array(prop["rear"]), np.array(prop["muzzle"])
+                        hx, hy = to_sprite(union[d], scale[d], px, *(rear + 0.15 * (muz - rear)))
+                        mx, my = to_sprite(union[d], scale[d], px, *muz)
+                        im = paint_pistol(im, d, (hx + dx, hy + dy), (mx - hx, my - hy), pistol, px)
+                if a.breathe and n % 2 == 1 and n in rig:
+                    im = breathe(im, to_sprite(union[d], scale[d], px, *rig[n]["body"][3][:2])[1] + dy)
                 if a.idle_ends and n in (0, len(idx) - 1):  # the cut into and out of the clip is the idle itself
                     im = idle.copy()
                 f = f"{a.out}/{px}/{a.kind}-{d}-{a.state}-{n}.png"
@@ -284,6 +369,9 @@ def main():
     p.add_argument("--idle-ends", action="store_true", help="frame 0 and the last frame are the shipped idle, "
                    "pixel for pixel (pick rest-pose clip frames for them): the cut in and out cannot jump")
     p.add_argument("--props", action="append", help="dir=CTL: paint the rig's held props (joints-NN.json `props`)")
+    p.add_argument("--pistol", help="a pistol design dir (pistol-<view>@2x/@1x.png + weapons.json): paste it at the "
+                   "rig's hand on the posted sprite instead of painting a slide on the render (needs --props)")
+    p.add_argument("--breathe", action="store_true", help="odd frames raise the upper body 1 px above the belt (a held pose's breath)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("export")
     p.add_argument("dir")

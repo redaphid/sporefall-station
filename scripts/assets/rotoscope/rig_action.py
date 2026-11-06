@@ -142,7 +142,7 @@ def draw(B, period, yaw=14.0):
 
 # ---- scratch (quadruped) ----------------------------------------------------------------------------
 
-def scratch(B, period):
+def scratch(B, period, sit_forward=0.16):
     F = B.fit
     H = B.height
     legs = ("fore_near", "fore_far", "hind_near", "hind_far")
@@ -158,7 +158,7 @@ def scratch(B, period):
         if kind == "rest":
             return J
         # sit back: the rump drops and slides forward, the hips with it; the front stays planted
-        sit = B.proj(f=0.16 * H, u=-0.16 * H)
+        sit = B.proj(f=sit_forward * H, u=-0.16 * H)
         for k in ("rump", "hind_near_top", "hind_far_top"):
             J[k] = F[k] + sit
         J["withers"] = F["withers"] + B.proj(u=-0.03 * H)
@@ -216,10 +216,13 @@ def main():
     ap.add_argument("--period", type=int, default=16)
     ap.add_argument("--yaw", type=float, help="draw: the aim's turn to his right, degrees (default 14); a view "
                                                "that looks along the facing (s, n) reads an aim better turned ~30")
+    ap.add_argument("--sit-forward", type=float, help="scratch: how far the rump slides forward as it sits, in body "
+                                                       "heights (default .16); less keeps the centroid (gate 3 cx) still")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     B = Body(json.load(open(a.fit)))
-    frames, keys = build(B, a.action, a.period, **({"yaw": a.yaw} if a.yaw is not None else {}))
+    kw = {k: v for k, v in (("yaw", a.yaw), ("sit_forward", a.sit_forward)) if v is not None}
+    frames, keys = build(B, a.action, a.period, **kw)
     for i, f in enumerate(frames):
         json.dump(f, open(os.path.join(a.out, f"joints-{i:02d}.json"), "w"))
     json.dump(keys, open(os.path.join(a.out, "keys.json"), "w"))

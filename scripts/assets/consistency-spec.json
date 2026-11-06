@@ -287,11 +287,11 @@
  "bog-mender": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 45,
-   "width": 26,
-   "head_h": 33,
-   "mass": 717,
-   "cx": -0.85,
+   "height": 44,
+   "width": 27,
+   "head_h": 35,
+   "mass": 713,
+   "cx": -0.63,
    "foot_y": 45
   },
   "tol": {

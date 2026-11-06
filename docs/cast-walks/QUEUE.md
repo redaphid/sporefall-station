@@ -96,3 +96,16 @@ Not animated, in order, using concept-picks-v3 and rule 13:
 Junk, never merge: wip/mireclaw-alpha-crash-0929 (files zeroed by a crash).
 
 Concurrency: each worker has its own worktree and branch `art/<char>-1104`, cut from origin/art/cast-walk-cycles. Workers append to PROGRESS.md through the /mnt/d/tmp/cast-walks symlink and do not commit it; the coordinator commits it. Workers stop at "ready" for the coordinator's contact-sheet check (rule 5); merges are serial.
+
+## Resume 2026-11-06 06:3x (Aaron: "resume the sprite art for the rest of the cast, then improve props; loop through art improvements overnight, ComfyUI as the pacing signal")
+
+Supersedes the order above. Crash 00:30 11-06 (4th since 11-04). Gate head still G7 `938319cdcc807028`.
+
+In flight (workers, sharing GPU-WAN.lock):
+1. bog-mutant: Aaron picked A pod-carrier s3 (00:08). Walk: take1 se/e/ne/n pass, s retake. Branch art/bog-mutant-1105.
+2. derelict-bot: gate 9/9 at 76bcd63c; shipping checks + se gauge pocket fix. Branch art/derelict-bot-1105.
+3. bog-mender: Step 0 design (proceeds unless vetoed), then walk. Branch art/bog-mender-1106.
+
+Next, in order: 4. mireclaw-alpha (original design, many-legs rig route), 5. spore-drone (real wing-beat flight, rule 13), 6. brood-sac (needs a way to move), 7. hive-spire (stationary).
+Waiting on Aaron (one question each, in the morning): spore-mortar ship-or-redesign; stalker n gate-4a exemption; gloam-hound head_h gate case.
+After the cast: props pass (docs/prop-sweep), then whole-game art improvement loop.

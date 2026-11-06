@@ -545,3 +545,39 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## brood-sac (pod), 2026-11-06: redesigned (root-walker egg), ripple crawl on six root legs by skeleton control; gate 8/9, 4a case open
+
+Rule 13: the pod has speed 3.0 once woken, and the shipped sac (one frame, a vine-wrapped egg on a root
+mat) could only pulse. The redesign lifts the same egg onto its own roots as legs. Candidate A of three
+(design sheet https://2cb.pw/design-sheet-daed50, shown in the rule 6 veto window; B, the dust-brood cyst
+orb, drew a riveted copper hatch and read as a machine; C, a translucent embryo sac, drew the hatchling as
+a letter). The old frame is archived in `/mnt/d/tmp/cast-walks/archive/brood-sac/pre-walk-1106/`.
+Procedure: [`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Lore family B (swamp fauna): a native egg-sac laid in an essence pool. Swallowed essence shows as one teal blister on the shell (G4), the single hot accent, and when woken it walks off its nest on its own root mat. Holds nothing |
+| input | `concept_to_input.py` from the r2 anchor (`D:\tmp\sprite-stage-0822\cast\anchors\brood-sac-s-idle.png`), seed 11 of 3, 96 px in the locked 34, thin 0; sha256 `47ac62513e08afa0…` |
+| keyframes | Qwen-Image-Edit band (`runs/brood-sac/tools/kfprobe.py`): s, se seed 11. e seed 3 from a side describe with "no head, no beak, no snout" (the first round drew a bird beak on 3 of 3 seeds; a small nub remains by the blister). ne, n seed 3 from a back describe: no blister, one dark brown hatching crack as the rear cue (a bone-white seam keyed out as a pocket). Qwen drew a checkerboard backdrop on e/ne/n, flooded to white before Fun-Control (`runs/brood-sac/tools/kfclean.py`) |
+| motion | Wan 2.2 Fun-Control A14B Q4_K_M, 848x480, 81 frames, seed 3, driven by `scripts/assets/rotoscope/rig_hexapod.py --axis upright --gait ripple --duty .67 --hip-y .55` (new options): six root legs, each side swinging rear to front a third of a cycle apart, the sides half a cycle apart, two feet up at a time; the egg rigid and upright; period 16, stride .5, lift .25, OpenPose sticks by `skeleton.py` |
+| takes | skel1 in all five directions, one take each |
+| loops | s 16 (seam .130), se 16 (.104), e 16 (.119), ne 16 (.116), n 16 (.126) |
+| colour lock | `assemble --lock-height` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.pod.*` |
+| motion.ts | brood-sac keeps `pulse`: it breathes while dormant (one drawn idle frame); the drawn walk switches the pulse off, so woken it only crawls |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), 8/9 on the one run:
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .130 / .104 / .119 / .116 / .126 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | **FAIL 39 of 50**: every failure is "does not read as a figure" (subject 'egg'); the views and the ne/n no-face check pass. Case: `docs/cast-walks/gate-cases/brood-sac-4a-figure.md` |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | identity .028-.045, boil .145-.167, head .025-.063 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Not shipped until the 4a case is decided.

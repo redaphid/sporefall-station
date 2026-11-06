@@ -68,16 +68,12 @@ CURATED: dict[str, dict] = {
         accent="#46e078", accent_q=0.995,
     ),
     "work-desk": dict(
-        tag="j1", seed=7007, dst="work-desk.png",
-        ramp=["#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26",
-              "#8f6c38", "#b08d50", "#cbb277", "#e0d3ae"],
-        accent="#46e078", accent_q=0.995,
+        tag="l1106", subject="work-desk", seed=2002, dst="work-desk.png",
+        ramp=["#08080c", "#141a16", "#1c1420", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38", "#7b8791", "#a2adb4"], accent="#3ce0d8", accent_q=0.995,
     ),
     "supply-cabinet": dict(
-        tag="j1", seed=7003, dst="supply-cabinet.png",
-        ramp=["#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80",
-              "#5aa4ae", "#7ecbd2", "#a2adb4", "#c6d6d4"],
-        accent="#46e078", accent_q=0.995,
+        tag="l1106", subject="supply-cabinet", seed=2005, dst="supply-cabinet.png",
+        ramp=["#08080c", "#141a16", "#163a3e", "#24565c", "#3a7a80", "#5aa4ae", "#a2adb4", "#cbb277"], accent="#46e078", accent_q=0.995,
     ),
     "spore-barrel": dict(
         tag="j1", seed=7000, dst="spore-barrel.png",
@@ -86,16 +82,12 @@ CURATED: dict[str, dict] = {
         accent="#ffd83e", accent_q=0.995,
     ),
     "weapons-locker": dict(
-        tag="j1", seed=7004, dst="weapons-locker.png",
-        ramp=["#08080c", "#141a16", "#22380f", "#35511a", "#4c6b28",
-              "#67873c", "#86a750", "#a8c46a", "#c2b184"],
-        accent="#ffd83e", accent_q=0.995,
+        tag="l1106", subject="weapons-locker", seed=2004, dst="weapons-locker.png",
+        ramp=["#08080c", "#141a16", "#1c1420", "#22380f", "#35511a", "#4c6b28", "#67873c", "#b08d50", "#86a750", "#cbb277"], accent="#ffd83e", accent_q=0.995, equalize=0.7,
     ),
     "wall-screen": dict(
-        tag="j1", seed=7009, dst="wall-screen.png",
-        ramp=["#08080c", "#141a16", "#23282e", "#3c444d", "#59636d",
-              "#7b8791", "#a2adb4", "#7ecbd2", "#cfe0e2"],
-        accent="#46e078", accent_q=0.995,
+        tag="l1106", subject="wall-screen", seed=2003, dst="wall-screen.png",
+        ramp=["#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38", "#b08d50", "#cbb277"], accent="#46e078", accent_q=0.985,
     ),
     # The mess chair. THE OWNER PICKED THIS ONE, by tapping "Chair 2 -- chunkiest,
     # tall rounded back, teal frame" in the relay picker on 2026-08-20. It
@@ -179,10 +171,8 @@ CURATED: dict[str, dict] = {
               "#6b4d26", "#8f6c38", "#b08d50", "#d8a878", "#a6ffbe"],
     ),
     "mess-bench": dict(
-        tag="blocky", subject="bench", seed=1009, dst="mess-bench.png",
-        # Tan plank on chunky teal end blocks (the raw's own description).
-        ramp=["#08080c", "#141a16", "#2e1e10", "#24565c", "#6b4d26",
-              "#8f6c38", "#b08d50", "#d8a878", "#cbb277"],
+        tag="l1106", subject="mess-bench", seed=2003, dst="mess-bench.png",
+        ramp=["#08080c", "#141a16", "#163a3e", "#24565c", "#6b4d26", "#8f6c38", "#b08d50", "#d8a878", "#cbb277"],
     ),
     # Came out of a SHELF sweep and was relabelled a table on inspection; the
     # 3-vote qwen3-vl read answered "table" unprompted, which is why the
@@ -216,6 +206,27 @@ CURATED: dict[str, dict] = {
         ramp=["#08080c", "#141a16", "#1c1420", "#2e1e10", "#163a3e",
               "#6b4d26", "#8f6c38", "#b08d50", "#cbb277", "#a6ffbe"],
         accent="#46e078", accent_q=0.995,
+    ),
+    # --- 11-06 lore pass, tag l1106, juggernautXL seeds 2000-2005 ------------
+    # The eight props the 11-06 census graded C-F (docs/prop-sweep/census-1106.png),
+    # regenerated on generate.py's G2 "everything is plumbing" prompts and picked
+    # by eye at game scale off docs/prop-sweep/candidates-1106.png. Hue families:
+    # the grey PLATING floor swallows a steel ramp (the first steel desk and cryo
+    # cuts vanished into it), so steel only appears as highlights over brown/bone.
+    # Ramps interleave two families by luma where a raw has two materials (jar
+    # vs tank, cushion vs frame). weapons-locker: an olive ramp with grey steps
+    # mottled into camouflage; olive with tan scuffs at equalize 0.7 did not.
+    "hydro-recycler": dict(
+        tag="l1106", subject="hydro-recycler", seed=2001, dst="hydro-recycler.png",
+        ramp=["#08080c", "#141a16", "#163a3e", "#4a3419", "#24565c", "#3a7a80", "#8f6c38", "#5aa4ae", "#cbb277", "#7ecbd2"], accent="#3ce0d8", accent_q=0.99,
+    ),
+    "cryo-terminal": dict(
+        tag="l1106", subject="cryo-terminal", seed=2002, dst="cryo-terminal.png",
+        ramp=["#08080c", "#141a16", "#23282e", "#3c444d", "#59636d", "#7b8791", "#b08d50", "#a2adb4", "#d8a878", "#cbb277"], accent="#46e078", accent_q=0.99,
+    ),
+    "nutrient-dispenser": dict(
+        tag="l1106", subject="nutrient-dispenser", seed=2000, dst="nutrient-dispenser.png",
+        ramp=["#08080c", "#141a16", "#2e1e10", "#4a3419", "#6b4d26", "#8f6c38", "#b08d50", "#d8a878", "#cbb277"], accent="#46e078", accent_q=0.99,
     ),
 }
 

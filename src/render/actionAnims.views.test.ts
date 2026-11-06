@@ -33,11 +33,12 @@ import {
   trace as traceWith,
   type Frame,
   type Scene,
+  type TraceOpts,
 } from './animTestkit'
 
-const trace = (scene: Scene, extra: readonly ('draw' | 'fidget')[]): Record<number, Frame[]> => {
+const trace = (scene: Scene, extra: readonly ('draw' | 'fidget')[], opts: TraceOpts = {}): Record<number, Frame[]> => {
   const clips = Object.fromEntries(extra.map((s) => [s, 8]))
-  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }))
+  return traceWith(scene, fakeArt({ drowner: clips, gloamhound: clips }), opts)
 }
 
 /** The draw scene of actionAnims.test.ts, rendered every tick. */
@@ -127,14 +128,17 @@ const digest = (t: Frame[][]): string[][] =>
 
 describe('a pack without action frames renders exactly as origin/main did', () => {
   const plain = fakeArt()
+  // The skid (skid.test.ts) is a later feature with its own switch; off, the
+  // renderer must draw exactly what it drew before it existed.
+  const off: TraceOpts = { skid: false }
   const now = {
-    draw: digest(Object.values(trace(drawScene(), []))),
-    kennel: digest(Object.values(trace(kennelScene(), []))),
+    draw: digest(Object.values(trace(drawScene(), [], off))),
+    kennel: digest(Object.values(trace(kennelScene(), [], off))),
     // Attack (wrench swing, pistol recoil), hurt and a death ghost; the
     // lobber's shells; a hive spire budding and spreading.
-    brawl: digest(Object.values(traceWith(brawlScene(), plain))),
-    siege: digest(Object.values(traceWith(siegeScene(), plain))),
-    hive: digest(Object.values(traceWith(hiveScene(), plain))),
+    brawl: digest(Object.values(traceWith(brawlScene(), plain, off))),
+    siege: digest(Object.values(traceWith(siegeScene(), plain, off))),
+    hive: digest(Object.values(traceWith(hiveScene(), plain, off))),
   }
   const out = process.env.ACTION_ANIMS_GOLDEN
   if (out) writeFileSync(out, JSON.stringify(now, null, 1) + '\n')

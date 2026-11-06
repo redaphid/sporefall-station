@@ -98,12 +98,16 @@ export interface TraceOpts {
    * (default), only the rendered tick's own events (`view.events` on a host),
    * or none at all. */
   events?: 'log' | 'lastTick' | 'none'
+  /** The skid feature (EntityViews `skid`); omitted = the renderer's default. */
+  skid?: boolean
+  /** Render alpha per frame. Default 0.5. */
+  alpha?: number
 }
 
 /** Run the scene and record each focus entity's sprite on every rendered tick.
  * The event log is fed after every tick, the way main.ts feeds it. */
 export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Record<number, Frame[]> => {
-  const views = new EntityViews(art)
+  const views = new EntityViews(art, opts.skid === undefined ? {} : { skid: opts.skid })
   const log = createEventLog()
   const stride = opts.stride ?? 1
   const out: Record<number, Frame[]> = {}
@@ -115,7 +119,7 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
     if ((i + 1) % stride !== 0 || opts.frozen?.(scene.w.tick)) continue
     const events =
       opts.events === 'none' ? [] : opts.events === 'lastTick' ? [{ tick: scene.w.tick, events: scene.w.events }] : log.entries
-    views.update(scene.w.entities, 0.5, scene.w.tick, scene.w.floor, events)
+    views.update(scene.w.entities, opts.alpha ?? 0.5, scene.w.tick, scene.w.floor, events)
     for (const e of scene.focus) {
       const v = internals(views).views.get(e.id)
       const g = v ? undefined : internals(views).ghosts.find((x) => x.id === e.id)

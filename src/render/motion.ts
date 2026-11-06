@@ -71,6 +71,14 @@ export const MOTION = {
    * over each foot in turn (rot ±rad around the feet) and rising up to `rise` px
    * over the planted one. One rock left and right is two steps. */
   waddle: { rad: 0.13, freq: 0.4, rise: 1 },
+  /** SKID to a stop (the Flashback in-between): the sim halts dead, the
+   * display body leans back against the run for `ticks`, peaking `rise` ticks
+   * in, and braces with a squash. `rad` is the full lean of a profile stop
+   * (scaled by the horizontal part of the run), `squash` the brace of any stop.
+   * A skid cut short (the body moves, swings or is hit) fades over `cutTicks`
+   * instead of snapping upright. `gain` scales the whole move per legged
+   * style: a mite's stubby legs skid smaller. */
+  skid: { rad: 0.2, squash: 0.07, rise: 2, ticks: 10, cutTicks: 3, gain: { stride: 1, waddle: 0.6 } },
 } as const
 
 /** How a character's body carries itself. The 48px canvas is the reason this
@@ -130,6 +138,22 @@ export interface MotionInput {
   /** The frames on screen are the pack's own clip for this state (2+ drawn
    * frames), so its procedural twin stays off (see the module comment). */
   drawn?: boolean
+  /** The skid this body is in, as observed by animTracker (AnimMemory.skid).
+   * Omitted = no skid term at all, so a caller with the feature off keeps its
+   * motion exactly. */
+  skid?: SkidMotion
+}
+
+/** What the motion layer needs of a skid: when the body stopped, which way it
+ * was running, and when (if) something cut the skid short. */
+export interface SkidMotion {
+  /** Tick the sim position stopped. */
+  at: number
+  /** Unit direction of the run, screen coords. */
+  dirX: number
+  dirY: number
+  /** Tick the body left idle mid-skid (moved, swung, flinched). */
+  cutAt?: number
 }
 
 /** Transform offsets to compose onto the sprite (identity = no motion). */
@@ -256,5 +280,29 @@ export const composeMotion = (m: MotionInput): MotionPose => {
     }
   }
 
+  // Skid to a stop: lean back against the run around the planted feet, braced.
+  // Only bodies with legs skid (hover/pulse have nothing to skid on); a roll is
+  // a whole-body tumble and death its own topple.
+  if (m.skid !== undefined && legged && m.state !== 'roll' && m.state !== 'death') {
+    const k = skidEnvelope(m.skid, m.t) * MOTION.skid.gain[style === 'waddle' ? 'waddle' : 'stride']
+    if (k > 0) {
+      p.rot -= m.skid.dirX * MOTION.skid.rad * k
+      p.sy *= 1 - MOTION.skid.squash * k
+      p.sx *= 1 + MOTION.skid.squash * 0.5 * k
+    }
+  }
+
   return p
+}
+
+/** 0..1 strength of a skid at view-time t: a quarter-sine up to the peak at
+ * `rise`, a quarter-cosine back to 0 at `ticks` (zero slope at both ends, so it
+ * settles into idle without a pop), times a linear fade from `cutAt`. */
+export const skidEnvelope = (s: SkidMotion, t: number): number => {
+  const { rise, ticks, cutTicks } = MOTION.skid
+  const e = t - s.at
+  if (e <= 0 || e >= ticks) return 0
+  const shape = e < rise ? Math.sin((Math.PI / 2) * (e / rise)) : Math.cos((Math.PI / 2) * ((e - rise) / (ticks - rise)))
+  const cut = s.cutAt === undefined ? 1 : 1 - clamp01((t - s.cutAt) / cutTicks)
+  return shape * cut
 }

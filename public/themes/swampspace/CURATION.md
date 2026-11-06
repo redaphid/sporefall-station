@@ -613,3 +613,37 @@ the third, on a quiet GPU, is the one above.
 Nothing parked. Known look gap: the white specular on each pod is keyed out
 as a backdrop pocket, so it shows the floor as a 2-4 px speck. Frame heights:
 87-92 px on the hi-res pack, 43-46 on the 48 px pack.
+
+## hive-spire (hivespire), 2026-11-06: design kept, an 8-frame idle loop by rigid parts in all 5 directions
+
+The rooted spawner (`npcs.ts` `hivespire`, speed 0, the one archetype PROTOCOL
+rule 13 exempts from a walk) had one frame, the August hires s-idle, in every
+direction. The design is kept (critic grade D: noisy moss, no focal point). The
+loop adds the focal point the critique asked for: an essence-glow seam under the
+cap and a spore bud on the side the spire faces. No video model.
+
+| stage | what |
+|---|---|
+| design | kept as shipped; no redesign on this run |
+| input | the shipped `hive-spire-s-idle.png` (96 px), sha256 `eac3712b7b6d1fb4…`, archived in `/mnt/d/tmp/cast-walks/archive/hive-spire/pre-idle/` |
+| motion | `scripts/assets/rotoscope/rig_spire.py`: the s-idle cut at rows 18 and 26 and 62 into cap, rim, shaft and the rooted base; per frame the shaft drops 0-3 rows (nearest, no blending) and widens 2 px at the deepest squash, the cap lifts 0-2 px a frame behind it on a glow seam (#46e078, hot #a6ffbe), and a bud (diameter 6-9 px, glow core) hangs under the rim at the facing's azimuth: front for s/se, the right edge for e, behind the shaft for ne/n |
+| loop | 8 frames, `idle` tpf 12 (3.2 s); frame 8 = frame 0, no two neighbouring frames equal |
+| colour | every pixel is a shipped pixel or a locked-34 colour |
+| export | 96 px frames to `swampspace-hires`; 48 px by a 2x2 block reduction (majority alpha, modal colour) aligned as the shipped 48 px s-idle sat; `<d>-idle`/`<d>-step` stay on `hive-spire-s-idle.png`, now s idle-0; 40 new `char.hivespire.<d>-idle-<n>` keys per pack |
+
+Checks, 2026-11-06. `cast_walk.py gate` cannot run on an idle-only kind (it reads a
+run's sheet.json and the walk poses), and gate scope for idle-only kinds is a
+rule 14 question for Aaron, so no gate version is claimed. The walk gate's
+thresholds were applied by `scripts/assets/rotoscope/check_idle.py`:
+
+| # | check | result |
+|---|---|---|
+| 1 | loop seam, max .5 | 0 by construction; the wrap step is .73-.82 of the median step (no jump) |
+| 2 | colour drift vs s-idle, max 1% | s/se/e .45%, ne/n 0 |
+| 3 | silhouette spec (`consistency.py --check`, 41 frames) | 0 violations |
+| 5 | judge identity / head drift / coverage jitter; boil max .3 | .017-.023 / .050-.057 / .0085; boil .002 |
+| 6b | pixels off the locked palette, max 0 | 0 at 96 and at 48 |
+| 4a, 4b, 6 | VLM facing, identity and style | not run (no face to face; every pixel is shipped art) |
+
+Known gaps: ne and n are the same frames (the bud is hidden behind the shaft);
+the moss texture and the baked grass pad the critique names are unchanged.

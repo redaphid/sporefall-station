@@ -364,9 +364,9 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 34,
-   "head_h": 43,
-   "mass": 612,
+   "width": 36,
+   "head_h": 42,
+   "mass": 622,
    "cx": 0.15,
    "foot_y": 45
   },

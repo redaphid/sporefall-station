@@ -760,14 +760,17 @@ def faint(rgb: np.ndarray, backdrop, pal, tol: float = 38, cover: float = 0.5) -
     return (blend & (a < cover)).reshape(rgb.shape[:2])
 
 
-def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=None, beside=()) -> Image.Image:
+def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=None, beside=(),
+                   band: float = 1.0) -> Image.Image:
     """Alpha from a BORDER-CONNECTED flood of the backdrop colour. A plain colour key
     also punches holes in pale interiors (cream fur, a white chest); only backdrop
     reachable from the frame edge is removed (cyber-puck's premat lesson).
 
     `pockets` > 0 also keys backdrop the flood cannot reach, in pieces of at least that many
     pixels: the gap where a claw curls back to a leg stays white otherwise. Only for a
-    character with no backdrop-coloured part of its own (`pocket_px`).
+    character with no backdrop-coloured part of its own (`pocket_key`). `band` < 1 keys only the
+    pockets that lie wholly in the lower `band` of this frame's silhouette, where the legs are: for
+    a character whose only pale part is higher up (the carapace-brute's bone shell).
 
     `pal` (the character's colours) takes `unmix` blends back out: the flood also crosses the
     faint ones, so a thin ghost joined to the backdrop goes with it. `beside` (the clip frames
@@ -800,23 +803,45 @@ def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=No
         lab, _ = ndimage.label(near & ~bg)
         big = np.bincount(lab.ravel()) >= pockets
         big[0] = False
+        if band < 1.0:
+            rows = np.nonzero((~bg).any(1))[0]
+            if len(rows):
+                top = rows[-1] - band * (rows[-1] - rows[0])
+                first = np.full(len(big), len(near), float)  # each pocket's top row
+                ys = np.nonzero(lab)[0]
+                np.minimum.at(first, lab[lab > 0], ys)
+                big &= first >= top
         bg |= big[lab]
     return Image.fromarray(np.dstack([rgb, np.where(bg, 0, 255).astype(np.uint8)]), "RGBA")
 
 
 POCKET_PX = 24      # raw video pixels, about 2x2 pixels of the 96 px sprite; smaller specks go to despeckle
 POCKET_PALE = 0.01  # the drone's anchor 0.0001, the mycologist's cream suit 0.0023, the frog 0.0033
+POCKET_BAND = 0.4   # the legs' share of the silhouette, from the feet up
 
 
-def pocket_px(anchor: str | None, backdrop, thresh: float = 38) -> int:
-    """`key_background(pockets=)` for a character: POCKET_PX when under POCKET_PALE of its anchor's
-    opaque pixels are backdrop-coloured, else 0 (it has a white part a pocket key would eat)."""
+def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, float]:
+    """`key_background(pockets=, band=)` for a character. Pockets are keyed where its anchor has under
+    POCKET_PALE of its opaque pixels backdrop-coloured: anywhere (band 1) when that holds for the whole
+    anchor; only in the leg band (POCKET_BAND) when it holds there and not above. A pale part in the
+    leg band (the mycologist's cream suit, the sporeling-mite's stalk) turns the key off, (0, 0).
+    The locked palette's palest colour is within `thresh` of white, so a bone shell's highlights count
+    as pale; before the band, they kept the carapace-brute's leg gaps white in every export."""
     if not anchor or not os.path.exists(anchor):
-        return 0
+        return 0, 0.0
     a = np.asarray(key_background(Image.open(anchor))).astype(np.float32)
-    px = a[a[..., 3] > 128][:, :3]
-    pale = float((np.sqrt(((px - backdrop) ** 2).sum(-1)) <= thresh).mean()) if len(px) else 1.0
-    return POCKET_PX if pale < POCKET_PALE else 0
+    opaque = a[..., 3] > 128
+    pale = np.sqrt(((a[..., :3] - backdrop) ** 2).sum(-1)) <= thresh
+    if not opaque.any():
+        return 0, 0.0
+    if (pale & opaque).sum() < POCKET_PALE * opaque.sum():
+        return POCKET_PX, 1.0
+    rows = np.nonzero(opaque.any(1))[0]
+    legs = opaque.copy()
+    legs[: int(rows[-1] - POCKET_BAND * (rows[-1] - rows[0]))] = False
+    if (pale & legs).sum() < POCKET_PALE * max(1, legs.sum()):
+        return POCKET_PX, POCKET_BAND
+    return 0, 0.0
 
 
 GHOST_PALE = 0.05  # anchors' faint share: stalker 0.007, blast-diver 0.005, vine-ranger 0.023, mycologist 0.131
@@ -1053,7 +1078,7 @@ def despeckle(im: Image.Image, lum: int = 225) -> Image.Image:
 
 
 def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pal, shrink: int = 1,
-                   pockets: int = 0, ghost=None, beside=None, lock_height: bool = False) -> dict:
+                   pockets: int = 0, ghost=None, beside=None, lock_height: bool = False, band: float = 1.0) -> dict:
     """Video frames share a locked camera, so each direction goes through ONE crop window
     (the union of its frames) at ONE scale for the whole sheet: nothing pumps, feet stay
     where the video put them (trace.py's fixed-window rule). `ghost`: `ghost_pal`'s colours;
@@ -1061,7 +1086,7 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
     keyframe is its own Qwen edit and draws the figure at its own size, so each direction is
     scaled to make its idle as tall as the s idle. A quadruped's side is legitimately lower
     than its front, so it never takes this."""
-    keyed = {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ())), shrink)
+    keyed = {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ()), band=band), shrink)
              for k, v in raws.items()}
     boxes = {k: bbox(v) for k, v in keyed.items()}
     union = {}
@@ -1422,7 +1447,8 @@ def finish(out, raws, dirs, poses, a, kind, pal, meta) -> str:
     raws = {k: v for k, v in raws.items() if k[0] in dirs and k[1] in poses}
     if meta.get("method") == "video":
         backdrop = P.corner_bg(next(iter(raws.values())))
-        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal, pockets=pocket_px(meta.get("input"), backdrop),
+        pockets, band = pocket_key(meta.get("input"), backdrop)
+        frames = pixelize_fixed(raws, dirs, poses, a.size, a.content, pal, pockets=pockets, band=band,
                                 ghost=ghost_pal(meta.get("input"), backdrop, pal),
                                 beside=clip_beside(out, raws, meta.get("loops", {})),
                                 lock_height=bool(meta.get("lock_height")))

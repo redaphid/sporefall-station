@@ -344,10 +344,29 @@ def main():
         da.save(dark)
         pale = os.path.join(tmp, "wren-anchor.png")
         wren().save(pale)
-        check("key: pocket keying on for an anchor with no backdrop-coloured part",
-              S.pocket_px(dark, np.array([255.0, 255, 255])) == S.POCKET_PX)
-        check("key: pocket keying off for an anchor with a pale chest, and for no anchor",
-              S.pocket_px(pale, np.array([255.0, 255, 255])) == 0 and S.pocket_px(None, np.array([255.0, 255, 255])) == 0)
+        white = np.array([255.0, 255, 255])
+        check("key: pocket keying everywhere for an anchor with no backdrop-coloured part",
+              S.pocket_key(dark, white) == (S.POCKET_PX, 1.0))
+        check("key: pocket keying in the leg band only for an anchor whose pale part is above it (a chest, a shell)",
+              S.pocket_key(pale, white) == (S.POCKET_PX, S.POCKET_BAND))
+        legs = os.path.join(tmp, "pale-legs-anchor.png")
+        pl = wren()
+        ImageDraw.Draw(pl).rectangle((380, 760, 650, 900), fill=CHEST)  # cream trousers: pale in the leg band
+        pl.save(legs)
+        check("key: pocket keying off for an anchor with a pale part in the leg band, and for no anchor",
+              S.pocket_key(legs, white) == (0, 0.0) and S.pocket_key(None, white) == (0, 0.0))
+        beast = Image.new("RGB", (200, 300), (255, 255, 255))
+        db = ImageDraw.Draw(beast)
+        db.ellipse((30, 20, 170, 120), fill=TEAL, outline=(8, 8, 12), width=6)  # body
+        db.rectangle((80, 50, 120, 80), fill=(255, 255, 255))  # a backdrop-white patch on the body, like a lit shell
+        db.rectangle((50, 100, 70, 290), fill=TEAL)  # two legs that cross low down and touch at the feet
+        db.rectangle((120, 100, 140, 290), fill=TEAL)
+        db.rectangle((50, 200, 140, 210), fill=TEAL)
+        db.rectangle((50, 275, 140, 290), fill=TEAL)
+        kb = np.asarray(S.key_background(beast, pockets=S.POCKET_PX, band=S.POCKET_BAND))
+        check("key: band= keys the gap between the legs and keeps a white patch above the leg band",
+              kb[240, 95, 3] == 0 and kb[65, 100, 3] == 255 and kb[60, 55, 3] == 255)
+        check("key: band 1 (the default) keys both", np.asarray(S.key_background(beast, pockets=S.POCKET_PX))[65, 100, 3] == 0)
         charcoal, bone, teal = (8, 8, 12), (203, 178, 119), (36, 86, 92)
         ghost = tuple(round(0.35 * c + 0.65 * 255) for c in charcoal)  # a leg a third drawn: Wan's motion blur
         leg = Image.new("RGB", (120, 120), (255, 255, 255))

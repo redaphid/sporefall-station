@@ -154,12 +154,12 @@
  "carapace-brute": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 42,
-   "width": 40,
-   "head_h": 32,
-   "mass": 1000,
-   "cx": -2.84,
-   "foot_y": 44
+   "height": 36,
+   "width": 44,
+   "head_h": 26,
+   "mass": 900,
+   "cx": -0.63,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,
@@ -192,12 +192,12 @@
  "gloom-lurker": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 43,
-   "width": 32,
-   "head_h": 32,
-   "mass": 718,
-   "cx": 0.53,
-   "foot_y": 45
+   "height": 25,
+   "width": 40,
+   "head_h": 20,
+   "mass": 471,
+   "cx": 0.14,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

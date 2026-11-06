@@ -49,6 +49,12 @@ flowchart LR
   with characteristics different than the existing projectiles." The fast hard-hitting
   sidearm reads as a punchy kinetic gun (recoil, muzzle flash, a solid barrel); lore
   shows in salvaged-tool details and at most one small essence-glow accent.
+- **Mods show on the gun.** 2026-11-06: "the shot fired (projectile) is significantly
+  mutated based off of the mods." A weapon's look follows its mods the way the projectile
+  does (`src/render/bulletVisuals.ts`): a neutral base, a glow region coloured and pulsed
+  from `src/render/weaponSkin.ts` (mod-gem colours), and generated per-mod attachment
+  layers (frost coils, an igniter, a Tesla coil, extra barrels) so a modded gun visibly
+  becomes what it fires. Whole-sprite tinting muddies pixel art; colour the glow region.
 - **Animated.** A weapon has an idle loop (the essence jar bubbles) and a use clip
   (recoil and flash, a swing arc).
 - **Held like a weapon.** Guns are aimed, not dangled at the hip: characters walk

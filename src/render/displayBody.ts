@@ -52,18 +52,23 @@ export const TUMBLE = {
   rollTicks: 6,
   /** How far the body rocks past its side as it rolls to a stop. */
   rock: 0.22,
-  /** Ground speed kept along a wall's normal after a touch (default onWall). */
-  wallKeep: 0.35,
-  /** Ground speed kept along the wall on a touch. */
-  wallSlide: 0.8,
+  /** Ground speed kept ALONG a wall on a touch (default onWall). The speed
+   * into it is lost: a body that bounced back off a wall would read as the
+   * shot having come from the wall. */
+  wallSlide: 0.3,
   /** Half-size of the body's footprint against walls. Wider than tall: a
    * body lying on its side is long across the screen, and its head and feet
    * must not lie over a side wall. Shrinks to fit where the body died. */
   footprint: { x: 0.55, y: 0.3 },
   /** Never simulate past this many ticks. */
   maxTicks: 90,
-  /** Force above which the body turns a full somersault before landing on its side. */
-  flipForce: 0.55,
+  /** Below this share of its max hp dealt on the death tick, a kill is a
+   * plink and the body topples in place exactly as before: a pistol round
+   * (14) into a mutant (40 hp) is 0.35 and topples; the same round into a
+   * sporeling (22) is 0.64 and throws it; a wrench (16) into a mutant is
+   * exactly 0.4; a machine-gun round (8) never throws a mutant; a
+   * sledgehammer (26) always does. Blasts always throw. */
+  threshold: 0.4,
   /** Ticks the settled body lies still before the fade starts. */
   hold: 12,
   /** Directions are snapped to 1/sectors of a turn, so a small difference in
@@ -111,7 +116,16 @@ export interface DeathFacts {
   explosions: readonly { x: number; y: number; radius: number }[]
   /** Projectiles the renderer saw, each at its latest sighting. `ticksBefore`
    * is how many ticks before the death that sighting was. */
-  projectiles: readonly { x: number; y: number; vx: number; vy: number; ticksBefore: number; ownerId: number }[]
+  projectiles: readonly {
+    x: number
+    y: number
+    vx: number
+    vy: number
+    ticksBefore: number
+    ownerId: number
+    /** The round's damage, where the view carries it. */
+    damage?: number
+  }[]
   /** Bodies that were trying to kill this one, where last seen. */
   hostiles: readonly Vec[]
 }
@@ -146,9 +160,10 @@ const snapDir = (x: number, y: number): Vec | undefined => {
   return { x: Math.cos(a), y: Math.sin(a) }
 }
 
-/** How far the projectile's line passes from the body, if it was heading at it
+/** How far the projectile's line passes from the body (`miss`), and how many
+ * ticks after its sighting it got there (`eta`), if it was heading at the body
  * and could have reached it by the death tick. */
-const projectileMiss = (p: DeathFacts['projectiles'][number], x: number, y: number): number | undefined => {
+const projectileLine = (p: DeathFacts['projectiles'][number], x: number, y: number): { miss: number; eta: number } | undefined => {
   const speed = Math.hypot(p.vx, p.vy)
   if (speed < 1e-6) return undefined
   const ux = p.vx / speed
@@ -157,13 +172,30 @@ const projectileMiss = (p: DeathFacts['projectiles'][number], x: number, y: numb
   if (along < -0.5) return undefined // flying away from the body
   const reach = (speed * (p.ticksBefore + 1)) / SIM_RATE + 0.75
   if (along > reach) return undefined // could not have got there in time
-  return Math.abs((x - p.x) * uy - (y - p.y) * ux)
+  return { miss: Math.abs((x - p.x) * uy - (y - p.y) * ux), eta: (Math.max(0, along) / speed) * SIM_RATE }
 }
 
-/** Which way and how hard the kill throws the body. */
-export const deriveThrow = (f: DeathFacts): Throw => {
+/** Force from the killing blow's share of max hp, or undefined below the
+ * threshold (a plink: the old topple). */
+const forceOf = (blow: number, maxHp: number): number | undefined => {
+  const share = maxHp > 0 ? blow / maxHp : 0
+  if (share < TUMBLE.threshold) return undefined
+  return clamp01(0.25 + (0.75 * (share - TUMBLE.threshold)) / (1 - TUMBLE.threshold))
+}
+
+/** Which way and how hard the kill throws the body; undefined when the blow
+ * was too light to throw it (TUMBLE.threshold), and it topples as before. */
+export const deriveThrow = (f: DeathFacts): Throw | undefined => {
   const seed = bodySeed(f.id, f.x, f.y)
-  let force = f.maxHp > 0 ? clamp01(0.1 + 0.9 * (f.killDamage / f.maxHp)) : 0.1
+  // The blow: the hits the death tick logged, or, when more, the volley seen
+  // arriving that tick. A body's i-frames void every pellet of a shotgun
+  // blast but the first, so its hit events alone undersell the blast.
+  let volley = 0
+  for (const p of f.projectiles) {
+    const line = p.ownerId === f.id ? undefined : projectileLine(p, f.x, f.y)
+    if (line && line.miss <= 0.75 && Math.abs(line.eta - p.ticksBefore) <= 1.5) volley += p.damage ?? 0
+  }
+  let force = forceOf(Math.max(f.killDamage, volley), f.maxHp)
   let dir: Vec | undefined
   let source: ThrowSource = 'facing'
 
@@ -175,16 +207,18 @@ export const deriveThrow = (f: DeathFacts): Throw => {
     nearest = d
     const away = snapDir(f.x - ex.x, f.y - ex.y)
     if (away) dir = away
-    force = Math.max(force, 0.6 + 0.4 * clamp01(1 - d / Math.max(ex.radius, 0.1)))
+    force = Math.max(force ?? 0, 0.6 + 0.4 * clamp01(1 - d / Math.max(ex.radius, 0.1)))
     source = 'explosion'
   }
+
+  if (force === undefined) return undefined
 
   // 2. A round seen flying at the body: along its flight.
   if (!dir) {
     let best: { miss: number; ticks: number; v: Vec } | undefined
     for (const p of f.projectiles) {
       if (p.ownerId === f.id) continue
-      const miss = projectileMiss(p, f.x, f.y)
+      const miss = projectileLine(p, f.x, f.y)?.miss
       if (miss === undefined || miss > 0.75) continue
       if (!best || p.ticksBefore < best.ticks || (p.ticksBefore === best.ticks && miss < best.miss)) {
         best = { miss, ticks: p.ticksBefore, v: { x: p.vx, y: p.vy } }
@@ -236,12 +270,12 @@ export interface WallContact {
 /** The rebound a wall gives: the new ground velocity, tiles/tick. */
 export type OnWall = (c: WallContact, v: Vec) => Vec
 
-/** The default rebound: a dull bounce off the wall, slowed along it. */
-export const bounceOffWall: OnWall = (c, v) => {
-  const into = v.x * c.nx + v.y * c.ny // negative: moving into the wall
-  const tx = v.x - into * c.nx
-  const ty = v.y - into * c.ny
-  return { x: tx * TUMBLE.wallSlide - into * c.nx * TUMBLE.wallKeep, y: ty * TUMBLE.wallSlide - into * c.ny * TUMBLE.wallKeep }
+/** The default: the wall takes the speed into it, the body keeps a little
+ * slide along it and drops to the wall's foot. (The slam squash, #173, plugs
+ * in here.) */
+export const stopAtWall: OnWall = (c, v) => {
+  const into = v.x * c.nx + v.y * c.ny
+  return { x: (v.x - into * c.nx) * TUMBLE.wallSlide, y: (v.y - into * c.ny) * TUMBLE.wallSlide }
 }
 
 /** The body at one moment. `z` is height off the floor in tiles; `rot` is the
@@ -259,6 +293,8 @@ export interface BodyTrack {
   readonly poses: readonly BodyPose[]
   /** Tick (since the death) the body came to rest. */
   readonly settle: number
+  /** Tick (since the death) of the last landing: in flight before it. */
+  readonly landed: number
   readonly contacts: readonly WallContact[]
 }
 
@@ -283,7 +319,7 @@ const fitFootprint = (solid: IsSolid, x: number, y: number): { rx: number; ry: n
 }
 
 /** Integrate the throw at whole ticks until the body lies still. */
-export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceOffWall): BodyTrack => {
+export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = stopAtWall): BodyTrack => {
   const jitter = (salt: number): number => 0.9 + 0.2 * unit(th.seed, salt)
   const speed = lerp(TUMBLE.speed.min, TUMBLE.speed.max, th.force) * jitter(1)
   let vx = th.dirX * speed
@@ -297,10 +333,11 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
   const { rx, ry } = fitFootprint(solid, x, y)
   if (blocked(solid, x, y, 0, 0)) vx = vy = 0
 
-  // Spin with the throw: thrown right turns clockwise. Straight up or down,
-  // the seed picks.
+  // One tip onto its side, away from the blow: thrown right turns clockwise.
+  // Straight up or down, the seed picks. Never a somersault: the force shows
+  // in the distance, the hop, the bounces and the slide.
   const side = th.dirX > 0.2 ? 1 : th.dirX < -0.2 ? -1 : unit(th.seed, 3) < 0.5 ? -1 : 1
-  const finalRot = side * (Math.PI / 2 + (th.force > TUMBLE.flipForce ? Math.PI * 2 : 0))
+  const finalRot = side * (Math.PI / 2)
 
   const poses: BodyPose[] = [{ x, y, z, rot: 0 }]
   const contacts: WallContact[] = []
@@ -366,10 +403,9 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
     poses.push({ x, y, z, rot: 0 })
     if (grounded && k >= rollEnd && vx === 0 && vy === 0) break
   }
-  // The spin is steady through the hop and the bounces and lands the body on
-  // its side on the last landing: it never slows down near upright, where it
-  // would read as the dead man getting back up. Then it rocks past its side
-  // and back (the roll), and slides lying still.
+  // The tip is steady through the hop and the bounces and lays the body on its
+  // side at the last landing; then it rocks past its side and back (the roll)
+  // and slides lying still. It never comes back toward upright.
   const land = landed > 0 ? landed : poses.length - 1
   for (let i = 1; i < poses.length; i++) {
     if (i <= land) poses[i].rot = (finalRot * i) / land
@@ -378,7 +414,7 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
       poses[i].rot = finalRot + side * TUMBLE.rock * Math.sin(q * Math.PI) * (1 - q)
     }
   }
-  return { throw: th, poses, settle: poses.length - 1, contacts }
+  return { throw: th, poses, settle: poses.length - 1, landed: land, contacts }
 }
 
 /** The body `ticks` after its death (fractional: tick + interpolation). */

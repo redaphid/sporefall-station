@@ -1,4 +1,4 @@
-import { Container, Sprite, type Texture } from 'pixi.js'
+import { Container, Graphics, Sprite, type Texture } from 'pixi.js'
 import type { Entity, Fx } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
 import { SIM_DT } from '../game/types'
@@ -81,6 +81,7 @@ interface SeenRound {
   vy: number
   tick: number
   ownerId: number
+  damage: number
 }
 
 /** Ticks a vanished round stays in memory. */
@@ -99,7 +100,13 @@ interface Ghost {
   texKey: string
   /** The thrown body's track, when the kill tumbles it (displayBody.ts). */
   body?: BodyTrack
+  /** Its blob on the floor while it flies (thrown bodies only). */
+  shadow?: Graphics
 }
+
+/** The thrown body's floor shadow: a dark blob that stays on the floor while
+ * the hop lifts the sprite, so a hop up or down the screen reads as a hop. */
+const SHADOW = { alpha: 0.35, rx: 7, ry: 3 } as const
 
 /** Ghost cap — a massacre never accumulates unbounded sprites (mobile-cheap). */
 const MAX_GHOSTS = 24
@@ -256,6 +263,7 @@ export class EntityViews {
     for (const g of this.ghosts) {
       this.root.removeChild(g.sprite)
       g.sprite.destroy()
+      g.shadow?.destroy()
     }
     this.ghosts.length = 0
   }
@@ -264,6 +272,7 @@ export class EntityViews {
     const g = this.ghosts[i]
     this.root.removeChild(g.sprite)
     g.sprite.destroy()
+    g.shadow?.destroy()
     this.ghosts.splice(i, 1)
   }
 
@@ -283,6 +292,11 @@ export class EntityViews {
     view.sprite.rotation = 0
     view.sprite.scale.set(view.flip ? -1 : 1, 1)
     const thrown = this.tumble && view.last?.tumbles ? this.throwBody(view, id, tick, entities, eventLog) : undefined
+    let shadow: Graphics | undefined
+    if (thrown) {
+      shadow = new Graphics().ellipse(0, 0, SHADOW.rx, SHADOW.ry).fill({ color: 0x000000 })
+      this.root.addChild(shadow)
+    }
     this.ghosts.push({
       sprite: view.sprite,
       artKey: view.archetype,
@@ -292,6 +306,7 @@ export class EntityViews {
       id,
       texKey: view.texKey,
       body: thrown?.body,
+      shadow,
     })
     if (this.ghosts.length > MAX_GHOSTS) this.expireGhost(0)
   }
@@ -305,7 +320,7 @@ export class EntityViews {
     tick: number,
     entities: readonly Entity[],
     eventLog: readonly TickEvents[],
-  ): { start: number; body: BodyTrack } {
+  ): { start: number; body: BodyTrack } | undefined {
     const last = view.last!
     let death: { tick: number; x: number; y: number } | undefined
     for (const { tick: t, events } of eventLog) {
@@ -343,7 +358,7 @@ export class EntityViews {
       projectiles,
       hostiles,
     })
-    return { start: at.tick, body: simulateBody(th, this.solid) }
+    return th && { start: at.tick, body: simulateBody(th, this.solid) }
   }
 
   private prevTick = -1
@@ -656,7 +671,8 @@ export class EntityViews {
   private seeRounds(entities: readonly Entity[], tick: number): void {
     for (const e of entities) {
       if (e.kind !== 'projectile' || e.dead || !e.projectile) continue
-      this.rounds.set(e.id, { x: e.pos.x, y: e.pos.y, vx: e.vel.x, vy: e.vel.y, tick, ownerId: e.projectile.ownerId })
+      const p = e.projectile
+      this.rounds.set(e.id, { x: e.pos.x, y: e.pos.y, vx: e.vel.x, vy: e.vel.y, tick, ownerId: p.ownerId, damage: p.damage })
     }
     for (const [id, r] of this.rounds) if (tick - r.tick > ROUND_MEMORY_TICKS || r.tick > tick) this.rounds.delete(id)
   }
@@ -731,6 +747,16 @@ export class EntityViews {
         g.sprite.alpha = motion.alpha
         g.sprite.scale.set(g.flip ? -1 : 1, 1)
         g.sprite.zIndex = depthKey('npc', p.y)
+        if (g.shadow) {
+          // On the floor under the body, fading out once it has landed.
+          const since = t - g.start - g.body.landed
+          const fade = since <= 0 ? 1 : Math.max(0, 1 - since / TUMBLE.rollTicks)
+          g.shadow.position.set(p.x * TILE_PX, charFootPx(p.y, TILE_PX) - SHADOW.ry)
+          g.shadow.scale.set(1 + 0.6 * Math.abs(Math.sin(rot)) - 0.25 * Math.min(1, p.z), 1)
+          g.shadow.alpha = SHADOW.alpha * fade * motion.alpha
+          g.shadow.visible = g.shadow.alpha > 0
+          g.shadow.zIndex = g.sprite.zIndex - 0.01
+        }
         continue
       }
       g.sprite.rotation = motion.rot

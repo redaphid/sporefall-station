@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { Sprite } from 'pixi.js'
+import type { Graphics, Sprite } from 'pixi.js'
 import type { Entity } from '../game/entity'
 import { spawnNpc } from '../game/populate'
 import { spawnProjectile } from '../game/systems/combat'
@@ -28,6 +28,7 @@ interface GhostPeek {
   start: number
   sprite: Sprite
   body?: BodyTrack
+  shadow?: Graphics
 }
 const ghostsOf = (v: EntityViews): GhostPeek[] => (v as unknown as { ghosts: GhostPeek[] }).ghosts
 
@@ -61,12 +62,14 @@ const mutant = (s: Scene['w'], x: number, y: number, hp: number, max = 90): Enti
   return m
 }
 
-/** A pistol round from the west kills a still mutant in one shot. */
-const pistolScene = (mx = 9.5, w = 20): Scene => {
-  const world = worldFromRows(walledRoom(w, 10), { seed: 5 })
+/** A pistol round from the west kills a still mutant in one shot. `max` 24:
+ * the round is 14/24 of it, over the throw threshold; at 40 (a real mutant)
+ * it is a plink. */
+const pistolScene = (mx = 9.5, max = 24): Scene => {
+  const world = worldFromRows(walledRoom(20, 10), { seed: 5 })
   const p = tank(world, mx - 5, 5.5)
   arm(p, 'pistol')
-  const m = mutant(world, mx, 5.5, 14)
+  const m = mutant(world, mx, 5.5, 14, max)
   return { w: world, focus: [m], before: () => {}, n: 140, inputs: new Map([[0, { attack: true, aimX: 1, aimY: 0 }]]) }
 }
 
@@ -122,7 +125,8 @@ describe('a kill throws the body', () => {
     expect(dx).toBeLessThan(2.5)
     // Off the floor at some point (the hop), and spinning clockwise.
     expect(Math.max(...g.body!.poses.map((p) => p.z)) * TILE_PX).toBeGreaterThan(3)
-    expect(fs.at(-1)!.rot).toBeGreaterThan(Math.PI / 2 - 1e-9)
+    expect(fs.at(-1)!.rot).toBeCloseTo(Math.PI / 2, 9)
+    expect(Math.max(...fs.map((f) => f.rot))).toBeLessThanOrEqual(Math.PI / 2 + TUMBLE.rock)
     // Lies still, then fades out over the last stretch, alpha falling.
     const alphas = fs.map((f) => f.alpha)
     expect(alphas[0]).toBe(1)
@@ -130,7 +134,40 @@ describe('a kill throws the body', () => {
     // Lifetime: settle + hold + the fade, from the death tick.
     expect(fs.at(-1)!.tick).toBe(g.start + g.body!.settle + TUMBLE.hold + 18 - 1)
     expect(g.sprite.destroyed).toBe(true)
+    expect(g.shadow?.destroyed).toBe(true)
     expect(live.at(-1)).toBe(0)
+  })
+
+  it('a pistol plink (14 of a 40-hp mutant, under the threshold) is today\'s topple, frame for frame', () => {
+    const on = run(pistolScene(9.5, 40))
+    const m = Object.keys(on.frames)[0]
+    expect(on.ghosts.get(Number(m))?.body).toBeUndefined()
+    expect(on.ghosts.get(Number(m))?.shadow).toBeUndefined()
+    const off = trace(pistolScene(9.5, 40), art, { tumble: false })
+    const fs = on.frames[Number(m)]
+    expect(ghostFrames(fs).length).toBeGreaterThan(0)
+    expect(fs).toEqual(off[Number(m)])
+  })
+
+  it('the shadow stays on the floor under the flying body and is gone once it lies still', () => {
+    const scene = pistolScene()
+    const m = scene.focus[0]
+    const seen: { tick: number; y: number; alpha: number; bodyY: number }[] = []
+    trace(scene, art, {
+      tumble: true,
+      inspect: (v, tick) => {
+        const g = ghostsOf(v).find((x) => x.id === m.id)
+        if (g?.shadow) seen.push({ tick, y: g.shadow.position.y, alpha: g.shadow.alpha, bodyY: g.sprite.position.y })
+      },
+    })
+    const inFlight = seen.filter((s) => s.alpha > 0)
+    expect(inFlight.length).toBeGreaterThan(5)
+    // The body rises off the floor, the shadow does not (it moves only with the ground point).
+    const drift = Math.max(...inFlight.map((s) => s.y)) - Math.min(...inFlight.map((s) => s.y))
+    const lift = Math.max(...inFlight.map((s) => s.y - s.bodyY)) - Math.min(...inFlight.map((s) => s.y - s.bodyY))
+    expect(drift).toBeLessThan(1e-9) // thrown east: the ground point stays on one row
+    expect(lift).toBeGreaterThan(8)
+    expect(seen.at(-1)!.alpha).toBe(0)
   })
 
   it('a wrench (no blast, no round): thrown away from the swinger', () => {
@@ -179,8 +216,12 @@ describe('a kill throws the body', () => {
     expect(body.contacts.length).toBeGreaterThan(0)
     expect(body.contacts[0].nx).toBe(-1)
     expect(body.throw.x + TUMBLE.footprint.x).toBeGreaterThan(19) // flush: inside its full footprint
-    // Never nearer the wall than a living body of its size could stand.
-    for (const p of body.poses) expect(p.x + m.radius).toBeLessThan(19)
+    // Never nearer the wall than a living body of its size could stand, and
+    // never knocked back off it toward the shooter.
+    for (const p of body.poses) {
+      expect(p.x + m.radius).toBeLessThan(19)
+      expect(p.x).toBeGreaterThanOrEqual(body.throw.x)
+    }
   })
 
   it('a body that dies the tick after it is first seen still tumbles; one never seen leaves no ghost', () => {

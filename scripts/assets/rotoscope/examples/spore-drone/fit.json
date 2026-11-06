@@ -1,0 +1,79 @@
+{
+ "kind": "spore-drone",
+ "input": "/mnt/d/tmp/cast-walks/runs/spore-drone/input-anchor.png",
+ "wing": "wings/wing-QA2.png",
+ "wing_hinge": [
+  97,
+  255
+ ],
+ "wing_px": 0.28,
+ "elev": 30,
+ "up": 50,
+ "down": -25,
+ "down_share": 0.45,
+ "bob": 5,
+ "lag": 0.15,
+ "body_h": 260,
+ "centre": [
+  424,
+  250
+ ],
+ "dirs": {
+  "s": {
+   "keyframe": "/mnt/d/tmp/cast-walks/runs/spore-drone/take1/video-s3/raw/s-keyframe.png",
+   "az": 0,
+   "hinge": [
+    55,
+    115,
+    -10
+   ],
+   "idle": 12,
+   "step": 3
+  },
+  "se": {
+   "keyframe": "/mnt/d/tmp/cast-walks/runs/spore-drone/take2-s-se-e/video-s11/raw/se-keyframe.png",
+   "az": 45,
+   "hinge": [
+    55,
+    115,
+    -10
+   ],
+   "idle": 10,
+   "step": 5
+  },
+  "e": {
+   "keyframe": "/mnt/d/tmp/cast-walks/runs/spore-drone/take2-s-se-e/video-s11/raw/e-keyframe.png",
+   "az": 90,
+   "hinge": [
+    45,
+    115,
+    -10
+   ],
+   "idle": 11,
+   "step": 4
+  },
+  "ne": {
+   "keyframe": "kf/ne-kf-s3-mirror.png",
+   "az": 135,
+   "hinge": [
+    55,
+    115,
+    -10
+   ],
+   "idle": 11,
+   "step": 3
+  },
+  "n": {
+   "keyframe": "kf/n-kf-s11.png",
+   "az": 180,
+   "hinge": [
+    55,
+    115,
+    -10
+   ],
+   "idle": 15,
+   "step": 0
+  }
+ },
+ "outline_px": 4
+}

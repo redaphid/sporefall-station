@@ -9,7 +9,7 @@ not move. Comics that settled the roster: https://draw.hypnodroid.com/b/sporefal
 
 | old id | new id | name | glow (G3: one hue) | carried by |
 |---|---|---|---|---|
-| pistol | decanter | Decanter | teal | Ranger (start), Rootcult Acolyte, Drowned Diver, Tide Bellwether, loot |
+| pistol | rivetDriver | Rivet Driver | green | Ranger (start), Rootcult Acolyte, Drowned Diver, Tide Bellwether, loot |
 | wrench | pressureLance | Pressure Lance | teal | Bog Mutant, Blast Diver, Barter Frog, loot |
 | knife | siphonSpike | Siphon Spike | teal | loot |
 | sledgehammer | cageRam | Cage Ram | yellow | loot |
@@ -20,11 +20,13 @@ not move. Comics that settled the roster: https://draw.hypnodroid.com/b/sporefal
 | tranquilizer | lullDarter | Lull Darter | violet | (scenarios) |
 | stunGun | sparkCoil | Spark Coil | yellow | loot |
 
-- **Decanter** (sidearm): a caged glass bulb IS the barrel; the petcock decants one bubble per pull.
+- **Rivet Driver** (sidearm): a salvaged pneumatic rivet driver: heavy receiver, thick clamp-banded barrel, muzzle collar, air cylinder, one small green charge vial. It fires the game's fast hard tracer, so it must look punchy and kinetic. (The first design, a caged-bulb "Decanter", was dropped the same day: owner, "a 'bubble gun' would be very unsatisfying to use, with characteristics different than the existing projectiles".)
 - **Pressure Lance**: a stolen still pipe with a heavy pneumatic piston head; the thrust slams the piston (the knockback).
 - **Siphon Spike**: a sampling probe: glass barrel, needle tip. Quick jab.
 - **Cage Ram**: two-handed pole, a wire cage holding a charged bulb; it bursts on impact (the stun).
 - **Scatter Funnel / Coil Repeater / Phosphor Hose / Frost Condenser / Lull Darter / Spark Coil**: funnel mouth, coil-wrapped tube, hose-fed wand, finned condenser, slim dart tube, forked coil prongs.
+
+**Look promises behaviour** (owner, 2026-11-06): each weapon must read as what its existing projectile, hit and numbers deliver; essence glow is one small accent, never the barrel.
 
 **Look promises behaviour** (owner, 2026-11-06): each weapon must read as what its existing projectile, hit and numbers deliver; essence glow is one small accent, never the barrel.
 

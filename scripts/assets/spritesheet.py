@@ -825,6 +825,14 @@ POCKET_PX = 24      # raw video pixels, about 2x2 pixels of the 96 px sprite; sm
 POCKET_PALE = 0.01  # the drone's anchor 0.0001, the mycologist's cream suit 0.0023, the frog 0.0033
 POCKET_BAND = 0.4   # the legs' share of the silhouette, from the feet up
 POCKET_FLAT = 3.0   # brute: gaps between tail, rump and legs have median 1.1-2.6; shell and blends 4.3-31
+POCKET_PART = 12    # px at 96 in one piece: derelict-bot's gauge 17; blast-diver 9, spore-mortar 4, the rest <= 3
+
+
+def _pale_part(pale: np.ndarray) -> float:
+    """The largest connected piece of `pale`, in pixels of a 96 px canvas."""
+    from scipy import ndimage
+    lab, n = ndimage.label(pale)
+    return float(np.bincount(lab.ravel())[1:].max()) * (96 / max(pale.shape)) ** 2 if n else 0.0
 
 
 def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, float]:
@@ -833,7 +841,9 @@ def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, f
     anchor; only in the leg band (POCKET_BAND) when it holds there and not above. A pale part in the
     leg band (the mycologist's cream suit, the sporeling-mite's stalk) turns the key off, (0, 0).
     The locked palette's palest colour is within `thresh` of white, so a bone shell's highlights count
-    as pale; before the band, they kept the carapace-brute's leg gaps white in every export."""
+    as pale; before the band, they kept the carapace-brute's leg gaps white in every export.
+    A small share in one piece of POCKET_PART or more is still a drawn pale part (the derelict-bot's
+    gauge face, share .0083): band 1 keyed it out as a pocket in every view that rings it."""
     if not anchor or not os.path.exists(anchor):
         return 0, 0.0
     a = np.asarray(key_background(Image.open(anchor))).astype(np.float32)
@@ -841,7 +851,7 @@ def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, f
     pale = np.sqrt(((a[..., :3] - backdrop) ** 2).sum(-1)) <= thresh
     if not opaque.any():
         return 0, 0.0
-    if (pale & opaque).sum() < POCKET_PALE * opaque.sum():
+    if (pale & opaque).sum() < POCKET_PALE * opaque.sum() and _pale_part(pale & opaque) < POCKET_PART:
         return POCKET_PX, 1.0
     rows = np.nonzero(opaque.any(1))[0]
     legs = opaque.copy()

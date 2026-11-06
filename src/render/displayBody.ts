@@ -311,6 +311,9 @@ export const SLAM = {
   /** A second wall this many ticks away across the first one's normal is
    * the same slam: a corner. */
   cornerTicks: 2,
+  /** Ticks before the impact a body flying into the back of a south wall
+   * comes down onto its drawn top edge (sprites.ts). */
+  onto: 3,
   /** Ticks the impact burst lasts, and the dust puff at the foot. */
   burstTicks: 5,
   dustTicks: 8,

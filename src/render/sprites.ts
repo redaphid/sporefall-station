@@ -737,7 +737,15 @@ export class EntityViews {
       const lim = sl.faceX * TILE_PX + Math.sign(sl.nx) * reachToWall(rot, w, h, 1, 0)
       if (Math.sign(sl.nx) * (x - lim) < 0) x = lim
     }
-    if (sl.faceY !== undefined && sl.ny < 0) y = Math.min(y, sl.faceY * TILE_PX - reachToWall(rot, w, h, 0, 1))
+    if (sl.faceY !== undefined && sl.ny < 0) {
+      // The back of a south wall is drawn flat, as its top edge: a body in
+      // the air above it would hit nothing on screen. Over the last ticks
+      // of the flight it comes down onto that edge and stays on it.
+      const edge = sl.faceY * TILE_PX - reachToWall(rot, w, h, 0, 1)
+      const u = Math.min(1, Math.max(0, (ticks - sl.tick + SLAM.onto) / SLAM.onto))
+      if (edge > y) y += (edge - y) * u * u * (3 - 2 * u)
+      y = Math.min(y, edge)
+    }
     const sq = slamAt(body, ticks)
     if (sq && sq.q !== 0) {
       const m = squashMatrix(rot, g.flip, sq.q, sq.nx, sq.ny)
@@ -750,7 +758,10 @@ export class EntityViews {
     if (since >= 0 && since < SLAM.burstTicks) {
       // In profile, on the face at the body's middle; face-on or from
       // behind, a ring over the middle of the splat.
-      const midY = charFootPx(sl.y, TILE_PX) - restLift(sl.rot, h) - sl.z * TILE_PX
+      const midY =
+        sl.faceY !== undefined && sl.ny < 0
+          ? sl.faceY * TILE_PX - reachToWall(sl.rot, w, h, 0, 1)
+          : charFootPx(sl.y, TILE_PX) - restLift(sl.rot, h) - sl.z * TILE_PX
       const profile = sl.faceX !== undefined
       const cx = profile ? sl.faceX! * TILE_PX : sl.x * TILE_PX
       blocks.push(...burstBlocks(since, body.throw.seed, cx, midY, sl.nx, sl.ny, profile ? FAN.profile : FAN.ring))

@@ -17,7 +17,7 @@ import type { Entity } from '../game/entity'
 import { spawnNpc } from '../game/populate'
 import { arm, walledRoom, worldFromRows } from '../game/testkit'
 import { brawlScene, fakeArt, tank, trace, type Frame, type Scene, type TraceOpts } from './animTestkit'
-import { TILE_PX } from './art'
+import { CHAR_PX, TILE_PX } from './art'
 import { poseAt, SLAM, TUMBLE, type BodyTrack } from './displayBody'
 import { BODY_FILL } from './slamFx'
 import type { EntityViews } from './sprites'
@@ -33,7 +33,11 @@ interface GhostPeek {
 }
 const ghostsOf = (v: EntityViews): GhostPeek[] => (v as unknown as { ghosts: GhostPeek[] }).ghosts
 
-const art = fakeArt()
+// Sized frames (the game's CHAR_PX canvas): the slam measures how far the
+// drawn body reaches toward the wall.
+const art = fakeArt({}, {}, CHAR_PX)
+/** The plain testkit art (unsized frames), as the tumble's golden was made with. */
+const plainArt = fakeArt()
 const F = TUMBLE.footprint
 
 type Wall = 'E' | 'W' | 'N' | 'S'
@@ -295,7 +299,7 @@ const digest = (fs: unknown[]): string[] => {
 describe('the slam, pinned', () => {
   it('slam off is the tumble as recorded before the slam (the death-tumble ON golden)', () => {
     const golden = JSON.parse(readFileSync(ON_GOLDEN, 'utf8')) as { brawl: string[][] }
-    expect(Object.values(trace(brawlScene(), art, { tumble: true, slam: false })).map(digest)).toEqual(golden.brawl)
+    expect(Object.values(trace(brawlScene(), plainArt, { tumble: true, slam: false })).map(digest)).toEqual(golden.brawl)
   })
 
   it('the four wall kills with the slam on render exactly as recorded', () => {

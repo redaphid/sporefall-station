@@ -5,7 +5,7 @@
 //
 // Test-only: nothing in the game imports this file.
 
-import { Texture, type Renderer, type Sprite } from 'pixi.js'
+import { Texture, TextureSource, type Renderer, type Sprite } from 'pixi.js'
 import { createEventLog } from '../app/eventLog'
 import type { Entity } from '../game/entity'
 import { spawnNpc } from '../game/populate'
@@ -19,7 +19,10 @@ import { createArt, type ArtRegistry, type CharSet, type DirPose } from './art'
 import { EntityViews } from './sprites'
 
 const DIRS = ['s', 'se', 'e', 'ne', 'n'] as const
-const tex = (label: string): Texture => new Texture({ label })
+/** A labelled stand-in frame; `px` gives it a real size (a CHAR_PX canvas),
+ * for tests that measure where the drawn body reaches. */
+const tex = (label: string, px?: number): Texture =>
+  px ? new Texture({ label, source: new TextureSource({ width: px, height: px }) }) : new Texture({ label })
 
 /** Frames per state a fake pack draws for one kind (absent = not drawn). */
 export type FakeClips = Partial<Record<AnimStateName, number>>
@@ -27,11 +30,11 @@ export type FakeClips = Partial<Record<AnimStateName, number>>
 /** A pose per direction: legacy idle + step, an 8-frame walk clip, plus the
  * states in `clips` at the given frame counts — every frame its own texture,
  * labelled `<name>.<dir>.<state>.<n>`. */
-export const fakeSet = (name: string, clips: FakeClips = {}): CharSet => {
+export const fakeSet = (name: string, clips: FakeClips = {}, px?: number): CharSet => {
   const set: CharSet = {}
   for (const d of DIRS) {
-    const clip = (state: string, n: number): Texture[] => Array.from({ length: n }, (_, k) => tex(`${name}.${d}.${state}.${k}`))
-    const pose: DirPose = { idle: tex(`${name}.${d}.idle`), step: tex(`${name}.${d}.step`), clips: { walk: clip('walk', 8) } }
+    const clip = (state: string, n: number): Texture[] => Array.from({ length: n }, (_, k) => tex(`${name}.${d}.${state}.${k}`, px))
+    const pose: DirPose = { idle: tex(`${name}.${d}.idle`, px), step: tex(`${name}.${d}.step`, px), clips: { walk: clip('walk', 8) } }
     for (const [s, n] of Object.entries(clips) as [AnimStateName, number][]) pose.clips![s] = clip(s, n)
     set[d] = pose
   }
@@ -47,9 +50,10 @@ export const KINDS = ['player', 'mutant', 'drowner', 'gloamhound', 'lobber', 'hi
 export const fakeArt = (
   clips: Partial<Record<(typeof KINDS)[number], FakeClips>> = {},
   tpf: Partial<Record<AnimStateName, number>> = {},
+  px?: number,
 ): ArtRegistry => {
   const chars: Record<string, CharSet> = {}
-  for (const k of KINDS) chars[k] = fakeSet(k, clips[k])
+  for (const k of KINDS) chars[k] = fakeSet(k, clips[k], px)
   return createArt(fakeRenderer, { chars }, {}, tpf, true)
 }
 

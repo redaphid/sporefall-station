@@ -195,6 +195,11 @@ def cmd_assemble(a):
     json.dump(meta, open(f"{out}/sheet.json", "w"), indent=1)
     ss = [sys.executable, os.path.join(HERE, "spritesheet.py"), "repack"]
     subprocess.run(ss + [out, "--period", a.period], check=True)
+    if a.idle:  # stance() picks the loop frame nearest the clip start; swap in another before the colours settle
+        for t in a.idle:
+            d, _, pose = t.partition("=")
+            shutil.copyfile(f"{out}/raw/{d}-{pose}.png", f"{out}/raw/{d}-idle.png")
+        subprocess.run(ss + [out], check=True, stdout=subprocess.DEVNULL)
     # The colours must be those of the s-idle export ships, the frame gate 2 anchors on. The run's own
     # s-idle is posted at another size and before the snap, which can move a colour near the 0.5% share
     # across it: bog-mutant's stalk teal was 0.68% here and 0.44% shipped, so it left the anchor set and
@@ -467,6 +472,9 @@ def main():
                            help="dir=<other run>, e.g. n=runs/x/take2-n/video-s11")
             p.add_argument("--out", required=True)
             p.add_argument("--period", default="12:64")
+            p.add_argument("--idle", nargs="+", action="extend",
+                           help="d=walk-N: ship that loop frame as d's idle (one whose height, head and feet match "
+                                "the s idle), in place of stance()'s pick")
             p.add_argument("--lock-height", action="store_true",
                            help="bipeds: scale each direction so its idle stands as tall as the s idle "
                                 "(each keyframe draws the figure at its own size); never a quadruped")

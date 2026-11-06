@@ -4,10 +4,10 @@
 
 ## Ready to ship (Aaron pushes; the classifier blocks main pushes from sessions)
 
-Both fast-forward from origin/main 8ecfd465, merge-trap checked on the combination, gate hash G7 938319cdcc807028 unchanged:
-1. `git push origin f91170d8:main`: ship/batch-1106b = derelict-bot walk, bog-mutant (pod-carrier) walk, hive-spire idle, 8 regenerated props, hand-sized held weapons + beasts' natural weapons, levelgen timing-test flake fix. 5521 tests pass.
-2. then `git push origin ee613512:main`: ship/actions-1106 = the above + action engine (one state table; drawn draw/fidget; full attack/hurt/death clips; lob/hive event starts; pistol carriers wait 16 ticks before the first shot) + drowner pistol draw (5 dirs) + hive-spire attack clip. 5710 tests pass.
-3. optional, then `git push origin aa5ae38e:main`: art/drowner-hurt-1106 = drowner hurt clip (s/e/ne/n; se falls back), fast-forwards from ee613512. 5733 tests pass.
+All fast-forward from origin/main ca17bf73 (rebuilt 13:5x on the preview definition-of-done docs commit; trees otherwise identical), merge-trap checked on the combination, gate hash G7 938319cdcc807028 unchanged:
+1. `git push origin a1f32e79:main`: ship/batch-1106b = derelict-bot walk, bog-mutant (pod-carrier) walk, hive-spire idle, 8 regenerated props, hand-sized held weapons + beasts' natural weapons, levelgen timing-test flake fix. 5521 tests pass.
+2. then `git push origin 55d400a3:main`: ship/actions-1106 = the above + action engine (one state table; drawn draw/fidget; full attack/hurt/death clips; lob/hive event starts; pistol carriers wait 16 ticks before the first shot) + drowner pistol draw (5 dirs) + hive-spire attack clip. 5710 tests pass.
+3. optional, then `git push origin 82ddd2b4:main`: art/drowner-hurt-1106 = drowner hurt clip (s/e/ne/n; se falls back), fast-forwards from 55d400a3. 5733 tests pass.
 After each push: watch deploy-web, check /ota/version.json and one frame's sha on the live site (rule 5).
 
 ## Questions for Aaron (one at a time)

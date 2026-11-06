@@ -234,22 +234,22 @@ describe('the review probes, pinned', () => {
   const stat = (l: LoadoutModel, k: string) => l.stats.find((s) => s.key === k)!.resolvedText
 
   it('a pistol with only Rapid is one cast, so it fires at the Rapid rate, not the recharge (#115)', () => {
-    expect(stat(panel('pistol', [m('rapid')]), 'fireRate')).toBe('2/s')
+    expect(stat(panel('decanter', [m('rapid')]), 'fireRate')).toBe('2/s')
   })
   it('a pistol [frost, rapid] wraps on the Rapid cast, so its next pull after frost waits out the recharge', () => {
-    const w = rig('pistol', [m('frost'), m('rapid')])
+    const w = rig('decanter', [m('frost'), m('rapid')])
     const p = w.entities.find((e: Entity) => e.playerCtl)!
     weaponStack(p)!.castIndex = 1
     expect(stat(buildLoadout(p)!, 'fireRate')).toBe('1.5/s')
   })
   it('a shotgun [frost, bulk, shock] shows both casts: 7 pellets, both elements, the 30-tick recharge', () => {
-    const l = panel('shotgun', [m('frost'), m('bulk'), m('shock')])
+    const l = panel('scatterFunnel', [m('frost'), m('bulk'), m('shock')])
     expect(stat(l, 'pellets')).toBe('7')
     expect(stat(l, 'fireRate')).toBe('1/s')
     expect(l.behaviors.filter((b) => b.key === 'onhit').map((b) => b.label).sort()).toEqual(['electrified on hit', 'frozen on hit'])
   })
   it("a player's sledgehammer shows the player melee bonus: 33 bare, 26 with Barrage", () => {
-    expect(stat(panel('sledgehammer', []), 'damage')).toBe('33')
-    expect(stat(panel('sledgehammer', [m('bulk')]), 'damage')).toBe('26')
+    expect(stat(panel('cageRam', []), 'damage')).toBe('33')
+    expect(stat(panel('cageRam', [m('bulk')]), 'damage')).toBe('26')
   })
 })

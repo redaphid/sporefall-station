@@ -94,13 +94,13 @@ const main = async () => {
   // Host-authoritative loadout for Bob's avatar: two guns (one MODDED) + items.
   const bobAvatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
   bobAvatar.playerCtl!.inventory = [
-    { itemId: 'pistol', qty: 20 },
-    { itemId: 'freezeRay', qty: 6, mods: [{ id: 'frost', stacks: 2 }] },
-    { itemId: 'stunGun', qty: 4 },
+    { itemId: 'decanter', qty: 20 },
+    { itemId: 'frostCondenser', qty: 6, mods: [{ id: 'frost', stacks: 2 }] },
+    { itemId: 'sparkCoil', qty: 4 },
     { itemId: 'bandage', qty: 37 },
   ]
   bobAvatar.playerCtl!.activeSlot = 0
-  bobAvatar.combat!.weapon = 'pistol'
+  bobAvatar.combat!.weapon = 'decanter'
   bobAvatar.health!.hp = 40
   const tick = async (n: number) => {
     for (let i = 0; i < n; i++) {

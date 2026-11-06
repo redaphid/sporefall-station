@@ -51,7 +51,7 @@ describe('itemName', () => {
   })
 
   it('names weapons and throwables from their tables', () => {
-    expect(itemName('shotgun')).toBe(WEAPONS.shotgun.name)
+    expect(itemName('scatterFunnel')).toBe(WEAPONS.scatterFunnel.name)
     expect(itemName('grenade')).toBe(THROWABLES.grenade.name)
     expect(itemName('canister')).toBe('Specimen Canister')
   })

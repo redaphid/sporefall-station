@@ -23,8 +23,8 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
   const w = makeArena(1234)
   const c = center(w)
   const p = addPlayer(w, c.x, c.y)
-  p.combat!.weapon = 'pistol'
-  p.playerCtl!.inventory = [{ itemId: 'pistol', qty: 99999 }]
+  p.combat!.weapon = 'decanter'
+  p.playerCtl!.inventory = [{ itemId: 'decanter', qty: 99999 }]
   p.playerCtl!.activeSlot = 0
   const g = addNpc(w, 'acolyte', c.x + 6, c.y, { sight: 12 })
   g.health = { hp: Math.round(g.health!.max * frac), max: g.health!.max, iframes: 0 }
@@ -36,8 +36,8 @@ for (const frac of [0.2, 0.34, 0.5, 0.75, 1.0]) {
 {
   const w = makeArena(22, 24)
   const c = center(w)
-  for (let i = 0; i < 6; i++) addNpc(w, 'warden', c.x - 8, c.y - 5 + i * 2, { sight: 12, weapon: 'pistol' })
-  for (let i = 0; i < 6; i++) addNpc(w, 'acolyte', c.x + 8, c.y - 5 + i * 2, { sight: 12, weapon: 'pistol' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'warden', c.x - 8, c.y - 5 + i * 2, { sight: 12, weapon: 'decanter' })
+  for (let i = 0; i < 6; i++) addNpc(w, 'acolyte', c.x + 8, c.y - 5 + i * 2, { sight: 12, weapon: 'decanter' })
   run('faction clash 6v6', w, 400)
 }
 

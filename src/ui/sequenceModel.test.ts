@@ -11,7 +11,7 @@ const tech = (mods: WeaponMod[], castIndex?: number, rechargeUntil?: number): En
   const w = createWorld(3, 1)
   const p = spawnPlayer(w, 0, 10.5, 10.5)
   p.loadout!.inventory = []
-  const s = arm(p, 'pistol')
+  const s = arm(p, 'decanter')
   s.mods = mods
   if (castIndex !== undefined) s.castIndex = castIndex
   if (rechargeUntil !== undefined) s.rechargeUntil = rechargeUntil

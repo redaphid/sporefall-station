@@ -361,13 +361,13 @@ export const ITEM_ALIAS: Record<string, string> = {
   // Thrown explosives — the spore-grenade art was already on disk.
   grenade: 'grenade-item',
   // Long guns wear the scatter-blaster; sidearms wear the spore-pistol.
-  machinegun: 'shotgun',
-  flamethrower: 'shotgun',
-  freezeRay: 'shotgun',
-  tranquilizer: 'pistol',
-  stunGun: 'pistol',
+  coilRepeater: 'scatterFunnel',
+  phosphorHose: 'scatterFunnel',
+  frostCondenser: 'scatterFunnel',
+  lullDarter: 'decanter',
+  sparkCoil: 'decanter',
   // Blunt melee wears the root-club.
-  sledgehammer: 'wrench',
+  cageRam: 'pressureLance',
 }
 
 // Archetypes with a dedicated character sprite; the rest reuse the warden body.

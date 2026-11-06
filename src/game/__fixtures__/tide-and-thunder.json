@@ -101,7 +101,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -113,7 +113,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1,
             "mods": [
               {

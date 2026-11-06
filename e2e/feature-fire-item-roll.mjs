@@ -70,7 +70,7 @@ let ok = true
 {
   const { w, p } = clearedStage()
   p.health = { hp: p.health.max, max: p.health.max, iframes: 0 }
-  p.playerCtl.inventory = [{ itemId: 'pistol', qty: 0 }] // empty mag
+  p.playerCtl.inventory = [{ itemId: 'decanter', qty: 0 }] // empty mag
   p.playerCtl.activeSlot = 0
   const bullet = {
     id: w.nextId,

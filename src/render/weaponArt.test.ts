@@ -5,13 +5,13 @@ import { WEAPONS } from '../game/data/items'
 
 describe('weaponShape — each weapon maps to its intended silhouette', () => {
   it('names the distinctive melee silhouettes', () => {
-    expect(weaponShape('sledgehammer')).toBe('hammer')
-    expect(weaponShape('wrench')).toBe('club')
-    expect(weaponShape('knife')).toBe('blade')
+    expect(weaponShape('cageRam')).toBe('hammer')
+    expect(weaponShape('pressureLance')).toBe('club')
+    expect(weaponShape('siphonSpike')).toBe('blade')
   })
 
   it('maps the pistol to the gun silhouette', () => {
-    expect(weaponShape('pistol')).toBe('gun')
+    expect(weaponShape('decanter')).toBe('gun')
   })
 
   it('draws every registered ranged weapon as a gun', () => {
@@ -42,18 +42,18 @@ describe('hasHeldWeapon', () => {
   })
 
   it('every real weapon — and even an unknown id — shows a held sprite', () => {
-    expect(hasHeldWeapon('sledgehammer')).toBe(true)
-    expect(hasHeldWeapon('pistol')).toBe(true)
+    expect(hasHeldWeapon('cageRam')).toBe(true)
+    expect(hasHeldWeapon('decanter')).toBe(true)
     expect(hasHeldWeapon('spork-of-doom')).toBe(true)
   })
 })
 
 describe('isMeleeWeapon', () => {
   it('classifies registered weapons by kind', () => {
-    expect(isMeleeWeapon('sledgehammer')).toBe(true)
-    expect(isMeleeWeapon('wrench')).toBe(true)
-    expect(isMeleeWeapon('pistol')).toBe(false)
-    expect(isMeleeWeapon('shotgun')).toBe(false)
+    expect(isMeleeWeapon('cageRam')).toBe(true)
+    expect(isMeleeWeapon('pressureLance')).toBe(true)
+    expect(isMeleeWeapon('decanter')).toBe(false)
+    expect(isMeleeWeapon('scatterFunnel')).toBe(false)
   })
 
   it('treats an unknown id as melee so the fallback rod swings', () => {
@@ -72,7 +72,7 @@ describe('WEAPON_ANCHOR', () => {
 describe('held size — the canvas is drawing room, HELD_LENGTH is the hand', () => {
   it('maps the authored grip-to-tip run onto each shape\'s held length', () => {
     expect(CANVAS_REACH).toBe(WEAPON_CANVAS.w - WEAPON_CANVAS.grip)
-    for (const id of ['pistol', 'knife', 'wrench', 'sledgehammer', 'spork-of-doom']) {
+    for (const id of ['decanter', 'siphonSpike', 'pressureLance', 'cageRam', 'spork-of-doom']) {
       expect(heldScale(id) * CANVAS_REACH, id).toBeCloseTo(HELD_LENGTH[weaponShape(id)], 9)
     }
   })

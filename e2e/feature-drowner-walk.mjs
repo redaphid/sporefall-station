@@ -53,7 +53,7 @@ const walker = (id, dx, dy) => {
     radius: 0.35,
     facing: Math.atan2(dy, dx),
     health: { hp: 30, max: 30, iframes: 0 },
-    combat: { weapon: 'pistol', cooldown: 0 },
+    combat: { weapon: 'decanter', cooldown: 0 },
     status: { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 },
     ai: {
       mode: 'wander',

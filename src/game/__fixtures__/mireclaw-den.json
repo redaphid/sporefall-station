@@ -99,7 +99,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "status": {
@@ -111,7 +111,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1,
             "mods": [
               {

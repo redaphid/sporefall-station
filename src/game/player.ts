@@ -8,7 +8,7 @@ import { addEntity, type World } from './world'
 
 export const PLAYER_HP = 120
 export const PLAYER_SPEED = 4.5
-export const PLAYER_START_WEAPON = 'pistol'
+export const PLAYER_START_WEAPON = 'decanter'
 /** Players swing melee weapons harder than NPCs do. */
 export const PLAYER_MELEE_MULT = 1.25
 /** HUD/touch label for the special (the grenade lob). */

@@ -55,7 +55,7 @@ const frog = (id, dx, dy) => {
     radius: 0.35,
     facing: Math.atan2(dy, dx),
     health: { hp: 25, max: 25, iframes: 0 },
-    combat: { weapon: 'shotgun', cooldown: 0 },
+    combat: { weapon: 'scatterFunnel', cooldown: 0 },
     status: { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 },
     ai: {
       mode: 'wander',

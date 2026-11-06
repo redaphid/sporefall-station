@@ -17,7 +17,7 @@ const ARCH: Record<Faction, string> = { warden: 'warden', rootcult: 'acolyte', n
 const npc = (w: World, faction: Faction, x: number, y: number): Entity => {
   const e = addEntity(w, makeEntity('npc', ARCH[faction], x, y))
   e.health = { hp: 60, max: 60, iframes: 0 }
-  e.combat = { weapon: 'wrench', cooldown: 0 }
+  e.combat = { weapon: 'pressureLance', cooldown: 0 }
   e.ai = { mode: 'idle', faction, home: { x, y }, thinkAt: 0, sightRange: 8 }
   return e
 }

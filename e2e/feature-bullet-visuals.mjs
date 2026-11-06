@@ -76,7 +76,7 @@ const runs = [
   {
     name: 'bullets-vanilla-control',
     mods: undefined,
-    weapon: 'machinegun',
+    weapon: 'coilRepeater',
     // The control: bullets flew, and every one of them was UNMODDED gold —
     // exactly what enemy fire always looks like (never confusable).
     expect: (s) => [
@@ -92,7 +92,7 @@ const runs = [
       { id: 'pierce', stacks: 3 },
       { id: 'velocity', stacks: 2 },
     ],
-    weapon: 'machinegun',
+    weapon: 'coilRepeater',
     // Ice-blue elongated darts with a cold trail, punching through the line.
     expect: (s) => [
       s.moddedBulletsSeen < 5 && `only ${s.moddedBulletsSeen} modded bullets seen`,
@@ -105,7 +105,7 @@ const runs = [
   {
     name: 'bullets-monster-maxstack',
     mods: ALL_MODS.map((id) => ({ id, stacks: 5 })),
-    weapon: 'machinegun',
+    weapon: 'coilRepeater',
     // Every mod at the cap: the chromatic, throbbing, arcing monster build.
     expect: (s) => [
       s.moddedBulletsSeen < 3 && `only ${s.moddedBulletsSeen} modded bullets seen`,

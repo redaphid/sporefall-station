@@ -86,7 +86,7 @@ describe('spawn', () => {
     const w = world()
     const out = JSON.parse(runVerb(w, 'spawn player anything 1 1'))
     expect(out.kind).toBe('player')
-    expect(out.combat.weapon).toBe('pistol')
+    expect(out.combat.weapon).toBe('decanter')
   })
 })
 

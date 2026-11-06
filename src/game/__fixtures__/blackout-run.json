@@ -90,7 +90,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -102,7 +102,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1,
             "mods": [
               {
@@ -158,13 +158,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -216,13 +216,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -274,13 +274,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -333,13 +333,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -391,13 +391,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -450,13 +450,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -508,13 +508,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -566,13 +566,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],

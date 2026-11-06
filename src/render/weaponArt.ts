@@ -16,9 +16,9 @@ export type WeaponShape = 'hammer' | 'club' | 'blade' | 'gun' | 'rod'
  * here. `fists` is present so `weaponShape` is total, but it draws no held sprite
  * (see `hasHeldWeapon`) — bare hands hold nothing. */
 const MELEE_SHAPE: Record<string, WeaponShape> = {
-  sledgehammer: 'hammer',
-  wrench: 'club',
-  knife: 'blade',
+  cageRam: 'hammer',
+  pressureLance: 'club',
+  siphonSpike: 'blade',
   fists: 'rod',
   claws: 'blade',
 }

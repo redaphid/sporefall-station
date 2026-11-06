@@ -21,7 +21,7 @@ import { projectileSystem } from './projectiles'
 
 const m = (id: string, stacks = 1): WeaponMod => ({ id, stacks })
 
-const rig = (weapon = 'pistol', mods?: WeaponMod[], castIndex?: number): { w: World; p: Entity } => {
+const rig = (weapon = 'decanter', mods?: WeaponMod[], castIndex?: number): { w: World; p: Entity } => {
   const w = createWorld(1, 1)
   const p = spawnPlayer(w, 0, 20, 20)
   p.loadout!.inventory = []
@@ -41,7 +41,7 @@ const pull = (w: World, p: Entity): Entity[] => {
 }
 
 /** The first round of each of `n` consecutive pulls. */
-const rounds = (mods: WeaponMod[], n: number, weapon = 'pistol'): Entity[] => {
+const rounds = (mods: WeaponMod[], n: number, weapon = 'decanter'): Entity[] => {
   const { w, p } = rig(weapon, mods)
   return Array.from({ length: n }, () => pull(w, p)[0])
 }
@@ -66,7 +66,7 @@ describe("a round's provenance lists only its own cast", () => {
   })
 
   it('modifiers, with their stacks, ride only the element after them', () => {
-    const [a, b, c] = rounds([m('shock'), m('pierce', 2), m('incendiary'), m('rapid', 3), m('frost')], 3, 'machinegun')
+    const [a, b, c] = rounds([m('shock'), m('pierce', 2), m('incendiary'), m('rapid', 3), m('frost')], 3, 'coilRepeater')
     expect(a.projectile!.mods).toEqual([m('shock')])
     expect(a.projectile!.pierceLeft).toBeUndefined()
     expect(b.projectile!.mods).toEqual([m('incendiary'), m('pierce', 2)])
@@ -79,7 +79,7 @@ describe("a round's provenance lists only its own cast", () => {
   })
 
   it("a cast's element overrides the base weapon element, and only the mod shows", () => {
-    const [b] = rounds([m('shock')], 1, 'freezeRay')
+    const [b] = rounds([m('shock')], 1, 'frostCondenser')
     expect(b.projectile!.onHit?.status).toBe('electrified')
     expect(b.projectile!.mods).toEqual([m('shock')])
   })
@@ -105,7 +105,7 @@ describe("a round's provenance lists only its own cast", () => {
     const pool = ['frost', 'incendiary', 'shock', 'pierce', 'rapid']
     const arrangements = (xs: string[]): string[][] =>
       [[] as string[]].concat(xs.flatMap((x, i) => arrangements([...xs.slice(0, i), ...xs.slice(i + 1)]).map((rest) => [x, ...rest])))
-    const shape = sequenceShape(WEAPONS.pistol)
+    const shape = sequenceShape(WEAPONS.decanter)
     const lists = arrangements(pool)
     expect(lists).toHaveLength(326)
     for (const list of lists) {
@@ -126,7 +126,7 @@ describe("a round's provenance lists only its own cast", () => {
 
 describe('provenance survives the paths a round takes after it spawns', () => {
   it("split shards carry their cast's provenance, never another cast's element", () => {
-    const { w, p } = rig('pistol', [m('shock'), m('split'), m('frost')], 1)
+    const { w, p } = rig('decanter', [m('shock'), m('split'), m('frost')], 1)
     const victim = addEntity(w, makeEntity('npc', 'civilian', 22, 20))
     victim.health = { hp: 1, max: 40, iframes: 0 }
     const [parent] = pull(w, p)
@@ -141,7 +141,7 @@ describe('provenance survives the paths a round takes after it spawns', () => {
   })
 
   it("splinter fragments carry their cast's element and only its provenance", () => {
-    const { w, p } = rig('pistol', [m('frost'), m('splinterShot'), m('shock')], 1)
+    const { w, p } = rig('decanter', [m('frost'), m('splinterShot'), m('shock')], 1)
     const [parent] = pull(w, p)
     parent.projectile!.ttl = 1
     projectileSystem(w)
@@ -154,7 +154,7 @@ describe('provenance survives the paths a round takes after it spawns', () => {
   })
 
   it("a cast's provenance round-trips through world serialization byte for byte", () => {
-    const { w, p } = rig('pistol', [m('shock'), m('pierce'), m('frost')], 1)
+    const { w, p } = rig('decanter', [m('shock'), m('pierce'), m('frost')], 1)
     pull(w, p)
     const json = serializeWorld(w)
     const back = deserializeWorld(json)

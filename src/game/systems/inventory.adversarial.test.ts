@@ -60,7 +60,7 @@ describe('inventory — adversarial', () => {
   describe('equipSlot bounds and class gating', () => {
     it('refuses a slot index past the end of the inventory', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'wrench', qty: 12 }]
+      e.loadout!.inventory = [{ itemId: 'pressureLance', qty: 12 }]
       expect(equipSlot(e, 99)).toBe(false)
       expect(e.loadout!.activeSlot).toBe(-1)
       expect(e.combat!.weapon).toBe('fists')
@@ -68,7 +68,7 @@ describe('inventory — adversarial', () => {
 
     it('refuses a negative slot index', () => {
       const e = player(w)
-      e.loadout!.inventory = [{ itemId: 'wrench', qty: 12 }]
+      e.loadout!.inventory = [{ itemId: 'pressureLance', qty: 12 }]
       expect(equipSlot(e, -5)).toBe(false)
       expect(e.loadout!.activeSlot).toBe(-1)
     })
@@ -87,25 +87,25 @@ describe('inventory — adversarial', () => {
     it('equipping a consumable holds it without changing the swung weapon', () => {
       withTempConsumable((id) => {
         const e = player(w)
-        arm(e, 'wrench')
+        arm(e, 'pressureLance')
         e.loadout!.inventory.push({ itemId: id, qty: 2 })
-        expect(e.combat!.weapon).toBe('wrench')
+        expect(e.combat!.weapon).toBe('pressureLance')
         expect(equipSlot(e, 1)).toBe(true)
         expect(e.loadout!.activeSlot).toBe(1)
         // A consumable is "held" for Use; the wrench stays in hand for swinging.
-        expect(e.combat!.weapon).toBe('wrench')
+        expect(e.combat!.weapon).toBe('pressureLance')
       })
     })
 
     it('REFUSES a weapon slot outright — the weapon is permanent and unselectable', () => {
       const e = player(w)
-      arm(e, 'pistol')
-      e.loadout!.inventory.push({ itemId: 'shotgun', qty: 1 }, { itemId: 'wrench', qty: 16 })
+      arm(e, 'decanter')
+      e.loadout!.inventory.push({ itemId: 'scatterFunnel', qty: 1 }, { itemId: 'pressureLance', qty: 16 })
       expect(equipSlot(e, 0)).toBe(false) // its own weapon
       expect(equipSlot(e, 1)).toBe(false) // a gun that somehow got into a slot
       expect(equipSlot(e, 2)).toBe(false) // ...or a melee weapon
       expect(e.loadout!.activeSlot).toBe(-1)
-      expect(e.combat!.weapon).toBe('pistol') // never swapped
+      expect(e.combat!.weapon).toBe('decanter') // never swapped
     })
   })
 
@@ -118,7 +118,7 @@ describe('inventory — adversarial', () => {
 
     it('throwing with no throwable (only a weapon) returns false', () => {
       const e = player(w)
-      arm(e, 'wrench')
+      arm(e, 'pressureLance')
       expect(throwActive(w, e)).toBe(false)
     })
 
@@ -146,20 +146,20 @@ describe('inventory — adversarial', () => {
 
     it("a PLAYER's weapon never breaks — it is permanent, so it is never worn", () => {
       const e = player(w)
-      arm(e, 'knife')
+      arm(e, 'siphonSpike')
       e.loadout!.inventory[0].qty = 1 // one swing from breaking, under the old rule
       for (let i = 0; i < 10; i++) wearMelee(e)
       expect(e.loadout!.inventory).toHaveLength(1)
       expect(e.loadout!.inventory[0].qty).toBe(1) // no durability spent at all
-      expect(e.combat!.weapon).toBe('knife')
+      expect(e.combat!.weapon).toBe('siphonSpike')
     })
 
     it("breaking an NPC's weapon still drops it to fists and clears activeSlot", () => {
       // Enemy gear is untouched by the one-weapon rule; this keeps the removeSlot
       // bookkeeping (weapon reset + activeSlot clear) under test.
       const npc = dummy(w, 21, 20)
-      npc.combat = { weapon: 'knife', cooldown: 0 }
-      npc.loadout = { inventory: [{ itemId: 'knife', qty: 1 }], activeSlot: 0 }
+      npc.combat = { weapon: 'siphonSpike', cooldown: 0 }
+      npc.loadout = { inventory: [{ itemId: 'siphonSpike', qty: 1 }], activeSlot: 0 }
       wearMelee(npc)
       expect(npc.loadout.inventory).toHaveLength(0)
       expect(npc.combat.weapon).toBe('fists')
@@ -177,14 +177,14 @@ describe('inventory — adversarial', () => {
         const e = player(w)
         // The permanent weapon in slot 0, a throwable in slot 1, a HELD
         // consumable above it in slot 2.
-        arm(e, 'pistol')
+        arm(e, 'decanter')
         e.loadout!.inventory.push({ itemId: 'grenade', qty: 1 }, { itemId: id, qty: 2 })
         expect(equipSlot(e, 2)).toBe(true) // hold the consumable
         throwActive(w, e) // throws the grenade at slot 1, removeSlot(1)
-        expect(e.loadout!.inventory.map((s) => s.itemId)).toEqual(['pistol', id])
+        expect(e.loadout!.inventory.map((s) => s.itemId)).toEqual(['decanter', id])
         expect(e.loadout!.activeSlot).toBe(1) // shifted down, still the consumable
         expect(activeStack(e)!.itemId).toBe(id)
-        expect(e.combat!.weapon).toBe('pistol')
+        expect(e.combat!.weapon).toBe('decanter')
       })
     })
   })
@@ -195,7 +195,7 @@ describe('inventory — adversarial', () => {
       for (let i = 0; i < MAX_SLOTS - 1; i++) addItem(slots, `weapon${i}`, 1)
       addItem(slots, 'grenade', 1) // fills the last slot
       expect(slots).toHaveLength(MAX_SLOTS)
-      expect(addItem(slots, 'freezeRay', 1)).toBe(false) // full, new slot refused
+      expect(addItem(slots, 'frostCondenser', 1)).toBe(false) // full, new slot refused
       expect(addItem(slots, 'grenade', 5)).toBe(true) // stacks into existing
       expect(slots.find((s) => s.itemId === 'grenade')!.qty).toBe(6)
     })
@@ -224,38 +224,38 @@ describe('inventory — adversarial', () => {
       // `combat.weapon`'s slot even when `activeSlot` points somewhere else.
       // Players no longer wear at all, so an NPC carries the assertion.
       const npc = dummy(w, 21, 20)
-      npc.combat = { weapon: 'wrench', cooldown: 0 }
+      npc.combat = { weapon: 'pressureLance', cooldown: 0 }
       npc.loadout = {
         inventory: [
-          { itemId: 'wrench', qty: 5 },
+          { itemId: 'pressureLance', qty: 5 },
           { itemId: 'grenade', qty: 1 },
         ],
         activeSlot: 1, // active slot is NOT the weapon
       }
       wearMelee(npc)
-      expect(npc.loadout.inventory.find((s) => s.itemId === 'wrench')!.qty).toBe(4)
+      expect(npc.loadout.inventory.find((s) => s.itemId === 'pressureLance')!.qty).toBe(4)
       expect(npc.loadout.inventory.find((s) => s.itemId === 'grenade')!.qty).toBe(1)
     })
 
     it('firing spends nothing from the weapon or the held throwable', () => {
       const e = player(w)
-      arm(e, 'pistol')
+      arm(e, 'decanter')
       e.loadout!.inventory.push({ itemId: 'grenade', qty: 3 })
       equipSlot(e, 1) // hold the grenade; weapon still pistol
       // Firing spends nothing now, so holding a throwable cannot drain the gun
       // (nor the throwable) — the counts simply stand still.
-      expect(e.loadout!.inventory.find((s) => s.itemId === 'pistol')!.qty).toBe(1)
+      expect(e.loadout!.inventory.find((s) => s.itemId === 'decanter')!.qty).toBe(1)
       expect(e.loadout!.inventory.find((s) => s.itemId === 'grenade')!.qty).toBe(3)
     })
 
     it('throwing the held throwable keeps the permanent weapon in hand (not reset to fists)', () => {
       const e = player(w)
-      arm(e, 'wrench')
+      arm(e, 'pressureLance')
       e.loadout!.inventory.push({ itemId: 'grenade', qty: 1 })
       equipSlot(e, 1) // hold the grenade
       throwActive(w, e) // spends the grenade, empties slot 1
-      expect(e.combat!.weapon).toBe('wrench')
-      expect(e.loadout!.inventory.some((s) => s.itemId === 'wrench')).toBe(true)
+      expect(e.combat!.weapon).toBe('pressureLance')
+      expect(e.loadout!.inventory.some((s) => s.itemId === 'pressureLance')).toBe(true)
     })
 
     it('through combatSystem: FIRE swings the weapon even with a CONSUMABLE HELD', () => {
@@ -267,14 +267,14 @@ describe('inventory — adversarial', () => {
         const e = player(w)
         e.health!.hp = 60
         const target = dummy(w, 21, 20)
-        arm(e, 'wrench')
+        arm(e, 'pressureLance')
         e.loadout!.inventory.push({ itemId: id, qty: 1 })
         equipSlot(e, 1) // hold the consumable as the active item
         combatSystem(w, attack())
         expect(target.health!.hp).toBeLessThan(40) // the wrench SWUNG
         expect(e.health!.hp).toBe(60) // no heal — the item was not used
         expect(e.loadout!.inventory.some((s) => s.itemId === id)).toBe(true) // not spent
-        expect(e.combat!.weapon).toBe('wrench')
+        expect(e.combat!.weapon).toBe('pressureLance')
       })
     })
 
@@ -283,7 +283,7 @@ describe('inventory — adversarial', () => {
         const e = player(w)
         e.health!.hp = 60
         const target = dummy(w, 21, 20)
-        arm(e, 'wrench')
+        arm(e, 'pressureLance')
         e.loadout!.inventory.push({ itemId: id, qty: 1 })
         equipSlot(e, 1)
         const cmd = emptyInput()
@@ -292,7 +292,7 @@ describe('inventory — adversarial', () => {
         expect(e.health!.hp).toBe(90) // 60 + 30 heal → the item was USED
         expect(e.loadout!.inventory.some((s) => s.itemId === id)).toBe(false) // spent
         expect(target.health!.hp).toBe(40) // and the wrench did NOT swing
-        expect(e.combat!.weapon).toBe('wrench')
+        expect(e.combat!.weapon).toBe('pressureLance')
       })
     })
   })

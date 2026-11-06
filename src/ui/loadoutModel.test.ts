@@ -41,15 +41,15 @@ describe('buildLoadout', () => {
   })
 
   it('an unmodded gun shows base stats and no mods', () => {
-    const m = buildLoadout(player('pistol'))!
-    expect(m.name).toBe('Pistol')
+    const m = buildLoadout(player('decanter'))!
+    expect(m.name).toBe('Decanter')
     expect(m.kind).toBe('ranged')
     expect(m.unarmed).toBe(false)
     expect(m.mods).toEqual([])
     expect(m.behaviors).toEqual([])
     const dmg = m.stats.find((s) => s.key === 'damage')!
-    expect(dmg.baseText).toBe(String(WEAPONS.pistol.damage))
-    expect(dmg.resolvedText).toBe(String(WEAPONS.pistol.damage))
+    expect(dmg.baseText).toBe(String(WEAPONS.decanter.damage))
+    expect(dmg.resolvedText).toBe(String(WEAPONS.decanter.damage))
     expect(dmg.changed).toBe(false)
     // Ranged-only rows are present.
     expect(m.stats.map((s) => s.key)).toContain('speed')
@@ -80,7 +80,7 @@ describe('buildLoadout', () => {
       { id: 'pierce', stacks: 3 },
       { id: 'incendiary', stacks: 1 },
     ]
-    const m = buildLoadout(player('pistol', mods))!
+    const m = buildLoadout(player('decanter', mods))!
     // Chips are in firing order and carry name/icon/desc/stacks.
     expect(m.mods.map((c) => c.id)).toEqual(['overload', 'pierce', 'incendiary'])
     const overload = m.mods.find((c) => c.id === 'overload')!
@@ -94,7 +94,7 @@ describe('buildLoadout', () => {
     for (const c of m.mods) expect(c.color).toBe(toCssHex(modPickupColor(c.id)))
 
     // Resolved damage matches resolveWeapon and beats base (overload ×2 damage).
-    const res = resolveWeapon(WEAPONS.pistol, mods)
+    const res = resolveWeapon(WEAPONS.decanter, mods)
     const dmg = m.stats.find((s) => s.key === 'damage')!
     expect(dmg.resolvedText).toBe(String(res.damage))
     expect(dmg.changed).toBe(true)
@@ -107,7 +107,7 @@ describe('buildLoadout', () => {
   })
 
   it('drops unknown / zero-stack mods from the chips', () => {
-    const m = buildLoadout(player('pistol', [
+    const m = buildLoadout(player('decanter', [
       { id: 'bogus', stacks: 3 },
       { id: 'rapid', stacks: 0 },
       { id: 'frost', stacks: 1 },

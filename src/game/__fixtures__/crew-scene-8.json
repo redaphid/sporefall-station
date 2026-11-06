@@ -603,13 +603,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1
           }
         ],
@@ -666,13 +666,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "freezeRay",
+        "weapon": "frostCondenser",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "freezeRay",
+            "itemId": "frostCondenser",
             "qty": 1
           }
         ],
@@ -729,13 +729,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -792,13 +792,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -855,13 +855,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -918,13 +918,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1
           }
         ],
@@ -981,13 +981,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -1061,13 +1061,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -1123,13 +1123,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "machinegun",
+        "weapon": "coilRepeater",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "machinegun",
+            "itemId": "coilRepeater",
             "qty": 1,
             "mods": [
               {
@@ -1192,13 +1192,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -1255,13 +1255,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1,
             "mods": [
               {
@@ -1341,13 +1341,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -1403,13 +1403,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -1483,13 +1483,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -1545,13 +1545,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -1608,13 +1608,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "shotgun",
+        "weapon": "scatterFunnel",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "shotgun",
+            "itemId": "scatterFunnel",
             "qty": 1
           }
         ],
@@ -1671,13 +1671,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -1730,13 +1730,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -1789,13 +1789,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -1848,13 +1848,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -1907,13 +1907,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "knife",
+        "weapon": "siphonSpike",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "knife",
+            "itemId": "siphonSpike",
             "qty": 20
           }
         ],
@@ -1966,13 +1966,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2025,13 +2025,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2084,13 +2084,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2143,13 +2143,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2219,13 +2219,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],
@@ -2325,7 +2325,7 @@
     {
       "id": 29,
       "kind": "pickup",
-      "archetype": "pickup.wrench",
+      "archetype": "pickup.pressureLance",
       "pos": {
         "x": 59.5,
         "y": 56.5
@@ -2346,7 +2346,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "wrench",
+        "itemId": "pressureLance",
         "qty": 1
       }
     },
@@ -2409,7 +2409,7 @@
     {
       "id": 32,
       "kind": "pickup",
-      "archetype": "pickup.knife",
+      "archetype": "pickup.siphonSpike",
       "pos": {
         "x": 4.5,
         "y": 38.5
@@ -2430,7 +2430,7 @@
       "radius": 0.3,
       "facing": 0,
       "pickup": {
-        "itemId": "knife",
+        "itemId": "siphonSpike",
         "qty": 1
       }
     },
@@ -8273,7 +8273,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8285,7 +8285,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8327,7 +8327,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8339,7 +8339,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8381,7 +8381,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8393,7 +8393,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8435,7 +8435,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8447,7 +8447,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8489,7 +8489,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8501,7 +8501,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8543,7 +8543,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8555,7 +8555,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8601,7 +8601,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8613,7 +8613,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8655,7 +8655,7 @@
         "iframes": 90
       },
       "combat": {
-        "weapon": "pistol",
+        "weapon": "decanter",
         "cooldown": 0
       },
       "status": {
@@ -8667,7 +8667,7 @@
       "loadout": {
         "inventory": [
           {
-            "itemId": "pistol",
+            "itemId": "decanter",
             "qty": 1
           }
         ],
@@ -8709,13 +8709,13 @@
         "iframes": 0
       },
       "combat": {
-        "weapon": "wrench",
+        "weapon": "pressureLance",
         "cooldown": 0
       },
       "loadout": {
         "inventory": [
           {
-            "itemId": "wrench",
+            "itemId": "pressureLance",
             "qty": 16
           }
         ],

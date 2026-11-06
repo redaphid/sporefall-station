@@ -27,9 +27,9 @@ describe('castle-siege save', () => {
     expect(players).toHaveLength(1)
     const [p] = players
     expect(p.pos).toEqual({ x: 21.5, y: 30.5 })
-    expect(p.combat?.weapon).toBe('pistol')
+    expect(p.combat?.weapon).toBe('decanter')
     expect(p.loadout?.inventory[0]).toMatchObject({
-      itemId: 'pistol',
+      itemId: 'decanter',
       mods: [
         { id: 'split', stacks: 1 },
         { id: 'frost', stacks: 1 },

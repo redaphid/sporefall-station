@@ -38,16 +38,16 @@ export type ArtGrid = 1 | 2
 export const artGridFor = (artScale: number): ArtGrid => (artScale >= 2 ? 2 : 1)
 
 const CLASS_OF: Record<string, WeaponClass> = {
-  pistol: 'pistol',
-  tranquilizer: 'pistol',
-  stunGun: 'pistol',
-  freezeRay: 'pistol',
-  shotgun: 'longgun',
-  machinegun: 'longgun',
-  flamethrower: 'longgun',
-  knife: 'blade',
-  wrench: 'wrench',
-  sledgehammer: 'hammer',
+  decanter: 'pistol',
+  lullDarter: 'pistol',
+  sparkCoil: 'pistol',
+  frostCondenser: 'pistol',
+  scatterFunnel: 'longgun',
+  coilRepeater: 'longgun',
+  phosphorHose: 'longgun',
+  siphonSpike: 'blade',
+  pressureLance: 'wrench',
+  cageRam: 'hammer',
 }
 
 /** Weapon id → drawn class. Named ids first; an unnamed ranged weapon is a

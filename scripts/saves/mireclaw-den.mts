@@ -49,7 +49,7 @@ const pools = [
 const rows = s.rows
 const w = worldFromState({ level: levelFromJson({ rows }) })
 const player = spawnPlayer(w, 0, w.level.spawn.x, w.level.spawn.y)
-arm(player, 'machinegun', [
+arm(player, 'coilRepeater', [
   { id: 'incendiary', stacks: 1 },
   { id: 'rapid', stacks: 1 },
   { id: 'overload', stacks: 2 },

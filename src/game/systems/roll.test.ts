@@ -198,7 +198,7 @@ describe('combatSystem — cannot act mid-roll', () => {
   beforeEach(() => {
     w = frozenWorld(1, 1)
     p = player(w)
-    p.combat = { weapon: 'pistol', cooldown: 0 }
+    p.combat = { weapon: 'decanter', cooldown: 0 }
   })
 
   it('an attack pressed mid-roll fires nothing (no projectile, no cooldown)', () => {

@@ -30,7 +30,7 @@ const coop = (): World => {
   weaponStack(gunner)!.mods = [m('frost'), m('shock'), m('choke')]
   const bruiser = spawnPlayer(w, 1, 20.5, 23.5)
   bruiser.loadout!.inventory = []
-  arm(bruiser, 'sledgehammer').mods = [m('pierce'), m('bulk'), m('incendiary')]
+  arm(bruiser, 'cageRam').mods = [m('pierce'), m('bulk'), m('incendiary')]
   return deserializeWorld(serializeWorld(w))
 }
 const player = (w: World, id: number): Entity => w.entities.find((e) => e.playerCtl?.playerId === id)!
@@ -75,8 +75,8 @@ describe('loadout', () => {
     const dmg = model.stats.find((s) => s.key === 'damage')!
     expect(dmg.direction).toBe(-1)
     // A player's swing carries the player melee bonus on top of Barrage's cut.
-    expect(dmg.resolvedText).toBe(String(Math.round(WEAPONS.sledgehammer.damage * 0.8 * PLAYER_MELEE_MULT)))
-    expect(dmg.baseText).toBe(String(Math.round(WEAPONS.sledgehammer.damage * PLAYER_MELEE_MULT)))
+    expect(dmg.resolvedText).toBe(String(Math.round(WEAPONS.cageRam.damage * 0.8 * PLAYER_MELEE_MULT)))
+    expect(dmg.baseText).toBe(String(Math.round(WEAPONS.cageRam.damage * PLAYER_MELEE_MULT)))
     expect(model.stats.map((s) => s.key)).toContain('knockback')
   })
 
@@ -146,7 +146,7 @@ describe('draft', () => {
   it('cards carry the verdict for the drafting player, and none without a weapon', () => {
     const w = coop()
     const bruiser = player(w, 1)
-    const loadout = { weapon: WEAPONS.sledgehammer, mods: weaponStack(bruiser)!.mods! }
+    const loadout = { weapon: WEAPONS.cageRam, mods: weaponStack(bruiser)!.mods! }
     const cards = draftCards(['pierce', 'overload', 'incendiary'], loadout)
     expect(cards.map((c) => c.verdict)).toEqual([
       { kind: 'inert', reason: 'no effect on melee' },
@@ -173,7 +173,7 @@ describe('DOM', () => {
     const mount = document.createElement('div')
     const screen = createDraftScreen(mount, () => {})
     screen.update(['pierce', 'overload'], [{ playerId: 0, cursor: 0 }], 10, 'full', {
-      weapon: WEAPONS.sledgehammer,
+      weapon: WEAPONS.cageRam,
       mods: [],
     })
     const card = (id: string) => mount.querySelector(`[data-mod-id="${id}"]`)!
@@ -187,9 +187,9 @@ describe('draft screen re-renders when a verdict changes', () => {
     const mount = document.createElement('div')
     const screen = createDraftScreen(mount, () => {})
     const seats = [{ playerId: 0, cursor: 0 }]
-    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.pistol, mods: [] })
+    screen.update(['pierce'], seats, 10, 'full', { weapon: WEAPONS.decanter, mods: [] })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')).toBeNull()
-    screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.sledgehammer, mods: [] })
+    screen.update(['pierce'], seats, 9, 'full', { weapon: WEAPONS.cageRam, mods: [] })
     expect(mount.querySelector('[data-mod-id="pierce"] .draft-verdict')!.textContent).toBe('NO EFFECT ON MELEE')
   })
 })

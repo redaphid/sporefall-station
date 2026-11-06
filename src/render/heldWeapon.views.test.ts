@@ -91,7 +91,7 @@ const ARMED_HUMANOIDS = Object.values(NPCS)
 
 describe('held weapon SIZE — a pistol is hand-sized, not half a body', () => {
   it('the pistol reads between a sixth and a quarter of the character frame', () => {
-    const { held } = drawn(holding('pistol'))
+    const { held } = drawn(holding('decanter'))
     expect(held).toHaveLength(1)
     const len = gripToTip(held[0])
     expect(len).toBeGreaterThanOrEqual(CHAR_PX / 6)
@@ -113,8 +113,8 @@ describe('held weapon SIZE — a pistol is hand-sized, not half a body', () => {
   )
 
   it('the mirrored west-half pose keeps the same size (only the y axis flips)', () => {
-    const east = drawn(holding('pistol')).held[0]
-    const e = holding('pistol')
+    const east = drawn(holding('decanter')).held[0]
+    const e = holding('decanter')
     e.facing = Math.PI
     const west = drawn(e).held[0]
     expect(Math.abs(west.scale.x)).toBeCloseTo(Math.abs(east.scale.x), 9)
@@ -123,21 +123,21 @@ describe('held weapon SIZE — a pistol is hand-sized, not half a body', () => {
   })
 
   it('a maxed mod skin grows the pistol but never past a third of the body', () => {
-    const e = holding('pistol')
+    const e = holding('decanter')
     const mods = [
       { id: 'heavy', stacks: 9 },
       { id: 'rapid', stacks: 9 },
       { id: 'pierce', stacks: 9 },
     ]
-    e.loadout = { inventory: [{ itemId: 'pistol', qty: 1, mods }], activeSlot: 0 }
-    const plain = gripToTip(drawn(holding('pistol')).held[0])
+    e.loadout = { inventory: [{ itemId: 'decanter', qty: 1, mods }], activeSlot: 0 }
+    const plain = gripToTip(drawn(holding('decanter')).held[0])
     const modded = gripToTip(drawn(e).held[0])
     expect(modded).toBeGreaterThan(plain)
     expect(modded).toBeLessThanOrEqual(CHAR_PX / 3)
   })
 
   it('a melee swing keeps the size through the whole attack window', () => {
-    const e = holding('wrench')
+    const e = holding('pressureLance')
     const r = rig()
     r.views.update([e], 0, 100, 0)
     const rest = gripToTip(heldSprites(r)[0])
@@ -180,12 +180,12 @@ describe('held weapon VISIBILITY — beasts bite, people hold', () => {
   })
 
   it('the player still draws the pistol', () => {
-    const e = holding('pistol', 'player')
+    const e = holding('decanter', 'player')
     expect(drawn(e).held).toHaveLength(1)
   })
 
   it('a beast handed a carried weapon (a scenario or debug verb) draws it: the rule is the weapon, not the body', () => {
-    expect(drawn(holding('knife', 'gloamhound')).held).toHaveLength(1)
+    expect(drawn(holding('siphonSpike', 'gloamhound')).held).toHaveLength(1)
   })
 
   it('an unknown weapon id still draws the fallback rod, never nothing', () => {
@@ -193,7 +193,7 @@ describe('held weapon VISIBILITY — beasts bite, people hold', () => {
   })
 
   it('switching a humanoid to a natural weapon removes the sprite it had', () => {
-    const e = holding('pistol')
+    const e = holding('decanter')
     const r = rig()
     r.views.update([e], 0, 100, 0)
     expect(heldSprites(r)).toHaveLength(1)

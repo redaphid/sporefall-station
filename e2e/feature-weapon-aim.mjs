@@ -51,7 +51,7 @@ let ok = true
 ok =
   (await recordFeature({
     name: 'weapon-aim-pistol',
-    world: staged('pistol', undefined),
+    world: staged('decanter', undefined),
     script: 'aimShowcase',
     params: { zoom: 2 },
     stills: [
@@ -62,14 +62,14 @@ ok =
       { tick: 480, label: '05-west' },
     ],
     readState,
-    expect: (s) => [s.weapon !== 'pistol' && 'lost the pistol', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
+    expect: (s) => [s.weapon !== 'decanter' && 'lost the pistol', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
   })) && ok
 
 // Cut 2 — melee swing around a downward aim.
 ok =
   (await recordFeature({
     name: 'weapon-aim-down-swing',
-    world: staged('wrench', undefined),
+    world: staged('pressureLance', undefined),
     script: 'aimDownSwing',
     params: { zoom: 2 },
     stills: [
@@ -77,7 +77,7 @@ ok =
       { tick: 120, label: '02-swing-b' },
     ],
     readState,
-    expect: (s) => [s.weapon !== 'wrench' && 'lost the wrench', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
+    expect: (s) => [s.weapon !== 'pressureLance' && 'lost the wrench', s.gameOver && 'unexpected game over', s.playerHp <= 0 && 'player died'],
   })) && ok
 
 if (!ok) process.exitCode = 1

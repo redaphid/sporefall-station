@@ -20,7 +20,7 @@ import { addEntity, createWorld, type World } from '../../src/game/world'
 /** hyperbolic() from resolveWeapon — the accumulation lifesteal actually uses. */
 const hyperbolic = (perStack: number, stacks: number): number => 1 - 1 / (1 + perStack * stacks)
 const FRAC = hyperbolic(MODS.lifesteal.behavior!.lifestealFrac!, 1)
-const BULLET = WEAPONS.pistol.damage
+const BULLET = WEAPONS.decanter.damage
 
 const target = (w: World, hp: number, resist?: number): Entity => {
   const e = addEntity(w, makeEntity('npc', 'civilian', 20, 20))

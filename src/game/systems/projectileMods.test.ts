@@ -39,7 +39,7 @@ describe('projectile mod provenance', () => {
   })
 
   it('a vanilla shot carries NO mods field (snapshot-stable)', () => {
-    const p = armed(w, 20, 20, 'pistol')
+    const p = armed(w, 20, 20, 'decanter')
     fire(w, p)
     const [b] = bullets(w)
     expect(b.projectile!.mods).toBeUndefined()
@@ -48,7 +48,7 @@ describe('projectile mod provenance', () => {
 
   it('an NPC shot carries no mods (enemy fire stays visually vanilla)', () => {
     const npc = addEntity(w, makeEntity('npc', 'mutant', 20, 20))
-    npc.combat = { weapon: 'pistol', cooldown: 0 }
+    npc.combat = { weapon: 'decanter', cooldown: 0 }
     npc.health = { hp: 40, max: 40, iframes: 0 }
     // NPCs route through the same fire site with no inventory stack.
     expect(fireWeapon(w, npc)).toBe(true)
@@ -57,7 +57,7 @@ describe('projectile mod provenance', () => {
   })
 
   it('a modded shot carries the normalized (sorted, capped) mod list of its cast', () => {
-    const p = armed(w, 20, 20, 'pistol', [
+    const p = armed(w, 20, 20, 'decanter', [
       { id: 'pierce', stacks: 2 },
       { id: 'bogus', stacks: 3 }, // unknown → dropped
       { id: 'overload', stacks: 1 },
@@ -73,7 +73,7 @@ describe('projectile mod provenance', () => {
   })
 
   it('every pellet of a multi-shot spread carries the same provenance', () => {
-    const p = armed(w, 20, 20, 'shotgun', [{ id: 'bulk', stacks: 1 }, { id: 'bounce', stacks: 1 }])
+    const p = armed(w, 20, 20, 'scatterFunnel', [{ id: 'bulk', stacks: 1 }, { id: 'bounce', stacks: 1 }])
     fire(w, p)
     const shots = bullets(w)
     expect(shots.length).toBeGreaterThan(2)
@@ -86,7 +86,7 @@ describe('projectile mod provenance', () => {
   })
 
   it('split shards inherit the parent build (deep-copied, not shared)', () => {
-    const p = armed(w, 20, 20, 'pistol', [{ id: 'split', stacks: 1 }])
+    const p = armed(w, 20, 20, 'decanter', [{ id: 'split', stacks: 1 }])
     // hp 1: the parent's hit kills the victim, so the shards it bursts into
     // fly FREE instead of dying against the same body on their spawn tick.
     const victim = addEntity(w, makeEntity('npc', 'civilian', 22, 20))
@@ -107,7 +107,7 @@ describe('projectile mod provenance', () => {
   })
 
   it('provenance round-trips losslessly through world serialization', () => {
-    const p = armed(w, 20, 20, 'pistol', [{ id: 'homing', stacks: 2 }, { id: 'lifesteal', stacks: 1 }])
+    const p = armed(w, 20, 20, 'decanter', [{ id: 'homing', stacks: 2 }, { id: 'lifesteal', stacks: 1 }])
     fire(w, p)
     const json = serializeWorld(w)
     const back = deserializeWorld(json)

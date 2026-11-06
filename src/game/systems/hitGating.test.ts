@@ -225,8 +225,8 @@ describe('callers read the result correctly (the bugs lived here, not in applyDa
     const shooter = spawnNpc(w, 'acolyte', sp.x + 3, sp.y)
     const victim = spawnNpc(w, 'civilian', sp.x + 5, sp.y)
     if (!shooter || !victim) throw new Error('probe setup failed')
-    shooter.combat!.weapon = 'freezeRay'
-    expect(WEAPONS.freezeRay.damage).toBe(0) // the premise of this test
+    shooter.combat!.weapon = 'frostCondenser'
+    expect(WEAPONS.frostCondenser.damage).toBe(0) // the premise of this test
     shooter.facing = Math.atan2(victim.pos.y - shooter.pos.y, victim.pos.x - shooter.pos.x)
     let froze = false
     for (let t = 0; t < 60 && !froze; t++) {

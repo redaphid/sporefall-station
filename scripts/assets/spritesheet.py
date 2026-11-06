@@ -568,6 +568,14 @@ MOTIONS = {
                     "bent the whole time, the legs step forward and back one after another in a clear repeating "
                     "gait, the arms swing opposite the legs, the body stays low and bobs slightly, and it never "
                     "moves across the frame", closed=False),
+    # An upright fast stalker (gloom-lurker, 11-05): Aaron rejected the squatting prowl. Standing tall,
+    # back slightly hunched, long fast strides; the keyframe stands so Wan never crouches it.
+    "stalk": Motion("standing upright on straight legs, the back slightly hunched and the head pushed forward, "
+                    "arms bent and loose at the sides",
+                    "walks in place like a video game walk cycle, fast and upright: it stays standing tall with the "
+                    "back slightly hunched and the head forward, the legs swing forward and back one after another "
+                    "in long, fast, full strides, the knees straighten on every step and never squat, the arms "
+                    "swing opposite the legs, and it never moves across the frame", closed=False),
     "pulse": Motion("resting in place in a relaxed idle pose",
                     "stays rooted in place like a video game idle: it slowly swells and settles back once, its base "
                     "never moves, and it never moves across the frame", closed=True),

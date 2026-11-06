@@ -25,6 +25,7 @@ import {
   type DirPose,
 } from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
+import { indoorArtKey } from './indoorSkin'
 import { weaponStack } from '../game/systems/inventory'
 import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
 import { recoilKick, weaponPose } from './weaponPose'
@@ -181,9 +182,15 @@ export class EntityViews {
   readonly root = new Container()
   private views = new Map<number, View>()
   private ghosts: Ghost[] = []
+  private indoor = false
 
   constructor(private art: ArtRegistry) {
     this.root.sortableChildren = true
+  }
+
+  /** Draw the indoor prop art (indoorSkin.INDOOR_PROP_ART): set per level. */
+  setIndoor(indoor: boolean): void {
+    this.indoor = indoor
   }
 
   /** Drop every pooled sprite so the next update() rebuilds them against the
@@ -255,7 +262,10 @@ export class EntityViews {
       if (e.kind === 'projectile' && e.archetype === 'projectile') continue
       // Doors render differently open vs closed vs LOCKED (padlock art) —
       // treat state as part of identity so unlocking swaps the sprite.
-      const artKey = e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype
+      const artKey = indoorArtKey(
+        e.door ? (e.door.open ? 'door.open' : e.door.locked ? 'door.locked' : 'door') : e.archetype,
+        this.indoor,
+      )
       let view = this.views.get(e.id)
       if (!view || view.archetype !== artKey) {
         if (view) {

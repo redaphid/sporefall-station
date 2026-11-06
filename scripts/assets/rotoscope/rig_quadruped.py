@@ -73,9 +73,9 @@ def build(fit, period, stride, lift, gait, bob, fold):
             b = math.dist(mid0, ank0)
             dx, h, f = foot(phi + off, stride, lift, stance)
             toe = [toe0[0] + sh[0] + dx, toe0[1] + sh[1] - h]
-            # the paw folds back under the leg in swing (toe trails the wrist/hock)
+            # in swing the foot folds back under the leg: the toe trails behind the wrist or hock
             rest = (ank0[0] - toe0[0], ank0[1] - toe0[1])
-            ang = math.atan2(rest[1], rest[0]) + (fold if limb == "fore" else -fold * 0.6) * f
+            ang = math.atan2(rest[1], rest[0]) + fold * (1.0 if limb == "fore" else 0.7) * f
             r = math.hypot(*rest)
             ank = [toe[0] + r * math.cos(ang), toe[1] + r * math.sin(ang)]
             bend = 1.0 if limb == "hind" else -1.0

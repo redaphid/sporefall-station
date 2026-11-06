@@ -30,3 +30,7 @@ This directory holds the maintained recipes for proving player-facing behavior o
 - [Console inspection](./console-inspection.md) covers `window.sporefall` reads everywhere and `verb` writes under `?debug`.
 - [Same-machine co-op](./local-coop.md) covers host lobby, join, start, and late join over `?transport=tabs`.
 - [State links](./state-links.md) covers `sporefallShare` capture and `?state=<id>` replay.
+
+## Unmapped
+
+- **Play online.** The start-menu button hosts or joins a relay room by code (`src/app/onlineSession.ts`, `src/app/joinTransport.ts`, added in `cf561332`). No recipe exists yet. Do not treat a proof of `local-coop` as proof of this feature. Run `/maintain-verification-skill` to map it.

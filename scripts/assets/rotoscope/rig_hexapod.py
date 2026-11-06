@@ -61,6 +61,7 @@ class Plan:
         # (hip y, rest-foot angle from lateral, degrees, + = forward), front to back, one side
         self.legs = [(-0.55, 40.0), (0.0, 2.0), (0.55, -38.0)]
         self.hip_x, self.foot_r = a.hip_x, a.foot_r
+        self.pole_up = a.pole_up
         self.heap = (a.heap_w, a.heap_l, a.heap_h)   # ellipsoid semi-axes x, y, z, centred over the body
         # the drawn body axis, head to tail: head tip, head, shell middle, heap top, rear plate
         self.axis = [(0, -1.25, self.body_z * 0.9), (0, -0.95, self.body_z * 1.1), (0, -0.1, self.body_z + 0.35),
@@ -91,7 +92,7 @@ class Plan:
                 dist = min(max(v_len(d), abs(self.femur - self.tibia) + 1e-3), self.femur + self.tibia - 1e-3)
                 u = v_norm(d)
                 out = v_norm([rest[0] - hip[0], rest[1] - hip[1], 0.0])
-                pole = v_norm(v_add(out, [0, 0, 1.4]))
+                pole = v_norm(v_add(out, [0, 0, self.pole_up]))
                 v = v_norm(v_sub(pole, v_mul(u, v_dot(pole, u))))
                 x = (self.femur ** 2 - self.tibia ** 2 + dist ** 2) / (2 * dist)
                 knee = v_add(v_add(hip, v_mul(u, x)), v_mul(v, math.sqrt(max(0.0, self.femur ** 2 - x * x))))
@@ -174,6 +175,7 @@ def main():
     ap.add_argument("--body-z", type=float, default=0.38)
     ap.add_argument("--femur", type=float, default=0.62)
     ap.add_argument("--tibia", type=float, default=0.66)
+    ap.add_argument("--pole-up", type=float, default=0.7, help="how far the knees bow up rather than out")
     ap.add_argument("--hip-x", type=float, default=0.5)
     ap.add_argument("--foot-r", type=float, default=0.75)
     ap.add_argument("--heap-w", type=float, default=0.85)

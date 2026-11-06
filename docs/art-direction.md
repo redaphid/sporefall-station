@@ -36,7 +36,9 @@ flowchart LR
 
 - **Thematic, not mundane.** 2026-11-06: characters holding "'clubs' or similar low
   tech mundane weapons like that ... need to be removed." Weapons are salvaged colony
-  tech that fits the lore. Earlier: "Not a 'bat', etc."
+  tech that fits the lore. Earlier: "Not a 'bat', etc." The plain pistol counts as
+  mundane too (2026-11-06: "A 'pistol' is a non-thematic, mundane weapon. But we can use
+  it for testing until a better one is available."): keep it only as a test stand-in.
 - **Beasts carry no weapons.** "Dogs shouldn't have knives" (2026-09-29), and
   2026-11-06: "doglike creatures have 'knives' or similar, which is bizarre." Hounds,
   stalkers, lurkers, brutes and the boss use natural weapons (`natural: true` in

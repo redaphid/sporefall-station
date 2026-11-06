@@ -5,8 +5,8 @@ import { SIM_DT } from '../game/types'
 import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
-  CLIP_SIZED_STATES,
   effectiveClips,
+  MEASURED_STATES,
   onceEnd,
   resolveClip,
   sceneContinuous,
@@ -31,7 +31,8 @@ import {
 import { DIR_FALLBACK, type Dir5 } from './theme'
 import { weaponStack } from '../game/systems/inventory'
 import { CANVAS_REACH, hasHeldWeapon, heldScale, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
-import { recoilKick, weaponPose } from './weaponPose'
+import { raisedPose, recoilKick, weaponPose } from './weaponPose'
+import { isAiming } from '../game/aiming'
 import { composeWeaponSkin } from './weaponSkin'
 
 const elementTint = (fx: Fx | undefined): number => {
@@ -113,13 +114,13 @@ const ownFrames = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): n
 const drawsState = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): boolean =>
   ownFrames(set, dir, state) > 1
 
-/** Length in ticks (frames × tpf) of the facing's own clip for each state
- * whose window reads it (animState.CLIP_SIZED_STATES); a state the pack does
- * not draw is left out: a drawn-only state then never plays, and attack/hurt/
- * death keep their fixed window. */
+/** Length in ticks (frames × tpf) of the facing's own clip for each measured
+ * state (animState.MEASURED_STATES); a state the pack does not draw is left
+ * out: a drawn-only state then never plays, and attack/hurt/death keep their
+ * fixed window. */
 const clipTicksFor = (art: ArtRegistry, set: CharSet | undefined, dir: Dir5): Partial<Record<AnimStateName, number>> => {
   const out: Partial<Record<AnimStateName, number>> = {}
-  for (const s of CLIP_SIZED_STATES) {
+  for (const s of MEASURED_STATES) {
     const n = ownFrames(set, dir, s)
     if (n > 0) out[s] = n * Math.max(1, Math.floor(art.animTpf(s)))
   }
@@ -436,8 +437,9 @@ export class EntityViews {
       // --- Layer 3: the held weapon — a hand-anchored sprite that swings on
       // attack (melee) or recoils (ranged) and re-tints from its mods. Rolling
       // is a whole-body tumble, so the weapon is stowed for its duration, and
-      // a state whose clip draws the weapon (draw) stows it too.
-      if (character && !rolling && !stowsWeapon(anim.state)) this.updateWeapon(view, e, anim, t)
+      // a state whose clip draws the weapon (draw, aim, aimwalk) stows it too.
+      // A body that aims without such frames holds it raised (weaponPose.raisedPose).
+      if (character && !rolling && !stowsWeapon(anim.state)) this.updateWeapon(view, e, anim, t, isAiming(e, tick))
       else this.hideWeapon(view)
     }
 
@@ -469,7 +471,7 @@ export class EntityViews {
    * and glow are all pure functions of sim-derived signals (facing, the attack
    * window, the equipped weapon's mods), so the swing is deterministic and
    * replay-stable — the renderer only draws what the sim already implies. */
-  private updateWeapon(view: View, e: Entity, anim: ResolvedAnim, t: number): void {
+  private updateWeapon(view: View, e: Entity, anim: ResolvedAnim, t: number, aiming: boolean): void {
     const weaponId = e.combat?.weapon
     if (weaponId === undefined || !hasHeldWeapon(weaponId)) {
       this.hideWeapon(view)
@@ -502,7 +504,8 @@ export class EntityViews {
     const { dir, flip } = facingDir(e.facing)
     const melee = isMeleeWeapon(weaponId)
     const progress = anim.state === 'attack' ? (t - anim.start) / STATE_TICKS.attack : undefined
-    const pose = weaponPose(e.facing, dir, melee ? progress : undefined, flip)
+    const hip = weaponPose(e.facing, dir, melee ? progress : undefined, flip)
+    const pose = aiming ? raisedPose(hip, e.facing) : hip
     const kick = melee ? 0 : recoilKick(progress)
 
     // The body sprite already sits at the interpolated feet point (with its

@@ -107,3 +107,21 @@ export const weaponPose = (aim: number, dir: Dir, progress: number | undefined, 
 export const RECOIL_PX = 3
 export const recoilKick = (progress: number | undefined): number =>
   progress !== undefined && progress >= 0 && progress < 1 ? -RECOIL_PX * swingSweep(progress) : 0
+
+/** The RAISED hold: a body that aims (game/aiming.ts) but whose pack draws no
+ * aim frames brings the held sprite up from the hip to the chest and out along
+ * the aim, arms extended, instead of leaving it hanging at HAND_RIG. In
+ * 48px-character px, measured off the vine-ranger and drowned diver: the chest
+ * sits ~28px above the feet, an extended arm reaches ~7px out from it, and in
+ * this 3/4 view a reach toward or away from the camera foreshortens by half.
+ * The grip keeps half its hip-rig offset from the centre line (the gun hand's
+ * side of the body). */
+export const AIM_RAISE = { chest: -28, reach: 7, depth: 0.5, side: 0.5 } as const
+
+/** Lift a hip `weaponPose` into the raised aim hold: only the grip moves; the
+ * angle, mirror and draw order (and so where the barrel points) are the pose's. */
+export const raisedPose = (pose: WeaponPose, aim: number): WeaponPose => ({
+  ...pose,
+  hx: pose.hx * AIM_RAISE.side + Math.cos(aim) * AIM_RAISE.reach,
+  hy: AIM_RAISE.chest + Math.sin(aim) * AIM_RAISE.reach * AIM_RAISE.depth,
+})

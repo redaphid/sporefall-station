@@ -7,6 +7,7 @@
 
 import { Texture, type Renderer, type Sprite } from 'pixi.js'
 import { createEventLog } from '../app/eventLog'
+import { isAiming } from '../game/aiming'
 import type { Entity } from '../game/entity'
 import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
@@ -72,6 +73,8 @@ export interface Scene {
   n: number
   /** Inputs per player slot, every tick. */
   inputs?: Map<number, Partial<InputCmd>>
+  /** Inputs per player slot for tick i (0-based); wins over `inputs`. */
+  inputsAt?: (i: number) => Map<number, Partial<InputCmd>>
 }
 
 export interface Frame {
@@ -86,6 +89,8 @@ export interface Frame {
   weapon: string | null
   /** The sprite is a death ghost (the entity has left the snapshot). */
   ghost?: true
+  /** The body aims (game/aiming.ts isAiming) on this tick. */
+  aiming?: true
 }
 
 export interface TraceOpts {
@@ -110,7 +115,7 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
   for (const e of scene.focus) out[e.id] = []
   for (let i = 0; i < scene.n; i++) {
     scene.before(i)
-    runTicks(scene.w, scene.inputs ?? new Map(), 1)
+    runTicks(scene.w, scene.inputsAt?.(i) ?? scene.inputs ?? new Map(), 1)
     log.afterTick(scene.w.tick, scene.w.events)
     if ((i + 1) % stride !== 0 || opts.frozen?.(scene.w.tick)) continue
     const events =
@@ -132,6 +137,7 @@ export const trace = (scene: Scene, art: ArtRegistry, opts: TraceOpts = {}): Rec
         alpha: s.alpha,
         weapon: v?.weapon ? `${v.weapon.rotation.toFixed(6)}@${v.weapon.position.x.toFixed(3)},${v.weapon.position.y.toFixed(3)}` : null,
         ...(g ? { ghost: true as const } : {}),
+        ...(v && isAiming(e, scene.w.tick) ? { aiming: true as const } : {}),
       })
     }
   }
@@ -168,6 +174,40 @@ export const brawlScene = (): Scene => {
     before: () => {},
     n: 240,
     inputs: new Map([[0, { attack: true, aimX: 1, aimY: 0 }]]),
+  }
+}
+
+/** A player with a pistol (the tank) holds aim east the whole time while it
+ * stands (0..39), strafes north (40..79), backpedals west (80..119), walks
+ * east (120..159) and stands firing (160..199); then it swaps to a wrench and
+ * walks south (200..259). A drowner is brought into sight at 100 (it engages,
+ * winds up, aims and fires back) and taken out of it at 200. */
+export const aimScene = (): Scene => {
+  const w = worldFromRows(walledRoom(30, 14), { seed: 9 })
+  const p = tank(w, 12.5, 9.5)
+  arm(p, 'pistol')
+  const d = spawnNpc(w, 'drowner', 27.5, 1.5)
+  const input = (i: number): Partial<InputCmd> => {
+    const aim = { aimX: 1, aimY: 0 }
+    if (i < 40) return aim
+    if (i < 80) return { ...aim, moveY: -1 }
+    if (i < 120) return { ...aim, moveX: -1 }
+    if (i < 160) return { ...aim, moveX: 1 }
+    if (i < 200) return { ...aim, attack: true }
+    return { aimX: 0, aimY: 1, moveY: 1 }
+  }
+  return {
+    w,
+    focus: [p, d],
+    before: (i: number): void => {
+      if (i === 100) teleport(d, p.pos.x + 6, p.pos.y)
+      if (i === 200) {
+        teleport(d, 27.5, 1.5)
+        arm(p, 'wrench')
+      }
+    },
+    n: 260,
+    inputsAt: (i) => new Map([[0, input(i)]]),
   }
 }
 

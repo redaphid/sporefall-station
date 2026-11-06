@@ -162,6 +162,8 @@ describe('resolveClip — per-state fallback chains', () => {
     death: ['d0', 'd1'],
     draw: ['dr0', 'dr1', 'dr2'],
     fidget: ['f0', 'f1'],
+    aim: ['am0', 'am1'],
+    aimwalk: ['aw0', 'aw1', 'aw2'],
   }
 
   it('a state with its own frames plays them all', () => {
@@ -213,7 +215,7 @@ describe('resolveClip — per-state fallback chains', () => {
   })
 
   it('ADVERSARIAL: a drawn-only state with no frames of its own resolves NO clip (never a borrowed stand-in)', () => {
-    for (const s of ['draw', 'fidget'] as const) {
+    for (const s of ['draw', 'fidget', 'aim', 'aimwalk'] as const) {
       expect(resolveClip({ idle: ['i0'], walk: ['w0', 'w1'], attack: ['a0'] }, s)).toBeUndefined()
     }
   })
@@ -296,16 +298,16 @@ describe('entityPhase', () => {
 })
 
 describe('constants sanity', () => {
-  it('one-shot windows are positive and loops are exactly idle+walk', () => {
+  it('one-shot windows are positive and loops are exactly idle, walk and the two aim loops', () => {
     expect(STATE_TICKS.attack).toBeGreaterThan(0)
     expect(STATE_TICKS.hurt).toBeGreaterThan(STATE_TICKS.attack) // hurt lingers past the 3-tick flash
     expect(STATE_TICKS.death).toBeGreaterThan(STATE_TICKS.hurt)
-    expect(ANIM_STATES.filter(isLoop).sort()).toEqual(['idle', 'walk'])
+    expect(ANIM_STATES.filter(isLoop).sort()).toEqual(['aim', 'aimwalk', 'idle', 'walk'])
   })
 
   it('the table: the today-states keep their exact windows, cadences and chains', () => {
     expect(STATE_TICKS).toEqual({ attack: 6, hurt: 8, death: 18 })
-    expect(DEFAULT_TPF).toEqual({ idle: 12, walk: 6, attack: 2, hurt: 3, roll: 3, death: 5, draw: 2, fidget: 3 })
+    expect(DEFAULT_TPF).toEqual({ idle: 12, walk: 6, attack: 2, hurt: 3, roll: 3, death: 5, draw: 2, fidget: 3, aim: 12, aimwalk: 6 })
     expect(fallbackChain('attack')).toEqual(['attack', 'walk', 'idle'])
     expect(fallbackChain('death')).toEqual(['death', 'hurt', 'idle'])
     expect(fallbackChain('roll')).toEqual(['roll', 'walk', 'idle'])
@@ -319,9 +321,11 @@ describe('constants sanity', () => {
     expect(ANIM_PRIORITY[ANIM_PRIORITY.length - 1]).toBe('idle')
   })
 
-  it('the art contract: draw and fidget are drawn-only one-shots; only draw stows the weapon', () => {
-    expect([...DRAWN_ONLY_STATES].sort()).toEqual(['draw', 'fidget'])
-    expect(ANIM_STATES.filter(stowsWeapon)).toEqual(['draw'])
+  it('the art contract: draw and fidget are drawn-only one-shots, aim and aimwalk drawn-only loops; draw and the aim loops stow the weapon', () => {
+    expect([...DRAWN_ONLY_STATES].sort()).toEqual(['aim', 'aimwalk', 'draw', 'fidget'])
+    expect(ANIM_STATES.filter(stowsWeapon).sort()).toEqual(['aim', 'aimwalk', 'draw'])
+    expect(ANIM_STATE_DEFS.aim.play).toBe('loop')
+    expect(ANIM_STATE_DEFS.aimwalk.play).toBe('loop')
     expect(ANIM_STATE_DEFS.draw.play).toBe('once')
     expect(ANIM_STATE_DEFS.fidget.play).toBe('once')
   })

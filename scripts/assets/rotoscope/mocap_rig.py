@@ -34,7 +34,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rig_action import Body, bend_of, ik2  # noqa: E402
+from rig_action import Body, aim as aim_action, bend_of, ik2  # noqa: E402
 
 COCO = {"nose": 0, "neck": 1, "r_sho": 2, "r_elb": 3, "r_wri": 4, "l_sho": 5, "l_elb": 6, "l_wri": 7,
         "r_hip": 8, "r_knee": 9, "r_ank": 10, "l_hip": 11, "l_knee": 12, "l_ank": 13,
@@ -133,7 +133,13 @@ BONES = [("pelvis", "chest", "pelvis", "neck"), ("chest", "neck", "pelvis", "nec
          ("pelvis", "hip_near", "pelvis", "neck"), ("pelvis", "hip_far", "pelvis", "neck")]
 
 
-def retarget(F, S, S0, S1, x, scale):
+# --pin-head: the head rides the torso and keeps the fit's facing. The actor's head nods and turns in the settle
+# (DWPose's nose/eye/ear points swing as he looks down the sights); a 2D turn of the fit's head reads to
+# Fun-Control as the head turning away, and it drew the back of the head where the face was (owner, 11-06).
+HEAD_PINNED = ("neck", "head_top", "pelvis", "neck")
+
+
+def retarget(F, S, S0, S1, x, scale, bones=BONES):
     """One frame: fit F posed by actor frame S, relative to the window's ends S0 (x=0) and S1 (x=1)."""
     J = {}
     d_pel = (S["pelvis"] - ((1 - x) * S0["pelvis"] + x * S1["pelvis"])) * scale
@@ -144,7 +150,7 @@ def retarget(F, S, S0, S1, x, scale):
         t0, t1 = ang(S0[b] - S0[a]), ang(S1[b] - S1[a])
         drift = (t1 - t0 + math.pi) % (2 * math.pi) - math.pi
         return (t - t0 - x * drift + math.pi) % (2 * math.pi) - math.pi
-    for fa, fb, sa, sb in BONES:
+    for fa, fb, sa, sb in bones:
         J[fb] = J[fa] + rot(F[fb] - F[fa], turn(sa, sb))
     for w in ("near", "far"):  # ankles pinned (plus the actor's own foot travel), knees by IK
         d_ank = (S[f"ankle_{w}"] - ((1 - x) * S0[f"ankle_{w}"] + x * S1[f"ankle_{w}"])) * scale
@@ -194,6 +200,20 @@ def main():
     ap.add_argument("--sigma", type=float, default=0.8)
     ap.add_argument("--frames", type=int, default=14, help="how many frames `picks` chooses")
     ap.add_argument("--mirror", action="store_true", help="the actor faces screen left: flip x first")
+    ap.add_argument("--end", choices=("rest", "aim"), default="rest",
+                    help="rest: the clip closes on the fit (a there-and-back action). aim: it ends IN rig_action's two-"
+                         "handed aim pose (the state `aim` continues from): no drift spread, and from the grab to the "
+                         "first full reach the pose is pulled onto the aim pose, so the actor's overshoot and settle "
+                         "play around it and the last frame is exactly it")
+    ap.add_argument("--yaw", type=float, default=0.0, help="--end aim: the aim's turn, as rig_action aim --yaw (per view)")
+    ap.add_argument("--pin-head", action=argparse.BooleanOptionalAction, default=True,
+                    help="the head keeps the fit's facing (rides the torso); see HEAD_PINNED")
+    ap.add_argument("--pad", type=int, default=81, help="--end aim: hold the last pose in the control to this many "
+                                                       "frames (the video model sees no jump back to rest)")
+    ap.add_argument("--fps", type=float, default=16.0, help="the capture's frame rate (Wan: 16)")
+    ap.add_argument("--slowmo", type=float, default=1.0, help="how much slower than life the capture plays (the "
+                                                              "per-frame durations divide by it)")
+    ap.add_argument("--hold-last", type=int, default=4, help="ticks the last picked frame lasts")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     fit = json.load(open(a.fit))
@@ -216,36 +236,78 @@ def main():
     scale = Hf / Hs
     n = len(S)
     g0, a_in, a_out, g1, reach = gun_window(S, Hs)
+    to_aim = a.end == "aim"
+    bones = [HEAD_PINNED if b[:2] == ("neck", "head_top") else b for b in BONES] if a.pin_head else BONES
+    if to_aim:
+        J_aim = aim_action(B, 81, yaw=a.yaw)[1]("aim")
+        g1 = n  # the gun never goes back
+        def ramp(i):  # 0 up to the grab, smoothstep to 1 at the first full reach, 1 after
+            if i <= g0:
+                return 0.0
+            if i >= a_in:
+                return 1.0
+            x = (i - g0) / max(1, a_in - g0)
+            return x * x * (3 - 2 * x)
     frames = [B.layout({**F, "gun_rear": F["hip_near"], "gun_muzzle": F["hip_near"], "gun_on": np.array([0.0, 0.0])})
               for _ in range(a.lead)]
     G = 0.30 * (np.linalg.norm(F["shoulder_near"] - F["elbow_near"]) + np.linalg.norm(F["elbow_near"] - F["hand_near"]))
-    for i, s in enumerate(S):
-        x = i / (n - 1)
-        J = {**F, **retarget(F, s, S[0], S[-1], x, scale)}
+    def posed(i, s):
+        x = 0.0 if to_aim else i / (n - 1)
+        J = {**F, **retarget(F, s, S[0], S[0] if to_aim else S[-1], x, scale, bones)}
         J["gun_on"] = np.array([1.0 if g0 < i < g1 else 0.0, 0.0])
         u = J["hand_near"] - J["elbow_near"]
         u = u / max(np.linalg.norm(u), 1e-6)
         J["gun_rear"] = J["hand_near"] - 0.15 * G * u
         J["gun_muzzle"] = J["hand_near"] + 0.85 * G * u
+        return J
+    if to_aim:
+        R_end = posed(n - 1, S[-1])
+        C = {k: J_aim[k] - R_end[k] for k in J_aim if k in R_end and k != "gun_on"}
+    for i, s in enumerate(S):
+        J = posed(i, s)
+        if to_aim:
+            w = ramp(i)
+            J = {**J, **{k: J[k] + w * C[k] for k in C}}
         frames.append(B.layout(J))
-    frames.pop()  # the last window frame IS the fit's rest, i.e. frame 0 of the next period
+    if not to_aim:
+        frames.pop()  # the last window frame IS the fit's rest, i.e. frame 0 of the next period
     period = len(frames)
-    for i, f in enumerate(frames):
+    written = frames + [frames[-1]] * (max(0, a.pad - period) if to_aim else 0)
+    for i, f in enumerate(written):
         json.dump(f, open(os.path.join(a.out, f"joints-{i:02d}.json"), "w"))
     # per rig frame: how far the near hand and the head travel (screen px), what picks spreads frames by
     pts = lambda f: np.array([f["legs"]["arm-near"][-1][:2], f["body"][0][:2]])  # noqa: E731
-    speed = [float(np.abs(pts(frames[(i + 1) % period]) - pts(frames[i])).sum()) for i in range(a.lead, period)]
+    nxt = (lambda i: min(i + 1, period - 1)) if to_aim else (lambda i: (i + 1) % period)
+    speed = [float(np.abs(pts(frames[nxt(i)]) - pts(frames[i])).sum()) for i in range(a.lead, period)]
     keys = {"rest": a.lead, "grab": a.lead + g0, "aim": a.lead + a_in, "hold": a.lead + a_out, "home": a.lead + g1,
             "end": period}
-    must = [0, g0, a_in, a_out, min(g1, n - 2)]
-    pk = picks(speed, a.lead, a.frames - 1, must) + [period]  # the clip's frame `period` is rest again
+    if to_aim:
+        keys = {"rest": a.lead, "grab": a.lead + g0, "aim": a.lead + a_in, "end": period - 1}
+        pk = picks(speed + [0.0], a.lead, a.frames, [0, g0, a_in, n - 1])
+    else:
+        must = [0, g0, a_in, a_out, min(g1, n - 2)]
+        pk = picks(speed, a.lead, a.frames - 1, must) + [period]  # the clip's frame `period` is rest again
+    # per-frame durations (manifest animTiming): each picked frame lasts as long as the actor spent until the
+    # next pick, in sim ticks (30/s) at life speed; the snap gets one tick a frame, the held aim gets many
+    cap = lambda r: float(src_t[min(max(r - a.lead, 0), len(src_t) - 1)])  # noqa: E731
+    tick_per_cap = 30.0 / a.fps / a.slowmo
+    dur = [max(1, round((cap(pk[k + 1]) - cap(pk[k])) * tick_per_cap)) for k in range(len(pk) - 1)] + [a.hold_last]
+    # urgency: capture frames (and seconds of life) from the hand leaving the holster to full reach, peak hand
+    # speed in body heights per second of life
+    hand = np.array([s["hand_near"] for s in S])
+    v = np.linalg.norm(np.diff(hand, axis=0), axis=1) / Hs * a.fps * a.slowmo / a.speed
+    urgency = {"hip_to_aim_capture_frames": round(float((a_in - g0) * a.speed), 1),
+               "hip_to_aim_s": round(float((a_in - g0) * a.speed / a.fps / a.slowmo), 3),
+               "peak_hand_speed_h_per_s": round(float(v.max()), 2)}
     json.dump([[v, k] for k, v in sorted(keys.items(), key=lambda kv: kv[1])], open(os.path.join(a.out, "keys.json"), "w"))
     json.dump({"fit": os.path.abspath(a.fit), "kps": os.path.abspath(a.kps), "window": [s0, s1], "speed": a.speed,
                "lead": a.lead, "period": period, "scale": round(float(scale), 3), "source_frame": [round(float(t), 2) for t in src_t[:-1]],
                "gun": [a.lead + g0 + 1, a.lead + g1 - 1], "keys": keys, "hand_speed": [round(v, 1) for v in speed],
-               "picks": pk}, open(os.path.join(a.out, "mocap.json"), "w"), indent=1)
+               "picks": pk, "durations": dur, "end": a.end, "urgency": urgency},
+              open(os.path.join(a.out, "mocap.json"), "w"), indent=1)
     print(f"{n - 1} capture frames (x{a.speed}) + {a.lead} lead = period {period}; scale {scale:.3f}; "
-          f"gun out {a.lead + g0 + 1}-{a.lead + g1 - 1}; keys {keys}\npicks ({len(pk)}): {','.join(map(str, pk))}")
+          f"gun out {a.lead + g0 + 1}-{a.lead + g1 - 1}; keys {keys}\npicks ({len(pk)}): {','.join(map(str, pk))}\n"
+          f"durations: {dur} (sum {sum(dur)} ticks)\nurgency: {urgency}")
 
 
 if __name__ == "__main__":

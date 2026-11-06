@@ -1,5 +1,6 @@
 import { HostSession } from './app/hostSession'
 import { cameraRect } from './game/stairs'
+import { createEventLog } from './app/eventLog'
 import { createInspect, installInspect, type Inspect } from './app/inspect'
 import { NetClientSession } from './app/netClient'
 import { NetHostSession } from './app/netHost'
@@ -1325,6 +1326,14 @@ const runLoop = (
   let lastFloor: number | undefined
   let floorFrames = 0
 
+  // Every sim tick's events, for the renderer (app/eventLog.ts): view.events
+  // holds only the newest tick's, so a frame that runs several ticks, or a
+  // hitstop, would hide the rest from the animation tracker. A host (solo or
+  // net) feeds it per tick from its world; a client has no world and feeds the
+  // events its session drains each frame.
+  const eventLog = createEventLog()
+  const simWorld = (): World | undefined => ('world' in session ? (session as HostSession).world : undefined)
+
   let acc = 0
   let last = performance.now()
   const showFrameError = createFrameErrorBanner(uiMount)
@@ -1358,6 +1367,8 @@ const runLoop = (
           }
           debug?.afterTick() // stream this tick's events + drain queued debug mutations
           inspect.afterTick() // buffer this tick's events for sporefall.events()
+          const ticked = simWorld()
+          if (ticked) eventLog.afterTick(ticked.tick, ticked.events)
           acc -= SIM_DT
         }
         // Throttled autosave: cheap no-op most ticks, JSON-serializes at most once per
@@ -1367,7 +1378,9 @@ const runLoop = (
           if (w) persister.maybeSave(w)
         }
         const alpha = acc / SIM_DT
-        const view = session.renderView()
+        const drawn = session.renderView()
+        if (!simWorld()) eventLog.frame(drawn.tick, drawn.events)
+        const view: RenderView = { ...drawn, eventLog: eventLog.entries }
         inspect.frame(view) // cache the view for sporefall reads (+ client event harvest)
         if (view.level !== currentLevel) {
           currentLevel = view.level

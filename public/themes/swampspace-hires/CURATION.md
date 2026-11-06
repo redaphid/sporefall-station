@@ -545,3 +545,183 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## derelict-bot (robot), 2026-11-06: redesigned (compressor-hulk concept), walking by skeleton control in all 5 directions
+
+The derelict unit (`npcs.ts` `robot`, speed 2.6) had one frame, the August hires
+s-idle, drawn in every direction. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign from the critic's v3 pick (`assets/identity/lore/compressor-hulk.png`, sha256 `65c47d704a0dc4af…`). Lore family D (drowned machinery, the canon anchor): a colony maintenance unit still walking its last work order, a rusting grey riveted box chassis on oxide-orange piston legs cannibalised from another machine, one amber status lamp as the single hot accent, a pale pressure gauge below it, a battery pack low on the back. It holds nothing; the renderer draws its weapon (`weaponArt.ts`) |
+| input | the concept redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 3 of 4), sha256 `0cd805b02cefb081…`; legs 6-8 px wide at 96 px; old anchors archived at `/mnt/d/tmp/cast-walks/archive/derelict-bot/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction (take1, seed 3); ne/n use a face-free `--describe-back`. The n keyframe was repainted on CPU: the battery pack moved from the centre of the back to a narrow panel low on the right third, because a centred square read as a face panel (gate 4a) |
+| motion | Wan 2.2 Fun-Control A14B driven by a stick-skeleton biped walk rig (`rig_biped.py`, period 24, half stride 55, lift 26, arm swing 20), the keyframe as reference, a stiff deliberate mechanical stride |
+| takes | Wan I2V take1 (seed 3) and take2 (seed 11) did not loop s, e or ne (s 1.151/1.092, e .762/1.832, ne 1.097/1.729), and its n passed the seam with a near-static shuffle. Skeleton: s, e, ne skel1 (seed 3); se skel2 (seed 11); n skel2 (seed 11, repainted keyframe) |
+| loops | period 24 in every direction: s seam .216, se .111, e .119, ne .132, n .169 |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.robot.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .216 / .111 / .119 / .132 / .169 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .105-.201, head .034-.086 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+The first gate run (n skel1, centred pack) failed 4a on 3 of 50 frames (n-walk-2, 4, 6 read as
+facing the viewer); the n keyframe repaint above fixed it. Nothing parked. The se gauge face first
+shipped keyed out as a backdrop pocket (a dark socket where s shows a pale dial): the anchor's pale
+share is under `POCKET_PALE`, so pockets were keyed everywhere. `pocket_key` now keeps a one-piece pale
+part of `POCKET_PART` or more (101417dd), and se alone was re-posted from the same raws; s, e, ne and n
+are the frames of the first pass. The gate was run again on it, same gate, 9/9 with the numbers above.
+Frame heights: 86-92 px on the hi-res pack,
+42-46 on the 48 px pack.
+
+## bog-mutant (mutant, acolyte), 2026-11-06: redesigned (pod-carrier), walking, s and n by skeleton control
+
+The mutant and acolyte archetypes drew one frame, the August hires s-idle, in
+every direction. Aaron (11-05): it "needs a complete replacement and makeover";
+it read as the Hulk. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign, Aaron's pick of three (design sheet 2026-11-06 00:05, A seed 3). Lore family C (spore-warped colonist, still on shift): a dredge-line worker whose parka's back seam split into a cluster of glowing mint essence pods on thick stalks, rising above both shoulders. Deep drab olive hood with a glowing pale mint face plate, quilted olive liner parka (G1), black webbing crossed on the chest, grey work trousers, black gloves and rubber boots. The pods are the one glow. It holds nothing; the renderer draws its weapon (`weaponArt.ts`) |
+| input | concept pod-carrier_seed412 redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 3), 96 px, sha256 `9ab265c501c05faa…`; old anchors archived at `/mnt/d/tmp/cast-walks/archive/bog-mutant/anchor-2026-11-06/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction; ne/n use a face-free `--describe-back` (the back of the hood, the pods out of the split back seam) |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, `--motion walk`, for se, e, ne. s and n: Wan Fun-Control driven by a stick-skeleton biped walk rig (`rig_biped.py`, period 24, half-stride 45, lift 24, swing 18; `fun_control.py`), seed 3, on the take1 keyframes |
+| takes | se, e, ne take1 (seed 3). s: take1 Wan was a near-static shuffle (seam .772, leg motion .21), take2 Wan (seed 11) lost to the 00:30 machine crash, then skel1. n: take1 Wan passed (.449) but barely moved its legs (.14); skel1 replaces it (.19, shipped bipeds' n .16-.19) |
+| loops | the shortest full stride: s period 24 (seam .189), se 24 (.218), e 20 (.209), ne 25 (.355), n 24 (.148) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours as export ships them (5ef1a3b4), all in the locked 34; `--lock-height`, so every direction's idle stands as tall as s |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys each for `char.mutant.*` and `char.acolyte.*`. The unused s-attack-1/2 frames of the old design (in no manifest) are removed; copies at `/mnt/d/tmp/cast-walks/archive/bog-mutant/pre-walk/` |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .189 / .218 / .209 / .355 / .148 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | identity .031-.106, boil .097-.170, head .039-.088 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Before that pass: the first run failed gate 2 on ne (1.15%) and n (3.5%) in the
+stalk teal, a colour of the s-idle itself that the export's re-post pushed under
+the 0.5% anchor share; `assemble` now locks to the s-idle as shipped (5ef1a3b4).
+A second run timed out beside an unlocked video job and read 1 of 9 in 4b same;
+the third, on a quiet GPU, is the one above.
+
+Nothing parked. Known look gap: the white specular on each pod is keyed out
+as a backdrop pocket, so it shows the floor as a 2-4 px speck. Frame heights:
+87-92 px on the hi-res pack, 43-46 on the 48 px pack.
+
+## hive-spire (hivespire), 2026-11-06: design kept, an 8-frame idle loop by rigid parts in all 5 directions
+
+The rooted spawner (`npcs.ts` `hivespire`, speed 0, the one archetype PROTOCOL
+rule 13 exempts from a walk) had one frame, the August hires s-idle, in every
+direction. The design is kept (critic grade D: noisy moss, no focal point). The
+loop adds the focal point the critique asked for: an essence-glow seam under the
+cap and a spore bud on the side the spire faces. No video model.
+
+| stage | what |
+|---|---|
+| design | kept as shipped; no redesign on this run |
+| input | the shipped `hive-spire-s-idle.png` (96 px), sha256 `eac3712b7b6d1fb4…`, archived in `/mnt/d/tmp/cast-walks/archive/hive-spire/pre-idle/` |
+| motion | `scripts/assets/rotoscope/rig_spire.py`: the s-idle cut at rows 18 and 26 and 62 into cap, rim, shaft and the rooted base; per frame the shaft drops 0-3 rows (nearest, no blending) and widens 2 px at the deepest squash, the cap lifts 0-2 px a frame behind it on a glow seam (#46e078, hot #a6ffbe), and a bud (diameter 6-9 px, glow core) hangs under the rim at the facing's azimuth: front for s/se, the right edge for e, behind the shaft for ne/n |
+| loop | 8 frames, `idle` tpf 12 (3.2 s); frame 8 = frame 0, no two neighbouring frames equal |
+| colour | every pixel is a shipped pixel or a locked-34 colour |
+| export | 96 px frames to `swampspace-hires`; 48 px by a 2x2 block reduction (majority alpha, modal colour) aligned as the shipped 48 px s-idle sat; `<d>-idle`/`<d>-step` stay on `hive-spire-s-idle.png`, now s idle-0; 40 new `char.hivespire.<d>-idle-<n>` keys per pack |
+
+Checks, 2026-11-06. `cast_walk.py gate` cannot run on an idle-only kind (it reads a
+run's sheet.json and the walk poses), and gate scope for idle-only kinds is a
+rule 14 question for Aaron, so no gate version is claimed. The walk gate's
+thresholds were applied by `scripts/assets/rotoscope/check_idle.py`:
+
+| # | check | result |
+|---|---|---|
+| 1 | loop seam, max .5 | 0 by construction; the wrap step is .73-.82 of the median step (no jump) |
+| 2 | colour drift vs s-idle, max 1% | s/se/e .45%, ne/n 0 |
+| 3 | silhouette spec (`consistency.py --check`, 41 frames) | 0 violations |
+| 5 | judge identity / head drift / coverage jitter; boil max .3 | .017-.023 / .050-.057 / .0085; boil .002 |
+| 6b | pixels off the locked palette, max 0 | 0 at 96 and at 48 |
+| 4a, 4b, 6 | VLM facing, identity and style | not run (no face to face; every pixel is shipped art) |
+
+Known gaps: ne and n are the same frames (the bud is hidden behind the shaft);
+the moss texture and the baked grass pad the critique names are unchanged.
+
+### hive-spire attack clip, 2026-11-06 (needs the action engine: `hiveSpawn`/`hiveSpread` start a drawn `attack`)
+
+8 frames per direction (`char.hivespire.<d>-attack-<n>`), `attack` tpf 2, so 16
+ticks. Same rig (`rig_spire.py --attack`): idle 0, the shaft squashes 3 rows and
+the cap opens 2-3 px, the bud swells to 11 px, falls 26 px down the shaft,
+bursts at the roots in a glow puff, leaves a moss stain, the cap closes, idle 0
+again (frame 7 = idle frame 0). ne/n draw no burst (the roots hide it).
+Checks (`check_idle.py ... attack`): boil .005-.017, identity drift .020-.035,
+head drift .066-.073, coverage jitter .007-.009, colour drift .39-.67%,
+off-palette 0 at 96 and 48, `consistency.py --check` 0 violations (81 frames).
+
+## props (8), 2026-11-06: the census's C-F props regenerated as colony plumbing kit
+
+Census of all 16 prop files behind the 17 `prop.*` keys at game scale, graded A-F
+(`docs/prop-sweep/census-1106.png`, `grades-1106.json`): hydro-recycler F;
+cryo-terminal, nutrient-dispenser, weapons-locker, mess-bench D; wall-screen,
+work-desk, supply-cabinet C. The three old restyles still carried the moss fringe
+and ground slab in their alpha; the rest were clean but modern (an ECG flatscreen,
+an office desk with a PC) or a sliver at 32 px.
+
+Regenerated on `generate.py`'s rewritten PROPS entries (G2 bubble plumbing: glass
+jars, petcocks, coil, hose, riveted patches; stouter proportions; `NEG_LORE` adds
+the no-steampunk list), tag `l1106`, juggernautXL, seeds 2000-2005, 48 renders,
+0 failed. Picked by eye at game scale beside the cast
+(`docs/prop-sweep/candidates-1106.png`), installed by `install_props.py`:
+
+| key | file | seed | read |
+|---|---|---|---|
+| prop.toilet | hydro-recycler.png | 2001 | tank + glowing glass condenser jar |
+| prop.cryo-terminal | cryo-terminal.png | 2002 | bone cabinet, green screen |
+| prop.vending-machine | nutrient-dispenser.png | 2000 | three glass jars on taps |
+| prop.locker | weapons-locker.png | 2004 | olive locker bank, tan scuffs |
+| prop.bench | mess-bench.png | 2003 | thick tan seat, solid legs |
+| prop.desk | work-desk.png | 2002 | pedestal desk, no monitor |
+| prop.tv (+ generator) | wall-screen.png | 2003 | boxy console, dials, green readout |
+| prop.cabinet | supply-cabinet.png | 2005 | teal cabinet, jars behind glass |
+
+All clear the cast floors (sat, chroma, value range, palette_n) in both packs;
+locker needed a `#cbb277` ramp top for value_range at 32 px (0.484 -> 0.602).
+Same filenames, so no manifest or code change. Old art: repo history and
+`/mnt/d/tmp/cast-walks/props/archive/2026-11-06/`. Before/after
+`docs/prop-sweep/before-after-1106.png`; in a room `docs/prop-sweep/ingame-1106.png`
+(`e2e/prop-room-shots.mjs`, fixture lore-1106). Kept: chair (C, the owner's pick).
+Known gaps: the bench came out as a table-shaped seat, not the quilted cushion
+asked for; the locker's tan scuffs read slightly camouflage.
+
+## drowned-diver (drowner), 2026-11-06: `draw` action clip, 8 frames in all 5 directions
+
+The first non-walk state. Keys `char.drowner.<dir>-draw-0..7` (engine on `feat/action-anims-1106`:
+draw tpf 2, the held-weapon sprite hidden while draw plays, so these frames carry the pistol).
+Tools: `scripts/assets/rotoscope/rig_action.py` (one-shot keyframed rig), `scripts/assets/cast_action.py`
+(post on the walk's own window, export, sheet).
+
+| stage | what |
+|---|---|
+| design | unchanged; the clip starts and ends on the shipped idle (frames 0 and 7 are the idle itself, `--idle-ends`) |
+| rig | `rig_action.py draw` on a hand fit per direction over the shipped walk keyframe (848x480): rest, hand to the right hip, draw, aim along the facing, hold, holster, rest; P16 closed. Aim yaw to his right: s -38 (cross-body: a sideways arm breaks the s silhouette envelope), se -20, e 5, ne 14, n 32 |
+| render | Wan 2.2 Fun-Control A14B Q4_K_M + lightx2v 4-step, the stick skeleton as control, the walk keyframe as `ref_image`, 81 frames; describe without "hands empty", motion "draws a short stubby dark gunmetal harpoon pistol ..." |
+| pistol | Fun-Control drew an empty fist from the text (s: 0 of 2 seeds; e drew its own pistol and keeps it). `cast_action.py --props` paints the rig's pistol (steel slide, palette greys) out of the rendered fist before the pixel post: s, se, ne, n |
+| takes | s: take 3 (seed 11; takes 1-2 failed gate 3 width/head_h), cut 22, 24, 40, 56, 72, 30 (the aim held from four cycles; the hip frame is skipped because it moves s head_h by 5); se/e/ne/n: take 1 (seed 3), cut 36, 38, 40, 42, 43, 46 |
+| post | each frame through its walk direction's crop window, scale and pixel grid (`fixed_windows`/`post_fixed`), snapped to the s-idle's colours |
+
+Checks, 2026-11-06: consistency `--check` 0 violations; 0 pixels off the locked palette (80 frames);
+consecutive-frame change on the held aim .04-.15 of the silhouette. No walk gate applies to a one-shot
+(no loop, no gait); a gate scope for actions is still to go to Aaron (PIPELINE-NONBIPED.md).

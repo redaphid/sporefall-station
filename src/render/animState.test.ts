@@ -1,24 +1,47 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ANIM_PRIORITY,
+  ANIM_STATE_DEFS,
   ANIM_STATES,
   animFrame,
+  CLIP_SIZED_STATES,
+  DRAWN_ONLY_STATES,
   DEFAULT_TPF,
   effectiveClips,
   entityPhase,
+  fallbackChain,
   HURT_FLASH_TICKS,
-  LOOP_STATES,
+  hurtStart,
+  isLoop,
   MAX_ANIM_FRAMES,
   MAX_TICK_SKIP,
+  onceEnd,
   resolveAnimState,
   sceneContinuous,
   resolveClip,
-  STATE_FALLBACK,
   STATE_TICKS,
+  stowsWeapon,
   type AnimClips,
   type AnimInputs,
 } from './animState'
 
-const at = (over: Partial<AnimInputs>): AnimInputs => ({ tick: 100, moving: false, ...over })
+/** The sim-named signals the tracker reads, mapped onto resolveAnimState's
+ * starts/simEnds the way animTracker.trackAnim does. */
+interface Signals {
+  tick?: number
+  moving?: boolean
+  attackStart?: number
+  hitFlashUntil?: number
+  rollUntil?: number
+  rollStart?: number
+  deathStart?: number
+}
+const at = (o: Signals): AnimInputs => ({
+  tick: o.tick ?? 100,
+  moving: o.moving ?? false,
+  starts: { attack: o.attackStart, hurt: hurtStart(o.hitFlashUntil), roll: o.rollStart, death: o.deathStart },
+  simEnds: { roll: o.rollUntil },
+})
 
 describe('resolveAnimState — priority (death > roll > hurt > attack > walk > idle)', () => {
   it('idles with no signals', () => {
@@ -79,7 +102,7 @@ describe('resolveAnimState — priority (death > roll > hurt > attack > walk > i
 
   it('ADVERSARIAL: hitFlashUntil = 0 (the never-hit sentinel) must not read hurt at boot', () => {
     for (let tick = 0; tick < 10; tick++) {
-      expect(resolveAnimState({ tick, moving: false, hitFlashUntil: 0 }).state).toBe('idle')
+      expect(resolveAnimState(at({ tick, hitFlashUntil: 0 })).state).toBe('idle')
     }
   })
 
@@ -137,6 +160,8 @@ describe('resolveClip — per-state fallback chains', () => {
     hurt: ['h0'],
     roll: ['r0'],
     death: ['d0', 'd1'],
+    draw: ['dr0', 'dr1', 'dr2'],
+    fidget: ['f0', 'f1'],
   }
 
   it('a state with its own frames plays them all', () => {
@@ -178,10 +203,18 @@ describe('resolveClip — per-state fallback chains', () => {
     for (const s of ANIM_STATES) expect(resolveClip({}, s)).toBeUndefined()
   })
 
-  it('every fallback chain starts with the state itself and ends in idle', () => {
+  it('every fallback chain starts with the state itself and ends in idle, except the drawn-only states', () => {
     for (const s of ANIM_STATES) {
-      expect(STATE_FALLBACK[s][0]).toBe(s)
-      expect(STATE_FALLBACK[s][STATE_FALLBACK[s].length - 1]).toBe('idle')
+      const chain = fallbackChain(s)
+      expect(chain[0]).toBe(s)
+      if (DRAWN_ONLY_STATES.includes(s)) expect(chain).toEqual([s])
+      else expect(chain[chain.length - 1]).toBe('idle')
+    }
+  })
+
+  it('ADVERSARIAL: a drawn-only state with no frames of its own resolves NO clip (never a borrowed stand-in)', () => {
+    for (const s of ['draw', 'fidget'] as const) {
+      expect(resolveClip({ idle: ['i0'], walk: ['w0', 'w1'], attack: ['a0'] }, s)).toBeUndefined()
     }
   })
 })
@@ -267,7 +300,30 @@ describe('constants sanity', () => {
     expect(STATE_TICKS.attack).toBeGreaterThan(0)
     expect(STATE_TICKS.hurt).toBeGreaterThan(STATE_TICKS.attack) // hurt lingers past the 3-tick flash
     expect(STATE_TICKS.death).toBeGreaterThan(STATE_TICKS.hurt)
-    expect([...LOOP_STATES].sort()).toEqual(['idle', 'walk'])
+    expect(ANIM_STATES.filter(isLoop).sort()).toEqual(['idle', 'walk'])
+  })
+
+  it('the table: the today-states keep their exact windows, cadences and chains', () => {
+    expect(STATE_TICKS).toEqual({ attack: 6, hurt: 8, death: 18 })
+    expect(DEFAULT_TPF).toEqual({ idle: 12, walk: 6, attack: 2, hurt: 3, roll: 3, death: 5, draw: 2, fidget: 3 })
+    expect(fallbackChain('attack')).toEqual(['attack', 'walk', 'idle'])
+    expect(fallbackChain('death')).toEqual(['death', 'hurt', 'idle'])
+    expect(fallbackChain('roll')).toEqual(['roll', 'walk', 'idle'])
+    expect(fallbackChain('hurt')).toEqual(['hurt', 'idle'])
+    expect(fallbackChain('walk')).toEqual(['walk', 'idle'])
+    expect(fallbackChain('idle')).toEqual(['idle'])
+  })
+
+  it('ANIM_PRIORITY ranks every state exactly once, idle last', () => {
+    expect([...ANIM_PRIORITY].sort()).toEqual([...ANIM_STATES].sort())
+    expect(ANIM_PRIORITY[ANIM_PRIORITY.length - 1]).toBe('idle')
+  })
+
+  it('the art contract: draw and fidget are drawn-only one-shots; only draw stows the weapon', () => {
+    expect([...DRAWN_ONLY_STATES].sort()).toEqual(['draw', 'fidget'])
+    expect(ANIM_STATES.filter(stowsWeapon)).toEqual(['draw'])
+    expect(ANIM_STATE_DEFS.draw.play).toBe('once')
+    expect(ANIM_STATE_DEFS.fidget.play).toBe('once')
   })
 
   it('hurt outlives the sim hit-flash so the state is visible after the white flash', () => {
@@ -322,14 +378,50 @@ describe('roll window coupling', () => {
     let rollTicks = 0
     for (let tick = start; tick < until + 10; tick++) {
       const active = tick < until
-      const r = resolveAnimState({
-        tick,
-        moving: true,
-        rollUntil: active ? until : undefined,
-        rollStart: active ? start : undefined,
-      })
+      const r = resolveAnimState(
+        at({ tick, moving: true, rollUntil: active ? until : undefined, rollStart: active ? start : undefined }),
+      )
       if (r.state === 'roll') rollTicks++
     }
     expect(rollTicks).toBe(ROLL_TICKS)
+  })
+})
+
+describe('clip-sized windows: attack, hurt and death play a drawn clip whole', () => {
+  const fixed = ['attack', 'hurt', 'death'] as const
+  const end = (s: (typeof fixed)[number], clipTicks?: number): number | undefined =>
+    onceEnd(s, 100, { tick: 100, moving: false, clipTicks: clipTicks === undefined ? {} : { [s]: clipTicks } })
+
+  it('the table: every one-shot but roll reads its clip; attack/hurt/death are never shorter than STATE_TICKS', () => {
+    expect([...CLIP_SIZED_STATES].sort()).toEqual(['attack', 'death', 'draw', 'fidget', 'hurt'])
+    for (const s of fixed) expect(ANIM_STATE_DEFS[s].window).toEqual({ clipAtLeast: STATE_TICKS[s] })
+  })
+
+  it.each(fixed)('%s without a clip (absent or 0 ticks) keeps exactly its fixed window', (s) => {
+    expect(end(s)).toBe(100 + STATE_TICKS[s])
+    expect(end(s, 0)).toBe(100 + STATE_TICKS[s])
+  })
+
+  it.each(fixed)('%s with a clip longer than the fixed window lasts the clip, to the tick', (s) => {
+    const len = STATE_TICKS[s] + 7
+    expect(end(s, len)).toBe(100 + len)
+    const a = { tick: 0, moving: true, starts: { [s]: 100 }, clipTicks: { [s]: len } }
+    expect(resolveAnimState({ ...a, tick: 100 + len - 1 }).state).toBe(s)
+    expect(resolveAnimState({ ...a, tick: 100 + len }).state).toBe('walk')
+  })
+
+  it.each(fixed)('%s with a clip SHORTER than the fixed window still lasts the fixed window', (s) => {
+    expect(end(s, 1)).toBe(100 + STATE_TICKS[s])
+    expect(end(s, STATE_TICKS[s] - 1)).toBe(100 + STATE_TICKS[s])
+  })
+
+  it('the frame index runs through a long clip and holds its last frame only past it', () => {
+    // 8 attack frames at tpf 2 = 16 ticks: frame k at ticks 2k, 2k+1.
+    for (let dt = 0; dt < 16; dt++) expect(animFrame('attack', 8, 100 + dt, 100, 2, 7)).toBe(Math.floor(dt / 2))
+  })
+
+  it('a drawn-only state still never plays without its clip', () => {
+    expect(onceEnd('draw', 100, { tick: 100, moving: false })).toBeUndefined()
+    expect(onceEnd('fidget', 100, { tick: 100, moving: false, clipTicks: { fidget: 0 } })).toBeUndefined()
   })
 })

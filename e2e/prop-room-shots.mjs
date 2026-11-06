@@ -30,11 +30,13 @@ const JOBS = [
   ['crew-quarters', ['swampspace', '_review-A', '_review-B', '_review-C'], [1, 1.6, 2]],
   ['old-vs-new', ['swampspace'], [1.6, 2]],
   ['as-generated', ['swampspace'], [1, 1.6]],
+  ['lore-1106', ['swampspace', 'swampspace-hires'], [1, 1.6]],
 ]
 
 const browser = await chromium.launch({ headless: true })
 const errs = []
-for (const [fixture, themes, zooms] of JOBS) {
+// ONLY=lore-1106 shoots one fixture instead of every job.
+for (const [fixture, themes, zooms] of JOBS.filter(([f]) => !process.env.ONLY || f === process.env.ONLY)) {
   const world = JSON.parse(readFileSync(join(ROOMS, `${fixture}.json`), 'utf8'))
   for (const theme of themes) {
     const context = await browser.newContext({ viewport: SIZE, deviceScaleFactor: 3 })
@@ -46,9 +48,12 @@ for (const [fixture, themes, zooms] of JOBS) {
     // fixed timeout instead let one pack photograph a half-loaded tile pool and
     // the next a complete one -- the floor changed between shots, which destroys
     // the whole point of holding everything else still.
+    // main.ts parks on `__loadWorld` BEFORE it defines `__setTheme`, so waiting
+    // for the theme hook first deadlocks: hand over the world, then set the theme.
+    await page.waitForFunction(() => typeof window.__loadWorld === 'function')
+    await page.evaluate((j) => window.__loadWorld(j), world)
     await page.waitForFunction(() => typeof window.__setTheme === 'function')
     await page.evaluate((t) => window.__setTheme(t), theme)
-    await page.evaluate((j) => window.__loadWorld(j), world)
     await page.waitForTimeout(700)
     for (const z of zooms) {
       await page.evaluate((zz) => window.__zoom(zz, true), z)

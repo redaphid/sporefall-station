@@ -1,3 +1,4 @@
+import type { TickEvents } from './eventLog'
 import type { LinkStatus } from './linkHealth'
 import type { Entity } from '../game/entity'
 import type { ModifierView } from '../game/floorModifiers'
@@ -8,7 +9,14 @@ import type { RunMode } from '../game/world'
 /** What the render layer consumes each frame. */
 export interface RenderView {
   entities: readonly Entity[]
+  /** The events of the newest tick only (a client: of everything drained since
+   * the last frame). A frame can run several ticks: see `eventLog`. */
   events: readonly SimEvent[]
+  /** Every recent tick's events, oldest first (eventLog.ts). A consumer that
+   * must not miss a one-tick event on a frame that ran several ticks, or while
+   * hitstop froze it, reads every entry after the last tick it saw. main.ts
+   * fills it; absent when a caller drives the renderer without one. */
+  eventLog?: readonly TickEvents[]
   tick: number
   level: Level
   floor: number

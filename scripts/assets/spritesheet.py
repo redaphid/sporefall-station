@@ -825,6 +825,14 @@ POCKET_PX = 24      # raw video pixels, about 2x2 pixels of the 96 px sprite; sm
 POCKET_PALE = 0.01  # the drone's anchor 0.0001, the mycologist's cream suit 0.0023, the frog 0.0033
 POCKET_BAND = 0.4   # the legs' share of the silhouette, from the feet up
 POCKET_FLAT = 3.0   # brute: gaps between tail, rump and legs have median 1.1-2.6; shell and blends 4.3-31
+POCKET_PART = 12    # px at 96 in one piece: derelict-bot's gauge 17; blast-diver 9, spore-mortar 4, the rest <= 3
+
+
+def _pale_part(pale: np.ndarray) -> float:
+    """The largest connected piece of `pale`, in pixels of a 96 px canvas."""
+    from scipy import ndimage
+    lab, n = ndimage.label(pale)
+    return float(np.bincount(lab.ravel())[1:].max()) * (96 / max(pale.shape)) ** 2 if n else 0.0
 
 
 def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, float]:
@@ -833,7 +841,9 @@ def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, f
     anchor; only in the leg band (POCKET_BAND) when it holds there and not above. A pale part in the
     leg band (the mycologist's cream suit, the sporeling-mite's stalk) turns the key off, (0, 0).
     The locked palette's palest colour is within `thresh` of white, so a bone shell's highlights count
-    as pale; before the band, they kept the carapace-brute's leg gaps white in every export."""
+    as pale; before the band, they kept the carapace-brute's leg gaps white in every export.
+    A small share in one piece of POCKET_PART or more is still a drawn pale part (the derelict-bot's
+    gauge face, share .0083): band 1 keyed it out as a pocket in every view that rings it."""
     if not anchor or not os.path.exists(anchor):
         return 0, 0.0
     a = np.asarray(key_background(Image.open(anchor))).astype(np.float32)
@@ -841,7 +851,7 @@ def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, f
     pale = np.sqrt(((a[..., :3] - backdrop) ** 2).sum(-1)) <= thresh
     if not opaque.any():
         return 0, 0.0
-    if (pale & opaque).sum() < POCKET_PALE * opaque.sum():
+    if (pale & opaque).sum() < POCKET_PALE * opaque.sum() and _pale_part(pale & opaque) < POCKET_PART:
         return POCKET_PX, 1.0
     rows = np.nonzero(opaque.any(1))[0]
     legs = opaque.copy()
@@ -1093,8 +1103,23 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
     keyframe is its own Qwen edit and draws the figure at its own size, so each direction is
     scaled to make its idle as tall as the s idle. A quadruped's side is legitimately lower
     than its front, so it never takes this."""
-    keyed = {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ()), band=band), shrink)
-             for k, v in raws.items()}
+    keyed = key_frames(raws, pockets, ghost, beside, band, shrink)
+    union, scale = fixed_windows(keyed, dirs, poses, canvas, content, lock_height)
+    out = {}
+    for d in dirs:
+        for p in poses:
+            out[(d, p)] = post_fixed(keyed[(d, p)], union.get(d), scale.get(d), canvas, pal) if (d, p) in keyed \
+                else Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    return drop_specks(out, dirs, poses, canvas)
+
+
+def key_frames(raws: dict, pockets: int = 0, ghost=None, beside=None, band: float = 1.0, shrink: int = 1) -> dict:
+    return {k: shrink_alpha(key_background(v, pockets=pockets, pal=ghost, beside=(beside or {}).get(k, ()), band=band), shrink)
+            for k, v in raws.items()}
+
+
+def fixed_windows(keyed: dict, dirs, poses, canvas: int, content: int | None, lock_height: bool = False):
+    """({dir: crop window in raw pixels}, {dir: scale}): `pixelize_fixed`'s one window and scale per direction."""
     boxes = {k: bbox(v) for k, v in keyed.items()}
     union = {}
     for d in dirs:
@@ -1113,17 +1138,29 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
             if b:
                 fits = content / max(u[3] - u[1], u[2] - u[0])
                 scale[d] = min(s * (ref[3] - ref[1]) / (b[3] - b[1]), fits)
-    out = {}
-    for d in dirs:
-        u = union.get(d)
-        for p in poses:
-            frame = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-            if u and (d, p) in keyed:
-                tw, th = max(1, round((u[2] - u[0]) * scale[d])), max(1, round((u[3] - u[1]) * scale[d]))
-                px = despeckle(snap(P.kcentroid(keyed[(d, p)].crop(u), tw, th), pal))
-                frame.paste(px, ((canvas - tw) // 2, canvas - 1 - th), px)
-            out[(d, p)] = frame
-    return drop_specks(out, dirs, poses, canvas)
+    return union, scale
+
+
+def post_fixed(keyed: Image.Image, u, scale, canvas: int, pal, whole: bool = False) -> Image.Image:
+    """One keyed raw frame through its direction's window `u` at `scale`, feet on canvas - 2. `whole`
+    extends the window's own pixel grid over the full canvas, so a pose that reaches past every walk
+    frame (an aimed arm) keeps its reach and the pixels inside the window match the walk's grid."""
+    frame = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    if not u:
+        return frame
+    tw, th = max(1, round((u[2] - u[0]) * scale)), max(1, round((u[3] - u[1]) * scale))
+    x0, y0 = (canvas - tw) // 2, canvas - 1 - th
+    if whole:
+        cw, ch = (u[2] - u[0]) / tw, (u[3] - u[1]) / th
+        # kcentroid's own edges inside the window (np.linspace: k * step, the last edge exact), extended
+        xs = np.array([u[0] + (u[2] - u[0] if k == tw else np.floor(k * cw)) for k in range(-x0, canvas - x0 + 1)], int)
+        ys = np.array([u[1] + (u[3] - u[1] if k == th else np.floor(k * ch)) for k in range(-y0, canvas - y0 + 1)], int)
+        px = despeckle(snap(P.kcentroid_grid(keyed, xs, ys), pal))
+        frame.paste(px, (0, 0), px)
+        return frame
+    px = despeckle(snap(P.kcentroid(keyed.crop(u), tw, th), pal))
+    frame.paste(px, (x0, y0), px)
+    return frame
 
 
 SPECK_PX = 12  # at 96 px; a detached piece this small or smaller may be a speck

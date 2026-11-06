@@ -516,9 +516,18 @@ describe('complex generator: floorplans, not graph paper', () => {
   })
 
   it('generation stays cheap (a phone pays it at every floor change)', () => {
-    const t0 = performance.now()
-    for (let seed = 1; seed <= 40; seed++) generateLevel(seed, 3 + 2 * (seed % 4))
-    expect((performance.now() - t0) / 40).toBeLessThan(25)
+    // Best-of-10 per floor, not one wall-clock pass: load only adds time, so the
+    // fastest run is the code's cost (same statistic as storeys.test.ts). A
+    // ceiling, not a regression detector.
+    const PASSES = 10
+    const best = new Array<number>(40).fill(Infinity)
+    for (let pass = 0; pass < PASSES; pass++)
+      for (let seed = 1; seed <= 40; seed++) {
+        const t0 = performance.now()
+        generateLevel(seed, 3 + 2 * (seed % 4))
+        best[seed - 1] = Math.min(best[seed - 1], performance.now() - t0)
+      }
+    expect(best.reduce((a, b) => a + b, 0) / 40).toBeLessThan(25)
   })
 })
 

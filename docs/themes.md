@@ -114,7 +114,7 @@ the console and in `validateManifest` unit tests.
 | `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `tile.<name>.cap` / `tile.<name>.cap.inner` | OPTIONAL, wall family only (`wall`, `hull`). The lit top strip of the wall, authored as RGBA along the tile's TOP edge (transparent below), plus the matching cap-sized nub in the top-left corner. The tilemap lays the strip on every edge of a wall tile that faces open ground, rotated to that edge, and the nub in concave corners (`src/render/wallCaps.ts`), so the cap line runs continuously along runs, corners and T-junctions; bevelled corners bake it along the 45° cut too. When a theme ships these, its wall BODY art must carry no cap of its own (`scripts/assets/wall_caps.py` splits a baked cap off existing art). Both keys or neither. |
 | `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player warden mutant civilian scientist acolyte robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
-| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
+| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death draw fidget`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
 | `unit.player`, `unit.warden` | single-sprite billboard fallback (no directions) |
 | `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `mutant scientist robot` |
 | `item.default` | generic ground-item sprite |
@@ -186,20 +186,84 @@ weapon-mod gems and pickup-outline shapes are procedural (themeable via
 
 ### Animation states (`char.<name>.<dir>-<state>-<n>`)
 
-Characters animate through six NAMED STATES, resolved every frame from sim
-state (render-only — the sim knows nothing about animation):
+Characters animate through eight NAMED STATES, resolved every frame from sim
+state (render-only — the sim knows nothing about animation). One table,
+`ANIM_STATE_DEFS` in `src/render/animState.ts`, defines each state; the
+render-side start signals live in `src/render/animTracker.ts`.
 
 | State | Kind | Triggered by | Window |
 |---|---|---|---|
 | `idle` | loop | nothing else active | — |
 | `walk` | loop | entity is moving | while moving |
-| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting) | 6 ticks |
-| `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | 8 ticks |
+| `attack` | one-shot | an attack/throw fired (weapon cooldown observed starting); a `lobber` firing a shell, a `hivespire` budding or spreading (sim events, drawn frames only) | its drawn clip, at least 6 ticks |
+| `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | its drawn clip, at least 8 ticks |
 | `roll` | one-shot | dodge-roll active | the sim's roll window (12 ticks) |
-| `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | 18 ticks |
+| `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | its drawn clip, at least 18 ticks |
+| `draw` | one-shot, **drawn-only** | the NPC's AI entered `aggro` (it engaged a target), after at least 30 ticks not engaged | its own clip: frames × tpf |
+| `fidget` | one-shot, **drawn-only** | the body has been still and calm (not aggro/flee/seek, dormant, downed, stunned, asleep or frozen) for 90 ticks; then on a per-entity grid every 180–329 ticks, hashed from the entity id | its own clip: frames × tpf |
 
 **Priority when several conditions hold at once (highest wins):**
-`death > roll > hurt > attack > walk > idle`.
+`death > roll > hurt > draw > attack > walk > fidget > idle`. A pistol
+carrier never has `draw` and `attack` at once: the sim holds its first shot
+for the archetype's `drawTicks` (16), so an 8-frame draw at the default tpf
+ends the tick the first shot fires. The order matters only when they do
+overlap: a kind with no wind-up (it attacks on its engage tick), or a theme
+whose `anim.draw` tpf makes the clip longer than the wind-up. Then the draw
+plays whole and the attack pose is skipped; the shot itself still shows.
+
+**Drawn-only states (`draw`, `fidget`).** These exist only as art. A pack that
+ships no frames for one never enters it: no borrowed stand-in, no procedural
+version, and the character renders exactly as it would without the state. When
+the frames exist, the state lasts exactly `frames × tpf` ticks and plays every
+frame once. Draw the clip so it **starts and ends on the idle pose**; the cut
+in from idle/walk and back out must not jump. While `draw` plays, the engine
+hides the held-weapon sprite, because the clip draws the weapon. Neither state
+adds procedural motion (no breathe, lean or bob over the frames).
+
+To enable them for a kind, map the frames in `sprites`, contiguous from 0, in
+all five drawn directions (west is mirrored):
+
+```jsonc
+"char.drowner.s-draw-0": "chars/drowner/s-draw-0.png",   // … through -7, and se e ne n
+"char.gloamhound.e-fidget-0": "chars/gloamhound/e-fidget-0.png",
+"anim": { "draw": 2, "fidget": 3 }                        // optional; these are the defaults
+```
+
+At the defaults, an 8-frame `draw` lasts 16 ticks (0.53 s) and an 8-frame
+`fidget` 24 ticks (0.8 s). `anim` is per theme, not per kind.
+
+**Action clips (`attack`, `hurt`, `death`).** These play with or without art.
+Without frames of its own, each lasts its fixed window (6, 8 and 18 ticks) on a
+borrowed pose, exactly as before. With frames, it lasts `frames × tpf` ticks,
+or the fixed window if that is longer (the last frame holds), so a drawn clip
+always plays whole. At the defaults an 8-frame `attack` lasts 16 ticks, an
+8-frame `hurt` 24 and an 8-frame `death` 40. The effects tied to the fixed
+window keep it whatever the art:
+
+- `attack`: the held-weapon swing (melee) or recoil (ranged) takes 6 ticks,
+  then the weapon is back at rest while the clip plays on. The lunge also
+  takes the first 6 ticks, at 30% when the clip is drawn. The held weapon
+  stays visible over an attack clip, so draw the body, not the weapon.
+- `hurt`: the white hit flash covers the clip's first 3 ticks (the hit lands
+  one tick after the state starts, so at tpf 3 frame 0 is never seen). Put
+  the impact on frame 1.
+- `death`: a drawn death gets no topple. The body stays opaque, fades out over
+  the clip's last 18 ticks, and is gone when the clip ends.
+
+**Attacks that start from a sim event.** The lobber's shell and a hive spire's
+budding or spreading raise no weapon cooldown, so the renderer starts their
+`attack` from the sim event (`lob`; `hiveSpawn` and `hiveSpread`, on the spire
+that buds, not the bud). The table of such events is `EVENT_STARTS` in
+`src/render/animTracker.ts`. The clip starts on the event's own tick even when
+the frame that first sees it runs later (a slow frame, a hitstop). An
+event-started attack plays only drawn frames: without `char.lobber.*-attack-*`
+art the lobber looks exactly as it did before, with no borrowed pose and no
+lunge.
+
+A new trigger restarts the clip from frame 0. Keep an attack clip no longer
+than the kind's attack interval, or its tail is never seen: a wrench swings
+every 15 ticks, so 7 frames at tpf 2 (14 ticks) play whole and 8 frames
+(16 ticks) lose their last tick. Start and end the clip on the idle pose.
 
 **Key grammar.** Each state takes up to 8 frames per drawn direction:
 `char.<name>.<dir>-<state>-<n>` with `<n>` ∈ `0..7`. Frames must be
@@ -209,7 +273,7 @@ so crowds don't move in lockstep); one-shots play once from the state's start
 and **hold their last frame** until the window closes.
 
 **Cadence.** Each state has a default ticks-per-frame — `idle` 12, `walk` 6,
-`attack` 2, `hurt` 3, `roll` 3, `death` 5 — overridable per state via the
+`attack` 2, `hurt` 3, `roll` 3, `death` 5, `draw` 2, `fidget` 3 — overridable per state via the
 manifest `anim` section (integers 1..30). Frame selection is a pure function
 of sim tick + entity id: deterministic on every device and replay.
 
@@ -234,6 +298,7 @@ flinches/topples on top, so borrowed states read correctly):
 - `hurt` → `hurt` → `idle`
 - `roll` → `roll` → `walk` frame 0 → `idle`
 - `death` → `death` → `hurt` frame 0 → `idle`
+- `draw`, `fidget` → nothing (drawn-only; see above)
 
 Direction fallback (`se→s`, `e→s`, `ne→e→s`, `n→s`) applies BEFORE state
 fallback: the drawn direction is chosen first, then that direction's clips
@@ -244,8 +309,11 @@ the same chains, so a zero-asset theme still animates.
 The engine also layers **procedural motion** (walk lean+bob, idle breathing,
 attack lunge, hurt flinch, roll tumble + landing squash, death topple+fade) as
 subtle transform offsets around the feet anchor — themes get it for free; it
-composes with any frames you ship. Tuning lives in `src/render/motion.ts`
-(`MOTION` table).
+composes with any frames you ship. Where a pack draws a state itself (2+
+frames), the procedural twin steps aside: a drawn walk or idle loop drops the
+bob, breath, hover or pulse cycle; a drawn `death` keeps the fade (over its last
+18 ticks) but not the topple; a drawn `attack` keeps 30% of the lunge. Tuning lives in
+`src/render/motion.ts` (`MOTION` table).
 
 ## Fallback semantics (exact)
 

@@ -36,7 +36,24 @@ export interface NpcDef {
   /** #68 — stimulus kinds that wake it (also the Derelict Unit's `'power-cut'`
    * rouse). Copied to `Entity.wakeOn` at spawn. */
   wakeOn?: string[]
+  /** Engage wind-up: ticks between ENGAGING a target (`ai.mode` turning
+   * `'aggro'`) and the first attack it may make — the time to draw the weapon.
+   * The render's `draw` one-shot plays over exactly this window
+   * (render/animTracker.ts), so 16 = an 8-frame draw at the default tpf 2.
+   * Re-engaging waits again only after DRAW_REARM_TICKS out of aggro (the same
+   * rule the render re-plays `draw` by). Absent = 0 = attacks the tick it
+   * engages. Set on every ranged-weapon archetype (pinned by drawWindup.test). */
+  drawTicks?: number
 }
+
+/** Ticks a body must spend out of aggro before engaging again re-draws: it
+ * re-waits its `drawTicks`, and the render re-plays `draw`. The AI drops in and
+ * out of aggro at perception edges (a target stepping behind a pillar); a
+ * weapon already out is not drawn twice in a second. */
+export const DRAW_REARM_TICKS = 30
+
+/** The wind-up of every pistol carrier: an 8-frame draw at tpf 2. */
+const PISTOL_DRAW_TICKS = 16
 
 export const NPCS: Record<string, NpcDef> = {
   mutant: {
@@ -103,6 +120,7 @@ export const NPCS: Record<string, NpcDef> = {
     hp: 35,
     speed: 3.6,
     weapon: 'pistol',
+    drawTicks: PISTOL_DRAW_TICKS,
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -178,7 +196,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 95,
     speed: 2.5,
-    weapon: 'wrench',
+    weapon: 'horns',
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -221,7 +239,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'neutral',
     hp: 30,
     speed: 4.2,
-    weapon: 'knife',
+    weapon: 'fangs',
     sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,
@@ -238,7 +256,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'rootcult',
     hp: 28,
     speed: 4.6,
-    weapon: 'knife',
+    weapon: 'mandibles',
     sightRange: 8,
     hostility: 'always',
     fleesOnDamage: false,
@@ -281,6 +299,7 @@ export const NPCS: Record<string, NpcDef> = {
     hp: 38,
     speed: 3.4,
     weapon: 'pistol',
+    drawTicks: PISTOL_DRAW_TICKS,
     sightRange: 9,
     hostility: 'always',
     fleesOnDamage: false,
@@ -296,6 +315,7 @@ export const NPCS: Record<string, NpcDef> = {
     hp: 90,
     speed: 3.0,
     weapon: 'pistol',
+    drawTicks: PISTOL_DRAW_TICKS,
     sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,
@@ -356,7 +376,7 @@ export const NPCS: Record<string, NpcDef> = {
     faction: 'neutral',
     hp: 32,
     speed: 4.2,
-    weapon: 'knife',
+    weapon: 'fangs',
     sightRange: 10,
     hostility: 'always',
     fleesOnDamage: false,

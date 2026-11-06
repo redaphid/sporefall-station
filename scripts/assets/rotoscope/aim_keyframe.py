@@ -48,6 +48,7 @@ def qwen(images, prompt, seed, prefix):
     q, _ = ss.detect_qwen({"unet": None, "lightning": None, "clip": None, "vae": None})
     names = [ss.upload(im, f"{prefix.replace('/', '-')}-in{i}.png") for i, im in enumerate(images)]
     g = ss.Graph()
+    g.band("models + input", "#335")
     m, clip, vae, src, neg = ss._qwen_loaders(g, q, names[0])
     refs = {"image1": [src, 0]}
     for i, n in enumerate(names[1:], start=2):
@@ -144,16 +145,16 @@ def cmd_paint(a):
     prompt = (f"Edit image 1, a pixel-art video game character, so it matches the rough paint-over: {who}, "
               f"{VIEWS[a.dir]}, holding a weapon in a firm two-handed grip with both arms raised and held out "
               f"straight at chest height, exactly where the rough painted arms and grey block are. The weapon is "
-              f"the one in image 2: {WEAPON}. {NOT} The arms no longer hang at the sides. Keep everything else "
+              f"{'the one in image 2: ' if a.design else ''}{a.weapon or WEAPON}. {'' if a.weapon else NOT} The arms no longer hang at the sides. Keep everything else "
               f"exactly the same: the same character, face, hair, clothes, colours, proportions, size and position, "
               f"the same thick dark outline and crisp pixel-art style, on the same plain white background.")
     if a.paint_only:
         return
-    design = Image.open(a.design).convert("RGB")
+    design = [Image.open(a.design).convert("RGB")] if a.design else []
     sq = paint.crop(CROP).resize((Q, Q), Image.LANCZOS)
     json.dump({"prompt": prompt, "frame": a.frame, "rig": a.rig, "design": a.design}, open(f"{a.out}/{a.dir}-paint.json", "w"), indent=1)
     for seed in a.seeds:
-        im, g = qwen([sq, design], prompt, seed, f"aimkf-{a.dir}")
+        im, g = qwen([sq] + design, prompt, seed, f"aimkf-{a.dir}")
         back = kf.copy()
         back.paste(im.resize((CROP[2] - CROP[0], CROP[3] - CROP[1]), Image.LANCZOS), CROP[:2])
         back.save(f"{a.out}/{a.dir}-aim-s{seed}.png")
@@ -176,7 +177,8 @@ def main():
     p.add_argument("--dir", required=True)
     p.add_argument("--frame", type=int, default=40)
     p.add_argument("--limb", type=float, default=1.0, help="painted limb thickness factor")
-    p.add_argument("--design", required=True)
+    p.add_argument("--design", help="the weapon's design reference (image 2); none: the text alone")
+    p.add_argument("--weapon", help="the weapon's description (default: WEAPON)")
     p.add_argument("--describe-file", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--seeds", type=lambda s: [int(x) for x in s.split(",")], default=[3, 11])

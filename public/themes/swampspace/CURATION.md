@@ -550,3 +550,22 @@ calm body after 90 idle ticks). Built on this branch's orange design and its 5-d
 Checks, 2026-11-06: consistency `--check` adds 0 violations (the 1 it reports is this branch's
 existing walk head_h case, docs/cast-walks/gate-cases/gloam-hound-head-h.md); 0 pixels off the
 locked palette (32 frames).
+## drowned-diver (drowner), 2026-11-06: `draw` action clip, 8 frames in all 5 directions
+
+The first non-walk state. Keys `char.drowner.<dir>-draw-0..7` (engine on `feat/action-anims-1106`:
+draw tpf 2, the held-weapon sprite hidden while draw plays, so these frames carry the pistol).
+Tools: `scripts/assets/rotoscope/rig_action.py` (one-shot keyframed rig), `scripts/assets/cast_action.py`
+(post on the walk's own window, export, sheet).
+
+| stage | what |
+|---|---|
+| design | unchanged; the clip starts and ends on the shipped idle (frames 0 and 7 are the idle itself, `--idle-ends`) |
+| rig | `rig_action.py draw` on a hand fit per direction over the shipped walk keyframe (848x480): rest, hand to the right hip, draw, aim along the facing, hold, holster, rest; P16 closed. Aim yaw to his right: s -38 (cross-body: a sideways arm breaks the s silhouette envelope), se -20, e 5, ne 14, n 32 |
+| render | Wan 2.2 Fun-Control A14B Q4_K_M + lightx2v 4-step, the stick skeleton as control, the walk keyframe as `ref_image`, 81 frames; describe without "hands empty", motion "draws a short stubby dark gunmetal harpoon pistol ..." |
+| pistol | Fun-Control drew an empty fist from the text (s: 0 of 2 seeds; e drew its own pistol and keeps it). `cast_action.py --props` paints the rig's pistol (steel slide, palette greys) out of the rendered fist before the pixel post: s, se, ne, n |
+| takes | s: take 3 (seed 11; takes 1-2 failed gate 3 width/head_h), cut 22, 24, 40, 56, 72, 30 (the aim held from four cycles; the hip frame is skipped because it moves s head_h by 5); se/e/ne/n: take 1 (seed 3), cut 36, 38, 40, 42, 43, 46 |
+| post | each frame through its walk direction's crop window, scale and pixel grid (`fixed_windows`/`post_fixed`), snapped to the s-idle's colours |
+
+Checks, 2026-11-06: consistency `--check` 0 violations; 0 pixels off the locked palette (80 frames);
+consecutive-frame change on the held aim .04-.15 of the silhouette. No walk gate applies to a one-shot
+(no loop, no gait); a gate scope for actions is still to go to Aaron (PIPELINE-NONBIPED.md).

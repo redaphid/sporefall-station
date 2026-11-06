@@ -206,6 +206,12 @@ export interface AiState {
   activity?: ActivityClaim
   /** Earliest tick this NPC looks for another activity. Absent: any time. */
   leisureAt?: number
+  /** Engage wind-up (`NpcDef.drawTicks`, systems/ai.ts trackDraw). `readyAt`:
+   * the first tick this body may attack. `holsteredAt`: the tick it last left
+   * aggro, absent while engaged. Absent as a whole = holstered (never engaged),
+   * and only an archetype with a wind-up ever carries it, so every other
+   * snapshot is unchanged. */
+  draw?: { readyAt: number; holsteredAt?: number }
 }
 
 /** A member's job inside its group (systems/groups.ts). */

@@ -533,3 +533,34 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## Held weapons and loot icons: the lore weapons (2026-11-06, art/lore-weapons-1106)
+
+`weapons/<id>-<view>-<idle|attack|glow|mod-<modId>>-<n>.png` and
+`items/<id>.png` for the ten carried weapons (docs/lore-weapons.md). Owner:
+no hand-drawn weapons, nothing mundane, a weapon's look promises what its shot
+does. Lineage, all generated (the hand-pixelled v2 silhouettes and the design
+sketches were ControlNet structure only, never shipped):
+
+1. Profile: juggernautXL (SDXL) + xinsir union ControlNet (lineart type,
+   strength .5, end .75) from the design sketch, 1216x640, plain white.
+   Rivet Driver = seed 12 of 12 (cn .45-.6); the others 3 seeds each.
+2. Matte: ComfyUI rembg.
+3. Facings se/s/ne/n: Qwen-Image-Edit 2511 (Lightning 4-step) from the matted
+   profile, 2 seeds per view, picked by eye.
+4. Idle: SDXL inpaint (juggernautXL inpaint) of the essence accent only,
+   3 frames. Attack (guns): a generated muzzle flash/burst sprite (SDXL on
+   black, luma-keyed) composited at the muzzle; recoil is the engine's.
+   Thrust weapons: the same frames advanced along the axis plus a burst.
+5. Mod attachments (Rivet Driver: frost, incendiary, shock, explosive):
+   Qwen-Image-Edit adds the part; only its zone is kept; the layer is the
+   pixels that differ from idle-0 after reduction.
+6. Reduction: one crop per view registered on the grip, k-centroid to this
+   pack's grid (Rivet Driver 26 px long on the hi-res pack, 13 on the base),
+   locked palette, 1 px #08080c outline. Glow layer = the accent's coverage
+   in pale ink, coloured by the renderer from the mods.
+
+Old icons (spore-pistol, root-club, shard-knife, scatter-blaster) stay on
+disk; no key points at them now. Decanter (first sidearm, a caged bubble
+barrel) was dropped the same day and is archived at
+`D:\tmp\cast-walks\weapons\lore\archive\decanter-1106`.

@@ -34,7 +34,13 @@ const expectRegistered = (archetype: string, why: string): void => {
 
 describe('ARCHETYPES covers everything the game can spawn', () => {
   it('registers a pickup archetype for every item', () => {
-    for (const id of Object.keys(ITEMS)) expectRegistered(`pickup.${id}`, 'populate.ts spawnItem / combat.ts weapon drop')
+    // Natural armament (a hound's fangs) is the beast's body: it never lies on
+    // the floor, so it has no pickup to put on the wire. Fists and claws were
+    // registered before that rule and stay registered (the list is append-only).
+    for (const [id, def] of Object.entries(ITEMS)) {
+      if ('natural' in def && def.natural && !registered.has(`pickup.${id}`)) continue
+      expectRegistered(`pickup.${id}`, 'populate.ts spawnItem / combat.ts weapon drop')
+    }
   })
 
   it('registers a pickup archetype for every weapon mod', () => {

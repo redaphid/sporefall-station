@@ -2,7 +2,7 @@ import { Container, Graphics, Rectangle, Sprite, Texture, type Renderer } from '
 import { isWallTile, Tile, WALL_CUT_OUTSIDE } from '../game/levelgen/level'
 import { modPickupColor } from './modColors'
 import { WEAPON_CANVAS, weaponShape, type WeaponShape } from './weaponArt'
-import { DEFAULT_TPF, type AnimStateName } from './animState'
+import { cadenceOf, DEFAULT_TPF, type AnimStateName } from './animState'
 import { DIRS5, type Dir5 } from './theme'
 import { pickTileVariant } from './tileSelect'
 import { CAP_QUARTER_TURNS, cutCapSides } from './wallCaps'
@@ -574,6 +574,13 @@ export const createArt = (
     : CHARSET_ALIAS_BASE
   const tileCache = new Map<number, Texture>()
   const entityCache = new Map<string, Texture>()
+  // A loop with no cadence of its own follows its `cadenceOf` state's.
+  const animTpf = (state: AnimStateName): number => {
+    const own = animTpfs[state]
+    if (own !== undefined) return own
+    const follows = cadenceOf(state)
+    return follows !== undefined ? animTpf(follows) : DEFAULT_TPF[state]
+  }
 
   // Themed procedural colors: theme palette wins over the built-in constants.
   const tileColors: Record<number, number> = { ...TILE_COLORS }
@@ -1489,7 +1496,7 @@ export const createArt = (
     bulletCore,
     bulletGlow,
     themedBullet: () => sprites.projectile,
-    animTpf: (state) => animTpfs[state] ?? DEFAULT_TPF[state],
+    animTpf,
     weaponTexture,
   }
 }

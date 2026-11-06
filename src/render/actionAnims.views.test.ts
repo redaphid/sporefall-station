@@ -15,6 +15,14 @@
 // shot 16 ticks; draw windows from tick 51 moved, window 0 and the kennel not.)
 // The brawl, siege and hive scenes were added the same way, from 8ecfd465's
 // renderer over this branch's sim; 828dffad's renderer gives the same digests.
+//
+// Aiming (feat/aim-anims-1106) moves exactly one thing in a pack without aim
+// frames: on a tick the body aims, the held weapon rises from the hip to the
+// raised hold (weaponPose.raisedPose). So the digest records only WHETHER a
+// weapon is held on those ticks, not where; aimAnims.views.test.ts asserts the
+// raised hold itself. Every digest, the aim scene's included, was regenerated
+// from the actions renderer (origin/ship/actions-1106 at 55d400a3) over this
+// branch's src/game and this test kit, and must not move.
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -24,6 +32,7 @@ import { spawnNpc } from '../game/populate'
 import { spawnPlayer } from '../game/player'
 import { walledRoom, worldFromRows } from '../game/testkit'
 import {
+  aimScene,
   brawlScene,
   fakeArt,
   hiveScene,
@@ -116,7 +125,8 @@ const GOLDEN = join(process.cwd(), 'src', 'render', '__fixtures__', 'action-anim
 /** sha256 of each 50-tick window of each entity's trace: a small fixture that
  * still says WHERE a divergence starts. */
 const digest = (t: Frame[][]): string[][] =>
-  t.map((frames) => {
+  t.map((all) => {
+    const frames = all.map((f) => (f.aiming ? { ...f, weapon: f.weapon === null ? null : 'held' } : f))
     const out: string[] = []
     for (let i = 0; i < frames.length; i += 50) {
       const w = frames.slice(i, i + 50)
@@ -135,11 +145,14 @@ describe('a pack without action frames renders exactly as origin/main did', () =
     brawl: digest(Object.values(traceWith(brawlScene(), plain))),
     siege: digest(Object.values(traceWith(siegeScene(), plain))),
     hive: digest(Object.values(traceWith(hiveScene(), plain))),
+    // A pistol player standing, strafing, backpedalling and firing with its
+    // aim held east, then a wrench; a drowner engaging and firing back.
+    aim: digest(Object.values(traceWith(aimScene(), plain))),
   }
   const out = process.env.ACTION_ANIMS_GOLDEN
   if (out) writeFileSync(out, JSON.stringify(now, null, 1) + '\n')
 
-  it('the golden digest exists and covers the engage, the long idle, a fight to the death, shelling and budding', () => {
+  it('the golden digest exists and covers the engage, the long idle, a fight to the death, shelling, budding and aiming', () => {
     expect(existsSync(GOLDEN)).toBe(true)
     const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')) as typeof now
     expect(golden.draw.map((c) => c.length)).toEqual([7])
@@ -147,6 +160,7 @@ describe('a pack without action frames renders exactly as origin/main did', () =
     expect(golden.brawl.map((c) => c.length)).toEqual([5, 3])
     expect(golden.siege.map((c) => c.length)).toEqual([6])
     expect(golden.hive.map((c) => c.length)).toEqual([6])
+    expect(golden.aim.map((c) => c.length)).toEqual([6, 6])
   })
 
   it('sprite texture, transform, alpha and held weapon match the old renderer on every tick', () => {

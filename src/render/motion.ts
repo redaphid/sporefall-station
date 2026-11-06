@@ -181,6 +181,9 @@ export const composeMotion = (m: MotionInput): MotionPose => {
   const legged = style === 'stride' || style === 'waddle'
 
   switch (m.state) {
+    // Aiming moves the body as walking and standing do: a drawn cycle drops the
+    // bob (the lean stays), and a 1-frame aim hold breathes.
+    case 'aimwalk':
     case 'walk': {
       if (legged) {
         if (!m.drawn && style === 'waddle') {
@@ -201,6 +204,7 @@ export const composeMotion = (m: MotionInput): MotionPose => {
       }
       break
     }
+    case 'aim':
     case 'idle': {
       if (m.drawn) break
       if (legged) {

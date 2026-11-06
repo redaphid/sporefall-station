@@ -13,6 +13,10 @@
  * - fidget: the body has been still and calm since `stillSince`, and the
  *           entity's hashed fidget grid has an onset (animState.fidgetStart).
  *
+ * The aim loops need no memory: `aiming` is a pure read of the entity
+ * (game/aiming.ts isAiming), the same on host, replay and, through the
+ * snapshot's aim trailer, on a co-op client.
+ *
  * Some actions leave no such trace on the actor: the lobber's shell and a hive
  * spire's budding raise no `combat.cooldown`. Those start from sim EVENTS
  * (EVENT_STARTS). An event lives for one tick, so the renderer reads it from
@@ -27,6 +31,7 @@
  */
 
 import type { TickEvents } from '../app/eventLog'
+import { isAiming } from '../game/aiming'
 import { DRAW_REARM_TICKS } from '../game/data/npcs'
 import type { Entity } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
@@ -118,7 +123,7 @@ export const isCalm = (e: Entity): boolean => {
 /**
  * Observe `e` at `tick`, update `mem`, and resolve its animation state.
  * `clipTicks` holds the length (frames × tpf) of the facing pose's OWN clip for
- * each clip-sized state (animState.CLIP_SIZED_STATES); a state absent there is
+ * each measured state (animState.MEASURED_STATES); a state absent there is
  * not drawn. `fromEvents` are the starts the sim events since the last
  * observation call for on this entity (eventStarts).
  */
@@ -165,6 +170,7 @@ export const trackAnim = (
   const anim = resolveAnimState({
     tick,
     moving: entityMoving(e, SIM_DT),
+    aiming: isAiming(e, tick),
     starts,
     simEnds: { roll: rolling ? roll.untilTick : undefined },
     clipTicks,

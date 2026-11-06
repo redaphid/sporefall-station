@@ -114,7 +114,7 @@ the console and in `validateManifest` unit tests.
 | `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `tile.<name>.cap` / `tile.<name>.cap.inner` | OPTIONAL, wall family only (`wall`, `hull`). The lit top strip of the wall, authored as RGBA along the tile's TOP edge (transparent below), plus the matching cap-sized nub in the top-left corner. The tilemap lays the strip on every edge of a wall tile that faces open ground, rotated to that edge, and the nub in concave corners (`src/render/wallCaps.ts`), so the cap line runs continuously along runs, corners and T-junctions; bevelled corners bake it along the 45° cut too. When a theme ships these, its wall BODY art must carry no cap of its own (`scripts/assets/wall_caps.py` splits a baked cap off existing art). Both keys or neither. |
 | `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player warden mutant civilian scientist acolyte robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
-| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death draw fidget`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
+| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death draw fidget aim aimwalk`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
 | `unit.player`, `unit.warden` | single-sprite billboard fallback (no directions) |
 | `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `mutant scientist robot` |
 | `item.default` | generic ground-item sprite |
@@ -186,7 +186,7 @@ weapon-mod gems and pickup-outline shapes are procedural (themeable via
 
 ### Animation states (`char.<name>.<dir>-<state>-<n>`)
 
-Characters animate through eight NAMED STATES, resolved every frame from sim
+Characters animate through ten NAMED STATES, resolved every frame from sim
 state (render-only — the sim knows nothing about animation). One table,
 `ANIM_STATE_DEFS` in `src/render/animState.ts`, defines each state; the
 render-side start signals live in `src/render/animTracker.ts`.
@@ -201,9 +201,15 @@ render-side start signals live in `src/render/animTracker.ts`.
 | `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | its drawn clip, at least 18 ticks |
 | `draw` | one-shot, **drawn-only** | the NPC's AI entered `aggro` (it engaged a target), after at least 30 ticks not engaged | its own clip: frames × tpf |
 | `fidget` | one-shot, **drawn-only** | the body has been still and calm (not aggro/flee/seek, dormant, downed, stunned, asleep or frozen) for 90 ticks; then on a per-entity grid every 180–329 ticks, hashed from the entity id | its own clip: frames × tpf |
+| `aim` | loop, **drawn-only** | the body aims (below) and stands still | while it holds |
+| `aimwalk` | loop, **drawn-only** | the body aims and moves, whichever way | while it holds |
 
 **Priority when several conditions hold at once (highest wins):**
-`death > roll > hurt > draw > attack > walk > fidget > idle`. A pistol
+`death > roll > hurt > draw > attack > aimwalk > aim > walk > fidget > idle`.
+One exception: an `attack` the pack does not draw does not cover drawn
+aiming. Its stand-in (a walk or idle frame plus the held weapon at the hip)
+would cut into the raised gun on every shot, so the aim frames hold and the
+shot flies. A drawn attack plays over aim, then aim resumes. A pistol
 carrier never has `draw` and `attack` at once: the sim holds its first shot
 for the archetype's `drawTicks` (16), so an 8-frame draw at the default tpf
 ends the tick the first shot fires. The order matters only when they do
@@ -211,14 +217,41 @@ overlap: a kind with no wind-up (it attacks on its engage tick), or a theme
 whose `anim.draw` tpf makes the clip longer than the wind-up. Then the draw
 plays whole and the attack pose is skipped; the shot itself still shows.
 
-**Drawn-only states (`draw`, `fidget`).** These exist only as art. A pack that
+**Aiming (`aim`, `aimwalk`).** A body aims while it holds a ranged weapon
+ready (`isAiming`, `src/game/aiming.ts`):
+
+- an NPC whose AI is engaged (`aggro`: battle or pursuit) with a ranged weapon,
+  once its engage wind-up has run (the tick its first shot may fire). So `draw`
+  plays first and `aim` takes over as it ends. Fleeing, stunned, asleep, frozen
+  or dormant: no aim.
+- a player holding a ranged weapon, unless downed, stunned, frozen, picking a
+  lock or choosing a draft card. The InputCmd carries one resolved aim vector
+  (aim stick or mouse, else the move direction), so the player's gun is always
+  up: the twin-stick stance.
+
+The facing is the aim (`entity.facing`, which the sim points down the aim line
+and fires along), never the move direction. A body that strafes or backpedals
+keeps facing its target, and the legs play the `aimwalk` cycle whichever way
+it travels. `aimwalk` runs at the theme's `walk` cadence and `aim` at its
+`idle` cadence unless the manifest's `anim` names them. While either plays the
+engine hides the held-weapon sprite: **the frames draw the gun**, raised and
+pointing along the facing. Draw `aim` as a 1-2 frame breathing hold
+(`…-aim-0`, `…-aim-1`) and `aimwalk` as 8 frames with the same stride timing as
+`walk`, so the cut between them keeps the feet. The two are independent: a
+pack with only `aimwalk` stands in `idle`, one with only `aim` walks in `walk`.
+Without aim frames the held weapon sprite rises from the hip to a raised hold
+at chest height, an arm's length out along the aim. Co-op clients get the
+host's verdict in the snapshot (an aim trailer), so they show the same states.
+
+**Drawn-only states (`draw`, `fidget`, `aim`, `aimwalk`).** These exist only as art. A pack that
 ships no frames for one never enters it: no borrowed stand-in, no procedural
 version, and the character renders exactly as it would without the state. When
 the frames exist, the state lasts exactly `frames × tpf` ticks and plays every
 frame once. Draw the clip so it **starts and ends on the idle pose**; the cut
 in from idle/walk and back out must not jump. While `draw` plays, the engine
 hides the held-weapon sprite, because the clip draws the weapon. Neither state
-adds procedural motion (no breathe, lean or bob over the frames).
+adds procedural motion (no breathe, lean or bob over the frames). The aim loops
+move like idle and walk do: a 1-frame aim breathes, and aimwalk keeps the lean.
 
 To enable them for a kind, map the frames in `sprites`, contiguous from 0, in
 all five drawn directions (west is mirrored):
@@ -226,6 +259,8 @@ all five drawn directions (west is mirrored):
 ```jsonc
 "char.drowner.s-draw-0": "chars/drowner/s-draw-0.png",   // … through -7, and se e ne n
 "char.gloamhound.e-fidget-0": "chars/gloamhound/e-fidget-0.png",
+"char.player.e-aim-0": "chars/vine-ranger/e-aim-0.png",   // … -aim-1; s se e ne n
+"char.player.e-aimwalk-0": "chars/vine-ranger/e-aimwalk-0.png", // … through -7
 "anim": { "draw": 2, "fidget": 3 }                        // optional; these are the defaults
 ```
 
@@ -273,7 +308,8 @@ so crowds don't move in lockstep); one-shots play once from the state's start
 and **hold their last frame** until the window closes.
 
 **Cadence.** Each state has a default ticks-per-frame — `idle` 12, `walk` 6,
-`attack` 2, `hurt` 3, `roll` 3, `death` 5, `draw` 2, `fidget` 3 — overridable per state via the
+`attack` 2, `hurt` 3, `roll` 3, `death` 5, `draw` 2, `fidget` 3, `aim` = `idle`'s,
+`aimwalk` = `walk`'s — overridable per state via the
 manifest `anim` section (integers 1..30). Frame selection is a pure function
 of sim tick + entity id: deterministic on every device and replay.
 
@@ -298,7 +334,7 @@ flinches/topples on top, so borrowed states read correctly):
 - `hurt` → `hurt` → `idle`
 - `roll` → `roll` → `walk` frame 0 → `idle`
 - `death` → `death` → `hurt` frame 0 → `idle`
-- `draw`, `fidget` → nothing (drawn-only; see above)
+- `draw`, `fidget`, `aim`, `aimwalk` → nothing (drawn-only; see above)
 
 Direction fallback (`se→s`, `e→s`, `ne→e→s`, `n→s`) applies BEFORE state
 fallback: the drawn direction is chosen first, then that direction's clips

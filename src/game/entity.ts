@@ -309,6 +309,11 @@ export interface Entity {
    * activities.shownActivity. */
   activityShown?: { kind: ActivityKind; playing: boolean }
 
+  /** CLIENT render mirror of the host's `aiming.isAiming` verdict (net/protocol
+   * aim trailer), set on every entity a snapshot carries. The host never sets
+   * it: there the truth is the AI, weapon and status state the client lacks. */
+  aimShown?: boolean
+
   health?: {
     hp: number
     max: number

@@ -5,6 +5,7 @@ import { OBJECTS } from '../../game/data/objects'
 import { SnapFlags } from '../../game/snapshot'
 import { isRolling, ROLL_TICKS } from '../../game/systems/roll'
 import { shownActivity } from '../../game/systems/activities'
+import { isAiming } from '../../game/aiming'
 import type { FloorModifier } from '../../game/floorModifiers'
 import type { InputCmd } from '../../game/types'
 import { emptyInput } from '../../game/types'
@@ -248,6 +249,9 @@ export interface WireEntity {
   statuses?: string[]
   /** A seated NPC's activity at a prop, and whether play has started. */
   activity?: { kind: ActivityKind; playing: boolean }
+  /** The body holds a ranged weapon ready (game/aiming.ts): the client plays
+   * the aim loops from it. Absent = not aiming. */
+  aiming?: true
 }
 
 export interface WireSnapshot {
@@ -321,13 +325,23 @@ export const encodeSnapshot = (s: WireSnapshot): Uint8Array => {
     const k = e.activity ? WIRE_ACTIVITIES.indexOf(e.activity.kind) : -1
     if (k >= 0) seated.push([i, (k + 1) | (e.activity!.playing ? ACTIVITY_PLAYING : 0)])
   })
-  if (statused.length > 0 || seated.length > 0) {
+  // Sparse aim trailer, last: u8 count, then the u8 record index of each body
+  // that aims. When it is present both counts before it are written, even as 0.
+  const aimers: number[] = []
+  entities.forEach((e, i) => {
+    if (e.aiming) aimers.push(i)
+  })
+  if (statused.length > 0 || seated.length > 0 || aimers.length > 0) {
     w.u8(statused.length)
     for (const [i, mask] of statused) w.u8(i).u8(mask)
   }
-  if (seated.length > 0) {
+  if (seated.length > 0 || aimers.length > 0) {
     w.u8(seated.length)
     for (const [i, code] of seated) w.u8(i).u8(code)
+  }
+  if (aimers.length > 0) {
+    w.u8(aimers.length)
+    for (const i of aimers) w.u8(i)
   }
   return w.finish()
 }
@@ -382,6 +396,13 @@ export const decodeSnapshot = (bytes: Uint8Array): WireSnapshot => {
       const code = r.u8()
       const kind = WIRE_ACTIVITIES[(code & ~ACTIVITY_PLAYING) - 1]
       if (target && kind) target.activity = { kind, playing: (code & ACTIVITY_PLAYING) !== 0 }
+    }
+  }
+  if (r.remaining > 0) {
+    const n = r.u8()
+    for (let j = 0; j < n && r.remaining >= 1; j++) {
+      const target = entities[r.u8()]
+      if (target) target.aiming = true
     }
   }
   return { tick, epoch, floor, alarm, lastInputSeq, entities }
@@ -519,6 +540,7 @@ export const toWireEntity = (e: Entity, tick: number): WireEntity => {
   if (statuses.length > 0) we.statuses = statuses
   const shown = shownActivity(e)
   if (shown) we.activity = shown
+  if (isAiming(e, tick)) we.aiming = true
   return we
 }
 
@@ -548,6 +570,7 @@ export const applyWireEntity = (target: Entity | undefined, we: WireEntity, tick
   else delete e.fx
   if (we.activity) e.activityShown = { ...we.activity }
   else delete e.activityShown
+  e.aimShown = we.aiming === true
   if ((we.flags & SnapFlags.HitFlash) !== 0) {
     e.status ??= { stun: 0, sleep: 0, hitFlashUntil: 0, cloakUntil: 0 }
     e.status.hitFlashUntil = tick + 2

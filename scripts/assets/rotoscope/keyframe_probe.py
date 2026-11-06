@@ -11,7 +11,9 @@ src, d, desc, pose, out, *seeds = sys.argv[1:]
 os.makedirs(out, exist_ok=True)
 q, notes = S.detect_qwen({})
 w, _ = S.detect_wan({})
-name = S.upload(S.prep_input(src), "pipeline1105-kf-input.png")
+# a per-input name: a shared fixed name let a second probe overwrite the image a queued prompt reads
+import hashlib
+name = S.upload(S.prep_input(src), f"kf-input-{hashlib.sha256(open(src, 'rb').read()).hexdigest()[:12]}.png")
 S.MOTIONS["probe"] = S.Motion(pose, "", closed=False)
 pids = {}
 for seed in map(int, seeds):

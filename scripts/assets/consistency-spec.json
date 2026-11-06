@@ -21,12 +21,12 @@
  "bog-mutant": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 40,
-   "head_h": 33,
-   "mass": 997,
-   "cx": 0.85,
-   "foot_y": 45
+   "height": 46,
+   "width": 26,
+   "head_h": 30,
+   "mass": 728,
+   "cx": -0.12,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

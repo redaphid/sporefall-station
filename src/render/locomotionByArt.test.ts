@@ -244,13 +244,20 @@ describe('drawn cycles are not bobbed twice', () => {
     return out
   }
   const walkFrames = (name: string, kind: string, count: number) => drawnLoop(name, kind, 'walk', count)
+  /** The pack with `name`'s drawn walk masked off: it walks on the legacy idle/step pair. */
+  const legacyWalk = (name: string): ThemeChain => {
+    const off: Record<string, null> = {}
+    for (const d of DIRS5) for (let n = 0; n < MAX_ANIM_FRAMES; n++) off[`char.${name}.${d}-walk-${n}`] = null
+    return overlay(off, HIRES)
+  }
 
   it('a walker whose pack draws its walk cycle gets no procedural bob on top of it', () => {
     // The frog-settler ships 8 drawn walk frames that already carry a head bob;
-    // the mutant still walks on the legacy idle/step pair and keeps the bob.
+    // the same walker on the legacy idle/step pair keeps the bob.
     expect(walkLift(HIRES, 'civilian')).toBe(0)
     expect(walkLift(HIRES, 'player')).toBe(0)
-    expect(walkLift(HIRES, 'mutant')).toBeGreaterThan(2)
+    expect(walkLift(HIRES, 'mutant')).toBe(0)
+    expect(walkLift(legacyWalk('mutant'), 'mutant')).toBeGreaterThan(2)
   })
 
   it('a drone whose walk is drawn hover frames floats procedurally only while it stands', () => {
@@ -276,6 +283,6 @@ describe('drawn cycles are not bobbed twice', () => {
 
   it('a one-frame drawn clip is a held pose, not a cycle: the procedural motion stays', () => {
     expect(walkLift(overlay(walkFrames('warden', 'spore-drone', 1), HIRES), 'warden')).toBeGreaterThan(4)
-    expect(walkLift(overlay(walkFrames('mutant', 'bog-mutant', 1), HIRES), 'mutant')).toBeGreaterThan(2)
+    expect(walkLift(overlay(walkFrames('mutant', 'bog-mutant', 1), legacyWalk('mutant')), 'mutant')).toBeGreaterThan(2)
   })
 })

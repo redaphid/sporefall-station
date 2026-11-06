@@ -53,7 +53,8 @@ describe('the weapons grip/muzzle section', () => {
   ])('drops a %s with a warning, never throws', (_name, weapons) => {
     const { manifest, warnings } = validateManifest({ weapons })
     expect(warnings.length).toBeGreaterThan(0)
-    expect(manifest.weapons.pistol?.e ?? manifest.weapons.pistol?.sw).toBeUndefined()
+    expect(manifest.weapons.pistol?.e).toBeUndefined()
+    expect(Object.keys(manifest.weapons.pistol ?? {})).toEqual([])
   })
 
   it('the first theme in the chain that pins a view wins', () => {

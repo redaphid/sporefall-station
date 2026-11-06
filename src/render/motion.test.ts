@@ -338,14 +338,14 @@ describe('WADDLE — short legs rock the body instead of bobbing it', () => {
   })
 })
 
-describe('drawnCycle — the frames carry the loop', () => {
+describe('drawn — the frames carry the motion', () => {
   const STYLES = ['stride', 'hover', 'pulse', 'waddle'] as const
 
   it('walk and idle add no cycle of their own, for every body', () => {
     for (const style of STYLES) {
       for (const state of ['idle', 'walk'] as const) {
         for (let t = 100; t < 160; t += 0.5) {
-          const p = composeMotion(base({ state, style, moving: state === 'walk', t, drawnCycle: true }))
+          const p = composeMotion(base({ state, style, moving: state === 'walk', t, drawn: true }))
           expect({ dy: p.dy, sx: p.sx, sy: p.sy }, `${style} ${state} t=${t}`).toEqual({ dy: 0, sx: 1, sy: 1 })
         }
       }
@@ -355,23 +355,56 @@ describe('drawnCycle — the frames carry the loop', () => {
   it('a striding or waddling lean still answers the heading on top of drawn walk frames', () => {
     for (const style of ['stride', 'waddle'] as const) {
       for (let t = 100; t < 130; t += 0.7) {
-        const p = composeMotion(base({ state: 'walk', style, moving: true, vx: 3, t, drawnCycle: true }))
+        const p = composeMotion(base({ state: 'walk', style, moving: true, vx: 3, t, drawn: true }))
         expect(p.rot, `${style} t=${t}`).toBeCloseTo(MOTION.lean.rad)
         expect(p.dy, `${style} t=${t}`).toBe(0)
       }
     }
   })
 
-  it('attack, hurt, death and the landing squash are responses, not cycles: unchanged', () => {
+  it('hurt and the landing squash are responses to the sim, not drawn motion: unchanged', () => {
     for (const style of STYLES) {
-      for (const state of ['attack', 'hurt', 'death'] as const) {
-        const input = base({ state, style, start: 100, t: 102.5, facing: 0.7 })
-        expect(composeMotion({ ...input, drawnCycle: true }), `${style} ${state}`).toEqual(composeMotion(input))
-      }
+      const input = base({ state: 'hurt', style, start: 100, t: 102.5, facing: 0.7 })
+      expect(composeMotion({ ...input, drawn: true }), `${style} hurt`).toEqual(composeMotion(input))
       const landing = base({ state: 'walk', style, moving: true, tick: 101, t: 101.5, rollUntil: 100 })
-      const drawn = composeMotion({ ...landing, drawnCycle: true })
+      const drawn = composeMotion({ ...landing, drawn: true })
       expect(drawn.sy, `${style} landing`).toBeLessThan(1)
       expect(drawn.sx, `${style} landing`).toBeGreaterThan(1)
+    }
+  })
+
+  it('a drawn death keeps the fade and drops the topple (one fall per body)', () => {
+    for (const style of STYLES) {
+      for (const t of [100, 104.5, 109, 117.9]) {
+        const input = base({ state: 'death', style, start: 100, t, id: 3 })
+        const procedural = composeMotion(input)
+        const drawn = composeMotion({ ...input, drawn: true })
+        expect(drawn.rot, `${style} t=${t}`).toBe(0)
+        expect(drawn.alpha, `${style} t=${t}`).toBe(procedural.alpha)
+      }
+      // The procedural topple is really there when nothing is drawn.
+      expect(Math.abs(composeMotion(base({ state: 'death', style, start: 100, t: 109, id: 3 })).rot)).toBeGreaterThan(0.5)
+    }
+  })
+
+  it('a drawn attack keeps exactly drawnScale of the lunge', () => {
+    for (const t of [100.5, 101, 103, 105.5]) {
+      const input = base({ state: 'attack', start: 100, t, facing: 0.7 })
+      const procedural = composeMotion(input)
+      const drawn = composeMotion({ ...input, drawn: true })
+      expect(drawn.dx, `t=${t}`).toBeCloseTo(procedural.dx * MOTION.attackLunge.drawnScale, 10)
+      expect(drawn.dy, `t=${t}`).toBeCloseTo(procedural.dy * MOTION.attackLunge.drawnScale, 10)
+    }
+  })
+
+  it('the drawn-only states (draw, fidget) add no motion at all, for every body', () => {
+    for (const style of STYLES) {
+      for (const state of ['draw', 'fidget'] as const) {
+        for (let t = 100; t < 130; t += 0.7) {
+          const p = composeMotion(base({ state, style, start: 100, t, drawn: true, moving: state === 'draw', vx: 3 }))
+          expect(p, `${style} ${state} t=${t}`).toEqual(IDENTITY_POSE)
+        }
+      }
     }
   })
 })

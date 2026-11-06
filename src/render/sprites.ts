@@ -5,14 +5,16 @@ import { SIM_DT } from '../game/types'
 import { burnPulse, charFootPx, cycleFrame, depthKey, entityMoving, facingDir } from './anim'
 import {
   animFrame,
+  CLIP_WINDOW_STATES,
   effectiveClips,
-  resolveAnimState,
   resolveClip,
   sceneContinuous,
+  stowsWeapon,
   STATE_TICKS,
   type AnimStateName,
   type ResolvedAnim,
 } from './animState'
+import { trackAnim, type AnimMemory } from './animTracker'
 import { composeMotion, IDENTITY_POSE, locomotionFor, type MotionPose } from './motion'
 import {
   ARCHETYPE_SCALE,
@@ -46,11 +48,8 @@ interface View {
   flashing: boolean
   /** Key of the texture currently shown (state/dir/frame), to skip redundant writes. */
   texKey: string
-  /** combat.cooldown last frame — the sim only DECREMENTS it, so an increase
-   * means "an attack fired this tick" (the render-derived attack signal). */
-  prevCooldown?: number
-  /** Tick the last observed attack started (drives the attack state window). */
-  attackStart?: number
+  /** Render-derived one-shot starts (attack, draw, fidget …): animTracker.ts. */
+  anim: AnimMemory
   /** Last drawn facing/feet position — a death ghost freezes these. */
   facing: number
   flip: boolean
@@ -100,12 +99,28 @@ const poseFor = (set: CharSet, dir: Dir5): DirPose | undefined => {
   return undefined
 }
 
-/** Does the pack draw this state's loop itself for the facing's pose (2+
- * frames of `char.<name>.<dir>-<state>-<n>`)? Then the frames carry the cycle
- * and motion.ts adds none (MotionInput.drawnCycle). The legacy idle/step pair
- * is not a drawn loop: the procedural cycle exists for exactly that art. */
-const drawsCycle = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): boolean =>
-  (set ? (poseFor(set, dir)?.clips?.[state]?.length ?? 0) : 0) > 1
+/** How many frames of its OWN the facing's pose has for a state
+ * (`char.<name>.<dir>-<state>-<n>`; borrowed stand-ins do not count). */
+const ownFrames = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): number =>
+  set ? (poseFor(set, dir)?.clips?.[state]?.length ?? 0) : 0
+
+/** Does the pack draw this state itself (2+ frames)? Then the frames carry the
+ * motion and motion.ts drops its procedural twin (MotionInput.drawn). The
+ * legacy idle/step pair is not a drawn loop: the procedural cycle exists for
+ * exactly that art. */
+const drawsState = (set: CharSet | undefined, dir: Dir5, state: AnimStateName): boolean =>
+  ownFrames(set, dir, state) > 1
+
+/** Length in ticks (frames × tpf) of each drawn-only state's own clip for the
+ * facing; a state the pack does not draw is left out and never plays. */
+const clipTicksFor = (art: ArtRegistry, set: CharSet | undefined, dir: Dir5): Partial<Record<AnimStateName, number>> => {
+  const out: Partial<Record<AnimStateName, number>> = {}
+  for (const s of CLIP_WINDOW_STATES) {
+    const n = ownFrames(set, dir, s)
+    if (n > 0) out[s] = n * Math.max(1, Math.floor(art.animTpf(s)))
+  }
+  return out
+}
 
 /** Pick the texture a CHARACTER shows for a resolved animation state: state
  * clip (with per-state fallback chains) → legacy idle/step synthesis →
@@ -276,6 +291,7 @@ export class EntityViews {
           seen: true,
           flashing: false,
           texKey: '',
+          anim: {},
           facing: e.facing,
           flip: false,
           footX: 0,
@@ -285,30 +301,19 @@ export class EntityViews {
       }
       view.seen = true
 
-      // --- Render-derived attack signal: the sim only ever decrements
-      // combat.cooldown (statusSystem), so an INCREASE between observed frames
-      // marks the tick an attack/throw fired. No sim change needed.
-      const cd = e.combat?.cooldown
-      if (cd !== undefined && view.prevCooldown !== undefined && cd > view.prevCooldown) view.attackStart = tick
-      view.prevCooldown = cd
-
       const character = this.art.isCharacterSprite(artKey)
       const moving = entityMoving(e, SIM_DT)
       const roll = e.playerCtl?.roll
       const rolling = roll !== undefined && tick < roll.untilTick
+      const charSet = character ? this.art.characterSet(artKey) : undefined
+      const facing = facingDir(e.facing).dir
 
-      // --- Layer 1: resolve the animation state (priority: death > roll >
-      // hurt > attack > walk > idle). Death never appears here — corpses are
-      // swept the same tick and continue as ghosts (noteEvents).
+      // --- Layer 1: resolve the animation state (animState.ANIM_PRIORITY)
+      // from the one-shot starts the tracker derives off observed change.
+      // Death never appears here — corpses are swept the same tick and
+      // continue as ghosts (toGhost).
       const anim: ResolvedAnim = character
-        ? resolveAnimState({
-            tick,
-            moving,
-            rollUntil: rolling ? roll.untilTick : undefined,
-            rollStart: rolling ? roll.untilTick - ROLL_TICKS : undefined,
-            hitFlashUntil: e.status?.hitFlashUntil,
-            attackStart: view.attackStart,
-          })
+        ? trackAnim(view.anim, e, tick, clipTicksFor(this.art, charSet, facing))
         : { state: moving ? 'walk' : 'idle', start: 0 }
 
       const flashing = e.status !== undefined && e.status.hitFlashUntil > tick
@@ -335,7 +340,7 @@ export class EntityViews {
               moving,
               rollUntil: roll?.untilTick,
               style: locomotionFor(this.art.artKind(artKey)),
-              drawnCycle: drawsCycle(this.art.characterSet(artKey), facingDir(e.facing).dir, anim.state),
+              drawn: drawsState(charSet, facing, anim.state),
             })
           : IDENTITY_POSE
 
@@ -419,8 +424,9 @@ export class EntityViews {
 
       // --- Layer 3: the held weapon — a hand-anchored sprite that swings on
       // attack (melee) or recoils (ranged) and re-tints from its mods. Rolling
-      // is a whole-body tumble, so the weapon is stowed for its duration.
-      if (character && !rolling) this.updateWeapon(view, e, anim, t)
+      // is a whole-body tumble, so the weapon is stowed for its duration, and
+      // a state whose clip draws the weapon (draw) stows it too.
+      if (character && !rolling && !stowsWeapon(anim.state)) this.updateWeapon(view, e, anim, t)
       else this.hideWeapon(view)
     }
 
@@ -555,6 +561,7 @@ export class EntityViews {
       }
       const { dir } = facingDir(g.facing)
       const set = this.art.characterSet(g.artKey)
+      const drawn = drawsState(set, dir, 'death')
       const pose = set ? poseFor(set, dir) : undefined
       if (pose) {
         const clips = effectiveClips<Texture>({ idle: pose.idle, step: pose.step }, pose.clips)
@@ -577,6 +584,7 @@ export class EntityViews {
         facing: g.facing,
         vx: 0,
         moving: false,
+        drawn,
       })
       g.sprite.rotation = motion.rot
       g.sprite.alpha = motion.alpha

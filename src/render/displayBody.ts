@@ -50,12 +50,16 @@ export const TUMBLE = {
   friction: 0.004,
   /** Ticks of roll after the last landing before it lies still on its side. */
   rollTicks: 6,
+  /** How far the body rocks past its side as it rolls to a stop. */
+  rock: 0.22,
   /** Ground speed kept along a wall's normal after a touch (default onWall). */
   wallKeep: 0.35,
   /** Ground speed kept along the wall on a touch. */
   wallSlide: 0.8,
-  /** Half-size of the body's footprint against walls. */
-  radius: 0.3,
+  /** Half-size of the body's footprint against walls. Wider than tall: a
+   * body lying on its side is long across the screen, and its head and feet
+   * must not lie over a side wall. Shrinks to fit where the body died. */
+  footprint: { x: 0.55, y: 0.3 },
   /** Never simulate past this many ticks. */
   maxTicks: 90,
   /** Force above which the body turns a full somersault before landing on its side. */
@@ -258,12 +262,24 @@ export interface BodyTrack {
   readonly contacts: readonly WallContact[]
 }
 
-/** Is a square footprint of half-size r at (x, y) touching a solid tile? */
-const blocked = (solid: IsSolid, x: number, y: number, r: number): boolean => {
-  for (let ty = Math.floor(y - r); ty <= Math.floor(y + r); ty++) {
-    for (let tx = Math.floor(x - r); tx <= Math.floor(x + r); tx++) if (solid(tx, ty)) return true
+/** Is a footprint of half-size (rx, ry) at (x, y) touching a solid tile? */
+export const blocked = (solid: IsSolid, x: number, y: number, rx: number, ry: number): boolean => {
+  for (let ty = Math.floor(y - ry); ty <= Math.floor(y + ry); ty++) {
+    for (let tx = Math.floor(x - rx); tx <= Math.floor(x + rx); tx++) if (solid(tx, ty)) return true
   }
   return false
+}
+
+/** The largest footprint, up to TUMBLE.footprint, that is clear where the body
+ * died (a body flush against a wall gets a narrower one). */
+const fitFootprint = (solid: IsSolid, x: number, y: number): { rx: number; ry: number } => {
+  const shrink = (full: number, clear: (r: number) => boolean): number => {
+    for (let r = full; r > 0; r -= 0.05) if (clear(r)) return r
+    return 0
+  }
+  const ry = shrink(TUMBLE.footprint.y, (r) => !blocked(solid, x, y, 0, r))
+  const rx = shrink(TUMBLE.footprint.x, (r) => !blocked(solid, x, y, r, ry))
+  return { rx, ry }
 }
 
 /** Integrate the throw at whole ticks until the body lies still. */
@@ -276,12 +292,10 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
   let x = th.x
   let y = th.y
   let z = 0
-  // A footprint that already overlaps a wall (a body dying flush in a corner)
-  // shrinks to its centre point, which the sim keeps on open floor. A centre
-  // inside a wall does not move at all.
-  let r: number = TUMBLE.radius
-  if (blocked(solid, x, y, r)) r = 0
-  if (blocked(solid, x, y, 0)) vx = vy = 0
+  // A body dying flush against a wall gets a footprint narrow enough to be
+  // clear there. A centre inside a wall does not move at all.
+  const { rx, ry } = fitFootprint(solid, x, y)
+  if (blocked(solid, x, y, 0, 0)) vx = vy = 0
 
   // Spin with the throw: thrown right turns clockwise. Straight up or down,
   // the seed picks.
@@ -292,6 +306,7 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
   const contacts: WallContact[] = []
   let bounces = 0
   let grounded = false
+  let landed = 0
   let rollEnd = Infinity
   const rest = TUMBLE.bounce * jitter(4)
 
@@ -300,7 +315,7 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
     if (v === 0) return
     const nx = axis === 'x' ? x + v : x
     const ny = axis === 'y' ? y + v : y
-    if (!blocked(solid, nx, ny, r)) {
+    if (!blocked(solid, nx, ny, rx, ry)) {
       x = nx
       y = ny
       return
@@ -338,6 +353,7 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
         } else {
           grounded = true
           vz = 0
+          landed = k
           rollEnd = k + TUMBLE.rollTicks
         }
       }
@@ -350,12 +366,17 @@ export const simulateBody = (th: Throw, solid: IsSolid, onWall: OnWall = bounceO
     poses.push({ x, y, z, rot: 0 })
     if (grounded && k >= rollEnd && vx === 0 && vy === 0) break
   }
-  // The spin runs from the death to the end of the roll, fast in the air and
-  // easing into the lie; the slide after it keeps the body on its side.
-  const spinEnd = Math.min(rollEnd, poses.length - 1)
+  // The spin is steady through the hop and the bounces and lands the body on
+  // its side on the last landing: it never slows down near upright, where it
+  // would read as the dead man getting back up. Then it rocks past its side
+  // and back (the roll), and slides lying still.
+  const land = landed > 0 ? landed : poses.length - 1
   for (let i = 1; i < poses.length; i++) {
-    const p = Math.min(1, i / spinEnd)
-    poses[i].rot = finalRot * (1 - (1 - p) * (1 - p))
+    if (i <= land) poses[i].rot = (finalRot * i) / land
+    else {
+      const q = Math.min(1, (i - land) / TUMBLE.rollTicks)
+      poses[i].rot = finalRot + side * TUMBLE.rock * Math.sin(q * Math.PI) * (1 - q)
+    }
   }
   return { throw: th, poses, settle: poses.length - 1, contacts }
 }

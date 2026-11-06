@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  blocked,
   bodySeed,
   bounceOffWall,
   deriveThrow,
@@ -46,12 +47,9 @@ const thrown = (over: Partial<Throw> = {}): Throw => ({
   ...over,
 })
 
-/** Is the body's footprint (or its centre, when it started flush) clear? */
-const clear = (solid: IsSolid, x: number, y: number, r: number): boolean => {
-  for (let ty = Math.floor(y - r); ty <= Math.floor(y + r); ty++)
-    for (let tx = Math.floor(x - r); tx <= Math.floor(x + r); tx++) if (solid(tx, ty)) return false
-  return true
-}
+/** Is the full footprint clear of walls? */
+const clear = (solid: IsSolid, x: number, y: number): boolean =>
+  !blocked(solid, x, y, TUMBLE.footprint.x, TUMBLE.footprint.y)
 
 const travelled = (t: ReturnType<typeof simulateBody>): number => {
   const a = t.poses[0]
@@ -169,8 +167,13 @@ describe('simulateBody: the tumble', () => {
     expect(d).toBeLessThan(2.5)
     // Thrown right: spins clockwise, a full turn and onto its side.
     expect(t.poses[t.settle].rot).toBeCloseTo(Math.PI / 2 + Math.PI * 2, 9)
-    // Monotone spin, still at the end, never below the floor.
-    for (let i = 1; i < t.poses.length; i++) expect(t.poses[i].rot).toBeGreaterThanOrEqual(t.poses[i - 1].rot)
+    // A steady spin until the last landing (never lingering upright), then a
+    // rock past its side and back; never below the floor.
+    const land = t.poses.findIndex((p, i) => i > 0 && p.rot >= Math.PI / 2 + Math.PI * 2 - 1e-9)
+    expect(land).toBeGreaterThan(0)
+    const steps = t.poses.slice(1, land + 1).map((p, i) => p.rot - t.poses[i].rot)
+    for (const d of steps) expect(d).toBeCloseTo(steps[0], 9)
+    expect(Math.max(...t.poses.map((p) => p.rot))).toBeGreaterThan(t.poses[t.settle].rot)
     expect(t.poses.every((p) => p.z >= 0)).toBe(true)
     expect(t.settle).toBeLessThan(TUMBLE.maxTicks)
   })
@@ -198,11 +201,11 @@ describe('simulateBody: the tumble', () => {
     expect([...sides].sort()).toEqual([-1, 1])
   })
 
-  it('a body dying flush against a wall, thrown into it, never enters the wall and records the touch', () => {
-    // Wall column x = 12; the body's footprint (0.3) touches x = 11.7.
+  it('a body dying flush against a wall, thrown into it, gets no closer to the wall and records the touch', () => {
+    // Wall column x = 12; the body died 0.31 from it, inside its full footprint.
     const solid = room(40, 40, Array.from({ length: 40 }, (_, y) => [12, y] as [number, number]))
     const t = simulateBody(thrown({ x: 11.69, y: 10.5 }), solid)
-    for (const p of t.poses) expect(p.x + TUMBLE.radius).toBeLessThan(12)
+    for (const p of t.poses) expect(p.x).toBeLessThanOrEqual(11.69)
     expect(t.contacts.length).toBeGreaterThan(0)
     expect(t.contacts[0]).toMatchObject({ tick: 1, nx: -1, ny: 0 })
     expect(t.poses[t.settle].x).toBeLessThan(11.69) // bounced back into the room
@@ -211,8 +214,8 @@ describe('simulateBody: the tumble', () => {
   it('in a corner, thrown into both walls, it stays in the open tile', () => {
     const solid = room(12, 12)
     const s = Math.SQRT1_2
-    const t = simulateBody(thrown({ x: 10.6, y: 10.6, dirX: s, dirY: s }), solid)
-    for (const p of t.poses) expect(clear(solid, p.x, p.y, TUMBLE.radius)).toBe(true)
+    const t = simulateBody(thrown({ x: 10.4, y: 10.6, dirX: s, dirY: s }), solid)
+    for (const p of t.poses) expect(clear(solid, p.x, p.y)).toBe(true)
     expect(t.contacts.some((c) => c.nx === -1)).toBe(true)
     expect(t.contacts.some((c) => c.ny === -1)).toBe(true)
   })
@@ -237,9 +240,9 @@ describe('simulateBody: the tumble', () => {
       const a = (i * 2.399) % (Math.PI * 2)
       const x = 1.5 + ((i * 7) % 17) + 0.31
       const y = 1.5 + ((i * 11) % 17) + 0.31
-      if (!clear(solid, x, y, TUMBLE.radius)) continue
+      if (!clear(solid, x, y)) continue
       const t = simulateBody(thrown({ x, y, dirX: Math.cos(a), dirY: Math.sin(a), force: (i % 10) / 9, seed: i }), solid)
-      for (const p of t.poses) expect(clear(solid, p.x, p.y, TUMBLE.radius)).toBe(true)
+      for (const p of t.poses) expect(clear(solid, p.x, p.y)).toBe(true)
     }
   })
 

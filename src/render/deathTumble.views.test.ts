@@ -170,15 +170,17 @@ describe('a kill throws the body', () => {
     expect(ghosts.has(barrel.id)).toBe(false)
   })
 
-  it('flush against a wall and shot into it: never past the wall, the touch on record', () => {
-    // walledRoom(20): x = 19 is wall. Footprint 0.3 → the body may reach 18.7.
+  it('flush against a wall and shot into it: never into the wall, the touch on record', () => {
+    // walledRoom(20): x = 19 is wall. It died at 18.6, inside its full footprint.
     const scene = pistolScene(18.6)
     const m = scene.focus[0]
     const { ghosts } = run(scene)
     const body = ghosts.get(m.id)!.body!
     expect(body.contacts.length).toBeGreaterThan(0)
     expect(body.contacts[0].nx).toBe(-1)
-    for (const p of body.poses) expect(p.x + TUMBLE.radius).toBeLessThan(19)
+    expect(body.throw.x + TUMBLE.footprint.x).toBeGreaterThan(19) // flush: inside its full footprint
+    // Never nearer the wall than a living body of its size could stand.
+    for (const p of body.poses) expect(p.x + m.radius).toBeLessThan(19)
   })
 
   it('a body that dies the tick after it is first seen still tumbles; one never seen leaves no ghost', () => {

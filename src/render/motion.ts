@@ -90,7 +90,6 @@ export type LocomotionStyle = 'stride' | 'hover' | 'pulse' | 'waddle'
  * changes how it moves — you opt in. */
 export const LOCOMOTION: ReadonlyMap<string, LocomotionStyle> = new Map([
   ['spore-drone', 'hover'],
-  ['gloom-lurker', 'hover'],
   ['brood-sac', 'pulse'],
   ['sporeling-mite', 'waddle'],
 ])

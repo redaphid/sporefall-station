@@ -470,3 +470,78 @@ Nothing parked. Known look gaps: s and n are Wan clips with short strides
 (period 13) and sit close to their limits (s seam .495 of .5, n head drift
 .136 of .14); se/e/ne are skeleton-driven and step more evenly than s/n. Frame
 heights: 84-91 px on the hi-res pack, 42-46 on the 48 px pack.
+
+## gloom-lurker (lurker), 2026-11-05: redesigned again (bubble-back beetle), six-leg scuttle by skeleton control
+
+Aaron rejected the squatting hazmat's crouched prowl, then asked for a redesign and picked candidate C of
+three (design sheet https://2cb.pw/design-sheet-2a66fe). The hooded-colonist entry above is the
+history; its frames are archived in `/mnt/d/tmp/cast-walks/archive/gloom-lurker/hazmat-live-5f801b3f/`.
+Procedure: [`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md) and
+`docs/cast-walks/PIPELINE-NONBIPED.md` (branch `docs/pipeline-nonbiped-1105`).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign from concept `assets/identity/lore/scrap-brood.png` (sporefall-art), its copper eggs redrawn as swallowed essence-green bubbles. Lore family B (swamp fauna that eats bubbles): a low beetle that hoards essence in a heap on its back; in a dark stockroom the heap reads as stored bubbles until it runs. The heap is the single hot accent. Holds nothing |
+| input | `concept_to_input.py` seed 11 of 3 (Qwen-Image-Edit), 96 px in the locked 34, thin .049, 92x58; sha256 `bb76b835505d7a5d…` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning, one per direction from the input: s, se, e seed 3; n seed 3 and ne seed 3 from a back describe with a pale seam stripe down the heap as the rear cue, inside the silhouette (a notched tail plate read as an eye; a rust lip as a mouth). Qwen drew every ne facing nw, so the ne keyframe is mirrored |
+| motion | Wan 2.2 Fun-Control A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, driven by `scripts/assets/rotoscope/rig_hexapod.py` (new): six legs, alternating tripod (L0 R1 L2 / R0 L1 R2), duty .5, period 16, stride .45, lift .18, elevation 20, the heap rigid; drawn as OpenPose sticks by `skeleton.py`. No Wan I2V: Wan gives many legs no loop (mireclaw-stalker) |
+| takes | s, se, e, n skel1 (seed 3). ne skel1 failed gate 3 (mass -27%: the keyframe's heap is rounder), then skel2 (seed 3) on the seed-3 keyframe with a wider stance (foot-r 1.15) |
+| loops | s 16 (seam .100), se 16 (.153), e 16 (.134), ne 16 (.132), n 16 (.125) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.lurker.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-05, gate 938319cdcc807028 (G7), all PASS (9/9) on the first run:
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .100 / .153 / .134 / .132 / .125 |
+
+## carapace-brute (brute), 2026-11-05: design kept, trotting on four legs by skeleton control in all 5 directions
+
+The armoured quadruped (`npcs.ts` `brute`) had one frame, the August hires
+s-idle, drawn in every direction. The design is kept: a bone-tan ridged shell
+over head and shoulders, dark teal mottled hide, a teal flank plate with brass
+trim, a tufted tail, tan claws. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md) and the
+quadruped route in `docs/cast-walks/PIPELINE-NONBIPED.md`.
+
+| stage | what |
+|---|---|
+| design | kept as shipped (no redesign on this run); a beast that holds nothing |
+| input | the shipped `carapace-brute-s-idle.png`, sha256 `113a1d81630bda3e…` |
+| keyframes | Qwen-Image-Edit band only (`scripts/assets/rotoscope/keyframe_probe.py`), one still per direction from the s-idle. s: an all-fours describe (the head-on one drew an upright biped on 3 of 3 seeds), seed 3. se seed 3. e: the pipeline proof's seed 3. ne/n: a face-free back describe naming the ridged shell (the first round drew a smooth dome and gave n 24% less mass); ne seed 3 drawn facing upper left and mirrored, n seed 11. The tail and its tuft are the rear cue, inside the silhouette |
+| motion | Wan 2.2 Fun-Control A14B driven by a stick skeleton of a diagonal-pair trot (`scripts/assets/rotoscope/rig_quadruped.py`, period 16, half stride 40 px, lift 28 at 848x480; n half stride 50, lift 44; e by `rig_quadruped_side.py`), keyframe as `ref_image`, seed 3 |
+| takes | s take1, se take1, e the proof take (fc-brute-e-s3), ne take2 (ridged-shell keyframe), n take3 (ridged-shell keyframe, longer stride: foot lift 2.9 px -> 4.4 px at 96) |
+| loops | period 16 in every direction: s .129, se .112, e .103, ne .113, n .125 |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| backdrop | `spritesheet.py` keys the backdrop the legs enclose in the lower 40% of the silhouette, and flat backdrop anywhere (`pocket_key`, `POCKET_FLAT`); the shell's pale highlights had switched pocket keying off for this kind |
+| hind legs | after export, `/mnt/d/tmp/cast-walks/runs/carapace-brute-1105/tools/hindlegs.py` moves the hide ramp one step lighter in the rear hind-leg box below the belly of s/se/e/ne ((35,40,46) -> (22,58,62) -> (36,86,92) -> (58,122,128); outlines and claws kept): 13671 px at 96, 4137 at 48 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.brute.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-05, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .129 / .112 / .103 / .113 / .125 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .114-.144, head .043-.077, identity .030-.048 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. The body is low and wide, so frames are 46-51 px tall and
+74-92 wide on the hi-res pack (23-26 by 36-45 on the 48 px pack). The
+renderer's `LOCOMOTION` still lists gloom-lurker as `hover`; the drawn walk
+loop switches the procedural float off for walk only.
+
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | identity .024-.058, boil .100-.197, head .030-.070 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. Gait at 96 px (`gait_measure.py`, first-harmonic foot lift):
+s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
+(phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
+to the left, as the shipped s-idle was; its hind legs stay in the belly's
+shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.

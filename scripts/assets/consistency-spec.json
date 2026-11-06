@@ -344,12 +344,12 @@
  "gloam-hound": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 44,
-   "width": 44,
-   "head_h": 23,
-   "mass": 972,
-   "cx": -2.0,
-   "foot_y": 45
+   "height": 34,
+   "width": 30,
+   "head_h": 33,
+   "mass": 542,
+   "cx": -0.68,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

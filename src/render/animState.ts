@@ -105,7 +105,8 @@ export const ANIM_STATE_DEFS = {
   // Roll's window is the sim's (`playerCtl.roll.untilTick`), never a render guess.
   roll: { play: 'once', tpf: 3, window: 'sim', borrows: ['walk', 'idle'] },
   death: { play: 'once', tpf: 5, window: { clipAtLeast: 18 }, borrows: ['hurt', 'idle'] },
-  // An armed NPC pulls its weapon the moment it engages (animTracker.ts).
+  // An armed NPC pulls its weapon the moment it engages; a player, when its gun
+  // comes up (animTracker.ts).
   draw: { play: 'once', tpf: 2, window: 'clip', borrows: [], stowsWeapon: true },
   // An occasional idle variant (scratch, shift weight) on a still, calm body.
   fidget: { play: 'once', tpf: 3, window: 'clip', borrows: [] },
@@ -126,8 +127,9 @@ export const ANIM_STATES = Object.keys(ANIM_STATE_DEFS) as readonly AnimStateNam
  * flinch reads as more urgent than anything the body chose to do. `draw` over
  * `attack` no longer decides anything for a pistol carrier: the sim holds its
  * first shot for `NpcDef.drawTicks`, which ends as an 8-frame default-cadence
- * clip does. It still decides two overlaps: a body with no wind-up that swings
- * on its engage tick, and a theme whose `anim.draw` tpf outlasts the wind-up.
+ * clip does, and a player's draw ends at its first shot (animTracker.ts). It
+ * still decides two overlaps: a body with no wind-up that swings on its
+ * engage tick, and a theme whose `anim.draw` tpf outlasts the wind-up.
  * There attack on top would cut into the clip, show the held weapon, then jump
  * back into the draw; draw on top plays the clip whole and only hides the
  * attack pose (the shot still flies). Walk beats fidget so a step cancels a
@@ -146,8 +148,10 @@ export const ANIM_PRIORITY: readonly AnimStateName[] = [
 ]
 
 /** Frames per state are indexed 0..MAX_ANIM_FRAMES-1 (manifest key grammar
- * `char.<kind>.<dir>-<state>-<n>`). Contiguous from 0; a gap ends the clip. */
-export const MAX_ANIM_FRAMES = 8
+ * `char.<kind>.<dir>-<state>-<n>`). Contiguous from 0; a gap ends the clip.
+ * 16 so a motion-captured one-shot (the player's 14-frame draw) plays whole;
+ * loops and the NPC clips still draw 8 or fewer. */
+export const MAX_ANIM_FRAMES = 16
 
 export const isLoop = (s: AnimStateName): boolean => ANIM_STATE_DEFS[s].play === 'loop'
 

@@ -153,10 +153,16 @@ describe('draw — an armed NPC pulls its weapon the tick it engages', () => {
 })
 
 describe('draw — the clip fits the sim wind-up', () => {
+  // NPC packs draw 8-frame draws. MAX_ANIM_FRAMES is 16 for the player's
+  // motion-captured draw, which ends at the player's first shot instead
+  // (playerDraw.test.ts); an NPC clip longer than its wind-up plays whole over
+  // the first shot (animState ANIM_PRIORITY).
+  const NPC_DRAW_FRAMES = 8
   it('every archetype with a wind-up holds fire for at least a full 8-frame draw at the default tpf', () => {
     const armed = Object.values(NPCS).filter((d) => (d.drawTicks ?? 0) > 0)
     expect(armed.map((d) => d.archetype).sort()).toEqual(['acolyte', 'bellwether', 'drowner'])
-    for (const d of armed) expect(d.drawTicks, d.archetype).toBeGreaterThanOrEqual(MAX_ANIM_FRAMES * DEFAULT_TPF.draw)
+    for (const d of armed) expect(d.drawTicks, d.archetype).toBeGreaterThanOrEqual(NPC_DRAW_FRAMES * DEFAULT_TPF.draw)
+    expect(NPC_DRAW_FRAMES).toBeLessThanOrEqual(MAX_ANIM_FRAMES)
   })
 })
 

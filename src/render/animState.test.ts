@@ -342,8 +342,8 @@ describe('constants sanity', () => {
     }
   })
 
-  it('MAX_ANIM_FRAMES bounds the manifest key grammar', () => {
-    expect(MAX_ANIM_FRAMES).toBe(8)
+  it('MAX_ANIM_FRAMES bounds the manifest key grammar: 16, room for the 14-frame motion-captured draw', () => {
+    expect(MAX_ANIM_FRAMES).toBe(16)
   })
 })
 

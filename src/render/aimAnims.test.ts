@@ -219,7 +219,9 @@ describe('player aim: the gun stays up and on the aim line whichever way the leg
   it('stands in aim, strafes and backpedals in aimwalk, facing east the whole time', () => {
     const seen = playerSeen(AIM_PACK)
     const phase = (from: number, to: number): Seen[] => seen.slice(from + 2, to) // a tick or two to get going
-    for (const s of phase(0, 30)) expect(s.state).toBe('aim')
+    // First seen standing with the gun up: the player draws (playerDraw.test.ts), then aims.
+    expect(seen.slice(0, DRAW_TICKS).map((s) => s.state)).toEqual(Array(DRAW_TICKS).fill('draw'))
+    for (const s of seen.slice(DRAW_TICKS, 30)) expect(s.state).toBe('aim')
     for (const [from, to, dx, dy] of [
       [30, 60, 0, -1],
       [60, 90, -1, 0],

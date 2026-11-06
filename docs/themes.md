@@ -114,7 +114,7 @@ the console and in `validateManifest` unit tests.
 | `tile.<name>.overlay` | OPTIONAL pool of RGBA decals placed by CONTEXT, not by chance: the tilemap plans placements from the tile grid — wall bases, room corners (two adjacent walls → two overlapping decals), door thresholds, macro-cell plate seams, plus a rare open-floor clump (`src/render/tileSelect.ts` `planTileOverlays`). Author each decal with its mass biased toward the TOP edge of the tile; the renderer rotates it toward whichever edge earned it. This is how overgrowth "pools" against structure instead of being speckled into the base texture. Deterministic per coordinate — same moss on every device. |
 | `tile.<name>.cap` / `tile.<name>.cap.inner` | OPTIONAL, wall family only (`wall`, `hull`). The lit top strip of the wall, authored as RGBA along the tile's TOP edge (transparent below), plus the matching cap-sized nub in the top-left corner. The tilemap lays the strip on every edge of a wall tile that faces open ground, rotated to that edge, and the nub in concave corners (`src/render/wallCaps.ts`), so the cap line runs continuously along runs, corners and T-junctions; bevelled corners bake it along the 45° cut too. When a theme ships these, its wall BODY art must carry no cap of its own (`scripts/assets/wall_caps.py` splits a baked cap off existing art). Both keys or neither. |
 | `char.<name>.<dir>-<frame>` | directional billboard character, LEGACY two-frame form. `<name>` ∈ `player warden mutant civilian scientist acolyte robot`; `<dir>` ∈ `s se e ne n`; `<frame>` ∈ `idle step`. 70 keys. See "Character art convention" below. |
-| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death draw fidget aim aimwalk`; `<n>` ∈ `0..7`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
+| `char.<name>.<dir>-<state>-<n>` | directional character ANIMATION-STATE frame. `<state>` ∈ `idle walk attack hurt roll death draw fidget aim aimwalk`; `<n>` ∈ `0..15`, contiguous from 0. Same `<name>`/`<dir>` sets as above. See "Animation states" below. |
 | `unit.player`, `unit.warden` | single-sprite billboard fallback (no directions) |
 | `unit.<name>.idle`, `unit.<name>.step` | single-sprite two-frame walkers, `<name>` ∈ `mutant scientist robot` |
 | `item.default` | generic ground-item sprite |
@@ -199,7 +199,7 @@ render-side start signals live in `src/render/animTracker.ts`.
 | `hurt` | one-shot | took a hit (`status.hitFlashUntil`) | its drawn clip, at least 8 ticks |
 | `roll` | one-shot | dodge-roll active | the sim's roll window (12 ticks) |
 | `death` | one-shot | entity died (render-side ghost; corpses leave the snapshot the same tick) | its drawn clip, at least 18 ticks |
-| `draw` | one-shot, **drawn-only** | the NPC's AI entered `aggro` (it engaged a target), after at least 30 ticks not engaged | its own clip: frames × tpf |
+| `draw` | one-shot, **drawn-only** | an NPC: its AI entered `aggro` (it engaged a target), after at least 30 ticks not engaged. A player: its gun came up (below) | its own clip: frames × tpf; a player's ends early at its first step or shot |
 | `fidget` | one-shot, **drawn-only** | the body has been still and calm (not aggro/flee/seek, dormant, downed, stunned, asleep or frozen) for 90 ticks; then on a per-entity grid every 180–329 ticks, hashed from the entity id | its own clip: frames × tpf |
 | `aim` | loop, **drawn-only** | the body aims (below) and stands still | while it holds |
 | `aimwalk` | loop, **drawn-only** | the body aims and moves, whichever way | while it holds |
@@ -243,11 +243,24 @@ Without aim frames the held weapon sprite rises from the hip to a raised hold
 at chest height, an arm's length out along the aim. Co-op clients get the
 host's verdict in the snapshot (an aim trailer), so they show the same states.
 
+**The player's draw.** A player never engages, so its `draw` starts where its
+gun comes up (`isAiming` turns true) after at least 30 ticks down: first seen
+armed (spawn, a new floor), a swap from fists or a melee weapon to a gun, a
+swap from one gun to another, getting up from a revive, a finished lockpick or
+draft pick. A stun, sleep, freeze or shock pauses the edge, so the thaw does not
+re-draw. The draw never holds a player up: a player moving on that tick does
+not draw, and its first step or shot ends the clip. The clip runs holster, grab,
+snap and settle and **ends in the `aim` pose**, so it hands into `aim` (or
+`aimwalk`) with no jump. Up to 16 frames (`MAX_ANIM_FRAMES`); the shipped
+motion-captured draw is 14. Render-side only: no wire change, and co-op clients
+run the same rule on the host's aim verdict.
+
 **Drawn-only states (`draw`, `fidget`, `aim`, `aimwalk`).** These exist only as art. A pack that
 ships no frames for one never enters it: no borrowed stand-in, no procedural
 version, and the character renders exactly as it would without the state. When
 the frames exist, the state lasts exactly `frames × tpf` ticks and plays every
-frame once. Draw the clip so it **starts and ends on the idle pose**; the cut
+frame once. Draw the clip so it **starts and ends on the idle pose** (a player's
+`draw` is the exception: it ends IN the `aim` pose, below); the cut
 in from idle/walk and back out must not jump. While `draw` plays, the engine
 hides the held-weapon sprite, because the clip draws the weapon. Neither state
 adds procedural motion (no breathe, lean or bob over the frames). The aim loops
@@ -301,7 +314,7 @@ every 15 ticks, so 7 frames at tpf 2 (14 ticks) play whole and 8 frames
 (16 ticks) lose their last tick. Start and end the clip on the idle pose.
 
 **Key grammar.** Each state takes up to 8 frames per drawn direction:
-`char.<name>.<dir>-<state>-<n>` with `<n>` ∈ `0..7`. Frames must be
+`char.<name>.<dir>-<state>-<n>` with `<n>` ∈ `0..15`. Frames must be
 **contiguous from 0** — the first missing index ends the clip (a gap after it
 is ignored). Loop states cycle their frames forever (phase-shifted per entity
 so crowds don't move in lockstep); one-shots play once from the state's start

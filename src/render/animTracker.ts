@@ -6,8 +6,9 @@
  * observed change between frames where the entity carries the signal:
  *
  * - attack: `combat.cooldown` rose (the sim only ever decrements it);
- * - draw:   `ai.mode` became `'aggro'` (the body engaged a target), after at
- *           least DRAW_REARM_TICKS not engaged — a flicker does not re-draw;
+ * - draw:   an NPC: `ai.mode` became `'aggro'` (the body engaged a target),
+ *           after at least DRAW_REARM_TICKS not engaged — a flicker does not
+ *           re-draw. A player: its gun came up (playerDrawEdge below);
  * - hurt:   `status.hitFlashUntil` (the sim stamps the hit tick + 3);
  * - roll:   `playerCtl.roll` (the sim's own window);
  * - fidget: the body has been still and calm since `stillSince`, and the
@@ -35,6 +36,7 @@ import { isAiming } from '../game/aiming'
 import { DRAW_REARM_TICKS } from '../game/data/npcs'
 import type { Entity } from '../game/entity'
 import { ROLL_TICKS } from '../game/systems/roll'
+import { isMovementLocked } from '../game/systems/statusFx'
 import { SIM_DT, type EntityId, type SimEvent } from '../game/types'
 import { entityMoving } from './anim'
 import { fidgetStart, hurtStart, resolveAnimState, type AnimStateName, type ResolvedAnim } from './animState'
@@ -56,6 +58,13 @@ export interface AnimMemory {
   disengagedAt?: number
   /** Tick the last draw started. */
   drawStart?: number
+  /** A player's gun was up (isAiming) at the last observation. Undefined until
+   * first seen: a player first seen with its gun up draws (it arrived armed). */
+  gunUp?: boolean
+  /** Tick a player's gun last went down. */
+  gunDownAt?: number
+  /** The ranged weapon a player held up at the last observation. */
+  gun?: string
   /** Tick the body last became still and calm (idle or fidgeting); undefined
    * while it is doing anything else. */
   stillSince?: number
@@ -121,6 +130,37 @@ export const isCalm = (e: Entity): boolean => {
 }
 
 /**
+ * A player's draw. A player never engages: its gun is up whenever it holds a
+ * ranged weapon and is free to use it (game/aiming.ts isAiming). So the draw
+ * starts where the gun comes up after being down:
+ * - first seen with the gun up (it spawned, or arrived on a floor, armed);
+ * - a swap from fists or a melee weapon to a gun, or from one gun to another;
+ * - getting up from a revive, finishing a lockpick or a draft pick.
+ * A gun down for less than DRAW_REARM_TICKS does not re-draw. A stun, sleep,
+ * freeze or shock pauses the edge: the gun never left the hand, so the thaw
+ * does not re-draw.
+ *
+ * The draw is cosmetic and never holds a player up: a player moving on the
+ * edge tick does not draw, and a step or a shot after it ends the clip, which
+ * hands straight to aim or aimwalk. A co-op client runs the same code on the
+ * host's aim verdict (`aimShown`), so it shows the same draws.
+ */
+const trackPlayerDraw = (mem: AnimMemory, e: Entity, tick: number, moving: boolean): void => {
+  if (!isMovementLocked(e)) {
+    const up = isAiming(e, tick)
+    const gun = up ? e.combat?.weapon : undefined
+    const rose = up && mem.gunUp !== true && (mem.gunDownAt === undefined || tick - mem.gunDownAt >= DRAW_REARM_TICKS)
+    const swapped = up && mem.gunUp === true && gun !== undefined && mem.gun !== undefined && gun !== mem.gun
+    if ((rose || swapped) && !moving) mem.drawStart = tick
+    if (mem.gunUp === true && !up) mem.gunDownAt = tick
+    mem.gunUp = up
+    mem.gun = gun
+  }
+  const d = mem.drawStart
+  if (d !== undefined && (moving || (mem.attackStart ?? -Infinity) >= d)) mem.drawStart = undefined
+}
+
+/**
  * Observe `e` at `tick`, update `mem`, and resolve its animation state.
  * `clipTicks` holds the length (frames × tpf) of the facing pose's OWN clip for
  * each measured state (animState.MEASURED_STATES); a state absent there is
@@ -142,13 +182,17 @@ export const trackAnim = (
   if (cd !== undefined && mem.prevCooldown !== undefined && cd > mem.prevCooldown) mem.attackStart = tick
   mem.prevCooldown = cd
 
-  const engaged = isEngaged(e)
-  if (mem.engaged === false && engaged) {
-    if (mem.disengagedAt === undefined || tick - mem.disengagedAt >= DRAW_REARM_TICKS) mem.drawStart = tick
-  } else if (mem.engaged === true && !engaged) {
-    mem.disengagedAt = tick
+  const moving = entityMoving(e, SIM_DT)
+  if (e.kind === 'player') trackPlayerDraw(mem, e, tick, moving)
+  else {
+    const engaged = isEngaged(e)
+    if (mem.engaged === false && engaged) {
+      if (mem.disengagedAt === undefined || tick - mem.disengagedAt >= DRAW_REARM_TICKS) mem.drawStart = tick
+    } else if (mem.engaged === true && !engaged) {
+      mem.disengagedAt = tick
+    }
+    mem.engaged = engaged
   }
-  mem.engaged = engaged
 
   const roll = e.playerCtl?.roll
   const rolling = roll !== undefined && tick < roll.untilTick
@@ -169,7 +213,7 @@ export const trackAnim = (
   }
   const anim = resolveAnimState({
     tick,
-    moving: entityMoving(e, SIM_DT),
+    moving,
     aiming: isAiming(e, tick),
     starts,
     simEnds: { roll: rolling ? roll.untilTick : undefined },

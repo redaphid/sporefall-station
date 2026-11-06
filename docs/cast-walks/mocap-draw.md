@@ -1,4 +1,4 @@
-# Motion-capture draw (R&D, 2026-11-06)
+# Motion-capture draw (R&D, then the shipped player draw, 2026-11-06)
 
 Owner ask: a pistol draw with the fluid feel of Flashback (Amiga), which was rotoscoped from filmed
 actors. This note covers the route, the numbers and the verdict against the hand-keyed `rig_action.py`
@@ -101,3 +101,66 @@ Weak spots shared by both takes (the pipeline, not mocap):
 4. Fix the two shared weak spots: draw a stronger pistol prop, and snap the action colours to the
    shipped idle's own trouser colours.
 5. Engine: a player draw trigger, and `MAX_ANIM_FRAMES` 16 for one-shot clips.
+
+## Shipped: the player's quickdraw (`feat/player-draw-1106`)
+
+Owner notes this round, 11-06: the draw looked "lazy, not urgent, and limp"; "the mocap weapon draw
+sprite also makes the character's face disappear at the end"; the trousers flip from the idle's brown to
+blue-grey; the gun must be the Rivet Driver; "the motion can crouch a bit ... or brace against the weapon
+recoil".
+
+### Engine
+
+- The player draws when its gun comes up: the render-side edge of `isAiming` (first seen armed, a swap
+  to a gun or between guns, a revive, a finished lockpick or draft), at least 30 ticks after it went down.
+  A stun, sleep, freeze or shock pauses the edge. A step or a shot ends the clip. No wire change; a co-op
+  client runs the same rule on the host's aim verdict. `src/render/animTracker.ts` `trackPlayerDraw`,
+  tests in `src/render/playerDraw.test.ts`.
+- `MAX_ANIM_FRAMES` is 16. The clip ends IN the aim pose and hands into `aim`.
+- Per-frame timing: the manifest's `animTiming` (`"player.draw": [ticks per frame]`), the window is the
+  sum. Lookup walks `@<weapon>` then `@<weapon class>` then the generic key (`src/render/weaponVariant.ts`),
+  the reserved seam for per-weapon draws, aims and braces (`docs/themes.md` "Weapon variants").
+
+### Route (e)
+
+| step | tool | settings |
+|---|---|---|
+| reference | `mocap_ref.py video` from the profile still s23, `ship/prompts.py` quickdraw prompt | 4 seeds; ranked by `mocap_pick.py` (frames from the holster to full reach, peak hand speed); s11 won: peak 0.074 body heights a frame vs 0.051 for the R&D take |
+| keypoints | `mocap_ref.py pose` | per-run prefix (a reused `clip-sN` prefix read an old run's keypoints) |
+| retarget | `mocap_rig.py --end aim --plan quick --ant 4 --plant --dip-max .07 --travel .3 --lean .45` | the actor up to the first full reach lands exactly on `rig_action aim` (the pose the `aim` loop holds); then a one-frame overshoot (hands 3% of height above level), a settle and the braced aim |
+| weapon | `aim_keyframe.py paint` (Qwen edit, the Rivet Driver design `weapons/lore/pistol-ref.png` as image 2) | the e aim keyframe holding the Rivet Driver is the Fun-Control reference |
+| render | `fun_control.py` seed 3, `ship/moves-draw.txt` | the idle keyframe as the reference draws a plain silver pistol; the Rivet Driver keyframe carries the gun |
+| post | `cast_action.py post --no-paint --snap-idle --own-colours --idle-start` | 14 frames, both packs |
+
+Timing (`--plan quick`): rest 1 tick, four anticipation frames 1 tick each (weight drops, knees bend, the
+elbow cocks back to the hip), the grab held 2, three snap frames and the reach at 1 tick each, the
+overshoot 1, the settle 2 and 3, the braced aim 4: 21 ticks. From the hand leaving the holster to full
+reach: 4 ticks (0.13 s) against 10 ticks (0.33 s) for the R&D cut at the uniform 2-tick cadence.
+
+### Lessons (each one fixed at the root, each one a gate)
+
+- **The face did not disappear in the render; the key ate it.** Fun-Control draws the skin lighter than
+  the palette's skin, (255,212,179) against (216,168,120). `unmix` reads that as a faint blend of the
+  palette skin and the white backdrop, so the backdrop flood crossed the profile face and keyed it out
+  (the raw frames show the face in every frame). `cast_action.py post --own-colours` adds the colours the
+  video model renders the character in (median cut of the base run's raw idle) to the ghost key's own
+  colours. `rotoscope/action_checks.py face` gates every frame: under 60% of the idle's skin in the head
+  box, or the skin on the other side of the head, fails a face view; skin appearing fails a back view.
+  `post --face-strict` exits non-zero. `--pin-head` (default) also keeps the skeleton's head on the torso:
+  a nodding head is never the reason a face goes.
+- **Trouser drift:** `action_checks.py snap` (and `post --snap-idle`) learns a colour map from the clip's
+  rest frame against the shipped idle, pixel by pixel after registration, above and below the belt, and
+  maps unseen shades into the idle's band family by luminance. Proven on the R&D take: blue-grey to brown
+  in every frame. Limit: it learns from the rest frame, so a take whose rest frame already matches and that
+  drifts later (seed 11) is not fixed; pick another seed or learn from a second frame.
+- **Generated actors lunge and kneel into a quickdraw** whatever the prompt says. `--plant` keeps the feet,
+  `--dip-max` caps the drop (front views .035: a 2D knee bend reads as a sideways knee), `--lean` keeps a
+  share of the torso pitch and the limbs keep their angle to the torso.
+- **Front and back views** reach toward or away from the camera: `mocap_pick.py` finds grab and reach from
+  the wrist's distance from the hip plus its height; pass them as `mocap_rig.py --keys grab:reach`.
+
+### Library
+
+`/mnt/d/tmp/cast-walks/mocap/library/draw/<view>/`: the actor stills, the Wan clips (`clip-sN/`), the
+DWPose keypoints (`clip-sN-kps.json`) and drawn poses, and `urgency.json` (mocap_pick's ranking). Any
+humanoid retargets them with its own `fit-<view>.json` and no GPU for the reference.

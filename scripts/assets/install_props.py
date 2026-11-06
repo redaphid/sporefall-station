@@ -28,6 +28,7 @@ sheet at game size.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -39,7 +40,8 @@ from palette_metrics import CAST, band, measure
 from restyle import ink_rim, ramp_grade
 
 ROOT = Path(__file__).resolve().parents[2]
-GEN = Path("D:/tmp/props-gen")
+GEN = Path(os.environ.get("EXP_OUT") or (
+    "/mnt/d/tmp/props-gen" if os.name != "nt" and Path("/mnt/d").is_dir() else "D:/tmp/props-gen"))
 
 # subject -> (run tag, seed, destination filename, ramp spec)
 #

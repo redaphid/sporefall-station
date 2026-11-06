@@ -173,6 +173,13 @@ NEG_WRONG_READ = ("gravestone, tombstone, headstone, grave marker, monolith, sta
                   "moss cap, overgrown, covered in moss, vines, foliage on top, cemetery, "
                   "tree, potted plant, planter, plant pot, flower pot, tub, trunk, branches, "
                   "leaves, canopy, topiary, bonsai, terrarium, on stilts, on legs")
+# The cast canon (docs/cast-walks/RUNBOOK.md Step 0; sporefall-art LORE_CHARACTERS
+# G1-G3) applies to the station's fittings too: salvaged, patched, fifty-year-old
+# colony kit whose tech is bubble plumbing (glass jars, petcocks, coil, hose), never
+# steampunk and never showroom-modern. The 11-06 census found the clean modern reads
+# (a flatscreen with an ECG line, an office desk with a PC) as off-lore as the moss.
+NEG_LORE = ("steampunk, gears, cogs, clockwork, victorian, ornate, filigree, "
+            "modern, sleek, glossy plastic, office furniture, consumer electronics")
 BG_OBJ = "single isolated game object centered on plain flat white background"
 BG_CHAR = "single character centered on plain flat white background, full body, feet on the ground"
 BG_TILE = ("flat texture swatch filling the whole frame edge to edge, no horizon, no sky, "
@@ -522,26 +529,28 @@ PROPS = {
                     "dome, domed top, rounded top, curved, sphere, hemisphere, mound, hill, "
                     "barrel, cylinder, drum, pod, egg, sack, bag, tarpaulin, cloth, open lid, "
                     "spilling contents, tall, narrow, pillar, column"),
+    # 11-06 lore pass: the eight entries the census graded C-F (hydro-recycler,
+    # cryo-terminal, nutrient-dispenser, weapons-locker, mess-bench, work-desk,
+    # wall-screen, supply-cabinet) were rewritten as G2 plumbing kit and made
+    # STOUTER: at 32px a 4:7 locker or a thin-legged bench is a sliver. Still no
+    # monitor on the desk: a desk wearing a screen is the console's silhouette.
     "work-desk": ("props/work-desk.png",
-                  # NOTHING ON TOP is load-bearing twice over: the old prompt asked for a
-                  # monitor on the desktop, so no reseed could ever fix the monitor tower —
-                  # and a desk wearing a monitor is the same object as wall-screen, which
-                  # defeats the split that justifies generating both.
-                  "a low wide sci-fi office work desk, a bare empty flat rectangular horizontal "
-                  "desktop surface with NOTHING ON TOP of it, supported on two solid side "
-                  "panels, a drawer unit under one end, WIDE horizontal silhouette, the desktop "
-                  "is a wide flat plank twice as wide as the whole object is tall, low to the "
-                  "floor, roughly 8 wide by 4 tall",
-                  "monitor, screen, computer, keyboard, tower, clutter, objects on the desk, "
-                  "tall, upright slab, vertical, narrow, cabinet, obelisk, pillar, column"),
+        "a heavy old metal work desk, a THICK flat rectangular desktop slab, a solid "
+        "drawer pedestal under EACH end with chunky drawer handles, a closed modesty "
+        "panel between them, scuffed riveted metal, ONE small glass specimen jar "
+        "standing on one corner of the desktop and nothing else on top, WIDE horizontal "
+        "shape, roughly 7 wide by 4.5 tall",
+        "monitor, screen, computer, keyboard, laptop, tower, clutter, lamp, papers, "
+        "tall, upright slab, vertical, narrow, cabinet, obelisk, pillar, column, thin "
+        "legs"),
     "supply-cabinet": ("props/supply-cabinet.png",
-                       "a tall narrow sci-fi supply cabinet, a rectangular metal cupboard with "
-                       "TWO hinged doors meeting at a vertical seam down the middle, a "
-                       "horizontal handle bar on each door, louvred vent slots near the top, "
-                       "four short feet lifting it off the floor, flat square top, sharp square "
-                       "corners, roughly 4 wide by 6 tall",
-                       "rounded top, dome, arch, curved top, screen, window, glass front, "
-                       "extremely tall, thin, sliver, pole"),
+        "a stout metal supply cabinet, TWO hinged doors meeting at a vertical seam, the "
+        "left door with a wire mesh window panel showing round glass jars on a shelf "
+        "inside, the right door solid with a stencilled supply number and a latch "
+        "handle, four short feet, flat square top, sharp square corners, solid and "
+        "chunky, roughly 5 wide by 6 tall",
+        "rounded top, dome, arch, curved top, extremely tall, thin, sliver, pole, open "
+        "doors, vending machine"),
     "spore-barrel": ("props/spore-barrel.png",
                      "a SQUAT cylindrical oil drum barrel standing upright on its flat circular "
                      "end, clearly a CYLINDER with a visible round elliptical rim at the top, "
@@ -552,46 +561,45 @@ PROPS = {
                      "dome, hemisphere, egg, sphere, round top, tapered, cone, sack, pot, vase, "
                      "tall, narrow, thin, slender, pillar, column, canister, tube, rocket, pipe"),
     "nutrient-dispenser": ("props/nutrient-dispenser.png",
-                           # The ONE prop whose silhouette was already right. Regenerate only if
-                           # the ramp cannot carry it — shape here is not the problem.
-                           "an upright vending machine nutrient dispenser, a tall rectangular "
-                           "metal cabinet with a large glass window front, three horizontal "
-                           "shelves of canisters visible behind the glass, a dispensing slot at "
-                           "the bottom, a keypad beside the window, flat square top, roughly 4 "
-                           "wide by 7 tall",
-                           "rounded top, dome, arch, solid front, no window, doors, "
-                           "sliver, pole, obelisk"),
+        "an upright nutrient dispenser cabinet, a boxy metal cabinet with THREE big "
+        "round glass jars standing in a row in an open recess behind a wire mesh guard, "
+        "each jar with a brass petcock tap underneath it over a drip tray at waist "
+        "height, a hand-painted number on the top panel, riveted patch plates, flat "
+        "square top, chunky, roughly 5 wide by 6 tall",
+        "rounded top, dome, arch, solid front, sliver, pole, obelisk, vending machine "
+        "snacks, candy, bottles of soda, thin"),
     "wall-screen": ("props/wall-screen.png",
-                    "a wall-mounted sci-fi flat panel display screen, a thin rectangular monitor "
-                    "in a slim bezel showing glowing green readout glyphs, mounted flush against "
-                    "a vertical wall on a bracket, a bundle of cables trailing from one bottom "
-                    "corner, flat and thin, wider than it is tall, no floor contact and nothing "
-                    "beneath it, roughly 7 wide by 5 tall",
-                    "stand, post, pole, tripod, base plate, pedestal, feet, stubby stand, "
-                    "desk monitor, on a table, thick body, box, crt, deep cabinet, tall, "
-                    "narrow, tower"),
+        "a chunky old console set, a thick boxy metal housing with a rounded rectangular "
+        "glass screen glowing with a green readout, two round dials and a row of toggle "
+        "switches on a control strip below the screen, a coiled rubber cable out of one "
+        "side, riveted patch plates, a squat block wider than it is tall, roughly 6 wide "
+        "by 5 tall",
+        "flat panel, thin bezel, modern tv, sleek, stand, post, pole, tripod, pedestal, "
+        "feet, desk, table, tall, narrow, tower, keyboard"),
     "weapons-locker": ("props/weapons-locker.png",
-                       "a tall rectangular steel weapons locker, one full-height vertical door "
-                       "with a recessed handle and a small keypad panel, three horizontal "
-                       "louvred vent slits at eye height, a stencilled yellow number on the "
-                       "door, riveted edges, flat square top, hard square corners, like a school "
-                       "locker, roughly 4 wide by 7 tall",
-                       "rounded top, arch, dome, screen, glass, vending machine, shelves, "
-                       "window, sliver, pole, obelisk"),
+        "a WIDE stout steel locker, TWO full-height doors side by side with a vertical "
+        "seam between them, a heavy padlock hasp across the seam, louvred vent slits at "
+        "the top of each door, one door patched with a riveted mismatched metal plate, a "
+        "big stencilled number, flat square top, hard square corners, solid and heavy, "
+        "almost as wide as it is tall, roughly 5 wide by 6 tall",
+        "rounded top, arch, dome, screen, glass, vending machine, shelves, window, "
+        "sliver, pole, obelisk, thin, narrow, single door"),
     "cryo-terminal": ("props/cryo-terminal.png",
-                      "an upright cryo-credit terminal kiosk, a narrow rectangular metal cabinet "
-                      "with a small glowing screen set into an angled head at the top, a card "
-                      "slot and a keypad below it, a flat square top, straight vertical sides, "
-                      "standing flat on the floor, roughly 3 wide by 6 tall",
-                      "rounded top, dome, arch, tapered, obelisk, pillar, headstone, "
-                      "extremely tall, sliver"),
+        "an old upright cryo-credit terminal cabinet, a thick boxy metal cabinet with a "
+        "small round porthole screen near the top, a glass bubble jar clamped in a wire "
+        "cage on its side, a slot and a row of chunky push buttons below the screen, a "
+        "rubber hose looping from the cage into the cabinet, riveted patch plates, flat "
+        "square top, roughly 4 wide by 5 tall",
+        "rounded top, dome, arch, tapered, obelisk, pillar, headstone, extremely tall, "
+        "sliver, thin, flat panel, tablet"),
     "hydro-recycler": ("props/hydro-recycler.png",
-                       "a squat hydroponic water recycler unit, a wide open circular BASIN with "
-                       "a clearly visible elliptical rim holding glowing teal water, sitting on "
-                       "a short cylindrical metal pedestal with two pipes running up one side, "
-                       "wider than it is tall, roughly 6 wide by 4 tall",
-                       "closed top, solid lump, dome, sphere, tall, narrow, pillar, "
-                       "plants, sprouts, foliage"),
+        "a squat salvaged water still machine, a stout round metal tank with a big round "
+        "glass condenser jar sitting on top of it, a coil of copper pipe wrapped around "
+        "the jar, two brass petcock valves and a short rubber hose on the front of the "
+        "tank, riveted patch plates on the tank, one small round status lamp, chunky and "
+        "solid, about as wide as it is tall, roughly 5 wide by 5 tall",
+        "toilet, bowl, basin, sink, bathtub, open water, fountain, plants, sprouts, "
+        "foliage, tall, narrow, pillar"),
     # ---- the furnishings that never had art ---------------------------------
     # These six archetypes are placed by the room planner (levelgen/furnish.ts)
     # and have ALWAYS drawn as hand-coded PixiJS vector shapes (render/art.ts
@@ -719,6 +727,13 @@ PROPS = {
                    "desk, drawers, drawer unit, side panels, cabinet, objects on the table, "
                    "plates, cups, food, clutter, chairs, stools, round tabletop, circular, "
                    "tall, narrow"),
+    "mess-bench": ("props/mess-bench.png",
+        "a heavy low bench seat, ONE thick padded seat cushion of quilted canvas patched "
+        "with mismatched squares and visible stitches, lying on a thick solid metal box "
+        "frame, solid and chunky, no backrest, LONG low horizontal shape twice as wide "
+        "as it is tall, roughly 7 wide by 3.5 tall",
+        "backrest, back panel, chair, armchair, armrests, sofa, couch, table, desk, "
+        "tall, upright, pillows, several benches, thin legs, open frame"),
 }
 ITEMS = {
     "spore-pistol": ("items/spore-pistol.png",
@@ -868,7 +883,7 @@ def jobs():
                                        f"frame height, tightly cropped, centered, upright, "
                                        f"slight high three-quarter game angle, {PROP_LOOK}",
                                    neg=f"{NEG_FIGURE}, {NEG_BASE}, {NEG_GROUND}, "
-                                       f"{NEG_WRONG_READ}, {extra}")
+                                       f"{NEG_WRONG_READ}, {NEG_LORE}, {extra}")
     # Items get NO IPAdapter refs: the environment anchors (mossy barrel + deck
     # tile) turned every weapon into a mushroom. Inventory-icon wording instead;
     # palette lock keeps them cohesive with the pack.

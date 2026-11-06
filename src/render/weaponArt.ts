@@ -46,9 +46,35 @@ export const hasHeldWeapon = (id: string): boolean => WEAPONS[id]?.natural !== t
  * fallback rod still reads as a swing rather than freezing at a gun's idle hold. */
 export const isMeleeWeapon = (id: string): boolean => WEAPONS[id]?.kind !== 'ranged'
 
-/** The weapon-sprite canvas. Weapons are drawn pointing +x (east) with the grip
- * near the left edge, so rotating the sprite around `grip` swings the head. */
+/** The weapon-sprite AUTHORING canvas. Weapons are drawn pointing +x (east)
+ * with the grip near the left edge, so rotating the sprite around `grip` swings
+ * the head. This is drawing room, not the size the weapon shows at: a 44px
+ * canvas held 1:1 against a 48px character made every pistol nearly as long as
+ * the body holding it. `heldScale` shrinks it to `HELD_LENGTH`. */
 export const WEAPON_CANVAS = { w: 44, h: 18, grip: 5 } as const
+
+/** Grip-to-tip span of the authoring canvas: the length `HELD_LENGTH` maps onto. */
+export const CANVAS_REACH = WEAPON_CANVAS.w - WEAPON_CANVAS.grip
+
+/** How long each silhouette reads IN THE HAND, grip to tip, in character-canvas
+ * px (the 48px `CHAR_PX` frame; the renderer scales it with CHAR_PX). Sized off
+ * the bodies the packs draw: a diver stands ~45 of its 48px, and the pistol its
+ * hand-painted `draw` clip holds is ~7px (13px at the hi-res pack's 96). A held
+ * pistol at 10 reads as a pistol at play zoom without outsizing the hand-painted
+ * one by more than ~1.5x; the one-handed tools sit near it, and only the
+ * two-handed sledge reaches half the body. Every value stays under half the
+ * character, which `weaponArt.test.ts` and the render-layer test pin. */
+export const HELD_LENGTH: Record<WeaponShape, number> = {
+  gun: 10,
+  blade: 8,
+  club: 12,
+  hammer: 22,
+  rod: 12,
+}
+
+/** Sprite scale that shows weapon `id`'s authored canvas at its `HELD_LENGTH`
+ * (before the mod skin's growth and the CHAR_PX/48 factor). */
+export const heldScale = (id: string): number => HELD_LENGTH[weaponShape(id)] / CANVAS_REACH
 
 /** The grip anchor (fraction of the canvas) the renderer pins to the hand and
  * rotates the swing around: horizontally at the grip, vertically centred. */

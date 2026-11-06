@@ -26,7 +26,7 @@ import {
 } from './art'
 import { DIR_FALLBACK, type Dir5 } from './theme'
 import { weaponStack } from '../game/systems/inventory'
-import { hasHeldWeapon, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
+import { CANVAS_REACH, hasHeldWeapon, heldScale, isMeleeWeapon, weaponShape, WEAPON_ANCHOR } from './weaponArt'
 import { recoilKick, weaponPose } from './weaponPose'
 import { composeWeaponSkin } from './weaponSkin'
 
@@ -493,13 +493,18 @@ export class EntityViews {
     // pixels; scale them with the actual CHAR_PX so the held weapon stays pinned
     // and proportional if the render-layer sprite size is bumped (hi-res proto).
     const hs = CHAR_PX / 48
+    // The weapon canvas is drawing room, not hand size: `held` shrinks it to the
+    // shape's HELD_LENGTH so a pistol reads as a pistol in a 48px fist rather
+    // than a barrel nearly as long as the body (weaponArt.HELD_LENGTH).
+    const held = heldScale(weaponId)
     const baseX = view.sprite.position.x + Math.cos(e.facing) * kick * hs
     const baseY = view.sprite.position.y + Math.sin(e.facing) * kick * hs
     weapon.position.set(baseX + pose.hx * hs, baseY + pose.hy * hs)
     weapon.rotation = pose.angle
     // Mirror vertically for the west-half aim so the grip hangs down (never
     // upside-down); the barrel still points along `angle` (y-flip keeps local +x).
-    weapon.scale.set(skin.scale * hs, (pose.flipY ? -skin.scale : skin.scale) * hs)
+    const size = skin.scale * held * hs
+    weapon.scale.set(size, pose.flipY ? -size : size)
     weapon.tint = skin.tint
     weapon.alpha = view.sprite.alpha
     // In front of the body normally; tucked behind for away-facing poses.
@@ -514,12 +519,12 @@ export class EntityViews {
         view.weaponGlow = glow
       }
       const glow = view.weaponGlow
-      // Centre the halo on the weapon head (out along the blade from the grip).
-      const reach = 20 * skin.scale
+      // Centre the halo on the weapon head, halfway out along the held length.
+      const reach = (CANVAS_REACH / 2) * size
       glow.position.set(weapon.position.x + Math.cos(pose.angle) * reach, weapon.position.y + Math.sin(pose.angle) * reach)
       glow.tint = skin.glowColor
       glow.alpha = skin.glow * view.sprite.alpha
-      glow.scale.set(0.7 * skin.scale)
+      glow.scale.set(0.7 * size)
       glow.zIndex = weapon.zIndex - 0.1
     } else if (view.weaponGlow) {
       this.root.removeChild(view.weaponGlow)

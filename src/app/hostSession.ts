@@ -1,6 +1,7 @@
 import type { Entity } from '../game/entity'
 import { modifierView } from '../game/floorModifiers'
 import { spawnPlayer } from '../game/player'
+import { dealOpeningDraft, dealOpeningHand } from '../game/systems/draft'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
@@ -103,6 +104,9 @@ export class HostSession implements Session {
     private coop?: CoopSource,
     /** Difficulty rules for the run — `casual` keeps death forgiving (kid mode). */
     private mode: RunMode = 'normal',
+    /** Open the run on a card pick (draft.ts `dealOpeningDraft`). Off for scripted,
+     * scenario and loaded-world runs, which start from the state they name. */
+    private opening = false,
   ) {
     this.buildRun()
   }
@@ -116,6 +120,7 @@ export class HostSession implements Session {
     setupFloor(this.world)
     const at = playerSpawnPoint(this.world.level, 0)
     this.self = spawnPlayer(this.world, 0, at.x, at.y)
+    if (this.opening) dealOpeningDraft(this.world)
   }
 
   /** Play again from a game-over: rebuild the run in place. (Solo has no
@@ -139,7 +144,8 @@ export class HostSession implements Session {
     if (this.joined.has(slot)) return
     this.joined.add(slot)
     const at = playerSpawnPoint(this.world.level, slot)
-    spawnPlayer(this.world, slot, at.x, at.y)
+    const joiner = spawnPlayer(this.world, slot, at.x, at.y)
+    if (this.opening) dealOpeningHand(this.world, joiner)
   }
 
   tick(): void {

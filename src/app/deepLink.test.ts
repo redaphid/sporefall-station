@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { overridesSave, persistsRun, readDeepLink, resumesSave, unknownScenarioMessage, wantsFreshBuild } from './deepLink'
+import { opensOnDraft, overridesSave, persistsRun, readDeepLink, resumesSave, unknownScenarioMessage, wantsFreshBuild } from './deepLink'
 
 const link = (qs: string) => readDeepLink(new URLSearchParams(qs))
 
@@ -71,5 +71,15 @@ describe('unknownScenarioMessage', () => {
     expect(msg).toContain('armed, fire')
     expect(msg).toMatch(/saved run is untouched/)
     expect(msg).toMatch(/reload/i)
+  })
+})
+
+describe('opensOnDraft', () => {
+  it('a plain or seeded run opens on a card pick', () => {
+    expect(opensOnDraft(link(''))).toBe(true)
+    expect(opensOnDraft(link('mode=solo&seed=18'))).toBe(true)
+  })
+  it.each(['scenario=armed', 'state=abc', 'world=castle-siege', 'script=modGrab'])('%s starts from the state it names', (qs) => {
+    expect(opensOnDraft(link(qs))).toBe(false)
   })
 })

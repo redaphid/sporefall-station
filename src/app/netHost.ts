@@ -1,4 +1,5 @@
 import { spawnPlayer } from '../game/player'
+import { dealOpeningDraft, dealOpeningHand } from '../game/systems/draft'
 import { playerSpawnPoint } from '../game/spawnPlacement'
 import { populateWorld } from '../game/populate'
 import { setupFloor } from '../game/systems/missions'
@@ -113,6 +114,8 @@ export class NetHostSession implements Session {
     /** Floor 1 of a run. An authored world (one not built from its seed) is
      * played as given; a seeded one is populated at Start. */
     private makeWorld: (seed: number, mode: RunMode) => World = (seed, mode) => createWorld(seed, 1, mode),
+    /** Open the run on a card pick (draft.ts `dealOpeningDraft`). */
+    private opening = false,
   ) {
     this.world = this.freshWorld()
     transport.on((ev) => {
@@ -219,6 +222,7 @@ export class NetHostSession implements Session {
       p.entityId = e.id
       entityIds[p.slot] = e.id
     }
+    if (this.opening) dealOpeningDraft(this.world)
     const start: GameStartMsg = this.gameStartMsg()
     const go: GoMsg = { startTick: this.world.tick, entityIds }
     this.broadcastJson(MsgType.GameStart, start)
@@ -596,6 +600,7 @@ export class NetHostSession implements Session {
         // that slot would have landed had they been there from the beginning.
         const at = playerSpawnPoint(this.world.level, slot)
         const avatar = spawnPlayer(this.world, slot, at.x, at.y)
+        if (this.opening) dealOpeningHand(this.world, avatar)
         p.entityId = avatar.id
         this.peersBySlot.set(slot, p)
         p.queue.queueReliable(encodeJson(MsgType.Welcome, { slot, token: p.token }))

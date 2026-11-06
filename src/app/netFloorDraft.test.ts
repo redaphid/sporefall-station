@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import { emptyInput, type InputCmd } from '../game/types'
 import { weaponStack } from '../game/systems/inventory'
-import { floorDraftOffer } from '../game/systems/draft'
+import { DRAFT_TICKS, floorDraftOffer, OPENING_DRAFT_STREAM } from '../game/systems/draft'
 import type { InputSource } from '../input/input'
 import { withDraftPicks } from '../input/draftPick'
 import { decodeInput, encodeInput } from '../net/protocol/messages'
@@ -199,5 +199,54 @@ describe('withDraftPicks', () => {
     expect(src.sample().draftPick).toBe(2)
     for (const bad of [-1, 1.5, NaN, 255]) src.pick(bad)
     expect(src.sample().draftPick).toBeUndefined()
+  })
+})
+
+describe('opening draft over co-op', () => {
+  const open = (hub: MockHub) =>
+    new NetHostSession(SEED, 'Host', makeInput().source, hub.hostTransport, 'normal', undefined, undefined, true)
+
+  it('beginGame deals host and client the opening hand and the client hears it', async () => {
+    const hub = new MockHub()
+    const host = open(hub)
+    const bob = hub.addClient('Bob', makeInput().source)
+    await host.start()
+    await bob.session.start()
+    bob.connect()
+    await flush()
+    host.beginGame()
+    await flush()
+    const avatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
+    const offer = floorDraftOffer(SEED, OPENING_DRAFT_STREAM)
+    expect(host.self.playerCtl!.draft).toMatchObject({ offer, opening: true, until: DRAFT_TICKS })
+    expect(avatar.playerCtl!.draft).toMatchObject({ offer, opening: true, until: DRAFT_TICKS })
+    await step(host, bob, 16)
+    expect(bob.session.renderView().self!.playerCtl!.draft).toMatchObject({ offer, opening: true })
+  })
+
+  it('a client joining mid-opening is dealt the same hand; after the deadline, none', async () => {
+    const hub = new MockHub()
+    const host = open(hub)
+    await host.start()
+    host.beginGame()
+    for (let i = 0; i < 5; i++) host.tick()
+    const eve = hub.addClient('Eve', makeInput().source)
+    await eve.session.start()
+    eve.connect()
+    await flush()
+    const evAvatar = host.world.byId.get(host.peersBySlot.get(1)!.entityId!)!
+    expect(evAvatar.playerCtl!.draft).toMatchObject({ opening: true, until: DRAFT_TICKS })
+    host.world.tick = DRAFT_TICKS
+    const lou = hub.addClient('Lou', makeInput().source)
+    await lou.session.start()
+    lou.connect()
+    await flush()
+    expect(host.world.byId.get(host.peersBySlot.get(2)!.entityId!)!.playerCtl!.draft).toBeUndefined()
+  })
+
+  it('a session without the opening deals none', async () => {
+    const { host, avatar } = await startPair(makeInput().source)
+    expect(host.self.playerCtl!.draft).toBeUndefined()
+    expect(avatar.playerCtl!.draft).toBeUndefined()
   })
 })

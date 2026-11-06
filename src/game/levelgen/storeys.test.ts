@@ -236,9 +236,23 @@ describe('storeys: the structural rule over 200 seeds x floors 3-7', () => {
   })
 
   it('generation stays inside the phone budget (< 15 ms per complex floor on average)', () => {
-    const t0 = performance.now()
-    for (let seed = 500; seed < 540; seed++) generateLevel(seed, 3 + (seed % 5))
-    expect((performance.now() - t0) / 40).toBeLessThan(15)
+    // One timed pass measures the machine, not the generator: a full parallel
+    // suite on a loaded box read 18-20 ms for code that costs ~4 ms quiet. Load
+    // only ever adds time, so each floor keeps its fastest of PASSES runs (the
+    // usual noise-robust benchmark statistic) and the budget applies to their mean.
+    // Under a 20-burner full suite this read ~6 ms where one pass read 9-14 ms.
+    // It is a ceiling, not a regression detector: at ~3.5 ms quiet it trips
+    // on a ~4x slowdown.
+    const PASSES = 10
+    const best = new Array<number>(40).fill(Infinity)
+    for (let pass = 0; pass < PASSES; pass++)
+      for (let i = 0; i < 40; i++) {
+        const seed = 500 + i
+        const t0 = performance.now()
+        generateLevel(seed, 3 + (seed % 5))
+        best[i] = Math.min(best[i], performance.now() - t0)
+      }
+    expect(best.reduce((a, b) => a + b, 0) / 40).toBeLessThan(15)
   })
 })
 

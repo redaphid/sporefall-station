@@ -30,11 +30,13 @@ const JOBS = [
   ['crew-quarters', ['swampspace', '_review-A', '_review-B', '_review-C'], [1, 1.6, 2]],
   ['old-vs-new', ['swampspace'], [1.6, 2]],
   ['as-generated', ['swampspace'], [1, 1.6]],
+  ['lore-1106', ['swampspace', 'swampspace-hires'], [1, 1.6]],
 ]
 
 const browser = await chromium.launch({ headless: true })
 const errs = []
-for (const [fixture, themes, zooms] of JOBS) {
+// ONLY=lore-1106 shoots one fixture instead of every job.
+for (const [fixture, themes, zooms] of JOBS.filter(([f]) => !process.env.ONLY || f === process.env.ONLY)) {
   const world = JSON.parse(readFileSync(join(ROOMS, `${fixture}.json`), 'utf8'))
   for (const theme of themes) {
     const context = await browser.newContext({ viewport: SIZE, deviceScaleFactor: 3 })

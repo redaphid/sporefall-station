@@ -59,6 +59,7 @@ describe('scripted aim (ax/ay): the body strafes with its aim held', () => {
     expect(moving.length).toBe(36 + 36 + 30)
     for (const c of moving) expect([c.aimX, c.aimY]).toEqual([1, 0])
     expect(cmds.slice(0, 60).every((c) => c.moveX === 0 && c.moveY === 0)).toBe(true) // stands through the draw
+    expect(cmds.slice(132, 202).every((c) => c.moveX === 0 && c.moveY === 0)).toBe(true) // and through the re-draw
   })
 
   it('a step without ax/ay still aims along the move, as before', () => {

@@ -238,10 +238,10 @@ export const SCRIPTS: Record<string, ScriptStep[]> = {
   // south with the aim held east (aimwalk, gun on the line), stops (aim), and
   // backpedals west. Paired with e2e/feature-player-draw.mjs.
   playerDraw: [
-    { ticks: 60 }, // stand: draw, then the braced aim
-    { ticks: 36, y: -1, ax: 1 }, // strafe north, aim east
-    { ticks: 36, y: 1, ax: 1 }, // strafe south, aim east
-    { ticks: 24, ax: 1 }, // stand in aim
+    { ticks: 60 }, // stand: draw (under the floor intro), then the braced aim
+    { ticks: 36, y: -1, ax: 1 }, // strafe north, aim east (the e2e swaps to a wrench at ~100)
+    { ticks: 36, y: 1, ax: 1 }, // strafe south
+    { ticks: 70, ax: 1 }, // stand: the gun comes back at ~140 and the quickdraw plays, then aim
     { ticks: 30, x: -1, ax: 1 }, // backpedal west, aim east
     { ticks: 24, ax: 1 },
   ],

@@ -2,7 +2,8 @@
 // the floor armed, stands, and the gun comes out of the holster in the
 // motion-captured quickdraw, ending IN the braced aim; then it strafes north and
 // south with the aim held east (aimwalk), stands (aim) and backpedals west. The
-// draw plays once: a step after it never re-draws. World: the combat stage with
+// draw plays once: a step after it never re-draws. Mid-run the gun goes to a
+// wrench and back while the player stands, and the quickdraw plays again. World: the combat stage with
 // the player alone, facing east.
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -24,6 +25,13 @@ const stage = () => {
   return w
 }
 
+// The hotbar swap, done on the live world: the gun goes down for 40 ticks and comes back up while the player stands.
+const swap = (weapon) => (page) =>
+  page.evaluate((w) => {
+    const p = window.__world.entities.find((e) => e.playerCtl)
+    p.combat.weapon = w
+  }, weapon)
+
 const readState = () => {
   const w = window.__world
   const p = w.entities.find((e) => e.playerCtl)
@@ -36,13 +44,12 @@ const ok = await recordFeature({
   script: 'playerDraw',
   params: { zoom: 3, theme: 'swampspace-hires' },
   stills: [
-    { tick: 3, label: '00-holster' },
-    { tick: 9, label: '01-snap' },
-    { tick: 16, label: '02-braced' },
-    { tick: 50, label: '03-aim' },
-    { tick: 75, label: '04-strafe-north' },
-    { tick: 110, label: '05-strafe-south' },
-    { tick: 175, label: '06-backpedal' },
+    { tick: 30, label: '00-aim-after-spawn-draw' },
+    { tick: 80, label: '01-strafe-north' },
+    { tick: 100, label: '02-swap-to-wrench', act: swap('wrench') },
+    { tick: 140, label: '03-gun-back', act: swap('pistol') },
+    { tick: 170, label: '04-aim' },
+    { tick: 215, label: '05-backpedal' },
   ],
   readState,
   expect: (s) => [

@@ -1108,11 +1108,13 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
     scale = {d: s for d in union}
     ref = boxes.get(("s", "idle"))
     if lock_height and ref:
-        for d, u in union.items():
-            b = boxes.get((d, "idle"))
-            if b:
-                fits = content / max(u[3] - u[1], u[2] - u[0])
-                scale[d] = min(s * (ref[3] - ref[1]) / (b[3] - b[1]), fits)
+        # each direction's height factor against the s idle; then the largest sheet scale at which every
+        # direction, so matched, still fits. Sizing by the widest raw union instead shrank a crab whose n
+        # view is wider than its s view to 73 of 92 px, and left the capped directions short.
+        k = {d: (ref[3] - ref[1]) / (boxes[(d, "idle")][3] - boxes[(d, "idle")][1]) if boxes.get((d, "idle")) else 1.0
+             for d in union}
+        s = min(content / (k[d] * max(u[3] - u[1], u[2] - u[0])) for d, u in union.items())
+        scale = {d: s * k[d] for d in union}
     out = {}
     for d in dirs:
         u = union.get(d)
@@ -1123,7 +1125,29 @@ def pixelize_fixed(raws: dict, dirs, poses, canvas: int, content: int | None, pa
                 px = despeckle(snap(P.kcentroid(keyed[(d, p)].crop(u), tw, th), pal))
                 frame.paste(px, ((canvas - tw) // 2, canvas - 1 - th), px)
             out[(d, p)] = frame
-    return drop_specks(out, dirs, poses, canvas)
+    return seat_feet(drop_specks(out, dirs, poses, canvas), dirs, canvas)
+
+
+def seat_feet(frames: dict, dirs, canvas: int) -> dict:
+    """Move each direction down until its lowest drawn row, over all its frames, is canvas-2. The crop
+    window is the raw frames' union, and a thin tip that fills under half an output pixel (the alpha's
+    hooked claw points) vanishes in the downsample, which left its s row standing 2 px up at 48 px."""
+    out = dict(frames)
+    for d in dirs:
+        keys = [k for k in frames if k[0] == d]
+        rows = [np.where(np.asarray(frames[k])[..., 3].any(1))[0] for k in keys]
+        rows = [r for r in rows if len(r)]
+        if not rows:
+            continue
+        drop = canvas - 2 - max(int(r[-1]) for r in rows)
+        if drop <= 0:
+            continue
+        for k in keys:
+            a = np.asarray(frames[k])
+            moved = np.zeros_like(a)
+            moved[drop:] = a[:-drop]
+            out[k] = Image.fromarray(moved, "RGBA")
+    return out
 
 
 SPECK_PX = 12  # at 96 px; a detached piece this small or smaller may be a speck

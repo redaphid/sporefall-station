@@ -325,6 +325,25 @@ def main():
               all(np.asarray(f)[..., 3][0].sum() == 0 and np.asarray(f)[..., 3][:, [0, -1]].sum() == 0
                   for f in locked_q.values()))
 
+        crab = Image.new("RGB", (400, 400), (255, 255, 255))
+        ImageDraw.Draw(crab).rectangle((0, 0, 400, 400), fill=TEAL)  # s: as wide as tall
+        back = Image.new("RGB", (560, 440), (255, 255, 255))
+        ImageDraw.Draw(back).rectangle((0, 0, 560, 440), fill=TEAL)  # n: drawn 10% taller and 40% wider
+        wide = {("s", "idle"): on_frame(crab), ("n", "idle"): on_frame(back)}
+        lw = S.pixelize_fixed(wide, ["s", "n"], ["idle"], 48, None, None, lock_height=True)
+        check("height lock: a direction wider than s still stands as tall as the s idle, +-1 px",
+              abs(tall(lw[("s", "idle")]) - tall(lw[("n", "idle")])) <= 1,
+              f"{tall(lw[('s', 'idle')])} vs {tall(lw[('n', 'idle')])}")
+        check("height lock: the widest direction fills the content width (no smaller than it must be)",
+              int(np.asarray(lw[("n", "idle")])[..., 3].any(0).sum()) >= 45)
+        tip = Image.new("RGB", (400, 400), (255, 255, 255))
+        ImageDraw.Draw(tip).rectangle((100, 0, 300, 380), fill=TEAL)
+        ImageDraw.Draw(tip).rectangle((198, 380, 201, 400), fill=TEAL)  # a claw point under half an output pixel wide
+        seated = S.pixelize_fixed({("s", "idle"): on_frame(tip)}, ["s"], ["idle"], 48, None, None)
+        rows = np.where(np.asarray(seated[("s", "idle")])[..., 3].any(1))[0]
+        check("feet: the lowest drawn row sits on canvas-2 even when a thin tip vanished in the downsample",
+              int(rows[-1]) == 46, f"bottom row {rows[-1]}")
+
         print("keying")
         k = np.asarray(S.key_background(wren(bg=(250, 248, 246))))
         check("key: backdrop gone", k[5, 5, 3] == 0)

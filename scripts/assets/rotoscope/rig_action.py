@@ -144,7 +144,7 @@ def draw(B, period, yaw=14.0):
 
 # ---- hurt (biped) -----------------------------------------------------------------------------------
 
-def hurt(B, period, knock=1.0, arm_up=0.45, guard=False):
+def hurt(B, period, knock=1.0, arm_up=0.45, guard=False, spread=1.0):
     """Struck in the chest from the front: the torso snaps back and the head whips back further, both
     arms fling out and up, the knees give; it sways forward past rest, then settles. The impact pose is
     the second key, so a clip picked from frame 0 shows it on its frame 1 (the hit flash hides frame 0)."""
@@ -179,7 +179,7 @@ def hurt(B, period, knock=1.0, arm_up=0.45, guard=False):
         if kind in ("hit", "reel"):  # arms flung out to the sides and up, hands behind the body
             fl = 1.0 if kind == "hit" else 0.7
             for w, side in (("near", 1.0), ("far", -1.0)):
-                T = np.array([-0.35 * fl, side * (0.40 + 0.15 * fl), arm_up * fl - 0.55 * (1 - fl)])
+                T = np.array([-0.35 * fl, side * spread * (0.40 + 0.15 * fl), arm_up * fl - 0.55 * (1 - fl)])
                 if guard:  # the hands come up in front of the chest instead: the silhouette keeps its width
                     T = np.array([0.45 * fl + 0.1, -side * 0.05, 0.05 * fl - 0.5 * (1 - fl)])
                 T = 0.95 * T / np.linalg.norm(T)
@@ -277,13 +277,14 @@ def main():
     ap.add_argument("--head-back", type=float, help="scratch: how far the head turns back to meet the foot (default .16)")
     ap.add_argument("--arm-up", type=float, help="hurt: how high the flung hands go at the hit (default .45, about "
                                                   "shoulder height; below 0 flings them out and down)")
+    ap.add_argument("--spread", type=float, help="hurt: how far out to the sides the arms fling (default 1)")
     ap.add_argument("--guard", action="store_true", help="hurt: the hands come up to guard the chest instead of "
                                                          "flinging out (keeps the front view inside its idle width)")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     B = Body(json.load(open(a.fit)))
     kw = {k: v for k, v in (("yaw", a.yaw), ("sit_forward", a.sit_forward), ("sit_down", a.sit_down),
-                                              ("head_back", a.head_back), ("arm_up", a.arm_up), ("guard", a.guard or None)) if v is not None}
+                                              ("head_back", a.head_back), ("arm_up", a.arm_up), ("guard", a.guard or None), ("spread", a.spread)) if v is not None}
     frames, keys = build(B, a.action, a.period, **kw)
     for i, f in enumerate(frames):
         json.dump(f, open(os.path.join(a.out, f"joints-{i:02d}.json"), "w"))

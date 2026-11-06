@@ -155,9 +155,9 @@ export const trackAnim = (
     roll: rolling ? roll.untilTick - ROLL_TICKS : undefined,
     fidget: calm ? fidgetStart(e.id, tick, mem.stillSince, clipTicks.fidget ?? 0) : undefined,
   }
-  // An event start counts only where the pose draws the state, and only over
-  // an earlier start (a later observed one, or one from a rewound future, keeps
-  // its own).
+  // An event start counts only where the pose draws the state, only once its
+  // tick has come (a rewound tracker can hold one from the future), and only
+  // over an older observed start.
   for (const [s, at] of Object.entries(mem.eventStarts ?? {}) as [AnimStateName, number][]) {
     const own = starts[s]
     if ((clipTicks[s] ?? 0) > 0 && at <= tick && (own === undefined || own > tick || own < at)) starts[s] = at

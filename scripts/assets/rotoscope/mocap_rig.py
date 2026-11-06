@@ -225,6 +225,8 @@ def main():
     ap.add_argument("--slowmo", type=float, default=1.0, help="how much slower than life the capture plays (the "
                                                               "per-frame durations divide by it)")
     ap.add_argument("--hold-last", type=int, default=4, help="ticks the last picked frame lasts")
+    ap.add_argument("--keys", help="grab:reach as CLIP frame indices (mocap_pick.py's), overriding the side-view "
+                                   "reach test; needed for s, se, ne, n")
     ap.add_argument("--plant", action="store_true", help="feet stay on the fit's place (drop the actor's steps)")
     ap.add_argument("--dip-max", type=float, help="the deepest pelvis drop, in fit body heights (e.g. .08: a crouch, "
                                                   "never a kneel)")
@@ -264,6 +266,8 @@ def main():
     scale = Hf / Hs
     n = len(S)
     g0, a_in, a_out, g1, reach = gun_window(S, Hs)
+    if a.keys:  # a front or back view: the reach is toward or away from the camera, not along screen x
+        g0, a_in = (int(round((int(v) - s0) / a.speed)) for v in a.keys.split(":"))
     to_aim = a.end == "aim"
     bones = [HEAD_PINNED if b[:2] == ("neck", "head_top") else b for b in BONES] if a.pin_head else BONES
     if to_aim:

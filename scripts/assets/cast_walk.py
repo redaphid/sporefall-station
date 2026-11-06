@@ -195,9 +195,25 @@ def cmd_assemble(a):
     json.dump(meta, open(f"{out}/sheet.json", "w"), indent=1)
     ss = [sys.executable, os.path.join(HERE, "spritesheet.py"), "repack"]
     subprocess.run(ss + [out, "--period", a.period], check=True)
-    subprocess.run(ss + [out, "--palette-from", f"{out}/frames/{a.kind}-s-idle.png", "--to", out + "-pal"], check=True,
-                   stdout=subprocess.DEVNULL)
-    print(f"-> {out}-pal (loops re-found, colours from its s-idle): export that")
+    # The colours must be those of the s-idle export ships, the frame gate 2 anchors on. The run's own
+    # s-idle is posted at another size and before the snap, which can move a colour near the 0.5% share
+    # across it: bog-mutant's stalk teal was 0.68% here and 0.44% shipped, so it left the anchor set and
+    # n failed gate 2 at 3.5%. Post as export does and re-snap until the shipped s-idle's colours hold.
+    import spritesheet as S
+    px, content = PACKS["swampspace-hires"]
+    src = f"{out}/frames/{a.kind}-s-idle.png"
+    for i in range(4):
+        subprocess.run(ss + [out, "--palette-from", src, "--to", out + "-pal"], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(ss + [out + "-pal", "--size", str(px), "--content", str(content), "--to", f"{out}-pal-{px}"],
+                       check=True, stdout=subprocess.DEVNULL)
+        shipped = f"{out}-pal-{px}/frames/{a.kind}-s-idle.png"
+        if S.anchor_palette(shipped) == S.anchor_palette(src):
+            break
+        src = f"{out}/palette-anchor-{i + 1}.png"  # its own file: -pal's sheet.json keeps this path
+        shutil.copyfile(shipped, src)
+    else:
+        raise SystemExit("the s-idle's colours did not settle in 4 snaps")
+    print(f"-> {out}-pal (loops re-found, colours from its s-idle as shipped): export that")
 
 
 def _flow_of(kind, d="s"):

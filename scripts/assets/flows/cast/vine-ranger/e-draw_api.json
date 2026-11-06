@@ -94,7 +94,7 @@
     "9",
     0
    ],
-   "text": "Pixel art video game sprite animation. A stocky bareheaded swamp colonist with short copper-red hair and a long thick copper-red braid hanging over the right shoulder onto the chest, a quilted dove-grey liner vest over a grey shirt, faded orange sleeves, dark work gloves, dark trousers, brown boots, a small caged rust-orange glass jar hanging from the belt at the right hip, full side profile facing the right side of the image, nose pointing right, draws a short stubby dark gunmetal pistol from the holster on its right hip and snaps its right arm out straight to aim the pistol forward, holds the aim, then puts the pistol back on its hip, exactly as the control motion shows; the feet stay planted and it never moves across the frame. The camera is completely static and locked off: no zoom, no pan, no rotation. The character stays centred and the same size, keeps facing the same direction the whole time, never turns around, and the whole body stays in frame. Plain flat white background, no shadow, no ground, crisp pixel art, flat colours, no motion blur."
+   "text": "Pixel art video game sprite animation. A stocky bareheaded swamp colonist with short copper-red hair and a long thick copper-red braid hanging over the right shoulder onto the chest, a quilted dove-grey liner vest over a grey shirt, faded orange sleeves, dark work gloves, dark trousers, brown boots, a small caged rust-orange glass jar hanging from the belt at the right hip, full side profile facing the right side of the image, nose pointing right, crouches a little and in one explosive motion draws the chunky grey rivet gun from the holster on its hip and snaps it up level in both hands at chest height, braced against the recoil, exactly as the control motion shows; the gun is a heavy cylindrical grey receiver with a short clamped barrel, a thick muzzle collar and a pale green glowing charge cylinder under the barrel; the feet stay planted and it never moves across the frame. The camera is completely static and locked off: no zoom, no pan, no rotation. The character stays centred and the same size, keeps facing the same direction the whole time, never turns around, and the whole body stays in frame. Plain flat white background, no shadow, no ground, crisp pixel art, flat colours, no motion blur."
   }
  },
  "12": {
@@ -110,13 +110,13 @@
  "13": {
   "class_type": "LoadImage",
   "inputs": {
-   "image": "rnd-multileg-fc-mocap-e-s3-ref.png"
+   "image": "rnd-multileg-e-s11-aimkf-s3-ref.png"
   }
  },
  "14": {
   "class_type": "LoadVideo",
   "inputs": {
-   "file": "rnd-multileg-fc-mocap-e-s3.mp4"
+   "file": "rnd-multileg-e-s11-aimkf-s3.mp4"
   }
  },
  "15": {
@@ -237,7 +237,7 @@
     "19",
     0
    ],
-   "filename_prefix": "sprite-sheet/rnd-multileg/fc-mocap-e-s3/f"
+   "filename_prefix": "sprite-sheet/rnd-multileg/e-s11-aimkf-s3/f"
   }
  },
  "21": {
@@ -257,7 +257,7 @@
     "21",
     0
    ],
-   "filename_prefix": "sprite-sheet/rnd-multileg/fc-mocap-e-s3/clip",
+   "filename_prefix": "sprite-sheet/rnd-multileg/e-s11-aimkf-s3/clip",
    "format": "mp4",
    "codec": "h264"
   }

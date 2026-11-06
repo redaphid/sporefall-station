@@ -164,6 +164,10 @@ def cmd_post(a):
     pockets, band = S.pocket_key(meta.get("input"), backdrop)
     ghost = S.ghost_pal(meta.get("input"), backdrop, pal)
     keyed = S.key_frames(raws, pockets, ghost, S.clip_beside(base, raws, meta.get("loops", {})), band)
+    own = {}  # per direction: the ghost key's palette plus the colours the video model renders the character in
+    for d in dirs:
+        if a.own_colours and ghost is not None and (d, "idle") in raws:
+            own[d] = list(ghost) + [tuple(c) for c in S.input_palette(raws[(d, "idle")], 24)]
     clips = _clips(a.clip)
     props = dict(p.split("=", 1) for p in a.props or [])
     shifts = dict(_clips_shift(s) for s in a.shift or [])
@@ -185,7 +189,7 @@ def cmd_post(a):
                     for prop in json.load(open(ctl[t % len(ctl)])).get("props", {}).values():
                         raw = paint_gun(raw, prop, pal, 1 / (scale[d] * 96 / px))
                     beside = ()  # the painted prop is in this frame only: a ghost key would take it
-                k = S.shrink_alpha(S.key_background(raw, pockets=pockets, pal=ghost, beside=beside, band=band), 1)
+                k = S.shrink_alpha(S.key_background(raw, pockets=pockets, pal=own.get(d, ghost), beside=beside, band=band), 1)
                 frames[(d, f"{a.state}-{n}")] = S.post_fixed(k, union[d], scale[d], px, pal, whole=True)
             frames = S.drop_specks(frames, [d], [p for _, p in frames], px)
             idle = Image.open(os.path.join(CW.THEMES, pack, "chars", f"{a.kind}-{d}-idle.png")).convert("RGBA")
@@ -335,6 +339,13 @@ def main():
     p.add_argument("--snap-idle", action="store_true", help="map the clip's colours onto the shipped idle's, above and below "
                                                             "the belt, learned from frame 0 (action_checks.py snap): the "
                                                             "trousers keep the idle's brown")
+    p.add_argument("--own-colours", action="store_true", help="the ghost key also treats the colours the video model "
+                                                              "renders the character in (median cut of the base run's "
+                                                              "raw idle) as its own. Without it the light skin Fun-"
+                                                              "Control draws (255,212,179) reads as a faint blend of the "
+                                                              "palette's skin and the white backdrop, and the flood keys "
+                                                              "the profile face out (owner 11-06: 'makes the face "
+                                                              "disappear')")
     p.add_argument("--face-strict", action="store_true", help="exit non-zero when a frame lost the idle's face "
                                                               "(action_checks.py face; always reported in post.json)")
     p.add_argument("--out", required=True)

@@ -227,6 +227,13 @@
   "char.player.e-draw-5": "chars/vine-ranger-e-draw-5.png",
   "char.player.e-draw-6": "chars/vine-ranger-e-draw-6.png",
   "char.player.e-draw-7": "chars/vine-ranger-e-draw-7.png",
+  "char.player.e-draw-8": "chars/vine-ranger-e-draw-8.png",
+  "char.player.e-draw-9": "chars/vine-ranger-e-draw-9.png",
+  "char.player.e-draw-10": "chars/vine-ranger-e-draw-10.png",
+  "char.player.e-draw-11": "chars/vine-ranger-e-draw-11.png",
+  "char.player.e-draw-12": "chars/vine-ranger-e-draw-12.png",
+  "char.player.e-draw-13": "chars/vine-ranger-e-draw-13.png",
+  "char.player.e-aim-0": "chars/vine-ranger-e-aim-0.png",
   "char.warden.s-idle": "chars/spore-drone-s-idle.png",
   "char.warden.s-step": "chars/spore-drone-s-idle.png",
   "char.warden.se-idle": "chars/spore-drone-s-idle.png",
@@ -1195,5 +1202,23 @@
   "plating": 2,
   "bog": 2
  },
- "artScale": 2
+ "artScale": 2,
+ "animTiming": {
+  "player.draw": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   2,
+   1,
+   1,
+   1,
+   1,
+   1,
+   2,
+   3,
+   4
+  ]
+ }
 }

@@ -213,6 +213,8 @@ const FAMILY_TOL = { height: 3, head_h: 4, mass_frac: 0.25 } // consistency.py F
 // poses take mass and centroid from their own view's walk frames (consistency.py
 // SIDE_VIEWS / SIDE_FROM_WALK); front and back views answer to the reference.
 const SIDE_VIEWS = new Set(['e', 'w'])
+/** Extra centroid allowance, px at 48, for frames that draw the held weapon out in front of the body. */
+const HELD_WEAPON_CX = 1.0
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b)
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2
@@ -287,7 +289,11 @@ describe('swampspace character-sprite consistency (committed spec)', () => {
           }
           const v = { ...ref, ...sideRef.get(frame.split('-')[0]) }
           expect(Math.abs(m.mass - v.mass) / v.mass, `mass ${m.mass} vs ref ${v.mass}`).toBeLessThanOrEqual(tol.mass_frac)
-          expect(Math.abs(m.cx - v.cx), `cx ${m.cx.toFixed(2)} vs ref ${v.cx}`).toBeLessThanOrEqual(tol.cx)
+          // A frame that draws its own held weapon out in front (draw, aim, aimwalk: the states that stow
+          // the held-weapon sprite) moves the centroid toward the muzzle by the weapon's mass, not by the
+          // body drifting: the Rivet Driver held level shifts it about 2 px at 48 (feat/player-draw-1106).
+          const heldOut = /-(draw|aim|aimwalk)-\d+$/.test(frame) ? HELD_WEAPON_CX : 0
+          expect(Math.abs(m.cx - v.cx), `cx ${m.cx.toFixed(2)} vs ref ${v.cx}`).toBeLessThanOrEqual(tol.cx + heldOut)
           expect(Math.abs(m.foot_y - ref.foot_y), `foot_y ${m.foot_y} vs ref ${ref.foot_y}`).toBeLessThanOrEqual(tol.foot_y)
           if (s.accent) {
             const dir = frame.split('-')[0]

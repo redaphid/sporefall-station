@@ -14,7 +14,7 @@ post    each frame through its walk direction's own crop window, scale and pixel
         `fixed_windows` on BASE's raws, exactly as export re-posts the walk), extended over the whole
         canvas so a reach past every walk frame is kept; colours snapped to BASE's s-idle palette, then
         the locked palette. Writes DIR/<px>/<kind>-<dir>-<state>-<n>.png for both packs with the take's
-        flow embedded, and DIR/post.json: per frame the shift from the shipped idle (registration of
+        flow embedded (--idle-ends: the first and last frame are the shipped idle itself), and DIR/post.json: per frame the shift from the shipped idle (registration of
         frame 0) and the share of pixels that differ from it.
 export  copies DIR's frames into both packs and sets char.<arch>.<dir>-<state>-<n> for every archetype
         whose keys point at chars/<kind>-*, after that archetype's last key; the take's flows go to
@@ -67,6 +67,57 @@ def _locked(im):
     return Image.fromarray(a, "RGBA")
 
 
+def _gun_colours(pal):
+    """(outline, body, highlight) for a held pistol: the palette's darkest colour and its two greys
+    nearest worn steel and its highlight (a light slide reads against the dark suit), so the prop is in the character's own colours."""
+    P_ = np.array(pal, float)
+    lum = P_ @ [0.299, 0.587, 0.114]
+    sat = P_.max(1) - P_.min(1)
+    outline = P_[lum.argmin()]
+    grey = lambda target: P_[np.argmin(np.abs(lum - target) + 2.0 * sat)]  # noqa: E731
+    return tuple(int(v) for v in outline), tuple(int(v) for v in grey(140)), tuple(int(v) for v in grey(200))
+
+
+def paint_gun(im, prop, pal, scale):
+    """Paint the rig's held pistol onto a raw render (848x480 RGB) where the rendered fist really is.
+    `prop`: rig_action's {"rear", "muzzle", "on"}; `scale`: raw px per 96 px sprite pixel. The rear sits
+    in the fist's front edge (found as the non-backdrop extreme along the barrel near the rig's hand), the
+    barrel runs out of it, at least 2.6 slide-heights long even when the aim is foreshortened."""
+    if prop["on"] < 0.5:
+        return im
+    rear, muz = np.array(prop["rear"]), np.array(prop["muzzle"])
+    hand = rear + 0.15 / 1.0 * (muz - rear)
+    a = np.asarray(im.convert("RGB")).astype(float)
+    bg = P.corner_bg(im)
+    body = np.sqrt(((a - bg) ** 2).sum(-1)) > 38
+    ys, xs = np.nonzero(body)
+    th = 4.5 * scale  # the slide: about 3 sprite pixels thick
+    v = muz - rear
+    n = np.linalg.norm(v)
+    near = np.hypot(xs - hand[0], ys - hand[1]) < 9 * scale
+    out = im.convert("RGB").copy()
+    dr = ImageDraw.Draw(out)
+    edge, fill, hi = _gun_colours(pal)
+    if not near.any():
+        return out
+    u = v / n
+    proj = (xs[near] - hand[0]) * u[0] + (ys[near] - hand[1]) * u[1]
+    k = proj.argmax()
+    tip = np.array([xs[near][k], ys[near][k]], float)
+    r0 = tip - 0.6 * th * u
+    length = max(1.15 * n, 2.6 * th)  # a pistol aimed near the camera still shows its slide at 96 px
+    m = r0 + length * u
+    w = np.array([-u[1], u[0]])
+    if w[1] > 0:  # the top of the slide faces screen up
+        w = -w
+    half = th / 2
+    slide = [tuple(r0 + w * half), tuple(m + w * half), tuple(m - w * half), tuple(r0 - w * half)]
+    dr.polygon(slide, fill=fill, outline=edge, width=max(1, round(scale)))
+    dr.line([tuple(r0 + w * (half - scale)), tuple(m + w * (half - scale))], fill=hi, width=max(1, round(scale)))
+    dr.ellipse([m[0] - 0.4 * th, m[1] - 0.4 * th, m[0] + 0.4 * th, m[1] + 0.4 * th], fill=edge)
+    return out
+
+
 def register(frame, idle, reach=3):
     """(dx, dy, share): the integer shift of `frame` that best matches `idle`'s alpha, and the share of
     the union's pixels that still differ in colour after it."""
@@ -96,6 +147,7 @@ def cmd_post(a):
     ghost = S.ghost_pal(meta.get("input"), backdrop, pal)
     keyed = S.key_frames(raws, pockets, ghost, S.clip_beside(base, raws, meta.get("loops", {})), band)
     clips = _clips(a.clip)
+    props = dict(p.split("=", 1) for p in a.props or [])
     shifts = dict(_clips_shift(s) for s in a.shift or [])
     report = {"base": base, "state": a.state, "clips": {d: [r, i] for d, (r, i) in clips.items()}, "frames": {}}
     for pack, (px, content) in PACKS.items():
@@ -104,10 +156,15 @@ def cmd_post(a):
         for d, (run, idx) in clips.items():
             clip = sorted(glob.glob(f"{run}/raw/walk-{d}/*.png"))
             frames = {}
+            ctl = sorted(glob.glob(f"{props[d]}/joints-*.json")) if d in props else []
             for n, t in enumerate(idx):
                 beside = tuple(Image.open(clip[k]).convert("RGB") for k in (t - 1, t + 1) if 0 <= k < len(clip))
-                k = S.shrink_alpha(S.key_background(Image.open(clip[t]).convert("RGB"), pockets=pockets, pal=ghost,
-                                                    beside=beside, band=band), 1)
+                raw = Image.open(clip[t]).convert("RGB")
+                if ctl:  # the control repeats from its frame 0, so clip frame t was posed by rig frame t % P
+                    for prop in json.load(open(ctl[t % len(ctl)])).get("props", {}).values():
+                        raw = paint_gun(raw, prop, pal, 1 / (scale[d] * 96 / px))
+                    beside = ()  # the painted prop is in this frame only: a ghost key would take it
+                k = S.shrink_alpha(S.key_background(raw, pockets=pockets, pal=ghost, beside=beside, band=band), 1)
                 frames[(d, f"{a.state}-{n}")] = S.post_fixed(k, union[d], scale[d], px, pal, whole=True)
             frames = S.drop_specks(frames, [d], [p for _, p in frames], px)
             idle = Image.open(os.path.join(CW.THEMES, pack, "chars", f"{a.kind}-{d}-idle.png")).convert("RGBA")
@@ -116,6 +173,8 @@ def cmd_post(a):
             prompt, workflow = _flow(run, d)
             for n in range(len(idx)):
                 im = _locked(Image.fromarray(np.roll(np.roll(np.asarray(frames[(d, f"{a.state}-{n}")]), dy, 0), dx, 1)))
+                if a.idle_ends and n in (0, len(idx) - 1):  # the cut into and out of the clip is the idle itself
+                    im = idle.copy()
                 f = f"{a.out}/{px}/{a.kind}-{d}-{a.state}-{n}.png"
                 im.save(f)
                 if prompt and workflow:
@@ -222,6 +281,9 @@ def main():
     p.add_argument("--state", required=True)
     p.add_argument("--clip", action="append", required=True, help="dir=RUN:i,j,k (clip frame indices, in order)")
     p.add_argument("--shift", action="append", help="dir=dx,dy in 96 px pixels, applied to every frame (registration)")
+    p.add_argument("--idle-ends", action="store_true", help="frame 0 and the last frame are the shipped idle, "
+                   "pixel for pixel (pick rest-pose clip frames for them): the cut in and out cannot jump")
+    p.add_argument("--props", action="append", help="dir=CTL: paint the rig's held props (joints-NN.json `props`)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("export")
     p.add_argument("dir")

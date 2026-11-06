@@ -545,3 +545,20 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## gloam-hound (gloamhound), 2026-11-06: `fidget` action clip (hind-leg scratch), e and ne only
+
+Keys `char.gloamhound.<dir>-fidget-0..7` (engine on `feat/action-anims-1106`: fidget tpf 3, plays on a
+calm body after 90 idle ticks). Built on this branch's orange design and its 5-direction idles
+(art/gloam-hound-1105, not on main: main ships the old green hound as one s-idle in every direction).
+
+| stage | what |
+|---|---|
+| rig | `rig_action.py scratch` on the walk's quadruped fits: sit back, head turns back toward the near side, near hind foot up behind the head, two scratches, down; P16 closed; frames 0 and 7 are the shipped idle (`--idle-ends`) |
+| render | Wan 2.2 Fun-Control A14B, stick skeleton + walk keyframe as `ref_image`, motion "sits back on its haunches ... lifts one hind leg high up to its head to scratch behind it" |
+| shipped | e: take 2 (seed 11; take 1 drew the far hind foot bleached pale, 137-230 pale px a frame vs the idle's 92); ne: take 2 (seed 3, `--head-back .30 --sit-forward 0`: take 1 moved gate 3 cx by 2.8-3.1, limit 2.5). Cut 35, 37, 38, 39, 40, 44 |
+| fell back | s: 3 takes (seeds 3, 11, 23): Fun-Control never lifts the hind leg in the front view; se: 3 takes, cx 2.6-3.1 against the 2.5 limit (the se idle already sits at 2.25); n: 2 takes, mass +26-28% and foot_y +2. These directions have no fidget keys; the engine falls back to idle |
+
+Checks, 2026-11-06: consistency `--check` adds 0 violations (the 1 it reports is this branch's
+existing walk head_h case, docs/cast-walks/gate-cases/gloam-hound-head-h.md); 0 pixels off the
+locked palette (32 frames).

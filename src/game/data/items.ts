@@ -30,10 +30,12 @@ export interface WeaponDef {
   /** Melee: swings before it breaks — the slot's count doubles as durability.
    * Absent (natural armament) = innate, never consumed. */
   durability?: number
-  /** NATURAL armament — grown, not carried (fists, a Mireclaw's claws). It has
-   * no durability (nothing to break), never drops as loot, and draws no held
-   * sprite (render/weaponArt.hasHeldWeapon). The one flag that distinguishes
-   * "this creature's body" from "a weapon it picked up". */
+  /** NATURAL armament — grown, not carried (fists, claws, a hound's fangs). It
+   * never drops as loot and draws no held sprite (render/weaponArt.hasHeldWeapon).
+   * The one flag that distinguishes "this creature's body" from "a weapon it
+   * picked up". Usually durability-free; the beast armaments below keep the
+   * durability of the blade/wrench they replaced so a pack fights exactly as it
+   * did (see BEAST ARMAMENT). */
   natural?: true
   /** Ranged: pellets fired per shot across `spread` radians (shotgun). */
   pellets?: number
@@ -76,6 +78,20 @@ export const WEAPONS: Record<string, WeaponDef> = {
   // fewer, heavier, longer-reach blows — a hit you feel and roll away from
   // rather than a chip you tank.
   claws: { id: 'claws', name: 'Claws', kind: 'melee', damage: 22, range: 1.5, cooldownTicks: 20, knockback: 12, natural: true },
+  // BEAST ARMAMENT. Hounds, stalkers, lurkers and the carapace brute used to be
+  // armed with a `knife` or `wrench`, so the renderer hung a drawn blade or
+  // wrench off a hound's "hand" — and dogs don't carry knives. These are the
+  // same rows relabelled as the body's own weapon: every combat number
+  // (damage, range, cooldown, knockback) AND the durability are the knife's or
+  // wrench's, byte for byte, so a fight is the same fight (pinned by
+  // beastArmament.test.ts, which replays one against the old label). Keeping
+  // durability keeps the one quirk that came with it: after that many bites the
+  // armament wears through and the beast swipes with its fists-grade baseline,
+  // exactly as its knife used to break. Drop `durability` to change that — it is
+  // a balance change, not a relabel.
+  fangs: { id: 'fangs', name: 'Fangs', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20, natural: true },
+  mandibles: { id: 'mandibles', name: 'Mandibles', kind: 'melee', damage: 12, range: 1.1, cooldownTicks: 9, knockback: 2, durability: 20, natural: true },
+  horns: { id: 'horns', name: 'Horns', kind: 'melee', damage: 16, range: 1.3, cooldownTicks: 15, knockback: 7, durability: 16, natural: true },
   pistol: {
     id: 'pistol',
     name: 'Pistol',

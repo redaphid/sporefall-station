@@ -236,10 +236,14 @@ describe('item data — well-formedness', () => {
     }
   })
 
-  it('natural armament is durability-free and never a held sprite', () => {
+  it('natural armament is the known set, and only the beast relabels wear out', () => {
     const natural = Object.values(WEAPONS).filter((w) => w.natural)
-    expect(natural.map((w) => w.id).sort()).toEqual(['claws', 'fists'])
-    for (const wpn of natural) expect(wpn.durability, wpn.id).toBeUndefined()
+    expect(natural.map((w) => w.id).sort()).toEqual(['claws', 'fangs', 'fists', 'horns', 'mandibles'])
+    // Fists and claws are innate and never wear. The beast armaments keep the
+    // durability of the knife/wrench they relabelled so fights are unchanged
+    // (data/beastArmament.test.ts); every one of them is finite.
+    for (const id of ['fists', 'claws']) expect(WEAPONS[id].durability, id).toBeUndefined()
+    for (const id of ['fangs', 'mandibles', 'horns']) expect(WEAPONS[id].durability, id).toBeGreaterThan(0)
   })
 
   it('every weapon onHit / throwable onLand names a status the systems can apply', () => {

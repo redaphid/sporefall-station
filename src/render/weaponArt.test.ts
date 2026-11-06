@@ -37,6 +37,10 @@ describe('hasHeldWeapon', () => {
     expect(hasHeldWeapon('fists')).toBe(false)
   })
 
+  it('no natural armament draws a held sprite — claws, fangs, mandibles, horns', () => {
+    for (const id of ['claws', 'fangs', 'mandibles', 'horns']) expect(hasHeldWeapon(id), id).toBe(false)
+  })
+
   it('every real weapon — and even an unknown id — shows a held sprite', () => {
     expect(hasHeldWeapon('sledgehammer')).toBe(true)
     expect(hasHeldWeapon('pistol')).toBe(true)

@@ -224,10 +224,11 @@ describe('the sporeling-mite walks on two short legs, with a waddle', () => {
   it('the waddle belongs to the mite: a striding frog-settler, a mutant and a moving brood-sac do not rock', () => {
     expect(observe(HIRES, 'civilian', true).rock).toBe(0)
     expect(observe(HIRES, 'mutant', true).rock).toBe(0)
+    // A woken brood-sac crawls on its drawn root legs; the pulse is only its dormant idle.
     const sac = observe(HIRES, 'pod', true)
     expect(sac.rock).toBe(0)
     expect(sac.lift).toBe(0)
-    expect(sac.widen).toBeGreaterThan(0)
+    expect(sac.widen).toBe(0)
   })
 
   it('standing still, it does not rock', () => {

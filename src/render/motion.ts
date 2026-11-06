@@ -90,6 +90,7 @@ export type LocomotionStyle = 'stride' | 'hover' | 'pulse' | 'waddle'
  * changes how it moves — you opt in. */
 export const LOCOMOTION: ReadonlyMap<string, LocomotionStyle> = new Map([
   ['spore-drone', 'hover'],
+  // Pulses only while it sits dormant: its drawn walk is a root-leg crawl, which switches the pulse off.
   ['brood-sac', 'pulse'],
   ['sporeling-mite', 'waddle'],
 ])

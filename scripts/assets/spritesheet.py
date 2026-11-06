@@ -769,8 +769,9 @@ def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=No
     `pockets` > 0 also keys backdrop the flood cannot reach, in pieces of at least that many
     pixels: the gap where a claw curls back to a leg stays white otherwise. Only for a
     character with no backdrop-coloured part of its own (`pocket_key`). `band` < 1 keys only the
-    pockets that lie wholly in the lower `band` of this frame's silhouette, where the legs are: for
-    a character whose only pale part is higher up (the carapace-brute's bone shell).
+    pockets that lie wholly in the lower `band` of this frame's silhouette, where the legs are, or
+    that are flat backdrop (median within POCKET_FLAT of it; a drawn pale part has texture): for a
+    character whose only pale part is higher up (the carapace-brute's bone shell).
 
     `pal` (the character's colours) takes `unmix` blends back out: the flood also crosses the
     faint ones, so a thin ghost joined to the backdrop goes with it. `beside` (the clip frames
@@ -782,8 +783,11 @@ def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=No
     rgb = np.asarray(im.convert("RGB"))
     backdrop = P.corner_bg(im)
 
+    def dist(x):
+        return np.sqrt(((np.asarray(x.convert("RGB"), np.float32) - backdrop) ** 2).sum(-1))
+
     def is_near(x):
-        return np.sqrt(((np.asarray(x.convert("RGB"), np.float32) - backdrop) ** 2).sum(-1)) <= thresh
+        return dist(x) <= thresh
 
     near = is_near(im)
     see, gone = near.copy(), np.zeros_like(near)
@@ -810,7 +814,9 @@ def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=No
                 first = np.full(len(big), len(near), float)  # each pocket's top row
                 ys = np.nonzero(lab)[0]
                 np.minimum.at(first, lab[lab > 0], ys)
-                big &= first >= top
+                flat = np.zeros(len(big), bool)  # flat backdrop, no texture: never a drawn part
+                flat[1:] = np.asarray(ndimage.median(dist(im), lab, np.arange(1, len(big)))) <= POCKET_FLAT
+                big &= (first >= top) | flat
         bg |= big[lab]
     return Image.fromarray(np.dstack([rgb, np.where(bg, 0, 255).astype(np.uint8)]), "RGBA")
 
@@ -818,6 +824,7 @@ def key_background(im: Image.Image, thresh: float = 38, pockets: int = 0, pal=No
 POCKET_PX = 24      # raw video pixels, about 2x2 pixels of the 96 px sprite; smaller specks go to despeckle
 POCKET_PALE = 0.01  # the drone's anchor 0.0001, the mycologist's cream suit 0.0023, the frog 0.0033
 POCKET_BAND = 0.4   # the legs' share of the silhouette, from the feet up
+POCKET_FLAT = 3.0   # brute: gaps between tail, rump and legs have median 1.1-2.6; shell and blends 4.3-31
 
 
 def pocket_key(anchor: str | None, backdrop, thresh: float = 38) -> tuple[int, float]:

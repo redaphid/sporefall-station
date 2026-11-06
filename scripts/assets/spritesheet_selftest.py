@@ -358,14 +358,17 @@ def main():
         beast = Image.new("RGB", (200, 300), (255, 255, 255))
         db = ImageDraw.Draw(beast)
         db.ellipse((30, 20, 170, 120), fill=TEAL, outline=(8, 8, 12), width=6)  # body
-        db.rectangle((80, 50, 120, 80), fill=(255, 255, 255))  # a backdrop-white patch on the body, like a lit shell
+        for y in range(50, 81):  # a pale lit patch on the shell: textured, as Wan draws one
+            for x in range(80, 121):
+                beast.putpixel((x, y), (242, 246, 234) if (x + y) % 2 else (250, 251, 249))
+        db.rectangle((130, 60, 150, 80), fill=(255, 255, 255))  # flat backdrop enclosed above the band (tail to rump)
         db.rectangle((50, 100, 70, 290), fill=TEAL)  # two legs that cross low down and touch at the feet
         db.rectangle((120, 100, 140, 290), fill=TEAL)
         db.rectangle((50, 200, 140, 210), fill=TEAL)
         db.rectangle((50, 275, 140, 290), fill=TEAL)
         kb = np.asarray(S.key_background(beast, pockets=S.POCKET_PX, band=S.POCKET_BAND))
-        check("key: band= keys the gap between the legs and keeps a white patch above the leg band",
-              kb[240, 95, 3] == 0 and kb[65, 100, 3] == 255 and kb[60, 55, 3] == 255)
+        check("key: band= keys the gap between the legs and flat backdrop above the band, and keeps a textured pale patch",
+              kb[240, 95, 3] == 0 and kb[70, 140, 3] == 0 and kb[65, 100, 3] == 255 and kb[60, 55, 3] == 255)
         check("key: band 1 (the default) keys both", np.asarray(S.key_background(beast, pockets=S.POCKET_PX))[65, 100, 3] == 0)
         charcoal, bone, teal = (8, 8, 12), (203, 178, 119), (36, 86, 92)
         ghost = tuple(round(0.35 * c + 0.65 * 255) for c in charcoal)  # a leg a third drawn: Wan's motion blur

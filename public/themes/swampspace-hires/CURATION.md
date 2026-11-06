@@ -659,3 +659,38 @@ thresholds were applied by `scripts/assets/rotoscope/check_idle.py`:
 
 Known gaps: ne and n are the same frames (the bud is hidden behind the shaft);
 the moss texture and the baked grass pad the critique names are unchanged.
+
+## props (8), 2026-11-06: the census's C-F props regenerated as colony plumbing kit
+
+Census of all 16 prop files behind the 17 `prop.*` keys at game scale, graded A-F
+(`docs/prop-sweep/census-1106.png`, `grades-1106.json`): hydro-recycler F;
+cryo-terminal, nutrient-dispenser, weapons-locker, mess-bench D; wall-screen,
+work-desk, supply-cabinet C. The three old restyles still carried the moss fringe
+and ground slab in their alpha; the rest were clean but modern (an ECG flatscreen,
+an office desk with a PC) or a sliver at 32 px.
+
+Regenerated on `generate.py`'s rewritten PROPS entries (G2 bubble plumbing: glass
+jars, petcocks, coil, hose, riveted patches; stouter proportions; `NEG_LORE` adds
+the no-steampunk list), tag `l1106`, juggernautXL, seeds 2000-2005, 48 renders,
+0 failed. Picked by eye at game scale beside the cast
+(`docs/prop-sweep/candidates-1106.png`), installed by `install_props.py`:
+
+| key | file | seed | read |
+|---|---|---|---|
+| prop.toilet | hydro-recycler.png | 2001 | tank + glowing glass condenser jar |
+| prop.cryo-terminal | cryo-terminal.png | 2002 | bone cabinet, green screen |
+| prop.vending-machine | nutrient-dispenser.png | 2000 | three glass jars on taps |
+| prop.locker | weapons-locker.png | 2004 | olive locker bank, tan scuffs |
+| prop.bench | mess-bench.png | 2003 | thick tan seat, solid legs |
+| prop.desk | work-desk.png | 2002 | pedestal desk, no monitor |
+| prop.tv (+ generator) | wall-screen.png | 2003 | boxy console, dials, green readout |
+| prop.cabinet | supply-cabinet.png | 2005 | teal cabinet, jars behind glass |
+
+All clear the cast floors (sat, chroma, value range, palette_n) in both packs;
+locker needed a `#cbb277` ramp top for value_range at 32 px (0.484 -> 0.602).
+Same filenames, so no manifest or code change. Old art: repo history and
+`/mnt/d/tmp/cast-walks/props/archive/2026-11-06/`. Before/after
+`docs/prop-sweep/before-after-1106.png`; in a room `docs/prop-sweep/ingame-1106.png`
+(`e2e/prop-room-shots.mjs`, fixture lore-1106). Kept: chair (C, the owner's pick).
+Known gaps: the bench came out as a table-shaped seat, not the quilted cushion
+asked for; the locker's tan scuffs read slightly camouflage.

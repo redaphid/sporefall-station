@@ -147,4 +147,19 @@ const park = (w: World, x: number, y: number): void => {
   else park(w, r.x + Math.floor(r.w / 2), r.y + Math.floor(r.h / 2))
   write('as-generated', w, r, [])
 }
+// 4. THE 11-06 LORE PASS. The eight props the census graded C-F, regenerated as
+//    colony plumbing kit, in one room beside the crate and barrel they share
+//    floors with -- so the before/after is judged among neighbours, not alone.
+{
+  const { w, b, r } = findRoom(9, 7)
+  clearBuilding(w, b)
+  const plan: [string, number, number][] = [
+    ['vending', 1, 1], ['cryoTerminal', 2, 1], ['tv', 4, 1], ['locker', 6, 1], ['cabinet', 7, 1],
+    ['toilet', 1, 3], ['crate', 6, 3], ['barrel', 7, 3],
+    ['desk', 3, 4], ['bench', 1, 5], ['bench', 2, 5], ['chair', 4, 5],
+  ]
+  const notes = furnish(w, r, plan)
+  park(w, r.x + 5, r.y + 3)
+  write('lore-1106', w, r, notes)
+}
 console.log(`prop-room fixtures in ${OUT}`)

@@ -1,0 +1,18 @@
+{
+ "cargo-crate": {"grade": "B", "why": "reads instantly as a box; but a glossy teal plastic cooler, modern and clean - no salvage/heirloom wear. Most-seen prop (23/floor)."},
+ "spore-barrel": {"grade": "C+", "why": "clean readable oil drum, on-palette; generic - nothing says spore or this swamp (no sight-glass, no patching)."},
+ "cryo-terminal": {"grade": "D", "why": "old restyle (no raw): ragged moss fringe and a ground slab welded into the alpha; dark, muddy, reads as a tombstone with a green eye."},
+ "nutrient-dispenser": {"grade": "D", "why": "old restyle: sits on a green-goo slab (the tombstone plinth); the dispenser itself is a flat teal slab, glow is noise not one accent."},
+ "wall-screen": {"grade": "C", "why": "reads as a TV, but a clean modern flatscreen with an ECG line - off-lore (G2: no glass jars, no coil); also worn by every generator."},
+ "hydro-recycler": {"grade": "F", "why": "unreadable at any scale: a speckled dark shrub on a white puddle. Moss + ground slab; does not read as a machine at all."},
+ "weapons-locker": {"grade": "D", "why": "a 10px-wide sickly-green stick at 32px; no form, no door read, mottled like moss."},
+ "supply-cabinet": {"grade": "C", "why": "reads as an open cupboard but thin (sliver at 32px) and duplicates the crate/rack teal."},
+ "work-desk": {"grade": "C", "why": "modern office desk with a PC monitor (prompt forbids it); low and tiny at game scale, mostly empty pixels."},
+ "chair": {"grade": "C", "why": "wiry modern chair, thin legs vanish at 32px. OWNER'S PICK (08-20) - kept, not regenerated."},
+ "storage-rack": {"grade": "B-", "why": "chunky, reads as shelving; a pale slab top and teal sameness with the crate/cabinet."},
+ "crew-bunk": {"grade": "B", "why": "reads as a bed at game scale, warm/cool split works; green rim glow slightly loud."},
+ "mess-bench": {"grade": "D", "why": "thin dark plank on two stubs, broken-looking; most of the 64px cell is empty."},
+ "mess-table": {"grade": "B", "why": "chunky worn-wood table, reads well, on-palette, fits salvage tone."},
+ "bio-planter": {"grade": "C", "why": "lime-green cube is the loudest flat colour in the set (breaks G3 muted frame); plant reads."},
+ "spore-node": {"grade": "B+", "why": "on-lore organism with one essence glow; reads at game scale."}
+}

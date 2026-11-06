@@ -62,7 +62,16 @@ from PIL import Image  # noqa: E402
 # nothing about what the pipeline will produce later.
 import generate as G  # noqa: E402
 
-OUT = Path(os.environ.get("EXP_OUT", "D:/tmp/props-gen"))
+# "D:/tmp/props-gen" is only a path on Windows. Under WSL it is a RELATIVE path, so
+# a sweep run from the repo quietly wrote into ./D:/tmp/... and install_props.py
+# then could not find a single raw. One resolver, shared by both scripts.
+def default_out() -> Path:
+    if os.name != "nt" and Path("/mnt/d").is_dir():
+        return Path("/mnt/d/tmp/props-gen")
+    return Path("D:/tmp/props-gen")
+
+
+OUT = Path(os.environ.get("EXP_OUT") or default_out())
 
 # THE FLOW, and the measurement that set it. Converged one knob at a time on
 # cargo-crate against a FIXED seed set, so each number below is a comparison and

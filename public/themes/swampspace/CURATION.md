@@ -533,3 +533,44 @@ s 6.8, se 8.1, e 4.4, ne 8.7, n 4.4 px, legs out of phase in every direction
 (phase_R .05-.20). Known look gaps: the s view is a three-quarter front turned
 to the left, as the shipped s-idle was; its hind legs stay in the belly's
 shadow. Frame heights: 68-77 px on the hi-res pack, 34-38 on the 48 px pack.
+
+## bog-mutant (mutant, acolyte), 2026-11-06: redesigned (pod-carrier), walking, s and n by skeleton control
+
+The mutant and acolyte archetypes drew one frame, the August hires s-idle, in
+every direction. Aaron (11-05): it "needs a complete replacement and makeover";
+it read as the Hulk. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign, Aaron's pick of three (design sheet 2026-11-06 00:05, A seed 3). Lore family C (spore-warped colonist, still on shift): a dredge-line worker whose parka's back seam split into a cluster of glowing mint essence pods on thick stalks, rising above both shoulders. Deep drab olive hood with a glowing pale mint face plate, quilted olive liner parka (G1), black webbing crossed on the chest, grey work trousers, black gloves and rubber boots. The pods are the one glow. It holds nothing; the renderer draws its weapon (`weaponArt.ts`) |
+| input | concept pod-carrier_seed412 redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 3), 96 px, sha256 `9ab265c501c05faa…`; old anchors archived at `/mnt/d/tmp/cast-walks/archive/bog-mutant/anchor-2026-11-06/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction; ne/n use a face-free `--describe-back` (the back of the hood, the pods out of the split back seam) |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, `--motion walk`, for se, e, ne. s and n: Wan Fun-Control driven by a stick-skeleton biped walk rig (`rig_biped.py`, period 24, half-stride 45, lift 24, swing 18; `fun_control.py`), seed 3, on the take1 keyframes |
+| takes | se, e, ne take1 (seed 3). s: take1 Wan was a near-static shuffle (seam .772, leg motion .21), take2 Wan (seed 11) lost to the 00:30 machine crash, then skel1. n: take1 Wan passed (.449) but barely moved its legs (.14); skel1 replaces it (.19, shipped bipeds' n .16-.19) |
+| loops | the shortest full stride: s period 24 (seam .189), se 24 (.218), e 20 (.209), ne 25 (.355), n 24 (.148) |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours as export ships them (5ef1a3b4), all in the locked 34; `--lock-height`, so every direction's idle stands as tall as s |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys each for `char.mutant.*` and `char.acolyte.*`. The unused s-attack-1/2 frames of the old design (in no manifest) are removed; copies at `/mnt/d/tmp/cast-walks/archive/bog-mutant/pre-walk/` |
+
+Gates (`cast_walk.py gate`), 2026-11-06, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .189 / .218 / .209 / .355 / .148 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | identity .031-.106, boil .097-.170, head .039-.088 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Before that pass: the first run failed gate 2 on ne (1.15%) and n (3.5%) in the
+stalk teal, a colour of the s-idle itself that the export's re-post pushed under
+the 0.5% anchor share; `assemble` now locks to the s-idle as shipped (5ef1a3b4).
+A second run timed out beside an unlocked video job and read 1 of 9 in 4b same;
+the third, on a quiet GPU, is the one above.
+
+Nothing parked. Known look gap: the white specular on each pod is keyed out
+as a backdrop pocket, so it shows the floor as a 2-4 px speck. Frame heights:
+87-92 px on the hi-res pack, 43-46 on the 48 px pack.

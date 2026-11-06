@@ -11,6 +11,8 @@ Poses are written in the body's own frame (forward, the character's right, up) a
 fit's az/elev the way rig_biped/rig_quadruped project a walk, so one action serves all five views.
 `near` in a biped fit is the character's RIGHT side (in s that is screen left): the gun hand.
 Writes joints-NN.json (NN < period) plus keys.json, which names the key frames (`rest`, `aim` ...).
+A held prop the skeleton cannot carry (draw's pistol: Fun-Control draws an empty fist from text alone)
+goes in joints-NN.json `props` (screen rear/muzzle, `on` 0-1) for `cast_action.py post --props`.
 
 Actions:
   draw     biped: hand to the hip, draw, snap the arm up to aim along the facing, hold, holster.
@@ -58,7 +60,11 @@ class Body:
                 dz = 1.0 if "near" in L else 2.0
                 root = "withers" if L.startswith("fore") else "rump"
                 legs[L] = [pt(root, dz)] + [pt(f"{L}_{j}", dz) for j in ("top", "mid", "low", "toe")]
-        return {"w": 848, "h": 480, "body": body, "legs": legs}
+        out = {"w": 848, "h": 480, "body": body, "legs": legs}
+        if "gun_on" in J:  # a held prop: not drawn in the control, painted on the render (cast_action --props)
+            out["props"] = {"gun": {"rear": [float(v) for v in J["gun_rear"]], "muzzle": [float(v) for v in J["gun_muzzle"]],
+                                    "on": float(J["gun_on"][0])}}
+        return out
 
 
 def ik3(T, a, b, pole):
@@ -101,22 +107,31 @@ def draw(B, period, yaw=14.0):
     L = a + b
     drop = F["hip_near"][1] - F["shoulder_near"][1]  # shoulder to hip, screen px: the holster's height
 
-    def arm(J, T, pole, lift=0.0):
+    G = 0.30 * L  # the pistol's length in the body frame
+
+    def arm(J, T, pole, lift=0.0, gun=None):
         sh = F["shoulder_near"] + B.proj(u=lift)
         J["shoulder_near"] = sh
         J["elbow_near"] = sh + B.proj(*ik3(T, a, b, pole))
         J["hand_near"] = sh + B.proj(*T)
+        if gun is not None:  # in hand, pointing along `gun` (body frame): the prop cast_action paints in
+            g = np.asarray(gun, float) / np.linalg.norm(gun)
+            J["gun_rear"] = J["hand_near"] + B.proj(*(-0.15 * G * g))
+            J["gun_muzzle"] = J["hand_near"] + B.proj(*(0.85 * G * g))
+            J["gun_on"] = np.array([1.0, 0.0])
 
     def pose(kind):
         J = dict(F)
+        J["gun_rear"] = J["gun_muzzle"] = F["hip_near"]
+        J["gun_on"] = np.array([0.0, 0.0])
         if kind == "grab":  # hand on the holster at the right hip (the shoulder sits outside the hip), elbow back
             arm(J, (-0.06 * L, -0.02 * L, -drop), (-1.0, 0.6, 0.0))
         elif kind == "draw":  # the pistol clears the holster: hand forward at the waist, elbow down
-            arm(J, (0.42 * L, 0.0, -0.55 * drop), (-0.4, 0.4, -1.0))
+            arm(J, (0.42 * L, 0.0, -0.55 * drop), (-0.4, 0.4, -1.0), gun=(0.8, 0.0, -0.6))
         elif kind in ("aim", "hold"):  # the arm straight along the facing, turned `yaw` to his right, a little up
             turn, pitch = math.radians(yaw), math.radians(12 if kind == "aim" else 15)
             T = 0.97 * L * np.array([math.cos(pitch) * math.cos(turn), math.cos(pitch) * math.sin(turn), math.sin(pitch)])
-            arm(J, T, (0.0, 0.3, -1.0), lift=0.04 * L)
+            arm(J, T, (0.0, 0.3, -1.0), lift=0.04 * L, gun=T)
             J["chest"] = F["chest"] + B.proj(f=0.02 * L)  # the body squares up behind the shot
             J["head_top"] = F["head_top"] + B.proj(f=0.03 * L)
         return J

@@ -424,6 +424,41 @@ Nothing parked. The skeleton ne row takes small steps with the feet held
 apart; it never crosses its legs. Frame heights: 87-92 px on the hi-res pack,
 43-46 on the 48 px pack.
 
+## gloom-lurker (lurker), 2026-11-05: redesigned (feral hooded colonist), prowling, se/e/ne by skeleton control
+
+The ambusher (`npcs.ts` `lurker`: spawns inert, wakes on a stimulus and
+pounces) had one frame, the August hires s-idle, drawn in every direction.
+Procedure: [`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| design | Step 0 redesign from concept textile-tailor. Lore family C: a colonist in a sealed black-teal rubber hood and loose coverall gone feral, crouched dormant in dark stockrooms until a body strays close. One lit essence-green visor (the single hot accent) on s/se/e; ne/n are faceless backs with a faded canvas patch. Holds nothing |
+| input | concept redrawn by `concept_to_input.py` (Qwen-Image-Edit, seed 3 of 4), suit ramp one step darker and visor snapped to essence green (`/mnt/d/tmp/cast-walks/gloom-lurker/tools/tune.py`), sha256 `c0cf35ddea088872…` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA, one per direction; coverall describes (no muscle read), face-free `--describe-back` for ne/n. s from a narrow-stance describe (seed 13) so its head and mass match the walk. ne: the take2 keyframe with the charcoal hood-front edge recoloured to suit teal (3297 px at 1280x720, outline kept) so the back view carries no face-like dark mass |
+| motion | s and n: Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, `--motion prowl`. se, e, ne: Wan Fun-Control driven by the stick-skeleton biped rig (`scripts/assets/rotoscope/rig_biped.py`, period 24, crouch kept), because Wan's prowl lunged its limbs past gate 5's match window (boil se .846, e 1.372, ne .800) |
+| takes | s take3 (seed 13); n take2 (seed 3). e: Wan take2 .539, take3 .504, take4 .221 (boil 1.372), then skel1 (seed 3) on the take4 keyframe. se: Wan take2 (boil .846), then skel1 (seed 3). ne: Wan take2 (boil .800), skel1 (seed 3; one frame failed gate 4a), then skel2 (seed 11) on the recoloured keyframe |
+| loops | the shortest full stride: s period 13 (seam .495), se 24 (.135), e 24 (.137), ne 24 (.129), n 13 (.561) |
+| colour lock | `assemble --lock-height` snaps every frame onto the s-idle's colours, all in the locked 34, and scales each direction's idle to the s idle's height |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.lurker.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-05, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .495 / .135 / .137 / .129 / .561 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .150-.239, head .016-.136 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. Known look gaps: s and n are Wan clips with short strides
+(period 13) and sit close to their limits (s seam .495 of .5, n head drift
+.136 of .14); se/e/ne are skeleton-driven and step more evenly than s/n. Frame
+heights: 84-91 px on the hi-res pack, 42-46 on the 48 px pack.
+
 ## spore-mortar (lobber), 2026-11-05: redesigned (coil-carrier), walking, se/e/ne by skeleton control
 
 The siege gun (`npcs.ts` `lobber`: sets up at range and lobs arcing spore

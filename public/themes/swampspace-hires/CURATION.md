@@ -331,3 +331,37 @@ Gates (`cast_walk.py gate`), 2026-09-29, all PASS (9/9):
 Gate 4b same was fixed on the way (7046bba): it counted the front's visor
 against every back view. Nothing parked. Frame heights: 84-90 px on the
 hi-res pack, 42-45 on the 48 px pack.
+
+## sporeling-mite, 2026-11-05: the shipped design, walking, ne by skeleton control
+
+The hive-spire's budded vermin (lore family B swamp fauna). Step 0 kept the
+shipped hires s-idle. Procedure:
+[`docs/cast-walks/RUNBOOK.md`](../../../docs/cast-walks/RUNBOOK.md).
+
+| stage | what |
+|---|---|
+| input | shipped hires s-idle, sha256 `a9c061414e793800…`; archived at `/mnt/d/tmp/cast-walks/archive/sporeling-mite/anchor-2026-09-29/` |
+| keyframes | Qwen-Image-Edit-2511 + Lightning 4-step + multiple-angles LoRA. s, se and e from take1/take2. ne and n were redrawn (kf2) from the s keyframe with a face-free back describe so they keep the mossy mottled cap and star spot: ne seed 3, n seed 3 |
+| motion | Wan 2.2 I2V A14B Q4_K_M hi/lo, 848x480, 81 frames at 16 fps, `--motion walk`, for s, se, e, n. ne: Wan Fun-Control driven by a stick-skeleton biped waddle rig fitted to the kf2 ne keyframe (`scripts/assets/rotoscope/rig_biped.py`, `fun_control.py`), seed 3, period 18 |
+| takes | s and se take1 (seed 3). e take2 (seed 11; take1 .573). n kf2 (seed 3). ne: take1 (.262) was held as a different render (smooth highlighted cap); take2 .615. On the kf2 keyframe seeds 3, 11 and 23 (.377, .527, .228), then a kf3 keyframe (.853), failed the VLM figure read under 1 px shifts (10/40, 8/40, 10/40, 4/40). The skeleton take (skel1) fails 0/40 |
+| loops | the shortest full stride: s period 17 (seam .267), se 16 (.391), e 24 (.487), ne 18 (.325), n 17 (.308) |
+| height lock | `assemble --lock-height`: each direction scaled so its idle stands as tall as the s idle |
+| colour lock | `assemble` snaps every frame onto the s-idle's colours, all in the locked 34 |
+| export | 96 px (content 92) to `swampspace-hires`, 48 px (content 46) to `swampspace`, feet on canvas-2; 50 keys for `char.sporeling.*` |
+
+Gates (`cast_walk.py gate`), 2026-11-05, gate 938319cdcc807028 (G7), all PASS (9/9):
+
+| # | gate | result |
+|---|---|---|
+| 1 | loop seam, max .5 (n 1.0) | .267 / .391 / .487 / .325 / .308 |
+| 2 | colour drift vs s-idle, max 1% | 0 in every direction |
+| 3 | silhouette spec | 0 violations |
+| 4a | VLM view of every frame, against its own s-idle and n-idle | 0 of 50 fail |
+| 4b | VLM idle/step pairs; identity vs s-idle | 0 of 5; 0 of 9 |
+| 5 | judge identity, sharpness and coverage; boil max .3; head drift max .14 | boil .133-.206, head .044-.138 |
+| 6 | VLM style vs the frog, rendering only | 0 of 10 |
+| 6b | pixels off the locked palette, max 0 | 0.0 |
+
+Nothing parked. The skeleton ne row takes small steps with the feet held
+apart; it never crosses its legs. Frame heights: 87-92 px on the hi-res pack,
+43-46 on the 48 px pack.

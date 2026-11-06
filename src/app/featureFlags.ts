@@ -76,6 +76,18 @@ export const FEATURE_FLAGS: readonly FeatureFlag[] = [
       'Default flipped ON. Remaining step: delete the flag and fold the six into CHARSET_ALIAS_BASE once the colour pass lands and each of the six has more than the single south-facing idle frame it reuses for all five facings.',
     since: 400,
   },
+  {
+    key: 'skidStop',
+    label: 'Skid to a stop',
+    description:
+      'A character that stops dead from a run leans back against it for a third of a second and kicks a puff of dust forward from its feet.',
+    // ON by default: it is the animation track's feature, shipped for review on
+    // its preview. The flag is the off switch while he judges it by eye.
+    retire:
+      'Default ON from the start. Delete the flag (keep the skid) once the owner has judged it on a phone; delete the skid with it if he turns it off.',
+    defaultOn: true,
+    since: 1177,
+  },
 ]
 
 const BY_KEY: ReadonlyMap<string, FeatureFlag> = new Map(FEATURE_FLAGS.map((f) => [f.key, f]))

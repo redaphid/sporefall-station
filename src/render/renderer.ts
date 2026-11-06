@@ -161,7 +161,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
   }
   const world = new Container()
   const tilemap = new TilemapView()
-  const entities = new EntityViews(art)
+  const entities = new EntityViews(art, { skid: flagOn(loadSettings().flags, 'skidStop') })
   const bullets = new BulletLayer(art)
   // Per-character status-effect shaders (lightning/fire/frost/poison/wet),
   // modulated by uniforms derived from the applying weapon + its mods. A batched
@@ -432,6 +432,7 @@ export const createRenderer = async (mount: HTMLElement, chromeMount: HTMLElemen
       const prevTheme = settings.theme
       const prevArt = flagOn(settings.flags, 'newEnemyArt')
       settings = s
+      entities.setSkid(flagOn(s.flags, 'skidStop'))
       if (s.theme !== prevTheme) void setTheme(s.theme)
       // Creature-art switch: same full asset re-bake as a theme swap, because
       // which archetypes count as character sprites changes with it. Reuses

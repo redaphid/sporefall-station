@@ -21,7 +21,20 @@
 // The state table
 
 /** Every named animation state a character can be in. */
-export type AnimStateName = 'idle' | 'walk' | 'attack' | 'hurt' | 'roll' | 'death' | 'draw' | 'fidget'
+export type AnimStateName =
+  | 'idle'
+  | 'walk'
+  | 'attack'
+  | 'hurt'
+  | 'roll'
+  | 'death'
+  | 'draw'
+  | 'fidget'
+  | 'aim'
+  | 'aimwalk'
+
+/** A condition a loop state needs, read off AnimInputs. */
+export type LoopCondition = 'moving' | 'aiming'
 
 /** How long a one-shot stays active once started:
  * - `{ clipAtLeast: n }`: the pose's own drawn clip, `frames × tpf`, but never
@@ -41,11 +54,21 @@ export type AnimStateDef =
       /** Default ticks per frame (30 ticks = 1 s); the manifest `anim` section
        * overrides it per theme (1..30). */
       tpf: number
-      /** When the loop is the active state (given nothing above it is). */
-      while: 'moving' | 'always'
+      /** When the loop is the active state (given nothing above it is): every
+       * listed condition must equal its value. `{}` = always. */
+      while: Partial<Record<LoopCondition, boolean>>
       /** States whose FIRST FRAME stands in when the pose has no frames of its
        * own, tried in order. */
       borrows: readonly AnimStateName[]
+      /** DRAWN-ONLY loop: with no frames of its own it never activates, and the
+       * character shows whatever it would have shown without it. */
+      drawnOnly?: true
+      /** Without a theme `anim` entry of its own, the loop runs at this state's
+       * resolved cadence (theme override included), so aimwalk steps with walk. */
+      cadenceOf?: AnimStateName
+      /** The held-weapon sprite hides while this state plays: its frames draw
+       * the weapon itself. */
+      stowsWeapon?: true
     }
   | {
       play: 'once'
@@ -55,16 +78,29 @@ export type AnimStateDef =
       /** The held-weapon sprite hides while this state plays: its clip draws
        * the weapon itself. */
       stowsWeapon?: true
+      /** When the pack does NOT draw this state, it gives way to these drawn
+       * loops: a borrowed stand-in pose (a walk or idle frame plus the held
+       * weapon sprite) must not cut into frames that draw the weapon raised,
+       * shot after shot. A drawn clip still plays over them. */
+      undrawnYieldsTo?: readonly AnimStateName[]
     }
 
 /** THE state table. `satisfies` keeps each row's literal types, so
  * `ANIM_STATE_DEFS.attack.window.clipAtLeast` is the number 6. */
 export const ANIM_STATE_DEFS = {
-  idle: { play: 'loop', tpf: 12, while: 'always', borrows: [] },
+  idle: { play: 'loop', tpf: 12, while: {}, borrows: [] },
   // walk tpf matches the legacy 2-frame walk cadence (WALK_TPF).
-  walk: { play: 'loop', tpf: 6, while: 'moving', borrows: ['idle'] },
+  walk: { play: 'loop', tpf: 6, while: { moving: true }, borrows: ['idle'] },
   // attack, hurt, death: a drawn clip plays whole; without one, the fixed window.
-  attack: { play: 'once', tpf: 2, window: { clipAtLeast: 6 }, borrows: ['walk', 'idle'] },
+  // An undrawn attack does not interrupt drawn aiming: the shot flies, the
+  // aim frames hold (and the ranged recoil is the held sprite's, which aim hides).
+  attack: {
+    play: 'once',
+    tpf: 2,
+    window: { clipAtLeast: 6 },
+    borrows: ['walk', 'idle'],
+    undrawnYieldsTo: ['aimwalk', 'aim'],
+  },
   hurt: { play: 'once', tpf: 3, window: { clipAtLeast: 8 }, borrows: ['idle'] },
   // Roll's window is the sim's (`playerCtl.roll.untilTick`), never a render guess.
   roll: { play: 'once', tpf: 3, window: 'sim', borrows: ['walk', 'idle'] },
@@ -73,11 +109,19 @@ export const ANIM_STATE_DEFS = {
   draw: { play: 'once', tpf: 2, window: 'clip', borrows: [], stowsWeapon: true },
   // An occasional idle variant (scratch, shift weight) on a still, calm body.
   fidget: { play: 'once', tpf: 3, window: 'clip', borrows: [] },
+  // A body holding a ranged weapon ready (animTracker.ts isAiming): standing,
+  // and walking. Facing is the aim (`entity.facing`), never the move heading,
+  // so the legs cycle aimwalk whichever way the body travels: strafe, backpedal.
+  aim: { play: 'loop', tpf: 12, while: { aiming: true, moving: false }, borrows: [], drawnOnly: true, cadenceOf: 'idle', stowsWeapon: true },
+  aimwalk: { play: 'loop', tpf: 6, while: { aiming: true, moving: true }, borrows: [], drawnOnly: true, cadenceOf: 'walk', stowsWeapon: true },
 } as const satisfies Record<AnimStateName, AnimStateDef>
 
 export const ANIM_STATES = Object.keys(ANIM_STATE_DEFS) as readonly AnimStateName[]
 
-/** Resolution order, highest first. Death is terminal; a roll is a committed
+/** Resolution order, highest first. Aiming sits under every one-shot (the
+ * body still dies, rolls, flinches, draws first and fires over it: an undrawn
+ * attack excepted, see `undrawnYieldsTo`) and over walk, fidget and idle, which
+ * it replaces while the body holds a gun ready. Death is terminal; a roll is a committed
  * whole-body tumble (and its i-frames make a mid-roll hurt impossible); a hurt
  * flinch reads as more urgent than anything the body chose to do. `draw` over
  * `attack` no longer decides anything for a pistol carrier: the sim holds its
@@ -94,6 +138,8 @@ export const ANIM_PRIORITY: readonly AnimStateName[] = [
   'hurt',
   'draw',
   'attack',
+  'aimwalk',
+  'aim',
   'walk',
   'fidget',
   'idle',
@@ -143,13 +189,16 @@ export interface AnimInputs {
   tick: number
   /** isMoving(vel) — drives walk vs idle. */
   moving: boolean
+  /** The body holds a ranged weapon ready (animTracker.isAiming): drives the
+   * aim loops. Absent = false. */
+  aiming?: boolean
   /** Tick each one-shot started, as observed. Absent = not started. */
   starts?: Partial<Record<AnimStateName, number>>
   /** End tick of each `'sim'`-window state (roll: `playerCtl.roll.untilTick`). */
   simEnds?: Partial<Record<AnimStateName, number>>
-  /** Length in ticks of the pose's OWN clip for each state whose window reads
-   * it (CLIP_SIZED_STATES): frames × tpf. Absent or 0 = the pack does not draw
-   * it. */
+  /** Length in ticks of the pose's OWN clip for each MEASURED_STATES entry
+   * (frames × tpf): a clip-sized window reads it, a drawn-only state needs it
+   * non-zero. Absent or 0 = the pack does not draw it. */
   clipTicks?: Partial<Record<AnimStateName, number>>
 }
 
@@ -172,19 +221,32 @@ export const onceEnd = (s: AnimStateName, start: number, a: AnimInputs): number 
   return start + Math.max(def.window.clipAtLeast, len)
 }
 
+const drawn = (s: AnimStateName, a: AnimInputs): boolean => (a.clipTicks?.[s] ?? 0) > 0
+
+/** Is loop `s` the state its conditions call for (drawn-only loops: and drawn)? */
+const loopHolds = (s: AnimStateName, a: AnimInputs): boolean => {
+  const def: AnimStateDef = ANIM_STATE_DEFS[s]
+  if (def.play !== 'loop') return false
+  if (def.drawnOnly === true && !drawn(s, a)) return false
+  const now: Record<LoopCondition, boolean> = { moving: a.moving, aiming: a.aiming === true }
+  return (Object.entries(def.while) as [LoopCondition, boolean][]).every(([c, v]) => now[c] === v)
+}
+
 export const resolveAnimState = (a: AnimInputs): ResolvedAnim => {
   for (const s of ANIM_PRIORITY) {
-    const def = ANIM_STATE_DEFS[s]
+    const def: AnimStateDef = ANIM_STATE_DEFS[s]
     if (def.play === 'loop') {
-      if (def.while === 'always' || a.moving) return { state: s, start: 0 }
+      if (loopHolds(s, a)) return { state: s, start: 0 }
       continue
     }
     const start = a.starts?.[s]
     if (start === undefined || a.tick < start) continue
     const end = onceEnd(s, start, a)
-    if (end !== undefined && a.tick < end) return { state: s, start }
+    if (end === undefined || a.tick >= end) continue
+    if (!drawn(s, a) && def.undrawnYieldsTo?.some((l) => loopHolds(l, a))) continue
+    return { state: s, start }
   }
-  return { state: 'idle', start: 0 } // unreachable: idle is `always`
+  return { state: 'idle', start: 0 } // unreachable: idle holds always
 }
 
 // ---------------------------------------------------------------------------
@@ -344,13 +406,14 @@ export const animFrame = (
 /** Does this state hide the held-weapon sprite while it plays? */
 export const stowsWeapon = (s: AnimStateName): boolean => {
   const def: AnimStateDef = ANIM_STATE_DEFS[s]
-  return def.play === 'once' && def.stowsWeapon === true
+  return def.stowsWeapon === true
 }
 
-/** The drawn-only states: their window is their own clip (`window: 'clip'`). */
+/** The drawn-only states: one-shots whose window is their own clip (`window:
+ * 'clip'`) and `drawnOnly` loops. Without frames of their own they never play. */
 export const DRAWN_ONLY_STATES: readonly AnimStateName[] = ANIM_STATES.filter((s) => {
   const def: AnimStateDef = ANIM_STATE_DEFS[s]
-  return def.play === 'once' && def.window === 'clip'
+  return def.play === 'once' ? def.window === 'clip' : def.drawnOnly === true
 })
 
 /** The states whose window reads the pose's own clip length (`'clip'` or
@@ -359,3 +422,16 @@ export const CLIP_SIZED_STATES: readonly AnimStateName[] = ANIM_STATES.filter((s
   const def: AnimStateDef = ANIM_STATE_DEFS[s]
   return def.play === 'once' && def.window !== 'sim'
 })
+
+/** The states whose own clip the renderer measures into `AnimInputs.clipTicks`:
+ * the clip-sized one-shots, plus the drawn-only loops (present = drawn). */
+export const MEASURED_STATES: readonly AnimStateName[] = ANIM_STATES.filter(
+  (s) => CLIP_SIZED_STATES.includes(s) || DRAWN_ONLY_STATES.includes(s),
+)
+
+/** The state whose cadence a loop follows when the theme sets none of its own
+ * (`cadenceOf`), or undefined. */
+export const cadenceOf = (s: AnimStateName): AnimStateName | undefined => {
+  const def: AnimStateDef = ANIM_STATE_DEFS[s]
+  return def.play === 'loop' ? def.cadenceOf : undefined
+}

@@ -5,6 +5,7 @@
 // through steering. No archetype-specific code paths — swap the component,
 // swap the brain.
 
+import { weaponDrawn } from '../aiming'
 import { WEAPONS } from '../data/items'
 import { DRAW_REARM_TICKS, NPCS } from '../data/npcs'
 import type { Entity } from '../entity'
@@ -175,7 +176,7 @@ const trackDraw = (w: World, e: Entity): void => {
 }
 
 /** Weapon out: past its engage wind-up (always, for archetypes without one). */
-const drawn = (w: World, e: Entity): boolean => e.ai?.draw === undefined || w.tick >= e.ai.draw.readyAt
+const drawn = (w: World, e: Entity): boolean => weaponDrawn(e, w.tick)
 
 const think = (w: World, e: Entity): void => {
   const ai = e.ai!

@@ -8,7 +8,7 @@
  * asset-generation pipeline targets — keep them in sync).
  */
 
-import { ANIM_STATES, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
+import { ANIM_STATES, cadenceOf, DEFAULT_TPF, MAX_ANIM_FRAMES, type AnimStateName } from './animState'
 
 // The hi-res Sporefall Station pack (artScale 2 — themeLoader bakes it at
 // double texture density over the same logical sizes) is the default theme.
@@ -458,13 +458,15 @@ export const themedName = (archetype: string, chain: ThemeChain): string => {
 }
 
 /** Ticks-per-frame for an animation state: first theme in the chain that sets
- * it wins; otherwise the engine default (animState.DEFAULT_TPF). */
+ * it wins; otherwise a loop with `cadenceOf` follows that state (aimwalk steps
+ * at the theme's walk cadence), else the engine default (animState.DEFAULT_TPF). */
 export const resolveAnimTpf = (state: AnimStateName, chain: ThemeChain): number => {
   for (const theme of chain) {
     const v = theme.manifest.anim[state]
     if (v !== undefined) return v
   }
-  return DEFAULT_TPF[state]
+  const follows = cadenceOf(state)
+  return follows !== undefined ? resolveAnimTpf(follows, chain) : DEFAULT_TPF[state]
 }
 
 /** The full per-state cadence table for a chain (fed to the ArtRegistry). */

@@ -4,6 +4,7 @@ and ending on the fit's rest pose (the shipped idle), so Fun-Control and the loo
 clip that repeats every `period` frames. No Blender, no gait: each action is a list of key poses.
 
   python3 rig_action.py fit.json draw --out <dir> [--period 16]      # biped fit (rig_biped.py's)
+  python3 rig_action.py fit.json hurt --out <dir> [--period 16]      # biped fit
   python3 rig_action.py fit.json scratch --out <dir> [--period 16]   # quadruped fit (rig_quadruped.py's)
   python3 skeleton.py <dir> --stick 5 --ref keyframe.png
 
@@ -16,6 +17,7 @@ goes in joints-NN.json `props` (screen rear/muzzle, `on` 0-1) for `cast_action.p
 
 Actions:
   draw     biped: hand to the hip, draw, snap the arm up to aim along the facing, hold, holster.
+  hurt     biped: idle, snap back from a hit (torso and head thrown back, arms flung out), recover, idle.
   scratch  quadruped: sit back on the haunches, turn the head toward the near side, lift the near hind
            leg to behind the ear, scratch twice, put it down.
 """
@@ -140,6 +142,57 @@ def draw(B, period, yaw=14.0):
     return keys, pose
 
 
+# ---- hurt (biped) -----------------------------------------------------------------------------------
+
+def hurt(B, period, knock=1.0):
+    """Struck in the chest from the front: the torso snaps back and the head whips back further, both
+    arms fling out and up, the knees give; it sways forward past rest, then settles. The impact pose is
+    the second key, so a clip picked from frame 0 shows it on its frame 1 (the hit flash hides frame 0)."""
+    F = B.fit
+    H = B.height
+    arms = {}
+    for w in ("near", "far"):
+        arms[w] = (np.linalg.norm(F[f"shoulder_{w}"] - F[f"elbow_{w}"]), np.linalg.norm(F[f"elbow_{w}"] - F[f"hand_{w}"]))
+
+    def arm(J, w, T, pole, shift):
+        a, b = arms[w]
+        L = a + b
+        T = np.asarray(T, float) * L
+        sh = F[f"shoulder_{w}"] + shift
+        J[f"shoulder_{w}"] = sh
+        J[f"elbow_{w}"] = sh + B.proj(*ik3(T, a, b, pole))
+        J[f"hand_{w}"] = sh + B.proj(*T)
+
+    def pose(kind):
+        J = dict(F)
+        if kind == "rest":
+            return J
+        k = {"hit": 1.0, "reel": 0.65, "sway": -0.25, "settle": 0.12}[kind] * knock
+        back = B.proj(f=-0.07 * k * H)
+        J["pelvis"] = F["pelvis"] + B.proj(f=-0.025 * k * H, u=-0.015 * abs(k) * H)
+        J["chest"] = F["chest"] + back
+        J["neck"] = F["neck"] + 1.3 * back
+        J["head_top"] = F["head_top"] + B.proj(f=-0.13 * k * H, u=-0.01 * abs(k) * H)
+        for w in ("near", "far"):  # the knees give a little, feet planted
+            J[f"knee_{w}"] = F[f"knee_{w}"] + B.proj(f=0.02 * abs(k) * H)
+            J[f"hip_{w}"] = F[f"hip_{w}"] + B.proj(f=-0.02 * k * H, u=-0.015 * abs(k) * H)
+        if kind in ("hit", "reel"):  # arms flung out to the sides and up, hands behind the body
+            fl = 1.0 if kind == "hit" else 0.7
+            for w, side in (("near", 1.0), ("far", -1.0)):
+                T = np.array([-0.35 * fl, side * (0.40 + 0.15 * fl), 0.45 * fl - 0.55 * (1 - fl)])
+                T = 0.95 * T / np.linalg.norm(T)
+                arm(J, w, T, (-0.3, side * 0.3, -1.0), back)
+        else:  # arms hang, swinging a little with the sway
+            for w in ("near", "far"):
+                J[f"shoulder_{w}"] = F[f"shoulder_{w}"] + back
+                J[f"elbow_{w}"] = F[f"elbow_{w}"] + 1.2 * back
+                J[f"hand_{w}"] = F[f"hand_{w}"] + 1.5 * back
+        return J
+
+    keys = [(0, "rest"), (2, "hit"), (4, "hit"), (6, "reel"), (9, "sway"), (12, "settle")]
+    return keys, pose
+
+
 # ---- scratch (quadruped) ----------------------------------------------------------------------------
 
 def scratch(B, period, sit_forward=0.16, sit_down=0.16, head_back=0.16):
@@ -188,7 +241,7 @@ def scratch(B, period, sit_forward=0.16, sit_down=0.16, head_back=0.16):
     return keys, pose
 
 
-ACTIONS = {"draw": draw, "scratch": scratch}
+ACTIONS = {"draw": draw, "hurt": hurt, "scratch": scratch}
 
 
 def ease(x):

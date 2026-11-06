@@ -20,6 +20,7 @@ fit.json:
     az        facing, degrees: s 0, se 45, e 90, ne 135, n 180
     hinge     a wing's hinge from the body centre, clip px: x out to the side, y up, z forward; the other
               wing mirrors x
+  outline_px  dark rim drawn under each wing at clip scale (about 4 for one pixel at 96)
   body_h      body height in clip px; centre      [x, y] clip px of the body centre (its bbox centre)
 
 Writes <out>/raw/walk-<d>/NNNN.png (848x480, white), <out>/raw/<d>-keyframe.png and a sheet.json whose loop is
@@ -82,6 +83,22 @@ def plate(tex, origin, su, sv, min_px=3.0):
                          resample=Image.BICUBIC)
 
 
+def outlined(layer, px):
+    """A dark rim `px` clip px wide under a plate. The texture's own outline shrinks with the plate's scale and is
+    gone by 96 px; this one is drawn at clip scale, so it survives the reduction as about one pixel."""
+    if px <= 0:
+        return layer
+    from scipy import ndimage
+    a = np.asarray(layer)[..., 3] > 96
+    rim = ndimage.binary_dilation(a, iterations=round(px))
+    out = Image.new("RGBA", layer.size, (0, 0, 0, 0))
+    rimarr = np.zeros((layer.height, layer.width, 4), np.uint8)
+    rimarr[rim] = (20, 26, 22, 255)
+    out.alpha_composite(Image.fromarray(rimarr, "RGBA"))
+    out.alpha_composite(layer)
+    return out
+
+
 def body_layer(path, body_h):
     im = Image.open(path).convert("RGB")
     k = S.key_background(im)
@@ -119,7 +136,7 @@ def frames(fit, d, period):
             sv, _ = project(chord3, fit["elev"])
             origin = centre + hs - su * hu - sv * hv
             mid, mdepth = project(hinge3 + span3 * tex.width / 2, fit["elev"])
-            layers.append((mdepth, plate(tex, origin, su, sv)))
+            layers.append((mdepth, outlined(plate(tex, origin, su, sv), fit.get("outline_px", 0))))
         frame = Image.new("RGBA", (W, H), (255, 255, 255, 255))
         bl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         bl.paste(body, (round(centre[0] - body.width / 2), round(centre[1] - body.height / 2)))

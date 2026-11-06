@@ -151,7 +151,12 @@ stand-down, crash auto-resume, the draw-board dashboard in `scripts/dashboard/`)
 
 Owner's rule. Before deciding what to build, or how, walk through several concrete
 scenarios from the game and draw each as a short comic strip (3-6 panels) on the draw
-whiteboard (`https://draw.hypnodroid.com`, the draw MCP; one board per effort). A panel
+whiteboard (`https://draw.hypnodroid.com`, the draw MCP; one board per effort).
+**Illustrate ON the board, live**, with its own elements (frames, shapes, freedraw
+strokes, arrows, sticky notes, text), so the owner can watch it appear and draw on it.
+Pasting finished images composed offline is not a storyboard (owner, 11-06: "I was
+thinking the agent would _illustrate_, storyboard on the board"); a small game-sprite
+inset in a panel is fine. A panel
 shows a real moment: who is on screen, what the player does, what the sim does, what
 the player should see and feel. Use the game's own sprites, tiles and palette in the
 panels where you can, so the comic doubles as a proposed screenshot. Make them mildly

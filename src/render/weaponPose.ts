@@ -35,13 +35,18 @@ interface HandRig {
   hy: number
 }
 
-/** The five DRAWN facings (west half is these mirrored). */
+/** The five DRAWN facings (west half is these mirrored). Measured off the hands
+ * the swampspace-hires ranger and drowned diver actually draw in their idle
+ * frames (96px art, halved to these 48px units): front and back views hold the
+ * hand ~8-10px out from the centre line, the east profile lets it hang at the
+ * hip, ~0-2px. The old rig put the east grip 12px out, in mid-air in front of a
+ * profile body; a canvas-sized weapon hid that, a hand-sized one does not. */
 export const HAND_RIG: Record<Dir, HandRig> = {
-  s: { hx: 11, hy: -18 },
-  se: { hx: 12, hy: -18 },
-  e: { hx: 12, hy: -18 },
-  ne: { hx: 10, hy: -20 },
-  n: { hx: 7, hy: -20 },
+  s: { hx: 9, hy: -18 },
+  se: { hx: 8, hy: -20 },
+  e: { hx: 2, hy: -20 },
+  ne: { hx: 8, hy: -19 },
+  n: { hx: 8, hy: -19 },
 }
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v)

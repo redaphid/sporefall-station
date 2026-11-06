@@ -1,1 +1,1 @@
-export default 'Salvage weapons: Rivet Driver, Cage Ram, more'
+export default 'Salvaged colony weapons, mods you can see'

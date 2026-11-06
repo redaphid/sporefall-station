@@ -38,7 +38,8 @@ SPLAT = (76, 107, 40)
 SHADOW = (20, 26, 22)
 
 # idle keyframes per frame: shaft rows dropped, cap lift (px), bud diameter
-IDLE = {"drop": [0, 1, 2, 3, 3, 2, 1, 0], "lift": [0, 0, 1, 2, 2, 1, 0, 0], "bud": [6, 6, 7, 8, 9, 8, 7, 6]}
+# every neighbouring pair differs (no held frame); the cap lifts a frame behind the squash, as overlapping action
+IDLE = {"drop": [0, 1, 2, 3, 3, 2, 1, 1], "lift": [0, 0, 1, 1, 2, 2, 1, 0], "bud": [6, 7, 8, 9, 9, 8, 7, 6]}
 # attack: bud_dy is how far the bud has fallen; burst draws a splat at the roots in place of the bud
 ATTACK = {"drop": [0, 2, 3, 1, 0, 1, 1, 0], "lift": [0, 2, 3, 3, 2, 1, 0, 0], "bud": [6, 9, 11, 10, 0, 0, 0, 6],
           "bud_dy": [0, 0, 1, 14, 0, 0, 0, 0], "burst": [0, 0, 0, 0, 1, 2, 0, 0]}

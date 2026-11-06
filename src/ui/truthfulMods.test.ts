@@ -46,7 +46,7 @@ describe('loadout', () => {
     const gunner = player(w, 0)
     expect(chip(gunner, 'frost')).toEqual({ kind: 'live' })
     expect(chip(gunner, 'shock')).toEqual({ kind: 'live' })
-    expect(chip(gunner, 'choke')).toEqual({ kind: 'inert', reason: 'no effect on this gun' })
+    expect(chip(gunner, 'choke')).toEqual({ kind: 'inert', reason: 'no effect on this weapon' })
     const model = buildLoadout(gunner)!
     expect(model.statsScope).toBe('next shot')
     expect(model.behaviors.filter((b) => b.key === 'onhit').map((b) => b.label)).toEqual(['frozen on hit'])
@@ -94,7 +94,7 @@ describe('the HUD strip', () => {
   it('flags the choke riding a single-pellet cast', () => {
     const w = coop()
     const strip = buildSequence(player(w, 0), w.tick)!
-    expect(strip.entries.find((e) => e.id === 'choke')!.verdict).toBe('no effect on this gun')
+    expect(strip.entries.find((e) => e.id === 'choke')!.verdict).toBe('no effect on this weapon')
     expect(strip.entries.find((e) => e.id === 'frost')!.verdict).toBeUndefined()
   })
 })
@@ -130,7 +130,7 @@ describe('pickups', () => {
     runTicks(w, fire, 20)
     const late = spawnPlayer(w, 2, 25.5, 20.5)
     const pk = dropMod(w, 'choke', 30.5, 30.5)
-    expect(buildInfoCard(pk, { self: late }).rows.find((r) => r.label === 'On your weapon')?.value).toBe('no effect on this gun')
+    expect(buildInfoCard(pk, { self: late }).rows.find((r) => r.label === 'On your weapon')?.value).toBe('no effect on this weapon')
     expect(buildLoadout(late)!.mods).toEqual([])
   })
 

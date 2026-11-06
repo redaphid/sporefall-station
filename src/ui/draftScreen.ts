@@ -117,7 +117,7 @@ export const createDraftScreen = (mount: HTMLElement, onPick: (index: number) =>
 
     const title = document.createElement('div')
     titleEl = title
-    title.textContent = 'FLOOR CLEARED — take one mod for your gun'
+    title.textContent = 'FLOOR CLEARED — take one mod for your weapon'
     title.style.cssText = 'font:800 22px system-ui;color:#ffd75e;text-shadow:0 2px 6px #000;text-align:center'
     panel.appendChild(title)
 

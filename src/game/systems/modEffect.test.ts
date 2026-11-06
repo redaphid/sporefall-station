@@ -49,7 +49,7 @@ describe('melee (PR #78 inventory: 9 work, 9 silently inert, bulk worse than not
 describe('the pistol every player holds', () => {
   it('every mod works except Choke, which has no fan to tighten', () => {
     const v = verdicts('decanter')
-    expect(v.choke).toBe('inert: no effect on this gun')
+    expect(v.choke).toBe('inert: no effect on this weapon')
     expect(Object.entries(v).filter(([, x]) => x !== 'live').map(([k]) => k)).toEqual(['choke'])
   })
 
@@ -77,7 +77,7 @@ describe('elements: each cast carries its own', () => {
   })
 
   it('an element the gun already fires adds nothing', () => {
-    expect(modVerdict(WEAPONS.frostCondenser, [m('frost')], 'frost')).toEqual({ kind: 'inert', reason: 'no effect on this gun' })
+    expect(modVerdict(WEAPONS.frostCondenser, [m('frost')], 'frost')).toEqual({ kind: 'inert', reason: 'no effect on this weapon' })
     expect(modVerdict(WEAPONS.phosphorHose, [m('incendiary')], 'incendiary').kind).toBe('inert')
     expect(modVerdict(WEAPONS.sparkCoil, [m('shock')], 'shock').kind).toBe('inert')
   })

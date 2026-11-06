@@ -100,13 +100,15 @@ def save_flow(g, out, d):
     json.dump(comfy_ui.to_workflow(g, pos, specs=comfy_ui.fetch_specs(S.HOST)), open(os.path.join(out, f"flow-{d}.json"), "w"), indent=1)
 
 
-def adopt(base, out, d, raw, ref):
+def adopt(base, out, d, raw, ref, g):
     """Make <out> a run `cast_walk.py assemble --take` reads: the base run's idle for <d>, the keyframe this
-    take really used, and a sheet.json whose loop for <d> is spritesheet's own pick on this clip."""
+    take really used, this take's flow (assemble carries flow-<d>*.json, and without them the shipped frames
+    of <d> embed no flow), and a sheet.json whose loop for <d> is spritesheet's own pick on this clip."""
     import shutil
     for f in glob.glob(os.path.join(base, "raw", f"{d}-idle.png")):
         shutil.copyfile(f, os.path.join(out, "raw", os.path.basename(f)))
     Image.open(ref).convert("RGB").save(os.path.join(out, "raw", f"{d}-keyframe.png"))
+    save_flow(g, out, d)
     meta = json.load(open(os.path.join(base, "sheet.json")))
     clip = [Image.open(f).convert("RGB") for f in sorted(glob.glob(os.path.join(raw, "*.png")))]
     meta["loops"] = {d: S.find_loop(clip)}
@@ -163,7 +165,7 @@ def main():
     for i, im in enumerate(sorted(ims, key=lambda im: im["filename"])):
         S.fetch(im).save(os.path.join(raw, f"{i:04d}.png"))
     if a.base_run:
-        adopt(a.base_run, a.out, a.dir, raw, a.ref)
+        adopt(a.base_run, a.out, a.dir, raw, a.ref, g)
     json.dump({"period": period, "seed": a.seed, "shift": a.shift, "steps": a.steps, "lora": not a.no_lora,
                "text": text}, open(os.path.join(a.out, "run.json"), "w"), indent=1)
     print(f"-> {raw} ({len(ims)} frames)")

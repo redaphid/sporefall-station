@@ -135,12 +135,12 @@
  "sporeling-mite": {
   "ref_frame": "s-idle",
   "ref": {
-   "height": 46,
-   "width": 36,
-   "head_h": 21,
-   "mass": 952,
-   "cx": -0.34,
-   "foot_y": 46
+   "height": 44,
+   "width": 37,
+   "head_h": 20,
+   "mass": 940,
+   "cx": -0.62,
+   "foot_y": 45
   },
   "tol": {
    "height": 2,
@@ -174,10 +174,10 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 43,
-   "width": 20,
-   "head_h": 8,
-   "mass": 374,
-   "cx": -0.31,
+   "width": 17,
+   "head_h": 7,
+   "mass": 331,
+   "cx": -0.38,
    "foot_y": 45
   },
   "tol": {
@@ -269,11 +269,11 @@
   "ref_frame": "s-idle",
   "ref": {
    "height": 44,
-   "width": 19,
-   "head_h": 18,
-   "mass": 473,
-   "cx": 0.47,
-   "foot_y": 45
+   "width": 27,
+   "head_h": 30,
+   "mass": 652,
+   "cx": 0.43,
+   "foot_y": 46
   },
   "tol": {
    "height": 2,

@@ -26,10 +26,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import spritesheet as ss  # noqa: E402
 
-WEAPON = ("a stubby salvaged colony sidearm: a short thick barrel cut from yellowed station-white pipe with a "
-          "dark muzzle ring, a small round caged glass jar of glowing teal essence bolted on top behind the "
-          "barrel, a short black rubber hose looping from the jar into the barrel, a tiny steel petcock valve, "
-          "a chunky grip wrapped in worn olive canvas tape, scuffed charcoal frame")
+WEAPON = ("the Decanter, a sidearm cut from a colony essence still: a caged round glass bulb of glowing teal "
+          "essence with bubbles inside IS the barrel, a short worn grey steel nozzle out the front of the bulb, a "
+          "small steel petcock valve on top of the breech, a bent black rubber hose looping down behind it, a "
+          "chunky grip wrapped in dark canvas tape, worn grey steel")
 NOT = "It is not steampunk: no gears, no cogs, no brass filigree, no ornament. It is not a modern handgun."
 
 VIEWS = {"s": "facing the viewer, aiming straight at the viewer so the weapon is seen muzzle-first, held in "
@@ -68,13 +68,17 @@ def qwen(images, prompt, seed, prefix):
 
 def cmd_design(a):
     os.makedirs(a.out, exist_ok=True)
-    sk = Image.new("RGB", (Q, Q), "white")
-    d = ImageDraw.Draw(sk)  # structure only: a block sketch the model replaces
-    d.rectangle([300, 430, 760, 520], fill=(200, 196, 170), outline=(20, 20, 24), width=8)   # pipe barrel
-    d.rectangle([740, 445, 790, 505], fill=(40, 40, 44))                                      # muzzle ring
-    d.ellipse([360, 330, 480, 440], fill=(70, 200, 190), outline=(20, 20, 24), width=8)        # essence jar
-    d.line([(470, 380), (560, 360), (600, 430)], fill=(15, 15, 18), width=14)                 # hose
-    d.polygon([(300, 500), (420, 500), (390, 700), (270, 690)], fill=(95, 100, 70), outline=(20, 20, 24))  # grip
+    if a.sketch:  # a structure sketch from the weapons roster (docs/lore-weapons.md), fitted onto the square
+        src = Image.open(a.sketch).convert("RGB")
+        src.thumbnail((Q - 120, Q - 120))
+        sk = Image.new("RGB", (Q, Q), "white")
+        sk.paste(src, ((Q - src.width) // 2, (Q - src.height) // 2))
+    else:
+        sk = Image.new("RGB", (Q, Q), "white")
+        d = ImageDraw.Draw(sk)  # structure only: a block sketch the model replaces
+        d.rectangle([300, 430, 760, 520], fill=(200, 196, 170), outline=(20, 20, 24), width=8)
+        d.ellipse([360, 330, 480, 440], fill=(70, 200, 190), outline=(20, 20, 24), width=8)
+        d.polygon([(300, 500), (420, 500), (390, 700), (270, 690)], fill=(95, 100, 70), outline=(20, 20, 24))
     sk.save(f"{a.out}/sketch.png")
     prompt = (f"Turn the rough block sketch in image 1 into a finished, detailed pixel-art video game weapon item: "
               f"{WEAPON}. Side view, barrel pointing right, the grip below. {NOT} Muted worn colours with the "
@@ -163,6 +167,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("design")
     p.add_argument("--out", required=True)
+    p.add_argument("--sketch", help="a structure sketch to start from (e.g. the roster's control-src.png)")
     p.add_argument("--seeds", type=lambda s: [int(x) for x in s.split(",")], default=[3, 11, 23, 1004])
     p = sub.add_parser("paint")
     p.add_argument("kf")

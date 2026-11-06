@@ -40,7 +40,7 @@ After a push: watch `deploy-web`, then check `/ota/version.json` and one frame's
 
 ## Not started or stopped
 
-- **derelict-bot:** see PROGRESS for where it stopped. Seams on the Wan route and skeleton takes for s/e/ne are in `/mnt/d/tmp/cast-walks/runs/derelict-bot/`. Branch `art/derelict-bot-1105`. Design sheet https://2cb.pw/design-sheet-398359.
+- **derelict-bot:** gate 8/9 on G7, branch `art/derelict-bot-1105` 45fe4d51 (frames 7f2c099e, ungated). All 5 directions are skeleton Fun-Control (seams .111-.216). Gate 4a reads n-walk-2/4/6 as facing the viewer: the square battery pack centred on the box back reads as a face panel. Next: edit the n keyframe so the back cue sits off-centre, skeleton try 2 on n, then gate once (commands in its last PROGRESS line). Known defect: in se the white gauge face keys out as a dark hole. Design sheet https://2cb.pw/design-sheet-398359.
 - **mireclaw-alpha:** Aaron rejected the new design (art/mireclaw-alpha-1105) as "much worse". Keep the original. It has no walk yet; use the many-legs route.
 - **Not started:** bog-mender, spore-drone (flyer), brood-sac (pod, needs a way to move), hive-spire (stationary).
 

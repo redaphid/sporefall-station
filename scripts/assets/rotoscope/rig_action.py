@@ -16,6 +16,11 @@ goes in joints-NN.json `props` (screen rear/muzzle, `on` 0-1) for `cast_action.p
 
 Actions:
   draw     biped: hand to the hip, draw, snap the arm up to aim along the facing, hold, holster.
+  aim      biped: both hands come up to a two-handed pistol grip in front of the chest and hold it
+           along the facing (the 90s top-down shooter read), feet planted; `--period` is the whole
+           clip (81 = no repeat), the raise takes the first 8 frames and the rest is the hold.
+  aimwalk  biped: rig_biped's periodic walk-in-place (`--stride`, `--lift`, `--period`) with both
+           arms locked in `aim`'s grip on the moving chest, so the legs walk and the gun stays level.
   scratch  quadruped: sit back on the haunches, turn the head toward the near side, lift the near hind
            leg to behind the ear, scratch twice, put it down.
 """
@@ -140,6 +145,84 @@ def draw(B, period, yaw=14.0):
     return keys, pose
 
 
+# ---- aim / aimwalk (biped) ----------------------------------------------------------------------------
+
+def aim_arms(B, J, shift=(0.0, 0.0), reach=0.86, drop=0.10, yaw=0.0):
+    """Both arms in a two-handed pistol grip, written into J: the gun hand (near, his right) out along the
+    facing on the body's centre line at chest height, the support hand cupped just under and behind it,
+    both elbows bent a little and out. `shift` moves the shoulders with the walking body (screen px).
+    Writes the pistol as a prop (rear, muzzle, on, hand, aim) for cast_action's painter."""
+    F = B.fit
+    a = np.linalg.norm(F["shoulder_near"] - F["elbow_near"])
+    b = np.linalg.norm(F["elbow_near"] - F["hand_near"])
+    L = a + b
+    # the far shoulder in the body frame, solved from the fit's screen offset (forward + side, no height):
+    # the support hand then reaches the gun hand in every view, whatever the fit's torso turn
+    Dx = F["shoulder_near"] - F["shoulder_far"]
+    M = np.array([[B.fwd[0], B.side[0]], [B.fwd[1], B.side[1]]])
+    fD, sD = np.linalg.lstsq(M, Dx, rcond=None)[0]
+    # near is his right, so the far shoulder sits to his left: sD > 0. Side-on the screen barely shows the
+    # width (and a turned torso in the fit reads as the wrong sign): give it the body's own
+    sD = 0.85 * L if abs(B.side[0]) < 0.5 else max(sD, 0.3 * L)
+    D = np.array([fD, sD, 0.0])
+    # where a forced width leaves the fit's far shoulder off its projection, take up the rest in forward + up,
+    # so on screen the support hand still lands on the gun hand
+    c = Dx - B.proj(*D)
+    fC, uC = np.linalg.lstsq(np.array([[B.fwd[0], 0.0], [B.fwd[1], -1.0]]), c, rcond=None)[0]
+    D = D + np.array([fC, 0.0, uC])
+    turn = math.radians(yaw)
+    f = reach * L
+    G = np.array([f * math.cos(turn), f * math.sin(turn), -drop * L]) - np.array([0.0, sD / 2, 0.0])
+    if np.linalg.norm(G) > 0.97 * L:  # out of reach: pull the gun in along the facing
+        G[0] = math.sqrt(max(0.0, (0.97 * L) ** 2 - G[1] ** 2 - G[2] ** 2))
+    shift = np.asarray(shift, float)
+    for w, T, pole in (("near", G, (0.0, 1.0, -1.0)),
+                       ("far", G + D + np.array([-0.06 * L, 0.0, -0.07 * L]), (0.0, -1.0, -1.0))):
+        sh = F[f"shoulder_{w}"] + shift
+        J[f"shoulder_{w}"] = sh
+        J[f"elbow_{w}"] = sh + B.proj(*ik3(T, a, b, pole))
+        J[f"hand_{w}"] = sh + B.proj(*T)
+    g = np.array([math.cos(turn), math.sin(turn), 0.0])
+    Lg = 0.30 * L
+    J["gun_rear"] = J["hand_near"] + B.proj(*(-0.15 * Lg * g))
+    J["gun_muzzle"] = J["hand_near"] + B.proj(*(0.85 * Lg * g))
+    J["gun_on"] = np.array([1.0, 0.0])
+    return J
+
+
+def aim(B, period, yaw=0.0):
+    def pose(kind):
+        J = dict(B.fit)
+        J["gun_rear"] = J["gun_muzzle"] = B.fit["hip_near"]
+        J["gun_on"] = np.array([0.0, 0.0])
+        if kind == "aim":
+            aim_arms(B, J, yaw=yaw)
+            J["head_top"] = B.fit["head_top"] + B.proj(f=0.02 * B.height)  # the head leans into the sights
+        return J
+    return [(0, "rest"), (8, "aim"), (period - 1, "aim")], pose
+
+
+def aimwalk(fit, B, period, stride, lift, bob, sway, yaw=0.0):
+    """rig_biped's walk with the arms replaced by the aim grip on the moved chest."""
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import rig_biped
+    frames = rig_biped.build(fit, period, stride, lift, 0.0, bob, sway)
+    out = []
+    for fr in frames:
+        chest = np.array(fr["body"][2][:2])
+        shift = chest - B.fit["chest"]
+        J = {k: v + shift for k, v in B.fit.items()}
+        aim_arms(B, J, shift=shift, yaw=yaw)
+        J["head_top"] = J["head_top"] + B.proj(f=0.02 * B.height)
+        lay = B.layout(J)
+        fr["body"][0] = lay["body"][0]
+        fr["legs"]["arm-near"], fr["legs"]["arm-far"] = lay["legs"]["arm-near"], lay["legs"]["arm-far"]
+        fr["props"] = lay["props"]
+        out.append(fr)
+    return out
+
+
 # ---- scratch (quadruped) ----------------------------------------------------------------------------
 
 def scratch(B, period, sit_forward=0.16, sit_down=0.16, head_back=0.16):
@@ -188,7 +271,7 @@ def scratch(B, period, sit_forward=0.16, sit_down=0.16, head_back=0.16):
     return keys, pose
 
 
-ACTIONS = {"draw": draw, "scratch": scratch}
+ACTIONS = {"draw": draw, "scratch": scratch, "aim": aim}
 
 
 def ease(x):
@@ -211,7 +294,7 @@ def build(B, action, period, **kw):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("fit")
-    ap.add_argument("action", choices=sorted(ACTIONS))
+    ap.add_argument("action", choices=sorted(ACTIONS) + ["aimwalk"])
     ap.add_argument("--out", required=True)
     ap.add_argument("--period", type=int, default=16)
     ap.add_argument("--yaw", type=float, help="draw: the aim's turn to his right, degrees (default 14); a view "
@@ -220,9 +303,21 @@ def main():
                                                        "heights (default .16); less keeps the centroid (gate 3 cx) still")
     ap.add_argument("--sit-down", type=float, help="scratch: how far the rump drops (default .16 body heights)")
     ap.add_argument("--head-back", type=float, help="scratch: how far the head turns back to meet the foot (default .16)")
+    ap.add_argument("--stride", type=float, default=50.0, help="aimwalk: half a stride, px (rig_biped's)")
+    ap.add_argument("--lift", type=float, default=34.0, help="aimwalk: foot lift, px")
+    ap.add_argument("--bob", type=float, default=6.0, help="aimwalk: body bob, px")
+    ap.add_argument("--sway", type=float, default=3.0, help="aimwalk: body sway, px")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
-    B = Body(json.load(open(a.fit)))
+    fit = json.load(open(a.fit))
+    B = Body(fit)
+    if a.action == "aimwalk":
+        frames = aimwalk(fit, B, a.period, a.stride, a.lift, a.bob, a.sway, yaw=a.yaw or 0.0)
+        for i, f in enumerate(frames):
+            json.dump(f, open(os.path.join(a.out, f"joints-{i:02d}.json"), "w"))
+        json.dump([[0, "walk"]], open(os.path.join(a.out, "keys.json"), "w"))
+        print(f"aimwalk: {len(frames)} frames -> {a.out}")
+        return
     kw = {k: v for k, v in (("yaw", a.yaw), ("sit_forward", a.sit_forward), ("sit_down", a.sit_down),
                                               ("head_back", a.head_back)) if v is not None}
     frames, keys = build(B, a.action, a.period, **kw)

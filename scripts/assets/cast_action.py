@@ -118,6 +118,21 @@ def paint_gun(im, prop, pal, scale):
     return out
 
 
+def to_sprite(u, scale, canvas, x, y):
+    """A raw-clip point in sprite pixels (floats), through post_fixed(whole=True)'s grid for window u."""
+    tw, th = max(1, round((u[2] - u[0]) * scale)), max(1, round((u[3] - u[1]) * scale))
+    x0, y0 = (canvas - tw) // 2, canvas - 1 - th
+    return x0 + (x - u[0]) / ((u[2] - u[0]) / tw), y0 + (y - u[1]) / ((u[3] - u[1]) / th)
+
+
+def breathe(im, cut):
+    """The upper body one pixel up above row `cut` (the belt), the cut row stretched into the gap: a breath."""
+    a = np.asarray(im).copy()
+    cut = int(np.clip(cut, 1, a.shape[0] - 1))
+    a[: cut - 1] = a[1:cut]
+    return Image.fromarray(a, "RGBA")
+
+
 def register(frame, idle, reach=3):
     """(dx, dy, share): the integer shift of `frame` that best matches `idle`'s alpha, and the share of
     the union's pixels that still differ in colour after it."""
@@ -157,10 +172,13 @@ def cmd_post(a):
             clip = sorted(glob.glob(f"{run}/raw/walk-{d}/*.png"))
             frames = {}
             ctl = sorted(glob.glob(f"{props[d]}/joints-*.json")) if d in props else []
+            rig = {}
             for n, t in enumerate(idx):
                 beside = tuple(Image.open(clip[k]).convert("RGB") for k in (t - 1, t + 1) if 0 <= k < len(clip))
                 raw = Image.open(clip[t]).convert("RGB")
-                if ctl:  # the control repeats from its frame 0, so clip frame t was posed by rig frame t % P
+                if ctl:
+                    rig[n] = json.load(open(ctl[t % len(ctl)]))
+                if ctl and not a.no_paint:  # the control repeats from its frame 0, so clip frame t was posed by rig frame t % P
                     for prop in json.load(open(ctl[t % len(ctl)])).get("props", {}).values():
                         raw = paint_gun(raw, prop, pal, 1 / (scale[d] * 96 / px))
                     beside = ()  # the painted prop is in this frame only: a ghost key would take it
@@ -173,6 +191,8 @@ def cmd_post(a):
             prompt, workflow = _flow(run, d)
             for n in range(len(idx)):
                 im = _locked(Image.fromarray(np.roll(np.roll(np.asarray(frames[(d, f"{a.state}-{n}")]), dy, 0), dx, 1)))
+                if a.breathe and n % 2 == 1 and n in rig:
+                    im = breathe(im, to_sprite(union[d], scale[d], px, *rig[n]["body"][3][:2])[1] + dy)
                 if a.idle_ends and n in (0, len(idx) - 1):  # the cut into and out of the clip is the idle itself
                     im = idle.copy()
                 f = f"{a.out}/{px}/{a.kind}-{d}-{a.state}-{n}.png"
@@ -284,6 +304,9 @@ def main():
     p.add_argument("--idle-ends", action="store_true", help="frame 0 and the last frame are the shipped idle, "
                    "pixel for pixel (pick rest-pose clip frames for them): the cut in and out cannot jump")
     p.add_argument("--props", action="append", help="dir=CTL: paint the rig's held props (joints-NN.json `props`)")
+    p.add_argument("--no-paint", action="store_true", help="keep the rig's props out of the frame: the model drew "
+                   "the weapon (docs/art-direction.md: no hand-drawn guns in shipped frames)")
+    p.add_argument("--breathe", action="store_true", help="odd frames raise the upper body 1 px above the belt (a held pose's breath)")
     p.add_argument("--out", required=True)
     p = sub.add_parser("export")
     p.add_argument("dir")
